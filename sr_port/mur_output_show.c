@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,6 @@
 #include <jpidef.h>
 #endif
 #include "real_len.h"		/* for real_len() prototype */
-#include "hashtab.h"
 
 GBLREF	mur_opt_struct	mur_options;
 GBLREF	reg_ctl_list	*mur_ctl;

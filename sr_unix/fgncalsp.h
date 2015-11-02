@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,11 +33,14 @@
 										\
 	if ((err_ptr = dlerror()) != NULL)					\
 	{									\
-		len = real_len(SIZEOF(err_buf)-1, (uchar_ptr_t)err_ptr);	\
+		len = real_len(SIZEOF(err_buf) - 1, (uchar_ptr_t)err_ptr);	\
 		strncpy(err_buf, err_ptr, len);					\
 		err_buf[len] = '\0';						\
 	} else									\
+	{	/* Ensure we will not overrun err_buf limits */			\
+		assert(ARRAYSIZE(UNKNOWN_SYSERR) < ARRAYSIZE(err_buf));		\
 		STRCPY(err_buf, UNKNOWN_SYSERR);				\
+	}									\
 }
 
 typedef int4	(*fgnfnc)();

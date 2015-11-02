@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,6 @@
 #include "fnpc.h"
 #include "op.h"
 
-GBLREF fnpc_area	fnpca;			/* The $piece cache area */
 GBLREF spdesc		stringpool;
 
 #ifdef DEBUG
@@ -60,9 +59,11 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 	mval		dummymval;	/* It's value is not used but is part of the call to op_fnp1() */
 	fnpc		*cfnpc, *pfnpc;
 	delimfmt	ldelim;
+	DCL_THREADGBL_ACCESS;
 
 	error_def(ERR_MAXSTRLEN);
 
+	SETUP_THREADGBL_ACCESS;
 	ldelim.unichar_val = delim;	/* Local copys (in unsigned char and integer formats) */
 	ldelimc = ldelim.unibytes_val[0];
 
@@ -95,7 +96,7 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			SETWON;
 			op_fnzp1(src, delim, ind, &dummymval);
 			SETWOFF;
-			cfnpc = &fnpca.fnpcs[src->fnpc_indx - 1];
+			cfnpc = &(TREF(fnpca)).fnpcs[src->fnpc_indx - 1];
 			assert(cfnpc->last_str.addr == src->str.addr);
 			assert(cfnpc->last_str.len == src->str.len);
 			assert(cfnpc->delim == ldelim.unichar_val);
@@ -131,7 +132,7 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 			SETWON;
 			op_fnzp1(src, delim, FNPC_ELEM_MAX, &dummymval);
 			SETWOFF;
-			cfnpc = &fnpca.fnpcs[src->fnpc_indx - 1];
+			cfnpc = &(TREF(fnpca)).fnpcs[src->fnpc_indx - 1];
 			assert(cfnpc->last_str.addr == src->str.addr);
 			assert(cfnpc->last_str.len == src->str.len);
 			assert(cfnpc->delim == ldelim.unichar_val);
@@ -284,10 +285,10 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 		pfnpc = cfnpc;				/* pointer for src mval's cache */
 		do
 		{
-			cfnpc = fnpca.fnpcsteal;	/* Next cache element to steal */
-			if (fnpca.fnpcmax < cfnpc)
-				cfnpc = &fnpca.fnpcs[0];
-			fnpca.fnpcsteal = cfnpc + 1;	/* -> next element to steal */
+			cfnpc = (TREF(fnpca)).fnpcsteal;	/* Next cache element to steal */
+			if ((TREF(fnpca)).fnpcmax < cfnpc)
+				cfnpc = &(TREF(fnpca)).fnpcs[0];
+			(TREF(fnpca)).fnpcsteal = cfnpc + 1;	/* -> next element to steal */
 		} while (cfnpc == pfnpc);		/* Make sure we don't step on ourselves */
 
 		cfnpc->last_str = dst->str;		/* Save validation info */

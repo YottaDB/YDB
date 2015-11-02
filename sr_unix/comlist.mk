@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -16,9 +16,9 @@
 #    (download and install GT.M binary distribution from SourceForge
 #    if you do not have GT.M installed already).
 # 3. To build debug version with no compiler optimzations -
-# 	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=<the current directory>
+# 	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=$PWD
 #    To build a version enabling optimizations -
-#    	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=<the current directory>
+#	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=$PWD
 #
 #    By default the build procedure will build 64 bit version of GT.M
 #    on a x86_64 machine.
@@ -37,7 +37,7 @@ gt_os_type=$(shell uname -s)
 
 verbose ?= 0
 # get_lib_dirs.mk defines library directories
-# linux_build_type
+# gt_build_type
 # use_nsb
 # gt_build_xfer_desc
 # it also santizes the CYGWIN gt_os_type
@@ -81,7 +81,7 @@ export #export all variables defined here to sub-make
 
 # Build the complete suit for packaging - all executables, % utilities,
 # help files etc.
-all: dirs xfer_build $(addsuffix _all, $(buildtypes)) ;
+all: dirs xfer_build gtm_threadgbl_deftypes $(addsuffix _all, $(buildtypes)) ;
 
 # Build xfer_desc.i for ia64 || linux x86_64
 # set in get_lib_dirs.mk
@@ -89,6 +89,9 @@ xfer_build:
 ifeq ($(gt_build_xfer_desc),1)
 	tcsh -f $(gtm_ver)/sr_unix/gen_xfer_desc.csh $(gt_src_list)
 endif
+
+gtm_threadgbl_deftypes:
+	tcsh -f $(gtm_ver)/sr_unix/gen_gtm_threadgbl_deftypes.csh $(gtm_ver) sr_port $(buildtypes)/obj $(gt_src_list)
 
 dirs: 	$(addprefix $(gtm_ver)/, $(addsuffix /obj, $(buildtypes))) \
  	$(addprefix $(gtm_ver)/, $(addsuffix /map, $(buildtypes))) \
@@ -123,7 +126,7 @@ package: $(addsuffix _tar, $(buildtypes))
 ifeq ($(MACHTYPE),x86_64)
 # On a 64 bit machine switch between 64 bit and 32 bit depending upon
 # the OBJECT_MODE environment variable
-ifeq ($(linux_build_type),64)
+ifeq ($(gt_build_type),64)
 	@tar -zcvf gtm_`head -n 1 idtemp`_$(OSTYPE)_$(MACHTYPE)_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
 else
 	@tar -zcvf gtm_`head -n 1 idtemp`_$(OSTYPE)_i686_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
@@ -406,21 +409,21 @@ endif
 define gt-ld
 rm -f $@
 @echo "linking $(notdir $@)..."
-@echo $(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $+ $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1
-@$(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $+ $(gt_ld_syslibs) >> ../map/$(notdir $@).map 2>&1
+@echo $(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $+ $(gt_ld_syslibs) $(gt_ld_extra_libs) > ../map/$(notdir $@).map 2>&1
+@$(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $+ $(gt_ld_syslibs) $(gt_ld_extra_libs) >> ../map/$(notdir $@).map 2>&1
 endef
 define gt-ld_with_export
 rm -f $@
 @echo "linking $(notdir $@)..."
-@echo $(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $(gt_ld_options_all_exe) $+ $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1
-@$(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $(gt_ld_options_all_exe) $+ $(gt_ld_syslibs) >> ../map/$(notdir $@).map 2>&1
+@echo $(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $(gt_ld_options_all_exe) $+ $(gt_ld_syslibs) $(gt_ld_extra_libs) > ../map/$(notdir $@).map 2>&1
+@$(gt_ld_linker) $(gt_ld_options) -o $@ $(gt_ld_sysrtns) $(gt_ld_options_all_exe) $+ $(gt_ld_syslibs) $(gt_ld_extra_libs) >> ../map/$(notdir $@).map 2>&1
 endef
 
 ifdef gt_svc_exe
 # Note: gtm_svc should link with gtm_dal_svc.o before
 # gtm_mumps_call_clnt.o(libgtmrpc.a) to resolve conflicting symbols
 # (gtm_init_1, gtm_halt_1 etc..) appropriately.
-../$(gt_svc_exe): $(gtm_svc_obj) $(gtmshr_obj) libmumps.a libgnpclient.a libcmisockettcp.a $(gt_ld_gtmrpc_library_option)
+../$(gt_svc_exe): $(gtm_svc_obj) libmumps.a libgnpclient.a libcmisockettcp.a $(gt_ld_gtmrpc_library_option)
 	$(gt-ld)
 endif
 

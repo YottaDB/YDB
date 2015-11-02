@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,9 +38,7 @@
 
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gtm_facility.h"
@@ -48,7 +46,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "merge_def.h"
-#include "subscript.h"
 #include "filestruct.h"
 #include "gdscc.h"
 #include "copy.h"
@@ -56,7 +53,6 @@
 #include "buddy_list.h"
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
-#include "lvname_info.h"
 #include "gvname_info.h"
 #include "op_merge.h"
 #include "format_targ_key.h"

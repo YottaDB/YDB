@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,6 @@
  */
 #include "mdef.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
-#include "sbs_blk.h"
 #include "toktyp.h"
 #include "compiler.h"
 #include "opcode.h"

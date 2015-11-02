@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,15 +38,25 @@ void iorm_wteol(int4 x,io_desc *iod)
 	int		status, outbytes;
 	char		*outstr, temppad, temppadarray[2];
 	d_rm_struct	*rm_ptr;
+	unsigned int	*dollarx_ptr;
+	unsigned int	*dollary_ptr;
 	error_def(ERR_NOTTOEOFONPUT);
 	error_def(ERR_RMSRDONLY);
 
 #ifdef __MVS__
+	/* on zos if it is a fifo device then point to the pair.out for $X and $Y */
 	if (((d_rm_struct *)iod->dev_sp)->fifo)
+	{
+		dollarx_ptr = &(iod->pair.out->dollar.x);
+		dollary_ptr = &(iod->pair.out->dollar.y);
 		rm_ptr = (d_rm_struct *) (iod->pair.out)->dev_sp;
-	else
+	} else
 #endif
-	rm_ptr = (d_rm_struct *)iod->dev_sp;
+	{
+		dollarx_ptr = &(iod->dollar.x);
+		dollary_ptr = &(iod->dollar.y);
+		rm_ptr = (d_rm_struct *)iod->dev_sp;
+	}
 	if (rm_ptr->noread)
 		rts_error(VARLSTCNT(1) ERR_RMSRDONLY);
 	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
@@ -83,7 +93,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 			}
 			if (rm_ptr->fixed)
 			{
-				fixed_pad = iod->width - iod->dollar.x;
+				fixed_pad = iod->width - *dollarx_ptr;
 				bytes_per_char = (CHSET_UTF8 == iod->ochset) ? 1 : 2;
 				fixed_pad_bytes = fixed_pad * bytes_per_char;
 				avail_bytes = rm_ptr->recordsize - rm_ptr->out_bytes;
@@ -135,7 +145,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 #endif
 		if (rm_ptr->fixed)
 		{
-			for (fixed_pad = iod->width - iod->dollar.x; fixed_pad > 0; fixed_pad -= res_size)
+			for (fixed_pad = iod->width - *dollarx_ptr; fixed_pad > 0; fixed_pad -= res_size)
 			{
 				pad_size = (fixed_pad > TAB_BUF_SZ) ? TAB_BUF_SZ : fixed_pad;
 				DOWRITERL(rm_ptr->fildes, RM_SPACES_BLOCK, pad_size, res_size);
@@ -158,15 +168,15 @@ void iorm_wteol(int4 x,io_desc *iod)
 				rts_error(VARLSTCNT(1) status);
 			}
 		}
-		iod->dollar.x = 0;
+		*dollarx_ptr = 0;
 	}
 #ifdef __MVS__
 	} else
-		iod->dollar.x = 0;	/* just reset $X for BINARY */
+		*dollarx_ptr = 0;	/* just reset $X for BINARY */
 #endif
 	iod->dollar.za = 0;
-	iod->dollar.y += x;
+	*dollary_ptr += x;
 	if (iod->length)
-		iod->dollar.y %= iod->length;
+		*dollary_ptr %= iod->length;
 	return;
 }

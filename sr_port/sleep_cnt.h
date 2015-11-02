@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,8 +46,6 @@
 #define	PHASE2_COMMIT_WAIT	SLEEP_ONE_MIN
 #define	PHASE2_COMMIT_WAIT_HTBT	8		/* = 8 heartbeats (each 8 seconds) = 64 seconds wait (used in Unix) */
 
-#define LOOP_CNT_SEND_WAKEUP	300		/* When loops hit multiple of this count, they can send
-						   a wakeup (resume/continue) to the process */
 #define	SLEEP_JNLQIOLOCKWAIT	1		/* 1-msec wait */
 #define	MAXJNLQIOLOCKWAIT	4000		/* 4sec = 4000 1-msec waits to see if io_in_prog lock is free in wcs_flu */
 

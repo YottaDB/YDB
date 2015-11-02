@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <stddef.h>
+
 #include "gtm_string.h"
 
 #include "gdsroot.h"
@@ -26,7 +27,6 @@
 #include "cache.h"
 #include "comline.h"
 #include "compiler.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "io.h"
 #include "jnl.h"
 #include "lv_val.h"
@@ -34,7 +34,6 @@
 #include "mdq.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"
-#include "sbs_blk.h"
 #include "stack_frame.h"
 #include "stp_parms.h"
 #include "stringpool.h"
@@ -51,17 +50,16 @@
 #include "stpg_sort.h"
 #include "hashtab_objcode.h"
 #include "hashtab_str.h"
-#include "hashtab.h"
 #include "min_max.h"
 #include "alias.h"
 #include "gtmimagename.h"
+#include "srcline.h"
 
 #ifndef STP_MOVE
 GBLDEF int	indr_stp_low_reclaim_passes = 0;
 GBLDEF int	rts_stp_low_reclaim_passes = 0;
 GBLDEF int	indr_stp_incr_factor = 1;
 GBLDEF int	rts_stp_incr_factor = 1;
-GBLDEF symval		*first_symval;
 #else
 GBLREF int	indr_stp_low_reclaim_passes;
 GBLREF int	rts_stp_low_reclaim_passes;
@@ -75,10 +73,8 @@ GBLREF int 		mvmax;
 GBLREF int		mlmax;
 GBLREF int 		mvar_index;
 GBLREF hash_table_objcode cache_table;
-GBLREF bool		compile_time;
 GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF int		stp_array_size;
-GBLREF gvzwrite_datablk	gvzwrite_block;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF mliteral		literal_chain;
@@ -92,11 +88,7 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 GBLREF tp_frame		*tp_pointer;
 GBLREF boolean_t	stop_non_mandatory_expansion, expansion_failed, retry_if_expansion_fails;
-GBLREF mval		last_fnquery_return_varname;			/* Return value of last $QUERY (on stringpool) (varname) */
-GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];	/* .. (subscripts) */
-GBLREF int		last_fnquery_return_subcnt;			/* .. (count of subscripts) */
 GBLREF boolean_t	mstr_native_align;
-GBLREF fnpc_area	fnpca;
 GBLREF zwr_hash_table	*zwrhtab;					/* How we track aliases during zwrites */
 GBLREF int4		SPGC_since_LVGC;				/* stringpool GCs since the last dead-data GC */
 GBLREF int4		LVGC_interval;					/* dead data GC done every LVGC_interval stringpool GCs */
@@ -110,46 +102,144 @@ OS_PAGE_SIZE_DECLARE
 
 static mstr		**topstr, **array, **arraytop;
 
+error_def		(ERR_STPEXPFAIL);
+
+/* See comment inside LV_NODE_KEY_STPG_ADD macro for why the ASSERT_LV_NODE_MSTR_EQUIVALENCE macro does what it does */
+#ifdef UNIX
+# define	ASSERT_LV_NODE_MSTR_EQUIVALENCE								\
+{													\
+	assert(OFFSETOF(treeNode, key_len) - OFFSETOF(treeNode, key_mvtype) == OFFSETOF(mstr, len));	\
+	assert(SIZEOF(((treeNode *)NULL)->key_len) == SIZEOF(((mstr *)NULL)->len));			\
+	assert(OFFSETOF(treeNode, key_addr) - OFFSETOF(treeNode, key_mvtype) == OFFSETOF(mstr, addr));	\
+	assert(SIZEOF(((treeNode *)NULL)->key_addr) == SIZEOF(((mstr *)NULL)->addr));			\
+}
+#elif defined(VMS)
+# define	ASSERT_LV_NODE_MSTR_EQUIVALENCE								\
+{													\
+	assert(SIZEOF(((treeNode *)NULL)->key_len) == SIZEOF(((mstr *)NULL)->len));			\
+	assert(OFFSETOF(treeNode, key_addr) - OFFSETOF(treeNode, key_len) == OFFSETOF(mstr, addr));	\
+	assert(SIZEOF(((treeNode *)NULL)->key_addr) == SIZEOF(((mstr *)NULL)->addr));			\
+}
+#endif
+
+#define	LV_NODE_KEY_STPG_ADD(NODE)											\
+{	/* NODE is of type "treeNode *" or "treeNodeFlt *" or "lvIntNode *".						\
+	 * Only if it is a "treeNode *" (MV_STR bit is set in this case only)						\
+	 * should we go ahead with the STPG_ADD.									\
+	 */														\
+	if (LV_NODE_KEY_IS_STRING(NODE))										\
+	{														\
+		/* NODE is of type "treeNode *". We need to now pass an mstr pointer to the MSTR_STPG_ADD macro.	\
+		 * We cannot create a local mstr since the address of this mstr needs to be different for each		\
+		 * NODE passed in to LV_NODE_KEY_STPG_ADD during stp_gcol. Therefore we use an offset inside NODE	\
+		 * as the mstr address. Even though NODE is not exactly laid out as an mstr, we ensure the fields	\
+		 * that stp_gcol most cares about "mstr->len" and "mstr->addr" are at the exact same offset in		\
+		 * both NODE and an "mstr". The equivalent of "mstr->char_len" is not present in NODE but thankfully	\
+		 * char_len is not used/touched in stp_gcol and therefore it is ok if something else is present		\
+		 * at that offset in the mstr as long as that is exactly 4 bytes long (that happens to be the case	\
+		 * in the NODE structure). We assert this below before using an mstr inside NODE.			\
+		 * Note: VMS mstr does not have char_len so start accordingly below.					\
+		 */													\
+		ASSERT_LV_NODE_MSTR_EQUIVALENCE;									\
+		/* Note: the typecast below is two-fold (first a "void *" and then a "mstr *"). Not having the "void *"	\
+		 * gives compiler warnings in HPUX Itanium since source is 2-byte aligned whereas destination		\
+		 * is 8-byte aligned. The void * in between makes the compiler forget the 2-byte alignment.		\
+		 */													\
+		UNIX_ONLY(MSTR_STPG_ADD((mstr *)(void *)&NODE->key_mvtype);)						\
+		VMS_ONLY(MSTR_STPG_ADD((mstr *)(void *)&NODE->key_len);)						\
+	}														\
+}
+
+#define	MVAL_STPG_ADD(MVAL1)							\
+{										\
+	mval		*lcl_mval;						\
+										\
+	lcl_mval = MVAL1;							\
+	if (MV_IS_STRING(lcl_mval))						\
+		MSTR_STPG_ADD(&lcl_mval->str);					\
+}
+
+#define MSTR_STPG_PUT(MSTR1)							\
+{										\
+	int		stp_put_int;						\
+										\
+	TREE_DEBUG_ONLY(							\
+	/* assert that we never add a duplicate mstr as otherwise we will	\
+	 * face problems later in PROCESS_CONTIGUOUS_BLOCK macro.		\
+	 * this code is currently commented out as it slows down stp_gcol	\
+	 * tremendously (O(n^2) algorithm where n is # of mstrs added) */	\
+		mstr	**curstr;						\
+										\
+		for (curstr = array; curstr < topstr; curstr++)			\
+			assert(*curstr != MSTR1);				\
+	)									\
+	assert(topstr < arraytop);						\
+	assert(0 < MSTR1->len);							\
+	/* It would be nice to test for maxlen as well here but that causes	\
+	 * some usages of stringpool to fail as other types of stuff are	\
+	 * built into the stringppool besides strings. */			\
+	*topstr++ = MSTR1;							\
+	if (topstr >= arraytop)							\
+	{									\
+		stp_put_int = (int)(topstr - array);				\
+		stp_expand_array();						\
+		array = stp_array;						\
+		topstr = array + stp_put_int;					\
+		arraytop = array + stp_array_size;				\
+		assert(topstr < arraytop);					\
+	}									\
+}										\
+
 #ifdef STP_MOVE
 
-#define MV_STPG_GET(x) \
-	((((x)->mvtype & MV_STR) && (x)->str.len) ? \
-		(((x)->str.addr >= (char *)stringpool.base && (x)->str.addr < (char *)stringpool.free) ? &((x)->str) \
-		: (((x)->str.addr >= from && (x)->str.addr < to) ? move_count++, &((x)->str) : NULL))\
-	: NULL)
+#define	MSTR_STPG_ADD(MSTR1)								\
+{											\
+	mstr		*lcl_mstr;							\
+	char		*lcl_addr;							\
+											\
+	GBLREF	spdesc	stringpool;							\
+	GBLREF	char	*stp_move_from, *stp_move_to;					\
+	GBLREF	int	stp_move_count;							\
+											\
+	lcl_mstr = MSTR1;								\
+	if (lcl_mstr->len)								\
+	{										\
+		lcl_addr = lcl_mstr->addr;						\
+		if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	\
+		{									\
+			MSTR_STPG_PUT(lcl_mstr);					\
+		} else if (IS_PTR_IN_RANGE(lcl_addr, stp_move_from, stp_move_to))	\
+		{									\
+			MSTR_STPG_PUT(lcl_mstr);					\
+			stp_move_count++;						\
+		}									\
+	}										\
+}
 
-#define STR_STPG_GET(x) \
-	(((x)->len) ? \
-	  	(((x)->addr >= (char *)stringpool.base && (x)->addr < (char *)stringpool.free) ? (x) \
-	 	: (((x)->addr >= from && (x)->addr < to) ? move_count++, (x) : NULL)) \
-	: NULL)
-
-#else /* !STP_MOVE <=> STP_GCOL */
-
-#define MV_STPG_GET(x) \
-	((((x)->mvtype & MV_STR) && (x)->str.len && \
-	(x)->str.addr >= (char *)stringpool.base && (x)->str.addr < (char *)stringpool.free) \
-	? &((x)->str) : NULL)
-
-#define STR_STPG_GET(x) (((x)->len && (x)->addr >= (char *)stringpool.base && (x)->addr < (char *)stringpool.free) ? (x) : NULL)
-
-#endif /* end if STP_MOVE ... else ... */
-
-#if defined(DEBUG) && !defined(STP_MOVE)
-#  define MV_STPG_PUT(X) stp_gcol_mv_stpg_put(X) /* STP_GCOL only -- only updates statics in stp_gcol() */
 #else
-#  define MV_STPG_PUT(X) \
-	  (*topstr++ = (X), topstr >= arraytop ?  \
-           (stp_put_int = (int)(topstr - array), stp_expand_array(), array = stp_array, \
-           topstr = array + stp_put_int, arraytop = array + stp_array_size) : 0)
+
+#define	MSTR_STPG_ADD(MSTR1)								\
+{											\
+	mstr		*lcl_mstr;							\
+	char		*lcl_addr;							\
+											\
+	GBLREF spdesc	stringpool;							\
+											\
+	lcl_mstr = MSTR1;								\
+	if (lcl_mstr->len)								\
+	{										\
+		lcl_addr = lcl_mstr->addr;						\
+		if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	\
+			MSTR_STPG_PUT(lcl_mstr);					\
+	}										\
+}
+
 #endif
 
 #define PROCESS_CACHE_ENTRY(cp)								\
         if (cp->src.str.len)	/* entry is used */					\
 	{										\
-		x = STR_STPG_GET(&cp->src.str);						\
-		if (x)									\
-			MV_STPG_PUT(x);							\
+		MSTR_STPG_ADD(&cp->src.str);						\
 		/* Run list of mvals for each code stream that exists */		\
 		if (cp->obj.len)							\
 		{									\
@@ -159,56 +249,94 @@ static mstr		**topstr, **array, **arraytop;
 			{								\
 				m = (mval *)((char *)ihdr + ihdr->fixup_vals_off);	\
 				for (mtop = m + fixup_cnt;  m < mtop; m++)		\
-				{							\
-					x = MV_STPG_GET(m);				\
-					if (x)						\
-						MV_STPG_PUT(x);				\
-				}							\
+					MVAL_STPG_ADD(m);				\
 			}								\
 			fixup_cnt = ihdr->vartab_len;					\
 			if (fixup_cnt)							\
 			{								\
 				vent = (var_tabent *)((char *)ihdr + ihdr->vartab_off);	\
 				for (vartop = vent + fixup_cnt;  vent < vartop; vent++)	\
-				{							\
-					x = STR_STPG_GET(&vent->var_name);		\
-					if (x)						\
-						MV_STPG_PUT(x);				\
-				}							\
+					MSTR_STPG_ADD(&vent->var_name);			\
 			}								\
 		}									\
 	}
 
-#define PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta) \
-{ \
-	padlen = 0; \
-	for (; cstr < topstr; cstr++) \
-	{ 	/* Note having same mstr in array more than once can cause following assert to fail */ \
-		assert((*cstr)->addr >= (char *)begaddr); \
-		if ((*cstr)->addr > (char *)endaddr && (*cstr)->addr != (char *)endaddr + padlen) \
-			break; \
-		tmpaddr = (unsigned char *)(*cstr)->addr + (*cstr)->len; \
-		if (tmpaddr > endaddr) \
-			endaddr = tmpaddr;\
-		padlen = mstr_native_align ? PADLEN((*cstr)->len, NATIVE_WSIZE) : 0;\
-		(*cstr)->addr -= delta; \
-	} \
+#define PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta)						\
+{													\
+	padlen = 0;											\
+	for (; cstr < topstr; cstr++)									\
+	{ 	/* Note having same mstr in array more than once can cause following assert to fail */	\
+		assert((*cstr)->addr >= (char *)begaddr);						\
+		if ((*cstr)->addr > (char *)endaddr && (*cstr)->addr != (char *)endaddr + padlen)	\
+			break;										\
+		tmpaddr = (unsigned char *)(*cstr)->addr + (*cstr)->len;				\
+		if (tmpaddr > endaddr)									\
+			endaddr = tmpaddr;								\
+		padlen = mstr_native_align ? PADLEN((*cstr)->len, NATIVE_WSIZE) : 0;			\
+		(*cstr)->addr -= delta;									\
+	}												\
 }
 
-#define COPY2STPOOL(cstr, topstr) \
-{ \
-	while (cstr < topstr) \
-	{ \
-		if (mstr_native_align) \
-			stringpool.free = (unsigned char *)ROUND_UP2((INTPTR_T)stringpool.free, NATIVE_WSIZE); \
-		/* Determine extent of next contiguous block and copy it into new stringpool.base. */ \
-		begaddr = endaddr = (unsigned char *)((*cstr)->addr); \
-		delta = (*cstr)->addr - (char *)stringpool.free; \
-		PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta); \
-		blklen = endaddr - begaddr; \
-		memcpy(stringpool.free, begaddr, blklen); \
-		stringpool.free += blklen; \
-	} \
+#define COPY2STPOOL(cstr, topstr)										\
+{														\
+	while (cstr < topstr)											\
+	{													\
+		if (mstr_native_align)										\
+			stringpool.free = (unsigned char *)ROUND_UP2((INTPTR_T)stringpool.free, NATIVE_WSIZE);	\
+		/* Determine extent of next contiguous block and copy it into new stringpool.base. */		\
+		begaddr = endaddr = (unsigned char *)((*cstr)->addr);						\
+		delta = (*cstr)->addr - (char *)stringpool.free;						\
+		PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta);					\
+		blklen = endaddr - begaddr;									\
+		memcpy(stringpool.free, begaddr, blklen);							\
+		stringpool.free += blklen;									\
+	}													\
+}
+
+#define LVZWRITE_BLOCK_GC(LVZWRITE_BLOCK)									\
+{														\
+	if ((NULL != (LVZWRITE_BLOCK)) && ((LVZWRITE_BLOCK)->curr_subsc))					\
+	{													\
+		assert((LVZWRITE_BLOCK)->sub);									\
+		zwr_sub = (zwr_sub_lst *)(LVZWRITE_BLOCK)->sub;							\
+		for (index = 0;  index < (int)(LVZWRITE_BLOCK)->curr_subsc;  index++)				\
+		{												\
+			assert(zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first		\
+			       || !zwr_sub->subsc_list[index].second);						\
+			/*											\
+			 * we cannot garbage collect duplicate mval pointers.					\
+			 * So make sure zwr_sub->subsc_list[index].actual is not pointing to an			\
+			 * existing (mval *) which  is already protected					\
+			 */											\
+			if (zwr_sub->subsc_list[index].actual							\
+			    && (zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first))		\
+			{											\
+				MVAL_STPG_ADD(zwr_sub->subsc_list[index].actual);				\
+			}											\
+		}												\
+	}													\
+}
+
+#define ZWRHTAB_GC(ZWRHTAB)											\
+{														\
+	if ((ZWRHTAB))												\
+	{													\
+		for (tabent_addr = (ZWRHTAB)->h_zwrtab.base, topent_addr = (ZWRHTAB)->h_zwrtab.top;		\
+		     tabent_addr < topent_addr; tabent_addr++)							\
+		{												\
+			if (HTENT_VALID_ADDR(tabent_addr, zwr_alias_var, zav))					\
+			{											\
+				x = &zav->ptrs.val_ent.zwr_var;							\
+				/* Regular varnames are already accounted for in other ways so			\
+				 * we need to avoid putting this mstr into the process array twice.		\
+				 * The only var names we need worry about are $ZWRTACxxx so make		\
+				 * simple check for var names starting with '$'.				\
+				 */										\
+				if (x->len && ('$' == x->addr[0]))						\
+					MSTR_STPG_ADD(x);							\
+			}											\
+		}												\
+	}													\
 }
 
 /* Macro used intermittently in code to debug string pool garbage collection. Set to 1
@@ -221,7 +349,7 @@ static mstr		**topstr, **array, **arraytop;
 #define DBGSTPGCOL(x)
 #endif
 
-static void expand_stp(unsigned int new_size)
+static void expand_stp(unsigned int new_size)	/* BYPASSOK */
 {
 	if (retry_if_expansion_fails)
 		ESTABLISH(stp_gcol_ch);
@@ -234,52 +362,47 @@ static void expand_stp(unsigned int new_size)
 	return;
 }
 
-
-DEBUG_ONLY(mstr **stp_gcol_mv_stpg_put(mstr *X);)
 #ifndef STP_MOVE
 #ifdef DEBUG
-/* MV_STP_PUT macro expansion as routine so we can add asserts without issues (and see vars in core easier) */
-mstr **stp_gcol_mv_stpg_put(mstr *X)
-{
-	int	stp_put_int;
-
-	assert(0 < X->len); /* It would be nice to test for maxlen here but that causes some usages of stringpool
-			       to fail as other types of stuff are built into the stringppool besides strings. */
-	*topstr++ = X;
-	return (topstr >= arraytop ? (stp_put_int = (int)(topstr - array), stp_expand_array(), array = stp_array,
-				      topstr = array + stp_put_int, arraytop = array + stp_array_size) : 0);
-}
-
-/* Verify the saved symbol table that we will be processing later in stp_gcol(). This version is callable from anywhere
-   and is a great debuging tool for corrupted mstrs in local variable trees. Uncomment the call near the top of stp_gcol to
-   verify it will catch what you want it to catch and sprinkle calls around other places as necessary. Be warned, this can
-   *really* slow things down so use judiciously. SE 10/2007
-*/
+/* Verify the current symbol table that we will be processing later in "stp_gcol". This version is callable from anywhere
+ * and is a great debuging tool for corrupted mstrs in local variable trees. Uncomment the call near the top of stp_gcol to
+ * verify it will catch what you want it to catch and sprinkle calls around other places as necessary. Be warned, this can
+ * *really* slow things down so use judiciously. SE 10/2007
+ */
 void stp_vfy_mval(void)
 {
 	lv_blk		*lv_blk_ptr;
 	lv_val		*lvp, *lvlimit;
 	mstr		*x;
+	mval		*mv;
+	char		*addr;
+	symval		*sym;
+	symval		*symtab;
 
-	if (!first_symval)
-	{	/* Must be setting up first symbol table now */
-		first_symval = (symval *)1;	/* Only allow first time, else this will cause sig-10/11 next time through */
-		return;
-	}
-	for (lv_blk_ptr = &first_symval->first_block;
-	     lv_blk_ptr;
-	     lv_blk_ptr = lv_blk_ptr->next)
+	for (symtab = curr_symval; NULL != symtab; symtab = symtab->last_tab)
 	{
-		for (lvp = lv_blk_ptr->lv_base, lvlimit = lv_blk_ptr->lv_free;
-		     lvp < lvlimit;  lvp++)
+		for (lv_blk_ptr = symtab->lv_first_block; lv_blk_ptr; lv_blk_ptr = lv_blk_ptr->next)
 		{
-			if (MV_SBS != lvp->v.mvtype)
+			for (lvp = (lv_val *)LV_BLK_GET_BASE(lv_blk_ptr), lvlimit = LV_BLK_GET_FREE(lv_blk_ptr, lvp);
+				lvp < lvlimit; lvp++)
 			{
-				x = MV_STPG_GET(&(lvp->v));
-				if (x)
+				sym = LV_SYMVAL(lvp);
+				if (NULL == sym)
+					continue;
+				assert(SYM_IS_SYMVAL(sym) && (sym == symtab));
+				mv = &lvp->v;
+				if (MV_IS_STRING(mv))
 				{
-					assert(0 < (x)->len);
+					x = &mv->str;
+					if (x->len)
+					{
+						addr = x->addr;
+						if (IS_PTR_IN_RANGE(addr, stringpool.base, stringpool.free))
+							assert(0 < (x)->len);
+					}
 				}
+				assert(LV_IS_BASE_VAR(lvp));
+				assert(lvTreeIsWellFormed(LV_CHILD(lvp)));
 			}
 		}
 	}
@@ -295,14 +418,12 @@ boolean_t	is_stp_space_available(int space_needed)
 #endif  /* DEBUG */
 
 void mv_parse_tree_collect(mvar *node);
+
 void mv_parse_tree_collect(mvar *node)
 {
-	mstr		*string;
 	int		stp_put_int;
 
-	string = (mstr *)STR_STPG_GET(&node->mvname);
-	if (string)
-		MV_STPG_PUT(string);
+	MSTR_STPG_ADD(&node->mvname);
 	if (node->lson)
 		mv_parse_tree_collect(node->lson);
 	if (node->rson)
@@ -312,39 +433,37 @@ void mv_parse_tree_collect(mvar *node)
 
 
 #ifdef STP_MOVE
+
+GBLDEF	char	*stp_move_from, *stp_move_to;	/* input parameters to "stp_move" saved in globals to be accessible to lvval_gcol */
+GBLDEF	int	stp_move_count;
+
 void stp_move(char *from, char *to) /* garbage collect and move range (from,to] to stringpool adjusting all mvals/mstrs pointing
 				     * in this range */
 #else
-void stp_gcol(int space_asked) /* garbage collect and create enough space for space_asked bytes */ /* BYPASSOK */
+void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough space for space_asked bytes */
 #endif
 {
-#ifdef STP_MOVE
-	int			space_asked = 0, move_count = 0;
-#endif
+#	ifdef STP_MOVE
+	int			space_asked = 0;
+#	endif
 	unsigned char		*strpool_base, *straddr, *tmpaddr, *begaddr, *endaddr;
 	int			index, space_needed, fixup_cnt, tmplen, totspace;
 	long			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
-	int			stp_put_int;
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
-	lv_sbs_tbl		*tbl;
 	lv_val			*lvp, *lvlimit;
+	treeNode		*node, *node_limit;
 	mstr			**cstr, *x;
 	mv_stent		*mvs;
 	mval			*m, *mtop;
-	sbs_blk			*blk;
-	sbs_str_struct		*s_sbs;
-	sgm_info		*si;
 	stack_frame		*sf;
 	tp_frame		*tf;
-	jnl_format_buffer	*jfb;
 	zwr_sub_lst		*zwr_sub;
 	ihdtyp			*ihdr;
-	zbrk_struct		*z_ptr;
 	int			*low_reclaim_passes;
 	int			*incr_factor;
 	int			killcnt;
-	long		stp_incr, space_needed_rounded_up;
+	long			stp_incr, space_needed_rounded_up;
 	ht_ent_objcode 		*tabent_objcode, *topent;
 	ht_ent_mname		*tabent_mname, *topent_mname;
 	ht_ent_addr		*tabent_addr, *topent_addr;
@@ -357,12 +476,14 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	lv_xnew_var		*xnewvar;
 	tp_var			*restore_ent;
 	boolean_t		non_mandatory_expansion, exp_gt_spc_needed, first_expansion_try;
-	error_def		(ERR_STPEXPFAIL);
+	routine_source		*rsptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Asserts added here are tested every time any module in the codebase does stringpool garbage collection */
 	assert(!stringpool_unusable);
 	assert(!stringpool_unexpandable);
-#ifndef STP_MOVE
+#	ifndef STP_MOVE
 	/* Before we get cooking with our stringpool GC, check if it is appropriate to call lv_val garbage collection.
 	   This is data that can get orphaned with no way to access it when aliases are used. This form of GC is only done
 	   if aliases are actively being used. It is not called with every stringpool garbage collection but every "N"
@@ -391,25 +512,26 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			/* SPGC_since_LVGC is cleared by als_lv_gc() */
 		}
 	}
-#ifdef DEBUG_REFCNT
+#	ifdef DEBUG_REFCNT
 	else if ((stringpool.base == rts_stringpool.base) && (NULL != curr_symval))
 	{
 		DBGRFCT((stderr, "stp_gcol: lvgcol check bypassed for lack of aliasness\n"));
 	}
-#endif	/* DEBUG_REFCNT */
-#endif	/* !STP_MOVE */
+#	endif	/* DEBUG_REFCNT */
+#	endif	/* !STP_MOVE */
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	assert(stringpool.top - stringpool.free < space_asked || space_asked == 0);
         assert(CHK_BOUNDARY_ALIGNMENT(stringpool.top) == 0);
-#ifdef STP_MOVE
+	/* stp_vfy_mval(); / * uncomment to debug lv corruption issues.. */
+#	ifdef STP_MOVE
 	assert(from < to); /* why did we call with zero length range, or a bad range? */
 	assert((from <  (char *)stringpool.base && to <  (char *)stringpool.base) || /* range to be moved should not intersect */
 	       (from >= (char *)stringpool.top  && to >= (char *)stringpool.top));   /* with stringpool range */
-#else
-	/* stp_vfy_mval(); / * uncomment to debug lv corruption issues.. */
-#endif
-
+	stp_move_from = from;
+	stp_move_to = to;
+	stp_move_count = 0;
+#	endif
 	space_needed = ROUND_UP2(space_asked, NATIVE_WSIZE);
 	assert(0 == (INTPTR_T)stringpool.base % NATIVE_WSIZE);
 	if (stringpool.base == rts_stringpool.base)
@@ -439,7 +561,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	 */
 	if (((stringpool.base != rts_stringpool.base) || (0 == cache_table.size)))
 	{
-#ifndef STP_MOVE
+#		ifndef STP_MOVE
 		if (literal_chain.que.fl != 0)
 		{	/* If hashtable exists, pull it all from there rather that searching for it twice */
 			if (complits_hashtab && complits_hashtab->base)
@@ -449,22 +571,15 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 				{
 					if (HTENT_VALID_STR(tabent_lit, mliteral, mlit))
 					{	/* Key first, then value */
-						x = STR_STPG_GET(&(tabent_lit->key.str));
-						if (x)
-							MV_STPG_PUT(x);
-						x = MV_STPG_GET(&(mlit->v));
-						if (x)
-							MV_STPG_PUT(x);
-
+						MSTR_STPG_ADD(&(tabent_lit->key.str));
+						MVAL_STPG_ADD(&(mlit->v));
 					}
 				}
 			} else
 			{	/* No hash table, just the values */
 				dqloop(&literal_chain, que, mlit)
 				{
-					x = MV_STPG_GET(&(mlit->v));
-					if (x)
-						MV_STPG_PUT(x);
+					MVAL_STPG_ADD(&(mlit->v));
 				}
 			}
 		}
@@ -473,171 +588,96 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			mv_parse_tree_collect(mvartab);
 		if (NULL != mlabtab)
 			mv_parse_tree_collect((mvar *)mlabtab);
-		x = MV_STPG_GET(&director_mval);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&window_mval);
-		if (x)
-			MV_STPG_PUT(x);
-#endif
+		MVAL_STPG_ADD(&director_mval);
+		MVAL_STPG_ADD(&window_mval);
+#		endif
 	} else
 	{
-#ifndef STP_MOVE
+#		ifndef STP_MOVE
 		/* Some house keeping since we are garbage collecting. Clear out all the lookaside
 		   arrays for the simple $piece function. */
-#  ifdef DEBUG
+#		ifdef DEBUG
 		GBLREF int c_clear;
 		++c_clear;		/* Count clearing operations */
-#  endif
+#		endif
 		for (index = 0; FNPC_MAX > index; index++)
 		{
-			fnpca.fnpcs[index].last_str.addr = NULL;
-			fnpca.fnpcs[index].last_str.len = 0;
-			fnpca.fnpcs[index].delim = 0;
+			(TREF(fnpca)).fnpcs[index].last_str.addr = NULL;
+			(TREF(fnpca)).fnpcs[index].last_str.len = 0;
+			(TREF(fnpca)).fnpcs[index].delim = 0;
 		}
-#endif
+#		endif
 		assert(0 != cache_table.size);	/* Must have done a cache_init() */
 		/* These cache entries have mvals in them we need to keep */
 		for (tabent_objcode = cache_table.base, topent = cache_table.top; tabent_objcode < topent; tabent_objcode++)
 		{
 			if (HTENT_VALID_OBJCODE(tabent_objcode, cache_entry, cp))
 			{
-				x = (mstr *)STR_STPG_GET(&(tabent_objcode->key.str));
-				if (x)
-					MV_STPG_PUT(x);
+				MSTR_STPG_ADD(&(tabent_objcode->key.str));
 				PROCESS_CACHE_ENTRY(cp);
 			}
 		}
-
 		for (symtab = curr_symval; NULL != symtab; symtab = symtab->last_tab)
 		{
 			for (tabent_mname = symtab->h_symtab.base, topent_mname = symtab->h_symtab.top;
 			     tabent_mname < topent_mname; tabent_mname++)
 			{
 				if (!HTENT_EMPTY_MNAME(tabent_mname, lv_val, lvp))
-				{	/* Note this code checks for "not empty" rathan than VALID hash table entry
-					   because a deleted entry still has a key that needs to be preserved. With
-					   the introduction of aliases, the $ZWRTAC* pseudo local vars are created and
-					   deleted where before aliases no deletion of MNAME entries ever occurred.
-					*/
-					x = (mstr *)STR_STPG_GET(&(tabent_mname->key.var_name));
-					if (x)
-						MV_STPG_PUT(x);
+				{	/* Note this code checks for "not empty" rather than VALID hash table entry
+					 * because a deleted entry still has a key that needs to be preserved. With
+					 * the introduction of aliases, the $ZWRTAC* pseudo local vars are created and
+					 * deleted where before aliases no deletion of MNAME entries ever occurred.
+					 */
+					MSTR_STPG_ADD(&(tabent_mname->key.var_name));
 				}
 			}
 			for (xnewvar = symtab->xnew_var_list; xnewvar; xnewvar = xnewvar->next)
+				MSTR_STPG_ADD(&xnewvar->key.var_name);
+		}
+		if (NULL != (TREF(rt_name_tbl)).base)
+		{	/* Keys for $TEXT source hash table can live in stringpool */
+			for (tabent_mname = (TREF(rt_name_tbl)).base, topent_mname = (TREF(rt_name_tbl)).top;
+			     tabent_mname < topent_mname; tabent_mname++)
 			{
-				x = (mstr *)STR_STPG_GET(&xnewvar->key.var_name);
-				if (x)
-					MV_STPG_PUT(x);
+				if (HTENT_VALID_MNAME(tabent_mname, routine_source, rsptr))
+					MSTR_STPG_ADD(&tabent_mname->key.var_name);
 			}
 		}
-
 		if (x = comline_base)
 		{
 			for (index = MAX_RECALL;  index > 0 && x->len;  index--, x++)
-				MV_STPG_PUT(x);
-		}
-
-		if (lvzwrite_block && lvzwrite_block->curr_subsc)
-		{
-			assert(lvzwrite_block->sub);
-			zwr_sub = (zwr_sub_lst *)lvzwrite_block->sub;
-			for (index = 0;  index < (int)lvzwrite_block->curr_subsc;  index++)
-			{
-				assert(zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first
-				       || !zwr_sub->subsc_list[index].second);
-				/*
-				 * we cannot garbage collect duplicate mval pointers.
-				 * So make sure zwr_sub->subsc_list[index].actual is not pointing to an
-				 * existing (mval *) which  is already protected
+			{	/* These strings are guaranteed to be in the stringpool so use MSTR_STPG_PUT macro directly
+				 * instead of going through MSTR_STPG_ADD. But assert accordingly to be sure.
 				 */
-				if (zwr_sub->subsc_list[index].actual &&
-				    zwr_sub->subsc_list[index].actual != zwr_sub->subsc_list[index].first)
-				{
-					x = MV_STPG_GET(zwr_sub->subsc_list[index].actual);
-					if (x)
-						MV_STPG_PUT(x);
-				}
+				assert(IS_PTR_IN_RANGE(x->addr, stringpool.base, stringpool.free));
+				MSTR_STPG_PUT(x);
 			}
 		}
-		if (zwrhtab)
-		{
-			for (tabent_addr = zwrhtab->h_zwrtab.base, topent_addr = zwrhtab->h_zwrtab.top;
-			     tabent_addr < topent_addr; tabent_addr++)
-			{
-				if (HTENT_VALID_ADDR(tabent_addr, zwr_alias_var, zav))
-				{
-					x = (mstr *)STR_STPG_GET(&zav->ptrs.val_ent.zwr_var);
-					/* Regular varnames are already accounted for in other ways so
-					   we need to avoid putting this mstr into the process array twice.
-					   The only var names we need worry about are $ZWRTACxxx so make
-					   simple check for var names starting with '$'.
-					*/
-					if (x && x->len && '$' == *x->addr)
-						MV_STPG_PUT(x);
-				}
-			}
-		}
+		LVZWRITE_BLOCK_GC(lvzwrite_block);
+		ZWRHTAB_GC(zwrhtab);
 		for (l = io_root_log_name;  0 != l;  l = l->next)
 		{
 			if ((IO_ESC != l->dollar_io[0]) && (l->iod->trans_name == l))
-			{
-				x = STR_STPG_GET(&l->iod->error_handler);
-				if (x)
-					MV_STPG_PUT(x);
-			}
+				MSTR_STPG_ADD(&l->iod->error_handler);
 		}
-		x = MV_STPG_GET(&dollar_etrap);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_system);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_zsource);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_ztrap);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_zstatus);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_zgbldir);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_zinterrupt);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_zstep);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&zstep_action);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_zerror);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_ztexit);
-		if (x)
-			MV_STPG_PUT(x);
-		x = MV_STPG_GET(&dollar_zyerror);
-		if (x)
-			MV_STPG_PUT(x);
+		MVAL_STPG_ADD(&dollar_etrap);
+		MVAL_STPG_ADD(&dollar_system);
+		MVAL_STPG_ADD(&dollar_zsource);
+		MVAL_STPG_ADD(&dollar_ztrap);
+		MVAL_STPG_ADD(&dollar_zstatus);
+		MVAL_STPG_ADD(&dollar_zgbldir);
+		MVAL_STPG_ADD(&dollar_zinterrupt);
+		MVAL_STPG_ADD(&dollar_zstep);
+		MVAL_STPG_ADD(&zstep_action);
+		MVAL_STPG_ADD(&dollar_zerror);
+		MVAL_STPG_ADD(&dollar_ztexit);
+		MVAL_STPG_ADD(&dollar_zyerror);
 #		ifdef GTM_TRIGGER
-		x = MV_STPG_GET(&dollar_ztwormhole);
-		if (x)
-			MV_STPG_PUT(x);
+		MVAL_STPG_ADD(&dollar_ztwormhole);
 #		endif
-		x = MV_STPG_GET(&last_fnquery_return_varname);
-		if (x)
-			MV_STPG_PUT(x);
-		for (index = 0; index < last_fnquery_return_subcnt; index++);
-		{
-			x = MV_STPG_GET(&last_fnquery_return_sub[index]);
-			if (x)
-				MV_STPG_PUT(x);
-		}
+		MVAL_STPG_ADD(TADR(last_fnquery_return_varname));
+		for (index = 0; index < TREF(last_fnquery_return_subcnt); index++);
+			MVAL_STPG_ADD(&TAREF1(last_fnquery_return_sub, index));
 		for (mvs = mv_chain;  mvs < (mv_stent *)stackbase;  mvs = (mv_stent *)((char *)mvs + mvs->mv_st_next))
 		{
 			switch (mvs->mv_st_type)
@@ -649,38 +689,48 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 					m = &mvs->mv_st_cont.mvs_msav.v;
 					break;
 				case MVST_STAB:
-					if (mvs->mv_st_cont.mvs_stab)
+					if (NULL != (symtab = mvs->mv_st_cont.mvs_stab))
 					{	/* if initalization of the table was successful */
-						for (lv_blk_ptr = &mvs->mv_st_cont.mvs_stab->first_block;
-						     lv_blk_ptr;
-						     lv_blk_ptr = lv_blk_ptr->next)
+						for (lv_blk_ptr = symtab->lv_first_block; NULL != lv_blk_ptr;
+											lv_blk_ptr = lv_blk_ptr->next)
 						{
-							for (lvp = lv_blk_ptr->lv_base, lvlimit = lv_blk_ptr->lv_free;
-							     lvp < lvlimit;  lvp++)
+							for (lvp = (lv_val *)LV_BLK_GET_BASE(lv_blk_ptr),
+								lvlimit = LV_BLK_GET_FREE(lv_blk_ptr, lvp);
+									lvp < lvlimit; lvp++)
 							{
-								if ((lvp->v.mvtype == MV_SBS)
-								    && (tbl = (lv_sbs_tbl *)lvp)
-								    && (blk = tbl->str))
-								{
-									assert(tbl->ident == MV_SBS);
-									for (;  blk;  blk = blk->nxt)
-									{
-										for (s_sbs = &blk->ptr.sbs_str[0],
-										     straddr = (uchar_ptr_t)
-											     &blk->ptr.sbs_str[blk->cnt];
-										     s_sbs < (sbs_str_struct *)straddr; s_sbs++)
-										{
-											x = STR_STPG_GET(&s_sbs->str);
-											if (x)
-												MV_STPG_PUT(x);
-										}
-									}
-								} else
-								{
-									x = MV_STPG_GET(&(lvp->v));
-									if (x)
-										MV_STPG_PUT(x);
-								}
+								/* lvp could be actively in use or free (added to the symval's
+								 * lv_flist). Ignore the free ones. Those should have their
+								 * "parent" (aka "symval" since this is a lv_val) set to NULL.
+								 */
+								if (NULL == LV_PARENT(lvp))
+									continue;
+								assert(LV_IS_BASE_VAR(lvp));
+								/* For a base variable, we need to protect only the node value
+								 * (if it exists and is of type string).
+								 */
+								MVAL_STPG_ADD(&(lvp->v));
+							}
+						}
+						for (lv_blk_ptr = symtab->lvtreenode_first_block; NULL != lv_blk_ptr;
+												lv_blk_ptr = lv_blk_ptr->next)
+						{
+							for (node = (treeNode *)LV_BLK_GET_BASE(lv_blk_ptr),
+								node_limit = LV_BLK_GET_FREE(lv_blk_ptr, node);
+									node < node_limit; node++)
+							{
+								/* node could be actively in use or free (added to the symval's
+								 * lvtreenode_flist). Ignore the free ones. Those should have
+								 * their "parent"  set to NULL.
+								 */
+								if (NULL == LV_PARENT(node))
+									continue;
+								assert(!LV_IS_BASE_VAR(node));
+								/* For a subscripted variable, we need to protect the subscript
+								 * (if string) as well as the subscripted node value (if exists
+								 * and is of type string).
+								 */
+								LV_NODE_KEY_STPG_ADD(node);	/* Protect node subscript */
+								MVAL_STPG_ADD(&(node->v));	/* Protect node value */
 							}
 						}
 					}
@@ -688,11 +738,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 				case MVST_IARR:
 					m = (mval *)mvs->mv_st_cont.mvs_iarr.iarr_base;
 					for (mtop = m + mvs->mv_st_cont.mvs_iarr.iarr_mvals;  m < mtop;  m++)
-					{
-						x = MV_STPG_GET(m);
-						if (x)
-							MV_STPG_PUT(x);
-					}
+						MVAL_STPG_ADD(m);
 					continue;
 				case MVST_LVAL:
 				case MVST_NTAB:
@@ -708,19 +754,13 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 #					ifdef GTM_TRIGGER
 					if (0 == mvs->mv_st_cont.mvs_tp_holder.tphold_tlevel)
 					{	/* $ZTWORMHOLE only saved at initial TP level */
-						x = MV_STPG_GET(&mvs->mv_st_cont.mvs_tp_holder.ztwormhole_save);
-						if (x)
-							MV_STPG_PUT(x);
+						MVAL_STPG_ADD(&mvs->mv_st_cont.mvs_tp_holder.ztwormhole_save);
 					}
 #					endif
 					continue;
 				case MVST_NVAL:
-#					ifdef DEBUG
 					/* The var_name field is only present in a debug build */
-					x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_nval.name.var_name);
-					if (x)
-						MV_STPG_PUT(x);
-#					endif
+					DEBUG_ONLY(MSTR_STPG_ADD(&mvs->mv_st_cont.mvs_nval.name.var_name);)
 					continue;
 #				ifdef GTM_TRIGGER
 				case MVST_TRIGR:
@@ -728,34 +768,26 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 					 * elements are processed when we fall through to the MVST_ZINTR entry below. Here
 					 * we process the unique MVST_TRIGR elements.
 					 */
-					x = MV_STPG_GET(&mvs->mv_st_cont.mvs_trigr.dollar_etrap_save);
-					if (x)
-						MV_STPG_PUT(x);
-					x = MV_STPG_GET(&mvs->mv_st_cont.mvs_trigr.dollar_ztrap_save);
-					if (x)
-						MV_STPG_PUT(x);
+					MVAL_STPG_ADD(&mvs->mv_st_cont.mvs_trigr.dollar_etrap_save);
+					MVAL_STPG_ADD(&mvs->mv_st_cont.mvs_trigr.dollar_ztrap_save);
 					/* Note fall into MVST_ZINTR to process common entries */
 #				endif
 				case MVST_ZINTR:
-					x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_zintr.savextref);
-					if (x)
-                                                MV_STPG_PUT(x);
+					MSTR_STPG_ADD(&mvs->mv_st_cont.mvs_zintr.savextref);
 					m = &mvs->mv_st_cont.mvs_zintr.savtarg;
 					break;
 				case MVST_ZINTDEV:
 					if (mvs->mv_st_cont.mvs_zintdev.buffer_valid)
-					{
-						x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_zintdev.curr_sp_buffer);
-						if (x)
-							MV_STPG_PUT(x);
-					}
+						MSTR_STPG_ADD(&mvs->mv_st_cont.mvs_zintdev.curr_sp_buffer);
+					continue;
+				case MVST_MRGZWRSV:
+					LVZWRITE_BLOCK_GC(mvs->mv_st_cont.mvs_mrgzwrsv.save_lvzwrite_block);
+					ZWRHTAB_GC(mvs->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab);
 					continue;
 				default:
 					GTMASSERT;
 			}
-			x = MV_STPG_GET(m);
-			if (x)
-				MV_STPG_PUT(x);
+			MVAL_STPG_ADD(m);
 		}
 		for (sf = frame_pointer;  sf < (stack_frame *)stackbase;  sf = sf->old_frame_pointer)
 		{	/* Cover temp mvals in use */
@@ -777,14 +809,11 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 				continue;
 			m = (mval *)sf->temps_ptr;
 			for (mtop = m + sf->temp_mvals;  m < mtop;  m++)
-			{
-				x = MV_STPG_GET(m);
-				if (x)
-				{
-					/* we don't expect DM frames to have temps */
-					assert(!(sf->type & SFT_DM));
-					MV_STPG_PUT(x);
-				}
+			{	/* DM frames should not normally have temps. If they do then it better have mvtype 0
+				 * thereby guaranteeing it will not need stp_gcol protection by the MVAL_STPG_ADD macro below.
+				 */
+				assert(!(sf->type & SFT_DM) || !MV_DEFINED(m));
+				MVAL_STPG_ADD(m);
 			}
 		}
 		if (NULL != alias_retarg)
@@ -793,29 +822,19 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			if (alias_retarg->mvtype & MV_ALIASCONT)
 			{	/* Protect the refs were are about to make in case ptr got banged up somehow */
 				lvp = (lv_val *)alias_retarg;
-				assert(MV_SYM == lvp->ptrs.val_ent.parent.sym->ident);	/* Verify a base var */
-				x = MV_STPG_GET(&lvp->v);
-				if (x)
-					MV_STPG_PUT(x);
+				assert(LV_IS_BASE_VAR(lvp));
+				MVAL_STPG_ADD(&lvp->v);
 			}
 		}
 		if (tp_pointer)
 		{
 			tf = tp_pointer;
-			while(tf)
+			while (tf)
 			{
-				x = MV_STPG_GET(&tf->trans_id);
-				if (x)
-					MV_STPG_PUT(x);
-				x = MV_STPG_GET(&tf->zgbldir);
-				if (x)
-					MV_STPG_PUT(x);
+				MVAL_STPG_ADD(&tf->trans_id);
+				MVAL_STPG_ADD(&tf->zgbldir);
 				for (restore_ent = tf->vars; restore_ent; restore_ent = restore_ent->next)
-				{
-					x = (mstr *)STR_STPG_GET(&(restore_ent->key.var_name));
-					if (x)
-						MV_STPG_PUT(x);
-				}
+					MSTR_STPG_ADD(&(restore_ent->key.var_name));
 				tf = tf->old_tp_frame;
 			}
 		}
@@ -849,25 +868,25 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 		space_after_compact = stringpool.top - stringpool.base - totspace; /* can be -ve number */
 	} else
 		space_after_compact = stringpool.top - stringpool.free;
-#ifndef STP_MOVE
+#	ifndef STP_MOVE
 	assert(mstr_native_align || space_after_compact >= space_before_compact);
-#endif
+#	endif
 	space_reclaim = space_after_compact - space_before_compact; /* this can be -ve, if alignment causes expansion */
 	space_needed -= (int)space_after_compact;
 	DBGSTPGCOL((stderr, "space_needed=%i\n", space_needed));
 	/* After compaction if less than 31.25% of space is avail, consider it a low reclaim pass */
-	if (STP_LOWRECLAIM_LEVEL(stringpool.top - stringpool.base) > space_after_compact)
+	if (STP_LOWRECLAIM_LEVEL(stringpool.top - stringpool.base) > space_after_compact) /* BYPASSOK */
 		(*low_reclaim_passes)++;
 	else
 		*low_reclaim_passes = 0;
 	non_mandatory_expansion = FALSE;
 	if (0 < space_needed /* i */
-#ifndef STP_MOVE /* do expansion only for stp_gcol, no forced expansion for stp_move */
+#	ifndef STP_MOVE /* do expansion only for stp_gcol, no forced expansion for stp_move */
 	    || (non_mandatory_expansion =
 	        (!stop_non_mandatory_expansion && /* ii */
 	         (STP_MAXLOWRECLAIM_PASSES <= *low_reclaim_passes ))) /* iii */
-#endif
-	    )
+#	endif
+		)
 	{
 		/* i   - more space needed than available so do a mandatory expansion
 		 * ii  - non-mandatory expansions disabled because a previous attempt failed due to lack of memory
@@ -928,8 +947,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			/* Adjust incr_factor */
 			if (*incr_factor < STP_NUM_INCRS) *incr_factor = *incr_factor + 1;
 		} else
-		{
-			/* could not expand during forced expansion */
+		{	/* could not expand during forced expansion */
 			assert(non_mandatory_expansion && stop_non_mandatory_expansion);
 			if (space_after_compact < space_needed)
 				rts_error(VARLSTCNT(3) ERR_STPEXPFAIL, 1, stp_incr + stringpool.top - stringpool.base);
@@ -942,19 +960,19 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 		if (*incr_factor > 1) *incr_factor = *incr_factor - 1;
 		if (topstr != array)
 		{
-#ifdef STP_MOVE
-			if (0 != move_count)
+#			ifdef STP_MOVE
+			if (0 != stp_move_count)
 			{	/* All stp_move elements must be contiguous in the 'array'. They point outside
 				 * the range of stringpool.base and stringpool.top. In the 'array' of (mstr *) they
 				 * must be either at the beginning, or at the end. */
-				if ((*array)->addr >= (char *)stringpool.base	/* BYPASSOK */
-				    && (*array)->addr < (char *)stringpool.top) /* BYPASSOK */
-					topstr -= move_count; /* stringpool elements before move elements in stp_array */
+				tmpaddr = (unsigned char *)(*array)->addr;
+				if (IS_PTR_IN_RANGE(tmpaddr, stringpool.base, stringpool.top))
+					topstr -= stp_move_count;/* stringpool elements before move elements in stp_array */
 				else
-					array += move_count; /* stringpool elements after move elements or no stringpool elements in
-							      * stp_array */
+					array += stp_move_count;/* stringpool elements after move elements or no stringpool
+								 * elements in stp_array */
 			}
-#endif
+#			endif
 			/* Skip over contiguous block, if any, at beginning of stringpool.
 			 * Note that here we are not considering any stp_move() elements.  */
 			cstr = array;
@@ -973,12 +991,12 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 				stringpool.free += blklen;
 			}
 		}
-#ifdef STP_MOVE
-		if (0 != move_count)
+#		ifdef STP_MOVE
+		if (0 != stp_move_count)
 		{	/* Copy stp_move elements into stringpool now */
 			assert(topstr == cstr); /* all stringpool elements garbage collected */
 			if (array == stp_array) /* stringpool elements before move elements in stp_array */
-				topstr += move_count;
+				topstr += stp_move_count;
 			else
 			{ /* stringpool elements after move elements OR no stringpool elements in stp_array */
 				cstr = stp_array;
@@ -986,12 +1004,12 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			}
 			COPY2STPOOL(cstr, topstr);
 		}
-#endif
+#		endif
 	}
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
-#ifndef STP_MOVE
+#	ifndef STP_MOVE
 	assert(stringpool.top - stringpool.free >= space_asked);
-#endif
+#	endif
 	return;
 }

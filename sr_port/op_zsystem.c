@@ -48,7 +48,6 @@
 #define	MAXZSYSSTRLEN	4096	/* maximum command line length supported by most Unix shells */
 
 GBLREF	int4		dollar_zsystem;			/* exit status of child */
-GBLREF	short		dollar_tlevel;
 GBLREF	io_pair		io_std_device;
 GBLREF	uint4           trust;
 

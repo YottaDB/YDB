@@ -32,7 +32,6 @@
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
-GBLREF bool		gv_curr_subsc_null;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*gd_header;
 GBLREF gd_binding	*gd_map;
@@ -49,8 +48,10 @@ void op_zprevious(mval *v)
 	mstr			name;
 	enum db_acc_method	acc_meth;
 	boolean_t		found, ok_to_change_currkey;
+	DCL_THREADGBL_ACCESS;
 
-	assert(gv_currkey->prev || !gv_curr_subsc_null);
+	SETUP_THREADGBL_ACCESS;
+	assert(gv_currkey->prev || !TREF(gv_last_subsc_null));
 	if (gv_currkey->prev)
 	{	/* If last subscript is a NULL subscript, modify gv_currkey such that a gvcst_search of the resulting gv_currkey
 		 * will find the last available subscript. But in case of dba_usr, (the custom implementation of $ZPREVIOUS which
@@ -59,7 +60,7 @@ void op_zprevious(mval *v)
 		 */
 		acc_meth = gv_cur_region->dyn.addr->acc_meth;
 		ok_to_change_currkey = (dba_usr != acc_meth);
-		if (gv_curr_subsc_null && ok_to_change_currkey)
+		if (TREF(gv_last_subsc_null) && ok_to_change_currkey)
 		{	/* Replace the last subscript with the highest possible subscript value i.e. the byte sequence
 			 * 	0xFF (STR_SUB_MAXVAL), 0xFF, 0xFF ...  as much as possible i.e. until gv_currkey->top permits.
 			 * This subscript is guaranteed to be NOT present in the database since a user who tried to set this
@@ -116,7 +117,7 @@ void op_zprevious(mval *v)
 		} else
 			v->str.len = 0;
 		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
-		if (gv_curr_subsc_null && ok_to_change_currkey)
+		if (TREF(gv_last_subsc_null) && ok_to_change_currkey)
 		{	/* Restore gv_currkey to what it was at function entry time */
 			gv_currkey->base[gv_currkey->prev + 1] = KEY_DELIMITER;
 			if (gv_cur_region->std_null_coll)

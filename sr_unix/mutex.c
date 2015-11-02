@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +94,6 @@
 		BG_TRACE_PRO_ANY(CSA, EVENT);					\
 }
 
-GBLREF boolean_t		disable_sigcont;
 GBLREF pid_t			process_id;
 GBLREF uint4			image_count;
 GBLREF int			num_additional_processors;
@@ -914,9 +913,11 @@ void mutex_salvage(gd_region *reg)
 	pid_t		holder_pid;
 	boolean_t	mutex_salvaged;
 	VMS_ONLY(uint4	holder_imgcnt;)
+        DCL_THREADGBL_ACCESS;
 
 	error_def(ERR_MUTEXFRCDTERM);
 	error_def(ERR_WCBLOCKED);
+        SETUP_THREADGBL_ACCESS;
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	if (0 != (holder_pid = csa->critical->semaphore.u.parts.latch_pid))
@@ -953,7 +954,7 @@ void mutex_salvage(gd_region *reg)
 			if ((NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff) && (csa->jnl->jnl_buff->blocked == holder_pid))
 				csa->jnl->jnl_buff->blocked = 0;
 			MUTEX_DPRINT3("%d : mutex salvaged, culprit was %d\n", process_id, holder_pid);
-		} else if (FALSE == disable_sigcont)
+		} else if (FALSE == TREF(disable_sigcont))
 		{
 			/* The process might have been STOPPED (kill -SIGSTOP). Send SIGCONT and nudge the stopped
 			 * process forward */

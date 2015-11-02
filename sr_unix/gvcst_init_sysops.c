@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@
 
 /* Include prototypes */
 #include "mlk_shr_init.h"
+#include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
 #include "is_file_identical.h"
 #include "repl_instance.h"
@@ -74,6 +75,7 @@
 #include "gtmmsg.h"
 #include "shmpool.h"
 #include "gtm_permissions.h"
+#include "wbox_test_init.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -119,7 +121,7 @@
 #define GTM_ATTACH_SHM														\
 {																\
 	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, next_smseg, SHM_RND));			\
-	next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + reg->sec_size), SHMAT_ADDR_INCS);				\
+	next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + sec_size), SHMAT_ADDR_INCS);				\
 	GTM_ATTACH_CHECK_ERROR;													\
 	csa->nl = (node_local_ptr_t)csa->db_addrs[0];										\
 }
@@ -325,7 +327,7 @@ gd_region *dbfilopn (gd_region *reg)
 	return reg;
 }
 
-void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
+void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 {
 	/* Ensure that all the various sections that the shared memory contains are actually
 	 * aligned at the OS_PAGE_SIZE boundary
@@ -338,12 +340,12 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
 	{
 	case dba_mm:
 		assert(0 == MMBLK_CONTROL_SIZE(csd) % OS_PAGE_SIZE);
-		reg->sec_size = (uint4)ROUND_UP(NODE_LOCAL_SPACE + LOCK_SPACE_SIZE(csd) + MMBLK_CONTROL_SIZE(csd) \
+		*sec_size = ROUND_UP(NODE_LOCAL_SPACE + LOCK_SPACE_SIZE(csd) + MMBLK_CONTROL_SIZE(csd) \
 					 + JNL_SHARE_SIZE(csd) + SHMPOOL_SECTION_SIZE, OS_PAGE_SIZE);
 		break;
 	case dba_bg:
 		assert(0 == CACHE_CONTROL_SIZE(csd) % OS_PAGE_SIZE);
-		reg->sec_size = (uint4)ROUND_UP(NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd) \
+		*sec_size = ROUND_UP(NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd) \
 					 + CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + SHMPOOL_SECTION_SIZE, OS_PAGE_SIZE);
 		break;
 	default:
@@ -376,7 +378,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		int		init_status;
 		boolean_t	do_crypt_init = FALSE;
 	)
-	intrpt_state_t		save_intrpt_ok_state;
 	boolean_t		shm_setup_ok = FALSE;
 	boolean_t		vermismatch = FALSE;
 	boolean_t		vermismatch_already_printed = FALSE;
@@ -384,6 +385,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	int			group_id;
 	struct stat		sb;
 	int			perm;
+	gtm_uint64_t 		sec_size;
 
 	error_def(ERR_CLSTCONFLICT);
 	error_def(ERR_CRITSEMFAIL);
@@ -394,6 +396,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	error_def(ERR_SYSCALL);
 	error_def(ERR_VERMISMATCH);
 
+	assert(INTRPT_IN_GVCST_INIT == intrpt_ok_state); /* we better be called from gvcst_init */
 	assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
 	is_bg = (dba_bg == tsd->acc_meth);
 	read_only = reg->read_only;
@@ -406,7 +409,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	csa = &udi->s_addrs;
 	csa->db_addrs[0] = csa->db_addrs[1] = csa->lock_addrs[0] = NULL;   /* to help in dbinit_ch  and gds_rundown */
 	reg->opening = TRUE;
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_DB_INIT);
 	/* We do some basic encryption initializations here.
 	 * 1. Call hash check to figure out if the dat file's hash matches with that of the db_key_file
 	 * 2. if the dat file is encrypted, then make a call to the encryption plugin with GTMCRYPT_GETKEY to obtain the
@@ -462,7 +464,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	udi->semid = tsd->semid;
 	udi->gt_sem_ctime = tsd->gt_sem_ctime.ctime;
 	udi->gt_shm_ctime = tsd->gt_shm_ctime.ctime;
-	dbsecspc(reg, tsd); 	/* Find db segment size */
+	dbsecspc(reg, tsd, &sec_size); 	/* Find db segment size */
 	/* get the stats for the database file */
 	FSTAT_FILE(udi->fd, &sb, stat_res);
 	if (-1 == stat_res)
@@ -588,7 +590,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	sem_incremented = TRUE;
 	if (new_dbinit_ipc)
 	{	/* Create new shared memory using IPC_PRIVATE. System guarantees a unique id */
-		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, reg->sec_size, RWDALL | IPC_CREAT)))
+		GTM_WHITE_BOX_TEST(WBTEST_FAIL_ON_SHMGET, sec_size, GTM_UINT64_MAX);
+		if (-1 == (status_l = udi->shmid = shmget(IPC_PRIVATE, sec_size, RWDALL | IPC_CREAT)))
 		{
 			udi->shmid = (int)INVALID_SHMID;
 			status_l = INVALID_SHMID;
@@ -644,6 +647,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	if (new_dbinit_ipc)
 	{
 		memset(csa->nl, 0, SIZEOF(*csa->nl));			/* We allocated shared storage -- we have to init it */
+		csa->nl->sec_size = sec_size;				/* Set the shared memory size 			     */
 		if (JNL_ALLOWED(csa))
 		{	/* initialize jb->cycle to a value different from initial value of jpc->cycle (0). although this is not
 			 * necessary right now, in the future, the plan is to change jnl_ensure_open() to only do a cycle mismatch
@@ -779,8 +783,11 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			csd->zqgblmod_tn = 0;
 			csd->dualsite_resync_seqno = csd->pre_multisite_resync_seqno;
 			assert(csd->dualsite_resync_seqno);
+			assert(csd->dualsite_resync_seqno <= csd->reg_seqno);
 			if (!csd->dualsite_resync_seqno)
 				csd->dualsite_resync_seqno = 1;
+			else if (csd->dualsite_resync_seqno > csd->reg_seqno)
+				csd->dualsite_resync_seqno = csd->pre_multisite_resync_seqno = csd->reg_seqno;
 			csd->multi_site_open = TRUE;
 		}
 		csa->nl->glob_sec_init = TRUE;
@@ -867,6 +874,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 				  ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("lock address"),
 				  (uint4)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)csa->nl), (uint4)csa->nl->lock_addrs);
 	}
+	/* Record  ftok information as soon as shared memory set up is done */
+	FTOK_TRACE(csa, csd->trans_hist.curr_tn, ftok_ops_lock, process_id);
 	if (-1 == (semval = semctl(udi->semid, 1, GETVAL))) /* semval = number of process attached */
 	{
 		errno_save = errno;
@@ -953,10 +962,18 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		}
 		sem_incremented = FALSE;
 	}
+	if (gtm_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == gtm_white_box_test_case_number) \
+										&& (1 == csa->nl->wbox_test_seq_num))
+	{
+		csa->nl->wbox_test_seq_num  = 2;
+		/*Wait till the other process has got some stack traces*/
+		while (csa->nl->wbox_test_seq_num  != 3)
+			LONG_SLEEP(10);
+	}
 	/* Release ftok semaphore lock so that any other ftok conflicted database can continue now */
 	if (!ftok_sem_release(reg, FALSE, FALSE))
 		rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-	RESTORE_INTRPT_OK_STATE;
+	FTOK_TRACE(csa, csd->trans_hist.curr_tn, ftok_ops_release, process_id);
 	/* Do the per process initialization of mutex stuff */
 	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
 	if (!mutex_per_process_init_pid)

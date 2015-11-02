@@ -90,10 +90,17 @@ GBLREF	int4			backup_write_errno;
 
 LITREF	mval			literal_null;
 
-#define	COMMON_WRITE(A, B, C)	{					\
-					(*common_write)(A, B, (int)C);	\
-					if (0 != backup_write_errno)	\
-						return FALSE;		\
+#ifdef DEBUG_INCBKUP
+#  define DEBUG_INCBKUP_ONLY(X) X
+#else
+#  define DEBUG_INCBKUP_ONLY(X)
+#endif
+
+#define	COMMON_WRITE(A, B, C)	{								\
+					(*common_write)(A, B, (int)C);				\
+					if (0 != backup_write_errno)				\
+						return FALSE;					\
+					DEBUG_INCBKUP_ONLY(backup_write_offset += (int)C;)	\
 				}
 
 #define CLEANUP_AND_RETURN_FALSE {						\
@@ -108,12 +115,6 @@ LITREF	mval			literal_null;
 				}
 
 #define	MAX_FILENAME_LENGTH	256
-
-#ifdef DEBUG_INCBKUP
-#  define DEBUG_INCBKUP_ONLY(X) X
-#else
-#  define DEBUG_INCBKUP_ONLY(X)
-#endif
 
 static	char			incbackupfile[MAX_FILENAME_LENGTH];
 static	BFILE			*backup;
@@ -141,7 +142,7 @@ bool	mubinccpy (backup_reg_list *list)
 	mval			val;
 	unsigned short		port;
 	void			(*common_write)(BFILE *, char *, int);
-	shmpool_blk_hdr_ptr_t	sblkh_p;
+	muinc_blk_hdr_ptr_t	sblkh_p;
 	trans_num		blk_tn;
 	int4			blk_bsiz;
 	block_id		blk_num_base, blk_num;
@@ -153,6 +154,7 @@ bool	mubinccpy (backup_reg_list *list)
 	int			group_id;
 	int			perm;
 	DEBUG_INCBKUP_ONLY(int	blks_this_lmap;)
+	DEBUG_INCBKUP_ONLY(gtm_uint64_t backup_write_offset = 0;)
 
 	error_def(ERR_BCKUPBUFLUSH);
 	error_def(ERR_COMMITWAITSTUCK);
@@ -307,9 +309,9 @@ bool	mubinccpy (backup_reg_list *list)
 	gds_ratio	= bsize / DISK_BLOCK_SIZE;
 	blks_per_buff	= BACKUP_READ_SIZE / bsize;	/* Worse case holds one block */
 	read_size	= blks_per_buff * bsize;
-	outsize		= SIZEOF(shmpool_blk_hdr) + bsize;
+	outsize		= SIZEOF(muinc_blk_hdr) + bsize;
 	outptr		= (char_ptr_t)malloc(MAX(outsize, mubmaxblk));
-	sblkh_p		= (shmpool_blk_hdr_ptr_t)outptr;
+	sblkh_p		= (muinc_blk_hdr_ptr_t)outptr;
 	data_ptr	= (char_ptr_t)(sblkh_p + 1);
 	bp		= (blk_hdr_ptr_t)mubbuf;
 	bm_blk_buff	= (uchar_ptr_t)malloc(SIZEOF(blk_hdr) + (BLKS_PER_LMAP * BML_BITS_PER_BLK / BITS_PER_UCHAR));
@@ -457,6 +459,8 @@ bool	mubinccpy (backup_reg_list *list)
 			sblkh_p->blkid = blk_num;
 			memcpy(data_ptr, bptr, blk_bsiz);
 			sblkh_p->valid_data = TRUE;	/* Validation marker */
+			DEBUG_INCBKUP_ONLY(PRINTF("DEBUG - write block: blk_num = 0x%08lx, start = 0x%016lx, size = 0x%x \n",
+				blk_num, backup_write_offset, outsize);)
 			COMMON_WRITE(backup, outptr, outsize);
 			if (online)
 			{
@@ -547,7 +551,7 @@ bool	mubinccpy (backup_reg_list *list)
 		}
 	}
 	/* Write one last (zero-filled) block into this file that designates the end of the blocks */
-	memset(outptr, 0, SIZEOF(shmpool_blk_hdr) + bsize);
+	memset(outptr, 0, SIZEOF(muinc_blk_hdr) + bsize);
 	COMMON_WRITE(backup, outptr, outsize);
 
 	/* ============================= write end_msg and fileheader =============================== */

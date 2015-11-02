@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +37,11 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 	VMS_ONLY(int4	count;)
 	mval		*mv;
 	zshow_out	output;
+	DCL_THREADGBL_ACCESS;
 	MAXSTR_BUFF_DECL(buff);
 
+	SETUP_THREADGBL_ACCESS;
+	TREF(in_zwrite) = TRUE;
 	MAXSTR_BUFF_INIT;
 	memset(&output, 0, SIZEOF(output));
 	output.code = 'V';
@@ -61,6 +64,7 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 		case ZWRITE_END:
 			gvzwr_fini(&output, pat);
 			MAXSTR_BUFF_FINI;
+			TREF(in_zwrite) = FALSE;
 			return;
 			break;
 		case ZWRITE_ALL:
@@ -91,4 +95,5 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 	}
 	va_end(var);
 	MAXSTR_BUFF_FINI;
+	TREF(in_zwrite) = FALSE;
 }

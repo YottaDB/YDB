@@ -35,7 +35,7 @@ GBLREF	cw_set_element	cw_set[];
 GBLREF	unsigned char	cw_set_depth;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgm_info	*sgm_info_ptr;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	trans_num	local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	gv_namehead	*gv_target;
 GBLREF	uint4		t_err;
@@ -86,7 +86,7 @@ cw_set_element *t_write (
 	assert(SIZEOF(prev_next_off) >= SIZEOF(block_offset));
 
 	blk = blkhist->blk_num;
-	if (dollar_tlevel == 0)
+	if (!dollar_tlevel)
 	{
 		if (blk >= csa->ti->total_blks)
 			GTMASSERT;

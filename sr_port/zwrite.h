@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,7 @@ typedef struct zwr_zav_blk_struct
 	/* note this block (when allocated) will also contain the zwr_alias_var array */
 } zwr_zav_blk;
 
-typedef struct
+typedef struct zwr_hash_table_struct
 {
 	boolean_t			cleaned;
 	GTM64_ONLY(int4			filler;)
@@ -108,6 +108,8 @@ typedef struct gvzwrite_datablk_struct
 	gd_binding			*old_map;
 	gd_binding			*old_map_top;
 	gd_region			*gd_reg;
+	boolean_t			gv_last_subsc_null;
+	boolean_t			gv_some_subsc_null;
 } gvzwrite_datablk;
 
 void gvzwr_arg(int t, mval *a1, mval *a2);

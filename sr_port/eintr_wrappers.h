@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 
 #include <sys/types.h>
 #include <errno.h>
+/*#include "gtm_c_stack_trace.h"*/
 
 #define ACCEPT_SOCKET(SOCKET, ADDR, LEN, RC)	\
 {						\
@@ -181,12 +182,20 @@
 	} while(-1 == RC && EINTR == errno);	\
 }
 
-#define SEMOP(SEMID, SOPS, NSOPS, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = semop(SEMID, SOPS, NSOPS);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define SEMOP(SEMID, SOPS, NSOPS, RC)					\
+{									\
+	boolean_t	wait_option = FALSE;				\
+	int             numsems; 					\
+	RC = -1;							\
+	for (numsems = NSOPS - 1; numsems >= 0; --numsems)		\
+	{								\
+		if (!(SOPS[numsems].sem_flg & IPC_NOWAIT))		\
+		{							\
+			wait_option = TRUE;				\
+			break;						\
+		}							\
+	}								\
+	TRY_SEMOP_GET_C_STACK(wait_option, SEMID, SOPS, NSOPS, RC);	\
 }
 
 #define SEND(SOCKET, BUF, LEN, FLAGS, RC)	\

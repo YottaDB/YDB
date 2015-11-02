@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #define SEMGETERROR			9
 #define SEMAPHORETAKEN			10
 #define SYSLOGHASERRORDETAIL		11
+#define UNABLETOCHDIR			12
 
 /* return codes with gtmsecshr*/
 #define INVLOGNAME			20

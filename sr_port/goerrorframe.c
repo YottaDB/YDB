@@ -20,6 +20,11 @@
 #include "error.h"
 #include "error_trap.h"
 #ifdef GTM_TRIGGER
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif

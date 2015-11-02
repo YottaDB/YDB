@@ -30,6 +30,7 @@
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab.h"
 #include "muprec.h"
 #include "mur_read_file.h"
 
@@ -74,8 +75,8 @@ void mur_init(void)
 	initialize_list(murgbl.multi_list, SIZEOF(multi_struct), MUR_MULTI_LIST_INIT_ALLOC);
 	murgbl.forw_multi_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 	initialize_list(murgbl.forw_multi_list, SIZEOF(forw_multi_struct), MUR_MULTI_LIST_INIT_ALLOC);
-	init_hashtab_int8(&murgbl.token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS);
-	init_hashtab_int8(&murgbl.forw_token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS);
+	init_hashtab_int8(&murgbl.token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
+	init_hashtab_int8(&murgbl.forw_token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 	murgbl.pini_buddy_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 	initialize_list(murgbl.pini_buddy_list, SIZEOF(pini_list_struct), MUR_PINI_LIST_INIT_ELEMS);
 	/* pini_list hash table of a jnl_ctl_list is initialized in mur_fopen */

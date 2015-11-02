@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *    Copyright 2001, 2010 Fidelity Information Services, Inc   *
+ *    Copyright 2001, 2011 Fidelity Information Services, Inc   *
  *                                                              *
  *    This source code contains the intellectual property       *
  *    of its copyright holder(s), and is made available         *
@@ -59,8 +59,6 @@ typedef uint2 mach_inst;
 #undef VMS
 #define BIGENDIAN 1
 #define CNTR_WORD_32
-
-/* #define memcmp(DST,SRC,LEN) memucmp(DST,SRC,LEN) */
 
 #ifdef __sparc
 #define CACHELINE_SIZE	256
@@ -209,30 +207,27 @@ typedef char  mach_inst;	/* machine instruction */
 
 typedef struct
 {
+	unsigned short	mvtype;
 #ifdef	BIGENDIAN
-	unsigned int	sgn : 1 ;
-	unsigned int	e	: 7 ;
+	unsigned	sgn	: 1;
+	unsigned	e	: 7;
 #else
-	unsigned int	e	: 7 ;
-	unsigned int	sgn : 1 ;
+	unsigned	e	: 7;
+	unsigned	sgn	: 1;
 #endif
-	int4		m[2]	;
-} mflt ;
-
-typedef struct
-{
-	unsigned int	mvtype	: 16;
-#ifdef	BIGENDIAN
-	unsigned int	sgn	: 1;
-	unsigned int	e	: 7;
-#else
-	unsigned int	e	: 7;
-	unsigned int	sgn	: 1;
-#endif
-	unsigned int	fnpc_indx: 8;	/* Index to fnpc_work area this mval is using */
+	unsigned char	fnpc_indx;	/* Index to fnpc_work area this mval is using */
 	int4	m[2];
 	mstr	str;
-} mval ;
+} mval;
+/* Another version of mval struct with byte fields instead of bit fields */
+typedef struct
+{
+	unsigned short	mvtype;
+	unsigned char	sgne;
+	unsigned char	fnpc_indx;	/* Index to fnpc_work area this mval is using */
+	int4	m[2];
+	mstr	str;
+} mval_b;
 
 #define VAR_START(a, b)	va_start(a, b)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,9 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -49,6 +47,6 @@ ht_ent_mname *lookup_variable_htent(unsigned int x)
 #endif
 		lv_newname(tabent, curr_symval);
 	}
-	assert(NULL != ((lv_val *)tabent->value)->ptrs.val_ent.parent.sym);
+	assert(NULL != LV_GET_SYMVAL((lv_val *)tabent->value));
 	return tabent;
 }

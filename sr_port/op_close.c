@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,10 @@
 #include "iosp.h"
 #include "op.h"
 #include "trans_log_name.h"
+#ifdef __MVS__
+#include "iormdef.h"
+#endif
+
 
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_pair		io_curr_device;
@@ -29,6 +33,7 @@ void op_close(mval *v, mval *p)
 	io_log_name	*tl;		/* logical record for translated name */
 	int4		stat;	        /* status */
 	mstr		tn;		/* translated name */
+	ZOS_ONLY(d_rm_struct     *rm_ptr;)
 
 	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TEXT);
@@ -71,7 +76,19 @@ void op_close(mval *v, mval *p)
 
 	active_device = ciod;
 	if (io_curr_device.in == ciod)
+	{
 		io_curr_device.in = io_std_device.in;
+		/* On z/OS if is a fifo and it is read and write then need to set the current
+		   device out to the std device out */
+#		ifdef __MVS__
+		if (ciod->type == rm)
+		{
+			rm_ptr = (d_rm_struct *) ciod->dev_sp;
+			if (rm_ptr->fifo && (ciod->pair.out != ciod))
+				io_curr_device.out = io_std_device.out;
+		}
+#		endif
+	}
 	if (io_curr_device.out == ciod)
 		io_curr_device.out = io_std_device.out;
 

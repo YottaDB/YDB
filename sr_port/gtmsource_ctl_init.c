@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -177,6 +177,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	repl_ctl_element	*tmp_ctl = NULL;
 	jnl_file_header		*tmp_jfh = NULL;
 	jnl_file_header		*tmp_jfh_base = NULL;
+	jnl_private_control	*jpc;
 	int			tmp_fd = NOJNL;
 	int			status;
 	GTMCRYPT_ONLY(
@@ -204,6 +205,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	tmp_ctl = (repl_ctl_element *)malloc(SIZEOF(repl_ctl_element));
 	tmp_ctl->reg = reg;
 	csa = &FILE_INFO(reg)->s_addrs;
+	jpc = csa->jnl;
 	if (init)
 	{
 		assert((0 == jnl_fn_len) && ((NULL == jnl_fn) || ('\0' == jnl_fn[0])));
@@ -211,7 +213,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		gv_cur_region = reg;
 		tp_change_reg();
 		assert(csa == cs_addrs);
-		csa->jnl->channel = NOJNL; /* Not to close the prev gener file */
+		jpc->channel = NOJNL; /* Not to close the prev gener file */
 		was_crit = csa->now_crit;
 		if (!was_crit)
 			grab_crit(reg);
@@ -229,13 +231,18 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		assert(REPL_ALLOWED(csd));
 		if (!REPL_WAS_ENABLED(csd))
 		{
+			/* replication is allowed and has not gone into the WAS_ON state so journaling is expected to be ON*/
+			assert(JNL_ENABLED(csd));
 			did_jnl_ensure_open = TRUE;
 			jnl_status = jnl_ensure_open();
 			if (0 != jnl_status)
 			{
 				if (!was_crit)
 					rel_crit(reg);
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+				if (SS_NORMAL != jpc->status)
+					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
+				else
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
 			} else
 			{
 				tmp_ctl->jnl_fn_len = csd->jnl_file_len;
@@ -243,10 +250,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				tmp_ctl->jnl_fn[tmp_ctl->jnl_fn_len] = '\0';
 			}
 			/* stash the shared fileid into private storage before rel_crit as it is used in JNL_GDID_PVT macro below */
-			VMS_ONLY (csa->jnl->fileid = csa->nl->jnl_file.jnl_file_id;)
-			UNIX_ONLY(csa->jnl->fileid = csa->nl->jnl_file.u;)
+			VMS_ONLY (jpc->fileid = csa->nl->jnl_file.jnl_file_id;)
+			UNIX_ONLY(jpc->fileid = csa->nl->jnl_file.u;)
 			REPL_DPRINT2("CTL INIT :  Open of file %s thru jnl_ensure_open\n", tmp_ctl->jnl_fn);
-			tmp_fd = csa->jnl->channel;
+			tmp_fd = jpc->channel;
 		} else
 		{	/* Note that we hold crit so it is safe to pass csd->jnl_file_name (no one else will be changing it) */
 			status = repl_open_jnl_file_by_name(tmp_ctl, csd->jnl_file_len, (char *)csd->jnl_file_name,
@@ -320,7 +327,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		 * actively updated journal file and is only for GT.M and never for source server which only
 		 * READS from journal files. Source server anyways has a copy of the fd in tmp_ctl->repl_buff->fc->fd.
 		 */
-		csa->jnl->channel = NOJNL;
+		jpc->channel = NOJNL;
 	} else
 	{
 		F_COPY_GDID_FROM_STAT(tmp_ctl->repl_buff->fc->id, stat_buf);  /* For VMS stat_buf is a NAM structure */
@@ -333,7 +340,8 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	tmp_ctl->file_state = JNL_FILE_UNREAD;
 	tmp_ctl->lookback = FALSE;
 	tmp_ctl->first_read_done = FALSE;
-	tmp_ctl->fh_read_done = FALSE;
+	tmp_ctl->eof_addr_final = FALSE;
+	tmp_ctl->max_seqno_final = FALSE;
 	tmp_ctl->read_complete = FALSE;
 	tmp_ctl->min_seqno_dskaddr = 0;
 	tmp_ctl->max_seqno_dskaddr = 0;

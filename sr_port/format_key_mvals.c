@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,11 +28,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include "subscript.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
-#include "sbs_blk.h"
-#include "lvname_info.h"
+#include "lv_val.h"		/* needed by "lv_nameinfo.h" */
 
 unsigned char	*format_key_mvals(unsigned char *buff, int size, lvname_info *lvnp)
 {

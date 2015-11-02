@@ -37,7 +37,7 @@ GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	gd_region	*gv_cur_region;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 GBLREF	uint4		t_err;
 
@@ -66,7 +66,7 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 	error_def(ERR_GVKILLFAIL);
 
 	/* The following code is lifted from gvcst_data. Any changes here might need to be reflected there as well */
-	assert(0 < dollar_tlevel);
+	assert(dollar_tlevel);
 	assert((CDB_STAGNATE > t_tries) || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	save_t_err = t_err;
 	assert(ERR_GVKILLFAIL == save_t_err);	/* this function should currently be called only from gvcst_kill */

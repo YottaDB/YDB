@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,5 +13,7 @@
 #define ADVANCEWINDOW_included
 
 void advancewindow(void);
-
+#ifdef GTM_TRIGGER
+void advwindw_hash_in_mname_allowed(void);
+#endif
 #endif /* ADVANCEWINDOW_included */

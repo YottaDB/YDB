@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,42 +32,45 @@
 #include "error.h"
 #include "have_crit.h"
 #include "min_max.h"
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"
+#include "gv_trigger.h"		/* for INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
+#endif
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 GBLREF	ua_list			*curr_ua, *first_ua;
 GBLREF	char			*update_array, *update_array_ptr;
-GBLREF	int			tp_allocation_clue;
+GBLREF	block_id		tp_allocation_clue;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gv_namehead		*gv_target_list, *gvt_tp_list;
 GBLREF	trans_num		local_tn;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	short			dollar_tlevel;
 GBLREF	buddy_list		*global_tlvl_info_list;
 GBLREF	global_tlvl_info	*global_tlvl_info_head;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int			process_exiting;
-GBLREF	boolean_t		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
-
+GBLREF	block_id		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
-
 #ifdef DEBUG
-GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
 GBLREF	unsigned int		t_tries;
 #endif
+
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
 
 void	tp_clean_up(boolean_t rollback_flag)
 {
 	gv_namehead	*gvnh, *blk_target;
 	sgm_info	*si, *next_si;
-	kill_set	*ks, *next_ks;
+	kill_set	*ks;
 	cw_set_element	*cse, *cse1;
-	int		cw_in_page = 0, hist_in_page = 0, level = 0;
+	int		level;
 	int4		depth;
 	uint4		tmp_update_array_size;
 	off_chain	chain1;
@@ -78,20 +81,18 @@ void	tp_clean_up(boolean_t rollback_flag)
 	block_id	cseblk, histblk;
 	cache_rec_ptr_t	cr;
 	int4		upd_trans;
-	intrpt_state_t	save_intrpt_ok_state;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_MEMORY);
-	error_def(ERR_VMSMEMORY);
-
+	SETUP_THREADGBL_ACCESS;
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_TP_CLEAN_UP);
+	DEFER_INTERRUPTS(INTRPT_IN_TP_CLEAN_UP);
 
 	assert((NULL != first_sgm_info) || (0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
 	DEBUG_ONLY(
 		if (rollback_flag)
-			donot_commit = FALSE;
-		assert(!donot_commit);
+			TREF(donot_commit) = FALSE;
+		assert(!TREF(donot_commit));
 	)
 	if (NULL != first_sgm_info)
 	{	/* It is possible that first_ua is NULL at this point due to a prior call to tp_clean_up() that failed in
@@ -116,7 +117,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 				 * macro while trying to do the malloc of the update array. Since tp_clean_up() is called in
 				 * most exit handling code, it has to be very careful, hence the checks for non-NULLness below.
 				 */
-				if (NULL != &curr_ua->update_array[0])
+				if (NULL != curr_ua->update_array)
 				{
 					free(curr_ua->update_array);
 					tmp_update_array_size += curr_ua->update_array_size;
@@ -156,7 +157,10 @@ void	tp_clean_up(boolean_t rollback_flag)
 					assert(csa->dir_tree != gvnh);
 					gvnh->root = 0;
 				}
+				/* Cleanup any block-split info (of created block #) in gvtarget histories */
+				TP_CLEANUP_GVNH_SPLIT_IF_NEEDED(gvnh, 0);
 			}
+			GTMTRIG_ONLY(INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, FALSE));
 #			ifdef DEBUG
 			if (!process_exiting)
 			{	/* Ensure that we did not miss out on resetting clue for any gvtarget.
@@ -175,7 +179,11 @@ void	tp_clean_up(boolean_t rollback_flag)
 			}
 #			endif
 			local_tn++;	/* to effectively invalidate first_tp_srch_status of all gv_targets */
+		} else
+		{
+			GTMTRIG_ONLY(INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, TRUE));
 		}
+		GTMTRIG_ONLY(ASSERT_ZTRIGGER_CYCLE_RESET;) /* for all regions, we better have csa->db_dztrigger_cycle = 0*/
 		for (si = first_sgm_info;  si != NULL;  si = next_si)
 		{
 			TP_TEND_CHANGE_REG(si);
@@ -216,6 +224,29 @@ void	tp_clean_up(boolean_t rollback_flag)
 						assert(NULL == cse->new_buff || NULL != cse->blk_target);
 						if (NULL == (blk_target = cse->blk_target))
 							continue;
+						if (blk_target->split_cleanup_needed)
+						{
+							for (level = 0; level < ARRAYSIZE(blk_target->last_split_blk_num); level++)
+							{
+								chain1 = *(off_chain *)&blk_target->last_split_blk_num[level];
+								if (chain1.flag)
+								{
+									if (chain1.cw_index < si->cw_set_depth)
+									{
+										tp_get_cw(si->first_cw_set,
+												(int)chain1.cw_index, &cse1);
+										assert(NULL != cse1);
+										histblk = cse1->blk;
+									} else
+									{	/* out of design situation. fix & proceed in pro */
+										assert(FALSE);
+										histblk = 0;
+									}
+									blk_target->last_split_blk_num[level] = histblk;
+								}
+							}
+							blk_target->split_cleanup_needed = FALSE;
+						}
 						if (0 == blk_target->clue.end)
 						{
 							chain1 = *(off_chain *)&blk_target->root;
@@ -229,7 +260,8 @@ void	tp_clean_up(boolean_t rollback_flag)
 							continue;
 						}
 						depth = blk_target->hist.depth;
-						if ((level = (int)cse->level) > depth)
+						level = (int)cse->level;
+						if (level > depth)
 							continue;
 						t1 = &blk_target->hist.h[level];
 						cseblk = cse->blk;
@@ -241,7 +273,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 							{
 								cr = cse->cr;
 								assert(NULL != cr);
-								UNIX_ONLY(assert((NULL == t1->cr) || (t1->cr == cr));)
+								UNIX_ONLY(assert((NULL == t1->cr) || (t1->cr == cr)));
 								if (cr != t1->cr)
 								{
 									t1->cr = cr;
@@ -337,11 +369,18 @@ void	tp_clean_up(boolean_t rollback_flag)
 		{	/* Ensure that we did not miss out on clearing any gv_target->root which had chain.flag set.
 			 * Dont do this if the process is cleaning up the TP transaction as part of exit handling
 			 * Also use this opportunity to check that non-zero clues for BG contain non-null cr in histories.
+			 * In addition, check that the list of multi-level block numbers (involved in the most recent split
+			 * operations) stored in the gv_target are valid block #s.
 			 */
 			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
 			{
 				chain1 = *(off_chain *)&gvnh->root;
 				assert(!chain1.flag);
+				for (level = 0; level < ARRAYSIZE(gvnh->last_split_blk_num); level++)
+				{
+					chain1 = *(off_chain *)&gvnh->last_split_blk_num[level];
+					assert(!chain1.flag);
+				}
 				/* If there was a gvnh->write_local_tn, we could assert that if ever that field was updated
 				 * in this transaction, then gvnh->root better be non-zero. Otherwise gvnh could have been
 				 * used only for reads in this TP and in that case it is ok for the root to be 0.
@@ -356,7 +395,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 				if (gvnh->clue.end)
 				{
 					is_mm = (dba_mm == gvnh->gd_csa->hdr->acc_meth);
-					for (t1 = &gvnh->hist.h[0]; t1->blk_num; t1++)
+					for (t1 = gvnh->hist.h; t1->blk_num; t1++)
 					{
 						assert(is_mm || (NULL != t1->cr));
 						assert(NULL == t1->cse);
@@ -389,6 +428,14 @@ void	tp_clean_up(boolean_t rollback_flag)
 	first_sgm_info = NULL;
 	/* ensure that we don't have crit on any region at the end of a TP transaction (be it GT.M or MUPIP) */
 	assert((CDB_STAGNATE == t_tries) || (0 == have_crit(CRIT_HAVE_ANY_REG)));
-	assert((NULL == first_tp_si_by_ftok) || process_exiting);
-	RESTORE_INTRPT_OK_STATE;	/* check if any MUPIP STOP/signals were deferred while in this function */
+	/* Now that this transaction try is done (need to start a fresh try in case of a restart; in case of commit the entire
+	 * transaction is done) ensure first_tp_si_by_ftok is NULL at end of tp_clean_up as this field is relied upon by
+	 * secshr_db_clnup and t_commit_cleanup to determine if we have an ongoing transaction. In case of a successfully
+	 * committing transaction (rollback_flag == FALSE), this should be guaranteed already. So we might need to do the reset
+	 * only in case rollback_flag == TRUE but since that is an if condition which involves a pipeline break we avoid it by
+	 * doing the set to NULL unconditionally.
+	 */
+	assert(rollback_flag || (NULL == first_tp_si_by_ftok));
+	first_tp_si_by_ftok = NULL;
+	ENABLE_INTERRUPTS(INTRPT_IN_TP_CLEAN_UP);	/* check if any MUPIP STOP/signals were deferred while in this function */
 }

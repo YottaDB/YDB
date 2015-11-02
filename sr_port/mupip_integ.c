@@ -148,7 +148,7 @@ GTM_SNAPSHOT_ONLY(
 
 void mupip_integ(void)
 {
-	boolean_t		full;
+	boolean_t		full, muint_all_index_blocks;
 	boolean_t		update_filehdr, update_header_tn;
 	char			*temp, util_buff[MAX_UTIL_LEN];
 	unsigned char		dummy;
@@ -158,10 +158,9 @@ void mupip_integ(void)
 	unsigned int		blocks_free = LEAVE_BLOCKS_ALONE;
 	int			idx, leftpt, rightpt, total_errors, util_len;
 	uint4			cli_status;
-	block_id		mu_index_adj, mu_data_adj;
+	block_id		dir_root, mu_index_adj, mu_data_adj, muint_block;
 	uint4			prev_errknt, mu_dir_blks, mu_dir_recs, mu_data_blks, mu_data_recs, mu_index_blks, mu_index_recs;
 	qw_num			mu_dir_size, mu_index_size, mu_data_size;
-	block_id		dir_root;
 	tp_region		*rptr;
 	file_control		*fc;
 	boolean_t		retvalue_mu_int_reg, online_integ = FALSE, region_was_frozen;
@@ -263,9 +262,18 @@ void mupip_integ(void)
 			mupip_exit(ERR_MUPCLIERR);
 		if (FALSE == mu_int_getkey(key_buff, keylen))
 			mupip_exit(ERR_MUPCLIERR);
-		if (muint_key)
-			disp_map_errors = 0;
+		assert(muint_key);	/* or else "mu_int_getkey" call above would have returned FALSE */
+		disp_map_errors = 0;
 	}
+	if (CLI_PRESENT == cli_present("BLOCK"))
+	{
+		if (0 == cli_get_hex("BLOCK", (uint4 *)&muint_block))
+			mupip_exit(SS_NORMAL);
+		block = TRUE;
+		disp_map_errors = 0;
+		master_dir = FALSE;
+	}
+	muint_all_index_blocks = !(block || muint_key);
 	mu_int_master = malloc(MASTER_MAP_SIZE_MAX);
 	tn_reset_specified = (CLI_PRESENT == cli_present("TN_RESET"));
 	/* Note if -ONLINE is explicitly specified */
@@ -400,28 +408,10 @@ void mupip_integ(void)
 			} else
 				tn_reset_this_reg = update_header_tn = TRUE;
 		}
-		if (CLI_PRESENT == cli_present("BLOCK"))
+		if (block)
 		{
-			if (0 == cli_get_hex("BLOCK", (uint4 *)&trees->root))
-			{
-				if (region_was_frozen)
-				{
-					region_freeze(rptr->reg, FALSE, FALSE, FALSE);
-					if (!rptr->reg->read_only)
-					{
-						fc = rptr->reg->dyn.addr->file_cntl;
-						fc->op = FC_WRITE;
-						fc->op_buff = (unsigned char *)FILE_INFO(rptr->reg)->s_addrs.hdr;
-						fc->op_len = ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
-						fc->op_pos = 1;
-						dbfilop(fc);
-					}
-				}
-				mupip_exit(SS_NORMAL);
-			}
 			master_dir = FALSE;
-			block = TRUE;
-			disp_map_errors = 0;
+			trees->root = muint_block;
 		}
 		for (trees->link = 0;  ;  master_dir = FALSE, temp = (char*)trees,  trees = trees->link,  free(temp))
 		{
@@ -552,7 +542,7 @@ void mupip_integ(void)
 				mu_int_errknt--; /* if this error is not supposed to increment the error count */
 			}
 		}
-		if ((FALSE == block) && (FALSE == muint_key))
+		if (muint_all_index_blocks)
 		{
 			mu_int_maps();
 			if (! mu_int_errknt)
@@ -580,8 +570,7 @@ void mupip_integ(void)
 				} else
 					blocks_free = LEAVE_BLOCKS_ALONE;
 			}
-			if (!muint_fast &&
-				(mu_int_blks_to_upgrd != csd->blks_to_upgrd))
+			if (!muint_fast && (mu_int_blks_to_upgrd != csd->blks_to_upgrd))
 			{
 				gtm_putmsg(VARLSTCNT(4) ERR_DBBTUWRNG, 2, mu_int_blks_to_upgrd, csd->blks_to_upgrd);
 				if (gv_cur_region->read_only || mu_int_errknt)
@@ -681,7 +670,7 @@ void mupip_integ(void)
 			{
 				if (LEAVE_BLOCKS_ALONE != blocks_free)
 					csd->trans_hist.free_blocks = blocks_free;
-				if (!mu_int_errknt && !muint_fast)
+				if (!mu_int_errknt && muint_all_index_blocks && !muint_fast)
 				{
 					if (mu_int_blks_to_upgrd != csd->blks_to_upgrd)
 						csd->blks_to_upgrd = mu_int_blks_to_upgrd;
@@ -715,7 +704,7 @@ void mupip_integ(void)
 		{
 			assert(!online_integ);
 			update_filehdr = FALSE;
-			if ((FALSE == block) && (FALSE == muint_key))
+			if (muint_all_index_blocks)
 			{
 				if ((0 == mu_map_errs) && ((0 != mu_int_data.kill_in_prog) || (0 != mu_int_data.abandoned_kills)))
 				{
@@ -739,7 +728,7 @@ void mupip_integ(void)
 			}
 			if (update_header_tn)
 			{
-				mu_int_data.trans_hist.early_tn = mu_int_data.trans_hist.header_open_tn = 2;
+				mu_int_data.trans_hist.early_tn = 2;
 				mu_int_data.trans_hist.curr_tn = 1;
 				/* curr_tn = 1 + 1 is done (instead of = 2) so as to use INCREMENT_CURR_TN macro.
 				 * this way all places that update db curr_tn are easily obtained by searching for the macro.

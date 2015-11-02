@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,6 @@
 
 #include "gtm_string.h"
 
-#include "hashtab.h"
-#include "hashtab_mname.h"      /* needed for lv_val.h */
 #include "lv_val.h"
 #include "stringpool.h"
 #include "op.h"
@@ -28,7 +26,6 @@ void op_fnlvname(mval *src, boolean_t return_undef_aliases,  mval *dst)
 	ht_ent_mname	*p, *min, *top;
 	int 		n;
 	mident		name;
-	lv_sbs_tbl 	*tbl;
 	lv_val 		*lv;
 
 	MV_FORCE_STR(src);
@@ -43,9 +40,9 @@ void op_fnlvname(mval *src, boolean_t return_undef_aliases,  mval *dst)
 	{
 		if (HTENT_VALID_MNAME(p, lv_val, lv) && '$' != *p->key.var_name.addr)	/* Avoid $ZWRTAC* variables in tree */
 		{
-			if (lv && (MV_DEFINED(&(lv->v))
-				   || ((tbl = lv->ptrs.val_ent.children) && (tbl->num || tbl->str))
-				   || (return_undef_aliases && ((1 < lv->stats.trefcnt) || (0 < lv->stats.crefcnt)))))
+			if (lv && (LV_IS_VAL_DEFINED(lv)
+					|| LV_HAS_CHILD(lv)
+					|| (return_undef_aliases && ((1 < lv->stats.trefcnt) || (0 < lv->stats.crefcnt)))))
 			{
 				MIDENT_CMP(&name, &p->key.var_name, n);
 				if (0 > n)

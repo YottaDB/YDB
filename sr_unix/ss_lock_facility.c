@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@ boolean_t ss_get_lock(gd_region *reg)
 			wcs_sleep(LOCK_SLEEP);
 			/* If near end of loop segment (LOCK_TRIES iters), see if target is dead and/or wake it up */
 			if (RETRY_CASLATCH_CUTOFF == (retries % LOCK_TRIES))
-				performCASLatchCheck(latch, LOOP_CNT_SEND_WAKEUP);
+				performCASLatchCheck(latch, TRUE);
 		}
 	}
 	DUMP_LOCKHIST();

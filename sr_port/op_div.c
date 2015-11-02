@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,13 +20,14 @@
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
 
+error_def(ERR_DIVZERO);
+error_def(ERR_NUMOFLOW);
+
 void	op_div (mval *u, mval *v, mval *q)
 {
 	bool		promo;
 	int4		c, exp;
 	mval		w, z;
-	error_def	(ERR_NUMOFLOW);
-	error_def	(ERR_DIVZERO);
 
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
@@ -39,21 +40,18 @@ void	op_div (mval *u, mval *v, mval *q)
 		{
 			q->mvtype = MV_NM | MV_INT;
 			return;
-		}
-		else
+		} else
 		{
 			w = *u;	     z = *v;
 			promote(&w); promote(&z);
 			u = &w;	     v = &z;
 		}
-	}
-	else if (u->mvtype & MV_INT)
+	} else if (u->mvtype & MV_INT)
 	{
 		w = *u;
 		promote(&w);
 		u = &w;
-	}
-	else if (v->mvtype & MV_INT)
+	} else if (v->mvtype & MV_INT)
 	{
 		w = *v;
 		promote(&w);
@@ -61,18 +59,12 @@ void	op_div (mval *u, mval *v, mval *q)
 	}
 	c = eb_div(v->m, u->m, q->m);
 	exp = u->e - v->e + c + MV_XBIAS;
-	if (exp >= EXPHI)
-	{
+	if (EXPHI <= exp)
 		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
-	}
 	else if (exp < EXPLO)
-	{
 		*q = literal_zero;
-	}
 	else if (exp < EXP_INT_OVERF  &&  exp > EXP_INT_UNDERF  &&  q->m[0] == 0  &&  (q->m[1]%ten_pwr[EXP_INT_OVERF-1-exp] == 0))
-	{
 		demote(q, exp, u->sgn ^ v->sgn);
-	}
 	else
 	{
 		q->mvtype = MV_NM;

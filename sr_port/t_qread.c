@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,7 @@
 #include "is_proc_alive.h"
 #include "cache.h"
 #include "longset.h"		/* needed for cws_insert.h */
+#include "hashtab.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "wcs_sleep.h"
 #include "add_inter.h"
@@ -51,7 +52,6 @@
 #include "io.h"			/* needed by gtmsecshr.h */
 #include "gtmsecshr.h"		/* for continue_proc */
 #endif
-#include "hashtab.h"
 #include "wcs_phase2_commit_wait.h"
 
 #ifdef GTM_CRYPT
@@ -69,7 +69,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	short			crash_count;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
@@ -133,7 +133,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	is_mm = (dba_mm == csd->acc_meth);
 	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit || mupip_jnl_recover);
-	if (0 < dollar_tlevel)
+	if (dollar_tlevel)
 	{
 		assert(sgm_info_ptr);
 		if (0 != sgm_info_ptr->cw_set_depth)
@@ -342,6 +342,12 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(0 <= cr->read_in_progress);
 				*cycle = cr->cycle;
 				cr->tn = csd->trans_hist.curr_tn;
+				/* Record history of most recent disk reads only in dbg builds for now. Although the macro
+				 * is just a couple dozen instructions, it is done while holding crit so we want to avoid
+				 * delaying crit unless really necessary. Whoever wants this information can enable it
+				 * by a build change to remove the DEBUG_ONLY part below.
+				 */
+				DEBUG_ONLY(DSKREAD_TRACE(csa, GDS_ANY_ABS2REL(csa,cr), cr->tn, process_id, blk, cr->cycle);)
 				if (!was_crit && !hold_onto_crit)
 					rel_crit(gv_cur_region);
 				/* read outside of crit may be of a stale block but should be detected by t_end or tp_tend */
@@ -410,7 +416,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			set_wc_blocked = TRUE;
 			break;
 		}
-		/* It is very important for cycle to be noted down before checking for read_in_progress/in_tend.
+		/* It is very important for cycle to be noted down BEFORE checking for read_in_progress/in_tend.
+		 * Because of this instruction order requirement, we need to have a read barrier just after noting down cr->cycle.
 		 * Doing it the other way round introduces the scope for a bug in the concurrency control validation logic in
 		 * t_end/tp_hist/tp_tend. This is because the validation logic relies on t_qread returning an atomically
 		 * consistent value of <"cycle","cr"> for a given input blk such that cr->buffaddr held the input blk's
@@ -421,6 +428,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 * in which case the cycle check in the validation logic will detect this.
 		 */
 		*cycle = cr->cycle;
+		SHM_READ_MEMORY_BARRIER;
 		sleep_invoked = FALSE;
 		for (lcnt = 1;  ; lcnt++)
 		{
@@ -462,6 +470,16 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				 * coherency delays in multi-processor environments) and this could lead to mysterious
 				 * failures including GTMASSERTs and database damage as the validation logic in t_end/tp_tend
 				 * relies on the fact that the cr->in_tend check here is accurate as of this point.
+				 *
+				 * Note that on architectures where a change done by another process needs two steps to be made
+				 * visible by another process (write memory barrier on the writer side AND a read memory barrier
+				 * on the reader side) this read memory barrier also serves the purpose of ensuring this process
+				 * sees an uptodate state of the global buffer whose contents got modified by the disk read (done
+				 * by another process) that finished just now. Example is the Alpha architecture where this is
+				 * needed. Example where this is not needed is the Power architecture (as of this writing) where
+				 * only the write memory barrier on the write side is necessary. As long as the reader sees any
+				 * update done AFTER the write memory barrier, it is guaranteed to see all updates done BEFORE
+				 * the write memory barrier.
 				 */
 				SHM_READ_MEMORY_BARRIER;
 				blocking_pid = cr->in_tend;

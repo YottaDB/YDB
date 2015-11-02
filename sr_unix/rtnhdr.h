@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +88,9 @@ typedef struct	rhead_struct
 	int4			temp_size;		/* (#) temp_size value of current module version */
 	struct rhead_struct	*current_rhead_adr;	/* (#) address of routine header of current module version */
 	struct rhead_struct	*old_rhead_adr;		/* (#) chain of replaced routine headers */
-        GTM64_ONLY(char  filler[8];) /* Need to make this structure 16 byte aligned */
+#	ifdef GTM_TRIGGER
+	void_ptr_t		trigr_handle;		/* Type is void to avoid needing gv_trigger.h for gv_trigger_t type addr */
+#	endif
 } rhdtyp;
 
 /* Routine table entry */
@@ -190,8 +192,12 @@ struct	sym_table
 #define	N_TEXT	0x04		/* text */
 #define	N_EXT	0x01		/* external bit, or'ed in */
 
+/* Flag values for get_src_line call */
+#define VERIFY		TRUE
+#define NOVERIFY	FALSE
+
 /* Prototypes */
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret);
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);
 rhdtyp *find_rtn_hdr(mstr *name);

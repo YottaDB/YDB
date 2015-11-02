@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@ GBLREF spdesc stringpool;
 
 #ifdef UNICODE_SUPPORTED
 #include "hashtab_int4.h"
+#include "hashtab.h"
 #include "gtm_utf8.h"
 
 GBLREF	boolean_t	badchar_inhibit;
@@ -41,7 +42,7 @@ error_def(ERR_MAXSTRLEN);
 	(1-based) byte offset of the replacement character within out_str rather than the
 	character itself.
 
-	Since stp_gcol() can potentially change out_str address, the byte offsets
+	Since "stp_gcol" can potentially change out_str address, the byte offsets
 	are stored instead of byte pointers. Also, note that the offset is not
 	0-based, since 0 can not be stored as valid entry in hash table.
 
@@ -90,7 +91,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	memset(xlate, 0, SIZEOF(xlate));
 	if (!MV_IS_SINGLEBYTE(in_str))
 	{ /* hash table not needed if input is entirely single byte */
-		init_hashtab_int4(&xlate_hash, 0);
+		init_hashtab_int4(&xlate_hash, 0, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 		hashtab_created = TRUE;
 	} else
 		hashtab_created = FALSE;
@@ -153,7 +154,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	size = src->str.len + src->str.char_len * max_len_incr;
 	size = (size > MAX_STRLEN) ? MAX_STRLEN : size;
 	ENSURE_STP_FREE_SPACE(size);
-	outbase = (unsigned char *)out_str->str.addr; /* recompute in case stp_gcol() changes out_str->str.addr */
+	outbase = (unsigned char *)out_str->str.addr; /* recompute in case "stp_gcol" changes out_str->str.addr */
 	outtop = outbase + out_str->str.len;
 	dstbase = stringpool.free;
 	dstlen = char_len = 0; /* character length of the result */
@@ -206,10 +207,11 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
  * the second argument specified in $TR() */
 void op_fnztranslate(mval *src,mval *in_str,mval *out_str,mval *dst)
 {
-	short int xlate[256];
+	int xlate[256];
 	unsigned char *inpt,*intop,*outpt,*dstp;
 	int n;
 	unsigned char ch;
+
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(in_str);
 	MV_FORCE_STR(out_str);
@@ -219,11 +221,11 @@ void op_fnztranslate(mval *src,mval *in_str,mval *out_str,mval *dst)
 	for (inpt = (unsigned char *)in_str->str.addr,
 		outpt = (unsigned char *)out_str->str.addr,
 		intop = inpt + n; inpt < intop ; inpt++, outpt++ )
-		if (xlate[*inpt] == -1)
-		    xlate[*inpt] = *outpt;
+		if (xlate[ch = *inpt] == -1)
+		    xlate[ch] = *outpt;
 	for (intop = (unsigned char *)in_str->str.addr + in_str->str.len ; inpt < intop ; inpt++)
-		if (xlate[*inpt] == -1)
-		    xlate[*inpt] = -2;
+		if (xlate[ch = *inpt] == -1)
+		    xlate[ch] = -2;
 	dstp = outpt = stringpool.free;
 	for (inpt = (unsigned char *)src->str.addr, intop = inpt + src->str.len ; inpt < intop ; )
 	{

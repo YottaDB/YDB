@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@
 #include "repl_instance.h"
 #include "iotcpdef.h"
 #include "gtmio.h"
+#include "replgbl.h"
 
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	60 /* max-wait in seconds for source server response after connection is established */
 #define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* max-wait in seconds to establish connection with the source server */
@@ -72,8 +73,12 @@ GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		repl_connection_reset;
 GBLREF 	mur_gbls_t		murgbl;
-GBLREF	boolean_t		src_node_same_endianness;
-GBLREF	boolean_t		src_node_endianness_known;
+
+error_def(ERR_PRIMARYNOTROOT);
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_TEXT);
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
@@ -117,12 +122,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 								   */
 	seq_num				triple_seqnum;
 	short				retry_num;
-	error_def(ERR_PRIMARYNOTROOT);
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_REPLINSTNOHIST);
-	error_def(ERR_TEXT);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assumed_remote_proto_ver = REPL_PROTO_VER_MULTISITE;
 	repl_log(stdout, TRUE, TRUE, "Assuming primary supports multisite functionality. Connecting "
 		"using multisite communication protocol.\n");
@@ -239,8 +241,6 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 
 		/* Send REPL_FETCH_RESYNC message */
 		memset(&resync_msg, 0, SIZEOF(resync_msg));
-		resync_msg.type = REPL_FETCH_RESYNC;
-		resync_msg.len = MIN_REPL_MSGLEN;
 		/* If we assume remote primary is multisite capable, we need to send the journal seqno of this instance
 		 * for comparison. If on the other hand, it is assumed to be only dualsite capable, we need to send the
 		 * dualsite_resync_seqno of this instance which is maintained in "jgbl.max_dualsite_resync_seqno".
@@ -252,9 +252,10 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		assert(resync_msg.resync_seqno);
 		resync_msg.proto_ver = REPL_PROTO_VER_THIS;
 		resync_msg.node_endianness = NODE_ENDIANNESS;
-		src_node_same_endianness = TRUE;
-		src_node_endianness_known = FALSE;
-		gtmrecv_repl_send((repl_msg_ptr_t)&resync_msg, "REPL_FETCH_RESYNC", resync_msg.resync_seqno);
+		REPLGBL.src_node_same_endianness = TRUE;
+		REPLGBL.src_node_endianness_known = FALSE;
+		gtmrecv_repl_send((repl_msg_ptr_t)&resync_msg, REPL_FETCH_RESYNC, MIN_REPL_MSGLEN,
+					"REPL_FETCH_RESYNC", resync_msg.resync_seqno);
 		if (repl_connection_reset)
 		{	/* Connection got reset during the above send */
 			rts_error(VARLSTCNT(1) ERR_REPLCOMM);
@@ -284,15 +285,15 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			if (wait_count <= 0)
 				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Waited too long to get message from primary. Check if primary is alive."));
-			if ( !src_node_endianness_known )
+			if (!REPLGBL.src_node_endianness_known)
 			{
-				src_node_endianness_known = TRUE;
+				REPLGBL.src_node_endianness_known = TRUE;
 				if ((REPL_MSGTYPE_LAST < msg.type) && (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg.type)))
-					src_node_same_endianness = FALSE;
+					REPLGBL.src_node_same_endianness = FALSE;
 				else
-					src_node_same_endianness = TRUE;
+					REPLGBL.src_node_same_endianness = TRUE;
 			}
-			if ( !src_node_same_endianness )
+			if (!REPLGBL.src_node_same_endianness)
 			{
 				msg.type = GTM_BYTESWAP_32(msg.type);
 				msg.len = GTM_BYTESWAP_32(msg.len);
@@ -308,21 +309,13 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 					assert(REPL_PROTO_VER_UNINITIALIZED != murgbl.remote_proto_ver);
 					assert(REPL_PROTO_VER_MULTISITE <= murgbl.remote_proto_ver);
 					memset(&instinfo_msg, 0, SIZEOF(instinfo_msg));
-					if ( src_node_same_endianness )
-					{
-						instinfo_msg.type = REPL_INSTANCE_INFO;
-						instinfo_msg.len = MIN_REPL_MSGLEN;
-					} else
-					{
-						instinfo_msg.type = GTM_BYTESWAP_32(REPL_INSTANCE_INFO);
-						instinfo_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
-					}
 					assert(NULL != jnlpool.repl_inst_filehdr);
 					memcpy(instinfo_msg.instname, jnlpool.repl_inst_filehdr->this_instname,
 						MAX_INSTNAME_LEN - 1);
 					instinfo_msg.was_rootprimary = (unsigned char)repl_inst_was_rootprimary();
 					murgbl.was_rootprimary = instinfo_msg.was_rootprimary;
-					gtmrecv_repl_send((repl_msg_ptr_t)&instinfo_msg, "REPL_INSTANCE_INFO", MAX_SEQNO);
+					gtmrecv_repl_send((repl_msg_ptr_t)&instinfo_msg, REPL_INSTANCE_INFO,
+								MIN_REPL_MSGLEN, "REPL_INSTANCE_INFO", MAX_SEQNO);
 					if (instinfo_msg.was_rootprimary && !need_instinfo_msg->is_rootprimary)
 						rts_error(VARLSTCNT(4) ERR_PRIMARYNOTROOT, 2,
 							LEN_AND_STR((char *)need_instinfo_msg->instname));
@@ -330,7 +323,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 
 				case REPL_NEED_TRIPLE_INFO:
 					need_tripleinfo_msg = RECAST(repl_needtriple_msg_ptr_t)&msg;
-					if ( src_node_same_endianness )
+					if (REPLGBL.src_node_same_endianness)
 						triple_seqnum = need_tripleinfo_msg->seqno;
 					else
 						triple_seqnum = GTM_BYTESWAP_64(need_tripleinfo_msg->seqno);
@@ -372,6 +365,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 
 				default:
 					repl_log(stdout, TRUE, TRUE, "Message of unknown type (%d) received\n", msg.type);
+					assert(FALSE);
 					rts_error(VARLSTCNT(1) ERR_REPLCOMM);
 					break;
 			}
@@ -381,7 +375,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			rts_error(VARLSTCNT(1) ERR_REPLCOMM);
 			return ERR_REPLCOMM;
 		}
-		if ( src_node_same_endianness )
+		if (REPLGBL.src_node_same_endianness)
 			QWASSIGN(*resync_seqno, *(seq_num *)&msg.msg[0]);
 		else
 			QWASSIGN(*resync_seqno, GTM_BYTESWAP_64(*(seq_num *)&msg.msg[0]));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,6 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"
@@ -33,7 +32,7 @@ GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF stack_frame	*frame_pointer;
 GBLREF tp_frame		*tp_pointer;
 GBLREF symval		*curr_symval;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 
 /* Note this module follows the same basic pattern as gtm_newintrisic which handles
    the same function but for intrinsic vars instead of local vars. */
@@ -144,7 +143,7 @@ void op_newvar(uint4 arg1)
 			}
 		}
 		/* Adjust stackframe and mvstent pointers in relevant tp_frame blocks */
-		assert((NULL == tp_pointer && 0 == dollar_tlevel) || (NULL != tp_pointer && 0 != dollar_tlevel));
+		assert(((NULL == tp_pointer) && !dollar_tlevel) || ((NULL != tp_pointer) && dollar_tlevel));
 		for (tpp = tp_pointer; (tpp && ((unsigned char *)tpp->fp < top)); tpp = tpp->old_tp_frame)
 		{
 			if ((unsigned char *)tpp->fp > stacktop)

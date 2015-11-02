@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,8 +44,11 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 	VMS_ONLY(int4	count;)
 	mval		*mv;
 	zshow_out	output, *out;
+	DCL_THREADGBL_ACCESS;
 	MAXSTR_BUFF_DECL(buff);
 
+	SETUP_THREADGBL_ACCESS;
+	TREF(in_zwrite) = TRUE;
 	VAR_START(var, arg1);
 	VMS_ONLY(va_count(count));
 	assert(1 < count);
@@ -87,6 +90,7 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 					als_zwrhtab_init();
 				if (local_buff)
 					MAXSTR_BUFF_FINI;
+				TREF(in_zwrite) = FALSE;
 				return;
 				break;
 			case ZWRITE_ALL:
@@ -118,4 +122,5 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 	va_end(var);
 	if (local_buff)
 		MAXSTR_BUFF_FINI;
+	TREF(in_zwrite) = FALSE;
 }

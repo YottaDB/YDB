@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,6 @@
 #include "gtm_stdio.h"
 
 #include "op.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -27,7 +25,7 @@
 #include "stack_frame.h"
 
 GBLREF symval		*curr_symval;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF stack_frame	*frame_pointer;
 GBLREF mval		*alias_retarg;
 
@@ -35,7 +33,7 @@ GBLREF mval		*alias_retarg;
  *
  *  Note that this opcode's function is very similar to op_setalsct2alsct() but is necessarily different because the
  *  source container is a temporary mval passed back through a function return rather than the lv_val op_setalsct2alsct()
- *  deals with. Consequently, the amount of verification we can do reduced. But this is acceptable due to the checks
+ *  deals with. Consequently, the amount of verification we can do is reduced. But this is acceptable due to the checks
  *  done by unw_retarg() and op_exfunretals() which pre-processed this value for us. There is also different reference
  *  count maintenance to do than the op_setalsct2alsct() opcode. With substantially more work to reorganize how SET
  *  operates, it would likely be possible to combine these functions but the way things are structured now, all the
@@ -44,50 +42,39 @@ GBLREF mval		*alias_retarg;
  */
 void op_setfnretin2alsct(mval *srcmv, lv_val *dstlv)
 {
-	lv_val		*lvref, *tp_val;
- 	lv_sbs_tbl	*tbl;
-	symval		*sym;
-
-	error_def(ERR_ALIASEXPECTED);
+	lv_val		*src_lvref, *dst_lvbase;
+	symval		*sym_src_lvref, *sym_dstlv;
 
 	assert(srcmv);
 	assert(dstlv);
 	assert(srcmv == alias_retarg);
-	assert(MV_SBS == dstlv->ptrs.val_ent.parent.sbs->ident);  	/* Verify subscripted var */
+	assert(!LV_IS_BASE_VAR(dstlv));	/* Verify subscripted var */
 	assert(srcmv->mvtype & MV_ALIASCONT);
 	/* Verify is a temp mval */
 	assert((char *)srcmv >= (char *)frame_pointer->temps_ptr
 	       && (char *)srcmv < ((char *)frame_pointer->temps_ptr + (SIZEOF(char *) * frame_pointer->temp_mvals)));
-	lvref = (lv_val *)srcmv->str.addr;
-	assert(lvref);
-	assert(MV_SYM == lvref->ptrs.val_ent.parent.sym->ident);	/* Verify base var */
+	assert(MV_IS_STRING(srcmv) && (0 == srcmv->str.len));
+	src_lvref = (lv_val *)srcmv->str.addr;
+	assert(src_lvref);
+	assert(LV_IS_BASE_VAR(src_lvref));	/* Verify base var */
 	assert(srcmv != (mval *)dstlv);	/* Equality not possible since src is a temp mval and destination cannot be */
-	if (dollar_tlevel)
-	{	/* Determine base var that needs to be cloned for this subscripted container var being modified */
-		tp_val = dstlv;
-		tbl = tp_val->ptrs.val_ent.parent.sbs;
-		while (MV_SYM != tbl->ident)
-		{
-			tp_val = tbl->lv;
-			tbl = tp_val->ptrs.val_ent.parent.sbs;
-		}
-		if (NULL != tp_val->tp_var && !tp_val->tp_var->var_cloned)
-			TP_VAR_CLONE(tp_val);	/* clone the tree. */
-	}
+	dst_lvbase = LV_GET_BASE_VAR(dstlv);
+	if (dollar_tlevel && (NULL != dst_lvbase->tp_var) && !dst_lvbase->tp_var->var_cloned)
+		TP_VAR_CLONE(dst_lvbase);	/* clone the tree. */
 	/* Note reference counts were increased in unw_retarg() to preserve the values the input container pointed to
 	 * when they potentially went out of scope during the return. So we do not increment them further here.
 	 */
 	DBGRFCT((stderr, "op_setfnretin2alsct: Copying funcret container referencing lvval 0x"lvaddr" into container 0x"lvaddr
-		 "\n", lvref, dst_lv));
+		 "\n", src_lvref, dstlv));
 	dstlv->v = *srcmv;
-	assert(0 < lvref->stats.trefcnt);
-	assert(0 <= lvref->stats.crefcnt);
-	assert(lvref->stats.trefcnt >= lvref->stats.crefcnt);
+	assert(0 < src_lvref->stats.trefcnt);
+	assert(0 <= src_lvref->stats.crefcnt);
+	assert(src_lvref->stats.trefcnt >= src_lvref->stats.crefcnt);
 	/* Mark as alias-active the symval(s) of the destination container's and the source's pointed-to arrays */
-	MARK_ALIAS_ACTIVE(MIN(dstlv->ptrs.val_ent.parent.sbs->sym->symvlvl, lvref->ptrs.val_ent.parent.sym->symvlvl));
-	/* Last operation is to mark the base var for our container array that it now has a container in it.
-	   But first it must be found by going backwards through the levels.
-	*/
-	MARK_CONTAINER_ONBOARD(dstlv);
+	sym_dstlv = LV_GET_SYMVAL(dst_lvbase);
+	sym_src_lvref = LV_GET_SYMVAL(src_lvref);
+	MARK_ALIAS_ACTIVE(MIN(sym_dstlv->symvlvl, sym_src_lvref->symvlvl));
+	/* Last operation is to mark the base var for our container array that it now has a container in it. */
+	MARK_CONTAINER_ONBOARD(dst_lvbase);
 	alias_retarg = NULL;
 }

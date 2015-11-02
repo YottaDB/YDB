@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,12 @@ GBLREF	gd_addr			*gd_header;
 GBLREF	tp_region		*grlist;
 GBLREF	boolean_t		mu_star_specified;
 GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
-GBLREF	unsigned int		parms_cnt;			/* Number of parameters specified in command line */
+
+error_def(ERR_MUBCKNODIR);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUNODBNAME);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_TEXT);
 
 #define	CHECK_IF_NOT_ABSENT(QUALIFIER)										\
 {														\
@@ -59,13 +64,9 @@ void mu_getlst(char *name, int4 size)
 	gd_region	*reg;
 	tp_region	*list;
 	boolean_t	matched;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_MUBCKNODIR);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_MUNODBNAME);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_TEXT);
-
+	SETUP_THREADGBL_ACCESS;
 	mu_star_specified = FALSE;
 	assert(size > 0);
 	rlen = SIZEOF(rbuff);
@@ -80,7 +81,7 @@ void mu_getlst(char *name, int4 size)
 	{
 		if (CLI_PRESENT == cli_present("REPLINSTANCE"))
 		{	/* Region corresponding to the replication instance file has been specified. */
-			if (0 == parms_cnt)
+			if (0 == TREF(parms_cnt))
 			{	/* No REG_NAME or SAVE_DIR parameter specified in command line. Disable other backup qualifiers. */
 				CHECK_IF_NOT_ABSENT("BKUPDBJNL");
 				CHECK_IF_NOT_ABSENT("BYTESTREAM");
@@ -110,7 +111,7 @@ void mu_getlst(char *name, int4 size)
 			/* Do not let the db region backup destination list be affected if -replinstance had directory specified */
 			is_directory = FALSE;
 		}
-		if ((0 == parms_cnt) && mu_repl_inst_reg_list)
+		if ((0 == TREF(parms_cnt)) && mu_repl_inst_reg_list)
 		{	/* -REPLINSTANCE was specified and no other parameters were specified. Do not bother prompting
 			 * the user to enter values for REG_NAME and SAVE_DIR parameters. */
 			return;
@@ -136,7 +137,7 @@ void mu_getlst(char *name, int4 size)
 			matched = FALSE;
 			for (i = 0, reg = gd_header->regions; i < gd_header->n_regions; i++, reg++)
 			{
-				if (TRUE == str_match((char *)reg->rname, reg->rname_len, c1, c2 - c1))
+				if (TRUE == str_match((char *)REG_STR_LEN(reg), c1, c2 - c1))
 				{
 					matched = TRUE;
 					if (NULL == (list = insert_region(reg, &(grlist), NULL, size)))

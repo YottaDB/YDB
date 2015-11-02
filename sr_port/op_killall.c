@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashtab.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
+
 #include "lv_val.h"
 #include "op.h"
 
@@ -26,7 +25,7 @@ void op_killall(void)
 	for (sym = curr_symval->h_symtab.base, top = sym + curr_symval->h_symtab.size; sym < top; sym++)
 	{
 		if (HTENT_VALID_MNAME(sym, lv_val, lv))
-			lv_kill(lv, TRUE);
+			lv_kill(lv, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);
 	}
 	return;
 }

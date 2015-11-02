@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,11 +40,13 @@
 #include "dse_is_blk_free.h"
 #include "bit_set.h"
 #include "bit_clear.h"
+#include "t_begin_crit.h"
 #include "t_write.h"
+#include "t_end.h"
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "process_deferred_stale.h"
-#include "dse_simulate_t_end.h"
+#include "gvcst_blk_build.h"
 
 #define MAX_UTIL_LEN 80
 
@@ -56,6 +58,8 @@ GBLREF block_id         patch_curr_blk;
 GBLREF gd_region        *gv_cur_region;
 GBLREF short            crash_count;
 GBLREF boolean_t        unhandled_stale_timer_pop;
+GBLREF srch_hist	dummy_hist;
+GBLREF unsigned char	*non_tp_jfb_buff_ptr;
 
 void dse_maps(void)
 {
@@ -79,9 +83,11 @@ void dse_maps(void)
 	jnl_buffer_ptr_t	jbp;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	cw_set_element		*cse;
 
 	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DBRDONLY);
+	error_def(ERR_DSEFAIL);
 
 	if (CLI_PRESENT == cli_present("BUSY") || CLI_PRESENT == cli_present("FREE") ||
 		CLI_PRESENT == cli_present("MASTER") || CLI_PRESENT == cli_present("RESTORE_ALL"))
@@ -190,7 +196,10 @@ void dse_maps(void)
 		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
 			bml_newmap((blk_hdr_ptr_t)(bml_list + bml_index * bml_size), bml_size, csa->ti->curr_tn);
 		if (!was_crit)
+		{
 			grab_crit(gv_cur_region);
+			csa->hold_onto_crit = TRUE;	/* need to do this AFTER grab_crit */
+		}
 		blk = get_dir_root();
 		assert(blk < bplmap);
 		csa->ti->free_blocks = total_blks - DIVIDE_ROUND_UP(total_blks, bplmap);
@@ -199,11 +208,11 @@ void dse_maps(void)
 		dse_m_rest(blk, bml_list, bml_size, &csa->ti->free_blocks, TRUE);
 		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
 		{
+			t_begin_crit(ERR_DSEFAIL);
 			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			CWS_RESET;
 			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
-			csa->ti->early_tn++;
 			blk_ptr = bml_list + bml_index * bml_size;
 			blkhist.blk_num = blk_index;
 			if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
@@ -212,7 +221,8 @@ void dse_maps(void)
 			BLK_SEG(bs_ptr, blk_ptr + SIZEOF(blk_hdr), bml_size - SIZEOF(blk_hdr));
 			BLK_FINI(bs_ptr, bs1);
 			t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
-			dse_simulate_t_end(gv_cur_region, csa, csa->ti->curr_tn);
+			BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, cse, csa->ti->curr_tn);
+			t_end(&dummy_hist, NULL, csa->ti->curr_tn);
 		}
 		/* Fill in master map */
 		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
@@ -227,7 +237,10 @@ void dse_maps(void)
 				csa->nl->highest_lbm_blk_changed = blk_index;
 		}
 		if (!was_crit)
+		{
+			csa->hold_onto_crit = FALSE;	/* need to do this before the rel_crit */
 			rel_crit(gv_cur_region);
+		}
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
 		free(bml_list);

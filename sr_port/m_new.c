@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,10 +27,15 @@ LITREF nametabent 	svn_names[];
 GBLREF char 		window_token;
 GBLREF mident 		window_ident;
 LITREF svn_data_type 	svn_data[];
-GBLREF oprtype		*for_stack[], **for_stack_ptr;
 GBLREF triple 		*curr_fetch_trip, *curr_fetch_opr;
 GBLREF triple		*curtchain;
 GBLREF int4 		curr_fetch_count;
+
+error_def(ERR_INVSVN);
+error_def(ERR_SVNONEW);
+error_def(ERR_SVNEXPECTED);
+error_def(ERR_RPARENMISSING);
+error_def(ERR_VAREXPECTED);
 
 int m_new(void)
 {
@@ -40,13 +45,9 @@ int m_new(void)
 	int		count;
 	mvar		*var;
 	boolean_t	parse_warn;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_INVSVN);
-	error_def(ERR_SVNONEW);
-	error_def(ERR_SVNEXPECTED);
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_VAREXPECTED);
-
+	SETUP_THREADGBL_ACCESS;
 	switch (window_token)
 	{
 		case TK_IDENT:
@@ -76,7 +77,7 @@ int m_new(void)
 			return TRUE;
 		case TK_DOLLAR:
 			advancewindow();
-			if (window_token == TK_IDENT)
+			if (TK_IDENT == window_token)
 			{
 				parse_warn = FALSE;
 				if ((n = namelook(svn_index, svn_names, window_ident.addr, window_ident.len)) >= 0)
@@ -117,7 +118,7 @@ int m_new(void)
 			tmp = maketriple(OC_XNEW);
 			tmp->operand[0] = put_ilit((mint) 0);
 			ins_triple(tmp);
-			if (for_stack_ptr == for_stack)
+			if (TREF(for_stack_ptr) == TADR(for_stack))
 				start_fetches (OC_FETCH);
 			else
 				start_for_fetches ();
@@ -150,8 +151,8 @@ int m_new(void)
 				ins_triple(next);
 				ref = next;
 				count++;
-			} while (window_token == TK_COMMA);
-			if (window_token != TK_RPAREN)
+			} while (TK_COMMA == window_token);
+			if (TK_RPAREN != window_token)
 			{
 				stx_error(ERR_RPARENMISSING);
 				return FALSE;
@@ -159,7 +160,7 @@ int m_new(void)
 			advancewindow();
 			org->operand[0] = put_ilit((mint) count);
 			ins_triple(org);
-			if (for_stack_ptr == for_stack)
+			if (TREF(for_stack_ptr) == TADR(for_stack))
 				start_fetches (OC_FETCH);
 			else
 				start_for_fetches ();

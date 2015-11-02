@@ -36,8 +36,6 @@ static char rcsid[] = "$Header:$";
 #include "dpgbldir.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 
-GBLREF bool		gv_curr_subsc_null;
-GBLREF bool		gv_prev_subsc_null;
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*gd_header;
@@ -52,8 +50,9 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 	parse_blk	pblk;
 	int4		status;
 	gd_segment	*cur_seg, *last_seg;
+	DCL_THREADGBL_ACCESS;
 
-
+	SETUP_THREADGBL_ACCESS;
 /*	Pointers into the global reference */
 	ptr = ref;
 	end = ref + len;
@@ -116,8 +115,9 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 		mval2subsc(&v, gv_currkey);
 		ptr       += si.value;
 	}
-	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
-	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
+	TREF(gv_some_subsc_null) = was_null; /* if true, it indicates there is a null subscript (except the last subscript)
+						in current key */
+	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null  &&  NEVER == gv_cur_region->null_subs)
 		return -OMI_ER_DB_INVGLOBREF;
 	return 0;

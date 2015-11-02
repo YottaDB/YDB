@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,12 +24,27 @@
 
 #define	NO_STRING	"NO"
 
-GBLDEF char	 	*parm_ary[MAX_PARMS];		/* Parameter strings buffers */
-GBLDEF unsigned int	parms_cnt;			/* Parameters count */
+/* Dynamically allocates (that is, grows) enough space for the current array
+ * of parameter strings during the lifetime of the process. Since the number
+ * of array elements is limited, it is better to allocate memory as needed
+ * rather than constantly free and reallocate. */
+#define GROW_HEAP_IF_NEEDED(PARM_ARY_INDEX)									\
+{														\
+	if (TAREF1(parm_str_len, PARM_ARY_INDEX) > TAREF1(parm_ary_len, PARM_ARY_INDEX))			\
+	{													\
+		if (TAREF1(parm_ary, PARM_ARY_INDEX))								\
+			free(TAREF1(parm_ary, PARM_ARY_INDEX));							\
+														\
+		TAREF1(parm_ary, PARM_ARY_INDEX) = (char *)malloc(TAREF1(parm_str_len, PARM_ARY_INDEX));	\
+														\
+		TAREF1(parm_ary_len, PARM_ARY_INDEX) = TAREF1(parm_str_len, PARM_ARY_INDEX);			\
+	}													\
+}
+
 GBLDEF void 		(*func)(void);			/* Function to be dispatched
 							   to for this command */
 
-GBLREF char 		cli_err_str[];	/* Parse Error message buffer */
+GBLREF char 		cli_err_str[];			/* Parse Error message buffer */
 static CLI_ENTRY 	*gpqual_root;			/* pointer to root of
 							   subordinate qualifier table */
 static CLI_ENTRY 	*gpcmd_qual;			/* pointer command qualifier table */
@@ -40,6 +55,10 @@ GBLREF char 		cli_token_buf[];
 GBLREF CLI_ENTRY 	*cmd_ary;
 
 GBLREF IN_PARMS *cli_lex_in_ptr;
+
+error_def(ERR_CLIERR);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUPCLIERR);
 
 /*
  * -----------------------------------------------
@@ -139,7 +158,7 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 			if (-1 != match_ind)
 			{
 				if (FALSE == len_match)
-					return(-1);
+					return (-1);
 				break;
 			} else
 			{
@@ -155,8 +174,8 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 		ind++;
 	}
 	if (-1 != match_ind && gpqual_root && 0 == STRNCMP_STR(gpqual_root->name, str))
-		return(-1);
-	return(match_ind);
+		return (-1);
+	return (match_ind);
 }
 
 /*
@@ -173,7 +192,7 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
  */
 int 	find_verb(char *str)
 {
-	return(find_entry(str, cmd_ary));
+	return (find_entry(str, cmd_ary));
 }
 
 
@@ -193,8 +212,8 @@ int 	find_verb(char *str)
 CLI_ENTRY *find_cmd_param(char *str, CLI_ENTRY *pparm, int follow)
 {
 	CLI_ENTRY	*pparm_tmp;
-	int 	ind, ind_match;
-	char 	*sp;
+	int		ind, ind_match;
+	char		*sp;
 
 	ind_match = -1;
 	if (NULL == pparm)
@@ -242,15 +261,17 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	CLI_ENTRY 	*pparm;
 	char 		*opt_str, *val_str;
 	int 		neg_flg;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* -----------------------------------------
 	 * get qualifier marker, or parameter token
 	 * -----------------------------------------
 	 */
-	if (VAL_LIST == gpcmd_verb->val_type && parms_cnt == gpcmd_verb->max_parms)
-		return(0);
+	if (VAL_LIST == gpcmd_verb->val_type && TREF(parms_cnt) == gpcmd_verb->max_parms)
+		return (0);
 	if (!cli_look_next_token(eof))
-		return(0);
+		return (0);
 	/* -------------------------------------------------------------------
 	 * here cli_token_buf is set by the previous cli_look_next_token(eof)
 	 * call itself since it in turn calls cli_gettoken()
@@ -270,16 +291,16 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		 */
 		skip_white_space();
 		cli_get_string_token(eof);
-		if (parms_cnt >= gpcmd_verb->max_parms)
+		if (TREF(parms_cnt) >= gpcmd_verb->max_parms)
 		{
 			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Too many parameters ");
-			return(-1);
+			return (-1);
 		}
-		if (parm_ary[parms_cnt] && (((char *)-1L) != parm_ary[parms_cnt]))
-			free(parm_ary[parms_cnt]);
-		MALLOC_CPY_STR(parm_ary[parms_cnt], cli_token_buf);
-		parms_cnt++;
-		return(1);
+		TAREF1(parm_str_len, TREF(parms_cnt)) = strlen(cli_token_buf) + 1;
+		GROW_HEAP_IF_NEEDED(TREF(parms_cnt));
+		memcpy(TAREF1(parm_ary, TREF(parms_cnt)), cli_token_buf, TAREF1(parm_str_len, TREF(parms_cnt)));
+		(TREF(parms_cnt))++;
+		return (1);
 	}
 	/* ---------------------------------------------------------------------
 	 * cli_gettoken(eof) need not be checked for return value since earlier
@@ -291,7 +312,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	if (!pcmd_parms)
 	{
 		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "No qualifiers allowed for this command");
-		return(-1);
+		return (-1);
 	}
 	/* ------------------------------------------
 	 * Qualifiers must start with qualifier token
@@ -300,7 +321,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	if (!cli_is_qualif(cli_token_buf))
 	{
 		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Qualifier expected instead of : %s ", opt_str);
-		return(-1);
+		return (-1);
 	}
 	/* -------------------------
 	 * Get the qualifier string
@@ -309,7 +330,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	if (!cli_look_next_token(eof) || 0 == cli_gettoken(eof))
 	{
 		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Qualifier string missing %s ", opt_str);
-		return(-1);
+		return (-1);
 	}
 	/* ---------------------------------------
 	 * Fold the qualifier string to upper case
@@ -321,7 +342,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	 * -------------------------
 	 */
 	if (-1 == (neg_flg = cli_check_negated(&opt_str, pcmd_parms, &pparm)))
-		return(-1);
+		return (-1);
 	/* -------------------------------------------------------------
 	 * If value is disallowed for this qualifier, and an assignment
 	 * token is encounter, report error, values not allowed for
@@ -335,7 +356,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
 			  "Assignment is not allowed for this option : %s",
 			  pparm->name);
-			return(-1);
+			return (-1);
 		}
 	} else
 	{	/* --------------------------------------------------
@@ -348,7 +369,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 	    		if (VAL_REQ == pparm->required)
 			{
 				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option : %s needs value", pparm->name);
-				return(-1);
+				return (-1);
 			} else
 			{
 				if (pparm->present)
@@ -370,7 +391,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 				{
 					MALLOC_CPY_STR(pparm->pval_str, pparm->parm_values->prompt);
 					if (!cli_get_sub_quals(pparm))
-						return(-1);
+						return (-1);
 				}
 			}
 		} else
@@ -383,7 +404,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			if (!cli_is_assign(cli_token_buf))
 			{
 				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Assignment missing after option : %s", pparm->name);
-				return(-1);
+				return (-1);
 			}
 			/* --------------------------------------------------------
 			 * get the value token, "=" is NOT a token terminator here
@@ -394,13 +415,13 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 				SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized option : %s, value expected but not found",
 						pparm->name);
 				cli_lex_in_ptr->tp = 0;
-				return(-1);
+				return (-1);
 			}
 			val_str = cli_token_buf;
 			if (!cli_numeric_check(pparm, val_str))
 			{
 				cli_lex_in_ptr->tp = 0;
-				return(-1);
+				return (-1);
 			}
 			if (pparm->present)
 			{	/* The option was specified before, so clean up that one,
@@ -417,7 +438,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 			 */
 			MALLOC_CPY_STR(pparm->pval_str, cli_token_buf);
 			if (!cli_get_sub_quals(pparm))
-				return(-1);
+				return (-1);
 		}
 	}
 	if (pparm->present)
@@ -445,7 +466,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 		gpcmd_verb = pparm;	/* this needs to be done in order for check_disallow() to do the proper disallow check.
 					 * an example that will not work otherwise is cli_disallow_mupip_replic_receive() */
 	}
-	return(1);
+	return (1);
 }
 
 /* -----------------------------------------------------
@@ -460,6 +481,7 @@ int 	parse_arg(CLI_ENTRY *pcmd_parms, int *eof)
 boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 {
 	boolean_t retval = TRUE;
+
 	if (VAL_NUM == pparm->val_type)
 	{
 		if (pparm->hex_num)
@@ -479,7 +501,7 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 			retval = FALSE;
 		}
 	}
-	return(retval);
+	return (retval);
 }
 
 /*---------------------------
@@ -511,7 +533,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 		{
 			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Unrecognized option : %s", *opt_str_ptr);
 			cli_lex_in_ptr->tp = 0;
-			return(-1);
+			return (-1);
 		} else
 		{
 			/* It was a valid qualifier with the prefix NO */
@@ -526,7 +548,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 	if (!(*pparm_ptr)->negatable && neg_flg)
 	{
 		SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option %s may not be negated", *opt_str_ptr);
-		return(-1);
+		return (-1);
 	}
 	return neg_flg;
 }
@@ -585,7 +607,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			 */
 			if (-1 == (neg_flg = cli_check_negated( &tmp_str_ptr, pparm_qual, &pparm1)))
 				return FALSE;
-			if ( 1 == neg_flg)
+			if (1 == neg_flg)
 				len_str -=  STRLEN(NO_STRING);
 
 			if ((ptr_equal) && (ptr_equal + 1 < ptr_next_comma))
@@ -704,13 +726,14 @@ int parse_cmd(void)
 	char 	*cmd_str;
 	int 	opt_cnt;
 	int 	eof, cmd_err;
-	error_def(ERR_CLIERR);
+        DCL_THREADGBL_ACCESS;
 
+        SETUP_THREADGBL_ACCESS;
 	opt_cnt = 0;
-	gpqual_root = 0;
+	gpqual_root = NULL;
 	func = 0;
 	cmd_err = 0;
-	parms_cnt = 0;			/* Parameters count */
+	TREF(parms_cnt) = 0;			/* Parameters count */
 	*cli_err_str = 0;
 
 	cmd_str = cli_token_buf;
@@ -721,8 +744,8 @@ int parse_cmd(void)
 	if (0 == cli_gettoken(&eof))
 	{
 		if (eof)
-			return(EOF);
-		return(0);
+			return (EOF);
+		return (0);
 	}
 	/* ------------------------------
 	 * Find command in command table
@@ -772,15 +795,15 @@ int parse_cmd(void)
 	if (-1 == res)
 		func = 0;
 	else
-		return(0);
+		return (0);
 	/* -------------------------
 	 * If gettoken returned EOF
 	 * -------------------------
 	 */
 	if (eof)
-		return(EOF);
+		return (EOF);
 	else
-		return(ERR_CLIERR);
+		return (ERR_CLIERR);
 }
 
 /* ------------------------------------------------------------
@@ -800,7 +823,6 @@ CLI_ENTRY *get_parm_entry(char *parm_str)
 	CLI_ENTRY	*pparm;
 	bool		root_match;
 	char		local_str[MAX_LINE], *tmp_ptr;
-	error_def(ERR_MUPCLIERR);
 
 	strncpy(local_str, parm_str, SIZEOF(local_str) - 1);
 	root_match = (gpqual_root && !STRNCMP_STR(gpqual_root->name, local_str));
@@ -810,7 +832,7 @@ CLI_ENTRY *get_parm_entry(char *parm_str)
 	 * ---------------------------------------
 	 */
 	if (!gpcmd_qual)
-		return(NULL);
+		return (NULL);
 	if (NULL == strchr(local_str,'.'))
 		pparm = find_cmd_param(local_str, gpcmd_qual, TRUE);
 	else
@@ -825,11 +847,11 @@ CLI_ENTRY *get_parm_entry(char *parm_str)
 
 	}
 	if (root_match && !pparm)
-		return(gpqual_root);
+		return (gpqual_root);
 	else if (pparm)
-		return(pparm);
+		return (pparm);
 	else
-		return(NULL);
+		return (NULL);
 }
 
 /*
@@ -855,12 +877,12 @@ int cli_present(char *entry)
 	if (pparm = get_parm_entry(local_str))
 	{
 		if (pparm->negated)
-			return(CLI_NEGATED);
+			return (CLI_NEGATED);
 		if ((CLI_PRESENT == pparm->present) || (CLI_DEFAULT == pparm->present))
-			return(CLI_PRESENT);
+			return (CLI_PRESENT);
 	}
 
-	return(CLI_ABSENT);
+	return (CLI_ABSENT);
 }
 
 /*
@@ -885,12 +907,12 @@ bool cli_get_value(char *entry, char val_buf[])
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	cli_strupper(local_str);
 	if (NULL == (pparm = get_parm_entry(local_str)))
-		return(FALSE);
+		return (FALSE);
 	if (!pparm->present || NULL == pparm->pval_str)
-		return(FALSE);
+		return (FALSE);
 	else
 		strcpy(val_buf, pparm->pval_str);
-	return(TRUE);
+	return (TRUE);
 }
 
 /*
@@ -911,8 +933,8 @@ boolean_t cli_negated(char *entry) 		/* entity */
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	cli_strupper(local_str);
 	if (pparm = get_parm_entry(local_str))
-		return(pparm->negated);
-	return(FALSE);
+		return (pparm->negated);
+	return (FALSE);
 }
 
 
@@ -925,19 +947,20 @@ bool cli_get_parm(char *entry, char val_buf[])
 	int		eof;
 	char		*gets_res;
 	int		parm_len;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ind = 0;
 	assert(0 != gpcmd_parm_vals);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	cli_strupper(local_str);
 	match_ind = -1;
-
-	while (0 < strlen(sp = (gpcmd_parm_vals + ind)->name))
+	while (0 < strlen(sp = (gpcmd_parm_vals + ind)->name)) /* implicit assignment intended */
 	{
-		if (0 == (res = STRNCMP_STR(sp, local_str)))
+		if (0 == (res = STRNCMP_STR(sp, local_str))) /* implicit assignment intended */
 		{
 			if (-1 != match_ind)
-				return(FALSE);
+				return (FALSE);
 			else
 				match_ind = ind;
 		} else
@@ -949,7 +972,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 	}
 	if (-1 != match_ind)
 	{	/* If no value, prompt for it */
-		if (NULL == parm_ary[match_ind])
+		if (NULL == TAREF1(parm_ary, match_ind))
 		{
 			PRINTF("%s", (gpcmd_parm_vals + match_ind)->prompt);
 		/* smw FGETS(local_str, MAX_LINE, stdin, gets_res);	*/
@@ -963,10 +986,11 @@ bool cli_get_parm(char *entry, char val_buf[])
 					local_str[parm_len - 1] = '\0';
 					--parm_len;
 				}
-				parm_ary[match_ind] = malloc(parm_len + 1);
+				TAREF1(parm_str_len, match_ind) = parm_len + 1;
+				GROW_HEAP_IF_NEEDED(match_ind);
 				if (parm_len)
-					memcpy(parm_ary[match_ind], &local_str[0], parm_len);
-				*(parm_ary[match_ind] + parm_len) = '\0';
+					memcpy(TAREF1(parm_ary, match_ind), &local_str[0], parm_len);
+				*(TAREF1(parm_ary, match_ind) + parm_len) = '\0';
 			} else
 			{	/* No string was returned so create a real ghost to point to.
 				   Note that this should be revisited since this is NOT what should
@@ -974,26 +998,29 @@ bool cli_get_parm(char *entry, char val_buf[])
 				   return a null parm since current behaviors have a dependency on it
 				   SE 10/2003
 				 */
-				parm_ary[match_ind] = malloc(1);
-				*parm_ary[match_ind] = '\0';
+				TAREF1(parm_str_len, match_ind) = 1;
+				GROW_HEAP_IF_NEEDED(match_ind);
+				*TAREF1(parm_ary, match_ind) = '\0';
 			}
-		} else if (((char *)-1L) == parm_ary[match_ind])
-			return(FALSE);
-		strcpy(val_buf, parm_ary[match_ind]);
+		} else if (-1 == *TAREF1(parm_ary, match_ind) && 1 == TAREF1(parm_str_len, match_ind))
+			return (FALSE);
+		strcpy(val_buf, TAREF1(parm_ary, match_ind));
 		if (!cli_look_next_token(&eof) || (0 == cli_gettoken(&eof)))
-			parm_ary[match_ind] = (char *)-1L;
-		else
+		{
+			TAREF1(parm_str_len, match_ind) = 1;
+			GROW_HEAP_IF_NEEDED(match_ind);
+			*TAREF1(parm_ary, match_ind) = -1;
+		} else
 		{
 			parm_len = STRLEN(cli_token_buf) + 1;
 			if (MAX_LINE < parm_len)
 			{
 				PRINTF("Parameter string too long\n");
-				return(FALSE);
+				return (FALSE);
 			}
-			if (parm_ary[match_ind])
-				free(parm_ary[match_ind]);
-			parm_ary[match_ind] = malloc(parm_len);
-			memcpy(parm_ary[match_ind], cli_token_buf, parm_len);
+			TAREF1(parm_str_len, match_ind) = parm_len;
+			GROW_HEAP_IF_NEEDED(match_ind);
+			memcpy(TAREF1(parm_ary, match_ind), cli_token_buf, parm_len);
 		}
 	} else
 	{
@@ -1002,9 +1029,9 @@ bool cli_get_parm(char *entry, char val_buf[])
 		 * -----------------
 		 */
 		if (!cli_get_value(local_str, val_buf))
-			return(FALSE);
+			return (FALSE);
 	}
-	return(TRUE);
+	return (TRUE);
 }
 
 #ifdef GTM_TRIGGER
@@ -1015,13 +1042,13 @@ int parse_triggerfile_cmd(void)
 	int 		eof;
 	char		cmd[] = "TRIGGER";
 	char		*ptr;
+        DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_MUNOACTION);
-
+        SETUP_THREADGBL_ACCESS;
 	opt_cnt = 0;
 	gpqual_root = 0;
 	func = 0;
-	parms_cnt = 0;			/* Parameters count */
+	TREF(parms_cnt) = 0;			/* Parameters count */
 	*cli_err_str = 0;
 	cmd_ind = find_verb(cmd);
 	assert(-1 != cmd_ind);
@@ -1046,14 +1073,14 @@ int parse_triggerfile_cmd(void)
 	if (-1 == res)
 		func = 0;
 	else
-		return(0);
+		return (0);
 	/* -------------------------
 	 * If gettoken returned EOF
 	 * -------------------------
 	 */
 	if (eof)
-		return(EOF);
+		return (EOF);
 	else
-		return(ERR_MUNOACTION);
+		return (ERR_MUNOACTION);
 }
 #endif

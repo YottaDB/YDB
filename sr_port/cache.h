@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,14 @@
 
 #ifndef CACHE_H
 #define CACHE_H
+
+/* Macros to add debugging to objcode cache for indirects. To enable, uncomment line below */
+/*#define DEBUG_CACHE */
+#ifdef DEBUG_CACHE
+#  define DBGCACHE(x) DBGFPF(x)
+#else
+#  define DBGCACHE(x)
+#endif
 
 typedef struct {
 	mstr		str;

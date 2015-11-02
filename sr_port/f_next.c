@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,9 +16,8 @@
 #include "toktyp.h"
 #include "mdq.h"
 
-GBLREF bool shift_gvrefs;
 GBLREF char window_token, director_token;
-GBLREF triple *curtchain, *expr_start;
+GBLREF triple *curtchain;
 
 int f_next( oprtype *a, opctype op)
 {
@@ -26,7 +25,9 @@ int f_next( oprtype *a, opctype op)
 	error_def(ERR_VAREXPECTED);
 	error_def(ERR_LVORDERARG);
 	error_def(ERR_GVNEXTARG);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	switch (window_token)
 	{
@@ -41,12 +42,12 @@ int f_next( oprtype *a, opctype op)
 		ins_triple(r);
 		break;
 	case TK_CIRCUMFLEX:
-		ref = shift_gvrefs ? expr_start : curtchain->exorder.bl;
+		ref = TREF(shift_side_effects) ? TREF(expr_start) : curtchain->exorder.bl;
 		if (!gvn())
 			return FALSE;
 		/* the following assumes OC_LIT and OC_GVNAME are all one
 		 * gets for an unsubscripted global variable reference */
-		if ((shift_gvrefs ? expr_start : curtchain)->exorder.bl->exorder.bl->exorder.bl == ref)
+		if ((TREF(shift_side_effects) ? TREF(expr_start) : curtchain)->exorder.bl->exorder.bl->exorder.bl == ref)
 		{
 			stx_error(ERR_GVNEXTARG);
 			return FALSE;
@@ -55,7 +56,7 @@ int f_next( oprtype *a, opctype op)
 		ins_triple(r);
 		break;
 	case TK_ATSIGN:
-		if (shift_gvrefs)
+		if (TREF(shift_side_effects))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);
@@ -64,20 +65,19 @@ int f_next( oprtype *a, opctype op)
 				setcurtchain(oldchain);
 				return FALSE;
 			}
-			r->operand[1] = put_ilit((mint) indir_fnnext);
+			r->operand[1] = put_ilit((mint)indir_fnnext);
 			ins_triple(r);
 			newtriple(OC_GVSAVTARG);
 			setcurtchain(oldchain);
-			dqadd(expr_start, &tmpchain, exorder);
-			expr_start = tmpchain.exorder.bl;
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
-		}
-		else
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		} else
 		{
 			if (!indirection(&(r->operand[0])))
 				return FALSE;
-			r->operand[1] = put_ilit((mint) indir_fnnext);
+			r->operand[1] = put_ilit((mint)indir_fnnext);
 			ins_triple(r);
 		}
 		r->opcode = OC_INDFUN;

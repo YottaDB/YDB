@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,6 @@
 
 #include "gtm_string.h"
 
-#include "hashtab_addr.h"
-#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"
@@ -28,7 +26,6 @@
 #include "zwrite.h"
 #include "op.h"
 #include "patcode.h"
-#include "hashtab.h"
 
 GBLREF symval		*curr_symval;
 GBLREF lvzwrite_datablk	*lvzwrite_block;
@@ -52,7 +49,7 @@ void lvzwr_fini(zshow_out *out, int t)
 		temp_key.var_name = lvzwrite_block->pat->str;
 		COMPUTE_HASH_MNAME(&temp_key);
 		tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key);
-		if (!tabent || (!MV_DEFINED(&((lv_val *)tabent->value)->v)) && !((lv_val *)tabent->value)->ptrs.val_ent.children)
+		if (!tabent || (!MV_DEFINED(&((lv_val *)tabent->value)->v)) && !LV_HAS_CHILD((lv_val *)tabent->value))
 		{
 			lvzwrite_block->subsc_count = 0;
 			rts_error(VARLSTCNT(4) ERR_UNDEF, 2, size, lvzwrite_block->pat->str.addr);

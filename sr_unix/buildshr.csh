@@ -106,7 +106,7 @@ if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 
 	gt_ld $gt_ld_options $gt_ld_shl_options $aix_binitfini_option $gt_ld_ci_options $aix_loadmap_option \
 		${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix \
-		${gt_ld_linklib_options} $gt_ld_syslibs >& $gtm_map/libgtmshr.map
+		${gt_ld_linklib_options} $gt_ld_extra_libs $gt_ld_syslibs >& $gtm_map/libgtmshr.map
 	if ( $status != 0 ) then
 		set buildshr_status = `expr $buildshr_status + 1`
 		echo "buildshr-E-linkgtmshr, Failed to link gtmshr (see ${dollar_sign}gtm_map/libgtmshr.map)" \
@@ -130,7 +130,7 @@ if ( $HOSTOS == "AIX") then
 endif
 
 gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/mumps ${gt_ld_linklib_options} $gtm_obj/gtm.o \
-	$gt_ld_sysrtns $gt_ld_syslibs >& $gtm_map/mumps.map
+	$gt_ld_extra_libs $gt_ld_sysrtns $gt_ld_syslibs >& $gtm_map/mumps.map
 
 if ( $status != 0  ||  ! -x $3/mumps ) then
 	set buildshr_status = `expr $buildshr_status + 1`
@@ -153,8 +153,8 @@ if ( $gt_ar_gtmrpc_name != "" ) then
 	endif
 	# export gtm_filename_to_id and dependent modules from gtm_svc.
 	gt_ld $gt_ld_options $gt_ld_options_all_exe $aix_loadmap_option ${gt_ld_option_output}$3/gtm_svc \
-		-L$gtm_obj $gtm_obj/{gtm_svc,gtm_rpc_init,gtm_dal_svc}.o $gt_ld_sysrtns \
-		-lmumps -lgnpclient -lcmisockettcp -L$gtm_exe -l$gt_ar_gtmrpc_name $gt_ld_syslibs >& $gtm_map/gtm_svc.map
+		-L$gtm_obj $gtm_obj/{gtm_svc,gtm_rpc_init,gtm_dal_svc}.o $gt_ld_sysrtns -lmumps -lgnpclient \
+		$gt_ld_extra_libs  -lcmisockettcp -L$gtm_exe -l$gt_ar_gtmrpc_name $gt_ld_syslibs >& $gtm_map/gtm_svc.map
 	if ( $status != 0  ||  ! -x $3/gtm_svc ) then
 		set buildshr_status = `expr $buildshr_status + 1`
 		echo "buildshr-E-linkgtm_svc, Failed to link gtm_svc (see ${dollar_sign}gtm_map/gtm_svc.map)" \

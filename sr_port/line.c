@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,38 +18,35 @@
 #include "mmemory.h"
 #include "advancewindow.h"
 
-GBLDEF triple			pos_in_chain;
-
 GBLREF char			window_token;
 GBLREF mident			window_ident;
 GBLREF short int		source_line;
-GBLREF oprtype 			*for_stack[], **for_stack_ptr;
-GBLREF short int		last_source_column;
 GBLREF triple			*curtchain;
 GBLREF int			mlmax;
 GBLREF mline			*mline_tail;
 GBLREF short int		block_level;
 GBLREF mlabel			*mlabtab;
-GBLREF bool			code_generated;
 GBLREF command_qualifier	cmd_qlf;
-GBLREF boolean_t		trigger_compile;
 
-int line(uint4 *lnc)
+error_def(ERR_MULTLAB);
+error_def(ERR_LSEXPECTED);
+error_def(ERR_COMMAORRPAREXP);
+error_def(ERR_MULTFORMPARM);
+error_def(ERR_NAMEEXPECTED);
+error_def(ERR_BLKTOODEEP);
+error_def(ERR_NESTFORMP);
+
+boolean_t line(uint4 *lnc)
 {
 	mlabel *x;
 	triple *first_triple, *parmbase, *parmtail, *r;
 	int parmcount, varnum;
 	mline *curlin;
 	short int dot_count;
-	bool success;
-	error_def(ERR_MULTLAB);
-	error_def(ERR_LSEXPECTED);
-	error_def(ERR_COMMAORRPAREXP);
-	error_def(ERR_MULTFORMPARM);
-	error_def(ERR_NAMEEXPECTED);
-	error_def(ERR_BLKTOODEEP);
-	error_def(ERR_NESTFORMP);
+	boolean_t success;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	first_triple = curtchain->exorder.bl;
 	parmbase = 0;
 	dot_count = 0;
@@ -57,22 +54,19 @@ int line(uint4 *lnc)
 	curlin = (mline *)mcalloc(SIZEOF(*curlin));
 	curlin->line_number = 0;
 	curlin->table = FALSE;
-	last_source_column = 0;
-	if (window_token == TK_INTLIT)
+	TREF(last_source_column) = 0;
+	if (TK_INTLIT == window_token)
 		int_label();
-
-	if (window_token == TK_IDENT || (cmd_qlf.qlf & CQ_LINE_ENTRY))
-		start_fetches(GTMTRIG_ONLY(trigger_compile ? OC_FETCH : ) OC_LINEFETCH);
+	if ((TK_IDENT == window_token) || (cmd_qlf.qlf & CQ_LINE_ENTRY))
+		start_fetches(OC_LINEFETCH);
 	else
 		newtriple(OC_LINESTART);
-
 	curlin->line_number = *lnc;
 	*lnc = *lnc + 1;
 	curlin->table = TRUE;
 	CHKTCHAIN(curtchain);
-	pos_in_chain = *curtchain;
-
-	if (window_token == TK_IDENT)
+	TREF(pos_in_chain) = *curtchain;
+	if (TK_IDENT == window_token)
 	{
 		x = get_mladdr(&window_ident);
 		if (x->ml)
@@ -81,7 +75,7 @@ int line(uint4 *lnc)
 			success = FALSE;
 		} else
 		{
-			assert(x->formalcnt == NO_FORMALLIST);
+			assert(NO_FORMALLIST == x->formalcnt);
 			x->ml = curlin;
 			advancewindow();
 			if (window_token != TK_COLON)
@@ -92,7 +86,7 @@ int line(uint4 *lnc)
 				advancewindow();
 			}
 		}
-		if (success && window_token == TK_LPAREN)
+		if (success && (TK_LPAREN == window_token))
 		{
 			r = maketriple (OC_ISFORMAL);
 			dqins(curtchain->exorder.bl->exorder.bl, exorder, r);
@@ -100,7 +94,7 @@ int line(uint4 *lnc)
 			parmbase = parmtail = newtriple(OC_BINDPARM);
 			for (parmcount = 0 ; window_token != TK_RPAREN ; parmcount++)
 			{
-				if (window_token != TK_IDENT)
+				if (TK_IDENT != window_token)
 				{
 					stx_error(ERR_NAMEEXPECTED);
 					success = FALSE;
@@ -110,10 +104,9 @@ int line(uint4 *lnc)
 					varnum = get_mvaddr(&window_ident)->mvidx;
 					for (r = parmbase->operand[1].oprval.tref ; r ; r = r->operand[1].oprval.tref)
 					{
-						assert(r->operand[0].oprclass == TRIP_REF);
-						assert(r->operand[0].oprval.tref->operand[0].oprclass == ILIT_REF);
-						assert(r->operand[1].oprclass == TRIP_REF ||
-							r->operand[1].oprclass == 0);
+						assert(TRIP_REF == r->operand[0].oprclass);
+						assert(ILIT_REF == r->operand[0].oprval.tref->operand[0].oprclass);
+						assert((TRIP_REF == r->operand[1].oprclass) || (0 == r->operand[1].oprclass));
 						if (r->operand[0].oprval.tref->operand[0].oprval.ilit == varnum)
 						{
 							stx_error(ERR_MULTFORMPARM);
@@ -129,9 +122,9 @@ int line(uint4 *lnc)
 					parmtail = r;
 					advancewindow();
 				}
-				if (window_token == TK_COMMA)
+				if (TK_COMMA == window_token)
 					advancewindow();
-				else if (window_token != TK_RPAREN)
+				else if (TK_RPAREN != window_token)
 				{
 					stx_error(ERR_COMMAORRPAREXP);
 					success = FALSE;
@@ -144,14 +137,14 @@ int line(uint4 *lnc)
 				parmbase->operand[0] = put_ilit(parmcount);
 				x->formalcnt = parmcount;
 				assert(!mlabtab->lson);
-				if (mlabtab->rson == x && !code_generated)
+				if (mlabtab->rson == x && !TREF(code_generated))
 					mlabtab->formalcnt = parmcount;
 			}
 		}
 	}
-	if (window_token != TK_EOL && success)
+	if (success && (TK_EOL != window_token))
 	{
-		if (window_token != TK_SPACE)
+		if (TK_SPACE != window_token)
 		{
 			stx_error(ERR_LSEXPECTED);
 			success = FALSE;
@@ -160,9 +153,9 @@ int line(uint4 *lnc)
 			assert(dot_count == 0);
 			for (;;)
 			{
-				if (window_token == TK_SPACE)
+				if (TK_SPACE == window_token)
 					advancewindow();
-				else if (window_token == TK_PERIOD)
+				else if (TK_PERIOD == window_token)
 				{
 					dot_count++;
 					advancewindow();
@@ -170,14 +163,14 @@ int line(uint4 *lnc)
 					break;
 			}
 		}
-		if (dot_count > block_level + 1)
+		if (block_level + 1 < dot_count)
 		{
 			dot_count = (block_level > 0 ? block_level : 0);
 			stx_error(ERR_BLKTOODEEP);
 			success = FALSE;
 		}
 	}
-	if (parmbase != 0 && dot_count != 0)
+	if ((0 != parmbase) && (0 != dot_count))
 	{
 		stx_error(ERR_NESTFORMP);	/* Should be warning */
 		success = FALSE;
@@ -190,7 +183,7 @@ int line(uint4 *lnc)
 		block_level = dot_count;
 	} else
 	{
-		for ( ; dot_count < block_level ; block_level--)
+		for ( ; dot_count < block_level; block_level--)
 			mline_tail = mline_tail->parent;
 		mline_tail->sibling = curlin;
 		curlin->parent = mline_tail->parent;
@@ -198,25 +191,24 @@ int line(uint4 *lnc)
 	mline_tail = curlin;
 	if (success)
 	{
-		for_stack_ptr = for_stack;
-		*for_stack_ptr = 0;
+		assert(TREF(for_stack_ptr) == TADR(for_stack));
+		*TREF(for_stack_ptr) = NULL;
 		success = linetail();
 		if (success)
 		{
-			assert(for_stack_ptr == for_stack);
-			if (*for_stack_ptr)
-				tnxtarg(*for_stack_ptr);
+			assert(TREF(for_stack_ptr) == TADR(for_stack));
+			if (*TREF(for_stack_ptr))
+				tnxtarg(*TREF(for_stack_ptr));
 		}
 	}
+	TREF(for_stack_ptr) = TADR(for_stack);
 	if (first_triple->exorder.fl == curtchain)
 		newtriple(OC_NOOP);			/* empty line (comment, blank, etc) */
 	curlin->externalentry = first_triple->exorder.fl;
-
 	/* first_triple points to the last triple before this line was processed.  Its forward
 	   link will point to a LINEFETCH or a LINESTART, or possibly a NOOP.  It the line was a comment, there is
 	   only a LINESTART, and hence no "real" code yet */
-
-	code_generated = code_generated | (first_triple->exorder.fl->opcode != OC_NOOP &&
+	TREF(code_generated) = TREF(code_generated) | (first_triple->exorder.fl->opcode != OC_NOOP &&
 		first_triple->exorder.fl->exorder.fl != curtchain);
 	return success;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,6 @@
 
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "stringpool.h"
 
@@ -25,7 +24,7 @@ LITREF	mval		literal_null;
 
 /* Gives a unique handle for either the var itself (if a base var aka unsubscripted) or
    if is a container var, then the handle is for the base var it points to. Other subscripted
-   vars return NULL. The unique handle is the ASCII-ized version of the objects address.
+   vars return NULL. The unique handle is the ASCII-ized version of the object's address.
 */
 void op_fnzahandle(lv_val *srclv, mval *dst)
 {
@@ -34,14 +33,14 @@ void op_fnzahandle(lv_val *srclv, mval *dst)
 	assert(srclv);
 	assert(dst);
 	if (srclv->v.mvtype & MV_ALIASCONT)
-		/* lv_val is an alias container, use its pointer addr as the handle */
+	{	/* lv_val is an alias container, use its pointer addr as the handle */
+		assert(!LV_IS_BASE_VAR(srclv));
 		handle = (unsigned char *)srclv->v.str.addr;
-	else if (MV_SYM == srclv->ptrs.val_ent.parent.sym->ident)
+	} else if (LV_IS_BASE_VAR(srclv))
 		/* lv_val is a base variable, use its lv_val addr as the handle */
 		handle = (unsigned char *)srclv;
 	else
 		handle = NULL;
-
 	/* Now convert handle to return value -- return ascii-ized addr if present */
 	if (NULL != handle)
 	{

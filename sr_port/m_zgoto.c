@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,53 +20,54 @@
 #include "cmd.h"
 
 GBLREF char window_token;
-GBLREF triple *expr_start, *expr_start_orig;
+
+error_def(ERR_COLON);
 
 int m_zgoto(void)
 {
-	triple tmpchain, *oldchain, *obp, *ref0, *ref1, *triptr;
-	oprtype *cr, quits;
-	int4 rval;
-	error_def(ERR_COLON);
+	triple		tmpchain, *oldchain, *obp, *ref0, *ref1, *triptr;
+	oprtype		*cr, quits;
+	int4		rval;
+	DCL_THREADGBL_ACCESS;
 
-	dqinit(&tmpchain,exorder);
+	SETUP_THREADGBL_ACCESS;
+	dqinit(&tmpchain, exorder);
 	oldchain = setcurtchain(&tmpchain);
-	if (window_token == TK_EOL || window_token == TK_SPACE)
-	{
+	if ((TK_EOL == window_token) || (TK_SPACE == window_token))
+	{	/* Default zgoto level is 1 */
 		quits = put_ilit(1);
 		rval = EXPR_GOOD;
-	}
-	else if (!(rval = intexpr(&quits)))
+	} else if (!(rval = intexpr(&quits)))		/* note assignment */
 	{
 		setcurtchain(oldchain);
 		return FALSE;
 	}
-	if (rval != EXPR_INDR && (window_token == TK_EOL || window_token == TK_SPACE))
-	{
+	if ((EXPR_INDR != rval) && ((TK_EOL == window_token) || (TK_SPACE == window_token)))
+	{	/* Only level parm supplied (no entry ref) - job for op_zg1 */
 		setcurtchain(oldchain);
 		obp = oldchain->exorder.bl;
-		dqadd(obp,&tmpchain,exorder);   /*this is a violation of info hiding*/
+		dqadd(obp, &tmpchain, exorder);		/* this is a violation of info hiding */
 		ref0 = newtriple(OC_ZG1);
 		ref0->operand[0] = quits;
 		return TRUE;
 	}
-	if (window_token != TK_COLON)
-	{
+	if (TK_COLON != window_token)
+	{	/* First arg parsed, not ending in ":". Better have been indirect */
 		setcurtchain(oldchain);
-		if (rval != EXPR_INDR)
+		if (EXPR_INDR != rval)
 		{
 			stx_error(ERR_COLON);
 			return FALSE;
 		}
-		make_commarg(&quits,indir_zgoto);
+		make_commarg(&quits, indir_zgoto);
 		obp = oldchain->exorder.bl;
-		dqadd(obp,&tmpchain,exorder);   /*this is a violation of info hiding*/
+		dqadd(obp, &tmpchain, exorder);		/* this is a violation of info hiding */
 	 	return TRUE;
 	}
 	advancewindow();
-	if (window_token != TK_COLON)
+	if (TK_COLON != window_token)
 	{
-		if (!entryref(OC_NOOP,OC_PARAMETER,(mint) indir_goto, FALSE, FALSE))
+		if (!entryref(OC_NOOP, OC_PARAMETER, (mint)indir_goto, FALSE, FALSE, TRUE))
 		{
 			setcurtchain(oldchain);
 			return FALSE;
@@ -76,40 +77,38 @@ int m_zgoto(void)
 		ref0->operand[1] = put_tref(tmpchain.exorder.bl);
 		ins_triple(ref0);
 		setcurtchain(oldchain);
-	}
-	else
+	} else
 	{
 		ref0 = maketriple(OC_ZG1);
 		ref0->operand[0] = quits;
 		ins_triple(ref0);
 		setcurtchain(oldchain);
 	}
-	if (window_token == TK_COLON)
-	{
+	if (TK_COLON == window_token)
+	{	/* post conditional expression */
 		advancewindow();
-		cr = (oprtype *) mcalloc(SIZEOF(oprtype));
-		if (!bool_expr((bool) FALSE,cr))
+		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
+		if (!bool_expr((bool)FALSE, cr))
 			return FALSE;
-		if (expr_start != expr_start_orig)
+		if (TREF(expr_start) != TREF(expr_start_orig))
 		{
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
+			triptr->operand[0] = put_tref(TREF(expr_start));
 		}
 		obp = oldchain->exorder.bl;
-		dqadd(obp,&tmpchain,exorder);   /*this is a violation of info hiding*/
-		if (expr_start != expr_start_orig)
+		dqadd(obp, &tmpchain, exorder);		 /* this is a violation of info hiding */
+		if (TREF(expr_start) != TREF(expr_start_orig))
 		{
 			ref0 = newtriple(OC_JMP);
 			ref1 = newtriple(OC_GVRECTARG);
-			ref1->operand[0] = put_tref(expr_start);
+			ref1->operand[0] = put_tref(TREF(expr_start));
 			*cr = put_tjmp(ref1);
 			tnxtarg(&ref0->operand[0]);
-		}
-		else
+		} else
 			tnxtarg(cr);
 		return TRUE;
 	}
 	obp = oldchain->exorder.bl;
-	dqadd(obp,&tmpchain,exorder);   /*this is a violation of info hiding*/
+	dqadd(obp, &tmpchain, exorder);			/* this is a violation of info hiding */
 	return TRUE;
 }

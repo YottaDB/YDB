@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,11 +10,12 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "arit.h"
-#include "val_iscan.h"
 
-int	val_iscan (mval *v)
-{	bool	dot;
+#include "arit.h"
+
+int	val_iscan(mval *v)
+{
+	bool	dot;
 	char 	*c, *eos;
 	int4	zeroes, sigdigs, exp;
 
@@ -25,16 +26,13 @@ int	val_iscan (mval *v)
 		return FALSE;
 	else if (v->str.len == 1 && *c == '0')
 		return TRUE;
-
 	eos = c + v->str.len;
 	zeroes = sigdigs = exp = 0;
-
 	if (*c == '-')
 	{	c++;
 		if (c == eos)
 			return FALSE;
 	}
-
 	dot = FALSE;
 	if (*c <= '9' && *c > '0')
 	{
@@ -60,27 +58,21 @@ int	val_iscan (mval *v)
 			}
 		}
 		sigdigs -= zeroes;
-	}
-	else if (*c == '.')
+	} else if (*c == '.')
 	{
 		dot = TRUE ; c++;
 		while (c != eos && *c == '0')
 		{	exp--;
 			c++;
 		}
-
 		while (c != eos && *c <= '9' && *c >= '0')
 		{	sigdigs++;
 			c++;
 		}
-	}
-	else
+	} else
 		return FALSE;
-
 	exp += MV_XBIAS;
-	if (c != eos || (dot && (*(c-1) == '0' || *(c-1) == '.')) ||
-		sigdigs > NUM_DEC_DG_2L || exp < EXPLO || exp > EXPHI)
+	if (c != eos || (dot && (*(c-1) == '0' || *(c-1) == '.')) || (NUM_DEC_DG_2L < sigdigs)|| (EXPLO > exp) || (EXPHI <= exp))
 		return FALSE;
-
 	return TRUE;
 }

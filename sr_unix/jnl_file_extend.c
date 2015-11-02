@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,6 @@ error_def(ERR_JNLSPACELOW);
 error_def(ERR_NEWJNLFILECREAT);
 error_def(ERR_DSKSPACEFLOW);
 error_def(ERR_JNLFILEXTERR);
-error_def(ERR_JNLCREATERR);
 error_def(ERR_DBFILERR);
 error_def(ERR_NOSPACEEXT);
 error_def(ERR_JNLRDERR);
@@ -53,7 +52,7 @@ error_def(ERR_JNLWRERR);
 error_def(ERR_JNLNOCREATE);
 error_def(ERR_PREMATEOF);
 
-int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
+uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 {
 	file_control		*fc;
 	boolean_t		need_extend;
@@ -148,7 +147,13 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
 				csd = cs_data;	/* In MM, wcs_flu() can remap an extended DB, so reset csd to be sure */
 			} else
-				rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region), jpc->status);
+			{
+				if (SS_NORMAL != jpc->status)
+					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
+						jpc->status);
+				else
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+			}
 			assert(!jgbl.forw_phase_recovery || (NULL != jgbl.mur_pini_addr_reset_fnptr));
 			assert(jgbl.forw_phase_recovery || (NULL == jgbl.mur_pini_addr_reset_fnptr));
 			if (NULL != jgbl.mur_pini_addr_reset_fnptr)
@@ -164,7 +169,6 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				assert(csd->jnl_alq == jnl_info.alloc);
 				assert(csd->jnl_deq == jnl_info.extend);
 				assert(csd->jnl_before_image == jnl_info.before_images);
-				csd->trans_hist.header_open_tn = jnl_info.tn;	/* needed for successful jnl_file_open() */
 				csd->jnl_checksum = jnl_info.checksum;
 				send_msg(VARLSTCNT(4) ERR_NEWJNLFILECREAT, 2, JNL_LEN_STR(csd));
 				fc = gv_cur_region->dyn.addr->file_cntl;
@@ -179,7 +183,13 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				/* call jnl_ensure_open instead of jnl_file_open to make sure jpc->pini_addr is set to 0 */
 				jnl_status = jnl_ensure_open();	/* sets jpc->status */
 				if (0 != jnl_status)
-					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+				{
+					if (jpc->status)
+						rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
+							jpc->status);
+					else
+						rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+				}
 				assert(jb->filesize == csd->jnl_alq);
 				aligned_tot_jrec_size = ALIGNED_ROUND_UP(MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size),
 										csd->jnl_alq, csd->jnl_deq);
@@ -194,7 +204,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				}
 			} else
 			{
-				send_msg(VARLSTCNT(4) ERR_JNLCREATERR, 2, JNL_LEN_STR(csd));
+				send_msg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, JNL_LEN_STR(csd));
 				jpc->status = ERR_JNLNOCREATE;
 				new_blocks = -1;
 			}
@@ -225,11 +235,9 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		if (0 >= new_blocks)
 			break;
 	}
-	if (0 >= new_blocks)
-	{
-		jpc->status = ERR_JNLREADEOF;
-		jnl_file_lost(jpc, ERR_JNLEXTEND);
-       		new_blocks = -1;
-	}
-	return new_blocks;
+	if (0 < new_blocks)
+		return EXIT_NRM;
+	jpc->status = ERR_JNLREADEOF;
+	jnl_file_lost(jpc, ERR_JNLEXTEND);
+       	return EXIT_ERR;
 }

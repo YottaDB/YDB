@@ -695,7 +695,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD8(trans_hist.curr_tn);
 	SWAP_SD8(trans_hist.early_tn);
 	SWAP_SD8(trans_hist.last_mm_sync);
-	SWAP_SD8(trans_hist.header_open_tn);
 	SWAP_SD8(trans_hist.mm_tn);
 	SWAP_SD4(trans_hist.lock_sequence);
 	SWAP_SD4(trans_hist.ccp_jnl_filesize);

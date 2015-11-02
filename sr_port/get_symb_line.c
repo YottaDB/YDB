@@ -29,18 +29,13 @@ unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigne
 	unsigned char	*fpmpc, *fpctxt;
 
 	line_reset = FALSE;
-	for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
+	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
-		if (NULL == fp->old_frame_pointer)
-		{	/* This frame is a base frame - endpoint or jump it? */
 #		ifdef GTM_TRIGGER
-			if (fp->type & SFT_TRIGR)
-				/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
+		if (NULL == fp->old_frame_pointer && (fp->type & SFT_TRIGR))
+			/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
 				fp = *(stack_frame **)(fp + 1);
-			else
 #		endif
-				break;	/* Endpoint.. */
-		}
 		fpmpc = fp->mpc;
 		fpctxt = fp->ctxt;
 		if (ADDR_IN_CODE(fpmpc, fp->rvector))

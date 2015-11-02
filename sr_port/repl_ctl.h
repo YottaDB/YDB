@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +94,10 @@ typedef struct repl_ctl_struct
 	int4			file_state; 	/* enum jnl_file_state */
 	boolean_t		lookback;
 	boolean_t		first_read_done;
-	boolean_t		fh_read_done;
+	boolean_t		eof_addr_final;	/* TRUE if the journal file is switched and the final eof addr for this jnl file
+						 * is noted down */
+	boolean_t		max_seqno_final; /* TRUE ONLY if ctl->eof_addr_final is TRUE and if source server has noted down
+						  * the final max_seqno for this journal file */
 	boolean_t		read_complete;
 	int4			jnl_fn_len;
 	char			jnl_fn[JNL_NAME_SIZE];

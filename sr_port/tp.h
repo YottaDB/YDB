@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,12 @@
 #define TP_BATCH_SHRT		2	/* permit abbreviation to two characters */
 #define TP_DEADLOCK_FACTOR	5	/* multiplied by dollar_trestart to produce an argument for wcs_backoff */
 #define MAX_VISIBLE_TRESTART	4	/* Per Bhaskar on 10/20/98: dollar_trestart is not allowed to visibly exceed 4
-					 * because of errors this causes in legacy Profile versions (any < 6.1)        */
+					 * because of errors this causes in legacy Profile versions (any < 6.1)
+					 */
+#define	MAX_TP_FINAL_RETRY_TRESTART_CNT		 2
+#define	MAX_TP_FINAL_RETRY_MLOCKRESTART_CNT	16
+#define	MAX_TRESTARTS		(2 * MAX_TP_FINAL_RETRY_MLOCKRESTART_CNT)
+#define	FAIL_HIST_ARRAY_SIZE	MAX_TRESTARTS
 
 /* structure to hold transaction level specific info per segment.
  * Aids in incremental rollback, to identify the state of various elements at the BEGINNING of a new transaction level. */
@@ -51,7 +56,7 @@ typedef struct tlevel_info_struct
 	jnl_format_buffer
 			*tlvl_jfb_info;		/* state of the tp_jnl_format_buff_info list before this t_level started */
 	srch_blk_status	*tlvl_tp_hist_info;	/* state of the tp_hist array (tail) before this t_level started */
-	int4		t_level;
+	uint4		t_level;
 	uint4		update_trans;		/* a copy of sgm_info_ptr->update_trans before this t_level started */
 	uint4		jnl_list_elems;		/* # of si->jnl_list elements consumed before this transaction started */
 	uint4		jfb_list_elems;	/* # of si->format_buff_list elements consumed before this transaction started */
@@ -66,7 +71,7 @@ typedef struct global_tlvl_info_struct
 	struct global_tlvl_info_struct
 			*next_global_tlvl_info;
 	sgmnt_addrs	*global_tlvl_fence_info;
-	short		t_level;
+	uint4		t_level;
 	uint4		tlvl_cumul_jrec_len;
 #	ifdef DEBUG
 	uint4		tlvl_cumul_index;
@@ -80,13 +85,13 @@ typedef struct global_tlvl_info_struct
 } global_tlvl_info;
 
 /* A note on the buddy lists used in sgm_info structure,
- *	cw_set_list		->	uses get_new_element() and free_last_n_elements()
- *	tlvl_cw_set_list	-> 	uses get_new_free_element() and free_element()
- *	jnl_list		->	uses get_new_element() and free_last_n_elements()
- *	tlvl_info_list		->	uses get_new_element() and free_last_n_elements()
- *	gbl_tlvl_info_list	->	uses get_new_element() and free_last_n_elements()
- *	new_buff_list		->	uses get_new_free_element() and free_element()
- *	recompute_list		->	uses get_new_element()
+ *	cw_set_list		->	uses get_new_element      and free_last_n_elements
+ *	tlvl_cw_set_list	-> 	uses get_new_free_element and free_element
+ *	jnl_list		->	uses get_new_element      and free_last_n_elements
+ *	tlvl_info_list		->	uses get_new_element      and free_last_n_elements
+ *	gbl_tlvl_info_list	->	uses get_new_element      and free_last_n_elements
+ *	new_buff_list		->	uses get_new_free_element and free_element
+ *	recompute_list		->	uses get_new_element
  */
 
 /* A small comment about the tp_hist_size and cur_tp_hist_size members of the sgm_info structure.
@@ -243,6 +248,29 @@ typedef struct tp_region_struct
 #define	DBG_CHECK_TP_REG_LIST_SORTING(REGLIST)
 #endif
 
+/* The below macro is used to check if any block split info (heuristic used by gvcst_put) is no longer relevant
+ * (due to an incremental rollback or rollback or restart) and if so reset it to a safe value of 0.
+ */
+#define	TP_CLEANUP_GVNH_SPLIT_IF_NEEDED(GVNH, CW_DEPTH)								\
+{														\
+	int		cw_set_depth;										\
+	int		level;											\
+	off_chain	chain1;											\
+														\
+	cw_set_depth = CW_DEPTH;										\
+	if (GVNH->split_cleanup_needed)										\
+	{	/* Created block numbers stored in the blk split array are no longer relevant after the		\
+		 * restart. So reset them not to confuse the next call to gvcst_put for this gv_target.		\
+		 */												\
+		for (level = 0; level < ARRAYSIZE(GVNH->last_split_blk_num); level++)				\
+		{												\
+			chain1 = *(off_chain *)&GVNH->last_split_blk_num[level];				\
+			if (chain1.flag && ((unsigned)cw_set_depth <= (unsigned)chain1.cw_index))		\
+				GVNH->last_split_blk_num[level] = 0;						\
+		}												\
+	}													\
+}
+
 typedef struct ua_list_struct
 {
 	struct ua_list_struct
@@ -251,11 +279,16 @@ typedef struct ua_list_struct
 	uint4		update_array_size;
 } ua_list;
 
-typedef struct new_buff_buddy_list_struct
+#define TP_MAX_NEST	127
+
+/* Note gv_orig_key[i] is assigned to tp_pointer->orig_key which then tries to dereference the "begin", "end", "prev", "top"
+ * 	fields like it were a gv_currkey pointer. Since these members are 2-byte fields, we need atleast 2 byte alignment.
+ * We want to be safer and hence give 4-byte alignment by declaring the array as an array of integers.
+ */
+typedef struct gv_orig_key_struct
 {
-	que_ent		free_que;
-	unsigned char	new_buff[1];
-}new_buff_buddy_list;
+	int4	gv_orig_key[TP_MAX_NEST + 1][DIVIDE_ROUND_UP((SIZEOF(gv_key) + MAX_KEY_SZ + 1), SIZEOF(int4))];
+}gv_orig_key_array;
 
 GBLREF	int4		tprestart_syslog_delta;
 GBLREF	block_id	t_fail_hist_blk[];
@@ -290,8 +323,6 @@ GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 	}												\
 }
 
-GBLREF	short	dollar_trestart;
-
 #define	ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(first_tp_srch_status, sgm_info_ptr)	\
 {											\
 	assert(NULL == (first_tp_srch_status) 						\
@@ -324,6 +355,8 @@ GBLREF	short	dollar_trestart;
 
 #define	TP_RETRY_ACCOUNTING(csa, cnl, status)						\
 {											\
+	GBLREF	uint4		dollar_trestart;					\
+											\
 	switch (dollar_trestart)							\
 	{										\
 		case 0:									\
@@ -506,6 +539,127 @@ GBLREF	short	dollar_trestart;
 		free_last_n_elements(global_tlvl_info_list, macro_cnt);		\
 }
 
+#ifdef GTM_TRIGGER
+#define INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(INCREMENTAL, COMMIT)								\
+{																\
+	GBLREF	boolean_t	dollar_ztrigger_invoked;									\
+	GBLREF	trans_num	local_tn;											\
+	GBLREF	gv_namehead	*gvt_tp_list;											\
+	GBLREF	sgm_info	*first_sgm_info;										\
+																\
+	gv_namehead		*gvnh, *lcl_hasht_tree;										\
+	cw_set_element		*cse;												\
+	sgmnt_addrs		*csa;												\
+	sgm_info		*si;												\
+																\
+	if (dollar_ztrigger_invoked)												\
+	{	/* There was at least one region where a $ZTRIGGER() was invoked. */						\
+		dollar_ztrigger_invoked = FALSE;										\
+		/* Phase 1: Adjust trigger/$ztrigger related fields for all gv_target read/updated in this transaction */	\
+		if (COMMIT)													\
+		{	/* Reset csa->db_dztrigger_cycle and gvt->db_dztrigger_cycle to zero. This is needed so that globals 	\
+			 * updated after the TCOMMIT don't re-read triggers when NOT necessary. Such a case is possible if	\
+			 * for instance a $ZTRIGGER() happened in a sub-transaction that got rolled back. Though no actual	\
+			 * trigger change happened, csa->db_dztrigger_cycle will be incremented and hence gvt(s) whose 		\
+			 * db_dztrigger_cycle does not match will now re-read triggers. We don't expect $ZTRIGGER() to be	\
+			 * frequent. So, it's okay to go through the list of gvt 						\
+			 */													\
+			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)					\
+			{													\
+				gvnh->db_dztrigger_cycle = 0;									\
+				gvnh->gd_csa->db_dztrigger_cycle = 0;								\
+			}													\
+		} else														\
+		{														\
+			/* Now that the transaction is rolled back/restarted, invalidate gvt->gvt_trigger->gv_trigger_cycle	\
+			 * (by resetting it to zero) for all gvt read/updated in this transaction. Note that even though we	\
+			 * reset db_trigger_cycle (to -1) for non-incremental rollbacks/restarts and increment db_dztrigger_cycle\
+			 * for incremental rollbacks we still need to reset gv_trigger_cycle as otherwise gvtr_init will find 	\
+			 * that gv_trigger_cycle has NOT changed since it was updated last and will NOT do any trigger reads	\
+			 */													\
+			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)					\
+			{													\
+				assert(gvnh->read_local_tn == local_tn);							\
+				if (NULL != gvnh->gvt_trigger)									\
+					((gvt_trigger_t *)(gvnh->gvt_trigger))->gv_trigger_cycle = 0;				\
+				if (!INCREMENTAL)										\
+				{	/* TROLLBACK(0) or TRESTART. Reset db_dztrigger_cycle to 0 since we are going to start 	\
+					 * a new transaction. But, we want to ensure that the new transaction re-read triggers	\
+					 * since any gvt which updated its gvt_trigger in this transaction will be stale as	\
+					 * they never got committed								\
+					 */											\
+					gvnh->db_dztrigger_cycle = 0;								\
+					gvnh->db_trigger_cycle = (uint4)-1;							\
+				}												\
+			}													\
+		}														\
+		/* Phase 2: Adjust trigger/$ztrigger related fields for all csa accessed in this transaction */			\
+		if (INCREMENTAL)												\
+		{	/* An incremental rollback. Find out if there are still any cse->blk_target containing ^#t updates. 	\
+			 * If not, set csa->incr_db_trigger_cycle to FALSE (if already set to TRUE) so that we don't 		\
+			 * increment csd->db_trigger_cycle during commit time 							\
+			 */													\
+			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)						\
+			{													\
+				cse = si->first_cw_set;										\
+				csa = si->tp_csa;										\
+				lcl_hasht_tree = csa->hasht_tree;								\
+				if (NULL != lcl_hasht_tree)									\
+				{												\
+					/* Walk through the cw_set_elements remaining after the incremental rollback to 	\
+					 * see if any of them has a ^#t update 							\
+					 */											\
+					while (NULL != cse)									\
+					{											\
+						if (lcl_hasht_tree == cse->blk_target)						\
+							break;									\
+						cse = cse->next_cw_set;								\
+					}											\
+					if (NULL != cse)									\
+						csa->incr_db_trigger_cycle = FALSE;						\
+				} else												\
+				{												\
+					assert(!csa->incr_db_trigger_cycle);							\
+				}												\
+				if (csa->db_dztrigger_cycle)									\
+					csa->db_dztrigger_cycle++; /* so that future updates in this TN re-read triggers */	\
+			}													\
+			/* Keep dollar_ztrigger_invoked as TRUE as the transaction is not yet complete and we need this 	\
+			 * variable being TRUE to reset csa->db_dztrigger_cycle and gvt->db_dztrigger_cycle to 0 during 	\
+			 * tp_clean_up of this transaction.									\
+			 */													\
+			dollar_ztrigger_invoked = TRUE;										\
+		} else if (!COMMIT)												\
+		{	/* This is either a complete rollback or a restart. In either case, set csa->incr_db_trigger_cycle 	\
+			 * to FALSE for all csa referenced in this transaction as they are anyways not going to be committed.	\
+			 */													\
+			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)						\
+			{													\
+				si->tp_csa->db_dztrigger_cycle = 0;								\
+				si->tp_csa->incr_db_trigger_cycle = FALSE;							\
+			}													\
+		}														\
+	}															\
+}
+# ifdef DEBUG
+#  define ASSERT_ZTRIGGER_CYCLE_RESET											\
+{	/* At the end of a transaction (either because of trestart, complete trollback or tcommit) ensure that 		\
+	 * csa->db_dztrigger_cycle is reset to zero. It's okay not to check if all gvt updated in this transaction	\
+	 * also has gvt->db_dztrigger_cycle set back to zero because if they don't there are other asserts that 	\
+	 * will trip in the subsequent transactions									\
+	 */														\
+	GBLREF	sgm_info	*first_sgm_info;									\
+															\
+	sgm_info		*si;											\
+															\
+	for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)							\
+		assert(0 == si->tp_csa->db_dztrigger_cycle);								\
+}
+# else
+#  define ASSERT_ZTRIGGER_CYCLE_RESET
+# endif
+#endif
+
 #ifdef VMS
 /* The error below has special handling in a few condition handlers because it not so much signals an error
    as it does drive the necessary mechanisms to invoke a restart. Consequently this error can be
@@ -532,7 +686,7 @@ GBLREF	short	dollar_trestart;
 	GBLREF	uint4		t_err;											\
 	error_def(err_code);												\
 															\
-	if (0 == dollar_tlevel)												\
+	if (!dollar_tlevel)												\
 		t_begin(err_code, UPDTRNS_DB_UPDATED_MASK);								\
 	else														\
 	{														\
@@ -551,7 +705,7 @@ GBLREF	short	dollar_trestart;
 															\
 	error_def(err_code);												\
 															\
-	if (0 == dollar_tlevel)												\
+	if (!dollar_tlevel)												\
 		t_begin(err_code, 0);											\
 	else														\
 	{														\
@@ -561,7 +715,7 @@ GBLREF	short	dollar_trestart;
 }
 
 /* The following GBLREFs are needed by the IS_TP_AND_FINAL_RETRY macro */
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 
 #define	IS_TP_AND_FINAL_RETRY 	(dollar_tlevel && (CDB_STAGNATE <= t_tries))
@@ -620,7 +774,7 @@ void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_clean_up(boolean_t rollback_flag);
 void tp_cw_list(cw_set_element **cs);
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
-void tp_incr_clean_up(short newlevel);
+void tp_incr_clean_up(uint4 newlevel);
 void tp_set_sgm(void);
 void tp_start_timer_dummy(int4 timeout_seconds);
 void tp_clear_timeout_dummy(void);

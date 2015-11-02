@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@ GBLREF	volatile boolean_t	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
+GBLREF	void			(*create_fatal_error_zshow_dmp_fp)();
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 
@@ -133,6 +134,11 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
 				assert(!IS_GTMSECSHR_IMAGE);
+				if (exit_handler_active && !gtm_quiet_halt)
+				{
+					send_msg(VARLSTCNT(1) forced_exit_err);
+					gtm_putmsg(VARLSTCNT(1) forced_exit_err);
+				}
 				return;
 			}
 			exit_state = EXIT_IMMED;
@@ -293,12 +299,32 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		need_core = TRUE;
 		gtm_fork_n_core();
 	}
-	/* If a special routine was registered to be driven on a signal, drive it now */
-	if (0 != exi_condition && call_on_signal)
+	/* If any special routines are registered to be driven on a signal, drive them now */
+	if (0 != exi_condition)
 	{
-		signal_routine = call_on_signal;
-		call_on_signal = NULL;		/* So we don't recursively call ourselves */
-		(*signal_routine)();
+		/* If this is a GTM-ish process in runtime mode, call the routine to generate the zshow dump. This separate
+		 * routine necessary because (1) generic_signal_handler() no longer calls condition handlers and (2) we couldn't
+		 * use call_on_signal because it would already be in use in updproc() where it is also possible this routine
+		 * needs to be called. Bypass this code if we didn't create a core since that means it is not a GTM
+		 * issue that forced its demise (and since this is an uncaring interrupt, we could be in any number of
+		 * situations that would cause a ZSHOW dump to explode). Better for user to use jobexam to cause a dump prior
+		 * to terminating the process in a deferrable fashion.
+		 */
+		if (!dont_want_core && IS_MCODE_RUNNING && (NULL != create_fatal_error_zshow_dmp_fp))
+		{
+			signal_routine = create_fatal_error_zshow_dmp_fp;
+			create_fatal_error_zshow_dmp_fp = NULL;
+			(*signal_routine)(exi_condition, FALSE);
+		}
+		/* Some mupip functions define an entry point to drive on signals. Make sure to do this AFTER we create the
+		 * dump file above as it may detach things (like the recvpool) we need to create the above dump.
+		 */
+		if (call_on_signal)
+		{
+			signal_routine = call_on_signal;
+			call_on_signal = NULL;		/* So we don't recursively call ourselves */
+			(*signal_routine)();
+		}
 	}
 	if (!IS_GTMSECSHR_IMAGE)
 	{

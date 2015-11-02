@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,6 @@
 #include "util.h"
 #include "t_abort.h"
 #include "gvcst_blk_build.h"	/* for the BUILD_AIMG_IF_JNL_ENABLED macro */
-#include "dse_simulate_t_end.h"
 
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size;
@@ -68,10 +67,17 @@ void dse_chng_bhead(void)
 	int4			blk_seg_cnt, blk_size;	/* needed for BLK_INIT,BLK_SEG and BLK_FINI macros */
 	boolean_t		ismap;
 	boolean_t		chng_blk;
+	boolean_t		was_crit;
+	boolean_t		was_hold_onto_crit;
 	uint4			mapsize;
 	srch_blk_status		blkhist;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+#	ifdef GTM_CRYPT
+	int			req_enc_blk_size;
+	int			crypt_status;
+	blk_hdr_ptr_t		bp, save_bp, save_old_block;
+#	endif
 
 	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DSEFAIL);
@@ -166,17 +172,17 @@ void dse_chng_bhead(void)
 			return;
 		}
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0, new_hdr.levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-		BUILD_AIMG_IF_JNL_ENABLED(csa, csd, non_tp_jfb_buff_ptr, cse);
-		t_end(&dummy_hist, 0);
+		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, cse, csa->ti->curr_tn);
+		t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 	}
 	if (cli_present("TN") == CLI_PRESENT)
 	{
 		if (!cli_get_hex64("TN", &tn))
 			return;
+		was_crit = csa->now_crit;
 		t_begin_crit(ERR_DSEFAIL);
 		CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 		assert(csa->ti->early_tn == csa->ti->curr_tn);
-		csa->ti->early_tn++;
 		if (NULL == (blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		{
 			util_out_print("Error: Unable to read buffer.", TRUE);
@@ -193,8 +199,50 @@ void dse_chng_bhead(void)
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0,
 			((blk_hdr_ptr_t)blkhist.buffaddr)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 		/* Pass the desired tn as argument to bg_update/mm_update below */
-		dse_simulate_t_end(gv_cur_region, csa, tn);
-		t_abort(gv_cur_region, csa); /* primarily to do rel_crit if necessary since dse_simulate_t_end does not do that */
+		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, cse, tn);
+		was_hold_onto_crit = csa->hold_onto_crit;
+		csa->hold_onto_crit = TRUE;
+		t_end(&dummy_hist, NULL, tn);
+#		ifdef GTM_CRYPT
+		if (csd->is_encrypted && (tn < csa->ti->curr_tn))
+		{	/* BG and db encryption is enabled and the DSE update caused the block-header to potentially have a tn
+			 * that is LESS than what it had before. At this point, the global buffer (corresponding to cse->blk)
+			 * reflects the contents of the block AFTER the dse update (bg_update would have touched this) whereas
+			 * the corresponding encryption global buffer reflects the contents of the block BEFORE the update.
+			 * Normally wcs_wtstart takes care of propagating the tn update from the regular global buffer to the
+			 * corresponding encryption buffer. But if before it gets a chance, let us say a process goes to t_end
+			 * as part of a subsequent transaction and updates this same block. Since the  blk-hdr-tn potentially
+			 * decreased, it is possible that the PBLK writing check (comparing blk-hdr-tn with the epoch_tn) decides
+			 * to write a PBLK for this block (even though a PBLK was already written for this block as part of a
+			 * previous DSE CHANGE -BL -TN in the same epoch). In this case, since the db is encrypted, the logic
+			 * will assume there were no updates to this block since the last time wcs_wtstart updated the encryption
+			 * buffer and therefore use that to write the pblk, which is incorrect since it does not yet contain the
+			 * tn update. The consequence of this is would be writing an older before-image PBLK) record to the
+			 * journal file. To prevent this situation, we update the encryption buffer here (before releasing crit)
+			 * using logic like that in wcs_wtstart to ensure it is in sync with the regular global buffer.
+			 */
+			bp = (blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cse->cr->buffaddr);
+			DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)bp);
+			save_bp = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(bp, csa);
+			DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)save_bp);
+			assert((bp->bsiz <= csd->blk_size) && (bp->bsiz >= SIZEOF(*bp)));
+			req_enc_blk_size = MIN(csd->blk_size, bp->bsiz) - SIZEOF(*bp);
+			if (BLK_NEEDS_ENCRYPTION(bp->levl, req_enc_blk_size))
+			{
+				ASSERT_ENCRYPTION_INITIALIZED;
+				memcpy(save_bp, bp, SIZEOF(blk_hdr));
+				GTMCRYPT_ENCODE_FAST(csa->encr_key_handle, (char *)(bp + 1), req_enc_blk_size,
+					(char *)(save_bp + 1), crypt_status);
+				if (0 != crypt_status)
+					GC_GTM_PUTMSG(crypt_status, gv_cur_region->dyn.addr->fname);
+			} else
+				memcpy(save_bp, bp, bp->bsiz);
+		}
+#		endif
+		if (!was_hold_onto_crit)
+			csa->hold_onto_crit = FALSE;
+		if (!was_crit)
+			rel_crit(gv_cur_region);
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
 	}

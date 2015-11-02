@@ -17,16 +17,16 @@
 #include "mdq.h"
 #include "advancewindow.h"
 
-GBLREF bool shift_gvrefs;
 GBLREF char window_token, director_token;
-GBLREF triple *expr_start;
 GBLREF mident window_ident;
 
 int f_order1( oprtype *a, opctype op)
 {
 	triple *oldchain, tmpchain, *r, *triptr;
 	error_def(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	switch (window_token)
 	{
@@ -51,7 +51,7 @@ int f_order1( oprtype *a, opctype op)
 			ins_triple(r);
 			break;
 		case TK_ATSIGN:
-			if (shift_gvrefs)
+			if (TREF(shift_side_effects))
 			{
 				dqinit(&tmpchain, exorder);
 				oldchain = setcurtchain(&tmpchain);
@@ -64,10 +64,10 @@ int f_order1( oprtype *a, opctype op)
 				ins_triple(r);
 				newtriple(OC_GVSAVTARG);
 				setcurtchain(oldchain);
-				dqadd(expr_start, &tmpchain, exorder);
-				expr_start = tmpchain.exorder.bl;
+				dqadd(TREF(expr_start), &tmpchain, exorder);
+				TREF(expr_start) = tmpchain.exorder.bl;
 				triptr = newtriple(OC_GVRECTARG);
-				triptr->operand[0] = put_tref(expr_start);
+				triptr->operand[0] = put_tref(TREF(expr_start));
 			} else
 			{
 				if (!indirection(&(r->operand[0])))

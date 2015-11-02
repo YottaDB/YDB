@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,8 @@
 #include "gvcmy_close.h"
 #include "gvcmz.h"
 #include "op.h"
-#include "lv_val.h"
 #include "dpgbldir.h"
+#include "lv_val.h"		/* needed for "callg.h" */
 #include "callg.h"
 
 GBLREF	struct NTD	*ntd_root;

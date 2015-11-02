@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,12 @@
  ****************************************************************/
 #ifndef HASHTAB_COMMON_H
 #define HASHTAB_COMMON_H
+
+#define HASHTAB_COMPACT	FALSE
+#define HASHTAB_NO_COMPACT TRUE
+
+#define HASHTAB_SPARE_TABLE FALSE
+#define HASHTAB_NO_SPARE_TABLE TRUE
 
 #define HT_VALUE_DUMMY ((void *) 1L)
 	/* It is required not to have 0 or -1 for this macro.
@@ -30,14 +36,34 @@
 	(tabent)->value = value;						\
 	(table)->count++;							\
 }
-#define DELETE_HTENT(table, tabent)					\
-{									\
-	(tabent)->value = HT_DELETED_ENTRY;				\
-	(table)->count--;						\
-	(table)->del_count++;						\
-	assert(((table)->count + (table)->del_count) <= (table)->size);	\
+
+#define COMPACT_NEEDED(table) ((!(table)->dont_compact) && (((table)->del_count > (table)->cmp_trigger_size) || \
+	(((table)->initial_size < (table)->size ) && ((table)->count < ((table)->cmp_trigger_size / 2)))))
+
+/*
+ * This macro is used by callers outside of the hash table implementation to indicate
+ * whether they will request the free of the hash table base at a later point in time or
+ * if it should be released by the hash table implementation during an expansion/compaction.
+ * They must call FREE_BASE_HASHTAB() later to release the base otherwise the memory
+ * will be leaked.
+ */
+#define DEFER_BASE_REL_HASHTAB(table, deferit)					\
+{										\
+	(table)->defer_base_release = deferit;					\
 }
-#define COMPACT_NEEDED(table) ((table)->del_count > (table)->cmp_trigger_size)
+
+/*
+ * This macro is used by callers outside of the hash table implementation to indicate
+ * that they are no longer using the hash table base. This function only provides a "hint" to the
+ * hash table implementation, i.e., the base can now be freed when appropriate. This can
+ * mean when this function is called if we are not keeping spare bases or at a potentially
+ * much later time if we are using a spare base.
+ */
+#define FREE_BASE_HASHTAB(table, base)						\
+{										\
+	if ((table)->dont_keep_spare_table)					\
+		free(base);							\
+}
 
 /*
 Different Hash Computation Macros for Strings:

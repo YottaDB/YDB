@@ -58,7 +58,7 @@ void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	assert((0 != jpc->pini_addr) || REPL_WAS_ENABLED(csa));
 	assert(jgbl.gbl_jrec_time || REPL_WAS_ENABLED(csa));
 	assert(csa->now_crit);
-	assert(IS_SET_KILL_ZKILL(jfb->rectype));
+	assert(IS_SET_KILL_ZKILL_ZTRIG(jfb->rectype));
 	assert(IS_ZTP(jfb->rectype));
 	jrec = (struct_jrec_upd *)jfb->buff;
 	jrec->prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;

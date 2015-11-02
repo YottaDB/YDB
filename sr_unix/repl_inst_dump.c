@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,7 +115,8 @@ void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 {
 	char		*string;
 	char		dststr[MAX_DIGITS_IN_INT], dstlen;
-	int4		minorver;
+	uchar_ptr_t	nodename_ptr;
+	int4		minorver, nodename_len;
 
 	util_out_print("", TRUE);
 	PRINT_DASHES;
@@ -177,8 +178,14 @@ void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 	PRINT_TIME( PREFIX_FILEHDR "Instance File Create Time         ", repl_instance->created_time);
 
 	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, created_nodename[0]), SIZEOF(repl_instance->created_nodename));
-	util_out_print( PREFIX_FILEHDR "Instance File Created Nodename         !R15AD", TRUE,
-		LEN_AND_STR((char *)repl_instance->created_nodename));
+	/* created_nodename can contain upto MAX_NODENAME_LEN characters. If it consumes the entire array, then
+	 * the last character will NOT be null terminated. Check and set the array length to be used for the call
+	 * to util_out_print
+	 */
+	nodename_ptr = repl_instance->created_nodename;
+	nodename_len = ('\0' == nodename_ptr[MAX_NODENAME_LEN - 1]) ? STRLEN((char *)nodename_ptr) : MAX_NODENAME_LEN;
+	util_out_print( PREFIX_FILEHDR "Instance File Created Nodename        !R16AD", TRUE,
+		nodename_len, nodename_ptr);
 
 	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, this_instname[0]), SIZEOF(repl_instance->this_instname));
 	util_out_print( PREFIX_FILEHDR "Instance Name                          !R15AD", TRUE,
@@ -318,7 +325,7 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 	}
 
 	PRINT_OFFSET_PREFIX(offsetof(replpool_identifier, now_running[0]), SIZEOF(jnlpool_ctl->jnlpool_id.now_running));
-	util_out_print( PREFIX_JNLPOOLCTL "GT.M Version                    !R22AZ", TRUE, jnlpool_ctl->jnlpool_id.now_running);
+	util_out_print( PREFIX_JNLPOOLCTL "GT.M Version            !R30AZ", TRUE, jnlpool_ctl->jnlpool_id.now_running);
 
 	PRINT_OFFSET_PREFIX(offsetof(replpool_identifier, instfilename[0]), SIZEOF(jnlpool_ctl->jnlpool_id.instfilename));
 	if (22 >= strlen(jnlpool_ctl->jnlpool_id.instfilename))

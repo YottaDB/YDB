@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,6 @@
 #ifndef FORMAT_TARG_KEY_INCLUDED
 #define FORMAT_TARG_KEY_INCLUDED
 
-unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_key *key,
-	bool dollarc);
+unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_key *key, boolean_t dollarc);
 
 #endif /* FORMAT_TARG_KEY_INCLUDED */

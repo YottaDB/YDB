@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,32 +20,36 @@
 
 GBLREF char	window_token;
 
+error_def(ERR_ACTOFFSET);
+
 int exfunc(oprtype *a, boolean_t alias_target)
 {
-	triple		*ref0, *calltrip, *masktrip, *counttrip, *funret, *tripsize;
-	triple		*triptr;
-	triple		tmpchain, *oldchain, *obp, *routineref, *labelref, *calltrip_opr1_tref;
+	triple		*calltrip, *calltrip_opr1_tref, *counttrip, *funret, *labelref, *masktrip;
+	triple		*oldchain, *ref0, *routineref, tmpchain, *triptr;
+#	if defined(USHBIN_SUPPORTED) || defined(VMS)
+	triple		*tripsize;
+#	endif
 
-	error_def	(ERR_ACTOFFSET);
-
-	assert(TK_DOLLAR == window_token);
-	advancewindow();
 	assert(TK_DOLLAR == window_token);
 	advancewindow();
 	dqinit(&tmpchain, exorder);
 	oldchain = setcurtchain(&tmpchain);
-	calltrip = entryref(OC_EXFUN, OC_EXTEXFUN, INDIR_DUMMY, TRUE, TRUE);
+	calltrip = entryref(OC_EXFUN, OC_EXTEXFUN, INDIR_DUMMY, TRUE, TRUE, FALSE);
 	setcurtchain(oldchain);
 	if (!calltrip)
 		return FALSE;
 	if (OC_EXFUN == calltrip->opcode)
 	{
 		assert(MLAB_REF == calltrip->operand[0].oprclass);
+#		if defined(USHBIN_SUPPORTED) || defined(VMS)
 		ref0 = newtriple(OC_PARAMETER);
 		ref0->operand[0] = put_tsiz();		/* Need size of following code gen triple here */
 		calltrip->operand[1] = put_tref(ref0);
 		tripsize = ref0->operand[0].oprval.tref;
 		assert(OC_TRIPSIZE == tripsize->opcode);
+#		else
+		ref0 = calltrip;
+#		endif
 	} else
 	{
 		calltrip_opr1_tref = calltrip->operand[1].oprval.tref;
@@ -107,15 +111,17 @@ int exfunc(oprtype *a, boolean_t alias_target)
 	} else
 		if (!actuallist(&ref0->operand[1]))
 			return FALSE;
-	obp = oldchain->exorder.bl;
-	dqadd(obp, &tmpchain, exorder);		/*this is a violation of info hiding*/
+	triptr = oldchain->exorder.bl;
+	dqadd(triptr, &tmpchain, exorder);		/*this is a violation of info hiding*/
 	if (OC_EXFUN == calltrip->opcode)
 	{
 		assert(MLAB_REF == calltrip->operand[0].oprclass);
 		triptr = newtriple(OC_JMP);
 		triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
 		calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
+#		if defined(USHBIN_SUPPORTED) || defined(VMS)
 		tripsize->operand[0].oprval.tsize->ct = triptr;
+#		endif
 	}
 	/* If target is an alias, use special container-expecting routine OC_EXFUNRETALS, else regular OC_EXFUNRET */
 	funret = newtriple((alias_target ? OC_EXFUNRETALS : OC_EXFUNRET));

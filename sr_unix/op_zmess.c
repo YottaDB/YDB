@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "error.h"
 #include "op.h"
 #include "mval2fao.h"
+#include "tp_restart.h"
 
 #define FAO_BUFFER_SPACE 2048
 
@@ -29,6 +30,8 @@ void op_zmess(unsigned int cnt, ...)
 	char		buff[FAO_BUFFER_SPACE];
 	unsigned int	errnum, j;
 	int		faocnt;
+
+	error_def(ERR_TPRETRY);
 
 	VAR_START(var, cnt);
 	errnum = va_arg(var, int);
@@ -44,8 +47,14 @@ void op_zmess(unsigned int cnt, ...)
 		faocnt = mval2fao(eptr->msg, var, &fao[0], cnt, faocnt, buff, buff + SIZEOF(buff));
 		va_end(var);
 		if (faocnt != -1)
+		{
+			if (ERR_TPRETRY == errnum)
+			{	/* A TP restart is being signalled. Set t_fail_hist just like a TRESTART command would */
+				op_trestart_set_cdb_code();
+			}
 			rts_error(VARLSTCNT(faocnt+2) errnum, faocnt, fao[0], fao[1], fao[2], fao[3], fao[4], fao[5], fao[6],
 				fao[7], fao[8], fao[9], fao[10], fao[11]);
+		}
 	} else
 	{
 		va_end(var);

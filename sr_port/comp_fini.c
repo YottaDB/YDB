@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,20 +28,19 @@
  *	rts_stringpool to indr_stringpool during compilation setup.
  */
 GBLREF spdesc		stringpool, rts_stringpool, indr_stringpool;
-GBLREF oprtype		*for_stack[], **for_stack_ptr;
-GBLREF bool		compile_time;
 GBLREF short int	source_column;
 GBLREF char		cg_phase;
 GBLREF unsigned char	*source_buffer;
-GBLREF bool		transform;
 GBLREF char		window_token;
+
+error_def(ERR_INDEXTRACHARS);
 
 int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len)
 {
 	triple *ref;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_INDEXTRACHARS);
-
+	SETUP_THREADGBL_ACCESS;
 	if (status)
 	{
 		while (TK_SPACE == window_token)	/* Eat up trailing white space */
@@ -53,9 +52,9 @@ int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len
 		} else
 		{
 			cg_phase = CGP_RESOLVE;
-			assert(for_stack_ptr == for_stack);
-			if (*for_stack_ptr)
-				tnxtarg(*for_stack_ptr);
+			assert(TREF(for_stack_ptr) == TADR(for_stack));
+			if (*TREF(for_stack_ptr))
+				tnxtarg(*TREF(for_stack_ptr));
 			ref = newtriple(retcode);
 			if (retopr)
 				ref->operand[0] = *retopr;
@@ -73,7 +72,7 @@ int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len
 			assert(indr_stringpool.base == stringpool.base);
 			indr_stringpool = stringpool;
 			stringpool = rts_stringpool;
-			compile_time = FALSE;
+			TREF(compile_time) = FALSE;
 			ind_code(obj);
 			indr_stringpool.free = indr_stringpool.base;
 		}
@@ -84,10 +83,10 @@ int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len
 		indr_stringpool = stringpool;
 		stringpool = rts_stringpool;
 		indr_stringpool.free = indr_stringpool.base;
-		compile_time = FALSE;
+		TREF(compile_time) = FALSE;
 		cg_phase = CGP_NOSTATE;
 	}
-	transform = TRUE;
+	TREF(transform) = TRUE;
 	COMPILE_HASHTAB_CLEANUP;
 	mcfree();
 	return status;

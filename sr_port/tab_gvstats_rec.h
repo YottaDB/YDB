@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,3 +49,4 @@ TAB_GVSTATS_REC(n_tp_cnflct_retries_1, "TC1", "# of Tp Conflict retries [1]     
 TAB_GVSTATS_REC(n_tp_cnflct_retries_2, "TC2", "# of Tp Conflict retries [2]          ")
 TAB_GVSTATS_REC(n_tp_cnflct_retries_3, "TC3", "# of Tp Conflict retries [3]          ")
 TAB_GVSTATS_REC(n_tp_cnflct_retries_4, "TC4", "# of Tp Conflict retries [4]          ")
+TAB_GVSTATS_REC(n_ztrigger           , "ZTR", "# of ZTRigger operations              ")

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,37 @@ typedef struct shmpool_blk_hdr_struct
 						 */
 } shmpool_blk_hdr;
 
+typedef struct muinc_blk_hdr_struct
+{	/* This is a mirror structure of shmpool_blk_hdr_struct to maintain compatibility with the current incremental
+	 * backup format. The sm_que structure is replaced with a 8-byte filler.
+	 */
+
+	char		filler_8byte[8];	/* Main queue fields */
+	volatile enum shmblk_type blktype;	/* free, backup or reformat? */
+	block_id	blkid;			/* block number */
+	union
+	{
+		struct
+		{	/* Use for backup */
+			enum db_ver	ondsk_blkver;	/* Version of block from cache_rec */
+			VMS_ONLY(int4	filler;)	/* If VMS, this structure will be 2 words since rfrmt struct is */
+		} bkup;
+#ifdef VMS
+		struct
+		{	/* Use in downgrade mode (as reformat buffer) */
+			volatile sm_off_t	cr_off;	/* Offset to cache rec associated with this reformat buffer */
+			volatile int4		cycle;	/* cycle of given cache record (to validate we have same CR */
+		} rfrmt;
+#endif
+	} use;
+	pid_t		holder_pid;		/* PID holding/using this buffer */
+	boolean_t	valid_data;		/* This buffer holds valid data (else not initialized) */
+	int4		image_count;		/* VMS only */
+	VMS_ONLY(int4	filler;)		/* 8 byte alignment. Only necessary for VMS since bkup struct will only
+						   be 4 bytes for UNIX and this filler is not then necessary for alignment.
+						 */
+} muinc_blk_hdr;
+
 /* Header of the shmpool buffer area. Describes contents */
 typedef struct  shmpool_buff_hdr_struct
 {
@@ -90,6 +121,8 @@ typedef struct  shmpool_buff_hdr_struct
 } shmpool_buff_hdr;
 
 typedef	shmpool_buff_hdr	*shmpool_buff_hdr_ptr_t;
+typedef muinc_blk_hdr	muinc_blk_hdr_t;
+typedef muinc_blk_hdr	*muinc_blk_hdr_ptr_t;
 typedef	shmpool_blk_hdr		*shmpool_blk_hdr_ptr_t;
 
 /* Macro to allow release of a shmpool reformat block if the current cache record is pointing to it

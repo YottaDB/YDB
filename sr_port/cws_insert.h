@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ GBLREF	boolean_t	cw_stagnate_reinitialized;
 /* Initialize the cw_stagnate hash-table */
 #define	CWS_INIT						\
 {								\
-	init_hashtab_int4(&cw_stagnate, CWS_INITIAL_SIZE);	\
+	init_hashtab_int4(&cw_stagnate, CWS_INITIAL_SIZE, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);	\
 	cw_stagnate_reinitialized = TRUE;               	\
 }
 

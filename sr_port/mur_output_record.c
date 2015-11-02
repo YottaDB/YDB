@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include "cache.h"
 #include "gtmmsg.h"
 #include "jnl_typedef.h"
+#include "jnl_get_checksum.h"
 #include "iosp.h"		/* for SS_NORMAL */
 #include "send_msg.h"
 #include "svnames.h"		/* for SV_ZTWORMHOLE */
@@ -60,15 +61,12 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF  sgmnt_data_ptr_t 	cs_data;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		write_after_image;
 GBLREF	jnl_fence_control	jnl_fence_ctl; /* Needed to set the token, optimize jnl_write_logical for recover */
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF 	mur_gbls_t		murgbl;
-#ifdef GTM_TRIGGER
-GBLREF	boolean_t		incr_db_trigger_cycle;
-#endif
 
 /* This routine is called only for recover and rollback (that is, mur_options.update).
  * It applies the set/kill/zkill, tcom, inctn, and aimg records during forward processing.
@@ -131,7 +129,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 				murgbl.consist_jnl_seqno = jgbl.mur_jrec_seqno + 1;
 		}
 	}
-	if (IS_SET_KILL_ZKILL(rectype))
+	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{	/* TP and non-TP has same format */
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 		if (jnl_enabled)
@@ -164,9 +162,20 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 				tp_set_sgm();
 		}
 #		ifdef GTM_TRIGGER
-		/* Check if ^#t and if so need to increment trigger cycle in file header */
+		/* Check if ^#t and if so need to increment trigger cycle in file header. Note that the below 'if' check could cause
+		 * csd->db_trigger_cycle to be incremented even for the region that actually did NOT get any trigger updates. This
+		 * is because some of the ^#t subscripts (like ^#t(#TNAME)) go to the DEFAULT region. So, even though a trigger was
+		 * loaded only for ^a (corresponding to AREG), csd->db_trigger_cycle will be incremented for DEFAULT region as well.
+		 * To avoid this, the below check should be modified to set csa->incr_db_trigger_cycle only if the ^#t subscript
+		 * does not begin with '#' (similar to what is done in UPD_GV_BIND_NAME_APPROPRIATE). However, since journal
+		 * recovery operates in standalone mode, the db_trigger_cycle increment to DEFAULT region should be okay since it
+		 * will NOT cause any restarts
+		 */
 		if (IS_GVKEY_HASHT_GBLNAME(keystr->length, keystr->text))
-			incr_db_trigger_cycle = TRUE;
+		{
+			assert(cs_addrs == csa);
+			csa->incr_db_trigger_cycle = TRUE;
+		}
 #		endif
 		if (IS_SET(rectype))
 		{
@@ -180,8 +189,16 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			if (IS_TP(rectype))
 				tp_set_sgm();
 			op_gvkill();
+#		ifdef GTM_TRIGGER
+		} else if (IS_ZTRIG(rectype))
+		{
+			if (IS_TP(rectype))
+				tp_set_sgm();
+			op_ztrigger();
+#		endif
 		} else
 		{
+			assert(IS_ZKILL(rectype));
 			if (IS_TP(rectype))
 				tp_set_sgm();
 			op_gvzwithdraw();
@@ -305,12 +322,21 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		{
 			if (FALSE == ((was_crit = rctl->csa->now_crit)))
 				grab_crit(reg);
+			/* MUPIP RECOVER should be the only one updating the database so journal state not expected to changes */
+			assert(JNL_ENABLED(csd));
 			jnl_status = jnl_ensure_open();
-			if (0 != jnl_status)
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
-			assert(plst->new_pini_addr == csa->jnl->pini_addr);
-			if (0 != csa->jnl->pini_addr)
-				jnl_put_jrt_pfin(rctl->csa);
+			if (0 == jnl_status)
+			{
+				assert(plst->new_pini_addr == csa->jnl->pini_addr);
+				if (0 != csa->jnl->pini_addr)
+					jnl_put_jrt_pfin(rctl->csa);
+			} else
+			{
+				if (SS_NORMAL != csa->jnl->status)
+					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), csa->jnl->status);
+				else
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+			}
 			if (!was_crit)
 				rel_crit(reg);
 		}
@@ -320,11 +346,13 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 		{
 			if (FALSE == ((was_crit = rctl->csa->now_crit)))
 				grab_crit(reg);
+			/* MUPIP RECOVER should be the only one updating the database so journal state not expected to changes */
+			assert(JNL_ENABLED(csd));
 			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-			csa->ti->early_tn = csa->ti->curr_tn + 1;
 			jnl_status = jnl_ensure_open();
 			if (0 == jnl_status)
 			{
+				csa->ti->early_tn = csa->ti->curr_tn + 1;
 				if (0 == csa->jnl->pini_addr)
 					jnl_put_jrt_pini(csa);
 				null_record.prefix.jrec_type = JRT_NULL;
@@ -332,11 +360,17 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 				null_record.prefix.time = jgbl.gbl_jrec_time;
 				null_record.prefix.tn = csa->ti->curr_tn;
 				null_record.prefix.pini_addr = csa->jnl->pini_addr;
+				null_record.prefix.checksum = INIT_CHECKSUM_SEED;
 				null_record.jnl_seqno = jgbl.mur_jrec_seqno;
 				null_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 				jnl_write(csa->jnl, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
 			} else
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+			{
+				if (SS_NORMAL != csa->jnl->status)
+					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), csa->jnl->status);
+				else
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+			}
 			INCREMENT_CURR_TN(csd);
 			if (!was_crit)
 				rel_crit(reg);

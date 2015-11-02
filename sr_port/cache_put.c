@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "cache.h"
 #include "hashtab_objcode.h"
@@ -17,6 +18,7 @@
 #include "cacheflush.h"
 #include "rtnhdr.h"
 #include "gtm_text_alloc.h"
+#include "io.h"
 
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
@@ -33,13 +35,15 @@ void cache_put(icode_str *src, mstr *object)
 	boolean_t	added;
 
 	indir_cache_mem_size += (ICACHE_SIZE + object->len);
-	if (indir_cache_mem_size > max_cache_memsize || cache_table.size > max_cache_entries)
+	if (indir_cache_mem_size > max_cache_memsize || cache_table.count > max_cache_entries)
 		cache_table_rebuild();
 	csp = (cache_entry *)GTM_TEXT_ALLOC(ICACHE_SIZE + object->len);
 	csp->obj.addr = (char *)csp + ICACHE_SIZE;
 	csp->refcnt = csp->zb_refcnt = 0;
 	csp->src = *src;
 	csp->obj.len = object->len;
+	DBGCACHE((stdout, "cache_put: *** Adding to cache lookaside %d bytes - (%d/%d, %d)\n", ICACHE_SIZE + object->len,
+		  cache_table.count, cache_table.size, indir_cache_mem_size));
 	memcpy(csp->obj.addr, object->addr, object->len);
 	((ihdtyp *)(csp->obj.addr))->indce = csp;	/* Set backward link to this cache entry */
 	added = add_hashtab_objcode(&cache_table, &csp->src, csp, &tabent);

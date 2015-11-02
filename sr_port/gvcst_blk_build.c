@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,11 +32,11 @@
 #include "gtmimagename.h"
 
 #ifdef DEBUG
-GBLDEF	boolean_t		skip_block_chain_tail_check;
+GBLREF	boolean_t		skip_block_chain_tail_check;
 #endif
 
 GBLREF	unsigned char		cw_set_depth;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -51,7 +51,15 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	sm_ulong_t	n;
 	int4		offset;
 	trans_num	blktn;
+#	ifdef DEBUG
+	boolean_t	integ_error_found;
+	rec_hdr_ptr_t	rp;
+	sm_uc_ptr_t	chainptr, input_base_addr;
+	unsigned short	nRecLen;
+#	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert((dba_bg != cs_data->acc_meth) || dollar_tlevel || !cs_addrs->now_crit || write_after_image);
 	assert((dba_mm != cs_data->acc_meth) || dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
@@ -62,12 +70,13 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	assert((short)cse->index >= 0);
 	assert(!cse->undo_next_off[0] && !cse->undo_offset[0]);
 	assert(!cse->undo_next_off[1] && !cse->undo_offset[1]);
+	DEBUG_ONLY(input_base_addr = base_addr;)
 
 	if (base_addr == NULL)
 	{	/* it's the first private TP build */
 		assert(dollar_tlevel);
 		assert(cse->blk_target);
-		base_addr = cse->new_buff = ((new_buff_buddy_list *)get_new_free_element(sgm_info_ptr->new_buff_list))->new_buff;
+		base_addr = cse->new_buff = (unsigned char *)get_new_free_element(sgm_info_ptr->new_buff_list);
 		cse->first_copy = TRUE;
 	} else
    		assert(0 == ((sm_ulong_t)base_addr & 3));	/* word aligned at least */
@@ -165,22 +174,72 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 			cse->ins_off = 0;
 			cse->next_off = 0;
 		}
-		DEBUG_ONLY(
-			if (cse->first_off)
-			{	/* verify the integrity of the TP chains within a newly created block */
-				ptr = base_addr;
-				ptrtop = ptr + cs_data->blk_size;
-				for (offset = cse->first_off; (0 < offset); offset = chain.next_off)
+#		ifdef DEBUG
+		if (offset = cse->first_off)
+		{	/* Verify the integrity of the TP chains within a newly created block.
+			 * If it is the first TP private build, the update array could have referenced
+			 * shared memory global buffers which could have been concurrently updated.
+			 * So the integrity of the chain cannot be easily verified. If ever we find
+			 * an integ error in the chain, we check if this is the first private TP build
+			 * and if so allow it but set a debug flag donot_commit so we never ever commit
+			 * this transaction. The hope is that it will instead restart after validation.
+			 */
+			ptr = base_addr;
+			ptrtop = ptr + ((blk_hdr_ptr_t)ptr)->bsiz;
+			chainptr = ptr + offset;
+			ptr += SIZEOF(blk_hdr);
+			integ_error_found = FALSE;
+			for ( ; ptr < ptrtop; )
+			{
+				do
 				{
-					ptr = ptr + offset;
-					assert(ptr < ptrtop);	/* ensure we have not overrun the buffer */
-					GET_LONGP(&chain, ptr);
+					GET_USHORT(nRecLen, &((rec_hdr_ptr_t)ptr)->rsiz);
+					if (0 == nRecLen)
+					{
+						assert(NULL == input_base_addr);
+						integ_error_found = TRUE;
+						break;
+					}
+					ptr += nRecLen;
+					if (ptr - SIZEOF(off_chain) == chainptr)
+						break;
+					if ((ptr - SIZEOF(off_chain)) > chainptr)
+					{
+						assert(NULL == input_base_addr);
+						integ_error_found = TRUE;
+						break;
+					}
+					GET_LONGP(&chain, ptr - SIZEOF(off_chain));
+					if (chain.flag)
+					{
+						assert(NULL == input_base_addr);
+						integ_error_found = TRUE;
+						break;
+					}
+				} while (ptr < ptrtop);
+				if (integ_error_found)
+					break;
+				if (chainptr < ptrtop)
+				{
+					GET_LONGP(&chain, chainptr);
 					assert(1 == chain.flag || (skip_block_chain_tail_check && (0 == chain.next_off)));
 					assert(chain.cw_index < sgm_info_ptr->cw_set_depth);
+					offset = chain.next_off;
+					if (0 == offset)
+						chainptr = ptrtop;
+					else
+					{
+						chainptr = chainptr + offset;
+						assert(chainptr < ptrtop);	/* ensure we have not overrun the buffer */
+					}
 				}
-				assert(0 == offset);	/* ensure the chain is NULL terminated */
 			}
-		)
+			if (integ_error_found)
+				TREF(donot_commit) |= DONOTCOMMIT_GVCST_BLK_BUILD_TPCHAIN;
+			else
+				assert(0 == offset);	/* ensure the chain is NULL terminated */
+		}
+#		endif
 	} else
 		assert(dollar_tlevel || (cse->index < (int)cw_set_depth));
 }

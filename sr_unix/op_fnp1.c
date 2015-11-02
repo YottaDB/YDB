@@ -39,7 +39,6 @@
 #include "op.h"
 #include "gtm_utf8.h"
 
-GBLREF fnpc_area	fnpca;			/* The $piece cache area */
 GBLREF boolean_t	gtm_utf8_mode;		/* We are indeed doing the UTF8 thang */
 GBLREF boolean_t	badchar_inhibit;	/* No BADCHAR errors should be signaled */
 
@@ -77,7 +76,9 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 	mval		ldst;		/* Local copy since &dst == &src .. move to dst at return */
 	fnpc   		*cfnpc;
 	delimfmt	ldelim;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(gtm_utf8_mode);
 	MV_FORCE_STR(src);
 	ldelim.unichar_val = delim;
@@ -107,7 +108,7 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 	 * (using bytes) and since its results are not same as $PIECE(), we must ignore the cache
 	 * and rebuild it for this mval. */
 	fnpc_indx = src->fnpc_indx - 1;
-	cfnpc = &fnpca.fnpcs[fnpc_indx];
+	cfnpc = &(TREF(fnpca)).fnpcs[fnpc_indx];
 	if (FNPC_MAX > fnpc_indx && cfnpc->last_str.addr == (char *)first &&
 	    cfnpc->last_str.len == slen && cfnpc->delim == ldelim.unichar_val &&
 	    !cfnpc->byte_oriented) /* cannot use the cache created by an earlier $ZPIECE() */
@@ -143,10 +144,10 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 		COUNT_EVENT(miss);
 
 		/* Need to steal a new piece cache, get "least recently reused" */
-		cfnpc = fnpca.fnpcsteal;		/* Get next element to steal */
-		if (fnpca.fnpcmax < cfnpc)
-			cfnpc = &fnpca.fnpcs[0];
-		fnpca.fnpcsteal = cfnpc + 1;		/* -> next element to steal */
+		cfnpc = (TREF(fnpca)).fnpcsteal;	/* Get next element to steal */
+		if ((TREF(fnpca)).fnpcmax < cfnpc)
+			cfnpc = &(TREF(fnpca)).fnpcs[0];
+		(TREF(fnpca)).fnpcsteal = cfnpc + 1;	/* -> next element to steal */
 
 		cfnpc->last_str = src->str;		/* Save validation info */
 		cfnpc->delim = ldelim.unichar_val;

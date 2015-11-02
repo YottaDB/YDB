@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,12 +26,13 @@
 #include "tp.h"
 #include "tp_frame.h"
 #include "tp_timeout.h"
-#include "lv_val.h"
+#include "lv_val.h"		/* needed for tp_unwind.h */
 #include "tp_unwind.h"
 #include "op.h"
 #include "jobinterrupt_process.h"
 
-GBLREF	short			dollar_tlevel, dollar_trestart;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			dollar_trestart;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
@@ -56,9 +57,9 @@ GBLREF	tp_frame		*tp_pointer;
 	TP_CHANGE_REG(gv_cur_region);					\
 }
 
-void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback */
+void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback : BYPASSOK */
 {
-	short		newlevel;
+	uint4		newlevel;
 	tp_region	*tr;
 	gd_region	*save_cur_region;	/* saved copy of gv_cur_region before tp_clean_up/tp_incr_clean_up modifies it */
 	gd_region	*curreg;
@@ -72,20 +73,21 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 
 	if (implicit_trollback)
 	{
-		/* Unlike the call to op_trollback from generated code, this invocation of op_trollback is from C runtime code.
+		/* Unlike the call to "op_trollback" from generated code, this invocation of "op_trollback" is from C runtime code.
 		 * Set the global variable to FALSE right away to avoid incorrect values from persisting in case of errors
 		 * down below. Before the reset of the global variable, copy it into a local variable.
 		 */
 		lcl_implicit_trollback = implicit_trollback;
 		implicit_trollback = FALSE;
 	}
-	if (0 == dollar_tlevel)
+	if (!dollar_tlevel)
 		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
-	if (0 > rb_levels && dollar_tlevel < -rb_levels)
-		rts_error(VARLSTCNT(4) ERR_TROLLBK2DEEP, 2, -rb_levels, dollar_tlevel);
-	else if (dollar_tlevel <= rb_levels)
+	if (0 > rb_levels)
+	{
+		if (dollar_tlevel < -rb_levels)
+			rts_error(VARLSTCNT(4) ERR_TROLLBK2DEEP, 2, -rb_levels, dollar_tlevel);
+	} else if (dollar_tlevel <= rb_levels)
 		rts_error(VARLSTCNT(4) ERR_INVROLLBKLVL, 2, rb_levels, dollar_tlevel);
-
 	newlevel = (0 > rb_levels) ? dollar_tlevel + rb_levels : rb_levels;
 	/* The DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC macro is used at various points in the database code to check that
 	 * gv_target and cs_addrs are in sync. This is because op_gvname relies on this in order to avoid a gv_bind_name
@@ -131,12 +133,12 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 			gv_orig_key_ptr = tp_pointer->orig_key;
 			/* At this point we expect tp_pointer->orig_key and gv_currkey to be in sync. However there are two
 			 * exceptions to this.
-			 * (a) If MUPIP TRIGGER detects that all of the triggers are erroneous and attempts an op_trollback,
+			 * (a) If MUPIP TRIGGER detects that all of the triggers are erroneous and attempts an "op_trollback",
 			 *     gv_currkey would be pointing to ^#t. However, tp_pointer->orig_key would remain at "" (initialized
 			 *     during op_tstart).
 			 * (b) If an M program defines $etrap to do a halt and an explicit Non-TP update causes a trigger to be
 			 *     executed that further causes a runtime error which will now invoke the $etrap code. Since the
-			 *     $etrap code does a halt, gtm_exit_handler will invoke op_trollback (since dollar_tlevel is > 0).
+			 *     $etrap code does a halt, gtm_exit_handler will invoke "op_trollback" (since dollar_tlevel is > 0).
 			 *     At this point, tp_pointer->orig_key and gv_currkey need not be in sync.
 			 * To maintain $reference accurately, we need to restore gv_currkey from tp_pointer->orig_key.
 			 */

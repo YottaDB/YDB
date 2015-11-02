@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,16 +9,14 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
+
 #include "min_max.h"
 #include "gtm_string.h"
 #include "error.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
 #include "rtnhdr.h"
-#include "hashtab.h"
-#include "stack_frame.h"
 #include "hashtab_mname.h"
-#include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -57,15 +55,25 @@ boolean_t add_hashtab_mname_symval(hash_table_mname *table, mname_entry *key, vo
 	table_base_orig = table->base;
 	table_size_orig = table->size;
 
+	/* We'll do the base release once we do the reparations */
+	DEFER_BASE_REL_HASHTAB(table, TRUE);
+
 	/* Call real table function */
 	retval = add_hashtab_mname(table, key, value, tabentptr);
 
 	/* If the hash table has not changed, we are done */
 	if (table_base_orig == table->base)
+	{
+		DEFER_BASE_REL_HASHTAB(table, FALSE);
 		return retval;
+	}
 
 	/* Otherwise we have some work to do to repair the l_symtab entries in the stack */
 	als_lsymtab_repair(table, table_base_orig, table_size_orig);
+
+	/* We're done with the previous base */
+	FREE_BASE_HASHTAB(table, table_base_orig);
+	DEFER_BASE_REL_HASHTAB(table, FALSE);
 
 	return retval;
 }

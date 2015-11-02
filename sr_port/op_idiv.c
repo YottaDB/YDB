@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,8 @@
 
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
+
+error_def(ERR_NUMOFLOW);
 
 void	op_idiv(mval *u, mval *v, mval *q)
 {
@@ -86,6 +88,9 @@ void	op_idiv(mval *u, mval *v, mval *q)
 			demote(q, exp, u->sgn ^ v->sgn);
 		else
 		{
+			assert(EXPLO <= exp);
+			if (EXPHI <= exp)
+				rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
 			q->e = exp;
 			q->sgn = u->sgn ^ v->sgn;
 			q->mvtype = MV_NM;

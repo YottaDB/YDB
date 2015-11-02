@@ -53,6 +53,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "repl_instance.h"
+#include "have_crit.h"
 #endif
 
 GBLREF	int4			gv_keysize;
@@ -144,6 +145,7 @@ CONDITION_HANDLER(mupip_recover_ch)
 void	mupip_recover(void)
 {
 	boolean_t		all_gen_properly_closed, apply_pblk, ztp_broken, intrrupted_recov_processing;
+	bool			mur_open_files_status;
 	enum jnl_record_type	rectype;
 	int			cur_time_len, regno, reg_total;
 	jnl_tm_t		min_broken_time;
@@ -175,8 +177,13 @@ void	mupip_recover(void)
 	JNL_PUT_MSG_PROGRESS("Initial processing started");
 	mur_init();
 	mur_get_options();
-	if (!mur_open_files()) /* mur_open_files already issued error */
+	/*DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); */
+	mur_open_files_status = mur_open_files();
+	/*ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);*/
+	if (!mur_open_files_status) /* mur_open_files already issued error */
+	{
 		mupip_exit(ERR_MUNOACTION);
+	}
 	VMS_ONLY(assert(!mur_options.rollback_losttnonly);)
 	UNIX_ONLY(assert(!mur_options.rollback_losttnonly || mur_options.rollback);)
 	murgbl.prc_vec = prc_vec;

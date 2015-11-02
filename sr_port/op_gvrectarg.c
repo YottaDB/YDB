@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,9 +30,6 @@
 
 #define DIR_ROOT 1
 
-GBLREF	bool		gv_curr_subsc_null;
-GBLREF	bool		gv_prev_subsc_null;
-GBLREF	gd_addr		*gd_targ_addr;
 GBLREF	gd_binding	*gd_map;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
@@ -40,7 +37,7 @@ GBLREF	gv_namehead	*gv_target;
 GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgmnt_data	*cs_data;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 
 void op_gvrectarg(mval *v)
 {
@@ -53,7 +50,9 @@ void op_gvrectarg(mval *v)
 		int		n;
 		unsigned char	*tmpc;
 	)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* You might be somewhat apprehensive at the seemingly cavalier use of GTMASSERT in this routine.
 	 * First, let me explain myself.  The mvals passed to RECTARG are supposed to come only from SAVTARG,
 	 * and are to represent the state of gv_currkey when SAVTARG was done.  Consequently, there are
@@ -92,7 +91,7 @@ void op_gvrectarg(mval *v)
 		gvsavtarg = &gvst_tmp;
 		memcpy(gvsavtarg, c, GVSAVTARG_FIXED_SIZE);
 	}
-	gd_targ_addr = gvsavtarg->gd_targ_addr;
+	TREF(gd_targ_addr) = gvsavtarg->gd_targ_addr;
 	gd_map = gvsavtarg->gd_map;
 	reg = gvsavtarg->gv_cur_region;
 	TP_CHANGE_REG(reg);	/* sets gv_cur_region, cs_addrs, cs_data */
@@ -100,8 +99,8 @@ void op_gvrectarg(mval *v)
 	if (dollar_tlevel)
 		sgm_info_ptr = gvsavtarg->sgm_info_ptr;
 	assert(dollar_tlevel || (NULL == sgm_info_ptr));
-	gv_curr_subsc_null = gvsavtarg->gv_curr_subsc_null;
-	gv_prev_subsc_null = gvsavtarg->gv_prev_subsc_null;
+	TREF(gv_last_subsc_null) = gvsavtarg->gv_last_subsc_null;
+	TREF(gv_some_subsc_null) = gvsavtarg->gv_some_subsc_null;
 	gv_currkey->prev = gvsavtarg->prev;
 	gv_currkey->end = end = gvsavtarg->end;
 	assert(gv_currkey->end < gv_currkey->top);

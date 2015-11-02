@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF int4		gv_keysize;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
 bool gvcst_zprevious(void)
@@ -134,9 +134,9 @@ bool gvcst_zprevious(void)
 				gv_altkey->end = c1 - gv_altkey->base;
 				assert(gv_altkey->end < gv_altkey->top);
 			}
-			if (0 == dollar_tlevel)
+			if (!dollar_tlevel)
 			{
-				if ((trans_num)0 == t_end(&gv_target->hist, two_histories ? lft_history : NULL))
+				if ((trans_num)0 == t_end(&gv_target->hist, two_histories ? lft_history : NULL, TN_NOT_SPECIFIED))
 					continue;
 			} else
 			{

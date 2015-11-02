@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,20 +25,22 @@
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_region	*gv_cur_region;
-GBLREF bool		gv_curr_subsc_null;
 GBLREF gv_key		*gv_currkey;
 GBLREF bool		gv_replication_error;
 GBLREF bool		gv_replopen_error;
+
+error_def(ERR_DBPRIVERR);
 
 void kill_var(void);
 
 void op_gvkill(void)
 {	gd_region	*reg;
-	error_def(ERR_DBPRIVERR);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
-	if (gv_curr_subsc_null && NEVER == gv_cur_region->null_subs)
+	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
 
 	if (gv_cur_region->dyn.addr->acc_meth == dba_bg || gv_cur_region->dyn.addr->acc_meth == dba_mm)

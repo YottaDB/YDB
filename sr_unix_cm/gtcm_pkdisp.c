@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@
 #include "gtm_unistd.h"		/* for read() */
 #include "gtm_fcntl.h"
 #include <errno.h>
-
+#include "gtm_threadgbl_init.h"
 #include "omi.h"
 
 #ifndef lint
@@ -49,7 +49,9 @@ int main(int argc, char_ptr_t argv[])
 	omi_li		nx;
 	omi_si		hlen;
 	omi_req_hdr	rh;
+	DCL_THREADGBL_ACCESS;
 
+	GTM_THREADGBL_INIT;
 	bunches = 0;
 	if (argc == 3)
 	{
@@ -117,7 +119,7 @@ int main(int argc, char_ptr_t argv[])
 			continue;
 		}
 		rdmr = 0;
-		PRINTF("Message %d, %d bytes", n, mlen.value);
+		PRINTF("Message %d, %ld bytes", n, (long)mlen.value);
 		if (argc == 3 && bunches)
 		{
 			OMI_LI_READ(&nx, xptr);
@@ -146,13 +148,13 @@ int main(int argc, char_ptr_t argv[])
 			OMI_LI_READ(&rh.ref, xptr);
 			if (rh.op_class.value == 1)
 			{
-				PRINTF("    %s (%d bytes)", (omi_oprlist[rh.op_type.value])
-				       ? omi_oprlist[rh.op_type.value] : "unknown",xlen.value);
+				PRINTF("    %s (%ld bytes)", (omi_oprlist[rh.op_type.value])
+				       ? omi_oprlist[rh.op_type.value] : "unknown",(long)xlen.value);
 				if (argc == 3 && bunches)
 				    PRINTF(", transaction #%d in bunch", i);
 				puts("");
 			} else
-				PRINTF("    (%d bytes)\n", xlen.value);
+				PRINTF("    (%ld bytes)\n", (long)xlen.value);
 			chr  = (char *)buf;
 			while (xptr < end)
 			{

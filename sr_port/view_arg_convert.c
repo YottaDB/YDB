@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,12 +21,10 @@
 #include "view.h"
 #include "toktyp.h"
 #include "targ_alloc.h"
-#include "mstrcmp.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "valid_mname.h"
 #include "dpgbldir.h"
-#include "lv_val.h"
+#include "lv_val.h"	/* needed for "symval" structure */
+#include "min_max.h"
 
 LITREF mval 		literal_one;
 
@@ -89,19 +87,19 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
 				gvinit();
-
 			r_ptr = gd_header->regions;
 			if (!parm->str.len && vtp->keycode == VTK_GVNEXT)	/* "" => 1st region */
 				parmblk->gv_ptr = r_ptr;
 			else
-			{	for (r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
+			{
+				for (r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
 				{
 					if (r_ptr >= r_top)
 						rts_error(VARLSTCNT(4) ERR_NOREGION,2, parm->str.len, parm->str.addr);
 					tmpstr.len = r_ptr->rname_len;
 					tmpstr.addr = (char *) r_ptr->rname;
-					n = mstrcmp(&tmpstr, &parm->str);
-					if (n == 0)
+					MSTR_CMP(tmpstr, parm->str, n);
+					if (0 == n)
 						break;
 				}
 				parmblk->gv_ptr = r_ptr;

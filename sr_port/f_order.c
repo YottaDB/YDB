@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,11 +21,9 @@
 #include "advancewindow.h"
 #include "mvalconv.h"
 
-GBLREF	bool	shift_gvrefs;
-GBLREF	char	window_token, director_token;
-GBLREF	triple	*expr_start;
-GBLREF	mident	window_ident;
-GBLREF	triple	*curtchain;
+GBLREF	char		window_token, director_token;
+GBLREF	mident		window_ident;
+GBLREF	triple		*curtchain;
 
 /* The following are static triples used to pass information between functions "f_order" and "set_opcode" */
 STATICDEF triple	*gvo2_savtarg1;	/* Save gv_currkey after processing gvn1 in $ORDER(gvn1,expr) */
@@ -50,6 +48,7 @@ STATICFNDEF boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr
 	enum order_dir	direction;
 	triple		*s;
 	triple		tmpchain, *oldchain, *x, *tp, *tmptriple, *gvo2_post_srchindx_triple, *t1, *t2;
+	int4		dummy_intval;
 
 	if (window_token == TK_COMMA)
 	{
@@ -87,9 +86,10 @@ STATICFNDEF boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr
 		s = result_ptr->oprval.tref;
 		if (OC_LIT == s->opcode)
 		{
-			if (MV_IS_INT(&s->operand[0].oprval.mlit->v)  &&
-			    (s->operand[0].oprval.mlit->v.m[1] == MV_BIAS  ||  s->operand[0].oprval.mlit->v.m[1] == -MV_BIAS))
-				direction = s->operand[0].oprval.mlit->v.m[1] == MV_BIAS ? forward : backward;
+			if (MV_IS_TRUEINT(&s->operand[0].oprval.mlit->v, &dummy_intval)
+					&& ((MV_BIAS == s->operand[0].oprval.mlit->v.m[1])
+						||  (-MV_BIAS == s->operand[0].oprval.mlit->v.m[1])))
+				direction = (MV_BIAS == s->operand[0].oprval.mlit->v.m[1]) ? forward : backward;
 			else
 			{
 				if (global == object)
@@ -220,10 +220,11 @@ int f_order(oprtype *a, opctype op)
 	enum order_obj	object;
 	oprtype		result, *result_ptr, *second_opr;
 	triple		tmpchain, *oldchain, *r, *triptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	result_ptr = (oprtype *)mcalloc(SIZEOF(oprtype));
 	result = put_indr(result_ptr);
-
 	r = maketriple(OC_NOOP);	/* We'll fill in the opcode later, when we figure out what it is */
 	switch (window_token)
 	{
@@ -249,7 +250,7 @@ int f_order(oprtype *a, opctype op)
 			second_opr = &r->operand[0];
 			break;
 		case TK_ATSIGN:
-			if (shift_gvrefs)
+			if (TREF(shift_side_effects))
 			{
 				dqinit(&tmpchain, exorder);
 				oldchain = setcurtchain(&tmpchain);
@@ -265,10 +266,10 @@ int f_order(oprtype *a, opctype op)
 
 				newtriple(OC_GVSAVTARG);
 				setcurtchain(oldchain);
-				dqadd(expr_start, &tmpchain, exorder);
-				expr_start = tmpchain.exorder.bl;
+				dqadd(TREF(expr_start), &tmpchain, exorder);
+				TREF(expr_start) = tmpchain.exorder.bl;
 				triptr = newtriple(OC_GVRECTARG);
-				triptr->operand[0] = put_tref(expr_start);
+				triptr->operand[0] = put_tref(TREF(expr_start));
 				*a = put_tref(r);
 				return TRUE;
 			}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,9 +11,9 @@
 
 /* Print cacheing stats for indirect code */
 #include "mdef.h"
+
 #include "gtm_stdio.h"
 #include "cache.h"
-#include "hashtab.h"
 #include "hashtab_objcode.h"
 
 GBLREF int			cache_hits, cache_fails;

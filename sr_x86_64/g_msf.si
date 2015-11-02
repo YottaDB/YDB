@@ -224,5 +224,4 @@ mrt_tmp_mv		=	196
 mrt_tmp_sz		=	200
 mrt_curr_ptr		=	208
 mrt_oldr_ptr		=	216
-mrt_hdr_size		=	224
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,16 +39,17 @@
 #include "mvalconv.h"
 #include "tp_set_sgm.h"
 
-GBLREF short            dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF gd_addr		*gd_header;
-GBLREF bool		gv_curr_subsc_null;
-GBLREF bool		gv_prev_subsc_null;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgm_info         *first_sgm_info;
 GBLREF mstr		extnam_str;
+
+error_def(ERR_GVNAKED);
+error_def(ERR_MAXNRSUBSCRIPTS);
 
 void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
@@ -58,10 +59,9 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	mval		*val;
 	short 		max_key;
 	unsigned char	*ptr, *end_ptr;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_GVNAKED);
-	error_def(ERR_MAXNRSUBSCRIPTS);
-
+	SETUP_THREADGBL_ACCESS;
 	extnam_str.len = 0;
 	if (!gv_currkey || (0 == gv_currkey->prev) || (0 == gv_currkey->end))
 		rts_error(VARLSTCNT(1) ERR_GVNAKED);
@@ -76,18 +76,19 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 		assert(gv_target->gd_csa == cs_addrs);
 	}
 
-	VMS_ONLY(va_count(count);)
+	VMS_ONLY(va_count(count));
 	UNIX_ONLY(count = count_arg;)	/* i386 assembler modules may depend on unchanged count */
 	if (0 >= count)
 		GTMASSERT;
 	gv_currkey->end = gv_currkey->prev;
 	is_null = FALSE;
-	was_null = (gv_currkey->end ? gv_prev_subsc_null : FALSE);
+	assert(gv_currkey->end);
+	was_null = TREF(gv_some_subsc_null);
 	sbs_cnt = 0;
 	if (1 < count)
 	{
 		/* Use of naked reference can cause increase in number of subscripts.   So count the subscripts */
-		ptr = &gv_currkey->base[0];
+		ptr = gv_currkey->base;
 		end_ptr = ptr + gv_currkey->end;
 		while (ptr < end_ptr)
 			if (KEY_DELIMITER == *ptr++)
@@ -108,8 +109,9 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 			break;
 	}
 	va_end(var);
-	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
-	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
+	TREF(gv_some_subsc_null) = was_null; /* if true, it indicates there is a null subscript (other than the last subscript)
+						in current key */
+	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && (NEVER == gv_cur_region->null_subs))
 		sgnl_gvnulsubsc();
 	return;

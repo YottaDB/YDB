@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,13 @@
 #include "mdef.h"
 #include "semwt2long_handler.h"
 
-GBLREF volatile boolean_t semwt2long;
 
 void semwt2long_handler(void)
 {
-	semwt2long = TRUE;
+
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	TREF(semwait2long) = TRUE;
 	return;
 }

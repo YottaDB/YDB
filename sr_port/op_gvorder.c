@@ -29,7 +29,6 @@
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
-GBLREF bool		gv_curr_subsc_null;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*gd_header;
 GBLREF gd_binding	*gd_map;
@@ -46,7 +45,9 @@ void op_gvorder (mval *v)
 	mstr			name;
 	enum db_acc_method	acc_meth;
 	boolean_t		found, ok_to_change_currkey;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	/* Modify gv_currkey such that a gvcst_search of the resulting gv_currkey will find the next available subscript.
 	 * But in case of dba_usr (the custom implementation of $ORDER which is overloaded for DDP but could be more in the
@@ -55,7 +56,7 @@ void op_gvorder (mval *v)
 	ok_to_change_currkey = (dba_usr != acc_meth);
 	if (ok_to_change_currkey)
 	{	/* Modify gv_currkey to reflect the next possible key value in collating order */
-		if (!gv_curr_subsc_null || gv_cur_region->std_null_coll)
+		if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll)
 		{
 			*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
 			*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
@@ -109,7 +110,7 @@ void op_gvorder (mval *v)
 		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 		if (ok_to_change_currkey)
 		{	/* Restore gv_currkey to what it was at function entry time */
-			if (!gv_curr_subsc_null || gv_cur_region->std_null_coll)
+			if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll)
 			{
 				assert(1 == gv_currkey->base[gv_currkey->end - 2]);
 				assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end-1]);

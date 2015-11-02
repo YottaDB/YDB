@@ -27,6 +27,7 @@
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	int4			exi_condition;
 GBLREF	void			(*call_on_signal)();
+GBLREF	void			(*create_fatal_error_zshow_dmp_fp)();
 GBLREF	int			forced_exit_err;
 GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
@@ -101,13 +102,16 @@ void deferred_signal_handler(void)
 	 * that would drive us to exit. Setting the "process_exiting" variable causes those csa checks to pass.
 	 */
 	SET_PROCESS_EXITING_TRUE;
-	/* If a special routine was registered to be driven on a signal, drive it now */
-	if (0 != exi_condition && call_on_signal)
+	/* If any special routines are registered to be driven on a signal, drive them now */
+	if ((0 != exi_condition) && (NULL != call_on_signal))
 	{
 		signal_routine = call_on_signal;
 		call_on_signal = NULL;		/* So we don't recursively call ourselves */
 		(*signal_routine)();
 	}
-	/* If the condition handler didn't cause an exit, drive the defined exit handler */
+	/* Note, we do not drive create_fatal_error zshow_dmp() in this routine since any deferrable signals are
+	 * by definition not fatal.
+	 */
+
 	exit(-exi_condition);
 }

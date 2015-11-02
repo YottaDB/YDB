@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,9 +48,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	sf->mpc = transfer_addr;
 	sf->flags = 0;
 #ifdef HAS_LITERAL_SECT
-	/* VMS *may* need this to still be NULL in this case but UNIX does NOT */
-	VMS_ONLY(sf->literal_ptr = (int4 *)NULL);
-	UNIX_ONLY(sf->literal_ptr = (int4 *)LITERAL_ADR(rtn_base));
+	sf->literal_ptr = (int4 *)LITERAL_ADR(rtn_base);
 #endif
 	sf->temp_mvals = sf->rvector->temp_mvals;
 	msp -= x1 = rtn_base->temp_size;

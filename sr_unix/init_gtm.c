@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,22 +36,26 @@
 #include "fnpc.h"
 #include "gtm_malloc.h"
 #include "stp_parms.h"
+#include "create_fatal_error_zshow_dmp.h"
 
-GBLREF void		(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
-GBLREF void		(*tp_timeout_clear_ptr)(void);
-GBLREF void		(*tp_timeout_action_ptr)(void);
+GBLREF void		(*create_fatal_error_zshow_dmp_fp)();
 GBLREF void		(*ctrlc_handler_ptr)();
+GBLREF void		(*tp_timeout_action_ptr)(void);
+GBLREF void		(*tp_timeout_clear_ptr)(void);
+GBLREF void		(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
-GBLREF void		(*unw_prof_frame_ptr)(void);
 GBLREF void		(*op_write_ptr)(mval *v);
 GBLREF void		(*op_wteol_ptr)(int4 n);
+GBLREF void		(*unw_prof_frame_ptr)(void);
 
-GBLREF mstr			default_sysid;
-GBLDEF boolean_t		gtm_startup_active = FALSE;
+GBLREF mstr		default_sysid;
+GBLDEF boolean_t	gtm_startup_active = FALSE;
 
 void init_gtm(void)
 {
 	struct startup_vector   svec;
+	DEBUG_ONLY(mval		chkmval;)
+	DEBUG_ONLY(mval		chkmval_b;)
 
 	/* We believe much of our code depends on these relationships.  */
 	assert(SIZEOF(int) == 4);
@@ -72,7 +76,11 @@ void init_gtm(void)
 	assert(BITS_PER_UCHAR == 8);
 	assert(SIZEOF(enum db_ver) == SIZEOF(int4));
 	assert(254 >= FNPC_MAX);	/* The value 255 is reserved */
+	assert(SIZEOF(mval) == SIZEOF(mval_b));
+	assert(SIZEOF(chkmval.fnpc_indx) == SIZEOF(chkmval_b.fnpc_indx));
+	assert(OFFSETOF(mval, fnpc_indx) == OFFSETOF(mval_b, fnpc_indx));
 
+	create_fatal_error_zshow_dmp_fp = create_fatal_error_zshow_dmp;
 	tp_timeout_start_timer_ptr = tp_start_timer;
 	tp_timeout_clear_ptr = tp_clear_timeout;
 	tp_timeout_action_ptr = tp_timeout_action;
@@ -91,11 +99,11 @@ void init_gtm(void)
 	svec.argcnt = SIZEOF(svec);
 	svec.rtn_start = svec.rtn_end = malloc(SIZEOF(rtn_tabent));
 	memset(svec.rtn_start, 0, SIZEOF(rtn_tabent));
-	svec.user_stack_size = 256 * 1024;
+	svec.user_stack_size = (256 ZOS_ONLY(+ 64))* 1024;	/* ZOS stack frame 2x other platforms so give more stack */
 	svec.user_indrcache_size = 32;
 	svec.user_strpl_size = STP_INITSIZE_REQUESTED;
 	svec.ctrlc_enable = 1;
-	svec.break_message_mask = 15;
+	svec.break_message_mask = 31;
 	svec.labels = 1;
 	svec.lvnullsubs = 1;
 	svec.base_addr = (unsigned char *)1L;

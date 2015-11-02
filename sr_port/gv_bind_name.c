@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,6 @@
 #include "targ_alloc.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "min_max.h"
-#include "hashtab.h"
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,6 @@ GBLREF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
 GBLREF	boolean_t	 	mupip_jnl_recover;
 #ifdef DEBUG
 GBLREF	unsigned int		t_tries;
-GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
 #endif
 
 /* Sync the filehdr (and epoch in the journal file if before imaging). The goal is to sync the database,
@@ -71,7 +70,9 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	NOPIO_ONLY(boolean_t	lseekIoInProgress_flag;)
 	DEBUG_ONLY(boolean_t	save_ok_to_call_wcs_recover;)
 	boolean_t		is_mm;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = *csaptr;
 	assert(csa->dbsync_timer);	/* to ensure no duplicate dbsync timers */
 	CANCEL_DBSYNC_TIMER(csa, TRUE);	/* reset csa->dbsync_timer now that the dbsync timer has popped */
@@ -144,8 +145,8 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			assert(CDB_STAGNATE >= t_tries);
 			if (CDB_STAGNATE <= t_tries)
 			{
-				save_ok_to_call_wcs_recover = ok_to_call_wcs_recover;
-				ok_to_call_wcs_recover = TRUE;
+				save_ok_to_call_wcs_recover = TREF(ok_to_call_wcs_recover);
+				TREF(ok_to_call_wcs_recover) = TRUE;
 			}
 		)
 		if (!mupip_jnl_recover NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag))
@@ -201,7 +202,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		}
 		DEBUG_ONLY(
 			if (CDB_STAGNATE <= t_tries)
-				ok_to_call_wcs_recover = save_ok_to_call_wcs_recover;
+				TREF(ok_to_call_wcs_recover) = save_ok_to_call_wcs_recover;
 		)
 	}
 	if (dbsync_defer_timer)

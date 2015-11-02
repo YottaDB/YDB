@@ -62,7 +62,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	if (SS_NORMAL != status)
 		return TRUE;
 	pv = &plst->jpv;
-	if (IS_SET_KILL_ZKILL(rectype))
+	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{	/* Translate internal format of jnl_record key to ascii */
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 		key = (gv_key *)key_buff;
@@ -172,7 +172,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 		if (exc_item_seen || (inc_seen && !inc_item_seen))
 			return FALSE;
 	}
-	if (IS_SET_KILL_ZKILL(rectype))
+	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{
 		if (IS_SET(rectype))
 			return mur_options.transaction != TRANS_KILLS;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -326,6 +326,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			continue;
 		jnl_curr_state = (enum jnl_state_codes)csd->jnl_state;
 		repl_curr_state = (enum repl_state_codes)csd->repl_state;
+		jnl_info.csd = csd;
 		jnl_info.before_images = rptr->before_images;
 		jnl_info.repl_state = rptr->repl_new_state;
 		jnl_info.jnl_state = csd->jnl_state;
@@ -429,7 +430,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			if (!jnl_options.epoch_interval_specified)
 				jnl_info.epoch_interval = (0 == csd->epoch_interval) ? DEFAULT_EPOCH_INTERVAL : csd->epoch_interval;
 			JNL_MAX_RECLEN(&jnl_info, csd);
-			jnl_info.tn = csd->trans_hist.curr_tn;
 			jnl_info.reg_seqno = max_reg_seqno;
 			jnl_info.prev_jnl = (char *)prev_jnl_fn;
 			jnl_info.prev_jnl_len = 0;
@@ -652,7 +652,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			memcpy(csd->jnl_file_name, jnl_info.jnl, jnl_info.jnl_len);
 			csd->jnl_file_len = jnl_info.jnl_len;
 			csd->jnl_file_name[jnl_info.jnl_len] = 0;
-			csd->trans_hist.header_open_tn = jnl_info.tn;
 			csd->reg_seqno = jnl_info.reg_seqno;
 			if (jnl_options.sync_io_specified)
 				csd->jnl_sync_io = jnl_options.sync_io;

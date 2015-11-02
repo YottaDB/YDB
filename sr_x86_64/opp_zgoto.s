@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2010 Fidelity Information Services, Inc	#
+#	Copyright 2010, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -10,9 +10,10 @@
 #################################################################
 
 #      Args:
-#        level   - stack frame nesting level to which to transfer control
-#        rhdaddr - address of routine header of routine containing the label
-#        labaddr - address of address of offset into routine to which to transfer cont
+#	 mval* (routine name)
+#	 mval* (label name)
+#	 int (offset from label)
+#	 int (stack frame nesting level to which to transfer control)
 #	PAGE	,132
 	.title	opp_zgoto.s
 

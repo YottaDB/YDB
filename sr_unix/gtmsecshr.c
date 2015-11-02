@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@
 #include "mutex.h"
 #include "iosp.h"
 #include "gt_timer.h"
+#include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
 #include "gtmimagename.h"
 #include "util.h"
@@ -65,6 +66,7 @@
 #include "suspsigs_handler.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_imagetype_init.h"
+#include "gtm_threadgbl_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -161,6 +163,7 @@ int main(void)
 	struct sockaddr_un	client_addr;
 	struct timeval		input_timeval;
 	gtmsecshr_mesg		mesg;
+	DCL_THREADGBL_ACCESS;
 
 	error_def(ERR_GTMSECSHR);
 	error_def(ERR_GTMSECSHRSCKSEL);
@@ -170,6 +173,7 @@ int main(void)
 	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_TEXT);
 
+	GTM_THREADGBL_INIT;
 	gtm_imagetype_init(GTMSECSHR_IMAGE); /* Side-effect : Sets skip_dbtriggers to TRUE for trigger non-supporting platforms */
 	gtm_wcswidth_fnptr = NULL;
 	gtm_env_init();	/* read in all environment variables */
@@ -303,6 +307,7 @@ void gtmsecshr_init(void)
 	error_def(ERR_GTMSECSHRSOCKET);
 	error_def(ERR_TEXT);
 	error_def(ERR_GTMSECSHRTMPPATH);
+	error_def(ERR_GTMSECSHRCHDIRF);
 
 	process_id = getpid();
 	if (-1 == setuid(ROOTUID))
@@ -340,7 +345,15 @@ void gtmsecshr_init(void)
 		 */
 		CLOSEFILE_IF_OPEN(file_des, rc);
 	}
-	CHDIR("/");
+	if (-1 == CHDIR(P_tmpdir))
+	{
+		save_errno = errno;
+		send_msg(VARLSTCNT(10) ERR_GTMSECSHRSTART, 3, RTS_ERROR_LITERAL("Server"), process_id,
+			ERR_GTMSECSHRCHDIRF, 2, LEN_AND_STR(P_tmpdir), save_errno);
+		gtm_putmsg(VARLSTCNT(10) ERR_GTMSECSHRSTART, 3, RTS_ERROR_LITERAL("Server"), process_id,
+			ERR_GTMSECSHRCHDIRF, 2, LEN_AND_STR(P_tmpdir), save_errno);
+		exit (UNABLETOCHDIR);
+	}
 	umask(0);
 	if (gtmsecshr_pathname_init(SERVER) != 0)
 	{
@@ -424,10 +437,7 @@ void gtmsecshr_exit (int exit_code, boolean_t dump)
 	char		time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 
 	if (dump)
-	{
-		CHDIR(P_tmpdir);
 		DUMP_CORE;
-	}
 	gtmsecshr_sock_cleanup(SERVER);
 	gtmsecshr_sockfd = FD_INVALID;
 	if (SEMAPHORETAKEN != exit_code)
@@ -618,7 +628,6 @@ void gtmsecshr_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	boolean_t	process_signal(enum gtmImageTypes, int, siginfo_t *, void *);
 
-	CHDIR(P_tmpdir);
 	/* Do standard signal handling */
 	(void)generic_signal_handler(sig, info, context);
 	/* Note that we are not letting process_signal run gtm_fork_n_core. In testing,

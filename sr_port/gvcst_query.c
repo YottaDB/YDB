@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
 bool gvcst_query(void)
@@ -98,9 +98,9 @@ bool gvcst_query(void)
 					continue;
 				}
 			}
-			if (0 == dollar_tlevel)
+			if (!dollar_tlevel)
 			{
-				if ((trans_num)0 == t_end(&gv_target->hist, !two_histories ? NULL : rt_history))
+				if ((trans_num)0 == t_end(&gv_target->hist, !two_histories ? NULL : rt_history, TN_NOT_SPECIFIED))
 					continue;
 			} else
 			{

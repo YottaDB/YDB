@@ -13,4 +13,5 @@
 #define TRIGGER_USER_NAME_H_INCLUDED
 
 boolean_t trigger_user_name(char *trigger_value, int trigger_value_len);
+int validate_input_trigger_name(char *trigger_name, uint4 trigger_name_len, boolean_t *wildcard_ptr);
 #endif

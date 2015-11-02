@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,6 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "gds_map_moved.h"
-#include "hashtab.h"
 #include "hashtab_mname.h"
 #include "dpgbldir.h"
 #include "gtmimagename.h"

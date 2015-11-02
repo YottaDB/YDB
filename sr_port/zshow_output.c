@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,6 @@
 #include "gtm_string.h"
 
 #include "error.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "subscript.h"
 #include "rtnhdr.h"
@@ -54,14 +53,14 @@ GBLREF	int		process_exiting;
 void zshow_output(zshow_out *out, const mstr *str)
 {
 	mval		*mv, lmv;
-	lv_val		*temp;
+	lv_val		*lv, *lv_child;
 	char		buff, *strptr, *strnext, *strtop, *strbase, *leadptr;
 	unsigned char	*kend, kbuff[MAX_ZWR_KEY_SZ];
-	int		key_ovrhd, str_processed, n_spaces;
+	int		key_ovrhd, str_processed, n_spaces, sbs_depth, dbg_sbs_depth;
 	ssize_t        	len, outlen, chcnt, char_len, disp_len ;
 	int		buff_len;
 	int		device_width, inchar_width, cumul_width;
-	boolean_t	utf8_active;
+	boolean_t	is_base_var, lvundef, utf8_active;
 #ifdef UNICODE_SUPPORTED
 	wint_t		codepoint;
 #endif
@@ -186,112 +185,116 @@ void zshow_output(zshow_out *out, const mstr *str)
 		} else
 			mv = &lmv;
 		mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
-
-		if (out->code && out->code != out->curr_code)
+		if (out->code)
 		{
-			ENSURE_STP_FREE_SPACE(1);
-			mv->str.addr = (char *)stringpool.free;
-			mv->str.len = 1;
-			mv->mvtype = MV_STR;
-			*mv->str.addr = out->code;
-			stringpool.free++;
-			if ((out->out_var.lv.child = op_srchindx(VARLSTCNT(2) out->out_var.lv.lvar, mv)))
+			if (out->code != out->curr_code)
 			{
-				bool	lvundef;
-
-				lvundef = FALSE;
-				if (!MV_DEFINED(&out->out_var.lv.lvar->v))
+				ENSURE_STP_FREE_SPACE(1);
+				mv->str.addr = (char *)stringpool.free;
+				mv->str.len = 1;
+				mv->mvtype = MV_STR;
+				*mv->str.addr = out->code;
+				stringpool.free++;
+				lv = out->out_var.lv.lvar;
+				out->out_var.lv.child = lv_child = op_srchindx(VARLSTCNT(2) lv, mv);
+				if (NULL != lv_child)
 				{
-					out->out_var.lv.lvar->v.mvtype = MV_STR;
-					out->out_var.lv.lvar->v.str.len = 0;
-					lvundef = TRUE;
+					lvundef = FALSE;
+					if (!MV_DEFINED(&lv->v))
+					{
+						lv->v.mvtype = MV_STR;
+						lv->v.str.len = 0;
+						lvundef = TRUE;
+					}
+					op_kill(lv_child);
+					if (lvundef)
+						lv->v.mvtype = 0;
 				}
-				op_kill(out->out_var.lv.child);
-				if (lvundef)
-					out->out_var.lv.lvar->v.mvtype = 0;
+				/* Check if we can add two more subscripts 1) out->code & 2) out->line_num */
+				is_base_var = LV_IS_BASE_VAR(lv);
+				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
+				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 2))
+					rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
+				out->out_var.lv.child = op_putindx(VARLSTCNT(2) lv, mv);
+				DEBUG_ONLY(LV_SBS_DEPTH(out->out_var.lv.child, FALSE, dbg_sbs_depth);)
+				assert(MAX_LVSUBSCRIPTS > (dbg_sbs_depth + 1));
 			}
-			/* Check if we can add two more subscripts */
-			if (MV_SBS == out->out_var.lv.lvar->ptrs.val_ent.parent.sbs->ident &&
-				MAX_LVSUBSCRIPTS <= out->out_var.lv.lvar->ptrs.val_ent.parent.sbs->level + 2)
-				rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-			out->out_var.lv.child = op_putindx(VARLSTCNT(2) out->out_var.lv.lvar, mv);
-		}
-		if (str)
-		{
-			len = str->len;
-			strptr = str->addr;
-			str_processed = 0;
-		}
-		if (str && (str->len + (out->ptr - out->buff) > MAX_SRCLINE))
-		{
-			strtop = str->addr + str->len;
-			for (; strptr != strtop; )
+			if (str)
 			{
-				len = (ssize_t)(strtop - strptr);
-				if (len <= MAX_SRCLINE - (out->ptr - out->buff))
-					break;
-				len = MAX_SRCLINE - (ssize_t)(out->ptr - out->buff);
-				strbase = str->addr + str_processed;
+				len = str->len;
+				strptr = str->addr;
+				str_processed = 0;
+				if (str->len + (out->ptr - out->buff) > MAX_SRCLINE)
+				{
+					strtop = str->addr + str->len;
+					lv_child = out->out_var.lv.child;
+					assert(NULL != lv_child);
+					for (; strptr != strtop; )
+					{
+						len = (ssize_t)(strtop - strptr);
+						if (len <= MAX_SRCLINE - (out->ptr - out->buff))
+							break;
+						len = MAX_SRCLINE - (ssize_t)(out->ptr - out->buff);
+						strbase = str->addr + str_processed;
 #ifdef UNICODE_SUPPORTED
-				if (gtm_utf8_mode)
-				{ /* terminate at the proper character boundary within MAX_SRCLINE bytes */
-					UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
-					len = (ssize_t)(leadptr - strbase);
-				}
+						if (gtm_utf8_mode)
+						{ /* terminate at the proper character boundary within MAX_SRCLINE bytes */
+							UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
+							len = (ssize_t)(leadptr - strbase);
+						}
 #endif
-				memcpy(out->ptr, strbase, len);
-				strptr += len;
+						memcpy(out->ptr, strbase, len);
+						strptr += len;
+						out->ptr += len;
+						str_processed += (int)len;
+						mv->str.addr = 0;
+						mv->str.len = 0;
+						MV_FORCE_MVAL(mv, out->line_num);
+						/* It is safe to add the second subscript here since the check for this
+						 * is already done in the previous if block (MAX_LVSUBSCRIPTS error)
+						 */
+						DEBUG_ONLY(LV_SBS_DEPTH(lv_child, FALSE, dbg_sbs_depth);)
+						assert(MAX_LVSUBSCRIPTS > (dbg_sbs_depth + 1));
+						lv = op_putindx(VARLSTCNT(2) lv_child, mv);
+						ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
+						mv->mvtype = MV_STR;
+						mv->str.addr = (char *)stringpool.free;
+						mv->str.len = INTCAST(out->ptr - out->buff);
+						memcpy(mv->str.addr, &out->buff[0], mv->str.len);
+						stringpool.free += mv->str.len;
+						lv->v = *mv;
+						out->ptr = out->buff + 10;
+						memset(out->buff, ' ', 10);
+						out->line_num++;
+					}
+				}
+				memcpy(out->ptr, str->addr + str_processed, len);
 				out->ptr += len;
-				str_processed += (int)len;
+			}
+			if (out->flush && (out->ptr != out->buff))
+			{
 				mv->str.addr = 0;
 				mv->str.len = 0;
 				MV_FORCE_MVAL(mv, out->line_num);
-				/* Check if we can add one more subscripts */
-				if (MV_SBS == out->out_var.lv.lvar->ptrs.val_ent.parent.sbs->ident &&
-					MAX_LVSUBSCRIPTS <= out->out_var.lv.lvar->ptrs.val_ent.parent.sbs->level + 1)
-					rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-				temp = op_putindx(VARLSTCNT(2) out->out_var.lv.child, mv);
+				/* Check for if it is ok to add this second subscript is already done above (MAX_LVSUBSCRIPTS) */
+				lv_child = out->out_var.lv.child;
+				assert(NULL != lv_child);
+				DEBUG_ONLY(LV_SBS_DEPTH(lv_child, FALSE, dbg_sbs_depth);)
+				assert(MAX_LVSUBSCRIPTS > (dbg_sbs_depth + 1));
+				lv = op_putindx(VARLSTCNT(2) lv_child, mv);
 				ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
-				mv->mvtype = MV_STR;
 				mv->str.addr = (char *)stringpool.free;
 				mv->str.len = INTCAST(out->ptr - out->buff);
+				mv->mvtype = MV_STR;
 				memcpy(mv->str.addr, &out->buff[0], mv->str.len);
 				stringpool.free += mv->str.len;
-				temp->v = *mv;
-				out->ptr = out->buff + 10;
-				memset(out->buff, ' ', 10);
+				lv->v = *mv;
+				out->ptr = out->buff;
 				out->line_num++;
 			}
 		}
-		if (str)
-		{
-			memcpy(out->ptr, str->addr + str_processed, len);
-			out->ptr += len;
-		}
-		if (out->flush && out->ptr != out->buff)
-		{
-			mv->str.addr = 0;
-			mv->str.len = 0;
-			MV_FORCE_MVAL(mv, out->line_num);
-			/* Check if we can add one more subscripts */
-			if (MV_SBS == out->out_var.lv.lvar->ptrs.val_ent.parent.sbs->ident &&
-				MAX_LVSUBSCRIPTS <= out->out_var.lv.lvar->ptrs.val_ent.parent.sbs->level + 1)
-				rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-			temp = op_putindx(VARLSTCNT(2) out->out_var.lv.child, mv);
-			ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
-			mv->str.addr = (char *)stringpool.free;
-			mv->str.len = INTCAST(out->ptr - out->buff);
-			mv->mvtype = MV_STR;
-			memcpy(mv->str.addr, &out->buff[0], mv->str.len);
-			stringpool.free += mv->str.len;
-			temp->v = *mv;
-			out->ptr = out->buff;
-			out->line_num++;
-		}
 		if (!process_exiting)
-		{
 			POP_MV_STENT();
-		}
 		break;
 	case ZSHOW_GLOBAL:
 		if (!out->len)

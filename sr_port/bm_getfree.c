@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region	*gv_cur_region;
 GBLREF unsigned char	rdfail_detail;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF uint4		update_array_size, cumul_update_array_size;
 GBLREF unsigned int	t_tries;
 
@@ -130,7 +130,7 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 			map_size = (total_blks - bml);
 		else
 			map_size = BLKS_PER_LMAP;
-		if (0 != dollar_tlevel)
+		if (dollar_tlevel)
 		{
 			depth = cw_work;
 			cw_set_top = *cw_depth_ptr;

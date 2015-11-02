@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ int mu_extr_getblk(unsigned char *ptr)
 			}
 		}
 		memcpy(ptr, bp, bp->bsiz);
-		if ((trans_num)0 != t_end(&gv_target->hist, two_histories ? rt_history : NULL))
+		if ((trans_num)0 != t_end(&gv_target->hist, two_histories ? rt_history : NULL, TN_NOT_SPECIFIED))
 		{
 			if (two_histories)
 				memcpy(gv_target->hist.h, rt_history->h, SIZEOF(srch_blk_status) * (rt_history->depth + 1));

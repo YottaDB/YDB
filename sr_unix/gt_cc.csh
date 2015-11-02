@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -31,11 +31,9 @@ if ( $?comlist_gt_cc == "0" ) then
 	exit 1
 endif
 
-set	gs = ($gtm_src)
-
 alias	gt_cc_local	"$comlist_gt_cc"
 
 foreach i ($*)
-	echo $gs[1]/$i
-	gt_cc_local $gs[1]/$i
+	echo $i
+	gt_cc_local $i
 end

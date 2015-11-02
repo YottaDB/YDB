@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "send_msg.h"
+#include "iosp.h"
 #ifdef VMS
 #include "iosb_disk.h"
 #endif
@@ -36,8 +37,8 @@ typedef struct mmblk_rec_struct
 {
 	struct
 	{
-		int4	fl;
-		int4	bl;
+		sm_off_t	fl;
+		sm_off_t	bl;
 	}
 			blkque,		/* cache records whose block numbers hash to the same location */
 			state_que;	/* cache records in same state (either wip or active) */
@@ -60,8 +61,8 @@ typedef struct mmblk_state_rec_struct
 {
 	struct
 	{
-		int4	fl;
-		int4	bl;
+		sm_off_t	fl;
+		sm_off_t	bl;
 	}
 			state_que;	/* WARNING -- from this point onwards this should be identical to a mmblk_rec */
 	union
@@ -93,8 +94,8 @@ typedef struct cache_rec_struct
 {
 	struct
 	{
-		int4 	fl;
-		int4	bl;
+		sm_off_t 	fl;
+		sm_off_t	bl;
 	}
 			blkque,		/* cache records whose block numbers hash to the same location */
 			state_que;	/* cache records in same state (either wip or active) */
@@ -164,8 +165,8 @@ typedef struct
 {
 	struct
 	{
-		int4 	fl;
-		int4	bl;
+		sm_off_t 	fl;
+		sm_off_t	bl;
 	}
 			state_que;	/* WARNING from this point, this structure must be identical to a cache_rec */
 	union
@@ -292,22 +293,20 @@ void verify_queue(que_head_ptr_t qhdr);
 
 #define SET_GD_MAP					\
 {							\
-	GBLREF	gd_addr		*gd_targ_addr;		\
 	GBLREF	gd_binding	*gd_map, *gd_map_top;	\
 							\
 	gd_map = gd_header->maps;			\
 	gd_map_top = gd_map + gd_header->n_maps;	\
-	gd_targ_addr = gd_header;			\
+	TREF(gd_targ_addr) = gd_header;			\
 }
 
 #define GD_HEADER_ASSERT					\
 {								\
-	GBLREF gd_addr		*gd_targ_addr;			\
 	GBLREF	gd_binding	*gd_map, *gd_map_top;		\
 								\
 	assert(gd_map == gd_header->maps);			\
 	assert(gd_map_top == gd_map + gd_header->n_maps);	\
-	assert(gd_targ_addr == gd_header);			\
+	assert(TREF(gd_targ_addr) == gd_header);		\
 }
 
 /* If reallocating gv_currkey/gv_altkey, preserve pre-existing values */
@@ -373,7 +372,7 @@ void verify_queue(que_head_ptr_t qhdr);
 	if (NULL == csa->dir_tree)								\
 	{											\
 		csa->dir_tree = targ_alloc(keysize, NULL, reg);					\
-		GTMTRIG_ONLY(assert(NULL == csa->hasht_tree);)					\
+		GTMTRIG_ONLY(assert(NULL == csa->hasht_tree));					\
 	} else											\
 		assert((csa->dir_tree->gd_csa == csa) && (DIR_ROOT == csa->dir_tree->root));	\
 }
@@ -464,11 +463,11 @@ void verify_queue(que_head_ptr_t qhdr);
 	cache_start = &(CSA)->acc_meth.bg.cache_state->cache_array[0];			\
 	cache_start += CSD->bt_buckets;							\
 	bufstart = (sm_uc_ptr_t)GDS_ANY_REL2ABS((CSA), cache_start->buffaddr);		\
-	bufstart += (off_t)CSD->blk_size * CSD->n_bts;					\
+	bufstart += (gtm_uint64_t)CSD->blk_size * CSD->n_bts;					\
 	assert((PTR) >= bufstart);							\
 	bufindx = (PTR - bufstart) / CSD->blk_size;					\
 	assert(bufindx < CSD->n_bts);							\
-	assert((bufstart + (bufindx * CSD->blk_size)) == (PTR));			\
+	assert((bufstart + (bufindx * (gtm_uint64_t)CSD->blk_size)) == (PTR));			\
 }
 
 #define	DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd)								\
@@ -516,7 +515,7 @@ void verify_queue(que_head_ptr_t qhdr);
 		cache_start = &csa->acc_meth.bg.cache_state->cache_array[0];					\
 		cache_start += csa->hdr->bt_buckets;								\
 		bufstart = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cache_start->buffaddr);				\
-		bufend = bufstart + (csa->hdr->n_bts * csa->hdr->blk_size);					\
+		bufend = bufstart + ((gtm_uint64_t)csa->hdr->n_bts * csa->hdr->blk_size);					\
 		bufaddr = (sm_uc_ptr_t)(seg)->addr;								\
 		/* Check if given address is within database shared memory range */				\
 		if ((bufaddr >= bufstart) && (bufaddr < bufend))						\
@@ -886,8 +885,8 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 			{	/* Replication instance file mismatch. Issue error. But before that detach from journal pool.	\
 				 * Copy replication instance file name in journal pool to temporary memory before detaching.	\
 				 */												\
-				UNIX_ONLY(assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool_ctl->jnlpool_id.instfilename));)	\
-				VMS_ONLY(assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool_ctl->jnlpool_id.gtmgbldir));)	\
+				UNIX_ONLY(assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool_ctl->jnlpool_id.instfilename)));	\
+				VMS_ONLY(assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool_ctl->jnlpool_id.gtmgbldir)));	\
 				memcpy(&instfilename_copy[0], jnlpool_instfilename, SIZEOF(instfilename_copy));			\
 				assert(NULL != jnlpool.jnlpool_ctl);								\
 				jnlpool_detach();										\
@@ -1090,22 +1089,33 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 
 #define ENSURE_JNL_OPEN(csa, reg)                                                 					\
 {                                                                               					\
+	boolean_t		was_crit;                                               				\
+	jnl_private_control	*jpc;											\
+	sgmnt_data_ptr_t	csd;											\
+	uint4			jnl_status;										\
+															\
 	assert(cs_addrs == csa);                                                        				\
 	assert(gv_cur_region == reg);                                                   				\
 	assert(FALSE == reg->read_only);                                                				\
-	if (JNL_ENABLED(csa->hdr) && NULL != csa->jnl && NOJNL == csa->jnl->channel)  					\
+	csd = csa->hdr;													\
+	if (JNL_ENABLED(csd))												\
 	{                                                                       					\
-		boolean_t	was_crit;                                               				\
-		uint4		jnl_status;										\
-															\
 		was_crit = csa->now_crit;                                         					\
 		if (!was_crit)                                                  					\
 			grab_crit(reg);                                         					\
-		jnl_status = jnl_ensure_open();                                 					\
+		jnl_status = JNL_ENABLED(csd) ? jnl_ensure_open() : 0;    	                             		\
 		if (!was_crit)                                                  					\
 			rel_crit(reg);                                          					\
 		if (0 != jnl_status)											\
-			rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));	\
+		{													\
+			jpc = csa->jnl;											\
+			assert(NULL != jpc);										\
+			if (SS_NORMAL != jpc->status)									\
+				rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),	\
+					jpc->status);									\
+			else												\
+				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));	\
+		}													\
 	}                                                                       					\
 }
 
@@ -1221,6 +1231,7 @@ enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 #define	DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL	(1 << 1)	/* Restartable situation encountered in gvcst_delete_blk */
 #define	DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR	(1 << 2)	/* Restartable situation encountered in jnl_get_checksum.h */
 #define	DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS	(1 << 3)	/* Restartable situation encountered in gvcst_kill */
+#define	DONOTCOMMIT_GVCST_BLK_BUILD_TPCHAIN	(1 << 4)	/* Restartable situation encountered in gvcst_blk_build */
 
 #define TAB_BG_TRC_REC(A,B)	B,
 enum bg_trc_rec_type
@@ -1616,6 +1627,14 @@ typedef struct	header_struct_struct
 	/* removed unused file_log struct */
 } header_struct;
 
+typedef struct gdr_name_struct
+{
+	mstr			name;
+	mstr			exp_name;
+	struct gdr_name_struct	*link;
+	struct gd_addr_struct	*gd_ptr;
+} gdr_name;
+
 typedef struct	gd_addr_struct
 {
 	struct gd_region_struct		*local_locks;
@@ -1806,7 +1825,15 @@ typedef struct	sgmnt_addrs_struct
 						 */
 	boolean_t	wcs_pidcnt_incremented;	/* set to TRUE if we incremented cnl->wcs_phase2_commit_pidcnt.
 						 * used by secshr_db_clnup to decrement the shared counter. */
+	boolean_t	incr_db_trigger_cycle;	/* set to FALSE by default. set to TRUE if trigger state change (in ^#t) occurs for
+						 * any global in this database which means an increment to csa->db_trigger_cycle and
+						 * csd->db_trigger_cycle. Currently used by MUPIP TRIGGER/$ZTRIGGER(), MUPIP RECOVER
+						 * and UPDATE PROCESS
+						 */
 	uint4		db_trigger_cycle;	/* mirror of csd->db_trigger_cycle; used to detect concurrent ^#t global changes */
+	uint4		db_dztrigger_cycle;	/* incremented on every $ZTRIGGER() operation. Due to the presence of $ZTRIGGER()
+						 * and ZTRIGGER command the 'd' prefix for ztrigger in db_dztrigger_cycle is used
+						 * to denote the '$' in $ZTRIGGER() */
 	boolean_t	hold_onto_crit;		/* TRUE currently for dse if a CRIT -SEIZE has been done on this region.
 						 * Set to FALSE by a DSE CRIT -RELEASE done on this region. Will also be TRUE in
 						 * case of ONLINE ROLLBACK when that is implemented. Any code that can be invoked
@@ -1873,6 +1900,14 @@ typedef struct	gv_key_struct
 	unsigned char	base[1];	/* Base of the key */
 } gv_key;
 
+/* The direction that the newly added record went after a block split at a given level */
+enum split_dir
+{
+	NEWREC_DIR_FORCED,	/* direction forced due to one of the sides being too-full i.e. no choice */
+	NEWREC_DIR_LEFT,	/* new record went into the end of the left block after the split */
+	NEWREC_DIR_RIGHT,	/* new record went into the beginning of the right block after the split */
+};
+
 /* Any change to this structure should also have a corresponding [re]initialization in mupip_recover.c
  * in the code where we play the records in the forward phase i.e. go through each of the jnl_files
  * and within if (mur_options.update), initialize necessary fields of gv_target before proceeding with mur_forward().
@@ -1888,10 +1923,11 @@ typedef struct	gv_namehead_struct
 	struct collseq_struct	*collseq;		/* pointer to a linked list of user supplied routine addresses
 							   for internationalization */
 	trans_num	read_local_tn;			/* local_tn of last reference for this global */
+	GTMTRIG_ONLY(trans_num trig_local_tn;)		/* local_tn of last trigger driven for this global */
 	boolean_t	noisolation;     		/* whether isolation is turned on or off for this global */
 	block_id	root;				/* Root of global variable tree */
 	mname_entry	gvname;				/* the name of the global */
-	NON_GTM64_ONLY(uint4	filler_8byte_align1;)	/* for 8-byte alignment of "hist" member */
+	NON_GTM64_ONLY(uint4	filler_8byte_align0;)	/* for 8-byte alignment of "hist" member */
 	srch_hist	hist;				/* block history array */
 	int4		regcnt;				/* number of global directories whose hash-tables point to this gv_target.
 							 * 1 by default. > 1 if the same name in TWO DIFFERENT global directories
@@ -1901,15 +1937,20 @@ typedef struct	gv_namehead_struct
 	unsigned char	nct;				/* numerical collation type for internalization */
 	unsigned char	act;				/* alternative collation type for internalization */
 	unsigned char	ver;
-	char		filler[1];
+	bool		split_cleanup_needed;
+	char		last_split_direction[MAX_BT_DEPTH - 1];	/* maintain last split direction for each level in the GVT */
+	char		filler_8byte_align1[2];
+	block_id	last_split_blk_num[MAX_BT_DEPTH - 1];
 #	ifdef GTM_TRIGGER
 	struct gvt_trigger_struct *gvt_trigger;		/* pointer to trigger info for this global
 							 * (is non-NULL only if db_trigger_cycle is non-zero) */
 	uint4		db_trigger_cycle;		/* copy of csd->db_trigger_cycle when triggers for this global were
 							 * last read/initialized from ^#t global (in gvtr_init) */
+	uint4		db_dztrigger_cycle;		/* copy of csa->db_dztrigger_cycle when triggers for this global were
+							 * last read/initialized from ^#t global (in gvtr_init) */
 	boolean_t	trig_mismatch_test_done;	/* whether update process has checked once if there is a mismatch
 							 * in trigger definitions between originating and replicating instance */
-	NON_GTM64_ONLY(uint4	filler_8byte_align2;)	/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
+	GTM64_ONLY(uint4 filler_8byte_align2;)		/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
 #	endif
 	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer. */
 } gv_namehead;
@@ -1929,8 +1970,8 @@ typedef struct gvsavtarg_struct
 	gd_region		*gv_cur_region;
 	gv_namehead		*gv_target;
 	struct sgm_info_struct	*sgm_info_ptr;
-	bool			gv_curr_subsc_null;
-	bool			gv_prev_subsc_null;
+	bool			gv_last_subsc_null;
+	bool			gv_some_subsc_null;
 	short			prev;
 	short			end;
 	short			filler_8byte_align;
@@ -1997,6 +2038,7 @@ GBLREF	int		process_exiting;
 	gv_namehead	*gvtarg;							\
 											\
 	GBLREF gv_namehead	*gvt_tp_list;						\
+	GBLREF  uint4           dollar_tlevel;						\
 											\
 	for (gvtarg = gvt_tp_list; NULL != gvtarg; gvtarg = gvtarg->next_tp_gvnh)	\
 	{										\
@@ -2004,7 +2046,7 @@ GBLREF	int		process_exiting;
 			break;								\
 	}										\
 	assert(!present || (NULL != gvtarg));						\
-	assert(present || (NULL == gvtarg));						\
+	assert(present || (NULL == gvtarg) || (process_exiting && !dollar_tlevel));	\
 }
 
 #define	DBG_CHECK_GVT_IN_GVTARGETLIST(gvt)						\
@@ -2105,7 +2147,6 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 #define COPY_SUBS_TO_GVCURRKEY(mvarg, max_key, gv_currkey, was_null, is_null)							\
 {																\
 	GBLREF mv_stent		*mv_chain;											\
-	GBLREF bool		transform;											\
 	GBLREF unsigned char	*msp, *stackwarn, *stacktop;									\
 	mval			temp;												\
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;									\
@@ -2124,9 +2165,9 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 		{														\
 			assert(dba_cm != gv_cur_region->dyn.addr->acc_meth); /* collation transformation should be done at the	\
 										server's end for CM regions */			\
-			transform = FALSE;											\
+			TREF(transform) = FALSE;										\
 			end = gvsub2str((uchar_ptr_t)mvarg->str.addr, buff, FALSE);						\
-			transform = TRUE;											\
+			TREF(transform) = TRUE;											\
 			temp.mvtype = MV_STR;											\
 			temp.str.addr = (char *)buff;										\
 			temp.str.len = (mstr_len_t)(end - buff);								\
@@ -2283,8 +2324,13 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 							 * back by "t_commit_cleanup" and can only be rolled forward by
 							 * "secshr_db_clnup".
 							 */
-#define	UPDTRNS_VALID_MASK		(UPDTRNS_DB_UPDATED_MASK | UPDTRNS_JNL_LOGICAL_MASK			\
-						| UPDTRNS_JNL_REPLICATED_MASK | UPDTRNS_TCOMMIT_STARTED_MASK)
+#define UPDTRNS_ZTRIGGER_MASK		(1 << 4)	/* 1 if ZTRIGGER command was done in this transaction. This allows
+							 * the transaction to be committed even if it had no updates.
+							 * Maintained only for TP.
+							 */
+#define	UPDTRNS_VALID_MASK		(UPDTRNS_DB_UPDATED_MASK | UPDTRNS_JNL_LOGICAL_MASK		\
+					 | UPDTRNS_JNL_REPLICATED_MASK | UPDTRNS_TCOMMIT_STARTED_MASK	\
+					 | UPDTRNS_ZTRIGGER_MASK)
 
 /* The enum codes below correspond to code-paths that can increment the database curr_tn
  * without having a logical update. Journaling currently needs to know all such code-paths */
@@ -2398,13 +2444,15 @@ typedef enum
  */
 #define CACHE_CONTROL_SIZE(X)												\
 	(ROUND_UP((ROUND_UP((X->bt_buckets + X->n_bts) * SIZEOF(cache_rec) + SIZEOF(cache_que_heads), OS_PAGE_SIZE)	\
-		+ (X->n_bts * X->blk_size * (X->is_encrypted ? 2 : 1))), OS_PAGE_SIZE))
+		+ ((gtm_uint64_t)X->n_bts * X->blk_size * (X->is_encrypted ? 2 : 1))), OS_PAGE_SIZE))
 #define MMBLK_CONTROL_SIZE(X) (ROUND_UP((((sgmnt_data_ptr_t)X)->bt_buckets + ((sgmnt_data_ptr_t)X)->n_bts) * SIZEOF(mmblk_rec) \
 	+ SIZEOF(mmblk_que_heads), OS_PAGE_SIZE))
 
 OS_PAGE_SIZE_DECLARE
 
+#ifdef VMS
 #define MAX_NAME_LEN		31	/* Size of a repl resource name on vvms */
+#endif
 /* structure to identify a given system wide shared section to be ours (replic section) */
 typedef struct
 {
@@ -2594,7 +2642,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	int4			sleep_counter;					\
 										\
 	GBLREF	boolean_t	need_kip_incr;					\
-	GBLREF	short		dollar_tlevel;					\
+	GBLREF	uint4		dollar_tlevel;					\
 										\
 	assert(dollar_tlevel || need_kip_incr);					\
 	for (sleep_counter = 1; (0 < CNL->inhibit_kills); ++sleep_counter)	\
@@ -2742,7 +2790,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 			RTS_ERROR_TEXT("cr->buffaddr"), cr->buffaddr, bp, CALLFROM);		\
 		cr->buffaddr = bp;								\
 	}											\
-	DEBUG_ONLY(bp_top = bp_lo + csd->n_bts * csd->blk_size;)				\
+	DEBUG_ONLY(bp_top = bp_lo + (gtm_uint64_t)csd->n_bts * csd->blk_size;)			\
 	assert(IS_PTR_IN_RANGE(bp, bp_lo, bp_top) && IS_PTR_ALIGNED(bp, bp_lo, csd->blk_size));	\
 }
 

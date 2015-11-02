@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
-#include "hashtab.h"
 #include "muprec.h"
 
 /* this routine resets new_pini_addr to 0 for all process-vectors in the current rctl->jctl hash-table entries.

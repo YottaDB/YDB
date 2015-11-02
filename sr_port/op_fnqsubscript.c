@@ -92,7 +92,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 		if ((0 == seq) && ('^' == src->str.addr[0]))
 		{	/* add ^ here in case there's an intervening environment */
 			dst->str.addr[odst++] = '^';
-			UNICODE_ONLY(++char_len;)
+			UNICODE_ONLY(++char_len);
 		}
 		if ((0 == isrc) || ('"' == src->str.addr[isrc - 1])
 			|| ((('"' != (letter = src->str.addr[isrc])) && ('$' != letter))))
@@ -105,7 +105,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 					dst->str.addr[odst++] = letter;
 					if (('"' == letter) && ('"' == src->str.addr[isrc]))
 						isrc++;  /* safe 'cause embedded quotes have at least 1 following char in src */
-					UNICODE_ONLY(++char_len;)
+					UNICODE_ONLY(++char_len);
 				}
 #				ifdef UNICODE_SUPPORTED
 				else
@@ -121,17 +121,34 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 			{
 				letter = src->str.addr[isrc++];
 				if ('"' == letter)
-				{
-					letter = src->str.addr[isrc++];
-					if ('"' != letter)
-						instring = !instring;
+				{	/* process one or more quotes */
+					ch_int = odst;
+					do
+					{
+						if (!(instring = !instring))
+						{	/* keep quotes in quotes */
+							dst->str.addr[odst++] = letter;
+							UNICODE_ONLY(++char_len);
+						}
+						letter = src->str.addr[isrc++];
+					} while (('"' == letter) && (isrc <= stop));
+					if ((!instring) && (odst > ch_int))
+					{	/* loose the closing quote */
+						odst--;
+						UNICODE_ONLY(char_len--);
+					}
+					if (isrc == stop)
+					{
+						assert(!instring);
+						break;
+					}
 				}
 				if (instring)
 				{
 					UNICODE_ONLY(if (!gtm_utf8_mode || (0 == (0x80 & letter))))
 					{
 						dst->str.addr[odst++] = letter;
-						UNICODE_ONLY(++char_len;)
+						UNICODE_ONLY(++char_len);
 					}
 #					ifdef UNICODE_SUPPORTED
 					else
@@ -166,7 +183,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 							if (0 == (0xFFFFFF00 & ch_int))
 							{
 								dst->str.addr[odst++] = (char)ch_int;	/* byte copy */
-								UNICODE_ONLY(++char_len;)
+								UNICODE_ONLY(++char_len);
 							}
 						}
 #						ifdef UNICODE_SUPPORTED

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,6 @@
 
 #include "mdef.h"
 
-#include "hashtab.h"
-#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "compiler.h"
 #include "toktyp.h"
@@ -29,25 +27,21 @@ GBLREF	symval			*curr_symval;
 GBLREF	char			window_token;
 GBLREF	mval			**ind_source_sp, **ind_source_top;
 GBLREF	mval			**ind_result_sp, **ind_result_top;
-GBLREF	bool			shift_gvrefs;
-GBLREF	triple			*expr_start;
 
 void	op_indget(mval *dst, mval *target, mval *value)
 {
 	bool		rval;
 	mstr		object, *obj;
 	oprtype		v;
-	lv_val 		*a;
-	int4		y;
 	triple		*s, *src, *oldchain, tmpchain, *r, *triptr;
 	icode_str	indir_src;
-	lv_val		*lv;
 	var_tabent	targ_key;
 	ht_ent_mname	*tabent;
-
 	error_def(ERR_INDMAXNEST);
 	error_def(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
@@ -62,10 +56,7 @@ void	op_indget(mval *dst, mval *target, mval *value)
 			if (!tabent || !MV_DEFINED(&((lv_val *)tabent->value)->v))
 				*dst = *value;
 			else
-			{
-				a = (lv_val *)tabent->value;
-				*dst = a->v;
-			}
+				*dst = ((lv_val *)tabent->value)->v;
 			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 			return;
 		}
@@ -91,7 +82,7 @@ void	op_indget(mval *dst, mval *target, mval *value)
 				}
 				break;
 			case TK_ATSIGN:
-				if (shift_gvrefs)
+				if (TREF(shift_side_effects))
 				{
 					dqinit(&tmpchain, exorder);
 					oldchain = setcurtchain(&tmpchain);
@@ -102,10 +93,10 @@ void	op_indget(mval *dst, mval *target, mval *value)
 						s->operand[1] = put_tref(src);
 						newtriple(OC_GVSAVTARG);
 						setcurtchain(oldchain);
-						dqadd(expr_start, &tmpchain, exorder);
-						expr_start = tmpchain.exorder.bl;
+						dqadd(TREF(expr_start), &tmpchain, exorder);
+						TREF(expr_start) = tmpchain.exorder.bl;
 						triptr = newtriple(OC_GVRECTARG);
-						triptr->operand[0] = put_tref(expr_start);
+						triptr->operand[0] = put_tref(TREF(expr_start));
 					} else
 						setcurtchain(oldchain);
 				} else

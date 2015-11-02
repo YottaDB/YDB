@@ -30,13 +30,42 @@
 #include "send_msg.h"
 #include "gtm_c_stack_trace.h"
 
+#define	SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(BLOCKING_PID, STUCK_CNT, CR, CSA)						\
+{																\
+	GBLREF	uint4	process_id;												\
+																\
+	error_def(ERR_COMMITWAITPID);												\
+																\
+	if (BLOCKING_PID)													\
+	{															\
+		STUCK_CNT++;													\
+		GET_C_STACK_FROM_SCRIPT("COMMITWAITPID", process_id, BLOCKING_PID, STUCK_CNT);					\
+		send_msg(VARLSTCNT(8) ERR_COMMITWAITPID, 6, process_id, 1, BLOCKING_PID, CR->blk, DB_LEN_STR(CSA->region));	\
+	}															\
+}
+
+/* take C-stack trace of the process doing the phase2 commits at half the entire wait. We do this only while waiting
+ * for a particular cache record
+ */
+#define GET_STACK_AT_HALF_WAIT_IF_NEEDED(BLOCKING_PID, STUCK_CNT)						\
+{														\
+	GBLREF	uint4	process_id;										\
+														\
+	if (BLOCKING_PID && (process_id != BLOCKING_PID))							\
+	{													\
+		STUCK_CNT++;											\
+		GET_C_STACK_FROM_SCRIPT("COMMITWAITPID_HALF_WAIT", process_id, BLOCKING_PID, STUCK_CNT);	\
+	}													\
+}
+
 GBLREF	uint4		process_id;
 GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 GBLREF	boolean_t	gtm_white_box_test_case_enabled;
 GBLREF	int		process_exiting;
 
 #ifdef UNIX
-GBLREF	volatile uint4	heartbeat_counter;
+GBLREF	volatile uint4		heartbeat_counter;
+GBLREF	volatile boolean_t	timer_in_handler;
 #endif
 
 /* if cr == NULL, wait a maximum of 1 minute for ALL processes actively in bg_update_phase2 to finish.
@@ -61,17 +90,20 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	uint4			heartbeat_counter = 0;	/* dummy variable to make compiler happy */
 #	endif
 	int4			index, crarray_size, crarray_index;
-	cache_rec_ptr_t		crarray[512], cr_lo, cr_top, curcr;
+	cache_rec_ptr_t		cr_lo, cr_top, curcr;
+	phase2_wait_trace_t	crarray[MAX_PHASE2_WAIT_CR_TRACE_SIZE];
 #	ifdef DEBUG
-	uint4			incrit_pid;
+	uint4			incrit_pid, phase2_commit_half_wait;
 	int4			waitarray[1024];
 	int4			waitarray_size;
+	boolean_t		half_time = FALSE;
 #	endif
 	static uint4		stuck_cnt = 0; /* stuck_cnt signifies the number of times the same process
 						has called gtmstuckexec for the same condition*/
 	error_def(ERR_COMMITWAITPID);
 	error_def(ERR_COMMITWAITSTUCK);
 
+	DEBUG_ONLY(cr_lo = cr_top = NULL;)
 	crarray_size = SIZEOF(crarray) / SIZEOF(crarray[0]);
 	DEBUG_ONLY(waitarray_size = SIZEOF(waitarray) / SIZEOF(waitarray[0]);)
 
@@ -79,18 +111,23 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	csd = csa->hdr;
 	/* To avoid unnecessary time spent waiting, we would like to do rel_quants instead of wcs_sleep. But this means
 	 * we need to have some other scheme for limiting the total time slept. We use the heartbeat scheme which currently
-	 * is available only in Unix. Every 8 seconds or so, the heartbeat timer increments a counter. But this timer
-	 * could have been cancelled if we are in the process of exiting (through a call to cancel_timer(0)).
+	 * is available only in Unix. Every 8 seconds or so, the heartbeat timer increments a counter. But there are two
+	 * cases where heartbeat_timer will not pop:
+	 * (a) if we are in the process of exiting (through a call to cancel_timer(0) which cancels all active timers)
+	 * (b) if we are are already in timer_handler. This is possible if the flush timer pops and we end up invoking
+	 *     wcs_clean_dbsync->wcs_flu->wcs_phase2_commit_wait. Since SIGALRM signals in Unix don't nest we cannot use
+	 *     heartbeat scheme in this case as well.
 	 * Therefore, if heartbeat timer is available and currently active, then use rel_quants. If not, use wcs_sleep.
 	 * We have found that doing rel_quants (instead of sleeps) causes huge CPU usage in Tru64 even if the default spincnt is
 	 * set to 0 and ALL processes are only waiting for one process to finish its phase2 commit. Therefore we choose
 	 * the sleep approach for Tru64. Choosing a spincnt of 0 would choose the sleep approach (versus rel_quant).
 	 */
 #	if (defined(UNIX) && !defined(__osf__))
-	use_heartbeat = !process_exiting && csd->wcs_phase2_commit_wait_spincnt;
+	use_heartbeat = (!process_exiting && csd->wcs_phase2_commit_wait_spincnt && !timer_in_handler);
 #	else
 	use_heartbeat = FALSE;
 #	endif
+	DEBUG_ONLY(phase2_commit_half_wait = use_heartbeat ? (PHASE2_COMMIT_WAIT_HTBT >> 1) : (PHASE2_COMMIT_WAIT >> 1);)
 	if (use_heartbeat)
 	{
 		maxspincnt = csd->wcs_phase2_commit_wait_spincnt;
@@ -129,6 +166,10 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 			GTMASSERT;	/* should not deadlock on our self */
 		if (!start_in_tend)
 			return TRUE;
+	} else
+	{	/* initialize the beginning and the end of cache-records to be used later (only in case of cr == NULL) */
+		cr_lo = ((cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array) + csd->bt_buckets;
+		cr_top = cr_lo + csd->n_bts;
 	}
 	/* Spin & sleep/yield alternately for the phase2 commit to complete */
 	for (spincnt = 0, lcnt = 0; ; spincnt++)
@@ -198,46 +239,84 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		{
 			if (PHASE2_COMMIT_WAIT_HTBT < heartbeat_delta)
 				break;
+			DEBUG_ONLY(half_time = (phase2_commit_half_wait == heartbeat_delta));
 			rel_quant();
 		} else
 		{
 			if (lcnt >= PHASE2_COMMIT_WAIT)
 				break;
+			DEBUG_ONLY(half_time = (phase2_commit_half_wait == lcnt));
 			wcs_sleep(PHASE2_COMMIT_SLEEP);
 		}
-	}
-	/* Note down those cache-records that are still not done with commits. Note only as many as we can. */
-	cr_lo = ((cache_rec_ptr_t)csa->acc_meth.bg.cache_state->cache_array) + csd->bt_buckets;
-	cr_top = cr_lo + csd->n_bts;
-	crarray_index = 0;
-	for (curcr = cr_lo; curcr < cr_top;  curcr++)
-	{
-		blocking_pid = curcr->in_tend;
-		if (blocking_pid)
+#		ifdef DEBUG
+		if (half_time)
 		{
-			assert(blocking_pid != process_id);
-			crarray[crarray_index++] = curcr;
+			if (NULL != cr)
+			{
+				blocking_pid = cr->in_tend; /* Get a more recent value */
+				GET_STACK_AT_HALF_WAIT_IF_NEEDED(blocking_pid, stuck_cnt);
+			} else
+			{
+				assert((NULL != cr_lo) && (cr_lo < cr_top));
+				for (curcr = cr_lo; curcr < cr_top; curcr++)
+				{
+					blocking_pid = curcr->in_tend;
+					GET_STACK_AT_HALF_WAIT_IF_NEEDED(blocking_pid, stuck_cnt);
+				}
+			}
 		}
-		assert(crarray_size >= crarray_index);
-		if (crarray_size <= crarray_index)
-			break;
+#		endif
+
 	}
-	for (index = 0; index < crarray_index; index++)
-	{	/* It is possible that cr->in_tend changed since the time we added it to the crarray array.
-		 * Account for this by rechecking.
+	if (NULL == cr)
+	{	/* This is the case where we wait for all the phase2 commits to complete. Note down the cache records that
+		 * are still not done with the commits. Since there can be multiple cache records held by the same PID, note
+		 * down one cache record for each representative PID. We don't expect the list of distinct PIDs to be large.
+		 * In any case, note down only as many as we can
 		 */
-		if (crarray[index] == cr)
+		crarray_index = 0;
+		for (curcr = cr_lo; curcr < cr_top;  curcr++)
 		{
-			blk = crarray[index]->blk;
-			blocking_pid = crarray[index]->in_tend;
-		} else
-			blocking_pid = 0;
-		if (blocking_pid)
-		{
-			stuck_cnt++;
-			GET_C_STACK_FROM_SCRIPT("COMMITWAITPID", process_id, blocking_pid, stuck_cnt);
-			send_msg(VARLSTCNT(8) ERR_COMMITWAITPID, 6, process_id, 1, blocking_pid, blk, DB_LEN_STR(csa->region));
+			blocking_pid = curcr->in_tend;
+			/* In rare cases, wcs_phase2_commit_wait could be invoked from bg_update_phase1 (via bt_put->wcs_get_space)
+			 * when bg_update_phase1 has already pinned a few cache records (with our PID). We don't want to note down
+			 * such cache records and hence the (blocking_pid != process_id) check below
+			 */
+			if (blocking_pid && (blocking_pid != process_id))
+			{
+				/* go through the book-keeping array to see if we have already noted down this PID. We don't
+				 * expect many processes to be in the phase2 commit section concurrently. So, in most cases,
+				 * we won't scan the array more than once
+				 */
+				for (index = 0; index < crarray_index; ++index)
+					if (crarray[index].blocking_pid == blocking_pid)
+						break;
+				if (index == crarray_index)
+				{	/* cache-record with distinct PID */
+					assert(crarray_size >= crarray_index);
+					if (crarray_size <= crarray_index)
+						break;
+					crarray[crarray_index].blocking_pid = blocking_pid;
+					crarray[crarray_index].cr = curcr;
+					crarray_index++;
+				}
+			}
 		}
+		/* Issue COMMITWAITPID and get c-stack trace (if possible) for all the distinct PID noted down above */
+		for (index = 0; index < crarray_index; index++)
+		{	/* It is possible that cr->in_tend changed since the time we added it to the crarray array.
+			 * Account for this by rechecking.
+			 */
+			curcr = crarray[index].cr;
+			blocking_pid = curcr->in_tend;
+			SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(blocking_pid, stuck_cnt, curcr, csa);
+		}
+	} else
+	{	/* This is the case where we wait for a particular cache-record. Take the c-stack of the PID that is still
+		 * holding this cr
+		 */
+		blocking_pid = cr->in_tend;
+		SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(blocking_pid, stuck_cnt, cr, csa);
 	}
 	DEBUG_ONLY(incrit_pid = cnl->in_crit;)
 	send_msg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1, cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(csa->region));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,6 +71,7 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "memcoherency.h"
+#include "gtm_c_stack_trace.h"
 
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -86,13 +87,12 @@ GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		mu_rndwn_file_dbjnl_flush;
 GBLREF	uint4			gtmDebugLevel;
 GBLREF	unsigned int		cr_array_index;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
+GBLREF volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
 #ifdef DEBUG
-GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
 GBLREF	unsigned int		t_tries;
 GBLREF	int			process_exiting;
 #endif
-
 #ifdef DEBUG_DB64
   /* if debugging large address stuff, make all memory segments allocate above 4G line */
   GBLREF sm_uc_ptr_t		next_smseg;
@@ -100,7 +100,20 @@ GBLREF	int			process_exiting;
 #  define next_smseg	NULL
 #endif
 
-GBLREF volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
+error_def(ERR_BUFRDTIMEOUT);
+error_def(ERR_DBADDRALIGN);
+error_def(ERR_DBADDRANGE);
+error_def(ERR_DBCCERR);
+error_def(ERR_DBCNTRLERR);
+error_def(ERR_DBCRERR);
+error_def(ERR_DBDANGER);
+error_def(ERR_DBFILERR);
+error_def(ERR_ERRCALL);
+error_def(ERR_INVALIDRIP);
+error_def(ERR_GBLOFLOW);
+error_def(ERR_GVIS);
+error_def(ERR_STOPTIMEOUT);
+error_def(ERR_TEXT);
 
 void wcs_recover(gd_region *reg)
 {
@@ -124,19 +137,9 @@ void wcs_recover(gd_region *reg)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	sgm_info		*si;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_BUFRDTIMEOUT);
-	error_def(ERR_DBADDRALIGN);
-	error_def(ERR_DBADDRANGE);
-	error_def(ERR_DBCCERR);
-	error_def(ERR_DBCNTRLERR);
-	error_def(ERR_DBCRERR);
-	error_def(ERR_DBDANGER);
-	error_def(ERR_ERRCALL);
-	error_def(ERR_INVALIDRIP);
-	error_def(ERR_STOPTIMEOUT);
-	error_def(ERR_TEXT);
-
+	SETUP_THREADGBL_ACCESS;
 	save_reg = gv_cur_region;	/* protect against [at least] M LOCK code which doesn't maintain cs_addrs and cs_data */
 	TP_CHANGE_REG(reg);		/* which are needed by called routines such as wcs_wtstart and wcs_mm_recover */
 	if (dba_mm == reg->dyn.addr->acc_meth)	 /* MM uses wcs_recover to remap the database in case of a file extension */
@@ -162,7 +165,7 @@ void wcs_recover(gd_region *reg)
 	 * the process of exiting, we are guaranteed no transaction is in progress so it is ok to invoke wcs_recover
 	 * even if the variable ok_to_call_wcs_recover is not set to TRUE.
 	 */
-	assert((CDB_STAGNATE > t_tries) || ok_to_call_wcs_recover || process_exiting);
+	assert((CDB_STAGNATE > t_tries) || TREF(ok_to_call_wcs_recover) || process_exiting);
 	assert(csa->now_crit || csd->clustered);
 	CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	SIGNAL_WRITERS_TO_STOP(csd);		/* to stop all active writers */
@@ -225,7 +228,7 @@ void wcs_recover(gd_region *reg)
 		 * to before-images that need to be backed up. If so take care of that first before doing any cache recovery.
 		 */
 		bp_lo = (INTPTR_T)buffptr;
-		bp_top = bp_lo + (csd->n_bts * csd->blk_size);
+		bp_top = bp_lo + ((gtm_uint64_t)csd->n_bts * csd->blk_size);
 		for (cr = cr_lo; cr < cr_top;  cr++)
 		{
 			if (cr->stopped && (0 != cr->twin))
@@ -373,6 +376,7 @@ void wcs_recover(gd_region *reg)
 					if ((0 != r_epid) && (epid != r_epid))
 						GTMASSERT;
 					/* process still active but not playing fair or cache is corrupted */
+					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, r_epid, TWICE);
 					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id, cr->blk, cr, r_epid,
 						DB_LEN_STR(reg));
 					send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Buffer forcibly seized"));
@@ -384,12 +388,15 @@ void wcs_recover(gd_region *reg)
 						wait_in_rip++;
 					break;
 				}
+				DEBUG_ONLY(
+				else if (((BUF_OWNER_STUCK / 2) == lcnt) || ((MAX_WAIT_FOR_RIP / 2) == wait_in_rip))
+						GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, r_epid, ONCE);)
     				wcs_sleep(lcnt);
 			}
 		}
 		/* reset cr->rip_latch. it is unused in VMS, but wcs_verify() checks it hence the reset in both Unix and VMS */
-		UNIX_ONLY(SET_LATCH_GLOBAL(&(cr->rip_latch), LOCK_AVAILABLE);)
-		VMS_ONLY(memset((sm_uc_ptr_t)&cr->rip_latch, 0, SIZEOF(global_latch_t));)
+		UNIX_ONLY(SET_LATCH_GLOBAL(&(cr->rip_latch), LOCK_AVAILABLE));
+		VMS_ONLY(memset((sm_uc_ptr_t)&cr->rip_latch, 0, SIZEOF(global_latch_t)));
 		cr->r_epid = 0;		/* the processing above should make this appropriate */
 		cr->tn = csd->trans_hist.curr_tn;
 		cr->blkque.fl = cr->blkque.bl = 0;		/* take no chances that the blkques are messed up */
@@ -497,7 +504,7 @@ void wcs_recover(gd_region *reg)
 					if ((cr_alt < cr) && cr_alt->state_que.fl)
 					{	/* cr_alt has already been processed and is in the state_que. hence remove it */
 						wq = (cache_que_head_ptr_t)((sm_uc_ptr_t)&cr_alt->state_que + cr_alt->state_que.fl);
-						assert(0 == (((UINTPTR_T)wq) % SIZEOF(que_ent)));
+						assert(0 == (((UINTPTR_T)wq) % SIZEOF(cr_alt->state_que.fl)));
 						assert((UINTPTR_T)wq + wq->bl == (UINTPTR_T)&cr_alt->state_que);
 						back_link = (que_ent_ptr_t)remqt((que_ent_ptr_t)wq);
 						assert(EMPTY_QUEUE != back_link);
@@ -511,7 +518,7 @@ void wcs_recover(gd_region *reg)
 						back_link->fl = 0;
 						back_link->bl = 0;
 					}
-					UNIX_ONLY(assert(!cr_alt->twin);)
+					UNIX_ONLY(assert(!cr_alt->twin));
 					UNIX_ONLY(cr_alt->twin = 0;)
 					cr->twin = cr_alt->twin;		/* existing cache record may have a twin */
 					cr_alt->cycle++; /* increment cycle whenever blk number changes (tp_hist depends on this) */
@@ -526,7 +533,7 @@ void wcs_recover(gd_region *reg)
 					cr_alt->refer = FALSE;
 					cr_alt->twin = 0;
 					cnl->wc_in_free++;
-					UNIX_ONLY(assert(!cr->twin);)
+					UNIX_ONLY(assert(!cr->twin));
 					if (0 != cr->twin)
 					{	/* inherited a WIP twin from cr_alt, transfer the twin's affections */
 						cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr->twin);
@@ -547,7 +554,7 @@ void wcs_recover(gd_region *reg)
 			cr->in_tend = 0;
 			cr->data_invalid = 0;
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
-			VMS_ONLY(assert(0 == cr->iosb.cond);)
+			VMS_ONLY(assert(0 == cr->iosb.cond));
 			VMS_ONLY(cr->iosb.cond = 0;)
 			cr->refer = TRUE;
 			cr->stopped = FALSE;
@@ -691,7 +698,7 @@ void wcs_recover(gd_region *reg)
 			cr->epid = 0;
 			cr->image_count = 0;
 			WRITE_LATCH_VAL(cr) = LATCH_CLEAR;
-			VMS_ONLY(assert(0 == cr->iosb.cond || WRT_STRT_PNDNG == cr->iosb.cond);)
+			VMS_ONLY(assert(0 == cr->iosb.cond || WRT_STRT_PNDNG == cr->iosb.cond));
 			VMS_ONLY(cr->iosb.cond = 0;)
 			continue;
 		}
@@ -727,9 +734,9 @@ void wcs_recover(gd_region *reg)
 			cr->refer = FALSE;
 			insqt((que_ent_ptr_t)&cr->blkque, (que_ent_ptr_t)hq);
 		}
-		VMS_ONLY(assert(cr->epid);) /* before inserting into WIP queue, ensure there is a writer process for this */
+		VMS_ONLY(assert(cr->epid)); /* before inserting into WIP queue, ensure there is a writer process for this */
 		insqt((que_ent_ptr_t)&cr->state_que, (que_ent_ptr_t)wip_head);
-		UNIX_ONLY(ADD_ENT_TO_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);)
+		UNIX_ONLY(ADD_ENT_TO_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock));
 		/* end of processing for a single cache record */
 	}	/* end of processing all cache records */
 	if (change_bmm)
@@ -799,13 +806,11 @@ void	wcs_mm_recover(gd_region *reg)
 {
 	int			mm_prot;
 	INTPTR_T		status;
-        struct stat     	stat_buf;
+	struct stat     	stat_buf;
 	sm_uc_ptr_t		old_base[2];
 	sigset_t        	savemask;
 	boolean_t       	need_to_restore_mask = FALSE, was_crit;
 	unix_db_info		*udi;
-
-	error_def(ERR_DBFILERR);
 
 	assert(&FILE_INFO(reg)->s_addrs == cs_addrs);
 	assert(cs_addrs->hdr == cs_data);
@@ -819,9 +824,7 @@ void	wcs_mm_recover(gd_region *reg)
 			rel_crit(gv_cur_region);
 		return;
 	}
-
 	mm_prot = cs_addrs->read_write ? (PROT_READ | PROT_WRITE) : PROT_READ;
-
 	/* Block SIGALRM to ensure cs_data and cs_addrs are always in-sync / No IO in this period */
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
 	old_base[0] = cs_addrs->db_addrs[0];
@@ -831,18 +834,18 @@ void	wcs_mm_recover(gd_region *reg)
 	{
 		udi = FILE_INFO(gv_cur_region);
 		FSTAT_FILE(udi->fd, &stat_buf, status);
-#ifdef DEBUG_DB64
+#	ifdef DEBUG_DB64
 		rel_mmseg((caddr_t)old_base[0]);
 		status = (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)get_mmseg((size_t)stat_buf.st_size),
 										(size_t)stat_buf.st_size,
 										mm_prot,
 										GTM_MM_FLAGS, udi->fd, (off_t)0));
-#else
+#	else
 		status = (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL,
 										(size_t)stat_buf.st_size,
 										mm_prot,
 										GTM_MM_FLAGS, udi->fd, (off_t)0));
-#endif
+#	endif
 	}
 	if (-1 == status)
 	{
@@ -851,13 +854,13 @@ void	wcs_mm_recover(gd_region *reg)
 			rel_crit(gv_cur_region);
 		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 	}
-#ifdef DEBUG_DB64
+#	ifdef DEBUG_DB64
 	put_mmseg((caddr_t)(cs_addrs->db_addrs[0]), (size_t)stat_buf.st_size);
-#endif
+#	endif
 	/* In addition to updating the internal map values, gds_map_moved also updates cs_data to point to the remapped file */
 	gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], (off_t)stat_buf.st_size);
         cs_addrs->total_blks = cs_addrs->ti->total_blks;
- 	if (!was_crit)
+	if (!was_crit)
 		rel_crit(gv_cur_region);
 	sigprocmask(SIG_SETMASK, &savemask, NULL);
 	return;
@@ -866,9 +869,6 @@ void	wcs_mm_recover(gd_region *reg)
 void	wcs_mm_recover(gd_region *reg)
 {
 	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
-
-	error_def(ERR_GBLOFLOW);
-	error_def(ERR_GVIS);
 
 	if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 		end = &buff[MAX_ZWR_KEY_SZ - 1];
@@ -881,9 +881,6 @@ void	wcs_mm_recover(gd_region *reg)
 void	wcs_mm_recover(gd_region *reg)
 {
 	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
-
-	error_def(ERR_GBLOFLOW);
-	error_def(ERR_GVIS);
 
 	assert(&FILE_INFO(reg)->s_addrs == cs_addrs);
 	assert(cs_addrs->now_crit);

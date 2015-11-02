@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,10 +31,7 @@
 #include "mdef.h"
 
 #include "min_max.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
-#include "subscript.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"
 #include "gdsroot.h"
@@ -55,7 +52,6 @@
 #include "gtm_string.h"
 #include "merge_def.h"
 #include "gvname_info.h"
-#include "lvname_info.h"
 #include "op_merge.h"
 #include "gvsub2str.h"
 #include "op.h"
@@ -69,14 +65,14 @@
 #include "collseq.h"
 #include "alias.h"
 
-#define UNDO_ACTIVE_LV										\
-{												\
-	if (NULL != active_lv)									\
-	{											\
-		if (!MV_DEFINED(&active_lv->v) && NULL == active_lv->ptrs.val_ent.children)	\
-			op_kill(active_lv);							\
-		active_lv = (lv_val *)NULL;							\
-	}											\
+#define UNDO_ACTIVE_LV								\
+{										\
+	if (NULL != active_lv)							\
+	{									\
+		if (!MV_DEFINED(&active_lv->v) && !LV_HAS_CHILD(active_lv))	\
+			op_kill(active_lv);					\
+		active_lv = (lv_val *)NULL;					\
+	}									\
 }
 
 GBLREF mv_stent		*mv_chain;
@@ -91,27 +87,27 @@ GBLREF gv_namehead      *gv_target;
 GBLREF lvzwrite_datablk *lvzwrite_block;
 GBLREF lv_val		*active_lv;
 
+error_def(ERR_GVIS);
+error_def(ERR_GVSUBOFLOW);
+error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_MERGEINCOMPL);
+error_def(ERR_NCTCOLLDIFF);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
+
 void op_merge(void)
 {
-	boolean_t		found, check_for_null_subs;
+	boolean_t		found, check_for_null_subs, is_base_var;
 	lv_val			*dst_lv;
 	mval 			*mkey, *value, *subsc;
-	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata_src, dollardata_dst;
-	static boolean_t	first_time = TRUE;
-	static gv_key          	*gvn2_org_key;
+	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata_src, dollardata_dst, sbs_depth;
 	unsigned char		*ptr, *ptr2;
 	unsigned char  		buff[MAX_ZWR_KEY_SZ], *endbuff;
 	unsigned char		nullcoll_src, nullcoll_dst;
 	zshow_out		output;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
-	error_def(ERR_MAXNRSUBSCRIPTS);
-	error_def(ERR_MERGEINCOMPL);
-	error_def(ERR_GVSUBOFLOW);
-	error_def(ERR_GVIS);
-	error_def(ERR_NCTCOLLDIFF);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(MAX_STRLEN >= MAX_ZWR_KEY_SZ);
 	assert ((merge_args == (MARG1_LCL | MARG2_LCL)) ||
 		(merge_args == (MARG1_LCL | MARG2_GBL)) ||
@@ -140,17 +136,15 @@ void op_merge(void)
 			merge_args = 0;	/* Must reset to zero to reuse the Global */
 			return;
 		}
-		if (first_time)
-		{	/* We need to save gvn2 (right hand side). */
-			assert(NULL == gvn2_org_key);
-			GVKEY_INIT(gvn2_org_key, DBKEYSIZE(MAX_KEY_SZ));
-			first_time = FALSE;
+		if (NULL == TREF(gv_mergekey2))
+		{	/* We need to initialize gvn2 (right hand side). */
+			GVKEY_INIT(TREF(gv_mergekey2), DBKEYSIZE(MAX_KEY_SZ));
 		}
 		org_glvn1_keysz = mglvnp->gblp[IND1]->s_gv_currkey->end + 1;
 		org_glvn2_keysz = gv_currkey->end + 1;
-		gvn2_org_key->end = gv_currkey->end;
-		gvn2_org_key->prev = gv_currkey->prev;
-		memcpy(gvn2_org_key->base, gv_currkey->base, gv_currkey->end + 1);
+		(TREF(gv_mergekey2))->end = gv_currkey->end;
+		(TREF(gv_mergekey2))->prev = gv_currkey->prev;
+		memcpy((TREF(gv_mergekey2))->base, gv_currkey->base, gv_currkey->end + 1);
 		if (MARG1_IS_GBL(merge_args))
 		{
 			/*==================== MERGE ^gvn1=^gvn2 =====================*/
@@ -198,8 +192,8 @@ void op_merge(void)
 				assert(MV_IS_STRING(mkey));
 				if (mkey->str.len < org_glvn2_keysz)
 					break;
-				if (0 != *((unsigned char *)mkey->str.addr +  gvn2_org_key->end - 1) ||
-					memcmp(mkey->str.addr, gvn2_org_key->base, gvn2_org_key->end - 1))
+				if (0 != *((unsigned char *)mkey->str.addr + (TREF(gv_mergekey2))->end - 1) ||
+					memcmp(mkey->str.addr, (TREF(gv_mergekey2))->base, (TREF(gv_mergekey2))->end - 1))
 					break; 					/* mkey is not under the sub-tree */
 				delta2 = mkey->str.len - org_glvn2_keysz; 	/* length increase of source key */
 				assert (0 < delta2);
@@ -296,10 +290,10 @@ void op_merge(void)
 				 * mkey->str contains data as database format. So no conversion necessary */
 				if (!op_gvqueryget(mkey, value))
 					break;
-				if (mkey->str.len < gvn2_org_key->end + 1)
+				if (mkey->str.len < (TREF(gv_mergekey2))->end + 1)
 					break;
-				ptr = (unsigned char *)mkey->str.addr +  gvn2_org_key->end - 1;
-				if (0 != *ptr || memcmp(mkey->str.addr, gvn2_org_key->base, gvn2_org_key->end - 1))
+				ptr = (unsigned char *)mkey->str.addr +  (TREF(gv_mergekey2))->end - 1;
+				if (0 != *ptr || memcmp(mkey->str.addr, (TREF(gv_mergekey2))->base, (TREF(gv_mergekey2))->end - 1))
 					break;
 				assert(MV_IS_STRING(mkey));
 				delta2 = mkey->str.len - org_glvn2_keysz; /* length increase of key */
@@ -309,12 +303,13 @@ void op_merge(void)
 				gv_currkey->end = mkey->str.len - 1;
 				/* Now add subscripts to create the entire key */
 				dst_lv =  mglvnp->lclp[IND1];
+				is_base_var = LV_IS_BASE_VAR(dst_lv);
 				ptr = (unsigned char *)gv_currkey->base + org_glvn2_keysz - 1;
 				assert(*ptr);
-				while (*ptr)
+				do
 				{
-					if (MV_SBS == dst_lv->ptrs.val_ent.parent.sbs->ident &&
-						MAX_LVSUBSCRIPTS <= dst_lv->ptrs.val_ent.parent.sbs->level)
+					LV_SBS_DEPTH(dst_lv, is_base_var, sbs_depth);
+					if (MAX_LVSUBSCRIPTS <= sbs_depth)
 						rts_error(VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 					ptr2 = gvsub2str(ptr, buff, FALSE);
 					subsc->mvtype = MV_STR;
@@ -323,10 +318,11 @@ void op_merge(void)
 					s2pool(&subsc->str);
 					dst_lv = op_putindx(VARLSTCNT(2) dst_lv, subsc);
 					while (*ptr++);	/* skip to start of next subscript */
-				}
+					is_base_var = FALSE;
+				} while (*ptr);
 				/* We created the key. Pre-process the node in case a container is being replaced,
 				 * then assign the value directly. Note there is no need to worry about MV_ALIASCONT
-				 * propagation since the source in this source is a global var.
+				 * propagation since the source in this case is a global var.
 				 */
 				DECR_AC_REF(dst_lv, TRUE);
 				dst_lv->v = *value;
@@ -354,7 +350,7 @@ void op_merge(void)
 		{	/*==================== MERGE lvn1=lvn2 =====================*/
 			assert(mglvnp->lclp[IND1]);
 			merge_desc_check(); /* will not proceed if one is descendant of another */
-			output.buff = (char *)&buff[0];
+			output.buff = (char *)buff;
 			output.ptr = output.buff;
 			output.out_var.lv.lvar = mglvnp->lclp[IND1];
 			zwr_output = &output;
@@ -362,14 +358,14 @@ void op_merge(void)
 			lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
 			lvzwr_var(mglvnp->lclp[IND2], 0);
 			/* assert that destination got all data of the source and its descendants */
-			DEBUG_ONLY(op_fndata(mglvnp->lclp[IND1], value);)
-			DEBUG_ONLY(dollardata_dst = MV_FORCE_INT(value);)
+			DEBUG_ONLY(op_fndata(mglvnp->lclp[IND1], value));
+			DEBUG_ONLY(dollardata_dst = MV_FORCE_INT(value));
 			assert((dollardata_src & dollardata_dst) == dollardata_src);
 		} else
 		{	/*==================== MERGE ^gvn1=lvn2 =====================*/
 			assert(MARG1_IS_GBL(merge_args) && MARG2_IS_LCL(merge_args));
 			gvname_env_save(mglvnp->gblp[IND1]);
-			output.buff = (char *)&buff[0];
+			output.buff = (char *)buff;
 			output.ptr = output.buff;
 			output.out_var.gv.end = gv_currkey->end;
 			output.out_var.gv.prev = gv_currkey->prev;

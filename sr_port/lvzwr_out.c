@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,9 +14,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gtm_facility.h"
@@ -26,25 +24,22 @@
 #include "zwrite.h"
 #include "mlkdef.h"
 #include "zshow.h"
-#include "subscript.h"
 #include "filestruct.h"
 #include "gdscc.h"
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashtab.h"
 #include "hashtab_int4.h"	/* needed for tp.h */
-#include "hashtab_addr.h"
 #include "tp.h"
 #include "merge_def.h"
 #include "gvname_info.h"
-#include "lvname_info.h"
 #include "op_merge.h"
 #include "op.h"
 #include "gtmmsg.h"
 #include "sgnl.h"
 #include "stringpool.h"
 #include "alias.h"
+#include "callg.h"
 
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF zshow_out	*zwr_output;
@@ -53,7 +48,6 @@ GBLREF gv_key		*gv_currkey;
 GBLREF int		merge_args;
 GBLREF merge_glvn_ptr	mglvnp;
 GBLREF gd_region	*gv_cur_region;
-GBLREF bool		gv_curr_subsc_null;
 GBLREF symval		*curr_symval;
 GBLREF zwr_hash_table	*zwrhtab;			/* Used to track aliases during zwrites */
 GBLREF uint4		zwrtacindx;			/* When creating $ZWRTACxxx vars for ZWRite, this holds xxx */
@@ -61,22 +55,26 @@ GBLREF uint4		zwrtacindx;			/* When creating $ZWRTACxxx vars for ZWRite, this ho
 LITDEF MSTR_CONST(semi_star, " ;*");
 LITDEF MSTR_CONST(dzwrtac_clean, "$ZWRTAC=\"\"");
 
+error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_MERGEINCOMPL);
+
 void lvzwr_out_targkey(mstr *one);
 
 
 void lvzwr_out_targkey(mstr *one)
 {
-	int	n;
+	int	n, nsubs;
 
 	zshow_output(zwr_output, lvzwrite_block->curr_name);
-	if (lvzwrite_block->curr_subsc)
+	nsubs = lvzwrite_block->curr_subsc;
+	if (nsubs)
 	{
 		*one->addr = '(';
 		zshow_output(zwr_output, one);
 		for (n = 0 ; ; )
 		{
 			mval_write(zwr_output, ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual, FALSE);
-			if (++n < lvzwrite_block->curr_subsc)
+			if (++n < nsubs)
 			{
 				*one->addr = ',';
 				zshow_output(zwr_output, one);
@@ -95,7 +93,7 @@ void lvzwr_out(lv_val *lvp)
 {
 	char 			buff;
 	uchar_ptr_t		lastc;
-	int 			n;
+	int			n, nsubs, sbs_depth;
 	lv_val			*dst_lv, *res_lv, *lvpc;
 	mstr 			one;
 	mval 			*subscp, *val, outindx;
@@ -105,23 +103,21 @@ void lvzwr_out(lv_val *lvp)
 	zwr_alias_var		*newzav, *zav;
 	mident_fixed		zwrt_varname;
 	lvzwrite_datablk	*newzwrb;
-
-
-	error_def(ERR_MAXNRSUBSCRIPTS);
-	error_def(ERR_MERGEINCOMPL);
+	gparam_list		param_list;	/* for op_putindx call through callg */
 
 	val = &lvp->v;
 	assert(lvzwrite_block);
 	if (!merge_args)
 	{	/* The cases that exist here are:
-		   1) This is a container variable. If the lv_val it refers to has been printed, show that association. Else,
-		      "create" a $ZWRTACxxx var/index that will define the value. Then before returning, cause that container
-		      var to be dumped with the appropriate $ZWRTACxxx index as the var name.
-		   2) This is an alias base variable. If first time seen, we print normally but record it and put a ";#" tag on the
-		      end to signify it is an alias var (doesn't affect value). If we look it up and it is not the first time this
-		      lv_val has been printed, then we instead print the statement needed to alias it to the first seen var.
-		   3) This is just a normal var needing to be printed normally
-		*/
+		 * 1) This is a container variable. If the lv_val it refers to has been printed, show that association.
+		 *    Else, "create" a $ZWRTACxxx var/index that will define the value. Then before returning, cause
+		 *    that container var to be dumped with the appropriate $ZWRTACxxx index as the var name.
+		 * 2) This is an alias base variable. If first time seen, we print normally but record it and put a
+		 *    ";#" tag on the end to signify it is an alias var (doesn't affect value). If we look it up and it
+		 *    is not the first time this lv_val has been printed, then we instead print the statement needed to
+		 *    alias it to the first seen var.
+		 * 3) This is just a normal var needing to be printed normally.
+		 */
 		htent_added = FALSE;
 		one.addr = &buff;
 		one.len = 1;
@@ -129,10 +125,10 @@ void lvzwr_out(lv_val *lvp)
 		if (lvp->v.mvtype & MV_ALIASCONT)
 		{	/* Case 1 -- have an alias container */
 			assert(curr_symval->alias_activity);
-			assert(MV_SBS == lvp->ptrs.val_ent.parent.sbs->ident);		/* verify is subscripted var */
+			assert(!LV_IS_BASE_VAR(lvp));	/* verify is subscripted var */
 			lvpc = (lv_val *)lvp->v.str.addr;
 			assert(lvpc);
-			assert(MV_SYM == lvpc->ptrs.val_ent.parent.sym->ident);	/* Verify base var lv_val */
+			assert(LV_IS_BASE_VAR(lvpc));	/* Verify base var lv_val */
 			if (tabent_addr = (ht_ent_addr *)lookup_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lvpc))
 			{	/* The value was found, we have  a reference we can print now */
 				assert(HTENT_VALID_ADDR(tabent_addr, zwr_alias_var, zav));
@@ -185,9 +181,9 @@ void lvzwr_out(lv_val *lvp)
 				dump_container = TRUE;
 			}
 			/* Note value_printed flag in newzav not set since we are NOT dumping the value at this point
-			   but only the association. Since the flag is not set, we *will* dump it when we get to that
-			   actual variable.
-			*/
+			 * but only the association. Since the flag is not set, we *will* dump it when we get to that
+			 * actual variable.
+			 */
 			*one.addr = '*';
 			zshow_output(zwr_output, &one);
 			lvzwr_out_targkey(&one);
@@ -197,9 +193,9 @@ void lvzwr_out(lv_val *lvp)
 			zshow_output(zwr_output, (const mstr *)&newzav->ptrs.val_ent.zwr_var);
 			if (dump_container)
 			{	/* We want to dump the entire container variable but the name doesn't match the var we are
-				   currently dumping so push a new lvzwrite_block onto the stack, fill it in for the current var
-				   and call lvzwr_va() to handle it. When done, dismantle the temp lvzwrite_block.
-				*/
+				 * currently dumping so push a new lvzwrite_block onto the stack, fill it in for the current var
+				 * and call lvzwr_va() to handle it. When done, dismantle the temp lvzwrite_block.
+				 */
 				newzwrb = (lvzwrite_datablk *)malloc(SIZEOF(lvzwrite_datablk));
 				memset(newzwrb, 0, SIZEOF(lvzwrite_datablk));
 				newzwrb->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
@@ -214,12 +210,11 @@ void lvzwr_out(lv_val *lvp)
 				free(newzwrb);
 			}
 			return;
-		} else if (IS_ALIASLV(lvp))
+		} else if (LV_IS_BASE_VAR(lvp) && IS_ALIASLV(lvp))
 		{	/* Case 2 -- alias base variable (only base vars have reference counts). Note this can occur with
-			   TP save/restore vars since we increment both trefcnt and crefcnt for these hidden copied references.
-			   Because of that, we can't assert alias_activity but otherwise it shouldn't affect processing.
-			*/
-			assert(MV_SYM == lvp->ptrs.val_ent.parent.sym->ident);	/* Verify base var lv_val */
+			 * TP save/restore vars since we increment both trefcnt and crefcnt for these hidden copied references.
+			 * Because of that, we can't assert alias_activity but otherwise it shouldn't affect processing.
+			 */
 			if (!(htent_added = add_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lvp, NULL, &tabent_addr)))
 			{	/* Entry already existed -- need to output association rather than values */
 				assert(tabent_addr);
@@ -240,11 +235,11 @@ void lvzwr_out(lv_val *lvp)
 					return;
 				}
 				/* Else the value for this entry has not yet been printed so let us fall into case 3
-				   and get that done. Also set the flag so we mark it as an alias. Note this can happen if
-				   a container value for a name is encountered before the base var it points to. We will
-				   properly resolve the entry but its value  won't have been printed until we actually encounter
-				   it in the tree.
-				*/
+				 * and get that done. Also set the flag so we mark it as an alias. Note this can happen if
+				 * a container value for a name is encountered before the base var it points to. We will
+				 * properly resolve the entry but its value  won't have been printed until we actually encounter
+				 * it in the tree.
+				 */
 				htent_added = TRUE;		/* to force the ;# tag at end of value printing */
 				zav->value_printed = TRUE;	/* value will be output shortly below */
 			} else
@@ -272,11 +267,12 @@ void lvzwr_out(lv_val *lvp)
 		}
 	} else
 	{	/* MERGE assignment from local variable */
+		nsubs = lvzwrite_block->curr_subsc;
 		if (MARG1_IS_GBL(merge_args))
 		{	/* Target global var */
 			memcpy(gv_currkey->base, mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND1]->s_gv_currkey->end + 1);
 			gv_currkey->end = mglvnp->gblp[IND1]->s_gv_currkey->end;
-			for (n = 0 ; n < lvzwrite_block->curr_subsc ; n++)
+			for (n = 0 ; n < nsubs; n++)
 			{
 				subscp = ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual;
 				MV_FORCE_STR(subscp);
@@ -290,22 +286,22 @@ void lvzwr_out(lv_val *lvp)
 		{	/* Target local var - pre-process target in case is a container */
 			assert(MARG1_IS_LCL(merge_args));
 			dst_lv = mglvnp->lclp[IND1];
-			if (MV_SBS == dst_lv->ptrs.val_ent.parent.sbs->ident && MAX_LVSUBSCRIPTS
-			    < dst_lv->ptrs.val_ent.parent.sbs->level + lvzwrite_block->curr_subsc)
-				rts_error(VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
-			/*
-			 * Followings are not efficient. Saving mval * for each level we last worked on,
-			 * we can skip some of the op_putindx calls.
-			 * Following will do op_putindx even if the index exists
-			 */
-			for (n = 0 ; n < lvzwrite_block->curr_subsc ; n++)
+			if (!LV_IS_BASE_VAR(dst_lv))
 			{
-				subscp = ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual;
-				if (res_lv = op_srchindx(VARLSTCNT(2) dst_lv, subscp))
-					dst_lv = res_lv;
-				else
-					dst_lv = op_putindx(VARLSTCNT(2) dst_lv, subscp);
+				LV_SBS_DEPTH(dst_lv, FALSE, sbs_depth);
+				if (MAX_LVSUBSCRIPTS < (sbs_depth + nsubs))
+					rts_error(VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 			}
+			param_list.arg[0] = dst_lv;	/* this is already protected from stp_gcol by op_merge so no need to
+							 * push this into the stack for stp_gcol protection. */
+			for (n = 0 ; n < nsubs; n++)
+			{	/* Note: no need to do push these mvals on the stack before calling op_putindx
+				 * as lvzwrite_block->sub is already protected by stp_gcol_src.h.
+				 */
+				param_list.arg[n+1] = ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual;
+			}
+			param_list.n = n + 1;
+			dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &param_list);
 			MV_FORCE_STR(val);
 			DECR_AC_REF(dst_lv, TRUE);
 			dst_lv->v = *val;

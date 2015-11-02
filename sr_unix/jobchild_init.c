@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,16 +30,23 @@
 #include "job.h"
 #include "gcall.h"
 #include "jobchild_init.h"
-#include "lv_val.h"
+#include "lv_val.h"	/* needed for "callg.h" */
 #include "callg.h"
 #include "invocation_mode.h"
 #include "gtmci.h"
+#include "send_msg.h"
 
 #define FILE_NAME_SIZE	255
 
-GBLREF	mval		dollar_zmode;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	uint4		process_id;
+
+error_def (ERR_RUNPARAMERR);
+error_def (ERR_TEXT);
+error_def(ERR_SYSCALL);
+
+LITDEF char interactive_mode_buf[] = "INTERACTIVE";
+LITDEF char other_mode_buf[] = "OTHER";
 
 CONDITION_HANDLER(job_init_ch)
 {
@@ -60,65 +67,55 @@ void jobchild_init(void)
 {
 	unsigned int	status;
 	job_params_type		jparms;
-
-/* Transfer data */
-	unsigned char	*transfer_addr;
+	unsigned char	*transfer_addr;		/* Transfer data */
 	rhdtyp		*base_addr;
 	unsigned short	i, arg_len;
 	char		run_file_name[FILE_NAME_SIZE + 2], *c;
 	gcall_args	job_arglist;
 	mval		job_args[MAX_ACTUALS];
-	error_def	(ERR_RUNPARAMERR);
+	DCL_THREADGBL_ACCESS;
 
-	static char interactive_mode_buf[] = "INTERACTIVE";
-	static char other_mode_buf[] = "OTHER";
-
-	error_def(ERR_TEXT);
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(job_init_ch);
-
-/*
- * Check if environment variable ppid - job parent pid
- * exists. If it does not, we are a regular gtm process,
- * else, we are a child process of a job command.
- */
+	/*
+	 * Check if environment variable ppid - job parent pid
+	 * exists. If it does not, we are a regular gtm process,
+	 * else, we are a child process of a job command.
+	 */
 	if ((c = GETENV(CHILD_FLAG_ENV)) && strlen(c))
-	{
-		/*
-		 * We are a Jobbed process.
-		 * Get Job parameters and set up environment
-		 * to run the Job command
-		 */
-
-		/* Clear the environment variable so that subsequent child
-		 * mumps processes can start normal initialization. */
-
+	{	/* We are a Jobbed process Get Job parameters and set up environment to run the Job command */
+		/* Clear the environment variable so that subsequent child mumps processes can start normal initialization. */
 		if (PUTENV(CLEAR_CHILD_FLAG_ENV))
 		{
 			util_out_print("Unable to clear gtmj0 process !UL exiting.", TRUE, process_id);
 			rts_error(VARLSTCNT(1) errno);
 		}
-
 		/* read parameters into parameter structure */
 		ojchildparms(&jparms, &job_arglist, job_args);
-
 		/* Execute the command to be run before executing the actual M routine */
 		if (jparms.startup.len)
-			SYSTEM(jparms.startup.addr);
-
+		{
+			if (0 != SYSTEM(jparms.startup.addr))
+			{
+				rts_error(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("STARTUP command failed"));
+			}
+		}
 		/* Set up job's input, output and error files.  Redirect them, if necessary. */
 		/* It is needed since the middle process would not have always done this(under jobpid == TRUE cases) */
 		if (!(status = ojchildioset(&jparms)))
 			rts_error(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Failed to set STDIN/OUT/ERR for the job"));
-
 		job_addr(&jparms.routine, &jparms.label, jparms.offset, (char **)&base_addr, (char **)&transfer_addr);
-
 		/* Set process priority */
 		if (jparms.baspri)
-			nice((int)jparms.baspri);
+		{
+			/* send message to system log if nice fails */
+			if (-1 == nice((int)jparms.baspri))
+				send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("nice"), CALLFROM, errno);
+		}
 		/* Set up $ZMODE to "OTHER" */
-		dollar_zmode.mvtype = MV_STR;
-		dollar_zmode.str.addr = &other_mode_buf[0];
-		dollar_zmode.str.len = SIZEOF(other_mode_buf) -1;
+		(TREF(dollar_zmode)).mvtype = MV_STR;
+		(TREF(dollar_zmode)).str.addr = (char *)other_mode_buf;
+		(TREF(dollar_zmode)).str.len = SIZEOF(other_mode_buf) -1;
 		/* Release storage allocated by ojchildparms() */
 		if (jparms.directory.len)
 			free(jparms.directory.addr);
@@ -162,9 +159,9 @@ void jobchild_init(void)
 		}
 		job_arglist.callargs = 0;
 		/* Set up $ZMODE to "INTERACTIVE" */
-		dollar_zmode.mvtype = MV_STR;
-		dollar_zmode.str.addr = &interactive_mode_buf[0];
-		dollar_zmode.str.len = SIZEOF(interactive_mode_buf) -1;
+		(TREF(dollar_zmode)).mvtype = MV_STR;
+		(TREF(dollar_zmode)).str.addr = (char *)interactive_mode_buf;
+		(TREF(dollar_zmode)).str.len = SIZEOF(interactive_mode_buf) -1;
 	}
 	gtm_init_env(base_addr, transfer_addr);
 	if (MUMPS_CALLIN & invocation_mode)

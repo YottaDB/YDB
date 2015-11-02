@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@
 #include "wbox_test_init.h"
 
 GBLREF	boolean_t		is_src_server;
+GBLREF	boolean_t		mupip_jnl_recover;
 
 error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLMOVED);
@@ -89,7 +90,8 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 		jb->cycle++;
 		for (retry = TRUE;  ;)
 		{
-			if (csd->jnl_sync_io)
+			/* D9E04-002445 MUPIP RECOVER always open journal file without O_SYNC, ignoring jnl_sync_io */
+			if (csd->jnl_sync_io && !mupip_jnl_recover)
 			{
 				OPENFILE_SYNC((sm_c_ptr_t)csd->jnl_file_name, O_RDWR, jpc->channel);
 				jpc->sync_io = TRUE;
@@ -138,7 +140,8 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 	{
 		assert(0 == nameptr[csd->jnl_file_len]);
 		ASSERT_JNLFILEID_NOT_NULL(csa);
-		if (csd->jnl_sync_io)
+		/* D9E04-002445 MUPIP RECOVER always open journal file without O_SYNC, ignoring jnl_sync_io */
+		if (csd->jnl_sync_io && !mupip_jnl_recover)
 		{
 			OPENFILE_SYNC((sm_c_ptr_t)nameptr, O_RDWR, jpc->channel);
 			jpc->sync_io = TRUE;
@@ -179,7 +182,9 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 					{	/* Stash the file id in shared-memory for subsequent users */
 						set_gdid_from_stat(&csa->nl->jnl_file.u, &stat_buf);
 					}
-					jpc->cycle = jb->cycle;	/* make private cycle and shared cycle in sync */
+					GTM_WHITE_BOX_TEST(WBTEST_JNL_FILE_OPEN_FAIL, sts, ERR_JNLFILOPN);
+					DEBUG_ONLY(if (0 == sts))
+						jpc->cycle = jb->cycle;	/* make private cycle and shared cycle in sync */
 					GTM_FD_TRACE_ONLY(
 						gtm_dbjnl_dupfd_check(); /* Check if db or jnl fds collide (D9I11-002714) */
 						if (NOJNL == jpc->channel)

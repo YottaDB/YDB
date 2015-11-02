@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,16 +17,16 @@
 #include "mdq.h"
 #include "advancewindow.h"
 
-GBLREF bool 	shift_gvrefs;
-GBLREF char 	window_token, director_token;
-GBLREF triple 	*expr_start;
-GBLREF mident 	window_ident;
+GBLREF char		window_token, director_token;
+GBLREF mident		window_ident;
 
 int f_zprevious( oprtype *a, opctype op)
 {
 	triple *oldchain, tmpchain, *r, *triptr;
 	error_def(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	switch (window_token)
 	{
@@ -39,7 +39,7 @@ int f_zprevious( oprtype *a, opctype op)
 			advancewindow();
 			break;
 		}
-		if (!lvn(&(r->operand[0]),OC_SRCHINDX,r))
+		if (!lvn(&(r->operand[0]), OC_SRCHINDX, r))
 			return FALSE;
 		ins_triple(r);
 		break;
@@ -50,7 +50,7 @@ int f_zprevious( oprtype *a, opctype op)
 		ins_triple(r);
 		break;
 	case TK_ATSIGN:
-		if (shift_gvrefs)
+		if (TREF(shift_side_effects))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);
@@ -59,20 +59,19 @@ int f_zprevious( oprtype *a, opctype op)
 				setcurtchain(oldchain);
 				return FALSE;
 			}
-			r->operand[1] = put_ilit((mint) indir_fnzprevious);
+			r->operand[1] = put_ilit((mint)indir_fnzprevious);
 			ins_triple(r);
 			newtriple(OC_GVSAVTARG);
 			setcurtchain(oldchain);
-			dqadd(expr_start, &tmpchain, exorder);
-			expr_start = tmpchain.exorder.bl;
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
-		}
-		else
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		} else
 		{
 			if (!indirection(&(r->operand[0])))
 				return FALSE;
-			r->operand[1] = put_ilit((mint) indir_fnzprevious);
+			r->operand[1] = put_ilit((mint)indir_fnzprevious);
 			ins_triple(r);
 		}
 		r->opcode = OC_INDFUN;

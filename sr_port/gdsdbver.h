@@ -57,6 +57,7 @@ enum mdb_ver
 	GDSMV53003,	/* ZSHOW "G" release: Db Statistics rearranged in file header */
 	GDSMV53004,	/* New fields(is_encrypted, encryption_hash) for encryption */
 	GDSMV54000,	/* New fields(db_trigger_cycle) for triggers */
+	GDSMV54002,	/* New statistical counter field for ZTRIGGER command */
 	GDSMVLAST
 };
 #define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))

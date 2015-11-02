@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +12,9 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+
 #include "gtm_stdio.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"

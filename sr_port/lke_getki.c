@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,9 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 #include "lke_getcli.h"
-#include "val_iscan.h"
 
 /* This routine performs the necessary transformation of the LOCK keys passed in
  * from the CLI layer and produces a canonical formatted key. This routine

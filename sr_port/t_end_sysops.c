@@ -55,6 +55,7 @@
 #include "cache.h"
 #include "memcoherency.h"
 #include "repl_sp.h"		/* for F_CLOSE (used by JNL_FD_CLOSE) */
+#include "have_crit.h"
 
 #if defined(VMS)
 #include "efn.h"
@@ -141,7 +142,7 @@
 				/* to write valid before-image, ensure buffer is protected against preemption */	\
 				assert(process_id == backup_cr->in_cw_set);						\
 				backup_block(csa, blkid, backup_cr, NULL);						\
-				if (0 == dollar_tlevel)									\
+				if (!dollar_tlevel)									\
 					nontp_block_saved = TRUE;							\
 				else											\
 					tp_block_saved = TRUE;								\
@@ -162,6 +163,7 @@ void	wcs_stale(gd_region *reg);
 
 GBLREF	volatile int4		crit_count;
 GBLREF	volatile boolean_t	in_mutex_deadlock_check;
+GBLREF  volatile int4		gtmMallocDepth;
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	uint4			process_id;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -170,7 +172,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	boolean_t		block_saved;
 GBLREF	boolean_t		write_after_image;
@@ -331,7 +333,7 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 				|| (inctn_blkmarkfree == inctn_opcode) || dse_running);
 		if ((inctn_bmp_mark_free_gtm == inctn_opcode) || (inctn_bmp_mark_free_mu_reorg == inctn_opcode))
 		{	/* coming in from gvcst_bmp_mark_free. adjust "csd->blks_to_upgrd" if necessary */
-			assert(0 == dollar_tlevel);	/* gvcst_bmp_mark_free runs in non-TP */
+			assert(!dollar_tlevel);	/* gvcst_bmp_mark_free runs in non-TP */
 			/* Bitmap block should be the only block updated in this transaction. The only exception is if the
 			 * previous cw-set-element is of type gds_t_busy2free (which does not go through bg_update) */
 			assert((1 == cw_set_depth)
@@ -547,7 +549,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 		&& (((blk_hdr_ptr_t)(db_addr[0]))->tn >= cs_addrs->shmpool_buffer->inc_backup_tn))
 	{
 		backup_block(cs_addrs, blkid, NULL, db_addr[0]);
-		if (0 == dollar_tlevel)
+		if (!dollar_tlevel)
 			block_saved = TRUE;
 		else
 			si->backup_block_saved = TRUE;
@@ -586,7 +588,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 			gvcst_blk_build(cs, db_addr[0], effective_tn);
 		} else
 		{	/* It has been built; Update tn in the block and copy from private memory to shared space */
-			assert(write_after_image || 0 < dollar_tlevel);
+			assert(write_after_image || dollar_tlevel);
 			assert(dse_running || (ctn == effective_tn));
 				/* ideally should be dse_chng_bhead specific but using generic dse_running flag for now */
 			if (!dse_running)
@@ -596,7 +598,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) > 0);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) <= cs_data->blk_size);
-		if (0 == dollar_tlevel)
+		if (!dollar_tlevel)
 		{
 			if (0 != cs->ins_off)
 			{	/* reference to resolve: insert real block numbers in the buffer */
@@ -991,7 +993,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 					 */
 					assert(0 == cr1->in_cw_set);
 					assert(0 == cr1->in_tend);
-					if (0 == dollar_tlevel)		/* stuff it in the array before setting in_cw_set */
+					if (!dollar_tlevel)		/* stuff it in the array before setting in_cw_set */
 					{
 						assert((((MAX_BT_DEPTH * 2) - 1) * 2) > cr_array_index);
 						PIN_CACHE_RECORD(cr1, cr_array, cr_array_index);
@@ -1154,7 +1156,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		assert(dse_running || write_after_image
 				|| ((gds_t_acquired == mode) && (!read_before_image || (NULL == cs->old_block)))
 				|| (gds_t_acquired != mode) && (0 != cs->new_buff));
-		if (0 == dollar_tlevel)		/* stuff it in the array before setting in_cw_set */
+		if (!dollar_tlevel)		/* stuff it in the array before setting in_cw_set */
 		{
 			assert((((MAX_BT_DEPTH * 2) - 1) * 2) > cr_array_index);
 			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
@@ -1406,7 +1408,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			gvcst_blk_build(cs, blk_ptr, effective_tn);
 		} else
 		{	/* It has been built; Update tn in the block and copy from private memory to shared space */
-			assert(write_after_image || 0 < dollar_tlevel);
+			assert(write_after_image || dollar_tlevel);
 			assert(dse_running || (ctn == effective_tn));
 				/* ideally should be dse_chng_bhead specific but using generic dse_running flag for now */
 			if (!dse_running)
@@ -1416,7 +1418,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
 		assert((int)((blk_hdr_ptr_t)blk_ptr)->bsiz > 0);
 		assert((int)((blk_hdr_ptr_t)blk_ptr)->bsiz <= csd->blk_size);
-		if (0 == dollar_tlevel)
+		if (!dollar_tlevel)
 		{
 			if (0 != cs->ins_off)
 			{	/* reference to resolve: insert real block numbers in the buffer */
@@ -1533,7 +1535,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	VMS_ONLY(
 		if (cr->backup_cr_off && (gds_t_write == mode))	/* update landed in a different cache-record (twin) */
 		{	/* If valid clue and this block is in it, need to update buffer address */
-			targ = (0 == dollar_tlevel) ? gv_target : cs->blk_target;
+			targ = (!dollar_tlevel ? gv_target : cs->blk_target);
 			if ((NULL != targ) && (0 != targ->clue.end))
 			{
 				blk_hist = &targ->hist.h[cs->level];
@@ -1661,70 +1663,6 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	return;
 }
 
-/* make sure that the journal file is available if appropriate */
-uint4	jnl_ensure_open(void)
-{
-	uint4			jnl_status;
-	jnl_private_control	*jpc;
-	sgmnt_addrs		*csa;
-	boolean_t		first_open_of_jnl, need_to_open_jnl;
-	int			close_res;
-#	if defined(VMS)
-	static const gds_file_id	file;
-	uint4				status;
-#	endif
-
-	csa = cs_addrs;
-	assert(csa->now_crit);
-	jpc = csa->jnl;
-	assert(NULL != jpc);
-	/* The goal is to change the code below to do only one JNL_FILE_SWITCHED(jpc) check instead of the additional
-	 * (NOJNL == jpc->channel) check done below. The assert below ensures that the NOJNL check can indeed
-	 * be subsumed by the JNL_FILE_SWITCHED check (with the exception of the source-server which has a special case that
-	 * needs to be fixed in C9D02-002241). Over time, this has to be changed to one check.
-	 */
-	assert((NOJNL != jpc->channel) || JNL_FILE_SWITCHED(jpc) || is_src_server);
-	need_to_open_jnl = FALSE;
-	jnl_status = 0;
-	if (NOJNL == jpc->channel)
-	{
-#		ifdef VMS
-		if (NOJNL != jpc->old_channel)
-		{
-			if (lib$ast_in_prog())		/* called from wcs_wipchk_ast */
-				jnl_oper_user_ast(gv_cur_region);
-			else
-			{
-				status = sys$setast(DISABLE);
-				jnl_oper_user_ast(gv_cur_region);
-				if (SS$_WASSET == status)
-					ENABLE_AST;
-			}
-		}
-#		endif
-		need_to_open_jnl = TRUE;
-	} else if (JNL_FILE_SWITCHED(jpc))
-	{	/* The journal file has been changed "on the fly"; close the old one and open the new one */
-		VMS_ONLY(assert(FALSE);)	/* everyone having older jnl open should have closed it at time of switch in VMS */
-		JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
-		need_to_open_jnl = TRUE;
-	}
-	if (need_to_open_jnl)
-	{
-		/* Whenever journal file get switch, reset the pini_addr and new_freeaddr. */
-		jpc->pini_addr = 0;
-		jpc->new_freeaddr = 0;
-		if (IS_GTCM_GNP_SERVER_IMAGE)
-			gtcm_jnl_switched(jpc->region); /* Reset pini_addr of all clients that had any older journal file open */
-		UNIX_ONLY(first_open_of_jnl = (0 == csa->nl->jnl_file.u.inode);)
-		VMS_ONLY(first_open_of_jnl = (0 == memcmp(csa->nl->jnl_file.jnl_file_id.fid, file.fid, SIZEOF(file.fid))));
-		jnl_status = jnl_file_open(gv_cur_region, first_open_of_jnl, NULL);
-	}
-	assert((0 != jnl_status) || !JNL_FILE_SWITCHED(jpc)
-		UNIX_ONLY(|| (is_src_server && !JNL_ENABLED(csa) && REPL_WAS_ENABLED(csa))));
-	return jnl_status;
-}
-
 /* A timer has popped. Some buffers are stale -- start writing to the database */
 #if defined(UNIX)
 void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
@@ -1789,7 +1727,7 @@ void	wcs_stale(gd_region *reg)
 	   4) We are in a "fast lock".
 	   **************************************************************************************************/
 	UNIX_ONLY(GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);)
-	if ((0 == crit_count) && !in_mutex_deadlock_check
+	if ((0 == crit_count) && !in_mutex_deadlock_check && OK_TO_INTERRUPT
 		UNIX_ONLY(NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag)))
 		&& ((NULL == check_csaddrs) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(check_csaddrs))
 		&& (0 == fast_lock_count))

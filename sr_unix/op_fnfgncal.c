@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,16 +21,15 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
+#include "lv_val.h"		/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "gtmci.h"
 #include "gtmxc_types.h"
 #include "mvalconv.h"
-#include "mstrcmp.h"
 #include "gt_timer.h"
 #include "callg.h"
 #include "callintogtmxfer.h"
+#include "min_max.h"
 
 /******************************************************************************
  *
@@ -272,7 +271,7 @@ static int	extarg_getsize(void *src, enum xc_types typ, mval *dst)
 void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
 	va_list		var;
-	int		i;
+	int		i, rslt;
 	int4 		callintogtm_vectorindex;
 	mval		*arg, *v;
 	int4		n;
@@ -301,7 +300,8 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	/* find package */
 	for (package_ptr = extcall_package_root;  package_ptr;  package_ptr = package_ptr->next_package)
 	{
-		if (0 == mstrcmp(&(package_ptr->package_name), &(package->str)))
+		MSTR_CMP(package_ptr->package_name, package->str, rslt);
+		if (0 == rslt)
 			break;
 	}
 	/* If package has not been found, create it */
@@ -318,7 +318,8 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	/* Find entry */
 	for (entry_ptr = package_ptr->first_entry;  entry_ptr;  entry_ptr = entry_ptr->next_entry)
 	{
-		if (0 == mstrcmp(&(entry_ptr->entry_name), &(extref->str)))
+		MSTR_CMP(entry_ptr->entry_name, extref->str, rslt);
+		if (0 == rslt)
 			break;
 	}
 	if (call_table_initialized == FALSE)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@
 #include "lockconst.h"
 #include "memcoherency.h"
 #include "shmpool.h"
+#include"gtm_c_stack_trace.h"
 
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	pid_t			process_id;
@@ -186,8 +187,17 @@ shmpool_blk_hdr_ptr_t shmpool_blk_alloc(gd_region *reg, enum shmblk_type blktype
 			shmpool_unlock_hdr(reg);
 			return (shmpool_blk_hdr_ptr_t)-1L;
 		}
+DEBUG_ONLY (
+		if ((MAX_BACKUP_FLUSH_TRY / 2) == attempts)
+			GET_C_STACK_FROM_SCRIPT("BCKUPBUFLUSH", process_id, sbufh_p->shmpool_crit_latch.u.parts.latch_pid, ONCE);
+	   )
 		if (MAX_BACKUP_FLUSH_TRY < attempts)
 		{	/* We have tried too long .. backup errors out */
+#ifdef DEBUG
+			GET_C_STACK_FROM_SCRIPT("BCKUPBUFLUSH", process_id, sbufh_p->shmpool_crit_latch.u.parts.latch_pid, TWICE);
+#else
+			GET_C_STACK_FROM_SCRIPT("BCKUPBUFLUSH", process_id, sbufh_p->shmpool_crit_latch.u.parts.latch_pid, ONCE);
+#endif
 			sbufh_p->failed = process_id;
 			sbufh_p->backup_errno = ERR_BCKUPBUFLUSH;
 			csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
@@ -532,7 +542,7 @@ boolean_t shmpool_lock_hdr(gd_region *reg)
 			*/
 			/* If near end of loop segment (LOCK_TRIES iters), see if target is dead and/or wake it up */
 			if (RETRY_CASLATCH_CUTOFF == (retries % LOCK_TRIES))
-				performCASLatchCheck(latch, LOOP_CNT_SEND_WAKEUP);
+				performCASLatchCheck(latch, TRUE);
 		}
 	}
 	DUMP_LOCKHIST();

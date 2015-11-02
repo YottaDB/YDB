@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,9 @@
 
 #include "mdef.h"
 #include "compiler.h"
+#include "mdq.h"
 #include "opcode.h"
+#include "nametabtyp.h"
 #include "indir_enum.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -20,20 +22,33 @@
 #include "gdsfhead.h"
 #include "zwrite.h"
 #include "toktyp.h"
-#include "mdq.h"
+#include "svnames.h"
+#include "funsvn.h"
 #include "advancewindow.h"
 #include "cmd.h"
 #include "compile_pattern.h"
 #include "mvalconv.h"
+#include "namelook.h"
 
 GBLREF char 		window_token;
 GBLREF mval 		window_mval;
 GBLREF mident 		window_ident;
+GBLREF triple		*curtchain;
 GBLREF char 		director_token;
 GBLREF short int 	source_column;
-GBLREF short int 	last_source_column;
 GBLREF uint4 		pat_everything[];
 GBLREF mstr_len_t	sizeof_pat_everything;
+
+error_def(ERR_COMMA);
+error_def(ERR_INVSVN);
+error_def(ERR_RPARENMISSING);
+error_def(ERR_SVNEXPECTED);
+error_def(ERR_VAREXPECTED);
+error_def(ERR_ZWRSPONE);
+
+LITREF unsigned char    svn_index[];
+LITREF nametabent       svn_names[];
+LITREF svn_data_type    svn_data[];
 
 /******	CAUTION !!! ******
  *	All occurrences of put_lit should be replaced by put_ilit.  In order to maintain object
@@ -44,6 +59,7 @@ GBLREF mstr_len_t	sizeof_pat_everything;
 
 int m_zwrite(void)
 {
+	int		index;
 	int4		pcount;			/* parameter count */
 	triple		*ref, *ref1, *head, *last, *count;
 	opctype 	op;
@@ -52,28 +68,24 @@ int m_zwrite(void)
 	mint		code;
 	mint		subscount;
 	char		c;
-	boolean_t	pat;
+	boolean_t	parse_warn, pat;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_VAREXPECTED);
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_ZWRSPONE);
-	error_def(ERR_COMMA);
-
+	SETUP_THREADGBL_ACCESS;
 	subscount = 0;
 	count = 0;
 	pat = FALSE;
-	if (window_token == TK_CIRCUMFLEX)
+	if (TK_CIRCUMFLEX == window_token)
 	{
 		advancewindow();
 		op = OC_GVZWRITE;
 	} else
 		op = OC_LVZWRITE;
-
 	switch(window_token)
 	{
 		case TK_SPACE:
 		case TK_EOL:
-			if (op == OC_GVZWRITE)
+			if (OC_GVZWRITE == op)
 			{
 				stx_error(ERR_VAREXPECTED);
 				return FALSE;
@@ -95,8 +107,51 @@ int m_zwrite(void)
 			name = put_str(window_ident.addr, window_ident.len);
 			advancewindow();
 			break;
+		case TK_DOLLAR:
+                        advancewindow();
+                        if ((TK_IDENT != window_token) || (OC_GVZWRITE == op))
+                        {
+                                stx_error(ERR_SVNEXPECTED);
+                                return FALSE;
+                        }
+                        parse_warn = FALSE;
+                        index = namelook(svn_index, svn_names, window_ident.addr, window_ident.len);
+                        if (0 > index)
+                        {
+                                STX_ERROR_WARN(ERR_INVSVN);     /* sets "parse_warn" to TRUE */
+                        } else
+                        {
+                                if (!VALID_SVN(index))
+                                {
+                                        STX_ERROR_WARN(ERR_FNOTONSYS);  /* sets "parse_warn" to TRUE */
+                                }
+                        }
+                        advancewindow();
+                        switch(window_token)
+                        {
+                                case TK_SPACE:
+                                case TK_EOL:
+                                case TK_COMMA:
+                                        if (!parse_warn)
+                                        {
+                                                assert(SV_NUM_SV > svn_data[index].opcode);
+                                                ref = maketriple(OC_ZWRITESVN);
+                                                ref->operand[0] = put_ilit(svn_data[index].opcode);
+                                                ins_triple(ref);
+                                        } else
+                                        {       /* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
+                                                 * (invoked by stx_error). No need to do anything else.
+                                                 */
+                                                assert(OC_RTERROR == curtchain->exorder.bl->exorder.bl->exorder.bl->opcode);
+                                        }
+                                        return TRUE;
+                                default:
+                                        stx_error(ERR_SVNEXPECTED);
+                                        return FALSE;
+                        }
+                        break;
 		case TK_LPAREN:
-			if (op != OC_GVZWRITE) /* naked reference */
+			if (OC_GVZWRITE != op) /* naked reference */
 			{
 				stx_error(ERR_VAREXPECTED);
 				return FALSE;
@@ -106,7 +161,7 @@ int m_zwrite(void)
 		case TK_ATSIGN:
 			if (!indirection(&name))
 				return FALSE;
-			if (op == OC_LVZWRITE && window_token != TK_LPAREN)
+			if ((OC_LVZWRITE == op) && (TK_LPAREN != window_token))
 			{
 				ref = maketriple(OC_COMMARG);
 				ref->operand[0] = name;
@@ -120,7 +175,7 @@ int m_zwrite(void)
 			break;
 		case TK_QUESTION:
 			advancewindow();
-			source_column = last_source_column;
+			source_column = TREF(last_source_column);
 			if (!compile_pattern(&name, FALSE))
 				return FALSE;
 			if (op == OC_LVZWRITE)
@@ -135,14 +190,14 @@ int m_zwrite(void)
 	last = newtriple(OC_PARAMETER);
 	head->operand[1] = put_tref(last);
 	pcount = 1;
-	if (op == OC_LVPATWRITE || op == OC_GVZWRITE)
+	if ((OC_LVPATWRITE == op) || (OC_GVZWRITE == op))
 	{
 		pcount++;
 		last->operand[0] = put_ilit((op == OC_GVZWRITE ? pat : 0));
 		ref = newtriple(OC_PARAMETER);
 		last->operand[1] = put_tref(ref);
 		last = ref;
-		if (op == OC_GVZWRITE)
+		if (OC_GVZWRITE == op)
 		{
 			pcount++;
 			count = last;
@@ -152,7 +207,7 @@ int m_zwrite(void)
 		}
 	}
 	last->operand[0] = name;
-	if (window_token != TK_LPAREN)
+	if (TK_LPAREN != window_token)
 	{
 		pcount++;
 		if (pat)
@@ -208,14 +263,15 @@ int m_zwrite(void)
 				return TRUE;
 			case TK_QUESTION:
 				advancewindow();
-				source_column = last_source_column;
+				source_column = TREF(last_source_column);
 				if (!compile_pattern(&limit, FALSE))
 					return FALSE;
 				if (window_token != TK_COMMA && window_token != TK_RPAREN)
-				{	stx_error(ERR_ZWRSPONE);
+				{
+					stx_error(ERR_ZWRSPONE);
 					return FALSE;
 				}
-				if (window_token == TK_COMMA)
+				if (TK_COMMA == window_token)
 					advancewindow();
 				subscount++;
 				MV_FORCE_MVAL(&mv, ZWRITE_PATTERN);
@@ -230,7 +286,7 @@ int m_zwrite(void)
 			case TK_COLON:
 				if ((c = director_token) != TK_RPAREN)
 				{
-					if (c != TK_COMMA)
+					if (TK_COMMA != c)
 					{
 						advancewindow();
 						MV_FORCE_MVAL(&mv, ZWRITE_UPPER);
@@ -258,7 +314,7 @@ int m_zwrite(void)
 				ref->operand[1] = put_tref(last);
 				last->operand[0] = limit;
 				pcount++;
-				if ((c = window_token) == TK_COLON)
+				if (TK_COLON == (c = window_token))
 				{
 					code = ZWRITE_LOWER;
 					advancewindow();

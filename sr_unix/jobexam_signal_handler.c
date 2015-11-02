@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,9 +30,14 @@
 #include "gtmsiginfo.h"
 #include "gtmimagename.h"
 #include "jobexam_signal_handler.h"
+#include "send_msg.h"
+#include "gtmmsg.h"
 
 GBLREF	uint4			process_id;
 GBLREF	enum gtmImageTypes	image_type;
+GBLREF	boolean_t		need_core;
+
+DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
 
 LITREF	gtmImageName		gtmImageNames[];
 
@@ -47,6 +52,7 @@ void jobexam_signal_handler(int sig, siginfo_t *info, void *context)
 	error_def(ERR_KILLBYSIGSINFO1);
 	error_def(ERR_KILLBYSIGSINFO2);
 	error_def(ERR_KILLBYSIGSINFO3);
+	error_def(ERR_JOBEXAMFAIL);
 
 	if (NULL != info)
 		exi_siginfo = *info;
@@ -66,25 +72,51 @@ void jobexam_signal_handler(int sig, siginfo_t *info, void *context)
 	switch(signal_info.infotype)
 	{
 		case GTMSIGINFO_NONE:
-			rts_error(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type), process_id, sig);
+			send_msg(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type), process_id, sig);
+			gtm_putmsg(VARLSTCNT(6) ERR_KILLBYSIG, 4, GTMIMAGENAMETXT(image_type), process_id, sig);
 			break;
 		case GTMSIGINFO_USER:
-			rts_error(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
+			send_msg(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
+				 process_id, sig, signal_info.send_pid, signal_info.send_uid);
+			gtm_putmsg(VARLSTCNT(8) ERR_KILLBYSIGUINFO, 6, GTMIMAGENAMETXT(image_type),
 				 process_id, sig, signal_info.send_pid, signal_info.send_uid);
 			break;
 		case GTMSIGINFO_ILOC + GTMSIGINFO_BADR:
-			rts_error(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
+			send_msg(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
+				 process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
+			gtm_putmsg(VARLSTCNT(8) ERR_KILLBYSIGSINFO1, 6, GTMIMAGENAMETXT(image_type),
 				 process_id, sig, signal_info.int_iadr, signal_info.bad_vadr);
 			break;
 		case GTMSIGINFO_ILOC:
-			rts_error(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
+			send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
+				 process_id, sig, signal_info.int_iadr);
+			gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
 				 process_id, sig, signal_info.int_iadr);
 			break;
 		case GTMSIGINFO_BADR:
-			rts_error(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+			send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+				 process_id, sig, signal_info.bad_vadr);
+			gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
 				 process_id, sig, signal_info.bad_vadr);
 			break;
 		default:
 			GTMASSERT;
+	}
+	send_msg(VARLSTCNT(3) ERR_JOBEXAMFAIL, 1, process_id);
+	/* Create a core to examine later. Note this handler is only enabled for two fatal core types so we don't
+	 * do any futher checking in this regard.
+	 */
+	need_core = TRUE;
+	gtm_fork_n_core();
+	/* Note this routine do NOT invoke create_fatal_error_zshow_dmp() because it would in turn call jobexam
+	 * again which would loop us right back around to here. We basically want to do UNWIND(NULL, NULL) logic
+	 * but the UNWIND macro can only be used in a condition handler so next is a block that pretends it is
+	 * our condition handler and does the needful.
+	 */
+	{	/* Needs new block since START_CH declares a new var used in UNWIND() */
+		int arg = 0;	/* Needed for START_CH macro if debugging enabled */
+		START_CH;
+		DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
+		UNWIND(NULL, NULL);
 	}
 }

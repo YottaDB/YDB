@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,6 @@
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
-GBLREF gd_addr		*gd_targ_addr;
 GBLREF gd_binding	*gd_map;
 GBLREF gd_binding	*gd_map_top;
 GBLREF mval		dollar_ztrap;
@@ -43,6 +42,8 @@ GBLREF int4		gtm_trigger_depth;
 GBLREF mval		dollar_ztwormhole;
 #endif
 
+error_def(ERR_NOZTRAPINTRIG);
+
 /* Routine to NEW a special intrinsic variable. Note that gtm_newinstrinsic(),
    which actually does the dirty work, may shift the stack to insert the mv_stent
    which saves the old value. Because of this, any caller of this module MUST
@@ -53,9 +54,9 @@ void op_newintrinsic(int intrtype)
 {
 	mval		*intrinsic;
 	boolean_t	stored_explicit_null;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_NOZTRAPINTRIG);
-
+	SETUP_THREADGBL_ACCESS;
 	switch(intrtype)
 	{
 		case SV_ZTRAP:
@@ -128,8 +129,7 @@ void op_newintrinsic(int intrtype)
 			gd_header = zgbldir(&dollar_zgbldir);
 			/* update the gd_map */
 			SET_GD_MAP;
-		}
-		else
+		} else
 		{
 			dpzgbini();
         		gd_header = NULL;

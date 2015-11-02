@@ -4,7 +4,7 @@ download from http://sourceforge.net/projects/fis-gtm/), Linux x86, tcsh,
 Unicode and GPG include files. Unicode include files are automatically 
 installed if ICU is installed. GPG include files require installing the
 GNUPG and related library development packages. GNU make 3.81, 
-Ubuntu 8.04 LTS and RHEL 4.0 were used to do the test builds for this 
+Ubuntu 10.04 LTS and RHEL 5.0 were used to do the test builds for this 
 distribution.  The default ICU and GPG packages were taken from the OS
 vendors' repositories.
 
@@ -18,8 +18,8 @@ To build a production version GT.M for linux do the following steps:
    Unpack the tar file and run the configure script as root. Note: the tar
    file unpacks everything into your current working directory, not a new
    subdirectory. The Linux Standard Base (LSB) install path for GT.M 
-   V53004 is /opt/lsb-gtm/V5.3-004_i686 or /opt/lsb-gtm/V5.3-004_x8664.
-   $ tar xfz gtm_V53004_linux_i686_src.tar.gz
+   V54002 is /opt/lsb-gtm/V5.4-002_i686 or /opt/lsb-gtm/V5.4-002_x8664.
+   $ tar xfz gtm_V54002_linux_i686_src.tar.gz
    $ sudo sh ./configure
 
 2. Unpack the GT.M sources
@@ -27,7 +27,7 @@ To build a production version GT.M for linux do the following steps:
    here after referred to as <gtm-directory>.
    $ mkdir <gtm-directory>
    $ cd <gtm-directory>
-   $ tar xfz gtm_V53004_linux_i686_src.tar.gz
+   $ tar xfz gtm_V54002_linux_i686_src.tar.gz
 
    You should find this README, COPYING file and sr_* source directroies.
 
@@ -44,8 +44,8 @@ To build a production version GT.M for linux do the following steps:
    $ setenv HOSTOS `uname -s`
 
    - Define 'gtm_tools' and 'gtm_inc'
-   $ setenv gtm_tools `pwd`/sr_linux
-   $ setenv gtm_inc `pwd`/sr_linux
+   $ setenv gtm_tools $PWD/sr_linux
+   $ setenv gtm_inc $PWD/sr_linux
 
    - [OPTIONAL] Ubuntu users must define 'distro'
    $ setenv distro ubuntu
@@ -76,24 +76,24 @@ bta (beta), and pro (production).  Passing a subset of dbg, bta, or pro in
 "buildtypes" from the environment or the command line will build that subset.
 For example:
 
-	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=<gtm-directory>
+	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=$PWD
 
 will build just a debuggable GT.M release.
 
 You can clean your builds by appending 'clean' to the make line.
 For example:
-	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=<gtm-directory> clean
+	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=$PWD clean
 
 5. Packaging GT.M -
 
 Once the required builds have been done the object distribution can be
 tar'ed by doing:
 
-	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux gtm_ver=<gtm-directory> package
+	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux gtm_ver=$PWD package
 
 Again, buildtypes can be used to package just a subset. For example:
 
-	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=<gtm-directory> package
+	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=$PWD package
 
 Appendix: Known warnings and errors
   - "cc1: note: obsolete option -I- used, please use -iquote instead"

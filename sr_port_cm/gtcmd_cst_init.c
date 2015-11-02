@@ -20,6 +20,7 @@
 #include "filestruct.h"
 #include "cmidef.h"
 #include "hashtab_mname.h"
+#include "hashtab.h"
 #include "cmmdef.h"
 #include "gtcmd.h"
 #include "targ_alloc.h"
@@ -51,6 +52,6 @@ void gtcmd_cst_init(cm_region_head *ptr)
 	csa = &FILE_INFO(reg)->s_addrs;
 	assert(NULL == csa->dir_tree);
 	SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
-	init_hashtab_mname(ptr->reg_hash, 0);
+	init_hashtab_mname(ptr->reg_hash, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 	cm_add_gdr_ptr(reg);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,31 +13,29 @@
 #include "compiler.h"
 #include "opcode.h"
 
-GBLREF unsigned short int expr_depth;
-GBLREF triple *expr_start, *expr_start_orig;
-GBLREF bool shift_gvrefs;
-
 int intexpr(oprtype *a)
 {
 
 	triple *triptr;
 	int4 rval;
+	DCL_THREADGBL_ACCESS;
 
-	if (!expr_depth++)
-		expr_start = expr_start_orig = 0;
+	SETUP_THREADGBL_ACCESS;
+	if (!(TREF(expr_depth))++)
+		TREF(expr_start) = TREF(expr_start_orig) = NULL;
 	if (!(rval = eval_expr(a)))
 	{
-		expr_depth = 0;
+		TREF(expr_depth) = 0;
 		return FALSE;
 	}
 	coerce(a,OCT_MINT);
 	ex_tail(a);
-	if (!--expr_depth)
-		shift_gvrefs = FALSE;
-	if (expr_start != expr_start_orig)
+	if (!(--(TREF(expr_depth))))
+		TREF(shift_side_effects) = FALSE;
+	if (TREF(expr_start) != TREF(expr_start_orig))
 	{
 		triptr = newtriple(OC_GVRECTARG);
-		triptr->operand[0] = put_tref(expr_start);
+		triptr->operand[0] = put_tref(TREF(expr_start));
 	}
 	return rval;
 

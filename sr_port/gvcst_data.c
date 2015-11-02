@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF unsigned int	t_tries;
 
 mint	gvcst_data(void)
@@ -51,7 +51,7 @@ mint	gvcst_data(void)
 	srch_hist	*rt_history;
 	sm_uc_ptr_t	b_top;
 
-	assert((gv_target->root < cs_addrs->ti->total_blks) || (0 < dollar_tlevel));
+	assert((gv_target->root < cs_addrs->ti->total_blks) || dollar_tlevel);
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVDATAFAIL);
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
@@ -104,9 +104,10 @@ mint	gvcst_data(void)
 				val += 10;
 			}
 		}
-		if (0 == dollar_tlevel)
+		if (!dollar_tlevel)
 		{
-			if ((trans_num)0 == t_end(&gv_target->hist, 0 == rt_history->h[0].blk_num ? NULL : rt_history))
+			if ((trans_num)0 == t_end(&gv_target->hist, 0 == rt_history->h[0].blk_num ? NULL : rt_history,
+				TN_NOT_SPECIFIED))
 				continue;
 		} else
 		{

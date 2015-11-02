@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,8 +25,9 @@
 ##################################################################
 #
 
+#	Get rid of debug options producing huge amounts of output if set
+unsetenv gtmdbglvl
 #	Get the version number/designation:
-
 echo " "
 echo -n "Enter Version		"
 echo -n "[$gtm_verno]:	"

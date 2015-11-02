@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,6 @@
 #include "mdq.h"
 #include "hashtab_str.h"
 
-GBLREF bool			shift_gvrefs;
 GBLREF mcalloc_hdr		*mcavailptr, *mcavailbase;
 GBLREF int			mcavail;
 GBLREF int			mvmax, mlmax, mlitmax;
@@ -29,12 +28,13 @@ GBLREF mliteral			literal_chain;
 GBLREF mvar			*mvartab;
 GBLREF mvax			*mvaxtab,*mvaxtab_end;
 GBLREF short int		block_level;
-GBLREF triple			*expr_start, *expr_start_orig;
 GBLREF triple			t_orig;
-GBLREF unsigned short int	expr_depth;
 
 void tripinit(void)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	COMPILE_HASHTAB_CLEANUP;
 	if (!mcavailbase)
 	{
@@ -45,13 +45,13 @@ void tripinit(void)
 	mcavailptr = mcavailbase;
 	mcavail = mcavailptr->size;
 	memset(&mcavailptr->data[0], 0, mcavail);
-	expr_depth = 0;
-	expr_start = expr_start_orig = 0;
-	shift_gvrefs = FALSE;
+	TREF(expr_depth) = 0;
+	TREF(expr_start) = TREF(expr_start_orig) = NULL;
+	TREF(shift_side_effects) = FALSE;
 	mlitmax = mlmax = mvmax = 0;
-	mlabtab = 0;
-	mvartab = 0;
-	mvaxtab = mvaxtab_end = 0;
+	mlabtab = NULL;
+	mvartab = NULL;
+	mvaxtab = mvaxtab_end = NULL;
 	dqinit(&t_orig,exorder);
 	dqinit(&(t_orig.backptr), que);
 	dqinit(&literal_chain, que);

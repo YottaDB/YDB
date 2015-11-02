@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,10 +37,11 @@ GBLREF gv_namehead 	*gv_target;
 GBLREF sgmnt_data	*cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLDEF rc_oflow		*rc_overflow;
-GBLREF bool		gv_curr_subsc_null;
 GBLREF gd_region	*gv_cur_region;
 GBLREF trans_num	rc_read_stamp;
 GBLREF int		gv_keysize;
+
+error_def(ERR_GVGETFAIL);
 
 int rc_prc_getr(rc_q_hdr *qhdr)
 {
@@ -56,8 +57,9 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	rc_req_getr	*req;
 	rc_rsp_page	*rsp;
 	srch_blk_status	*bh;
-	error_def(ERR_GVGETFAIL);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(rc_dbms_ch,0);
 	req = (rc_req_getr *)qhdr;
 	rsp = (rc_rsp_page *)qhdr;
@@ -67,9 +69,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	if ((qhdr->a.erc.value = rc_fnd_file(&qhdr->r.xdsid)) != RC_SUCCESS)
 	{
 		REVERT;
-#ifdef DEBUG
-	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"rc_fnd_file failed.");
-#endif
+		DEBUG_ONLY(gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"rc_fnd_file failed.");)
 		return -1;
 	}
 	if (req->key.len.value > cs_data->max_key_size)
@@ -96,9 +96,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		    rsp->size_remain.value = 0;
 		    rsp->rstatus.value = 0;
 		    REVERT;
-#ifdef DEBUG
-	gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");
-#endif
+		    DEBUG_ONLY(gtcm_cpktdmp((char *)qhdr,qhdr->a.len.value,"RC_KEYTOOLONG.");)
 		    return -1;
 		}
 	}
@@ -107,11 +105,11 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	gv_currkey->end = req->key.len.value;
 	dollar_order = FALSE;
 	if (gv_currkey->base[gv_currkey->end - 1] == 0xFF)
-	{	gv_curr_subsc_null = TRUE;			/* Trailing null subscript has NO trailing zero */
+	{	TREF(gv_last_subsc_null) = TRUE;			/* Trailing null subscript has NO trailing zero */
 		gv_currkey->base[gv_currkey->end] = 0;
 		gv_currkey->end += 1;
 	}else
-	{	gv_curr_subsc_null = FALSE;
+	{	TREF(gv_last_subsc_null) = FALSE;
 		if (gv_currkey->base[gv_currkey->end - 1] == 0x01)
 		{	dollar_order = TRUE;
 			gv_currkey->base[gv_currkey->end] = 0;
@@ -135,7 +133,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 
 	if (fmode & RC_MODE_NEXT)
 	{
-		if (gv_curr_subsc_null)
+		if (TREF(gv_last_subsc_null))
 			gv_currkey->base[gv_currkey->prev] = 01;
 		else {
 			if (dollar_order)
@@ -152,7 +150,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	}
 	else if (fmode & RC_MODE_PREV)
 	{
-		if (gv_curr_subsc_null)
+		if (TREF(gv_last_subsc_null))
 		{
 			*(&gv_currkey->base[0] + gv_currkey->prev + 1) = 0xFF;
 			*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
@@ -247,7 +245,8 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 				rsp->size_remain.value = rc_overflow->size;
 			}
 
-			if ((rc_read_stamp = t_end(&gv_target->hist, two_histories ? &second_history : NULL)) == 0)
+			if (0 == (rc_read_stamp = t_end(&gv_target->hist, two_histories ? &second_history : NULL,
+				TN_NOT_SPECIFIED)))
 				continue;
 			if (bsiz == SIZEOF(blk_hdr) + RC_BLKHD_PAD)	/* Empty block, global does not exist */
 			{

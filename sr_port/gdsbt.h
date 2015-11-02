@@ -31,7 +31,9 @@
 
 #define CR_NOTVALID (-1L)
 
+#define GTM64_WC_MAX_BUFFS (2*1024*1024)-1 /* to fit in an int4 */
 #define WC_MAX_BUFFS 64*1024
+
 #define WC_DEF_BUFFS 128
 #define WC_MIN_BUFFS 64
 
@@ -64,7 +66,8 @@ typedef struct
 	trans_num	curr_tn;
 	trans_num	early_tn;
 	trans_num	last_mm_sync;		/* Last tn where a full mm sync was done */
-	trans_num	header_open_tn;		/* Tn to be compared against jnl tn on open */
+	char		filler_8byte[8];	/* previously header_open_tn but no longer used.
+						 * cannot remove as this is part of database file header */
 	trans_num	mm_tn;			/* Used to see if CCP must update master map */
 	uint4		lock_sequence;		/* Used to see if CCP must update lock section */
 	uint4		ccp_jnl_filesize;	/* Passes size of journal file if extended */
@@ -76,8 +79,8 @@ typedef struct
 {
 	struct
 	{
-		int4 		fl;
-		int4		bl;	/* self-relative queue entry */
+		sm_off_t 		fl;
+		sm_off_t		bl;	/* self-relative queue entry */
 	} blkque, tnque;		/* for block number hash, lru queue */
 	trans_num	tn;		/* transaction # #*/
 	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
@@ -96,8 +99,8 @@ typedef struct
 {
 	struct
 	{
-		int4 		fl;
-		int4		bl;
+		sm_off_t 		fl;
+		sm_off_t		bl;
 	} tnque;
 	trans_num	tn;
 	trans_num	killtn;		/* last transaction when this block was updated as part of an M-kill */
@@ -122,7 +125,7 @@ typedef struct
 {
 	struct
 	{
-		int4	fl,
+		sm_off_t	fl,
 			bl;
 	}		que;
 	int4		pid;
@@ -151,7 +154,7 @@ typedef struct
 {
 	struct
 	{
-		int4	fl,
+		sm_off_t	fl,
 			bl;
 	}		que;
 	global_latch_t	latch;
@@ -212,6 +215,15 @@ typedef struct
 	int4		epid;
 } crit_trace;
 
+typedef struct
+{
+	sm_off_t	cr_off;
+	trans_num	cr_tn;
+	uint4		process_id;
+	block_id	blk;
+	uint4		cycle;
+} dskread_trace;
+
 #define OP_LOCK_SIZE	4
 
 /* Structure to hold lock history */
@@ -224,9 +236,24 @@ typedef struct
 	char		lock_op[OP_LOCK_SIZE];	/* Operation performed (either OBTN or RLSE) */
 } lockhist;
 
-#define	CRIT_OPS_ARRAY_SIZE	512
-#define	LOCKHIST_ARRAY_SIZE	512
-#define	SECSHR_OPS_ARRAY_SIZE	1023		/* 1 less than 1K to accommodate the variable secshr_ops_index */
+enum ftok_ops
+{
+	ftok_ops_lock = 1,
+	ftok_ops_release
+};
+
+typedef struct
+{
+	uint4           process_id;
+	trans_num       cr_tn;
+	enum ftok_ops	ftok_oper;
+} ftokhist;
+
+#define	DSKREAD_OPS_ARRAY_SIZE	 512
+#define	CRIT_OPS_ARRAY_SIZE		 512
+#define	LOCKHIST_ARRAY_SIZE		 512
+#define	SECSHR_OPS_ARRAY_SIZE		1023		/* 1 less than 1K to accommodate the variable secshr_ops_index */
+#define FTOK_OPS_ARRAY_SIZE		 512
 
 /* SECSHR_ACCOUNTING macro assumes csa->nl is dereferencible and does accounting if variable "do_accounting" is set to TRUE */
 #define		SECSHR_ACCOUNTING(value)								\
@@ -234,7 +261,7 @@ typedef struct
 	if (do_accounting)										\
 	{												\
 		if (csa->nl->secshr_ops_index < SECSHR_OPS_ARRAY_SIZE)					\
-			csa->nl->secshr_ops_array[csa->nl->secshr_ops_index] = (INTPTR_T)(value);	\
+			csa->nl->secshr_ops_array[csa->nl->secshr_ops_index] = (gtm_uint64_t)(value);	\
 		csa->nl->secshr_ops_index++;								\
 	}												\
 }
@@ -297,8 +324,11 @@ typedef struct node_local_struct
 	int4		nbb;                                    /* Next backup block -- for online backup */
 	int4		lockhist_idx;				/* (DW alignment) "circular" index into lockhists array */
 	int4		crit_ops_index;				/* "circular" index into crit_ops_array */
+	int4		dskread_ops_index;			/* "circular" index into dskread_ops_array */
+	int4		ftok_ops_index;				/* "circular" index into ftok_ops_array */
 	lockhist	lockhists[LOCKHIST_ARRAY_SIZE];		/* Keep lock histories here */
 	crit_trace	crit_ops_array[CRIT_OPS_ARRAY_SIZE];	/* space for CRIT_TRACE macro to record info */
+	dskread_trace	dskread_ops_array[DSKREAD_OPS_ARRAY_SIZE];	/* space for DSKREAD_TRACE macro to record info */
 	unique_file_id	unique_id;
 	uint4		owner_node;
 	volatile int4   wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
@@ -321,7 +351,7 @@ typedef struct node_local_struct
 							  *       In VMS, this is the name of the corresponding global directory.
 							  */
    	int4		secshr_ops_index;
-   	INTPTR_T	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 4K(on 32-bit platform) and 8K(on 64-bit platforms) */
+   	gtm_uint64_t	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 8K */
 	gvstats_rec_t	gvstats_rec;
 	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
 	sm_off_t	encrypt_glo_buff_off;	/* offset from unencrypted global buffer to its encrypted counterpart */
@@ -336,7 +366,31 @@ typedef struct node_local_struct
 	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
 	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
 	uint4		kip_pid_array[MAX_KIP_PID_SLOTS]; /* Processes actively doing kill (0 denotes empty slots) */
+
+	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
+					/* need	to be in the file header but the node local since it can be calculated	*/
+					/* from info in the file header.						*/
+	uint4		filler_8byte_align;
+#	if defined(UNIX)
+	ftokhist	ftok_ops_array[FTOK_OPS_ARRAY_SIZE];
+#	endif
 } node_local;
+
+#define DSKREAD_TRACE(CSA, CR_OFF, CR_TN, PID, BLK, CYCLE)		\
+{									\
+	int4			doidx;					\
+	node_local_ptr_t	cnl;					\
+	assert((NULL != CSA)&& (NULL != (CSA->nl)));			\
+	cnl = CSA->nl;							\
+	doidx = ++cnl->dskread_ops_index;				\
+	if (DSKREAD_OPS_ARRAY_SIZE <= doidx)				\
+		doidx = cnl->dskread_ops_index = 0;			\
+	cnl->dskread_ops_array[doidx].cr_off = CR_OFF;			\
+	cnl->dskread_ops_array[doidx].cr_tn = CR_TN;			\
+	cnl->dskread_ops_array[doidx].process_id = PID;			\
+	cnl->dskread_ops_array[doidx].blk = BLK;			\
+	cnl->dskread_ops_array[doidx].cycle = CYCLE;			\
+}
 
 #ifdef DEBUG
 /* The following macro does not use a separate semaphore to protect its maintenance of the shared memory
@@ -344,33 +398,29 @@ typedef struct node_local_struct
  * in order to to maximize the chances of gathering meaningful data, it seems better placed after grab_crit
  * and before rel_crit. Also we will increment the index first and cache it so we can shorten our exposure window.
  */
-#define CRIT_TRACE(X)								\
-{										\
-	int4			coidx;						\
-	node_local_ptr_t	cnl;						\
-	boolean_t		in_ast;						\
-	unsigned int		ast_status;					\
-										\
-	if (csa && csa->nl)							\
-	{									\
-		cnl = csa->nl;							\
-		assert(NULL != (node_local_ptr_t)cnl);				\
-		coidx = ++cnl->crit_ops_index;					\
-		if (CRIT_OPS_ARRAY_SIZE <= coidx)				\
-			coidx = cnl->crit_ops_index = 0;			\
-		VMS_ONLY(							\
-			in_ast = lib$ast_in_prog();				\
-			if (!in_ast)						\
-				ast_status = sys$setast(DISABLE);		\
-		)								\
-		cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id();	\
-		VMS_ONLY(							\
-			if ((!in_ast) && (SS$_WASSET == ast_status))		\
-				sys$setast(ENABLE);				\
-		)								\
-		cnl->crit_ops_array[coidx].epid = process_id;			\
-		cnl->crit_ops_array[coidx].crit_act = (X);			\
-	}									\
+#define CRIT_TRACE(X)							\
+{									\
+	int4			coidx;					\
+	node_local_ptr_t	cnl;					\
+	boolean_t		in_ast;					\
+	unsigned int		ast_status;				\
+	assert((NULL != csa) && (NULL !=(csa->nl)));			\
+	cnl = csa->nl;							\
+	coidx = ++cnl->crit_ops_index;					\
+	if (CRIT_OPS_ARRAY_SIZE <= coidx)				\
+		coidx = cnl->crit_ops_index = 0;			\
+	VMS_ONLY(							\
+		in_ast = lib$ast_in_prog();				\
+		if (!in_ast)						\
+			ast_status = sys$setast(DISABLE);		\
+		)							\
+	cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id();	\
+	VMS_ONLY(							\
+		if ((!in_ast) && (SS$_WASSET == ast_status))		\
+			sys$setast(ENABLE);				\
+		)							\
+	cnl->crit_ops_array[coidx].epid = process_id;			\
+	cnl->crit_ops_array[coidx].crit_act = (X);			\
 }
 
 /* The following macro checks that curr_tn and early_tn are equal right before beginning a transaction commit.
@@ -459,6 +509,7 @@ typedef struct node_local_struct
 	lcknl->lockhists[lockidx].loop_cnt = (int4)(CNT);		\
 }
 
+
 #define DUMP_LOCKHIST() dump_lockhist()
 #else
 #define CRIT_TRACE(X)
@@ -466,6 +517,22 @@ typedef struct node_local_struct
 #define LOCK_HIST(OP, LOC, ID, CNT)
 #define DUMP_LOCKHIST()
 #endif
+
+#define FTOK_TRACE(CSA, CR_TN, FTOK_OPER, PID)				\
+{									\
+	node_local_ptr_t        cnl;                                    \
+	int4 			foindx;					\
+	assert(NULL != CSA);						\
+	if (cnl = (CSA->nl))						\
+	{								\
+		foindx = ++cnl->ftok_ops_index;				\
+		if (FTOK_OPS_ARRAY_SIZE <= cnl->ftok_ops_index)		\
+			foindx = cnl->ftok_ops_index = 0;		\
+		cnl->ftok_ops_array[foindx].process_id = PID;		\
+		cnl->ftok_ops_array[foindx].cr_tn = CR_TN;		\
+		cnl->ftok_ops_array[foindx].ftok_oper = FTOK_OPER;	\
+	}								\
+}
 
 #define BT_NOT_ALIGNED(bt, bt_base)		(!IS_PTR_ALIGNED((bt), (bt_base), SIZEOF(bt_rec)))
 #define BT_NOT_IN_RANGE(bt, bt_lo, bt_hi)	(!IS_PTR_IN_RANGE((bt), (bt_lo), (bt_hi)))

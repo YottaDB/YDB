@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,7 @@ typedef struct backup_reg_list_struct
 #else
 #define BACKUP_READ_SIZE	(32 * 1024 - DISK_BLOCK_SIZE)
 #endif
-#define BACKUP_TEMPFILE_BUFF_SIZE (BACKUP_READ_SIZE + SIZEOF(shmpool_blk_hdr))
+#define BACKUP_TEMPFILE_BUFF_SIZE (BACKUP_READ_SIZE + SIZEOF(muinc_blk_hdr))
 #define BLOCKING_FACTOR         32
 #define STARTING_BLOCKS         16
 #define EXTEND_SIZE             256

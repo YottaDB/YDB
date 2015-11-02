@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,13 +16,13 @@
 #include "gtm_limits.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
+
 #include <errno.h>
 
 #include "compiler.h"
 #include "error.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
-#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "mv_stent.h"
 #include "gdsroot.h"
@@ -37,6 +37,7 @@
 #include "jnl.h"
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
+#include "trigger.h"
 #include "op.h"
 #include "gtmio.h"
 #include "stringpool.h"
@@ -48,15 +49,20 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
+#include "gvname_info.h"
+#include "op_merge.h"
 #include "auto_zlink.h"
 #include "golevel.h"
 #include "flush_jmp.h"
 #include "dollar_zlevel.h"
 #include "gtmimagename.h"
 #include "wbox_test_init.h"
+#include "have_crit.h"
+#include "srcline.h"
+#include "zshow.h"
+#include "zwrite.h"
 
 #ifdef GTM_TRIGGER
-
 #define PREFIX_SPACE		" "
 #define ERROR_CAUSING_JUNK	"XX XX XX XX"
 #define NEWLINE			"\n"
@@ -81,22 +87,28 @@ GBLREF	int4			tstart_trigger_depth;
 GBLREF	mval			dollar_etrap;
 GBLREF	mval			dollar_ztrap;
 GBLREF	mval			gtm_trigger_etrap;
-GBLREF	mval			*dollar_ztcode;
+GBLREF	mstr			*dollar_ztname;
 GBLREF	mval			*dollar_ztdata;
 GBLREF	mval			*dollar_ztoldval;
 GBLREF	mval			*dollar_ztriggerop;
 GBLREF	mval			*dollar_ztupdate;
 GBLREF	mval			*dollar_ztvalue;
 GBLREF	boolean_t		*ztvalue_changed_ptr;
-GBLREF	int4			dollar_zcstatus;
 GBLREF	rtn_tabent		*rtn_names, *rtn_names_end;
 GBLREF	boolean_t		ztrap_explicit_null;
 GBLREF	int			mumps_status;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	boolean_t		skip_dbtriggers;		/* see gbldefs.c for description of this global */
-GBLREF	boolean_t		trigger_compile;		/* A trigger compilation is active */
-GBLREF  short   		dollar_tlevel;
+GBLREF  uint4			dollar_tlevel;
 GBLREF	symval			*trigr_symval_list;
+GBLREF	trans_num		local_tn;
+GBLREF	int			merge_args;
+GBLREF	uint4			zwrtacindx;
+GBLREF	merge_glvn_ptr		mglvnp;
+GBLREF	gvzwrite_datablk	*gvzwrite_block;
+GBLREF	lvzwrite_datablk	*lvzwrite_block;
+GBLREF	zshow_out		*zwr_output;
+GBLREF	zwr_hash_table		*zwrhtab;
 #ifdef DEBUG
 GBLREF	ch_ret_type		(*ch_at_trigger_init)();
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
@@ -106,6 +118,7 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
  */
 GBLREF	gv_trigger_t		*gtm_trigdsc_last;
 GBLREF	gtm_trigger_parms	*gtm_trigprm_last;
+GBLREF	mval			dollar_ztwormhole;
 #endif
 
 LITREF	mval			literal_null;
@@ -133,6 +146,9 @@ error_def(ERR_TRIGTLVLCHNG);
 #define REINIT_SYMVAL_BLK(svb, prev)									\
 {													\
 	symval	*ptr;											\
+	lv_blk	*lvbp;											\
+	lv_val	*lv_base, *lv_free;									\
+													\
 	ptr = svb;											\
 	assert(NULL == ptr->xnew_var_list);								\
 	assert(NULL == ptr->xnew_ref_list);								\
@@ -142,17 +158,16 @@ error_def(ERR_TRIGTLVLCHNG);
 	ptr->alias_activity = FALSE;									\
 	ptr->last_tab = (prev);										\
 	ptr->symvlvl = prev->symvlvl + 1;								\
-	/* Equivalent of dqinit(ptr, sbs_que) except need coercion here */				\
-	ptr->sbs_que.bl = (struct sbs_blk_struct *)ptr;							\
-	ptr->sbs_que.fl = ptr->sbs_que.bl;								\
 	/* The lv_blk chain can remain as is but need to reinit each block so no elements are "used" */	\
-	for (lvbp = &ptr->first_block; lvbp; lvbp = lvbp->next)						\
+	for (lvbp = ptr->lv_first_block; lvbp; lvbp = lvbp->next)					\
 	{	/* Likely only one of these blocks (some few lvvals) but loop in case.. */		\
-		clrlen = INTCAST(lvbp->lv_free - lvbp->lv_base);					\
+		lv_base = (lv_val *)LV_BLK_GET_BASE(lvbp);						\
+		lv_free = LV_BLK_GET_FREE(lvbp, lv_base);						\
+		clrlen = INTCAST((char *)lv_free - (char *)lv_base);					\
 		if (0 != clrlen)									\
 		{											\
-			memset(lvbp->lv_base, '\0', clrlen);						\
-			lvbp->lv_free = lvbp->lv_base;							\
+			memset(lv_base, '\0', clrlen);							\
+			lvbp->numUsed = 0;								\
 		}											\
 	}												\
 }
@@ -214,8 +229,11 @@ CONDITION_HANDLER(gtm_trigger_complink_ch)
 	 * have their own handler but other errors are still possible. The primary use of this handler is (1) to remove
 	 * the mv_stent we created and (2) most importantly to turn off the trigger_compile flag.
 	 */
+	DCL_THREADGBL_ACCESS;
+
 	START_CH;
-	trigger_compile = FALSE;
+	SETUP_THREADGBL_ACCESS;
+	TREF(trigger_compile) = FALSE;
 	run_time = gtm_trigger_comp_prev_run_time;
 	if (((unsigned char *)mv_chain == msp) && (MVST_MSAV == mv_chain->mv_st_type)
 	    && (&dollar_zsource == mv_chain->mv_st_cont.mvs_msav.addr))
@@ -254,6 +272,8 @@ CONDITION_HANDLER(gtm_trigger_ch)
 		CONTINUE;
 	}
 	mumps_status = SIGNAL;
+	/* We are about to no longer have a trigger stack frame and thus re-enter trigger no-mans-land */
+	DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
 	gtm_trigger_depth--;	/* Bypassing gtm_trigger_invoke() so do maint on depth indicator */
 	assert(0 <= gtm_trigger_depth);
 	/* Return back to gtm_trigger with error code */
@@ -262,14 +282,18 @@ CONDITION_HANDLER(gtm_trigger_ch)
 
 STATICFNDEF int gtm_trigger_invoke(void)
 {	/* Invoke trigger M routine. Separate so error returns to gtm_trigger with proper retcode */
-	int	rc;
+	int		rc;
 
 	ESTABLISH_RET(gtm_trigger_ch, mumps_status);
 	gtm_trigger_depth++;
 	DBGTRIGR((stderr, "gtm_trigger: Dispatching trigger at depth %d\n", gtm_trigger_depth));
 	assert(0 < gtm_trigger_depth);
 	assert(GTM_TRIGGER_DEPTH_MAX >= gtm_trigger_depth);
+	/* Allow interrupts to occur while the trigger is running */
+	ENABLE_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
 	rc = dm_start();
+	/* Now that we no longer have a trigger stack frame, we are back in trigger no-mans-land */
+	DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
 	gtm_trigger_depth--;
 	DBGTRIGR((stderr, "gtm_trigger: Trigger returns with rc %d\n", rc));
 	REVERT;
@@ -287,8 +311,13 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	int		rtnfd, rc, lenrtnname, lenobjname, len, alphnum_len, retry, save_errno;
 	char		*mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2, *zcomp_parms_ptr;
 	mval		zlfile, zcompprm;
+	DCL_THREADGBL_ACCESS;
 
-	ESTABLISH_RET(gtm_trigger_complink_ch, ((0 == error_condition) ? dollar_zcstatus : error_condition ));
+	SETUP_THREADGBL_ACCESS;
+	DBGTRIGR_ONLY(memcpy(rtnname, trigdsc->rtn_desc.rt_name.addr, trigdsc->rtn_desc.rt_name.len));
+	DBGTRIGR_ONLY(rtnname[trigdsc->rtn_desc.rt_name.len] = 0);
+	DBGTRIGR((stderr, "gtm_trigger_complink: (Re)compiling trigger %s\n", rtnname));
+	ESTABLISH_RET(gtm_trigger_complink_ch, ((0 == error_condition) ? TREF(dollar_zcstatus) : error_condition ));
 	 /* Verify there are 2 available chars for uniqueness */
 	assert((MAX_MIDENT_LEN - TRIGGER_NAME_RESERVED_SPACE) >= (trigdsc->rtn_desc.rt_name.len));
 	assert(NULL == trigdsc->rtn_desc.rt_adr);
@@ -349,7 +378,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		}
 	}
 	/* Write trigger execute string out to temporary file and compile it */
-	assert(MAX_SRCLINE > (trigdsc->xecute_str.str.len + 1));
+	assert(MAX_XECUTE_LEN >= trigdsc->xecute_str.str.len);
 	rc = SNPRINTF(rtnname_template, GTM_PATH_MAX, "%s/trgtmpXXXXXX", DEFAULT_GTM_TMP);
 	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
 	assert(GTM_PATH_MAX >= rc);
@@ -381,23 +410,20 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		}
 	}
 #	endif
-	DOWRITERC(rtnfd, PREFIX_SPACE, strlen(PREFIX_SPACE), rc);	/* BYPASSOK */
-	if (0 != rc)
-	{
-		UNLINK(rtnname);
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
-	}
 	DOWRITERC(rtnfd, trigdsc->xecute_str.str.addr, trigdsc->xecute_str.str.len, rc);
 	if (0 != rc)
 	{
 		UNLINK(rtnname);
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
 	}
-	DOWRITERC(rtnfd, NEWLINE, strlen(NEWLINE), rc);			/* BYPASSOK */
-	if (0 != rc)
+	if (NULL == memchr(trigdsc->xecute_str.str.addr, '\n', trigdsc->xecute_str.str.len))
 	{
-		UNLINK(rtnname);
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+		DOWRITERC(rtnfd, NEWLINE, strlen(NEWLINE), rc);			/* BYPASSOK */
+		if (0 != rc)
+		{
+			UNLINK(rtnname);
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+		}
 	}
 	CLOSEFILE(rtnfd, rc);
 	if (0 != rc)
@@ -432,10 +458,10 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	PUSH_MV_STENT(MVST_MSAV);
 	mv_chain->mv_st_cont.mvs_msav.v = dollar_zsource;
 	mv_chain->mv_st_cont.mvs_msav.addr = &dollar_zsource;
-	trigger_compile = TRUE;		/* Set flag so generates OC_FETCH instead of OC_LINEFETCH */
+	TREF(trigger_compile) = TRUE;		/* Set flag so compiler knows this is a special trigger compile */
 	op_zcompile(&zcompprm, FALSE);	/* Compile but don't require a .m file extension */
-	trigger_compile = FALSE;	/* compile_source_file() establishes handler so always returns */
-	if (0 != dollar_zcstatus)
+	TREF(trigger_compile) = FALSE;	/* compile_source_file() establishes handler so always returns */
+	if (0 != TREF(dollar_zcstatus))
 	{	/* Someone err'd.. */
 		run_time = gtm_trigger_comp_prev_run_time;
 		REVERT;
@@ -463,6 +489,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 		/* Replace the randomly generated source name with the constant "GTM Trigger" */
 		trigdsc->rtn_desc.rt_adr->src_full_name.addr = GTM_TRIGGER_SOURCE_NAME;
 		trigdsc->rtn_desc.rt_adr->src_full_name.len = STRLEN(GTM_TRIGGER_SOURCE_NAME);
+		trigdsc->rtn_desc.rt_adr->trigr_handle = trigdsc;       /* Back pointer to trig def */
 	}
 	if (MVST_MSAV == mv_chain->mv_st_type && &dollar_zsource == mv_chain->mv_st_cont.mvs_msav.addr)
 	{       /* Top mv_stent is one we pushed on there - restore dollar_zsource and get rid of it */
@@ -483,7 +510,6 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	mval		*lvvalue;
 	lnr_tabent	*lbl_offset_p;
 	uchar_ptr_t	transfer_addr;
-	lv_blk		*lvbp;
 	lv_val		*lvval;
 	mname_entry	*mne_p;
 	uint4		*indx_p;
@@ -493,17 +519,18 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	mval		**lvvalarray;
 	mv_stent	*mv_st_ent;
 	symval		*new_symval;
-	short		dollar_tlevel_start;
+	uint4		dollar_tlevel_start;
 	stack_frame	*fp, *fpprev;
-	DEBUG_ONLY(int4	dlevel;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
 	assert(trigdsc);
 	assert(trigprm);
-	assert((MV_STR & trigdsc->xecute_str.mvtype) && (NULL != trigdsc->xecute_str.str.addr)
-	       && (0 != trigdsc->xecute_str.str.len));
-	assert(0 < dollar_tlevel);
-
+	assert((NULL != trigdsc->rtn_desc.rt_adr) || ((MV_STR & trigdsc->xecute_str.mvtype)
+						      && (0 != trigdsc->xecute_str.str.len)
+						      && (NULL != trigdsc->xecute_str.str.addr)));
+	assert(dollar_tlevel);
 	/* Determine if trigger needs to be compiled */
 	if (NULL == trigdsc->rtn_desc.rt_adr)
 	{	/* No routine hdr addr exists. Need to do compile */
@@ -515,14 +542,22 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	}
 	assert(trigdsc->rtn_desc.rt_adr);
 	assert(trigdsc->rtn_desc.rt_adr == CURRENT_RHEAD_ADR(trigdsc->rtn_desc.rt_adr));
-
 	/* Setup trigger environment stack frame(s) for execution */
 	if (!(frame_pointer->type & SFT_TRIGR))
 	{	/* Create new trigger base frame first that back-stops stack unrolling and return to us */
 		if (GTM_TRIGGER_DEPTH_MAX < (gtm_trigger_depth + 1))	/* Verify we won't nest too deep */
 			rts_error(VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
 		DBGTRIGR((stderr, "gtm_trigger: PUSH: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n", frame_pointer, ctxt));
+		/* Protect against interrupts while we have only a trigger base frame on the stack */
+		DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
+		/* The current frame invoked a trigger. We cannot return to it for a TP restart or other reason unless
+		 * either the total operation (including trigger) succeeds and we unwind normally or unless the mpc is reset
+		 * (like what happens in various error or restart conditions) because right now it returns to where a database
+		 * command (KILL, SET or ZTRIGGER) was entered. Set flag in the frame to prevent MUM_TSTART unless the frame gets
+		 * reset.
+		 */
 		frame_pointer->flags |= SFF_TRIGR_CALLD;	/* Do not return to this frame via MUM_TSTART */
+		DBGTRIGR((stderr, "gtm_trigger: Setting SFF_TRIGR_CALLD in frame 0x"lvaddr"\n", frame_pointer));
 		base_frame(trigdsc->rtn_desc.rt_adr);
 		/* Finish base frame initialization - reset mpc/context to return to us without unwinding base frame */
 		frame_pointer->type |= SFT_TRIGR;
@@ -537,7 +572,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 #		else
 		frame_pointer->mpc = CODE_ADDRESS(gtm_levl_ret_code);
 		frame_pointer->ctxt = GTM_CONTEXT(gtm_levl_ret_code);
-#endif
+#		endif
 		/* This base stack frame is also where we save environmental info for all triggers invoked at this stack level.
 		 * Subsequent triggers fired at this level in this trigger invocation need only reinitialize a few things but
 		 * can avoid "the big save".
@@ -551,7 +586,6 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			new_symval = trigr_symval_list;
 			assert(new_symval->trigr_symval);
 			trigr_symval_list = new_symval->last_tab;		/* dequeue new curr_symval from list */
-			new_symval->last_tab = curr_symval;
 			REINIT_SYMVAL_BLK(new_symval, curr_symval);
 			curr_symval = new_symval;
 			PUSH_MV_STENT(MVST_STAB);
@@ -560,8 +594,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		/* Push our trigger environment save mv_stent onto the chain */
 		PUSH_MV_STENT(MVST_TRIGR);
 		mv_st_ent = mv_chain;
-		/* Initialize the mv_stent elements processed by stp_gcol() which can be called by either op_gvsavtarg() or
-		 * by the extnam saving code below. This initialization keeps stp_gcol() (should it be called) from attempting
+		/* Initialize the mv_stent elements processed by stp_gcol which can be called by either op_gvsavtarg() or
+		 * by the extnam saving code below. This initialization keeps stp_gcol - should it be called - from attempting
 		 * to process unset fields filled with garbage in them as valid mstr address/length pairs.
 		 */
 		mv_st_ent->mv_st_cont.mvs_trigr.savtarg.str.len = 0;
@@ -579,7 +613,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			assert(stringpool.free <= stringpool.top);
 		}
 		mv_st_ent->mv_st_cont.mvs_trigr.savextref.len = extnam_str.len;
-		mv_st_ent->mv_st_cont.mvs_trigr.ztcode_save = dollar_ztcode;
+		mv_st_ent->mv_st_cont.mvs_trigr.ztname_save = dollar_ztname;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztdata_save = dollar_ztdata;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztoldval_save = dollar_ztoldval;
 		mv_st_ent->mv_st_cont.mvs_trigr.ztriggerop_save = dollar_ztriggerop;
@@ -608,7 +642,10 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		}
 		mv_st_ent->mv_st_cont.mvs_trigr.mumps_status_save = mumps_status;
 		mv_st_ent->mv_st_cont.mvs_trigr.run_time_save = run_time;
-		mv_st_ent->mv_st_next = mv_chain->mv_st_next;	/* Copy since new entry is being replaced */
+		/* See if a MERGE launched the trigger. If yes, save some state so ZWRITE, ZSHOW and/or MERGE can be
+		 * run in the trigger we dispatch. */
+		if ((0 != merge_args) || TREF(in_zwrite))
+			PUSH_MVST_MRGZWRSV;
 		mumps_status = 0;
 		run_time = TRUE;	/* Previous value saved just above restored when frame pops */
 	} else
@@ -640,16 +677,14 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	gtm_trigdsc_last = trigdsc;
 	gtm_trigprm_last = trigprm;
 #	endif
-
 	/* Set new value of trigger ISVs. Previous values already saved in trigger base frame */
-	dollar_ztcode = &trigdsc->xecute_str;
+	dollar_ztname = &trigdsc->rtn_desc.rt_name;
 	dollar_ztdata = (mval *)trigprm->ztdata_new;
 	dollar_ztoldval = trigprm->ztoldval_new;
 	dollar_ztriggerop = (mval *)trigprm->ztriggerop_new;
 	dollar_ztupdate = trigprm->ztupdate_new;
 	dollar_ztvalue = trigprm->ztvalue_new;
 	ztvalue_changed_ptr = &trigprm->ztvalue_changed;
-
 	/* Set values associated with trigger into symbol table */
 	lvvalarray = trigprm->lvvalarray;
 	for (i = 0, mne_p = trigdsc->lvnamearray, indx_p = trigdsc->lvindexarray;
@@ -665,23 +700,24 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		assert(added);
 		assert(NULL != tabent);
 	}
-
 	/* While the routine header is available in trigdsc, we also need the <null> label address associated with
 	 *  the first (and only) line of code.
 	 */
 	lbl_offset_p = LNRTAB_ADR(trigdsc->rtn_desc.rt_adr);
 	transfer_addr = (uchar_ptr_t)LINE_NUMBER_ADDR(trigdsc->rtn_desc.rt_adr, lbl_offset_p);
 	/* Create new stack frame for invoked trigger in same fashion as gtm_init_env() creates its 2ndary frame */
-#ifdef HAS_LITERAL_SECT
+#	ifdef HAS_LITERAL_SECT
 	new_stack_frame(trigdsc->rtn_desc.rt_adr, (unsigned char *)LINKAGE_ADR(trigdsc->rtn_desc.rt_adr), transfer_addr);
-#else
+#	else
 	/* Any platform that does not follow pv-based linkage model either
 	 *	(1) uses the following calculation to determine the context pointer value, or
 	 *	(2) doesn't need a context pointer
 	 */
 	new_stack_frame(trigdsc->rtn_desc.rt_adr, PTEXT_ADR(trigdsc->rtn_desc.rt_adr), transfer_addr);
-#endif
+#	endif
 	dollar_tlevel_start = dollar_tlevel;
+	assert(gv_target->gd_csa == cs_addrs);
+	gv_target->trig_local_tn = local_tn;			/* Record trigger being driven for this global */
 	/* Invoke trigger generated code */
 	rc = gtm_trigger_invoke();
 	if (1 == rc)
@@ -705,7 +741,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		 *    to restart the implied transaction.
 		 */
 		assert(dollar_tlevel && (tstart_trigger_depth <= gtm_trigger_depth));
-		if ((tstart_trigger_depth < gtm_trigger_depth) || !tp_pointer->implicit_tstart)
+		if ((tstart_trigger_depth < gtm_trigger_depth) || !tp_pointer->implicit_tstart || !tp_pointer->implicit_trigger)
 		{	/* Unwind a trigger level to restart level or to next trigger boundary */
 			gtm_trigger_fini(FALSE, FALSE);	/* Get rid of this trigger level - we won't be returning */
 			DBGTRIGR((stderr, "gtm_trigger: dm_start returned rethrow code - rethrowing ERR_TPRETRY\n"));
@@ -726,6 +762,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 				assert(tp_pointer->implicit_tstart);
 				assert(SFF_TRIGR_CALLD & frame_pointer->flags);
 				frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;
+				DBGTRIGR((stderr, "gtm_trigger: turning off SFF_TRIGR_CALLD (1) in frame 0x"lvaddr"\n",
+					  frame_pointer));
 				DBGTRIGR((stderr, "gtm_trigger: unwinding no-base-frame trigger for TP restart\n"));
 			}
 		}
@@ -766,14 +804,18 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 	if (0 == (frame_pointer->type & SFT_TRIGR))
 		GTMASSERT;		/* Would normally be an assert but potential frame stack damage so severe
 					   and resulting debug difficulty that we GTMASSERT instead. */
+	/* Unwind the trigger base frame */
 	op_unwind();
 	/* restore frame_pointer stored at msp (see base_frame.c) */
 	frame_pointer = *(stack_frame**)msp;
 	msp += SIZEOF(stack_frame *);		/* Remove frame save pointer from stack */
 	if (!forced_unwind)
-	{	/* Remove the "do not return to me" flag only on non-error unwinds */
-		assert(SFF_TRIGR_CALLD & frame_pointer->flags);
+	{	/* Remove the "do not return to me" flag only on non-error unwinds. Note this flag may have already been
+		 * turned off by an earlier tp_restart if this is not an implicit_tstart situation.
+		 */
+		assert(!tp_pointer->implicit_tstart || (SFF_TRIGR_CALLD & frame_pointer->flags));
 		frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;
+		DBGTRIGR((stderr, "gtm_trigger_fini: turning off SFF_TRIGR_CALLD (2) in frame 0x"lvaddr"\n", frame_pointer));
 	} else
 	{	/* Error unwind, make sure certain cleanups are done */
 #		ifdef DEBUG
@@ -795,11 +837,23 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 		}
 	}
 	DBGTRIGR((stderr, "gtm_trigger: POP: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n", frame_pointer, ctxt));
+	/* Re-allow interruptions now that our base frame is gone */
+	if (forced_unwind)
+	{	/* Since we are being force-unwound, we don't know the state of things except that it it should be either
+		 * the state we set it to or the ok-to-interrupt state. Assert that and if we are changing the state,
+		 * be sure to run the deferred handler.
+		 */
+		assert((INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state) || (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state));
+		ENABLE_INTERRUPTS(intrpt_ok_state);
+	} else
+	{	/* Normal unwind should be ok with this macro */
+		ENABLE_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
+	}
 }
 
 /* Routine to eliminate the zlinked trigger code for a given trigger about to be deleted. Operations performed
-   differ depending on platform type (shared binary or not).
-*/
+ * differ depending on platform type (shared binary or not).
+ */
 void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 {
 	rtn_tabent	*rbot, *mid, *rtop;
@@ -807,9 +861,23 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	rhdtyp		*rtnhdr;
 	textElem	*telem;
 	int		comp, size;
+	stack_frame	*fp, *fpprev;
+	mname_entry	key;
+	ht_ent_mname    *tabent;
+	routine_source	*src_tbl;
+	DCL_THREADGBL_ACCESS;
 
-	/* First thing to do is find the routine header in the rtn_names list so we can remove it. */
+	SETUP_THREADGBL_ACCESS;
+	/* First thing to do is release trigger source field if it exists */
+	if (0 < trigdsc->xecute_str.str.len)
+	{
+		free(trigdsc->xecute_str.str.addr);
+		trigdsc->xecute_str.str.len = 0;
+		trigdsc->xecute_str.str.addr = NULL;
+	}
+	/* Next thing to do is find the routine header in the rtn_names list so we can remove it. */
 	rtnname = &trigdsc->rtn_desc.rt_name;
+	rtnhdr = trigdsc->rtn_desc.rt_adr;
 	rbot = rtn_names;
 	rtop = rtn_names_end;
 	for (;;)
@@ -844,13 +912,52 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 			}
 		}
 	}
+#	ifdef DEBUG
+	assert(rtnhdr == mid->rt_adr);
+	/* Verify trigger routine we want to remove is not currently active. If it is, we need to GTMASSERT.
+	 * Triggers are not like regular routines since they should only ever be referenced from the stack during a
+	 * transaction. Likewise, we should only ever load the triggers as the first action in that transaction.
+	 */
+	for (fp = frame_pointer; fp ; fp = fpprev)
+	{
+		fpprev = fp->old_frame_pointer;
+#		ifdef GTM_TRIGGER
+		if (NULL != fpprev && SFT_TRIGR & fpprev->type)
+			fpprev = *(stack_frame **)(fpprev + 1);
+#		endif
+		/* Only one possible version of a trigger routine */
+		assert(USHBIN_ONLY(NULL) NON_USHBIN_ONLY(fp->rvector) == OLD_RHEAD_ADR(CURRENT_RHEAD_ADR(fp->rvector)));
+		assert(fp->rvector != rtnhdr);
+	}
+#	endif
+	/* Remove break points in this routine before rmv from rtntbl */
+	zr_remove(rtnhdr, BREAKMSG);
+	/* Release any $TEXT() info this trigger has loaded */
+	if (NULL != (TREF(rt_name_tbl)).base)
+	{
+		key.var_name = mid->rt_name;
+		COMPUTE_HASH_MNAME(&key);
+		if (NULL != (tabent = lookup_hashtab_mname(TADR(rt_name_tbl), &key)))	/* note assignment */
+		{	/* We have a hash entry. Whether it has a value or not, it has a key name (if this is
+			 * the first time this trigger is being deleted) that may be pointing into the routine we
+			 * are about to remove. Migrate this key name to the stringpool.
+			 */
+			s2pool(&tabent->key.var_name);
+			if (NULL != tabent->value)
+			{	/* Has value, release the source. Entries and source are malloc'd in two blocks on UNIX */
+				src_tbl = (routine_source *)tabent->value;
+				if (NULL != src_tbl->srcbuff)
+					free(src_tbl->srcbuff);
+				free(src_tbl);
+				tabent->value = NULL;
+			}
+		}
+	}
 	/* Remove the routine from the rtn_table */
 	size = INTCAST((char *)rtn_names_end - (char *)mid);
 	if (0 < size)
-		memcpy((char *)mid, (char *)(mid + 1), size);	/* Remove this routine name from sorted table */
+		memmove((char *)mid, (char *)(mid + 1), size);	/* Remove this routine name from sorted table */
 	rtn_names_end--;
-	rtnhdr = trigdsc->rtn_desc.rt_adr;
-	zr_remove(rtnhdr);					/* Remove any break points in this routine */
 	urx_remove(rtnhdr);					/* Remove any unresolved entries */
 #	ifdef USHBIN_SUPPORTED
 	stp_move((char *)rtnhdr->literal_text_adr,
@@ -859,23 +966,23 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	free(rtnhdr->literal_adr);				/* R/W releasable section part 1 */
 	free(rtnhdr->linkage_adr);				/* R/W releasable section part 2 */
 	free(rtnhdr->labtab_adr);				/* Usually non-releasable but triggers don't have labels so
-								   this is just cleaning up a dangling null malloc */
+								 * this is just cleaning up a dangling null malloc
+								 */
 	free(rtnhdr);
 #	else
-#	  if !defined(__linux__) || !defined(__i386) || !defined(COMP_GTA)
-#	    error Unsupported NON-USHBIN platform
-#	  endif
+#		if (!defined(__linux__) && !defined(__CYGWIN__)) || !defined(__i386) || !defined(COMP_GTA)
+#			error Unsupported NON-USHBIN platform
+#		endif
 	/* For a non-shared binary platform we need to get an approximate addr range for stp_move. This is not
-	   done when a routine is replaced on these platforms but in this case we are able to due to the isolated
-	   environment if we only take the precautions of migrating potential literal text which may have been
-	   pointed to by any set environment variables.
-
-	   In this format, the only platform we support currently is Linux-x86 (i386) which uses GTM_TEXT_ALLOC
-	   to allocate special storage for it to put executable code in. We can access the storage header for
-	   this storage and find out how big it is and use that information to give stp_move a good range since
-	   the literal segment occurs right at the end of allocated storage (for which there is no pointer
-	   in the fileheader).
-	*/
+	 * done when a routine is replaced on these platforms but in this case we are able to due to the isolated
+	 * environment if we only take the precautions of migrating potential literal text which may have been
+	 * pointed to by any set environment variables.
+	 * In this format, the only platform we support currently is Linux-x86 (i386) which uses GTM_TEXT_ALLOC
+	 * to allocate special storage for it to put executable code in. We can access the storage header for
+	 * this storage and find out how big it is and use that information to give stp_move a good range since
+	 * the literal segment occurs right at the end of allocated storage (for which there is no pointer
+	 * in the fileheader).
+	 */
 	telem = (textElem *)((char *)rtnhdr - offsetof(textElem, userStorage));
 	assert(TextAllocated == telem->state);
 	stp_move((char *)LNRTAB_ADR(rtnhdr) + (rtnhdr->lnrtab_len * SIZEOF(lnr_tabent)),

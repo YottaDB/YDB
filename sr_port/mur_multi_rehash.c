@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,6 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab.h"
 #include "hashtab_int4.h"
 #include "hashtab_int8.h"
 #include "hashtab_mname.h"
@@ -42,8 +41,8 @@ void mur_multi_rehash(void)
 	{ 	/* re-hash broken entries */
 		DEBUG_ONLY(brkn_cnt = 0;)
 		ESTABLISH(hashtab_rehash_ch);
-		init_hashtab_int8(&temp_table, murgbl.broken_cnt * 100.0 / HT_LOAD_FACTOR); /* enough size to
-										accommodate broken transactions */
+		/* enough size to acommodate broken transactions */
+		init_hashtab_int8(&temp_table, murgbl.broken_cnt * 100.0 / HT_LOAD_FACTOR, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 		REVERT;
 		for (curent = murgbl.token_table.base, topent = murgbl.token_table.top; curent < topent; curent++)
 		{

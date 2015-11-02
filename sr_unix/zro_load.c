@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,13 +21,19 @@
 #include "zroutines.h"
 #include "parse_file.h"
 #include "eintr_wrappers.h"
-#include "longcpy.h"
 #include "error.h"
-#include "fgncal.h"
+#include "zro_shlibs.h"
 
 #define GETTOK		toktyp = zro_gettok(&lp, top, &tok)
 
-GBLDEF	zro_ent		*zro_root;
+error_def(ERR_DIRONLY);
+error_def(ERR_FILEPARSE);
+error_def(ERR_FSEXP);
+error_def(ERR_INVZROENT);
+error_def(ERR_MAXARGCNT);
+error_def(ERR_NOLBRSRC);
+error_def(ERR_QUALEXP);
+error_def(ERR_ZROSYNTAX);
 
 void zro_load (mstr *str)
 {
@@ -40,19 +46,13 @@ void zro_load (mstr *str)
 	int			stat_res;
 	char			tranbuf[MAX_FBUFF + 1];
 	parse_blk		pblk;
-	error_def		(ERR_DIRONLY);
-	error_def		(ERR_FILEPARSE);
-	error_def		(ERR_FSEXP);
-	error_def		(ERR_MAXARGCNT);
-	error_def		(ERR_QUALEXP);
-	error_def		(ERR_ZROSYNTAX);
-	error_def		(ERR_NOLBRSRC);
-	error_def		(ERR_INVZROENT);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	memset(array, 0, SIZEOF(array));
 	lp = str->addr;
 	top = lp + str->len;
-	while (lp < top && *lp == ZRO_DEL)
+	while (lp < top && *lp == ZRO_DEL)	/* Bypass leading blanks */
 		lp++;
 
 	array[0].type = ZRO_TYPE_COUNT;
@@ -62,17 +62,17 @@ void zro_load (mstr *str)
 
 	GETTOK;
 	if (toktyp == ZRO_EOL)
-	{
+	{	/* Null string - set default */
 		array[0].count = 1;
 		array[1].type = ZRO_TYPE_OBJECT;
 		array[1].str.len = 0;
 		array[2].type = ZRO_TYPE_COUNT;
 		array[2].count = 1;
-		array[3] = array[1];
 		array[3].type = ZRO_TYPE_SOURCE;
+		array[3].str.len = 0;
 		si = 4;
 	} else
-	{
+	{	/* String supplied - parse it */
 		for (oi = 1;;)
 		{
 			if (toktyp != ZRO_IDN)
@@ -88,14 +88,14 @@ void zro_load (mstr *str)
 				rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
 					ERR_FILEPARSE, 2, tok.len, tok.addr, status);
 
-			tranbuf[ pblk.b_esl ] = 0;
+			tranbuf[pblk.b_esl] = 0;
 			STAT_FILE(tranbuf, &outbuf, stat_res);
 			if (-1 == stat_res)
 				rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr,
-						errno);
+					  errno);
 			if (S_ISREG(outbuf.st_mode))
-			{ /* regular file - a shared library file */
-				array[oi].shrlib = fgn_getpak(tranbuf, ERROR);
+			{	/* regular file - a shared library file */
+				array[oi].shrlib = zro_shlibs_find(tranbuf);
 				array[oi].type = ZRO_TYPE_OBJLIB;
 				si = oi + 1;
 			} else
@@ -140,7 +140,7 @@ void zro_load (mstr *str)
 					if (!(status & 1))
 						rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
 							ERR_FILEPARSE, 2, tok.len, tok.addr, status);
-					tranbuf[ pblk.b_esl ] = 0;
+					tranbuf[pblk.b_esl] = 0;
 					STAT_FILE(tranbuf, &outbuf, stat_res);
 					if (-1 == stat_res)
 						rts_error(VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
@@ -181,37 +181,37 @@ void zro_load (mstr *str)
 		}
 	}
 	total_ents = si;
-	if (zro_root)
+	if (TREF(zro_root))
 	{
-		assert (zro_root->type == ZRO_TYPE_COUNT);
-		oi = zro_root->count;
-		assert (oi);
-		for (op = zro_root + 1; oi-- > 0; )
+		assert((TREF(zro_root))->type == ZRO_TYPE_COUNT);
+		oi = (TREF(zro_root))->count;
+		assert(oi);
+		for (op = TREF(zro_root) + 1; oi-- > 0; )
 		{	/* release space held by translated entries */
-			assert (op->type == ZRO_TYPE_OBJECT || op->type == ZRO_TYPE_OBJLIB);
+			assert(op->type == ZRO_TYPE_OBJECT || op->type == ZRO_TYPE_OBJLIB);
 			if (op->str.len)
 				free(op->str.addr);
 			if ((op++)->type == ZRO_TYPE_OBJLIB)
 				continue;	/* i.e. no sources for shared library */
-			assert (op->type == ZRO_TYPE_COUNT);
+			assert(op->type == ZRO_TYPE_COUNT);
 			si = (op++)->count;
 			for ( ; si-- > 0; op++)
 			{
-				assert (op->type == ZRO_TYPE_SOURCE);
+				assert(op->type == ZRO_TYPE_SOURCE);
 				if (op->str.len)
 					free(op->str.addr);
 			}
 		}
-		free (zro_root);
+		free(TREF(zro_root));
 	}
-	zro_root = (zro_ent *) malloc (total_ents * SIZEOF(zro_ent));
-	longcpy ((uchar_ptr_t)zro_root, (uchar_ptr_t)array, total_ents * SIZEOF(zro_ent));
-	assert (zro_root->type == ZRO_TYPE_COUNT);
-	oi = zro_root->count;
-	assert (oi);
-	for (op = zro_root + 1; oi-- > 0; )
+	TREF(zro_root) = (zro_ent *)malloc(total_ents * SIZEOF(zro_ent));
+	memcpy((uchar_ptr_t)TREF(zro_root), (uchar_ptr_t)array, total_ents * SIZEOF(zro_ent));
+	assert((TREF(zro_root))->type == ZRO_TYPE_COUNT);
+	oi = (TREF(zro_root))->count;
+	assert(oi);
+	for (op = TREF(zro_root) + 1; oi-- > 0; )
 	{
-		assert (op->type == ZRO_TYPE_OBJECT || op->type == ZRO_TYPE_OBJLIB);
+		assert(op->type == ZRO_TYPE_OBJECT || op->type == ZRO_TYPE_OBJLIB);
 		if (op->str.len)
 		{
 			pblk.buff_size = MAX_FBUFF;
@@ -227,11 +227,11 @@ void zro_load (mstr *str)
 		}
 		if ((op++)->type == ZRO_TYPE_OBJLIB)
 			continue;
-		assert (op->type == ZRO_TYPE_COUNT);
+		assert(op->type == ZRO_TYPE_COUNT);
 		si = (op++)->count;
 		for ( ; si-- > 0; op++)
 		{
-			assert (op->type == ZRO_TYPE_SOURCE);
+			assert(op->type == ZRO_TYPE_SOURCE);
 			if (op->str.len)
 			{
 				pblk.buff_size = MAX_FBUFF;

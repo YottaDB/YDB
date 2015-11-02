@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,7 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	v15_csd->trans_hist.curr_tn = (v15_trans_num) csd->trans_hist.curr_tn;
 	v15_csd->trans_hist.early_tn = (v15_trans_num) csd->trans_hist.early_tn;
 	v15_csd->trans_hist.last_mm_sync = (v15_trans_num) csd->trans_hist.last_mm_sync;
-	v15_csd->trans_hist.header_open_tn = (v15_trans_num) csd->trans_hist.header_open_tn;
+	v15_csd->trans_hist.header_open_tn = (v15_trans_num) csd->trans_hist.curr_tn;
 	v15_csd->trans_hist.mm_tn = (v15_trans_num) csd->trans_hist.mm_tn;
 	v15_csd->trans_hist.lock_sequence = csd->trans_hist.lock_sequence;
 	v15_csd->trans_hist.total_blks = csd->trans_hist.total_blks;

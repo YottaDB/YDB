@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 #include "gdsfhead.h"
 #include "v15_gdsfhead.h"
 #include "gdsblk.h"
+#include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
 #include "mu_all_version_standalone.h"
 #ifdef __MVS__

@@ -1,7 +1,7 @@
 #! tcsh -f
 #################################################################
 #								#
-#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -24,7 +24,7 @@
 set checkunicode = "../sr_unix/check_unicode_support.csh"
 if ( -e $checkunicode ) then
     set incdir = ""
-    if ( "Linux" == `uname` && "64" == "$linux_build_type" ) then
+    if ( "Linux" == `uname` && "64" == "$gt_build_type" ) then
 	switch (`uname -m`)
 	case "x86_64":
 	    set incdir = "../sr_x86_64"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@
 GBLREF mv_stent 	*mv_chain;
 GBLREF unsigned char 	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF symval		*curr_symval;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 
 /* Take supplied mval and place it into a freshly allocated lv_val */
 lv_val *push_lvval(mval *arg1)
@@ -39,7 +39,7 @@ lv_val *push_lvval(mval *arg1)
 	   worry about setting up tp_var structures as is done in lv_newname().
 	   The assert below will catch if this condition changes.
 	*/
-	assert(0 == dollar_tlevel);
+	assert(!dollar_tlevel);
 	PUSH_MV_STENT(MVST_LVAL);
 	mv_chain->mv_st_cont.mvs_lvval = lvp = lv_getslot(curr_symval);
 	LVVAL_INIT(lvp, curr_symval);

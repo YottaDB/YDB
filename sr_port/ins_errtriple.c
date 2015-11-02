@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,19 +15,17 @@
 #include "opcode.h"
 #include "mdq.h"
 
-GBLREF	triple		*curtchain, pos_in_chain;
 GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
-GBLREF	triple		t_orig;
-#ifdef GTM_TRIGGER
-GBLREF	boolean_t	trigger_compile;
-#endif
+GBLREF	triple		*curtchain, t_orig;
 
 void ins_errtriple(int4 in_error)
 {
 	triple 		*x, *triptr;
 	boolean_t	add_rterror_triple;
+	DCL_THREADGBL_ACCESS;
 
-	if (!IS_STX_WARN(in_error) GTMTRIG_ONLY( || trigger_compile))
+	SETUP_THREADGBL_ACCESS;
+	if (!IS_STX_WARN(in_error) GTMTRIG_ONLY( || TREF(trigger_compile)))
 	{	/* Not a warning and not a trigger, we have a real error (warnings become errors in triggers) */
 		if (curtchain != &t_orig)
 		{	/* If working with more than 1 chain defer until back to 1 because dqdelchain cannot delete across
@@ -37,7 +35,7 @@ void ins_errtriple(int4 in_error)
 				pending_errtriplecode = in_error;	/* Save error for later insert */
 			return;
 		}
-		x = pos_in_chain.exorder.bl;
+		x = (TREF(pos_in_chain)).exorder.bl;
 		/* If first error in the current line/cmd, delete all triples and replace them with an OC_RTERROR triple. */
 		add_rterror_triple = (OC_RTERROR != x->exorder.fl->opcode);
 		if (!add_rterror_triple)
@@ -52,8 +50,8 @@ void ins_errtriple(int4 in_error)
 			assert(OC_ILIT == x->opcode);	/* corresponds to put_ilit(FALSE) in previous ins_errtriple */
 		}
 		dqdelchain(x, curtchain, exorder);
-		assert(!add_rterror_triple || (pos_in_chain.exorder.bl->exorder.fl == curtchain));
-		assert(!add_rterror_triple || (curtchain->exorder.bl == pos_in_chain.exorder.bl));
+		assert(!add_rterror_triple || ((TREF(pos_in_chain)).exorder.bl->exorder.fl == curtchain));
+		assert(!add_rterror_triple || (curtchain->exorder.bl == (TREF(pos_in_chain)).exorder.bl));
 	} else
 		/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain */
 		add_rterror_triple = TRUE;

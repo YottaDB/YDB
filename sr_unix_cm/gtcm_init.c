@@ -112,9 +112,6 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	(void) setpgrp();
 #endif
 	/* Initialize logging */
-#ifdef BSD_LOG
-	openlog(SRVR_NAME, LOG_PID, LOG_LOCAL7);
-#endif				/* defined(BSD_LOG) */
 
 	omi_pid = getpid();
 

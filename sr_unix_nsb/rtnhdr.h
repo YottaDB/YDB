@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,9 @@ typedef struct	rhead_struct
 	int4		current_rhead_off;	/* (updated) offset to routine header of current module version */
 	int4		temp_mvals;		/* (updated) temp_mvals value of current module version */
 	int4		temp_size;		/* (updated) temp_size value of current module version */
+#	ifdef GTM_TRIGGER
+	void_ptr_t	trigr_handle;		/* Type is void to avoid needing gv_trigger.h to define gv_trigger_t addr */
+#	endif
 } rhdtyp;
 
 /* Although the names change from _ptr to _off is politically correct, (they ARE offsets, not pointers),
@@ -118,7 +121,11 @@ typedef struct
 	int4 		lab_ln_ptr;	/* Offset of the lnrtab entry from the routine header */
 } lab_tabent;
 
-int get_src_line(mval *routine, mval *label, int offset, mstr **srcret);
+/* Flag values for get_src_line call */
+#define VERIFY		TRUE
+#define NOVERIFY	FALSE
+
+int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, boolean_t verifytrig);
 unsigned char *find_line_start(unsigned char *in_addr, rhdtyp *routine);
 int4 *find_line_addr(rhdtyp *routine, mstr *label, int4 offset, mident **lent_name);
 rhdtyp *find_rtn_hdr(mstr *name);

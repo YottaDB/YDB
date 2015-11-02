@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -86,5 +86,3 @@ mrt_oldr_ptr		=	68
 mrt_curr_ptr		=	72
 mrt_tmp_mv		=	76
 mrt_tmp_sz		=	78
-
-mrt_hdr_size		=	80

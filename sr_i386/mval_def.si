@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -23,7 +23,7 @@ mval_v_nm		=	0
 mval_v_int		=	1
 mval_v_str		=	2
 mval_v_num_approx	=	3
-mval_v_sbs		=	4
+mval_v_canonical	=	4
 mval_v_sym		=	5
 mval_v_sublit		=	6
 mval_v_retarg		=	7
@@ -35,7 +35,7 @@ mval_m_int_without_nm	=	0x002
 mval_m_int		=	0x003
 mval_m_str		=	0x004
 mval_m_num_approx	=	0x008
-mval_m_sbs		=	0x010
+mval_m_canonical	=	0x010
 mval_m_sym		=	0x020
 mval_m_sublit		=	0x040
 mval_m_retarg		=	0x080
@@ -236,7 +236,7 @@ top			=	8
 
 \tmp_label1:
 	pushl	\mval
-	call	nm_iscan
+	call	val_iscan
 	addl	$4,%esp
 	cmpl	$0,%eax
 	jne	\mainlabel

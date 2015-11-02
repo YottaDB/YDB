@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,14 +24,8 @@
 
 GBLREF	gv_namehead	*gv_target;
 GBLREF	gd_region	*gv_cur_region;
-GBLREF	bool		gv_curr_subsc_null;
 GBLREF	gv_key		*gv_currkey;
 GBLREF	bool		undef_inhibit;
-
-#ifdef DEBUG
-GBLREF	boolean_t	gtm_gvundef_fatal;
-GBLREF	boolean_t	in_op_gvget;
-#endif
 
 LITREF	mval		literal_null;
 
@@ -41,25 +35,27 @@ LITREF	mval		literal_null;
  * the status of the get, though they don't want to cause any
  * errors.
  */
-bool op_gvget(mval *v)
+boolean_t op_gvget(mval *v)
 {
-	bool gotit;
+	boolean_t	 gotit;
+	DCL_THREADGBL_ACCESS;
 
-	if (gv_curr_subsc_null && NEVER == gv_cur_region->null_subs)
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
-	if (gv_cur_region->dyn.addr->acc_meth == dba_bg || gv_cur_region->dyn.addr->acc_meth == dba_mm)
+	if ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))
 	{
-	 	if (gv_target->root == 0)		/* global does not exist */
+	 	if (0 == gv_target->root)		/* global does not exist */
 		{	/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
-			assert(!gtm_gvundef_fatal);
+			assert(!TREF(gtm_gvundef_fatal));
 			gotit = FALSE;
 		} else
 		{
-			DEBUG_ONLY(in_op_gvget = TRUE;)
+			DEBUG_ONLY(TREF(in_op_gvget) = TRUE;)
 		 	gotit = gvcst_get(v);
-			assert(FALSE == in_op_gvget); /* gvcst_get should have reset it right away */
+			assert(FALSE == TREF(in_op_gvget)); /* gvcst_get should have reset it right away */
 		}
-	} else  if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
+	} else  if (dba_cm == gv_cur_region->dyn.addr->acc_meth)
 	 	gotit = gvcmx_get(v);
 	else
 	{

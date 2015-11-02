@@ -16,8 +16,8 @@
 
 #include "jnl_typedef.h"	/* for IS_VALID_JRECTYPE macro */
 
-#define JNL_EXTR_LABEL		"GDSJEX04"	/* format of the simple journal extract */
-#define JNL_DET_EXTR_LABEL	"GDSJDX04"	/* format of the detailed journal extract */
+#define JNL_EXTR_LABEL		"GDSJEX05"	/* format of the simple journal extract */
+#define JNL_DET_EXTR_LABEL	"GDSJDX05"	/* format of the detailed journal extract */
 
 #define EXTQW(I)							\
 {									\
@@ -167,15 +167,22 @@
 
 #endif
 
-#define	MUR_GET_IMAGE_COUNT(JCTL, REC, REC_IMAGE_COUNT, STATUS)		\
-{									\
-	pini_list_struct	*plst;					\
-									\
-	UNIX_ONLY(assert(FALSE);)					\
-	STATUS = mur_get_pini(JCTL, REC->prefix.pini_addr, &plst);	\
-	assert(SS_NORMAL == STATUS);					\
-	if (SS_NORMAL == STATUS)					\
-		REC_IMAGE_COUNT = plst->jpv.jpv_image_count;		\
+#define	MUR_GET_IMAGE_COUNT(JCTL, REC, REC_IMAGE_COUNT, STATUS)					\
+{												\
+	pini_list_struct	*plst;								\
+												\
+	GBLREF 	jnl_gbls_t	jgbl;								\
+												\
+	UNIX_ONLY(assert(FALSE);)								\
+	STATUS = mur_get_pini(JCTL, REC->prefix.pini_addr, &plst);				\
+	/* In backward processing, it is possible we encounter corrupt journal records in	\
+	 * case the journal file had a crash and we have not yet reached the first epoch	\
+	 * (mur_fread_eof on the journal file at the start might not have caught it). In this	\
+	 * case, mur_back_process knows to restart the backward processing. Assert this though.	\
+	 */											\
+	assert((SS_NORMAL == STATUS) || !jgbl.forw_phase_recovery);				\
+	if (SS_NORMAL == STATUS)								\
+		REC_IMAGE_COUNT = plst->jpv.jpv_image_count;					\
 }
 
 /* Note that JRT_TRIPLE is NOT considered a valid rectype by this macro. This is because this macro is not used
@@ -526,6 +533,13 @@ typedef struct reg_ctl_list_struct
 	struct reg_ctl_list_struct	*prev_tp_rctl; /* Prev in a linked list of regions participating in this TP transaction */
 	forw_multi_struct	*forw_multi;	/* If non-NULL, this is a pointer to the structure containing all information
 						 * related to the TP transaction that is currently being processed. */
+	boolean_t		initialized;		/* Set to TRUE only after journaling and replication state information has
+							 * been copied over from csd into rctl. This way mur_close_files knows if
+							 * it is safe to use the rctl values to copy them back to csd. Previously,
+							 * an interrupt in mur_open_files before the journaling and/or replication
+							 * fields in rctl got initialized took us to mur_close_files which
+							 * unconditionally used those to restore the corresponding csd fields
+							 * resulting in journaling/replication getting incorrectly turned OFF. */
 #	ifdef DEBUG
 	boolean_t			deleted_from_unprocessed_list;
 	jnl_ctl_list 			*last_processed_jctl;
@@ -645,7 +659,7 @@ typedef struct
 	GBLREF	sgmnt_addrs		*cs_addrs;					\
 	GBLREF	sgm_info		*sgm_info_ptr;					\
 	GBLREF	gv_namehead		*gv_target;					\
-	GBLREF	short			dollar_tlevel;					\
+	GBLREF	uint4			dollar_tlevel;					\
 											\
 	sgmnt_addrs		*csa;							\
 	gd_region		*reg;							\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,23 +19,28 @@
 #define XFORM	0
 #define XBACK	1
 
-#define ALLOC_XFORM_BUFF(str)								\
-{											\
-	if (0 == max_lcl_coll_xform_bufsiz)						\
-	{										\
-		assert(NULL == lcl_coll_xform_buff);					\
-		max_lcl_coll_xform_bufsiz = MAX_STRBUFF_INIT;				\
-		lcl_coll_xform_buff = (char *)malloc(max_lcl_coll_xform_bufsiz);	\
-	} 										\
-	if ((str)->len > max_lcl_coll_xform_bufsiz)					\
-	{										\
-		assert(NULL != lcl_coll_xform_buff);					\
-		free(lcl_coll_xform_buff);						\
-		while ((str)->len > max_lcl_coll_xform_bufsiz)				\
-			max_lcl_coll_xform_bufsiz += max_lcl_coll_xform_bufsiz;		\
-		max_lcl_coll_xform_bufsiz = MIN(MAX_STRLEN, max_lcl_coll_xform_bufsiz);	\
-		lcl_coll_xform_buff = (char *)malloc(max_lcl_coll_xform_bufsiz);	\
-	}										\
+#define ALLOC_XFORM_BUFF(STR1LEN)									\
+{													\
+	mstr_len_t	lcl_len;									\
+													\
+	if (0 == TREF(max_lcl_coll_xform_bufsiz))							\
+	{												\
+		assert(NULL == TREF(lcl_coll_xform_buff));						\
+		TREF(max_lcl_coll_xform_bufsiz) = MAX_STRBUFF_INIT;					\
+		TREF(lcl_coll_xform_buff) = (char *)malloc(TREF(max_lcl_coll_xform_bufsiz));		\
+	} 												\
+	lcl_len = STR1LEN;										\
+	assert(MAX_STRLEN >= lcl_len);									\
+	if (lcl_len > TREF(max_lcl_coll_xform_bufsiz))							\
+	{												\
+		assert(NULL != TREF(lcl_coll_xform_buff));						\
+		free(TREF(lcl_coll_xform_buff));							\
+		assert(MAX_STRLEN >= TREF(max_lcl_coll_xform_bufsiz));					\
+		while (lcl_len > TREF(max_lcl_coll_xform_bufsiz))					\
+			TREF(max_lcl_coll_xform_bufsiz) *= 2;						\
+		TREF(max_lcl_coll_xform_bufsiz) = MIN(MAX_STRLEN, TREF(max_lcl_coll_xform_bufsiz));	\
+		TREF(lcl_coll_xform_buff) = (char *)malloc(TREF(max_lcl_coll_xform_bufsiz));		\
+	}												\
 }
 /*
    Following two macros are currently used in replication filters, merge command  and binary load to transform
@@ -86,9 +91,6 @@ typedef struct collseq_struct {
 	int4			(*verify)();
 	int			argtype;
 } collseq;
-
-GBLREF char	*lcl_coll_xform_buff;
-GBLREF	int	max_lcl_coll_xform_bufsiz;
 
 boolean_t map_collseq(mstr *fspec, collseq *ret_collseq);
 collseq *ready_collseq(int act);

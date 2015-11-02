@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@ mval *get_ret_targ(stack_frame **retsf)
 				case MVST_TRIGR:
 				case MVST_RSTRTPC:
 				case MVST_STORIG:
+				case MVST_MRGZWRSV:
 					break;
 				default:
 					assert(FALSE);

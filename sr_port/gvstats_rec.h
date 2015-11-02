@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,13 @@
 
 #ifndef GVSTATS_REC_H_INCLUDED
 #define GVSTATS_REC_H_INCLUDED
+
+/* Note gvstats_rec exists in both sgmnt_data (file header) and in node_local. The reason
+ * for this is so that gvstats can be updated by read-only processes which would not be
+ * able to update the read-only file header. The gvstats in node_local are the ones that
+ * get updated and are peridically copied back to the fileheader and during fileheader
+ * flushes to keep them up to date.
+ */
 
 #define	TAB_GVSTATS_REC(A,B,C)	A,
 enum gvstats_rec_type

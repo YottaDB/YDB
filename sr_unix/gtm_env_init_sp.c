@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,11 @@
 #include "error.h"
 #include "gtm_limits.h"
 #include "compiler.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "jnl.h"
 
 #define	DEFAULT_NON_BLOCKED_WRITE_RETRIES	10	/* default number of retries */
 #ifdef __MVS__
@@ -52,7 +57,6 @@ GBLREF	boolean_t		is_gtm_chset_utf8;
 GBLREF	boolean_t		utf8_patnumeric;
 GBLREF	boolean_t		badchar_inhibit;
 GBLREF	boolean_t		gtm_quiet_halt;
-GBLREF	int			lv_null_subs;			/* Local variable null subscripts allowed */
 GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
 GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
@@ -60,7 +64,12 @@ ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
 GTMTRIG_ONLY(GBLREF	mval	gtm_trigger_etrap;)
 
-static nametabent editing_params[] =
+#ifdef GTM_TRIGGER
+LITDEF mval default_mupip_trigger_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_MUPIP_TRIGGER_ETRAP) - 1),
+							      DEFAULT_MUPIP_TRIGGER_ETRAP , 0 , 0 );
+#endif
+
+static readonly nametabent editing_params[] =
 {
 	{7, "EDITING"},
 	{6, "INSERT"},
@@ -68,32 +77,28 @@ static nametabent editing_params[] =
 	{8, "NOINSERT"}
 };
 
-static unsigned char editing_index[27] =
+static readonly unsigned char editing_index[27] =
 {
 	0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
 	2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
 	4, 4, 4
 };
 
-#ifdef GTM_TRIGGER
-LITDEF mval default_mupip_trigger_etrap = DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , (SIZEOF(DEFAULT_MUPIP_TRIGGER_ETRAP) - 1),
-							      DEFAULT_MUPIP_TRIGGER_ETRAP , 0 , 0 );
-#endif
-
-/* Unix only environment initializations */
 void	gtm_env_init_sp(void)
-{
+{	/* Unix only environment initializations */
 	mstr		val, trans;
 	int4		status, index, len;
 	size_t		cwdlen;
 	boolean_t	ret, is_defined;
 	char		buf[MAX_TRANS_NAME_LEN], *token, cwd[GTM_PATH_MAX];
 	char		*cwdptr, *trigger_etrap;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 #	ifdef __MVS__
 	/* For now OS/390 only. Eventually, this will be added to all UNIX platforms along with the
-	   capability to specify the desired directory to put a core file in.
-	*/
+	 * capability to specify the desired directory to put a core file in.
+	 */
 	if (NULL == gtm_core_file)
 	{
 		token = getcwd(cwd, SIZEOF(cwd));
@@ -115,19 +120,16 @@ void	gtm_env_init_sp(void)
 	val.addr = GTM_SHMFLAGS;
 	val.len = SIZEOF(GTM_SHMFLAGS) - 1;
 	gtm_shmflags = (int4)trans_numeric(&val, &is_defined, TRUE);	/* Flags vlaue (0 is undefined or bad) */
-
 	val.addr = GTM_QUIET_HALT;
 	val.len = SIZEOF(GTM_QUIET_HALT) - 1;
 	ret = logical_truth_value(&val, FALSE, &is_defined);
 	if (is_defined)
 		gtm_quiet_halt = ret;
-
 	/* Initialize local variable null subscripts allowed flag */
 	val.addr = GTM_LVNULLSUBS;
 	val.len = SIZEOF(GTM_LVNULLSUBS) - 1;
 	ret = trans_numeric(&val, &is_defined, TRUE); /* Not initialized enuf for errors yet so silent rejection of invalid vals */
-	lv_null_subs = ((is_defined && (LVNULLSUBS_FIRST < ret) && (LVNULLSUBS_LAST > ret)) ? ret : LVNULLSUBS_OK);
-
+	TREF(lv_null_subs) = ((is_defined && (LVNULLSUBS_FIRST < ret) && (LVNULLSUBS_LAST > ret)) ? ret : LVNULLSUBS_OK);
 #	ifdef GTM_TRIGGER
 	token = GTM_TRIGGER_ETRAP;
 	trigger_etrap = GETENV(++token);	/* Point past the $ in gtm_logicals definition */
@@ -142,16 +144,12 @@ void	gtm_env_init_sp(void)
 	} else if (IS_MUPIP_IMAGE)
 		gtm_trigger_etrap = default_mupip_trigger_etrap;
 #	endif
-
 	/* ZLIB library compression level */
 	val.addr = GTM_ZLIB_CMP_LEVEL;
 	val.len = SIZEOF(GTM_ZLIB_CMP_LEVEL) - 1;
 	gtm_zlib_cmp_level = trans_numeric(&val, &is_defined, TRUE);
 	if (GTM_CMPLVL_OUT_OF_RANGE(gtm_zlib_cmp_level))
 		gtm_zlib_cmp_level = ZLIB_CMPLVL_MIN;	/* no compression in this case */
-
-
-
 	gtm_principal_editing_defaults = 0;
 	val.addr = GTM_PRINCIPAL_EDITING;
 	val.len = SIZEOF(GTM_PRINCIPAL_EDITING) - 1;
@@ -204,7 +202,6 @@ void	gtm_env_init_sp(void)
 				gtm_utf8_locale_object = malloc(trans.len + 1);
 				strcpy(gtm_utf8_locale_object, buf);
 			}
-
 			val.addr = GTM_TAG_UTF8_AS_ASCII;
 			val.len = STR_LIT_LEN(GTM_TAG_UTF8_AS_ASCII);
 			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
@@ -235,4 +232,10 @@ void	gtm_env_init_sp(void)
 	gtm_non_blocked_write_retries = trans_numeric(&val, &is_defined, TRUE);
 	if (!is_defined)
 		gtm_non_blocked_write_retries = DEFAULT_NON_BLOCKED_WRITE_RETRIES;
+	/* Initialize variable that controls the behavior on journal error */
+	val.addr = GTM_ERROR_ON_JNL_FILE_LOST;
+	val.len = SIZEOF(GTM_ERROR_ON_JNL_FILE_LOST) - 1;
+	TREF(error_on_jnl_file_lost) = trans_numeric(&val, &is_defined, FALSE);
+	if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
+		TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_TURN_OFF; /* default behavior */
 }

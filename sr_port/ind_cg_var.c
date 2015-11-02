@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,6 @@
 #include "obj_file.h"
 #include "cg_var.h"
 #include "stringpool.h"
-#include "hashtab.h"
 #include "hashtab_mname.h"
 
 GBLREF spdesc indr_stringpool;

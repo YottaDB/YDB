@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,11 +22,14 @@
 
 GBLREF	char		window_token;
 GBLREF	boolean_t	run_time;
-GBLREF	oprtype		*for_stack[], **for_stack_ptr;
 GBLREF	triple 		*curtchain;
 GBLREF	boolean_t	dollar_zquit_anyway;
 
-LITREF	mval		literal_null;
+error_def(ERR_ALIASEXPECTED);
+error_def(ERR_QUITARGUSE);
+error_def(ERR_QUITARGLST);
+
+	LITREF	mval		literal_null;
 
 int m_quit(void)
 {
@@ -36,13 +39,11 @@ int m_quit(void)
 	triple		*r;
 	oprtype		x, *cr, tmparg;
 	mvar		*mvarptr;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_ALIASEXPECTED);
-	error_def(ERR_QUITARGUSE);
-	error_def(ERR_QUITARGLST);
-
-	arg = (window_token != TK_EOL && window_token != TK_SPACE);
-	if (for_stack_ptr == for_stack)
+	SETUP_THREADGBL_ACCESS;
+	arg = ((TK_EOL != window_token) && (TK_SPACE != window_token));
+	if (TREF(for_stack_ptr) == TADR(for_stack))
 	{	/* not FOR */
 		if (dollar_zquit_anyway && !run_time)
 		{	/* turn a plain quit into a set with and without argument conditioned on $QUIT */
@@ -77,7 +78,7 @@ int m_quit(void)
 			advancewindow();
 			if (TK_IDENT == window_token)
 			{	/* Both alias and alias container sources go through here */
-				if (!lvn(&tmparg, OC_SRCHINDX, 0))
+				if (!lvn(&tmparg, OC_GETINDX, 0))
 					return FALSE;
 				r = newtriple(OC_RETARG);
 				r->operand[0] = tmparg;

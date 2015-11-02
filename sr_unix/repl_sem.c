@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include "gtm_string.h"
 #include "repl_instance.h"
 #include "gtm_logicals.h"
+#include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
 #include "do_semop.h"
 #include "ipcrmid.h"

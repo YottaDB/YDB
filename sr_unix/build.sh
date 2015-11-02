@@ -45,7 +45,7 @@ fi
 
 builddir=`pwd`
 bld_status=0
-gtmcrypt_libname="libgtmcrypt.so"
+ext=".so"
 
 # Set debug/optimization options if needed.
 if [ "d" = $2 -o "D" = $2 ]; then
@@ -107,8 +107,18 @@ elif [ "Linux" = "$hostos" ] ; then
 		ld_common="$ld_common -m32"
 	fi
 	ld_shl_options="-shared"
+elif [ "OS/390" = "$hostos" ] ; then
+	cc="xlc"
+	ld="xlc"
+	cc_common="-c -q64 -qWARN64 -qchars=signed -qenum=int -qascii -D_ENHANCED_ASCII_EXT=0xFFFFFFFF -D_VARARG_EXT_"
+	cc_common="$cc_common -D_XOPEN_SOURCE_EXTENDED=1 -D_ALL_SOURCE_NO_THREADS -D_ISOC99_SOURCE -D_UNIX03_SOURCE"
+	cc_common="$cc_common -D_IEEEV1_COMPATIBILITY -W c,DLL,XPLINK,EXPORTALL,RENT,NOANSIALIAS,LANGLVL(EXTENDED),ARCH(7)"
+	cc_common="$cc_common -W l,DLL,XPLINK"
+	ld_common="-q64 -W l,DLL,XPLINK,MAP,XREF,REUS=RENT"
+	ld_shl_options="-q64 -W l,DLL,XPLINK"
+	ext=".dll"
 fi
-
+gtmcrypt_libname="libgtmcrypt$ext"
 # Needed shared libraries for building encryption plugin
 crypto_libs="-lgpgme -lgpg-error"
 if [ "openssl" = "$1" ] ; then
@@ -137,7 +147,7 @@ cat > $builddir/gtmcrypt.tab << tabfile
 getpass:char* getpass^GETPASS(I:gtm_int_t)
 tabfile
 cat > $builddir/gpgagent.tab << tabfile
-$builddir/libgtmcrypt.so
+$builddir/$gtmcrypt_libname
 unmaskpwd: xc_status_t gc_pk_mask_unmask_passwd_interlude(I:xc_string_t*,O:xc_string_t*[512],I:xc_int_t)
 tabfile
 

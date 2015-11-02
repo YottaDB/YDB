@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,19 +41,17 @@
 #include "rc_oflow.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "rtnhdr.h"
+#include "stack_frame.h"
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
-#include "gv_trigger.h"
-#include "gtm_trigger.h"
-#include "gv_trigger_protos.h"
-#include "subscript.h"
-#include "mv_stent.h"
-#include "stringpool.h"
-#	ifdef DEBUG
-#	include "stack_frame.h"
-#	include "tp_frame.h"
-#	endif
+# include "gv_trigger.h"
+# include "gtm_trigger.h"
+# include "gv_trigger_protos.h"
+# include "subscript.h"
+# include "mv_stent.h"
+# include "stringpool.h"
 #endif
+#include "tp_frame.h"
 #include "tp_restart.h"
 
 /* Include prototypes */
@@ -71,6 +69,7 @@
 #include "gvsub2str.h"		/* for gvsub2str prototype */
 #include "tp_set_sgm.h"		/* for tp_set_sgm prototype */
 #include "op_tcommit.h"		/* for op_tcommit prototype */
+#include "have_crit.h"
 
 #ifdef GTM_TRIGGER
 LITREF	mval	literal_null;
@@ -98,18 +97,19 @@ GBLREF	uint4			update_trans;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			process_id;
 GBLREF	uint4			update_array_size, cumul_update_array_size;	/* the current total size of the update array */
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int		t_tries;
-GBLREF	cw_set_element		cw_set[];		/* create write set. */
+GBLREF	cw_set_element		cw_set[CDB_CW_SET_SIZE];/* create write set. */
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
+GBLREF	stack_frame		*frame_pointer;
 #ifdef GTM_TRIGGER
+GBLREF	int			tprestart_state;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
 GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
 #endif
 #ifdef DEBUG
@@ -144,7 +144,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 	/* The record that is newly inserted/updated does not fit by itself in a separate block	\
 	 * if the current reserved-bytes for this database is taken into account. Cannot go on.	\
 	 */											\
-	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, temp_key, TRUE)))			\
+	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))		\
 		end = &buff[MAX_ZWR_KEY_SZ - 1];						\
 	rts_error(VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,			\
 		REG_LEN_STR(gv_cur_region), blk_size, blk_reserved_bytes,			\
@@ -200,24 +200,24 @@ void	gvcst_put(mval *val)
 	const int4		zeroes = 0;
 	boolean_t		jnl_format_done;
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
-	block_id		allocation_clue, tp_root, gvt_for_root;
+	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
 	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
 	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
 	cw_set_element		*cse, *cse_new, *old_cse;
-	gv_namehead		*save_targ;
+	gv_namehead		*save_targ, *split_targ;
 	enum cdb_sc		status;
 	gv_key			*temp_key;
 	mstr			value;
-	off_chain		chain1, curr_chain, prev_chain;
+	off_chain		chain1, curr_chain, prev_chain, chain2;
 	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp;
 	srch_blk_status		*bh, *bq, *tp_srch_status;
 	srch_hist		*dir_hist;
-	int			cur_blk_size, blk_seg_cnt, delta, i, left_hand_offset, n, ins_chain_offset,
+	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
 				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
 				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1,
-				offset_sum, rec_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset;
-	uint4			segment_update_array_size;
-	char			*va;
+				offset_sum, rec_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset, curr_offset, bh_level;
+	uint4			segment_update_array_size, key_top, cp2_len, bs1_2_len, bs1_3_len;
+	char			*va, last_split_direction[MAX_BT_DEPTH];
 	sm_uc_ptr_t		cp1, cp2, curr;
 	unsigned short		extra_record_orig_size, rec_size, temp_short;
 	unsigned int		prev_rec_offset, prev_rec_match, curr_rec_offset, curr_rec_match;
@@ -228,16 +228,20 @@ void	gvcst_put(mval *val)
 	jnl_action		*ja;
 	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
 	ht_ent_int4		*tabent;
-	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, old_ch, new_ch;
 	sm_uc_ptr_t		buffaddr;
-	block_id		lcl_root;
+	block_id		lcl_root, last_split_bnum;
 	sgm_info		*si;
 	uint4			nodeflags;
-	boolean_t		write_logical_jnlrecs, can_write_logical_jnlrecs;
+	boolean_t		write_logical_jnlrecs, can_write_logical_jnlrecs, blk_match, is_split_dir_left;
+	int			split_depth;
 	mval			*ja_val;
+	int			rc;
+	int4			cse_first_off;
+	enum split_dir		last_split_dir;
 #	ifdef GTM_TRIGGER
 	boolean_t		is_tpwrap;
-	boolean_t		ztval_gvcst_put_redo;
+	boolean_t		ztval_gvcst_put_redo, skip_hasht_read;
 	gtm_trigger_parms	trigparms;
 	gvt_trigger_t		*gvt_trigger;
 	gvtr_invoke_parms_t	gvtr_parms;
@@ -257,7 +261,6 @@ void	gvcst_put(mval *val)
 								 * used to restore "val" in case of TP restarts */
 #	endif
 #	ifdef DEBUG
-	block_id		start_root;
 	char			dbg_valbuff[256];
 	mstr_len_t		dbg_vallen;
 	mval			*dbg_lcl_val;
@@ -323,7 +326,10 @@ void	gvcst_put(mval *val)
 	blk_reserved_bytes = csd->reserved_bytes;
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - blk_reserved_bytes;
 	jnl_format_done = FALSE; /* do "jnl_format" only once per logical non-tp transaction irrespective of number of retries */
-	GTMTRIG_ONLY(ztval_gvcst_put_redo = FALSE;)
+	GTMTRIG_ONLY(
+		ztval_gvcst_put_redo = FALSE;
+		skip_hasht_read = FALSE;
+	)
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	/* this needs to be initialized before any code that does a "goto retry" since this gets used there */
@@ -349,7 +355,6 @@ fresh_tn_start:
 	DEBUG_ONLY(lcl_t_tries = -1;)
 	DEBUG_ONLY(is_fresh_tn_start = TRUE;)
 	assert(!jnl_format_done || (dollar_tlevel GTMTRIG_ONLY(&& ztval_gvcst_put_redo)));
-	DEBUG_ONLY(start_root = gv_target->root;)
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVPUTFAIL);
 tn_restart:
 	/* t_tries should never decrease - it either increases or stays the same. If should decrease we could live-lock with
@@ -357,7 +362,7 @@ tn_restart:
 	 * typically do a normal increment and then, for certain conditions, do a complementary decrement, we assert that
 	 * the net effect is never a decrease.
 	 */
-	assert((((int)t_tries) > lcl_t_tries) || (CDB_STAGNATE == t_tries) || (cdb_sc_helpedout == t_fail_hist[t_tries]));
+	assert((((int)t_tries) > lcl_t_tries) || (CDB_STAGNATE == t_tries));
 	DEBUG_ONLY(lcl_t_tries = t_tries;) /* update lcl_t_tries */
 	DEBUG_ONLY(
 		dbg_num_iters++;
@@ -370,6 +375,7 @@ tn_restart:
 		dbg_trace_array[dbg_num_iters].val = val;
 		GTMTRIG_ONLY(dbg_trace_array[dbg_num_iters].lcl_implicit_tstart = lcl_implicit_tstart;)
 		dbg_trace_array[dbg_num_iters].is_extra_block_split = FALSE;
+		split_targ = NULL;
 	)
 	/* If MM and file extension occurred, reset csd to cs_data to avoid out-of-date value. If BG we dont need the reset
 	 * but if checks are costlier than unconditional sets in a pipelined architecture so we choose not to do the if.
@@ -380,7 +386,7 @@ tn_restart:
 	gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
 	assert(!ztval_gvcst_put_redo || IS_PTR_INSIDE_M_STACK(val));
 	is_tpwrap = FALSE;
-	if (!skip_dbtriggers)
+	if (!skip_dbtriggers && !skip_hasht_read)
 	{
 		GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap, ERR_GVPUTFAIL);
 		assert(gvt_trigger == gv_target->gvt_trigger);
@@ -400,7 +406,7 @@ tn_restart:
 			lcl_post_incr_mval = post_incr_mval;
 			lcl_increment_delta_mval = increment_delta_mval;
 		}
-		if ((NULL != gvt_trigger) && !ztval_gvcst_put_redo)
+		if (NULL != gvt_trigger)
 			PUSH_ZTOLDMVAL_ON_M_STACK(ztold_mval, save_msp, save_mv_chain);
 	}
 #	endif
@@ -432,9 +438,8 @@ tn_restart:
 	dir_hist = NULL;
 	ins_chain_index = 0;
 	lcl_root = gv_target->root;
-	assert(lcl_root == start_root);
 	tp_root = lcl_root;
-	if (0 == dollar_tlevel)
+	if (!dollar_tlevel)
 	{
 		CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	} else
@@ -471,7 +476,7 @@ tn_restart:
 			GET_LONG(tp_root, (dir_hist->h[0].buffaddr + SIZEOF(rec_hdr)
 					   + dir_hist->h[0].curr_rec.offset + gv_altkey->end + 1
 					   - ((rec_hdr_ptr_t)(dir_hist->h[0].buffaddr + dir_hist->h[0].curr_rec.offset))->cmpc));
-			if (0 < dollar_tlevel)
+			if (dollar_tlevel)
 			{
 				gvt_for_root = dir_hist->h[0].blk_num;
 				curr_chain = *(off_chain *)&gvt_for_root;
@@ -612,6 +617,8 @@ tn_restart:
 	 */
 	need_extra_block_split = FALSE; /* Assume we don't require an additional block split (most common case) */
 	duplicate_set = FALSE; /* Assume this is NOT a duplicate set (most common case) */
+	split_depth = 0;
+	split_targ = gv_target;
 	for (succeeded = FALSE; !succeeded; no_pointers = level_0 = FALSE)
 	{
 		buffaddr = bh->buffaddr;
@@ -648,7 +655,7 @@ tn_restart:
 		rp = (rec_hdr_ptr_t)(buffaddr + curr_rec_offset);
 		if (curr_rec_offset == cur_blk_size)
 		{
-			if ((FALSE == new_rec) && (0 < dollar_tlevel))
+			if ((FALSE == new_rec) && dollar_tlevel)
 			{
 				assert(CDB_STAGNATE > t_tries);
 				status = cdb_sc_mkblk;
@@ -687,7 +694,7 @@ tn_restart:
 			assert(target_key_size > rec_cmpc);
 			cur_val_offset = SIZEOF(rec_hdr) + (target_key_size - rec_cmpc);
 #			ifdef GTM_TRIGGER
-			if (no_pointers && (NULL != ztold_mval) && !ztval_gvcst_put_redo)
+			if (no_pointers && (NULL != ztold_mval) && !skip_hasht_read)
 			{	/* Complete initialization of ztold_mval */
 				assert(!skip_dbtriggers);
 				data_len = rec_size - cur_val_offset;
@@ -719,7 +726,9 @@ tn_restart:
 			}
 			next_rec_shrink = 0;
 		}
-		if (0 < dollar_tlevel)
+		blk_num = bh->blk_num;
+		bh_level = bh->level;
+		if (dollar_tlevel)
 		{
 			if ((SIZEOF(rec_hdr) + target_key_size - prev_rec_match + value.len) != new_rec_size)
 			{
@@ -727,7 +736,7 @@ tn_restart:
 				status = cdb_sc_mkblk;
 				GOTO_RETRY;
 			}
-			chain1 = *(off_chain *)&bh->blk_num;
+			chain1 = *(off_chain *)&blk_num;
 			if ((1 == chain1.flag) && ((int)chain1.cw_index >= si->cw_set_depth))
 			{
 				assert(si->tp_csa == csa);
@@ -826,7 +835,7 @@ tn_restart:
 				GOTO_RETRY;
 			}
 			assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
-			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh->level,
+			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh_level,
 				FALSE, FALSE, GDS_WRITE_PLAIN);
 			assert(!dollar_tlevel || !cse->high_tlevel);
 			if ((0 != ins_chain_offset) && (NULL != cse) && (0 != cse->first_off))
@@ -954,6 +963,7 @@ tn_restart:
 			}
 		} else
 		{	/* Block split required */
+			split_depth++;
 			gv_target->clue.end = 0;	/* invalidate clue */
 			/* Potential size of the left and right blocks, including the new record */
 			new_blk_size_l = curr_rec_offset + new_rec_size;
@@ -965,13 +975,86 @@ tn_restart:
 			prev_rec_offset = bh->prev_rec.offset;
 			assert(new_blk_size_single <= new_blk_size_r);
 			/* Decide which side (left or right) the new record goes. Ensure either side has at least one record.
-			 * This means we might not honour the desired FillFactor if the only record in a block exceeds the
+			 * This means we might not honor the desired FillFactor if the only record in a block exceeds the
 			 * blk_fill_size, but in this case we are guaranteed the block has room for the current reserved bytes.
 			 * The typecast of curr_rec_offset is needed below to enforce a "signed int" comparison.
 			 */
-			new_rec_goes_to_right = (new_blk_size_r <= blk_fill_size)
-				? (((blk_fill_size / 2) < (signed int)curr_rec_offset) || (blk_fill_size < new_blk_size_l))
-				: (new_blk_size_r <= new_blk_size_single);
+			if (new_blk_size_r > blk_fill_size)
+			{
+				new_rec_goes_to_right = (new_blk_size_r == new_blk_size_single);
+				last_split_dir = NEWREC_DIR_FORCED;	/* no choice in split direction */
+			} else if (new_blk_size_l > blk_fill_size)
+			{
+				new_rec_goes_to_right = TRUE;
+				last_split_dir = NEWREC_DIR_FORCED;	/* no choice in split direction */
+			} else
+			{	/* new_rec can go in either direction without any issues of fitting in.
+				 * This is where we need to use a few heuristics to ensure good block space utilization.
+				 * We note down which direction (left or right) the new record went in after the split.
+				 * We use that as the heuristic to identify the direction of data loading and do the
+				 * splits accordingly for future updates.
+				 */
+				last_split_dir = (enum split_dir)gv_target->last_split_direction[bh_level];
+				if (NEWREC_DIR_FORCED == last_split_dir)
+				{	/* dont have prior information to use heuristic. choose whichever side is less full.
+					 * if this turns out to not be the correct choice, we will correct ourselves at the
+					 * time of the next block split at the same level.
+					 */
+					last_split_dir = (new_blk_size_l < new_blk_size_r) ? NEWREC_DIR_LEFT : NEWREC_DIR_RIGHT;
+				} else
+				{	/* Last block split at this level chose a specific direction for new_rec. See if
+					 * that heuristic worked. This is done by checking if the block # that new_rec went
+					 * into previously is the same block that is being split now. If so, that means the
+					 * previous choice of direction was actually not optimal. So try the other direction now.
+					 */
+					last_split_bnum = gv_target->last_split_blk_num[bh_level];
+					if (dollar_tlevel)
+					{
+						chain2 = *(off_chain *)&last_split_bnum;
+						if (chain1.flag == chain2.flag)
+						{
+							if (!chain1.flag)
+								blk_match = (blk_num == last_split_bnum);
+							else
+							{
+								assert(chain1.cw_index < si->cw_set_depth);
+								blk_match = (chain1.cw_index == chain2.cw_index);
+							}
+						} else
+							blk_match = FALSE;
+					} else
+					{
+						DEBUG_ONLY(chain1 = *(off_chain *)&last_split_bnum;)
+						assert(!chain1.flag);
+						blk_match = (blk_num == last_split_bnum);
+					}
+					is_split_dir_left = (NEWREC_DIR_LEFT == last_split_dir);
+					if (blk_match)	/* switch direction since last choice did not seem to have worked */
+						last_split_dir = is_split_dir_left ? NEWREC_DIR_RIGHT : NEWREC_DIR_LEFT;
+					else
+					{	/* blk# did not match means there is a high likelihood that the current split
+						 * is happening in the OTHER sibling block from the previous block split operation
+						 * at the same level. There is no easy way of confirming this so we assume the
+						 * heuristic is doing its job, unless we see evidence otherwise. And that evidence
+						 * is IF the block sizes of the left and right halves dont match the direction of
+						 * choice (e.g. if we choose NEWREC_DIR_LEFT, we expect the right block to be
+						 * almost full and the left block to be almost empty and vice versa).
+						 * In this case too switch the direction.
+						 */
+						if (is_split_dir_left)
+						{
+							if (new_blk_size_l > new_blk_size_r)
+								last_split_dir = NEWREC_DIR_RIGHT;
+						} else
+						{
+							if (new_blk_size_l < new_blk_size_r)
+								last_split_dir = NEWREC_DIR_LEFT;
+						}
+					}
+				}
+				new_rec_goes_to_right = (NEWREC_DIR_RIGHT == last_split_dir);
+			}
+			last_split_direction[bh_level] = (char)last_split_dir;
 			if (new_rec_goes_to_right)
 			{	/* Left side of this block will be split off into a new block.
 				 * The new record and the right side of this block will remain in this block.
@@ -1062,26 +1145,30 @@ tn_restart:
 					GOTO_RETRY;
 			} else
 			{	/* Insert in left hand (new) block */
-				/* If there is only one record on the left hand side, try for two */
-				copy_extra_record = ((0 == prev_rec_offset)
-							&& level_0
-							&& new_rec
-							&& (SIZEOF(blk_hdr) < cur_blk_size));
+				if (!level_0)
+				{	/* In case of an index block, as long as the current record is not a *-record
+					 * (i.e. last record in the block) and copying an extra record into the left
+					 * block does not cause it to exceed the fill factor, copy an additional record.
+					 * Not doing the extra record copy for index blocks (was the case pre-V54002) has
+					 * been seen to create suboptimally filled index blocks (as low as 15% fillfactor)
+					 * depending on the patterns of updates.
+					 */
+					assert(new_rec);
+					copy_extra_record = ((BSTAR_REC_SIZE != rec_size)
+									&& ((new_blk_size_l + BSTAR_REC_SIZE) <= blk_fill_size));
+				} else
+				{
+					copy_extra_record = ((0 == prev_rec_offset) && (NEWREC_DIR_LEFT == last_split_dir)
+								&& new_rec && (SIZEOF(blk_hdr) < cur_blk_size));
+				}
 				BLK_INIT(bs_ptr, bs1);
 				if (no_pointers)
 					left_hand_offset = 0;
 				else
 				{
 					left_hand_offset = curr_rec_offset + SIZEOF(rec_hdr);
-					if (level_0)
+					if (level_0 || copy_extra_record)
 						left_hand_offset += target_key_size - prev_rec_match;
-					/* else it is a *-key (implies the child pointer follows immediately) so no need to
-					 * change left_hand_offset. Note that if copy_extra_record was TRUE, then we need to
-					 * update left_hand_offset as the new record to be inserted will no longer be a *-key
-					 * (the extra_record that got copied over will instead be the *-key), but since
-					 * copy_extra_record is explicitly not done for index blocks (see "&& level_0" in the
-					 * check above) we do not need to change left_hand_offset.
-					 */
 				}
 				left_hand_index = ins_chain_index;
 				ins_chain_index = ins_chain_offset = 0;
@@ -1146,11 +1233,31 @@ tn_restart:
 					}
 				} else
 				{
+					if (copy_extra_record)
+					{
+						BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
+						curr_rec_hdr->rsiz = new_rec_size;
+						curr_rec_hdr->cmpc = prev_rec_match;
+						BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
+						BLK_ADDR(cp1, target_key_size - prev_rec_match, unsigned char);
+						memcpy(cp1, temp_key->base + prev_rec_match, target_key_size - prev_rec_match);
+						BLK_SEG(bs_ptr, cp1, target_key_size - prev_rec_match);
+						assert(value.len);
+						BLK_ADDR(va, value.len, char);
+						memcpy(va, value.addr, value.len);
+						BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
+						new_blk_size_l += BSTAR_REC_SIZE;
+					} else
+						new_blk_size_l = curr_rec_offset + BSTAR_REC_SIZE;
 					BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
 					new_star_hdr->rsiz = BSTAR_REC_SIZE;
 					new_star_hdr->cmpc = 0;
 					BLK_SEG(bs_ptr, (sm_uc_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
-					BLK_SEG(bs_ptr, (unsigned char *)&zeroes, SIZEOF(block_id));
+					if (!copy_extra_record)
+					{
+						BLK_SEG(bs_ptr, (unsigned char *)&zeroes, SIZEOF(block_id));
+					} else
+						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id), SIZEOF(block_id));
 				}
 				new_blk_bs = bs1;
 				if (0 == BLK_FINI(bs_ptr, bs1))
@@ -1224,16 +1331,16 @@ tn_restart:
 				 * assert(bs1[0].len <= blk_reserved_size);
 				 */
 			}
-			next_blk_index = t_create(bh->blk_num, (uchar_ptr_t)new_blk_bs, left_hand_offset, left_hand_index,
-				bh->level);
-			if ((FALSE == no_pointers) && (0 < dollar_tlevel))
+			next_blk_index = t_create(blk_num, (uchar_ptr_t)new_blk_bs, left_hand_offset, left_hand_index, bh_level);
+			if (!no_pointers && dollar_tlevel)
 			{	/* there may be chains */
-				curr_chain = *(off_chain *)&bh->blk_num;
+				assert(new_rec);
+				curr_chain = *(off_chain *)&blk_num;
 				if (curr_chain.flag == 1)
 					tp_get_cw(si->first_cw_set, curr_chain.cw_index, &cse);
 				else
 				{
-					if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&bh->blk_num)))
+					if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&blk_num)))
 						tp_srch_status = tabent->value;
 					else
 						tp_srch_status = NULL;
@@ -1252,7 +1359,8 @@ tn_restart:
 					assert(cse_new->ins_off == left_hand_offset);
 					assert(cse_new->index == left_hand_index);
 					assert(cse_new->level == cse->level);
-					offset_sum = cse->first_off;
+					cse_first_off = (int4)cse->first_off;
+					offset_sum = cse_first_off;
 					curr = buffaddr + offset_sum;
 					GET_LONGP(&curr_chain, curr);
 					assert(curr_chain.flag == 1);
@@ -1260,25 +1368,28 @@ tn_restart:
 					/* some of the following logic used to be in tp_split_chain which was nixed */
 					if (offset_sum <= last_possible_left_offset)
 					{	/* the split falls within or after the chain; otherwise entire chain stays right */
-						assert(curr_rec_offset != (int4)cse->first_off);
-						if (left_hand_offset && (curr_rec_offset < (int4)cse->first_off))
-							/* we are inserting the new record (with the to-be-filled child block
-							 * number) in the left block and the TP block chain of the block to be
-							 * split starts AFTER the new record's offset in the current block.
-							 * this means the left block (cse_new) will have a block chain starting
-							 * with the newly inserted record's block pointer.
+						assert((cse_first_off < curr_rec_offset)
+							|| (cse_first_off == last_possible_left_offset));
+						if (left_hand_offset && (curr_rec_offset < cse_first_off))
+						{	/* We are inserting the new record (with the to-be-filled child block
+							 * number) AND an extra record in the left block and the TP block
+							 * chain of the block to be split starts AFTER the new record's offset
+							 * in the current block. This means the left block (cse_new) will have a
+							 * block chain starting with the newly inserted record's block pointer.
 							 */
 							cse_new->first_off = left_hand_offset;
-						else
-							cse_new->first_off = cse->first_off;
+						} else
+						{
+							cse_new->first_off = cse_first_off;
+							assert(0 == cse_new->next_off);
+						}
 						if (level_0)	/* if no *-key issue stop after, rather than at, a match */
 							last_possible_left_offset += SIZEOF(off_chain);
 						if (offset_sum < last_possible_left_offset)
 						{	/* it's not an immediate hit */
-							for ( ; ; curr += curr_chain.next_off)
-							{	/* follow chain to split */
-								GET_LONGP(&curr_chain, curr);
-								assert(curr_chain.flag == 1);
+							for ( ; ; curr += curr_chain.next_off, GET_LONGP(&curr_chain, curr))
+							{	/* follow chain upto split point */
+								assert(1 == curr_chain.flag);
 								if (0 == curr_chain.next_off)
 									break;
 								offset_sum += curr_chain.next_off;
@@ -1286,45 +1397,90 @@ tn_restart:
 									break;
 							}	/* end of search chain loop */
 						}
-						assert(curr >= (buffaddr + cse->first_off));
+						assert(curr >= (buffaddr + cse_first_off));
 						if (level_0)	/* restore match point to "normal" */
 							last_possible_left_offset -= SIZEOF(off_chain);
 						if ((offset_sum == last_possible_left_offset) && !level_0)
-						{	/* if the chain hits the new last record in an index block,
-							 * the search stopped just before the split
+						{	/* The last record in the left side of the pre-split block is where
+							 * the search stopped. If no extra record copy was done, then this
+							 * record will end up BEFORE the inserted record in the post-split
+							 * left block. Otherwise this will be AFTER the inserted record.
+							 *
+							 * In case of copy_extra_record, the extra record will become the *-key
+							 *                        ---|------------v-----------------v
+							 *     [blk_hdr]...[curr rec( )][new rec ( )] [extra rec (*-key)]
+							 *
+							 * In case of no extra record copy, the new record will become the *-key
+							 *                        ---|-------------------v
+							 *     [blk_hdr]...[curr rec( )][new rec (*-key)( )]
+							 *
+							 * Take this into account during the calculations below.
 							 */
-							assert(0 == extra_record_orig_size);
+							assert(cse_first_off <= last_possible_left_offset);
 							if (left_hand_offset)
-							{	/* the new record will become the *-key: terminate the chain */
-								/*		      ---|-------------------v
-								 * [blk_hdr]...[curr rec( )][new rec (*-key)( )] */
+							{
 								assert(!ins_chain_offset);
-								if (offset_sum != cse->first_off)
+								if (!extra_record_orig_size && (offset_sum != cse_first_off))
 								{	/* bring curr up to the match */
 									curr += curr_chain.next_off;
 									GET_LONGP(&curr_chain, curr);
 								}
-								prev_chain = curr_chain;
-								assert((left_hand_offset - (curr - buffaddr))
-									== BSTAR_REC_SIZE);
-								prev_chain.next_off = BSTAR_REC_SIZE;
-								assert((curr - buffaddr + prev_chain.next_off)
-									<= (new_blk_size_l - SIZEOF(off_chain)));
-								if (dollar_tlevel != cse->t_level)
-								{
-									assert(dollar_tlevel > cse->t_level);
-									assert(!cse->undo_next_off[0] && !cse->undo_offset[0]);
-									assert(!cse->undo_next_off[1] && !cse->undo_offset[1]);
-									cse->undo_next_off[0] = curr_chain.next_off;
-									cse->undo_offset[0] = (block_offset)(curr - buffaddr);
+								curr_offset = curr - buffaddr;
+								undo_index = 0;
+								if (curr_offset < curr_rec_offset)
+								{	/* The chain starts before the curr_rec_offset. Fix
+									 * next_off field from the last element in the chain
+									 * before this offset.
+									 */
+									prev_chain = curr_chain;
+									assert(extra_record_orig_size
+										|| (BSTAR_REC_SIZE
+											== (left_hand_offset - curr_offset)));
+									prev_chain.next_off = left_hand_offset - curr_offset;
+									assert((curr_offset + prev_chain.next_off)
+										<= (new_blk_size_l - SIZEOF(off_chain)));
+									if (dollar_tlevel != cse->t_level)
+									{
+										assert(dollar_tlevel > cse->t_level);
+										assert(!cse->undo_next_off[0]
+												&& !cse->undo_offset[0]);
+										assert(!cse->undo_next_off[1]
+												&& !cse->undo_offset[1]);
+										cse->undo_next_off[0] = curr_chain.next_off;
+										cse->undo_offset[0] = (block_offset)curr_offset;
+										undo_index = 1;
+									}
+									GET_LONGP(curr, &prev_chain);
 								}
-								GET_LONGP(curr, &prev_chain);
+								if (extra_record_orig_size)
+								{
+									if (offset_sum != cse_first_off)
+									{	/* bring curr up to the match */
+										curr += curr_chain.next_off;
+										curr_offset += curr_chain.next_off;
+										GET_LONGP(&curr_chain, curr);
+									}
+									if (dollar_tlevel != cse->t_level)
+									{
+										assert(dollar_tlevel > cse->t_level);
+										assert(!cse->undo_next_off[undo_index] &&
+											!cse->undo_offset[undo_index]);
+										cse->undo_next_off[undo_index] =
+													curr_chain.next_off;
+										cse->undo_offset[undo_index] =
+													(block_offset)curr_offset;
+									}
+									prev_chain = curr_chain;
+									prev_chain.next_off = 0;
+									GET_LONGP(curr, &prev_chain);
+									cse_new->next_off = BSTAR_REC_SIZE;
+								}
 								offset_sum += curr_chain.next_off;
 							} else
 							{
 								undo_index = 0;
 								/* the last record turns into the *-key */
-								if (offset_sum == cse->first_off)
+								if (offset_sum == cse_first_off)
 								{	/* it's all there is */
 									/* first_off --------------------v
 									 * [blk_hdr]...[curr rec (*-key)( )] */
@@ -1378,31 +1534,28 @@ tn_restart:
 							}
 						} else
 						{	/* found the split and no *-key issue: just terminate before the split */
-							if (offset_sum == cse->first_off)
+							if (offset_sum == cse_first_off)
 								offset_sum += curr_chain.next_off;	/* put it in the lead */
 							old_curr_chain_next_off = curr_chain.next_off;
 							if (left_hand_offset)
 							{	/* there's a new chain rec in left */
-								assert(!ins_chain_offset);
-								if ((extra_record_orig_size) && ((extra_record_orig_size
-									- SIZEOF(off_chain) + SIZEOF(blk_hdr)) == cse->first_off))
-								{	/* extra rec has a chain and it's after the new rec */
-									/*		  ---|--------------v
-									 * [blk_hdr][new rec( )][extra rec ( )] */
-									assert((curr - buffaddr) == cse->first_off);
-									assert(level_0);	/* otherwise *-key issue */
-									cse_new->next_off = extra_rec_hdr->rsiz;
-									curr_chain.next_off = 0;
-								} else
-								{	/* put the new one at the end of the chain */
-									/*		      ---|---------------v
-									 * [blk_hdr]...[curr rec( )]...[new rec ( )] */
-									/* the new rec may or may not be a *-key */
-									assert((offset_sum - curr_chain.next_off) /* check old */
-										== (curr - buffaddr)); /* method equivalent */
-									curr_chain.next_off = (block_offset)(left_hand_offset -
-												(curr - buffaddr));
+								curr_offset = curr - buffaddr;
+								if (extra_record_orig_size
+									&& (curr_offset == last_possible_left_offset))
+								{
+									assert(level_0);	/* else *-key issues */
+									cse_new->next_off = extra_record_orig_size
+													- next_rec_shrink1;
 								}
+								assert(!ins_chain_offset);
+								/* put the new one at the end of the chain */
+								/*		      ---|---------------v
+								 * [blk_hdr]...[curr rec( )]...[new rec ( )] */
+								/* the new rec may or may not be a *-key */
+								assert((offset_sum - curr_chain.next_off) == curr_offset);
+								assert(left_hand_offset > curr_offset);
+								curr_chain.next_off = (block_offset)(left_hand_offset
+												- curr_offset);
 							} else
 								curr_chain.next_off = 0;
 							assert((curr - buffaddr + curr_chain.next_off)
@@ -1422,7 +1575,7 @@ tn_restart:
 							((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
 								- SIZEOF(off_chain)));
 					}	/* end of buffer and cse_new adjustments */
-					prev_first_off = cse->first_off;
+					prev_first_off = cse_first_off;
 					if (ins_chain_offset)
 					{	/* if there is a new chain rec in the old block, put it first */
 						/* first_off---------v
@@ -1431,6 +1584,7 @@ tn_restart:
 						assert(0 == extra_record_orig_size);
 						assert(ins_chain_offset >= (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
 						cse->first_off = ins_chain_offset;
+						assert(0 == cse->next_off);
 						if (offset_sum > last_possible_left_offset)
 						{	/* there are existing chain records after the split */
 							/* first_off---------v--------------------v
@@ -1446,7 +1600,7 @@ tn_restart:
 					{	/* just adjust the anchor for the split */
 						/* first_off------------------v
 						 * [blk_hdr]...[existing rec ( )] */
-						assert(offset_sum >= (int)cse->first_off);
+						assert(offset_sum >= (int)cse_first_off);
 						cse->first_off =  (block_offset)(offset_sum - last_possible_left_offset + rec_cmpc
 								+ SIZEOF(blk_hdr) - SIZEOF(off_chain));
 						assert(cse->first_off >= (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
@@ -1456,7 +1610,7 @@ tn_restart:
 							- SIZEOF(off_chain)));
 				}	/* end of of split processing */
 			}	/* end of tp only code */
-			if (0 == dollar_tlevel)
+			if (!dollar_tlevel)
 				cse = NULL;
 			else
 			{
@@ -1465,38 +1619,82 @@ tn_restart:
 				gvcst_blk_build(cse_new, NULL, 0);
 				cse_new->done = TRUE;
 			}
-			assert(temp_key == gv_altkey);
-			if (level_0)
+			/* Record block split heuristic info that will be used in next block split */
+			if (!new_rec_goes_to_right)
 			{
+				chain1.flag = 1;
+				chain1.cw_index = next_blk_index;
+				chain1.next_off = 0;
+				assert(SIZEOF(gv_target->last_split_blk_num[bh_level]) == SIZEOF(off_chain));
+				last_split_blk_num[bh_level] = *(block_id *)&chain1;
+			} else
+				last_split_blk_num[bh_level] = blk_num;
+			assert(temp_key == gv_altkey);
+			/* If new_rec_goes_to_right is TRUE, then it almost always implies that the left side of
+			 * the block is almost full (i.e. adding the new record there caused it to exceed the fill
+			 * factor) therefore direct all future updates to keys in between (which lie between the
+			 * last key of the left block and the first key of the right block) to the right block.
+			 *
+			 * If not, direct those updates to the left block thereby preventing it from staying at a
+			 * low capacity for a long period of time.
+			 *
+			 * This direction of future updates is implemented by controlling what key gets passed for
+			 * record addition into the parent index block. For directing all in-between updates to the
+			 * right block, pass in the last key of the left block to the parent index block. For directing
+			 * all in-between updates to the left block, back off 1 spot from the first key of the right
+			 * block and pass that to the parent index block.
+			 *
+			 * Doing this backoff accurately would imply finding the last non-zero byte in the key and taking
+			 * 1 off from it. In case the length of the right key is less than the left key, it is possible
+			 * that this backoff causes the new key to be less than even the left key (e.g. if left side has
+			 * "C2 13 93 00" as key sequence corresponding to the number 1292 and right side has "C2 14 00"
+			 * corresponding to the number 1300, taking one off the right side would give "C2 13 00" which corresponds
+			 * to the number 12 and is lesser than the left side). In this case, we would have to start adding in
+			 * FF bytes to the key as much as possible until we reached the left key length. In the above example,
+			 * we would get "C2 13 FF 00".
+			 *
+			 * In the end, because of the complexities involved in getting an accurate backoff (see above paragraph),
+			 * we instead implement a simplified backoff by examining just the first byte that differs and the
+			 * immediately following byte (if needed). If it turns out that we cannot get a backoff with just
+			 * those 2 bytes (should be rare), we then let the left key go unmodified. In such cases, we expect
+			 * not many intervening possible keys and and therefore it does not matter that much whether we pass
+			 * the left or (right-1) key to the parent.
+			 *
+			 * temp_key already holds the key corresponding to the last record of the left block.
+			 * bs1[2] and bs1[3] hold the key corresponding to the first record of the right block.
+			 */
+			if (level_0)
+			{	/* Determine key for record to pass on to parent index block */
 				cp1 = temp_key->base;
 				cp2 = (unsigned char *)bs1[2].addr;
-				for (i = 0;  i < bs1[2].len  &&  *cp2 == *cp1;  ++i)
+				bs1_2_len = bs1[2].len;
+				for (i = 0; (i < bs1_2_len) && (*cp2 == *cp1); ++i)
 				{
 					++cp2;
 					++cp1;
 				}
-				if (i == bs1[2].len)
+				if (i == bs1_2_len)
 				{
 					cp2 = (unsigned char *)bs1[3].addr;
-					for (i = 0;  i < bs1[3].len  &&  *cp2 == *cp1;  ++i)
+					bs1_3_len = bs1[3].len;
+					for (j = 0; (j < bs1_3_len) && (*cp2 == *cp1); ++j)
 					{
 						++cp2;
 						++cp1;
 					}
 				}
-				n = (int)(((sm_long_t)*cp2 - (sm_long_t)*cp1) / 2);
-				if (n < 0)
+				n = (int)((sm_long_t)*cp2 - (sm_long_t)*cp1);
+				if (0 > n)
 				{
 					assert(CDB_STAGNATE > t_tries);
 					status = cdb_sc_mkblk;
 					GOTO_RETRY;
-				}
-				if (0 != n)
+				} else if (1 < n)
 				{
 					temp_key->end = cp1 - temp_key->base + 2;
 					if (temp_key->end < temp_key->top)
 					{
-						*cp1++ += n;
+						*cp1++ += (!new_rec_goes_to_right ?  (n - 1) : 1);
 						*cp1++ = 0;
 						*cp1 = 0;
 					} else
@@ -1507,15 +1705,61 @@ tn_restart:
 						status = cdb_sc_mkblk;
 						GOTO_RETRY;
 					}
+				} else if (1 == n)
+				{
+					cp1++;
+					if ((cp1 - temp_key->base + 2) < temp_key->top)
+					{
+						if (i == (bs1_2_len - 1))
+							cp2 = (unsigned char *)bs1[3].addr;
+						else
+							cp2++;
+						if ((STR_SUB_MAXVAL != *cp1) || (KEY_DELIMITER != *cp2))
+						{
+							if (!new_rec_goes_to_right)
+							{
+								old_ch = *cp2;
+								new_ch = old_ch - 1;
+								*cp1 = new_ch;
+								if (KEY_DELIMITER != old_ch)
+									*(cp1 - 1) = *(cp2 - 1);
+							} else
+							{
+								old_ch = *cp1;
+								new_ch = old_ch + 1;
+								*cp1 = new_ch;
+								if (STR_SUB_MAXVAL == old_ch)
+									*(cp1 - 1) = *(cp2 - 1);
+							}
+							cp1++;
+							if (KEY_DELIMITER == new_ch)
+								temp_key->end--;
+							else
+								*cp1++ = KEY_DELIMITER;
+							*cp1 = KEY_DELIMITER;
+							temp_key->end = cp1 - temp_key->base;
+						}
+					} else
+					{
+						temp_key->end = temp_key->prev;
+						assert(temp_key->end < temp_key->top);
+						assert(CDB_STAGNATE > t_tries);
+						status = cdb_sc_mkblk;
+						GOTO_RETRY;
+					}
 				}
 			}
+			assert(temp_key->end < temp_key->top);
+			assert(KEY_DELIMITER == temp_key->base[temp_key->end]);
+			assert(KEY_DELIMITER == temp_key->base[temp_key->end - 1]);
+			assert(KEY_DELIMITER != temp_key->base[temp_key->end - 2]);
 			bq = bh + 1;
 			if (HIST_TERMINATOR != bq->blk_num)
 			{	/* Not root;  write blocks and continue */
 				if (cdb_sc_normal != (status = gvcst_search_blk(temp_key, bq)))
 					GOTO_RETRY;
 				cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset,
-					ins_chain_index, bh->level, TRUE, FALSE, GDS_WRITE_PLAIN);
+							ins_chain_index, bh_level, TRUE, FALSE, GDS_WRITE_PLAIN);
 				assert(!dollar_tlevel || !cse->high_tlevel);
 				if (cse)
 				{
@@ -1528,14 +1772,13 @@ tn_restart:
 				ins_chain_index = next_blk_index;
 			} else
 			{	/* Create new root */
-				if ((bh->level + 1) == MAX_BT_DEPTH)
+				if ((bh_level + 1) == MAX_BT_DEPTH)
 				{
 					assert(CDB_STAGNATE > t_tries);
 					status = cdb_sc_maxlvl;
 					GOTO_RETRY;
 				}
-				ins_chain_index = t_create(bh->blk_num, (uchar_ptr_t)bs1, ins_chain_offset, ins_chain_index,
-					bh->level);
+				ins_chain_index = t_create(blk_num, (uchar_ptr_t)bs1, ins_chain_offset, ins_chain_index, bh_level);
 				make_it_null = FALSE;
 				if (NULL != cse)
 				{     /* adjust block to use the buffer and offsets worked out for the old root */
@@ -1549,8 +1792,7 @@ tn_restart:
 							/* to be able to incrementally rollback, we need another copy of new_buff,
 							 * pointer copying wouldn't suffice
 							 */
-					cse_new->new_buff = ((new_buff_buddy_list *)get_new_free_element
-										(si->new_buff_list))->new_buff;
+					cse_new->new_buff = (unsigned char *)get_new_free_element(si->new_buff_list);
 					memcpy(cse_new->new_buff, cse->new_buff, ((blk_hdr_ptr_t)cse->new_buff)->bsiz);
 					cse_new->old_block = NULL;
 					make_it_null = TRUE;
@@ -1602,11 +1844,11 @@ tn_restart:
 				 * root block should disable the "indexmod" optimization (C9B11-001813).
 				 */
 				cse = t_write(bh, (unsigned char *)bs1, ins_off1, next_blk_index,
-							bh->level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
+							bh_level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
 				if (make_it_null)
 					cse->new_buff = NULL;
 				assert(!dollar_tlevel || !cse->high_tlevel);
-				if (0 == dollar_tlevel)
+				if (!dollar_tlevel)
 				{	/* create a sibling cw-set-element to store ins_off2/ins_chain_index */
 					t_write_root(ins_off2, ins_chain_index);
 				} else
@@ -1646,7 +1888,7 @@ tn_restart:
 	 *	current value (and hence the post-increment value) of the key might be different in different tries.
 	 *	In this case, the restart code checks and resets "jnl_format_done" to FALSE.
 	 */
-	if (0 == dollar_tlevel)
+	if (!dollar_tlevel)
 	{
 		nodeflags = 0;
 		if (skip_dbtriggers)
@@ -1660,7 +1902,7 @@ tn_restart:
 			assert(NULL != jfb);
 			jnl_format_done = TRUE;
 		}
-                succeeded = ((trans_num)0 != t_end(&gv_target->hist, dir_hist));
+                succeeded = ((trans_num)0 != t_end(&gv_target->hist, dir_hist, TN_NOT_SPECIFIED));
                 inctn_opcode = inctn_invalid_op;
 		if (succeeded)
 		{
@@ -1715,8 +1957,31 @@ tn_restart:
 		{	/* The logical update required an extra block split operation first (which succeeded) so
 			 * get back to doing the logical update before doing any trigger invocations etc.
 			 */
-			GTMTRIG_ONLY(POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);)
+			GTMTRIG_ONLY(skip_hasht_read = TRUE;)
 			goto fresh_tn_start;
+		}
+		for (bh_level = 0; bh_level < split_depth; bh_level++)
+		{
+			blk_num = last_split_blk_num[bh_level];
+			assert(0 != blk_num);
+			split_targ->last_split_blk_num[bh_level] = blk_num;
+			assert((NEWREC_DIR_FORCED == last_split_direction[bh_level])
+				|| (NEWREC_DIR_LEFT == last_split_direction[bh_level])
+				|| (NEWREC_DIR_RIGHT == last_split_direction[bh_level]));
+			split_targ->last_split_direction[bh_level] = last_split_direction[bh_level];
+			/* Fix blk_num if it was created in this transaction. In case of non-TP, we have the real block number
+			 * corresponding to the created block. In case of TP, we can know that only at tp_clean_up time so defer.
+			 */
+			chain1 = *(off_chain *)&blk_num;
+			if (chain1.flag)
+			{
+				if (!dollar_tlevel)
+				{
+					assert(chain1.cw_index < ARRAYSIZE(cw_set));
+					split_targ->last_split_blk_num[bh_level] = cw_set[chain1.cw_index].blk;
+				} else
+					split_targ->split_cleanup_needed = TRUE;/* phantom blk# will be fixed at tp_clean_up time */
+			}
 		}
 		if (dollar_tlevel)
 		{
@@ -1728,7 +1993,13 @@ tn_restart:
 #			ifdef GTM_TRIGGER
 			if (!skip_dbtriggers)
 			{
-				assert(gvt_trigger == gv_target->gvt_trigger);
+				/* Since we are about to invoke the trigger, we better have gv_target->gvt_trigger and
+				 * the local variable gvt_trigger in sync. The only exception is when we are here because
+				 * of a $ztvalue update and redoing the gvcst_put. In this case, it's possible that
+				 * the trigger code that was previously executed deleted the trigger and did an update
+				 * on the global which would have set gv_target->gvt_trigger to NULL. Assert accordingly.
+				 */
+				assert(ztval_gvcst_put_redo || (gvt_trigger == gv_target->gvt_trigger));
 				if ((NULL != gvt_trigger) && !ztval_gvcst_put_redo)
 				{
 					assert(dollar_tlevel);
@@ -1761,14 +2032,15 @@ tn_restart:
 					gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
 					assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
 					if (ERR_TPRETRY == gtm_trig_status)
-					{	/* A restart has been signalled inside trigger code for this
-						 * implicit TP wrapped transaction. Redo gvcst_put logic.
-						 * The t_retry/tp_restart call has already been done on our
-						 * behalf by gtm_trigger so we need to skip that part and do
-						 * everything else before redoing gvcst_put.
+					{	/* A restart has been signaled that we need to handle or complete the handling of.
+						 * This restart could have occurred reading the trigger in which case no
+						 * tp_restart() has yet been done or it could have occurred in trigger code in
+						 * which case we need to finish the incomplete tp_restart. In both cases this
+						 * must be an implicitly TP wrapped transaction. Our action is to complete the
+						 * necessary tp_restart() logic (t_retry is already completed so should be skipped)
+						 * and then re-do the gvcst_put logic.
 						 */
 						assert(lcl_implicit_tstart);
-						assert(0 < t_tries);
 						assert(CDB_STAGNATE >= t_tries);
 						status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
 						GOTO_RETRY;
@@ -1783,6 +2055,7 @@ tn_restart:
 						val = trigparms.ztvalue_new;
 						MV_FORCE_STR(val); /* in case the updated value happens to be a numeric quantity */
 						ztval_gvcst_put_redo = TRUE;
+						skip_hasht_read = TRUE;
 						/* In case, the current gvcst_put invocation was for $INCR, reset the corresponding
 						 * global variable that indicates a $INCR is in progress since the redo of the
 						 * gvcst_put is a SET command (no longer $INCR).
@@ -1839,12 +2112,6 @@ retry:
 #	ifdef GTM_TRIGGER
 	if (!skip_dbtriggers)
 	{
-		/* Do not pop M-stack mvals if this is a restart in the gvcst_put redo logic (due to $ztval changes).
-		 * We still want ztval_mval (saved in the M-stack by the pre-redo gvcst_put code) accessible in the redo stage.
-		 * An assert at the top of gvcst_put (IS_PTR_INSIDE_M_STACK) checks this as well.
-		 */
-		if (!ztval_gvcst_put_redo)
-			POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
 		if (lcl_implicit_tstart)
 		{
 			assert(!skip_INVOKE_RESTART);
@@ -1857,6 +2124,7 @@ retry:
 			 * extra_block_split/retry/ztval_gvcst_put_redo.
 			 */
 			ztval_gvcst_put_redo = FALSE;
+			skip_hasht_read = FALSE;
 			val = lcl_val;
 			/* $increment related fields need to be restored */
 			is_dollar_incr = lcl_is_dollar_incr;
@@ -1867,20 +2135,27 @@ retry:
 #	endif
 	assert((cdb_sc_normal != status) GTMTRIG_ONLY(|| lcl_implicit_tstart));
 	if (cdb_sc_normal != status)
+	{
+		GTMTRIG_ONLY(POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain));
 		t_retry(status);
-	else
+	} else
 	{	/* else: t_retry has already been done so no need to do that again but need to still invoke tp_restart
 		 * to complete pending "tprestart_state" related work.
 		 */
-		GTMTRIG_ONLY(assert(ERR_TPRETRY == gtm_trig_status);)
-		tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
+#		ifdef GTM_TRIGGER
+		assert(ERR_TPRETRY == gtm_trig_status);
+		TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
+		POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
+#		endif
+		rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
+		assert(0 == rc GTMTRIG_ONLY(&& TPRESTART_STATE_NORMAL == tprestart_state));
 	}
 	GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART);) /* if set to TRUE a few statements above, should have been reset by t_retry */
 	/* At this point, we can be in TP only if we implicitly did a tstart in gvcst_put (as part of a trigger update).
 	 * Assert that. Since the t_retry/tp_restart would have reset si->update_trans, we need to set it again.
 	 * So reinvoke the T_BEGIN call only in case of TP. For non-TP, update_trans is unaffected by t_retry.
 	 */
-	assert((0 == dollar_tlevel) GTMTRIG_ONLY(|| lcl_implicit_tstart));
+	assert(!dollar_tlevel GTMTRIG_ONLY(|| lcl_implicit_tstart));
 	if (dollar_tlevel)
 	{
 		jnl_format_done = FALSE;	/* need to reformat jnl records unconditionally in case of TP */

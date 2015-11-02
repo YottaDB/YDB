@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,20 +27,24 @@
 #include "copy.h"
 #include "longset.h"		/* also needed for cws_insert.h */
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"
+#include "gv_trigger.h"		/* for INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
+#endif
 
-GBLREF  sgm_info        	*first_sgm_info;
-GBLREF  sgm_info        	*sgm_info_ptr;
-GBLREF  short        		dollar_tlevel;
-GBLREF  gd_region		*gv_cur_region;
-GBLREF  global_tlvl_info	*global_tlvl_info_head;
-GBLREF  buddy_list		*global_tlvl_info_list;
+GBLREF	sgm_info		*first_sgm_info;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	global_tlvl_info	*global_tlvl_info_head;
+GBLREF	buddy_list		*global_tlvl_info_list;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF jnl_gbls_t		jgbl;
+GBLREF	jnl_gbls_t		jgbl;
 GBLREF	trans_num		local_tn;
 GBLREF	uint4			update_array_size;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	ua_list			*curr_ua, *first_ua;
-DEBUG_ONLY(GBLREF	uint4			cumul_update_array_size;)
+GBLREF	gv_namehead		*gvt_tp_list;
+DEBUG_ONLY(GBLREF uint4		cumul_update_array_size;)
 
 /* undo all the changes done in transaction levels greater than 'newlevel' */
 /* Note that we do not make any effort to release crit grabbed in tlevels beyond the 'newlevel'
@@ -59,23 +63,24 @@ DEBUG_ONLY(GBLREF	uint4			cumul_update_array_size;)
  */
 
 void restore_next_off(cw_set_element *cse);
-void rollbk_gbl_tlvl_info(short newlevel);
-void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si);
+void rollbk_gbl_tlvl_info(uint4 newlevel);
+void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si);
 
-void tp_incr_clean_up(short newlevel)
+void tp_incr_clean_up(uint4 newlevel)
 {
-	uint4			num_free;
 	boolean_t		freed;
-	sgm_info 		*si;
-	cw_set_element 		*cse, *next_cse, *tmp_cse;
 	cw_set_element		*cse_newlvl;	/* pointer to that cse in a given horizontal list closest to "newlevel" */
-	srch_blk_status		*tp_srch_status;
-	int			min_t_level;	/* t_level of the head of the horizontal-list of a given cw-set-element */
+	cw_set_element 		*cse, *next_cse, *tmp_cse;
+	gv_namehead		*gvnh;
 	ht_ent_int4		*tabent;
+	int			min_t_level;	/* t_level of the head of the horizontal-list of a given cw-set-element */
 	int4			upd_trans;
+	sgm_info 		*si;
 	sgmnt_addrs		*csa;
+	srch_blk_status		*tp_srch_status;
+	uint4			num_free;
 
-	assert(newlevel > 0);
+	assert(newlevel);
 	if (NULL != first_sgm_info)
 	{
 		assert(NULL != global_tlvl_info_list);
@@ -168,7 +173,7 @@ void tp_incr_clean_up(short newlevel)
 				{
 					tmp_cse = cse->high_tlevel;
 					if (cse->new_buff)
-						free_element(si->new_buff_list, (char *)cse->new_buff - SIZEOF(que_ent));
+						free_element(si->new_buff_list, (char *)cse->new_buff);
 					if (NULL != cse->low_tlevel) /* do not free up the head of the horizontal list */
 						free_element(si->tlvl_cw_set_list, (char *)cse);
 					cse = tmp_cse;
@@ -198,6 +203,14 @@ void tp_incr_clean_up(short newlevel)
 		}
 		DEBUG_ONLY(if (!si->update_trans) DBG_CHECK_SI_BUDDY_LIST_IS_REINITIALIZED(si);)
 	}
+	GTMTRIG_ONLY(
+		INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(TRUE, FALSE);
+	)
+	/* After an incremental rollback, it is possible that some gv_targets now have a block-split history that reflects
+	 * a created block number that is no longer relevant due to the rollback. Fix those as needed.
+	 */
+	for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)
+		TP_CLEANUP_GVNH_SPLIT_IF_NEEDED(gvnh, gvnh->gd_csa->sgm_info_ptr->cw_set_depth);
 	assert((NULL != first_sgm_info) || 0 == cw_stagnate.size || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
 	if (NULL != first_sgm_info)
@@ -243,7 +256,7 @@ void restore_next_off(cw_set_element *cse)
 
 /* Rollback global (across all segments) tlvl specific info to the beginning of (newlevel + 1) tlevel.  */
 
-void rollbk_gbl_tlvl_info(short newlevel)
+void rollbk_gbl_tlvl_info(uint4 newlevel)
 {
 	global_tlvl_info	*gtli, *next_gtli, *tmp_gtli, *prev_gtli;
 	sgmnt_addrs		*old_csa, *tmp_next_csa;
@@ -318,7 +331,7 @@ void rollbk_gbl_tlvl_info(short newlevel)
  * Rollback to the beginning state of (newlevel + 1) for the sgm_info 'si'
  */
 
-void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
+void rollbk_sgm_tlvl_info(uint4 newlevel, sgm_info *si)
 {
 	int			tli_cnt;
 	boolean_t		deleted, invalidate;

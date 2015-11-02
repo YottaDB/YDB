@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #ifndef REPL_COMM_H
 #define REPL_COMM_H
 
-#define REPL_CONN_RESET(err)	(ECONNRESET == (err) || EPIPE == (err) || EINVAL == (err))
+#define REPL_CONN_RESET(err)	(ECONNRESET == (err) || EPIPE == (err) || EINVAL == (err) || ETIMEDOUT == (err))
 
 /* To use REPL_SEND_LOOP following variables need to exist:
  *	unsigned char	*msg_ptr;
@@ -28,6 +28,7 @@
  *    length that we failed to send.
  */
 #define REPL_SEND_LOOP(SOCK_FD, BUFF, LEN, SKIP_PIPE_READY_CHECK, TIMEOUT) \
+assert(LEN > 0);\
 for (msg_ptr = (unsigned char *)(BUFF), sent_len = 0, sent_this_iter = tosend_len = (LEN); \
      SS_NORMAL == (status = repl_send(SOCK_FD, msg_ptr, &sent_this_iter, SKIP_PIPE_READY_CHECK, TIMEOUT)) \
      && ((sent_len += sent_this_iter), (tosend_len -= sent_this_iter), (tosend_len > 0)); \

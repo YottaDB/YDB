@@ -46,7 +46,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	unsigned int		t_tries;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
@@ -109,7 +109,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	 * update_underway is set to TRUE to indicate the commit is beyond rollback. It is set only if we hold crit on the region.
 	 */
 	update_underway = FALSE;
-	if (dollar_tlevel > 0)
+	if (dollar_tlevel)
 	{
 		trstr = "TP";
 		/* Regions are committed in the ftok order using "first_tp_si_by_ftok". Also crit is released on each region
@@ -165,7 +165,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 					jpl_reg = jnlpool.jnlpool_dummy_reg;	/* note down to release crit later */
 			}
 		}
-		if (dollar_tlevel > 0)
+		if (dollar_tlevel)
 		{	/* At this point we know a TP update is NOT underway. In this case, use "first_sgm_info" and not
 			 * "first_tp_si_by_ftok" as the latter might be NULL even though we have gotten crit on all the
 			 * regions and are in the final retry. In this case using "first_sgm_info" will guarantee that

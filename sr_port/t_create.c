@@ -30,11 +30,11 @@ GBLREF	cw_set_element		cw_set[];
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	short			dollar_tlevel;
-GBLREF	int			tp_allocation_clue;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	block_id		tp_allocation_clue;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	boolean_t		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
+GBLREF	block_id		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 
 block_index t_create (
 		      block_id	hint,			/*  A hint block number.  */
@@ -53,7 +53,7 @@ block_index t_create (
 {
 	cw_set_element	*cse;
 
-	if (dollar_tlevel == 0)
+	if (!dollar_tlevel)
 	{
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
 		cse = &cw_set[cw_set_depth];
@@ -91,7 +91,7 @@ block_index t_create (
 	cse->low_tlevel = NULL;
 	cse->high_tlevel = NULL;
 	cse->ondsk_blkver = GDSVCURR;
-	if (dollar_tlevel == 0)
+	if (!dollar_tlevel)
 		return(cw_set_depth++);
 	else
 		return(sgm_info_ptr->cw_set_depth++);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,17 +32,13 @@
 
 GBLREF	kill_set	*kill_set_tail;
 GBLREF	sgm_info	*sgm_info_ptr;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF  gv_namehead	*gv_target;
 GBLREF  boolean_t	horiz_growth;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	unsigned int	t_tries;
 #ifdef VMS
 GBLREF	boolean_t	tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
-#endif
-
-#ifdef DEBUG
-GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
 #endif
 
 void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
@@ -53,13 +49,14 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 	srch_blk_status	*tp_srch_status;
 	uint4		iter;
 	ht_ent_int4	*tabent;
-
 	DEBUG_ONLY(
 	boolean_t	block_already_in_hist = FALSE;
 	)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	horiz_growth = FALSE;
-	if (dollar_tlevel == 0)
+	if (!dollar_tlevel)
 		ks = kill_set_tail;
 	else
 	{
@@ -88,7 +85,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 					 * newer cse and return. the restart will be later detected by tp_hist.
 					 */
 					 cse = cse->high_tlevel;
-					 DEBUG_ONLY(donot_commit |= DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL;)
+					 DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL;)
 					 DEBUG_ONLY(block_already_in_hist = TRUE;)
 				}
 				assert(!cse->high_tlevel);
@@ -110,8 +107,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 					if (old_cse->done)
 					{
 						assert(NULL != old_cse->new_buff);
-						cse->new_buff = ((new_buff_buddy_list *)
-								get_new_free_element(sgm_info_ptr->new_buff_list))->new_buff;
+						cse->new_buff = (unsigned char *)get_new_free_element(sgm_info_ptr->new_buff_list);
 						memcpy(cse->new_buff, old_cse->new_buff, ((blk_hdr_ptr_t)old_cse->new_buff)->bsiz);
 					} else
 						cse->new_buff = NULL;
@@ -143,7 +139,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 				switch(cse->mode)
 				{
 				case kill_t_create:
-					VMS_ONLY(assert(tp_has_kill_t_cse);)
+					VMS_ONLY(assert(tp_has_kill_t_cse));
 					if (level == 0)
 						return;
 					break;
@@ -177,7 +173,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 		   = ks->next_kill_set;
 	}
 	ks->blk[ks->used].level = level;
-	if (dollar_tlevel == 0 || chain.flag == 0)
+	if (!dollar_tlevel || !chain.flag)
 	{
 		assert((CDB_STAGNATE > t_tries) || (blk < cs_addrs->ti->total_blks));
 		ks->blk[ks->used].block = blk;

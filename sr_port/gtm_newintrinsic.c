@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,6 @@
 
 #include "mdef.h"
 
-#include "hashtab_mname.h"
-#include "lv_val.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"
 #include "stack_frame.h"
@@ -26,7 +24,7 @@ GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF stack_frame	*frame_pointer;
 GBLREF tp_frame		*tp_pointer;
 GBLREF symval		*curr_symval;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 #ifdef GTM_TRIGGER
 GBLREF mval		dollar_ztwormhole;
 #endif
@@ -112,7 +110,7 @@ void gtm_newintrinsic(mval *intrinsic)
 			}
 		}
 		/* Adjust stackframe and mvstent pointers in relevant tp_frame blocks */
-		assert((NULL == tp_pointer && 0 == dollar_tlevel) || (NULL != tp_pointer && 0 != dollar_tlevel));
+		assert(((NULL == tp_pointer) && !dollar_tlevel) || ((NULL != tp_pointer) && dollar_tlevel));
 		for (tpp = tp_pointer; (tpp && ((unsigned char *)tpp->fp < top)); tpp = tpp->old_tp_frame)
 		{
 			if ((unsigned char *)tpp->fp > stacktop)

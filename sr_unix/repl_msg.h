@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,7 @@ enum
 #define	START_FLAG_COLL_M			0x00000008
 #define	START_FLAG_VERSION_INFO			0x00000010
 #define	START_FLAG_TRIGGER_SUPPORT		0x00000020
+#define	START_FLAG_SRCSRV_IS_VMS		0x00000040
 
 #define	MIN_REPL_MSGLEN		32 /* To keep compiler happy with
 				    * the definition of repl_msg_t as well
@@ -262,8 +263,8 @@ typedef struct
 {
 	struct
 	{
-		int4		fl;
-		int4		bl;
+		sm_off_t	fl;
+		sm_off_t	bl;
 	} que;
 	repl_heartbeat_msg_t	heartbeat;
 } repl_heartbeat_que_entry_t;
@@ -301,9 +302,9 @@ typedef repl_cmpinfo_msg_t	*repl_cmpinfo_msg_ptr_t;
 #endif
 
 void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_seqno);
-void	gtmsource_send_new_triple(void);
+void	gtmsource_send_new_triple(boolean_t rcvr_same_endianness);
 
-void	gtmrecv_repl_send(repl_msg_ptr_t msgp, char *msgtypestr, seq_num optional_seqno);
+void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypestr, seq_num optional_seqno);
 void	gtmrecv_send_triple_info(repl_triple *triple, int4 triple_num);
 
 #endif

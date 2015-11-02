@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,6 @@ GBLREF gv_key		*gv_currkey;
 GBLREF unsigned char	rdfail_detail;
 GBLREF unsigned int	t_tries;
 GBLREF srch_blk_status	*first_tp_srch_status;	/* overriding value of srch_blk_status given by t_qread in case of TP */
-GBLREF short            dollar_tlevel;
 
 enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 {

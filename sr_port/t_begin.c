@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "t_begin.h"
+#include "have_crit.h"
 
 GBLREF	short			crash_count;
 GBLREF	trans_num		start_tn;
@@ -35,23 +36,22 @@ GBLREF	uint4			t_err;
 GBLREF	uint4			update_trans;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	sgm_info		*first_sgm_info;
 
-#ifdef DEBUG
-GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
-#endif
-
 void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcst_routine */
 {
 	srch_blk_status	*s;
 	trans_num	histtn;
+	DCL_THREADGBL_ACCESS;
 
-	assert(0 == dollar_tlevel); /* if in TP, the T_BEGIN_xxx_NONTP_OR_TP macro should have been used and we will not be here */
+	SETUP_THREADGBL_ACCESS;
+	assert(!dollar_tlevel); /* if in TP, the T_BEGIN_xxx_NONTP_OR_TP macro should have been used and we will not be here */
 	/* any changes to the initialization in the two lines below might need a similar change in T_BEGIN_xxx_NONTP_OR_TP macros */
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);
 	update_trans = upd_trans;
 	t_err = err;
 
@@ -60,7 +60,10 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	if (cs_addrs->critical)
 		crash_count = cs_addrs->critical->crashcnt;
 	start_tn = cs_addrs->ti->curr_tn;
-	if (gv_target->clue.end)
+	/* Note: If gv_target was NULL before the start of a transaction and the only operations done inside the transaction
+	 * are trigger deletions causing bitmap free operations, we can reach here with gv_target being NULL.
+	 */
+	if ((NULL != gv_target) && gv_target->clue.end)
 	{	/* Since we have a clue, determine if the clue history has lesser transaction numbers and if so use that
 		 * as the start tn. Note that we need to take the MIN of all history level tns (see comment in tp_tend.c
 		 * in valid_thru processing logic for why).
@@ -83,5 +86,5 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	t_tries = 0;
 	if (non_tp_jfb_ptr)
 		non_tp_jfb_ptr->record_size = 0; /* re-initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
-	assert(!donot_commit);
+	assert(!TREF(donot_commit));
 }

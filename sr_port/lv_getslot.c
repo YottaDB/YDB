@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,9 +13,7 @@
 
 #include "gtm_stdio.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -24,40 +22,129 @@
 #include "caller_id.h"
 #include "alias.h"
 
-GBLREF boolean_t	lvmon_enabled;
-
 lv_val *lv_getslot(symval *sym)
 {
-	lv_blk	*p,*q;
-	int	n;
-	lv_val	*x;
+	lv_blk		*p,*q;
+	lv_val		*lv;
+	unsigned int	numElems, numUsed;
 
-	n = 0;
-	if (sym->lv_flist)
+	numElems = MAXUINT4;	/* maximum value */
+	if (lv = sym->lv_flist)
 	{
-		x = sym->lv_flist;
-		sym->lv_flist = x->ptrs.free_ent.next_free;
+		assert(NULL == LV_PARENT(lv));	/* stp_gcol relies on this for correct garbage collection */
+		sym->lv_flist = (lv_val *)lv->ptrs.free_ent.next_free;
 	} else
 	{
-		for (p = &sym->first_block ; ; p = p->next)
+		for (p = sym->lv_first_block; ; p = p->next)
 		{
-			if (!p)
+			if (NULL == p)
 			{
-				p = lv_newblock(malloc(SIZEOF(lv_blk)), &sym->first_block, n > 64 ? 128 : n * 2);
-				p->next = sym->first_block.next;
-				sym->first_block.next = p;
+				if (NULL != (p = sym->lv_first_block))
+					numElems = p->numAlloc;
+				else
+				{
+					assert(FALSE);
+					numElems = LV_NEWBLOCK_INIT_ALLOC;	/* be safe in pro */
+				}
+				lv_newblock(sym, numElems > 64 ? 128 : numElems * 2);
+				p = sym->lv_first_block;
+				assert(NULL != p);
 			}
-			if (n < (int)(p->lv_top - p->lv_base))
-				n = (int)(p->lv_top - p->lv_base);
-			if (p->lv_free < p->lv_top)
+			if ((numUsed = p->numUsed) < p->numAlloc)
 			{
-				x = p->lv_free++;
+				lv = (lv_val *)LV_BLK_GET_BASE(p);
+				lv = &lv[numUsed];
+				p->numUsed++;
 				break;
 			}
+			assert(numElems >= p->numAlloc);
+			DEBUG_ONLY(numElems = p->numAlloc);
 		}
 	}
-	assert(x);
-	DBGRFCT((stderr, ">> lv_getslot(): Allocating new lv_val/lv_sbs_tbl at 0x"lvaddr" by routine 0x"lvaddr"\n",
-		 x, caller_id()));
-	return x;
+	assert(lv);
+	DBGRFCT((stderr, ">> lv_getslot(): Allocating new lv_val at 0x"lvaddr" by routine 0x"lvaddr"\n", lv, caller_id()));
+	return lv;
+}
+
+tree *lvtree_getslot(symval *sym)
+{
+	lv_blk		*p,*q;
+	tree		*lvt;
+	unsigned int	numElems, numUsed;
+
+	numElems = MAXUINT4;	/* maximum value */
+	if (lvt = sym->lvtree_flist)
+	{
+		assert(NULL == LVT_GET_PARENT(lvt));
+		sym->lvtree_flist = (tree *)lvt->avl_root;
+	} else
+	{
+		for (p = sym->lvtree_first_block; ; p = p->next)
+		{
+			if (NULL == p)
+			{
+				if (NULL != (p = sym->lvtree_first_block))
+					numElems = p->numAlloc;
+				else
+					numElems = LV_NEWBLOCK_INIT_ALLOC;
+				lvtree_newblock(sym, numElems > 64 ? 128 : numElems * 2);
+				p = sym->lvtree_first_block;
+				assert(NULL != p);
+			}
+			if ((numUsed = p->numUsed) < p->numAlloc)
+			{
+				lvt = (tree *)LV_BLK_GET_BASE(p);
+				lvt = &lvt[numUsed];
+				p->numUsed++;
+				break;
+			}
+			assert(numElems >= p->numAlloc);
+			DEBUG_ONLY(numElems = p->numAlloc);
+		}
+	}
+	assert(lvt);
+	DBGRFCT((stderr, ">> lvtree_getslot(): Allocating new tree at 0x"lvaddr" by routine 0x"lvaddr"\n", lvt, caller_id()));
+	return lvt;
+}
+
+treeNode *lvtreenode_getslot(symval *sym)
+{
+	lv_blk		*p,*q;
+	treeNode	*lv;
+	unsigned int	numElems, numUsed;
+
+	numElems = MAXUINT4;	/* maximum value */
+	if (lv = sym->lvtreenode_flist)
+	{
+		assert(NULL == LV_PARENT(lv));	/* stp_gcol relies on this for correct garbage collection */
+		sym->lvtreenode_flist = (treeNode *)lv->sbs_child;
+	} else
+	{
+		for (p = sym->lvtreenode_first_block; ; p = p->next)
+		{
+			if (NULL == p)
+			{
+				if (NULL != (p = sym->lvtreenode_first_block))
+					numElems = p->numAlloc;
+				else
+					numElems = LV_NEWBLOCK_INIT_ALLOC;
+				lvtreenode_newblock(sym, numElems > 64 ? 128 : numElems * 2);
+				p = sym->lvtreenode_first_block;
+				assert(NULL != p);
+			}
+			if ((numUsed = p->numUsed) < p->numAlloc)
+			{
+				lv = (treeNode *)LV_BLK_GET_BASE(p);
+				lv = &lv[numUsed];
+				p->numUsed++;
+				break;
+			}
+			assert(numElems >= p->numAlloc);
+			DEBUG_ONLY(numElems = p->numAlloc);
+		}
+	}
+	assert(lv);
+	DBGRFCT((stderr, ">> lvtreenode_getslot(): Allocating new treeNode at 0x"lvaddr" by routine 0x"lvaddr"\n",
+			lv, caller_id()));
+	return lv;
 }

@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2010 Fidelity Information Services, Inc 	#
+#	Copyright 2009, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -53,7 +53,7 @@ fi
 
 # Create external call table needed by pinenty-gtm
 cat > $gtm_dist_plugin/gpgagent.tab << tabfile
-$gtm_dist_plugin/libgtmcrypt.so
+$gtm_dist_plugin/$lib_name
 unmaskpwd: xc_status_t gc_pk_mask_unmask_passwd_interlude(I:xc_string_t*,O:xc_string_t*[512],I:xc_int_t)
 tabfile
 

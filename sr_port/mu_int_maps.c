@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,6 @@ GBLREF	unsigned char		*mu_int_locals;
 GBLREF	unsigned char		*mu_int_master;
 GBLREF	sgmnt_data		mu_int_data;
 GBLREF	block_id		mu_int_path[];
-GBLREF	boolean_t		block;
-GBLREF	boolean_t		muint_key;
 GBLREF	boolean_t		tn_reset_this_reg;
 GBLREF	int			mu_int_plen;
 GBLREF	int4			mu_int_blks_to_upgrd;
@@ -260,7 +258,7 @@ void mu_int_maps(void)
 		}
 		free(disk);
 	}
-	if (!block && !muint_key && (mu_map_errs >= disp_map_errors))
+	if (mu_map_errs >= disp_map_errors)
 	{
 		util_out_print("Maximum number of incorrectly busy errors to display:  !UL, has been exceeded", TRUE,
 			disp_map_errors);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,10 +55,6 @@
 #define ESC_OFFSET		4
 #define MAX_COMMAND_LINE_LENGTH	255
 
-GBLDEF mval		dollar_zmode;
-GBLDEF mstr		dollar_zroutines;
-GBLDEF mstr		dollar_zcompile;
-
 GBLREF mval		dollar_zproc;
 GBLREF mval		dollar_zdir;
 GBLREF stack_frame	*frame_pointer;
@@ -73,15 +69,12 @@ GBLREF mval		dollar_job;
 GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zstep;
-GBLREF char		*zro_root;  /* ACTUALLY some other pointer type! */
-GBLREF mstr		gtmprompt;
 GBLREF int		dollar_zmaxtptime;
 GBLREF mval		dollar_zsource;
 GBLREF int4		dollar_zsystem;
-GBLREF int4		dollar_zcstatus;
 GBLREF int4		dollar_zeditor;
-GBLREF short		dollar_tlevel;
-GBLREF short		dollar_trestart;
+GBLREF uint4		dollar_tlevel;
+GBLREF uint4		dollar_trestart;
 GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_zerror;
 GBLREF mval		dollar_zyerror;
@@ -90,7 +83,6 @@ GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
-GBLREF int4		zdate_form;
 GBLREF mval		dollar_ztexit;
 GBLREF size_t		totalAlloc;
 GBLREF size_t		totalRmalloc;
@@ -102,7 +94,7 @@ GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF boolean_t	dollar_zquit_anyway;
 #ifdef GTM_TRIGGER
-GBLREF	mval		*dollar_ztcode;
+GBLREF	mstr		*dollar_ztname;
 GBLREF	mval		*dollar_ztdata;
 GBLREF	mval		*dollar_ztoldval;
 GBLREF	mval		*dollar_ztriggerop;
@@ -113,6 +105,10 @@ GBLREF	mval		dollar_ztwormhole;
 GBLREF	int4		gtm_trigger_depth;
 GBLREF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
 #endif
+
+error_def(ERR_TEXT);
+error_def(ERR_UNIMPLOP);
+error_def(ERR_ZDIROUTOFSYNC);
 
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
@@ -126,13 +122,11 @@ void op_svget(int varnum, mval *v)
 	char		*c1, *c2;
 	mval		*mvp;
 #	ifdef UNIX
- 	d_rm_struct	*d_rm;
+	d_rm_struct	*d_rm;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
-	error_def(ERR_ZDIROUTOFSYNC);
-
+	SETUP_THREADGBL_ACCESS;
 	switch (varnum)
 	{
 		case SV_HOROLOG:
@@ -264,13 +258,13 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_PROMPT:
 			v->mvtype = MV_STR;
-			v->str.addr = gtmprompt.addr;
-			v->str.len = gtmprompt.len;
+			v->str.addr = (TREF(gtmprompt)).addr;
+			v->str.len = (TREF(gtmprompt)).len;
 			s2pool(&v->str);
 			break;
 		case SV_ZCOMPILE:
 			v->mvtype = MV_STR;
-			v->str = dollar_zcompile;
+			v->str = TREF(dollar_zcompile);
 			s2pool(&(v->str));
 			break;
 		case SV_ZDIR:
@@ -285,7 +279,7 @@ void op_svget(int varnum, mval *v)
 			*v = dollar_zstep;
 			break;
 		case SV_ZMODE:
-			*v = dollar_zmode;
+			*v = TREF(dollar_zmode);
 			break;
 		case SV_ZMAXTPTIME:
 			i2mval(v, dollar_zmaxtptime);
@@ -302,10 +296,10 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_ZROUTINES:
-			if (!zro_root)
+			if (!TREF(zro_root))
 				zro_init();
 			v->mvtype = MV_STR;
-			v->str = dollar_zroutines;
+			v->str = TREF(dollar_zroutines);
 			s2pool(&(v->str));
 			break;
 		case SV_ZSOURCE:
@@ -330,7 +324,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZVERSION:
 			v->mvtype = MV_STR;
-			v->str.addr = (char *)&gtm_release_name[0];
+			v->str.addr = (char *)gtm_release_name;
 			v->str.len = gtm_release_name_len;
 			break;
 		case SV_ZSYSTEM:
@@ -338,7 +332,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZCSTATUS:
 			/* Maintain the external $ZCSTATUS == 1 for SUCCESS on UNIX while internal good is 0 */
-			MV_FORCE_MVAL(v, UNIX_ONLY((0 == dollar_zcstatus) ? 1 : ) dollar_zcstatus);
+			MV_FORCE_MVAL(v, UNIX_ONLY((0 == TREF(dollar_zcstatus)) ? 1 : ) TREF(dollar_zcstatus));
 			break;
 		case SV_ZEDITOR:
 			MV_FORCE_MVAL(v, dollar_zeditor);
@@ -385,7 +379,7 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_UMVAL(v, dollar_zjob);
 			break;
 		case SV_ZDATE_FORM:
-			MV_FORCE_MVAL(v, zdate_form);
+			MV_FORCE_MVAL(v, TREF(zdate_form));
 			break;
 		case SV_ZTEXIT:
 			*v = dollar_ztexit;
@@ -410,17 +404,27 @@ void op_svget(int varnum, mval *v)
 			v->mvtype = MV_STR;
 			v->str = dollar_zpatnumeric;
 			break;
-		case SV_ZTCODE:
+		case SV_ZTNAME:
+		case SV_ZTCODE:		/* deprecated */
 #			ifdef GTM_TRIGGER
-			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
-			memcpy(v, (NULL != dollar_ztcode) ? dollar_ztcode : &literal_null, SIZEOF(mval));
+			if (NULL == dollar_ztname)
+				memcpy(v, &literal_null, SIZEOF(mval));
+			else
+			{
+				v->mvtype = MV_STR;
+				v->str.addr = dollar_ztname->addr;
+				v->str.len = dollar_ztname->len;
+			}
 			break;
 #			else
 			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZTDATA:
 #			ifdef GTM_TRIGGER
-			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			/* Value comes from GT.M, but it might be numeric and need conversion to a string */
+			assert(!dollar_ztdata || MV_DEFINED(dollar_ztdata));
+			if (NULL != dollar_ztdata)
+				MV_FORCE_STR(dollar_ztdata);
 			memcpy(v, (NULL != dollar_ztdata) ? dollar_ztdata : &literal_null, SIZEOF(mval));
 			break;
 #			else
@@ -428,7 +432,10 @@ void op_svget(int varnum, mval *v)
 #			endif
 		case SV_ZTOLDVAL:
 #			ifdef GTM_TRIGGER
-			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			/* Value comes from GT.M, but it might be numeric and need conversion to a string */
+			assert(!dollar_ztoldval || MV_DEFINED(dollar_ztoldval));
+			if (NULL != dollar_ztoldval)
+				MV_FORCE_STR(dollar_ztoldval);
 			memcpy(v, (NULL != dollar_ztoldval) ? dollar_ztoldval : &literal_null, SIZEOF(mval));
 			break;
 #			else
@@ -436,7 +443,8 @@ void op_svget(int varnum, mval *v)
 #			endif
 		case SV_ZTRIGGEROP:
 #			ifdef GTM_TRIGGER
-			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			/* Value comes from GT.M, but assert it's a string */
+			assert(!dollar_ztriggerop || (MV_STR & dollar_ztriggerop->mvtype));
 			memcpy(v, (NULL != dollar_ztriggerop) ? dollar_ztriggerop : &literal_null, SIZEOF(mval));
 			break;
 #			else
@@ -444,6 +452,9 @@ void op_svget(int varnum, mval *v)
 #			endif
 		case SV_ZTUPDATE:
 #			ifdef GTM_TRIGGER
+			/* Value comes from GT.M, but if there were no delims involved, the value will be undefined, and
+			 * we return a "literal_null".
+			 */
 			memcpy(v, ((NULL != dollar_ztupdate && (MV_STR & dollar_ztupdate->mvtype)) ? dollar_ztupdate
 				   : &literal_null), SIZEOF(mval));
 			break;
@@ -452,7 +463,10 @@ void op_svget(int varnum, mval *v)
 #			endif
 		case SV_ZTVALUE:
 #			ifdef GTM_TRIGGER
-			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			/* Value comes from user-land so make sure things are proper */
+			assert(!dollar_ztvalue || MV_DEFINED(dollar_ztvalue));
+			if (NULL != dollar_ztvalue)
+				MV_FORCE_STR(dollar_ztvalue);
 			memcpy(v, (NULL != dollar_ztvalue) ? dollar_ztvalue : &literal_null, SIZEOF(mval));
 			break;
 #			else
@@ -460,9 +474,14 @@ void op_svget(int varnum, mval *v)
 #			endif
 		case SV_ZTWORMHOLE:
 #			ifdef GTM_TRIGGER
+			/* Value comes from user-land so make sure things are proper */
 			mvp = &dollar_ztwormhole;
-			MV_FORCE_STR(mvp);
-			memcpy(v, mvp, SIZEOF(mval));
+			if (MV_DEFINED(mvp))
+			{
+				MV_FORCE_STR(mvp);
+				memcpy(v, mvp, SIZEOF(mval));
+			} else
+				memcpy(v, &literal_null, SIZEOF(mval));
 			ztwormhole_used = TRUE;
 			break;
 #			else
@@ -470,6 +489,8 @@ void op_svget(int varnum, mval *v)
 #			endif
 		case SV_ZTSLATE:
 #			ifdef GTM_TRIGGER
+			/* Value comes from user-land so make sure things are proper */
+			assert(MV_DEFINED((&dollar_ztslate)));
 			mvp = &dollar_ztslate;
 			MV_FORCE_STR(mvp);
 			memcpy(v, mvp, SIZEOF(mval));

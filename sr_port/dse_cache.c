@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -125,9 +125,9 @@ void dse_cache(void)
 				          VMS_ONLY(is_mm ? RECOVER_NOT_APPLIC : RECOVER_DONE));
 		} else if (offset_present)
 		{
-			if ((reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE)) < (offset + size))
+			if ((csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE)) < (offset + size))
 				util_out_print("Region !12AD : Error: offset + size is greater than region's max_offset = 0x!XL",
-						TRUE, REG_LEN_STR(reg), (reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE)));
+						TRUE, REG_LEN_STR(reg), (csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE)));
 			else
 			{
 				chng_ptr = (sm_uc_ptr_t)csa->nl + offset;
@@ -210,7 +210,7 @@ void dse_cache(void)
 				util_out_print("Region !AD :  bt_record          = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), csa->hdr->n_bts, SIZEOF(bt_rec));
 				util_out_print("Region !AD :  shared_memory_size = 0x!XL",
-					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
+					TRUE, REG_LEN_STR(reg), csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 			} else
 			{
 				util_out_print("Region !AD :  mmblk_state        = 0x!XJ",
@@ -222,7 +222,7 @@ void dse_cache(void)
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(mr_que_lo + csa->hdr->bt_buckets), csa->hdr->n_bts,
 					SIZEOF(mmblk_rec));
 				util_out_print("Region !AD :  shared_memory_size = 0x!XL",
-					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
+					TRUE, REG_LEN_STR(reg), csa->nl->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE, REG_LEN_STR(reg), csa->hdr);
 			}
 		}

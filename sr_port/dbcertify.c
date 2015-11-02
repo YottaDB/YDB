@@ -54,6 +54,7 @@
 #include "dbcertify.h"
 #include "cli.h"
 #include "gtm_imagetype_init.h"
+#include "gtm_threadgbl_init.h"
 
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		gtm_utf8_mode;
@@ -72,7 +73,10 @@ GBLDEF	CLI_ENTRY		*cmd_ary = &dbcertify_cmd_ary[0]; /* Define cmd_ary to be the 
 
 int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 {
+	DCL_THREADGBL_ACCESS;
+
 	/* Initialization of scaffolding we run on */
+	GTM_THREADGBL_INIT;
 	gtm_imagetype_init(DBCERTIFY_IMAGE);
 	gtm_env_init();
 	gtm_utf8_mode = FALSE; 		/* Only ever runs in V4 database so NO utf8 mode -- ever */

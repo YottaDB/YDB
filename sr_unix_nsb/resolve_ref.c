@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,12 +22,17 @@
 #include "cdbg_dump.h"
 #include "gtmdbglvl.h"
 
-GBLREF int4		source_error_found;
 GBLREF boolean_t	run_time;
 GBLREF triple		t_orig;
 GBLREF mlabel		*mlabtab;
 GBLREF command_qualifier cmd_qlf;
 GBLREF uint4		gtmDebugLevel;
+
+error_def(ERR_LABELMISSING);
+error_def(ERR_LABELUNKNOWN);
+error_def(ERR_FMLLSTPRESENT);
+error_def(ERR_FMLLSTMISSING);
+error_def(ERR_ACTLSTTOOLONG);
 
 int resolve_ref(int errknt)
 {
@@ -38,12 +43,9 @@ int resolve_ref(int errknt)
 	oprtype *n;
 	int4	in_error;
 	int	actcnt;
-	error_def(ERR_LABELMISSING);
-	error_def(ERR_LABELUNKNOWN);
-	error_def(ERR_FMLLSTPRESENT);
-	error_def(ERR_FMLLSTMISSING);
-	error_def(ERR_ACTLSTTOOLONG);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (errknt && !(cmd_qlf.qlf & CQ_IGNORE))
 	{
 		assert(!run_time);
@@ -54,7 +56,7 @@ int resolve_ref(int errknt)
 		dqloop(&t_orig, exorder, x)
 		{
 			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
-			COMPDBG(cdbg_dump_triple(x, 0););
+			COMPDBG(cdbg_dump_triple(x, 0);)
 			for (n = x->operand ; n < ARRAYTOP(x->operand); n++)
 			{
 				if (n->oprclass == INDR_REF)
@@ -72,13 +74,9 @@ int resolve_ref(int errknt)
 					continue;
 				case MNXL_REF:
 					mxl = n->oprval.mlin->child;
-					if (mxl)
-						y = mxl->externalentry;
-					else
-						y = 0;
+						y = mxl ? mxl->externalentry : 0;
 					if (!y)
-					{
-						/* ignore vacuuous DO sp sp */
+					{	/* ignore vacuuous DO sp sp */
 						x->opcode = OC_NOOP;
 						break;
 					}
@@ -99,7 +97,7 @@ int resolve_ref(int errknt)
 						{
 							errknt++;
 							stx_error(ERR_FMLLSTPRESENT, 2, mlbx->mvname.len, mlbx->mvname.addr);
-							source_error_found = 0;
+							TREF(source_error_found) = 0;
 							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_FMLLSTPRESENT);
 							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
@@ -110,7 +108,7 @@ int resolve_ref(int errknt)
 					{
 						errknt++;
 						stx_error(ERR_LABELMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
-						source_error_found = 0;
+						TREF(source_error_found) = 0;
 						y = newtriple(OC_RTERROR);
 						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);
 						y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
@@ -119,23 +117,23 @@ int resolve_ref(int errknt)
 					}
 					continue;
 				case MFUN_REF:
-					assert (!run_time);
-					assert (x->opcode == OC_JMP);
+					assert(!run_time);
+					assert(OC_JMP == x->opcode);
 					z = x->exorder.bl;
-					assert (z->opcode == OC_EXCAL || z->opcode == OC_EXFUN);
-					assert (z->operand[1].oprclass == TRIP_REF);
+					assert((OC_EXCAL == z->opcode) || (OC_EXFUN == z->opcode));
+					assert(TRIP_REF == z->operand[1].oprclass);
 					z = z->operand[1].oprval.tref;
-					assert (z->opcode == OC_PARAMETER);
-					assert (z->operand[0].oprclass == TRIP_REF);
-					assert (z->operand[0].oprval.tref->opcode == OC_ILIT);
-					assert (z->operand[0].oprval.tref->operand[0].oprclass == ILIT_REF);
+					assert(OC_PARAMETER == z->opcode);
+					assert(TRIP_REF == z->operand[0].oprclass);
+					assert(OC_ILIT == z->operand[0].oprval.tref->opcode);
+					assert(ILIT_REF == z->operand[0].oprval.tref->operand[0].oprclass);
 					z = z->operand[1].oprval.tref;
-					assert (z->opcode == OC_PARAMETER);
-					assert (z->operand[0].oprclass == TRIP_REF);
-					assert (z->operand[0].oprval.tref->opcode == OC_ILIT);
-					assert (z->operand[0].oprval.tref->operand[0].oprclass == ILIT_REF);
+					assert(OC_PARAMETER == z->opcode);
+					assert(TRIP_REF == z->operand[0].oprclass);
+					assert(OC_ILIT == z->operand[0].oprval.tref->opcode);
+					assert(ILIT_REF == z->operand[0].oprval.tref->operand[0].oprclass);
 					actcnt = z->operand[0].oprval.tref->operand[0].oprval.ilit;
-					assert (0 <= actcnt);
+					assert(0 <= actcnt);
 					mlbx = n->oprval.lab;
 					y = mlbx->ml ? mlbx->ml->externalentry : 0;
 					if (y)
@@ -144,7 +142,7 @@ int resolve_ref(int errknt)
 						{
 							errknt++;
 							stx_error(ERR_FMLLSTMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
-							source_error_found = 0;
+							TREF(source_error_found) = 0;
 							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_FMLLSTMISSING);
 							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
@@ -154,7 +152,7 @@ int resolve_ref(int errknt)
 						{
 							errknt++;
 							stx_error(ERR_ACTLSTTOOLONG, 2, mlbx->mvname.len, mlbx->mvname.addr);
-							source_error_found = 0;
+							TREF(source_error_found) = 0;
 							y = newtriple(OC_RTERROR);
 							y->operand[0] = put_ilit(ERR_ACTLSTTOOLONG);
 							y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
@@ -169,7 +167,7 @@ int resolve_ref(int errknt)
 					{
 						errknt++;
 						stx_error(ERR_LABELMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
-						source_error_found = 0;
+						TREF(source_error_found) = 0;
 						y = newtriple(OC_RTERROR);
 						y->operand[0] = put_ilit(ERR_LABELUNKNOWN);
 						y->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */

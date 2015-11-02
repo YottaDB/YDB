@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,9 +18,6 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "hashtab_mname.h"
-#include "lv_val.h"
-#include "hashtab_addr.h"
 #include "zwrite.h"
 #include "subscript.h"
 #include "mlkdef.h"
@@ -38,10 +35,12 @@ void lvzwr_init(enum zwr_init_types zwrpattyp, mval *val)
 	lvzwrite_datablk	*prevzwrb;
 
 	/* Standard call at start of zwrite type functions. If this symval has aliases in it,
-	   prep a hash table we will use to track the lv_val addrs we process (but only if not merging).
-	*/
-	if (!merge_args && curr_symval->alias_activity)
-	{
+	 * prep a hash table we will use to track the lv_val addrs we process (but only if not merging).
+	 */
+	if (!merge_args)
+	{	/* Re-initialize table even if no "aliases" defined since dotted parms are actually aliases too and
+		 * will be placed in this table by lvzwr_out().
+		 */
 		als_zwrhtab_init();
 		zwrtacindx = 0;
 	}

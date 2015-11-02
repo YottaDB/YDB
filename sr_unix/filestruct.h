@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,8 @@
 #define GDS_RPL_LABEL 		"GDSRPLUNX03" 	/* format of journal pool and receive pool (must be of length GDS_LABEL_SZ) */
 
 typedef struct unix_db_info_struct
-{	sgmnt_addrs	s_addrs;
+{
+	sgmnt_addrs	s_addrs;
 	char		*fn;
 	int		fd;
 	gd_id		fileid;
@@ -34,7 +35,8 @@ typedef struct unix_db_info_struct
 } unix_db_info;
 
 typedef struct unix_file_info_struct
-{	int	file;
+{
+	int	file;
 	int	fn_len;
 	char	*fn;
 } unix_file_info;

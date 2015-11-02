@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -558,6 +558,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 			tl->iod->pair.out->type = rm;
 			tl->iod->pair.out->state = tl->iod->pair.in->state;
 			tl->iod->pair.out->dev_sp = d_rm_in;
+			d_rm_in->read_fildes = FD_INVALID;
 		}
 	}
 	if (-1 < file_des_w)

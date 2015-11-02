@@ -52,7 +52,7 @@ LITREF	char		*jrt_label[JRT_RECTYPES];
 #define LAB_TERM_SZ	(SIZEOF(LAB_TERM) - 1)
 
 /* This routine formats and outputs journal extract records
-   corresponding to M SET, KILL, ZKILL, TSTART, and ZTSTART commands as well as $ZTWORMHOLE */
+   corresponding to M SET, KILL, ZKILL, TSTART, ZTSTART, and ZTRIGGER  commands as well as $ZTWORMHOLE */
 void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 {
 	enum jnl_record_type	rectype;
@@ -113,7 +113,11 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 		} else if (IS_ZTWORM(rectype))
 		{
 			EXT2BYTES(&muext_code[MUEXT_ZTWORM][0]);
-		}
+		} else if (IS_ZTRIG(rectype))
+		{
+			EXT2BYTES(&muext_code[MUEXT_ZTRIG][0]);
+		} else
+			assert(FALSE);	/* The assert will disappear in pro but not the ";" to properly terminate the else */
 	} else
 	{
 		if (IS_FUPD_TUPD(rectype))
@@ -138,11 +142,11 @@ void	mur_extract_set(jnl_ctl_list *jctl, fi_type *fi, jnl_record *rec, pini_list
 		EXTQW(rec->jrec_set_kill.token_seq.token);
 	} else
 		EXTQW(rec->jrec_set_kill.token_seq.jnl_seqno);
-	assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));
+	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
 	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
 	EXTINT(rec->jrec_set_kill.update_num);
 	do_format2zwr = FALSE;
-	if (IS_SET_KILL_ZKILL(rectype))
+	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 		EXTINT(keystr->nodeflags);

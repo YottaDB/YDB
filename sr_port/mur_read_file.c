@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab.h"
 #include "muprec.h"
 #include "mur_read_file.h"
 #include "iosp.h"
@@ -846,7 +847,7 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 				|| ((mur_desc->jnlrec->prefix.tn != rec_tn) && (mur_desc->jnlrec->prefix.tn != (rec_tn + 1))))
 			break;
 		rec = mur_desc->jnlrec;
-		if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rec->prefix.jrec_type, rec))
+		if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rec->prefix.jrec_type))
 		{
 			if (GET_JNL_SEQNO(rec) < rec_seqno) /* if jnl seqno is not in sequence */
 				break;
@@ -1036,7 +1037,7 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		gtm_putmsg(VARLSTCNT(6) ERR_BEGSEQGTENDSEQ, 4, jctl->jnl_fn_len, jctl->jnl_fn, &jfh->start_seqno, &jfh->end_seqno);
 		return FALSE;
 	}
-	init_hashtab_int4(&jctl->pini_list, MUR_PINI_LIST_INIT_ELEMS);
+	init_hashtab_int4(&jctl->pini_list, MUR_PINI_LIST_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 	/* Please investigate if murgbl.max_extr_record_length is more than what a VMS record (in a line) can handle ??? */
 	if (murgbl.max_extr_record_length < ZWR_EXP_RATIO(jctl->jfh->max_jrec_len))
 		murgbl.max_extr_record_length = ZWR_EXP_RATIO(jctl->jfh->max_jrec_len);

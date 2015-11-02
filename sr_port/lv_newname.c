@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,6 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "hashtab.h"
 #include "lv_val.h"
 #include "tp_frame.h"
 #include "gdsroot.h"
@@ -33,7 +31,6 @@ GBLREF tp_frame		*tp_pointer;
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 GBLREF mv_stent		*mv_chain;
-GBLREF short		dollar_tlevel;
 
 void lv_newname(ht_ent_mname *hte, symval *sym)
 {
@@ -70,7 +67,8 @@ void lv_newname(ht_ent_mname *hte, symval *sym)
 			first_tf_saveall = tf;
 	}
 	assert(first_tf_saveall);
-	var = lv_getslot(lv->ptrs.val_ent.parent.sym);
+	assert(sym == LV_SYMVAL(lv));
+	var = lv_getslot(sym);
 	restore_ent = (tp_var *)malloc(SIZEOF(*restore_ent));
 	restore_ent->current_value = lv;
 	restore_ent->save_value = var;

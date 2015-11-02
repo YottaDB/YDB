@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,11 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
-#include "sbs_blk.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"
 #include "objlabel.h"
@@ -24,6 +22,9 @@
 #include "op.h"
 #include "unwind_nocounts.h"
 #include "flush_jmp.h"
+#ifdef GTM_TRIGGER
+# include "gtm_trigger_trc.h"
+#endif
 
 GBLREF	mv_stent	*mv_chain;
 GBLREF	unsigned char	*stackbase,*stacktop,*msp,*stackwarn;
@@ -60,15 +61,14 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	assert(!(SFT_TRIGR & frame_pointer->type));
 	frame_pointer->flags &= SFF_ETRAP_ERR_OFF;	/* clear the SFF_ETRAP_ERR bit */
 	frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;	/* clear the SFF_TRIGR_CALLD bit since this frame is being rewritten */
+	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Turrning off SFF_TRIGR_CALLD in frame 0x"lvaddr"\n", frame_pointer)));
 	frame_pointer->rvector = rtn_base;
 	frame_pointer->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;
 	frame_pointer->mpc = transfer_addr;
 	frame_pointer->ctxt = context;
 #ifdef HAS_LITERAL_SECT
-	/* VMS *may* need this to still be NULL in this case but UNIX does NOT */
-	VMS_ONLY(frame_pointer->literal_ptr = (int4 *)NULL);
-	UNIX_ONLY(frame_pointer->literal_ptr = (int4 *)LITERAL_ADR(rtn_base));
+	frame_pointer->literal_ptr = (int4 *)LITERAL_ADR(rtn_base);
 #endif
 	frame_pointer->temp_mvals = frame_pointer->rvector->temp_mvals;
 	size = rtn_base->temp_size;
@@ -77,8 +77,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	frame_pointer->l_symtab = (ht_ent_mname **)((char *)frame_pointer - size);
 	assert(frame_pointer->type & SFT_COUNT);
 	assert((unsigned char *)mv_chain > stacktop && (unsigned char *)mv_chain <= stackbase);
-
-	while ((char *)mv_chain < (char *)frame_pointer && !mvs_save[mv_chain->mv_st_type])
+	while (((char *)mv_chain < (char *)frame_pointer) && !mvs_save[mv_chain->mv_st_type])
 	{
 		assert(MVST_TRIGR != mv_chain->mv_st_type);	/* Should never unwind a trigger frame here */
 		msp = (unsigned char *)mv_chain;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,9 +37,11 @@ typedef struct
 #define ZB_CODE_SHIFT 0
 #endif
 
+#define BREAKMSG	TRUE
+#define NOBREAKMSG	FALSE
 #define INIT_NUM_ZBREAKS 1
-#define CANCEL_ONE -1
-#define CANCEL_ALL -2
+#define CANCEL_ONE	-1
+#define CANCEL_ALL	-2
 
 #define SIZEOF_LA	0
 
@@ -48,6 +50,6 @@ zbrk_struct *zr_get_free(z_records *zrecs, zb_code *addr);
 void zr_init(z_records *zrecs, int4 count);
 void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr);
 zb_code *find_line_call(void *addr);
-void zr_remove(rhdtyp *rtn);
+void zr_remove(rhdtyp *rtn, boolean_t notify_is_trigger);
 
 #endif /* ZBREAK_H_INCLUDED */

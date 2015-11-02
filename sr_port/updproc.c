@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,6 @@
 #include "rtnhdr.h"			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "targ_alloc.h"
-#include "hashtab.h"			/* for STR_HASH (in COMPUTE_HASH_MNAME)*/
 #endif
 #ifdef VMS
 #include <fab.h>
@@ -97,10 +96,15 @@
 #include "format_targ_key.h"
 #include "op_tcommit.h"
 #include "error_trap.h"
+#include "tp_frame.h"
 
 #define	MAX_IDLE_HARD_SPINS	1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
 
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
+#ifdef DEBUG
+GBLREF	uint4			dollar_trestart;
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
 GBLREF	gv_key			*gv_currkey;
 GBLREF  gd_region               *gv_cur_region;
 GBLREF  sgmnt_addrs             *cs_addrs;
@@ -134,23 +138,32 @@ GBLREF	uint4			log_interval;
 DEBUG_ONLY(GBLREF ch_ret_type	(*ch_at_trigger_init)();)
 GBLREF	int			tprestart_state;        /* When triggers restart, multiple states possible. See tp_restart.h */
 GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
+GBLREF	mval			dollar_ztwormhole;
 #endif
 GBLREF	boolean_t		skip_dbtriggers;
-GBLREF	bool			gv_curr_subsc_null;
-GBLREF	bool			gv_prev_subsc_null;
 GBLREF	gv_namehead		*gv_target;
 
 LITREF	mval			literal_hasht;
 static	boolean_t		updproc_continue = TRUE;
+
+error_def(ERR_REPEATERROR);
+error_def(ERR_TPRETRY);
+error_def(ERR_TEXT);
+error_def(ERR_SECONDAHEAD);
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_UPDREPLSTATEOFF);
+error_def(ERR_TPRETRY);
+error_def(ERR_GBLOFLOW);
+error_def(ERR_GVSUBOFLOW);
+error_def(ERR_GVIS);
+error_def(ERR_REC2BIG);
+error_def(ERR_TRIGDEFNOSYNC);
 
 CONDITION_HANDLER(updproc_ch)
 {
 	int		rc;
 	unsigned char	seq_num_str[32], *seq_num_ptr;
 	unsigned char	seq_num_strx[32], *seq_num_ptrx;
-
-	error_def(ERR_REPEATERROR);
-	error_def(ERR_TPRETRY);
 
 	START_CH;
 	if ((int)ERR_TPRETRY == SIGNAL)
@@ -223,10 +236,6 @@ int updproc(void)
 	char			proc_name[PROC_NAME_MAXLEN + 1];
 	struct dsc$descriptor_s proc_name_desc;
 #	endif
-
-	error_def(ERR_TEXT);
-	error_def(ERR_SECONDAHEAD);
-	error_def(ERR_RECVPOOLSETUP);
 
 	call_on_signal = updproc_sigstop;
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &updproc_ch);
@@ -343,15 +352,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	boolean_t		primary_has_trigdef, secondary_has_trigdef;
 	const char		*trigdef_inst = NULL, *no_trigdef_inst = NULL;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_UPDREPLSTATEOFF);
-	error_def(ERR_TPRETRY);
-	error_def(ERR_GBLOFLOW);
-	error_def(ERR_GVSUBOFLOW);
-	error_def(ERR_GVIS);
-	error_def(ERR_REC2BIG);
-	error_def(ERR_TRIGDEFNOSYNC);
-
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(updproc_ch);
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
@@ -411,6 +414,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				temp_write = 0;
 				if (0 < tupd_num)
 				{
+					assert(donot_INVOKE_MUMTSTART);
 					assert(dollar_tlevel);
 					OP_TROLLBACK(0);
 					tupd_num = 0;
@@ -597,8 +601,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						recvpool.upd_proc_local->read_jnl_seqno, recvpool.upd_proc_local->read_jnl_seqno,
 						recvpool_ctl->jnl_seqno, recvpool_ctl->jnl_seqno);
 					upd_proc_local->bad_trans = TRUE;
-					assert(0 == dollar_tlevel);
-					if (0 < dollar_tlevel)
+					assert(!dollar_tlevel);
+					if (dollar_tlevel)
 					{
 						repl_log(updproc_log_fp, TRUE, TRUE, "OP_TROLLBACK IS CALLED "
 							"-->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
@@ -649,7 +653,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				assert(0 != upd_rec_seqno);	/* we know TCOM is not created without a SET/KILL/ZKILL */
 				if (0 != upd_rec_seqno)
 					tcom_num++;
-			} else if (IS_SET_KILL_ZKILL(rectype))
+			} else if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 			{
 				assert(!IS_ZTP(rectype));
 				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
@@ -686,8 +690,12 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 								assert((!dollar_tlevel && !tupd_num) || dollar_tlevel
 										&& (tupd_num || dollar_trestart));
 								if (!dollar_tlevel)
-									op_tstart(TRUE, TRUE, &ts_mv, 0);
+								{
+									assert(!donot_INVOKE_MUMTSTART);
+									DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
+									op_tstart(IMPLICIT_TSTART, TRUE, &ts_mv, 0);
 										/* 0 ==> save no locals but RESTART OK */
+								}
 								tupd_num++;
 							}
 							upd_rec_seqno++;
@@ -720,7 +728,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					ts_mv.str.addr = NULL;
 					assert((!dollar_tlevel && !tupd_num) || dollar_tlevel && (tupd_num || dollar_trestart));
 					if (!dollar_tlevel)
-						op_tstart(TRUE, TRUE, &ts_mv, 0); /* 0 ==> save no locals but RESTART OK */
+						 /* 0 ==> save no locals but RESTART OK */
+						op_tstart(IMPLICIT_TSTART, TRUE, &ts_mv, 0);
 					tupd_num++;
 				}
 				upd_rec_seqno++;
@@ -776,8 +785,14 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 							if (0 == jpc->pini_addr)
 								jnl_put_jrt_pini(csa);
 						} else
-							rts_error(VARLSTCNT(6) jnl_status, 4,
-								JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));
+						{
+							if (SS_NORMAL != jpc->status)
+								rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csa->hdr),
+									DB_LEN_STR(gv_cur_region), jpc->status);
+							else
+								rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr),
+									DB_LEN_STR(gv_cur_region));
+						}
 					}
 					null_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 					null_record.prefix.jrec_type = JRT_NULL;
@@ -837,7 +852,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					assert(0 != tcom_num);
 					memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
 					op_tcommit();
-					if (0 != dollar_tlevel)
+					if (dollar_tlevel)
 					{	/* op_tcommit restarted the transaction - do update process special
 						 * handling for tpretry.  The error below has special handling in a
 						 * few condition handlers because it not so much signals an error
@@ -850,15 +865,26 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						*/
 						INVOKE_RESTART;
 					}
+					DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
+					/* Following two changes to dollar_ztwormhole reset the value of $ztwormhole to
+					 * "undefined" which is important since it points into the receiver pool area
+					 * that is about to be allowed to be overwritten. Prior to the next reference,
+					 * to dollar_ztwormhole, it should be included in a journal record. Note since
+					 * the ISV must always be defined op_svget will turn this state into an empty
+					 * string if somehow $ZTWORMHOLE is referenced before the replicating instance
+					 * receives a new value (like in a jobexam dump).
+					 */
+					GTMTRIG_ONLY(dollar_ztwormhole.mvtype = 0);
+					GTMTRIG_ONLY(dollar_ztwormhole.str.len = 0);
 					tcom_num = tupd_num = upd_rec_seqno = 0;
 					incr_seqno = TRUE;
 				}
 			} else if (JRT_ZTCOM == rectype)
 			{
-				assert(0 != dollar_tlevel);
+				assert(dollar_tlevel);
 				op_ztcommit(1);
 				incr_seqno = TRUE;
-			} else if (IS_SET_KILL_ZKILL(rectype))
+			} else if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 			{
 				key = keystr->text;
 				UPD_GV_BIND_NAME_APPROPRIATE(gd_header, mname, key, key_len);	/* if ^#t do special processing */
@@ -890,9 +916,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					/* Scan the global for two reasons :
 					 * (a) Need to setup gv_currkey->prev as update process can invoke triggers which
 					 * could use naked references which relies on gv_currkey->prev being properly set
-					 * (b) Set gv_prev_subsc_null (if any of the subscripts in a global other than the
-					 * last subscript IS NULL) and gv_curr_subsc_null (if the last subscript in a global
-					 * IS NULL) to issue GTM-E-NULSUSBC if needed.
+					 * (b) Set gv_some_subsc_null and gv_last_subsc_null accordingly to issue GTM-E-NULSUSBC
+					 * if needed.
 					 */
 					key = (char *)(gv_currkey->base);
 					keyend = gv_currkey->end;
@@ -947,13 +972,17 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					assert(cntr == keyend);
 					assert(last_subs < keyend);
 					assert(last_nullsubs < keyend);
-					gv_prev_subsc_null = (last_nullsubs && (last_nullsubs < last_subs));
-					gv_curr_subsc_null = (last_nullsubs && (last_nullsubs == last_subs));
+					TREF(gv_some_subsc_null) = (last_nullsubs && (last_nullsubs < last_subs));
+					TREF(gv_last_subsc_null) = (last_nullsubs && (last_nullsubs == last_subs));
 					gv_currkey->prev = last_subs;
 					if (IS_KILL(rectype))
 						op_gvkill();
 					else if (IS_ZKILL(rectype))
 						op_gvzwithdraw();
+#					ifdef GTM_TRIGGER
+					else if (IS_ZTRIG(rectype))
+						op_ztrigger();
+#					endif
 					else
 					{
 						assert(IS_SET(rectype));
@@ -1025,7 +1054,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			 * Nevertheless release crit in PRO just in case we hold it.
 			 */
 			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
-			if (0 < dollar_tlevel)
+			if (dollar_tlevel)
 			{
 				repl_log(updproc_log_fp, TRUE, TRUE,
 					"OP_TROLLBACK IS CALLED -->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);

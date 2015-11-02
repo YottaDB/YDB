@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,6 +73,23 @@
  */
 
 GBLDEF	int	repl_max_send_buffsize, repl_max_recv_buffsize;
+#if defined(__hppa) || defined(__vms)
+#define REPL_SEND_TRACE_BUFF_SIZE 65536
+#define REPL_RECV_TRACE_BUFF_SIZE 65536
+#else
+#define REPL_SEND_TRACE_BUFF_SIZE 1048576
+#define REPL_RECV_TRACE_BUFF_SIZE 1048576
+#endif
+#define REPL_SEND_SIZE_TRACE_SIZE 1024
+#define REPL_RECV_SIZE_TRACE_SIZE 1024
+STATICDEF int repl_send_trace_buff_pos = 0;
+STATICDEF unsigned char * repl_send_trace_buff = 0;
+STATICDEF int repl_send_size_trace_pos = 0;
+STATICDEF int repl_send_size_trace[REPL_SEND_SIZE_TRACE_SIZE];
+STATICDEF int repl_recv_trace_buff_pos = 0;
+STATICDEF unsigned char * repl_recv_trace_buff = 0;
+STATICDEF int repl_recv_size_trace_pos = 0;
+STATICDEF int repl_recv_size_trace[REPL_RECV_SIZE_TRACE_SIZE];
 
 int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pipe_ready_check, struct timeval *max_pipe_ready_wait)
 { /* On entry, *send_len is the number of bytes to be sent
@@ -88,7 +105,13 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 	unsigned long	poll_nfds;
 	struct pollfd	poll_fdlist[1];
 #endif
+	int		space_to_end;
 
+	if (!repl_send_trace_buff)
+		repl_send_trace_buff = malloc(REPL_SEND_TRACE_BUFF_SIZE);
+	/* Note: there is no corresponding free for this malloc since it is only done once per process and will not
+	 * accumulate across multiple process invocations. It will be "freed" when the mupip process exits.
+	 */
 	send_size = *send_len;
 	/* VMS returns SYSTEM-F-INVBUFLEN if send_size is larger than the hard limit VMS_MAX_TCP_SEND_SIZE (64K - 1 on some
 	 * impelementations, 64K - 512 on some others). VMS_MAX_TCP_SEND_SIZE may be larger than repl_max_send_buffsize, and
@@ -157,36 +180,67 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 		 * the check for EINTR below is valid and should not be converted to an EINTR wrapper macro, because other errno
 		 * values are being checked.
 		 */
-		for (ewouldblock_cnt = emsgsize_cnt = 0;
-		     (0 < send_size)
-		      && ((bytes_sent = send(sock_fd, (char *)buff, send_size, 0)) < 0)
-		      && (EINTR == errno || EMSGSIZE == errno || EWOULDBLOCK == errno); )
+		/* Trace last REPL_SEND_SIZE_TRACE_SIZE sizes of what was sent */
+		repl_send_size_trace[repl_send_size_trace_pos++] = send_size;
+		repl_send_size_trace_pos %= ARRAYSIZE(repl_send_size_trace);
+		/* Trace last REPL_SEND_TRACE_BUFF_SIZE bytes sent. */
+		if (send_size > REPL_SEND_TRACE_BUFF_SIZE)
 		{
-			if (EINTR == errno)
-				continue;
-			assert(EMSGSIZE != errno); /* since we use blocking sockets, we don't expect to see EMSGSIZE */
-			if (EMSGSIZE == errno)
-			{ /* Reduce the send size if possible */
-				if (send_size > REPL_COMM_MIN_SEND_SIZE)
-				{
-					if ((send_size >> 1) <= REPL_COMM_MIN_SEND_SIZE)
-						send_size = REPL_COMM_MIN_SEND_SIZE;
-					else
-						send_size >>= 1;
-				}
-				if (0 == ++emsgsize_cnt % REPL_COMM_LOG_EMSGSIZE_INTERVAL)
-					repl_log(stderr, TRUE, TRUE, "Communication subsystem warning: System appears to be "
-							"clogged; EMSGSIZE returned from send %d times\n", emsgsize_cnt);
-			} else
-			{
-				if (0 == ++ewouldblock_cnt % REPL_COMM_LOG_EWDBLCK_INTERVAL)
-					repl_log(stderr, TRUE, TRUE, "Communication subsystem warning: System appears to be "
-							"running slow; EWOULDBLOCK returned from send %d times\n", ewouldblock_cnt);
-				rel_quant(); /* we hope the cause for blocking would have cleared by the time we get scheduled
-					      * next time around */
-			}
+			/* if the message size > our buffer just copy the last our buffer-size-worth starting from the
+			 * beginning of our buffer and reset pos to the beginning of our buffer.
+			 */
+			memcpy(repl_send_trace_buff, buff + send_size - REPL_SEND_TRACE_BUFF_SIZE, REPL_SEND_TRACE_BUFF_SIZE);
+			repl_send_trace_buff_pos = 0;
 		}
-		if (0 < bytes_sent)
+		else
+		{
+			space_to_end = REPL_SEND_TRACE_BUFF_SIZE - repl_send_trace_buff_pos;
+			if (send_size > space_to_end)
+			{
+				memcpy(repl_send_trace_buff + repl_send_trace_buff_pos, buff, space_to_end);
+				memcpy(repl_send_trace_buff, buff + space_to_end, send_size - space_to_end);
+			}
+			else
+			{
+				memcpy(repl_send_trace_buff + repl_send_trace_buff_pos, buff, send_size);
+			}
+			repl_send_trace_buff_pos = (repl_send_trace_buff_pos + send_size) % REPL_SEND_TRACE_BUFF_SIZE;
+		}
+		if (0 < send_size)
+		{
+			for (ewouldblock_cnt = emsgsize_cnt = 0;
+				(((bytes_sent = send(sock_fd, (char *)buff, send_size, 0)) < 0)
+					&& (EINTR == errno || EMSGSIZE == errno || EWOULDBLOCK == errno)); )
+			{
+				if (EINTR == errno)
+					continue;
+				assert(EMSGSIZE != errno); /* since we use blocking sockets, we don't expect to see EMSGSIZE */
+				if (EMSGSIZE == errno)
+				{ /* Reduce the send size if possible */
+					if (send_size > REPL_COMM_MIN_SEND_SIZE)
+					{
+						if ((send_size >> 1) <= REPL_COMM_MIN_SEND_SIZE)
+							send_size = REPL_COMM_MIN_SEND_SIZE;
+						else
+							send_size >>= 1;
+					}
+					if (0 == ++emsgsize_cnt % REPL_COMM_LOG_EMSGSIZE_INTERVAL)
+						repl_log(stderr, TRUE, TRUE, "Communication subsystem warning: System "
+								"appears to be clogged; EMSGSIZE returned from send "
+								"%d times\n", emsgsize_cnt);
+				} else
+				{
+					if (0 == ++ewouldblock_cnt % REPL_COMM_LOG_EWDBLCK_INTERVAL)
+						repl_log(stderr, TRUE, TRUE, "Communication subsystem warning: System "
+								"appears to be running slow; EWOULDBLOCK returned from "
+								"send %d times\n", ewouldblock_cnt);
+					rel_quant(); /* we hope the cause for blocking would have cleared by the time
+							* we get scheduled next time around */
+				}
+			}
+		} else
+			bytes_sent = 0;
+		if (0 <= bytes_sent)
 		{
 			*send_len = (int)bytes_sent;
 			REPL_DPRINT2("repl_send: returning with send_len %ld\n", bytes_sent);
@@ -214,7 +268,13 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 	unsigned long	poll_nfds;
 	struct pollfd	poll_fdlist[1];
 #endif
+	int		space_to_end;
 
+	if (!repl_recv_trace_buff)
+		repl_recv_trace_buff = malloc(REPL_RECV_TRACE_BUFF_SIZE);
+	/* Note: there is no corresponding free for this malloc since it is only done once per process and will not
+	 * accumulate across multiple process invocations. It will be "freed" when the mupip process exits.
+	 */
 	assert(FD_INVALID != sock_fd);
 	max_recv_len = *recv_len;
 	/* VMS returns SYSTEM-F-INVBUFLEN if max_recv_len is larger than the hard limit VMS_MAX_TCP_SEND_SIZE (64K - 1 on some
@@ -286,6 +346,34 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 		{
 			*recv_len = (int)bytes_recvd;
 			REPL_DPRINT2("repl_recv: returning with recv_len %ld\n", bytes_recvd);
+			/* Trace last REPL_RECV_SIZE_TRACE_SIZE sizes of what was received */
+			repl_recv_size_trace[repl_recv_size_trace_pos++] = bytes_recvd;
+			repl_recv_size_trace_pos %= ARRAYSIZE(repl_recv_size_trace);
+			/* Trace last REPL_RECV_TRACE_BUFF_SIZE bytes received. */
+			if (bytes_recvd > REPL_RECV_TRACE_BUFF_SIZE)
+			{
+				/* if the message size > our buffer just copy the last our buffer-size-worth starting from the
+				 *  beginning of our buffer and reset pos to the beginning of our buffer.
+				 */
+				memcpy(repl_recv_trace_buff, buff + bytes_recvd - REPL_RECV_TRACE_BUFF_SIZE,
+						REPL_RECV_TRACE_BUFF_SIZE);
+				repl_recv_trace_buff_pos = 0;
+			}
+			else
+			{
+				space_to_end = REPL_RECV_TRACE_BUFF_SIZE - repl_recv_trace_buff_pos;
+				if (bytes_recvd > space_to_end)
+				{
+					memcpy(repl_recv_trace_buff + repl_recv_trace_buff_pos, buff, space_to_end);
+					memcpy(repl_recv_trace_buff, buff + space_to_end, bytes_recvd - space_to_end);
+				}
+				else
+				{
+					memcpy(repl_recv_trace_buff + repl_recv_trace_buff_pos, buff, bytes_recvd);
+				}
+				repl_recv_trace_buff_pos = (repl_recv_trace_buff_pos + bytes_recvd) %
+						REPL_RECV_TRACE_BUFF_SIZE;
+			}
 			return (SS_NORMAL);
 		}
 		if (0 == bytes_recvd)

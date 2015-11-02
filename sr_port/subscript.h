@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +9,6 @@
  *								*
  ****************************************************************/
 
-#define MAX_GVSUBSCRIPTS 32
-#define MAX_LVSUBSCRIPTS 32
-#define MAX_INDSUBSCRIPTS 32
+/* desperate times call for desperate measures - this is empty in order to defer ripping it out
+ * it's former contents have gone to mdef.h
+ */

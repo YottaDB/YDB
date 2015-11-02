@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,29 +18,28 @@
 #include "advancewindow.h"
 
 GBLREF char window_token;
-GBLREF bool shift_gvrefs;
-GBLREF unsigned short int expr_depth;
-GBLREF triple *expr_start, *expr_start_orig;
 LITREF octabstruct oc_tab[];
 
 int f_select( oprtype *a, opctype op )
 {
-	triple tmpchain, *oldchain, *ref, *r, *temp_expr_start, *temp_expr_start_orig, *triptr;
+	triple tmpchain, *oldchain, *ref, *r, *save_start, *save_start_orig, *triptr;
 	oprtype *cnd, tmparg, endtrip, target;
 	opctype old_op;
-	unsigned short int temp_expr_depth;
-	bool first_time, temp_shift_gvrefs;
+	unsigned int save_depth;
+	boolean_t first_time, save_shift;
 	error_def(ERR_COLON);
 	error_def(ERR_SELECTFALSE);
+	DCL_THREADGBL_ACCESS;
 
-	temp_shift_gvrefs = shift_gvrefs;
-	temp_expr_depth = expr_depth;
-	temp_expr_start = expr_start;
-	temp_expr_start_orig = expr_start_orig;
-	shift_gvrefs = FALSE;
-	expr_depth = 0;
-	expr_start = expr_start_orig = 0;
-	if (temp_shift_gvrefs)
+	SETUP_THREADGBL_ACCESS;
+	save_shift = TREF(shift_side_effects);
+	save_depth = TREF(expr_depth);
+	save_start = TREF(expr_start);
+	save_start_orig = TREF(expr_start_orig);
+	TREF(shift_side_effects) = FALSE;
+	TREF(expr_depth) = 0;
+	TREF(expr_start) = TREF(expr_start_orig) = NULL;
+	if (save_shift)
 	{
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
@@ -50,32 +49,32 @@ int f_select( oprtype *a, opctype op )
 	endtrip = put_tjmp(r);
 	for (;;)
 	{
-		cnd = (oprtype *) mcalloc(SIZEOF(oprtype));
+		cnd = (oprtype *)mcalloc(SIZEOF(oprtype));
 		if (!bool_expr((bool) FALSE, cnd))
 		{
-			if (temp_shift_gvrefs)
+			if (save_shift)
 				setcurtchain(oldchain);
 			return FALSE;
 		}
-		if (window_token != TK_COLON)
+		if (TK_COLON != window_token)
 		{
-			stx_error(ERR_COLON);
-			if (temp_shift_gvrefs)
+			if (save_shift)
 				setcurtchain(oldchain);
+			stx_error(ERR_COLON);
 			return FALSE;
 		}
 		advancewindow();
 		if (!expr(&tmparg))
 		{
-			if (temp_shift_gvrefs)
+			if (save_shift)
 				setcurtchain(oldchain);
 			return FALSE;
 		}
-		assert(tmparg.oprclass == TRIP_REF);
+		assert(TRIP_REF == tmparg.oprclass);
 		old_op = tmparg.oprval.tref->opcode;
 		if (first_time)
 		{
-			if (old_op == OC_LIT || oc_tab[old_op].octype & OCT_MVADDR)
+			if ((OC_LIT == old_op) || (oc_tab[old_op].octype & OCT_MVADDR))
 			{
 				ref = newtriple(OC_STOTEMP);
 				ref->operand[0] = tmparg;
@@ -83,15 +82,14 @@ int f_select( oprtype *a, opctype op )
 			}
 			r->operand[0] = target = tmparg;
 			first_time = FALSE;
-		}
-		else
+		} else
 		{
 			ref = newtriple(OC_STO);
 			ref->operand[0] = target;
 			ref->operand[1] = tmparg;
-			if (tmparg.oprval.tref->opcode == OC_PASSTHRU)
+			if (OC_PASSTHRU == tmparg.oprval.tref->opcode)
 			{
-				assert(tmparg.oprval.tref->operand[0].oprclass == TRIP_REF);
+				assert(TRIP_REF == tmparg.oprval.tref->operand[0].oprclass);
 				ref = newtriple(OC_STO);
 				ref->operand[0] = target;
 				ref->operand[1] = put_tref(tmparg.oprval.tref->operand[0].oprval.tref);
@@ -100,7 +98,7 @@ int f_select( oprtype *a, opctype op )
 		ref = newtriple(OC_JMP);
 		ref->operand[0] = endtrip;
 		tnxtarg(cnd);
-		if (window_token != TK_COMMA)
+		if (TK_COMMA != window_token)
 			break;
 		advancewindow();
 	}
@@ -109,19 +107,19 @@ int f_select( oprtype *a, opctype op )
 	ref->operand[0] = tmparg;
 	ref->operand[1] = put_ilit(FALSE);	/* Not a subroutine reference */
 	ins_triple(r);
-	assert(!expr_depth);
-	shift_gvrefs = temp_shift_gvrefs;
-	expr_depth = temp_expr_depth;
-	expr_start = temp_expr_start;
-	expr_start_orig = temp_expr_start_orig;
-	if (temp_shift_gvrefs)
+	assert(!TREF(expr_depth));
+	TREF(shift_side_effects) = save_shift;
+	TREF(expr_depth) = save_depth;
+	TREF(expr_start) = save_start;
+	TREF(expr_start_orig) = save_start_orig;
+	if (save_shift)
 	{
 		newtriple(OC_GVSAVTARG);
 		setcurtchain(oldchain);
-		dqadd(expr_start, &tmpchain, exorder);
-		expr_start = tmpchain.exorder.bl;
+		dqadd(TREF(expr_start), &tmpchain, exorder);
+		TREF(expr_start) = tmpchain.exorder.bl;
 		triptr = newtriple(OC_GVRECTARG);
-		triptr->operand[0] = put_tref(expr_start);
+		triptr->operand[0] = put_tref(TREF(expr_start));
 	}
 	*a = put_tref(r);
 	return TRUE;

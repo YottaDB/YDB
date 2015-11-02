@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,9 +17,6 @@
 #include "rtnhdr.h"
 #include "mv_stent.h"
 #include "release_name.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
-#include "sbs_blk.h"
 #include "gdsroot.h"		/* needed for tp.h & gv_trigger.h */
 #include "gdsbt.h"		/* needed for tp.h & gv_trigger.h */
 #include "gtm_facility.h"	/* needed for tp.h & gv_trigger.h */
@@ -33,8 +30,10 @@
 #include "hashtab_int4.h"	/* needed for tp.h & gv_trigger.h */
 #include "tp.h"
 #include "gtmimagename.h"
+#include "arit.h"
 
 #ifdef GTM_TRIGGER
+#include "trigger.h"
 #include "gv_trigger.h"
 #endif
 
@@ -153,7 +152,8 @@ LITDEF unsigned char mvs_size[] =
 	MV_SIZE(mvs_lvval),
 	MV_SIZE(mvs_trigr),
 	MV_SIZE(mvs_rstrtpc),
-	MV_SIZE(mvs_storig)
+	MV_SIZE(mvs_storig),
+	MV_SIZE(mvs_mrgzwrsv)
 };
 
 /* All mv_stent types that need to be preserved are indicated by the mvs_save[] array.
@@ -184,7 +184,8 @@ LITDEF boolean_t mvs_save[] =
 	TRUE,	/* MVST_LVAL */
 	FALSE,	/* MVST_TRIGR */
 	FALSE,	/* MVST_RSTRTPC */
-	TRUE	/* MVST_STORIG */
+	TRUE,	/* MVST_STORIG */
+	FALSE	/* MVST_MRGZWRSV */
 };
 
 static readonly unsigned char localpool[7] = {'1', '1' , '1' , '0', '1', '0', '0'};
@@ -240,6 +241,14 @@ LITDEF	int4	gvtr_cmd_mask[GVTR_CMDTYPES] = {
 #	include "gv_trig_cmd_table.h"
 #	undef GV_TRIG_CMD_ENTRY
 };
+
+/* The initialization order of this array matches enum trig_subs_t defined in triggers.h */
+#define TRIGGER_SUBDEF(SUBNAME) LITERAL_##SUBNAME
+LITDEF char *trigger_subs[] = {
+#include "trigger_subs_def.h"
+#undef TRIGGER_SUBDEF
+};
+
 #endif
 
 LITDEF	gtmImageName	gtmImageNames[n_image_types] =
@@ -290,7 +299,7 @@ LITDEF char *gtm_dbversion_table[] =
 	"V5"
 };
 
-LITDEF int4 ten_pwr[10] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000} ;
+LITDEF int4 ten_pwr[NUM_DEC_DG_1L+1] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000} ;
 LITDEF unsigned char lower_to_upper_table[] =
 {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,

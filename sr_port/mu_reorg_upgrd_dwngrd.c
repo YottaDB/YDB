@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -584,7 +584,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 					}
 					assert(SIZEOF(lcl_update_trans) == SIZEOF(update_trans));
 					lcl_update_trans = update_trans;	/* take a copy before t_end modifies it */
-					if ((trans_num)0 != t_end(&alt_hist, 0))
+					if ((trans_num)0 != t_end(&alt_hist, NULL, TN_NOT_SPECIFIED))
 					{	/* In case this is MM and t_end() remapped an extended database, reset csd */
 						assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
 						csd = cs_data;

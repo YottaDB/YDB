@@ -135,6 +135,18 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		} else
 			GTMASSERT;	/* ZTWORMHOLE should always been seen only inside a TP fence */
 		break;
+	case MUEXT_ZTRIG:
+		if (in_tp)
+		{
+			if (0 == num_records)
+			{
+				num_records++;
+				rec->prefix.jrec_type = JRT_TZTRIG;
+			} else
+				rec->prefix.jrec_type = JRT_UZTRIG;
+		} else
+			GTMASSERT;	/* ZTRIGGER should always been seen only inside a TP fence */
+		break;
 #	endif
 
 	case MUEXT_TSTART:
@@ -209,7 +221,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			rec->jrec_tcom.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 			return ((char_ptr_t)rec) + TCOM_RECLEN;
 	}
-	assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));
+	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
 	ptr = strtok(NULL, "\\");	/* get the update_num field */
 	assert(NULL != ptr);
 	assert(OFFSETOF(struct_jrec_upd, update_num) == OFFSETOF(struct_jrec_ztworm, update_num));
@@ -224,7 +236,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	assert(NULL != ptr);
 	if (MUEXT_ZTWORM != exttype)
 	{
-		assert(IS_SET_KILL_ZKILL(rectype));
+		assert(IS_SET_KILL_ZKILL_ZTRIG(rectype));
 		len = STRLEN(ptr);
 		keylength = zwrkeylength(ptr, len); /* determine length of key */
 

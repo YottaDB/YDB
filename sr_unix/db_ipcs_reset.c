@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,11 @@ GBLREF uint4		process_id;
 GBLREF ipcs_mesg	db_ipcs;
 GBLREF gd_region        *gv_cur_region;
 GBLREF gd_region	*standalone_reg;
+
+error_def (ERR_TEXT);
+error_def (ERR_CRITSEMFAIL);
+error_def (ERR_DBFILERR);
+error_def (ERR_FILEPARSE);
 /*
  * This routine is the counterpart of mu_rndwn_file() for standalone access.
  * In mu_rndwn_file() we got database access control semaphore.
@@ -56,11 +61,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	unix_db_info		*udi;
 	gd_region		*temp_region;
 	char			sgmnthdr_unaligned[SGMNT_HDR_LEN + 8], *sgmnthdr_8byte_aligned;
-
-	error_def (ERR_TEXT);
-	error_def (ERR_CRITSEMFAIL);
-	error_def (ERR_DBFILERR);
-	error_def (ERR_FILEPARSE);
+	sgmnt_addrs             *csa;
 
 	assert(reg);
 	temp_region = gv_cur_region; 	/* save gv_cur_region wherever there is scope for it to be changed */
@@ -74,6 +75,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		gv_cur_region = temp_region;
 		return FALSE;
 	}
+	csa = &udi->s_addrs;
 	sgmnthdr_8byte_aligned = &sgmnthdr_unaligned[0];
 	sgmnthdr_8byte_aligned = (char *)ROUND_UP2((unsigned long)sgmnthdr_8byte_aligned, 8);
 	csd = (sgmnt_data_ptr_t)&sgmnthdr_8byte_aligned[0];
@@ -88,6 +90,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	}
 	if (!ftok_sem_lock(reg, FALSE, immediate))
 		return FALSE;
+	FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_lock, process_id);
 	/* Now we have locked the database using ftok_sem. Any other ftok conflicted database will
 	 * suspend at this point, because of the lock.
 	 * At the end of this routine, we release ftok semaphore.
@@ -150,6 +153,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 	}
 	if (!ftok_sem_release(reg, TRUE, immediate))
 		return FALSE;
+	FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_release, process_id);
 	udi->semid = INVALID_SEMID;
 	udi->shmid = INVALID_SHMID;
 	udi->gt_sem_ctime = 0;

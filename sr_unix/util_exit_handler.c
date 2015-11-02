@@ -30,7 +30,7 @@
 GBLREF	boolean_t	need_core;
 GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	exit_handler_active;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	boolean_t	hold_onto_crit;
 
 void util_exit_handler()

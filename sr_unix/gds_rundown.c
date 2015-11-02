@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "aswp.h"
+#include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
 #include "util.h"
 #include "send_msg.h"
@@ -107,6 +108,19 @@ GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		dse_running;
 
+error_def(ERR_CRITSEMFAIL);
+error_def(ERR_DBCCERR);
+error_def(ERR_DBFILERR);
+error_def(ERR_DBRNDWNWRN);
+error_def(ERR_ERRCALL);
+error_def(ERR_GBLOFLOW);
+error_def(ERR_GTMASSERT);
+error_def(ERR_IPCNOTDEL);
+error_def(ERR_JNLFLUSH);
+error_def(ERR_RNDWNSEMFAIL);
+error_def(ERR_TEXT);
+error_def(ERR_WCBLOCKED);
+
 LITREF  char                    gtm_release_name[];
 LITREF  int4                    gtm_release_name_len;
 
@@ -131,27 +145,10 @@ void gds_rundown(void)
 	unix_db_info		*udi;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
-	intrpt_state_t		save_intrpt_ok_state;
 	shm_snapshot_t		*ss_shm_ptr;
 	boolean_t		is_cur_process_ss_initiator;
 	uint4			ss_pid;
 
-	error_def(ERR_CRITSEMFAIL);
-	error_def(ERR_DBCCERR);
-	error_def(ERR_DBFILERR);
-	error_def(ERR_DBRNDWNWRN);
-	error_def(ERR_ERRCALL);
-	error_def(ERR_GBLOFLOW);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_IPCNOTDEL);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_RNDWNSEMFAIL);
-	error_def(ERR_TEXT);
-	error_def(ERR_WCBLOCKED);
-
-	forced_exit = FALSE;		/* Okay, we're dying already -- let rel_crit live in peace now.
-					 * If coming through a DAL, not necessarily dying. what to do then? -- nars -- 8/15/2001
-					 */
 	grabbed_access_sem = FALSE;
 	jnl_status = 0;
 	reg = gv_cur_region;			/* Local copy */
@@ -231,9 +228,10 @@ void gds_rundown(void)
 	 * We already have created ftok semaphore in db_init or, mu_rndwn_file and did not remove it.
 	 * So just lock it. We do it in blocking mode.
 	 */
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_GDS_RUNDOWN);
+	DEFER_INTERRUPTS(INTRPT_IN_GDS_RUNDOWN);
 	if (!ftok_sem_lock(reg, FALSE, FALSE))
 		rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
+	FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_lock, process_id);
 	/*
 	 * If we already have database access control semaphore, we do not release it now.  We will release it
 	 * in mupip_exit_handler.c
@@ -248,14 +246,13 @@ void gds_rundown(void)
 		if (-1 == status)			/* We couldn't get it in one shot -- see if we already have it */
 		{
 			save_errno = errno;
-			/* see comment about Linux specific difference in behaviour of semctl() with GETPID in gds_rundown_ch() */
 			if (semctl(udi->semid, 0, GETPID) == process_id)
 			{
 				send_msg(VARLSTCNT(5) MAKE_MSG_INFO(ERR_CRITSEMFAIL), 2,
 					DB_LEN_STR(reg),
 					ERR_RNDWNSEMFAIL);
 				REVERT;
-				RESTORE_INTRPT_OK_STATE;
+				ENABLE_INTERRUPTS(INTRPT_IN_GDS_RUNDOWN);
 				return;			/* Already in rundown for this region */
 			}
 			if (EAGAIN != save_errno)
@@ -375,7 +372,6 @@ void gds_rundown(void)
 			 */
 			assert(csd == csa->hdr);
 			assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
-			csd->trans_hist.header_open_tn = csd->trans_hist.curr_tn;
 		} else if ((cancelled_timer && (0 > csa->nl->wcs_timers)) || cancelled_dbsync_timer)
 		{	/* cancelled pending db or jnl flush timers - flush database and journal buffers to disk */
 			grab_crit(reg);
@@ -602,7 +598,8 @@ void gds_rundown(void)
 	}
 	if (!ftok_sem_release(reg, !have_standalone_access, FALSE))
 			rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-	RESTORE_INTRPT_OK_STATE;
+	FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_release, process_id);
+	ENABLE_INTERRUPTS(INTRPT_IN_GDS_RUNDOWN);
 	if (!ipc_deleted)
 	{
 		GET_CUR_TIME;
@@ -666,15 +663,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 				csa->now_crit = FALSE;
 		}
 		sem_pid = semctl(udi->semid, 0, GETPID);
-#ifndef __linux__
-		/* On non Linux platforms, semctl with GETPID argument returns the process_id of the last process to have
-		 * successfully completed a semop() system call. But on Linux it seems to return the process_id of the last
-		 * process to have attempted a semop() system call, be it successful or not. Hence, we cannot rely on the
-		 * fact that the return value will be "process_id" if we did the last semop - other concurrent processes
-		 * might have failed to acquire the semaphore after we succeeded.
-		 */
 		assert(sem_pid == process_id);
-#endif
 		if (0 != (semop_res = do_semop(udi->semid, 0, -1, SEM_UNDO | IPC_NOWAIT)))
 			gtm_putmsg(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(gv_cur_region),
 					  ERR_TEXT, 2, RTS_ERROR_TEXT("Error releasing access semaphore"), semop_res);

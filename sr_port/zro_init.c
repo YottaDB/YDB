@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #include "trans_log_name.h"
 #include "gtm_logicals.h"
 
-GBLREF	mstr	dollar_zroutines;
+error_def(ERR_LOGTOOLONG);
 
 #define MAX_NUMBER_FILENAMES	256*MAX_TRANS_NAME_LEN
 
@@ -28,11 +28,11 @@ void zro_init (void)
 	int4	status;
 	mstr	val, tn;
 	char	buf1[MAX_NUMBER_FILENAMES]; /* buffer to hold translated name */
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_LOGTOOLONG);
-
-	if (dollar_zroutines.addr)
-		free(dollar_zroutines.addr);
+	SETUP_THREADGBL_ACCESS;
+	if ((TREF(dollar_zroutines)).addr)
+		free((TREF(dollar_zroutines)).addr);
 	val.addr = GTM_ZROUTINES;
 	val.len = SIZEOF(GTM_ZROUTINES) - 1;
 	status = TRANS_LOG_NAME(&val, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
@@ -46,12 +46,12 @@ void zro_init (void)
 			rts_error(VARLSTCNT(1) status);
 	}
 	if (status == SS_NOLOGNAM)
-		dollar_zroutines.len = 0;
+		(TREF(dollar_zroutines)).len = 0;
 	else
 	{
-		dollar_zroutines.len = tn.len;
-		dollar_zroutines.addr = (char *) malloc (tn.len);
-		memcpy (dollar_zroutines.addr, buf1, tn.len);
+		(TREF(dollar_zroutines)).len = tn.len;
+		(TREF(dollar_zroutines)).addr = (char *)malloc (tn.len);
+		memcpy ((TREF(dollar_zroutines)).addr, buf1, tn.len);
 	}
-	zro_load(&dollar_zroutines);
+	zro_load(TADR(dollar_zroutines));
 }

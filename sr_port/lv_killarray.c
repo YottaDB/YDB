@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,9 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -24,98 +22,59 @@
 #include "gdsfhead.h"
 #include "alias.h"
 
-/* Note it is important that callers of this routine make sure that the pointer that is passed as
-   an argument is removed from the lv_val it came from prior to the call. This prevents arrays
-   that have alias containers pointing that form a loop back to the originating lv_val from causing
-   processing loops, in effect over-processing arrays that have already been processed or lv_vals
-   that have been deleted.
-*/
-void lv_killarray(lv_sbs_tbl *a, boolean_t dotpsave)
-{
-       	register lv_val *lv;
-	sbs_flt_struct	*f;
-	sbs_str_struct	*s;
-	int4		i;
-	lv_sbs_tbl	*tbl, *tmpsbs;
-	sbs_blk		*blk, *temp;
-	char		*top;
-	register lv_val **fl;
+STATICDEF	boolean_t	dotpsave_static;
 
-	assert(a);
-	assert(a->sym->ident == MV_SYM);
-	assert(NULL == a->lv->ptrs.val_ent.children);	/* Owner lv's children pointer MUST be NULL! */
-       	fl = &(a->sym->lv_flist);
-	if (a->num)
-	{
-		if (a->int_flag)
-		{
-			assert(a->num);
-			blk = a->num;
- 	 	   	for (i = 0; i < SBS_NUM_INT_ELE; i++)
-       	       	       	{
-				if (lv = blk->ptr.lv[i])
-		   	 	{
-		   			if (tmpsbs = lv->ptrs.val_ent.children)	/* note assignment */
-					{
-						assert(lv == tmpsbs->lv);
-						lv->ptrs.val_ent.children = NULL;
-						lv_killarray(tmpsbs, dotpsave);
-					}
-					DECR_AC_REF(lv, dotpsave);	/* Decrement alias contain ref and cleanup if necessary */
-					LV_FLIST_ENQUEUE(fl, lv);
-		   		}
-	       	   	}
-       	       	       	lv_free_sbs_blk(blk);
-		   	a->int_flag = FALSE;
-		} else
-       	       	{
-			for (blk = a->num; blk; )
-		 	{
-				for (f = &blk->ptr.sbs_flt[0], top = (char *)&blk->ptr.sbs_flt[blk->cnt];
-				     f < (sbs_flt_struct *)top; f++)
-		 	 	{
-					lv = f->lv;
-		 			if (tmpsbs = lv->ptrs.val_ent.children)	/* note assignment */
-					{
-						assert(lv == tmpsbs->lv);
-						lv->ptrs.val_ent.children = NULL;
-						lv_killarray(tmpsbs, dotpsave);
-					}
-					DECR_AC_REF(lv, dotpsave);	/* Decrement alias contain ref and cleanup if necessary */
-					LV_FLIST_ENQUEUE(fl, lv);
-		 		}
-				temp = blk->nxt;
-		 		lv_free_sbs_blk(blk);
-		 		blk = temp;
-	 	 	}
-		}
-		a->num = NULL;
-	}
-	if (a->str)
-	{
-		for (blk = a->str; blk; )
-	 	{
-			for (s = &blk->ptr.sbs_str[0], top = (char *)&blk->ptr.sbs_str[blk->cnt];
-			     s < (sbs_str_struct *)top; s++)
-	 	 	{
-				lv = s->lv;
-	 			if (tmpsbs = lv->ptrs.val_ent.children)	/* note assignment */
-				{
-					assert(lv == tmpsbs->lv);
-					lv->ptrs.val_ent.children = NULL;
-					lv_killarray(tmpsbs, dotpsave);
-				}
-				DECR_AC_REF(lv, dotpsave);	/* Decrement alias contain ref and cleanup if necessary */
-				LV_FLIST_ENQUEUE(fl, lv);
-	 		}
-			temp = blk->nxt;
-	 		lv_free_sbs_blk(blk);
-	 		blk = temp;
-	 	}
-	 	a->str = NULL;
-       	}
-	/* now free the subscript table */
-	lv = (lv_val *)a;
-	LV_FLIST_ENQUEUE(fl, lv);
+static void	lv_killarray_base(tree *lvt);
+static void	lv_killarray_recurse(treeNode *node);
+
+void lv_killarray(tree *lvt, boolean_t dotpsave)
+{
+	dotpsave_static = dotpsave;	/* save dotpsave in a static to avoid having to pass it all through the recursion */
+	lv_killarray_base(lvt);
+}
+
+/* Note it is important that callers of this routine make sure that the pointer that is passed as
+ * an argument is removed from the lv_val it came from prior to the call. This prevents arrays
+ * that have alias containers pointing that form a loop back to the originating lv_val from causing
+ * processing loops, in effect over-processing arrays that have already been processed or lv_vals
+ * that have been deleted.
+ *
+ * Note the below could have been implemented using iteration (using lvTreeNodeFirst and lvTreeNodeNext in a loop to
+ * scan all nodes in the tree) OR using recursion. We choose recursion because in this case, we are killing/freeing nodes
+ * as we scan them and to avoid risk of issues with accessing a freed pointer, we choose post-order traversal (where you
+ * process/kill/free a node only AFTER processing both its left and right subtrees) which is best done using recursion.
+ * If not for that, we would have preferred iteration as that is less intensive on the C stack.
+ */
+static void	lv_killarray_base(tree *lvt)
+{
+	DEBUG_ONLY(
+		lv_val		*lv;
+
+		lv = (lv_val *)lvt->sbs_parent;
+		assert(NULL == LV_CHILD(lv));	/* Owner lv's children pointer MUST be NULL! */
+	)
+	lvTreeWalkPostOrder(lvt, lv_killarray_recurse);
+	LVTREE_FREESLOT(lvt);
 	return;
+}
+
+static void	lv_killarray_recurse(treeNode *node)
+{
+	tree	*lvt;
+
+	assert(NULL != node);
+	lvt = LV_CHILD(node);
+	if (NULL != lvt)
+	{
+		LV_CHILD(node) = NULL;
+		lv_killarray_base(lvt);
+	}
+	DECR_AC_REF(((lv_val *)node), dotpsave_static);	/* Decrement alias contain ref and cleanup if necessary */
+	/* If node points to an "lv_val", we need to do a heavyweight LV_FREESLOT call to free up the lv_val.
+	 * But we instead do a simple "LVTREENODE_FREESLOT" call because we are guaranteed node points to a "treeNode"
+	 * (i.e. it is a subscripted lv and never the base lv). Assert that.
+	 */
+	assert(!LV_IS_BASE_VAR(node));
+	LV_VAL_CLEAR_MVTYPE(node);      /* see comment in macro definition for why this is necessary */
+	LVTREENODE_FREESLOT(node);
 }

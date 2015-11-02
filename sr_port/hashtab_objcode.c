@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,6 @@
 #include "send_msg.h"
 #include "gtmmsg.h"
 #include "cache.h"
-#include "hashtab.h"
 #include "hashtab_objcode.h"
 #define OBJCODE_HASH
 #include "hashtab_implementation.h"

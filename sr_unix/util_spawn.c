@@ -1,7 +1,6 @@
-#include "mdef.h"
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,33 +8,31 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#include "mdef.h"
 
-#include <stdio.h>
 #include "gtm_stdlib.h"
 #include "cli.h"
 #include "util_spawn.h"
 
-
-GBLREF char	*parm_ary[MAX_PARMS];
-GBLREF unsigned	parms_cnt;
-
 void util_spawn(void)
 {
 	char *cmd;
+	DCL_THREADGBL_ACCESS;
 
-	assert(1 >= parms_cnt);
-
-	if (0 == parms_cnt)
+	SETUP_THREADGBL_ACCESS;
+	assert(1 >= TREF(parms_cnt));
+	if (0 == TREF(parms_cnt))
 	{
 		cmd = GETENV("SHELL");
 		if (!cmd)
 			cmd = "/bin/sh";
-		SYSTEM(cmd);
+		if (-1 == SYSTEM(cmd))
+			PERROR("system : ");
 	} else
 	{
-		assert(parm_ary[parms_cnt - 1]);
-		assert((char *)-1L != parm_ary[parms_cnt - 1]);
-		SYSTEM(parm_ary[parms_cnt - 1]);
+		assert(TAREF1(parm_ary, TREF(parms_cnt) - 1));
+		assert((char *)-1L != (TAREF1(parm_ary, TREF(parms_cnt) - 1)));
+		if (-1 == SYSTEM(TAREF1(parm_ary, TREF(parms_cnt) - 1)))
+			PERROR("system : ");
 	}
 }
-

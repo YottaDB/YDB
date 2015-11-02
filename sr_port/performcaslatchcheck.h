@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,4 +11,4 @@
 
 /* Check that the latch is not stuck on a dead process */
 
-void performCASLatchCheck(sm_global_latch_ptr_t, int);
+void performCASLatchCheck(sm_global_latch_ptr_t, boolean_t);

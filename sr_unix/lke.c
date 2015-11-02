@@ -60,6 +60,7 @@
 #include "patcode.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_imagetype_init.h"
+#include "gtm_threadgbl_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -81,6 +82,9 @@ static void display_prompt(void);
 
 int main (int argc, char *argv[])
 {
+	DCL_THREADGBL_ACCESS;
+
+	GTM_THREADGBL_INIT;
 	gtm_imagetype_init(LKE_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@
 
 void	insqh (que_ent_ptr_t new, que_ent_ptr_t base)
 {
-	new->bl = (int4)((uchar_ptr_t)base - (uchar_ptr_t)new);
+	new->bl = (uchar_ptr_t)base - (uchar_ptr_t)new;
 	new->fl = new->bl + base->fl;
 	base->fl = -new->bl;
 	((que_ent_ptr_t)((uchar_ptr_t)new + new->fl))->bl = -new->fl;
@@ -45,7 +45,7 @@ void	insqh (que_ent_ptr_t new, que_ent_ptr_t base)
 
 void	insqt (que_ent_ptr_t new, que_ent_ptr_t base)
 {
-	new->fl = (int4)((uchar_ptr_t)base - (uchar_ptr_t)new);
+	new->fl = (uchar_ptr_t)base - (uchar_ptr_t)new;
 	new->bl = new->fl + base->bl;
 	base->bl = -new->fl;
 	((que_ent_ptr_t)((uchar_ptr_t)new + new->bl))->fl = -new->bl;

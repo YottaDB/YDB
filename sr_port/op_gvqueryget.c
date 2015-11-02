@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,6 @@
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_region	*gv_cur_region;
-GBLREF bool		gv_curr_subsc_null;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 LITREF mval		literal_null;
 
@@ -35,8 +34,10 @@ boolean_t op_gvqueryget(mval *key, mval *val)
 {
 	boolean_t 	gotit;
 	gv_key		*save_key;
+	DCL_THREADGBL_ACCESS;
 
-	if (gv_curr_subsc_null && NEVER == gv_cur_region->null_subs)
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
 	switch (gv_cur_region->dyn.addr->acc_meth)
 	{

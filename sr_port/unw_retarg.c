@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,6 @@
 #include "unwind_nocounts.h"
 #include "error_trap.h"
 #include "error.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -50,7 +48,8 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	mval		ret_value, *trg;
 	boolean_t	got_ret_target;
 	stack_frame	*prevfp;
-	lv_val		*srclv, *srclvc;
+	lv_val		*srclv, *srclvc, *base_lv;
+	symval		*symlv, *symlvc;
 	int4		srcsymvlvl;
 
 	error_def(ERR_ALIASEXPECTED);
@@ -78,18 +77,21 @@ int unw_retarg(mval *src, boolean_t alias_return)
 		ret_value.mvtype &= ~MV_ALIASCONT;	/* Make sure alias container of regular return does not propagate */
 	} else
 	{	/* QUIT *var or *var(indx..) syntax was used - see which one it was */
-		srclv = (lv_val *)src;		/* Since can never be an expression, this relationship is guarranteed */
-		if (MV_SBS == srclv->ptrs.val_ent.parent.sbs->ident)
+		assert(NULL != src);
+		srclv = (lv_val *)src;		/* Since can never be an expression, this relationship is guaranteed */
+		if (!LV_IS_BASE_VAR(srclv))
 		{	/* Have a potential container var - verify */
 			if (!(MV_ALIASCONT & srclv->v.mvtype))
 				rts_error(VARLSTCNT(1) ERR_ALIASEXPECTED);
 			ret_value = *src;
 			srclvc = (lv_val *)srclv->v.str.addr;
-			assert(MV_SYM == srclvc->ptrs.val_ent.parent.sym->ident);	/* Verify base var */
+			assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
 			assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
 			assert(1 <= srclvc->stats.crefcnt);				/* Verify is existing container ref */
-			MARK_ALIAS_ACTIVE(MIN(srclv->ptrs.val_ent.parent.sbs->sym->symvlvl,
-					      srclvc->ptrs.val_ent.parent.sym->symvlvl));
+			base_lv = LV_GET_BASE_VAR(srclv);
+			symlv = LV_GET_SYMVAL(base_lv);
+			symlvc = LV_GET_SYMVAL(srclvc);
+			MARK_ALIAS_ACTIVE(MIN(symlv->symvlvl, symlvc->symvlvl));
 			DBGRFCT((stderr, "unw_retarg: Returning alias container 0x"lvaddr" pointing to 0x"lvaddr" to caller\n",
 				 src, srclvc));
 		} else
@@ -98,7 +100,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 			ret_value.mvtype |= MV_ALIASCONT;
 			ret_value.str.addr = (char *)srclv;
 			srclvc = srclv;
-			MARK_ALIAS_ACTIVE(srclv->ptrs.val_ent.parent.sym->symvlvl);
+			MARK_ALIAS_ACTIVE(LV_SYMVAL(srclv)->symvlvl);
 			DBGRFCT((stderr, "unw_retarg: Returning alias 0x"lvaddr" to caller\n", srclvc));
 		}
 		INCR_TREFCNT(srclvc);

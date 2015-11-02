@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "mstrcmp.h"
+
+#include "gtm_string.h"
+
 #include "global_map.h"
+#include "min_max.h"
 
 /* "map[]" is assumed to be an array of mstrs whose last mstr has a NULL value for its "addr" field.
  * "map[]" contains even number of mstrs, each consecutive pair of mstrs (starting from map[0]) point to a range of names.
@@ -24,15 +27,25 @@
 void global_map(mstr map[], mstr *beg, mstr *end)
 {
 	mstr	*left, *right, rangestart, rangeend, tmpmstr;
+	int	rslt;
 
-	assert(mstrcmp(beg, end) <= 0);
+	DEBUG_ONLY(
+		MSTRP_CMP(beg, end, rslt);
+		assert(0 >= rslt);
+	)
 	for (left = map; left->addr; left++)
-		if (mstrcmp(left, beg) >= 0)
+	{
+		MSTRP_CMP(left, beg, rslt);
+		if (0 <= rslt)
 			break;
+	}
 	/* left now points to the first mstr in the array that is >= beg */
 	for (right = left; right->addr; right++)
-		if (mstrcmp(right, end) > 0)
+	{
+		MSTRP_CMP(right, end, rslt);
+		if (0 < rslt)
 			break;
+	}
 	/* right now points to the first mstr in the array that is > end */
 	if (left == right)
 	{	/* the usual case where {beg, end} has no or complete intersections with any existing range in map[].
@@ -60,9 +73,9 @@ void global_map(mstr map[], mstr *beg, mstr *end)
 	/* case where {beg, end} has partial intersections with existing ranges in map[].
 	 * replace intersecting ranges with one union range e.g. replace {1, 10} {5, 15} {12, 20} with {1, 20}
 	 */
-	if (((left - map) & 1) == 0)
+	if (0 == ((left - map) & 1))
 		*left++ = *beg;
-	if (((right - map) & 1) == 0)
+	if (0 == ((right - map) & 1))
 		*(--right) = *end;
 	if (left == right) /* possible if {beg, end} is exactly equal to an existing range in map[] */
 		return;

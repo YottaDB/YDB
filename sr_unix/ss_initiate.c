@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -200,7 +200,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
 	int			shdw_fd, tmpfd, fclose_res, fstat_res, status, perm, group_id, pwrite_res, dsk_addr = 0;
 	int			retries, idx, this_snapshot_idx, save_errno, ss_shmsize, ss_shm_vbn;
-	intrpt_state_t		save_intrpt_ok_state;
 	ZOS_ONLY(int		realfiletag;)
 	long			ss_shmid = INVALID_SHMID;
 	char			tempnamprefix[MAX_FN_LEN + 1], tempdir_full_buffer[GTM_PATH_MAX], *tempfilename;
@@ -215,7 +214,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	mstr			tempdir_log, tempdir_full, tempdir_trans;
 	boolean_t		debug_mupip = FALSE, wait_for_zero_kip, final_retry;
 	now_t			now;
-	DEBUG_ONLY(int		intrpt_state_at_entry;)
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_FILEPARSE);
@@ -234,7 +232,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	csd = csa->hdr;
 	cnl = csa->nl;
 	acc_meth = csd->acc_meth;
-	DEBUG_ONLY(intrpt_state_at_entry = intrpt_ok_state;)
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
 
 	/* Create a context containing default information pertinent to this initiate invocation */
@@ -342,7 +339,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 
 	/* ========================== STEP 2 : Create the shadow file ======================== */
 	/* get a unique temporary file name. The file gets created on success */
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP till the file is created */
+	DEFER_INTERRUPTS(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP till the file is created */
 	MKSTEMP(tempfilename, tmpfd);
 	STRCPY(lcl_ss_ctx->shadow_file, tempfilename);
 	/* Shadow file created. Any error below before the next cur_state assignment and a later call to ss_release will have
@@ -382,7 +379,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	/* Now that the temporary file has been opened successfully, close the fd returned by mkstemp */
 	F_CLOSE(tmpfd, fclose_res);
 	lcl_ss_ctx->shdw_fd = shdw_fd;
-	RESTORE_INTRPT_OK_STATE;
+	ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 	tempdir_full.len = STRLEN(tempdir_full.addr); /* update the length */
 	assert(GTM_PATH_MAX >= tempdir_full.len);
 
@@ -453,7 +450,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		 * 4. create shared memory segment to be used as bitmap for storing whether a given database block
 		 *    was before imaged or not.
 		 */
-		SAVE_INTRPT_OK_STATE(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP till the shared memory is created */
+		DEFER_INTERRUPTS(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP till the shared memory is created */
 		tot_blks = csd->trans_hist.total_blks;
 		prev_ss_shmsize = ss_shmsize;
 		ss_shmsize = (int)(ROUND_UP((SNAPSHOT_HDR_SIZE + TOT_BYTES_REQUIRED(tot_blks)), OS_PAGE_SIZE));
@@ -489,7 +486,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		lcl_ss_ctx->attach_shmid = ss_shmid;
 		lcl_ss_ctx->start_shmaddr = ss_shmaddr;
 		lcl_ss_ctx->cur_state = AFTER_SHM_CREAT;
-		RESTORE_INTRPT_OK_STATE;
+		ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 		if (debug_mupip)
 		{
 			util_out_print("!/MUPIP INFO: Shared memory created. SHMID = !UL",
@@ -628,8 +625,8 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	{
 		region_freeze(reg, FALSE, FALSE, FALSE);
 	}
-	else if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH)) /* wcs_flu guarantees that all the pending phase 2 commits
-								   * are done with before returning */
+	else if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_MSYNC_DB)) /* wcs_flu guarantees that all the pending
+								   * phase 2 commits are done with before returning */
 	{
 		assert(process_id != csd->freeze); /* We would not have frozen the region if the database is read-write */
 		gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_STR(calling_utility), DB_LEN_STR(reg));
@@ -647,7 +644,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	/* We are about to copy the process private variables to shared memory. Although we have done grab_crit above, we take
 	 * snapshot crit lock to ensure that no other process attempts snapshot cleanup.
 	 */
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP until we complete copying to shared memory */
+	DEFER_INTERRUPTS(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP until we complete copying to shared memory */
 	/* == STEP 7: Populate snapshot context, database shared memory snapshot structure and snapshot file header structure == */
 	ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(csa);
 	DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
@@ -704,8 +701,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	assert(0 == (dsk_addr % OS_PAGE_SIZE));
 	lcl_ss_ctx->cur_state = SNAPSHOT_INIT_DONE; /* Same as AFTER_SHM_CREAT but set for clarity of the snapshot state */
 	call_on_signal = NULL; /* Any further cleanup on signals will be taken care by gds_rundown */
-	RESTORE_INTRPT_OK_STATE;
-	assert(intrpt_ok_state == intrpt_state_at_entry);
+	ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE);
 	assert(!ss_lock_held_by_us(reg)); /* We should never leave the function with the snapshot latch not being released */
 	return TRUE;
 }

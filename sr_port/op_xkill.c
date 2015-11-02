@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,9 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "hashtab.h"
 #include "lv_val.h"
 #include "op.h"
 
@@ -28,8 +27,8 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 {
 	va_list		var;
 	VMS_ONLY(int	n;)
-		DEBUG_ONLY(int	vcnt;)
-		lv_val		*lv;
+	DEBUG_ONLY(int	vcnt;)
+	lv_val		*lv;
 	mval		*lvname;
 	mname_entry	lvent;
 	ht_ent_mname	*tabent, *top;
@@ -51,13 +50,13 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 	lcl_stdxkill = gtm_stdxkill;
 	VAR_START(var, lvname_arg);
 	VMS_ONLY(va_count(n);)
-		lvname = lvname_arg;
+	lvname = lvname_arg;
 	assert(0 < n);
 	/* In debug mode we want to make sure the elements we mark to not be deleted are the ONLY
-	   elements that don't get deleted. The lvtaskcycle value, which is guaranteed to never be 0
-	   (once it has been incremented via macro), is an excellent way to get a fairly unique way of
-	   marking the hte. If we get positive marks that are NOT this value, we need to figure out why.
-	*/
+	 * elements that don't get deleted. The lvtaskcycle value, which is guaranteed to never be 0
+	 * (once it has been incremented via macro), is an excellent way to get a fairly unique way of
+	 * marking the hte. If we get positive marks that are NOT this value, we need to figure out why.
+	 */
 #	ifdef DEBUG
 	vcnt = 0;
 	INCR_LVTASKCYCLE;		/* Needed for both debug of MSTD version or to mark lv_vals */
@@ -81,8 +80,8 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 			{	/* save info about the variable */
 				lv = (lv_val *)tabent->value;
 				assert(lv);
+				assert(LV_IS_BASE_VAR(lv));
 				assert(HTENT_VALID_MNAME(tabent, lv_val, lv));
-				assert(MV_SYM == lv->ptrs.val_ent.parent.sym->ident);
 				if (lcl_stdxkill)
 				{	/* M Standard xkill variant - mark the hash table entry so it is not deleted */
 					assert(!tabent->key.marked);
@@ -106,10 +105,11 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 	{
 		if (HTENT_VALID_MNAME(tabent, lv_val, lv))
 		{
+			assert(LV_IS_BASE_VAR(lv));
 			if (lcl_stdxkill)
 			{	/* M Standard variant - delete this var if hashtab entry not marked (delete by name) */
 				if (!tabent->key.marked)
-					lv_kill(lv, TRUE);
+					lv_kill(lv, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);
 				else
 				{	/* If marked, unmark it and reduce debug count to verify array was as we expected it */
 					assert(tabent->key.marked == lvtaskcycle);
@@ -119,7 +119,7 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 			} else
 			{	/* GTM variant - delete var if lv_val is not marked (delete by value) */
 				if (lv->stats.lvtaskcycle != lvtaskcycle)
-					lv_kill(lv, TRUE);
+					lv_kill(lv, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);
 				/* Note there is no (easy) way to maintain the debug vcnt in this variant */
 			}
 		}

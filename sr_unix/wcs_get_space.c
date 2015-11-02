@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@
 #include "gtm_c_stack_trace.h"
 
 GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
-GBLDEF	int4			*get_space_fail_array;	/* gbldefed to be accessilbe in a pro core */
+GBLDEF	wcs_conflict_trace_t	*get_space_fail_array;	/* gbldefed to be accessilbe in a pro core */
 GBLDEF	int4			get_space_fail_arridx;	/* gbldefed to be accessilbe in a pro core */
 
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -49,18 +49,39 @@ GBLREF	int			num_additional_processors;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		fast_lock_count;
 
-#define	ACTIVE_LVL_ARRAYSIZE	64
-#define	LCNT_INCREMENT		DIVIDE_ROUND_UP(UNIX_GETSPACEWAIT, ACTIVE_LVL_ARRAYSIZE)
+#define	WCS_CONFLICT_TRACE_ARRAYSIZE	64
+#define	LCNT_INTERVAL			DIVIDE_ROUND_UP(UNIX_GETSPACEWAIT, WCS_CONFLICT_TRACE_ARRAYSIZE)
 
-#define WCS_GET_SPACE_RETURN_FAIL(arraystart)						\
+#define WCS_GET_SPACE_RETURN_FAIL(TRACEARRAY, CR)					\
 {											\
 	assert(FALSE);			/* We have failed */				\
-	get_space_fail_cr = cr;								\
-	get_space_fail_array = arraystart;						\
+	get_space_fail_cr = CR;								\
+	get_space_fail_array = TRACEARRAY;						\
 	if (gtm_environment_init)							\
 		gtm_fork_n_core();	/* take a snapshot in case running in-house */	\
 	return FALSE;									\
 }
+
+#define GET_IO_LATCH_PID(CSA)		(CSA->jnl ? CSA->jnl->jnl_buff->io_in_prog_latch.u.parts.latch_pid : -1)
+#define GET_FSYNC_LATCH_PID(CSA)	(CSA->jnl ? CSA->jnl->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid : -1)
+
+#define INVOKE_C_STACK_APPROPRIATE(CR, CSA, STUCK_CNT)										\
+{																\
+	int4	io_latch_pid, fsync_latch_pid;											\
+																\
+	if (CR->epid)														\
+	{															\
+		GET_C_STACK_FROM_SCRIPT("WCS_GET_SPACE_RETURN_FAIL_CR", process_id, CR->epid, STUCK_CNT);			\
+	}															\
+	if (0 < (io_latch_pid = GET_IO_LATCH_PID(CSA)))										\
+	{															\
+		GET_C_STACK_FROM_SCRIPT("WCS_GET_SPACE_RETURN_FAIL_IO_PROG", process_id, io_latch_pid, STUCK_CNT);		\
+	}															\
+	if (0 < (fsync_latch_pid = GET_FSYNC_LATCH_PID(CSA)))									\
+	{															\
+		GET_C_STACK_FROM_SCRIPT("WCS_GET_SPACE_RETURN_FAIL_FSYNC_PROG", process_id, fsync_latch_pid, STUCK_CNT);	\
+	} 															\
+}																\
 
 /* go after a specific number of buffers or a particular buffer */
 /* not called if UNTARGETED_MSYNC and MM mode */
@@ -72,8 +93,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	cache_que_head_ptr_t	q0, base;
 	int4			n, save_errno = 0, k, i, dummy_errno, max_count, count;
 	int			maxspins, retries, spins;
-	uint4			lcnt, size, to_wait, to_msg, stuck_cnt = 0;
-	int4			wcs_active_lvl[ACTIVE_LVL_ARRAYSIZE];
+	uint4			lcnt, size, to_wait, to_msg, this_idx;
+	wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
 	boolean_t		is_mm;
 	cache_rec		cr_contents;
 
@@ -213,10 +234,13 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						wcs_recover(reg);
 					for (lcnt = 1; (0 != cr->dirty) && (UNIX_GETSPACEWAIT > lcnt); ++lcnt)
 					{
-						if (0 == (lcnt % LCNT_INCREMENT))
+						if (0 == (lcnt % LCNT_INTERVAL))
 						{
-							assert((lcnt/LCNT_INCREMENT) < ACTIVE_LVL_ARRAYSIZE);
-							wcs_active_lvl[lcnt/LCNT_INCREMENT] = cnl->wcs_active_lvl;
+							this_idx = (lcnt / LCNT_INTERVAL);
+							assert(this_idx < WCS_CONFLICT_TRACE_ARRAYSIZE);
+							wcs_conflict_trace[this_idx].wcs_active_lvl = cnl->wcs_active_lvl;
+							wcs_conflict_trace[this_idx].io_in_prog_pid = GET_IO_LATCH_PID(csa);
+							wcs_conflict_trace[this_idx].fsync_in_prog_pid = GET_FSYNC_LATCH_PID(csa);
 						}
 						get_space_fail_arridx = lcnt;
 						max_count = ROUND_UP(cnl->wcs_active_lvl, csd->n_wrt_per_flu);
@@ -274,9 +298,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					}
 					if (0 == cr->dirty)
 						return TRUE;
-					stuck_cnt++;
-					GET_C_STACK_FROM_SCRIPT("WCS_GET_SPACE_RETURN_FAIL", process_id, cr->epid, stuck_cnt);
-					WCS_GET_SPACE_RETURN_FAIL(&wcs_active_lvl[0]);
+					INVOKE_C_STACK_APPROPRIATE(cr, csa, 1);
+					WCS_GET_SPACE_RETURN_FAIL(wcs_conflict_trace, cr);
 				} else
 				{	/* buffer was locked */
 					if (0 == cr->dirty)
@@ -295,7 +318,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 				wcs_sleep(LOCK_SLEEP);
 				/* If near end of loop, see if target is dead and/or wake it up */
 				if (RETRY_CASLATCH_CUTOFF == retries)
-					performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+					performCASLatchCheck(&base->latch, TRUE);
 			}
 		}
 		--fast_lock_count;
@@ -307,7 +330,6 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		rts_error(VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
 	else
 		assert(FALSE);
-	stuck_cnt++;
-	GET_C_STACK_FROM_SCRIPT("WCS_GET_SPACE_RETURN_FAIL", process_id, cr->epid, stuck_cnt);
-	WCS_GET_SPACE_RETURN_FAIL(&wcs_active_lvl[0]);
+	INVOKE_C_STACK_APPROPRIATE(cr, csa, 2);
+	WCS_GET_SPACE_RETURN_FAIL(wcs_conflict_trace, cr);
 }

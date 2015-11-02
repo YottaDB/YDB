@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,6 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "parse_file.h"
 #include "source_file.h"
@@ -45,12 +44,9 @@ GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF stack_frame	 	*frame_pointer;
 GBLREF unsigned char 		*stackbase,*stacktop,*stackwarn,*msp;
 GBLREF mv_stent			*mv_chain;
-GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval			*curr_symval;
 GBLREF boolean_t		run_time;
-GBLREF bool			compile_time;
 GBLREF spdesc			rts_stringpool, stringpool;
-GBLREF int4			dollar_zcstatus;
 
 int	gtm_compile (void)
 {
@@ -60,7 +56,9 @@ int	gtm_compile (void)
 	char		obj_file[MAX_FBUFF + 1], list_file[MAX_FBUFF + 1], ceprep_file[MAX_FBUFF + 1];
 	unsigned char	*mstack_ptr;
 	void 		gtm_ret_code();
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	get_page_size();
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
@@ -69,12 +67,11 @@ int	gtm_compile (void)
 	getzdir();
 	prealloc_gt_timers();
 	run_time = FALSE;
-	compile_time = TRUE;
-        mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
-        msp = stackbase = mstack_ptr + (USER_STACK_SIZE - SIZEOF(char *));
+	TREF(compile_time) = TRUE;
+	mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
+	msp = stackbase = mstack_ptr + (USER_STACK_SIZE - SIZEOF(char *));
 	mv_chain = (mv_stent *)msp;
-        stackwarn = stacktop + (USER_STACK_SIZE / 4);
-
+	stackwarn = stacktop + (USER_STACK_SIZE / 4);
 	msp -= SIZEOF(stack_frame);
 	frame_pointer = (stack_frame *)msp;
 	memset(frame_pointer, 0, SIZEOF(stack_frame));
@@ -85,15 +82,14 @@ int	gtm_compile (void)
 	frame_pointer->rvector = (rhdtyp *)malloc(SIZEOF(rhdtyp));
 	memset(frame_pointer->rvector, 0, SIZEOF(rhdtyp));
 	symbinit();
-
 	/* Variables for supporting $ZSEARCH sorting and wildcard expansion */
-	zsrch_var = lv_getslot(curr_symval);
-	zsrch_dir1 = lv_getslot(curr_symval);
-	zsrch_dir2 = lv_getslot(curr_symval);
-	LVVAL_INIT(zsrch_var, curr_symval);
-	LVVAL_INIT(zsrch_dir1, curr_symval);
-	LVVAL_INIT(zsrch_dir2, curr_symval);
-
+	TREF(zsearch_var) = lv_getslot(curr_symval);
+	TREF(zsearch_dir1) = lv_getslot(curr_symval);
+	TREF(zsearch_dir2) = lv_getslot(curr_symval);
+	LVVAL_INIT((TREF(zsearch_var)), curr_symval);
+	LVVAL_INIT((TREF(zsearch_dir1)), curr_symval);
+	LVVAL_INIT((TREF(zsearch_dir2)), curr_symval);
+	/* command qualifier processing stuff */
 	cmd_qlf.object_file.str.addr = obj_file;
 	cmd_qlf.object_file.str.len = MAX_FBUFF;
 	cmd_qlf.list_file.str.addr = list_file;
@@ -103,8 +99,7 @@ int	gtm_compile (void)
 	get_cmd_qlf(&cmd_qlf);
 	initialize_pattern_table();
 	ce_init();	/* initialize compiler escape processing */
-
-	dollar_zcstatus = SS_NORMAL;
+	TREF(dollar_zcstatus) = SS_NORMAL;
 	len = MAX_FBUFF;
 	for (status = cli_get_str("INFILE", source_file_string, &len);
 		status;
@@ -115,7 +110,5 @@ int	gtm_compile (void)
 	}
 	print_exit_stats();
 	io_rundown(NORMAL_RUNDOWN);
-	if (SS_NORMAL != dollar_zcstatus)
-		return -1;
-	return SS_NORMAL;
+	return (SS_NORMAL == TREF(dollar_zcstatus)) ? SS_NORMAL : -1;
 }

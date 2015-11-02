@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2002, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2002, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -12,8 +12,8 @@
 # The purpose of this file is to define the source directories
 # for each platform
 # It also defines
-# - linux_build_type <--- significance for 32bit Linux
-# - use_nsb 		 <--- 32bit Linux and CYGWIN use NSB
+# - gt_build_type <--- significance for 32bit Linux
+# - gt_use_nsb 		 <--- 32bit Linux and CYGWIN use NSB
 # - gt_build_xfer_desc <- ia64/x86_64 Linuxen and HPUX IA64 use this
 
 # Preserve sanity ###############################################
@@ -35,33 +35,33 @@
 gt_build_xfer_desc=0
 
 # default to using shared libraries
-use_nsb=0
+gt_use_nsb=0
 
 # Sanitize the CYGWIN gt_os_type and mark it as NSB
 ifeq ($(findstring CYGWIN,$(gt_os_type)), CYGWIN)
 $(info Cygwin Host)
 gt_os_type=CYGWIN
-use_nsb=1
+gt_use_nsb=1
 endif
 
 # BEGIN Linux host, check for 32 bitness
-linux_build_type=0
+gt_build_type=0
 ifeq ($(gt_os_type), Linux)
-linux_build_type=64
+gt_build_type=64
 
 ifeq ($(gt_machine_type),i386)
-use_nsb=1
-linux_build_type=32
+gt_use_nsb=1
+gt_build_type=32
 endif
 
 ifeq ($(gt_machine_type),i686)
-use_nsb=1
-linux_build_type=32
+gt_use_nsb=1
+gt_build_type=32
 endif
 
 ifeq ($(OBJECT_MODE),32)
-use_nsb=1
-linux_build_type=32
+gt_use_nsb=1
+gt_build_type=32
 # Checking for OBJECT_MODE 32 is not accurate
 # throw an error if the ARCH is not x86_64
 ifneq ($(gt_machine_type),x86_64)
@@ -69,14 +69,14 @@ $(error OBJECT_MODE set to 32, but arch is $(gt_machine_type)))
 endif
 endif
 
-$(info Linux Host $(linux_build_type))
+$(info Linux Host $(gt_build_type))
 endif
 # END Linux host, check for 32 bitness
 
 
 # BEGIN common dirs, optimized for shared libs
 common_dirs_sp=unix_gnp unix_cm unix port_cm port
-ifeq ($(use_nsb), 1)
+ifeq ($(gt_use_nsb), 1)
 common_dirs_sp=unix_gnp unix_cm unix_nsb unix port_cm port
 endif
 # END common dirs, optimized for shared libs
@@ -103,7 +103,7 @@ ifeq ($(gt_os_type), Linux)
 
 ## Begin Linux specific cludgery
 ### Ugliness due to building 32bit x86 GT.M on x86_64 machines
-ifeq ($(linux_build_type),32)
+ifeq ($(gt_build_type),32)
 linux_arch=linux i386 x86_regs
 else
 linux_arch=linux x86_64 x86_regs

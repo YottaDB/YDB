@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ GBLREF volatile int4 	fast_lock_count;
 /* Only allow the process to be interrupted if we are not in crit and not in the process
    of obtaining it. Otherwise, we cannot service this interruption at this time and must
    return (but will set the interruption flag. */
-void lke_ctrlc_handler(void)
+CONDITION_HANDLER(lke_ctrlc_handler)
 {
 	int	dummy1, dummy2;
 

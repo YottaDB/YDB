@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,6 +70,8 @@
 
 #define TRAVERSE_TO_LATEST_CSE(x)					\
 {									\
+	GBLREF	uint4		dollar_tlevel;				\
+									\
 	assert(dollar_tlevel);						\
 	if (x)								\
                 for ( ; (x)->high_tlevel; x = (x)->high_tlevel)		\
@@ -112,8 +114,6 @@ typedef struct key_value_struct
 
 typedef struct cw_set_element_struct
 {
-	que_ent		free_que;			/* should be the first member in the structure (for buddy_list) */
-							/* needed to use free_element() of the buddy list */
 	trans_num	tn;				/* transaction number for bit maps */
 	sm_uc_ptr_t	old_block;			/* Address of 'before-image' of block to be over-written */
 	cache_rec_ptr_t	cr;
@@ -163,7 +163,7 @@ typedef struct cw_set_element_struct
 							/* just an optimisation - avoids copying first few bytes, if anyway
 							 * we are just overlaying the new_buff in the same transaction */
 	boolean_t	forward_process;		/* Need to process update array from front when doing kills */
-	int4		t_level;			/* transaction level associated with cw element, for incremental rollback */
+	uint4		t_level;			/* transaction level associated with cw element, for incremental rollback */
 	enum db_ver	ondsk_blkver;			/* Actual block version from block header as it exists on disk.
 							 * If "cse->mode" is gds_t_write_root, this is uninitialized.
 							 * If "cse->mode" is gds_t_create/gds_t_acquired, this is GDSVCURR.

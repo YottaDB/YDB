@@ -38,7 +38,7 @@ typedef struct post_restore_lvscan_struct
 	int	elemcnt;
 } lvscan_blk;
 
-void tp_unwind(short newlevel, enum tp_unwind_invocation, int *tprestart_rc);
+void tp_unwind(uint4 newlevel, enum tp_unwind_invocation, int *tprestart_rc);
 int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvscan_blk **lvscan_anchor, int *tprestart_lc);
 
 #endif

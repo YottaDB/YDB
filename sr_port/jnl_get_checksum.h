@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,26 @@
 
 #define ADJUST_CHECKSUM(sum, num4)  (((sum) >> 4) + ((sum) << 4) + (num4))
 
-#ifdef DEBUG
-GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#ifdef UNIX
+/* Include the sequence number field of the journal record as part of the checksum computation. ADJUST_CHECKSUM
+ * macro currently relies on 4 byte quanitites as inputs. But, the journal sequence number is an 8 byte quantity.
+ * To avoid multiple calls to ADJUST_CHECKSUM to include the complete 8 byte sequence number, each of which might
+ * take around 4-5 instructions, consider only the lower order order 4 bytes of the sequence number for the checksum
+ * compuation. Given that the lower order bytes are the ones that will keep changing for every transaction, this
+ * should suffice.
+ */
+#define ADJUST_CHECKSUM_WITH_SEQNO(IS_REPLICATED, CHECKSUM, SEQNO)						\
+{														\
+	seq_num				rec_token_seq;								\
+														\
+	if (IS_REPLICATED)											\
+	{													\
+		rec_token_seq = SEQNO;										\
+		CHECKSUM = ADJUST_CHECKSUM(CHECKSUM, (rec_token_seq & 0x0000FFFF));				\
+	}													\
+}
+#else
+#define ADJUST_CHECKSUM_WITH_SEQNO(IS_REPLICATED, CHECKSUM, SEQNO)
 #endif
 
 /* This macro is to be used whenever we are computing the checksum of a block that has been acquired. */
@@ -25,6 +43,9 @@ GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-onl
 {													\
 	cache_rec_ptr_t	cr;										\
 	boolean_t	cr_is_null;									\
+													\
+	GBLREF	uint4	dollar_tlevel;									\
+													\
 	/* Record current database tn before computing checksum of acquired block. This is used		\
 	 * later by the commit logic to determine if the block contents have changed (and hence		\
 	 * if recomputation of checksum is necessary). For BG, we have two-phase commit where		\
@@ -52,7 +73,7 @@ GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-onl
 	cr = cse->cr;											\
 	cr_is_null = (NULL == cr);									\
 	assert(!cr_is_null || dollar_tlevel);								\
-	DEBUG_ONLY(if (cr_is_null) donot_commit |= DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR;)			\
+	DEBUG_ONLY(if (cr_is_null) TREF(donot_commit) |= DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR;)		\
 	cse->tn = ((cr_is_null || cr->in_tend) ? 0 : csd->trans_hist.curr_tn);				\
 	/* If cr is NULL, it is a restartable situation. So dont waste time computing checksums. Also	\
 	 * if the db is encrypted, we cannot get at the encryption global buffer (jnl_get_checksum	\

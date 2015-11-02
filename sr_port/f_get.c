@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,7 +8,6 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 
 #include "mdef.h"
 #include "compiler.h"
@@ -19,22 +18,20 @@
 #include "mmemory.h"
 #include "advancewindow.h"
 
-GBLREF	char	window_token;
-GBLREF	bool	shift_gvrefs;
-GBLREF	triple	*expr_start;
-GBLREF	triple	*curtchain;
+GBLREF	char		window_token;
+GBLREF	triple		*curtchain;
 
 int f_get(oprtype *a, opctype op)
 {
 	triple		tmpchain, *oldchain, *r, *triptr;
 	oprtype		result, *result_ptr;
-
 	error_def(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	result_ptr = (oprtype *)mcalloc(SIZEOF(oprtype));
 	result = put_indr(result_ptr);
 	r = maketriple(op);
-
 	switch (window_token)
 	{
 	case TK_IDENT:
@@ -49,7 +46,6 @@ int f_get(oprtype *a, opctype op)
 		r->opcode = OC_FNGET2;
 		r->operand[1] = result;
 		break;
-
 	case TK_CIRCUMFLEX:
 		if (!gvn())
 			return FALSE;
@@ -71,10 +67,9 @@ int f_get(oprtype *a, opctype op)
 			r->operand[0] = result;
 		}
 		break;
-
 	case TK_ATSIGN:
 		r->opcode = OC_INDGET;
-		if (shift_gvrefs)
+		if (TREF(shift_side_effects))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);
@@ -92,13 +87,12 @@ int f_get(oprtype *a, opctype op)
 			} else
 				*result_ptr = put_str(0, 0);
 			ins_triple(r);
-
 			newtriple(OC_GVSAVTARG);
 			setcurtchain(oldchain);
-			dqadd(expr_start, &tmpchain, exorder);
-			expr_start = tmpchain.exorder.bl;
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
+			triptr->operand[0] = put_tref(TREF(expr_start));
 			*a = put_tref(r);
 			return TRUE;
 		}
@@ -106,7 +100,6 @@ int f_get(oprtype *a, opctype op)
 			return FALSE;
 		r->operand[1] = result;
 		break;
-
 	default:
 		stx_error(ERR_VAREXPECTED);
 		return FALSE;

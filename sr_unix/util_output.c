@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,6 @@
 #include "fao_parm.h"
 #include "min_max.h"
 #include "hashtab_mname.h"
-#include "lv_val.h"
 #include "util.h"
 #include "util_format.h"
 #include "util_out_print_vaparm.h"

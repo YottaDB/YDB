@@ -23,6 +23,9 @@
 #include "op.h"
 #include "error_trap.h"
 #include "error.h"
+#ifdef GTM_TRIGGER
+# include "gtm_trigger_trc.h"
+#endif
 
 GBLREF	void		(*unw_prof_frame_ptr)(void);
 GBLREF	stack_frame	*frame_pointer, *zyerr_frame;
@@ -86,6 +89,11 @@ void op_unwind(void)
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	if (msp > stackbase)
 		rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
+#	ifdef GTM_TRIGGER
+	if (SFF_TRIGR_CALLD & frame_pointer->type)
+		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SFF_TRIGR_CALLD turned on\n",
+			  frame_pointer, frame_pointer->type));
+#	endif
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "op_unwind: Stack frame 0x%016lx unwound - frame 0x%016lx now current\n", prevfp, frame_pointer));
 	if (NULL != zyerr_frame && frame_pointer > zyerr_frame)

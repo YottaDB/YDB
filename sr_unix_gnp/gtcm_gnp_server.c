@@ -80,6 +80,7 @@
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "suspsigs_handler.h"
 #include "gtm_imagetype_init.h"
+#include "gtm_threadgbl_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -365,12 +366,14 @@ int main(int argc, char **argv, char **envp)
 	char			time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	pid_t			pid;
 	struct sigaction	act;
+	DCL_THREADGBL_ACCESS;
 
         static boolean_t no_fork = FALSE;
 
 	error_def(ERR_NETFAIL);
 	error_def(ERR_TEXT);
 
+	GTM_THREADGBL_INIT;
 	gtm_imagetype_init(GTCM_GNP_SERVER_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,6 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -30,40 +28,30 @@
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 
 LITREF mval 		literal_null;
 
 /* Operation - The destination variable becomes a container variable holding a pointer to source alias
-
-   1) Convert the src lvval to an alias variable if necessary (by manipulating the reference counts
-   2) Save the address of the source lv_val in the destination var, setting the mval container flag.
-   3) Whichever symval of source or destination is greatest, that is the earliest symval affected. We
-      feed that to the MARK_ALIAS_ACTIVE macro to mark all interveening symvals as having alias
-      activity and that covers both potential symvals so we don't have to call the macro twice.
-*/
+ *
+ * 1) Convert the src lvval to an alias variable if necessary (by manipulating the reference counts
+ * 2) Save the address of the source lv_val in the destination var, setting the mval container flag.
+ * 3) Whichever symval of source or destination is greatest, that is the earliest symval affected. We
+ *    feed that to the MARK_ALIAS_ACTIVE macro to mark all intervening symvals as having alias
+ *    activity and that covers both potential symvals so we don't have to call the macro twice.
+ */
 void op_setalsin2alsct(lv_val *srclv, lv_val *dstlv)
 {
-	lv_val		*tp_val;
- 	lv_sbs_tbl	*tbl;
-	symval		*sym;
+	lv_val		*dst_lvbase;
+	symval		*sym_srclv, *sym_dstlv;
 
 	assert(srclv);
-	assert(MV_SYM == srclv->ptrs.val_ent.parent.sym->ident);	/* Verify base var */
+	assert(LV_IS_BASE_VAR(srclv));	/* Verify base var */
 	assert(dstlv);
-	assert(MV_SBS == dstlv->ptrs.val_ent.parent.sbs->ident);  	/* Verify subscripted var */
-	if (dollar_tlevel)
-	{	/* Determine base var that needs to be cloned for this subscripted container var being modified */
-		tp_val = dstlv;
-		tbl = tp_val->ptrs.val_ent.parent.sbs;
-		while (MV_SYM != tbl->ident)
-		{
-			tp_val = tbl->lv;
-			tbl = tp_val->ptrs.val_ent.parent.sbs;
-		}
-		if (NULL != tp_val->tp_var && !tp_val->tp_var->var_cloned)
-			TP_VAR_CLONE(tp_val);	/* clone the tree. */
-	}
+	assert(!LV_IS_BASE_VAR(dstlv));	/* Verify subscripted var */
+	dst_lvbase = LV_GET_BASE_VAR(dstlv);
+	if (dollar_tlevel && (NULL != dst_lvbase->tp_var) && !dst_lvbase->tp_var->var_cloned)
+		TP_VAR_CLONE(dst_lvbase);	/* clone the tree. */
 	/* Decrement alias container refs (if any) and cleanup if necessary */
 	DECR_AC_REF(dstlv, TRUE);
 	/* Reset value of lv_val to now be a container ref to the supplied base var */
@@ -76,9 +64,11 @@ void op_setalsin2alsct(lv_val *srclv, lv_val *dstlv)
 	INCR_CREFCNT(srclv);						/* .. and a contain reference at that.. */
 	assert(srclv->stats.trefcnt >= srclv->stats.crefcnt);
 	/* These symvals have had alias activity */
-	MARK_ALIAS_ACTIVE(MIN(srclv->ptrs.val_ent.parent.sym->symvlvl, dstlv->ptrs.val_ent.parent.sbs->sym->symvlvl));
+	sym_srclv = LV_GET_SYMVAL(srclv);
+	sym_dstlv = LV_GET_SYMVAL(dst_lvbase);
+	MARK_ALIAS_ACTIVE(MIN(sym_srclv->symvlvl, sym_dstlv->symvlvl));
 	/* Last operation is to mark the base var for our container array that it now has a container in it.
-	   But first it must be found by going backwards through the levels.
-	*/
-	MARK_CONTAINER_ONBOARD(dstlv);
+	 * But first it must be found by going backwards through the levels.
+	 */
+	MARK_CONTAINER_ONBOARD(dst_lvbase);
 }

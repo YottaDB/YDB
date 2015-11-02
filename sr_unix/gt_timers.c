@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,11 +120,10 @@ static boolean_t first_timeset = TRUE;
 volatile static GT_TIMER	*timefree = NULL;
 volatile static int4		num_timers_free;	/* # of timers in the unused queue */
 static		int4		timeblk_hdrlen;
-
 GBLREF	boolean_t	blocksig_initialized;	/* set to TRUE when blockalrm and block_sigsent are initialized */
 GBLREF	sigset_t	blockalrm;
 GBLREF	sigset_t	block_sigsent;
-
+volatile static st_timer_alloc	*timer_allocs = NULL;
 /*
  * Save previous SIGALRM handler if any.
  */
@@ -169,10 +168,15 @@ STATICFNDEF void gt_timers_alloc(void)
 {
 	int4		gt_timer_cnt;
        	GT_TIMER	*timeblk, *timeblks;
+	st_timer_alloc	*new_alloc;
 
 	assert(!timer_in_handler);
 	timeblk_hdrlen = OFFSETOF(GT_TIMER, hd_data[0]);
 	timeblk = timeblks = (GT_TIMER *)malloc((timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * TIMER_BLOCK_SIZE);
+	new_alloc = (st_timer_alloc *)malloc(SIZEOF(st_timer_alloc));
+	new_alloc->addr = timeblk;
+	new_alloc->next = (st_timer_alloc *)timer_allocs;
+	timer_allocs = new_alloc;
 	for (gt_timer_cnt = TIMER_BLOCK_SIZE; 0 < gt_timer_cnt; --gt_timer_cnt)
 	{
 		timeblk->hd_len_max = GT_TIMER_INIT_DATA_LEN;	/* Set amount it can store */
@@ -392,6 +396,37 @@ STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 		start_first_timer(&at);
 }
 
+STATICFNDEF void uninit_all_timers(void)
+{
+	st_timer_alloc	*next_timeblk;
+	st_timer_alloc *timer_iter;
+
+#ifdef BSD_TIMER
+	/* clear timer */
+	sys_timer.it_interval.tv_sec = sys_timer.it_interval.tv_usec = 0;
+	setitimer(ITIMER_REAL, &sys_timer, &old_sys_timer);
+	old_sys_timer.it_interval.tv_sec = old_sys_timer.it_interval.tv_usec = 0;
+#else
+	alarm((unsigned)1);
+#endif
+	first_timeset = TRUE;
+        /* Loop over timer_allocs entries and deallocate them */
+	for (; timer_allocs;  timer_allocs = next_timeblk)
+	{
+		next_timeblk = timer_allocs->next;
+		free(timer_allocs->addr);		/* Free the timeblk */
+		free((st_timer_alloc *)timer_allocs); 	/* Free the container */
+	}
+	/* After all timers are removed, we need to set the below pointers to NULL */
+	timeroot = NULL;
+	timefree = NULL;
+	num_timers_free = 0;
+	/* Empty the blockalrm and sigsent entries */
+	sigemptyset(&blockalrm);
+	sigemptyset(&block_sigsent);
+	uninit_timers();
+	timer_active = FALSE;
+}
 /*
  * ---------------------------------------------
  * Cancel timer
@@ -413,6 +448,7 @@ void cancel_timer(TID tid)
 	{
 		assert(process_exiting); /* wcs_phase2_commit_wait relies on this flag being set BEFORE cancelling all timers */
 		cancel_all_timers();
+		uninit_all_timers();
 		timer_in_handler = FALSE;
 		sigprocmask(SIG_SETMASK, &savemask, NULL);
 		return;
@@ -624,6 +660,7 @@ STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*ha
 {
 	GT_TIMER	*tp, *tpp, *ntp, *lastntp;
 	int4		cmp, i;
+	st_timer_alloc	*new_alloc;
 
 	/* Assert that no timer entry with the same "tid" exists in the timer chain */
 	assert((NULL == find_timer(tid, &tpp)));
@@ -655,6 +692,11 @@ STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*ha
 	{
 		assert(FALSE);		/* If dbg, we should have enough already */
 		ntp = (GT_TIMER *)malloc(timeblk_hdrlen + hdata_len); /* if we are in a timer, this malloc may error out */
+		/* Insert in front of the list */
+		new_alloc = (st_timer_alloc *)malloc(SIZEOF(st_timer_alloc));
+		new_alloc->addr = ntp;
+		new_alloc->next = (st_timer_alloc *)timer_allocs;
+		timer_allocs = new_alloc;
 		ntp->hd_len_max = hdata_len;
 	}
 	ntp->tid = tid;

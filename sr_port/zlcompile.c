@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,29 +21,27 @@
 #include "mmemory.h"
 
 GBLREF boolean_t		run_time;
-GBLREF bool			compile_time;
 GBLREF spdesc			stringpool, rts_stringpool, indr_stringpool;
 GBLREF char			source_file_name[];
 GBLREF unsigned short		source_name_len;
 GBLREF command_qualifier	cmd_qlf, glb_cmd_qlf;
 GBLREF char			cg_phase;
-GBLREF int4			dollar_zcstatus;
-GBLREF bool			transform;
 GBLREF mcalloc_hdr 		*mcavailptr, *mcavailbase;
+
+error_def(ERR_ZLINKFILE);
+error_def(ERR_ZLNOOBJECT);
 
 int zlcompile (unsigned char len, unsigned char *addr)
 {
 	boolean_t	obj_exp, status;
 	size_t		mcallocated, alloc;
 	mcalloc_hdr	*lastmca, *nextmca;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_ZLINKFILE);
-	error_def(ERR_ZLNOOBJECT);
-
+	SETUP_THREADGBL_ACCESS;
 	memcpy (source_file_name, addr, len);
 	source_file_name[len] = 0;
 	source_name_len = len;
-
 	assert(run_time);
 	obj_exp = (cmd_qlf.qlf & CQ_OBJECT) != 0;
 	assert(rts_stringpool.base == stringpool.base);
@@ -54,16 +52,15 @@ int zlcompile (unsigned char len, unsigned char *addr)
 		indr_stringpool = stringpool;
 	} else
 		stringpool = indr_stringpool;
-
 	run_time = FALSE;
-	compile_time = TRUE;
-	transform = FALSE;
+	mcfree();	/* If last compile errored out, may have left things uninitialized for us */
+	TREF(compile_time) = TRUE;
+	TREF(transform) = FALSE;
 	/* Find out how much space we have in mcalloc blocks */
-	assert(mcavailptr == mcavailbase);
 	for (mcallocated = 0, nextmca = mcavailptr; nextmca; nextmca = nextmca->link)
 		mcallocated += nextmca->size;
 	if (0 == mcallocated)
-		mcallocated = MC_DSBLKSIZE;	/* Min size is one default block size */
+		mcallocated = MC_DSBLKSIZE - MCALLOC_HDR_SZ;	/* Min size is one default block size */
 	status = compiler_startup();
 	/* Determine if need to remove any added added mc blocks. Min value of mcallocated will ensure
 	   we leave at least one block alone.
@@ -81,10 +78,10 @@ int zlcompile (unsigned char len, unsigned char *addr)
 			free(lastmca);
 		}
 	}
-	assert (run_time == FALSE && compile_time == TRUE);
+	assert ((FALSE == run_time) && (TRUE == TREF(compile_time)));
 	run_time = TRUE;
-	compile_time = FALSE;
-	transform = TRUE;
+	TREF(compile_time) = FALSE;
+	TREF(transform) = TRUE;
 	indr_stringpool = stringpool;
 	stringpool = rts_stringpool;
 	indr_stringpool.free = indr_stringpool.base;

@@ -52,7 +52,7 @@
 #include "have_crit.h"
 #include "mutex_deadlock_check.h"
 
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	unsigned int		t_tries;
 GBLREF	tp_region		*tp_reg_list;		/* Chained list of regions used in this transaction */
 GBLREF	uint4			crit_deadlock_check_cycle;
@@ -105,7 +105,7 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr)
 	 */
 	if (is_replicator || mu_reorg_process)
 	{
-		if (0 == dollar_tlevel)
+		if (!dollar_tlevel)
 		{
 			if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
 			{

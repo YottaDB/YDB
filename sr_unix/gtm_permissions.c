@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,6 @@
 #else
 #	define LIBGTMSHR "%s/libgtmshr.so"
 #endif
-
 /* Return the group id of the distribution based on libgtmshr.xx[x]. If there is some
    problem accessing that file then return -1 which signals no change to group.  Otherwise,
    the pointer to the stat buffer will contain the result of the call to STAT_FILE */
@@ -58,7 +57,7 @@ int gtm_member_group_id(int uid, int gid)
 {
 	struct group	*grp;
 	struct passwd	*pwd, *pwd2;
-	int		lp;
+
 	/* get group id for database */
 	grp = getgrgid(gid);
 	if (NULL == grp)
@@ -71,21 +70,17 @@ int gtm_member_group_id(int uid, int gid)
 		return(TRUE);
 	else
 	{
-		/* otherwise we have to compare the name from the passwd entry for the
-		   uid to the group members in the group structure.
-		   We will get the password entry for each group member for the compare.  */
-		for (lp = 0; NULL != *(grp->gr_mem); lp++, (grp->gr_mem)++)
+		/*
+		 * Otherwise we have to compare the name stored in pwd struct
+		 * with the names of the group members in the group struct.
+		 */
+		while (NULL != *(grp->gr_mem))
 		{
-			pwd2 = getpwnam(*(grp->gr_mem));
-			if (NULL == pwd2)
-				return(FALSE); 	/* if uid not found then assume uid not a member */
-			if (uid == pwd2->pw_uid)
-				break;
+			if (!strcmp(pwd->pw_name, *(grp->gr_mem++)))
+				return(TRUE);
 		}
-		if (NULL != *(grp->gr_mem))
-			return(TRUE);
-		else
-			return(FALSE);
+
+		return(FALSE);
 	}
 }
 
@@ -104,9 +99,9 @@ void gtm_set_group_and_perm(struct stat *stat_buff, int *group_id, int *perm, in
 	/* if database is world writeable then select no change to group and set permission to "and" of 0666 with database mode */
 	if (02 & stat_buff->st_mode)
 	{
-		*group_id = -1;
-		*perm = stat_buff->st_mode & 0666;
-		return;
+			*group_id = -1;
+			*perm = stat_buff->st_mode & 0666;
+			return;
 	}
 	/* default to database gid */
 	*group_id = stat_buff->st_gid;
@@ -116,28 +111,28 @@ void gtm_set_group_and_perm(struct stat *stat_buff, int *group_id, int *perm, in
 	db_uid = stat_buff->st_uid;
 	/* see if db_uid is a member of database group and process_uid is a member of database group */
 	if ((FALSE != gtm_member_group_id(db_uid, *group_id)) && (FALSE != gtm_member_group_id(process_uid, *group_id)))
-		use_world_writeable = TRUE;
+			use_world_writeable = TRUE;
 	else
-		use_world_writeable = FALSE;
+			use_world_writeable = FALSE;
 	/* if (database is world writeable or database uid is member of database group)
 	 * and process_uid is a member of database group then set perm and use database gid
 	 */
 	if (FALSE != use_world_writeable)
-		*perm = world_write_perm;
+			*perm = world_write_perm;
 	else
-	{	/* get the gid of the distribution */
-		lib_gid = gtm_get_group_id(&dist_stat_buff);
-		/* see if database uid is a member of distribution group and process_uid is a member of dist_group_id */
-		if ((-1 != lib_gid) && (FALSE != gtm_member_group_id(db_uid, lib_gid))
-			&& (FALSE != gtm_member_group_id(process_uid, lib_gid)))
-		{
-			*group_id = lib_gid;
-			*perm = 0660;
-		} else
-		{
-			/* no change to group id */
-			*group_id = -1;
-			*perm = 0666;
-		}
+	{       /* get the gid of the distribution */
+			lib_gid = gtm_get_group_id(&dist_stat_buff);
+			/* see if database uid is a member of distribution group and process_uid is a member of dist_group_id */
+			if ((-1 != lib_gid) && (FALSE != gtm_member_group_id(db_uid, lib_gid))
+					&& (FALSE != gtm_member_group_id(process_uid, lib_gid)))
+			{
+					*group_id = lib_gid;
+					*perm = 0660;
+			} else
+			{
+					/* no change to group id */
+					*group_id = -1;
+					*perm = 0666;
+			}
 	}
 }

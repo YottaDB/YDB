@@ -31,11 +31,12 @@
 #include "wcs_timer_start.h"
 #include "tp_change_reg.h"
 #include "jnl_get_checksum.h"
+#include "iosp.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 GBLREF  jnl_fence_control       jnl_fence_ctl;
-GBLREF  short                   dollar_tlevel;
+GBLREF  uint4			dollar_tlevel;
 GBLREF	seq_num			seq_num_zero;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	gd_region		*gv_cur_region;
@@ -48,6 +49,7 @@ void    op_ztcommit(int4 n)
         sgmnt_addrs			*csa, *csa_next, *new_fence_list, *repl_csa, *tcsa, **tcsa_insert;
 	gd_region			*save_gv_cur_region;
 	jnl_private_control		*jpc;
+	sgmnt_data_ptr_t		csd;
 	jnl_buffer_ptr_t		jbp;
 	jnl_tm_t			save_gbl_jrec_time;
 	int4				prev_index;
@@ -64,7 +66,7 @@ void    op_ztcommit(int4 n)
         if (jnl_fence_ctl.level == 0  ||  n > jnl_fence_ctl.level)
                 rts_error(VARLSTCNT(1) ERR_TRANSNOSTART);
         assert(jnl_fence_ctl.level > 0);
-        assert(dollar_tlevel == 0);
+        assert(!dollar_tlevel);
 
         if (n == 0)
                 jnl_fence_ctl.level = 0;
@@ -121,18 +123,28 @@ void    op_ztcommit(int4 n)
 		gv_cur_region = jpc->region;	/* needed for jnl_ensure_open */
 		tp_change_reg();		/* needed for jnl_ensure_open */
 		assert(csa == cs_addrs);
+		csd = csa->hdr;
 		if (!csa->hold_onto_crit)
 			grab_crit(gv_cur_region);
 		assert(csa->now_crit);
-		jbp = jpc->jnl_buff;
-		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl
-		 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records
-		 * (if it decides to switch to a new journal file)
-		 */
-		ADJUST_GBL_JREC_TIME(jgbl, jbp);
-		jnl_status = jnl_ensure_open();
-		if (jnl_status)
-			rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));
+		if (JNL_ENABLED(csd))
+		{
+			jbp = jpc->jnl_buff;
+			/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl
+			 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+			 * (if it decides to switch to a new journal file)
+			 */
+			ADJUST_GBL_JREC_TIME(jgbl, jbp);
+			jnl_status = jnl_ensure_open();
+			if (jnl_status)
+			{
+				if (SS_NORMAL != jpc->status)
+					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
+						jpc->status);
+				else
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+			}
+		}
 	}
 	gv_cur_region = save_gv_cur_region; /* restore original */
 	tp_change_reg(); /* bring cs_* in sync with gv_cur_region */

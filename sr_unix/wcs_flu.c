@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,6 +120,7 @@ boolean_t wcs_flu(uint4 options)
 {
 	bool			success, was_crit;
 	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch, need_db_fsync, in_commit;
+	boolean_t		flush_msync;
 	unsigned int		lcnt, pass;
 	int			save_errno, wtstart_errno;
 	jnl_buffer_ptr_t	jb;
@@ -150,6 +151,7 @@ boolean_t wcs_flu(uint4 options)
 	write_epoch = options & WCSFLU_WRITE_EPOCH;
 	sync_epoch = options & WCSFLU_SYNC_EPOCH;
 	need_db_fsync = options & WCSFLU_FSYNC_DB;
+	flush_msync = options & WCSFLU_MSYNC_DB;
 	/* WCSFLU_IN_COMMIT bit is set if caller is t_end or tp_tend. In that case, we should NOT invoke wcs_recover if we
 	 * encounter an error. Instead we should return the error as such so they can trigger appropriate error handling.
 	 * This is necessary because t_end and tp_tend could have pinned one or more cache-records (cr->in_cw_set non-zero)
@@ -170,21 +172,7 @@ boolean_t wcs_flu(uint4 options)
 	cnl->wcsflu_pid = process_id;
 	if (dba_mm == csd->acc_meth)
 	{
-#ifndef NO_MSYNC
-#if defined(UNTARGETED_MSYNC)
-		if (csa->ti->last_mm_sync != csa->ti->curr_tn)
-		{
-			if (0 == msync((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]), MS_ASYNC))
-				csa->ti->last_mm_sync = csa->ti->curr_tn;	/* Save when did last full sync */
-			else
-			{
-				cnl->wcsflu_pid = 0;
-				if (!was_crit)
-					rel_crit(gv_cur_region);
-				return FALSE;
-			}
-		}
-#else
+#if !defined(NO_MSYNC) && !defined(UNTARGETED_MSYNC)
 		SIGNAL_WRITERS_TO_STOP(csd);	/* to stop all active writers */
 		WAIT_FOR_WRITERS_TO_STOP(cnl, lcnt, MAXGETSPACEWAIT);
 		if (MAXGETSPACEWAIT == lcnt)
@@ -212,7 +200,19 @@ boolean_t wcs_flu(uint4 options)
 			wtstart_errno = wcs_wtstart(gv_cur_region, csd->n_bts);
 			assert(ERR_GBLOFLOW != wtstart_errno);
 		}
-#endif
+#else
+		if (NO_MSYNC_ONLY((csd->freeze || flush_msync) && ) (csa->ti->last_mm_sync != csa->ti->curr_tn))
+		{
+			if (0 == msync((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]), MS_SYNC))
+				csa->ti->last_mm_sync = csa->ti->curr_tn;	/* Save when did last full sync */
+			else
+			{
+				cnl->wcsflu_pid = 0;
+				if (!was_crit)
+					rel_crit(gv_cur_region);
+				return FALSE;
+			}
+		}
 #endif
 	}
 	/* jnl_enabled is an overloaded variable. It is TRUE only if JNL_ENABLED(csd) is TRUE
@@ -235,32 +235,40 @@ boolean_t wcs_flu(uint4 options)
 		ADJUST_GBL_JREC_TIME(jgbl, jb);
 		assert(csa == cs_addrs);	/* for jnl_ensure_open */
 		jnl_status = jnl_ensure_open();
-		if (SS_NORMAL != jnl_status)
+		if (SS_NORMAL == jnl_status)
+		{
+			fsync_dskaddr = jb->fsync_dskaddr;	/* take a local copy as it could change concurrently */
+			if (fsync_dskaddr != jb->freeaddr)
+			{
+				assert(fsync_dskaddr <= jb->dskaddr);
+				if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
+				{
+					assert(NOJNL == jpc->channel); /* jnl file lost */
+					if (!was_crit)
+						rel_crit(gv_cur_region);
+					send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"),
+						jnl_status);
+					return FALSE;
+				}
+				assert(jb->freeaddr == jb->dskaddr);
+				jnl_fsync(gv_cur_region, jb->dskaddr);
+				assert(jb->fsync_dskaddr == jb->dskaddr);
+			}
+		} else
 		{
 			assert(ERR_JNLFILOPN == jnl_status);
-			cnl->wcsflu_pid = 0;
-			if (!was_crit)
-				rel_crit(gv_cur_region);
 			send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
-			return FALSE;
-		}
-		fsync_dskaddr = jb->fsync_dskaddr;	/* take a local copy as it could change concurrently */
-		if (fsync_dskaddr != jb->freeaddr)
-		{
-			assert(fsync_dskaddr <= jb->dskaddr);
-			if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
-			{
-				assert(NOJNL == jpc->channel); /* jnl file lost */
+			if (JNL_ENABLED(csd))
+			{ /* If journaling is still enabled, but we failed to open the journal file, we don't want to continue
+			   * processing.
+			   */
+				cnl->wcsflu_pid = 0;
 				if (!was_crit)
 					rel_crit(gv_cur_region);
-				send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during wcs_flu1"),
-					jnl_status);
 				return FALSE;
 			}
-			assert(jb->freeaddr == jb->dskaddr);
-			jnl_fsync(gv_cur_region, jb->dskaddr);
-			assert(jb->fsync_dskaddr == jb->dskaddr);
+			jnl_enabled = FALSE;
 		}
 	}
 	if (dba_mm != csd->acc_meth)
@@ -424,7 +432,7 @@ boolean_t wcs_flu(uint4 options)
 		assert(!jb->need_db_fsync);
 		for (lcnt = 1; FALSE == (GET_SWAPLOCK(&jb->io_in_prog_latch)); lcnt++)
 		{
-			if (MAXJNLQIOLOCKWAIT == lcnt)	/* tried too long */
+			if (MAXJNLQIOLOCKWAIT < lcnt)	/* tried too long */
 			{
 				GET_C_STACK_MULTIPLE_PIDS("MAXJNLQIOLOCKWAIT", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
 				assert(FALSE);
@@ -434,7 +442,9 @@ boolean_t wcs_flu(uint4 options)
 				GTMASSERT;
 			}
 			wcs_sleep(SLEEP_JNLQIOLOCKWAIT);	/* since it is a short lock, sleep the minimum */
-			performCASLatchCheck(&jb->io_in_prog_latch, lcnt);
+
+			if ((MAXJNLQIOLOCKWAIT / 2 == lcnt) || (MAXJNLQIOLOCKWAIT == lcnt))
+				performCASLatchCheck(&jb->io_in_prog_latch, TRUE);
 		}
 		jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);

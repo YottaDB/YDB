@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,8 +51,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->directory.len = STRLEN(jparms->directory.addr);
 		if (0 != jparms->directory.len)
 		{
-			parmbuf = malloc(jparms->directory.len);
-			memcpy(parmbuf, jparms->directory.addr, jparms->directory.len);
+			parmbuf = malloc(jparms->directory.len+1);
+			memcpy(parmbuf, jparms->directory.addr, jparms->directory.len+1);
 		 	jparms->directory.addr = parmbuf;
 	 	}
 	} else
@@ -63,8 +63,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->gbldir.len = STRLEN(jparms->gbldir.addr);
 		if (0 != jparms->gbldir.len)
 		{
-			parmbuf = malloc(jparms->gbldir.len);
-			memcpy(parmbuf, jparms->gbldir.addr, jparms->gbldir.len);
+			parmbuf = malloc(jparms->gbldir.len+1);
+			memcpy(parmbuf, jparms->gbldir.addr, jparms->gbldir.len+1);
 			jparms->gbldir.addr = parmbuf;
 		}
 	} else
@@ -75,8 +75,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->startup.len = STRLEN(jparms->startup.addr);
 		if (0 != jparms->startup.len)
 		{
-			parmbuf = malloc(jparms->startup.len);
-			memcpy(parmbuf, jparms->startup.addr, jparms->startup.len);
+			parmbuf = malloc(jparms->startup.len+1);
+			memcpy(parmbuf, jparms->startup.addr, jparms->startup.len+1);
 			jparms->startup.addr = parmbuf;
 		}
 	} else
@@ -87,8 +87,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->input.len = STRLEN(jparms->input.addr);
 		if (0 != jparms->input.len)
 		{
-			parmbuf = malloc(jparms->input.len);
-			memcpy(parmbuf, jparms->input.addr, jparms->input.len);
+			parmbuf = malloc(jparms->input.len+1);
+			memcpy(parmbuf, jparms->input.addr, jparms->input.len+1);
 			jparms->input.addr = parmbuf;
 		}
 	} else
@@ -99,8 +99,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->output.len = STRLEN(jparms->output.addr);
 		if (0 != jparms->output.len)
 		{
-			parmbuf = malloc(jparms->output.len);
-			memcpy(parmbuf, jparms->output.addr, jparms->output.len);
+			parmbuf = malloc(jparms->output.len+1);
+			memcpy(parmbuf, jparms->output.addr, jparms->output.len+1);
 			jparms->output.addr = parmbuf;
 		}
 	} else
@@ -111,8 +111,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->error.len = STRLEN(jparms->error.addr);
 		if (0 != jparms->error.len)
 		{
-			parmbuf = malloc(jparms->error.len);
-			memcpy(parmbuf, jparms->error.addr, jparms->error.len);
+			parmbuf = malloc(jparms->error.len+1);
+			memcpy(parmbuf, jparms->error.addr, jparms->error.len+1);
 			jparms->error.addr = parmbuf;
 		}
 	} else
@@ -123,8 +123,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->routine.len = STRLEN(jparms->routine.addr);
 		if (0 != jparms->routine.len)
 		{
-			parmbuf = malloc(jparms->routine.len);
-			memcpy(parmbuf, jparms->routine.addr, jparms->routine.len);
+			parmbuf = malloc(jparms->routine.len+1);
+			memcpy(parmbuf, jparms->routine.addr, jparms->routine.len+1);
 			jparms->routine.addr = parmbuf;
 		}
 	} else
@@ -135,8 +135,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->label.len = STRLEN(jparms->label.addr);
 		if (0 != jparms->label.len)
 		{
-			parmbuf = malloc(jparms->label.len);
-			memcpy(parmbuf, jparms->label.addr, jparms->label.len);
+			parmbuf = malloc(jparms->label.len+1);
+			memcpy(parmbuf, jparms->label.addr, jparms->label.len+1);
 			jparms->label.addr = parmbuf;
 		}
 	} else
@@ -147,8 +147,8 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		jparms->logfile.len = STRLEN(jparms->logfile.addr);
 		if (0 != jparms->logfile.len)
 		{
-			parmbuf = malloc(jparms->logfile.len);
-			memcpy(parmbuf, jparms->logfile.addr, jparms->logfile.len);
+			parmbuf = malloc(jparms->logfile.len+1);
+			memcpy(parmbuf, jparms->logfile.addr, jparms->logfile.len+1);
 			jparms->logfile.addr = parmbuf;
 		}
 	} else

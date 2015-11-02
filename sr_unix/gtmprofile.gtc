@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2010 Fidelity Information Services, Inc       #
+#       Copyright 2010, 2011 Fidelity Information Services, Inc       #
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -8,7 +8,6 @@
 #       the license, please stop and do not read further.       #
 #                                                               #
 #################################################################
-
 # Usage: source "GTMDIST"/gtmprofile
 # Sets up the default environment for single-user use of GT.M.
 # System administrators must review and edit as appropriate for multi-user production environments.
@@ -20,8 +19,10 @@
 #   $gtm_dist $gtmgbldir $gtm_icu_version $gtm_log $gtm_principal_editing $gtm_prompt $gtm_retention $gtmroutines $gtm_tmp $gtmver
 # The following shell variables are used and left unset.
 #   $old_gtm_dist $old_gtmroutines $old_gtmver $tmp_gtm_tmp $tmp_passwd
-
 # ; is used as a separator for sed as being the character most unlikely to be in file names
+
+# Set gtm_arch - GT.M installation script sets the actual architecture for use in this script
+arch="ARCH"
 
 # Save gtmroutines if it exists because we need to temporarily override it
 if [ -n "$gtmroutines" ] ; then
@@ -60,21 +61,43 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
 
     gtmroutines=$gtm_dist ; export gtmroutines # Force $gtmroutines to guarantee access to %XCMD for now; repaired later
     # Set $gtm_icu_version if icu-config is available - should be set before checking for UTF-8 mode
-    if [ -z "$gtm_icu_version" -a -n "`which icu-config`" ] ; then
+    # use whence on z/OS and which elsewhere
+    if [ "zos" = $arch ] ; then
+	which="whence"
+    else
+	which="which"
+    fi
+    if [ -z "$gtm_icu_version" -a -n "`$which icu-config`" ] ; then
         gtm_icu_version=`icu-config --version | gtm_chset=M $gtm_dist/mumps -run %XCMD 'Read x Write $Piece(x,".",1,2)'`
         export gtm_icu_version
     fi
 
-    # If UTF-8 is selected, and UTF-8 mode works, set $gtm_dist to utf8 subdirectory; default $LC_CTYPE if not set
+    # If UTF-8 is selected, and UTF-8 mode works, set $gtm_dist to utf8 subdirectory
     # Note that if UTF-8 mode cannot be properly set, GT.M remains configured for M mode
-    if [ "`echo $gtm_chset|tr utf UTF`" = "UTF-8" -a -d $gtm_dist/utf8 ] ; then
-        if [ -z "$LC_CTYPE" ] ; then
-            LC_CTYPE=`locale -a | tr UTF utf | grep .utf | head -n 1` ; export LC_CTYPE
-        fi
-	echo $LC_CTYPE | grep utf > /dev/null
-        if [ $? = 0 -a "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'GTM>' ] ; then
-            gtm_dist=$gtm_dist/utf8 ; gtmroutines=$gtm_dist
-        fi
+    if [ "zos" = $arch ] ; then
+	# for z/OS make sure the en_US.UTF-8 locale is available and set $gtm_chset_locale if it is
+	utflocale=`locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n1`
+	if [ "`echo $gtm_chset|tr utf UTF`" = "UTF-8" -a -d $gtm_dist/utf8 -a $utflocale = en_US.UTF-8 ] ; then
+		gtm_chset_locale=$utflocale; export gtm_chset_locale
+		if [ "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'GTM>' ] ; then
+			gtm_dont_tag_UTF8_ASCII=0; export gtm_dont_tag_UTF8_ASCII
+			gtm_dist=$gtm_dist/utf8 ; gtmroutines=$gtm_dist
+		else
+			# undo the set
+			unset gtm_chset_locale
+		fi
+	fi
+    else
+	# default $LC_CTYPE if not set
+	if [ "`echo $gtm_chset|tr utf UTF`" = "UTF-8" -a -d $gtm_dist/utf8 ] ; then
+		if [ -z "$LC_CTYPE" ] ; then
+			LC_CTYPE=`locale -a | grep -i .utf | head -n 1` ; export LC_CTYPE
+		fi
+		echo $LC_CTYPE | grep -i .utf > /dev/null
+		if [ $? = 0 -a "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'GTM>' ] ; then
+			gtm_dist=$gtm_dist/utf8 ; gtmroutines=$gtm_dist
+		fi
+	fi
     fi
 
     # Set $gtmver - must be set before $gtmroutines and $gtm_prompt are set
@@ -210,7 +233,7 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     # Must handle case where database file path is relative to global directory
     if [ ! -f $gtmgbldir ] ; then
         if [ -f $gtm_dist/gdedefaults ] ; then
-            $gtm_dist/mumps -run %XCMD 'Write "@","'$gtm_dist'/gdedefaults",!,"exit",!' | $gtm_dist/mumps -run GDE
+            $gtm_dist/mumps -run %XCMD 'Write "@","'$gtm_dist'/gdedefaults",!,"exit",!' | $gtm_dist/mumps -run GDE; stty sane
         else
             echo exit | $gtm_dist/mumps -run GDE
         fi

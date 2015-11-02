@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,4 +39,5 @@
 #define GDL_PrintEntryPoints	0x00010000	/* (65536) Print address of entry points when they are loaded/resolved */
 #define GDL_PrintSockIntStats	0x00020000	/* (131072) Print Socket interrupt stats on exit */
 #define GDL_SmInitAlloc		0x00040000	/* (262144) Initialize all storage allocated or deallocated with 0xdeadbeef */
+#define GDL_PrintPipeIntStats	0x00080000	/* (524288) Print Pipe/Fifo(rm) interrupt stats on exit */
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,6 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "targ_alloc.h"
-#include "hashtab.h"		/* for STR_HASH in COMPUTE_HASH_MNAME */
 #include "hashtab_mname.h"	/* for COMPUTE_HASH_MNAME */
 #include "tp_set_sgm.h"
 #include "t_begin.h"
@@ -50,14 +49,14 @@
 #include "op_tcommit.h"		/* for op_tcommit prototype */
 #include "cdb_sc.h"
 #include "gv_trigger_protos.h"
+#include "trigger_fill_xecute_buffer.h"
 #include "strpiecediff.h"
 #include "gtm_utf8.h"		/* for CHSET_M_STR and CHSET_UTF8_STR */
 #include "trigger.h"		/* for MAX_TRIGNAME_LEN */
 #include "wbox_test_init.h"
+#include "have_crit.h"
 
 #ifdef GTM_TRIGGER
-
-GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
 GBLREF	boolean_t		is_dollar_incr;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	gd_region		*gv_cur_region;
@@ -71,15 +70,26 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			t_err;
 GBLREF	int			tprestart_state;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
-GBLREF	short			dollar_trestart;
+GBLREF	pid_t			process_id;
 #ifdef DEBUG
+GBLREF	uint4			dollar_trestart;
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
+
+error_def(ERR_GVZTRIGFAIL);
+error_def(ERR_INDRMAXLEN);
+error_def(ERR_PATMAXLEN);
+error_def(ERR_TEXT);
+error_def(ERR_TRIGDEFBAD);
+error_def(ERR_TRIGINVCHSET);
+error_def(ERR_TRIGIS);
+error_def(ERR_TRIGSUBSCRANGE);
+error_def(ERR_TPRETRY);
 
 LITREF	char	ctypetab[NUM_CHARS];
 LITREF	int4	gvtr_cmd_mask[GVTR_CMDTYPES];
@@ -99,30 +109,19 @@ LITREF	mval	literal_chset;
 LITREF	mval	literal_zdelim;
 LITREF	mval	literal_zero;
 
+error_def(ERR_GVZTRIGFAIL);
+error_def(ERR_INDRMAXLEN);
+error_def(ERR_PATMAXLEN);
+error_def(ERR_TEXT);
 error_def(ERR_TPRETRY);
+error_def(ERR_TRIGDEFBAD);
 error_def(ERR_TRIGINVCHSET);
+error_def(ERR_TRIGIS);
 error_def(ERR_TRIGSUBSCRANGE);
 
 #define	GVTR_PARSE_POINT	1
 #define	GVTR_PARSE_LEFT		2
 #define	GVTR_PARSE_RIGHT	3
-#define MAX_UTIL_LEN 		40	/* needed for storing the trigger index and the property (CMD, TRIGNAME.. etc.)
-					 * in util_buff to be passed as the last parameter for TRIGDEFBAD error message.
-					 * Both the index and the property name are guaranteed to be less than 20
-					 * and hence MAX_UTIL_LEN set to 40 should be enough
-					 */
-
-#define SET_PARAM_STRING(UTIL_BUFF, UTIL_LEN, TRIGIDX, PARAM)				\
-{											\
-	uchar_ptr_t		util_ptr;						\
-											\
-	util_ptr = i2asc(&UTIL_BUFF[0], TRIGIDX);	/* UTIL_BUFF = 1 */		\
-	assert(MAX_UTIL_LEN >= STR_LIT_LEN(PARAM));					\
-	MEMCPY_LIT(util_ptr, PARAM);		/* UTIL_BUFF = 1,"CMD" */		\
-	util_ptr += STR_LIT_LEN(PARAM);							\
-	UTIL_LEN = UINTCAST(util_ptr - &UTIL_BUFF[0]);					\
-	assert(MAX_UTIL_LEN >= UTIL_LEN);						\
-}
 
 #define SAVE_RTN_NAME(SAVE_RTN_NAME, SAVE_RTN_NAME_LEN, TRIGDSC)			\
 {											\
@@ -150,6 +149,8 @@ error_def(ERR_TRIGSUBSCRANGE);
 	/* check no keysize expansion occurred inside gvcst_root_search */		\
 	assert(gv_altkey->top == save_gv_altkey->top);					\
 	memcpy(gv_altkey, save_gv_altkey, SIZEOF(gv_key) + save_gv_altkey->end);	\
+	TREF(gv_last_subsc_null) = save_gv_last_subsc_null;				\
+	TREF(gv_some_subsc_null) = save_gv_some_subsc_null;				\
 }
 
 #define	GVTR_POOL2BUDDYLIST(GVT_TRIGGER, DST_MSTR)									\
@@ -171,8 +172,6 @@ error_def(ERR_TRIGSUBSCRANGE);
 	gv_trigger_t	*lcl_trigdsc;										\
 	char		rt_name[MAX_TRIGNAME_LEN], save_var_name[MAX_MIDENT_LEN];				\
 														\
-	error_def(ERR_PATMAXLEN);										\
-	error_def(ERR_TRIGIS);											\
 	status = gvtr_process_gvsubs(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT);					\
 	if (status)												\
 	{													\
@@ -217,6 +216,37 @@ error_def(ERR_TRIGSUBSCRANGE);
 	}										\
 }
 
+#define PUT_TRIGGER_ON_CMD_TYPE_QUEUE(trigdsc, gvt_trigger, type)						\
+{	/* Add to type queue in gvt_trigger */									\
+	if (NULL == (gvt_trigger)->type##_triglist)								\
+	{	/* Initialize circular list of one element */							\
+		(gvt_trigger)->type##_triglist = (trigdsc);							\
+		(trigdsc)->next_##type = trigdsc;								\
+	} else													\
+	{	/* Add element to list - Note this is a simplistic add algorithm that doesn't make		\
+		 * any attempt to keep elements sorted. Since triggers are supposed to fire in random		\
+		 * order, that's a good thing. Adding elements A,B,C will end up with order A,C,B.		\
+		 */												\
+		(trigdsc)->next_##type = (gvt_trigger)->type##_triglist->next_##type;				\
+		(gvt_trigger)->type##_triglist->next_##type = (trigdsc);					\
+	}													\
+}
+
+#define SELECT_AND_RANDOMIZE_TRIGGER_CHAIN(gvt_trigger, trigstart, trig_list_offset, type) 			\
+{														\
+	trigstart = (gvt_trigger)->type##_triglist;								\
+	if (NULL != trigstart)											\
+	{	/* Use arbitrary bit from sum of hodgepodge fields that change over time to see if should	\
+		 * rotate the trigger chain by 1 or 2 entries to increase pseudo-randomization.			\
+		 */												\
+		gvt_trigger->type##_triglist = trigstart = trigstart->next_##type;				\
+		if (0 != (0x10 & (process_id + (INTPTR_T)stringpool.free + (INTPTR_T)&trigstart)))		\
+			/* Do a 2nd rotation.. */								\
+			gvt_trigger->type##_triglist = trigstart = trigstart->next_##type;			\
+	}													\
+	trig_list_offset = OFFSETOF(gv_trigger_t, next_##type);							\
+}
+
 /* This code is modeled around "updproc_ch" in updproc.c */
 CONDITION_HANDLER(gvtr_tpwrap_ch)
 {
@@ -242,7 +272,7 @@ CONDITION_HANDLER(gvtr_tpwrap_ch)
 	NEXTCH;
 }
 
-STATICFNDEF void	gvtr_db_tpwrap_helper(sgmnt_addrs *csa)
+STATICFNDEF void gvtr_db_tpwrap_helper(sgmnt_addrs *csa, int err_code)
 {
 	enum cdb_sc		status;
 	DEBUG_ONLY(gv_namehead	*save_gv_target;)
@@ -272,8 +302,12 @@ STATICFNDEF void	gvtr_db_tpwrap_helper(sgmnt_addrs *csa)
 	 * This would mean, a non-TP set (in a concurrent environment with trigger loads happening frequently) could end up
 	 * writing a TSET record in the corresponding regions' journal file. In a non-trigger environment, this will NOT
 	 * be an issue since we come here only if process' trigger cycle is different from database trigger cycle.
+	 *
+	 * The exception to the above case is when we are processing a ZTRIGGER command (denoted by the err_code passed
+	 * in being set to ERR_GVTRIGFAIL). In that case, we will be journaling a TZTRIG record of some form and is ok
+	 * even if the global does not exist. So we don't want to prematurely terminate the transaction in that case.
 	 */
-	if ((NULL == gv_target->gvt_trigger) && (0 == t_tries))
+	if ((NULL == gv_target->gvt_trigger) && (0 == t_tries) && (ERR_GVZTRIGFAIL != err_code))
 	{	/* No triggers exist for this global. TP wrap not needed any more for this transaction */
 		status = op_tcommit();
 		assert(cdb_sc_normal == status); /* if retry, an rts_error should have been issued and we should not reach here */
@@ -287,13 +321,37 @@ STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
 	uint4		curend;
 	boolean_t	was_null = FALSE, is_null = FALSE, is_defined;
 	short int	max_key;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	is_defined = FALSE;
 	curend = gv_currkey->end; /* note down gv_currkey->end before changing it so we can restore it before function returns */
 	assert(KEY_DELIMITER == gv_currkey->base[curend]);
 	assert(gv_target->gd_csa == cs_addrs);
 	max_key = gv_cur_region->max_key_size;
 	COPY_SUBS_TO_GVCURRKEY(subs_mval, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
+	is_defined = gvcst_get(ret_mval);
+	assert(!is_defined || (MV_STR & ret_mval->mvtype));	/* assert that gvcst_get() sets type of mval to MV_STR */
+	gv_currkey->end = curend;	/* reset gv_currkey->end to what it was at function entry */
+	gv_currkey->base[curend] = KEY_DELIMITER;    /* restore terminator for entire key so key is well-formed */
+	return is_defined;
+}
+
+STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs_and_index(mval *subs_mval, mval *index, mval *ret_mval)
+{
+	uint4		curend;
+	boolean_t	was_null = FALSE, is_null = FALSE, is_defined;
+	short int	max_key;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	is_defined = FALSE;
+	curend = gv_currkey->end; /* note down gv_currkey->end before changing it so we can restore it before function returns */
+	assert(KEY_DELIMITER == gv_currkey->base[curend]);
+	assert(gv_target->gd_csa == cs_addrs);
+	max_key = gv_cur_region->max_key_size;
+	COPY_SUBS_TO_GVCURRKEY(subs_mval, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
+	COPY_SUBS_TO_GVCURRKEY(index, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
 	is_defined = gvcst_get(ret_mval);
 	assert(!is_defined || (MV_STR & ret_mval->mvtype));	/* assert that gvcst_get() sets type of mval to MV_STR */
 	gv_currkey->end = curend;	/* reset gv_currkey->end to what it was at function entry */
@@ -353,7 +411,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 		/* switch gv_target for mval2subsc */
 		save_gvt = gv_target;
 		gv_target = gvt;
-		out_key = (gv_key *)&keybuff[0];
+		out_key = (gv_key *)keybuff;
 		out_key->end = 0;
 		out_key->top = DBKEYSIZE(MAX_KEY_SZ);
 		mval2subsc(&tmpmval, out_key);
@@ -440,8 +498,6 @@ STATICFNDEF uint4	gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsds
 	ptstr		pat_ptstr;
 	uint4		status;
 
-	error_def(ERR_PATMAXLEN);
-
 	assert('?' == *ptr);
 	ptr++;
 	len--;
@@ -459,7 +515,7 @@ STATICFNDEF uint4	gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsds
 	assert(pat_ptstr.len <= MAX_PATOBJ_LENGTH);
 	len = pat_ptstr.len * SIZEOF(uint4);
 	ptr = (char *)get_new_element(gvt_trigger->gv_trig_list, DIVIDE_ROUND_UP(len, GVTR_LIST_ELE_SIZE));
-	memcpy(ptr, &pat_ptstr.buff[0], len);
+	memcpy(ptr, pat_ptstr.buff, len);
 	assert(&subsdsc->gvtr_subs_type == &subsdsc->gvtr_subs_pattern.gvtr_subs_type);
 	subsdsc->gvtr_subs_type = GVTR_SUBS_PATTERN;
 	subsdsc->gvtr_subs_pattern.pat_mval.mvtype = MV_STR;
@@ -496,158 +552,23 @@ STATICFNDEF uint4 gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsd
 	return 0;
 }
 
-/* Sorts SET triggers ahead of KILL triggers. Implements it in linear O(n) time.
- * Does two passes.
- * 	1) The first one brings KILL-only type triggers to the tail of the trigger array
- * 		The head of the array now contains a mix of SET-only type triggers and SET,KILL type triggers (i.e. multiple cmds)
- * 	2) The second one brings SET-only type triggers to the head of the trigger array
- * 		This way SET,KILL type mixed triggers now go to the middle of the array.
- * This way, if a SET command needs to match/invoke triggers, all it needs to check for a match is the set of
- * 	triggers from the beginning (SET) to the middle section (SET,KILL).
- * And if a KILL command needs to match/invoke triggers, all it needs to check for a match is the set of
- * 	triggers from the middle section (SET,KILL) to the end (KILL).
- *
- * Example
- *      ----------------------------------------------------------------------------
- *      Trigger array     0      1            2           3           4      5
- *      ----------------------------------------------------------------------------
- *      Input array :    KILL1  SET1,KILL2   SET2        SET3,KILL3  KILL4  SET4
- *      After Pass1 :    SET4   SET1,KILL2   SET2        SET3,KILL3  KILL4  KILL1
- *      After Pass2 :    SET4   SET2         SET1,KILL2  SET3,KILL3  KILL4  KILL1
- *      ----------------------------------------------------------------------------
- *
- * So SET commands need to check only from array indices 0 through 3, whereas KILL commands need to check indices 2 through 5.
- * In this case, gvt_trigger->trigdsc_setstop will point to index 4 and gvt_trigger->trigdsc_killstart will point to index 2.
- * */
-STATICFNDEF	void	gvtr_sort_sets_first(gvt_trigger_t *gvt_trigger, gv_trigger_t *trigtop)
-{
-	gv_trigger_t		*trigdscleft, *trigdscright, tmptrig, *trigdscsetstop, *trigdsckillstart;
-	DEBUG_ONLY(
-		boolean_t	killstart_seen;
-		boolean_t	setstop_seen;
-	)
-
-	/* -------------- PASS 1 : Move KILL-only type triggers to end of the array ----------- */
-	trigdscleft = &gvt_trigger->gv_trig_array[0];
-	trigdscright = trigtop - 1;
-	trigdscsetstop = trigtop;	/* the point where SET type triggers stop */
-	do
-	{	/* Find earliest non-SET type trigdsc on the left side of the array */
-		for ( ; trigdscleft < trigdscright; trigdscleft++)
-			if (!(gvtr_cmd_mask[GVTR_CMDTYPE_SET] & trigdscleft->cmdmask))
-				break;
-		assert((trigdscleft < trigdscright) || (trigdscleft == trigdscright));
-		if (trigdscleft == trigdscright)
-			break;
-		/* Find latest SET type trigdsc on the right side of the array */
-		for ( ; trigdscright > trigdscleft; trigdscright--)
-			if (gvtr_cmd_mask[GVTR_CMDTYPE_SET] & trigdscright->cmdmask)
-				break;
-		assert((trigdscright > trigdscleft) || (trigdscright == trigdscleft));
-		assert(trigdscsetstop > trigdscright);
-		trigdscsetstop = trigdscright;
-		if (trigdscright == trigdscleft)
-			break;
-		/* Swap these two trigger entries */
-		tmptrig = *trigdscleft;
-		*trigdscleft = *trigdscright;
-		*trigdscright = tmptrig;
-		/* Move both left and right trigger indices one position closer to each other */
-		trigdscleft++;
-		trigdscright--;
-	} while (trigdscleft < trigdscright);
-	if (trigdscsetstop > trigdscright)
-	{
-		assert(trigdscright == (trigdscsetstop - 1));
-		if (!(trigdscright->cmdmask & gvtr_cmd_mask[GVTR_CMDTYPE_SET]))
-			trigdscsetstop = trigdscright;
-	}
-	/* -------------- PASS 2 : Move SET-only type triggers to end of the array ----------- */
-	trigdscleft = &gvt_trigger->gv_trig_array[0];
-	trigdsckillstart = trigdscsetstop;	/* the point where KILL type triggers start */
-	/* No need to do any sorting if ALL entries in the array are KILL-only type triggers */
-	if (trigdscsetstop > trigdscleft)
-	{
-		trigdscright = trigdscsetstop - 1;
-		do
-		{	/* Find earliest SET,KILL type trigdsc on the left side of the array */
-			for ( ; trigdscleft < trigdscright; trigdscleft++)
-				if (~gvtr_cmd_mask[GVTR_CMDTYPE_SET] & trigdscleft->cmdmask)
-					break;
-			assert((trigdscleft < trigdscright) || (trigdscleft == trigdscright));
-			if (trigdscleft == trigdscright)
-				break;
-			/* Find latest SET-only type trigdsc on the right side of the array */
-			for ( ; trigdscright > trigdscleft; trigdscright--)
-				if (!(~gvtr_cmd_mask[GVTR_CMDTYPE_SET] & trigdscright->cmdmask))
-					break;
-			assert((trigdscright > trigdscleft) || (trigdscright == trigdscleft));
-			assert(trigdsckillstart > trigdscright);
-			trigdsckillstart = trigdscright;
-			if (trigdscright == trigdscleft)
-				break;
-			/* Swap these two trigger entries */
-			tmptrig = *trigdscleft;
-			*trigdscleft = *trigdscright;
-			*trigdscright = tmptrig;
-			/* Move both left and right trigger indices one position closer to each other */
-			trigdscleft++;
-			trigdscright--;
-		} while (trigdscleft < trigdscright);
-		if (trigdsckillstart > trigdscright)
-		{
-			assert(trigdscright == (trigdsckillstart - 1));
-			if (trigdscright->cmdmask & ~gvtr_cmd_mask[GVTR_CMDTYPE_SET])
-				trigdsckillstart = trigdscright;
-		}
-	}
-#	ifdef DEBUG
-	/* Verify that the array entries have been sorted right */
-	killstart_seen = FALSE;
-	setstop_seen   = FALSE;
-	for (trigdscleft = &gvt_trigger->gv_trig_array[0]; trigdscleft < trigtop; trigdscleft++)
-	{
-		if (!(~gvtr_cmd_mask[GVTR_CMDTYPE_SET] & trigdscleft->cmdmask))
-		{	/* SET-only type trigger */
-			assert(!setstop_seen);
-			assert(!killstart_seen);
-		} else if (!(gvtr_cmd_mask[GVTR_CMDTYPE_SET] & trigdscleft->cmdmask))
-		{	/* KILL-only type trigger */
-			assert(setstop_seen || (trigdscsetstop == trigdscleft));
-			setstop_seen = TRUE;
-			assert(killstart_seen || (trigdsckillstart == trigdscleft));
-			killstart_seen = TRUE;
-		} else
-		{	/* SET,KILL mixed type trigger */
-			assert(killstart_seen || (trigdsckillstart == trigdscleft));
-			killstart_seen = TRUE;
-			assert(!setstop_seen);
-		}
-	}
-#	endif
-	gvt_trigger->cur_set_trigdsc = trigdscsetstop - 1;
-	gvt_trigger->cur_kill_trigdsc = trigtop - 1;
-	gvt_trigger->trigdsc_setstop = trigdscsetstop;
-	gvt_trigger->trigdsc_killstart = trigdsckillstart;
-	gvt_trigger->gv_trig_top = trigtop;
-}
-
-STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
+void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 {
 	gv_namehead		*hasht_tree, *save_gvtarget, *gvt;
 	mname_entry		gvent;
 	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	char			save_altkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	unsigned char		util_buff[MAX_UTIL_LEN];
+	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];
 	gv_key			*save_gv_currkey;
 	gv_key			*save_gv_altkey;
 	mval			tmpmval, *ret_mval;
 	boolean_t		is_defined, was_null = FALSE, is_null = FALSE, zdelim_defined, delim_defined;
+	boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
 	short int		max_key;
 	int4			tmpint4, util_len;
 	gvt_trigger_t		*gvt_trigger;
 	uint4			trigidx, num_gv_triggers, num_pieces, len, cmdtype, index, minpiece, maxpiece;
-	gv_trigger_t		*gv_trig_array, *trigdsc;
+	gv_trigger_t		*gv_trig_array, *trigdsc, *trigtop;
 	uint4			currkey_end, cycle, numsubs, cursub, numlvsubs, curlvsub;
 	char			ch, *ptr, *ptr_top, *ptr_start;
 	boolean_t		quote_imbalance, colon_imbalance, end_of_subscript;
@@ -658,22 +579,26 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	int			ctype;
 	char			save_rtn_name[MAX_TRIGNAME_LEN], save_var_name[MAX_MIDENT_LEN];
 	uint4			save_rtn_name_len, save_var_name_len;
+#	ifdef DEBUG
+	int			cntset, icntset, cntkill, icntkill, cntztrig, icntztrig;
+	gv_trigger_t		*trigstart;
+#	endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_TEXT);
-	error_def(ERR_TRIGDEFBAD);
-	error_def(ERR_INDRMAXLEN);
-
+	SETUP_THREADGBL_ACCESS;
 	save_gvtarget = gv_target;
 	SETUP_TRIGGER_GLOBAL;
 	/* Save gv_currkey and gv_altkey */
 	assert(NULL != gv_currkey);
 	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(save_currkey));
-	save_gv_currkey = (gv_key *)&save_currkey[0];
+	save_gv_currkey = (gv_key *)save_currkey;
 	memcpy(save_gv_currkey, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
 	assert(NULL != gv_altkey);
 	assert((SIZEOF(gv_key) + gv_altkey->end) <= SIZEOF(save_altkey));
-	save_gv_altkey = (gv_key *)&save_altkey[0];
+	save_gv_altkey = (gv_key *)save_altkey;
 	memcpy(save_gv_altkey, gv_altkey, SIZEOF(gv_key) + gv_altkey->end);
+	save_gv_last_subsc_null = TREF(gv_last_subsc_null);
+	save_gv_some_subsc_null = TREF(gv_some_subsc_null);
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	gv_currkey->prev = 0;
 	if (0 == gv_target->root)
@@ -830,6 +755,7 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	trigdsc = (gv_trigger_t *)malloc(num_gv_triggers * SIZEOF(gv_trigger_t));
 	memset(trigdsc, 0, num_gv_triggers * SIZEOF(gv_trigger_t));
 	gvt_trigger->gv_trig_array = trigdsc; /* Now that everything is null-initialized, set gvt_trigger->gv_trig_array */
+	gvt_trigger->gv_target = gvt;
 	/* From this point onwards, we assume the integrity of the ^#t global i.e. MUPIP TRIGGER would have
 	 * set ^#t fields to their appropriate value. So we dont do any more checks in case taking the wrong path.
 	 */
@@ -857,15 +783,20 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 				save_var_name_len, save_var_name, util_len, util_buff);
 		}
 		trigdsc->rtn_desc.rt_name = ret_mval->str;	/* Copy trigger name mident */
-		trigdsc->rtn_desc.rt_adr = NULL;
+		trigdsc->gvt_trigger = gvt_trigger;		/* Save ptr to our main gvt_trigger struct for this trigger. With
+								 * this and given a gv_trigger_t, we can get to the gvt_trigger_t
+								 * block containing the gv_target pointer and thus get the trigger
+								 * csa, region and index for loading trigger source later without
+								 * having to look anything up again.
+								 */
 		/* Reserve extra space when triggername is placed in buddy list. This space is used by gtm_trigger() if
-		 * the trigger name is not unique within the process.One or two of the chars are appended to the trigger
+		 * the trigger name is not unique within the process. One or two of the chars are appended to the trigger
 		 * name until an unused name is found.
 		 */
 		trigdsc->rtn_desc.rt_name.len += TRIGGER_NAME_RESERVED_SPACE;
 		GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->rtn_desc.rt_name);
 		trigdsc->rtn_desc.rt_name.len -= TRIGGER_NAME_RESERVED_SPACE;	/* Not using the space yet */
-		/* Read in ^#t("GBL",1,"CMD")="S,K,ZK,ZTK" */
+		/* Read in ^#t("GBL",1,"CMD")="S,K,ZK,ZTK,ZTR" */
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_cmd, ret_mval);
 		if (!is_defined)
 		{	/* ^#t("GBL","#COUNT") is set to 1 so ^#t("GBL",1,"CMD") should be defined */
@@ -889,7 +820,7 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 				for (cmdtype = 0; cmdtype < GVTR_CMDTYPES; cmdtype++)
 				{
 					if ((len == gvtr_cmd_mval[cmdtype].str.len)
-						&& !memcmp(ptr_start, gvtr_cmd_mval[cmdtype].str.addr, len))
+					    && (0 ==memcmp(ptr_start, gvtr_cmd_mval[cmdtype].str.addr, len)))
 					{
 						trigdsc->cmdmask |= gvtr_cmd_mask[cmdtype];
 						break;
@@ -953,7 +884,7 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 			trigdsc->subsarray = (gvtr_subs_t *)get_new_element(gvt_trigger->gv_trig_list,
 							DIVIDE_ROUND_UP((numsubs * SIZEOF(gvtr_subs_t)), GVTR_LIST_ELE_SIZE));
 			cursub = 0;
-			subsdsc = &trigdsc->subsarray[0];
+			subsdsc = trigdsc->subsarray;
 			/* Initialize trigdsc->numlvsubs */
 			assert(numlvsubs <= numsubs);
 			trigdsc->numlvsubs = numlvsubs;
@@ -963,11 +894,11 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 				/* Allocate trigdsc->lvnamearray */
 				trigdsc->lvnamearray = (mname_entry *)get_new_element(gvt_trigger->gv_trig_list,
 							DIVIDE_ROUND_UP((numlvsubs * SIZEOF(mname_entry)), GVTR_LIST_ELE_SIZE));
-				lvnamedsc = &trigdsc->lvnamearray[0];
+				lvnamedsc = trigdsc->lvnamearray;
 				/* Allocate trigdsc->lvindexarray */
 				trigdsc->lvindexarray = (uint4 *)get_new_element(gvt_trigger->gv_trig_list,
 							DIVIDE_ROUND_UP((numlvsubs * SIZEOF(uint4)), GVTR_LIST_ELE_SIZE));
-				lvindexdsc = &trigdsc->lvindexarray[0];
+				lvindexdsc = trigdsc->lvindexarray;
 			}
 			/* Initialize trigdsc->subsarray, trigdsc->lvindexarray & trigdsc->lvnamearray */
 			quote_imbalance = FALSE;
@@ -1159,33 +1090,72 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 			rts_error(VARLSTCNT(8) ERR_TRIGINVCHSET, 6, save_rtn_name_len, save_rtn_name,
 				save_var_name_len, save_var_name, ret_mval->str.len, ret_mval->str.addr);
 		}
-		/* Read in ^#t("GBL",1,"XECUTE")="do ^XNAMEinGBL"	*/
-		/* If ^#t("GBL",1,"CMD") is defined but ^#t("GBL",1,"XECUTE") is undefined.
-		 * We set xecute_str.len to 0 this way we will see a runtime error when trying to compile this null length
-		 * string. We dont do any checks of is_defined here for performance reasons (assuming MUPIP TRIGGER would have
-		 * loaded the proper content) and yet handle out-of-design situations gracefully.
-		 */
-		ret_mval->str.len = 0;	/* Initialize "len" to 0 (instead of garbage) in case is_defined comes back as FALSE */
-		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_xecute, ret_mval);
-		assert(is_defined);
-		if (MAX_SRCLINE <= ret_mval->str.len)
-		{
-			assert(FALSE);
-			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-			rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
-		}
-		/* Initialize trigdsc->xecute_str */
-		trigdsc->xecute_str = *ret_mval;
-		GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->xecute_str.str);
+		/* Defer loading xecute string until time to compile it */
 		/* trigdsc->rtn_desc is already NULL-initialized as part of the memset above */
 		gv_currkey->end = currkey_end;	/* remove the current <trigidx> and make way for the next <trigidx> in gv_currkey */
 		gv_currkey->base[currkey_end] = KEY_DELIMITER;    /* restore terminator for entire key */
 	}
-	/* Now that ALL triggers for this global has been read, move all GVTR_CMDTYPE_SET type triggers to the front of the array.
-	 * This way, any SET command (most frequent) can stop examining triggers (for a potential match) the moment it encounters
-	 * a non-GVTR_CMDTYPE_SET type trigger in the trigger array.
+	/* Now that ALL triggers for this global have been read, separate the triggers into types. There is a link for each command
+	 * type in each trigger and an anchor for the list in gvt_trigger. Each list is circular for that type. Since triggers can
+	 * be for more than one command type (e.g. SET, KILL, etc), each trigger can be on more than one queue. Later when we need
+	 * to run the triggers of a given type, we can just pick the queue and run it.
 	 */
-	gvtr_sort_sets_first(gvt_trigger, trigdsc);
+	gv_trig_array = gvt_trigger->gv_trig_array;
+	assert(NULL != gv_trig_array);
+	gvt_trigger->set_triglist = gvt_trigger->kill_triglist = gvt_trigger->ztrig_triglist = NULL;
+	DEBUG_ONLY(icntset = icntkill = icntztrig = 0);
+	for (trigdsc = gv_trig_array, trigtop = trigdsc + num_gv_triggers; trigdsc < trigtop; trigdsc++)
+	{
+		if (0 != (trigdsc->cmdmask & gvtr_cmd_mask[GVTR_CMDTYPE_SET]))
+		{
+			PUT_TRIGGER_ON_CMD_TYPE_QUEUE(trigdsc, gvt_trigger, set);
+			DEBUG_ONLY(++icntset);
+		}
+		if ((0 != (trigdsc->cmdmask & gvtr_cmd_mask[GVTR_CMDTYPE_KILL]))
+			   || (0 != (trigdsc->cmdmask & gvtr_cmd_mask[GVTR_CMDTYPE_ZKILL]))
+			   || (0 != (trigdsc->cmdmask & gvtr_cmd_mask[GVTR_CMDTYPE_ZTKILL])))
+		{
+			PUT_TRIGGER_ON_CMD_TYPE_QUEUE(trigdsc, gvt_trigger, kill);
+			DEBUG_ONLY(++icntkill);
+		}
+		if (0 != (trigdsc->cmdmask & gvtr_cmd_mask[GVTR_CMDTYPE_ZTRIGGER]))
+		{
+			PUT_TRIGGER_ON_CMD_TYPE_QUEUE(trigdsc, gvt_trigger, ztrig);
+			DEBUG_ONLY(++icntztrig);
+		}
+	}
+	gvt_trigger->gv_trig_top = trigdsc;	/* Very top of the array */
+#	ifdef DEBUG	/* Verify that the queues are well built */
+	{
+		cntset = cntkill = cntztrig = 0;
+		trigstart = gvt_trigger->set_triglist;
+		trigtop = NULL;
+		for (trigdsc = trigstart; (NULL != trigdsc) && (trigdsc != trigtop); trigdsc = trigdsc->next_set)
+		{
+			trigtop = trigstart;	/* Stop when we get back here */
+			cntset++;
+		}
+
+		trigstart = gvt_trigger->kill_triglist;
+		trigtop = NULL;
+		for (trigdsc = trigstart; (NULL != trigdsc) && (trigdsc != trigtop); trigdsc = trigdsc->next_kill)
+		{
+			trigtop = trigstart;	/* Stop when we get back here */
+			cntkill++;
+		}
+
+		trigstart = gvt_trigger->ztrig_triglist;
+		trigtop = NULL;
+		for (trigdsc = trigstart; (NULL != trigdsc) && (trigdsc != trigtop); trigdsc = trigdsc->next_ztrig)
+		{
+			trigtop = trigstart;	/* Stop when we get back here */
+			cntztrig++;
+		}
+		assert(cntset == icntset);
+		assert(cntkill == icntkill);
+		assert(cntztrig == cntztrig);
+	}
+#	endif
 	GVTR_HASHTGBL_READ_CLEANUP(FALSE);	/* do NOT free gvt->gvt_trigger so pass FALSE */
 	gvt_trigger->gv_trigger_cycle = cycle;	/* Now that ^#t has been read, we can safely update "cycle" to the higher value */
 	return;
@@ -1209,7 +1179,7 @@ STATICFNDEF	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *tr
 
 	numsubs = trigdsc->numsubs;
 	assert(numsubs);
-	subsdsc = &trigdsc->subsarray[0];
+	subsdsc = trigdsc->subsarray;
 	for (keysub = 0; keysub < numsubs; keysub++, subsdsc++)
 	{
 		thissub_matched = FALSE;
@@ -1290,7 +1260,7 @@ STATICFNDEF	boolean_t	gvtr_is_key_a_match(char *keysub_start[], gv_trigger_t *tr
 	return TRUE;
 }
 
-STATICFNDEF	void	gvtr_free(gv_namehead *gvt)
+void	gvtr_free(gv_namehead *gvt)
 {
 	gvt_trigger_t		*gvt_trigger;
 	gv_trigger_t		*gv_trig_array, *trigdsc, *trigtop;
@@ -1325,12 +1295,13 @@ STATICFNDEF	void	gvtr_free(gv_namehead *gvt)
 }
 
 /* Initializes triggers for global variable "gvt" from ^#t global. */
-void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
+void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit, int err_code)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	gv_namehead		*dir_tree;
 	uint4			lcl_t_tries, loopcnt;
+	uint4			cycle_start;
 
 	assert(dollar_tlevel);		/* A TP wrap should have been done by the caller if needed */
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
@@ -1341,14 +1312,19 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
 	if (gvt == dir_tree)
 		return; /* trigger initialization should return for directory tree (e.g. set^%GBLDEF is caller) */
 	csd = csa->hdr;
-	assert(csa->db_trigger_cycle <= cycle);
-	assert(gvt->db_trigger_cycle < cycle);
-	/* Check if TP was in turn an implicit TP (e.g. created by the GVTR_INIT_AND_TPWRAP_IF_NEEDED macro).
-	 * If so, we need to go through gvtr_db_tpwrap_helper since we don't want any t_retry calls to end up
-	 * invoking MUM_TSTART.
-	 */
+	assert((gvt->db_trigger_cycle != cycle) || (gvt->db_dztrigger_cycle < csa->db_dztrigger_cycle));
+	/* Check if TP was in turn an implicit TP (e.g. created by the GVTR_INIT_AND_TPWRAP_IF_NEEDED macro). */
 	if (tp_is_implicit)
-	{
+	{	/* If implicit TP, we need to go through gvtr_db_tpwrap_helper since we don't want any t_retry calls to end up
+		 * invoking MUM_TSTART. This way any restarts signaled during ^#t global reads will be handled internally in
+		 * gvtr_init without disturbing the caller gvcst_put/gvcst_kill in any manner. But this assumes that the ^#t
+		 * global is the FIRST global reference in this TP transaction. Otherwise the TP restart would have to transfer
+		 * control back to wherever that global reference occurred instead of this ^#t global read. Assert that below.
+		 */
+		cycle_start = csa->db_trigger_cycle;
+		assert(NULL != first_sgm_info);	/* The region corresponding to ^#t should be the only one in this TP so far */
+		assert(NULL == first_sgm_info->next_sgm_info);
+		assert(!first_sgm_info->num_of_blks);	/* This region should not have had ANY other reads until now */
 		lcl_t_tries = t_tries;
 		t_fail_hist[lcl_t_tries] = cdb_sc_normal;
 		assert(donot_INVOKE_MUMTSTART);
@@ -1356,16 +1332,19 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
 		{
 			/* In case of restart in gvtr_db_read_hasht (handled by gvtr_tpwrap_ch), tp_restart will call tp_clean_up
 			 * which will reset sgm_info_ptr to NULL and csa->sgm_info_ptr->fresh_start to TRUE. Call tp_set_sgm
-			 * to set sgm_info_ptr and first_sgm_info as gvcst_get relies on this being set.
+			 * to set sgm_info_ptr and first_sgm_info as gvcst_get relies on this being set. Also re-inits
+			 * csa->db_trigger_cycle to the latest copy from csd->db_trigger_cycle which is important to detect if
+			 * triggers have changed.
 			 */
 			tp_set_sgm();
-			gvtr_db_tpwrap_helper(csa);
+			gvtr_db_tpwrap_helper(csa, err_code);
 			assert(t_tries >= lcl_t_tries);
 			if (!dollar_tlevel)
 			{	/* Came in as non-tp. Did op_tstart in the caller (GVTR_INIT_AND_TPWRAP_IF_NEEDED).
 				 * op_tcommit was completed by gvtr_db_tpwrap_helper as no triggers were defined.
 				 * Can break out of the loop.
 				 */
+				assert(ERR_GVZTRIGFAIL != err_code);
 				assert((0 == t_tries) && (NULL == gvt->gvt_trigger));
 				break;
 			} else
@@ -1398,6 +1377,13 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
 			if (TPWRAP_HELPER_MAX_ATTEMPTS < loopcnt)
 				GTMASSERT;
 		}
+		/* It is possible we have restarted one or more times. If so, it is possible for csa->db_trigger_cycle
+		 * to have also been updated one or more times by t_retry() or tp_set_sgm but "cycle" would not have been
+		 * refreshed. Since we snapshoted cycle into start_cycle, we can check if csa->db_trigger_cycle has changed.
+		 * If it has, we update "cycle" so the correct value gets set into gvt->db_trigger_cycle below.
+		 */
+		if (cycle_start != csa->db_trigger_cycle)
+			cycle = csa->db_trigger_cycle;
 	} else
 		gvtr_db_read_hasht(csa);
 	/* Note that only gvt->db_trigger_cycle (and not CSA->db_trigger_cycle) should be touched here.
@@ -1415,6 +1401,7 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
 	 * all the gvts that participated in this transaction and comparing their cycle with csd.
 	 */
 	gvt->db_trigger_cycle = cycle;
+	gvt->db_dztrigger_cycle = csa->db_dztrigger_cycle; /* No more trigger reads for this global until next $ZTRIGGER() */
 }
 
 /* Determines matching triggers for a given gv_currkey and uses "gtm_trigger" to invokes them with appropriate parameters.
@@ -1422,15 +1409,16 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
  */
 int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_parms)
 {
+	mident			gbl;
 	gvtr_cmd_type_t		gvtr_cmd;
 	gvt_trigger_t		*gvt_trigger;
-	boolean_t		is_set_trigger, ok_to_invoke_trigger, trigtop_reached;
+	boolean_t		is_set_trigger, is_ztrig_trigger, ok_to_invoke_trigger;
 	char			*key_ptr, *key_start, *key_end;
 	char			*keysub_start[MAX_KEY_SZ + 1];
 	gv_key			*save_gv_currkey;
 	char			save_currkey[SIZEOF(short) + SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
-	gv_trigger_t		*trigdsc, *trigtop, *trigstart, *trigcmd_start;
-	int			gtm_trig_status, num_triggers_invoked;
+	gv_trigger_t		*trigdsc, *trigstop, *trigstart;
+	int			gtm_trig_status, tfxb_status, num_triggers_invoked, trigmax, trig_list_offset;
 	mstr			*ztupd_mstr;
 	mval			*keysub_mval;
 	mval			*lvvalarray[MAX_GVSUBSCRIPTS + 1];
@@ -1438,6 +1426,10 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	uint4			*lvindexarray;
 	uint4			keysubs, keylen, numlvsubs, curlvsub, lvvalindex, cursub;
 	char			*thissub;
+	mval			*ret_mval;
+	mval			tmpmval;
+	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];
+	int4			util_len;
 #	ifdef DEBUG
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -1446,23 +1438,24 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	int			lcl_gtm_trigger_depth;
 #	endif
 
-	DEBUG_ONLY(csa = cs_addrs;)
-	DEBUG_ONLY(csd = cs_data;)
-	DEBUG_ONLY(si = sgm_info_ptr;)
-	DEBUG_ONLY(save_targ = gv_target;)
+	DEBUG_ONLY(csa = cs_addrs);
+	DEBUG_ONLY(csd = cs_data);
+	DEBUG_ONLY(si = sgm_info_ptr);
+	DEBUG_ONLY(save_targ = gv_target);
 	assert(gv_target != csa->dir_tree);
 	assert(dollar_tlevel);
-	/* Check that minimal pre-filling of trigparms has already occurred in the caller */
-	assert(NULL != trigparms->ztoldval_new);
-	assert(NULL != trigparms->ztvalue_new);
-	assert(NULL != trigparms->ztdata_new);
 	/* Initialize trigger parms that dont depend on the context of the matching trigger */
 	gvtr_cmd = gvtr_parms->gvtr_cmd;
 	gvt_trigger = gvtr_parms->gvt_trigger;
 	trigparms->ztriggerop_new = &gvtr_cmd_mval[gvtr_cmd];
 	is_set_trigger = (GVTR_CMDTYPE_SET == gvtr_cmd);
+	is_ztrig_trigger = (GVTR_CMDTYPE_ZTRIGGER == gvtr_cmd);
 	if (is_set_trigger)
 	{
+		/* Check that minimal pre-filling of trigparms has already occurred in the caller */
+		assert(NULL != trigparms->ztoldval_new);
+		assert(NULL != trigparms->ztvalue_new);
+		assert(NULL != trigparms->ztdata_new);
 		PUSH_MV_STENT(MVST_MVAL);	/* protect $ztupdate from stp_gcol */
 		ztupd_mval = &mv_chain->mv_st_cont.mvs_mval;
 		ztupd_mval->str.len = 0;
@@ -1470,11 +1463,11 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 		ztupd_mstr = &ztupd_mval->str;
 		trigparms->ztupdate_new = ztupd_mval;
 	} else
-	{
+	{	/* KILL or ZTRIGGER type command */
 		ztupd_mval = &dummy_mval;
 		trigparms->ztupdate_new = (mval *)&literal_zero;
 	}
-	trigparms->lvvalarray = &lvvalarray[0];
+	trigparms->lvvalarray = lvvalarray;
 	trigparms->ztvalue_changed = FALSE;
 	/* Parse gv_currkey into array of subscripts to facilitate trigger matching.
 	 * Save contents of gv_currkey into local array as the global variable gv_currkey could change
@@ -1483,7 +1476,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	 * gets opened) inside any of the "gtm_trigger" invocations. So we should maintain pointers only
 	 * to the local copy (not the global gv_currkey) for use inside all iterations of the for loop.
 	 */
-	save_gv_currkey = (gv_key *)ROUND_UP2((INTPTR_T)&save_currkey[0], SIZEOF(gv_currkey->end));
+	save_gv_currkey = (gv_key *)ROUND_UP2((INTPTR_T)save_currkey, SIZEOF(gv_currkey->end));
 	assert(((char *)save_gv_currkey + SIZEOF(gv_key) + gv_currkey->end) < ARRAYTOP(save_currkey));
 	memcpy(save_gv_currkey, gv_currkey, OFFSETOF(gv_key, base[0]) + gv_currkey->end + 1); /* + 1 for second null terminator */
 	key_ptr = (char *)save_gv_currkey->base;
@@ -1507,53 +1500,42 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	keysubs--;	/* do not count global name as subscript */
 	assert(keysub_start[keysubs] == key_end);
 	assert(NULL == lvvalarray[keysubs]);
-	DEBUG_ONLY(keylen = INTCAST(key_end - key_start);)
+	DEBUG_ONLY(keylen = INTCAST(key_end - key_start));
 	assert(!keysubs || keylen);
 	/* Match & Invoke triggers. Take care to ensure they are invoked in an UNPREDICTABLE order.
-	 * Current implementation is to invoke triggers in a rotating order. For example, if there are
-	 * 3 triggers 0, 1 and 2, the first update to this global will match triggers in the order
-	 * 0,1,2, the second update will match triggers in the order 1,2,0 and the third 2,0,1.
+	 * Current implementation is to invoke triggers in a rotating order. For example, each command
+	 * type is in a circular queue - say A, B, C. Each time we come here to drive triggers for this
+	 * node, bump the gvt_trigger list pointer to the next element in the queue we are processing. So
+	 * if triggers A, B, C are on the SET queue, first time we will process A,B,C, next time B,C,A,
+	 * and the third, C,A,B.
 	 */
 	num_triggers_invoked = 0;
 	if (is_set_trigger)
-	{	/* Determine last non-SET type of trigger in array */
-		trigcmd_start = &gvt_trigger->gv_trig_array[0];
-		trigstart = ++gvt_trigger->cur_set_trigdsc;
-		trigtop = gvt_trigger->trigdsc_setstop;
-		if (trigstart >= trigtop) /* trigstart can be > trigtop if there are NO "SET" type triggers */
-		{
-			trigstart = trigcmd_start;
-			gvt_trigger->cur_set_trigdsc = trigstart;
-		}
-		assert(&gvt_trigger->gv_trig_array[0] <= gvt_trigger->cur_set_trigdsc);
-		assert(gvt_trigger->cur_set_trigdsc <= gvt_trigger->trigdsc_setstop);
+	{	/* Chose the set command list to process */
+		SELECT_AND_RANDOMIZE_TRIGGER_CHAIN(gvt_trigger, trigstart, trig_list_offset, set);
+	} else if (is_ztrig_trigger)
+	{	/* Chose the ztrig command list to process */
+		SELECT_AND_RANDOMIZE_TRIGGER_CHAIN(gvt_trigger, trigstart, trig_list_offset, ztrig);
+
 	} else
-	{	/* Determine first KILL type of trigger in array */
-		trigcmd_start = gvt_trigger->trigdsc_killstart;
-		trigstart = ++gvt_trigger->cur_kill_trigdsc;
-		trigtop = gvt_trigger->gv_trig_top;
-		assert(trigtop == &gvt_trigger->gv_trig_array[gvt_trigger->num_gv_triggers]);
-		if (trigstart >= trigtop) /* trigstart can be > trigtop if there are NO "SET" type triggers */
-		{
-			trigstart = trigcmd_start;
-			gvt_trigger->cur_kill_trigdsc = trigstart;
-		}
-		assert(gvt_trigger->cur_kill_trigdsc >= gvt_trigger->trigdsc_killstart);
-		assert(gvt_trigger->cur_kill_trigdsc <= gvt_trigger->gv_trig_top);
+	{	/* Chose the kill command list to process */
+		SELECT_AND_RANDOMIZE_TRIGGER_CHAIN(gvt_trigger, trigstart, trig_list_offset, kill);
 	}
-	trigtop_reached = FALSE;
-	/* Note: trigstart would be EQUAL to trigtop if there are NO "SET" or "KILL" type triggers for this global */
-	for ( trigdsc = trigstart; ; trigdsc++)
+
+	trigmax = gvt_trigger->num_gv_triggers;
+	trigstop = NULL;			/* So we can get through the first iteration */
+	for (trigdsc = trigstart;
+	     (NULL != trigdsc) && (trigdsc != trigstop);
+	     --trigmax, trigdsc = *(gv_trigger_t **)((char *)trigdsc + trig_list_offset))	/* Follow the designated list */
 	{
-		if (trigdsc == trigtop)
-		{
-			trigdsc = trigcmd_start;
-			trigtop_reached = TRUE;
-		}
-		if (trigtop_reached && (trigdsc == trigstart))
-			break;
+		DBGTRIGR((stderr, "gvtr_match_n_invoke: top of trigr scan loop\n"));
+		trigstop = trigstart;		/* Stop when we get back to where we started */
+		if (0 > trigmax)
+			GTMASSERT;		/* Loop ender "just in case" */
+		assert(trigdsc >= gvt_trigger->gv_trig_array);
+		assert(trigdsc < gvt_trigger->gv_trig_top);
 		assert((trigdsc->cmdmask & gvtr_cmd_mask[gvtr_cmd]) || !is_set_trigger);
-		if (!is_set_trigger && !(trigdsc->cmdmask & gvtr_cmd_mask[gvtr_cmd]))
+		if (!is_set_trigger && !is_ztrig_trigger && !(trigdsc->cmdmask & gvtr_cmd_mask[gvtr_cmd]))
 			continue; /* Trigger is for different command. Currently only possible for KILL/ZKILL (asserted above) */
 		/* Check that global variables which could have been modified inside gvcst_put/gvcst_kill have been
 		 * reset to their default values before going into trigger code as that could cause a nested call to
@@ -1561,14 +1543,15 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 		 * gvcst_put/gvcst_kill to be reset by the nested invocation.
 		 */
 		assert(INVALID_GV_TARGET == reset_gv_target);
-		if ((keysubs == trigdsc->numsubs) && (!keysubs || gvtr_is_key_a_match(keysub_start, trigdsc, &lvvalarray[0])))
+		if ((keysubs == trigdsc->numsubs) && (!keysubs || gvtr_is_key_a_match(keysub_start, trigdsc, lvvalarray)))
 		{
 			/* Note: lvvalarray could be updated above in case any trigger patterns
 			 * needed to have been checked for a key-match. Before invoking the trigger,
 			 * check if it specified any local variables for subscripts. If so,
 			 * initialize any that are not yet already done.
 			 */
-			if (numlvsubs = trigdsc->numlvsubs)
+			numlvsubs = trigdsc->numlvsubs;
+			if (numlvsubs)
 			{
 				lvindexarray = trigdsc->lvindexarray;
 				for (curlvsub = 0; curlvsub < numlvsubs; curlvsub++)
@@ -1599,6 +1582,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 						!trigdsc->is_zdelim && gtm_utf8_mode, ztupd_mstr);
 					if (!ztupd_mstr->len)
 					{	/* No pieces of interest changed. So dont invoke trigger. */
+						DBGTRIGR((stderr, "gvtr_match_n_invoke: Turning off ok_to_invoke_trigger #1\n"));
 						ok_to_invoke_trigger = FALSE;
 					} else
 					{	/* The string containing list of updated pieces is pointing
@@ -1614,18 +1598,61 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 				{	/* No pieces of interest specified AND no change to value.
 					 * Do NOT invoke triggers.
 					 */
+					DBGTRIGR((stderr, "gvtr_match_n_invoke: Turning off ok_to_invoke_trigger #2\n"));
 					ok_to_invoke_trigger = FALSE;
 				}
 				assert(ok_to_invoke_trigger || (0 == ztupd_mval->mvtype));
 			}
 			if (ok_to_invoke_trigger)
 			{
-				DEBUG_ONLY(lcl_gtm_trigger_depth = gtm_trigger_depth;)
+				DBGTRIGR((stderr, "gvtr_match_n_invoke: Inside trigger drive block\n"));
+				DEBUG_ONLY(lcl_gtm_trigger_depth = gtm_trigger_depth);
+				/* To exercise the trigger load code, for a debug build, we often load the trigger source code even
+				 * when not needed (based on whether a random bit in an address is on or not). Trigger code is only
+				 * needed when the trigger has not yet been compiled (the routine address is NULL). For a pro
+				 * build, trigger source is only loaded when needed. Usually there will be no source here unless a
+				 * given trigger is nesting unpleasantly so is still loaded from an ealier invocation on the
+				 * stack. It's not strictly illegal but probably leads to a trigger depth error later.
+				 */
+				if ((0 == trigdsc->xecute_str.str.len) && ((NULL == trigdsc->rtn_desc.rt_adr)
+									   DEBUG_ONLY(|| (0 != ((INTPTR_T)trigdsc & 0x100)))))
+
+				{	/* Trigger xecute string not compiled yet, so load it */
+					/* Read in ^#t("GBL",1,"XECUTE")="do ^XNAMEinGBL"	*/
+					DBGTRIGR((stderr, "gvtr_match_n_invoke: Fetching trigger source\n"));
+					tfxb_status = trigger_fill_xecute_buffer(trigdsc);
+					if (0 != tfxb_status)
+					{
+						assert(ERR_TPRETRY == tfxb_status);
+						ztupd_mval->mvtype = 0;	/* so stp_gcol - if invoked somehow - can free up any space
+									 * currently occupied by this no-longer-necessary mval */
+						gvtr_parms->num_triggers_invoked = num_triggers_invoked;
+						return tfxb_status;
+					}
+					assert(NULL != trigdsc->xecute_str.str.addr);
+					if (MAX_XECUTE_LEN <= trigdsc->xecute_str.str.len)
+					{
+						assert(FALSE);
+						rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_XECUTE_LEN);
+					}
+				}
 				gtm_trig_status = gtm_trigger(trigdsc, trigparms);
-					/* note: the above call may update trigparms->ztvalue_new for SET type triggers */
+				/* note: the above call may update trigparms->ztvalue_new for SET type triggers */
+				if (NULL != trigdsc->xecute_str.str.addr)
+				{	/* Now that gtm_trigger() has compiled the xecute string, the source  can be freed
+					 * if it still allocated. Note a $TEXT() call or other source reference could have
+					 * stolen the buffer so it may no longer be here for us to free.
+					 */
+					if (0 < trigdsc->xecute_str.str.len)
+					{
+						free(trigdsc->xecute_str.str.addr);
+						trigdsc->xecute_str.str.addr = NULL;
+						trigdsc->xecute_str.str.len = 0;
+					}
+				}
 				assert(lcl_gtm_trigger_depth == gtm_trigger_depth);
 				num_triggers_invoked++;
-				ztupd_mval->mvtype = 0;	/* so stp_gcol (if invoked somehow) can free up any space
+				ztupd_mval->mvtype = 0;	/* so stp_gcol -if invoked somehow - can free up any space
 							 * currently occupied by this no-longer-necessary mval */
 				assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
 				if (0 != gtm_trig_status)

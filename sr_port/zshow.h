@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ typedef struct
 	int		prev;		/* gv_currkey->prev 				*/
 } zs_gv_struct;
 
-typedef struct
+typedef struct zshow_out_struct
 {
 	char		type;		/* device, local variable or global variable				*/
 	char		code;		/* function = "BDSW"							*/
@@ -84,7 +84,7 @@ void		zshow_devices(zshow_out *output);
 void		zshow_format_lock(zshow_out *output, mlk_pvtblk *temp);
 void		zshow_locks(zshow_out *output);
 void		zshow_output(zshow_out *out, const mstr *str);
-void		zshow_svn(zshow_out *output);
+void		zshow_svn(zshow_out *output, int svn);
 void		zshow_zbreaks(zshow_out *output);
 void		zshow_zcalls(zshow_out *output);
 void		zshow_gvstats(zshow_out *output);

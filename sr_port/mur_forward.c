@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashtab.h"
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
@@ -61,7 +60,7 @@ GBLREF 	mur_gbls_t		murgbl;
 GBLREF	reg_ctl_list		*mur_ctl, *rctl_start;
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF	mur_opt_struct		mur_options;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
@@ -201,14 +200,20 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		assert(murgbl.ok_to_update_db || !rctl->db_updated);
 		PRINT_VERBOSE_STAT(jctl, "mur_forward:at tp_resolve_time");
 	}
-	assert(NULL != prev_rctl);	/* there should have been at least one region with records AFTER tp-resolve-time */
+	/* Note that it is possible for rctl_start to be NULL at this point. That is there is no journal record in any region
+	 * AFTER the calculated tp-resolve-time. This is possible if for example -AFTER_TIME was used and has a time later
+	 * than any journal record in all journal files. If rctl_start is NULL, prev_rctl should also be NULL and vice versa.
+	 */
 	if (prev_rctl != rctl_start)
 	{
+		assert(NULL != prev_rctl);
+		assert(NULL != rctl_start);
 		prev_rctl->next_rctl = rctl_start;
 		rctl_start->prev_rctl = prev_rctl;
+	} else
+	{	/* prev_rctl & rctl_start are identical. They both should be NULL or should point to a single element linked list */
+		assert((NULL == rctl_start) || (NULL == rctl_start->next_rctl) && (NULL == rctl_start->prev_rctl));
 	}
-	assert((prev_rctl != rctl_start) || (NULL == rctl_start->next_rctl));
-	assert((prev_rctl != rctl_start) || (NULL == rctl_start->prev_rctl));
 	rctl = rctl_start;
 	regcnt_stuck = 0; /* # of regions we are stuck in waiting for other regions to resolve a multi-region TP transaction */
 	assert((NULL == rctl) || (NULL == rctl->forw_multi));
@@ -262,7 +267,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 				rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 				if (IS_TP(rectype) && IS_TUPD(rectype))
 				{
-					assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));
+					assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
 					assert(&rec->jrec_set_kill.num_participants == &rec->jrec_ztworm.num_participants);
 					num_partners = rec->jrec_set_kill.num_participants;
 					assert(0 < num_partners);
@@ -382,6 +387,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	assert(0 == murgbl.regcnt_remaining);
 	jgbl.mur_pini_addr_reset_fnptr = NULL;	/* No more simulation of GT.M activity for any region */
 	prc_vec = murgbl.prc_vec;	/* Use process-vector of MUPIP RECOVER (not any simulating GT.M process) now onwards */
+	assert(0 == dollar_tlevel);
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
 		PRINT_VERBOSE_STAT(rctl->jctl, "mur_forward:at the end");
@@ -390,7 +396,8 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		assert(!dollar_tlevel);	/* In case it applied a broken TUPD */
 		assert(murgbl.ok_to_update_db || !rctl->db_updated);
 		rctl->mur_plst = NULL;	/* reset now that simulation of GT.M updates is done */
-		if (rctl->db_updated && (SS_NORMAL != mur_block_count_correct(rctl)))
+		/* Ensure mur_block_count_correct is called if updates allowed*/
+		if ((murgbl.ok_to_update_db) && (SS_NORMAL != mur_block_count_correct(rctl)))
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(rctl->gd));
 			murgbl.wrn_count++;

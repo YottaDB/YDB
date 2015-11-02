@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 #include "gtm_strings.h"
 #include "gdsroot.h"
@@ -31,7 +32,6 @@
 #include "format_targ_key.h"
 
 #ifdef GTM_TRIGGER
-#include "hashtab.h"		/* for STR_HASH (in COMPUTE_HASH_MNAME)*/
 #include "hashtab_mname.h"
 #include "rtnhdr.h"
 #include "gv_trigger.h"		/* needed for INIT_ROOT_GVT */

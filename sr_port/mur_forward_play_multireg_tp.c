@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashtab.h"
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
@@ -37,7 +36,7 @@
 
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct		mur_options;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
@@ -114,7 +113,7 @@ uint4	mur_forward_play_multireg_tp(forw_multi_struct *forw_multi, reg_ctl_list *
 #			ifdef DEBUG
 			if (IS_TP(rectype))
 			{
-				assert(REC_HAS_TOKEN_SEQ(rectype, rec));
+				assert(REC_HAS_TOKEN_SEQ(rectype));
 				assert(rec_token_seq == GET_JNL_SEQNO(rec));
 			}
 #			endif

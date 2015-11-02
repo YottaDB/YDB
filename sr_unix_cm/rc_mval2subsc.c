@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +22,11 @@
 #include "format_targ_key.h"
 
 GBLREF gv_namehead	*gv_target;
-GBLREF bool		transform;
 GBLREF gd_region       *gv_cur_region;
+
+error_def(ERR_GVSUBOFLOW);
+error_def(ERR_NUMOFLOW);
+error_def(ERR_GVIS);
 
 static readonly unsigned char pos_code[100] =
 {
@@ -53,42 +56,41 @@ static readonly unsigned char neg_code[100] =
 	0x6e, 0x6d, 0x6c, 0x6b, 0x6a, 0x69, 0x68, 0x67, 0x66, 0x65
 };
 
-unsigned char *mval2subsc( mval *v , gv_key *g )
+unsigned char *mval2subsc(mval *v, gv_key *g)
 {
         char            buf1[MAX_KEY_SZ + 1];
 	mstr		mstr_buf1;
 	mstr		mstr_ch;
-	error_def(ERR_GVSUBOFLOW) ;
-	error_def(ERR_NUMOFLOW) ;
-	error_def(ERR_GVIS);
 	int	exp_val;
 	bool	is_negative;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
-	int4 	n, m , mx, digs;
+	int4 	n, m, mx, digs;
 	unsigned char *cvt_table;
 	uint4 mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
 	unsigned char *out_ptr;
 	unsigned char *in_ptr, ch;
 	unsigned char temp_mantissa[NUM_DEC_DG_2L / 2 + 3];	/* Need 1 byte for each two digits.  Add 3 bytes slop */
 	unsigned char *tm;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	out_ptr = g->base + g->end;
 	MV_FORCE_STR(v);
-	if (transform && gv_target->nct)
+	if (TREF(transform) && gv_target->nct)
 		mvt = v->mvtype | MV_NUM_APPROX;
 	else
 	{
 		mvt = (uint4)v->mvtype;
 		/* this code differs from mval2subsc in port
-		 * due to precision differences in the "datatree" representations
+		 * due to possilbe precision differences in the client representations
 		 */
 		if (rc_iscan(v))
 		{
 			/* Yes, convert it to numeric */
-			s2n(v) ;
+			s2n(v);
 			mvt = v->mvtype;
 			if (!(mvt & MV_NM))
-				rts_error(VARLSTCNT(1) ERR_NUMOFLOW) ;
+				rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
 		}
 		else
 		{
@@ -96,12 +98,11 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 			mvt = v->mvtype |= MV_NUM_APPROX;
 		}
 	}
-	if ( mvt & MV_NUM_APPROX )
-	{
-		/* It's a string */
+	if (mvt & MV_NUM_APPROX)
+	{	/* It's a string */
 		in_ptr = (unsigned char *) v->str.addr;
 		n = v->str.len;
-		if (transform && gv_target->collseq)
+		if (TREF(transform) && gv_target->collseq)
 		{
 			mstr_ch.len = n;
 			mstr_ch.addr = (char*) in_ptr;
@@ -111,12 +112,11 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 			in_ptr = (unsigned char *)mstr_buf1.addr; /* mstr_buf1.addr is used just in case it is
 								     reallocated by the XFORM routine */
                 }
-		if (g->end + n + 3 > g->top - MAX_NUM_SUBSC_LEN )
+		if ((g->end + n + 3) > (g->top - MAX_NUM_SUBSC_LEN))
 		{
-			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
-			{	end = &buff[MAX_ZWR_KEY_SZ - 1];
-			}
-			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
+			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)))
+				end = &buff[MAX_ZWR_KEY_SZ - 1];
+			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 		}
 		if (n > 0)
 		{
@@ -129,11 +129,11 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 					*out_ptr++ = STR_SUB_ESCAPE;
 					if ( out_ptr - g->base + n + 3 > g->top - MAX_NUM_SUBSC_LEN)
 					{
-						if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
+						if ((end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
 						{
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
 						}
-						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
+						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 					}
 					ch++;	/* promote character */
 				}
@@ -141,14 +141,14 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 			} while (--n > 0);
 		} else
 		{
-			*out_ptr++ = (!transform || 0 == gv_cur_region->std_null_coll) ? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL ;
+			*out_ptr++ = (!TREF(transform) || 0 == gv_cur_region->std_null_coll)
+				? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL;
 		}
 		goto FINI;
 	}
 	/* Its a number, is it an integer? */
 	if ( mvt & MV_INT )
-	{
-		/* Yes, its an integer, convert it */
+	{	/* Yes, its an integer, convert it */
 		is_negative = FALSE;
 		cvt_table = pos_code;
 		if ((m = v->m[1]) < 0)
@@ -156,57 +156,57 @@ unsigned char *mval2subsc( mval *v , gv_key *g )
 			is_negative = TRUE;
 			cvt_table = neg_code;
 			m = -m;
-		} else if (m == 0)
+		} else if (0 == m)
 		{
 			*out_ptr++ = 0x80;
 			goto FINI;
 		}
-		if (m < 10)
+		if (10 > m)
 		{
 			*out_ptr++ = is_negative ? ~(SUBSCRIPT_BIAS - 2): (SUBSCRIPT_BIAS - 2);
 			*out_ptr++ = cvt_table[m * 10];
 			goto FINISH_NUMBER;
 		}
-		if (m < 100)
+		if (100 > m)
 		{
 			*out_ptr++ = is_negative ? ~(SUBSCRIPT_BIAS - 1): (SUBSCRIPT_BIAS - 1);
 			*out_ptr++ = cvt_table[m];
 			goto FINISH_NUMBER;
 		}
 		tm = temp_mantissa;
-		if (m < 1000)
+		if (1000 > m)
 		{
 			exp_val = SUBSCRIPT_BIAS;
 			goto ODD_INTEGER;
 		}
-		if (m < 10000)
+		if (10000 > m)
 		{
 			exp_val = SUBSCRIPT_BIAS + 1;
 			goto EVEN_INTEGER;
 		}
-		if (m < 100000)
+		if (100000 > m)
 		{
 			exp_val =  SUBSCRIPT_BIAS + 2;
 			goto ODD_INTEGER;
 		}
-		if (m < 1000000)
+		if (1000000 > m)
 		{
 			exp_val = SUBSCRIPT_BIAS + 3;
 			goto EVEN_INTEGER;
 		}
-		if (m < 10000000)
+		if (10000000 > m)
 		{
 			exp_val = SUBSCRIPT_BIAS + 4;
 			goto ODD_INTEGER;
 		}
-		if (m < 100000000)
+		if (100000000 > m)
 		{
 			exp_val = SUBSCRIPT_BIAS + 5;
 			goto EVEN_INTEGER;
 		}
 		exp_val = SUBSCRIPT_BIAS + 6;
 ODD_INTEGER:
-		*out_ptr++ = is_negative ? ~(exp_val): (exp_val);
+		*out_ptr++ = is_negative ? ~exp_val : exp_val;
 		n = mx = m / 10;
 		n *= 10;
 		n = m - n;
@@ -218,7 +218,7 @@ ODD_INTEGER:
 		}
 		goto KEEP_STRIPING;
 EVEN_INTEGER:
-		*out_ptr++ = is_negative ? ~(exp_val): (exp_val);
+		*out_ptr++ = is_negative ? ~exp_val: exp_val;
 KEEP_STRIPING:
 		while (m)
 		{
@@ -252,23 +252,17 @@ FINISH_INTEGERS:
 	*out_ptr++ = is_negative ? ~(v->e - MV_XBIAS + SUBSCRIPT_BIAS): (v->e - MV_XBIAS + SUBSCRIPT_BIAS);
 	m = v->m[1];
 	n = v->m[0];
-	/*
-	 * Strip top two digits
-	 */
+	/* Strip top two digits */
 	mx = m / (MANT_HI / 100);
 	*out_ptr++ = cvt_table[mx];
 	m = (m - (mx * (MANT_HI / 100))) * 100;
-	/*
-	 * The two msd's have now been converted.  The maximum number of
+	/* The two msd's have now been converted.  The maximum number of
 	 * data remaining is 7 digits in "m" and 9 digits in "n".
 	 * If n is zero, then we should just grind out m till we are done
-	 *
 	 */
 	if (n == 0)
 		goto LAST_LONGWORD;
-	/*
-	 * there are more than 7 digits left.  First, we will put 8 digits in m, (leaving 8 digits in n)
-	 */
+	/* there are more than 7 digits left.  First, we will put 8 digits in m, (leaving 8 digits in n) */
 	mx = n / (MANT_HI / 10);
 	m += mx * 10;
 	n = (n - (mx * (MANT_HI / 10))) * 10;
@@ -295,12 +289,11 @@ FINI:
 	*out_ptr++ = 0 ; *out_ptr = 0 ;
 	g->prev = g->end ;
 	g->end  = out_ptr - g->base ;
-	if (g->end > g->top - MAX_NUM_SUBSC_LEN - 1) /* take of extra space and one for last zero */
-	{
-		if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
-		{	end = &buff[MAX_ZWR_KEY_SZ - 1];
-		}
-		rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - &buff[0] , &buff[0]);
+	if (g->end > g->top - MAX_NUM_SUBSC_LEN - 1)
+	{	/* take of extra space and one for last zero */
+		if ((end = format_targ_key(buff, MAX_ZWR_KEY_SZ, g, TRUE)) == 0)
+			end = &buff[MAX_ZWR_KEY_SZ - 1];
+		rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 	}
-	return out_ptr ;
+	return out_ptr;
 }

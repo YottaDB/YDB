@@ -33,6 +33,7 @@
 #include "gtmctype.h"
 
 GBLREF CLI_ENTRY                *cmd_ary;
+GBLREF	gd_region		*gv_cur_region;
 GBLREF CLI_ENTRY                trigger_cmd_ary[];
 
 #define BITS_PER_INT		(SIZEOF(uint4) * 8)	/* Number of bits in an integer */
@@ -43,8 +44,6 @@ GBLREF CLI_ENTRY                trigger_cmd_ary[];
 #define MAX_OPTIONS_LEN		1024			/* Maximum size of the "options" string */
 #define MAX_DCHAR_LEN		1024			/* Maximum size of $C or $ZCH string */
 #define MAX_DELIM_LEN		1024			/* Maximum size of the string for a delimiter - $C, $ZCH, "x", ... */
-#define MAX_XECUTE_LEN		(MAX_SRCLINE - 1)	/* Maximum length of the xecute string (the extra space is for when the
-							   string is written out as a routine at trigger compile time */
 #define MAX_ERROR_MSG_LEN	72
 #define TRIGR_PRECOMP_RTNNAME	"trigcomptest#"
 
@@ -591,7 +590,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 				}
 				break;
 			default:
-				assert(FALSE);
+				GTMASSERT;	/* Parsing should have found invalid command */
 				break;
 		}
 	} while (ptr = strtok(NULL, ","));
@@ -1154,55 +1153,110 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 	return TRUE;
 }
 
-STATICFNDEF boolean_t process_xecute(char *xecute_str, uint4 *xecute_len)
+STATICFNDEF boolean_t process_xecute(char *xecute_str, uint4 *xecute_len, boolean_t multi_line)
 {
 	uint4		dst_len;
-	char		dst_string[MAX_XECUTE_LEN];
+	char		dst_string[MAX_SRCLINE];
 	uint4		src_len;
 	gv_trigger_t	trigdsc;
 
-	error_def(ERR_SYSCALL);
-
 	src_len = *xecute_len;
-	if (MAX_XECUTE_LEN < *xecute_len)
+	if ((src_len == XTENDED_START_LEN) && (0 == memcmp(XTENDED_START, xecute_str, XTENDED_START_LEN)))
+		return TRUE;
+	if (!multi_line && (NULL != memchr(xecute_str, '\n', src_len)))
 	{
-		util_out_print_gtmio("XECUTE string longer than !UL characters", FLUSH, MAX_XECUTE_LEN);
+		util_out_print_gtmio("Newline not allowed in XECUTE string", FLUSH);
 		return FALSE;
 	}
-	if (!trigger_scan_string(xecute_str, &src_len, dst_string, &dst_len) || (1 != src_len))
+	if (!multi_line && MAX_SRCLINE < src_len + 1)	/* allow room for leading blank */
 	{
-		util_out_print_gtmio("Invalid XECUTE string", FLUSH);
 		return FALSE;
 	}
-	memcpy(xecute_str, dst_string, dst_len);
-	*xecute_len = dst_len;
+	if (0 == src_len)
+	{
+		util_out_print_gtmio("Empty XECUTE string is invalid", FLUSH);
+		return FALSE;
+	}
+	if (!multi_line)
+	{
+		dst_string[0] = ' ';
+		if (!trigger_scan_string(xecute_str, &src_len, dst_string + 1, &dst_len) || (1 != src_len))
+		{
+			util_out_print_gtmio("Invalid XECUTE string", FLUSH);
+			return FALSE;
+		}
+		memcpy(xecute_str, dst_string, ++dst_len);
+		*xecute_len = dst_len;
+		trigdsc.xecute_str.str.addr = dst_string;
+		trigdsc.xecute_str.str.len = dst_len;
+	} else
+	{
+		trigdsc.xecute_str.str.addr = xecute_str;
+		trigdsc.xecute_str.str.len = src_len;
+	}
 	/* Test compile the string - first build up the parm list to trigger compile routine */
 	trigdsc.rtn_desc.rt_name.addr = TRIGR_PRECOMP_RTNNAME;
 	trigdsc.rtn_desc.rt_name.len = SIZEOF(TRIGR_PRECOMP_RTNNAME) - 1;
 	trigdsc.rtn_desc.rt_adr = NULL;
-	trigdsc.xecute_str.str.addr = dst_string;
-	trigdsc.xecute_str.str.len = dst_len;
 	return (0 == gtm_trigger_complink(&trigdsc, FALSE));
 }
 
-boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **values, uint4 *value_len, int4 max_output_len)
+boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **values, uint4 *value_len, int4 *max_len,
+			boolean_t *multi_line_xecute)
 {
 	boolean_t	cli_status;
 	int		cmd_ind;
 	int		count;
 	int		eof;
+	int		extra;
 	boolean_t	found_zkill;
 	boolean_t	found_kill;
 	uint4		len;
+	int4		max_output_len;
 	int		parse_ret;
 	boolean_t	delim_present, name_present, pieces_present, xecute_present, zdelim_present;
 	char		*ptr;
 	char		*ptr1;
 	char		*ptr2;
+	int4		rec_num;
 	CLI_ENTRY       *save_cmd_ary;
 	boolean_t	set_present;
 	int		trigvn_len;
+	boolean_t	in_multi_line_xecute, out_multi_line_xecute;
 
+	max_output_len = *max_len;
+	in_multi_line_xecute = out_multi_line_xecute = *multi_line_xecute;
+	if (in_multi_line_xecute)
+	{
+		if ((XTENDED_STOP_LEN != input_len) || (0 != memcmp(XTENDED_STOP, input, XTENDED_STOP_LEN)))
+		{
+			ptr1 = values[XECUTE_SUB] + value_len[XECUTE_SUB];
+			if (0 < (max_output_len - input_len - 1))
+			{
+				memcpy(ptr1, input, input_len);
+				ptr1 += input_len;
+				*ptr1 = '\n';
+				max_output_len -= (input_len + 1);
+				value_len[XECUTE_SUB] += input_len + 1;
+				*max_len = max_output_len;
+				return TRIG_SUCCESS;
+			} else
+			{
+				*multi_line_xecute = FALSE;
+				util_out_print_gtmio("Trigger definition too long", FLUSH);
+				return FALSE;
+			}
+		}
+		out_multi_line_xecute = FALSE;
+		if (!process_xecute(values[XECUTE_SUB], &value_len[XECUTE_SUB], TRUE))
+		{
+			*multi_line_xecute = FALSE;
+			ERROR_MSG_RETURN("Error parsing XECUTE string: ", value_len[XECUTE_SUB], values[XECUTE_SUB]);
+		}
+		*multi_line_xecute = out_multi_line_xecute;
+		*max_len = max_output_len;
+		return TRIG_SUCCESS;
+	}
 	ptr1 = input;
 	len = (uint4)input_len;
 	if ('^' != *ptr1++)
@@ -1247,7 +1301,7 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	if (0 > --max_output_len)
 	{
 		util_out_print_gtmio("Trigger definition too long", FLUSH);
-		return FALSE;
+		return TRIG_FAILURE;
 	}
 	values[GVSUBS_SUB][len] = '\0';
 	value_len[GVSUBS_SUB] = (uint4)len;
@@ -1305,6 +1359,12 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 			ADD_STRING(count, ptr, gvtr_cmd_mval[GVTR_CMDTYPE_ZTKILL].str.len,
 				gvtr_cmd_mval[GVTR_CMDTYPE_ZTKILL].str.addr, max_output_len);
 		}
+		if (CLI_PRESENT == cli_present("COMMANDS.ZTRIGGER"))
+		{
+			ADD_COMMA_IF_NEEDED(count, ptr, max_output_len);
+			ADD_STRING(count, ptr, gvtr_cmd_mval[GVTR_CMDTYPE_ZTRIGGER].str.len,
+				gvtr_cmd_mval[GVTR_CMDTYPE_ZTRIGGER].str.addr, max_output_len);
+		}
 		*ptr = '\0';
 		value_len[CMD_SUB] = STRLEN(values[CMD_SUB]);
 	} else
@@ -1358,34 +1418,53 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
  	 * that are static in cli_parse.c), it is much easier to put process_xecute() last in the list of qualifiers to check -
  	 * solving the problem.  In other words, don't try to neaten things up by making the qualifiers alphabetical!
  	 */
-	GET_CLI_STR_AND_CHECK("XECUTE", xecute_present, max_output_len, process_xecute, values[XECUTE_SUB], value_len[XECUTE_SUB],
-			      values[CHSET_SUB], "Error parsing XECUTE string: ");
-	ptr = values[XECUTE_SUB] + value_len[XECUTE_SUB];
-	*ptr = '\0';
-	if (!xecute_present)
+	if (CLI_PRESENT == (xecute_present = cli_present("XECUTE")))
 	{
-		ERROR_STR_RETURN("XECUTE value missing");
-	}
-	if (0 == value_len[CMD_SUB])
+		GET_CLI_STR("XECUTE", max_output_len, values[XECUTE_SUB], value_len[XECUTE_SUB]);
+		out_multi_line_xecute |= (value_len[XECUTE_SUB] == XTENDED_START_LEN)
+			&& (0 == memcmp(XTENDED_START, values[XECUTE_SUB], XTENDED_START_LEN));
+		if (!process_xecute(values[XECUTE_SUB], &value_len[XECUTE_SUB], out_multi_line_xecute))
+		{
+			ptr = values[XECUTE_SUB];
+			len = value_len[XECUTE_SUB];
+			ERROR_MSG_RETURN("Error parsing XECUTE string: ", len, ptr);
+		}
+	} else
+		value_len[XECUTE_SUB] = 0;
+	if (!in_multi_line_xecute)
 	{
-		ERROR_STR_RETURN("COMMANDS value missing");
+		max_output_len -= value_len[XECUTE_SUB];
+		UPDATE_TRIG_PTRS(values[XECUTE_SUB], values[CHSET_SUB], value_len[XECUTE_SUB], max_output_len);
+		ptr = values[XECUTE_SUB] + value_len[XECUTE_SUB];
+		*ptr = '\0';
+		if (!xecute_present && !out_multi_line_xecute)
+		{
+			ERROR_STR_RETURN("XECUTE value missing");
+		}
+		if (0 == value_len[CMD_SUB])
+		{
+			ERROR_STR_RETURN("COMMANDS value missing");
+		}
+		if (delim_present && zdelim_present)
+		{
+			ERROR_STR_RETURN("Can't have both DELIM and ZDELIM in same entry");
+		}
+		if ((delim_present || zdelim_present) && !set_present)
+		{
+			ERROR_STR_RETURN("DELIM and ZDELIM need a commands=SET");
+		}
+		if (pieces_present && (!delim_present && !zdelim_present))
+		{
+			ERROR_STR_RETURN("PIECES need either DELIM or ZDELIM");
+		}
+		if (MAX_HASH_INDEX_LEN < (trigvn_len + 1 + value_len[GVSUBS_SUB] + 1 + value_len[DELIM_SUB] + 1
+					  + value_len[ZDELIM_SUB] + 1 + value_len[XECUTE_SUB] + 1))
+		{
+			ERROR_STR_RETURN("Entry too large to properly index");
+		}
 	}
-	if (delim_present && zdelim_present)
-	{
-		ERROR_STR_RETURN("Can't have both DELIM and ZDELIM in same entry");
-	}
-	if ((delim_present || zdelim_present) && !set_present)
-	{
-		ERROR_STR_RETURN("DELIM and ZDELIM need a commands=SET");
-	}
-	if (pieces_present && (!delim_present && !zdelim_present))
-	{
-		ERROR_STR_RETURN("PIECES need either DELIM or ZDELIM");
-	}
-	if (MAX_HASH_INDEX_LEN < (trigvn_len + 1 + value_len[GVSUBS_SUB] + 1 + value_len[DELIM_SUB] + 1 + value_len[ZDELIM_SUB] + 1
-				  + value_len[XECUTE_SUB] + 1))
-	{
-		ERROR_STR_RETURN("Entry too large to properly index");
-	}
-	return TRUE;
+
+	*multi_line_xecute = out_multi_line_xecute;
+	*max_len = max_output_len;
+	return TRIG_SUCCESS;
 }

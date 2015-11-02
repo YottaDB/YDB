@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,18 +41,16 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "interlock.h"
+#include "rtnhdr.h"
+#include "stack_frame.h"
 #ifdef GTM_TRIGGER
-#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
-#include "gv_trigger.h"
-#include "gtm_trigger.h"
-#include "gv_trigger_protos.h"
-#include "mv_stent.h"
-#include "stringpool.h"
-#	ifdef DEBUG
-#	include "stack_frame.h"
-#	include "tp_frame.h"
-#	endif
+# include "gv_trigger.h"
+# include "gtm_trigger.h"
+# include "gv_trigger_protos.h"
+# include "mv_stent.h"
+# include "stringpool.h"
 #endif
+#include "tp_frame.h"
 #include "tp_restart.h"
 
 /* Include prototypes */
@@ -74,23 +72,15 @@
 #include "format_targ_key.h"	/* for format_targ_key prototype */
 #include "tp_set_sgm.h"		/* for tp_set_sgm prototype */
 #include "op_tcommit.h"		/* for op_tcommit prototype */
+#include "have_crit.h"
 
-#ifdef GTM_TRIGGER
-LITREF	mval	literal_null;
-LITREF	mval	*fndata_table[2][2];
-#endif
-
-#ifdef DEBUG
-GBLREF char			*update_array, *update_array_ptr;
-GBLREF uint4			update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
-#endif
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
 GBLREF	int4			gv_keysize;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	kill_set		*kill_set_tail;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -101,16 +91,26 @@ GBLREF	uint4			update_trans;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
+GBLREF	stack_frame		*frame_pointer;
 #ifdef GTM_TRIGGER
+GBLREF	int			tprestart_state;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
 GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
 GBLREF	mval			dollar_ztwormhole;
 #endif
 #ifdef DEBUG
-GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+GBLREF char			*update_array, *update_array_ptr;
+GBLREF uint4			update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
+#endif
+
+error_def(ERR_TPRETRY);
+error_def(ERR_GVKILLFAIL);
+
+#ifdef GTM_TRIGGER
+LITREF	mval	literal_null;
+LITREF	mval	*fndata_table[2][2];
 #endif
 
 void	gvcst_kill(bool do_subtree)
@@ -133,7 +133,7 @@ void	gvcst_kill(bool do_subtree)
 	srch_rec_status		*left_rec_stat, local_srch_rec;
 	uint4			segment_update_array_size;
 	unsigned char		*base;
-	int			lcl_dollar_tlevel;
+	int			lcl_dollar_tlevel, rc;
 	uint4			nodeflags;
 	sgm_info		*si;
 #	ifdef GTM_TRIGGER
@@ -152,14 +152,13 @@ void	gvcst_kill(bool do_subtree)
 	boolean_t		is_mm;
 	uint4			dbg_research_cnt;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_TPRETRY);
-	error_def(ERR_GVKILLFAIL);
-
+	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth);)
+	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth));
 	GTMTRIG_ONLY(
 		TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
 		assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
@@ -173,7 +172,7 @@ void	gvcst_kill(bool do_subtree)
 		}
 	)
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl);
-	if (0 == dollar_tlevel)
+	if (!dollar_tlevel)
 	{
 		kill_set_head.next_kill_set = NULL;
 		if (jnl_fence_ctl.level)	/* next_fenced_was_null is reliable only if we are in ZTransaction */
@@ -248,13 +247,15 @@ void	gvcst_kill(bool do_subtree)
 					gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
 					assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
 					if (ERR_TPRETRY == gtm_trig_status)
-					{	/* A restart has been signalled inside trigger code for this implicit TP wrapped
-						 * transaction. Redo gvcst_kill logic. The t_retry/tp_restart call has already
-						 * been done on our behalf by gtm_trigger so we need to skip that part and do
-						 * everything else before redoing gvcst_kill.
+					{	/* A restart has been signaled that we need to handle or complete the handling of.
+						 * This restart could have occurred reading the trigger in which case no
+						 * tp_restart() has yet been done or it could have occurred in trigger code in
+						 * which case we need to finish the incomplete tp_restart. In both cases this
+						 * must be an implicitly TP wrapped transaction. Our action is to complete the
+						 * necessary tp_restart() logic (t_retry is already completed so should be skipped)
+						 * and then re-do the gvcst_kill logic.
 						 */
 						assert(lcl_implicit_tstart);
-						assert(0 < t_tries);
 						assert(CDB_STAGNATE >= t_tries);
 						cdb_status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
 						goto retry;
@@ -272,7 +273,7 @@ void	gvcst_kill(bool do_subtree)
 					 * sgm_info_ptr to a non-NULL value (if a non-TP transaction is tp wrapped for triggers).
 					 */
 		assert(t_tries < CDB_STAGNATE || csa->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
-		if (0 == dollar_tlevel)
+		if (!dollar_tlevel)
 		{
 			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 			kill_set_tail = &kill_set_head;
@@ -415,16 +416,16 @@ research:
 							 * Assert that.
 							 */
 							assert(!skip_dbtriggers);
-							donot_commit |= DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS;
+							TREF(donot_commit) |= DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS;
 						}
 					)
 					if (do_subtree ? dlr_data : (dlr_data & 1))
 						actual_update = UPDTRNS_DB_UPDATED_MASK;
 				}
 			)
-			NON_GTMTRIG_ONLY(assert(!jnl_format_done);)
+			NON_GTMTRIG_ONLY(assert(!jnl_format_done));
 			assert(!actual_update || si->cw_set_depth
-							GTMTRIG_ONLY(|| gvtr_parms.num_triggers_invoked || donot_commit));
+							GTMTRIG_ONLY(|| gvtr_parms.num_triggers_invoked || TREF(donot_commit)));
 			assert(!(prev_update_trans & ~UPDTRNS_VALID_MASK));
 			if (!actual_update)
 				si->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
@@ -436,7 +437,7 @@ research:
 			 * is treated in the same order in the secondary (trigger supporting platform) irrespective of whether
 			 * the secondary has defined triggers or not for the global that is being updated.
 			 */
-			if (0 == dollar_tlevel)
+			if (!dollar_tlevel)
 			{
 				nodeflags = 0;
 				if (skip_dbtriggers)
@@ -465,7 +466,7 @@ research:
 			}
 		}
 		flush_cache = FALSE;
-		if (0 == dollar_tlevel)
+		if (!dollar_tlevel)
 		{
 			if ((0 != csd->dsid) && (0 < kill_set_head.used)
 				&& gv_target->hist.h[1].blk_num != alt_hist->h[1].blk_num)
@@ -479,7 +480,7 @@ research:
 				if (!csa->now_crit)	/* Do not sleep while holding crit */
 					WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 			}
-			if ((trans_num)0 == t_end(&gv_target->hist, alt_hist))
+			if ((trans_num)0 == t_end(&gv_target->hist, alt_hist, TN_NOT_SPECIFIED))
 			{	/* In case this is MM and t_end caused a database extension, reset csd */
 				assert(is_mm || (csd == cs_data));
 				csd = cs_data;
@@ -534,10 +535,10 @@ research:
 			gv_target->hist.h[0].curr_rec.match = alt_hist->h[0].curr_rec.match;
 			COPY_CURRKEY_TO_GVTARGET_CLUE(gv_target, gv_altkey);
 		}
-		NON_GTMTRIG_ONLY(assert(lcl_dollar_tlevel == dollar_tlevel);)
-		if (0 == lcl_dollar_tlevel)
+		NON_GTMTRIG_ONLY(assert(lcl_dollar_tlevel == dollar_tlevel));
+		if (!lcl_dollar_tlevel)
 		{
-			assert(0 == dollar_tlevel);
+			assert(!dollar_tlevel);
 			assert(0 < kill_set_head.used || (NULL == kip_csa));
 			if (0 < kill_set_head.used)     /* free subtree, decrease kill_in_prog */
 			{	/* If csd->dsid is non-zero then some rc code was exercised before the changes
@@ -560,10 +561,9 @@ research:
 			}
 			assert(0 < kill_set_head.used || (NULL == kip_csa));
 		}
-		GTMTRIG_ONLY(assert(NULL == ztold_mval);)
+		GTMTRIG_ONLY(assert(NULL == ztold_mval));
 		return;
 retry:
-		GTMTRIG_ONLY(POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);)
 #		ifdef GTM_TRIGGER
 		if (lcl_implicit_tstart)
 		{
@@ -577,20 +577,27 @@ retry:
 #		endif
 		assert((cdb_sc_normal != cdb_status) GTMTRIG_ONLY(|| lcl_implicit_tstart));
 		if (cdb_sc_normal != cdb_status)
+		{
+			GTMTRIG_ONLY(POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain));
 			t_retry(cdb_status);
-		else
+		} else
 		{	/* else: t_retry has already been done so no need to do that again but need to still invoke tp_restart
 			 * to complete pending "tprestart_state" related work.
 			 */
-			GTMTRIG_ONLY(assert(ERR_TPRETRY == gtm_trig_status);)
-			tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
+#			ifdef GTM_TRIGGER
+			assert(ERR_TPRETRY == gtm_trig_status);
+			TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
+			POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
+#			endif
+			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
+			assert(0 == rc GTMTRIG_ONLY(&& TPRESTART_STATE_NORMAL == tprestart_state));
 		}
-		GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART);) /* if set to TRUE above, should have been reset by t_retry */
+		GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART)); /* if set to TRUE above, should have been reset by t_retry */
 		/* At this point, we can be in TP only if we implicitly did a tstart in gvcst_kill (as part of a trigger update).
 		 * Assert that. Since the t_retry/tp_restart would have reset si->update_trans, we need to set it again.
 		 * So reinvoke the T_BEGIN call only in case of TP. For non-TP, update_trans is unaffected by t_retry.
 		 */
-		assert((0 == dollar_tlevel) GTMTRIG_ONLY(|| lcl_implicit_tstart));
+		assert(!dollar_tlevel GTMTRIG_ONLY(|| lcl_implicit_tstart));
 		if (dollar_tlevel)
 		{
 			tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start */

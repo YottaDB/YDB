@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +81,6 @@
 #ifdef GTM_TRIGGER
 #include "rtnhdr.h"			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
-#include "hashtab.h"			/* for STR_HASH (in COMPUTE_HASH_MNAME)*/
 #include "tp_set_sgm.h"
 #endif
 
@@ -211,7 +210,7 @@ boolean_t updproc_preread(void)
 					/* On every 4th pass, we bide for awhile */
 					wcs_sleep(LOCK_SLEEP);
 					if (RETRY_CASLATCH_CUTOFF == retries)
-						performCASLatchCheck(&upd_helper_ctl->pre_read_lock, LOOP_CNT_SEND_WAKEUP);
+						performCASLatchCheck(&upd_helper_ctl->pre_read_lock, TRUE);
 				}
 			}
 			if (0 < spins)
@@ -318,7 +317,7 @@ boolean_t updproc_preread(void)
 		if (good_record)
 		{
 			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-			if (IS_SET_KILL_ZKILL(rectype))
+			if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 			{
 				was_wrapped = recvpool_ctl->wrapped;
 				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;

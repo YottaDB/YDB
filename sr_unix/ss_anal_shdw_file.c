@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,7 @@ static void ss_print_fil_hdr(snapshot_filhdr_ptr_t ss_filhdr_ptr)
 {
 	util_out_print("----------------------------------------", TRUE);
 	util_out_print("Snapshot Initiator PID   :!UL", TRUE, ss_filhdr_ptr->ss_info.ss_pid);
-	util_out_print("Snapshot TN              :!UL", TRUE, ss_filhdr_ptr->ss_info.snapshot_tn);
+	util_out_print("Snapshot TN              :0x!16@XQ", TRUE, &ss_filhdr_ptr->ss_info.snapshot_tn);
 	util_out_print("DB Block Size            :!UL", TRUE, ss_filhdr_ptr->ss_info.db_blk_size);
 	util_out_print("Free Blocks              :!UL", TRUE, ss_filhdr_ptr->ss_info.free_blks);
 	util_out_print("Total Blocks             :!UL", TRUE, ss_filhdr_ptr->ss_info.total_blks);
@@ -147,7 +147,7 @@ static void ss_print_blk_details(block_id blk, blk_hdr_ptr_t bp)
 {
 	util_out_print("--------------------------", TRUE);
 	util_out_print("Block Number     : !UL", TRUE, blk);
-	util_out_print("Block TN         : !UL", TRUE, bp->tn);
+	util_out_print("Block TN         : 0x!16@XQ", TRUE, &bp->tn);
 	util_out_print("Block Level      : !UL", TRUE, bp->levl);
 	util_out_print("Block Size       : !UL", TRUE, bp->bsiz);
 	util_out_print("--------------------------", TRUE);

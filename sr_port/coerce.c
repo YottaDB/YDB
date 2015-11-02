@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,11 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "compiler.h"
 #include "opcode.h"
 #include "mdq.h"
 #include "mvalconv.h"
-#include "hashtab.h"
 #include "hashtab_str.h"
 
 GBLREF hash_table_str	*complits_hashtab;

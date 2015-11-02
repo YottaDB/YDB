@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,6 +74,14 @@ typedef struct tag_ts {
 					 */
 	char		hd_data[1];	/* Handler data */
 } GT_TIMER;
+/*
+ * Struct to track timefree block allocations
+ */
+typedef struct st_timer_alloc
+{
+	void 			*addr;
+	struct st_timer_alloc	*next;
+}st_timer_alloc;
 
 #define GT_WAKE
 
@@ -100,6 +108,7 @@ STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
 STATICFNDCL void	add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata);
 STATICFNDCL void	remove_timer(TID tid);
 STATICFNDCL void	sys_canc_timer (TID tid);
+STATICFNDCL void 	uninit_all_timers(void);
 STATICFNDCL void	cancel_all_timers(void);
 STATICFNDCL void	init_timers(void);
 

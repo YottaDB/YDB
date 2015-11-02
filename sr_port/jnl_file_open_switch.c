@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,11 +67,10 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	} else
 	{
 		jpc->status = SS_NORMAL;
-		sts = 0;
 		csa->hdr->jnl_checksum = create.checksum;
 	}
 	send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
 	assert(csa->hdr->jnl_file_len == create.jnl_len);
 	assert(0 == memcmp(csa->hdr->jnl_file_name, create.jnl, create.jnl_len));
-	return sts;
+	return 0;
 }

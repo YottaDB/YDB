@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,6 @@
 
 #include "mdef.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
 #include "toktyp.h"
 #include "compiler.h"
 #include "opcode.h"
@@ -26,8 +24,6 @@
 GBLREF	char			window_token;
 GBLREF	mval			**ind_source_sp, **ind_source_top;
 GBLREF	mval			**ind_result_sp, **ind_result_top;
-GBLREF	bool			shift_gvrefs;
-GBLREF	triple			*expr_start;
 
 LITREF	mval			literal_null;
 
@@ -38,10 +34,11 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 	oprtype		v;
 	triple		*s, *src, *oldchain, tmpchain, *triptr;
 	icode_str	indir_src;
-
 	error_def(ERR_INDMAXNEST);
 	error_def(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
 	indir_src.code = indir_increment;
@@ -63,13 +60,13 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 				if (rval = gvn())
 				{
 					s = newtriple(OC_GVINCR);
-					/* dummy fill since emit_code does not like empty operand[0] */
+					/* dummy fill below since emit_code does not like empty operand[0] */
 					s->operand[0] = put_ilit(0);
 					s->operand[1] = put_tref(src);
 				}
 				break;
 			case TK_ATSIGN:
-				if (shift_gvrefs)
+				if (TREF(shift_side_effects))
 				{
 					dqinit(&tmpchain, exorder);
 					oldchain = setcurtchain(&tmpchain);
@@ -80,10 +77,10 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 						s->operand[1] = put_tref(src);
 						newtriple(OC_GVSAVTARG);
 						setcurtchain(oldchain);
-						dqadd(expr_start, &tmpchain, exorder);
-						expr_start = tmpchain.exorder.bl;
+						dqadd(TREF(expr_start), &tmpchain, exorder);
+						TREF(expr_start) = tmpchain.exorder.bl;
 						triptr = newtriple(OC_GVRECTARG);
-						triptr->operand[0] = put_tref(expr_start);
+						triptr->operand[0] = put_tref(TREF(expr_start));
 					} else
 						setcurtchain(oldchain);
 				} else

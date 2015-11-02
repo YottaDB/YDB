@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include <stdarg.h>
 #include "gtm_stdio.h"
 #include <errno.h>
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
-
 #include "cli.h"
 #include "stringpool.h"
 #include "rtnhdr.h"
@@ -42,15 +40,25 @@
 #include "send_msg.h"
 #include "gtmmsg.h"
 #include "gtm_imagetype_init.h"
-
+#include "gtm_threadgbl_init.h"
 #ifdef GTM_TRIGGER
-#include "gv_trigger.h"
-#include "gtm_trigger.h"
+# include "gdsroot.h"
+# include "gtm_facility.h"
+# include "fileinfo.h"
+# include "gdsbt.h"
+# include "gdsfhead.h"
+# include "gv_trigger.h"
+# include "gtm_trigger.h"
 #endif
 #ifdef UNICODE_SUPPORTED
-#include "gtm_icu_api.h"
-#include "gtm_utf8.h"
+# include "gtm_icu_api.h"
+# include "gtm_utf8.h"
 #endif
+#include "hashtab.h"
+#include "hashtab_str.h"
+#include "compiler.h"
+
+GBLDEF 	unsigned int		nested_level;		/* current nested depth of callin environments */
 
 GBLREF	parmblk_struct 		*param_list;
 GBLREF  stack_frame     	*frame_pointer;
@@ -61,31 +69,35 @@ GBLREF 	void			(*restart)();
 GBLREF 	boolean_t		gtm_startup_active;
 GBLREF	volatile int 		*var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 GBLREF	rhdtyp			*ci_base_addr;
-GBLDEF 	unsigned int		nested_level;		/* current nested depth of callin environments */
-
 GBLREF  mval			dollar_zstatus;
 GBLREF  unsigned char		*fgncal_stack;
-GBLREF  short			dollar_tlevel;
+GBLREF  uint4			dollar_tlevel;
 GBLREF	int			process_exiting;
-
-static  callin_entry_list	*ci_table = NULL;
+GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
 static callin_entry_list* get_entry(const char* call_name)
-{
-	callin_entry_list	*entry;
-	int 			len;
-	entry = ci_table;
-	for (len = STRLEN(call_name); NULL != entry; entry = entry->next_entry)
-	{
-		while (NULL != entry && entry->call_name.len != len)
-			entry = entry->next_entry;
-		if (NULL == entry || !memcmp(call_name, entry->call_name.addr, len))
-			break;
-	}
-	return entry;
+{	/* Lookup in a hashtable for entry corresponding to routine name */
+	ht_ent_str      *callin_entry;
+	stringkey       symkey;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	symkey.str.addr = (char *)call_name;
+	symkey.str.len = STRLEN(call_name);
+	COMPUTE_HASH_STR(&symkey);
+	callin_entry = lookup_hashtab_str(TREF(callin_hashtab), &symkey);
+	return (callin_entry ? callin_entry->value : NULL);
 }
 
-int gtm_ci (const char *c_rtn_name, ...)
+error_def(ERR_CALLINAFTERXIT);
+error_def(ERR_CIMAXLEVELS);
+error_def(ERR_CINOENTRY);
+error_def(ERR_CIRCALLNAME);
+error_def(ERR_CITPNESTED);
+error_def(ERR_INVGTMEXIT);
+error_def(ERR_MAXSTRLEN);
+
+int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
 {
 	va_list			var;
 	callin_entry_list	*entry;
@@ -103,11 +115,14 @@ int gtm_ci (const char *c_rtn_name, ...)
 	void 			op_extcall(), op_extexfun(), flush_pio(void);
 	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
-	error_def(ERR_MAXSTRLEN);
-	error_def(ERR_CIRCALLNAME);
-	error_def(ERR_CINOENTRY);
-	error_def(ERR_CALLINAFTERXIT);
+	boolean_t 		added;
+	stringkey       	symkey;
+	ht_ent_str		*syment;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	VAR_COPY(var, temp_var);
+	added = FALSE;
 	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
 	 * invoked after a gtm_exit
 	 */
@@ -117,7 +132,6 @@ int gtm_ci (const char *c_rtn_name, ...)
 		send_msg(VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-
 	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
 	{
 		if ((status = gtm_init()) != 0)
@@ -126,15 +140,40 @@ int gtm_ci (const char *c_rtn_name, ...)
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (msp < fgncal_stack) /* unwind all arguments left on the stack by previous gtm_ci */
 		fgncal_unwind();
-	if (!ci_table) /* load the call-in table only once from env variable GTMCI  */
-		ci_table = citab_parse();
+	if (!TREF(ci_table)) /* load the call-in table only once from env variable GTMCI  */
+	{
+		TREF(ci_table) = citab_parse();
+		if (!TREF(callin_hashtab))
+		{
+			TREF(callin_hashtab) = (hash_table_str *)malloc(SIZEOF(hash_table_str));
+			(TREF(callin_hashtab))->base = NULL;
+			/* Need to initialize hash table */
+			init_hashtab_str(TREF(callin_hashtab), CALLIN_HASHTAB_SIZE,
+				HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+			assert((TREF(callin_hashtab))->base);
+		}
+		for (entry = TREF(ci_table); NULL != entry; entry = entry->next_entry)
+		{	/* Loop over the list and populate the hash table */
+			symkey.str.addr = entry->call_name.addr;
+			symkey.str.len = entry->call_name.len;
+			COMPUTE_HASH_STR(&symkey);
+			added = add_hashtab_str(TREF(callin_hashtab), &symkey, entry, &syment);
+			assert(added);
+			assert(syment->value == entry);
+		}
+	}
 	if (!c_rtn_name)
 		rts_error(VARLSTCNT(1) ERR_CIRCALLNAME);
-	if (!(entry = get_entry(c_rtn_name)))	/* c_rtn_name not found in the table */
-		rts_error(VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
+	if (NULL == callin_handle)
+	{
+		if (!(entry = get_entry(c_rtn_name)))	/* c_rtn_name not found in the table */
+			rts_error(VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
+		if (populate_handle)
+			callin_handle = entry;
+	} else
+		entry = callin_handle;
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	job_addr(&routine, &label, 0, (char **)&base_addr, (char **)&transfer_addr);
-
 	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)base_addr;
 	/* lnr_entry below is a pointer to the code offset for this label from the
@@ -146,8 +185,6 @@ int gtm_ci (const char *c_rtn_name, ...)
 	*lnr_entry = (uint4)CODE_OFFSET(base_addr, transfer_addr);
 	param_blk.labaddr = USHBIN_ONLY(&)lnr_entry;
 	param_blk.argcnt = entry->argcnt;
-
-	VAR_START(var, c_rtn_name);
 	has_return = (xc_void == entry->return_type) ? 0 : 1;
 	if (has_return)
 	{	/* create mval slot for return value */
@@ -168,32 +205,45 @@ int gtm_ci (const char *c_rtn_name, ...)
 			switch (entry->parms[i])
 			{
 				case xc_int:
-					va_arg(var, gtm_int_t); break;
+					va_arg(var, gtm_int_t);
+					break;
 				case xc_uint:
-					va_arg(var, gtm_uint_t); break;
+					va_arg(var, gtm_uint_t);
+					break;
 				case xc_long:
-					va_arg(var, gtm_long_t); break;
+					va_arg(var, gtm_long_t);
+					break;
 				case xc_ulong:
-					va_arg(var, gtm_ulong_t); break;
+					va_arg(var, gtm_ulong_t);
+					break;
 				case xc_int_star:
-					va_arg(var, gtm_int_t *); break;
+					va_arg(var, gtm_int_t *);
+					break;
 				case xc_uint_star:
-					va_arg(var, gtm_uint_t *); break;
+					va_arg(var, gtm_uint_t *);
+					break;
 				case xc_long_star:
-					va_arg(var, gtm_long_t *); break;
+					va_arg(var, gtm_long_t *);
+					break;
 				case xc_ulong_star:
-					va_arg(var, gtm_ulong_t *); break;
+					va_arg(var, gtm_ulong_t *);
+					break;
 				case xc_float:
 				case xc_double:
-					va_arg(var, gtm_double_t); break;
+					va_arg(var, gtm_double_t);
+					break;
 				case xc_float_star:
-					va_arg(var, gtm_float_t *); break;
+					va_arg(var, gtm_float_t *);
+					break;
 				case xc_double_star:
-					va_arg(var, gtm_double_t *); break;
+					va_arg(var, gtm_double_t *);
+					break;
 				case xc_char_star:
-					va_arg(var, gtm_char_t *); break;
+					va_arg(var, gtm_char_t *);
+					break;
 				case xc_string_star:
-					va_arg(var, gtm_string_t *); break;
+					va_arg(var, gtm_string_t *);
+					break;
 				default:
 					va_end(var);
 					GTMASSERT;
@@ -258,7 +308,6 @@ int gtm_ci (const char *c_rtn_name, ...)
 					arg_mval.str.len = (mstr_len_t)mstr_parm->length;
 					arg_mval.str.addr = mstr_parm->address;
 					s2pool(&arg_mval.str);
-
 					break;
 				default:
 					va_end(var);
@@ -276,7 +325,6 @@ int gtm_ci (const char *c_rtn_name, ...)
 	   gtm environments. So instead of storing explicitely, setting the
 	   global param_list to point to local param_blk will do the job */
 	param_list = &param_blk;
-
 	save_var_on_cstack_ptr = var_on_cstack_ptr;
 	var_on_cstack_ptr = NULL; /* reset var_on_cstack_ptr for the new M environment */
 	assert(frame_pointer->flags & SFF_CI);
@@ -296,7 +344,6 @@ int gtm_ci (const char *c_rtn_name, ...)
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	VAR_START(var, c_rtn_name);
 	/* convert mval args passed by reference to C types */
 	for (i=0; i <= entry->argcnt; ++i)
 	{
@@ -321,34 +368,47 @@ int gtm_ci (const char *c_rtn_name, ...)
 			switch (arg_type)
 			{
                                 case xc_int_star:
-                                        va_arg(var, gtm_int_t *); break;
+                                        va_arg(temp_var, gtm_int_t *);
+					break;
                                 case xc_uint_star:
-                                        va_arg(var, gtm_uint_t *); break;
+                                        va_arg(temp_var, gtm_uint_t *);
+					break;
 				case xc_long_star:
-					va_arg(var, gtm_long_t *); break;
+					va_arg(temp_var, gtm_long_t *);
+					break;
 				case xc_ulong_star:
-					va_arg(var, gtm_ulong_t *); break;
+					va_arg(temp_var, gtm_ulong_t *);
+					break;
 				case xc_float_star:
-					va_arg(var, gtm_float_t *); break;
+					va_arg(temp_var, gtm_float_t *);
+					break;
 				case xc_double_star:
-					va_arg(var, gtm_double_t *); break;
+					va_arg(temp_var, gtm_double_t *);
+					break;
 				case xc_char_star:
-					va_arg(var, gtm_char_t *); break;
+					va_arg(temp_var, gtm_char_t *);
+					break;
 				case xc_string_star:
-					va_arg(var, gtm_string_t *); break;
+					va_arg(temp_var, gtm_string_t *);
+					break;
                                 case xc_int:
-                                        va_arg(var, gtm_int_t); break;
+                                        va_arg(temp_var, gtm_int_t);
+					break;
                                 case xc_uint:
-                                        va_arg(var, gtm_uint_t); break;
+                                        va_arg(temp_var, gtm_uint_t);
+					break;
  				case xc_long:
-					va_arg(var, gtm_long_t); break;
+					va_arg(temp_var, gtm_long_t);
+					break;
 				case xc_ulong:
-					va_arg(var, gtm_ulong_t); break;
+					va_arg(temp_var, gtm_ulong_t);
+					break;
 				case xc_float:
 				case xc_double:
-					va_arg(var, gtm_double_t); break;
+					va_arg(temp_var, gtm_double_t);
+					break;
 				default:
-					va_end(var);
+					va_end(temp_var);
 					GTMASSERT;
 			}
 
@@ -357,48 +417,75 @@ int gtm_ci (const char *c_rtn_name, ...)
 			switch (arg_type)
 			{
                                 case xc_int_star:
-                                        *va_arg(var, gtm_int_t *) = mval2i(arg_ptr); break;
+                                        *va_arg(temp_var, gtm_int_t *) = mval2i(arg_ptr);
+					break;
                                 case xc_uint_star:
-                                        *va_arg(var, gtm_uint_t *) = mval2ui(arg_ptr); break;
+                                        *va_arg(temp_var, gtm_uint_t *) = mval2ui(arg_ptr);
+					break;
 				case xc_long_star:
-					*va_arg(var, gtm_long_t *) = mval2i(arg_ptr); break;
+					*va_arg(temp_var, gtm_long_t *) = mval2i(arg_ptr);
+					break;
 				case xc_ulong_star:
-					*va_arg(var, gtm_ulong_t *) = mval2ui(arg_ptr); break;
+					*va_arg(temp_var, gtm_ulong_t *) = mval2ui(arg_ptr);
+					break;
 				case xc_float_star:
-					*va_arg(var, gtm_float_t *) = mval2double(arg_ptr); break;
+					*va_arg(temp_var, gtm_float_t *) = mval2double(arg_ptr);
+					break;
 				case xc_double_star:
-					*va_arg(var, gtm_double_t *) = mval2double(arg_ptr); break;
+					*va_arg(temp_var, gtm_double_t *) = mval2double(arg_ptr);
+					break;
 				case xc_char_star:
-					xc_char_ptr = va_arg(var, gtm_char_t *);
+					xc_char_ptr = va_arg(temp_var, gtm_char_t *);
 					MV_FORCE_STR(arg_ptr);
 					memcpy(xc_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
 					xc_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
 					break;
 				case xc_string_star:
-					mstr_parm = va_arg(var, gtm_string_t *);
+					mstr_parm = va_arg(temp_var, gtm_string_t *);
 					MV_FORCE_STR(arg_ptr);
 					mstr_parm->length = arg_ptr->str.len;
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
 					break;
 				default:
-					va_end(var);
+					va_end(temp_var);
 					GTMASSERT;
 			}
 		}
 	}
-	va_end(var);
+	va_end(temp_var);
 	REVERT;
 	return 0;
+}
+
+int gtm_ci(const char *c_rtn_name, ...)
+{
+	va_list                 var;
+
+	VAR_START(var, c_rtn_name);
+	return gtm_ci_exec(c_rtn_name, NULL, FALSE, var);
+}
+
+/* Functionality is same as that of gtmci but accepts a struct containing information about the routine. */
+int gtm_cip(ci_name_descriptor* ci_info, ...)
+{
+	va_list                 var;
+
+	VAR_START(var, ci_info);
+	return gtm_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var);
 }
 
 int gtm_init()
 {
 	rhdtyp          	*base_addr;
 	unsigned char   	*transfer_addr;
-	error_def(ERR_CITPNESTED);
-	error_def(ERR_CIMAXLEVELS);
-	error_def(ERR_CALLINAFTERXIT);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	if (NULL == lcl_gtm_threadgbl)
+	{	/* This will likely need some attention before going to a threaded model */
+		assert(!gtm_startup_active);
+		GTM_THREADGBL_INIT;
+	}
 	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_init to be
 	 * invoked after a gtm_exit
 	 */
@@ -408,7 +495,6 @@ int gtm_init()
 		send_msg(VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		gtm_imagetype_init(GTM_IMAGE);
@@ -420,6 +506,7 @@ int gtm_init()
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
 		 * the unwind logic in gtmci_ch() will get rid of the whole stack. */
 		msp = (unsigned char *)-1L;
+		GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!gtm_startup_active)
@@ -429,26 +516,26 @@ int gtm_init()
 		gtm_savetraps(); /* nullify default $ZTRAP handling */
 		assert(gtm_startup_active);
 		assert(frame_pointer->flags & SFF_CI);
-		nested_level = 1;
+		TREF(gtmci_nested_level) = 1;
 	} else if (!(frame_pointer->flags & SFF_CI))
 	{	/* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame) */
 		/* Mark the beginning of the new stack so that initialization errors in
 		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch).*/
 		fgncal_stack = msp;
-		/* generate CIMAXLEVELS error if nested_level > CALLIN_MAX_LEVEL */
-		if (CALLIN_MAX_LEVEL < nested_level)
-			rts_error(VARLSTCNT(3) ERR_CIMAXLEVELS, 1, nested_level);
+		/* generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
+		if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
+			rts_error(VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
 		/* Disallow call-ins within a TP boundary since TP restarts are not supported
 		 * currently across nested call-ins. When we implement TP restarts across call-ins,
 		 * this error needs be changed to a Warning or Notification */
-		if (0 < dollar_tlevel)
+		if (dollar_tlevel)
 			rts_error(VARLSTCNT(1) ERR_CITPNESTED);
 		base_addr = make_cimode();
 		transfer_addr = PTEXT_ADR(base_addr);
 		gtm_init_env(base_addr, transfer_addr);
 		SET_CI_ENV(ci_ret_code_exit);
 		gtmci_isv_save();
-		nested_level++;
+		(TREF(gtmci_nested_level))++;
 	}
 	/* Now that GT.M is initialized. Mark the new stack pointer (msp) so that errors
 	 * while executing an M routine do not unwind stack below this mark. It important that
@@ -461,15 +548,15 @@ int gtm_init()
 /* routine exposed to call-in user to exit from active GT.M environment */
 int gtm_exit()
 {
-	error_def(ERR_INVGTMEXIT);
+        DCL_THREADGBL_ACCESS;
 
+        SETUP_THREADGBL_ACCESS;
 	if (!gtm_startup_active)
 		return 0;		/* GT.M environment not setup yet - quietly return */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-
 	assert(NULL != frame_pointer);
 	/* Do not allow gtm_exit() to be invoked from external calls */
-	if (!(SFF_CI & frame_pointer->flags) || !(MUMPS_CALLIN & invocation_mode) || (1 < nested_level))
+	if (!(SFF_CI & frame_pointer->flags) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
 		rts_error(VARLSTCNT(1) ERR_INVGTMEXIT);
 	/* Now get rid of the whole M stack - end of GT.M environment */
 	while (NULL != frame_pointer)
@@ -490,7 +577,6 @@ int gtm_exit()
 		}
 	}
 	gtm_exit_handler(); /* rundown all open database resource */
-
 	/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
 	   the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
 	   'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
@@ -508,7 +594,6 @@ int gtm_exit()
 void gtm_zstatus(char *msg, int len)
 {
 	int msg_len;
-
 	msg_len = (len <= dollar_zstatus.str.len) ? len - 1 : dollar_zstatus.str.len;
 	memcpy(msg, dollar_zstatus.str.addr, msg_len);
 	msg[msg_len] = 0;

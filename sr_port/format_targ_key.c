@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,24 +21,20 @@
 #include "gvsub2str.h"
 
 /* return a pointer that points after the last char added */
-unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_key *key, bool dollarc)
+unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_key *key, boolean_t dollarc)
 {
 	unsigned char			*gvkey_char_ptr, *out_top, *work_char_ptr, work_buff[MAX_ZWR_KEY_SZ], *work_top;
 	boolean_t			is_string;
 	DEBUG_ONLY(unsigned char	*gvkey_top_ptr;)
 
-	assert(max_size > 12);
+	assert(12 < max_size);
 	out_top = out_char_ptr + max_size - 2;	/* - 2, as could add comma left-paren or TWO double quotes between checks */
 	gvkey_char_ptr = key->base;
 	DEBUG_ONLY(gvkey_top_ptr = gvkey_char_ptr + key->end;)
-	*out_char_ptr++ = '^';
-	for ( ; (*out_char_ptr = *gvkey_char_ptr++); out_char_ptr++)
-	{
+	for (*out_char_ptr++ = '^'; (*out_char_ptr = *gvkey_char_ptr++); out_char_ptr++)
 		assert(gvkey_char_ptr <= gvkey_top_ptr);
-		;
-	}
 	assert(gvkey_char_ptr <= gvkey_top_ptr);
-	if (!*gvkey_char_ptr)		/* no subscipts */
+	if (0 == *gvkey_char_ptr)		/* no subscipts */
 		return (out_char_ptr);
 	*out_char_ptr++ = '(';
 	for ( ; ; )
@@ -69,10 +65,7 @@ unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_ke
 		if (out_char_ptr >= out_top)
 			return (NULL);
 		for ( ; *gvkey_char_ptr++; )
-		{
 			assert(gvkey_char_ptr <= gvkey_top_ptr);
-			;
-		}
 		assert(gvkey_char_ptr <= gvkey_top_ptr);
 		if (*gvkey_char_ptr)
 			*out_char_ptr++ = ',';

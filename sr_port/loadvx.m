@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2010 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -20,7 +20,7 @@ loop	r x i $zeof g fini
 fini	c file
 	q
 proc	i $e(x,"1")'="#" q
-pr0	s z=$f(x,$c(9)) i x s x=$e(x,1,z-2)_" "_$e(x,z,999) g pr0
+pr0     s x=$tr(x,$c(9)," ")
 	i x'?1"#define"1." "1"VXI_"1.AN1." "1"(0x"1.3AN1")".E s ec=1 g err
 	s y=$f(x,"VXI_"),x=$e(x,y,999)
 	s cd=$p(x," ",1),cdx="VXI_"_cd

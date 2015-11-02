@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,9 @@ int m_zshow(void);
 int m_zstep(void);
 int m_zsystem(void);
 int m_ztcommit(void);
+#ifdef GTM_TRIGGER
+int m_ztrigger(void);
+#endif
 int m_ztstart(void);
 int m_zwatch(void);
 int m_zwithdraw(void);

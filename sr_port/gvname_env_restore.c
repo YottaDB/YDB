@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ GBLREF gd_region        *gv_cur_region;
 GBLREF gv_namehead      *gv_target;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF short            dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF sgm_info         *sgm_info_ptr;
 
 

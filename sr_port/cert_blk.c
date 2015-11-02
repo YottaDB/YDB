@@ -39,7 +39,7 @@
 #include "gv_trigger.h"
 #endif
 
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	boolean_t	dse_running;
 
 #define BITS_PER_UCHAR	8

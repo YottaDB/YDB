@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,6 @@
 #include "stack_frame.h"
 #include "op.h"
 #include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -42,37 +41,33 @@ void op_clralsvars(lv_val *rslt)
 	ht_ent_mname		*table_base, *table_top, **last_lsym_hte, **htep, *table_base_orig;
 	ht_ent_mname    	*tabent, *tabent_top;
 	stack_frame		*fp, *fpprev;
-	lv_blk			*lvbp;
-	lv_val			*lvp, *lvp_top, *lvrefp;
+	lv_val			*lvp;
  	DEBUG_ONLY(boolean_t	first_sym;)
 
 	delcnt = 0;
 	/* Remove $ZWRTAC* vars from hash table. Hash table shrink may be triggered in the next hashtab call */
-	for (tabent = curr_symval->h_symtab.base, tabent_top = curr_symval->h_symtab.top;
-	     tabent < tabent_top;
-	     tabent++)
+	for (tabent = curr_symval->h_symtab.base, tabent_top = curr_symval->h_symtab.top; tabent < tabent_top; tabent++)
 	{
 		if (HTENT_VALID_MNAME(tabent, lv_val, lvp))
 		{	/* Check if this var is $ZWRTAC* */
-			if (STR_LIT_LEN(DOLLAR_ZWRTAC) <= tabent->key.var_name.len
-			    && 0 == MEMCMP_LIT(tabent->key.var_name.addr, DOLLAR_ZWRTAC))
-			{	/* Note use here of DELETE_HTENT instead of delete_hashtab_mname() not only saves
-				   looking up the entry in the hashtab but avoids the chance of hashtable compaction
-				   which would be *really* bad since this call is not protected with the wrapper
-				   that add_hashtab_mname_symval() has to fix the l_symtab entries.
-				*/
+			if ((STR_LIT_LEN(DOLLAR_ZWRTAC) <= tabent->key.var_name.len)
+				&& (0 == MEMCMP_LIT(tabent->key.var_name.addr, DOLLAR_ZWRTAC)))
+			{	/* Note use here of delete_hashtab_ent_mname() instead of delete_hashtab_mname() not
+				 * only saves looking up the entry in the hashtab but avoids the chance of hashtable
+				 * compaction which would be *really* bad since this call is not protected with the
+				 * wrapper that add_hashtab_mname_symval() has to fix the l_symtab entries.
+				 */
 				DECR_BASE_REF_RQ(tabent, lvp, FALSE);		/* Our ref disappears like the symbol */
-				DELETE_HTENT(&curr_symval->h_symtab, tabent);	/* Remove from symbol table */
+				delete_hashtab_ent_mname(&curr_symval->h_symtab, tabent);	/* Remove from symbol table */
 				++delcnt;
 			}
 		}
 	}
-
 	if (delcnt)
 	{	/* Vars have been removed from hash table. Now find/clear any l_symtab entries that pointed
-		   to these vars (basically looking for pointers to deleted entries). Note this loop is similar
-		   to stack frame loops in als_lsymtab_repair().
-		*/
+		 * to these vars (basically looking for pointers to deleted entries). Note this loop is similar
+		 * to stack frame loops in als_lsymtab_repair().
+		 */
 		last_lsym_hte = NULL;
 		done = FALSE;
 		fp = frame_pointer;
@@ -117,21 +112,27 @@ void op_clralsvars(lv_val *rslt)
 			}
 		} while(fp);
 		/* Now that $ZWRTAC* vars have been deleted, we should check if compaction is a suggested thing
-		   to get rid of the deleted vars which will improve the free slot search and reduce the slot scan
-		   on a gargabe collection (both types). If it is, compact in a safe way and do the necessary l_symtab
-		   fixup.
-		*/
+		 * to get rid of the deleted vars which will improve the free slot search and reduce the slot scan
+		 * on a gargabe collection (both types). If it is, compact in a safe way and do the necessary l_symtab
+		 * fixup.
+		 */
 		if (COMPACT_NEEDED(&curr_symval->h_symtab))
 		{	/* Step 1: Remember the current table */
 			table = &curr_symval->h_symtab;
 			table_base_orig = table->base;
 			table_size_orig = table->size;
  			/* Step 2: compact the table */
+			/* We'll do the base release once we do the reparations */
+			DEFER_BASE_REL_HASHTAB(table, TRUE);
 			compact_hashtab_mname(&curr_symval->h_symtab);
 			/* Step 3: fix l_symtab and related entries */
 			if (table_base_orig != curr_symval->h_symtab.base)
+			{
 				/* Only needed if expansion was successful */
 				als_lsymtab_repair(table, table_base_orig, table_size_orig);
+				FREE_BASE_HASHTAB(table, table_base_orig);
+			}
+			DEFER_BASE_REL_HASHTAB(table, FALSE);
 		}
  	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,6 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -54,7 +52,7 @@ void op_exfunret(mval *retval)
 		 * alias reference are NOT being created.
 		 */
 		srclvc = (lv_val *)retval->str.addr;
-		assert(MV_SYM == srclvc->ptrs.val_ent.parent.sym->ident);	/* Verify base var */
+		assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
 		assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
 		assert(1 <= srclvc->stats.crefcnt);				/* Verify is existing container ref */
 		DECR_CREFCNT(srclvc);

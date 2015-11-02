@@ -33,6 +33,7 @@
 #include "ftok_sems.h"
 #include "gtmimagename.h"
 #include "gtmio.h"
+#include "have_crit.h"
 
 GBLREF gd_region		*db_init_region;
 GBLREF boolean_t		sem_incremented;
@@ -117,5 +118,12 @@ CONDITION_HANDLER(dbinit_ch)
 			seg->file_cntl = NULL;
 		}
 	}
+	/* Reset intrpt_ok_state to OK_TO_INTERRUPT in case we got called (due to an rts_error) with intrpt_ok_state
+	 * being set to INTRPT_IN_GVCST_INIT.
+	 * We should actually be calling RESTORE_INTRPT_OK_STATE macro but since we don't have access to local variable
+	 * save_intrpt_ok_state, set intrpt_ok_state directly.
+	 */
+	assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_GVCST_INIT == intrpt_ok_state));
+	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;
 	NEXTCH;
 }

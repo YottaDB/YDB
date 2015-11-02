@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,28 +27,27 @@ typedef struct
 } mvs_ntab_struct;
 
 /* PVAL includes NTAB plus a pointer to the new value created which may or may not be in the hashtable anymore
-   by the time this is unstacked but it needs to be cleaned up when the frame pops.
-*/
+ * by the time this is unstacked but it needs to be cleaned up when the frame pops. */
 typedef struct
 {
-	struct lv_val_struct	*mvs_val;	/* lv_val created to hold new value */
-	mvs_ntab_struct 	mvs_ptab;	/* Restoration-on-pop info */
+	lv_val		*mvs_val;	/* lv_val created to hold new value */
+	mvs_ntab_struct	mvs_ptab;	/* Restoration-on-pop info */
 } mvs_pval_struct;
 
 /* NVAL is similar to PVAL except when dealing with indirect frames, the name of the var in the indirect frame's l_symtab
-   can disappear before we are done with our potential need for it so the extra "name" field in this block allows us to
-   cache the reference to it on the stack so it doesn't disappear.
-
-   Note routine lvval_gcol() in alias_funcs.c has a dependency that mvs_ptab in PVAL and NVAL are at same offset within
-   the structure.
-
-   Note the extra "name" field is only carried in DEBUG mode. In non-Debug builds, the NVAL is the same as the PVAL.
-*/
+ * can disappear before we are done with our potential need for it so the extra "name" field in this block allows us to
+ * cache the reference to it on the stack so it doesn't disappear.
+ *
+ * Note routine lvval_gcol() in alias_funcs.c has a dependency that mvs_ptab in PVAL and NVAL are at same offset within
+ * the structure.
+ *
+ * Note the extra "name" field is only carried in DEBUG mode. In non-Debug builds, the NVAL is the same as the PVAL.
+ */
 typedef struct
 {
-	struct lv_val_struct	*mvs_val;	/* lv_val created to hold new value */
-	mvs_ntab_struct 	mvs_ptab;	/* Restoration-on-pop info */
-	DEBUG_ONLY(var_tabent	name;)		/* name.var_name.addr points to whatever the original vartab entry points to */
+	lv_val		*mvs_val;	/* lv_val created to hold new value */
+	mvs_ntab_struct	mvs_ptab;	/* Restoration-on-pop info */
+	DEBUG_ONLY(var_tabent	name;)	/* name.var_name.addr points to whatever the original vartab entry points to */
 } mvs_nval_struct;
 
 /* Structure put on stack to effect transfer of arguments to called M routines */
@@ -76,7 +75,7 @@ typedef struct
 
 typedef struct
 {	/* Note the top of this structure is a partial version of mvs_trigr_struct so needs to map into the top
-	   of that structure (below) since cleanups share the same code */
+	 * of that structure (below) since cleanups share the same code */
 	boolean_t		saved_dollar_truth;
 	GTM64_ONLY(int4		filler;)		/* Alignment */
 	mval			savtarg;		/* Current gv_currkey */
@@ -89,8 +88,9 @@ typedef struct
 
 typedef struct
 {	/* Saves "global" entries for a trigger invocation base frame. Note the top entries of this
-	   structure are the same as mvs_zintr_struct which should be kept in sync with this one as the
-	   cleanups in unw_mv_ent() share code. */
+	 * structure are the same as mvs_zintr_struct which should be kept in sync with this one as the
+	 * cleanups in unw_mv_ent() share code.
+	 */
 	boolean_t		saved_dollar_truth;
 	GTM64_ONLY(int4		filler;)		/* Alignment */
 	mval			savtarg;		/* Current gv_currkey */
@@ -102,7 +102,7 @@ typedef struct
 	 */
 	boolean_t		*ztvalue_changed_ptr;	/* pointer to ztvalue_changed for previous trigger level */
 	mval			*ztvalue_save;		/* Save it once per trigger level */
-	mval			*ztcode_save;
+	mstr			*ztname_save;
 	mval			*ztdata_save;
 	mval			*ztoldval_save;
 	mval			*ztriggerop_save;
@@ -122,8 +122,22 @@ typedef struct
 } mvs_trigr_struct;
 
 typedef struct
+{	/* When MERGE and/or ZWRITE nests (due to trigger or $ZINTRPT firing), the globals used need to be saved to
+	 * prevent collisions and restored when this frame pops. */
+	int					save_merge_args;
+	uint4					save_zwrtacindx;
+	boolean_t				save_in_zwrite;
+	GTM64_ONLY(int4				filler;)
+	struct merge_glvn_struct_type		*save_mglvnp;
+	struct gvzwrite_datablk_struct		*save_gvzwrite_block;
+	struct lvzwrite_datablk_struct		*save_lvzwrite_block;
+	struct zshow_out_struct			*save_zwr_output;
+	struct zwr_hash_table_struct		*save_zwrhtab;
+} mvs_mrgzwrsv_struct;
+
+typedef struct
 {
-	int4			tphold_tlevel;		/* $TLEVEL prior to level we are entering */
+	uint4			tphold_tlevel;		/* $TLEVEL prior to level we are entering */
 #	ifdef GTM_TRIGGER
 	mval			ztwormhole_save;	/* Saved $ZTWormhole value to be restored on restart if len != -1 */
 #	endif
@@ -136,8 +150,7 @@ typedef struct
 } mvs_rstrtpc_struct;
 
 /* Homogenous mv_stent structure containing all types. This structure is never allocated as is but is allocated
-   on the M stack using the size for the size defined in mvs_size[] array in mtables.c
-*/
+ * on the M stack using the size for the size defined in mvs_size[] array in mtables.c */
 typedef struct mv_stent_struct
 {
 	unsigned int 			mv_st_type : 6;		/* Max type is 63 */
@@ -172,6 +185,7 @@ typedef struct mv_stent_struct
 		mvs_trigr_struct	mvs_trigr;
 	  	mvs_tphold_struct	mvs_tp_holder;
 		mvs_rstrtpc_struct	mvs_rstrtpc;
+		mvs_mrgzwrsv_struct	mvs_mrgzwrsv;
 		int4			mvs_tval;
 		int4			mvs_storig;
 	} mv_st_cont;
@@ -181,9 +195,9 @@ mval *unw_mv_ent(mv_stent *mv_st_ent);
 void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 
 #define MVST_MSAV	0	/* An mval and an address to store it at pop time, most
-				   often used to save/restore new'd intrinsic variables.
-				   This is important because the restore addr is fixed,
-				   and no extra work is required to resolve it. */
+				 * often used to save/restore new'd intrinsic variables.
+				 * This is important because the restore addr is fixed,
+				 * and no extra work is required to resolve it. */
 #define MVST_MVAL	1	/* An mval which will be dropped at pop time */
 #define MVST_STAB	2	/* A symbol table */
 #define MVST_IARR	3	/* An array of (literal or temp) mval's and mstr's on the stack, due to indirection */
@@ -203,10 +217,10 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MVST_TRIGR	15	/* Used to save the base environment for Trigger execution */
 #define MVST_RSTRTPC	16	/* Used to save/restore the restartpc/context across error or jobinterrupt frames */
 #define MVST_STORIG	17	/* This is the origin mv_stent placed on the stack during initialization */
+#define MVST_MRGZWRSV	18	/* Block used to save merge/zwrite control blocks when one or more of them nest */
 
 /* Variation of ROUND_UP2 macro that doesn't have the checking that generates a GTMASSERT. This is necessary because the
-   MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it
-*/
+ * MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it */
 #define ROUND_UP2_NOCHECK(VALUE,MODULUS) (((VALUE) + ((MODULUS) - 1)) & ~((MODULUS) - 1))
 #define MV_SIZE(X) \
         ROUND_UP2_NOCHECK(((SIZEOF(*mv_chain) - SIZEOF(mv_chain->mv_st_cont) + SIZEOF(mv_chain->mv_st_cont.X))), NATIVE_WSIZE)
@@ -243,4 +257,25 @@ error_def(ERR_STACKOFLOW);
 
 #define	IS_PTR_INSIDE_M_STACK(PTR)	(((unsigned char *)PTR < (sm_uc_ptr_t)stackbase) && ((unsigned char *)PTR > stacktop))
 
+#define PUSH_MVST_MRGZWRSV								\
+{											\
+	PUSH_MV_STENT(MVST_MRGZWRSV);							\
+	mv_st_ent = mv_chain;								\
+	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_merge_args = merge_args;		\
+	merge_args = 0;									\
+	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrtacindx = zwrtacindx;		\
+	zwrtacindx = 0;									\
+	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_in_zwrite = TREF(in_zwrite);		\
+	TREF(in_zwrite) = 0;								\
+	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_mglvnp = mglvnp;			\
+	mglvnp = NULL;									\
+	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_lvzwrite_block = lvzwrite_block;	\
+	lvzwrite_block = NULL;								\
+	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_gvzwrite_block = gvzwrite_block;	\
+	gvzwrite_block = NULL;								\
+	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwr_output = zwr_output;		\
+	zwr_output = NULL;								\
+	mv_st_ent->mv_st_cont.mvs_mrgzwrsv.save_zwrhtab = zwrhtab;			\
+	zwrhtab = NULL;									\
+}
 #endif

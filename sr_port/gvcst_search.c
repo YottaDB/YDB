@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
 #include "gvcst_blk_build.h"
 #include "t_qread.h"
 #include "longset.h"		/* needed for cws_insert.h */
-#include "hashtab.h"
+#include "hashtab.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_search_tail,gvcst_search prototype */
 #include "min_max.h"
@@ -39,7 +39,7 @@
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -48,13 +48,9 @@ GBLREF	srch_blk_status		*first_tp_srch_status;	/* overriding value of srch_blk_s
 GBLREF	trans_num		local_tn;		/* transaction number for THIS PROCESS */
 GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
 GBLREF	boolean_t		mu_reorg_process;
+GBLREF	char			gvcst_search_clue;
 
-#ifdef DEBUG
-GBLDEF	char			gvcst_search_clue;
 #define	SET_GVCST_SEARCH_CLUE(X)	gvcst_search_clue = X;
-#else
-#define SET_GVCST_SEARCH_CLUE(X)
-#endif
 
 enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			     srch_hist *pHist)		/* History to fill in*/
@@ -145,7 +141,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				assert((NULL == cse) || cse->done);
 			}
 #			endif
-		} else if (0 < dollar_tlevel)
+		} else if (dollar_tlevel)
 		{	/* First nullify first_tp_srch_status member in gv_target history if out-of-date. This is logically done
 			 * at tp_clean_up time but delayed until the time this gv_target is used next in a transaction. This way
 			 * it saves some CPU cycles. pTarg->read_local_tn tells us whether this is the first usage of this

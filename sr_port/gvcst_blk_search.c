@@ -104,7 +104,7 @@ GBLREF gd_region	*gv_cur_region;
 
 #define	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat)				\
 {										\
-	GBLREF	short		dollar_tlevel;					\
+	GBLREF	uint4		dollar_tlevel;					\
 										\
 	srch_blk_status		*tp_srch_status;				\
 	cw_set_element		*cse;						\

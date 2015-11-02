@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,9 +33,7 @@
 #define LARGE_EXP	10000
 
 GBLREF  gv_namehead     *gv_target;
-GBLREF  bool		transform;
 LITREF	unsigned short	dpos[], dneg[];
-
 
 /*
  * -----------------------------------------------------
@@ -52,15 +50,16 @@ LITREF	unsigned short	dpos[], dneg[];
  *	converted in the targ string) + 1.
  * -----------------------------------------------------
  */
-unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
+unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, boolean_t xlat_flg)
 {
 	unsigned char	buf1[MAX_KEY_SZ + 1], ch, *ptr, trail_ch;
 	unsigned short	*tbl_ptr;
 	int		expon, in_length, length, tmp;
 	mstr		mstr_ch, mstr_targ;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ch = *sub++;
-
 	if (STR_SUB_PREFIX == ch || (SUBSCRIPT_STDCOL_NULL == ch && KEY_DELIMITER == *sub))
 	{	/* If this is a string */
 		if (xlat_flg)
@@ -77,8 +76,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 					ch = (*sub++ - 1);
 				*targ++ = ch;
 			}
-
-			if (transform && gv_target && gv_target->collseq)
+			if (TREF(transform) && gv_target && gv_target->collseq)
 			{
 				mstr_ch.len = in_length;
 				mstr_ch.addr = (char *)ptr;
@@ -86,7 +84,8 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 				mstr_targ.addr = (char *)buf1;
 				do_xform(gv_target->collseq, XBACK, &mstr_ch, &mstr_targ, &length);
 				memcpy(ptr, mstr_targ.addr, length); /* mstr_targ.addr is used just in case it is
-								        reallocated by the XBACK routine */
+								      * reallocated by the XBACK routine
+								      */
 				targ = ptr + length;
 			}
 		}
@@ -98,7 +97,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 		{
 			tbl_ptr = (unsigned short *)&dpos[0] - 1;
 			trail_ch = KEY_DELIMITER;
-			if ((signed char)ch >= 0)
+			if (0 <= (signed char)ch)
 			{	/* Bit 7 of the exponent is set for positive numbers; must be negative */
 				trail_ch = NEG_MNTSSA_END;
 				tbl_ptr = (unsigned short *)dneg;
@@ -107,7 +106,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 			}
 			ch -= (SUBSCRIPT_BIAS - 1);	/* Unbias the exponent */
 			expon = ch;
-			if ((signed char)ch <= 0)
+			if (0 >= (signed char)ch)
 			{	/* number is a fraction */
 				ch = -(signed char)ch;
 					/* Save decimal point */
@@ -123,7 +122,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 			while ((ch = *sub++) && ch != trail_ch)
 			{	/* Convert digits loop */
 					/* adjust dcm. point */
-				if ((expon -= 2) <= 0)
+				if (0 >= (expon -= 2))
 				{
 					if (0 != expon)
 					{
@@ -146,7 +145,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 					targ += SIZEOF(short);
 				}
 			}
-			if (expon > (LARGE_EXP - 100))
+			if ((LARGE_EXP - 100) < expon)
 			{
 				if ('0' == *(targ - 1))
 					targ--;

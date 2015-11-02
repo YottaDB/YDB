@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -310,3 +310,9 @@ OPCODE_DEF(OC_FNZTRIGGER, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_EXFUNRETALS, (OCT_NULL))
 OPCODE_DEF(OC_SETFNRETIN2ALS, (OCT_NULL))
 OPCODE_DEF(OC_SETFNRETIN2ALSCT, (OCT_NULL))
+OPCODE_DEF(OC_ZTRIGGER, (OCT_NULL))
+OPCODE_DEF(OC_ZWRITESVN, (OCT_EXPRLEAF))
+OPCODE_DEF(OC_SAVPUTINDX, (OCT_MVADDR | OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_RFRSHINDX, (OCT_MVADDR | OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FORCTRLINDR1, (OCT_NULL))
+OPCODE_DEF(OC_FORCTRLINDR2, (OCT_MINT | OCT_EXPRLEAF))

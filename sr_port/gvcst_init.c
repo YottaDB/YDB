@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,6 @@
 #include "compswap.h"
 #include "send_msg.h"
 #include "targ_alloc.h"		/* for "targ_free" prototype */
-#include "hashtab.h"
 #include "hashtab_mname.h"
 #include "process_gvt_pending_list.h"
 #include "gtmmsg.h"
@@ -71,7 +70,8 @@ GBLREF	int4			lkid;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
 GBLREF	ua_list			*first_ua, *curr_ua;
-GBLREF	short			crash_count, dollar_tlevel;
+GBLREF	short			crash_count;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -199,6 +199,7 @@ void gvcst_init(gd_region *greg)
 	gvnh_reg_t		*gvnh_reg;
 	hash_table_mname	*table;
 	boolean_t		added, first_wasopen;
+	intrpt_state_t		save_intrpt_ok_state;
 
 	error_def(ERR_BADDBVER);
 	error_def(ERR_DBCREINCOMP);
@@ -267,7 +268,7 @@ void gvcst_init(gd_region *greg)
 			 * Future targ_allocs will check this list before they allocate (to avoid duplicate allocations).
 			 */
 			csa->gvt_hashtab = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-			init_hashtab_mname(csa->gvt_hashtab, 0);
+			init_hashtab_mname(csa->gvt_hashtab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 			assert(1 == csa->regcnt);
 			first_wasopen = TRUE;
 		} else
@@ -336,7 +337,7 @@ void gvcst_init(gd_region *greg)
 	 * checking for mupip_set_journal, hence a coarse MUPIP_IMAGE check for image_type
 	 */
 	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || IS_MUPIP_IMAGE || (0 == have_crit(CRIT_HAVE_ANY_REG)));
-	if ((0 < dollar_tlevel) && (0 != have_crit(CRIT_HAVE_ANY_REG)))
+	if (dollar_tlevel && (0 != have_crit(CRIT_HAVE_ANY_REG)))
 	{	/* To avoid deadlocks with currently holding crits and the DLM lock request to be done in db_init(),
 		 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
 		 * having released crit on all regions. Note that this check should be done AFTER checking if the
@@ -473,6 +474,12 @@ void gvcst_init(gd_region *greg)
 	assert(offsetof(node_local, fname[0]) == GDS_LABEL_SZ);
 	assert(offsetof(node_local, now_running[0]) == GDS_LABEL_SZ + MAX_FN_LEN + 1);
 	assert(SIZEOF(csa->nl->now_running) == MAX_REL_NAME);
+	/* Protect the db_init and the code below until we set greg->open to TRUE. This is needed as otherwise,
+	 * if a MUPIP STOP is issued to this process at a time-window when db_init is completed but greg->open
+	 * is NOT set to TRUE, will cause gds_rundown NOT to clean up the shared memory created by db_init and
+	 * thus would be left over in the system.
+	 */
+	DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT);
 	db_init(greg, temp_cs_data);
 	crash_count = csa->critical->crashcnt;
 	csa->regnum = ++region_open_count;
@@ -605,6 +612,8 @@ void gvcst_init(gd_region *greg)
 	}
 	greg->open = TRUE;
 	greg->opening = FALSE;
+	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
+	ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT);
 	if (dba_bg == greg_acc_meth)
 	{	/* Check if (a) this region has non-upgraded blocks and if so, (b) the reformat buffer exists and
 		   (c) if it is big enough to deal with this region. If the region does not have any non-upgraded

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,12 @@
 #include "cmd.h"
 
 GBLREF char window_token;
-GBLREF short int last_source_column;
-GBLREF triple *curtchain, pos_in_chain, *expr_start, *expr_start_orig;
+GBLREF triple *curtchain;
 
-typedef struct jmpchntype
+error_def(ERR_SPOREOL);
+error_def(ERR_INDEXTRACHARS);
+
+	typedef struct jmpchntype
 {
 	struct
 	{
@@ -38,16 +40,15 @@ int m_if(void)
 	oprtype		x, y, *ta_opr;
 	boolean_t	first_time, t_set, is_commarg;
 	jmpchn		*jmpchain, *nxtjmp;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_SPOREOL);
-	error_def(ERR_INDEXTRACHARS);
-
-	ifpos_in_chain = pos_in_chain;
+	SETUP_THREADGBL_ACCESS;
+	ifpos_in_chain = TREF(pos_in_chain);
 	jmpchain = (jmpchn*)mcalloc(SIZEOF(jmpchn));
 	dqinit(jmpchain,link);
 	if (TK_EOL == window_token)
 		return TRUE;
-	is_commarg = (last_source_column == 1);
+	is_commarg = (1 == TREF(last_source_column));
 	x = for_end_of_scope(0);
 	assert(INDR_REF == x.oprclass);
 	if (TK_SPACE == window_token)
@@ -65,9 +66,9 @@ int m_if(void)
 			ta_opr = (oprtype *)mcalloc(SIZEOF(oprtype));
 			if (!bool_expr((bool)TRUE, ta_opr))
 				return FALSE;
-			if ((ref0 = curtchain->exorder.bl)->opcode == OC_JMPNEQ
-				&& (ref1 = ref0->exorder.bl)->opcode == OC_COBOOL
-				&& (ref2 = ref1->exorder.bl)->opcode == OC_INDGLVN)
+			if (((OC_JMPNEQ == (ref0 = curtchain->exorder.bl)->opcode))
+				&& (OC_COBOOL == (ref1 = ref0->exorder.bl)->opcode)
+				&& (OC_INDGLVN == (ref2 = ref1->exorder.bl)->opcode))
 			{
 				dqdel(ref0,exorder);
 				ref1->opcode = OC_JMPTSET;
@@ -78,10 +79,10 @@ int m_if(void)
 			t_set = (OC_JMPTSET == curtchain->exorder.bl->opcode);
 			if (!t_set)
 				newtriple(OC_CLRTEST);
-			if (expr_start != expr_start_orig)
+			if (TREF(expr_start) != TREF(expr_start_orig))
 			{
                 		triptr = newtriple(OC_GVRECTARG);
-				triptr->operand[0] = put_tref(expr_start);
+				triptr->operand[0] = put_tref(TREF(expr_start));
 			}
 			jmpref = newtriple(OC_JMP);
 			jmpref->operand[0] = x;
@@ -93,10 +94,10 @@ int m_if(void)
 			{
 				if (!t_set)
 					newtriple(OC_SETTEST);
-				if (expr_start != expr_start_orig)
+				if (TREF(expr_start) != TREF(expr_start_orig))
 				{
 					triptr = newtriple(OC_GVRECTARG);
-					triptr->operand[0] = put_tref(expr_start);
+					triptr->operand[0] = put_tref(TREF(expr_start));
 				}
 				first_time = FALSE;
 			}
@@ -116,7 +117,7 @@ int m_if(void)
 		}
 		return TRUE;
 	}
-	if (TK_EOL != window_token && TK_SPACE != window_token)
+	if ((TK_EOL != window_token) && (TK_SPACE != window_token))
 	{
 		stx_error(ERR_SPOREOL);
 		return FALSE;
@@ -128,7 +129,7 @@ int m_if(void)
 			ref1 = nxtjmp->jmptrip;
 			ref1->operand[0] = x;
 		}
-		pos_in_chain = ifpos_in_chain;
+		TREF(pos_in_chain) = ifpos_in_chain;
 		return FALSE;
 	}
 	return TRUE;

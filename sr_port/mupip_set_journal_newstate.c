@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,9 +59,9 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 		else if (repl_curr_state == repl_was_open && CLI_PRESENT != jnl_options->cli_replic_on)
 		{ /* Journaling was turned OFF by jnl_file_lost(). Do not allow turning journaling ON without also
 		     turning replication ON */
-			gtm_putmsg(VARLSTCNT(8) ERR_REPLJNLCNFLCT, 6, LEN_AND_STR(jnl_state_lit[jnl_open]),
-					DB_LEN_STR(gv_cur_region),
-					LEN_AND_STR(repl_state_lit[repl_closed]));
+			gtm_putmsg(VARLSTCNT(10) ERR_REPLJNLCNFLCT, 8, LEN_AND_STR(jnl_state_lit[jnl_open]),
+					DB_LEN_STR(gv_cur_region), LEN_AND_STR(repl_state_lit[repl_closed]),
+					LEN_AND_STR(jnl_state_lit[jnl_open]));
 			return EXIT_WRN;
 		}
 		else /* ON explicitly specified or present by default */
@@ -123,10 +123,11 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 				)
 				if (jnl_open != rptr->jnl_new_state)
 				{
-					gtm_putmsg(VARLSTCNT(8) ERR_REPLJNLCNFLCT, 6,
+					gtm_putmsg(VARLSTCNT(10) ERR_REPLJNLCNFLCT, 8,
 							LEN_AND_LIT("OFF/DISABLED"),
 							DB_LEN_STR(gv_cur_region),
-							LEN_AND_STR(repl_state_lit[repl_open]));
+							LEN_AND_STR(repl_state_lit[repl_open]),
+							LEN_AND_LIT("OFF/DISABLED"));
 					return EXIT_WRN;
 				}
 			}

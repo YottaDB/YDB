@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,11 +31,7 @@
 
 #include <stdarg.h>
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
-#include "subscript.h"
-#include "lvname_info.h"
 #include "callg.h"
 
 lv_val* op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...)

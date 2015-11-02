@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,9 @@
 #include "op.h"
 
 LITREF int4	ten_pwr[] ;
+LITREF mval	literal_zero;
+
+error_def(ERR_NUMOFLOW);
 
 void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 {
@@ -53,9 +56,8 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 		if (n1 == 0)
 			goto result_is_u;
 		else if (n1 > 0)
-		{
 			vsign = subtraction;
-		} else
+		else
 		{
 			vsign = !subtraction;
 			n1 = -n1;
@@ -180,11 +182,18 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 			return;
 		}
 	}
-        result->mvtype = MV_NM;
-        result->sgn = rsign;
-        result->e = exp;
-        result->m[0] = m0;
-        result->m[1] = m1;
+	if (EXPHI <= exp)
+		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+	else if (EXPLO > exp)
+		*result = literal_zero;
+	else
+	{
+		result->mvtype = MV_NM;
+		result->sgn = rsign;
+		result->e = exp;
+		result->m[0] = m0;
+		result->m[1] = m1;
+	}
         return;
 
 result_is_u:
@@ -213,7 +222,6 @@ result_is_v:
 		MV_FORCE_CANONICAL(result);
 	}
 	return;
-
 }
 
 void op_add (mval *u, mval *v, mval *s)

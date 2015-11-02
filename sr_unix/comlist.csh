@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Infromation Services, Inc #
+#	Copyright 2001, 2011 Fidelity Infromation Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -280,10 +280,15 @@ cp $gtm_tools/lowerc.sh lowerc
 cp $gtm_tools/lowerc_cp.sh lowerc_cp
 cp $gtm_tools/upperc.sh upperc
 cp $gtm_tools/upperc_cp.sh upperc_cp
+if ( "$HOSTOS" == "SunOS" ) then
+	cp $gtm_tools/gtminstall_Solaris.sh gtminstall
+else
+	cp $gtm_tools/gtminstall.sh gtminstall
+endif
 
 cp $gtm_tools/{lowerc,upperc}*.csh .
 
-chmod +x {lowerc,upperc}*
+chmod +x {lowerc,upperc,gtminstall}*
 
 cp $gtm_tools/*.gtc .
 mv configure{.gtc,}
@@ -327,9 +332,8 @@ endif
 cd ./obj
 
 # Remove anything that's not a library.
-/bin/ls | egrep -v '\.a$' | xargs -n25 rm
+find . -type f -name '*.a' -prune -o -type f -print | sort | xargs -n25 rm
 
-set eol_anchor = '$'
 set gi = ($gtm_inc)
 set gs = ($gtm_src)
 
@@ -371,7 +375,7 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
     end
 
     #  Generate ttt.c
-    tcsh $gtm_tools/gen_ttt.csh
+    $shell -f $gtm_tools/gen_ttt.csh
 
     setenv gtmroutines "$old_gtmroutines"
     unset old_gtmroutines
@@ -416,23 +420,30 @@ end
 # For ia64 & x86_64, the file - xfer_desc.i - needs to be generated.
 if ( "ia64" == $mach_type || "x86_64" == $mach_type ) then
         pushd $gtm_src
-        tcsh $gtm_tools/gen_xfer_desc.csh
+        $shell -f $gtm_tools/gen_xfer_desc.csh
         popd
+endif
+
+# For all systems, the file gtm_threadgbl_deftypes.h needs to be generated (no -f as needs startup file)
+$shell $gtm_tools/gen_gtm_threadgbl_deftypes.csh
+if (0 != $status) then
+    echo "Failed to generate gtm_threadgbl_deftypes.h -- aborting build"
+    exit 1
 endif
 
 echo ""
 echo "Start of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.awk relies on this to detect warnings.
 echo ""
 
-#Do not compile gtmcrypt_ref.c, maskpass.c.
+#Do not compile gtmcrypt_ref.c, maskpass.c, gtm_threadgbl_deftypes.c
 #$gtm_tools/buildplugin.csh will take care of compilation and building of the reference plugin and the supporting files.
-/bin/ls $gs[1] | egrep '\.c$' | \
-	egrep -v '^gtmcrypt_ref|^gtmcrypt_dbk_ref|^gtmcrypt_pk_ref|^maskpass'  | xargs -n25 $shell $gtm_tools/gt_cc.csh
+find $gs[1] \( -name 'gtmcrypt*_ref.c' -o -name 'maskpass.c' -o -name 'omi_sx_play.c' -o -name 'gtm_threadgbl_deftypes.c' \) -prune -o -name '*.c' -print | \
+	sort | xargs -n25 $shell $gtm_tools/gt_cc.csh
 
 # Special compilation for omi_sx_play.c
 set comlist_gt_cc_bak = "$comlist_gt_cc"
 setenv comlist_gt_cc "$comlist_gt_cc -DFILE_TCP"
-$shell $gtm_tools/gt_cc.csh omi_sx_play.c
+$shell $gtm_tools/gt_cc.csh $gtm_src/omi_sx_play.c
 setenv comlist_gt_cc "$comlist_gt_cc_bak"
 
 echo ""
@@ -444,37 +455,41 @@ if ( $?gt_xargs_insert == 0 ) setenv gt_xargs_insert "-i"
 # Assembly language assemblies next so they can supersede the C sources by overwriting the object files:
 
 echo "Start of Assembly"	# Do not change this string. $gtm_tools/buildwarn.awk relies on this to detect warnings.
-
-if ( $gt_as_inc_convert == "true" ) then
-	# Convert assembly language include files to native dialect:
-	/bin/ls $gi[1] | egrep "\$gt_as_inc_from_suffix$eol_anchor" | \
-		xargs $gt_xargs_insert $shell $gtm_tools/gt_as_inc_cvt.csh "$gs[1]/{}"
-endif
+# AS - 2010/07/12
+# No longer valid. Probably applied to sr_dux, but gt_as_inc_cvt.csh does
+# not exist in the current revision or in CVS history
+#if ( $gt_as_inc_convert == "true" ) then
+#	# Convert assembly language include files to native dialect:
+#	foreach cvt (${gi[1]}/*${gt_as_inc_from_suffix})
+#		$shell $gtm_tools/gt_as_inc_cvt.csh $cvt
+#	end
+#endif
 
 if ( "$HOSTOS" == "OS/390" ) then
     $shell $gtm_tools/gt_os390_maclib.csh
 endif
 
+# AS - 2010/07/12 this applies to sr_dux only
 if ( $gt_as_src_convert == "true" ) then
 	# Convert assembly language sources to native dialect in this directory:
-	/bin/ls $gs[1] | egrep "\$gt_as_src_from_suffix$eol_anchor" | \
-		xargs $gt_xargs_insert $shell $gtm_tools/gt_as_src_cvt.csh "$gs[1]/{}"
-
-	# Then assemble them:
-	/bin/ls | egrep "\$gt_as_src_suffix$eol_anchor" | xargs $gt_xargs_insert $shell $gtm_tools/gt_as.csh {}
+	foreach cvt (${gs[1]}/*${gt_as_src_from_suffix})
+		$shell $gtm_tools/gt_as_src_cvt.csh $cvt
+	end
 endif
 
 if ( $?gt_as_use_prebuilt == 0 ) then
 	# Finally assemble any sources originally in native dialect so they
 	# can supersede any conflicting non-native dialect sources:
-	/bin/ls $gs[1] | egrep "\$gt_as_src_suffix$eol_anchor" | xargs $gt_xargs_insert $shell $gtm_tools/gt_as.csh "$gs[1]/{}"
+	foreach asm (${gs[1]}/*${gt_as_src_suffix})
+		$shell $gtm_tools/gt_as.csh $asm
+	end
 else
 	cp -p $gtm_vrt/$gt_as_use_prebuilt/*.o .
 endif
 
 if ( $HOSTOS =~ "CYGWIN*" ) then
 	echo "Prefixing _ to .o in $gtm_exe to match Cygwin/Windows naming rules"
-	foreach x(`/bin/ls $gs[1]/*.s`)
+	foreach x (${gs[1]}/*.s)
 		objcopy --prefix-symbols="_" $gtm_exe/obj/$x:r:t.o
 	end
 endif
@@ -506,7 +521,7 @@ foreach i ( $comlist_liblist )
 	case "gtmrpc":
 		# Note: libgtmrpc.a must be built in $gtm_exe because it must also be shipped with the release.
 		gt_ar $gt_ar_option_create $gtm_exe/lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
-		if ( $status != 0 ) then
+		if ( 0 != $status ) then
 			@ comlist_status = $status
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
@@ -537,7 +552,7 @@ foreach i ( $comlist_liblist )
 		set exclude = "$exclude|^dummy_gtmci\.o"
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
 			xargs -n50 $shell $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
-		if ( $status != 0 ) then
+		if ( 0 != $status ) then
 			@ comlist_status = $status
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
@@ -546,7 +561,7 @@ foreach i ( $comlist_liblist )
 
 	default:
 		gt_ar $gt_ar_option_create lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
-		if ( $status != 0 ) then
+		if ( 0 != $status ) then
 			@ comlist_status = $status
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
@@ -579,17 +594,17 @@ end
 switch ( $3 )
 case "gtm_bta":
 	$shell $gtm_tools/buildbta.csh $p4
-	if ($status != 0) @ comlist_status = $status	# done before each breaksw instead of after endsw
+	if (0 != $status) @ comlist_status = $status	# done before each breaksw instead of after endsw
 	breaksw						# as $status seems to be get reset in between
 
 case "gtm_dbg":
 	$shell $gtm_tools/builddbg.csh $p4
-	if ($status != 0) @ comlist_status = $status
+	if (0 != $status) @ comlist_status = $status
 	breaksw
 
 case "gtm_pro":
 	$shell $gtm_tools/buildpro.csh $p4
-	if ($status != 0) @ comlist_status = $status
+	if (0 != $status) @ comlist_status = $status
 	breaksw
 endsw
 
@@ -617,12 +632,50 @@ if ( -e $gtm_tools/gtm_dbgld.csh ) then
 	$gtm_tools/gtm_dbgld.csh `echo $3 | sed 's/gtm_//'`
 endif
 
+# Build GTMDefinedTypesInit.m file but where to run the generation script from depends on whether our current working
+# directory has a version of it or not.
+rm -f obj/gengtmdeftypes.log* >& /dev/null
+rm -f GTMDefinedTypesInit.m >& /dev/null
+if ($?work_dir) then
+	if (-e $work_dir/tools/cms_tools/gengtmdeftypes.csh) then
+		$work_dir/tools/cms_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
+	else
+		$cms_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
+	endif
+else
+	$cms_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
+endif
+if ((0 != $status) || (! -e GTMDefinedTypesInit.m)) then
+	@ savestatus = $status
+	if (`expr $gtm_verno \>= V900`) @ comlist_status = $savestatus  # note no errors for development versions
+	echo "gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m - see log in $gtm_obj/gengtmdeftypes.log" >> $gtm_log/error.`basename $gtm_exe`.log
+endif
+if (-e GTMDefinedTypesInit.m) then
+	./mumps GTMDefinedTypesInit.m
+	if (0 != $status) then
+		@ comlist_status = $status
+		echo "Failed to compile $gtm_exe/GTMDefinedTypes.m" >> $gtm_log/error.`basename $gtm_exe`.log
+	endif
+	# If we have a utf8 dir (created by buildaux.csh above), add a link to it for GTMDefinedTypesInit.m
+	if (-e $gtm_dist/utf8) then
+		ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
+		pushd utf8
+		# mumps executable not yet linked to utf8 dir so access it in parent directory
+		../mumps GTMDefinedTypesInit.m
+		if (0 != $status) then
+			@ comlist_status = $status
+			echo "Failed to compile $gtm_exe/GTMDefinedTypes.m" >> $gtm_log/error.`basename $gtm_exe`.log
+		endif
+		popd
+	endif
+endif
+
 # Create a default global directory.
 setenv gtmgbldir ./mumps.gld
 gde <<GDE_in1
 exit
 GDE_in1
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 
 # Create the GT.M help database file.
 setenv gtmgbldir $gtm_dist/gtmhelp.gld
@@ -630,17 +683,17 @@ gde <<GDE_in_gtmhelp
 Change -segment DEFAULT	-block=2048	-file=$gtm_dist/gtmhelp.dat
 Change -region DEFAULT	-record=1020	-key=255
 GDE_in_gtmhelp
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 
 mupip create
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 
 gtm <<GTM_in_gtmhelp
 Do ^GTMHLPLD
 $gtm_dist/mumps.hlp
 Halt
 GTM_in_gtmhelp
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 
 # Create the GDE help database file.
 setenv gtmgbldir $gtm_dist/gdehelp.gld
@@ -648,24 +701,24 @@ gde <<GDE_in_gdehelp
 Change -segment DEFAULT	-block=2048	-file=$gtm_dist/gdehelp.dat
 Change -region DEFAULT	-record=1020	-key=255
 GDE_in_gdehelp
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 
 mupip create
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 
 gtm <<GTM_in_gdehelp
 Do ^GTMHLPLD
 $gtm_dist/gde.hlp
 GTM_in_gdehelp
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 
 chmod 775 *	# do not check $status here because we know it will be 1 since "gtmsecshr" permissions cannot be changed.
 
 # Create the dump file for ZHELP.
 touch $gtm_dist/gtmhelp.dmp
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 chmod a+rw $gtm_dist/gtmhelp.dmp
-if ($status != 0) @ comlist_status = $status
+if (0 != $status) @ comlist_status = $status
 
 # Create a mirror image (using soft links) of $gtm_dist under $gtm_dist/utf8 if it exists.
 if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while building GDE
@@ -683,10 +736,10 @@ if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while build
 		# Soft link everything else
 		if (-e utf8/$file) then
 			rm -rf utf8/$file
-			if ($status != 0) @ comlist_status = $status
+			if (0 != $status) @ comlist_status = $status
 		endif
 		ln -s ../$file utf8/$file
-		if ($status != 0) @ comlist_status = $status
+		if (0 != $status) @ comlist_status = $status
 	end
 	popd
 endif

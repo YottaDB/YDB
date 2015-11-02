@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -21,7 +21,6 @@
 	.sbttl	opp_tstart
 #	PAGE	+
 	.DATA
-.extern	dollar_truth 	# /* :DWORD */
 .extern	frame_pointer 	# /* :DWORD */
 
 	.text
@@ -54,7 +53,7 @@ arg_1:  movq    REG64_ARG3,REG64_ARG4
 no_arg: movq    REG64_ARG2,REG64_ARG3
         movq    REG64_ARG1,REG64_ARG2
         movq    REG64_ARG0,REG64_ARG1
-        movl    dollar_truth(REG_IP),REG32_ARG0
+        movl    $0,REG32_ARG0		# arg0: NOT an implicit op_tstart() call
         movb    $0,REG8_ACCUM           # variable length argument
         call    op_tstart
         leave   # restore $rsp

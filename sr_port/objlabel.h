@@ -33,7 +33,7 @@
  * Note that OBJ_UNIX_LABEL and OBJ_PLATFORM_LABEL should not exceed 255.
  */
 
-#define OBJ_UNIX_LABEL	19	/* When changed, be sure to zero the platform specific numbers below (if any non-0) */
+#define OBJ_UNIX_LABEL	20	/* When changed, be sure to zero the platform specific numbers below (if any non-0) */
 
 #if defined(__osf__)
 #	define	OBJ_PLATFORM_LABEL	0		/* Alpha/Tru64 */

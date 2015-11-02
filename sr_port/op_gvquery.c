@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,6 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF spdesc		stringpool;
 GBLREF gd_region	*gv_cur_region;
-GBLREF bool		gv_curr_subsc_null;
 GBLREF mstr             extnam_str;
 
 void op_gvquery (mval *v)
@@ -42,7 +41,9 @@ void op_gvquery (mval *v)
 	int			maxlen;
 	char			extnamdelim[] = "^|\"\"|";
 	mval			val;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* We want to turn QUERY into QUERYGET for all types of access methods so that we can cache the value of the key returned
 	 * by $QUERY. The value is very likely to be used shortly after $QUERY - Vinaya, Aug 13, 2001 */
 	acc_meth = gv_cur_region->dyn.addr->acc_meth;
@@ -53,7 +54,7 @@ void op_gvquery (mval *v)
 	ok_to_change_currkey = (dba_usr != acc_meth);
 	if (ok_to_change_currkey)
 	{
-		if (gv_curr_subsc_null && (0 == gv_cur_region->std_null_coll))
+		if (TREF(gv_last_subsc_null) && (NEVER == gv_cur_region->std_null_coll))
 		{
 			assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
 			gv_currkey->base[gv_currkey->prev] = 01;
@@ -85,7 +86,7 @@ void op_gvquery (mval *v)
 	}
 	if (ok_to_change_currkey)
 	{	/* Restore gv_currkey to what it was at function entry time */
-		if (gv_curr_subsc_null && (0 == gv_cur_region->std_null_coll))
+		if (TREF(gv_last_subsc_null) && (NEVER == gv_cur_region->std_null_coll))
 		{
 			assert(01 == gv_currkey->base[gv_currkey->prev]);
 			gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;

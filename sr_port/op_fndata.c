@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,29 +10,22 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
+
 #include "lv_val.h"
 
 LITREF mval *fndata_table[2][2];
 
-void op_fndata(x,y)
-lv_val *x;
-mval *y;
+void op_fndata(lv_val *x, mval *y)
 {
-	lv_val *p;
-	int r,s;
-	lv_sbs_tbl	*tbl;
+	int		r,s;
 
 	r = s = 0;
 	if (x)
 	{
-		if (MV_DEFINED(&(x->v)))
-	  	{	r++;
-		}
-       	       	if ((tbl = x->ptrs.val_ent.children) && (tbl->num || tbl->str))
-		{	assert(tbl->ident == MV_SBS);
+		if (LV_IS_VAL_DEFINED(x))
+	  		r++;
+		if (LV_HAS_CHILD(x))
 			s++;
-		}
 	}
 	*y = *fndata_table[s][r];
 }

@@ -45,7 +45,7 @@
 #include "secshr_db_clnup.h"
 
 GBLREF	int4			exi_condition;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		need_core;			/* Core file should be created */
 GBLREF	boolean_t		created_core;			/* core file was created */
 GBLREF	boolean_t		core_in_progress;

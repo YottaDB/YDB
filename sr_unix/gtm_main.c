@@ -38,6 +38,7 @@
 #include "gtm_main.h"		/* for "gtm_main" prototype */
 #include "io.h"
 #include "gtm_imagetype_init.h"
+#include "gtm_threadgbl_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -84,7 +85,9 @@ int gtm_main (int argc, char **argv, char **envp)
 		char		*gtm_passwd;
 		int		init_status;
 	)
+	DCL_THREADGBL_ACCESS;
 
+	GTM_THREADGBL_INIT;
 	gtmenvp = envp;
 	gtm_imagetype_init(GTM_IMAGE);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
@@ -110,7 +113,7 @@ int gtm_main (int argc, char **argv, char **envp)
 		we didnot change argv[0]
 	*/
 	ptr = cli_lex_in_ptr->in_str;
-	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr) + 1);
+	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr) + 1);	/* BYPASSOK */
 	MEMCPY_LIT(ptr, "MUMPS ");
 
 	/*	reset the argument buffer pointer, it's changed in cli_gettoken() call above    */

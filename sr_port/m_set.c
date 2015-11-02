@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,33 +26,39 @@
 #include "namelook.h"
 #include "cmd.h"
 #include "svnames.h"
-#include "hashtab.h"
-#include "hashtab_mname.h"      /* needed for lv_val.h */
-#include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
-
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
-#define	FIRST_SETLEFT_NOTSEEN	-1	/* see comment against variable "first_setleft_invalid" for details */
-
-GBLDEF bool		temp_subs;
+GBLREF boolean_t	badchar_inhibit;
 GBLREF triple		*curtchain;
 GBLREF char		director_token, window_token;
 GBLREF mident		director_ident, window_ident;
 GBLREF boolean_t	gtm_utf8_mode;
-GBLREF boolean_t	badchar_inhibit;
+
+error_def(ERR_INVSVN);
+error_def(ERR_VAREXPECTED);
+error_def(ERR_RPARENMISSING);
+error_def(ERR_EQUAL);
+error_def(ERR_COMMA);
+error_def(ERR_SVNOSET);
+error_def(ERR_NOALIASLIST);
+error_def(ERR_ALIASEXPECTED);
+error_def(ERR_DZWRNOPAREN);
+error_def(ERR_DZWRNOALIAS);
 
 LITREF unsigned char	svn_index[], fun_index[];
 LITREF nametabent	svn_names[], fun_names[];
 LITREF svn_data_type	svn_data[];
 LITREF fun_data_type	fun_data[];
+
+#define	FIRST_SETLEFT_NOTSEEN	-1	/* see comment against variable "first_setleft_invalid" for details */
 
 /* This macro is used to insert the conditional jump triples (in SET $PIECE/$EXTRACT) ahead of the global variable
  * reference of the SET $PIECE target. This is to ensure the naked indicator is not touched in cases where the M-standard
@@ -93,28 +99,6 @@ void	allow_dzwrtac_as_mident(void);
 
 int m_set(void)
 {
-	int		index, setop, delimlen;
-	int		first_val_lit, last_val_lit, nakedzalias;
-	boolean_t	first_is_lit, last_is_lit, got_lparen, delim1char, is_extract, valid_char;
-	boolean_t 	alias_processing, have_lh_alias;
-	opctype		put_oc;
-	oprtype		v, delimval, firstval, lastval, *result, resptr;
-	triple		*delimiter, *first, *put, *get, *last, *obp, *s, *sub, *s0, *s1;
-	triple		targchain, discardcurtchain, save_targchain, *curtargchain, *save_curtchain, *save_curtchain1, *tmp;
-	triple		*jmptrp1, *jmptrp2;
-	mint		delimlit;
-	mval		*delim_mval;
-	mvar		*mvarptr;
-	boolean_t	parse_warn;	/* set to TRUE in case of an invalid SVN etc. */
-	boolean_t	curtchain_switched;	/* set to TRUE if a setcurtchain was done */
-	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
-	boolean_t	temp_subs_was_FALSE;
-	union
-	{
-		uint4		unichar_val;
-		unsigned char	unibytes_val[4];
-	} unichar;
-
 	/* Some comment on "parse_warn". It is set to TRUE whenever the parse encounters an
 	   invalid setleft target.
 
@@ -140,27 +124,38 @@ int m_set(void)
 	   * target is valid. It is initialized to -1 before the start of the parse.
 	   */
 
-	error_def(ERR_INVSVN);
-	error_def(ERR_VAREXPECTED);
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_EQUAL);
-	error_def(ERR_COMMA);
-	error_def(ERR_SVNOSET);
-	error_def(ERR_NOALIASLIST);
-	error_def(ERR_ALIASEXPECTED);
-	error_def(ERR_DZWRNOPAREN);
-	error_def(ERR_DZWRNOALIAS);
+	int		index, setop, delimlen;
+	int		first_val_lit, last_val_lit, nakedzalias;
+	boolean_t	first_is_lit, last_is_lit, got_lparen, delim1char, is_extract, valid_char;
+	boolean_t 	alias_processing, have_lh_alias;
+	opctype		put_oc;
+	oprtype		v, delimval, firstval, lastval, *result, resptr;
+	triple		*curtargchain, *delimiter, discardcurtchain, *first, *get, *jmptrp1, *jmptrp2, *last, *obp, *put;
+	triple		*s, *s0, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
+	mint		delimlit;
+	mval		*delim_mval;
+	mvar		*mvarptr;
+	boolean_t	parse_warn;	/* set to TRUE in case of an invalid SVN etc. */
+	boolean_t	curtchain_switched;	/* set to TRUE if a setcurtchain was done */
+	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
+	boolean_t	temp_subs_was_FALSE;
+	union
+	{
+		uint4		unichar_val;
+		unsigned char	unibytes_val[4];
+	} unichar;
+	DCL_THREADGBL_ACCESS;
 
-	temp_subs = FALSE;
+	SETUP_THREADGBL_ACCESS;
+	TREF(temp_subs) = FALSE;
 	dqinit(&targchain, exorder);
 	result = (oprtype *)mcalloc(SIZEOF(oprtype));
 	resptr = put_indr(result);
 	delimiter = sub = last = NULL;
-
 	/* A SET clause must be entirely alias related or a normal set. Parenthized multiple sets of aliases are not allowed
-	   and will trigger an error. This is because the source and targets of aliases require different values and references
-	   than normal sets do and thus cannot be mixed.
-	*/
+	 * and will trigger an error. This is because the source and targets of aliases require different values and references
+	 * than normal sets do and thus cannot be mixed.
+	 */
 	if (alias_processing = (TK_ASTERISK == window_token))
 		advancewindow();
 	if (got_lparen = (TK_LPAREN == window_token))
@@ -168,7 +163,7 @@ int m_set(void)
 		if (alias_processing)
 			stx_error(ERR_NOALIASLIST);
 		advancewindow();
-		temp_subs = TRUE;
+		TREF(temp_subs) = TRUE;
 	}
 	/* Some explanation: The triples from the left hand side of the SET expression that are
 	 * expressly associated with fetching (in case of set $piece/$extract) and/or storing of
@@ -228,18 +223,19 @@ int m_set(void)
 		{
 			case TK_IDENT:
 				/* A slight diversion first. If this is a $ZWRTAC set (indication of $ in first char
-				   is currently enough to signify that), then we need to check a few conditions first.
-				   If this is a "naked $ZWRTAC", meaning no numeric suffix, then this is a flag that
-				   all the $ZWRTAC vars in the local variable tree need to be kill *'d which will not
-				   be generating a SET instruction. First we need to verify that fact and make sure
-				   we are not in PARENs and not doing alias processing. Note *any* value can be
-				   specified as the source but while it will be evaluated, it is NOT stored anywhere.
-				*/
+				 * is currently enough to signify that), then we need to check a few conditions first.
+				 * If this is a "naked $ZWRTAC", meaning no numeric suffix, then this is a flag that
+				 * all the $ZWRTAC vars in the local variable tree need to be kill *'d which will not
+				 * be generating a SET instruction. First we need to verify that fact and make sure
+				 * we are not in PARENs and not doing alias processing. Note *any* value can be
+				 * specified as the source but while it will be evaluated, it is NOT stored anywhere.
+				 */
 				if ('$' == *window_ident.addr)
 				{	/* We have a $ZWRTAC<xx> target */
 					if (got_lparen)
 						/* We don't allow $ZWRTACxxx to be specified in a parenthesized list.
-						   Verify that first */
+						 * Verify that first
+						 */
 						SYNTAX_ERROR(ERR_DZWRNOPAREN);
 					if (STR_LIT_LEN(DOLLAR_ZWRTAC) == window_ident.len)
 					{	/* Ok, this is a naked $ZWRTAC targeted set */
@@ -247,9 +243,9 @@ int m_set(void)
 							SYNTAX_ERROR(ERR_DZWRNOALIAS);
 						nakedzalias = TRUE;
 						/* This opcode doesn't really need args but it is easier to fit in with the rest
-						   of m_set processing to pass it the result arg, which there may actually be
-						   a use for someday..
-						*/
+						 * of m_set processing to pass it the result arg, which there may actually be
+						 * a use for someday..
+						 */
 						put = maketriple(OC_CLRALSVARS);
 						put->operand[0] = resptr;
 						dqins(targchain.exorder.bl, exorder, put);
@@ -258,14 +254,12 @@ int m_set(void)
 					}
 				}
 				/* If we are doing alias processing, there are two possibilities:
-
-				   1) LHS is unsubscripted - it is an alias variable being created or replaced. Need to parse
-				   the varname as if this were a regular set.
-				   2) LHS is subscripted - it is an alias container variable being created or replaced. The
-				   processing here is to pass the base variable index to the store routine so bypass the
-				   lvn() call.
-
-				*/
+				 *  1) LHS is unsubscripted - it is an alias variable being created or replaced. Need to parse
+				 *  the varname as if this were a regular set.
+				 *  2) LHS is subscripted - it is an alias container variable being created or replaced. The
+				 *  processing here is to pass the base variable index to the store routine so bypass the
+				 *  lvn() call.
+				 */
 				if (!alias_processing || TK_LPAREN == director_token)
 				{	/* Normal variable processing or we have a lh alias container */
 					if (!lvn(&v, OC_PUTINDX, 0))
@@ -276,7 +270,7 @@ int m_set(void)
 						dqins(targchain.exorder.bl, exorder, v.oprval.tref);
 						sub = v.oprval.tref;
 						put_oc = OC_PUTINDX;
-						if (temp_subs)
+						if (TREF(temp_subs))
 							m_set_create_temporaries(sub, put_oc);
 					}
 				} else
@@ -313,7 +307,7 @@ int m_set(void)
 				assert(OC_GVNAME == put_oc || OC_GVNAKED == put_oc || OC_GVEXTNAM == put_oc);
 				dqdel(sub, exorder);
 				dqins(targchain.exorder.bl, exorder, sub);
-				if (temp_subs)
+				if (TREF(temp_subs))
 					m_set_create_temporaries(sub, put_oc);
 				put = maketriple(OC_GVPUT);
 				put->operand[0] = resptr;
@@ -413,7 +407,6 @@ int m_set(void)
 							is_extract = TRUE;
 							setop = OC_SETEXTRACT;
 							break;
-#ifdef UNICODE_SUPPORTED
 						case OC_FNZPIECE:
 							setop = OC_SETZPIECE;
 							break;
@@ -421,7 +414,6 @@ int m_set(void)
 							is_extract = TRUE;
 							setop = OC_SETZEXTRACT;
 							break;
-#endif
 						default:
 							SYNTAX_ERROR(ERR_VAREXPECTED);
 					}
@@ -451,7 +443,7 @@ int m_set(void)
 								dqins(targchain.exorder.bl, exorder, v.oprval.tref);
 								sub = v.oprval.tref;
 								put_oc = OC_PUTINDX;
-								if (temp_subs)
+								if (TREF(temp_subs))
 									m_set_create_temporaries(sub, put_oc);
 							}
 							get = maketriple(OC_FNGET);
@@ -485,7 +477,7 @@ int m_set(void)
 							       || (OC_GVEXTNAM == put_oc));
 							dqdel(sub, exorder);
 							dqins(targchain.exorder.bl, exorder, sub);
-							if (temp_subs)
+							if (TREF(temp_subs))
 								m_set_create_temporaries(sub, put_oc);
 							get = maketriple(OC_FNGVGET);
 							get->operand[0] = put_str(0, 0);
@@ -499,7 +491,6 @@ int m_set(void)
 					/* Code to fetch args for target triple are on targchain. Put get there now too. */
 					dqins(targchain.exorder.bl, exorder, get);
 					CHKTCHAIN(&targchain);
-
 					if (!is_extract)
 					{	/* Set $[z]piece */
 						delimiter = newtriple(OC_PARAMETER);
@@ -536,12 +527,12 @@ int m_set(void)
 					}
 					if (TK_COMMA != window_token)
 					{	/* There is no "last" value. Only if 1 char literal delimiter and
-						   no "last" value can we generate shortcut code to op_set[z]p1 entry
-						   instead of op_set[z]piece. Note if UTF8 mode is in effect, then this
-						   optimization applies if the literal is one unicode char which may in
-						   fact be up to 4 bytes but will still be passed as a single unsigned
-						   integer.
-						*/
+						 * no "last" value can we generate shortcut code to op_set[z]p1 entry
+						 * instead of op_set[z]piece. Note if UTF8 mode is in effect, then this
+						 * optimization applies if the literal is one unicode char which may in
+						 * fact be up to 4 bytes but will still be passed as a single unsigned
+						 * integer.
+						 */
 						if (!is_extract)
 						{
 							delim_mval = &delimval.oprval.tref->operand[0].oprval.mlit->v;
@@ -553,9 +544,9 @@ int m_set(void)
 								UNICODE_ONLY(
 									if (gtm_utf8_mode)
 									{	/*  We have a supposed single char delimiter but it
-										    must be a valid utf8 char to be used by
-										    op_setp1() and MV_FORCE_LEN won't tell us that.
-										*/
+										 *  must be a valid utf8 char to be used by
+										 *  op_setp1() and MV_FORCE_LEN won't tell us that.
+										 */
 										valid_char = UTF8_VALID(delim_mval->str.addr,
 													(delim_mval->str.addr
 													 + delim_mval->str.len),
@@ -570,7 +561,8 @@ int m_set(void)
 								if (valid_char || 1 == delim_mval->str.len)
 								{	/* This reference to a one character literal or a single
 									 * byte invalid utf8 character that needs to be turned into
-									 * an explict formated integer literal instead */
+									 * an explict formated integer literal instead
+									 */
 									unichar.unichar_val = 0;
 									if (!gtm_utf8_mode)
 									{	/* Single byte delimiter */
@@ -597,9 +589,9 @@ int m_set(void)
 						}
 						if (!delim1char)
 						{	/* Was not handled as a single char delim by code above either bcause it
-							   was (1) not set $piece, or (2) was not a single char delim or (3) it was
-							   not a VALID utf8 single char delim and badchar was inhibited.
-							*/
+							 * was (1) not set $piece, or (2) was not a single char delim or (3) it was
+							 * not a VALID utf8 single char delim and badchar was inhibited.
+							 */
 							if (!is_extract)
 								delimiter->operand[0] = delimval;
 							last = newtriple(OC_PARAMETER);
@@ -607,7 +599,8 @@ int m_set(void)
 							last->operand[0] = first->operand[0];	/* start = end range */
 						}
 						/* Generate test sequences for first/last to bypass the set operation if
-						   first/last are not in a usable form */
+						 * first/last are not in a usable form
+						 */
 						if (first_is_lit)
 						{
 							if (1 > first_val_lit)
@@ -636,9 +629,9 @@ int m_set(void)
 						assert(lastval.oprclass == TRIP_REF);
 						last->operand[0] = lastval;
 						/* Generate inline code to test first/last for usability and if found
-						   lacking, branch around the getchain and the actual store so we avoid
-						   setting the naked indicator so far as the target gvn is concerned.
-						*/
+						 * lacking, branch around the getchain and the actual store so we avoid
+						 * setting the naked indicator so far as the target gvn is concerned.
+						 */
 						if (last_is_lit = (lastval.oprval.tref->opcode == OC_ILIT))
 						{	/* Case 1: last is a literal */
 							assert(lastval.oprval.tref->operand[0].oprclass  == ILIT_REF);
@@ -678,7 +671,8 @@ int m_set(void)
 					dqins(targchain.exorder.bl, exorder, put);
 					CHKTCHAIN(&targchain);
 					/* Put result operand on the chain. End of chain depends on whether or not
-					   we are calling the shortcut or the full set-piece code */
+					 * we are calling the shortcut or the full set-piece code
+					 */
 					if (delim1char)
 						first->operand[1] = resptr;
 					else
@@ -697,7 +691,8 @@ int m_set(void)
 				break;
 			case TK_ASTERISK:
 				/* The only way an asterisk can be detected here is if we are inside a list so mention this is
-				   not possible and give error. */
+				 * not possible and give error.
+				 */
 				stx_error(ERR_NOALIASLIST);
 				return FALSE;
 			default:
@@ -741,7 +736,7 @@ int m_set(void)
 		SYNTAX_ERROR(ERR_EQUAL);
 	advancewindow();
 	assert(FIRST_SETLEFT_NOTSEEN != first_setleft_invalid);
-	temp_subs_was_FALSE = (FALSE == temp_subs);	/* Note down if temp_subs is FALSE at this point */
+	temp_subs_was_FALSE = (FALSE == TREF(temp_subs));	/* Note down if temp_subs is FALSE at this point */
 	/* If we are in alias processing mode, the RHS cannot be an expression but must be one of a subscripted or unsubscripted
 	 * local variable, or a $$func(..) function call.
 	 */
@@ -756,7 +751,8 @@ int m_set(void)
 		{	/* Check if we have a $$func() call source */
 			if (TK_DOLLAR == window_token && TK_DOLLAR == director_token)
 			{	/* Parse the function only with exfunc(). We definitely do not want an expression */
-				temp_subs = TRUE;	/* RHS $$ function detected - need temporary */
+				TREF(temp_subs) = TRUE;	/* RHS $$ function detected - need temporary */
+				advancewindow();
 				if (!exfunc(result, TRUE))
 					SYNTAX_ERROR_NOREPORT_HERE;
 				if (OC_SETALSIN2ALSCT == put->opcode)
@@ -777,11 +773,11 @@ int m_set(void)
 				SYNTAX_ERROR(ERR_DZWRNOALIAS);
 			if (TK_LPAREN == director_token)
 			{	/* Subscripted local variable - have alias container.
-				   The storing opcode set into the "put" triple at the top of this routine was
-				   set assuming the source was an alias. Now that we know the source is actually
-				   an alias container (and hence a different data type), we need to adjust the
-				   opcode accordingly.
-				*/
+				 * The storing opcode set into the "put" triple at the top of this routine was
+				 * set assuming the source was an alias. Now that we know the source is actually
+				 * an alias container (and hence a different data type), we need to adjust the
+				 * opcode accordingly.
+				 */
 				if (OC_SETALS2ALS == put->opcode)
 					put->opcode = OC_SETALSCTIN2ALS;
 				else
@@ -791,13 +787,12 @@ int m_set(void)
 				}
 			}
 			/* For RHS processing, both alias var and alias container vars have their lv_val addr
-			   passed so normal var processing applies.
-			*/
+			 * passed so normal var processing applies.
+			 */
 			if (!lvn(result, OC_GETINDX, 0))
 				SYNTAX_ERROR(ERR_ALIASEXPECTED);
 		}
 	}
-
 	if (first_setleft_invalid)
 	{	/* switch from the temporary chain back to the current execution chain */
 		assert(curtchain_switched);
@@ -812,8 +807,9 @@ int m_set(void)
 	/* Check if "temp_subs" was FALSE originally but got set to TRUE as part of evaluating the right hand side
 	 * (for example, if rhs had $$ or $& or $INCR usages). If so need to create temporaries.
 	 */
-	if (temp_subs && temp_subs_was_FALSE && (NULL != sub))
+	if (TREF(temp_subs) && temp_subs_was_FALSE && (NULL != sub))
 		m_set_create_temporaries(sub, put_oc);
+	TREF(temp_subs) = FALSE;
 	return TRUE;
 }
 
@@ -821,21 +817,15 @@ int m_set(void)
  * in temporaries (using OC_STOTEMP opcode). This function is only invoked when
  * 	a) The SET is a compound SET (i.e. there are multiple targets specified on the left side of the SET command).
  *	b) Subscripts are specified in glvns which are targets of the SET.
- *
  *	e.g. set a=0,(a,array(a))=1
- *
  * The expected result of the above command as per the M-standard is that array(0) (not array(1)) gets set to 1.
  * That is, the value of the subscript "a" should be evaluated at the start of the compound SET before any sets happen
  * and should be used in any subscripts that refer to the name "a".
- *
  * In the above example, since it is a compound SET and "a" is used in a subscript, we need to store the value of "a"
  *	before the start of the compound SET (i.e.a=0) in a temporary and use that as the subscript for "array".
- *
  * If in the above example the compound set was instead specified as set a=1,array(a)=1, the value of 1 gets substituted
  *	when used in "array(a)".
- *
  * This is where the compound set acts differently from a sequence of multiple sets. This is per the M-standard.
- *
  * In the above example, the subscript used was also a target within the compound SET. It is possible that the
  *	subscript is not also an individual target within the same compound SET. Even in that case, this function
  *	will be called to store the subscript in temporaries (as we dont know at compile time if a particular
@@ -845,8 +835,10 @@ void	m_set_create_temporaries(triple *sub, opctype put_oc)
 {
 	oprtype	*sb1;
 	triple	*s0, *s1;
+	DCL_THREADGBL_ACCESS;
 
-	assert(temp_subs);
+	SETUP_THREADGBL_ACCESS;
+	assert(TREF(temp_subs));
 	assert(NULL != sub);
 	sb1 = &sub->operand[1];
 	if ((OC_GVNAME == put_oc) || (OC_PUTINDX == put_oc))
@@ -909,17 +901,17 @@ void	m_set_create_temporaries(triple *sub, opctype put_oc)
 }
 
 /* Prior to Alias support, the ZWRITE command was able to dump the entire local variable environment such that it could be
-   reloaded by Xecuting the dumped lines. With the addition of Alias type variables, the output lines not only include the
-   variable content but their alias associations as well. One aspect of this is the $ZWRTAC variable which is a temporary
-   "variable" which we allow to hold the content of what would otherwise be "orphaned data" or data which has a container
-   pointing to it but is not referenced by a base variable. During the reload operation, it is this orphaned data that is
-   put into the $ZWRTAC environment. The first orphaned array is put into $ZWRTAC1(...), the second into $ZWRTAC2(..) and
-   so on. Setting the $ZWRTAC variable itself to null (or to any value actually - null only is not enforced) causes all of
-   the $ZWRTAC variables to be KILL *'d. The only syntactic allowances for using $ZWRTACxxx as an mident in GTM are in this
-   SET statement. We do not support its use in any other statement type. This routine allows us to modify the tokens so that
-   if the current token is a '$' and the next token is ZWRTACxxx, we can combine them into a single token and the parser
-   need not be further modified.
-*/
+ * reloaded by Xecuting the dumped lines. With the addition of Alias type variables, the output lines not only include the
+ * variable content but their alias associations as well. One aspect of this is the $ZWRTAC variable which is a temporary
+ * "variable" which we allow to hold the content of what would otherwise be "orphaned data" or data which has a container
+ * pointing to it but is not referenced by a base variable. During the reload operation, it is this orphaned data that is
+ * put into the $ZWRTAC environment. The first orphaned array is put into $ZWRTAC1(...), the second into $ZWRTAC2(..) and
+ * so on. Setting the $ZWRTAC variable itself to null (or to any value actually - null only is not enforced) causes all of
+ * the $ZWRTAC variables to be KILL *'d. The only syntactic allowances for using $ZWRTACxxx as an mident in GTM are in this
+ * SET statement. We do not support its use in any other statement type. This routine allows us to modify the tokens so that
+ * if the current token is a '$' and the next token is ZWRTACxxx, we can combine them into a single token and the parser
+ * need not be further modified.
+ */
 void allow_dzwrtac_as_mident(void)
 {
 	char_ptr_t	chrp, chrpmin, chrplast;
@@ -934,11 +926,11 @@ void allow_dzwrtac_as_mident(void)
 	if (0 != MEMCMP_LIT(director_ident.addr, "ZWRTAC"))
 		return;			/* Couldn't be $ZWRTACxxx without ZWRTAC as first part of token */
 	/* We need to shift the existing token over 1 byte to make room for insertion of the '$' prefix. Normally,
-	   we wouldn't want to do this as we are verifying but since if the verification fails the code path will
-	   raise an error and since the error does not use this token buffer, we are safe in migrating while
-	   we do the verification check. Saves us having to scan the line backwards via memmove() again below. So
-	   verify the token suffix is all numeric while we do our shift.
-	*/
+	 * we wouldn't want to do this as we are verifying but since if the verification fails the code path will
+	 * raise an error and since the error does not use this token buffer, we are safe in migrating while
+	 * we do the verification check. Saves us having to scan the line backwards via memmove() again below. So
+	 * verify the token suffix is all numeric while we do our shift.
+	 */
 	movlen = (director_ident.len < MAX_MIDENT_LEN) ? director_ident.len : MAX_MIDENT_LEN - 1;
 	for (chrplast = director_ident.addr + movlen, chrp = chrplast - 1,
 		     chrpmin = director_ident.addr + STR_LIT_LEN("ZWRTAC") - 1;
@@ -952,7 +944,6 @@ void allow_dzwrtac_as_mident(void)
 	/* Verification (and shift) complete -- finish modifying director token */
 	MEMCPY_LIT(director_ident.addr, DOLLAR_ZWRTAC);
 	director_ident.len = movlen + 1;
-
 	/* Nnw forward the scan to pull director token values into window token for use by our caller */
 	advancewindow();
 	assert(TK_IDENT == window_token);

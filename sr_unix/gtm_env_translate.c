@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 #include "gtm_limits.h"		/* needed for PATH_MAX */
 #include "error.h"
 #include "gtmxc_types.h"	/* needed for xc_string_t */
-#include "lv_val.h"
+#include "lv_val.h"		/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "gtm_env_xlate_init.h"
 

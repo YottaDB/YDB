@@ -93,7 +93,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
 	int                     fstat_res;
 	uint4			ustatus;
-	shmpool_blk_hdr_ptr_t	sblkh_p;
+	muinc_blk_hdr_ptr_t	sblkh_p;
 	ZOS_ONLY(int		realfiletag;)
 	int			group_id;
 	int			perm;
@@ -349,8 +349,8 @@ bool	mubfilcpy (backup_reg_list *list)
 
 		if (0 < (filesize = stat_buf.st_size))
 		{
-			rsize = (int4)(SIZEOF(shmpool_blk_hdr) + header_cpy->blk_size);
-			sblkh_p = (shmpool_blk_hdr_ptr_t)malloc(rsize);
+			rsize = (int4)(SIZEOF(muinc_blk_hdr) + header_cpy->blk_size);
+			sblkh_p = (muinc_blk_hdr_ptr_t)malloc(rsize);
 			/* Do not use LSEEKREAD macro here because of dependence on setting filepointer for
 			   subsequent reads.
 			*/

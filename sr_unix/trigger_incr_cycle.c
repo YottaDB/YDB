@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,9 @@ void trigger_incr_cycle(char *trigvn, int trigvn_len)
 	char			*ptr, *ptr1;
 	int4			result;
 	mval			trigger_cycle, *mv_trig_cycle_ptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE));
 	if (gvcst_get(&trigger_cycle))
 	{

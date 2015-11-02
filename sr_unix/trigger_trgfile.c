@@ -13,11 +13,15 @@
 
 #include "gtm_stat.h"
 #include "gtm_string.h"
+
+#ifdef GTM_TRIGGER
 #include "gdsroot.h"			/* for gdsfhead.h */
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"			/* For gvcst_protos.h */
 #include "rtnhdr.h"
 #include "gv_trigger.h"
+#include "io.h"
+#include "hashtab_str.h"
 #include "trigger_trgfile_protos.h"
 #include "trigger_delete_protos.h"
 #include "trigger_update_protos.h"
@@ -36,57 +40,49 @@
 #include "tp_restart.h"
 #include "mupip_exit.h"
 #include "util.h"
-#include "io.h"
+#include "stack_frame.h"
+#include "mv_stent.h"
+#include "tp_frame.h"
+#include "t_retry.h"
+
+#define TRIG_ERROR_RETURN						\
+{									\
+	if (lcl_implicit_tpwrap)					\
+	{	/* only if we were implicitly wrapped */		\
+		assert(dollar_tlevel);					\
+		assert(donot_INVOKE_MUMTSTART);				\
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);		\
+		OP_TROLLBACK(-1);	/* Unroll implicit TP */	\
+		REVERT;							\
+	}								\
+	return TRIG_FAILURE;						\
+}
 
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	bool			mupip_error_occurred;
-GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
 GBLREF	gv_key			*gv_currkey;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	gd_addr			*gd_header;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	short			dollar_trestart;
 GBLREF	int			tprestart_state;
 GBLREF	io_pair			io_curr_device;
 GBLREF	gv_namehead		*reset_gv_target;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 
 LITREF	mval			literal_hasht;
 
-error_def(ERR_TPRETRY);
-
-/* This code is modeled around "updproc_ch" in updproc.c */
-CONDITION_HANDLER(trigger_trgfile_tpwrap_ch)
-{
-	int	rc;
-
-	START_CH;
-	if ((int)ERR_TPRETRY == SIGNAL)
-	{
-		assert(TPRESTART_STATE_NORMAL == tprestart_state);
-		tprestart_state = TPRESTART_STATE_NORMAL;
-		assert(NULL != first_sgm_info);
-		/* This only happens at the outer-most layer so state should be normal now */
-		rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
-		assert(0 == rc);
-		assert(TPRESTART_STATE_NORMAL == tprestart_state);
-		reset_gv_target = INVALID_GV_TARGET;	/* see similar code in "trigger_item_tpwrap_ch" for why this is needed */
-		UNWIND(NULL, NULL);
-	}
-	NEXTCH;
-}
-
-STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint4 trigger_filename_len, boolean_t noprompt)
+STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint4 trigger_filename_len, boolean_t noprompt,
+						    boolean_t lcl_implicit_tpwrap)
 {
 	boolean_t		all_triggers_error;
-	char			filename[MAX_FN_LEN + 1];
 	uint4			i;
 	io_pair			io_save_device;
 	io_pair			io_trigfile_device;
 	int			len;
-	uint4			record_num;
-	boolean_t		trigger_error;
-	struct stat		statbuf;
-	enum cdb_sc		status;
+	int4			record_num;
+	boolean_t		trigger_status;
+	enum cdb_sc		cdb_status;
 	uint4			trig_stats[NUM_STATS];
 	char			*trigger_rec;
 	char			*values[NUM_SUBS];
@@ -94,48 +90,26 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 
 	error_def(ERR_ZFILNMBAD);
 
-	trigger_error = all_triggers_error = FALSE;
-	if ((0 == trigger_filename_len) || MAX_FN_LEN < trigger_filename_len)
-	{
-		util_out_print_gtmio("Invalid file name: !AD", FLUSH, trigger_filename_len, trigger_filename);
-		OP_TROLLBACK(0);
-		return TRIG_FAILURE;
-	}
-	strncpy(filename, trigger_filename, trigger_filename_len);
-	filename[trigger_filename_len]='\0';
-	if ((-1 == Stat(filename, &statbuf)) || !S_ISREG(statbuf.st_mode))
-	{
-		util_out_print_gtmio("Invalid file name: !AD", FLUSH, trigger_filename_len, trigger_filename);
-		OP_TROLLBACK(0);
-		return TRIG_FAILURE;
-	}
-	ESTABLISH_RET(trigger_trgfile_tpwrap_ch, all_triggers_error);
+	all_triggers_error = FALSE;
+	if (lcl_implicit_tpwrap)
+		ESTABLISH_RET(trigger_tpwrap_ch, TRIG_FAILURE);	/* Return through here is a failure */
 	io_save_device = io_curr_device;
 	file_input_init(trigger_filename, trigger_filename_len);
 	if (mupip_error_occurred)
-	{
-		OP_TROLLBACK(0);
-		REVERT;
-		return TRIG_FAILURE;
-	}
+		TRIG_ERROR_RETURN;
 	io_trigfile_device = io_curr_device;
 	record_num = 0;
 	for (i = 0; NUM_STATS > i; i++)
 		trig_stats[i] = 0;
-	while (0 <= (len = file_input_get(&trigger_rec)))
+	while ((0 == io_curr_device.in->dollar.zeof) && (0 <= (len = file_input_get(&trigger_rec))))
 	{
 		io_curr_device = io_save_device;
 		record_num++;
 		if ((0 != len) && (COMMENT_LITERAL != trigger_rec[0]))
 			util_out_print_gtmio("File !AD, Line !UL: ", NOFLUSH, trigger_filename_len, trigger_filename, record_num);
-		trigger_error = trigger_update_rec(trigger_rec, (uint4)len, noprompt, trig_stats);
-		all_triggers_error |= (TRIG_FAILURE == trigger_error);
-		if (all_triggers_error && (TRIG_SUCCESS == trigger_error) && (0 != len) && (COMMENT_LITERAL != trigger_rec[0]))
-		{
-			assert(0 != trig_stats[STATS_ERROR]);
-			trig_stats[STATS_ADDED]++;
-			util_out_print_gtmio("No errors", FLUSH);
-		}
+		trigger_status = trigger_update_rec(trigger_rec, (uint4)len, noprompt, trig_stats, &io_trigfile_device,
+						    &record_num);
+		all_triggers_error |= (TRIG_FAILURE == trigger_status);
 		io_curr_device = io_trigfile_device;
 	}
 	if ((-1 == len) && (!io_curr_device.in->dollar.zeof))
@@ -154,13 +128,15 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 		util_out_print_gtmio("!UL trigger file entries have no errors", FLUSH,
 				     trig_stats[STATS_ADDED] + trig_stats[STATS_DELETED] + trig_stats[STATS_MODIFIED]);
 		util_out_print_gtmio("=========================================", FLUSH);
-		OP_TROLLBACK(0);
-		REVERT;
-		return TRIG_FAILURE;
+		TRIG_ERROR_RETURN;
 	}
-	status = op_tcommit();
-	assert(cdb_sc_normal == status); /* if retry, an rts_error should have been signalled and we should not be here at all */
-	REVERT;
+	if (lcl_implicit_tpwrap)
+	{
+		GVTR_OP_TCOMMIT(cdb_status);
+		if (cdb_sc_normal != cdb_status)
+			t_retry(cdb_status);	/* won't return */
+		REVERT;
+	}
 	if ((0 == trig_stats[STATS_ERROR])
 		&& (0 != (trig_stats[STATS_ADDED] + trig_stats[STATS_DELETED] + trig_stats[STATS_UNCHANGED]
 			  + trig_stats[STATS_MODIFIED])))
@@ -171,8 +147,7 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 		util_out_print_gtmio("!UL trigger file entries not changed", FLUSH, trig_stats[STATS_UNCHANGED]);
 		util_out_print_gtmio("!UL triggers modified", FLUSH, trig_stats[STATS_MODIFIED]);
 		util_out_print_gtmio("=========================================", FLUSH);
-	}
-	else if (0 != trig_stats[STATS_ERROR])
+	} else if (0 != trig_stats[STATS_ERROR])
 	{
 		util_out_print_gtmio("=========================================", FLUSH);
 		util_out_print_gtmio("!UL trigger file entries matched existing triggers", FLUSH, trig_stats[STATS_UNCHANGED]);
@@ -186,33 +161,55 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 
 boolean_t trigger_trgfile_tpwrap(char *trigger_filename, uint4 trigger_filename_len, boolean_t noprompt)
 {
-	boolean_t		trigger_error = FALSE;
+	boolean_t		trigger_status = TRIG_FAILURE;
 	mval			ts_mv;
 	int			loopcnt;
+	struct stat		statbuf;
 
 	ts_mv.mvtype = MV_STR;
 	ts_mv.str.len = 0;
 	ts_mv.str.addr = NULL;
-	implicit_tstart = TRUE;
-	op_tstart(TRUE, TRUE, &ts_mv, 0); 	/* 0 ==> save no locals but RESTART OK */
-	assert(FALSE == implicit_tstart);	/* should have been reset by op_tstart at very beginning */
-	/* The following for loop structure is similar to that in module trigger_update.c (function "trigger_update")
-	 * and module gv_trigger.c (function gvtr_db_tpwrap) so any changes here might need to be reflected there as well.
-	 */
-	for ( loopcnt = 0; ; loopcnt++)
+	/* Do sanity checks on the filename and the file's accessibility. */
+	assert('\0' == trigger_filename[trigger_filename_len]); /* should have been made sure by caller */
+	if ((-1 == Stat(trigger_filename, &statbuf)) || !S_ISREG(statbuf.st_mode))
 	{
-		trigger_error = trigger_trgfile_tpwrap_helper(trigger_filename, trigger_filename_len, noprompt);
-		if (!dollar_tlevel)
-			break;
-		util_out_print_gtmio("RESTART has invalidated this transaction's previous output.  New output follows.", FLUSH);
-		/* We expect the above function to return with either op_tcommit or a tp_restart invoked.
-		 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
-		 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
-		 * Additionally we also want to avoid an infinite loop so limit the loop to what is considered
-		 * a huge iteration count and GTMASSERT if that is reached as it suggests an out-of-design situation.
-		 */
-		if (TPWRAP_HELPER_MAX_ATTEMPTS < loopcnt)
-			GTMASSERT;
+		util_out_print_gtmio("Invalid file name: !AD", FLUSH, trigger_filename_len, trigger_filename);
+		return TRUE;	/* Failure */
 	}
-	return (TRIG_FAILURE == trigger_error);
+	if (0 == dollar_tlevel)
+	{	/* If not already wrapped in TP, wrap it now implicitly */
+		assert(!donot_INVOKE_MUMTSTART);
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
+		/* Note down dollar_tlevel before op_tstart. This is needed to determine if we need to break from the for-loop
+		 * below after a successful op_tcommit of the $ZTRIGGER operation. We cannot check that dollar_tlevel is zero
+		 * since the op_tstart done below can be a nested sub-transaction
+		 */
+		op_tstart((IMPLICIT_TSTART + IMPLICIT_TRIGGER_TSTART), TRUE, &ts_mv, 0); /* 0 ==> save no locals but RESTART OK */
+		/* The following for loop structure is similar to that in module trigger_update.c (function "trigger_update")
+		 * and module gv_trigger.c (function gvtr_db_tpwrap) so any changes here might need to be reflected there as well.
+		 */
+		for (loopcnt = 0; ; loopcnt++)
+		{
+			assert(donot_INVOKE_MUMTSTART);	/* Make sure still set */
+			trigger_status = trigger_trgfile_tpwrap_helper(trigger_filename, trigger_filename_len, noprompt, TRUE);
+			if (0 == dollar_tlevel)
+				break;
+			util_out_print_gtmio("RESTART has invalidated this transaction's previous output.  New output follows.",
+					     FLUSH);
+			/* We expect the above function to return with either op_tcommit or a tp_restart invoked.
+			 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
+			 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
+			 * Additionally we also want to avoid an infinite loop so limit the loop to what is considered
+			 * a huge iteration count and GTMASSERT if that is reached as it suggests an out-of-design situation.
+			 */
+			if (TPWRAP_HELPER_MAX_ATTEMPTS < loopcnt)
+				GTMASSERT;
+		}
+	} else
+	{
+		trigger_status = trigger_trgfile_tpwrap_helper(trigger_filename, trigger_filename_len, noprompt, FALSE);
+		assert(0 < dollar_tlevel);
+	}
+	return (TRIG_FAILURE == trigger_status);
 }
+#endif /* GTM_TRIGGER */

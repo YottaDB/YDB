@@ -185,7 +185,7 @@ void mucregini(int4 blk_init_size)
 	th = cs_addrs->ti;
 	th->lock_sequence = 0;
 	th->ccp_jnl_filesize = 0;
-	cs_data->max_bts = WC_MAX_BUFFS;
+	cs_data->max_bts = GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS);
 	cs_data->n_bts = BT_FACTOR(gv_cur_region->dyn.addr->global_buffers);
 	cs_data->bt_buckets = getprime(cs_data->n_bts);
 
@@ -227,7 +227,6 @@ void mucregini(int4 blk_init_size)
 				 * this is because the macro relies on max_tn/max_tn_warn being set and that does not happen
 				 * until a few lines later. hence keeping it simple here by doing a plain assignment of curr_tn.
 				 */
-	th->header_open_tn = th->curr_tn;
 	cs_data->max_tn = MAX_TN_V5;
 	SET_TN_WARN(cs_data, cs_data->max_tn_warn);
 	SET_LATCH_GLOBAL(&cs_data->next_upgrd_warn.time_latch, LOCK_AVAILABLE);

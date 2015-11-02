@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,12 +25,8 @@
 #include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
 #endif
 
-LITREF	char		ctypetab[NUM_CHARS];
-
 GBLREF	unsigned char	*source_buffer;
 GBLREF	short int	source_column;
-GBLREF	bool		s2n_intlit;
-GBLREF	short int	last_source_column;
 GBLREF	char		window_token;
 GBLREF	mval		window_mval;
 GBLREF	char		director_token;
@@ -39,9 +35,10 @@ GBLREF	char		*lexical_ptr;
 GBLREF	spdesc		stringpool;
 GBLREF	boolean_t	gtm_utf8_mode;
 GBLREF	boolean_t	run_time;
-
 GBLREF	mident		window_ident;	/* the current identifier */
 GBLREF	mident		director_ident;	/* the look-ahead identifier */
+
+LITREF	char		ctypetab[NUM_CHARS];
 
 error_def(ERR_LITNONGRAPH);
 
@@ -63,12 +60,14 @@ void advancewindow(void)
 	unsigned char	*cp1, *cp2, *cp3, x;
 	char		*tmp, source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	int		y, charlen;
-#ifdef UNICODE_SUPPORTED
+#	ifdef UNICODE_SUPPORTED
 	uint4		ch;
 	unsigned char	*cptr;
-#endif
+#	endif
+	DCL_THREADGBL_ACCESS;
 
-	last_source_column = source_column;
+	SETUP_THREADGBL_ACCESS;
+	TREF(last_source_column) = source_column;
 	source_column = (unsigned char *)lexical_ptr - source_buffer + 1;
 	window_token = director_token;
 	window_mval = director_mval;
@@ -98,7 +97,7 @@ void advancewindow(void)
 				x = *cp1++;
 				if ((SP > x) UNICODE_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch)))))
 				{
-					last_source_column = cp1 - source_buffer;
+					TREF(last_source_column) = cp1 - source_buffer;
 					if ('\0' == x)
 					{
 						director_token = window_token = TK_ERROR;
@@ -112,7 +111,7 @@ void advancewindow(void)
 				}
 				if ('\"' == x)
 				{
-					UNICODE_ONLY(assert(!gtm_utf8_mode || (cp1 == cptr));)
+					UNICODE_ONLY(assert(!gtm_utf8_mode || (cp1 == cptr)));
 					if ('\"' == *cp1)
 						cp1++;
 					else
@@ -182,7 +181,7 @@ void advancewindow(void)
 				director_token = TK_ERROR;
 				return;
 			}
-			if (s2n_intlit)
+			if (TREF(s2n_intlit))
 			{
 				director_token = TK_NUMLIT ;
 				n2s(&director_mval);
@@ -255,3 +254,44 @@ void advancewindow(void)
 	director_token = y;
 	return;
 }
+
+#ifdef GTM_TRIGGER
+/* The M standard does not allow the '#' character to appear inside mnames but in specific places, we want to allow this
+ * so that triggers, which have the imbedded '#' character in their routine names, can be debugged and printed. The places
+ * where this is allowed follow.
+ *
+ *   1. $TEXT()
+ *   2. ZBREAK
+ *   3. ZPRINT
+ *
+ * All other uses still prohibit '#' from being in an MNAME. Routines that need to allow # in a name can call this routine to
+ * recombine the existing token and the look-ahead (director) token such that '#' is considered part of an mident.
+ */
+void advwindw_hash_in_mname_allowed(void)
+{
+	unsigned char	*cp2, *cp3, x;
+	unsigned char	ident_buffer[SIZEOF(mident_fixed)];
+	int		ident_len, ch;
+
+	assert(TK_IDENT == window_token);
+	assert(TK_HASH == director_token);
+	/* First copy the existing token we want to expand into our safe-haven */
+	memcpy(ident_buffer, window_ident.addr, window_ident.len);
+	/* Now parse further until we run out of [m]ident */
+	cp2 = ident_buffer + window_ident.len;
+	cp3 = ident_buffer + MAX_MIDENT_LEN;
+	*cp2++ = '#';	/* We are only called if director token is '#' so put that char in buffer now */
+	/* Start processing with the token following the '#' */
+	for (x = *lexical_ptr, ch = ctypetab[x];
+	     ((TK_UPPER == ch) || (TK_DIGIT == ch) || (TK_LOWER == ch) || (TK_HASH == ch));
+	     x = *++lexical_ptr, ch = ctypetab[x])
+	{
+		if (cp2 < cp3)
+			*cp2++ = x;
+	}
+	director_ident.len = INTCAST(cp2 - ident_buffer);
+	director_token = TK_IDENT;
+	memcpy(director_ident.addr, ident_buffer, director_ident.len);
+	advancewindow();	/* Makes the homogenized token the current token (again) and prereads next token */
+}
+#endif

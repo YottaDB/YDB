@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1079,7 +1079,8 @@ repl_inst_bkup_done:
 			if (rptr->not_this_time > keep_going)
 				continue;
 			TP_CHANGE_REG(rptr->reg);
-			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
+			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_MSYNC_DB); /* For VMS, WCSFLU_FSYNC_DB and
+											   * WCSFLU_MSYNC_DB are ignored */
 			if (incremental)
 			{
 				if (inc_since_inc)
@@ -1181,8 +1182,8 @@ repl_inst_bkup_done:
 							}
 							jnl_info.no_rename = (FILE_NOT_FOUND == jnl_fstat);
 						}
-						wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR);	/* For VMS WCSFLU_FSYNC_DB
-												 * is ignored */
+						wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR | WCSFLU_MSYNC_DB);	/* For VMS
+												WCSFLU_FSYNC_DB is ignored */
 						if (!JNL_ENABLED(cs_data) && (NULL != cs_addrs->nl))
 
 						{ /* Cleanup the jnl file info in shared memory before switching
@@ -1218,10 +1219,11 @@ repl_inst_bkup_done:
 						{ /* Do not switch journal file when replication was turned
 						     OFF by jnl_file_lost() */
 							assert(cs_data->jnl_state == jnl_closed);
-							gtm_putmsg(VARLSTCNT(8) ERR_REPLJNLCNFLCT, 6,
+							gtm_putmsg(VARLSTCNT(10) ERR_REPLJNLCNFLCT, 8,
 									LEN_AND_STR(jnl_state_lit[jnl_open]),
 									DB_LEN_STR(gv_cur_region),
-									LEN_AND_STR(repl_state_lit[repl_closed]));
+									LEN_AND_STR(repl_state_lit[repl_closed]),
+									LEN_AND_STR(jnl_state_lit[jnl_open]));
 							rptr->not_this_time = give_up_after_create_tempfile;
 							DECR_INHIBIT_KILLS(cs_addrs->nl);
 							rel_crit(rptr->reg);
@@ -1246,7 +1248,6 @@ repl_inst_bkup_done:
 							cs_data->jnl_alq = jnl_info.alloc;
 							cs_data->jnl_deq = jnl_info.extend;
 							cs_data->jnl_before_image = jnl_info.before_images;
-							cs_data->trans_hist.header_open_tn = jnl_info.tn;
 							cs_data->jnl_state = jnl_info.jnl_state;
 							cs_data->repl_state = jnl_info.repl_state;
 							if (newjnlfiles_specified && sync_io_specified)
@@ -1279,14 +1280,7 @@ repl_inst_bkup_done:
 								continue;
 							}
 						} else
-						{
 							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
-							rptr->not_this_time = give_up_after_create_tempfile;
-							DECR_INHIBIT_KILLS(cs_addrs->nl);
-							rel_crit(rptr->reg);
-							error_mupip = TRUE;
-							continue;
-						}
 					} else
 						gtm_putmsg(VARLSTCNT(4) MAKE_MSG_WARNING(ERR_JNLDISABLE),
 										2, DB_LEN_STR(gv_cur_region));
@@ -1362,7 +1356,6 @@ repl_inst_bkup_done:
 			rptr->backup_hdr->image_count = 0;
 			rptr->backup_hdr->kill_in_prog = 0;
 			rptr->backup_hdr->owner_node = 0;
-			rptr->backup_hdr->trans_hist.header_open_tn = rptr->backup_hdr->trans_hist.curr_tn;
 			memset(rptr->backup_hdr->machine_name, 0, MAX_MCNAMELEN);
 			rptr->backup_hdr->repl_state = repl_closed;
 			rptr->backup_hdr->semid = INVALID_SEMID;

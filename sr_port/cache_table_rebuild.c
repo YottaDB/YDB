@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,10 +10,12 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
+#include "gtm_stdio.h"
+#include "io.h"
 #include "min_max.h"
 #include "cache.h"
-#include "hashtab.h"
 #include "hashtab_objcode.h"
 #include "cachectl.h"
 #include "gtm_text_alloc.h"
@@ -29,6 +31,7 @@ void cache_table_rebuild()
 	error_def(ERR_MEMORY);
 	error_def(ERR_VMSMEMORY);
 
+	DBGCACHE((stdout, "cache_table_rebuild: Rebuilding indirect lookaside cache\n"));
 	for (tabent = cache_table.base, topent = cache_table.top; tabent < topent; tabent++)
 	{
 		if (HTENT_VALID_OBJCODE(tabent, cache_entry, csp))
@@ -38,7 +41,7 @@ void cache_table_rebuild()
 				((ihdtyp *)(csp->obj.addr))->indce = NULL;
 				indir_cache_mem_size -= (ICACHE_SIZE + csp->obj.len);
 				GTM_TEXT_FREE(csp);
-				DELETE_HTENT((&cache_table), tabent);
+				delete_hashtab_ent_objcode(&cache_table, tabent);
 			}
 		}
 	}

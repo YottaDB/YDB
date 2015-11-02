@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,15 +16,12 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
-#include "lv_val.h"
 #include "get_ret_targ.h"
 #include "xfer_enum.h"
 #include "dollar_quit.h"
 #if defined(__sparc)
 #  include "sparc.h"
-#elif defined(__s390__)
+#elif defined(__s390__) || defined(__MVS__)
 #  include "s390.h"
 #elif defined(__hppa)
 #  include "hppa.h"
@@ -150,9 +147,10 @@ int dollar_quit(void)
 			} else
 				xfer_index = -1;
 		}
-#		elif defined(__s390__)
+#		elif defined(__s390__) || defined(__MVS__)
 		{
-			format_RXY	instr_LG;
+			format_RXY		instr_LG;
+			ZOS_ONLY(format_RR	instr_RR;)
 			union
 			{
 				int	offset;
@@ -163,8 +161,17 @@ int dollar_quit(void)
 					int	offset_low:12;
 				} instr_LG_bits;
 			} RXY;
-
-			ptrs.instr = sf->mpc + 6;	/* Past address load of compiler temp arg */
+			/* Need to forward space past address load of compiler temp arg. On zOS, the position of the mpc can
+			 * differ. If the origin point is an external call, we have to forward space past the BCR following
+			 * the call point. If the origin point is an internal call, the call point is a branch with no
+			 * following BCR. So zOS needs to determine if it has to jump over a BCR call first.
+			 */
+			ZOS_ONLY(memcpy(&instr_RR, sf->mpc, SIZEOF(instr_RR)));
+			ptrs.instr = sf->mpc;
+			ZOS_ONLY(if ((S390_OPCODE_RR_BCR == instr_RR.opcode)
+				     && (0 == instr_RR.r1) && (0 == instr_RR.r2))
+				 ptrs.instr += 2);	/* Past BCR 0,0 from external call */
+			ptrs.instr += 6;		/* Past address load of compiler temp arg */
 			memcpy(&instr_LG, ptrs.instr, SIZEOF(instr_LG));
 			if ((S390_OPCODE_RXY_LG == instr_LG.opcode) && (S390_SUBCOD_RXY_LG == instr_LG.opcode2)
 			    && (GTM_REG_SAVE_RTN_ADDR == instr_LG.r1) && (GTM_REG_XFER_TABLE == instr_LG.b2))

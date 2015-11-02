@@ -90,7 +90,7 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	if (jrt_fixed_size[rectype])
 		jnlrecptr = (uchar_ptr_t)jnl_rec;
 #	ifdef GTM_CRYPT
-	else if(csa->hdr->is_encrypted && IS_SET_KILL_ZKILL_ZTWORM(rectype))
+	else if(csa->hdr->is_encrypted && IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
 		jnlrecptr = (uchar_ptr_t)jfb->alt_buff;
 #	endif
 	else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,6 +137,29 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 			rel_crit(reg);
 		return status;
 	}
+	if (JNL_ENABLED(csd))
+	{
+		SET_GBL_JREC_TIME;	/* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_aimg_rec */
+		jpc = csa->jnl;
+		jbp = jpc->jnl_buff;
+		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl records.
+		 * This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+		 * (if it decides to switch to a new journal file)
+		 */
+		ADJUST_GBL_JREC_TIME(jgbl, jbp);
+		jnl_status = jnl_ensure_open();
+		if (0 == jnl_status)
+		{
+			save_inctn_opcode = inctn_opcode;
+			inctn_opcode = inctn_db_format_change;
+			inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta = csd->blks_to_upgrd;
+			if (0 == jpc->pini_addr)
+				jnl_put_jrt_pini(csa);
+			jnl_write_inctn_rec(csa);
+			inctn_opcode = save_inctn_opcode;
+		} else
+			gtm_putmsg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+	}
 	csd->desired_db_format = new_db_format;
 	csd->fully_upgraded = FALSE;
 	csd->desired_db_format_tn = curr_tn;
@@ -154,34 +177,8 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	SET_TN_WARN(csd, csd->max_tn_warn);	/* if max_tn changed above, max_tn_warn also needs a corresponding change */
 	assert(curr_tn < csd->max_tn);	/* ensure CHECK_TN macro below will not issue TNTOOLARGE rts_error */
 	CHECK_TN(csa, csd, curr_tn);	/* can issue rts_error TNTOOLARGE */
-	/* write INCTN record and increment csd->trans_hist.curr_tn */
+	/* increment csd->trans_hist.curr_tn */
 	assert(csd->trans_hist.early_tn == csd->trans_hist.curr_tn);
-	if (JNL_ENABLED(csd))
-	{
-		SET_GBL_JREC_TIME;	/* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_aimg_rec */
-		jpc = csa->jnl;
-		jbp = jpc->jnl_buff;
-		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl records.
-		 * This needs to be done BEFORE the jnl_ensure_open as that could write journal records
-		 * (if it decides to switch to a new journal file)
-		 */
-		ADJUST_GBL_JREC_TIME(jgbl, jbp);
-		jnl_status = jnl_ensure_open();
-		if (0 != jnl_status)
-		{
-			gtm_putmsg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
-			if (FALSE == was_crit)
-				rel_crit(reg);
-			return jnl_status;
-		}
-		save_inctn_opcode = inctn_opcode;
-		inctn_opcode = inctn_db_format_change;
-		inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta = csd->blks_to_upgrd;
-		if (0 == jpc->pini_addr)
-			jnl_put_jrt_pini(csa);
-		jnl_write_inctn_rec(csa);
-		inctn_opcode = save_inctn_opcode;
-	}
 	csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
 	INCREMENT_CURR_TN(csd);
 	if (FALSE == was_crit)

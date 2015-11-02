@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,6 +81,33 @@ void repl_inst_create(void)
 
 	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error))
 		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
+	/* Although the maximum length of an instance name is MAX_INSTNAME_LEN-1 characters, the input buffer needs to hold a lot
+	 * more since the input instance name might be longer. Hence inst_name (containing MAX_FN_LEN+1 = 257 bytes) is used.
+	 */
+	inst_name_len = 0;
+	if (cli_present("NAME"))
+	{
+		inst_name_len = SIZEOF(inst_name);;
+		if (!cli_get_str("NAME", &inst_name[0], &inst_name_len))
+			rts_error(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("Error parsing NAME qualifier"));
+	} else
+	{
+		log_nam.addr = GTM_REPL_INSTNAME;
+		log_nam.len = SIZEOF(GTM_REPL_INSTNAME) - 1;
+		trans_name.addr = &inst_name[0];
+		if (SS_NORMAL != (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, SIZEOF(inst_name),
+								dont_sendmsg_on_log2long)))
+		{
+			if (SS_LOG2LONG == status)
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(inst_name) - 1);
+			else
+				rts_error(VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
+		}
+		inst_name_len = trans_name.len;
+	}
+	if ((MAX_INSTNAME_LEN <= inst_name_len) || (0 == inst_name_len))
+		rts_error(VARLSTCNT(4) ERR_REPLINSTNMLEN, 2, inst_name_len, inst_name);
+	inst_name[inst_name_len] = '\0';
 	buff_8byte_aligned = &buff_unaligned[0];
 	buff_8byte_aligned = (char *)ROUND_UP2((INTPTR_T)buff_8byte_aligned, 8);
 	repl_instance = (repl_inst_hdr_ptr_t)&buff_8byte_aligned[0];
@@ -137,38 +164,17 @@ void repl_inst_create(void)
 	repl_instance->recvpool_semid = INVALID_SEMID;
 	repl_instance->recvpool_shmid = INVALID_SHMID;
 	time(&repl_instance->created_time);
-	/* machine_name was obtained from GETHOSTNAME above. It is an array of MAX_MCNAME_LEN (256) bytes. The actual
+	/* machine_name was obtained from GETHOSTNAME above. It is an array of MAX_MCNAMELEN (256) bytes. The actual
 	 * machine name might be longer than can fit in the "created_nodename" field which is MAX_NODENAME_LEN (16) in size.
 	 * Take care to copy only as much as needed leaving one character for the null-termination.
 	 */
-	memcpy(repl_instance->created_nodename, machine_name, MAX_NODENAME_LEN - 1);
-	repl_instance->created_nodename[MAX_NODENAME_LEN - 1] = '\0';
-	/* Although the maximum length of an instance name is MAX_INSTNAME_LEN-1 characters, the input buffer needs to hold a lot
-	 * more since the input instance name might be longer. Hence inst_name (containing MAX_FN_LEN+1 = 257 bytes) is used.
+	assert(MAX_NODENAME_LEN <= MAX_MCNAMELEN); /* '=' is valid since we have space to store MAX_NODENAME_LEN characters */
+	memcpy(repl_instance->created_nodename, machine_name, MAX_NODENAME_LEN);
+	/* if machine_name is less than MAX_NODENAME_LEN then set the last valid character of created_nodename array to '\0' which
+	 * is relied by repl_inst_dump_filehdr
 	 */
-	if (cli_present("NAME"))
-	{
-		inst_name_len = SIZEOF(inst_name);;
-		if (!cli_get_str("NAME", &inst_name[0], &inst_name_len))
-			rts_error(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("Error parsing NAME qualifier"));
-	} else
-	{
-		log_nam.addr = GTM_REPL_INSTNAME;
-		log_nam.len = SIZEOF(GTM_REPL_INSTNAME) - 1;
-		trans_name.addr = &inst_name[0];
-		if (SS_NORMAL != (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, SIZEOF(inst_name),
-								dont_sendmsg_on_log2long)))
-		{
-			if (SS_LOG2LONG == status)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(inst_name) - 1);
-			else
-				rts_error(VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
-		}
-		inst_name_len = trans_name.len;
-	}
-	inst_name[inst_name_len] = '\0';
-	if ((MAX_INSTNAME_LEN <= inst_name_len) || (0 == inst_name_len))
-		rts_error(VARLSTCNT(4) ERR_REPLINSTNMLEN, 2, inst_name_len, inst_name);
+	if (MAX_NODENAME_LEN > STRLEN(machine_name))
+		repl_instance->created_nodename[MAX_NODENAME_LEN - 1] = '\0';
 	memcpy(repl_instance->this_instname, inst_name, inst_name_len);
 	repl_instance->jnl_seqno = 0;
 	repl_instance->root_primary_cycle = 0;

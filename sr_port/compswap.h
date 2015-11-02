@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,51 +16,42 @@
  * memory consistency isues
  */
 #ifdef UNIX
-boolean_t compswap_secshr(sm_global_latch_ptr_t lock, int compval, int newval1);
-#ifndef __ia64
-boolean_t compswap(sm_global_latch_ptr_t lock, int compval, int newval1);
-#define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)		compswap(LCK, CMPVAL1, NEWVAL1)
-#define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap(LCK, CMPVAL1, NEWVAL1)
-#define COMPSWAP(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)		compswap(LCK, CMPVAL1, NEWVAL1)
-#else /* IA64 */
-#ifdef __HP_cc
-/* Use compiler inline assembly macros for HP-UX/HP C */
-/* This is assuming 32 bit lock storage, which right now seems to be PIDs
- * most of the time. PIDs are currently 32 bit values, but that could change
- * someday, so beware
- */
-#include <ia64/sys/inline.h>
-#define FENCE                                    \
-(_Asm_fence) (_UP_CALL_FENCE | _UP_SYS_FENCE |   \
-            _DOWN_CALL_FENCE | _DOWN_SYS_FENCE   )
-
-#define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)     \
-    (								   \
-    _Asm_mov_to_ar((_Asm_app_reg)_AREG_CCV, (uint64_t) CMPVAL1,FENCE), \
-    _Asm_cmpxchg((_Asm_sz)_SZ_W, (_Asm_sem)_SEM_ACQ,(uint32_t *)LCK,  \
-           (uint64_t)NEWVAL1, (_Asm_ldhint)_LDHINT_NONE) == (uint64_t)CMPVAL1 ? 1 : 0 \
-    )
-
-#define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)   \
-    (								   \
-    _Asm_mov_to_ar((_Asm_app_reg)_AREG_CCV,(uint64_t) CMPVAL1,FENCE),  \
-    _Asm_cmpxchg((_Asm_sz)_SZ_W,(_Asm_sem)_SEM_REL,(uint32_t *)LCK,   \
-	   (uint64_t)NEWVAL1, (_Asm_ldhint)_LDHINT_NONE) == (uint64_t)CMPVAL1 ? 1 : 0 \
-    )
-
-#else /* ! HP C compiler */
-boolean_t compswap_lock(sm_global_latch_ptr_t lock, int compval, int newval1);
-boolean_t compswap_unlock(sm_global_latch_ptr_t lock, int compval, int newval1);
-#define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)		compswap_lock(LCK, CMPVAL1, NEWVAL1)
-#define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap_unlock(LCK, CMPVAL1, NEWVAL1)
-#endif
-#endif /* __ia64 */
+	boolean_t compswap_secshr(sm_global_latch_ptr_t lock, int compval, int newval1);
+#	if (defined(_AIX) || (defined(__ia64) && defined(__linux__)))	/* AIX or Linux Itanium */
+		boolean_t compswap_lock(sm_global_latch_ptr_t lock, int compval, int newval1);
+		boolean_t compswap_unlock(sm_global_latch_ptr_t lock, int compval, int newval1);
+#		define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap_lock(LCK, CMPVAL1, NEWVAL1)
+#		define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap_unlock(LCK, CMPVAL1, NEWVAL1)
+#	elif !defined(__ia64)
+		boolean_t compswap(sm_global_latch_ptr_t lock, int compval, int newval1);
+#		define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap(LCK, CMPVAL1, NEWVAL1)
+#		define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap(LCK, CMPVAL1, NEWVAL1)
+#	elif defined(__HP_cc)
+		/* Use compiler inline assembly macros for HP-UX/HP C */
+		/* This is assuming 32 bit lock storage, which right now seems to be PIDs
+		 * most of the time. PIDs are currently 32 bit values, but that could change
+		 * someday, so beware
+		 */
+#		include <ia64/sys/inline.h>
+#		define FENCE	(_Asm_fence) (_UP_CALL_FENCE | _UP_SYS_FENCE | _DOWN_CALL_FENCE | _DOWN_SYS_FENCE)
+#		define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)					\
+		(												\
+			_Asm_mov_to_ar((_Asm_app_reg)_AREG_CCV, (uint64_t) CMPVAL1,FENCE),			\
+			_Asm_cmpxchg((_Asm_sz)_SZ_W, (_Asm_sem)_SEM_ACQ,(uint32_t *)LCK,			\
+				(uint64_t)NEWVAL1, (_Asm_ldhint)_LDHINT_NONE) == (uint64_t)CMPVAL1 ? 1 : 0	\
+		)
+#		define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)					\
+		(												\
+			_Asm_mov_to_ar((_Asm_app_reg)_AREG_CCV,(uint64_t) CMPVAL1,FENCE),			\
+			_Asm_cmpxchg((_Asm_sz)_SZ_W,(_Asm_sem)_SEM_REL,(uint32_t *)LCK,				\
+				(uint64_t)NEWVAL1, (_Asm_ldhint)_LDHINT_NONE) == (uint64_t)CMPVAL1 ? 1 : 0	\
+		)
+#	endif /* __ia64 */
 #else
-boolean_t compswap(sm_global_latch_ptr_t lock, int compval1, int compval2, int newval1, int newval2);
-boolean_t compswap_secshr(sm_global_latch_ptr_t lock, int compval1, int compval2, int newval1, int newval2);
-#define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)		compswap(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)
-#define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)	compswap(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)
-#define COMPSWAP(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)		compswap(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)
+	boolean_t compswap(sm_global_latch_ptr_t lock, int compval1, int compval2, int newval1, int newval2);
+	boolean_t compswap_secshr(sm_global_latch_ptr_t lock, int compval1, int compval2, int newval1, int newval2);
+#	define COMPSWAP_LOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)		compswap(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)
+#	define COMPSWAP_UNLOCK(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)		compswap(LCK, CMPVAL1, CMPVAL2, NEWVAL1, NEWVAL2)
 #endif
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,7 @@
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "mlkdef.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
-#include "hashtab.h"
 #include "lv_val.h"
 #include "op.h"
 #include "tp_unwind.h"
@@ -56,7 +54,7 @@ GBLREF	mv_stent	*mv_chain;
 GBLREF	tp_frame	*tp_pointer;
 GBLREF	unsigned char	*tp_sp, *tpstackbase, *tpstacktop;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	symval		*curr_symval;
 #ifdef GTM_TRIGGER
 GBLREF	int		tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
@@ -65,7 +63,7 @@ GBLREF	int		tprestart_state;	/* When triggers restart, multiple states possible.
 error_def(ERR_STACKUNDERFLO);
 error_def(ERR_TPRETRY);
 
-void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *tprestart_rc)
+void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *tprestart_rc)
 {
 	mlk_pvtblk	**prior, *mlkp;
 	mlk_tp		*oldlock, *nextlock;
@@ -76,10 +74,10 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *t
 	boolean_t	restore_lv, rollback_locks;
 	lvscan_blk	*lvscan, *lvscan_next, first_lvscan;
 	int		elemindx, rc;
-	intrpt_state_t	save_intrpt_ok_state;
+	tree		*lvt_child;
 
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_TP_UNWIND);
+	DEFER_INTERRUPTS(INTRPT_IN_TP_UNWIND);
 
 	DBGRFCT((stderr, "\ntp_unwind: Beginning TP unwind process\n"));
 	restore_lv = (invocation_type == RESTART_INVOCATION);
@@ -103,54 +101,61 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *t
 			save_lv = restore_ent->save_value;
 			assert(curr_lv);
 			assert(save_lv);
-			assert(MV_SYM == curr_lv->ptrs.val_ent.parent.sym->ident);
-			assert(MV_SYM == save_lv->ptrs.val_ent.parent.sym->ident);
+			assert(LV_IS_BASE_VAR(curr_lv));
+			assert(LV_IS_BASE_VAR(save_lv));
 			assert(0 < curr_lv->stats.trefcnt);
 			assert(curr_lv->tp_var);
 			assert(curr_lv->tp_var == restore_ent);
-
 			/* In order to restart sub-transactions, this would have to maintain
-			   the chain that currently is not built by op_tstart() */
+			 * the chain that currently is not built by op_tstart() */
 			if (restore_lv)
 			{
 				rc = tp_unwind_restlv(curr_lv, save_lv, restore_ent, NULL, tprestart_rc);
 #				ifdef GTM_TRIGGER
 				if (0 != rc)
 				{
-					RESTORE_INTRPT_OK_STATE;	/* drive any MUPIP STOP/signals deferred while
-									 * in this function */
+					ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND); /* drive any MUPIP STOP/signals deferred
+										       * while in this function */
 					dollar_tlevel = tl;		/* Record fact if we unwound some tp_frames */
 					INVOKE_RESTART;
 				}
 #				endif
-			} else if (NULL != save_lv->ptrs.val_ent.children)
-			{
-				DBGRFCT((stderr, "\ntp_unwind: Not restoring curr_lv and has children\n"));
-				if (curr_lv->tp_var->var_cloned)
-				{	/* If cloned, we have to blow away the cloned tree */
+			} else if (restore_ent->var_cloned)
+			{	/* curr_lv has been cloned.
+				 * Note: LV_CHILD(save_lv) can be non-NULL only if restore_ent->var_cloned is TRUE
+				 */
+				DBGRFCT((stderr, "\ntp_unwind: Not restoring curr_lv and is cloned\n"));
+				lvt_child = LV_GET_CHILD(save_lv);
+				if (NULL != lvt_child)
+				{	/* If subtree exists, we have to blow away the cloned tree */
+					DBGRFCT((stderr, "\ntp_unwind: save_lv has children\n"));
 					assert(save_lv->tp_var);
 					DBGRFCT((stderr,"\ntp_unwind: For lv_val 0x"lvaddr": Deleting saved lv_val 0x"lvaddr"\n",
 						 curr_lv, save_lv));
-					save_lv->ptrs.val_ent.children->lv = save_lv;
-					lv_kill(save_lv, FALSE);
-					curr_lv->tp_var->var_cloned = FALSE;
-				} else
-				{	/* If not cloned, we still have to reduce the reference counts of any
-					   container vars in the untouched tree that were added to keep anything
-					   they referenced from disappearing.
-					*/
-					DBGRFCT((stderr, "\ntp_unwind: curr_lv not cloned so just reducing ref counts\n"));
+					assert(lvt_child->sbs_parent == (treeNode *)save_lv);
+					lv_kill(save_lv, DOTPSAVE_FALSE, DO_SUBTREE_TRUE);
+				}
+				restore_ent->var_cloned = FALSE;
+			} else
+			{	/* If not cloned, we still have to reduce the reference counts of any
+				 * container vars in the untouched tree that were added to keep anything
+				 * they referenced from disappearing.
+				 */
+				DBGRFCT((stderr, "\ntp_unwind: Not restoring curr_lv and is NOT cloned\n"));
+				lvt_child = LV_GET_CHILD(curr_lv);
+				if (NULL != lvt_child)
+				{
+					DBGRFCT((stderr, "\ntp_unwind: curr_lv has children and so reducing ref counts\n"));
 					TPUNWND_CNTNRS_IN_TREE(curr_lv);
 				}
 			}
-			LV_FLIST_ENQUEUE(&save_lv->ptrs.val_ent.parent.sym->lv_flist, save_lv);
-
+			LV_FREESLOT(save_lv);
 			/* Not easy to predict what the trefcnt will be except that it should be greater than zero. In
-			   most cases, it will have its own hash table ref plus the extras we added but it is also
-			   possible that the entry has been kill *'d in which case the ONLY ref that will be left is
-			   our own increment but there is no [quick] way to distinguish this case so we just
-			   test for > 0.
-			*/
+			 * most cases, it will have its own hash table ref plus the extras we added but it is also
+			 * possible that the entry has been kill *'d in which case the ONLY ref that will be left is
+			 * our own increment but there is no [quick] way to distinguish this case so we just
+			 * test for > 0.
+			 */
 			assert(0 < curr_lv->stats.trefcnt);
 			assert(0 < curr_lv->stats.crefcnt);
 			DECR_CREFCNT(curr_lv);	/* Remove the copy refcnt we added in in op_tstart() or lv_newname() */
@@ -183,8 +188,8 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *t
 			save_lv = restore_ent->save_value;
 			assert(curr_lv);
 			assert(save_lv);
-			assert(MV_SYM == curr_lv->ptrs.val_ent.parent.sym->ident);
-			assert(MV_SYM == save_lv->ptrs.val_ent.parent.sym->ident);
+			assert(LV_IS_BASE_VAR(curr_lv));
+			assert(LV_IS_BASE_VAR(save_lv));
 			assert(curr_lv->tp_var);
 			assert(curr_lv->tp_var == restore_ent);
 			assert(0 < curr_lv->stats.trefcnt);
@@ -192,8 +197,8 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *t
 #			ifdef GTM_TRIGGER
 			if (0 != rc)
 			{
-				RESTORE_INTRPT_OK_STATE;	/* drive any MUPIP STOP/signals deferred while
-								 * in this function */
+				ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND);	/* drive any MUPIP STOP/signals deferred while
+										 * in this function */
 				dollar_tlevel = tl;		/* Record fact if we unwound some levels */
 				INVOKE_RESTART;
 			}
@@ -210,7 +215,7 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *t
 			{
 				lv = lvscan->ary_scncntnr[elemindx];
 				DBGRFCT((stderr, "\n**tp_unwind_process_lvscan_array: Deferred processing lv 0x"lvaddr"\n", lv));
-				assert(MV_SYM == lv->ptrs.val_ent.parent.sym->ident);
+				assert(LV_IS_BASE_VAR(lv));
 				/* This is the final level being restored so redo the counters on these vars */
 				TPREST_CNTNRS_IN_TREE(lv);
 			}
@@ -236,7 +241,6 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *t
 		}
 	}
 	assert(0 == lvscan->elemcnt);	/* verify no elements queued that were not scanned */
-
 	rollback_locks = (invocation_type != COMMIT_INVOCATION);
 	for (prior = &mlk_pvt_root, mlkp = *prior;  NULL != mlkp;  mlkp = *prior)
 	{
@@ -275,7 +279,7 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *t
 	}
 	DBGRFCT((stderr, "tp_unwind: Processing complete\n"));
 	dollar_tlevel = newlevel;
-	RESTORE_INTRPT_OK_STATE;	/* check if any MUPIP STOP/signals were deferred while in this function */
+	ENABLE_INTERRUPTS(INTRPT_IN_TP_UNWIND);	/* check if any MUPIP STOP/signals were deferred while in this function */
 }
 
 
@@ -293,10 +297,12 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 	int		elemindx;
 	mv_stent	*mvc;
 	lvscan_blk	*lvscan, *newlvscan;
-	lv_sbs_tbl	*tmpsbs;
+	tree		*lvt_child;
+	boolean_t	var_cloned;
 	DBGRFCT_ONLY(mident_fixed vname;)
 
 	assert(curr_lv);
+	assert(LV_IS_BASE_VAR(curr_lv));
 	assert(curr_lv->tp_var);
 	DBGRFCT_ONLY(
 		memcpy(vname.c, restore_ent->key.var_name.addr, restore_ent->key.var_name.len);
@@ -344,8 +350,8 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 				GTMASSERT;
 		}
 	}
-
-	if (curr_lv->tp_var->var_cloned)
+	var_cloned = curr_lv->tp_var->var_cloned;
+	if (var_cloned)
 	{	/* Var/tree has been copied (and modified) -- see about restoring it */
 		DBGRFCT((stderr, "\ntp_unwind_restlv: curr_lv was modified and cloned -- needs restoration\n"));
 		if (NULL != restore_ent->key.var_name.addr)
@@ -371,15 +377,22 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 		/* Step 3 -- We have the correct lv_val in the hash table now but it has the wrong value.
 		   Get rid of its current tree if any.
 		*/
-		if (tmpsbs = curr_lv->ptrs.val_ent.children)	/* Note assignment */
+		if (lvt_child = LV_GET_CHILD(curr_lv))	/* Note assignment */
 		{
 			DBGRFCT((stderr, "\ntp_unwind_restlv: Killing children of curr_lv 0x"lvaddr"\n", curr_lv));
-			assert(curr_lv == tmpsbs->lv);
-			curr_lv->ptrs.val_ent.children = NULL;	/* prevent recursion due to alias containers */
-			lv_killarray(tmpsbs, FALSE);
+			assert((treeNode *)curr_lv == lvt_child->sbs_parent);
+			LV_CHILD(curr_lv) = NULL;	/* prevent recursion due to alias containers */
+			lv_killarray(lvt_child, FALSE);
 		}
 	} else
+	{
 		DBGRFCT((stderr, "\ntp_unwind_restlv: curr_lv was NOT modified or cloned\n"));
+		/* Update LV_CHILD of save_lv to be same as that of curr_lv before doing the *curr_lv = *save_lv below.
+		 * Not doing so will otherwise cause LV_CHILD(curr_lv) to be NULL since that is what save_lv contains now.
+		 */
+		assert(NULL == LV_CHILD(save_lv));
+		LV_CHILD(save_lv) = LV_CHILD(curr_lv);
+	}
 	/* Step 4:  Copy in the saved flavor lv_val back to curr_lv but preserve the ref counts of
 	   the current var since the copy's ref counts have not been kept up to date.
 	*/
@@ -387,18 +400,21 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 	assert(0 < curr_lv->stats.crefcnt);
 	save_lv->stats = curr_lv->stats;	/* Store correct refcnts and cycles in save_lv for correct copy below */
 	DBGRFCT((stderr, "\ntp_unwind_restlv: Restoring value of lv 0x"lvaddr" back into lv 0x"lvaddr"\n", save_lv, curr_lv));
+	assert(var_cloned == save_lv->tp_var->var_cloned);
 	*curr_lv = *save_lv;
 	if (NULL == lvscan_anchor)
 		/* Means this is completely unwinding a nested level so we need to reset the tstartcycle in this
 		   lvval so it gets handled correctly when this lv is encounted again after the restart completes.
 		*/
 		curr_lv->stats.tstartcycle = 0;
-	if (curr_lv->tp_var->var_cloned)
+	if (var_cloned)
 	{	/* Some fixup may need to be done if the variable was cloned (and thus moved around) */
 		curr_lv->tp_var->var_cloned = FALSE;
-		if (curr_lv->ptrs.val_ent.children)
+		if (lvt_child = LV_GET_CHILD(curr_lv))
 		{	/* Some pointer fix up needs to be done since the owner of the restored tree changed */
-			curr_lv->ptrs.val_ent.children->lv = curr_lv;	/* Pointer fixup */
+			assert(lvt_child->sbs_parent == ((treeNode *)curr_lv->tp_var->save_value));
+			LV_CHILD(save_lv) = NULL;	/* now that curr_lv->tp_var->var_cloned has been reset */
+			lvt_child->sbs_parent = (treeNode *)curr_lv;
 			if (curr_lv->has_aliascont && NULL != lvscan_anchor)
 			{	/* Some ref counts need to be restored for arrays this tree points to -- but only if the
 				   array contains pointers (alias containers). */
@@ -422,6 +438,7 @@ int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvsc
 				lvscan->ary_scncntnr[elemindx] = curr_lv;
 			}
 		}
-	}
+	} else
+		LV_CHILD(save_lv) = NULL;
 	return 0;
 }

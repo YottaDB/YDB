@@ -35,7 +35,7 @@
 #endif
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	seq_num			seq_num_zero;
@@ -57,7 +57,7 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	assert((0 != jpc->pini_addr) || REPL_WAS_ENABLED(csa));
 	assert(jgbl.gbl_jrec_time || REPL_WAS_ENABLED(csa));
 	assert(csa->now_crit);
-	assert(IS_SET_KILL_ZKILL_ZTWORM(jfb->rectype));
+	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(jfb->rectype));
 	assert(!IS_ZTP(jfb->rectype));
 	jrec = (struct_jrec_upd *)jfb->buff;
 	jrec->prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;

@@ -48,3 +48,5 @@ JNL_TABLE_ENTRY (JRT_TRIPLE,  NULL,              "TRIPLE ", NA,                T
 											       *     replication pipe. Never part of a journal file. */
 JNL_TABLE_ENTRY (JRT_TZTWORM, mur_extract_set,   "TZTWORM", ZTWORMREC|TUPDREC, FALSE, TRUE)   /* 28: If $ZTWORMHOLE is first record in TP */
 JNL_TABLE_ENTRY (JRT_UZTWORM, mur_extract_set,   "UZTWORM", ZTWORMREC|UUPDREC, FALSE, TRUE)   /* 29: Like TZTWORM but not the first record in TP */
+JNL_TABLE_ENTRY (JRT_TZTRIG,  mur_extract_set,	 "TZTRIG ", ZTRIGREC|TUPDREC,  FALSE, TRUE)   /* 30: If ZTRIGGER is first record in TP */
+JNL_TABLE_ENTRY (JRT_UZTRIG,  mur_extract_set,	 "UZTRIG ", ZTRIGREC|UUPDREC,  FALSE, TRUE)   /* 31: Like TZTRIG but not the first record in TP */

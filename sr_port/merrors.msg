@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2010 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2011 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -635,8 +635,8 @@ ORDER2		<Invalid second argument to $ORDER.  Must be -1 or 1.>/error/fao=0!/ansi
 MUNOUPGRD	<Database not upgraded because of preceding errors>/error/fao=0!/ansi=0
 REORGCTRLY	<User interrupt encountered during database reorg -- halting>/info/fao=0!/ansi=0
 TSTRTPARM	<Error parsing TSTART qualifier>/error/fao=0!/ansi=0
-UNUSEDMSG638	<Was TPSTACKCRIT. last used in V5.3-004A (release-date 2009/08/12)>/error/fao=0!/ansi=0
-UNUSEDMSG639	<Was TPSTACKOFLOW. last used in V5.3-004A (release-date 2009/08/12)>/error/fao=0!/ansi=0
+TRIGNAMENF	<Trigger name !AD not found with the current default global directory>/error/fao=2!/ansi=0
+TRIGZBREAKREM	<ZBREAK in trigger !AD removed due to trigger being reloaded>/warning/fao=2!/ansi=0
 TLVLZERO	<Transaction is not in progress>/error/fao=0!/ansi=44
 TRESTNOT	<Cannot TRESTART, transaction is not restartable>/error/fao=0!/ansi=27
 TPLOCK		<Cannot release lock(s) held prior to current TSTART>/error/fao=0!/ansi=41
@@ -739,7 +739,7 @@ ZCPREALLNUMEX	<Pre-allocation value should be a decimal number>/error/fao=0!/ans
 ZCPREALLVALPAR	<Pre-allocation allowed only for variables passed by reference>/error/fao=0!/ansi=0
 VERMISMATCH	<Attempt to access !AD with version !AD, while already using !AD>/error/fao=6!/ansi=0
 JNLCNTRL	<Journal control unsynchronized.  Journaling closed for !AD.>/error/fao=2!/ansi=0
-UNUSEDMSG742	<Was JNLMEMDSK. last used in V5.3-001A (release-date 2008/04/04)>/error/fao=0!/ansi=0
+TRIGNAMBAD	<Trigger initialization failed. Error while processing ^#t("!AD",!AD)>/error/fao=4!/ansi=0
 BUFRDTIMEOUT	<Pid [0x!XL] timed out waiting for buffered read of blk [0x!XL] into cr [0x!XL] by process [0x!XL] to complete in database file !AD>/error/fao=6!/ansi=0
 INVALIDRIP	<Invalid read-in-progress field in Cache Record.  Resetting and continuing.  Region: !AD.>/error/fao=2!/ansi=0
 BLKSIZ512	<Block size !UL rounds to !UL>/info/fao=2!/ansi=0
@@ -773,7 +773,7 @@ MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
 STOPTIMEOUT	<Waited too long for stopped process to release.  Region: !AD.>/error/fao=2!/ansi=0
-UNUSEDMSG776	<BACKUP2MANYKILL last used in V5.3-002 (release-date 2008/08/18)>/error/fao=0!/ansi=0
+TRIGMODINTP	<Triggers for a given global cannot be both used and modified or removed in the same transaction>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
 JNLREAD		<Error reading from journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
@@ -1117,7 +1117,7 @@ JOBINTRRQST	<Job interrupt requested>/error/fao=0!/ansi=0
 ERRWZINTR	<Error while processing $ZINTERRUPT>/error/fao=0!/ansi=0
 CLIERR		<!AD>/error/fao=2!/ansi=0
 REPLNOBEFORE	<NOBEFORE option cannot be used when the current replication state is ON for database file !AD>/warning/fao=2!/ansi=0
-REPLJNLCNFLCT	<Journaling cannot be turned !AD on database file !AD as the replication state is !AD>/warning/fao=6!/ansi=0
+REPLJNLCNFLCT	<Journaling cannot be turned !AD on database file !AD as the replication state is !AD and must also be turned !AD in the same command>/warning/fao=8!/ansi=0
 JNLDISABLE	<Specified journal option(s) cannot take effect as journaling is DISABLED on database file !AD>/warning/fao=2!/ansi=0
 FILEEXISTS	<File !AD already exists>/error/fao=2!/ansi=0
 JNLSTATE	<Journaling state for !AD !AD is now !AD>/info/fao=6!/ansi=0
@@ -1128,7 +1128,7 @@ JNLFNF		<Journal file !AD not found>/info/fao=2!/ansi=0
 PREVJNLLINKCUT	<Previous journal file name link set to NULL in new journal file !AD created for database file !AD>/info/fao=4!/ansi=0
 PREVJNLLINKSET	<Previous generation journal file name is changed from !AD to !AD>/info/fao=4!/ansi=0
 FILENAMETOOLONG	<File name too long>/error/fao=0!/ansi=0
-JNLCREATERR	<Error creating journal file !AD>/error/fao=2!/ansi=0
+UNUSEDMSG1131	<JNLCREATERR Last used in V5.4-001>/error/fao=0!/ansi=0
 JNLTRANS2BIG	<Transaction needs an estimated [!UL blocks] in journal file !AD which exceeds the AUTOSWITCHLIMIT of !UL blocks>/error/fao=4!/ansi=0
 JNLSWITCHTOOSM	<Journal AUTOSWITCHLIMIT [!UL blocks] is less than Journal ALLOCATION [!UL blocks] for database file !AD>/error/fao=4!/ansi=0
 JNLSWITCHSZCHG	<Journal AUTOSWITCHLIMIT [!UL blocks] is rounded down to [!UL blocks] to equal the sum of Journal ALLOCATION [!UL blocks] and a multiple of Journal EXTENSION [!UL blocks] for database file !AD>/info/fao=6!/ansi=0
@@ -1168,7 +1168,7 @@ JOBINTRRETHROW	<Job interrupt redelivered>/error/fao=0!/ansi=0
 STARFILE	<Star(*) argument cannot be specified with !AD>/error/fao=2!/ansi=0
 NOSTARFILE	<Only star(*) argument can be specified with !AD>/error/fao=2!/ansi=0
 MUJNLSTAT	<!AD at !AD>/info/fao=4!/ansi=0
-JNLTPNEST	<Mupip journal command found nested TP transactions for journal file !AD at offset 0x!XL at transaction number 0x!16@XQ>/error/fao=4!/ansi=0
+JNLTPNEST	<Mupip journal command found nested TP transactions for journal file !AD at offset 0x!XL at transaction number 0x!16@XQ>/warning/fao=4!/ansi=0
 REPLOFFJNLON	<Replication state for database file !AD is OFF but journaling state is enabled>/error/fao=2!/ansi=0
 FILEDELFAIL	<Deletion of file !AD failed>/warning/fao=2!/ansi=0
 INVQUALTIME	<Invalid time qualifier value.  Specify as !AD=delta_or_absolute_time.>/error/fao=2!/ansi=0
@@ -1267,7 +1267,7 @@ BADCHAR		<$ZCHAR(!AD) is not a valid character in the !AD encoding form>/error/f
 DLRCILLEGAL	<!_!AD!/!_!_!_Illegal $CHAR() value !UL>/error/fao=3!/ansi=0
 NONUTF8LOCALE	<Locale has character encoding (!AD) which is not compatible with UTF-8 character set>/error/fao=2!/ansi=0
 INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
-UNUSEDMSG1270	<INVICUVER last used in V5.3-004 (release-date 2009/06/25)>/error/fao=0!/ansi=0
+DBMISALIGN	<Database file !AD has !UL blocks which does not match alignment rules. Reconstruct the database from a backup or extend it by at least !UL blocks.>/error/fao=4!/ansi=0
 LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with gtm_chset>/error/fao=2!/ansi=0
 DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
 DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
@@ -1351,7 +1351,7 @@ TRIGTCOMMIT	<TCOMMIT at $ZTLEVEL=!UL not allowed as corresponding TSTART was don
 TRIGTLVLCHNG	<Detected a net transaction level ($TLEVEL) change during trigger !AD. Transaction level must be the same at exit as when the trigger started>/error/fao=2!/ansi=0
 TRIGNAMEUNIQ	<Unable to make trigger name !AD unique beyond !UL versions already loaded>/error/fao=3!/ansi=0
 ZTRIGINVACT	<Missing or invalid parameter in position !UL given to $ZTRIGGER()>/error/fao=1!/ansi=0
-ZTRIGNOTP	<$ZTRIGGER() cannot use update subcodes FILE or ITEM when a TP transaction is in progress ($TLEVEL greater than zero)>/error/fao=0!/ansi=0
+UNUSEDMSG1354	<ZTRIGNOTP : Last used in V5.4-001>/error/fao=0!/ansi=0
 QUITALSINV	<QUIT * return when the extrinsic was not invoked with SET *>/error/fao=0!/ansi=0
 PROCTERM	<!AD process termination due to !AD from !AD>/warning/fao=6!/ansi=0
 SRCLNNTDSP	<Source lines exceeding !UL character width are not displayed>/info/fao=1!/ansi=0
@@ -1363,6 +1363,23 @@ TRIGIS		<!_!_Trigger name: !AD>/info/fao=2!/ansi=0
 TCOMMITDISALLOW	<TROLLBACK required after an unhandled error in trigger context>/error/fao=0!/ansi=0
 SSATTACHSHM	<Error while attaching to shared memory identifier !UL>/error/fao=1!/ansi=0
 TRIGDEFNOSYNC	<Global ^!AD has triggers defined on the !AD instance but none on the !AD instance. Current journal sequence number is 0x!16@XQ>/warning/fao=7!/ansi=0
+TRESTMAX	<TRESTART not allowed in a final TP retry more than once>/error/fao=0!/ansi=0
+TPLOCKRESTMAX	<Transaction restarts due to unavailability of locks not allowed in a final TP retry more than !UL times>/error/fao=1!/ansi=0
+GBLEXPECTED	<Global variable reference expected in this context>/error/fao=0!/ansi=0
+GVZTRIGFAIL	<ZTRIGGER of a global variable failed.  Failure code: !AD.>/error/fao=2!/ansi=0
+UNUSEDMSG1370	<ONLYLDTRIG: Last used in V5.4-001>/error/fao=0!/ansi=0
+SETINSETTRIGONLY      <ISV !AD can only be modified in a 'SET' type trigger>/error/fao=2!/ansi=0
+DZTRIGINTRIG	<$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD>/error/fao=2!/ansi=0
+SECNODZTRIGINTP	<Sequence number 0x!16@XQ contains $ZTRIGGER() updates made inside a trasanction which the current replicator does not support. The replicator must be upgraded to at least V5.4-002 to support this type of transaction. Cannot continue>/error/fao=1!/ansi=0
+BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression>/warning/fao=0!/ansi=0
+DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
+WRITEWAITPID   <PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
+ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
+REPLNOXENDIAN	<!AD side is running on a GT.M version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
+REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
+ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
+GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
+FORCTRLINDX	<Using a FOR with an indexed control variable that's assigned values calculated in extrinsics is not currently safe>/error/fao=0!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

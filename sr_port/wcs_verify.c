@@ -63,7 +63,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	char			secshr_string[2048];
 	char			secshr_string_delta[256];
 	sm_uc_ptr_t		jnl_buff_expected;
-	boolean_t		blkque_array[WC_MAX_BUFFS]; /* TRUE indicates we saw the cr or bt of that array index */
+	boolean_t		(*blkque_array)[] = NULL; /* TRUE indicates we saw the cr or bt of that array index */
 	int4			i, n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
 	trans_num		dummy_tn;
 	int4			in_wtstart, intent_wtstart, wcs_phase2_commit_pidcnt;
@@ -378,7 +378,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				 RTS_ERROR_TEXT("MAX(th_base->tn)"), max_tn, csd->trans_hist.curr_tn);
 		}
 		/* loop through bt blkques */
-		assert(n_bts <= WC_MAX_BUFFS);
+		blkque_array = malloc(n_bts * SIZEOF(boolean_t));
 		memset(blkque_array, 0, n_bts * SIZEOF(boolean_t));	/* initially, we did not find any bt in the bt blkques */
 		for (bt0 = csa->bt_header; bt0 < bt_lo; bt0++)
 		{
@@ -454,7 +454,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						}
 					}
 				}
-				blkque_array[bt - bt_lo] = TRUE; /* note: this bt's blkque hash validity is already checked */
+				(*blkque_array)[bt - bt_lo] = TRUE; /* note: this bt's blkque hash validity is already checked */
 				if (0 == bt->blkque.fl)
 				{	/* No point proceeding to next iteration as "bt + bt->blkque.fl" will be the same as "bt" */
 					assert(expect_damage);
@@ -482,7 +482,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		/* scan all bts looking for valid bt->blks whose bts were not in any blkque */
 		for (bt = bt_lo; bt < bt_hi; bt++)
 		{
-			if ((FALSE == blkque_array[bt - bt_lo]) && ((int)(bt->blk) != BT_NOTVALID))
+			if ((FALSE == (*blkque_array)[bt - bt_lo]) && ((int)(bt->blk) != BT_NOTVALID))
 			{
 				assert(expect_damage);
 				ret = FALSE;
@@ -492,7 +492,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		}
 
 		bp_lo = ROUND_UP(cr_top, OS_PAGE_SIZE);
-		bp_top = bp_lo + (n_bts * csd->blk_size);
+		bp_top = bp_lo + ((gtm_uint64_t)n_bts * csd->blk_size);
 		bt_base_off = GDS_ANY_ABS2REL(csa, (sm_uc_ptr_t)csd + cnl->bt_base_off);
 		bt_top_off = GDS_ANY_ABS2REL(csa, (sm_uc_ptr_t)csd + offset);
 
@@ -851,7 +851,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						cr->blk = CR_BLKEMPTY;
 					}
 				}
-				blkque_array[cr - cr_lo] = TRUE; /* note: this cr's blkque hash validity is already checked */
+				(*blkque_array)[cr - cr_lo] = TRUE; /* note: this cr's blkque hash validity is already checked */
 				if (0 == cr->blkque.fl)
 				{	/* No point proceeding to next iteration as "cr + cr->blkque.fl" will be the same as "cr" */
 					assert(expect_damage);
@@ -879,7 +879,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		/* scan all crs looking for non-empty cr->blks whose crs were not in any blkque */
 		for (cr = cr_lo; cr < cr_hi; cr++)
 		{
-			if ((FALSE == blkque_array[cr - cr_lo]) && ((int)(cr->blk) != CR_BLKEMPTY))
+			if ((FALSE == (*blkque_array)[cr - cr_lo]) && ((int)(cr->blk) != CR_BLKEMPTY))
 			{
 				assert(expect_damage);
 				ret = FALSE;
@@ -894,12 +894,12 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		}
 
 		que_head = &csa->acc_meth.bg.cache_state->cacheq_active;
-		if ((sm_long_t)que_head % SIZEOF(que_ent) != 0)
+		if ((sm_long_t)que_head % SIZEOF(que_head->fl) != 0)
 		{
 			assert(expect_damage);
 			ret = FALSE;
 			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, 0, RTS_ERROR_TEXT("cacheq_active"),
-				 que_head, ((sm_long_t)que_head / SIZEOF(que_ent)) * SIZEOF(que_ent));
+				 que_head, ((sm_long_t)que_head / SIZEOF(que_head->fl)) * SIZEOF(que_head->fl));
 		}
 		/* loop through the active queue */
 		for (cstt_prev = (cache_state_rec_ptr_t)que_head,
@@ -980,12 +980,12 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 
 		/* loop through the wip queue */
 		que_head = &csa->acc_meth.bg.cache_state->cacheq_wip;
-		if ((sm_long_t)que_head % SIZEOF(que_ent) != 0)
+		if ((sm_long_t)que_head % SIZEOF(que_head->fl) != 0)
 		{
 			assert(expect_damage);
 			ret = FALSE;
 			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, 0, RTS_ERROR_TEXT("cacheq_wip"),
-				 que_head, ((sm_long_t)que_head / SIZEOF(que_ent)) * SIZEOF(que_ent));
+				 que_head, ((sm_long_t)que_head / SIZEOF(que_head->fl)) * SIZEOF(que_head->fl));
 		}
 #ifdef VMS
 		for (cstt_prev = que_head, cstt = (cache_state_rec_ptr_t)((sm_uc_ptr_t)que_head + que_head->fl), cnt = n_bts;
@@ -1163,7 +1163,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						 RTS_ERROR_TEXT("mbr hash"), mbr0 - mbr_qbase, mbr->blk % csd->bt_buckets,
 						 CALLFROM);
 				}
-				blkque_array[mbr - mbr_lo] = TRUE; /* note: mbr's blkque hash validity is already checked */
+				(*blkque_array)[mbr - mbr_lo] = TRUE; /* note: mbr's blkque hash validity is already checked */
 				if (0 == mbr->blkque.fl)
 				{	/* Don't proceed to next iteration as "mbr + mbr->blkque.fl" will be the same as "mbr" */
 					assert(expect_damage);
@@ -1192,7 +1192,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		/* scan all mbrs looking for non-empty mbr->blks whose mbrs were not in any blkque */
 		for (mbr = mbr_lo; mbr < mbr_hi; mbr++)
 		{
-			if ((FALSE == blkque_array[mbr - mbr_lo]) && ((int)(mbr->blk) != MBR_BLKEMPTY))
+			if ((FALSE == (*blkque_array)[mbr - mbr_lo]) && ((int)(mbr->blk) != MBR_BLKEMPTY))
 			{
 				assert(expect_damage);
 				ret = FALSE;
@@ -1201,12 +1201,12 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			}
 		}
 		que_head = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
-		if ((sm_long_t)que_head % SIZEOF(que_ent) != 0)
+		if ((sm_long_t)que_head % SIZEOF(que_head->fl) != 0)
 		{
 			assert(expect_damage);
 			ret = FALSE;
 			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, 0, RTS_ERROR_TEXT("mmblkq_active"),
-				 que_head, ((sm_long_t)que_head / SIZEOF(que_ent)) * SIZEOF(que_ent));
+				 que_head, ((sm_long_t)que_head / SIZEOF(que_head->fl)) * SIZEOF(que_head->fl));
 		}
 		/* loop through the active queue */
 		for (mbstt_prev = (mmblk_state_rec_ptr_t)que_head,
@@ -1278,12 +1278,12 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 
 		/* loop through the wip queue */
 		que_head = &csa->acc_meth.mm.mmblk_state->mmblkq_wip;
-		if ((sm_long_t)que_head % SIZEOF(que_ent) != 0)
+		if ((sm_long_t)que_head % SIZEOF(que_head->fl) != 0)
 		{
 			assert(expect_damage);
 			ret = FALSE;
 			send_msg(VARLSTCNT(10) ERR_DBQUELINK, 8, DB_LEN_STR(reg), que_head, 0, RTS_ERROR_TEXT("mmblkq_wip"),
-				 que_head, ((sm_long_t)que_head / SIZEOF(que_ent)) * SIZEOF(que_ent));
+				 que_head, ((sm_long_t)que_head / SIZEOF(que_head->fl)) * SIZEOF(que_head->fl));
 		}
 		if (que_head->fl != 0)
 		{
@@ -1321,5 +1321,6 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 #	endif
 	}
 	send_msg(VARLSTCNT(7) ERR_DBWCVERIFYEND, 5, DB_LEN_STR(reg), process_id, process_id, &csd->trans_hist.curr_tn);
+	if (NULL != blkque_array) free(blkque_array);
 	return ret;
 }

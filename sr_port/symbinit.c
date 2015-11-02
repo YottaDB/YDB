@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,10 +13,8 @@
 
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
 #include "rtnhdr.h"
-#include "mv_stent.h"
+#include "mv_stent.h"		/* this includes lv_val.h which also includes hashtab_mname.h and hashtab.h */
 #include "stack_frame.h"
 #include "mdq.h"
 
@@ -142,26 +140,28 @@ int4 symbinit(void)
 	memset(l_syms, 0, ls_size);
 	size++;
 	ptr = (symval *)malloc(SIZEOF(symval));
-	init_hashtab_mname(&ptr->h_symtab, size);
-	ptr->last_tab = curr_symval;
-	ptr->lv_flist = NULL;
+	/* the order of initialization of fields mirrors the layout of the fields in the symval structure definition */
+	ptr->ident = MV_SYM;
+	ptr->sbs_depth = 0;
+	ptr->tp_save_all = 0;
 	ptr->xnew_var_list = NULL;
 	ptr->xnew_ref_list = NULL;
-	ptr->tp_save_all = 0;
-	ptr->alias_activity = FALSE;
-	GTMTRIG_ONLY(ptr->trigr_symval = FALSE);
-
-	/* dqinit (ptr, sbs_que); */
-	ptr->sbs_que.bl = (struct sbs_blk_struct *)ptr;
-	ptr->sbs_que.fl = ptr->sbs_que.bl;
-
-	ptr->ident = MV_SYM;
-	lv_newblock(&ptr->first_block, 0, size);
+	init_hashtab_mname(&ptr->h_symtab, size, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+	ptr->lv_first_block = NULL;
+	lv_newblock(ptr, size);
+	ptr->lvtree_first_block = NULL;
+	ptr->lvtreenode_first_block = NULL;
+	ptr->lv_flist = NULL;
+	ptr->lvtree_flist = NULL;
+	ptr->lvtreenode_flist = NULL;
+	ptr->last_tab = curr_symval;
 	/* if we get here, our initialization must have been successful */
 	if (curr_symval)
 		ptr->symvlvl = curr_symval->symvlvl + 1;
 	else
 		ptr->symvlvl = 1;
+	GTMTRIG_ONLY(ptr->trigr_symval = FALSE);
+	ptr->alias_activity = FALSE;
 	curr_symval = ptr;
 	mv_st_ent->mv_st_cont.mvs_stab = ptr;
 	return shift_size;

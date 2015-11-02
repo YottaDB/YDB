@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,6 @@
 #include "gdsfhead.h"
 #include "hashtab_mname.h"
 #include "hashtab_addr.h"
-#include "lv_val.h"
 #include "zwrite.h"
 
 GBLREF lvzwrite_datablk *lvzwrite_block;
@@ -35,7 +34,8 @@ void lvzwr_arg(int t, mval *a1, mval *a2)
 	if (a1)
 	{
 		MV_FORCE_DEFINED(a1);
-		MV_FORCE_NUMD(a1);
+		if (MV_IS_CANONICAL(a1))
+			MV_FORCE_NUMD(a1);
 		MV_FORCE_STRD(a1);
 		if ((ZWRITE_VAL != t) && (0 == a1->str.len))	/* value is real - leave it alone */
 			a1 = NULL;
@@ -43,7 +43,8 @@ void lvzwr_arg(int t, mval *a1, mval *a2)
 	if (a2)
 	{
 		MV_FORCE_DEFINED(a2);
-		MV_FORCE_NUMD(a2);
+		if (MV_IS_CANONICAL(a2))
+			MV_FORCE_NUMD(a2);
 		MV_FORCE_STRD(a2);
 		if (0 == a2->str.len)				/* can never be value */
 			a2 = NULL;

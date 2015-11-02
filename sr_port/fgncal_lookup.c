@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,7 @@
 #include "mdef.h"
 
 #include "toktyp.h"
-#include "hashtab.h"
-#include "hashtab_mname.h"
-#include "lv_val.h"
-#include "sbs_blk.h"
+#include "lv_val.h"	/* needed by "fgncal.h" */
 #include "fgncal.h"
 #include "valid_mname.h"
 #include "rtnhdr.h"

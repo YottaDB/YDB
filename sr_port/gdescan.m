@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2010 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -13,6 +13,7 @@ GETTOK
 	n c
 	s token=ntoken,toktype=ntoktype
 	f cp=cp:1 s c=$e(comline,cp) q:(c'=" ")&(c'=TAB)
+	i $c(10,13)[c,cp=$l(comline) s c=""
 	s ntoktype=$s(c?1A:"TKIDENT",c?1N:"TKNUMLIT",c="":"TKEOL",$d(tokens(c)):tokens(c),1:"TKOTHER")
 	d @ntoktype
 	q

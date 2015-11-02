@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,6 @@
 #include "min_max.h"
 #include "op.h"
 
-GBLREF fnpc_area	fnpca;			/* The $piece cache area */
 GBLREF boolean_t	badchar_inhibit;	/* Not recognizing bad characters in UTF8 */
 
 #ifdef DEBUG
@@ -72,7 +71,9 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 	mval		ldst;		/* Local copy since &dst == &src .. move to dst at return */
 	fnpc   		*cfnpc;
 	delimfmt	ldelim;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(src);
 	ldst.mvtype = MV_STR;
 	DEBUG_ONLY(ldst.str.len = -1);	/* Trigger assert at end if length not changed */
@@ -97,7 +98,7 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 	 * UTF8 chars) and since we cannot reuse it, we must ignore the cache and rebuild it for
 	 * this mval. */
 	fnpc_indx = src->fnpc_indx - 1;
-	cfnpc = &fnpca.fnpcs[fnpc_indx];
+	cfnpc = &(TREF(fnpca)).fnpcs[fnpc_indx];
 	if (FNPC_MAX > fnpc_indx && cfnpc->last_str.addr == (char *)first &&
 	    cfnpc->last_str.len == slen && cfnpc->delim == ldelim.unichar_val &&
 	    cfnpc->byte_oriented)
@@ -133,10 +134,10 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 		COUNT_EVENT(miss);
 
 		/* Need to steal a new piece cache, get "least recently reused" */
-		cfnpc = fnpca.fnpcsteal;		/* Get next element to steal */
-		if (fnpca.fnpcmax < cfnpc)
-			cfnpc = &fnpca.fnpcs[0];
-		fnpca.fnpcsteal = cfnpc + 1;		/* -> next element to steal */
+		cfnpc = (TREF(fnpca)).fnpcsteal;	/* Get next element to steal */
+		if ((TREF(fnpca)).fnpcmax < cfnpc)
+			cfnpc = &(TREF(fnpca)).fnpcs[0];
+		(TREF(fnpca)).fnpcsteal = cfnpc + 1;	/* -> next element to steal */
 
 		cfnpc->last_str = src->str;		/* Save validation info */
 		cfnpc->delim = ldelim.unichar_val;

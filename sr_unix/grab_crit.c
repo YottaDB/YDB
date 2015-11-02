@@ -39,10 +39,12 @@ void	grab_crit(gd_region *reg)
 	sgmnt_addrs		*csa;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
+	DCL_THREADGBL_ACCESS;
 
 	error_def(ERR_DBCCERR);
 	error_def(ERR_CRITRESET);
 
+	SETUP_THREADGBL_ACCESS;
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
 	assert(!hold_onto_locks && !csa->hold_onto_crit);
@@ -50,6 +52,7 @@ void	grab_crit(gd_region *reg)
 	{
 		assert(0 == crit_count);
 		crit_count++;	/* prevent interrupts */
+		TREF(grabbing_crit) = reg;
 		DEBUG_ONLY(locknl = csa->nl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csa->hdr->mutex_spin_parms;
 		status = mutex_lockw(reg, mutex_spin_parms, crash_count);
@@ -57,6 +60,7 @@ void	grab_crit(gd_region *reg)
 		if (status != cdb_sc_normal)
 		{
 			crit_count = 0;
+			TREF(grabbing_crit) = NULL;
 			switch(status)
 			{
 				case cdb_sc_critreset:
@@ -76,6 +80,7 @@ void	grab_crit(gd_region *reg)
 		assert((0 == csa->nl->in_crit) || (FALSE == is_proc_alive(csa->nl->in_crit, 0)));
 		csa->nl->in_crit = process_id;
 		CRIT_TRACE(crit_ops_gw);	/* see gdsbt.h for comment on placement */
+		TREF(grabbing_crit) = NULL;
 		crit_count = 0;
 	}
 	if (csa->hdr->wc_blocked)

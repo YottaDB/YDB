@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,18 +57,12 @@ void	op_mul (mval *u, mval *v, mval *p)
 	}
 	c = eb_mul(u->m, v->m, p->m);
 	exp = u->e + v->e + c - MV_XBIAS;
-	if (exp > EXPHI)
-	{
+	if (EXPHI <= exp)
 		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
-	}
-	else if (exp < EXPLO)
-	{
+	else if (EXPLO > exp)
 		*p = literal_zero;
-	}
 	else if (exp < EXP_INT_OVERF  &&  exp > EXP_INT_UNDERF  &&  p->m[0] == 0  &&  (p->m[1]%ten_pwr[EXP_INT_OVERF-1-exp]==0))
-	{
 		demote(p, exp, u->sgn ^ v->sgn);
-	}
 	else
 	{
 		p->mvtype = MV_NM;

@@ -41,10 +41,14 @@
 #include "wcs_backoff.h"
 #include "tp_restart.h"
 #include "gtm_ctype.h"		/* for ISALPHA_ASCII */
+#ifdef GTM_TRIGGER
+#include "gtm_trigger_trc.h"
+#endif
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	short			crash_count, dollar_tlevel;
+GBLREF	short			crash_count;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
@@ -60,10 +64,13 @@ GBLREF	uint4			update_trans;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 #endif
-#ifdef DEBUG
-GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
-GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
-#endif
+
+error_def(ERR_GBLOFLOW);
+error_def(ERR_GVIS);
+error_def(ERR_TPRETRY);
+error_def(ERR_GVPUTFAIL);
+error_def(ERR_GVINCRFAIL);
+UNIX_ONLY(error_def(ERR_GVFAILCORE));
 
 void t_retry(enum cdb_sc failure)
 {
@@ -73,17 +80,13 @@ void t_retry(enum cdb_sc failure)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	boolean_t		skip_invoke_restart;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_GBLOFLOW);
-	error_def(ERR_GVIS);
-	error_def(ERR_TPRETRY);
-	error_def(ERR_GVPUTFAIL);
-	error_def(ERR_GVINCRFAIL);
-	UNIX_ONLY(error_def(ERR_GVFAILCORE);)
-
+	SETUP_THREADGBL_ACCESS;
 #	ifdef GTM_TRIGGER
 	skip_invoke_restart = skip_INVOKE_RESTART;	/* note down global value in local variable */
 	skip_INVOKE_RESTART = FALSE;	/* reset global variable to default state as soon as possible */
+	GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: entered\n")));
 #	else
 	skip_invoke_restart = FALSE;	/* no triggers so set local variable to default state */
 #	endif
@@ -96,9 +99,9 @@ void t_retry(enum cdb_sc failure)
 	t_fail_hist[t_tries] = (unsigned char)failure;
 	if (mu_reorg_process)
 		CWS_RESET;
-	DEBUG_ONLY(donot_commit = FALSE;)
+	DEBUG_ONLY(TREF(donot_commit) = FALSE;)
 	csa = cs_addrs;
-	if (0 == dollar_tlevel)
+	if (!dollar_tlevel)
 	{
 		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, failure);	/* set wc_blocked if cache related status */
 		switch(t_tries)
@@ -130,22 +133,32 @@ void t_retry(enum cdb_sc failure)
 		assert(CDB_STAGNATE >= t_tries);
 		if (CDB_STAGNATE <= t_tries)
 		{
-			/* Both backup and snapshot state change cannot happen when we are in final retry as they need crit
-			 * which is held by us in the final retry.
+			assert(cdb_sc_bkupss_statemod != failure); /* backup and snapshot state change cannot happen in
+								    * final retry as they need crit which is held by us */
+			/* The following type of restarts can happen in the final retry.
+			 * (a) cdb_sc_jnlstatemod : This is expected because csa->jnl_state is noted from csd->jnl_state only
+			 * if they are different INSIDE crit. Therefore it is possible that in the final retry one might start
+			 * with a stale value of csa->jnl_state which will be noticed only in t_end just before commit as a
+			 * result of which we would restart. Such a restart is okay (instead of the checking for jnl state
+			 * change during the beginning of final retry) since jnl state changes are considered infrequent that
+			 * too in the final retry.
+			 * (b) cdb_sc_jnlclose : journaling might get turned off in the final retry INSIDE crit while trying to
+			 * flush journal buffer or during extending the journal file (due to possible disk issues) in which case
+			 * we will come here with t_tries = CDB_STAGNATE.
+			 * (c) cdb_sc_helpedout : csd->wc_blocked being TRUE as well as file extension in MM (both of which is
+			 * caused due to another process) can happen in final retry with failure status set to cdb_sc_helpedout
 			 */
-			assert(cdb_sc_bkupss_statemod != failure);
-			if ((cdb_sc_jnlstatemod == failure) || (cdb_sc_jnlclose == failure) || (cdb_sc_future_read == failure)
-				|| (cdb_sc_helpedout == failure))
+			if ((cdb_sc_jnlstatemod == failure) || (cdb_sc_jnlclose == failure) || (cdb_sc_helpedout == failure))
 				t_tries = CDB_STAGNATE - 1;
 		}
 		if (CDB_STAGNATE <= ++t_tries)
 		{
-			DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
+			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
 			if (!csa->hold_onto_crit)
 				grab_crit(gv_cur_region);
 			assert(csa->now_crit);
 			CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, gv_cur_region);
-			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
+			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 			csd = cs_data;
 			if (CDB_STAGNATE == t_tries)
 			{
@@ -157,9 +170,9 @@ void t_retry(enum cdb_sc failure)
 				}
 			} else
 			{
-				assert((failure != cdb_sc_helpedout) && (failure != cdb_sc_future_read)
-					&& (failure != cdb_sc_jnlclose) && (failure != cdb_sc_jnlstatemod)
-					&& (failure != cdb_sc_bkupss_statemod) && (failure != cdb_sc_inhibitkills));
+				assert((failure != cdb_sc_helpedout) && (failure != cdb_sc_jnlclose)
+					&& (failure != cdb_sc_jnlstatemod) && (failure != cdb_sc_bkupss_statemod)
+					&& (failure != cdb_sc_inhibitkills));
 				assert(csa->now_crit);
 				if (!csa->hold_onto_crit)
 					rel_crit(gv_cur_region);
@@ -191,34 +204,40 @@ void t_retry(enum cdb_sc failure)
 		/* In case triggers are supported, make sure we start with latest copy of file header's db_trigger_cycle
 		 * to avoid unnecessary cdb_sc_triggermod type of restarts.
 		 */
-		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle;)
+		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle);
+		GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: csa->db_trigger_cycle updated to %d\n", csa->db_trigger_cycle)));
 		start_tn = csa->ti->curr_tn;
-		assert(NULL != gv_target);
+		/* Note: If gv_target was NULL before the start of a transaction and the only operations done inside the transaction
+		 * are trigger deletions causing bitmap free operations which got restarted due to a concurrent update, we can
+		 * reach here with gv_target being NULL.
+		 */
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
 	} else
 	{	/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
 		assert(failure == t_fail_hist[t_tries]);
 		assert((NULL == csa) || (NULL != csa->hdr));	/* both csa and csa->hdr should be NULL or non-NULL. */
-		assert((NULL != csa) || (cdb_sc_needcrit == failure)); /* csa can be NULL in case of retry in op_lock2 */
-		if (NULL != csa)					/*  in which case failure code should be cdb_sc_needcrit. */
+		if (NULL != csa)
 		{
 			SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, failure);
 			TP_RETRY_ACCOUNTING(csa, csa->nl, failure);
-		}
-		assert((NULL != gv_target)
-				|| (cdb_sc_needcrit == failure) && (CDB_STAGNATE <= t_tries) && have_crit(CRIT_HAVE_ANY_REG));
-		/* only known case of gv_target being NULL is if a t_retry is done from gvcst_init. the above assert checks this */
+		} else /* csa can be NULL if retry in op_lock2 (cdb_sc_needlock) or if cur_reg is not open yet (cdb_sc_needcrit) */
+			assert((CDB_STAGNATE == t_tries) && ((cdb_sc_needlock == failure) || (cdb_sc_needcrit == failure)));
 		if (NULL != gv_target)
 		{
 			if (cdb_sc_blkmod != failure)
 				TP_TRACE_HIST(CR_BLKEMPTY, gv_target);
 			gv_target->clue.end = 0;
-		}
+		} else /* only known case of gv_target being NULL is if t_retry is done from gvcst_init. assert this below */
+			assert((CDB_STAGNATE <= t_tries) && ((cdb_sc_needcrit == failure) || have_crit(CRIT_HAVE_ANY_REG)));
 		if (!skip_invoke_restart)
 		{
+			GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: invoking restart logic (INVOKE_RESTART)\n")));
 			INVOKE_RESTART;
 		} else	/* explicit trigger update caused implicit tp wrap so should return to caller without rts_error */
+		{
+			GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: invoking tp_restart directly\n")));
 			tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
+		}
 	}
 }

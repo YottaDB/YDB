@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,8 +41,7 @@
 #include "tp_timeout.h"
 #include "gtm_caseconv.h"
 #include "op.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
+#include "lv_val.h"		/* needed for tp_unwind.h */
 #include "gvcst_expand_free_subtree.h"
 #include "format_targ_key.h"
 #include "bm_getfree.h"
@@ -59,6 +58,7 @@
 #include "memcoherency.h"
 #include "util.h"
 #include "op_tcommit.h"
+#include "caller_id.h"
 
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
@@ -70,16 +70,8 @@
 #include "gtm_trigger.h"
 #endif
 
-error_def(ERR_GBLOFLOW);
-error_def(ERR_GVIS);
-error_def(ERR_TLVLZERO);
-error_def(ERR_TPRETRY);
-#ifdef GTM_TRIGGER
-error_def(ERR_TRIGTCOMMIT);
-error_def(ERR_TCOMMITDISALLOW);
-#endif
-
-GBLREF	short			dollar_tlevel, dollar_trestart;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4 			dollar_trestart;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	gd_region		*gv_cur_region;
@@ -90,7 +82,7 @@ GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	cw_set_element		cw_set[];
 GBLREF	gd_addr			*gd_header;
-GBLREF	bool			tp_kill_bitmaps;
+GBLREF	boolean_t		tp_kill_bitmaps;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int		t_tries;
@@ -106,6 +98,15 @@ GBLREF	boolean_t		hold_onto_locks;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
+#endif
+
+error_def(ERR_GBLOFLOW);
+error_def(ERR_GVIS);
+error_def(ERR_TLVLZERO);
+error_def(ERR_TPRETRY);
+#ifdef GTM_TRIGGER
+error_def(ERR_TRIGTCOMMIT);
+error_def(ERR_TCOMMITDISALLOW);
 #endif
 
 enum cdb_sc	op_tcommit(void)
@@ -142,20 +143,21 @@ enum cdb_sc	op_tcommit(void)
 	boolean_t		before_image_needed;
 	boolean_t		skip_invoke_restart;
 	uint4			update_trans;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 #	ifdef GTM_TRIGGER
-	DBGTRIGR((stderr, "op_tcommit: Entry \n"));
+	DBGTRIGR((stderr, "op_tcommit: Entry from 0x"lvaddr"\n", caller_id()));
 	skip_invoke_restart = skip_INVOKE_RESTART;	/* note down global value in local variable */
 	skip_INVOKE_RESTART = FALSE;	/* reset global variable to default state as soon as possible */
 #	else
 	skip_invoke_restart = FALSE;	/* no triggers so set local variable to default state */
 #	endif
-	if (0 == dollar_tlevel)
+	if (!dollar_tlevel)
 		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
 	assert(0 == jnl_fence_ctl.level);
 	status = cdb_sc_normal;
 	tp_kill_bitmaps = FALSE;
-
 	GTMTRIG_ONLY(
 		/* The value of $ztlevel at the time of the TSTART, i.e. tstart_trigger_depth, can never be GREATER than
 		 * the current $ztlevel as otherwise a TPQUIT error would have been issued as part of the QUIT of the
@@ -210,11 +212,13 @@ enum cdb_sc	op_tcommit(void)
 				/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is non-zero */
 				assert((NULL == si->first_cw_set) || si->update_trans);
 				/* Whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE
-				 * except when the duplicate set noop optimization is enabled in which case also ensure
-				 * that if the database is journaled, at least one journal record is being written.
+				 * except (1) when the duplicate set noop optimization is enabled in which case also ensure
+				 * that if the database is journaled, at least one journal record is being written or
+				 * (2) when there has been a ZTRIGGER in this transaction.
 				 */
 				assert((NULL != si->first_cw_set) || !si->update_trans
-					|| (gvdupsetnoop && (!JNL_ENABLED(csa) || (NULL != si->jnl_head))));
+				       || (UPDTRNS_ZTRIGGER_MASK & si->update_trans)
+				       || (gvdupsetnoop && (!JNL_ENABLED(csa) || (NULL != si->jnl_head))));
 				if (NULL != si->first_cw_set)
 				{	/* at least one update to this region in this TP transaction */
 					assert(0 != si->cw_set_depth);
@@ -335,7 +339,6 @@ enum cdb_sc	op_tcommit(void)
 								}
 								if (!cse->was_free
 									&& (NULL != jbp) && (old_block->tn < jbp->epoch_tn))
-
 								{	/* Compute CHECKSUM for writing PBLK record before crit.
 									 * It is possible that we are reading a block that is
 									 * actually marked free in the bitmap (due to concurrency
@@ -474,9 +477,9 @@ enum cdb_sc	op_tcommit(void)
 		(*tp_timeout_clear_ptr)();
 	} else		/* an intermediate commit */
 		tp_incr_commit();
-	assert(0 < dollar_tlevel);
+	assert(dollar_tlevel);
 	tp_unwind(dollar_tlevel - 1, COMMIT_INVOCATION, NULL);
-	if (0 == dollar_tlevel) /* real commit */
+	if (!dollar_tlevel) /* real commit */
 		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return NORMAL status\n"));)
 	return cdb_sc_normal;

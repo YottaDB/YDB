@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,11 +17,11 @@
 void		db_auto_upgrade(gd_region *reg);
 void		db_init(gd_region *reg, sgmnt_data_ptr_t tsd);
 gd_region	*dbfilopn (gd_region *reg);
-void		dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd);
+void		dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size);
 mint		gvcst_data(void);
 enum cdb_sc	gvcst_dataget(mint *dollar_data, mval *val);
 bool		gvcst_gblmod(mval *v);
-bool		gvcst_get(mval *v);
+boolean_t	gvcst_get(mval *v);
 void		gvcst_incr(mval *increment, mval *result);
 void		gvcst_init(gd_region *greg);
 void		gvcst_kill(bool do_subtree);

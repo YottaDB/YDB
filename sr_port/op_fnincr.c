@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,6 @@
 
 #include "mdef.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -35,6 +34,6 @@ void	op_fnincr(lv_val *local_var, mval *increment, mval *result)
 	lv_mval = &local_var->v;
 	if (!MV_DEFINED(lv_mval))
 		*lv_mval = literal_null;
-	op_add(lv_mval, increment, lv_mval); /* FALSE is to indicate NOT subtraction (i.e. addition) */
+	op_add(lv_mval, increment, lv_mval);
 	*result = *lv_mval;
 }

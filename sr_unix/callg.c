@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include <stdarg.h>
-#include "lv_val.h"
+
+#include "lv_val.h"	/* needed for "callg.h" */
 #include "callg.h"
 
 #define VAR_ARGS32(ar)	ar[0], ar[1], ar[2], ar[3], ar[4], ar[5], ar[6], ar[7], ar[8], ar[9], ar[10], ar[11], ar[12],	\

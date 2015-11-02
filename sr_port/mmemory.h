@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,16 @@
 
 #define MC_DSBLKSIZE ((8 * 1024) - offsetof(storElem, userStorage))	/* Total (real) alloc will be for 8K */
 
+/* Uncomment #define for DEBUG_MCALC to enable mcalloc() testing */
+/*#define DEBUG_MCALC */
+#if defined(DEBUG_MCALC)
+# define DBGMCALC(x) DBGFPF(x)
+# define DBGMCALC_ONLY(x) x
+#else
+# define DBGMCALC(x)
+# define DBGMCALC_ONLY(x)
+#endif
+
 /* The header of the memory block allocated by mcalloc */
 typedef struct mcalloc_hdr_struct
 {
@@ -30,6 +40,5 @@ typedef struct mcalloc_hdr_struct
 
 char *mcalloc(unsigned int n);
 int memvcmp(void *a, int a_len, void *b, int b_len);
-int memucmp(uchar_ptr_t a, uchar_ptr_t b, uint4 siz);
 
 #endif /* MMEMORY_INCLUDED */

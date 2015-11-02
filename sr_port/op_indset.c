@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,18 +11,15 @@
 
 #include "mdef.h"
 
-#include "hashtab_mname.h"
 #include "lv_val.h"
 #include "toktyp.h"
 #include "compiler.h"
 #include "opcode.h"
 #include "indir_enum.h"
 #include "cache.h"
-#include "hashtab_objcode.h"
 #include "op.h"
 #include "rtnhdr.h"
 #include "valid_mname.h"
-#include "hashtab.h"
 
 GBLREF	symval			*curr_symval;
 GBLREF	char			window_token;
@@ -36,7 +33,6 @@ void	op_indset(mval *target, mval *value)
 	mstr		object, *obj;
 	oprtype		v;
 	triple		*s, *src;
-	lv_val		*a;
 	char 		new;
 	icode_str	indir_src;
 	var_tabent	targ_key;
@@ -55,8 +51,7 @@ void	op_indset(mval *target, mval *value)
 			targ_key.marked = FALSE;
 			if (add_hashtab_mname_symval(&curr_symval->h_symtab, &targ_key, NULL, &tabent))
 				lv_newname(tabent, curr_symval);
-			a = (lv_val *)tabent->value;
-			a->v = *value;
+			((lv_val *)tabent->value)->v = *value;
 			return;
 		}
 		comp_init(&target->str);

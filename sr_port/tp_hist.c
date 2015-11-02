@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,9 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "longcpy.h"
 #include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
-#include "hashtab.h"
 #include "tp.h"
 #include "longset.h"		/* needed for cws_insert.h */
+#include "hashtab.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "memcoherency.h"
 #include "wbox_test_init.h"
@@ -55,7 +55,7 @@
 														\
 	if (GVNH->gd_csa == CSA)										\
 	{	/* reposition pointers only if global corresponds to current database file */			\
-		for (t1 = &GVNH->hist.h[0]; t1->blk_num; t1++)							\
+		for (t1 = GVNH->hist.h; t1->blk_num; t1++)							\
 			REPOSITION_PTR_IF_NOT_NULL(t1->first_tp_srch_status, struct srch_blk_status_struct,	\
 							DELTA, SI->first_tp_hist, SI->last_tp_hist);		\
 	} else													\
@@ -76,11 +76,9 @@ GBLREF	boolean_t	mupip_jnl_recover;
 GBLREF	boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	uint4		process_id;
 
-#ifdef DEBUG
-GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
-GBLREF	boolean_t	ready2signal_gvundef;	/* TRUE if GET operation is about to signal a GVUNDEF */
-GBLREF	boolean_t	gtm_gvundef_fatal;
-#endif
+error_def(ERR_TRANS2BIG);
+error_def(ERR_GVKILLFAIL);
+error_def(ERR_GVPUTFAIL);
 
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1);
 
@@ -103,17 +101,15 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	boolean_t	ready2signal_gvundef_lcl;
 #	endif
 	gv_namehead	*gvt;	/* store local copy of global "gv_target" for faster access */
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_TRANS2BIG);
-	error_def(ERR_GVKILLFAIL);
-	error_def(ERR_GVPUTFAIL);
-
+	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY(
 		/* Store global variable ready2signal_gvundef in a local variable and reset the global right away to ensure that
 		 * the global value does not incorrectly get carried over to the next call of "t_end".
 		 */
-		ready2signal_gvundef_lcl = ready2signal_gvundef;
-		ready2signal_gvundef = FALSE;
+		ready2signal_gvundef_lcl = TREF(ready2signal_gvundef);
+		TREF(ready2signal_gvundef) = FALSE;
 	)
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 	assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));
@@ -262,7 +258,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						assert((ERR_GVPUTFAIL == t_err) && (0 == t1->level)
 							&& (t1->blk_target->noisolation || t2->blk_target->noisolation));
 						if (t1->blk_target != t2->blk_target)
-							donot_commit |= DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH;
+							TREF(donot_commit) |= DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH;
 #						endif
 					}
 				}
@@ -328,7 +324,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			{
 				assert(si->cw_set_depth || !t1->cse);
 				local_hash_entry = t1->first_tp_srch_status;
-				DEBUG_ONLY(lookup_tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&blk);)
+				DEBUG_ONLY(lookup_tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&blk));
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(local_hash_entry, si);
 				if ((NULL == local_hash_entry) && add_hashtab_int4(si->blks_in_use, (uint4 *)&blk,
 									(void *)(si->last_tp_hist), &tabent))
@@ -432,13 +428,13 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				 * Set the flag donot_commit to catch the case this does not restart.
 				 */
 				if (t2->blk_target != t1->blk_target)
-					donot_commit |= DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH;
+					TREF(donot_commit) |= DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH;
 			}
 		}
 #		endif
 	}
 	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
-	assert((cdb_sc_normal != status) || !gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
+	assert((cdb_sc_normal != status) || !TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
 	if (gvt->read_local_tn != local_tn)
 	{	/* Set read_local_tn to local_tn; Also add gvt to list of gvtargets referenced in this TP transaction. */
 		gvt->read_local_tn = local_tn;
@@ -503,7 +499,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	assert(NULL == hist1 || hist1 != &gv_target->hist);		/* ensure that gv_target isn't doubly repositioned */
 	if ((NULL != hist1) && (hist1 != &cs_addrs->dir_tree->hist))	/* ensure we don't reposition directory tree again */
 	{
-		for (t1 = &hist1->h[0]; t1->blk_num; t1++)
+		for (t1 = hist1->h; t1->blk_num; t1++)
 			REPOSITION_PTR_IF_NOT_NULL(t1->first_tp_srch_status, struct srch_blk_status_struct,
 									delta, si->first_tp_hist, si->last_tp_hist);
 	}

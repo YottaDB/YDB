@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,17 +16,19 @@
 #include "cmd.h"
 
 GBLREF char window_token;
-GBLREF triple pos_in_chain;
+
+error_def(ERR_SPOREOL);
 
 int m_else(void)
 {
-	error_def(ERR_SPOREOL);
 	triple	*jmpref, elsepos_in_chain;
+	DCL_THREADGBL_ACCESS;
 
-	elsepos_in_chain = pos_in_chain;
-	if (window_token == TK_EOL)
+	SETUP_THREADGBL_ACCESS;
+	elsepos_in_chain = TREF(pos_in_chain);
+	if (TK_EOL == window_token)
 		return TRUE;
-	if (window_token != TK_SPACE)
+	if (TK_SPACE != window_token)
 	{
 		stx_error(ERR_SPOREOL);
 		return FALSE;
@@ -35,10 +37,8 @@ int m_else(void)
 	jmpref->operand[0] = for_end_of_scope(0);
 	if (!linetail())
 	{	tnxtarg(&jmpref->operand[0]);
-		pos_in_chain = elsepos_in_chain;
+		TREF(pos_in_chain) = elsepos_in_chain;
 		return FALSE;
-	}
-	else
-	{	return TRUE;
-	}
+	} else
+		return TRUE;
 }

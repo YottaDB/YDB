@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,14 +38,13 @@ GBLREF	unsigned int		t_tries;
 GBLREF	uint4			update_trans;
 GBLREF	boolean_t		write_after_image;
 GBLREF	volatile int4		fast_lock_count;
-#ifdef DEBUG
-GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
-#endif
 
 void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
 {
 	boolean_t	was_crit;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	CWS_RESET;
 	start_tn = cs_addrs->ti->curr_tn;
 	cw_set_depth = 0;
@@ -71,8 +70,8 @@ void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
 		 * grab_crit. Set variable to indicate it is ok to do so even though t_tries is CDB_STAGNATE since we are not
 		 * in the middle of any transaction.
 		 */
-		DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
+		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
 		grab_crit(gv_cur_region);
-		DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
+		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,13 +53,7 @@ GBLREF boolean_t	dollar_zininterrupt;
 GBLREF mstr		*comline_base;
 GBLDEF int		recall_num;
 GBLDEF int		comline_index;
-GBLREF mstr		gtmprompt;
-LITREF unsigned char	lower_to_upper_table[];
 GBLREF	boolean_t	gtm_utf8_mode;
-
-#ifdef UNICODE_SUPPORTED
-LITREF	UChar32		u32_line_term[];
-#endif
 
 GBLREF int		AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
 GBLREF char		*CURSOR_UP, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CLR_EOL;
@@ -68,8 +62,12 @@ GBLREF char		*KEY_DOWN, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
 GBLREF char		*KEY_INSERT;
 GBLREF char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 
-static unsigned char	cr = '\r';
+LITREF unsigned char	lower_to_upper_table[];
+#ifdef UNICODE_SUPPORTED
+LITREF	UChar32		u32_line_term[];
+#endif
 
+static unsigned char	cr = '\r';
 
 #define	REC			"rec"
 #define	RECALL			"recall"
@@ -91,15 +89,21 @@ static	unsigned char	recall_error_msg[][MAX_ERR_MSG_LEN] =
 };
 
 error_def(ERR_IOEOF);
+error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_ZINTDIRECT);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
 
 #define	WRITE_GTM_PROMPT													\
-if (0 < gtmprompt.len)														\
+if (0 < (TREF(gtmprompt)).len)													\
 {																\
-	write_str(gtmprompt.addr, gtmprompt.len, 0, TRUE, TRUE);								\
+	write_str((TREF(gtmprompt)).addr, (TREF(gtmprompt)).len, 0, TRUE, TRUE);						\
 	if (utf8_active)													\
 	{	/* cannot use "gtm_wcswidth" function as we also want to compute "dx_start" in the loop */			\
 		dx_start = 0;													\
-		for (ptr = (unsigned char *)gtmprompt.addr, ptrtop = ptr + gtmprompt.len; ptr < ptrtop; ptr = ptrnext)		\
+		for (ptr = (unsigned char *)(TREF(gtmprompt)).addr, ptrtop = ptr + (TREF(gtmprompt)).len; 			\
+		     ptr < ptrtop; 												\
+		     ptr = ptrnext)												\
 		{														\
 			ptrnext = UTF8_MBTOWC(ptr, ptrtop, codepoint);								\
 			if (WEOF == codepoint)											\
@@ -113,7 +117,7 @@ if (0 < gtmprompt.len)														\
 		}														\
 		assert(0 <= dx_start);												\
 	} else															\
-		dx_start = gtmprompt.len;											\
+		dx_start = (TREF(gtmprompt)).len;										\
 	dx = dx_start % ioptr_width;												\
 } else																\
 	dx = dx_start = 0;
@@ -176,20 +180,15 @@ void	dm_read (mval *v)
 	unsigned char	*ptr, *ptrnext, *ptrtop;
 	wint_t		codepoint;
 	mv_stent	*mvc, *mv_zintdev;
-
 	d_tt_struct 	*tt_ptr;
 	fd_set		input_fd;
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
 	tt_interrupt	*tt_state;
-
 	struct timeval	input_timeval;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_ZINTRECURSEIO);
-	error_def(ERR_ZINTDIRECT);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,6 @@
 #include "error.h"
 #include "iosp.h"
 #include "jnl.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lv_val.h"
 #include "view.h"
 #include "send_msg.h"
@@ -45,32 +43,19 @@
 #include "gtmdbglvl.h"
 #include "gtm_malloc.h"
 #include "alias.h"
+#include "fullbool.h"
 #ifdef GTM_TRIGGER
 #include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
 
-#define WRITE_LITERAL(x) (outval.str.len = SIZEOF(x) - 1, outval.str.addr = (x), op_write(&outval))
-
-/* if changing noisolation status within TP and already referenced the global, then error */
-#define SET_GVNH_NOISOLATION_STATUS(gvnh, status)							\
-{													\
-	if (!dollar_tlevel || gvnh->read_local_tn != local_tn || status == gvnh->noisolation)		\
-		gvnh->noisolation = status;								\
-	else												\
-		rts_error(VARLSTCNT(6) ERR_ISOLATIONSTSCHN, 4, gvnh->gvname.var_name.len, 		\
-			gvnh->gvname.var_name.addr, gvnh->noisolation, status);				\
-}
-
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	bool			undef_inhibit, jobpid;
-GBLREF	int			lv_null_subs;
 GBLREF	bool			view_debug1, view_debug2, view_debug3, view_debug4;
 GBLREF	bool			zdefactive;
 GBLREF	unsigned short		zdefbufsiz;
 GBLREF	int4			break_message_mask;
-GBLREF	collseq			*local_collseq;
 GBLREF	command_qualifier	cmd_qlf, glb_cmd_qlf;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
@@ -80,11 +65,8 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	symval			*curr_symval;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	short			dollar_tlevel;
-GBLREF	int4			zdate_form;
 GBLREF	int4			zdir_form;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
-GBLREF	boolean_t		local_collseq_stdnull;
 GBLREF	boolean_t		badchar_inhibit;
 GBLREF	int			gv_fillfactor;
 GBLREF	symval			*curr_symval;
@@ -92,10 +74,39 @@ GBLREF	uint4			gtmDebugLevel;
 GBLREF	boolean_t		lvmon_enabled;
 GBLREF	spdesc			stringpool;
 
+error_def(ERR_ACTRANGE);
+error_def(ERR_COLLATIONUNDEF);
+error_def(ERR_COLLDATAEXISTS);
+error_def(ERR_INVZDIRFORM);
+error_def(ERR_ISOLATIONSTSCHN);
+error_def(ERR_JNLFLUSH);
+error_def(ERR_PATLOAD);
+error_def(ERR_PATTABNOTFND);
+error_def(ERR_REQDVIEWPARM);
+error_def(ERR_TEXT);
+error_def(ERR_TRACEON);
+error_def(ERR_VIEWCMD);
+error_def(ERR_YDIRTSZ);
+error_def(ERR_ZDEFACTIVE);
+
 #define MAX_YDIRTSTR 32
 #define ZDEFMIN 1024
 #define ZDEFDEF 32767
 #define ZDEFMAX 65535
+
+#define WRITE_LITERAL(x) (outval.str.len = SIZEOF(x) - 1, outval.str.addr = (x), op_write(&outval))
+
+/* if changing noisolation status within TP and already referenced the global, then error */
+#define SET_GVNH_NOISOLATION_STATUS(gvnh, status)							\
+{													\
+	GBLREF	uint4			dollar_tlevel;							\
+													\
+	if (!dollar_tlevel || gvnh->read_local_tn != local_tn || status == gvnh->noisolation)		\
+		gvnh->noisolation = status;								\
+	else												\
+		rts_error(VARLSTCNT(6) ERR_ISOLATIONSTSCHN, 4, gvnh->gvname.var_name.len, 		\
+			gvnh->gvname.var_name.addr, gvnh->noisolation, status);				\
+}
 
 void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 {
@@ -117,9 +128,10 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	lv_val			*lv;
 	symval			*cstab;
 	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 	jnl_buffer_ptr_t	jb;
-        int			table_size_orig;
-        ht_ent_mname		*table_base_orig;
+	int			table_size_orig;
+	ht_ent_mname		*table_base_orig;
 	hash_table_mname	*table;
 	boolean_t		dbgdmpenabled, was_crit;
 	symval			*lvlsymtab;
@@ -127,8 +139,6 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	lv_val			*lvp, *lvp_top;
 	VMS_ONLY(int		numarg;)
 
-	static int ydirt_str_len = 0;
-	static char ydirt_str[MAX_YDIRTSTR + 1];
 	static readonly char msg1[] = "Caution: Database Block Certification Has Been ";
 	static readonly char msg2[] = "Disabled";
 	static readonly char msg3[] = "Enabled";
@@ -136,30 +146,17 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 		"Caution: GT.M reserved local variable string pointer duplicate check diagnostic has been";
 	static readonly char upper[] = "UPPER";
 	static readonly char lower[] = "LOWER";
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_ACTRANGE);
-	error_def(ERR_COLLATIONUNDEF);
-	error_def(ERR_COLLDATAEXISTS);
-	error_def(ERR_INVZDIRFORM);
-	error_def(ERR_ISOLATIONSTSCHN);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_PATLOAD);
-	error_def(ERR_PATTABNOTFND);
-	error_def(ERR_REQDVIEWPARM);
-	error_def(ERR_TEXT);
-	error_def(ERR_TRACEON);
-	error_def(ERR_VIEWCMD);
-	error_def(ERR_YDIRTSZ);
-	error_def(ERR_ZDEFACTIVE);
-
+	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, keyword);
-	VMS_ONLY(va_count(numarg);)
+	VMS_ONLY(va_count(numarg));
 		jnl_status = 0;
 	if (numarg < 1)
 		GTMASSERT;
 	MV_FORCE_STR(keyword);
 	numarg--;	/* remove keyword from count */
-	if (numarg > 0)
+	if (0 < numarg)
 	{
 		arg = va_arg(var, mval *);
 		MV_FORCE_STR(arg);
@@ -169,14 +166,14 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	view_arg_convert(vtp, arg, &parmblk);
 	switch(vtp->keycode)
 	{
-#ifdef UNICODE_SUPPORTED
+#ifdef 		UNICODE_SUPPORTED
 		case VTK_BADCHAR:
 			badchar_inhibit = FALSE;
 			break;
 		case VTK_NOBADCHAR:
 			badchar_inhibit = TRUE;
 			break;
-#endif
+#		endif
 		case VTK_BREAKMSG:
 			break_message_mask = MV_FORCE_INT(parmblk.value);
 			break;
@@ -221,6 +218,15 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			gv_cur_region = save_reg;
 			change_reg();
 			break;
+		case VTK_FULLBOOL:
+			TREF(gtm_fullbool) = FULL_BOOL;
+			break;
+		case VTK_FULLBOOLWARN:
+			TREF(gtm_fullbool) = FULL_BOOL_WARN;
+			break;
+		case VTK_NOFULLBOOL:
+			TREF(gtm_fullbool) = GTM_BOOL;
+			break;
 		case VTK_GDSCERT0:
 			outval.mvtype = MV_STR;
 			op_wteol(1);
@@ -255,14 +261,49 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			/* This feature is not needed any more. This is a noop now */
 			break;
 		case VTK_LVNULLSUBS:
-			lv_null_subs = LVNULLSUBS_OK;
+			TREF(lv_null_subs) = LVNULLSUBS_OK;
 			break;
 		case VTK_NOLVNULLSUBS:
-			lv_null_subs = LVNULLSUBS_NO;
+			TREF(lv_null_subs) = LVNULLSUBS_NO;
 			break;
 		case VTK_NEVERLVNULLSUBS:
-			lv_null_subs = LVNULLSUBS_NEVER;
+			TREF(lv_null_subs) = LVNULLSUBS_NEVER;
 			break;
+#ifndef VMS
+		case VTK_JNLERROR:
+			TREF(error_on_jnl_file_lost) = MV_FORCE_INT(parmblk.value);
+			if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
+				TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_TURN_OFF;
+			if (NULL == gd_header)		/* open gbldir */
+				gvinit();
+			save_reg = gv_cur_region;
+			/* change all regions */
+			reg = gd_header->regions;
+			r_top = reg + gd_header->n_regions - 1;
+			for (;  reg <= r_top;  reg++)
+			{
+				if (!reg->open)
+					gv_init_reg(reg);
+				if (!reg->read_only)
+				{
+					gv_cur_region = reg;
+					change_reg();
+					csa = cs_addrs;
+					csd = csa->hdr;
+					if (JNL_ENABLED(csd))
+					{
+						was_crit = csa->now_crit;
+						if (!was_crit)
+							grab_crit(reg);
+						if (JNL_ENABLED(csd))
+							csa->jnl->error_reported = FALSE;
+						if (!was_crit)
+							rel_crit(reg);
+					}
+				}
+			}
+			break;
+#endif
 		case VTK_JNLFLUSH:
 			if (NULL == gd_header)		/* open gbldir */
 				gvinit();
@@ -280,30 +321,34 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				gv_cur_region = reg;
 				change_reg();
 				csa = cs_addrs;
-				if (JNL_ENABLED(csa->hdr))
+				csd = csa->hdr;
+				if (JNL_ENABLED(csd))
 				{
 					was_crit = csa->now_crit;
 					if (!was_crit)
 						grab_crit(reg);
-					jnl_status = jnl_ensure_open();
-					if (0 == jnl_status)
+					if (JNL_ENABLED(csd))
 					{
-						jb = csa->jnl->jnl_buff;
-						if (SS_NORMAL == (jnl_status = jnl_flush(reg)))
+						jnl_status = jnl_ensure_open();
+						if (0 == jnl_status)
 						{
-							assert(jb->dskaddr == jb->freeaddr);
-							UNIX_ONLY(jnl_fsync(reg, jb->dskaddr);)
-							UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr);)
+							jb = csa->jnl->jnl_buff;
+							if (SS_NORMAL == (jnl_status = jnl_flush(reg)))
+							{
+								assert(jb->dskaddr == jb->freeaddr);
+								UNIX_ONLY(jnl_fsync(reg, jb->dskaddr));
+								UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr));
+							} else
+							{
+								send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+									ERR_TEXT, 2,
+									RTS_ERROR_TEXT("Error with journal flush during op_view"),
+									jnl_status);
+								assert(FALSE);
+							}
 						} else
-						{
-							send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csa->hdr),
-								ERR_TEXT, 2,
-								RTS_ERROR_TEXT("Error with journal flush during op_view"),
-								jnl_status);
-							assert(FALSE);
-						}
-					} else
-						send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
+							send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+					}
 					if (!was_crit)
 						rel_crit(reg);
 				}
@@ -387,40 +432,39 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			break;
 		case VTK_YDIRTVAL:
 			/* This is an internal use only call to VIEW which is used to modify directory
-			   tree entries.  It places a string in in the static array ydirt_str.  A subsequent
-			   view to YDIRTREE causes the value to be put in the directory tree.
-			   For example VIEW "YDIRTVAL":$C(55,0,0,0),"YDIRTREE":XYZ would cause global ^XYZ
-			   to have a root block of 0x00000055, on a little-endian computer.
-
-			   Note that it is easy to corrupt a database with these calls.
-
-			   The use of the "Y" sentinal character indicates that the VIEW keyword is interal
-			   Greystone use only, and that Greystone will not provide upward compatibility to
-			   the user. These keywords should NOT be used outside of Greystone's software
-			   engineering department.
-			*/
-			ydirt_str_len = parmblk.value->str.len;
-			if (ydirt_str_len > MAX_YDIRTSTR)
+			 * tree entries.  It places a string in in the static array view_ydirt_str.  A subsequent
+			 * view to YDIRTREE causes the value to be put in the directory tree.
+			 * For example VIEW "YDIRTVAL":$C(55,0,0,0),"YDIRTREE":XYZ would cause global ^XYZ
+			 * to have a root block of 0x00000055, on a little-endian computer.
+			 * NOTE: it is easy to corrupt a database with these calls.
+			 * The use of the "Y" sentinal character indicates that the VIEW keyword is interal
+			 * FIS use only, and that FIS will not provide upward compatibility to the user.
+			 * These keywords should NOT be used outside of FIS software
+			 */
+			if (NULL == TREF(view_ydirt_str))
+				TREF(view_ydirt_str) = (char *)malloc(MAX_YDIRTSTR + 1);
+			TREF(view_ydirt_str_len) = parmblk.value->str.len;
+			if (TREF(view_ydirt_str_len) > MAX_YDIRTSTR)
 			{
 				va_end(var);
 				rts_error(VARLSTCNT(1) ERR_YDIRTSZ);
 			}
-			if (ydirt_str_len > 0)
-				memcpy(ydirt_str, parmblk.value->str.addr, ydirt_str_len);
+			if (TREF(view_ydirt_str_len) > 0)
+				memcpy(TREF(view_ydirt_str), parmblk.value->str.addr, TREF(view_ydirt_str_len));
 			break;
 		case VTK_YDIRTREE:
 			/* See comment under YDIRTVAL above
-			   Restriction: This program will update an existing entry in a directory tree but
-			   will fail if the entry is not present.  So make sure that the global exists before
-			   a YDIRTREE update is performed
-			*/
+			 * Restriction: This program will update an existing entry in a directory tree but
+			 * will fail if the entry is not present.  So make sure that the global exists before
+			 * a YDIRTREE update is performed
+			 */
 			op_gvname(VARLSTCNT(1) parmblk.value);
 			assert(INVALID_GV_TARGET == reset_gv_target);
 			reset_gv_target = gv_target;
 			gv_target = cs_addrs->dir_tree;		/* Trick the put program into using the directory tree */
 			outval.mvtype = MV_STR;
-			outval.str.len = ydirt_str_len;
-			outval.str.addr = (char *)ydirt_str;
+			outval.str.len = TREF(view_ydirt_str_len);
+			outval.str.addr = (char *)TREF(view_ydirt_str);
 			op_gvput(&outval);
 			RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 			gv_target->root = 0;
@@ -465,7 +509,8 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				{
 					if (HTENT_VALID_MNAME(tabent, lv_val, lv))
 					{
-						if (lv && lv->ptrs.val_ent.children)
+						assert(LV_IS_BASE_VAR(lv));
+						if (lv && LV_HAS_CHILD(lv))
 						{
 							va_end(var);
 							rts_error(VARLSTCNT(1) ERR_COLLDATAEXISTS);
@@ -483,21 +528,21 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 						va_end(var);
 						rts_error(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 					}
-					local_collseq = new_lcl_collseq;
+					TREF(local_collseq) = new_lcl_collseq;
 				} else
 				{
-					local_collseq = 0;
-					if (NULL != lcl_coll_xform_buff)
+					TREF(local_collseq) = 0;
+					if (NULL != TREF(lcl_coll_xform_buff))
 					{
-						assert(0 < max_lcl_coll_xform_bufsiz);
-						free(lcl_coll_xform_buff);
-						lcl_coll_xform_buff = NULL;
-						max_lcl_coll_xform_bufsiz = 0;
+						assert(0 < TREF(max_lcl_coll_xform_bufsiz));
+						free(TREF(lcl_coll_xform_buff));
+						TREF(lcl_coll_xform_buff) = NULL;
+						TREF(max_lcl_coll_xform_bufsiz) = 0;
 					}
 				}
 			}
 			if (-1 != ncol)
-				local_collseq_stdnull = (ncol ? TRUE: FALSE);
+				TREF(local_collseq_stdnull) = (ncol ? TRUE: FALSE);
 			break;
 		case VTK_PATLOAD:
 			if (!load_pattern_table(parmblk.value->str.len, parmblk.value->str.addr))
@@ -539,7 +584,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			testvalue = MV_FORCE_INT(parmblk.value);
 			if (testvalue)
 			{
-				if (numarg < 2)
+				if (2 > numarg)
 				{
 					va_end(var);
 					rts_error(VARLSTCNT(1) ERR_TRACEON);
@@ -555,9 +600,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					MV_FORCE_STR(arg);
 					turn_tracing_off(arg);
 				} else
-				{
 					turn_tracing_off(NULL);
-				}
 			}
 			break;
 		case VTK_ZDIR_FORM:
@@ -591,18 +634,22 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			break;
 		case VTK_LVREHASH:
 			/* This doesn't actually expand or contract the local variable hash table but does cause it to be
-			   rebuilt. Then we need to do the same sort of cleanup that add_hashtab_mname_symval does. */
-
+			 * rebuilt. Then we need to do the same sort of cleanup that add_hashtab_mname_symval does. */
 			/* Step 1: remember table we started with */
 			table = &curr_symval->h_symtab;
 			table_base_orig = table->base;
 			table_size_orig = table->size;
 			/* Step 2 - rebuild the local variable hash table */
+			/* We'll do the base release once we do the reparations */
+			DEFER_BASE_REL_HASHTAB(table, TRUE);
 			expand_hashtab_mname(&curr_symval->h_symtab, curr_symval->h_symtab.size);
 			/* Step 3 - repair the l_symtab entries on the stack from the rebuilt hash table */
 			if (table_base_orig != curr_symval->h_symtab.base)
-				/* Only needed if expansion was successful */
+			{	/* Only needed if expansion was successful */
 				als_lsymtab_repair(table, table_base_orig, table_size_orig);
+				FREE_BASE_HASHTAB(table, table_base_orig);
+			}
+			DEFER_BASE_REL_HASHTAB(table, FALSE);
 			break;
 		case VTK_STORDUMP:
 			if (gtmDebugLevel)
@@ -614,7 +661,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					gtmDebugLevel &= (~GDL_SmDump);	/* Shut indicator back off */
 			}
 			break;
-#if DEBUG_ALIAS
+#if			DEBUG_ALIAS
 		case VTK_LVMONOUT:
 			als_lvmon_output();
 			break;
@@ -622,16 +669,23 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			lvmon_enabled = TRUE;	/* Enable lv_val monitoring */
 			/* Clear any existing marks on all lv_vals */
 			for (lvlsymtab = curr_symval; lvlsymtab; lvlsymtab = lvlsymtab->last_tab)
-				for (lvbp = &curr_symval->first_block; lvbp; lvbp = lvbp->next)
-					for (lvp = lvbp->lv_base, lvp_top = lvbp->lv_free; lvp < lvp_top; lvp++)
-						if (MV_SBS != lvp->v.mvtype)
-							lvp->stats.lvmon_mark = FALSE;
+			{
+				for (lvbp = curr_symval->lv_first_block; lvbp; lvbp = lvbp->next)
+				{
+					for (lvp = (lv_val *)LV_BLK_GET_BASE(lvbp), lvp_top = LV_BLK_GET_FREE(lvbp, lvp);
+							lvp < lvp_top; lvp++)
+					{
+						assert(LV_IS_BASE_VAR(lv));
+						lvp->stats.lvmon_mark = FALSE;
+					}
+				}
+			}
 			break;
 		case VTK_LVMONSTOP:
 			als_lvmon_output();
 			lvmon_enabled = FALSE;
 			break;
-#endif
+#			endif
 		default:
 			va_end(var);
 			rts_error(VARLSTCNT(1) ERR_VIEWCMD);

@@ -29,6 +29,8 @@ GBLREF 	jnl_gbls_t		jgbl;
 
 void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 {
+	trans_num	db_tn;
+
 	/**** We will write journal file header, epoch and eof in order ****/
 	/* Write the file header */
 	memset((char *)header, 0, JNL_HDR_LEN);	/* note: In Unix, this means we 0-fill 2K REAL_JNL_HDR_LEN + 62K padding */
@@ -46,8 +48,9 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 	header->max_jrec_len = info->max_jrec_len;
 	header->bov_timestamp = jgbl.gbl_jrec_time;
 	header->eov_timestamp = jgbl.gbl_jrec_time;
-	header->bov_tn = info->tn;
-	header->eov_tn = info->tn;
+	db_tn = info->csd->trans_hist.curr_tn;
+	header->bov_tn = db_tn;
+	header->eov_tn = db_tn;
 	header->before_images = info->before_images;
 	/* Note that in case of MUPIP JOURNAL -ROLLBACK, we need to set header->repl_state to repl_open although replication
 	 * is currently not ON in the database. This is so future ROLLBACKs know this journal is replication enabled.

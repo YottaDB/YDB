@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ GBLREF	pid_t	process_id;
 GBLREF	uint4	image_count;
 GBLREF 	int4 	exi_condition;
 
-void performCASLatchCheck(sm_global_latch_ptr_t latch, int loopcnt)
+void performCASLatchCheck(sm_global_latch_ptr_t latch, boolean_t cont_proc)
 {
 	pid_t	holder_pid;
 	VMS_ONLY(uint4 holder_imgcnt;)
@@ -44,7 +44,7 @@ void performCASLatchCheck(sm_global_latch_ptr_t latch, int loopcnt)
 		{ /* remove (processe_id == holder && image_count == holder_pid) when fixed */
 			COMPSWAP_UNLOCK(latch, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 		}
-		UNIX_ONLY(else if (loopcnt && 0 == (loopcnt % LOOP_CNT_SEND_WAKEUP))
-		                    continue_proc(holder_pid));	/* Attempt wakeup in case process is stuck */
+		UNIX_ONLY(else if (cont_proc)
+		                    continue_proc(holder_pid);)	/* Attempt wakeup in case process is stuck */
 	}
 }

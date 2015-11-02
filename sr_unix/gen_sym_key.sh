@@ -23,14 +23,18 @@
 
 SYM_KEY_LEN=32
 
+hostos=`uname -s`
 # try to get a predictable which
-if [ -x "/usr/bin/which" ] ; then which=/usr/bin/which ; else which=which ; fi
+if [ "OS/390" = "$hostos" ] ; then which=whence ;
+elif [ -x "/usr/bin/which" ] ; then which=/usr/bin/which
+else which=which
+fi
 
 # echo and options
 ECHO=/bin/echo
 ECHO_OPTIONS=""
 #Linux honors escape sequence only when run with -e
-if [ "Linux" = "`uname -s`" ] ; then ECHO_OPTIONS="-e" ; fi
+if [ "Linux" = "$hostos" ] ; then ECHO_OPTIONS="-e" ; fi
 
 if [ $# -lt 2 ] ; then $ECHO Usage: "`basename $0` key_strength[0-2] output_file" ; exit 1 ; fi
 

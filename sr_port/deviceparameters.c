@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,11 @@
 GBLREF	char 	window_token;
 GBLREF	mident 	window_ident;
 GBLREF	triple	*curtchain;
+
+error_def(ERR_RPARENMISSING);
+error_def(ERR_DEVPARUNK);
+error_def(ERR_DEVPARINAP);
+error_def(ERR_DEVPARVALREQ);
 
 LITREF unsigned char io_params_size[];
 LITREF dev_ctl_struct dev_param_control[];
@@ -292,11 +297,6 @@ int deviceparameters(oprtype *c, char who_calls)
 	boolean_t	is_parm_list;
 	boolean_t	parse_warn;
 
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_DEVPARUNK);
-	error_def(ERR_DEVPARINAP);
-	error_def(ERR_DEVPARVALREQ);
-
 	static readonly unsigned char dev_param_data[] =
 	{
 		 iop_after
@@ -520,7 +520,9 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_width /* for ZWIDTH; ZWID* is a synonym for WI*, WIDTH */
 		,iop_wrap /* for ZWRAP; ZWRA* is a synonym for WR, and WRA* */
 	} ;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(dev_param_index[26] == (SIZEOF(dev_param_names)/SIZEOF(nametabent)));
 	assert(dev_param_index[26] == (SIZEOF(dev_param_data)/SIZEOF(unsigned char)));
 	is_parm_list = (window_token == TK_LPAREN);

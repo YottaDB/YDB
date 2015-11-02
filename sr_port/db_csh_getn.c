@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <signal.h>	/* needed for VSIG_ATOMIC_T */
+
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -24,6 +25,7 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab.h"		/* needed for cws_insert.h */
 #include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "gdsbgtr.h"
@@ -34,7 +36,6 @@
 #include "is_proc_alive.h"
 #include "cache.h"
 #include "longset.h"		/* needed for cws_insert.h */
-#include "hashtab.h"
 #include "cws_insert.h"
 #include "wcs_sleep.h"
 #include "wcs_get_space.h"
@@ -42,15 +43,27 @@
 #include "add_inter.h"
 #include "wbox_test_init.h"
 #include "have_crit.h"
+#include "memcoherency.h"
+#include "gtm_c_stack_trace.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		process_id;
 GBLREF uint4		image_count;
 GBLREF unsigned int	t_tries;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF boolean_t        mu_reorg_process;
+
+#define	TRACE_AND_SLEEP(ocnt)				\
+{							\
+	if (1 == ocnt)					\
+	{						\
+		BG_TRACE_PRO(db_csh_getn_rip_wait);	\
+		first_r_epid = latest_r_epid;		\
+	}						\
+	wcs_sleep(ocnt);				\
+}
 
 cache_rec_ptr_t	db_csh_getn(block_id block)
 {
@@ -64,7 +77,6 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
 	ht_ent_int4		*tabent;
-	intrpt_state_t		save_intrpt_ok_state;
 
 	error_def(ERR_BUFRDTIMEOUT);
 	error_def(ERR_INVALIDRIP);
@@ -81,7 +93,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	pass2 = 2 * max_ent;	/* skip referred cache records */
 	pass3 = 3 * max_ent;	/* skip nothing */
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getns, 1);
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_DB_CSH_GETN);
+	DEFER_INTERRUPTS(INTRPT_IN_DB_CSH_GETN);
 	for (lcnt = 0;  ; lcnt++)
 	{
 		if (lcnt > pass3)
@@ -246,18 +258,24 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 					INTERLOCK_INIT(cr);
 					assert(cr->r_epid == 0);
 					cr->r_epid = 0;
-				} else  if ((0 != latest_r_epid) && (FALSE == is_proc_alive(latest_r_epid, cr->image_count)))
+				} else  if (0 != latest_r_epid)
 				{
-					INTERLOCK_INIT(cr);			/* Process gone, release that process's lock */
-					cr->r_epid = 0;
+					if (TRUE == is_proc_alive(latest_r_epid, cr->image_count))
+					{
+						DEBUG_ONLY(
+								if ( (BUF_OWNER_STUCK / 2)== ocnt)
+									GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, \
+										latest_r_epid, ONCE);
+							  )
+						TRACE_AND_SLEEP(ocnt);
+					} else
+					{
+						INTERLOCK_INIT(cr);	/* Process gone, release that process's lock */
+						cr->r_epid = 0;
+					}
 				} else
 				{
-					if (1 == ocnt)
-					{
-						BG_TRACE_PRO(db_csh_getn_rip_wait);
-						first_r_epid = latest_r_epid;
-					}
-					wcs_sleep(ocnt);
+					TRACE_AND_SLEEP(ocnt);
 				}
 				LOCK_BUFF_FOR_READ(cr, rip);
 			}
@@ -268,6 +286,11 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				{
 					if (first_r_epid != latest_r_epid)
 						GTMASSERT;
+#ifdef DEBUG
+					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, latest_r_epid, TWICE);
+#else
+					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, latest_r_epid, ONCE);
+#endif
 					RELEASE_BUFF_READ_LOCK(cr);
 					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id,
 								cr->blk, cr, first_r_epid, DB_LEN_STR(gv_cur_region));
@@ -289,6 +312,14 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		cr->r_epid = process_id;	/* establish ownership */
 		cr->image_count = image_count;
 		cr->blk = block;
+		/* We want cr->read_in_progress to be locked BEFORE cr->cycle is incremented. t_qread relies on this order.
+		 * Enforce this order with a write memory barrier. Not doing so might cause the incremented cr->cycle to be
+		 * seen by another process even though it sees the unlocked state of cr->read_in_progress. This could cause
+		 * t_qread to incorrectly return with an uptodate cr->cycle even though the buffer is still being read in
+		 * from disk and this could cause db integ errors as validation (in t_end/tp_tend which relies on cr->cycle)
+		 * will detect no problems even though there is one.
+		 */
+		SHM_WRITE_MEMORY_BARRIER;
 		cr->cycle++;
 		cr->jnl_addr = 0;
 		cr->refer = TRUE;
@@ -312,12 +343,12 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			csa->nl->cache_hits = 0;
 		}
 		INCR_DB_CSH_COUNTER(csa, n_db_csh_getn_lcnt, lcnt);
-		RESTORE_INTRPT_OK_STATE;
+		ENABLE_INTERRUPTS(INTRPT_IN_DB_CSH_GETN);
 		return cr;
 	}
 	/* force a recover */
 	INCR_DB_CSH_COUNTER(csa, n_db_csh_getn_lcnt, lcnt);
 	csa->nl->cur_lru_cache_rec_off = GDS_ABS2REL(cr);
-	RESTORE_INTRPT_OK_STATE;
+	ENABLE_INTERRUPTS(INTRPT_IN_DB_CSH_GETN);
 	return (cache_rec_ptr_t)CR_NOTVALID;
 }

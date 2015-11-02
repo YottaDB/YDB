@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,8 +40,35 @@ typedef struct
 
 #define GET_MSTR_LEN(X, Y)	GET_ULONG(X, Y)
 #define PUT_MSTR_LEN(X, Y)	PUT_ULONG(X, Y)
-#define MSTR_CMP(x, y, result) 	(((result) = memcmp((x)->addr, (y)->addr, MIN((x)->len, (y)->len))) ?\
-								(result) : ((result) = (x)->len - (y)->len))
+
+#define	MEMVCMP(STR1, STR1LEN, STR2, STR2LEN, RESULT)							\
+{													\
+	int	lcl_str1Len, lcl_str2Len;								\
+	int	lcl_minLen, lcl_retVal, lcl_retVal2;							\
+													\
+	lcl_str1Len = STR1LEN;										\
+	lcl_str2Len = STR2LEN;										\
+	if (lcl_str1Len == lcl_str2Len)									\
+	{												\
+		lcl_minLen = lcl_str1Len;								\
+		lcl_retVal = 0;										\
+	} else if (lcl_str1Len > lcl_str2Len)								\
+	{												\
+		lcl_minLen = lcl_str2Len;								\
+		lcl_retVal = 1;										\
+	} else												\
+	{												\
+		lcl_minLen = lcl_str1Len;								\
+		lcl_retVal = -1;									\
+	}												\
+	RESULT = (0 == (lcl_retVal2 = memcmp(STR1, STR2, lcl_minLen))) ? lcl_retVal : lcl_retVal2;	\
+}
+
+/* There are 2 MSTR*CMP macros. One is if the parameters are available as MSTRs and another if the parameters
+ * are available as MSTR pointers. Use whichever is appropriate as it saves cycles.
+ */
+#define MSTRP_CMP(x, y, result)	MEMVCMP((x)->addr, (x)->len, (y)->addr, (y)->len, result)
+#define MSTR_CMP(x, y, result)	MEMVCMP((x).addr, (x).len, (y).addr, (y).len, result)
 #define MSTR_EQ(x, y)		(((x)->len == (y)->len) && !memcmp((x)->addr, (y)->addr, (x)->len))
 
 #include <sys/types.h>
@@ -56,12 +83,21 @@ typedef struct
 #include "mdefsa.h"
 #include "mdefsp.h"
 #include "gtm_sizeof.h"
+#include "gtm_threadgbl.h"
+/* Anchor for thread-global structure rather than individual global vars */
+GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */
 
 #ifdef DEBUG
 error_def(ERR_ASSERT);
 #define assert(x) ((x) ? 1 : rts_error(VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__, (SIZEOF(#x) - 1), (#x)))
 #else
 #define assert(x)
+#endif
+
+#ifdef GTM64
+# define lvaddr "%016lx"
+#else
+# define lvaddr "%08lx"
 #endif
 
 /* Define GT.M interlude functions for open, close, pipe, creat and dup system calls. This lets GT.M trace through all file
@@ -194,6 +230,13 @@ typedef UINTPTR_T uintszofptr_t;
 #	define	OFFSETOF(X,Y) offsetof(X,Y)
 #endif
 
+/* macro to check that the OFFSET & SIZE of TYPE1.MEMBER1 is identical to that of TYPE2.MEMBER2 */
+#define	IS_OFFSET_AND_SIZE_MATCH(TYPE1, MEMBER1, TYPE2, MEMBER2)		\
+	(SIZEOF(((TYPE1 *)NULL)->MEMBER1) == SIZEOF(((TYPE2 *)NULL)->MEMBER2))	\
+		&& (OFFSETOF(TYPE1, MEMBER1) == OFFSETOF(TYPE2, MEMBER2))
+
+#define	IS_OFFSET_MATCH(TYPE1, MEMBER1, TYPE2, MEMBER2)	(OFFSETOF(TYPE1, MEMBER1) == OFFSETOF(TYPE2, MEMBER2))
+
 #define	ARRAYSIZE(arr)	SIZEOF(arr)/SIZEOF(arr[0])	/* # of elements defined in the array */
 #define	ARRAYTOP(arr)	(&arr[0] + ARRAYSIZE(arr))	/* address of the TOP of the array (first byte AFTER array limits).
 							 * use &arr[0] + size instead of &arr[size] to avoid compiler warning.
@@ -261,7 +304,7 @@ typedef struct
 } mident_fixed;
 #define mid_len(name)		strlen(&(name)->c[0])	/* callers of mid_len should include gtm_string.h as well */
 
-#define MIDENT_CMP(x,y,result)	MSTR_CMP(x, y, result)
+#define MIDENT_CMP(x,y,result)	MSTRP_CMP(x, y, result)
 #define MIDENT_EQ(x,y)		MSTR_EQ(x, y)
 
 #ifdef INT8_NATIVE
@@ -297,22 +340,36 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 
 /* Bit definitions for mval type (mvtype) */
 #define MV_NM		 1	/* 0x0001 */
-#define MV_INT		 2	/* 0x0002 */
+#define MV_INT		 2	/* 0x0002
+				 * Note: this bit is set for integers and non-integers with <= 3 digits after the decimal point */
 #define MV_NUM_MASK	 3	/* 0x0003 (MV_NM | MV_INT) */
 #define MV_STR		 4	/* 0x0004 */
-#define MV_NUM_APPROX	 8	/* 0x0008 */
-#define MV_SBS		16	/* 0x0010 */
+#define MV_NUM_APPROX	 8	/* 0x0008 */	/* bit set implies value is guaranteed to be part number, part string */
+#define	MV_CANONICAL    16	/* 0x0010
+				 * Note: this bit is set currently only for mvals corresponding to local variable subscripts
+				 * in tree.c/tree.h. This bit should not be examined/relied-upon anywhere outside tree.c
+				 */
 #define MV_SYM		32	/* 0x0020 */
 #define MV_SUBLIT	64	/* 0x0040 */
 #define MV_RETARG      128	/* 0x0080 */
 #define MV_UTF_LEN     256	/* 0x0100 */
 #define MV_ALIASCONT   512	/* 0x0200 */
 
+#define	MV_INT_OFF			~(MV_INT)			/* Mask to turn off MV_INT */
+#define	MV_STR_OFF			~(MV_STR)			/* Mask to turn off MV_STR */
+#define	MV_CANONICAL_OFF		~(MV_CANONICAL)			/* Mask to turn off MV_CANONICAL */
+#define	MV_UTF_LEN_OFF			~(MV_UTF_LEN)			/* Mask to turn off MV_UTF_LEN */
+
+#define MV_EXT_NUM_MASK	 (MV_NM | MV_INT | MV_CANONICAL)
+
 /* Special definition used when an xnew'd lv_val is moved from a popped symtab to an earlier
-   one so it can be preserved. This flag marks the lv_val as a pointer to the new symtab so
-   multiple references to it can be resolved.
-*/
-#define MV_LVCOPIED	0x7fff
+ * one so it can be preserved. This flag marks the lv_val as a pointer to the new symtab so
+ * multiple references to it can be resolved.
+ */
+#define MV_LVCOPIED	0xf000
+
+/* A few more special definitions */
+#define	MV_LV_TREE	0xf001
 
 #define MV_XBIAS	62
 #define MV_XZERO	 0
@@ -391,7 +448,7 @@ mval *underr (mval *start, ...);
 #	define	DBG_ASSERT(X)
 #endif
 
-/* Use the "D" format of these MV_FORCE macros only in those places where there is no possibility of M being undefined */
+/* Use the "D" format of these MV_FORCE macros only in those places where there is no possibility of the input being undefined */
 #define MV_FORCE_STR(X)		(MV_FORCE_DEFINED(X), MV_FORCE_STRD(X))
 #define MV_FORCE_STRD(X)	(DBG_ASSERT(MV_DEFINED(X)) (0 == ((X)->mvtype & MV_STR)) ? n2s(X) : NULL)
 #define MV_FORCE_NUM(X)		(MV_FORCE_DEFINED(X), MV_FORCE_NUMD(X))
@@ -403,13 +460,6 @@ mval *underr (mval *start, ...);
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(int)(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (int)(I)*MV_BIAS ))
-#define MV_FORCE_FLT(F,I)	( (F)->e = 0 , (F)->m[1] = (I)*MV_BIAS )
-#define MV_ASGN_FLT2MVAL(M,F)	( (F).e == 0 ? ( (M).mvtype = MV_NM | MV_INT , (M).m[1] = (F).m[1] )\
-					     : ( (M).mvtype = MV_NM , (M).m[0] = (F).m[0] , (M).m[1] = (F).m[1]\
-						, (M).sgn = (F).sgn  , (M).e = (F).e ))
-#define MV_ASGN_MVAL2FLT(F,M)	( (M).mvtype & MV_INT ? ( (F).e = 0 , (F).m[1] = (M).m[1] )\
-						      : ( (F).m[0] = (M).m[0] , (F).m[1] = (M).m[1]\
-							, (F).sgn = (M).sgn , (F).e = (M).e ))
 #define MV_FORCE_DEFINED(X)	((!MV_DEFINED(X)) ? (X) = underr(X) : (X))
 /* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
@@ -417,13 +467,19 @@ mval *underr (mval *start, ...);
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
-#define MV_IS_INT(X)		(bool)isint(X)
+#define MV_IS_INT(X)		(((X)->mvtype & MV_INT) != 0)	/* returns TRUE if input has MV_INT bit set */
+#define MV_IS_TRUEINT(X, INTVAL_P)	(isint(X, INTVAL_P))	/* returns TRUE if input is a true integer (no fractions) */
 #define MV_IS_STRING(X)		(((X)->mvtype & MV_STR) != 0)
 #define MV_DEFINED(X)		(((X)->mvtype & (MV_STR | MV_NM)) != 0)
-#define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (bool)nm_iscan(X))
+#define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (boolean_t)val_iscan(X))
 #define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = 0xff)
 #define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = 0xff,		\
 				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
+
+#define MVTYPE_IS_NUMERIC(X)	(0 != ((X) & MV_NM))
+#define MVTYPE_IS_NUM_APPROX(X)	(0 != ((X) & MV_NUM_APPROX))
+#define MVTYPE_IS_INT(X)	(0 != ((X) & MV_INT))
+#define MVTYPE_IS_STRING(X)	(0 != ((X) & MV_STR))
 
 /* DEFINE_MVAL_LITERAL is intended to be used to define a string mval where the string is a literal or defined with type
  * "readonly".  In other words, the value of the string does not change.  Since we expect all callers of this macro to use
@@ -563,11 +619,6 @@ int4 timeout2msec(int4 timeout);
 
 #define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)
 #define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, SIZEOF(LITERAL) - 1)
-#define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)
-#define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)(STRING)))
-
-#define	STRCPY(SOURCE, DEST)		strcpy((char *)(SOURCE), (char *)(DEST))
-#define	STRCMP(SOURCE, DEST)		strcmp((char *)(SOURCE), (char *)(DEST))
 
 #define	SET_PROCESS_EXITING_TRUE				\
 {								\
@@ -798,6 +849,8 @@ int m_usleep(int useconds);
    typedef	int64_t			gtm_int64_t;
 #endif
 
+typedef INTPTR_T	sm_off_t;
+
 /* HPPA latches (used by load_and_clear) must be 16 byte aligned.
  * By allocating 16 bytes, the routines and macros used to access the latch can do the alignment.
  * Since nothing else should follow to avoid cache threshing, this doesn't really waste space.
@@ -837,14 +890,14 @@ typedef uint4 gtm_time4_t;
 
 typedef struct
 {
-	int4	fl;		/* forward link - relative offset from beginning of this element to next element in queue */
-	int4	bl;		/* backward link - relative offset from beginning of this element to previous element in queue */
+	sm_off_t	fl;		/* forward link - relative offset from beginning of this element to next element in queue */
+	sm_off_t bl; /* backward link - relative offset from beginning of this element to previous element in queue */
 } que_ent;			/* this structure is intended to be identical to the first two items in a cache_que_head */
 
 typedef struct
 {
-	int4	fl;		/* forward link - relative offset from beginning of this element to next element in queue */
-	int4	bl;		/* backward link - relative offset from beginning of this element to previous element in queue */
+	sm_off_t	fl;		/* forward link - relative offset from beginning of this element to next element in queue */
+	sm_off_t bl; /* backward link - relative offset from beginning of this element to previous element in queue */
 	global_latch_t	latch;	/* required for platforms without atomic operations to modify both fl and bl concurrently;
 				 * unused on platforms with such instructions. */
 } que_head, cache_que_head, mmblk_que_head;
@@ -853,6 +906,10 @@ typedef struct
 	(0 == ((((sm_uc_ptr_t)(ptr)) - ((sm_uc_ptr_t)(ptr_base))) % elemSize))
 #define	IS_PTR_IN_RANGE(ptr, ptr_lo, ptr_hi)								\
 	(((sm_uc_ptr_t)(ptr) >= (sm_uc_ptr_t)(ptr_lo)) && ((sm_uc_ptr_t)(ptr) < (sm_uc_ptr_t)(ptr_hi)))
+
+#define	IS_PTR_2BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) % 2))
+#define	IS_PTR_4BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) % 4))
+#define	IS_PTR_8BYTE_ALIGNED(ptr)	(0 == (((uintszofptr_t)ptr) % 8))
 
 #ifdef DB64
 # ifdef __osf__
@@ -1317,7 +1374,7 @@ int gtm_memcmp (const void *, const void *, size_t);
 DEBUG_ONLY(void printMallocInfo(void);)
 int is_equ(mval *u, mval *v);
 char is_ident(mstr *v);
-int nm_iscan(mval *v);
+int val_iscan(mval *v);
 void mcfree(void);
 int4 getprime(int4 n);
 void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...);
@@ -1403,7 +1460,6 @@ qw_num	gtm_byteswap_64(qw_num num64);
 
 typedef uint4 		jnl_tm_t;
 typedef uint4 		off_jnl_t;
-typedef INTPTR_T	sm_off_t;
 typedef gtm_uint64_t	gtm_off_t;
 
 #define MAXUINT8	((gtm_uint64_t)-1)
@@ -1537,7 +1593,7 @@ typedef struct gtm_num_range_struct
 
 /* Debug FPRINTF with pre and post requisite flushing of appropriate streams */
 #ifndef DBGFPF
-# define DBGFPF(x) {flush_pio(); FPRINTF x; fflush(stderr);}
+# define DBGFPF(x)	{flush_pio(); FPRINTF x; fflush(stderr); fflush(stdout);}
 #endif
 
 /* Settings for lv_null_subs */
@@ -1549,5 +1605,8 @@ enum
 	LVNULLSUBS_NEVER,	/* LVNULLSUBS_NO plus LV subscripts prohibited in $DATA, $GET, $ORDER, $QUERY, KILL, etc */
 	LVNULLSUBS_LAST
 };
+#define MAX_GVSUBSCRIPTS 32
+#define MAX_LVSUBSCRIPTS 32
+#define MAX_INDSUBSCRIPTS 32
 
 #endif /* MDEF_included */

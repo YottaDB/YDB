@@ -44,7 +44,6 @@ dse_rmrec
 dse_rmsb
 dse_save
 dse_shift
-dse_simulate_t_end
 dse_wcreinit
 dump_record
 skan_offset

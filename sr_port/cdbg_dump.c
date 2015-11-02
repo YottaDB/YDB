@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,10 +69,10 @@ LITDEF char *indents[11] =
 };
 
 GBLREF char	*oc_tab_graphic[];
-GBLREF bool	compile_time;
 GBLREF spdesc	indr_stringpool;
 GBLREF int4	sa_temps_offset[];
 GBLREF int4	sa_temps[];
+
 LITREF int4	sa_class_sizes[];
 
 #define MAX_INDENT (32 * 1024)
@@ -83,14 +83,14 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 {
 	int		len;
 
-	PRINTF("%s Triple %s [0x%08lx]   fwdptr: 0x%08lx   bkwdptr: 0x%08lx  srcline: %d  colmn: %d  rtaddr: %d\n",
+	PRINTF("%s Triple %s [0x"lvaddr"]   fwdptr: 0x"lvaddr"   bkwdptr: 0x"lvaddr"  srcline: %d  colmn: %d  rtaddr: %d\n",
 	       cdbg_indent(indent), oc_tab_graphic[dtrip->opcode], (long unsigned int) dtrip,
 	       (long unsigned int) dtrip->exorder.fl, (long unsigned int) dtrip->exorder.bl, dtrip->src.line,
 	       dtrip->src.column, dtrip->rtaddr);
 	/*switch(dtrip->opcode)
 	{
 		case OC_CDLIT:
-			PRINTF("%s  OC_CDLT ptr: 0x%08lx  len: 0x%08lx\n",
+			PRINTF("%s  OC_CDLT ptr: 0x"lvaddr"  len: 0x"lvaddr"\n",
 			       cdbg_indent(indent), opr->oprval.cdlt->addr, opr->oprval.cdlt->len);
 			if (opr->oprval.cdlt->len)
 				cdbg_dump_mstr(cdbg_indent(indent), opr->oprval.cdlt);
@@ -105,7 +105,7 @@ void cdbg_dump_triple(triple *dtrip, int indent)
 
 void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size)
 {
-	PRINTF("Shrunken triple %s [0x%08lx]   fwdptr: 0x%08lx   bkwdptr: 0x%08lx  srcline: %d  colmn: %d  rtaddr: %d\n",
+	PRINTF("Shrunken triple %s [0x"lvaddr"]   fwdptr: 0x"lvaddr"   bkwdptr: 0x"lvaddr"  srcline: %d  colmn: %d  rtaddr: %d\n",
 	       oc_tab_graphic[dtrip->opcode], (long unsigned int) dtrip, (long unsigned int) dtrip->exorder.fl,
 	       (long unsigned int) dtrip->exorder.bl, dtrip->src.line, dtrip->src.column, dtrip->rtaddr);
 	PRINTF("    old size: %d  new size: %d  shrinkage: %d\n", old_size, new_size, (old_size - new_size));
@@ -121,7 +121,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 	char 	mid[(SIZEOF(mident_fixed) * 2) + 1];	/* Sized to hold an labels name rtn.lbl */
 
 	if (opr)
-		PRINTF("%s %s  [0x%08lx]  Type: %s\n", cdbg_indent(indent), oprtype_names[opnum], (long unsigned int) opr,
+		PRINTF("%s %s  [0x"lvaddr"]  Type: %s\n", cdbg_indent(indent), oprtype_names[opnum], (long unsigned int) opr,
 		       oprtype_type_names[opr->oprclass]);
 	else
 		PRINTF("%s ** Warning ** Null opr passed as operand\n", cdbg_indent(indent));
@@ -130,7 +130,6 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		fflush(stdout);
 		return;
 	}
-
 	/* We have a real oprclass, dump it's info */
 	switch(opr->oprclass)
 	{
@@ -145,7 +144,8 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		case MVAR_REF:
 			if (opr->oprval.vref)
 			{
-				PRINTF("%s   LS vref: 0x%08lx  RS vref: 0x%08lx  index: %d  varname: %s  last triple: 0x%08lx\n",
+				PRINTF("%s   LS vref: 0x"lvaddr"  RS vref: 0x"lvaddr"  index: %d  varname: %s  last triple: "
+				       "0x"lvaddr"\n",
 				       cdbg_indent(indent),(long unsigned int) opr->oprval.vref->lson,
 				       (long unsigned int) opr->oprval.vref->rson, opr->oprval.vref->mvidx,
 				       cdbg_makstr(opr->oprval.vref->mvname.addr, &buff, opr->oprval.vref->mvname.len),
@@ -166,7 +166,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			break;
 		case MLIT_REF:
 			if (opr->oprval.mlit)
-				PRINTF("%s   lit-ref fwdptr: 0x%08lx  bkwdptr: 0x%08lx  rtaddr: 0x%08lx\n",
+				PRINTF("%s   lit-ref fwdptr: 0x"lvaddr"  bkwdptr: 0x"lvaddr"  rtaddr: 0x"lvaddr"\n",
 				       cdbg_indent(indent), (long unsigned int) opr->oprval.mlit->que.fl,
 				       (long unsigned int) opr->oprval.mlit->que.bl, opr->oprval.mlit->rt_addr);
 			else
@@ -175,7 +175,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			break;
 		case TJMP_REF:
 			if (opr->oprval.tref)
-				PRINTF("%s   tjmp-ref jump list ptr: 0x%08lx\n", cdbg_indent(indent),
+				PRINTF("%s   tjmp-ref jump list ptr: 0x"lvaddr"\n", cdbg_indent(indent),
 						(long unsigned int) &opr->oprval.tref->jmplist);
 			else
 				PRINTF("%s   ** Warning ** oprval.tref is NULL\n", cdbg_indent(indent));
@@ -190,7 +190,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			break;
 		case TSIZ_REF:
 			if (opr->oprval.tsize)
-				PRINTF("%s   triple at 0x%08lx has size %d\n", cdbg_indent(indent),
+				PRINTF("%s   triple at 0x"lvaddr" has size %d\n", cdbg_indent(indent),
 						(long unsigned int) opr->oprval.tsize->ct, opr->oprval.tsize->size);
 			else
 				PRINTF("%s   ** Warning ** oprval.tsize is NULL\n", cdbg_indent(indent));
@@ -289,18 +289,20 @@ void cdbg_dump_mstr(int indent, mstr *ms)
 {
 	unsigned char	*buffer, *strp;
 	int		len;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	len = ms->len;
 	strp = (unsigned char *)ms->addr;
-#if defined(USHBIN_SUPPORTED) || defined(VMS)
+#	if defined(USHBIN_SUPPORTED) || defined(VMS)
 	/* In shared binary mode, shrink_trips is called after indir_lits() changes the addresses
 	 * in the mvals to offsets. De-offset them if they don't point into the (indirect)
 	 * stringpool. This *ONLY* happens during an indirect compilation.
 	 */
-	assert(compile_time || indr_stringpool.base != indr_stringpool.free);
-	if (!compile_time && strp < indr_stringpool.base)
+	assert(TREF(compile_time) || indr_stringpool.base != indr_stringpool.free);
+	if (!TREF(compile_time) && strp < indr_stringpool.base)
 		strp += (UINTPTR_T)(indr_stringpool.base - SIZEOF(ihdtyp) - PADLEN(SIZEOF(ihdtyp), NATIVE_WSIZE));
-#endif
+#	endif
 	buffer = malloc(len + 1);
 	memcpy(buffer, strp, len);
 	buffer[len] = 0;

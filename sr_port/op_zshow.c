@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,6 @@
 #include "gtm_string.h"
 
 #include "error.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "mlkdef.h"
 #include "zshow.h"
@@ -26,6 +25,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gtm_maxstr.h"
+#include "svnames.h"
 
 GBLREF gv_key *gv_currkey;
 
@@ -142,7 +142,7 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 					break;
 				done_i = TRUE;
 				output.code = 'I';
-				zshow_svn(&output);
+				zshow_svn(&output, SV_ALL);
 				break;
 			case 'L':
 			case 'l':

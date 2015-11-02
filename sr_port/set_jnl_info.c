@@ -49,6 +49,7 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	assert(csd->autoswitchlimit);
 	assert(csd->jnl_buffer_size);
 	assert(csd->epoch_interval);
+	jnl_info->csd = csd;
 	/* note that csd->jnl_deq can be 0 since a zero journal extension size is accepted */
 	jnl_info->status = jnl_info->status2 = SS_NORMAL;
 	jnl_info->no_rename = jnl_info->no_prev_link = FALSE;
@@ -77,7 +78,6 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	assert(JNL_ALLOWED(jnl_info));
 	jnl_info->repl_state = csd->repl_state;
 	JNL_MAX_RECLEN(jnl_info, csd);
-	jnl_info->tn = csd->trans_hist.curr_tn;
 	UNIX_ONLY(
 		if (JNL_ALLOC_MIN > csd->jnl_alq)
 		{	/* Possible if a pre-V54001 journaled db (which allows allocation values as low as 10) is used

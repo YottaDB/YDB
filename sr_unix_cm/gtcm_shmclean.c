@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@
 #include "gdsfhead.h"
 #include "trans_log_name.h"
 #include "cli.h"
+#include "gtm_threadgbl_init.h"
 
 /* This executable does not have any command tables so initialize command array to NULL. The reason why cmd_ary is needed is
  * because trans_log_name (invoked by this module) in turn pulls in gtm_malloc/gtm_free and in turn a lot of the database
@@ -153,7 +154,9 @@ int main(int argc, char_ptr_t argv[])
 	int	daemon = 0;
 	char	resp;
 	int	opt, err;
+	DCL_THREADGBL_ACCESS;
 
+	GTM_THREADGBL_INIT;
 	err = 0;
 	while ((opt = getopt(argc, argv, "qds")) != -1)
 	{
@@ -183,7 +186,12 @@ int main(int argc, char_ptr_t argv[])
 		FPRINTF(stderr,"sure all GTM processes have been shut down cleanly before running\n");
 		FPRINTF(stderr,"this program.\n\n");
 		FPRINTF(stderr,"Do you want to contine? (y or n)  ");
-		read(0, &resp, 1);
+
+		if (1 != read(0, &resp, 1))  /*unable to read response*/
+		{
+			FPRINTF(stderr,"Error while reading response from user. Exiting\n");
+			exit(0);
+		}
 		if ((resp != 'y') && (resp != 'Y'))
 		{
 			exit(0);

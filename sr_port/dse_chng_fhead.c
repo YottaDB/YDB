@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -400,7 +400,7 @@ void dse_chng_fhead(void)
 		if (max_tn_warn_present)
 			cs_addrs->hdr->max_tn_warn = max_tn_warn_new;
 		if (curr_tn_present)
-			cs_addrs->ti->curr_tn = cs_addrs->ti->early_tn = cs_addrs->ti->header_open_tn = curr_tn_new;
+			cs_addrs->ti->curr_tn = cs_addrs->ti->early_tn = curr_tn_new;
 		assert(max_tn_new == cs_addrs->hdr->max_tn);
 		assert(max_tn_warn_new == cs_addrs->hdr->max_tn_warn);
 		assert(curr_tn_new == cs_addrs->ti->curr_tn);
@@ -531,7 +531,6 @@ void dse_chng_fhead(void)
 		cs_addrs->hdr->master_map_len = x * DISK_BLOCK_SIZE;
 	if (cs_addrs->hdr->clustered)
 	{
-		cs_addrs->ti->header_open_tn = cs_addrs->ti->curr_tn;		/* Force write of header */
 		if (cs_addrs->ti->curr_tn == prev_tn)
 		{
 			CHECK_TN(cs_addrs, cs_addrs->hdr, cs_addrs->ti->curr_tn);/* can issue rts_error TNTOOLARGE */

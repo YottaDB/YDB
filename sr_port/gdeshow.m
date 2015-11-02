@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2010 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -11,6 +11,17 @@
 show:	;implement the verb: SHOW
 ALL
 	d TEMPLATE,ALLNAME,ALLREGIO,ALLSEGME,MAP
+	q
+COMMANDS
+	s BOL="!"
+	set delim=$select("VMS"=ver:"/",1:"-")
+	set defconst=$select("VMS"=ver:"$DEFAULT",1:"DEFAULT")
+	i $l($get(cfile)) o cfile:(newversion:exc="w !,$ztatus c cfile zgoto $zl:cfilefail") u cfile d
+	. d namec,segmentc,regionc,templatec
+	. c cfile
+cfilefail:
+	f i="@useio",$s(log:"@uself",1:"") q:'$l(i)  u @i d templatec,namec,regionc,segmentc
+	s BOL=""
 	q
 NAME
 	i '$d(nams(NAME)) zm gdeerr("OBJNOTFND"):"Name":NAME q
@@ -26,6 +37,16 @@ ALLNAME
 	q
 n1:	d namehd s s="#"
 	f  s s=$o(nams(s)) q:'$l(s)  w !,BOL,?x(1),s,?x(2),nams(s)
+	q
+namec:
+	d SHOWNAM^GDEMAP
+	s s="#"
+	w !,"LOCKS "_delim_"REGION=",nams(s)
+	f  s s=$o(nams(s)) q:'$l(s)  d
+	. i "*"'=s w !,"ADD "_delim_"NAME ",s," "_delim_"REGION=",nams(s) q
+	. s defreg=nams(s)
+	. i defconst'=defreg w !,"RENAME "_delim_"REGION "_defconst_" ",defreg
+	w !
 	q
 REGION
 	i '$d(regs(REGION)) zm gdeerr("OBJNOTFND"):"Region":REGION q
@@ -55,7 +76,23 @@ onejnl:
 	i $x'<(x(3)-1) w !,BOL
 	w ?x(3),$s(regs(s,"BEFORE_IMAGE"):"Y",1:"N"),?x(4),$j(regs(s,"BUFFER_SIZE"),5)
 	w ?x(5),$j(regs(s,"ALLOCATION"),10),?x(6),$j(regs(s,"EXTENSION"),5)
-	;w ?x(7),$s(regs(s,"STOP_ENABLED"):"Y",1:"N")
+	w !,BOL
+	q
+regionc:
+	s s=""
+	f  s s=$o(regs(s)) q:'$l(s)  d
+	. i s=defreg s defseg=regs(s,"DYNAMIC_SEGMENT")
+	. w !,$s(s=defreg:"CHANGE",1:"ADD")," "_delim_"REGION ",s," "_delim_"DYNAMIC=",regs(s,"DYNAMIC_SEGMENT")
+	. f q="COLLATION_DEFAULT","RECORD_SIZE","KEY_SIZE" w " "_delim,q,"=",regs(s,q)
+	. w " "_delim_"NULL_SUBSCRIPTS=",$s(regs(s,"NULL_SUBSCRIPTS")=1:"ALWAYS",tmpreg("NULL_SUBSCRIPTS")=2:"EXISTING",1:"NEVER")
+	. i regs(s,"STDNULLCOLL") w " "_delim_"STDNULLCOLL"
+	. i regs(s,"JOURNAL") d
+	.. w " "_delim_"JOURNAL=(",$s(regs(s,"BEFORE_IMAGE"):"",1:"NO"),"BEFORE_IMAGE",",BUFFER_SIZE=",tmpreg("BUFFER_SIZE")
+	.. w ",ALLOCATION=",regs(s,"ALLOCATION"),",EXTENSION=",regs(s,"EXTENSION")
+	.. i $l(regs(s,"FILE_NAME")) w ",FILE=""",regs(s,"FILE_NAME"),""""
+	.. w ")"
+	. else  w " "_delim_"NOJOURNAL"
+	i defconst'=defseg w !,"DELETE "_delim_"SEGMENT "_defconst
 	w !,BOL
 	q
 SEGMENT
@@ -89,8 +126,21 @@ BG	w ?x(8),"GLOB=",$j(segs(s,"GLOBAL_BUFFER_COUNT"),4)
 	q
 MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"LOCK=",$j(segs(s,"LOCK_SPACE"),4)
-	w !,BOL,?x(8),"RES =",$j(segs(s,"RESERVED_BYTES"),4)
+	w !,BOL,?x(8),"RES = ",$j(segs(s,"RESERVED_BYTES"),4)
 	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR=OFF"
+	q
+segmentc:
+	s s=""
+	f  s s=$o(segs(s)) q:'$l(s)  s am=segs(s,"ACCESS_METHOD") d
+	. w !,$s(s=defseg:"CHANGE",1:"ADD")," "_delim_"SEGMENT ",s," "_delim_"ACCESS_METHOD=",segs(s,"ACCESS_METHOD")
+	. i am="USER" q
+	. f q="BLOCK_SIZE","ALLOCATION","EXTENSION_COUNT","LOCK_SPACE","RESERVED_BYTES" w " "_delim,q,"=",segs(s,q)
+	. i "BG"=am d
+	.. w " "_delim_"GLOBAL_BUFFER_COUNT=",segs(s,"GLOBAL_BUFFER_COUNT")
+	.. i $zver'["VMS",encsupportedplat=TRUE,segs(s,"ENCRYPTION_FLAG") w " "_delim_"ENCRYPT"
+	. i "MM"=am w " "_delim,$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
+	. w " "_delim_"FILE=",segs(s,"FILE_NAME")
+	w !,BOL
 	q
 MAP
 	n map
@@ -136,6 +186,8 @@ t1:	d tmpreghd
 	w ?x(6),$j(tmpseg("BG","ALLOCATION"),10),?x(7),$j(tmpseg("BG","EXTENSION_COUNT"),5)
 	w ?x(8),"GLOB =",$j(tmpseg("BG","GLOBAL_BUFFER_COUNT"),3)
 	w !,BOL,?x(8),"LOCK =",$j(tmpseg("BG","LOCK_SPACE"),3)
+	w !,BOL,?x(8),"RES  =",$j(tmpseg("BG","RESERVED_BYTES"),4)
+	i $ZVersion'["VMS" w !,BOL,?x(8),"ENCR = ",$s((encsupportedplat=TRUE&tmpseg("BG","ENCRYPTION_FLAG")):"ON",1:"OFF")
 	w !,BOL,?x(1),"<default>",?x(2),$s(tmpacc="MM":"   *",1:""),?x(3),"MM"
 	w ?x(4),$s(tmpseg("MM","FILE_TYPE")="DYNAMIC":"DYN",1:"STA"),?x(5),$j(tmpseg("MM","BLOCK_SIZE"),5)
 	w ?x(6),$j(tmpseg("MM","ALLOCATION"),10),?x(7),$j(tmpseg("MM","EXTENSION_COUNT"),5)
@@ -147,7 +199,24 @@ tmpjnlbd:
 	i $x'<(x(3)-1) w !,BOL
 	w ?x(3),$s(tmpreg("BEFORE_IMAGE"):"Y",1:"N"),?x(4),$j(tmpreg("BUFFER_SIZE"),5)
 	w ?x(5),$j(tmpreg("ALLOCATION"),10),?x(6),$j(tmpreg("EXTENSION"),5)
-	;w ?x(7),$s(tmpreg("STOP_ENABLED"):"Y",1:"N")
+	w !,BOL
+	q
+templatec:
+	f am="MM","BG" w !,"TEMPLATE "_delim_"SEGMENT "_delim_"ACCESS_METHOD=",am d
+	. f q="BLOCK_SIZE","ALLOCATION","EXTENSION_COUNT","LOCK_SPACE","RESERVED_BYTES" w " "_delim,q,"=",tmpseg(am,q)
+	. i "BG"=am d
+	.. w " "_delim_"GLOBAL_BUFFER_COUNT=",tmpseg("BG","GLOBAL_BUFFER_COUNT")
+	.. i $zver'["VMS",encsupportedplat=TRUE,tmpseg("BG","ENCRYPTION_FLAG") w " "_delim_"ENCRYPT"
+	. i "MM"=am w $s(tmpseg("MM","DEFER"):delim,1:delim_"NO"),"DEFER"
+	w !,"TEMPLATE "_delim_"REGION"
+	f q="RECORD_SIZE","KEY_SIZE" w " "_delim,q,"=",tmpreg(q)
+	w " "_delim_"NULL_SUBSCRIPTS=",$s(tmpreg("NULL_SUBSCRIPTS")=1:"ALWAYS",tmpreg("NULL_SUBSCRIPTS")=2:"EXISTING",1:"NEVER")
+	i tmpreg("STDNULLCOLL") w " "_delim_"STDNULLCOLL"
+	i tmpreg("JOURNAL") d
+	. w !,"TEMPLATE "_delim_"REGION "_delim_"JOURNAL=("
+	. w $s(tmpreg("BEFORE_IMAGE"):"",1:"NO"),"BEFORE_IMAGE,BUFFER_SIZE=",tmpreg("BUFFER_SIZE")
+	. w ",ALLOCATION=",tmpreg("ALLOCATION"),",EXTENSION=",tmpreg("EXTENSION"),")"
+	i $l(tmpreg("FILE_NAME")) w ",FILE=",tmpreg("FILE_NAME")
 	w !,BOL
 	q
 

@@ -38,19 +38,17 @@ enum upd_bad_trans_type
 #ifdef GTM_TRIGGER
 #define UPD_GV_BIND_NAME_APPROPRIATE(GD_HEADER, MNAME, KEY, KEYLEN)					\
 {													\
-	GBLREF	boolean_t	incr_db_trigger_cycle;							\
-													\
 	char			*tr_ptr;								\
 	gv_namehead		*hasht_tree;								\
 	mstr			gbl_name;								\
 	int			tr_len;									\
 	mname_entry		gvent;									\
+	GBLREF boolean_t	dollar_ztrigger_invoked;						\
 													\
 	if (IS_MNAME_HASHT_GBLNAME(MNAME))								\
 	{	/* gbl is ^#t. In this case, do special processing. Look at the first subscript and	\
 		 * bind to the region mapped to by that global name (not ^#t).				\
 		 */											\
-		incr_db_trigger_cycle = TRUE;								\
 		tr_ptr = KEY;			/* Skip to the first subscript */			\
 		tr_len = STRLEN(KEY);		/* Only want length to first 0, not entire length */	\
 		assert(tr_len < KEYLEN);	/* If ^#t, there has to be a subscript */		\
@@ -66,6 +64,10 @@ enum upd_bad_trans_type
 			csa = cs_addrs;									\
 			SETUP_TRIGGER_GLOBAL;								\
 			gv_target = hasht_tree;								\
+			if (!dollar_ztrigger_invoked)							\
+				dollar_ztrigger_invoked = TRUE;						\
+			csa->incr_db_trigger_cycle = TRUE;						\
+			csa->db_dztrigger_cycle++;							\
 		} else											\
 		{											\
 			SWITCH_TO_DEFAULT_REGION;							\

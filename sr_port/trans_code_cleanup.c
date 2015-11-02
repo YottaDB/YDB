@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,27 +21,30 @@
 #include "error.h"
 #include "error_trap.h"
 #include "io.h"
+#ifdef GTM_TRIGGER
+# include "gtm_trigger_trc.h"
+#endif
 
 GBLREF	unsigned short	proc_act_type;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	spdesc		stringpool;
 GBLREF	spdesc		rts_stringpool;
-GBLREF	bool		compile_time;
-GBLREF	bool		transform;
 GBLREF	mval		dollar_ztrap, dollar_etrap;
 GBLREF	mstr		*err_act;
 GBLREF	io_desc		*active_device;
+
+error_def(ERR_STACKCRIT);
+error_def(ERR_ERRWZTRAP);
+error_def(ERR_ERRWETRAP);
+error_def(ERR_ERRWIOEXC);
 
 void trans_code_cleanup(void)
 {
 	stack_frame	*fp, *fpprev;
 	uint4		err;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_STACKCRIT);
-	error_def(ERR_ERRWZTRAP);
-	error_def(ERR_ERRWETRAP);
-	error_def(ERR_ERRWIOEXC);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(!(SFT_ZINTR & proc_act_type));
 	/* With no extra ztrap frame being pushed onto stack, we may miss error(s)
 	 * during trans_code if we don't check proc_act_type in addition to
@@ -61,9 +64,9 @@ void trans_code_cleanup(void)
 	else
 		err = 0;
 	proc_act_type = 0;
-	if (compile_time)
+	if (TREF(compile_time))
 	{
-		compile_time = FALSE;
+		TREF(compile_time) = FALSE;
 		if (stringpool.base != rts_stringpool.base)
 			stringpool = rts_stringpool;
 	}
@@ -121,8 +124,10 @@ void trans_code_cleanup(void)
 		fp->mpc = CODE_ADDRESS(pseudo_ret);
 		fp->ctxt = GTM_CONTEXT(pseudo_ret);
 		fp->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
+		GTMTRIG_ONLY(DBGTRIGR((stderr, "trans_code_cleanup: turning off SFF_TRIGR_CALLD in frame 0x"lvaddr"\n",
+				       frame_pointer)));
 	}
-	transform = TRUE;
+	TREF(transform) = TRUE;
 	if (err)
 		dec_err(VARLSTCNT(1) err);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 	mur_desc = rctl->mur_desc;
 	jnlrec = mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
-	if (IS_SET_KILL_ZKILL_ZTWORM(rectype))	/* TUPD/UUPD/FUPD/GUPD */
+	if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))	/* TUPD/UUPD/FUPD/GUPD */
 	{
 		assert(&jnlrec->jrec_set_kill.mumps_node == &jnlrec->jrec_ztworm.ztworm_str);
 		start_ptr = (unsigned char *)&jnlrec->jrec_set_kill.mumps_node;
@@ -55,6 +55,8 @@ boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 	}
 	rec_checksum = ADJUST_CHECKSUM(rec_checksum, jctl->rec_offset);
 	rec_checksum = ADJUST_CHECKSUM(rec_checksum, jctl->jfh->checksum);
+	/* Note: rec_checksum updated inside the below macro */
+	ADJUST_CHECKSUM_WITH_SEQNO(jrt_is_replicated[rectype], rec_checksum, GET_JNL_SEQNO(jnlrec));
 	/* assert(jnlrec->prefix.checksum == rec_checksum); Can fail only for journal after crash or with holes */
 	return (jnlrec->prefix.checksum == rec_checksum);
 }

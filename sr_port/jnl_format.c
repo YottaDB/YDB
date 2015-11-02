@@ -63,7 +63,7 @@
 #endif
 
 GBLREF	gd_region		*gv_cur_region;
-GBLREF 	short  			dollar_tlevel;
+GBLREF 	uint4			dollar_tlevel;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
@@ -86,6 +86,7 @@ static	const	enum jnl_record_type	jnl_opcode[][5] =
 	{ JRT_ZKILL, JRT_FZKILL, JRT_TZKILL,  JRT_GZKILL, JRT_UZKILL  },	/* ZKILL       record types */
 #	ifdef GTM_TRIGGER
 	{ JRT_BAD,   JRT_BAD,    JRT_TZTWORM, JRT_BAD,    JRT_UZTWORM },	/* ZTWORM      record types */
+	{ JRT_BAD,   JRT_BAD,    JRT_TZTRIG,  JRT_BAD,    JRT_UZTRIG  },	/* ZTRIG       record types */
 #	endif
 };
 
@@ -113,7 +114,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	mstr			prev_str, *cur_str;
 #	endif
 
-	/* The below assert ensures that if ever jnl_format is interrupted by a signal, the interrup handler never calls
+	/* The below assert ensures that if ever jnl_format is interrupted by a signal, the interrupt handler never calls
 	 * jnl_format again. This is because jnl_format plays with global pointers and we would possibly end up in a bad
 	 * state if the interrupt handler calls jnl_format again.
 	 */
@@ -154,7 +155,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	}
 #	endif
 	/* Allocate a jfb structure */
-	if (0 == dollar_tlevel)
+	if (!dollar_tlevel)
 	{
 		jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
 		jgbl.cumul_jnl_rec_len = 0;
@@ -182,7 +183,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	ja->operation = opcode;
 	ja->nodeflags = nodeflags;
 	/* Proceed with formatting the journal record in the allocated jfb */
-	if (jnl_fence_ctl.level == 0 && dollar_tlevel == 0)
+	if (!jnl_fence_ctl.level && !dollar_tlevel)
 	{	/* Non-TP */
 		subcode = 0;
 		tmp_jrec_size = FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE;
@@ -205,7 +206,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 				GTMTRIG_ONLY(|| ((jfb->prev == si->jnl_head) && (JRT_TZTWORM == jfb->prev->rectype))));
 			subcode = 3;
 		}
-		if (0 != dollar_tlevel)
+		if (dollar_tlevel)
 			++subcode; /* TP */
 		tmp_jrec_size = FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE;
 		assert(FIXED_UPD_RECLEN == FIXED_ZTWORM_RECLEN);
@@ -223,7 +224,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	assert(JA_MAX_TYPES > opcode);
 	rectype = jnl_opcode[opcode][subcode];
 	assert(IS_VALID_JRECTYPE(rectype));
-	assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));
+	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
 	GTMTRIG_ONLY(assert((JNL_ZTWORM != opcode) || (NULL == key));)
 	GTMTRIG_ONLY(assert((JNL_ZTWORM == opcode) || (NULL != key));)
 	/* Compute actual record length */
@@ -253,7 +254,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 		/* assume an align record will be written while computing maximum jnl-rec size requirements */
 		si->total_jnl_rec_size += (int)(jrec_size + MIN_ALIGN_RECLEN);
 	}
-	/* else if (0 == dollar_tlevel) jfb->buff/jfb->alt_buff already malloced in gvcst_init. */
+	/* else if (!dollar_tlevel) jfb->buff/jfb->alt_buff already malloced in gvcst_init. */
 	jfb->record_size = jrec_size;
 	jgbl.cumul_jnl_rec_len += jfb->record_size;
 	assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
@@ -262,7 +263,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	/* PREFIX */
 	rec = (jnl_record *)jfb->buff;
 	rec->prefix.jrec_type = rectype;
-	assert(!IS_SET_KILL_ZKILL(rectype) || (JNL_MAX_SET_KILL_RECLEN(csd) >= jrec_size));
+	assert(!IS_SET_KILL_ZKILL_ZTRIG(rectype) || (JNL_MAX_SET_KILL_RECLEN(csd) >= jrec_size));
 	GTMTRIG_ONLY(assert(!IS_ZTWORM(rectype) || (MAX_ZTWORM_JREC_LEN >= jrec_size));)
 	rec->prefix.forwptr = jrec_size;
 	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);

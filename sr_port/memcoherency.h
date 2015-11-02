@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,10 @@
 #ifndef MEMCOHERENCY_H_INCLUDED
 #define MEMCOHERENCY_H_INCLUDED
 
-GBLREF	int	num_additional_processors; /* for Uniprocessor systems, no need for "memory barrier" as memory is always coherent */
+/* for Uniprocessor systems, no need for "memory barrier" as memory is always coherent.
+ * But almost always we expect to be running on a multi-processor system so we want to avoid the cost
+ * of the if check and do the memory barrier ALWAYS.
+ */
 
 #ifdef __alpha
 
@@ -32,18 +35,11 @@ GBLREF	int	num_additional_processors; /* for Uniprocessor systems, no need for "
  * cache hit on stale data) or writes (that may otherwise write the cache, only to have the write effectively overwriiten
  * by a late-delivered invalidate)
  */
-#define SHM_WRITE_MEMORY_BARRIER										\
-{														\
-	if (num_additional_processors)										\
-		asm("mb");											\
-}
+#define SHM_WRITE_MEMORY_BARRIER	asm("mb")
 
 #define SHM_READ_MEMORY_BARRIER		SHM_WRITE_MEMORY_BARRIER /* same MB instruction for both read and write barriers */
 
 #ifdef __vms
-/* Alpha OpenVMS SECSHR runs in kernel mode as a separate image. Avoid complications of making num_additional_processors available
- * to SECSHR. Issue memory barrier regardless of number of processors. This is not performance intensive as the usage is limited
- * to abnormal termination of processes in the midst of transaction processing. */
 #define SECSHR_SHM_WRITE_MEMORY_BARRIER	asm("mb")
 #define SECSHR_SHM_READ_MEMORY_BARRIER	SECSHR_SHM_WRITE_MEMORY_BARRIER
 #endif /* __vms */
@@ -99,14 +95,12 @@ void do_isync(void);
   /* tp_end.c) do not rely on store-load order across memory barrier. Note that grab/rel_lock() perform      */ \
   /* "sync" (via call to _clear_lock()), and so, we are guaranteed strict ordering of loads and stores of    */ \
   /* code that reads/writes to journal pool in transaction logic					     */ \
-	if (num_additional_processors)										\
-		do_lwsync();											\
+	do_lwsync();												\
 }
 
-#define SHM_READ_MEMORY_BARRIER											\
-{														\
-	if (num_additional_processors)										\
-		do_isync();											\
+#define SHM_READ_MEMORY_BARRIER		\
+{					\
+	do_isync();			\
 }
 
 #elif defined(__hppa)
@@ -134,11 +128,7 @@ void do_isync(void);
  * in its entirety.
  */
 
-#define SHM_WRITE_MEMORY_BARRIER										\
-{														\
-	if (num_additional_processors)										\
-		(void)_asm("SYNC");										\
-}
+#define SHM_WRITE_MEMORY_BARRIER	(void)_asm("SYNC")
 
 #define SHM_READ_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER /* same SYNC instruction for both read and write barriers.
 							  * For read, we want all cache purges to be completed before
@@ -148,32 +138,15 @@ void do_isync(void);
 #if defined(__hpux)
 
 #include <machine/sys/kern_inline.h>
-#define SHM_WRITE_MEMORY_BARRIER										\
-{														\
-	if (num_additional_processors)										\
-	{													\
-		_MF();												\
-	}													\
-}
+#define SHM_WRITE_MEMORY_BARRIER	_MF()
 
 #elif defined(__linux__) && defined(__INTEL_COMPILER)
 
-#	define SHM_WRITE_MEMORY_BARRIER										\
-	{													\
-		if (num_additional_processors)									\
-		{												\
-			__mf();											\
-		}												\
-	}
+#	define SHM_WRITE_MEMORY_BARRIER		__mf()
+
 #elif defined(__linux__) /* gcc */
 
-#	define SHM_WRITE_MEMORY_BARRIER										\
-	{													\
-		if (num_additional_processors)									\
-		{												\
-			__asm__ __volatile__ ("mf" ::: "memory");						\
-		}												\
-	}
+#	define SHM_WRITE_MEMORY_BARRIER		__asm__ __volatile__ ("mf" ::: "memory")
 #endif /* __linux__ */
 
 /* On IA64, cross processor notifications of write barriers are automatic so no read barrier is necessary */

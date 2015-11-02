@@ -176,7 +176,7 @@ void gtm_icu_init(void)
 	char		*major_ver_ptr, *minor_ver_ptr;
 	char		icu_libname[SIZEOF(ICU_LIBNAME) + MAX_ICU_VERSION_STRLEN];
 	const char	*cur_icu_fname;
-	int		icu_final_fname_len, icu_libname_len, len;
+	int		icu_final_fname_len, icu_libname_len, len, major_ver_len, minor_ver_len, save_fname_len;
 	void_ptr_t	handle;
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
@@ -218,20 +218,21 @@ void gtm_icu_init(void)
 	{	/* GTM_ICU_VERSION is defined. Do edit check on the value before considering it really defined */
 		gtm_icu_ver_defined = parse_gtm_icu_version(trans.addr, trans.len, &major_ver_ptr, &minor_ver_ptr);
 	}
+	DEBUG_ONLY(major_ver_len = minor_ver_len = -1;)
 	if (gtm_icu_ver_defined)
 	{	/* User explicitly specified an ICU version. So load version specific icu file (e.g. libicuio.so.36) */
 		icu_libname_len = 0;
+		major_ver_len = STRLEN(major_ver_ptr);
+		minor_ver_len = STRLEN(minor_ver_ptr);
 #		if defined(_AIX) || defined(__MVS__)
 		/* Transform (e.g. libicuio.a  -> libicuio36.a  ) */
 		len = STR_LIT_LEN(ICU_LIBNAME_ROOT);
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_ROOT, len);
 		icu_libname_len += len;
-		len = STRLEN(major_ver_ptr);
-		memcpy(&icu_libname[icu_libname_len], major_ver_ptr, len);
-		icu_libname_len += len;
-		len = STRLEN(minor_ver_ptr);
-		memcpy(&icu_libname[icu_libname_len], minor_ver_ptr, len);
-		icu_libname_len += len;
+		memcpy(&icu_libname[icu_libname_len], major_ver_ptr, major_ver_len);
+		icu_libname_len += major_ver_len;
+		memcpy(&icu_libname[icu_libname_len], minor_ver_ptr, minor_ver_len);
+		icu_libname_len += minor_ver_len;
 		icu_libname[icu_libname_len++] = '.';
 		len = STR_LIT_LEN(ICU_LIBNAME_EXT);
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_EXT, len);
@@ -242,12 +243,10 @@ void gtm_icu_init(void)
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME, len);
 		icu_libname_len += len;
 		icu_libname[icu_libname_len++] = '.';
-		len = strlen(major_ver_ptr);
-		memcpy(&icu_libname[icu_libname_len], major_ver_ptr, len);
-		icu_libname_len += len;
-		len = strlen(minor_ver_ptr);
-		memcpy(&icu_libname[icu_libname_len], minor_ver_ptr, len);
-		icu_libname_len += len;
+		memcpy(&icu_libname[icu_libname_len], major_ver_ptr, major_ver_len);
+		icu_libname_len += major_ver_len;
+		memcpy(&icu_libname[icu_libname_len], minor_ver_ptr, minor_ver_len);
+		icu_libname_len += minor_ver_len;
 #		endif
 		icu_libname[icu_libname_len] = '\0';
 		assert(SIZEOF(icu_libname) > icu_libname_len);
@@ -282,7 +281,7 @@ void gtm_icu_init(void)
 	each_libpath = strtok(search_path_ptr, DELIM);
 	while (NULL != each_libpath)
 	{
-		SPRINTF(temp_path, "%s/%s", each_libpath, libname);
+		SNPRINTF(temp_path, GTM_PATH_MAX, "%s/%s", each_libpath, libname);
 		if (NULL == realpath(temp_path, real_path) && (0 != Stat(real_path, &real_path_stat)))
 		{
 			each_libpath = strtok(NULL, DELIM);
@@ -296,7 +295,7 @@ void gtm_icu_init(void)
 		buflen = 0;
 		/* real_path = /usr/local/lib64/libicuio36.0.a */
 		ptr = basename(real_path);
-		SPRINTF(buf, "%s(%s", real_path, ptr);	/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+		SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr); /* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
 		buflen += (STRLEN(real_path) + STRLEN(ptr) + 1);
 		ptr = strrchr(buf, '.');
 		strcpy(ptr, ".so)");			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.so) */
@@ -317,7 +316,22 @@ void gtm_icu_init(void)
 	if (NULL == handle)
 	{
 		COPY_DLLERR_MSG(err_str, err_msg);
-		rts_error(VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname), ERR_TEXT, 2, LEN_AND_STR(err_msg));
+#		ifdef _AIX
+		/* On AIX, ICU is sometimes packaged differently where the archived shared library is named as libicuio.so
+		 * instead of libicuio36.0.so. Try dlopen with this new naming scheme as well.
+		 * Below SNPRINTF converts /usr/local/lib64/libicuio36.0.a to /usr/local/lib64/libicuio36.0.a(libicuio.so)
+		 */
+		SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s.so)", real_path, ICU_LIBNAME_ROOT);
+		libname = buf;
+		handle = dlopen(libname, ICU_LIBFLAGS | RTLD_MEMBER);
+		if (NULL == handle)
+		{
+			COPY_DLLERR_MSG(err_str, err_msg); /* overwrites the previous error */
+#		endif
+			rts_error(VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname), ERR_TEXT, 2, LEN_AND_STR(err_msg));
+#		ifdef _AIX
+		}
+#		endif
 	}
 #	ifdef __hpux
 	/* HP-UX dlsym() doesn't allow lookup for symbols that are present in the nested dependent shared libraries
@@ -328,6 +342,7 @@ void gtm_icu_init(void)
 	if (NULL == handle)
 		GTMASSERT;
 #	endif
+	assert(((-1 != major_ver_len) && (-1 != minor_ver_len)) || !gtm_icu_ver_defined);
 	DEBUG_ONLY(symbols_renamed = -1;)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{
@@ -349,16 +364,26 @@ void gtm_icu_init(void)
 			if (gtm_icu_ver_defined && ((0 == findx) || symbols_renamed))
 			{
 				icu_final_fname[icu_final_fname_len++] = '_';
-				len = STRLEN(major_ver_ptr);
-				memcpy(&icu_final_fname[icu_final_fname_len], major_ver_ptr, len);
-				icu_final_fname_len += len;
+				memcpy(&icu_final_fname[icu_final_fname_len], major_ver_ptr, major_ver_len);
+				icu_final_fname_len += major_ver_len;
+				save_fname_len = icu_final_fname_len;
 				icu_final_fname[icu_final_fname_len++] = '_';
-				len = STRLEN(minor_ver_ptr);
-				memcpy(&icu_final_fname[icu_final_fname_len], minor_ver_ptr, len);
-				icu_final_fname_len += len;
+				memcpy(&icu_final_fname[icu_final_fname_len], minor_ver_ptr, minor_ver_len);
+				icu_final_fname_len += minor_ver_len;
 				icu_final_fname[icu_final_fname_len] = '\0';
 				assert(SIZEOF(icu_final_fname) > icu_final_fname_len);
 				fptr = (icu_func_t)dlsym(handle, icu_final_fname);
+				if (NULL == fptr)
+				{	/* from ICU 4.4, symbols renaming is done differently. u_getVersion_4_4 now becomes
+					 * u_getVersion_44. Try the new renaming instead
+					 */
+					assert(0 < save_fname_len);
+					memcpy(&icu_final_fname[save_fname_len], minor_ver_ptr, minor_ver_len);
+					save_fname_len += minor_ver_len;
+					icu_final_fname[save_fname_len] = '\0';
+					assert(SIZEOF(icu_final_fname) > save_fname_len);
+					fptr = (icu_func_t)dlsym(handle, icu_final_fname);
+				}
 			}
 			if (NULL == fptr)
 			{
@@ -370,15 +395,15 @@ void gtm_icu_init(void)
 				symbols_renamed = TRUE;
 		} else if (0 == findx)	/* record the fact that the symbols are NOT renamed */
 			symbols_renamed = FALSE;
+		assert((0 == findx) || icu_getversion_found || gtm_icu_ver_defined); /* u_getVersion should have been dlsym'ed */
 		*icu_fptr[findx] = fptr;
-		/* If the current function that is dlsym'ed is u_getVersion, then we use fptr to query for
-		 * the library's ICU version. If it is less than the least ICU version that GT.M supports
-		 * we issue an error. If not, we continue dlsym the rest of the functions.
-		 * NOTE: To facilitate issuing wrong version error early, the ICU function getVersion should
-		 * be the first function in gtm_icu.h. This way dlsym on u_getVersion will happen as the
-		 * first thing in this loop. But do all this only if gtm_icu_version is not defined in the environment. If it's
-		 * defined to an appropriate value in the environment then the version check would have happened before and
-		 * there isn't any need to repeat it again.
+		/* If the current function that is dlsym'ed is u_getVersion, then we use fptr to query for the library's ICU
+		 * version. If it is less than the least ICU version that GT.M supports we issue an error. If not, we continue
+		 * dlsym the rest of the functions. To facilitate issuing wrong version error early, the ICU function getVersion
+		 * should be the first function in gtm_icu.h. This way dlsym on u_getVersion will happen as the first thing in
+		 * this loop. But do all this only if gtm_icu_version is not defined in the environment. If it's defined to an
+		 * an appropriate value in the environment then the version check would have happened before and there isn't any
+		 * need to repeat it again.
 		 */
 		if (!gtm_icu_ver_defined && (FALSE == icu_getversion_found) && (0 == strcmp(cur_icu_fname, GET_ICU_VERSION_FNAME)))
 		{

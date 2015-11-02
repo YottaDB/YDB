@@ -1,6 +1,7 @@
 gtm_main
 gtm_init
 gtm_ci
+gtm_cip
 gtm_exit
 gtm_zstatus
 gtm_hiber_start

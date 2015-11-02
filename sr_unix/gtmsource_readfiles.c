@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -122,7 +122,7 @@ static	int repl_read_file(repl_buff_t *rb)
 	dskaddr = csa->jnl->jnl_buff->dskaddr;
 	if (!is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
 	{
-		if (!rb->backctl->fh_read_done)
+		if (!rb->backctl->eof_addr_final)
 			update_eof_addr(rb->backctl, &eof_change); /* update possible change in end_of_data, re-read file header */
 		assert(!fc->jfh->crash);
 		dskaddr = fc->jfh->end_of_data;
@@ -175,8 +175,6 @@ static	int repl_read_file(repl_buff_t *rb)
 	{
 		b->buffremaining -= (uint4)nb;
 		b->readaddr += (uint4)nb;
-		if (fc->eof_addr < b->readaddr)
-			fc->eof_addr = b->readaddr;
 		return (SS_NORMAL);
 	}
 	repl_errno = EREPL_JNLFILEREAD;
@@ -244,14 +242,14 @@ static	int repl_next(repl_buff_t *rb)
 		{
 			rec = ((jnl_record *)(b->recbuff));
 			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
-			if (IS_SET_KILL_ZKILL_ZTWORM(rectype))
+			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
 			{
 				assert(!IS_ZTP(rectype));
 				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 				/* Assert that ZTWORMHOLE type record too has same layout as KILL/SET */
 				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&rec->jrec_ztworm.ztworm_str);
-				DECODE_SET_KILL_ZKILL(keystr, rec->prefix.forwptr, rb->backctl->encr_key_handle,
-							crypt_status);
+				DECODE_SET_KILL_ZKILL_ZTRIG(keystr, rec->prefix.forwptr, rb->backctl->encr_key_handle,
+							    crypt_status);
 				if (0 != crypt_status)
 					GC_RTS_ERROR(crypt_status, rb->backctl->jnl_fn);
 			}
@@ -415,14 +413,15 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	error_def(ERR_REPLFILIOERR);
 	error_def(ERR_TEXT);
 
+	assert(!ctl->eof_addr_final); /* The caller should invoke us ONLY if ctl->eof_addr_final is FALSE */
 	csa = &FILE_INFO(ctl->reg)->s_addrs;
 	rb = ctl->repl_buff;
 	fc = rb->fc;
 	prev_eof_addr = fc->eof_addr;
 	*eof_change = 0;
-	new_eof_addr = csa->jnl->jnl_buff->dskaddr;
 	if (is_gdid_gdid_identical(&fc->id, JNL_GDID_PTR(csa)))
 	{
+		new_eof_addr = csa->jnl->jnl_buff->dskaddr;
 		REPL_DPRINT3("Update EOF : New EOF addr from SHM for %s is %u\n", ctl->jnl_fn, new_eof_addr);
 	} else
 	{
@@ -430,14 +429,14 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 		REPL_DPRINT4("Update EOF : FC ID IS %u %d %u\n", fc->id.inode, fc->id.device, fc->id.st_gen);
 		REPL_DPRINT4("Update EOF : csa->nl->jnl_file.u (unreliable) is %u %d %u\n", csa->nl->jnl_file.u.inode,
 			     csa->nl->jnl_file.u.device,  csa->nl->jnl_file.u.st_gen);
-		if (!ctl->fh_read_done)
+		if (!ctl->eof_addr_final)
 		{
 			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, REAL_JNL_HDR_LEN, status);
 			if (SS_NORMAL != status)
 				rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn,
 						ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in reading jfh in update_eof_addr"), status);
 			REPL_DPRINT2("Update EOF : Jnl file hdr refreshed from file for %s\n", ctl->jnl_fn);
-			ctl->fh_read_done = TRUE;
+			ctl->eof_addr_final = TRUE; /* No more updates to fc->eof_addr for this journal file */
 		}
 		new_eof_addr = fc->jfh->end_of_data + EOF_RECLEN;
 		REPL_DPRINT3("Update EOF : New EOF addr from jfh for %s is %u\n", ctl->jnl_fn, new_eof_addr);
@@ -490,8 +489,7 @@ static	int force_file_read(repl_ctl_element *ctl)
 	assert(b->reclen == EOF_RECLEN);
 	assert(b->readaddr - b->recaddr >= EOF_RECLEN);
 	b->buffremaining += (b->readaddr - b->recaddr);
-	REPL_DPRINT3("FORCE FILE READ : Changing EOF_ADDR from %u to %u\n", fc->eof_addr, b->readaddr);
-	b->readaddr = fc->eof_addr = b->recaddr;
+	b->readaddr = b->recaddr;
 	b->reclen = 0;
 	return (SS_NORMAL);
 }
@@ -503,7 +501,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	repl_buff_desc		*b;
 	repl_file_control_t	*fc;
 	uint4			dskread, stop_at;
-	boolean_t		max_seqno_found, fh_read_done;
+	boolean_t		max_seqno_found;
 	uint4			max_seqno_addr;
 	seq_num			max_seqno, reg_seqno;
 	int			status;
@@ -520,16 +518,16 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	fc = rb->fc;
 	reg = ctl->reg;
 	csa = &FILE_INFO(reg)->s_addrs;
-	fh_read_done = ctl->fh_read_done;
-	update_eof_addr(ctl, &eof_change);
-#ifdef GTMSOURCE_SKIP_DSKREAD_WHEN_NO_EOF_CHANGE
+	if (!ctl->eof_addr_final)
+		update_eof_addr(ctl, &eof_change);
+#	ifdef GTMSOURCE_SKIP_DSKREAD_WHEN_NO_EOF_CHANGE
 	/* This piece of code needs some more testing - Vinaya 03/11/98 */
-	if (eof_change == 0 && ctl->first_read_done)
+	if ((0 == eof_change) && ctl->first_read_done)
 	{
 		REPL_DPRINT2("UPDATE MAX SEQNO INFO: No change in EOF addr. Skipping disk read for %s\n", ctl->jnl_fn);
 		return (SS_NORMAL);
 	}
-#endif
+#	endif
 	if (fc->eof_addr == JNL_FILE_FIRST_RECORD)
 	{
 		repl_errno = EREPL_JNLEARLYEOF;
@@ -537,7 +535,8 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	}
 	QWASSIGN(reg_seqno, csa->hdr->reg_seqno);
 	QWDECRBYDW(reg_seqno, 1);
- 	if (QWGE(ctl->max_seqno, reg_seqno) || (fh_read_done && ctl->fh_read_done && ctl->first_read_done))
+	assert(!ctl->max_seqno_final || ctl->eof_addr_final);
+ 	if (QWGE(ctl->max_seqno, reg_seqno) || (ctl->max_seqno_final && ctl->first_read_done))
  	{	/* have searched already */
  		REPL_DPRINT4("UPDATE MAX SEQNO INFO : not reading file %s; max_seqno = "INT8_FMT", reg_seqno = "INT8_FMT"\n",
  			     ctl->jnl_fn, INT8_PRINT(ctl->max_seqno), INT8_PRINT(reg_seqno));
@@ -599,6 +598,8 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 	{
 		QWASSIGN(ctl->max_seqno, max_seqno);
 		ctl->max_seqno_dskaddr = max_seqno_addr;
+		if (ctl->eof_addr_final)
+			ctl->max_seqno_final = TRUE; /* No more max_seqno updates as this journal file has switched */
 		return (SS_NORMAL);
 	}
 	/* dskread == 0 */
@@ -1124,6 +1125,7 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 	tr_search_state_t	found, (*srch_func)();
 	tr_search_status_t	srch_status;
 	uint4			willnotbefound_addr = 0, willnotbefound_stop_at = 0;
+	int			eof_change;
 	DEBUG_ONLY(jnl_record	*jrec;)
 	DEBUG_ONLY(enum jnl_record_type	rectype;)
 
@@ -1132,7 +1134,16 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 	 * If ctl->seqno > ctl->max_seqno update max_seqno as you move, else search between ctl->seqno and ctl->max_seqno.
 	 * We want to do a binary search here.
 	 */
-
+	/* If the receiver disconnects while we were previously in the read-file mode and later reconnects requesting a
+	 * particular sequence number, it is possible that we can have an out-of-date fc->eof_addr as fc->eof_addr is not
+	 * frequently updated. But, now that we will be searching for the sequence number (either with binary or linear
+	 * search) update the fc->eof_addr unconditionally. This is considered okay since the update_eof_addr function
+	 * is a almost always a light weight function (with the only exception being the case when the jnl file source
+	 * server is interested in is not the latest generation file then it could end up reading the journal file header
+	 * from disk but that too it does only once per older generation journal file so it is okay)
+	 */
+	if (!ctl->eof_addr_final)
+		update_eof_addr(ctl, &eof_change);
 	/* Validate the range; if called from read_transaction(), it is possible that we are looking out of range, but
 	 * we clearly can identify such a case */
 	assert(ctl->min_seqno <= read_seqno);
@@ -1286,10 +1297,14 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	int			nopen;
 	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
 	DEBUG_ONLY(static int	loopcnt;)
+	sgmnt_addrs		*csa;
+	jnlpool_ctl_ptr_t	jctl;
+	uint4			freeaddr;
 
 	cumul_read = 0;
 	*brkn_trans = TRUE;
 	assert(repl_ctl_list->next != NULL);
+	jctl = jnlpool.jnlpool_ctl;
 	/* For each region */
 	for (ctl = repl_ctl_list->next, prev_ctl = repl_ctl_list; ctl != NULL && !trans_read; prev_ctl = ctl, ctl = ctl->next)
 	{
@@ -1314,6 +1329,11 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					found = TR_FIND_WOULD_BLOCK;
 					continue;
 				}
+				/* We come here ONLY if we have searched from the current generation journal file (as known to the
+				 * source server) backwards till the oldest generation journal files of this region and failed to
+				 * find read_jnl_seqno. Open newer generation journal files (if any) to see if they contain
+				 * read_jnl_seqno
+				 */
 				nopen = open_newer_gener_jnlfiles(region, prev_ctl);
 				if (nopen > 0) /* Newer gener files opened */
 				{
@@ -1336,6 +1356,19 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					 */
 					ctl = prev_ctl;
 					prev_ctl = ctl->prev;
+					if (QWLT(read_jnl_seqno, jctl->jnl_seqno))
+					{
+						csa = &FILE_INFO(ctl->reg)->s_addrs;
+						freeaddr = csa->jnl->jnl_buff->freeaddr;
+						if ((ctl->repl_buff->fc->eof_addr == freeaddr) || (!JNL_ENABLED(csa->hdr)))
+						{	/* No more pending updates in the journal file. Next update to the
+							 * journal file will take the seqno jctl->jnl_seqno which will be
+							 * greater than read_jnl_seqno
+							 */
+							found = TR_WILL_NOT_BE_FOUND;
+							continue;
+						}
+					}
 					found = TR_FIND_WOULD_BLOCK;
 				}
 			} else if (ctl->file_state == JNL_FILE_UNREAD)

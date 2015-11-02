@@ -33,7 +33,6 @@ GBLREF	boolean_t	in_gvcst_incr;
 GBLREF	mval		increment_delta_mval;
 GBLREF	mval		*post_incr_mval;
 GBLREF	sgm_info	*sgm_info_ptr;
-GBLREF	short		dollar_tlevel;
 
 void	gvcst_incr(mval *increment, mval *result)
 {

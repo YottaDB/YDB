@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,6 +89,56 @@
 #endif
 #include "is_proc_alive.h"
 
+GBLREF	uint4			dollar_tlevel;
+GBLREF	uint4			dollar_trestart;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgm_info		*first_sgm_info, *sgm_info_ptr;
+GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
+GBLREF	tp_region		*tp_reg_list;
+GBLREF	boolean_t		tp_kill_bitmaps;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+GBLREF	int4			n_pvtmods, n_blkmods;
+GBLREF	unsigned int		t_tries;
+GBLREF	jnl_fence_control	jnl_fence_ctl;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
+GBLREF	boolean_t		is_updproc;
+GBLREF	seq_num			seq_num_zero;
+GBLREF	seq_num			seq_num_one;
+GBLREF	int			gv_fillfactor;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	int			rc_set_fragment;
+GBLREF	uint4			update_array_size, cumul_update_array_size;
+GBLREF	boolean_t		unhandled_stale_timer_pop;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	int4			tprestart_syslog_delta;
+GBLREF	struct_jrec_tcom	tcom_record;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	boolean_t		certify_all_blocks;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	uint4			process_id;
+GBLREF	boolean_t		hold_onto_locks;
+#ifdef UNIX
+GBLREF	recvpool_addrs		recvpool;
+#endif
+#ifdef VMS
+GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
+#endif
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
+GBLREF	int4			gtm_trigger_depth;
+#endif
+
+error_def(ERR_DLCKAVOIDANCE);
+error_def(ERR_JNLFILOPN);
+error_def(ERR_JNLFLUSH);
+error_def(ERR_JNLTRANS2BIG);
+error_def(ERR_REPLOFFJNLON);
+error_def(ERR_TEXT);
+
 #define	SET_REG_SEQNO_IF_REPLIC(CSA, TJPL)										\
 {															\
 	GBLREF	jnl_gbls_t		jgbl;										\
@@ -114,56 +164,6 @@
 	}														\
 }
 
-GBLREF	short			dollar_tlevel;
-GBLREF	gd_region		*gv_cur_region;
-GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	sgm_info		*first_sgm_info, *sgm_info_ptr;
-GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
-GBLREF	tp_region		*tp_reg_list;
-GBLREF	bool			tp_kill_bitmaps;
-GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
-GBLREF	int4			n_pvtmods, n_blkmods;
-GBLREF	unsigned int		t_tries;
-GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
-GBLREF	boolean_t		is_updproc;
-GBLREF	seq_num			seq_num_zero;
-GBLREF	seq_num			seq_num_one;
-GBLREF	int			gv_fillfactor;
-GBLREF	char			*update_array, *update_array_ptr;
-GBLREF	int			rc_set_fragment;
-GBLREF	uint4			update_array_size, cumul_update_array_size;
-GBLREF	boolean_t		unhandled_stale_timer_pop;
-GBLREF	jnl_gbls_t		jgbl;
-GBLREF	int4			tprestart_syslog_delta;
-GBLREF	struct_jrec_tcom	tcom_record;
-GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
-GBLREF	boolean_t		certify_all_blocks;
-GBLREF	gv_namehead		*gv_target;
-GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	uint4			process_id;
-GBLREF	boolean_t		incr_db_trigger_cycle;
-GBLREF	boolean_t		hold_onto_locks;
-
-#ifdef UNIX
-GBLREF	recvpool_addrs		recvpool;
-#endif
-
-#ifdef VMS
-GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
-#endif
-
-#ifdef GTM_TRIGGER
-GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
-GBLREF	int4			gtm_trigger_depth;
-#endif
-
-#ifdef DEBUG
-GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
-#endif
-
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
 enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
 
@@ -177,7 +177,7 @@ boolean_t	tp_crit_all_regions()
 	sgmnt_data_ptr_t	tmpcsd;
 	gd_region		*reg;
 
-	assert(dollar_tlevel > 0);
+	assert(dollar_tlevel);
 	/* This function is in tp_tend because its technique and structures should be maintained in parallel with tp_tend.
 	 * The following section grabs crit in all regions touched by the transaction. We use a different
 	 * structure here for grabbing crit. The tp_reg_list region list contains all the regions that
@@ -262,9 +262,6 @@ boolean_t	tp_tend()
 	gv_namehead		*prev_target, *curr_target;
 	jnl_tm_t		save_gbl_jrec_time;
 	enum gds_t_mode		mode;
-#	ifdef GTM_TRIGGER
-	boolean_t		lcl_incr_db_trigger_cycle;
-#	endif
 #	ifdef GTM_CRYPT
 	DEBUG_ONLY(
 		blk_hdr_ptr_t	save_old_block;
@@ -280,24 +277,12 @@ boolean_t	tp_tend()
 		uint4		upd_num_end;
 		char		upd_num_seen[256];
 	)
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_DLCKAVOIDANCE);
-	error_def(ERR_JNLFILOPN);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_JNLTRANS2BIG);
-	error_def(ERR_REPLOFFJNLON);
-	error_def(ERR_TEXT);
-
-	assert(dollar_tlevel > 0);
+	SETUP_THREADGBL_ACCESS;
+	assert(dollar_tlevel);
 	assert(0 == jnl_fence_ctl.level);
 	status = cdb_sc_normal;
-	/* Note down value of global variable "incr_db_trigger_cycle" in a local variable and reset it right away.
-	 * This way future transactions dont inherit this value inadvertently. Use local variable inside this function.
-	 */
-	GTMTRIG_ONLY(
-		lcl_incr_db_trigger_cycle = incr_db_trigger_cycle;
-		incr_db_trigger_cycle = FALSE;
-	)
 	/* if the transaction does no updates and the transaction history has not changed, we do not need any more validation */
 	do_validation = FALSE;	/* initially set to FALSE, but set to TRUE below */
 	jnl_status = 0;
@@ -327,13 +312,18 @@ boolean_t	tp_tend()
 		 * 	(a) If we are not in the final retry and we already hold crit on some region.
 		 * 	(b) If we are in the final retry and we don't hold crit on some region.
 		 * 	(c) If we are in the final retry and we hold crit on a frozen region that we want to update.
-		 * 		This is possible if we did a tp_grab_crit through one of the gvcst_* routines
-		 * 		when we first encountered the region in the TP transaction and it wasn't locked down
-		 * 		although it was frozen then.
-		 *	The first two cases we don't know of any way they can happen. Case (c) though can happen.
+		 * 		This is possible if:
+		 *		(1) We did a tp_grab_crit through one of the gvcst_* routines when we first encountered the region
+		 *		    in the TP transaction and it wasn't locked down although it was frozen then.
+		 *		(2) tp_crit_all_regions notices that at least one of the participating regions did ONLY READs, it
+		 *		    will not wait for any freeze on THAT region to complete before grabbing crit. Later, in the
+		 *		    final retry, if THAT region did an update which caused op_tcommit to invoke bm_getfree ->
+		 *		    gdsfilext, then we would have come here with a frozen region on which we hold crit.
+		 *	The first two cases, (a) and (b), we don't know of any way they can happen. Case (c) though can happen.
 		 *	Nevertheless, we restart for all the three and in dbg version assert so we get some information.
-		 *	Note that in case of an online mupip journal rollback/recover, we will hold onto crit for the
-		 *		entire life of the process so that needs to be taken into account below.
+		 *
+		 *	Note that in case of an online mupip journal rollback/recover, we will hold onto crit for the entire life
+		 *	of the process so that needs to be taken into account below.
 		 */
 		update_trans = si->update_trans;
 		assert(!(update_trans & ~UPDTRNS_VALID_MASK));
@@ -359,7 +349,7 @@ boolean_t	tp_tend()
 		/* Whenever si->first_cw_set is non-NULL, ensure that update_trans is non-zero */
 		assert((NULL == si->first_cw_set) || update_trans);
 		/* Whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE. See op_tcommit.c for exceptions */
-		assert((NULL != si->first_cw_set) || !si->update_trans
+		assert((NULL != si->first_cw_set) || !si->update_trans || (UPDTRNS_ZTRIGGER_MASK & si->update_trans)
 			|| (gvdupsetnoop && (!JNL_ENABLED(csa) || (NULL != si->jnl_head))));
 		if (!update_trans)
 		{
@@ -508,7 +498,7 @@ boolean_t	tp_tend()
 			/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is non-zero */
 			assert((NULL == first_cw_set) || update_trans);
 			/* When si->first_cw_set is NULL, ensure that si->update_trans is FALSE. See op_tcommit.c for exceptions */
-			assert((NULL != si->first_cw_set) || !si->update_trans
+			assert((NULL != si->first_cw_set) || !si->update_trans || (UPDTRNS_ZTRIGGER_MASK & si->update_trans)
 				|| (gvdupsetnoop && (!JNL_ENABLED(csa) || (NULL != si->jnl_head))));
 			leafmods = indexmods = 0;
 			is_mm = (dba_mm == csd->acc_meth);
@@ -549,6 +539,26 @@ boolean_t	tp_tend()
 			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			if (!is_mm)
 				tnque_earliest_tn = ((th_rec_ptr_t)((sm_uc_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn;
+#			ifdef GTM_TRIGGER
+			if (!skip_dbtriggers && (csa->db_trigger_cycle != csd->db_trigger_cycle))
+			{	/* the process' view of the triggers could be potentially stale. restart to be safe. */
+				/* Triggers can be invoked only by GT.M and Update process. Out of these, we expect only
+				 * GT.M to see restarts due to concurrent trigger changes. Update process is the only
+				 * updater on the secondary so we dont expect it to see any concurrent trigger changes
+				 * Assert accordingly.
+				 */
+				assert(CDB_STAGNATE > t_tries);
+				assert(IS_GTM_IMAGE);
+				assert(csd->db_trigger_cycle > csa->db_trigger_cycle);
+				/* csa->db_trigger_cycle will be set to csd->db_trigger_cycle for all participating
+				 * regions when they are each first referenced in the next retry (in tp_set_sgm)\
+				 */
+				status = cdb_sc_triggermod;
+				if ((CDB_STAGNATE - 1) == t_tries)
+					release_crit = TRUE;
+				goto failed;
+			}
+#			endif
 			if (update_trans)
 			{
 				assert((NULL == first_cw_set) || (0 != si->cw_set_depth));
@@ -563,26 +573,6 @@ boolean_t	tp_tend()
 						tmp_jnl_participants++;
 					}
 				)
-#				ifdef GTM_TRIGGER
-				if (!skip_dbtriggers && (csa->db_trigger_cycle != csd->db_trigger_cycle))
-				{	/* the process' view of the triggers could be potentially stale. restart to be safe. */
-					/* Triggers can be invoked only by GT.M and Update process. Out of these, we expect only
-					 * GT.M to see restarts due to concurrent trigger changes. Update process is the only
-					 * updater on the secondary so we dont expect it to see any concurrent trigger changes
-					 * Assert accordingly.
-					 */
-					assert(CDB_STAGNATE > t_tries);
-					assert(IS_GTM_IMAGE);
-					assert(csd->db_trigger_cycle > csa->db_trigger_cycle);
-					/* csa->db_trigger_cycle will be set to csd->db_trigger_cycle for all participating
-					 * regions when they are each first referenced in the next retry (in tp_set_sgm)\
-					 */
-					status = cdb_sc_triggermod;
-					if ((CDB_STAGNATE - 1) == t_tries)
-						release_crit = TRUE;
-					goto failed;
-				}
-#				endif
 				if (JNL_ALLOWED(csa))
 				{
 					if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
@@ -706,7 +696,12 @@ boolean_t	tp_tend()
 					{
 						ctn = csd->trans_hist.curr_tn;
 						assert(csd->trans_hist.early_tn == ctn);
-						rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+						if (SS_NORMAL != jpc->status)
+							rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd),
+								DB_LEN_STR(gv_cur_region), jpc->status);
+						else
+							rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),
+								DB_LEN_STR(gv_cur_region));
 					}
 					if (DISK_BLOCKS_SUM(jbp->freeaddr, si->total_jnl_rec_size) > jbp->filesize)
 					{	/* Moved here to prevent jnlrecs split across multiple generation journal files. */
@@ -721,7 +716,7 @@ boolean_t	tp_tend()
 							if ((CDB_STAGNATE - 1) == t_tries)
 								release_crit = TRUE;
 							goto failed;
-						} else if (-1 == jnl_file_extend(jpc, si->total_jnl_rec_size))
+						} else if (EXIT_ERR == jnl_file_extend(jpc, si->total_jnl_rec_size))
 						{
 							assert((!JNL_ENABLED(csd)) && JNL_ENABLED(csa));
 							assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
@@ -1135,8 +1130,7 @@ boolean_t	tp_tend()
 					if ((n_gds_t_op < cse->mode) && (NULL == cse->new_buff))
 					{
 						assert(!cse->done);
-						cse->new_buff =
-							((new_buff_buddy_list *)get_new_free_element(si->new_buff_list))->new_buff;
+						cse->new_buff = get_new_free_element(si->new_buff_list);
 						cse->first_copy = TRUE;
 					}
 				}
@@ -1159,14 +1153,15 @@ boolean_t	tp_tend()
 		for (si = first_tp_si_by_ftok;  (si_last != si);  si = si->next_tp_si_by_ftok)
 		{
 			assert(si->tp_csa->now_crit);
-			tp_cr_array = &si->cr_array[0];
+			tp_cr_array = si->cr_array;
 			UNPIN_CR_ARRAY_ON_RETRY(tp_cr_array, si->cr_array_index);
 			assert(!si->cr_array_index);
 			if (!hold_onto_locks)
 				rel_crit(si->gv_cur_region);
 		}
 		/* Check that we DONT own crit/commit on ANY region. The only exception is online mupip journal rollback/recovery
-		 * which holds crit for the entire process lifetime. */
+		 * which holds crit for the entire process lifetime.
+		 */
 		assert(hold_onto_locks || (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
 		/* Wait for it to be unfrozen before re-grabbing crit on ALL regions */
 		WAIT_FOR_REGION_TO_UNFREEZE(csa, csd);
@@ -1184,7 +1179,7 @@ boolean_t	tp_tend()
 		QWASSIGN(tjpl->write_addr, jpl->write_addr);
 		tjpl->write = jpl->write;
 		QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
-		INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size);)
+		INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size));
 		tjpl->write += SIZEOF(jnldata_hdr_struct);
 		if (tjpl->write >= tjpl->jnlpool_size)
 		{
@@ -1208,7 +1203,6 @@ boolean_t	tp_tend()
 	/* There are two possible approaches that can be taken from now onwards.
 	 * 	a) Write journal and database records together for a region and move onto the next region.
 	 * 	b) Write journal records for all regions and only then move onto writing database updates for all regions.
-	 *
 	 * If journal and database updates are done together region by region, there is a problem in that if an error
 	 * occurs after one region's updates are committed (to jnl and db) or if the process gets STOP/IDed in VMS,
 	 * secshr_db_clnup should then commit BOTH the journal and database updates of the remaining regions.
@@ -1226,7 +1220,7 @@ boolean_t	tp_tend()
 	/* the following section writes journal records in all regions */
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	DEBUG_ONLY(tmp_jnl_participants = 0;)
-	assert(!donot_commit);	/* We should never commit a transaction that was determined restartable */
+	assert(!TREF(donot_commit));	/* We should never commit a transaction that was determined restartable */
 #	ifdef DEBUG
 	/* Check that upd_num in jnl records got set in increasing order (not necessarily contiguous) within each region.
 	 * This is true for GT.M and journal recovery. Take the chance to also check that jnl_head & update_trans are in sync.
@@ -1349,7 +1343,7 @@ boolean_t	tp_tend()
 					assert(n_gds_t_op < kill_t_write);
 					if (n_gds_t_op <= cse->mode)
 						continue;
-					DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth);)
+					DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth));
 					DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd);
 					if ((NULL != old_block) && (old_block->tn < epoch_tn))
 					{	/* For acquired blocks, we should have computed checksum already.
@@ -1407,13 +1401,13 @@ boolean_t	tp_tend()
 			assert(0 != jnl_fence_ctl.token);
 			jfb = si->jnl_head;
 			assert(NULL != jfb);
-			/* Fill in "num_participants" field in TSET/TKILL/TZKILL/TZTWORM record.
-			 * The rest of the records (USET/UKILL/UZKILL/UZTWORM) dont have this initialized.
+			/* Fill in "num_participants" field in TSET/TKILL/TZKILL/TZTRIG/TZTWORM record.
+			 * The rest of the records (USET/UKILL/UZKILL/UZTRIG/UZTWORM) dont have this initialized.
 			 * Recovery looks at this field only in the T* records.
 			 */
 			rec = (jnl_record *)jfb->buff;
 			assert(IS_TUPD(jfb->rectype));
-			assert(IS_SET_KILL_ZKILL_ZTWORM(jfb->rectype));
+			assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(jfb->rectype));
 			assert(&rec->jrec_set_kill.num_participants == &rec->jrec_ztworm.num_participants);
 			rec->jrec_set_kill.num_participants = replay_jnl_participants;
 			DEBUG_ONLY(++tmp_jnl_participants;)
@@ -1601,7 +1595,7 @@ boolean_t	tp_tend()
 			assert(!csd->freeze);	/* should never increment curr_tn on a frozen database */
 			INCREMENT_CURR_TN(csd);
 			GTMTRIG_ONLY(
-				if (lcl_incr_db_trigger_cycle)
+				if (csa->incr_db_trigger_cycle)
 				{
 					csd->db_trigger_cycle++;
 					/* Update the process private view of trigger cycle also since we are the ones
@@ -1613,6 +1607,7 @@ boolean_t	tp_tend()
 					 * is in fact a necessary step (considering recovery).
 					 */
 					csa->db_trigger_cycle = csd->db_trigger_cycle;
+					csa->incr_db_trigger_cycle = FALSE;
 				}
 			)
 			/* If db is journaled, then db header is flushed periodically when writing the EPOCH record,
@@ -1715,7 +1710,7 @@ boolean_t	tp_tend()
 				cse = cse->next_cw_set;
 			} while (NULL != cse);
 			/* Free up all pinnned cache-records */
-			tp_cr_array = &si->cr_array[0];
+			tp_cr_array = si->cr_array;
 			UNPIN_CR_ARRAY_ON_COMMIT(tp_cr_array, si->cr_array_index);
 			if (!is_mm)
 			{	/* In BG, now that two-phase commit is done, decrement counter */
@@ -1747,7 +1742,7 @@ failed:
 		for (si = first_tp_si_by_ftok;  (si_last != si);  si = si->next_tp_si_by_ftok)
 		{
 			assert(si->tp_csa->now_crit);
-			tp_cr_array = &si->cr_array[0];
+			tp_cr_array = si->cr_array;
 			UNPIN_CR_ARRAY_ON_RETRY(tp_cr_array, si->cr_array_index);
 			assert(!si->cr_array_index);
 			si->start_tn = si->tp_csd->trans_hist.curr_tn;	/* start_tn used temporarily to store currtn
@@ -1757,7 +1752,8 @@ failed:
 				rel_crit(si->gv_cur_region);
 		}
 		/* Check that we DONT own crit/commit on ANY region. The only exception is online mupip journal rollback/recovery
-		 * which holds crit for the entire process lifetime. */
+		 * which holds crit for the entire process lifetime.
+		 */
 		assert(hold_onto_locks || !release_crit || (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
 	}
 	/* We have finished validation on this region. Reset transaction numbers in the gv_target
@@ -1783,7 +1779,7 @@ failed:
 			if ((prev_target != curr_target) && (0 != curr_target->clue.end))
 			{
 				prev_target = curr_target;
-				for (t1 = &curr_target->hist.h[0]; t1->blk_num; t1++)
+				for (t1 = curr_target->hist.h; t1->blk_num; t1++)
 				{	/* If MM, the history can be safely updated. In BG, phase2 of commit happens outside of
 					 * crit. So we need to check if the global buffer corresponding to this block is
 					 * in the process of being updated concurrently by another process. If so, we have no
@@ -1863,7 +1859,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 	enum cdb_sc		status;
 	gv_key			*pKey = NULL;
 	int4			blk_size, blk_fill_size, cur_blk_size, blk_seg_cnt, delta ;
-        int4                    n, new_rec_size, next_rec_shrink;
+	int4                    n, new_rec_size, next_rec_shrink;
 	int4			rec_cmpc, target_key_size;
 	uint4			segment_update_array_size;
 	key_cum_value		*kv, *kvhead;
@@ -2040,7 +2036,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 	/* If block in this history element is the same as gv_target's leaf block and it has a non-zero clue, update it */
 	gvt = bh->blk_target;
 	assert(!bh->level);	/* this is why it is safe to access 0th array index in the next line */
-	t1 = &gvt->hist.h[0];
+	t1 = gvt->hist.h;
 	if (gvt->clue.end && (t1->blk_num == bh->blk_num))
 	{
 		*t1 = *bh;
@@ -2098,7 +2094,9 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 	blk_hdr_ptr_t		old_block;
 	unsigned int		bsiz;
 	boolean_t		before_image_needed;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	csd = csa->hdr;
 	is_mm = (dba_mm == csd->acc_meth);

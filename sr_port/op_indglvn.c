@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,18 +10,16 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashtab_mname.h"
+
 #include "lv_val.h"
 #include "compiler.h"
 #include "opcode.h"
 #include "indir_enum.h"
 #include "toktyp.h"
 #include "cache.h"
-#include "hashtab_objcode.h"
 #include "op.h"
 #include "rtnhdr.h"
 #include "valid_mname.h"
-#include "hashtab.h"
 
 GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;
@@ -33,9 +31,7 @@ void	op_indglvn(mval *v,mval *dst)
 	bool		rval;
 	mstr		*obj, object;
 	oprtype		x;
-	lv_val 		*a;
 	icode_str	indir_src;
-	lv_val		*lv;
 	var_tabent	targ_key;
 	ht_ent_mname	*tabent;
 
@@ -62,8 +58,7 @@ void	op_indglvn(mval *v,mval *dst)
 				} else
 					rts_error(VARLSTCNT(4) ERR_UNDEF, 2, v->str.len, v->str.addr);
 			}
-			a = (lv_val *)tabent->value;
-			*dst = a->v;
+			*dst = ((lv_val *)tabent->value)->v;
 			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 			return;
 		}

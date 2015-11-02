@@ -33,7 +33,7 @@ GBLREF volatile int4		crit_count;
 GBLREF jnlpool_addrs		jnlpool;
 GBLREF uint4			process_id;
 GBLREF uint4			crit_deadlock_check_cycle;
-GBLREF short			dollar_tlevel;
+GBLREF uint4			dollar_tlevel;
 GBLREF unsigned int		t_tries;
 GBLREF	boolean_t		hold_onto_locks;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,9 +38,11 @@
 #include "gtmmsg.h"
 #include "caller_id.h"
 #include "gtm_text_alloc.h"
+#include "gtmdbglvl.h"
 
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
+GBLREF	uint4		gtmDebugLevel;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -59,12 +61,12 @@ OS_PAGE_SIZE_DECLARE
 #define MAXINDEX 5
 
 /* Fields to help instrument our algorithm */
-GBLREF  size_t    	totalRallocGta;                 /* Total storage currently (real) mmap alloc'd */
-GBLREF  size_t     	totalAllocGta;                  /* Total mmap allocated (includes allocation overhead but not free space */
-GBLREF  size_t     	totalUsedGta;                   /* Sum of "in-use" portions (totalAllocGta - overhead) */
+GBLREF  ssize_t    	totalRallocGta;                 /* Total storage currently (real) mmap alloc'd */
+GBLREF  ssize_t     	totalAllocGta;                  /* Total mmap allocated (includes allocation overhead but not free space */
+GBLREF  ssize_t     	totalUsedGta;                   /* Sum of "in-use" portions (totalAllocGta - overhead) */
 static	int		totalAllocs;                    /* Total alloc requests */
 static	int		totalFrees;                     /* Total free requests */
-static	size_t		rAllocMax;                      /* Maximum value of totalRalloc */
+static	ssize_t		rAllocMax;                      /* Maximum value of totalRalloc */
 static	int		allocCnt[MAXINDEX + 2];         /* Alloc count satisfied by each queue size */
 static	int		freeCnt[MAXINDEX + 2];          /* Free count for element in each queue size */
 static	int		elemSplits[MAXINDEX + 2];       /* Times a given queue size block was split */
@@ -72,20 +74,29 @@ static	int		elemCombines[MAXINDEX + 2];     /* Times a given queue block was for
 static	int		freeElemCnt[MAXINDEX + 2];      /* Current count of elements on the free queue */
 static	int		freeElemMax[MAXINDEX + 2];      /* Maximum number of blocks on the free queue */
 
-error_def(ERR_TRNLOGFAIL);
 error_def(ERR_INVDBGLVL);
 error_def(ERR_MEMORY);
-error_def(ERR_SYSCALL);
 error_def(ERR_MEMORYRECURSIVE);
+error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+error_def(ERR_TRNLOGFAIL);
 
 #define INCR_CNTR(x) ++x
 #define DECR_CNTR(x) --x
 #define INCR_SUM(x, y) x += y
-#define DECR_SUM(x, y) x -= y
+#define DECR_SUM(x, y) {x -= y; assert(0 <= x);}
 #define SET_MAX(max, tst) max = MAX(max, tst)
 #define SET_ELEM_MAX(idx) SET_MAX(freeElemMax[idx], freeElemCnt[idx])
 #define CALLERID ((unsigned char *)caller_id())
+#ifdef DEBUG
+#  define TRACE_TXTALLOC(addr,len) {if (GDL_SmTrace & gtmDebugLevel) \
+ 			FPRINTF(stderr,"TxtAlloc at 0x%lx of %ld bytes from 0x%lx\n", addr, len, CALLERID);}
+#  define TRACE_TXTFREE(addr,len)   {if (GDL_SmTrace & gtmDebugLevel) \
+			FPRINTF(stderr,"TxtFree at 0x%lx of %d bytes from 0x%lx\n", addr, len, CALLERID);}
+#else
+#  define TRACE_TXTALLOC(addr, len)
+#  define TRACE_TXTFREE(addr, len)
+#endif
 
 #ifdef __MVS__
 
@@ -129,18 +140,16 @@ void *gtm_text_alloc(size_t size)
 		aligned++;
 		/* Matching the alignment as required in comp_indr() */
 		aligned = (unsigned long *)ROUND_UP2((unsigned long)aligned, (unsigned long)SECTION_ALIGN_BOUNDARY);
-
 		memStart = aligned - 1;
 		*memStart = (unsigned long) uStor;
 		assert((unsigned long)uStor == *memStart);
-
 		uStor->realLen = tSize;
 		INCR_SUM(totalRallocGta, tSize);
 		INCR_SUM(totalAllocGta, tSize);
 		INCR_SUM(totalUsedGta, tSize);
 		INCR_CNTR(totalAllocs);
 		SET_MAX(rAllocMax, totalUsedGta);
-
+		TRACE_TXTALLOC(aligned, tSize);
 		return (void *)aligned;
 	}
 
@@ -173,6 +182,7 @@ void gtm_text_free(void *addr)
 	DECR_SUM(totalAllocGta, size);
 	DECR_SUM(totalUsedGta, size);
 	INCR_CNTR(totalFrees);
+	TRACE_TXTFREE(addr, size);
 }
 
 #else /* if not __MVS__ */
@@ -363,7 +373,7 @@ textElem *gtaFindStorElem(int sizeIndex)
 		uStor2 = (textElem *)uStorAlloc;
 		/* Make addr "MAXTWO" byte aligned */
 		uStor = (textElem *)(((unsigned long)(uStor2) + MAXTWO - 1) & (unsigned long) -MAXTWO);
-                totalRallocGta += MAXTWO;
+                INCR_SUM(totalRallocGta, MAXTWO);
                 SET_MAX(rAllocMax, totalRallocGta);
 		DEBUGSM(("debuggta: Allocating block at 0x%08lx\n", uStor));
 		uStor->state = TextFree;
@@ -446,17 +456,19 @@ void *gtm_text_alloc(size_t size)
 			} else
 			{	/* Use regular mmap to obtain the piece */
 				TEXT_ALLOC(tSize, uStor);
+				INCR_SUM(totalRallocGta, tSize);
 				uStor->queueIndex = REAL_ALLOC;
 				uStor->realLen = (unsigned int)tSize;
 				sizeIndex = MAXINDEX + 1;
 			}
-			totalUsedGta += tSize;
-			totalAllocGta += tSize;
+			INCR_SUM(totalUsedGta, tSize);
+			INCR_SUM(totalAllocGta, tSize);
 			INCR_CNTR(allocCnt[sizeIndex]);
 			uStor->state = TextAllocated;
 			retVal = &uStor->userStorage.userStart;
 			/* Assert we have an appropriate boundary */
 			assert(((long)retVal & (long)IA64_ONLY(-16)NON_IA64_ONLY(-8)) == (long)retVal);
+			TRACE_TXTALLOC(retVal, tSize);
 		} else	/* size was 0 */
 			retVal = &NullStruct.nullStr[0];
 		--gtaSmDepth;
@@ -497,8 +509,10 @@ void gtm_text_free(void *addr)
 	{
 		hdrSize = OFFSETOF(textElem, userStorage);
 		uStor = (textElem *)((unsigned long)addr - hdrSize);		/* Backup ptr to element header */
+		assert(TextAllocated == uStor->state);
+		allocSize = uStor->realLen;
 		sizeIndex = uStor->queueIndex;
-		totalUsedGta -= uStor->realLen;
+		DECR_SUM(totalUsedGta, uStor->realLen);
 		if (sizeIndex >= 0)
 		{	/* We can put the storage back on one of our simple queues */
 			assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
@@ -506,7 +520,7 @@ void gtm_text_free(void *addr)
 			assert(uStor->realLen == TwoTable[sizeIndex]);
 			uStor->state = TextFree;
 			INCR_CNTR(freeCnt[sizeIndex]);
-			totalAllocGta -= TwoTable[sizeIndex];
+			DECR_SUM(totalAllocGta, TwoTable[sizeIndex]);
 			/* First, if there are larger queues than this one, see if it has a buddy that it can
 			   combine with */
 			while (sizeIndex < MAXINDEX)
@@ -533,11 +547,11 @@ void gtm_text_free(void *addr)
 		{
 			assert(REAL_ALLOC == sizeIndex);		/* Better be a real alloc type block */
 			INCR_CNTR(freeCnt[MAXINDEX + 1]);               /* Count free of malloc */
- 			allocSize = uStor->realLen;
 			TEXT_FREE(uStor, allocSize);
-			totalRallocGta -= allocSize;
-			totalAllocGta -= allocSize;
+			DECR_SUM(totalRallocGta, allocSize);
+			DECR_SUM(totalAllocGta, allocSize);
  		}
+		TRACE_TXTFREE(addr, allocSize);
 	}
 	--gtaSmDepth;
 	--fast_lock_count;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -288,9 +288,13 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				assert(gtm_white_box_test_case_enabled
 					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number));
 				if (JNL_ENABLED(csa->hdr))
-				{
-					jnlfile_lost = TRUE;
+				{	/* We ignore the return value of jnl_file_lost() since we always want to report the journal
+					 * error, whatever its error handling method is.  Also, an operator log will be sent by some
+					 * callers (t_end()) only if an error is returned here, and the operator log is wanted in
+					 * those cases.
+					 */
 					jnl_file_lost(jpc, status);
+					jnlfile_lost = TRUE;
 				}
 				/* Else journaling got closed concurrently by another process by invoking "jnl_file_lost"
 				 * just before we got crit. Do not invoke "jnl_file_lost" again on the same journal file.

@@ -92,7 +92,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	upd_helper_entry_ptr_t	helper_entry;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 
 void close_repl_logfiles(void);
 

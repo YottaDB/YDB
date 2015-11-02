@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,9 +29,6 @@
 #include "tp.h"
 #include "process_gvt_pending_list.h"
 
-GBLREF	bool		gv_curr_subsc_null;
-GBLREF	bool		gv_prev_subsc_null;
-GBLREF	gd_addr		*gd_targ_addr;
 GBLREF	gd_binding	*gd_map;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
@@ -48,7 +45,9 @@ void op_gvsavtarg(mval *v)
 	)
 	short			end;
 	gvsavtarg_t		*gvsavtarg;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 	v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
@@ -58,7 +57,7 @@ void op_gvsavtarg(mval *v)
 		v->mvtype = MV_STR;
 		return;
 	}
-	assert(NULL != gd_targ_addr);
+	assert(NULL != TREF(gd_targ_addr));
 	assert((NULL != gv_target) || (0 == gv_currkey->end));
 	/* The way savtarg/rectarg works is by saving and restoring a copy of "gv_target". This assumes that once gv_target
 	 * has been allocated and used in a savtarg, the memory is never freed at least until the rectarg is completed.
@@ -81,13 +80,13 @@ void op_gvsavtarg(mval *v)
 	/* Now we are going to fill in the structure fields most of which are pointer fields (size upto 8-byte).
 	 * This is why we ensure 8-byte alignment of c before typecasting it into gvsavtarg.
 	 */
-	gvsavtarg->gd_targ_addr = gd_targ_addr;
+	gvsavtarg->gd_targ_addr = TREF(gd_targ_addr);
 	gvsavtarg->gd_map = gd_map;
 	gvsavtarg->gv_cur_region = gv_cur_region;
 	gvsavtarg->gv_target = gv_target;
 	gvsavtarg->sgm_info_ptr = sgm_info_ptr;
-	gvsavtarg->gv_curr_subsc_null = gv_curr_subsc_null;
-	gvsavtarg->gv_prev_subsc_null = gv_prev_subsc_null;
+	gvsavtarg->gv_last_subsc_null = TREF(gv_last_subsc_null);
+	gvsavtarg->gv_some_subsc_null = TREF(gv_some_subsc_null);
 	gvsavtarg->prev = gv_currkey->prev;
 	gvsavtarg->end = end;
 	c += GVSAVTARG_FIXED_SIZE;
@@ -96,7 +95,7 @@ void op_gvsavtarg(mval *v)
 		assert(KEY_DELIMITER != gv_currkey->base[0]);
 		assert(KEY_DELIMITER == gv_currkey->base[end - 1]);
 		assert(KEY_DELIMITER == gv_currkey->base[end]);
-		memcpy(c, &gv_currkey->base[0], end);
+		memcpy(c, gv_currkey->base, end);
 	}
 	return;
 }

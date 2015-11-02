@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #include "filestruct.h"
 #include "targ_alloc.h"
 #include "min_max.h"
-#include "hashtab.h"
 #include "hashtab_mname.h"
 #include "gtmimagename.h"
 
@@ -45,6 +44,20 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	ssize_t		first_rec_size, last_rec_size, clue_size;
 #endif
 
+	/* Ensure there are no additional compiler introduced filler bytes. This is a safety since a few elements in the
+	 * gv_namehead structure are defined using MAX_BT_DEPTH macros and we want to guard against changes to this macro
+	 * that cause unintended changes to the layout/size of the gv_namehead structure.
+	 */
+	assert(OFFSETOF(gv_namehead, filler_8byte_align1[0]) + SIZEOF(gvt->filler_8byte_align1)
+			== OFFSETOF(gv_namehead, last_split_blk_num[0]));
+#	ifdef GTM_TRIGGER
+	assert(OFFSETOF(gv_namehead, last_split_blk_num[0]) + SIZEOF(gvt->last_split_blk_num)
+			== OFFSETOF(gv_namehead, gvt_trigger));
+	GTM64_ONLY(assert(OFFSETOF(gv_namehead, filler_8byte_align2) + SIZEOF(gvt->filler_8byte_align2)
+			== OFFSETOF(gv_namehead, clue));)
+	NON_GTM64_ONLY(assert(OFFSETOF(gv_namehead, trig_mismatch_test_done) + SIZEOF(gvt->trig_mismatch_test_done)
+			== OFFSETOF(gv_namehead, clue));)
+#	endif
 	csa = ((NULL != reg) && reg->open) ? &FILE_INFO(reg)->s_addrs : NULL;
 	gvt_hashtab_present = FALSE;
 	if ((NULL != gvent) && (NULL != csa))
@@ -111,6 +124,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	gvt->regcnt = 1;
 	gvt->collseq = NULL;
 	gvt->read_local_tn = (trans_num)0;
+	GTMTRIG_ONLY(gvt->trig_local_tn = (trans_num)0);
 	gvt->noisolation = FALSE;
 	gvt->alt_hist = (srch_hist *)malloc(SIZEOF(srch_hist));
 	gvt->hist.h[0].blk_num = HIST_TERMINATOR;
@@ -123,12 +137,20 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		gvt->alt_hist->h[index].level = index;
 		gvt->alt_hist->h[index].blk_target = gvt;
 	}
+	gvt->split_cleanup_needed = FALSE;
+	assert(ARRAYSIZE(gvt->last_split_direction) == ARRAYSIZE(gvt->last_split_blk_num));
+	for (index = 0; index < ARRAYSIZE(gvt->last_split_direction); index++)
+	{
+		gvt->last_split_direction[index] = NEWREC_DIR_FORCED;
+		gvt->last_split_blk_num[index] = 0;
+	}
 	gvt->prev_gvnh = NULL;
 	gvt->next_tp_gvnh = NULL;
 	assert(gv_target_list != gvt);
 #	ifdef GTM_TRIGGER
 	gvt->gvt_trigger = NULL;
 	gvt->db_trigger_cycle = 0;
+	gvt->db_dztrigger_cycle = 0;
 	gvt->trig_mismatch_test_done = FALSE;
 #	endif
 	gvt->next_gvnh = gv_target_list;		/* Insert into gv_target list */

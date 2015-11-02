@@ -61,7 +61,7 @@ GBLREF	sigset_t	blockalrm;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgmnt_data_ptr_t cs_data;
 GBLREF	unsigned char	cw_set_depth;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	boolean_t	mu_reorg_process;
@@ -153,20 +153,27 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	was_crit = cs_addrs->now_crit;
 	assert(!cs_addrs->hold_onto_crit || was_crit);
 	/* If we are coming from mupip_extend (which gets crit itself) we better have waited for any unfreezes to occur.
-	 * If we are coming from GT.M and final retry (in which case we come in holding crit) we better have waited for
-	 * 	any unfreezes to occur (TP or non-TP) before coming into this function.
 	 * If we are coming from online rollback (when that feature is available), we will come in holding crit and in
 	 * 	the final retry. In that case too, we expect to have waited for unfreezes to occur in the caller itself.
-	 * Therefore if we are coming in holding crit, we expect the db to be unfrozen so no need to wait for freeze.
-	 * If ever, we later attempt to invoke grab_crit below while already holding crit, here is why that should be avoided.
-	 *	   If we are in the final retry and already hold crit, it is possible that csd->wc_blocked is also set to TRUE
-	 *	   (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
-	 *	   finished the job for it). In this case we do NOT want to invoke wcs_recover as that will update the "bt"
-	 *	   transaction numbers without correspondingly updating the history transaction numbers (effectively causing
-	 *	   a cdb_sc_blkmod type of restart). Therefore do NOT call grab_crit (which unconditionally invokes wcs_recover)
-	 *	   if we already hold crit.
+	 * Therefore if we are coming in holding crit from MUPIP, we expect the db to be unfrozen so no need to wait for
+	 * freeze.
+	 * If we are coming from GT.M and final retry (in which case we come in holding crit) we expect to have waited
+	 * 	for any unfreezes (by invoking tp_crit_all_regions) to occur (TP or non-TP) before coming into this
+	 *	function. However, there is one exception. In the final retry, if tp_crit_all_regions notices that
+	 *	at least one of the participating regions did ONLY READs, it will not wait for any freeze on THAT region
+	 *	to complete before grabbing crit. Later, in the final retry, if THAT region did an update which caused
+	 *	op_tcommit to invoke bm_getfree->gdsfilext, then we would have come here with a frozen region on which
+	 *	we hold crit.
 	 */
-	assert(!was_crit || !cs_data->freeze);
+	assert(!was_crit || !cs_data->freeze || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
+	/*
+	 * If we are in the final retry and already hold crit, it is possible that csd->wc_blocked is also set to TRUE
+	 * (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
+	 * finished the job for it). In this case we do NOT want to invoke wcs_recover as that will update the "bt"
+	 * transaction numbers without correspondingly updating the history transaction numbers (effectively causing
+	 * a cdb_sc_blkmod type of restart). Therefore do NOT call grab_crit (which unconditionally invokes wcs_recover)
+	 * if we already hold crit.
+	 */
 	if (!was_crit)
 	{
 		for ( ; ; )
@@ -178,6 +185,12 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			while (cs_data->freeze)
 				hiber_start(1000);
 		}
+	} else if (cs_data->freeze && dollar_tlevel)
+	{	/* We don't want to continue with file extension as explained above. Hence return with an error code which
+		 * op_tcommit will recognize (as a cdb_sc_needcrit type of restart) and restart accordingly.
+		 */
+		assert(CDB_STAGNATE <= t_tries);
+		return (uint4)(FINAL_RETRY_FREEZE_PROG);
 	}
 	assert(cs_addrs->ti->total_blks == cs_data->trans_hist.total_blks);
 	if (cs_data->trans_hist.total_blks != filesize)
@@ -188,7 +201,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		GDSFILEXT_CLNUP;
 		return (SS_NORMAL);
 	}
-	if (IS_GTM_IMAGE && (2 * ((0 < dollar_tlevel) ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks))
+	if (IS_GTM_IMAGE && (2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks))
 	{
 		if (FALSE == was_crit)
 		{
@@ -197,7 +210,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		}
 		/* If free_blocks counter is not ok, then correct it. Do the check again. If still fails, then GTMASSERT. */
 		if (is_free_blks_ctr_ok() ||
-				(2 * ((0 < dollar_tlevel) ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks))
+				(2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks))
 			GTMASSERT;	/* held crit through bm_getfree into gdsfilext and still didn't get it right */
 	}
 	if (JNL_ENABLED(cs_data))
@@ -268,7 +281,6 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		return (uint4)(NO_FREE_SPACE);
 	}
 	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-	assert(0 < (int)new_blocks);
 	new_total = cs_data->trans_hist.total_blks + new_blocks;
 	new_eof = ((off_t)(cs_data->start_vbn - 1) * DISK_BLOCK_SIZE) + ((off_t)new_total * cs_data->blk_size);
 	buff = (char *)malloc(DISK_BLOCK_SIZE);
@@ -314,6 +326,32 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), save_errno);
 		return (uint4)(NO_FREE_SPACE);
 	}
+	/* Ensure the EOF and metadata get to disk BEFORE any bitmap writes. Otherwise, the file size could no longer reflect
+	 * a proper extent and subsequent invocations of gdsfilext could corrupt the database.
+	 */
+	DEBUG_ONLY(
+		if ((gtm_white_box_test_case_enabled) && (WBTEST_FILE_EXTEND_INTERRUPT_1 == gtm_white_box_test_case_number))
+		{
+			LONG_SLEEP(600);
+			assert(FALSE); /* Should be killed before that */
+		}
+	)
+	GTM_FSYNC(udi->fd, status);
+	assert(0 == status);
+	if (0 != status)
+	{
+		GDSFILEXT_CLNUP;
+		send_msg(VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
+		return (uint4)(NO_FREE_SPACE);
+	}
+	DEBUG_ONLY(
+		if ((gtm_white_box_test_case_enabled) && (WBTEST_FILE_EXTEND_INTERRUPT_2 == gtm_white_box_test_case_number))
+		{
+			LONG_SLEEP(600);
+			assert(FALSE); /* Should be killed before that */
+		}
+	)
+
 	DEBUG_ONLY(prev_extend_blks_to_upgrd = cs_data->blks_to_upgrd;)
 	/* inctn_detail.blks_to_upgrd_delta holds the increase in "csd->blks_to_upgrd" due to the file extension */
 	inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta =
@@ -359,6 +397,32 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		}
 		assert(0 == new_bit_maps);
 	}
+	/* Ensures that if at all the file header write goes to disk before the crash, the bitmap blocks are all
+	 * guaranteed to be initialized and synced to disk as well.
+	 */
+	DEBUG_ONLY(
+		if ((gtm_white_box_test_case_enabled) && (WBTEST_FILE_EXTEND_INTERRUPT_3 == gtm_white_box_test_case_number))
+		{
+			LONG_SLEEP(600);
+			assert(FALSE); /* Should be killed before that */
+		}
+	)
+
+	GTM_FSYNC(udi->fd, status);
+	assert(0 == status);
+	if (0 != status)
+	{
+		GDSFILEXT_CLNUP;
+		send_msg(VARLSTCNT(8) ERR_DBFILERR, 5, RTS_ERROR_LITERAL("fsync()"), CALLFROM, errno);
+		return (uint4)(NO_FREE_SPACE);
+	}
+	DEBUG_ONLY(
+		if ((gtm_white_box_test_case_enabled) && (WBTEST_FILE_EXTEND_INTERRUPT_4 == gtm_white_box_test_case_number))
+		{
+			LONG_SLEEP(600);
+			assert(FALSE); /* Should be killed before that */
+		}
+	)
 	assert(cs_data->blks_to_upgrd == (inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta + prev_extend_blks_to_upgrd));
 	if (dba_mm == cs_addrs->hdr->acc_meth)
 	{	/* On 32 bit aix, is it possible we can have now increased the file size past what we can map ? */
@@ -408,7 +472,23 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		cs_data->trans_hist.early_tn = cs_data->trans_hist.curr_tn + 1;
 		INCREMENT_CURR_TN(cs_data);
 	}
+	/* white box test for interrupted file extension */
+	DEBUG_ONLY(
+		if ((gtm_white_box_test_case_enabled) && (WBTEST_FILE_EXTEND_INTERRUPT_5 == gtm_white_box_test_case_number))
+		{
+			LONG_SLEEP(600);
+			assert(FALSE); /* Should be killed before that */
+		}
+	)
 	fileheader_sync(gv_cur_region);
+	/* white box test for interrupted file extension */
+	DEBUG_ONLY(
+		if ((gtm_white_box_test_case_enabled) && (WBTEST_FILE_EXTEND_INTERRUPT_6 == gtm_white_box_test_case_number))
+		{
+			LONG_SLEEP(600);
+			assert(FALSE); /* Should be killed before that */
+		}
+	)
 	GDSFILEXT_CLNUP;
 	if (!gtm_dbfilext_syslog_disable)
 		send_msg(VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total, &curr_tn);

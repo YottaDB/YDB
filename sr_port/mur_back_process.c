@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +88,14 @@ static jnl_tm_t		prev_max_lvrec_time, prev_min_bov_time;
 {												\
 	MUR_GET_IMAGE_COUNT(JCTL, JNLREC, REC_IMAGE_COUNT, STATUS);				\
 	if (SS_NORMAL != STATUS)								\
+	{	/* We saw a corrupt journal record. Possible only if journal file had a crash	\
+		 * and have not yet reached the last epoch in backward processing and the	\
+		 * pini_addr should also point to an offset that is after the last epoch.	\
+		 */										\
+		assert(JCTL->jfh->crash && (JCTL->rec_offset > JNLREC->prefix.pini_addr)	\
+			&& (JNLREC->prefix.pini_addr > JCTL->jfh->end_of_data));		\
 		MUR_BACK_PROCESS_ERROR(JCTL, JJCTL, "pini_addr is bad");			\
+	}											\
 }
 #else
 #define	VMS_MUR_BACK_PROCESS_GET_IMAGE_COUNT(JCTL, JNLREC, JJCTL, REC_IMAGE_COUNT, STATUS)
@@ -479,13 +486,13 @@ uint4 mur_back_processing(jnl_ctl_list **jjctl, boolean_t apply_pblk, seq_num *p
 					rec_tn = jnlrec->prefix.tn;
 					MUR_BACK_PROCESS_ERROR(jctl, jjctl, "Transaction number continuty check failed");
 				}
-				if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rectype, jnlrec)
+				if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rectype)
 					&& (GET_JNL_SEQNO(jnlrec) > rec_token_seq))
 				{
 					rec_token_seq = GET_JNL_SEQNO(jnlrec);
 					MUR_BACK_PROCESS_ERROR(jctl, jjctl, "Sequence number continuty check failed");
 				}
-				if (IS_SET_KILL_ZKILL_ZTWORM(rectype))
+				if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
 				{
 					keystr = (jnl_string *)&jnlrec->jrec_set_kill.mumps_node;
 					/* Assert that ZTWORMHOLE type record too has same layout as KILL/SET */
@@ -493,8 +500,8 @@ uint4 mur_back_processing(jnl_ctl_list **jjctl, boolean_t apply_pblk, seq_num *p
 #					ifdef GTM_CRYPT
 					if (jctl->jfh->is_encrypted)
 					{
-						DECODE_SET_KILL_ZKILL(keystr, jnlrec->prefix.forwptr,
-								      jctl->encr_key_handle, crypt_status);
+						DECODE_SET_KILL_ZKILL_ZTRIG(keystr, jnlrec->prefix.forwptr,
+									    jctl->encr_key_handle, crypt_status);
 						if (0 != crypt_status)
 						{
 							GC_GTM_PUTMSG(crypt_status, NULL);
@@ -566,12 +573,13 @@ uint4 mur_back_processing(jnl_ctl_list **jjctl, boolean_t apply_pblk, seq_num *p
 			 * For replication (that is, doing rollback) token_seq.jnl_seqno is used as token in hash table.
 			 * Note : ZTP is not supported with replication.
 			 */
-			if (REC_HAS_TOKEN_SEQ(rectype, jnlrec))
+			if (REC_HAS_TOKEN_SEQ(rectype))
 			{
-				assert(IS_SET_KILL_ZKILL_ZTWORM(rectype) || IS_COM(rectype) || (JRT_EPOCH == (rectype))
-					|| (JRT_EOF == (rectype)));
+				assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype) || IS_COM(rectype) || (JRT_EPOCH == (rectype))
+					|| (JRT_EOF == (rectype)) || (JRT_NULL == (rectype)));
 				assert(&jnlrec->jrec_set_kill.token_seq == (token_seq_t *)&jnlrec->jrec_epoch.jnl_seqno);
 				assert(&jnlrec->jrec_set_kill.token_seq == (token_seq_t *)&jnlrec->jrec_eof.jnl_seqno);
+				assert(&jnlrec->jrec_set_kill.token_seq == (token_seq_t *)&jnlrec->jrec_null.jnl_seqno);
 				assert(&jnlrec->jrec_set_kill.token_seq == (token_seq_t *)&jnlrec->jrec_tcom.token_seq);
 				assert(&jnlrec->jrec_set_kill.token_seq == (token_seq_t *)&jnlrec->jrec_ztcom.token);
 				rec_token_seq = GET_JNL_SEQNO(jnlrec);
@@ -629,9 +637,12 @@ uint4 mur_back_processing(jnl_ctl_list **jjctl, boolean_t apply_pblk, seq_num *p
 				first_epoch = FALSE;
 				continue;
 			}
-			if ((FENCE_NONE == mur_options.fences || rec_time > mur_options.before_time)
-				|| (rec_time < jgbl.mur_tp_resolve_time && (!resolve_seq || rec_token_seq < murgbl.resync_seqno)))
+			/* Do preliminary checks to see if the jnl record needs to be involved in hashtable token processing */
+			if ((FENCE_NONE == mur_options.fences) || (rec_time > mur_options.before_time)
+					|| ((rec_time < jgbl.mur_tp_resolve_time)
+						&& (!resolve_seq || (rec_token_seq < murgbl.resync_seqno))))
 				continue;
+			/* Do detailed checks on the jnl record for token processing */
 			token = rec_token_seq;
 			if (IS_FENCED(rectype))
 			{	/* Note for a ZTP if FSET/GSET is present before mur_options.before_time and
@@ -639,7 +650,7 @@ uint4 mur_back_processing(jnl_ctl_list **jjctl, boolean_t apply_pblk, seq_num *p
 				rec_fence = GET_REC_FENCE_TYPE(rectype);
 				VMS_MUR_BACK_PROCESS_GET_IMAGE_COUNT(jctl, jnlrec, jjctl, rec_image_count, status);
 				assert(token == ((struct_jrec_upd *)jnlrec)->token_seq.token);
-				if (IS_SET_KILL_ZKILL_ZTWORM(rectype))	/* TUPD/UUPD/FUPD/GUPD */
+				if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))	/* TUPD/UUPD/FUPD/GUPD */
 				{
 					if (NULL != (multi = MUR_TOKEN_LOOKUP(token, rec_image_count, rec_time, rec_fence)))
 					{

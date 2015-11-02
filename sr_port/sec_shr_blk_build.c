@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 	{
 		SECSHR_ACCOUNTING(4);
 		SECSHR_ACCOUNTING(__LINE__);
-		SECSHR_ACCOUNTING(cse->upd_addr);
+		SECSHR_ACCOUNTING((INTPTR_T)cse->upd_addr);
 		SECSHR_ACCOUNTING(SIZEOF(blk_segment));
 		assert(FALSE);
 		return FALSE;
@@ -52,7 +52,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 	{
 		SECSHR_ACCOUNTING(4);
 		SECSHR_ACCOUNTING(__LINE__);
-		SECSHR_ACCOUNTING(base_addr);
+		SECSHR_ACCOUNTING((INTPTR_T)base_addr);
 		SECSHR_ACCOUNTING(SIZEOF(blk_hdr));
 		assert(FALSE);
 		return FALSE;
@@ -74,7 +74,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 			{
 				SECSHR_ACCOUNTING(4);
 				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(seg);
+				SECSHR_ACCOUNTING((INTPTR_T)seg);
 				SECSHR_ACCOUNTING(SIZEOF(blk_segment));
 				assert(FALSE);
 				return FALSE;
@@ -85,8 +85,8 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 			{
 				SECSHR_ACCOUNTING(5);
 				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(seg);
-				SECSHR_ACCOUNTING(seg->addr);
+				SECSHR_ACCOUNTING((INTPTR_T)seg);
+				SECSHR_ACCOUNTING((INTPTR_T)seg->addr);
 				SECSHR_ACCOUNTING(seg->len);
 				assert(FALSE);
 				return FALSE;
@@ -95,9 +95,9 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 			{
 				SECSHR_ACCOUNTING(6);
 				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(seg);
-				SECSHR_ACCOUNTING(ptr);
-				SECSHR_ACCOUNTING(seg->addr);
+				SECSHR_ACCOUNTING((INTPTR_T)seg);
+				SECSHR_ACCOUNTING((INTPTR_T)ptr);
+				SECSHR_ACCOUNTING((INTPTR_T)seg->addr);
 				SECSHR_ACCOUNTING(seg->len);
 				assert(FALSE);
 				return FALSE;
@@ -115,7 +115,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 			{
 				SECSHR_ACCOUNTING(4);
 				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(seg);
+				SECSHR_ACCOUNTING((INTPTR_T)seg);
 				SECSHR_ACCOUNTING(SIZEOF(blk_segment));
 				assert(FALSE);
 				return FALSE;
@@ -126,8 +126,8 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 			{
 				SECSHR_ACCOUNTING(5);
 				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(seg);
-				SECSHR_ACCOUNTING(seg->addr);
+				SECSHR_ACCOUNTING((INTPTR_T)seg);
+				SECSHR_ACCOUNTING((INTPTR_T)seg->addr);
 				SECSHR_ACCOUNTING(seg->len);
 				assert(FALSE);
 				return FALSE;
@@ -137,9 +137,9 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 			{
 				SECSHR_ACCOUNTING(6);
 				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(seg);
-				SECSHR_ACCOUNTING(ptr);
-				SECSHR_ACCOUNTING(seg->addr);
+				SECSHR_ACCOUNTING((INTPTR_T)seg);
+				SECSHR_ACCOUNTING((INTPTR_T)ptr);
+				SECSHR_ACCOUNTING((INTPTR_T)seg->addr);
 				SECSHR_ACCOUNTING(seg->len);
 				assert(FALSE);
 				return FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,8 @@
 #include "jnl_get_checksum.h"
 #include "gtmimagename.h"
 #include "get_fs_block_size.h"
+#include "wbox_test_init.h"
+#include "gt_timer.h"
 
 /* Note : Now all system error messages are issued here. So callers do not need to issue them again */
 #define STATUS_MSG(info)										\
@@ -176,6 +178,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	struct stat		sb;
 	int			perm;
 #endif
+	trans_num		db_tn;
 	uint4			temp_offset, temp_checksum;
 	uint4			jnl_fs_block_size;
 
@@ -338,7 +341,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	pini_record = (struct_jrec_pini *)&jrecbuf[0];
 	pini_record->prefix.jrec_type = JRT_PINI;
 	pini_record->prefix.forwptr = pini_record->suffix.backptr = PINI_RECLEN;
-	pini_record->prefix.tn = info->tn;
+	db_tn = info->csd->trans_hist.curr_tn;
+	pini_record->prefix.tn = db_tn;
 	pini_record->prefix.pini_addr = JNL_HDR_LEN;
 	pini_record->prefix.time = jgbl.gbl_jrec_time;	/* callers must set it */
 	temp_offset = JNL_HDR_LEN;
@@ -355,7 +359,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		epoch_record = (struct_jrec_epoch *)&jrecbuf[PINI_RECLEN];
 		epoch_record->prefix.jrec_type = JRT_EPOCH;
 		epoch_record->prefix.forwptr = epoch_record->suffix.backptr = EPOCH_RECLEN;
-		epoch_record->prefix.tn = info->tn;
+		epoch_record->prefix.tn = db_tn;
 		epoch_record->prefix.pini_addr = JNL_HDR_LEN;
 		epoch_record->prefix.time = jgbl.gbl_jrec_time;
 		epoch_record->blks_to_upgrd = info->blks_to_upgrd;
@@ -389,17 +393,20 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	}
 	pfin_record->prefix.jrec_type = JRT_PFIN;
 	pfin_record->prefix.forwptr = pfin_record->suffix.backptr = PFIN_RECLEN;
-	pfin_record->prefix.tn = info->tn;
+	pfin_record->prefix.tn = db_tn;
 	pfin_record->prefix.pini_addr = JNL_HDR_LEN;
 	pfin_record->prefix.time = jgbl.gbl_jrec_time;
 	pfin_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	eof_record->prefix.jrec_type = JRT_EOF;
 	eof_record->prefix.forwptr = eof_record->suffix.backptr = EOF_RECLEN;
-	eof_record->prefix.tn = info->tn;
+	eof_record->prefix.tn = db_tn;
 	eof_record->prefix.pini_addr = JNL_HDR_LEN;
 	eof_record->prefix.time = jgbl.gbl_jrec_time;
 	QWASSIGN(eof_record->jnl_seqno, info->reg_seqno);
 	eof_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+	/* Assert that the journal file header and journal records are all in sync with respect to the db tn. */
+	assert(header->bov_tn == db_tn);
+	assert(header->eov_tn == db_tn);
 	/* Write the journal records, but also 0-fill the tail of the journal file enough to fill
 	 * an aligned filesystem-block-size boundary. Take into account that the file header is already written.
 	 */
@@ -416,6 +423,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	DO_FILE_WRITE(channel, JNL_HDR_LEN, jrecbuf, write_size, info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
+	UNIX_ONLY(GTM_FSYNC(channel, status);)
 	F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
 	free(jrecbuf_base);
 	jrecbuf_base = NULL;
@@ -453,5 +461,12 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		send_msg(VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 	else
 		gtm_putmsg(VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
+	DEBUG_ONLY(
+		if (gtm_white_box_test_case_enabled && (WBTEST_JNL_CREATE_INTERRUPT == gtm_white_box_test_case_number))
+		{
+			LONG_SLEEP(600);
+			assert(FALSE); /* Should be killed before that */
+		}
+	)
 	return EXIT_NRM;
 }

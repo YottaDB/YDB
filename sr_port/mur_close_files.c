@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -191,7 +191,7 @@ void	mur_close_files(void)
 				)
 			}
 			assert(NULL != csa->nl);
-			assert(!(mur_options.update ^ csa->nl->donotflush_dbjnl));
+			assert((!(mur_options.update ^ csa->nl->donotflush_dbjnl)) || !murgbl.clean_exit);
 			if (mur_options.update && (murgbl.clean_exit || !rctl->db_updated) && (NULL != csa->nl))
 				csa->nl->donotflush_dbjnl = FALSE;	/* shared memory is now clean for dbjnl flushing */
 			gds_rundown();
@@ -259,11 +259,19 @@ void	mur_close_files(void)
 					csd->intrpt_recov_repl_state = repl_closed;
 					csd->recov_interrupted = FALSE;
 				} else
-				{	/* Always restore states. Otherwise, reissuing the command might fail */
-					csd->repl_state = rctl->repl_state;
-					csd->jnl_state = rctl->jnl_state;
-					csd->jnl_before_image = rctl->before_image;
-					csd->recov_interrupted = rctl->recov_interrupted;
+				{	/* Restore states. Otherwise, reissuing the command might fail.
+					 * However, before using rctl make sure it was properly initialized.
+					 * If not, skip the restore. This is okay because in this case an interrupt
+					 * occurred in mur_open_files before rctl->initialized was set which means
+					 * journaling and/or replication state of csd (updated AFTER rctl->initialized
+					 * is set to TRUE) would not yet have been touched either. */
+					if (rctl->initialized)
+					{
+						csd->repl_state = rctl->repl_state;
+						csd->jnl_state = rctl->jnl_state;
+						csd->jnl_before_image = rctl->before_image;
+						csd->recov_interrupted = rctl->recov_interrupted;
+					}
 				}
 				if (!file_head_write((char *)reg->dyn.addr->fname, csd, SIZEOF(csd_temp)))
 					wrn_count++;
@@ -435,10 +443,14 @@ void	mur_close_files(void)
 	{	/* This exit path is not coming through "mupip_exit". Print an error message indicating incomplete recovery.
 		 * The || in the assert below is to take care of a white-box test that primarily tests the
 		 * WBTEST_TP_HIST_CDB_SC_BLKMOD scenario but also induces a secondary WBTEST_MUR_ABNORMAL_EXIT_EXPECTED scenario.
+		 * WBTEST_JNL_FILE_OPEN_FAIL and WBTEST_JNL_CREATE_FAIL are also accepted since the impossibility to create a
+		 * journal file will induce a recovery failure.
 		 */
 		assert(gtm_white_box_test_case_enabled
 			&& ((WBTEST_MUR_ABNORMAL_EXIT_EXPECTED == gtm_white_box_test_case_number)
-				|| (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number)));
+				|| (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number)
+				|| (WBTEST_JNL_FILE_OPEN_FAIL == gtm_white_box_test_case_number)
+				|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)));
 		assert(!murgbl.clean_exit);
 		if (murgbl.wrn_count)
 			gtm_putmsg(VARLSTCNT (1) ERR_JNLACTINCMPLT);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,46 +18,30 @@
 #include "nametabtyp.h"
 #include "funsvn.h"
 #include "advancewindow.h"
+#include "mdq.h"
 #include "stringpool.h"
 #include "namelook.h"
+#include "fullbool.h"
+#include "show_source_line.h"
 
-#define VMS_OS  01
-#define UNIX_OS 02
-#define ALL_SYS (VMS_OS | UNIX_OS)
-#ifdef UNIX			/* function and svn validation are a function of the OS */
-#  define VALID_FUN(i) (fun_data[i].os_syst & UNIX_OS)
-#  define VALID_SVN(i) (svn_data[i].os_syst & UNIX_OS)
-#  ifdef __hppa
-#    define TRIGGER_OS 0
-#  else
-#    define TRIGGER_OS UNIX_OS
-#  endif
-#elif defined VMS
-#  define VALID_FUN(i) (fun_data[i].os_syst & VMS_OS)
-#  define VALID_SVN(i) (svn_data[i].os_syst & VMS_OS)
-#  define TRIGGER_OS 0
-#else
-#  error UNSUPPORTED PLATFORM
-#endif
+GBLREF	bool		devctlexp;
+GBLREF	char		director_token;
+GBLREF	triple		*curtchain;
+GBLREF	boolean_t	run_time;
+GBLREF	mident		window_ident;
+GBLREF	mval		window_mval;
+GBLREF	char		window_token;
+
+LITREF	toktabtype	tokentable[];
+LITREF	mval		literal_null;
 
 #ifndef UNICODE_SUPPORTED
 #define f_char f_zchar
 #endif
 
-GBLREF	char	window_token;
-GBLREF	char	director_token;
-GBLREF	mval	window_mval;
-GBLREF	mident	window_ident;
-GBLREF	bool	temp_subs;
-GBLREF	bool	devctlexp;
-GBLREF	triple	*curtchain;
-
-LITREF	toktabtype	tokentable[];
-LITREF	mval		literal_null;
-
 /* note that svn_index array provides indexes into this array for each letter of the
-   alphabet so changes here should be reflected there.
-*/
+ * alphabet so changes here should be reflected there.
+ */
 LITDEF nametabent svn_names[] =
 {
          { 1, "D" }, { 6, "DEVICE" }
@@ -114,8 +98,9 @@ LITDEF nametabent svn_names[] =
 	,{ 3, "ZSY*"}
 	,{ 4, "ZTCO*"}
 	,{ 4, "ZTDA*"}
-	,{ 3, "ZTE" }, { 6, "ZTEX*"}
+	,{ 3, "ZTE" }, { 4, "ZTEX*"}
 	,{ 4, "ZTLE*"}
+	,{ 4, "ZTNA*"}
 	,{ 4, "ZTOL*"}
 	,{ 4, "ZTRI*"}
 	,{ 4, "ZTSL*"}
@@ -132,7 +117,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 88	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 89	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -194,6 +179,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZTDATA, FALSE, TRIGGER_OS }
 	,{ SV_ZTEXIT, TRUE, ALL_SYS }, { SV_ZTEXIT, TRUE, ALL_SYS }
 	,{ SV_ZTLEVEL, FALSE, TRIGGER_OS}
+	,{ SV_ZTNAME, FALSE, TRIGGER_OS }
 	,{ SV_ZTOLDVAL, FALSE, TRIGGER_OS }
 	,{ SV_ZTRIGGEROP, FALSE, TRIGGER_OS}
 	,{ SV_ZTSLATE, TRUE, TRIGGER_OS}
@@ -208,7 +194,6 @@ LITDEF svn_data_type svn_data[] =
 
 /* note that fun_index array provides indexes into this array for each letter of the
  * alphabet so changes here should be reflected there.
- *
  * "*" is used below only after 8 characters.
  */
 LITDEF nametabent fun_names[] =
@@ -333,11 +318,11 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZBITSET, ALL_SYS }
 	,{ OC_FNZBITSTR, ALL_SYS }
 	,{ OC_FNZBITXOR, ALL_SYS }
-#ifdef __sun
+#	ifdef __sun
 	,{ OC_FNZCALL,UNIX_OS}, { OC_FNZCALL,UNIX_OS}
-#else
+#	else
 	,{ OC_FNZCALL, VMS_OS }, { OC_FNZCALL, VMS_OS }
-#endif
+#	endif
 	,{ OC_FNZCHAR, ALL_SYS }, { OC_FNZCHAR, ALL_SYS }
 	,{ OC_FNZCONVERT2, UNIX_OS }, { OC_FNZCONVERT2, UNIX_OS }
 	,{ OC_FNZDATE, ALL_SYS }
@@ -373,7 +358,7 @@ LITDEF fun_data_type fun_data[] =
 };
 
 /* Each entry corresponds to an entry in fun_names */
-GBLDEF int (*fun_parse[])(oprtype *, opctype) =
+GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't be a LITDEF */
 {
 	f_ascii, f_ascii,
 	f_char, f_char,
@@ -449,12 +434,13 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 
 int expritem(oprtype *a)
 {
-	int 		index, sv_opcode, i;
-	unsigned char 	type;
-	triple 		*ref;
+	int 		i, index, sv_opcode;
+	triple 		*oldchain, *ref, tmpchain, *triptr;
+	boolean_t	parse_warn, save_shift;
 	oprtype 	x1;
-	boolean_t	parse_warn;
-
+	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
+	unsigned char 	type;
+	error_def(ERR_BOOLSIDEFFECT);
 	error_def(ERR_EXPR);
 	error_def(ERR_FCNSVNEXPECTED);
 	error_def(ERR_FNOTONSYS);
@@ -462,7 +448,9 @@ int expritem(oprtype *a)
 	error_def(ERR_INVSVN);
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(svn_index[26] == (SIZEOF(svn_names)/SIZEOF(nametabent)));
 	assert(SIZEOF(svn_names)/SIZEOF(nametabent) == SIZEOF(svn_data)/SIZEOF(svn_data_type)); /* are all SVNs covered? */
 	assert(fun_index[26] == (SIZEOF(fun_names)/SIZEOF(nametabent)));
@@ -471,14 +459,14 @@ int expritem(oprtype *a)
 	{
 		type = tokentable[window_token].opr_type;
 		advancewindow();
-		if (i == OC_NEG && (window_token == TK_NUMLIT || window_token == TK_INTLIT))
+		if ((OC_NEG == i) && ((TK_NUMLIT == window_token) || (TK_INTLIT == window_token)))
 		{
 			assert(MV_IS_NUMERIC(&window_mval));
 			if (window_mval.mvtype & MV_INT)
 				window_mval.m[1] = -window_mval.m[1];
 			else
 				window_mval.sgn = 1;
-			if (window_token == TK_NUMLIT)
+			if (TK_NUMLIT == window_token)
 				n2s(&window_mval);
 		} else
 		{
@@ -510,17 +498,40 @@ int expritem(oprtype *a)
 			stx_error(ERR_RPARENMISSING);
 			return FALSE;
 		case TK_DOLLAR:
-			if (director_token == TK_DOLLAR)
+			if ((TK_DOLLAR == director_token) || (TK_AMPERSAND == director_token))
 			{
-				temp_subs = TRUE;
-				if (!exfunc(a, FALSE))
-					return FALSE;
-			} else if (TK_AMPERSAND == director_token)
-			{
+				if (!run_time && TREF(shift_side_effects) && (FULL_BOOL_WARN == TREF(gtm_fullbool)))
+				{	/* warnings requested */
+					show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
+					dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);
+				}
 				advancewindow();
-				temp_subs = TRUE;
-				if (!extern_func(a))
+				dqinit(&tmpchain, exorder);	/* a new chain in case we need to juggle things */
+				oldchain = setcurtchain(&tmpchain);
+				save_shift = TREF(shift_side_effects);
+				if (GTM_BOOL != TREF(gtm_fullbool))	/* if no short circuit, only the outermost should juggle */
+					TREF(shift_side_effects) = FALSE;
+				TREF(temp_subs) = TRUE;
+				if ((TK_DOLLAR == window_token) ? !exfunc(a, FALSE) : !extern_func(a))
+				{
+					setcurtchain(oldchain);
 					return FALSE;
+				}
+				TREF(shift_side_effects) = save_shift;
+				if (!save_shift || (GTM_BOOL == TREF(gtm_fullbool)))
+				{	/* put it on the end of the main chain as there's no reason to play with the ordering */
+					setcurtchain(oldchain);
+					triptr = curtchain->exorder.bl;
+					dqadd(triptr, &tmpchain, exorder);	/* this is a violation of info hiding */
+				} else /* put on the shift chain to get side effects in boolean expression */
+				{	/* add the chain after "expr_start" which may be much before "curtchain" */
+					ref = newtriple(OC_GVSAVTARG);
+					dqadd(TREF(expr_start), &tmpchain, exorder);	/* this is a violation of info hiding */
+					TREF(expr_start) = tmpchain.exorder.bl;
+					setcurtchain(oldchain);
+					triptr = newtriple(OC_GVRECTARG);
+					triptr->operand[0] = put_tref(ref);
+				}
 			} else
 			{
 				advancewindow();
@@ -549,7 +560,12 @@ int expritem(oprtype *a)
 							 * and as input to the $INCR function on the right), we want an UNDEF
 							 * error to show up which means we need to set "temp_subs" to TRUE.
 							 */
-							temp_subs = TRUE;
+							TREF(temp_subs) = TRUE;
+							if (!run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))
+							{	/* warnings requested */
+								show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
+								dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);
+							}
 						}
 					}
 					advancewindow();
@@ -567,7 +583,7 @@ int expritem(oprtype *a)
 						if (!parse_until_rparen_or_space())
 							return FALSE;
 					}
-					if (window_token != TK_RPAREN)
+					if (TK_RPAREN != window_token)
 					{
 						stx_error(ERR_RPARENMISSING);
 						return FALSE;
@@ -581,7 +597,7 @@ int expritem(oprtype *a)
 						STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
 					} else
 					{
-						assert(SIZEOF(svn_names)/SIZEOF(svn_data_type) > index);
+						assert(SIZEOF(svn_names) / SIZEOF(svn_data_type) > index);
 						if (!VALID_SVN(index))
 						{
 							STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
@@ -592,7 +608,7 @@ int expritem(oprtype *a)
 					{
 						sv_opcode = svn_data[index].opcode;
 						assert(SV_NUM_SV > sv_opcode);
-						if (sv_opcode == SV_TEST)
+						if (SV_TEST == sv_opcode)
 							*a = put_tref(newtriple(OC_GETTRUTH));
 						else
 						{
@@ -608,7 +624,7 @@ int expritem(oprtype *a)
 			}
 			return TRUE;
 		case TK_COLON:
-			stx_error (ERR_EXPR);
+			stx_error(ERR_EXPR);
 			return FALSE;
 	}
 	return FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,16 +28,16 @@
 #include "gt_timer.h"
 #include "mupip_exit.h"
 #include "gv_select.h"
-#include "mstrcmp.h"
 #include "global_map.h"
 #include "gtmmsg.h"
 #include "wcs_flu.h"
+#include "min_max.h"
+#include "hashtab.h"		/* needed for HT_VALUE_DUMMY */
 #ifdef GTM64
 #include "hashtab_int8.h"
 #else
 #include "hashtab_int4.h"
 #endif /* GTM64 */
-#include "hashtab.h"
 
 #define	MAX_GMAP_ENTRIES_PER_ITER	2 /* maximum increase (could even be negative) in gmap array size per call to global_map */
 
@@ -51,10 +51,10 @@ static readonly unsigned char	percent_lit = '%';
 static readonly unsigned char	tilde_lit = '~';
 
 void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist *gl_head,
-	int *reg_max_rec, int *reg_max_key, int *reg_max_blk)
+	       int *reg_max_rec, int *reg_max_key, int *reg_max_blk)
 {
 	bool				stashed = FALSE;
-	int				num_quote, len, gmap_size, new_gmap_size, estimated_entries, count;
+	int				num_quote, len, gmap_size, new_gmap_size, estimated_entries, count, rslt;
 	char				*ptr, *ptr1, *c;
 	mstr				gmap[512], *gmap_ptr, *gmap_ptr_base, gmap_beg, gmap_end;
 	mval				val, curr_gbl_name;
@@ -130,7 +130,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		}
 		gmap_beg.len = len;
 		c = mu_extr_ident(&gmap_beg);
-		len -= (int)(c - gmap_beg.addr);
+		len -= INTCAST(c - gmap_beg.addr);
 		assert(len >= 0);
 		if (0 == len)
 			gmap_end = gmap_beg;
@@ -161,7 +161,8 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 				gmap_end.len--;
 			}
 			c = mu_extr_ident(&gmap_end);
-			if (c - gmap_end.addr != gmap_end.len || mstrcmp(&gmap_beg, &gmap_end) > 0)
+			MSTR_CMP(gmap_beg, gmap_end, rslt);
+			if (((c - gmap_end.addr) != gmap_end.len) || (0 < rslt))
 			{
 				gtm_putmsg(VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
 				mupip_exit(ERR_MUNOACTION);
@@ -193,8 +194,8 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	}
 	if (freeze)
 	{
-		GTM64_ONLY(init_hashtab_int8(&ext_hash, 0);)
-		NON_GTM64_ONLY(init_hashtab_int4(&ext_hash, 0);)
+		GTM64_ONLY(init_hashtab_int8(&ext_hash, 0, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);)
+		NON_GTM64_ONLY(init_hashtab_int4(&ext_hash, 0, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);)
 	}
 	gl_head->next = NULL;
 	gl_tail = gl_head;
@@ -232,7 +233,8 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		}
 		for (;;)
 		{
-			if (mstrcmp(&curr_gbl_name.str, gmap_ptr) > 0)
+			MSTRP_CMP(&curr_gbl_name.str, gmap_ptr, rslt);
+			if (0 < rslt)
 				break;
 			if (freeze)
                         {
@@ -268,7 +270,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
                                 }
                         }
-			assert(curr_gbl_name.str.len > 0);
+			assert(0 < curr_gbl_name.str.len);
 			gl_ptr = (glist*)malloc(SIZEOF(glist) - 1 + curr_gbl_name.str.len);
 			gl_ptr->name.mvtype = MV_STR;
 			gl_ptr->name.str.addr = (char*)gl_ptr->nbuf;

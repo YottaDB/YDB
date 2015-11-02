@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,11 +13,10 @@
 
 #include "gtm_stdio.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 
 
 void	op_kill(lv_val *lv)
 {
-	lv_kill(lv, TRUE);	/* Do kill with TP var saving active */
+	lv_kill(lv, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);	/* Do kill with TP var saving active */
 }

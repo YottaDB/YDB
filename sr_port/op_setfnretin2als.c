@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,6 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -30,7 +28,7 @@
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF lv_val		*active_lv;
 GBLREF mval		*alias_retarg;
 
@@ -45,20 +43,20 @@ GBLREF mval		*alias_retarg;
  *     had alias activity via MARK_ALIAS_ACTIVE macro. This is so we can properly handle issues in an exlusive NEW
  *     situation involving multiple symvals and potential aliasing between them.
  *
- *  Note that this opcode's function is very similar to op_setalsctin2als() but is necessarily different because the
- *  source container is in a temporary mval passed back through a function rather than the lv_val that op_setalsctin2als()
- *  deals with. Consequently, the amount of verification we can do reduced. But this is acceptable due to the checks
- *  done by unw_retarg() and op_exfunretals() which pre-processed this value for us. There is also different reference
- *  count maintenance to do than the op_setalsctin2als() opcode. With substantially more work to reorganize how SET
+ *  Note that this opcode's function is very similar to "op_setalsctin2als" but is necessarily different because the
+ *  source container is in a temporary mval passed back through a function rather than the lv_val that "op_setalsctin2als"
+ *  deals with. Consequently, the amount of verification we can do is reduced. But this is acceptable due to the checks
+ *  done by "unw_retarg" and "op_exfunretals" which pre-processed this value for us. There is also different reference
+ *  count maintenance to do than the "op_setalsctin2als" opcode. With substantially more work to reorganize how SET
  *  operates, it would likely be possible to combine these functions but the way things are structured now, all the
- *  set functions plus op_sto() share the same API so adding a parm to one means adding a useless parm to all 6 of
+ *  set functions plus "op_sto" share the same API so adding a parm to one means adding a useless parm to all 6 of
  *  them which is not acceptable so we end up duplicating portions of code here.
  */
 void op_setfnretin2als(mval *srcmv, int destindx)
 {
 	ht_ent_mname	*tabent;
 	mname_entry	*varname;
-	lv_val		*srclvc, *dstlv, **free;
+	lv_val		*srclvc, *dstlv;
 	int4		srcsymvlvl;
 	boolean_t	added;
 
@@ -72,10 +70,10 @@ void op_setfnretin2als(mval *srcmv, int destindx)
 	       && (char *)srcmv < ((char *)frame_pointer->temps_ptr + (SIZEOF(char *) * frame_pointer->temp_mvals)));
 	srclvc = (lv_val *)srcmv->str.addr;
 	assert(srclvc);
-	assert(MV_SYM == srclvc->ptrs.val_ent.parent.sym->ident);	/* Verify base var */
+	assert(LV_IS_BASE_VAR(srclvc));	/* Verify base var */
 	assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
-	assert(1 <= srclvc->stats.crefcnt);				/* Verify we have an existing container reference */
-	srcsymvlvl = srclvc->ptrs.val_ent.parent.sym->symvlvl;		/* lv_val may go away below so record symlvl */
+	assert(1 <= srclvc->stats.crefcnt);		/* Verify we have an existing container reference */
+	srcsymvlvl = LV_SYMVAL(srclvc)->symvlvl;	/* lv_val may go away below so record symlvl */
 	varname = &(((mname_entry *)frame_pointer->vartab_ptr)[destindx]);
 	DEBUG_ONLY(added = FALSE);
 	/* Find hash table entry */
@@ -96,10 +94,11 @@ void op_setfnretin2als(mval *srcmv, int destindx)
 		assert(dstlv);
 	}
 	/* No need to increment before dstlv processing to prevent removal of last reference to srclvc in this case because
-	 * the increment has already been done in unw_retarg().
+	 * the increment has already been done in "unw_retarg".
 	 */
 	if (dstlv)
 	{
+		assert(LV_IS_BASE_VAR(dstlv));	/* Verify base var */
 		if (dollar_tlevel && NULL != dstlv->tp_var && !dstlv->tp_var->var_cloned)
 			TP_VAR_CLONE(dstlv);
 		assert(0 < dstlv->stats.trefcnt);
@@ -108,22 +107,21 @@ void op_setfnretin2als(mval *srcmv, int destindx)
 		assert(dstlv->stats.trefcnt >= dstlv->stats.crefcnt);
 		if (0 == dstlv->stats.trefcnt)
 		{	/* Non alias -- make room for an alias to live here instead */
-			lv_kill(dstlv, TRUE);
-			free = &dstlv->ptrs.val_ent.parent.sym->lv_flist;
-			LV_FLIST_ENQUEUE(free, dstlv);
+			lv_kill(dstlv, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);
+			LV_FREESLOT(dstlv);
 		} /* Else alias pointer in the hash table is just replaced below */
 	}
-	DECR_CREFCNT(srclvc);	/* In unw_retarg() we incremented for a container but is now "just" an alias so get rid of
+	DECR_CREFCNT(srclvc);	/* In "unw_retarg" we incremented for a container but is now "just" an alias so get rid of
 				 * the container count from the temp return parm */
 	frame_pointer->l_symtab[destindx] = tabent;
 	DBGRFCT((stderr, "op_setfnret2als: hte 0x"lvaddr" being reset from 0x"lvaddr" to 0x"lvaddr"\n",
 		 tabent, tabent->value, srclvc));
 	tabent->value = (void *)srclvc;
 	/* These symvals have had alias activity - Note the possibility of re-marking srcsymvlvl is not necessarily re-doing
-	 * the mark done by unw_retarg() since the source lv_val may have been re-created if it was originally in an xnew'd
+	 * the mark done by "unw_retarg" since the source lv_val may have been re-created if it was originally in an xnew'd
 	 * symtab which popped during the return.
 	 */
-	MARK_ALIAS_ACTIVE(MIN(srcsymvlvl, srclvc->ptrs.val_ent.parent.sym->symvlvl));
+	MARK_ALIAS_ACTIVE(MIN(srcsymvlvl, LV_SYMVAL(srclvc)->symvlvl));
 	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
 					   cleanup problems */
 	alias_retarg = NULL;

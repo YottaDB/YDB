@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "mdq.h"
-#include "hashtab.h"
 #include "hashtab_str.h"
 #include "compiler.h"
 #include "opcode.h"
@@ -58,7 +58,7 @@ oprtype put_lit(mval *x)
 		}
 		if (!complits_hashtab->base)
 		{	/* Need to initialize hash table and load it with the elements so far */
-			init_hashtab_str(complits_hashtab, LIT_HASH_CUTOVER * 2);
+			init_hashtab_str(complits_hashtab, LIT_HASH_CUTOVER * 2, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 			assert(complits_hashtab->base);
 			dqloop(&literal_chain, que, a)
 			{

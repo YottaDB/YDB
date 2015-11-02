@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,14 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+/* This routine may do a malloc() to get space for the MM file header which usually will not be
+ * available in a core file. There is no benefit to running gtm_malloc() here instead of the
+ * system malloc and doing so would actually produce potential error handling implications so
+ * use the system malloc() here (since the process is micro-milli-bleems from dying with a
+ * core anyway to avoid error handling issues. Use system malloc by un-defining the redefinition.
+ */
+#undef malloc
 
 #include <errno.h>
 #include <signal.h>
@@ -182,15 +190,15 @@ DEBUG_ONLY( struct rlimit rlim;)
 					 */
 					csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 					tmp_csd = csa->hdr;
-					/* If the malloc below has an error we could end up calling gtm_fork_n_core again
-					 * recursively.  We limit the recursion by not trying more than once per csa.
-					 */
 					if ((NULL != tmp_csd) && (MM_MALLOC_ALREADY_TRIED != csa->mm_core_hdr))
 					{
 						csa->mm_core_hdr = MM_MALLOC_ALREADY_TRIED;
 						csd = (sgmnt_data_ptr_t)malloc(SIZEOF(*csd));
-						memcpy((sm_uc_ptr_t)csd, (uchar_ptr_t)tmp_csd, SIZEOF(*csd));
-						csa->mm_core_hdr = csd;
+						if (NULL != csd)
+						{
+							memcpy((sm_uc_ptr_t)csd, (uchar_ptr_t)tmp_csd, SIZEOF(*csd));
+							csa->mm_core_hdr = csd;
+						}
 					}
 				}
 			}

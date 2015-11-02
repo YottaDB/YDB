@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ uint4 mur_process_intrpt_recov()
 	boolean_t		jfh_changed;
 
 	error_def(ERR_PREMATEOF); /* for DO_FILE_WRITE */
-	error_def(ERR_JNLCREATERR);
+	error_def(ERR_JNLNOCREATE);
 	error_def(ERR_JNLWRERR);
 	error_def(ERR_JNLFSYNCERR);
 	error_def(ERR_TEXT);
@@ -117,7 +117,7 @@ uint4 mur_process_intrpt_recov()
 		if (csd->blks_to_upgrd)
 			csd->fully_upgraded = FALSE;
 		jctl = rctl->jctl_turn_around;
-		csd->trans_hist.early_tn = csd->trans_hist.header_open_tn = jctl->turn_around_tn;
+		csd->trans_hist.early_tn = jctl->turn_around_tn;
 		csd->trans_hist.curr_tn = csd->trans_hist.early_tn;	/* INCREMENT_CURR_TN macro not used but noted in comment
 									 * to identify all places that set curr_tn */
 		/* MUPIP REORG UPGRADE/DOWNGRADE stores its partially processed state in the database file header.
@@ -263,7 +263,7 @@ uint4 mur_process_intrpt_recov()
 		jgbl.gbl_jrec_time = rctl->jctl_turn_around->turn_around_time;	/* time needed for cre_jnl_file_common() */
 		if (EXIT_NRM != cre_jnl_file_common(&jnl_info, rename_fn, rename_fn_len))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_JNLCREATERR, 2, jnl_info.jnl_len, jnl_info.jnl);
+			gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 			return jnl_info.status;
 		}
 		if (NULL != rctl->jctl_alt_head) /* remove the journal files created by last interrupted recover process */

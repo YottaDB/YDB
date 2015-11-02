@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,6 @@
 #include "is_proc_alive.h"
 #include "real_len.h"		/* for real_len() prototype */
 #include "zshow.h"
-#include "val_iscan.h"
 
 #define LNAM		24
 #define NDIM		32		/* max node name size */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,6 @@
 #include "callg.h"
 #include "zshow.h"
 #include "util.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
 #include "mv_stent.h"
 
 #define DEFAULT_DUMP_FILENAME "GTM_JOBEXAM.ZSHOW_DMP"
@@ -52,6 +50,7 @@ GBLREF unsigned char    *msp, *stackwarn, *stacktop;
 GBLREF char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
 GBLREF boolean_t        created_core;
 UNIX_ONLY(GBLREF sigset_t blockalrm;)
+DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
 
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMCHECK);
@@ -230,5 +229,6 @@ CONDITION_HANDLER(jobexam_dump_ch)
 
 	/* Stop the errors here and return to caller */
 	UNIX_ONLY(util_out_print("", RESET));	/* Prevent rts_error from flushing this error later */
+	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
 	UNWIND(NULL, NULL);
 }

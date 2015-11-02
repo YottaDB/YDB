@@ -39,6 +39,9 @@ if [ "AIX" = "$hostos" ]; then
 else
 	req_lib_files="libgcrypt $req_lib_files"
 fi
+if [ "OS/390" = "$hosotos" ]; then
+	lib_ext="dll"
+fi
 req_inc_files="gpgme.h gpg-error.h $sym_headers"
 req_bin_files="gpg ksh"
 

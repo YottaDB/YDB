@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,12 +37,12 @@
 #include "lv_val.h"
 #include "alias.h"
 #include "gtmimagename.h"
+#include "fullbool.h"
 
 GBLREF spdesc		stringpool;
 GBLREF int4		cache_hits, cache_fails;
 GBLREF unsigned char	*stackbase, *stacktop;
 GBLREF gd_addr		*gd_header;
-GBLREF gd_addr		*gd_targ_addr;
 GBLREF gd_binding	*gd_map;
 GBLREF gd_binding	*gd_map_top;
 GBLREF boolean_t	certify_all_blocks;
@@ -53,17 +53,15 @@ GBLREF jnl_fence_control jnl_fence_ctl;
 GBLREF bool		undef_inhibit;
 GBLREF int4		break_message_mask;
 GBLREF command_qualifier cmd_qlf;
-GBLREF int		lv_null_subs;
 GBLREF tp_frame		*tp_pointer;
-GBLREF short		dollar_tlevel;
-GBLREF collseq		*local_collseq;
-GBLREF boolean_t 	local_collseq_stdnull;
-GBLREF int4		zdate_form;
+GBLREF uint4		dollar_tlevel;
 GBLREF int4		zdir_form;
 GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF boolean_t	badchar_inhibit;
 GBLREF int		gv_fillfactor;
 GBLREF int4		gtm_max_sockets;
+
+error_def(ERR_VIEWFN);
 
 LITREF gtmImageName	gtmImageNames[];
 LITREF mval		literal_zero;
@@ -86,10 +84,11 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	tp_frame	*tf;
 	viewtab_entry	*vtp;
 	collseq		*csp;
+	lv_val		*lv;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_VIEWFN);
-
-	VMS_ONLY(va_count(numarg);)
+	SETUP_THREADGBL_ACCESS;
+	VMS_ONLY(va_count(numarg));
 	if (numarg < 2)
 		GTMASSERT;
 	VAR_START(var, dst);
@@ -107,11 +106,11 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	view_arg_convert(vtp, arg, &parmblk);
 	switch (vtp->keycode)
 	{
-#ifdef UNICODE_SUPPORTED
+#		ifdef UNICODE_SUPPORTED
 		case VTK_BADCHAR:
 			n = badchar_inhibit ? 0 : 1;
 			break;
-#endif
+#		endif
 		case VTK_RCHITS:
 			n = 0;
 			break;
@@ -169,7 +168,26 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				default:
 					GTMASSERT;
 			}
-			s2pool(&tmpstr);
+			dst->str = tmpstr;
+			break;
+		case VTK_FULLBOOL:
+			switch (TREF(gtm_fullbool))
+			{
+				case GTM_BOOL:
+					tmpstr.addr = "GT.M Boolean short-circuit";
+					tmpstr.len = SIZEOF("GT.M Boolean short-circuit")-1;
+					break;
+				case FULL_BOOL:
+					tmpstr.addr = "Standard Boolean evaluation side effects";
+					tmpstr.len = SIZEOF("Standard Boolean evaluation side effects")-1;
+					break;
+				case FULL_BOOL_WARN:
+					tmpstr.addr = "Boolean side-effect warning";
+					tmpstr.len = SIZEOF("Boolean side-effect warning")-1;
+					break;
+				default:
+					GTMASSERT;
+			}
 			dst->str = tmpstr;
 			break;
 		case VTK_GVDUPSETNOOP:
@@ -221,8 +239,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 					n = csa->hdr->jnl_state;
 				else
 					n = -1;
-			}
-			else
+			} else
 				n = 0;
 			break;
 		case VTK_JNLFILE:
@@ -236,8 +253,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 					view_jnlfile(dst, parmblk.gv_ptr);
 				else
 					dst->str.len = 0;
-			}
-			else
+			} else
 				dst->str.len = 0;
 			break;
 		case VTK_JNLTRANSACTION:
@@ -247,7 +263,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			n = (cmd_qlf.qlf & CQ_LOWER_LABELS) ? 1 : 0;
 			break;
 		case VTK_LVNULLSUBS:
-			n = lv_null_subs;
+			n = TREF(lv_null_subs);
 			break;
 		case VTK_NOISOLATION:
 			if (NOISOLATION_NULL != parmblk.ni_list.type || NULL == parmblk.ni_list.gvnh_list
@@ -270,7 +286,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		  DEBUG_ONLY(else GD_HEADER_ASSERT);
 		  map = gd_map;
 		  map++;	/* get past local locks */
-		  for (; memcmp(&parmblk.ident.c[0], &(map->name[0]), SIZEOF(mident_fixed)) >= 0; map++)
+		  for (; memcmp(parmblk.ident.c, map->name, SIZEOF(mident_fixed)) >= 0; map++)
 		    assert(map < gd_map_top);
 		  reg = map->reg.addr;
 		  tmpstr.addr = (char *)reg->rname;
@@ -387,11 +403,11 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			break;
 		case VTK_YLCT:
 			if (!arg)
-				n = local_collseq ? local_collseq->act : 0;
+				n = TREF(local_collseq) ? (TREF(local_collseq))->act : 0;
 			else
 			{
 				assert(!MEMCMP_LIT(arg->str.addr, "ncol"));
-				n = local_collseq_stdnull;
+				n = TREF(local_collseq_stdnull);
 			}
 			break;
 		case VTK_ZDEFBUFF:
@@ -431,10 +447,14 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			n = gtm_max_sockets;
 			break;
 		case VTK_LVCREF:
-			n = ((lv_val *)parmblk.value)->stats.crefcnt;
+			lv = (lv_val *)parmblk.value;
+			assert(LV_IS_BASE_VAR(lv));
+			n = lv->stats.crefcnt;
 			break;
 		case VTK_LVREF:
-			n = ((lv_val *)parmblk.value)->stats.trefcnt;
+			lv = (lv_val *)parmblk.value;
+			assert(LV_IS_BASE_VAR(lv));
+			n = lv->stats.trefcnt;
 			break;
 		case VTK_LVGCOL:
 			n = als_lvval_gc();
@@ -443,6 +463,11 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			dst->str.len = gtmImageNames[image_type].imageNameLen;
 			dst->str.addr = gtmImageNames[image_type].imageName;
 			break;
+#ifndef VMS
+		case VTK_JNLERROR:
+			n = TREF(error_on_jnl_file_lost);
+			break;
+#endif
 		default:
 			rts_error(VARLSTCNT(1) ERR_VIEWFN);
 	}

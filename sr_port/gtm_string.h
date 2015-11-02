@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,5 +20,13 @@
 #endif
 
 #define STRERROR	strerror
+
+#define	STRCPY(SOURCE, DEST)		strcpy((char *)(SOURCE), (char *)(DEST))
+#define STRNCPY_LIT(SOURCE, LITERAL)	strncpy((char *)(SOURCE), (char *)(LITERAL), SIZEOF(LITERAL) - 1)	/* BYPASSOK */
+#define	STRNCPY_STR(SOURCE, STRING)	strncpy((char *)(SOURCE), (char *)(STRING), strlen((char *)(STRING)))	/* BYPASSOK */
+
+#define	STRCMP(SOURCE, DEST)		strcmp((char *)(SOURCE), (char *)(DEST))
+#define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)		/* BYPASSOK */
+#define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)(STRING)))	/* BYPASSOK */
 
 #endif

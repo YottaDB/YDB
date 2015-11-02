@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,12 +21,6 @@
  *	This also provides for iterating through the list of elements.
  */
 
-typedef	struct
-{
-	int4	fl;
-	int4	bl;		/* can use the que_head definition from relqueop.c, but gdsfhead.h has a separate one.	*/
-} buddy_que_head;		/* therefore, need a separate que_head definition 					*/
-
 typedef struct	buddy_list_struct
 {
 	char	**ptrArray;     /* the array of pointers */
@@ -37,25 +31,21 @@ typedef struct	buddy_list_struct
 	int4	cumulMaxElems;  /* the maximum number of elements that can be held from the first upto the current array */
 	char	**ptrArrayCurr;	/* = &ptrArray[i] where i is the current array index in use for allocation */
 	char	*nextFreePtr;	/* pointer to the next free element in the current array. Initially = ptrArray[0] */
-	int4	itrnElems;	/* fields starting with itr are similar to non-itr counterparts except used while iterating */
-	int4	itrcumulMaxElems;
-	char	**itrptrArrayCurr;
-	char	*itrnextFreePtr;
-	buddy_que_head	*free_que;	/* pointer to the list of freed-up elements */
+	char	*free_que;	/* pointer to the singly linked list of freed-up elements */
+#	ifdef DEBUG
+	/* The following two debug-only variables are present to avoid mixing of usage of the functions "free_last_n_elements"
+	 * and "get_new_free_element"/"free_element()" in the same buddy list. This is because they both use completely
+	 * different schemes to free up elements (one reduces the # of elements in the buddy list whereas the other does not
+	 * touch the # of elements but maintains an internal singly linked list of freed up elements) and they cannot coexist.
+	 */
+	boolean_t	used_free_last_n_elements;	/* TRUE if "free_last_n_elements" was called in this buddy_list */
+	boolean_t	used_free_element;		/* TRUE if "get_new_free_element" or "free_element" was called */
+#	endif
 } buddy_list;
 
-/*
- * Note that to use the free_element() and get_new_free_element() functions, the structure that is used to
- * store the element should have a "que_head" member as the first field with "fl" and "bl" subfields
- * to maintain a linked list of free elements.
- *
- * Also don't mix usage of free_last_n_elements() and get_new_free_element() unless you know what you are doing.
- */
 void		initialize_list(buddy_list *list, int4 elemSize, int4 initAlloc);
 char		*get_new_element(buddy_list *list, int4 nElements);
 char		*find_element(buddy_list *list, int4 index);
-char		*find_first_element(buddy_list *list, int4 index);
-char		*find_next_element(buddy_list *list, int4 nElements);
 void		cleanup_list(buddy_list *list);
 void		reinitialize_list(buddy_list *list);	/* used for reusing already allocated storage */
 boolean_t	free_last_n_elements(buddy_list *list, int4 num);	/* to free up the last contiguous "num" elements */
@@ -87,12 +77,7 @@ char		*get_new_free_element(buddy_list *list);	/* gets a freed-up element if ava
 	assert(list->cumulMaxElems == list->initAlloc);				\
 	assert(list->ptrArrayCurr == list->ptrArray);				\
 	assert(list->nextFreePtr == list->ptrArray[0]);				\
-	assert(0 == list->itrptrArrayCurr);					\
-	assert(0 == list->itrnElems);						\
-	assert(0 == list->itrcumulMaxElems);					\
-	assert(0 == list->itrnextFreePtr);					\
-	assert(0 == list->free_que->fl);					\
-	assert(0 == list->free_que->bl);					\
+	assert(NULL == list->free_que);						\
 }
 
 #define	REINITIALIZE_LIST(LST)						\
@@ -100,8 +85,7 @@ char		*get_new_free_element(buddy_list *list);	/* gets a freed-up element if ava
 	buddy_list	*lcllist;					\
 									\
 	lcllist = LST;							\
-	assert((0 == lcllist->free_que->fl) || lcllist->nElems);	\
-	assert((0 == lcllist->free_que->bl) || lcllist->nElems);	\
+	assert((NULL == lcllist->free_que) || lcllist->nElems);		\
 	if (lcllist->nElems)						\
 		reinitialize_list(lcllist);				\
 	else								\

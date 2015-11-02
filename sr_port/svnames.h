@@ -11,7 +11,8 @@
 
 enum
 {
-	SV_HOROLOG = 1,		/* 1 */
+	SV_ALL = 0,		/* 0 */
+	SV_HOROLOG,		/* 1 */
 	SV_IO,			/* 2 */
 	SV_JOB,			/* 3 */
 	SV_STORAGE,		/* 4 */
@@ -67,7 +68,7 @@ enum
 	SV_ZCHSET,		/* 54 */
 	SV_ZPATNUMERIC,		/* 55 */
 	SV_ZQUIT,		/* 56 */
-	SV_ZTCODE,		/* 57 */
+	SV_ZTCODE,		/* 57 */	/* deprecated */
 	SV_ZTDATA,		/* 58 */
 	SV_ZTOLDVAL,		/* 59 */
 	SV_ZTRIGGEROP,		/* 60 */
@@ -76,6 +77,7 @@ enum
 	SV_ZTWORMHOLE,		/* 63 */
 	SV_ZTLEVEL,		/* 64 */
 	SV_ZTSLATE,		/* 65 */
+	SV_ZTNAME,		/* 66 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

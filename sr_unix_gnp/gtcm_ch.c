@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,7 @@ CONDITION_HANDLER(gtcm_ch)
 	short		short_len;
 
 	error_def(ERR_SERVERERR);
+	error_def(ERR_JNLFILOPN);
 
 	START_CH;
 	undef_inhibit = FALSE;	/* reset undef_inhibit to the default value in case it got reset temporarily and there was an error.
@@ -149,7 +150,7 @@ CONDITION_HANDLER(gtcm_ch)
 			cmi_write(curr_entry->clb_ptr);
 		}
 	}
-	if (SUCCESS == orig_severity || INFO == orig_severity)
+	if (SUCCESS == orig_severity || INFO == orig_severity || ERR_JNLFILOPN == arg)
 	{
 		CONTINUE;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,6 @@
 #include "gv_xform_key.h"
 #include "targ_alloc.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
-#include "hashtab.h"
 
 #define DIR_ROOT 1
 

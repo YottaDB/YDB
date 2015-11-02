@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,45 +53,43 @@
 #  include "io.h"
 #endif
 
-#ifdef GTM64
-# define lvaddr "%016lx"
-#else
-# define lvaddr "%08lx"
-#endif
-
 /* Macro to increment total refcount (and optionally trace it) */
-#define INCR_TREFCNT(lv)												\
-	{														\
-		DBGRFCT((stderr, "\nIncrement trefcnt for lv_val at 0x"lvaddr" from %d to %d by %s line %d\n",		\
-				(lv), (lv)->stats.trefcnt, (lv)->stats.trefcnt + 1, __FILE__, __LINE__)); 		\
-		++(lv)->stats.trefcnt;											\
-	}
+#define INCR_TREFCNT(lv)											\
+{														\
+	assert(LV_IS_BASE_VAR(lv));										\
+	DBGRFCT((stderr, "\nIncrement trefcnt for lv_val at 0x"lvaddr" from %d to %d by %s line %d\n",		\
+			(lv), (lv)->stats.trefcnt, (lv)->stats.trefcnt + 1, __FILE__, __LINE__)); 		\
+	++(lv)->stats.trefcnt;											\
+}
 
 /* Macro to decrement total refcount (and optionally trace it) */
-#define DECR_TREFCNT(lv)												\
-	{														\
-		DBGRFCT((stderr, "\nDecrement trefcnt for lv_val at 0x"lvaddr" from %d to %d by %s line %d\n",		\
-				(lv), (lv)->stats.trefcnt, (lv)->stats.trefcnt - 1, __FILE__, __LINE__)); 		\
-		--(lv)->stats.trefcnt;											\
-		assert(0 <= (lv)->stats.trefcnt);									\
-	}
+#define DECR_TREFCNT(lv)											\
+{														\
+	assert(LV_IS_BASE_VAR(lv));										\
+	DBGRFCT((stderr, "\nDecrement trefcnt for lv_val at 0x"lvaddr" from %d to %d by %s line %d\n",		\
+			(lv), (lv)->stats.trefcnt, (lv)->stats.trefcnt - 1, __FILE__, __LINE__)); 		\
+	--(lv)->stats.trefcnt;											\
+	assert(0 <= (lv)->stats.trefcnt);									\
+}
 
 /* Macro to increment container refcount (and optionally trace it) */
-#define INCR_CREFCNT(lv)												\
-	{														\
-		DBGRFCT((stderr, "\nIncrement crefcnt for lv_val at 0x"lvaddr" from %d to %d by %s line %d\n",		\
-				(lv), (lv)->stats.crefcnt, (lv)->stats.crefcnt + 1, __FILE__, __LINE__)); 		\
-		++(lv)->stats.crefcnt;											\
-	}
+#define INCR_CREFCNT(lv)											\
+{														\
+	assert(LV_IS_BASE_VAR(lv));										\
+	DBGRFCT((stderr, "\nIncrement crefcnt for lv_val at 0x"lvaddr" from %d to %d by %s line %d\n",		\
+			(lv), (lv)->stats.crefcnt, (lv)->stats.crefcnt + 1, __FILE__, __LINE__)); 		\
+	++(lv)->stats.crefcnt;											\
+}
 
 /* Macro to decrement container refcount (and optionally trace it) */
-#define DECR_CREFCNT(lv)												\
-	{														\
-		DBGRFCT((stderr, "\nDecrement crefcnt for lv_val at 0x"lvaddr" from %d to %d by %s line %d\n",		\
-				(lv), (lv)->stats.crefcnt, (lv)->stats.crefcnt - 1, __FILE__, __LINE__));		\
-		--(lv)->stats.crefcnt;											\
-		assert(0 <= (lv)->stats.crefcnt);									\
-	}
+#define DECR_CREFCNT(lv)											\
+{														\
+	assert(LV_IS_BASE_VAR(lv));										\
+	DBGRFCT((stderr, "\nDecrement crefcnt for lv_val at 0x"lvaddr" from %d to %d by %s line %d\n",		\
+			(lv), (lv)->stats.crefcnt, (lv)->stats.crefcnt - 1, __FILE__, __LINE__));		\
+	--(lv)->stats.crefcnt;											\
+	assert(0 <= (lv)->stats.crefcnt);									\
+}
 
 /* There are three flavors of DECR_BASE_REF depending on the activities we need to persue. The first two flavors
    DECR_BASE_REF and DECR_BASE_REF_RQ take 2 parms (hashtable entry and lv_val addresses). Both of these do hashtable
@@ -105,127 +103,132 @@
    orphaned lv_vals not in a hashtable. This macro just requeues lv_vals that hit a refcnt of zero.
 */
 
+#define	LVP_KILL_SUBTREE_IF_EXISTS(lvp, dotpsave)				\
+{										\
+	tree	*lvt_child;							\
+										\
+	assert(LV_IS_BASE_VAR(lvp));						\
+	assert(0 == (lvp)->stats.crefcnt);					\
+	lvt_child = LV_GET_CHILD(lvp);						\
+	if (NULL != lvt_child)							\
+	{									\
+		assert(((treeNode *)(lvp)) == lvt_child->sbs_parent);		\
+		LV_CHILD(lvp) = NULL;						\
+		lv_killarray(lvt_child, dotpsave);				\
+	}									\
+}
+
 /* Macro to decrement a base var reference and do appropriate cleanup */
-#define DECR_BASE_REF(tabent, lvp, dotpsave)										\
-	{	/* Perform reference count maintenance for base var */							\
-		lv_sbs_tbl *tmpsbs;											\
-		lv_val *dbr_lvp;											\
-		assert(MV_SYM == (lvp)->ptrs.val_ent.parent.sym->ident);						\
-                assert(0 < (lvp)->stats.trefcnt);									\
-		DECR_TREFCNT(lvp);											\
-		if (0 == (lvp)->stats.trefcnt)										\
-		{	/* This lv_val can be effectively killed and remain in hte */ 					\
-			assert(0 == (lvp)->stats.crefcnt);								\
-			if (tmpsbs = (lvp)->ptrs.val_ent.children)	/* Note assignment */				\
-			{												\
-				assert((lvp) == tmpsbs->lv);								\
-				(lvp)->ptrs.val_ent.children = NULL;							\
-				lv_killarray(tmpsbs, dotpsave);								\
-			}												\
-			assert(NULL == (lvp)->tp_var);									\
-			LVVAL_INIT(lvp, (lvp)->ptrs.val_ent.parent.sym);						\
-		} else													\
-		{	/* lv_val otherwise still in use -- put a new one in this hte */ 				\
-			assert((lvp)->stats.trefcnt >= (lvp)->stats.crefcnt);						\
-			dbr_lvp = lv_getslot((lvp)->ptrs.val_ent.parent.sym);						\
-			DBGRFCT((stderr, "DECR_BASE_REF: Resetting hte 0x"lvaddr" from 0x"lvaddr" to 0x"lvaddr"\n",	\
-				 tabent, (lvp), dbr_lvp));								\
-			LVVAL_INIT(dbr_lvp, (lvp)->ptrs.val_ent.parent.sym);						\
-			tabent->value = dbr_lvp;									\
-		}													\
-	}
+#define DECR_BASE_REF(tabent, lvp, dotpsave)									\
+{	/* Perform reference count maintenance for base var */							\
+	lv_val	*dbr_lvp;											\
+	symval	*sym;												\
+														\
+	assert(LV_IS_BASE_VAR(lvp));										\
+	assert(0 < (lvp)->stats.trefcnt);									\
+	DECR_TREFCNT(lvp);											\
+	sym = LV_GET_SYMVAL(lvp);										\
+	if (0 == (lvp)->stats.trefcnt)										\
+	{	/* This lv_val can be effectively killed and remain in hte */ 					\
+		LVP_KILL_SUBTREE_IF_EXISTS(lvp, dotpsave);							\
+		assert(NULL == (lvp)->tp_var);									\
+		LVVAL_INIT(lvp, sym);										\
+	} else													\
+	{	/* lv_val otherwise still in use -- put a new one in this hte */ 				\
+		assert((lvp)->stats.trefcnt >= (lvp)->stats.crefcnt);						\
+		dbr_lvp = lv_getslot(sym);									\
+		DBGRFCT((stderr, "DECR_BASE_REF: Resetting hte 0x"lvaddr" from 0x"lvaddr" to 0x"lvaddr"\n",	\
+			 tabent, (lvp), dbr_lvp));								\
+		LVVAL_INIT(dbr_lvp, sym);									\
+		tabent->value = dbr_lvp;									\
+	}													\
+}
 
 /* Macro to decrement a base var reference and do appropriate cleanup except the tabent value is unconditionally
-   cleared and the lvval put on the free queue. Used when the tabent is about to be reused for a different lv.
-*/
-#define DECR_BASE_REF_RQ(tabent, lvp, dotpsave)										\
-	{	/* Perform reference count maintenance for base var */							\
-		lv_sbs_tbl *tmpsbs;											\
-		assert(MV_SYM == (lvp)->ptrs.val_ent.parent.sym->ident);						\
-                assert(0 < (lvp)->stats.trefcnt);									\
-		DECR_TREFCNT(lvp);											\
-		DBGRFCT((stderr, "DECR_BASE_REF_RQ: Resetting hte 0x"lvaddr" from 0x"lvaddr" to NULL\n",		\
-			 tabent, tabent->value));									\
-		tabent->value = (void *)NULL;										\
-		if (0 == (lvp)->stats.trefcnt)										\
-		{	/* This lv_val is done .. requeue it after it is killed */ 					\
-			assert(0 == (lvp)->stats.crefcnt);								\
-			if (tmpsbs = (lvp)->ptrs.val_ent.children)	/* Note assignment */				\
-			{												\
-				assert((lvp) == tmpsbs->lv);								\
-				(lvp)->ptrs.val_ent.children = NULL;							\
-				lv_killarray(tmpsbs, dotpsave);								\
-			}												\
-			LV_FLIST_ENQUEUE(&(lvp)->ptrs.val_ent.parent.sym->lv_flist, lvp); 				\
-		} else													\
-			assert((lvp)->stats.trefcnt >= (lvp)->stats.crefcnt);						\
-	}
+ * cleared and the lvval put on the free queue. Used when the tabent is about to be reused for a different lv.
+ */
+#define DECR_BASE_REF_RQ(tabent, lvp, dotpsave)								\
+{	/* Perform reference count maintenance for base var */						\
+	assert(LV_IS_BASE_VAR(lvp));									\
+	assert(0 < (lvp)->stats.trefcnt);								\
+	DECR_TREFCNT(lvp);										\
+	DBGRFCT((stderr, "DECR_BASE_REF_RQ: Resetting hte 0x"lvaddr" from 0x"lvaddr" to NULL\n",	\
+		 tabent, tabent->value));								\
+	tabent->value = (void *)NULL;									\
+	if (0 == (lvp)->stats.trefcnt)									\
+	{	/* This lv_val is done .. requeue it after it is killed */ 				\
+		LVP_KILL_SUBTREE_IF_EXISTS(lvp, dotpsave);						\
+		LV_FREESLOT(lvp);									\
+	} else												\
+		assert((lvp)->stats.trefcnt >= (lvp)->stats.crefcnt);					\
+}
 
 /* Macro to decrement a base var reference and do appropriate cleanup except no hash table
    entry value cleanup is done.
 */
-#define DECR_BASE_REF_NOSYM(lvp, dotpsave)							\
-	{	/* Perform reference count maintenance for base var */				\
-		lv_sbs_tbl *tmpsbs;								\
-		assert(MV_SYM == (lvp)->ptrs.val_ent.parent.sym->ident);			\
-                assert(0 < (lvp)->stats.trefcnt);						\
-		DECR_TREFCNT(lvp);								\
-		if (0 == (lvp)->stats.trefcnt)							\
-		{	/* This lv_val is done .. requeue it after it is killed */ 		\
-			assert(0 == (lvp)->stats.crefcnt);					\
-			if (tmpsbs = (lvp)->ptrs.val_ent.children)	/* Note assignment */	\
-			{									\
-				assert((lvp) == tmpsbs->lv); 					\
-				(lvp)->ptrs.val_ent.children = NULL;				\
-				lv_killarray(tmpsbs, dotpsave);			 		\
-			}									\
-			LV_FLIST_ENQUEUE(&(lvp)->ptrs.val_ent.parent.sym->lv_flist, lvp); 	\
-		} else										\
-			assert((lvp)->stats.trefcnt >= (lvp)->stats.crefcnt);			\
-	}
+#define DECR_BASE_REF_NOSYM(lvp, dotpsave)					\
+{	/* Perform reference count maintenance for base var */			\
+	assert(LV_IS_BASE_VAR(lvp));						\
+	assert(0 < (lvp)->stats.trefcnt);					\
+	DECR_TREFCNT(lvp);							\
+	if (0 == (lvp)->stats.trefcnt)						\
+	{	/* This lv_val is done .. requeue it after it is killed */ 	\
+		LVP_KILL_SUBTREE_IF_EXISTS(lvp, dotpsave);			\
+		LV_FREESLOT(lvp);						\
+	} else									\
+		assert((lvp)->stats.trefcnt >= (lvp)->stats.crefcnt);		\
+}
 
 /* Macro to decrement an alias container reference and do appropriate cleanup */
 #define DECR_AC_REF(lvp, dotpsave)								\
+{												\
 	if (MV_ALIASCONT & (lvp)->v.mvtype)							\
 	{	/* Killing an alias container, perform reference count maintenance */		\
-		GBLREF	short	dollar_tlevel;							\
+												\
+		GBLREF	uint4	dollar_tlevel;							\
+												\
 		lv_val	*lvref = (lv_val *)(lvp)->v.str.addr;					\
 		assert(0 == (lvp)->v.str.len);							\
-		assert(MV_SBS == (lvp)->ptrs.val_ent.parent.sbs->ident);			\
+		assert(!LV_IS_BASE_VAR(lvp));							\
 		assert(lvref);									\
-		assert(MV_SYM == lvref->ptrs.val_ent.parent.sym->ident); 			\
+		assert(LV_IS_BASE_VAR(lvref));							\
 		assert(0 < lvref->stats.crefcnt);						\
 		assert(0 < lvref->stats.trefcnt);						\
-		if (dotpsave && dollar_tlevel && NULL != lvref->tp_var 				\
-		    && !lvref->tp_var->var_cloned && 1 == lvref->stats.trefcnt)			\
+		if (dotpsave && dollar_tlevel && (NULL != lvref->tp_var)			\
+			&& !lvref->tp_var->var_cloned && (1 == lvref->stats.trefcnt))		\
 			/* Only clone (here) if target is going to be deleted by decrement */	\
 			TP_VAR_CLONE(lvref);							\
 		DECR_CREFCNT(lvref);								\
 		DECR_BASE_REF_NOSYM(lvref, dotpsave);						\
-	}
+	}											\
+}
 
 /* Macro to mark nested symvals as having had alias activity. Mark nested symvals until we get
    to a symval owning the lv_val specified. This loop will normally only run once except in the
    case where the lv_val given is owned by a symval nested by an exclusive NEW.
 */
-#define MARK_ALIAS_ACTIVE(lv_own_svlvl)				\
-	{							\
-		symval	*sv;					\
-		for (sv = curr_symval; sv; sv = sv->last_tab)	\
-		{						\
-			sv->alias_activity = TRUE;		\
-			if (sv->symvlvl == lv_own_svlvl)	\
-				break;				\
-		}						\
-		assert(sv);	/* Loop should end early */	\
-	}
+#define MARK_ALIAS_ACTIVE(lv_own_svlvl)			\
+{							\
+	symval	*sv;					\
+	int4	lcl_own_svlvl;				\
+							\
+	lcl_own_svlvl = lv_own_svlvl;			\
+	for (sv = curr_symval; sv; sv = sv->last_tab)	\
+	{						\
+		sv->alias_activity = TRUE;		\
+		if (sv->symvlvl == lcl_own_svlvl)	\
+			break;				\
+	}						\
+	assert(sv);	/* Loop should end early */	\
+}
 
 /* Macro to scan a tree for container vars and for each one, treat it as if it had been specified in a TP restart variable list
-   by setting it up to be cloned if deleted. This activity should nest so container vars that point to further trees should also be
-   be scanned.
-*/
+ * by setting it up to be cloned if deleted. This activity should nest so container vars that point to further trees should also be
+ * be scanned.
+ */
 #define TPSAV_CNTNRS_IN_TREE(lv_base)												\
 {																\
+	assert(LV_IS_BASE_VAR(lv_base));											\
         if (lv_base->stats.tstartcycle != tstartcycle)										\
 	{	/* If haven't processed this lv_val for this transaction (or nested transaction */				\
 		lv_base->stats.tstartcycle = tstartcycle;									\
@@ -236,8 +239,7 @@
 		if (DEBUG_ONLY(TRUE) PRO_ONLY(lv_base->has_aliascont))								\
 		{														\
 			DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base)); 	\
-			als_scan_for_containers((lv_base), &als_prcs_tpsav_cntnr_node, (void *)tp_pointer, (void *)NULL,	\
-						(int *)NULL);									\
+			ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_tpsav_cntnr_node, tp_pointer, NULL);			\
 			DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base)); 	\
 		}														\
 	} else															\
@@ -245,74 +247,126 @@
 }
 
 /* Macro similar to TPSAV_CNTNRS_IN_TREE() above but in this case, we know we want to increment the reference counts
-   for all found container var targets. They have already been saved (we will assert they have a tp_var!) and we just want to
-   reestablish the reference counts. This is used when a saved array is being restored and the containers in it need to have
-   their reference counts re-established.
-*/
-#define TPREST_CNTNRS_IN_TREE(lv_base)												\
-{																\
-	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
-	{															\
-		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base));		\
-		als_scan_for_containers((lv_base), &als_prcs_tprest_cntnr_node, (void *)NULL, (void *)NULL, (int *)NULL); 	\
-		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base));		\
-	}															\
+ * for all found container var targets. They have already been saved (we will assert they have a tp_var!) and we just want to
+ * reestablish the reference counts. This is used when a saved array is being restored and the containers in it need to have
+ * their reference counts re-established.
+ */
+#define TPREST_CNTNRS_IN_TREE(lv_base)											\
+{															\
+	assert(LV_IS_BASE_VAR(lv_base));										\
+	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))							\
+	{														\
+		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base));	\
+		ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_tprest_cntnr_node, NULL, NULL);				\
+		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base));	\
+	}														\
 }
 
 /* Macro similar to TPREST_CNTNRS_IN_TREE() above but in this case we want to decrement the containers since we are
    in unwind processing */
 #define TPUNWND_CNTNRS_IN_TREE(lv_base)												\
 {																\
+	assert(LV_IS_BASE_VAR(lv_base));											\
 	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
 	{															\
 		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base));		\
-		als_scan_for_containers((lv_base), &als_prcs_tpunwnd_cntnr_node, (void *)NULL, (void *)NULL, (int *)NULL); 	\
+		ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_tpunwnd_cntnr_node, NULL, NULL);					\
 		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base));		\
 	} else															\
 		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Scan for tree at 0x"lvaddr" bypassed - no containers", lv_base));\
 }
 
 /* Macro to scan a tree for container vars, delete what they point to and unmark the container so it is no longer a container */
-#define KILL_CNTNRS_IN_TREE(lv_base)												\
-{																\
-	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
-		als_scan_for_containers((lv_base), &als_prcs_kill_cntnr_node, (void *)NULL, (void *)NULL, (int *)NULL); 	\
+#define KILL_CNTNRS_IN_TREE(lv_base)								\
+{												\
+	assert(LV_IS_BASE_VAR(lv_base));							\
+	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))				\
+		ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_kill_cntnr_node, NULL, NULL);	\
 }
 
 /* Macro to scan an lvval for containers pointing to other structures that need to be scanned in xnew pop processing */
-#define XNEWREF_CNTNRS_IN_TREE(lv_base)												\
-	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
-		als_scan_for_containers((lv_base), &als_prcs_xnewref_cntnr_node, (void *)NULL, (void *)NULL, (int *)NULL);
-
-/* Macro to mark the base frame of the current var as having a container */
-#define MARK_CONTAINER_ONBOARD(lvp) 										\
-{														\
-	lv_val		*lvbase;										\
-	lv_sbs_tbl	*tbl;											\
-	for (tbl = (lv_sbs_tbl *)((lvp)->ptrs.val_ent.parent.sym), lvbase = NULL;				\
-	     MV_SYM != tbl->ident;										\
-	     tbl = (lv_sbs_tbl *)lvbase->ptrs.val_ent.parent.sym)						\
-	{													\
-		lvbase = tbl->lv;										\
-		assert(MV_SBS == tbl->ident);									\
-	}													\
-	assert(lvbase); /* Should be impossible to be null since target should be a subscripted var */		\
-	assert(MV_SYM == lvbase->ptrs.val_ent.parent.sym->ident);       /* Verify base var */			\
-	lvbase->has_aliascont = TRUE;										\
+#define XNEWREF_CNTNRS_IN_TREE(lv_base)								\
+{												\
+	assert(LV_IS_BASE_VAR(lv_base));							\
+	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))				\
+		ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_xnewref_cntnr_node, NULL, NULL);	\
 }
 
+/* Macro to mark the base frame of the current var as having a container */
+#define MARK_CONTAINER_ONBOARD(lv_base) 									\
+{														\
+	assert(LV_IS_BASE_VAR(lv_base));									\
+	lv_base->has_aliascont = TRUE;										\
+}
 
+/* Macro to scan the supplied tree for container vars and invoke the supplied routine and args. Note that in debug mode,
+ * even if "has_aliascont" is NOT set, we will still scan the array for containers but if one is found, then we will assert fail.
+ * Note this means the processing is different for PRO and DBG builds in that this routine will not even be called in PRO if
+ * the has_aliascont flag is not on in the base mval. But this allows us to check the integrity of the has_aliascont flag
+ * in DBG because we will fail if ever a container is found in an array with the flag turned off.
+ *
+ * Just like "als_xnew_killaliasarray", we have a choice here of recursion vs iteration. Since a function pointer is passed
+ * in and we cannot be sure what that function does, the safest thing to do would be to do a post-order traversal using recursion.
+ *
+ * Since the ALS_SCAN_FOR_CONTAINERS macro invocation can nest on itself (if one local variable has a container pointing to a
+ * different local variable), we need to save the counters in a local variable and restore it before returning to the parent local.
+ * Since we save/restore the counter, we also do the same with the other global variables (even though we will be setting those
+ * to the exact same values in case of nested invocations) as we cannot easily distinguish a fresh call from a nested call.
+ */
+#define	ALS_SCAN_FOR_CONTAINERS(LVP, FNPTR, ARG1, ARG2)						\
+{												\
+	tree			*lvt_child;							\
+	als_cntnr_fnptr_t	als_cntnr_fnptr;						\
+	void			*als_cntnr_arg1, *als_cntnr_arg2;				\
+	int			als_cntnrs_cnt;							\
+												\
+	GBLREF	als_cntnr_fnptr_t	als_cntnr_fnptr_gbldef;					\
+	GBLREF	void			*als_cntnr_arg1_gbldef, *als_cntnr_arg2_gbldef;		\
+	GBLREF	int			als_cntnrs_cnt_gbldef;					\
+												\
+	assert(LV_IS_BASE_VAR(LVP));								\
+	DEBUG_ONLY(if (!LVP->has_aliascont)							\
+	   DBGRFCT((stderr, "als_scan_for_containers: Scan would have been avoided in PRO\n")));\
+	/* Save globals from previous invocation of ALS_SCAN_FOR_CONTAINERS (if any) */		\
+	als_cntnr_fnptr = als_cntnr_fnptr_gbldef;						\
+	als_cntnr_arg1 = als_cntnr_arg1_gbldef;							\
+	als_cntnr_arg2 = als_cntnr_arg2_gbldef;							\
+	als_cntnrs_cnt = als_cntnrs_cnt_gbldef;							\
+	/* Update global to reflect current invocation */					\
+	als_cntnr_fnptr_gbldef = FNPTR;								\
+	als_cntnr_arg1_gbldef = (void *)ARG1;							\
+	als_cntnr_arg2_gbldef = (void *)ARG2;							\
+	als_cntnrs_cnt_gbldef = 0;								\
+	lvt_child = LV_GET_CHILD(LVP);								\
+	assert(lvt_child);	/* caller should not call if lvt_child is NULL */		\
+	lvTreeWalkPostOrder(lvt_child, als_scan_for_containers_recurse);			\
+	/* If no alias containers found in this base var, make sure flag gets turned off */	\
+	if (0 == als_cntnrs_cnt_gbldef)								\
+		LVP->has_aliascont = FALSE;							\
+	else											\
+		assert(LVP->has_aliascont);							\
+	/* Restore globals before returning */							\
+	als_cntnr_fnptr_gbldef = als_cntnr_fnptr;						\
+	als_cntnr_arg1_gbldef = als_cntnr_arg1;							\
+	als_cntnr_arg2_gbldef = als_cntnr_arg2;							\
+	als_cntnrs_cnt_gbldef = als_cntnrs_cnt;							\
+}
 
 void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, int table_size_orig);
 void als_check_xnew_var_aliases(symval *oldsymtab, symval *cursymtab);
 void als_zwrhtab_init(void);
-void als_prcs_tpsav_cntnr_node(lv_val *lv, void *tfv, void *dummy);
-void als_prcs_tprest_cntnr_node(lv_val *lv, void *dummy1, void *dummy2);
-void als_prcs_tpunwnd_cntnr_node(lv_val *lv, void *dummy1, void *dummy2);
-void als_prcs_kill_cntnr_node(lv_val *lv, void *dummy1, void *dummy2);
-void als_prcs_xnewref_cntnr_node(lv_val *lv, void *dummy1, void *dummy2);
-void als_scan_for_containers(lv_val *lv_base, void (*als_container_processor)(lv_val *, void *, void *), void *arg1, void *arg2,
-			     int *cntnr_cnt );
+void als_prcs_tpsav_cntnr_node(treeNode *node);
+void als_prcs_tprest_cntnr_node(treeNode *node);
+void als_prcs_tpunwnd_cntnr_node(treeNode *node);
+void als_prcs_kill_cntnr_node(treeNode *node);
+void als_prcs_xnewref_cntnr_node(treeNode *node);
+void als_scan_for_containers_recurse(treeNode *node);
+
+
+typedef	void (*als_cntnr_fnptr_t)(treeNode *node);
+
+void als_scan_for_containers(lv_val *lv_base);
+
 ht_ent_mname *als_lookup_base_lvval(lv_val *lvp);
 zwr_alias_var *als_getzavslot(void);
 int als_lvval_gc(void);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,32 +16,34 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF int4 source_error_found;
 GBLREF char window_token;
 GBLREF triple *curtchain;
 
+error_def(ERR_SPOREOL);
+error_def(ERR_CMD);
+
 int linetail(void)
 {
-	error_def(ERR_SPOREOL);
-	error_def(ERR_CMD);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	for (;;)
 	{
-		while (window_token == TK_SPACE)
+		while (TK_SPACE == window_token)
 			advancewindow();
-		if (window_token == TK_EOL)
+		if (TK_EOL == window_token)
 			return TRUE;
 		if (!cmd())
 		{
 			if (curtchain->exorder.bl->exorder.bl->exorder.bl->opcode != OC_RTERROR)
 			{	/* If rterror is last triple generated (has two args), then error already raised */
-				source_error_found ? stx_error(source_error_found) : stx_error(ERR_CMD);
+				TREF(source_error_found) ? stx_error(TREF(source_error_found)) : stx_error(ERR_CMD);
 			}
 			assert(curtchain->exorder.bl->exorder.fl == curtchain);
-			assert(source_error_found);
+			assert(TREF(source_error_found));
 			return FALSE;
 		}
-		if (window_token != TK_SPACE && window_token != TK_EOL)
+		if ((TK_SPACE != window_token) && (TK_EOL != window_token))
 		{
 			stx_error(ERR_SPOREOL);
 			return FALSE;

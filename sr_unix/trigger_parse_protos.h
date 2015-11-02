@@ -19,8 +19,9 @@ STATICFNDCL boolean_t process_options(char *option_str, uint4 option_len, boolea
 				    boolean_t *consistency, boolean_t *noconsistency);
 STATICFNDCL boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, char **next_str);
 STATICFNDCL boolean_t process_pieces(char *piece_str, uint4 *piece_len);
-STATICFNDCL boolean_t process_xecute(char *xecute_str, uint4 *xecute_len);
+STATICFNDCL boolean_t process_xecute(char *xecute_str, uint4 *xecute_len, boolean_t multi_line);
 
 boolean_t check_trigger_name(char *name_str, uint4 *name_len);
-boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **values, uint4 *value_len, int4 max_output_len);
+boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **values, uint4 *value_len, int4 *max_len,
+			boolean_t *multi_line_xecute);
 #endif /* TRIGGER_PARSE_PROTOS_INCLUDED */

@@ -37,7 +37,7 @@
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*kip_csa;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF  sgm_info                *first_sgm_info;
@@ -74,7 +74,7 @@ void preemptive_ch(int preemptive_severe)
 			RESET_GV_TARGET(UNIX_ONLY(SKIP_GVT_GVKEY_CHECK) VMS_ONLY(DO_GVT_GVKEY_CHECK));
 		}
 	}
-	if (0 < dollar_tlevel)
+	if (dollar_tlevel)
 	{
 		for (si = first_sgm_info;  si != NULL; si = si->next_sgm_info)
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,17 +47,14 @@ void    initialize_list(buddy_list *list, int4 elemSize, int4 initAlloc)
         list->initAlloc = initAlloc;
         list->cumulMaxElems = initAlloc;
         list->nElems = 0;
-        list->ptrArray = (char **)malloc(SIZEOF(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
-							/* 1 for holding the NULL pointer and 1 for ptrArray[0] */
+        list->ptrArray = (char **)malloc((size_t)SIZEOF(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
+							/* +2 = +1 for holding the NULL pointer and +1 for ptrArray[0] */
         memset(list->ptrArray, 0, SIZEOF(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
         list->ptrArrayCurr = list->ptrArray;
-        list->nextFreePtr = list->ptrArray[0] = (char *)malloc(initAlloc * elemSize);
-        list->itrptrArrayCurr = 0;      /* null-initialise the iteration fields */
-        list->itrnElems = 0;
-        list->itrcumulMaxElems = 0;
-        list->itrnextFreePtr = 0;
-	list->free_que = (buddy_que_head *)malloc(SIZEOF(buddy_que_head));
-	list->free_que->fl = list->free_que->bl = 0;
+        list->nextFreePtr = list->ptrArray[0] = (char *)malloc((size_t)initAlloc * elemSize);
+	list->free_que = NULL; /* initialize the list to have no free element queue */
+	DEBUG_ONLY(list->used_free_last_n_elements = FALSE;)
+	DEBUG_ONLY(list->used_free_element = FALSE;)
 }
 
 /* Any changes to this routine need corresponding changes to the VERIFY_LIST_IS_REINITIALIZED macro (defined in buddy_list.h) */
@@ -68,27 +65,26 @@ void	reinitialize_list(buddy_list *list)
 	list->cumulMaxElems = list->initAlloc;
 	list->ptrArrayCurr = list->ptrArray;
 	list->nextFreePtr = list->ptrArray[0];
-        list->itrptrArrayCurr = 0;      /* null-initialise the iteration fields */
-        list->itrnElems = 0;
-        list->itrcumulMaxElems = 0;
-        list->itrnextFreePtr = 0;
-	list->free_que->fl = list->free_que->bl = 0;	/* reset the list to have no free element queue */
+	list->free_que = NULL; /* reset the list to have no free element queue */
+	DEBUG_ONLY(list->used_free_last_n_elements = FALSE;)
+	DEBUG_ONLY(list->used_free_element = FALSE;)
 }
 
 boolean_t	free_last_n_elements(buddy_list *list, int4 num)
 {
-	int4	rowElemsMax, rowElemsLeft, numLeft;
+	int4	rowElemsMax, rowElemsLeft, numLeft, nElems;
 	char	**ptrArrayCurr;
 
-	/* don't mix the usage of this routine with the usage of get_new_free_element() or free_element() */
-
 	assert(list);
-	if (list->nElems >= num)
+	assert(!list->used_free_element);
+	DEBUG_ONLY(list->used_free_last_n_elements = TRUE;)
+	nElems = list->nElems;
+	if (nElems >= num)
 	{
 		ptrArrayCurr = list->ptrArrayCurr;
 		numLeft = num;
 		rowElemsLeft = (int4)(list->nextFreePtr - ptrArrayCurr[0]) / list->elemSize;
-		rowElemsMax = list->nElems - rowElemsLeft;
+		rowElemsMax = nElems - rowElemsLeft;
 		while (numLeft >= rowElemsLeft  &&  ptrArrayCurr != list->ptrArray)
 		{
 			assert(0 == rowElemsMax % list->initAlloc);
@@ -100,7 +96,7 @@ boolean_t	free_last_n_elements(buddy_list *list, int4 num)
 			ptrArrayCurr--;
 			assert(rowElemsMax >= list->initAlloc);
 		}
-		list->nElems -= num;
+		list->nElems = nElems - num;
 		list->ptrArrayCurr = ptrArrayCurr;
 		list->nextFreePtr = ptrArrayCurr[0] + list->elemSize * (rowElemsLeft - numLeft);
 		assert(list->ptrArrayCurr >= list->ptrArray);
@@ -113,32 +109,34 @@ char    *get_new_element(buddy_list *list, int4 nElements)
 {
         char    *retPtr;
         char    **ptrArrayCurr;
-	int4	allocElems;
+	int4	cumulMaxElems, nElems, elemSize;
 
 	if (0 >= nElements)
 	{
 		assert(FALSE);
 		return NULL;
 	}
-        if (list->nElems + nElements <= list->cumulMaxElems)
+	nElems = list->nElems;
+	cumulMaxElems = list->cumulMaxElems;
+	elemSize = list->elemSize;
+        if (nElems + nElements <= cumulMaxElems)
         {
                 retPtr = list->nextFreePtr;
-                list->nextFreePtr += nElements * list->elemSize;
-                list->nElems += nElements;
-        }
-        else
+                list->nextFreePtr += nElements * elemSize;
+                list->nElems = nElems + nElements;
+        } else
         {
-		while (list->nElems + nElements > list->cumulMaxElems)
+		do
 		{
-			allocElems = list->cumulMaxElems;
 			ptrArrayCurr = ++list->ptrArrayCurr;
 			if (!(retPtr = *ptrArrayCurr))
-				retPtr = *ptrArrayCurr = (char *)malloc(allocElems * list->elemSize);
-			list->nElems = list->cumulMaxElems;
-			list->cumulMaxElems += allocElems;
-		}
-                list->nElems += nElements;
-                list->nextFreePtr = retPtr + list->elemSize * nElements;
+				retPtr = *ptrArrayCurr = (char *)malloc((size_t)cumulMaxElems * elemSize);
+			nElems = cumulMaxElems;
+			cumulMaxElems *= 2;
+		} while (nElems + nElements > cumulMaxElems);
+                list->nElems = nElems + nElements;
+                list->nextFreePtr = retPtr + elemSize * nElements;
+		list->cumulMaxElems = cumulMaxElems;
         }
         return retPtr;
 }
@@ -147,17 +145,31 @@ char	*get_new_free_element(buddy_list *list)
 {
 	char	*elem;
 
-	elem = (char *)remqh((que_ent_ptr_t)list->free_que);
-	if (elem)
+	assert(!list->used_free_last_n_elements);
+	DEBUG_ONLY(list->used_free_element = TRUE;)
+	/* Assert that each element has enough space to store a pointer. This will be used to maintain the singly linked list
+	 * of freed up elements in the buddy list. The head of this list will be list->free_que.
+	 */
+	assert(SIZEOF(char *) <= list->elemSize);
+	elem = list->free_que;
+	if (NULL != elem)
+	{
+		list->free_que = *(char **)elem;
+		assert(elem != list->free_que);
 		return elem;
+	}
 	return get_new_element(list, 1);
 }
 
 void	free_element(buddy_list *list, char *elem)
 {
+	assert(!list->used_free_last_n_elements);
+	DEBUG_ONLY(list->used_free_element = TRUE;)
 	assert(elem);
-	/* assumes that elem has a "que_head" structure as the first member */
-	insqt((que_ent_ptr_t)elem, (que_ent_ptr_t)list->free_que);
+	assert(elem != list->free_que);
+	/* Add it to the singly linked list of freed up elements in the buddy_list */
+	*(char **)elem = list->free_que;
+	list->free_que = elem;
 }
 
 char    *find_element(buddy_list *list, int4 index)
@@ -173,40 +185,6 @@ char    *find_element(buddy_list *list, int4 index)
 	return list->ptrArray[i] + list->elemSize * (index - list->initAlloc * (i ? 1 << (i-1) : 0));
 }
 
-char    *find_first_element(buddy_list *list, int4 index)
-{
-        /* index is provided as a future enhancement. Currently it is assumed to be 0 */
-
-	assert(0 == index);
-        list->itrptrArrayCurr = list->ptrArray;
-        list->itrnElems = 0;
-        list->itrcumulMaxElems = list->initAlloc;
-        list->itrnextFreePtr = *list->ptrArray;
-        return list->itrnextFreePtr;
-}
-
-char    *find_next_element(buddy_list *list, int4 nElements)
-{
-        /* nElements is provided as a future enhancement. Currently it is assumed to be 1 */
-
-        assert(1 == nElements);
-        if (++list->itrnElems >= list->nElems)
-	{
-		assert(list->itrnElems == list->nElems);
-                return NULL;
-	}
-        if (list->itrnElems < list->itrcumulMaxElems)
-                list->itrnextFreePtr += list->elemSize;
-        else
-        {
-                list->itrcumulMaxElems = list->itrcumulMaxElems << 1;
-		if (list->itrcumulMaxElems > list->nElems)
-			list->itrcumulMaxElems = list->nElems;
-                list->itrnextFreePtr = *++list->itrptrArrayCurr;
-        }
-        return list->itrnextFreePtr;
-}
-
 void    cleanup_list(buddy_list *list)
 {
         char    **curr;
@@ -219,6 +197,5 @@ void    cleanup_list(buddy_list *list)
                 free(*curr);
                 curr++;
 	}
-	free(list->free_que);
         free(list->ptrArray);
 }

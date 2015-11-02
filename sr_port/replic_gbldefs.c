@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,6 @@ GBLDEF	unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
 GBLDEF	unsigned char	jnl_source_rectype, jnl_dest_maxrectype;
 GBLDEF	char		*ext_stop;
 GBLDEF	char		*jb_stop;
-GBLDEF	boolean_t	null_subs_xform;
 GBLDEF	boolean_t	primary_side_std_null_coll;
 GBLDEF	boolean_t	primary_side_trigger_support;
 GBLDEF	boolean_t	secondary_side_std_null_coll;
@@ -54,11 +53,3 @@ GBLDEF	boolean_t	secondary_side_trigger_support;
 GBLDEF	seq_num		lastlog_seqno;
 GBLDEF	qw_num		trans_sent_cnt, last_log_tr_sent_cnt, trans_recvd_cnt, last_log_tr_recvd_cnt;
 GBLDEF	upd_helper_entry_ptr_t	helper_entry;
-GBLDEF	boolean_t	trig_replic_warning_issued;	/* TRUE if a warning to the source server log indicating a replicated
-							 * triggered update to a non-trigger supporting secondary has been issued
-							 * Reset to FALSE in gtmsource_recv_restart.
-							 */
-GBLDEF	seq_num		trig_replic_suspect_seqno;	/* The sequence number at which the primary detected a triggered update
-							 * being replciated.
-							 */
-

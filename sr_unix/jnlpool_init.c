@@ -59,7 +59,6 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 GBLREF	gtmsource_options_t	gtmsource_options;
 GBLREF	boolean_t		pool_init;
-GBLREF	short			dollar_tlevel;
 GBLREF	uint4			process_id;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	enum gtmImageTypes	image_type;

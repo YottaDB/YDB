@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	sgmnt_addrs		*cs_addrs;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 
 CONDITION_HANDLER(t_ch)
 {

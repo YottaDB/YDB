@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,12 +16,8 @@
 #define SETREC			0x00000001
 #define KILLREC			0x00000002
 #define ZKILLREC		0x00000004
-/* Note that $ZTWORMHOLE is applicable only in case of triggers so define macros accordingly */
-#ifdef GTM_TRIGGER
 #define ZTWORMREC		0x00000008
-#else
-#define ZTWORMREC		0x00000000
-#endif
+#define ZTRIGREC		0x00000800
 
 #define SET_KILL_ZKILL_MASK		(SETREC | KILLREC | ZKILLREC)
 #define SET_KILL_ZKILL_ZTWORM_MASK	(SETREC | KILLREC | ZKILLREC | ZTWORMREC)
@@ -43,16 +39,17 @@ LITREF	int		jrt_update[JRT_RECTYPES];
 LITREF	boolean_t	jrt_fixed_size[JRT_RECTYPES];
 LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 
-#define	IS_VALID_JRECTYPE(rectype)		((JRT_BAD < rectype) && (JRT_RECTYPES > rectype))
+#define IS_VALID_RECTYPES_RANGE(rectype)	((JRT_BAD < rectype) && (JRT_RECTYPES > rectype))
 #define IS_REPLICATED(rectype)			(jrt_is_replicated[rectype])
 #define IS_FIXED_SIZE(rectype)			(jrt_fixed_size[rectype])
 #define IS_SET(rectype)				(jrt_update[rectype] & SETREC)
 #define IS_KILL(rectype)			(jrt_update[rectype] & KILLREC)
 #define IS_ZKILL(rectype)			(jrt_update[rectype] & ZKILLREC)
 #define IS_ZTWORM(rectype)			(jrt_update[rectype] & ZTWORMREC)
+#define IS_ZTRIG(rectype)			(jrt_update[rectype] & ZTRIGREC)
 #define IS_KILL_ZKILL(rectype)			(jrt_update[rectype] & (KILLREC | ZKILLREC))
-#define IS_SET_KILL_ZKILL(rectype)		(jrt_update[rectype] & SET_KILL_ZKILL_MASK)
-#define IS_SET_KILL_ZKILL_ZTWORM(rectype)	(jrt_update[rectype] & SET_KILL_ZKILL_ZTWORM_MASK)
+#define IS_SET_KILL_ZKILL_ZTRIG(rectype)	(jrt_update[rectype] & (SET_KILL_ZKILL_MASK | ZTRIGREC))
+#define IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype)	(jrt_update[rectype] & (SET_KILL_ZKILL_ZTWORM_MASK | ZTRIGREC))
 #define IS_FENCED(rectype)			(jrt_update[rectype] & FENCE_MASK)
 #define IS_TP(rectype)				(jrt_update[rectype] & TPREC_MASK)
 #define IS_ZTP(rectype)				(jrt_update[rectype] & ZTPREC_MASK)
@@ -64,8 +61,15 @@ LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 #define IS_FUPD_TUPD(rectype)			(jrt_update[rectype] & (FUPDREC | TUPDREC))
 #define IS_GUPD_UUPD(rectype)			(jrt_update[rectype] & (GUPDREC | UUPDREC))
 
+#ifdef GTM_TRIGGER
+# define IS_VALID_JRECTYPE(rectype)	IS_VALID_RECTYPES_RANGE(rectype)
+#else /* On trigger non-supporting platforms, it is an error if a ZTWORM or ZTRIG rectype is seen. */
+# define IS_VALID_JRECTYPE(rectype)	(IS_VALID_RECTYPES_RANGE(rectype) && !IS_ZTWORM(rectype) && !IS_ZTRIG(rectype))
+#endif
+
 #define GET_REC_FENCE_TYPE(rectype)		(!IS_FENCED(rectype)) ? NOFENCE : (IS_TP(rectype)) ? TPFENCE : ZTPFENCE
-#define REC_HAS_TOKEN_SEQ(rectype, jnlrec)	(IS_SET_KILL_ZKILL_ZTWORM(rectype) || IS_COM(rectype)			\
-							|| (JRT_EPOCH == (rectype)) || (JRT_EOF == (rectype)))
+#define REC_HAS_TOKEN_SEQ(rectype)		(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype) || IS_COM(rectype)		\
+							|| (JRT_EPOCH == (rectype)) || (JRT_EOF == (rectype))		\
+							|| (JRT_NULL == (rectype)))
 
 #endif /* JNL_TYPEDEF_H_INCLUDED */

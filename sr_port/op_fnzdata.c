@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
+
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -26,10 +26,8 @@ LITREF mval 		*fnzdata_table[2][2];
 
 void op_fnzdata(lv_val *srclv, mval *dst)
 {
-	lv_val 		*p;
 	int 		isdefd, hasdesc;
-	lv_sbs_tbl	*tbl;
-	boolean_t	isalias;
+	boolean_t	isalias, is_base_var;
 
 	isdefd = hasdesc = 0;
 	isalias = FALSE;
@@ -37,18 +35,16 @@ void op_fnzdata(lv_val *srclv, mval *dst)
 	{
 		if (MV_DEFINED(&(srclv->v)))
 	  		isdefd++;
-       	       	if ((tbl = srclv->ptrs.val_ent.children) && (tbl->num || tbl->str))
-		{
-			assert(tbl->ident == MV_SBS);
+		is_base_var = LV_IS_BASE_VAR(srclv);
+       	       	if (LV_HAS_CHILD(srclv))
 			hasdesc++;
-		}
-		assert(srclv->ptrs.val_ent.parent.sym);
-		if (MV_SYM == srclv->ptrs.val_ent.parent.sym->ident)
-			/* This is an unsubscripted var -- check reference count */
+		if (is_base_var)
+		{	/* This is an unsubscripted var -- check reference count */
 			isalias = IS_ALIASLV(srclv);
-		else
+		} else
 		{	/* Must be a subscript lv - check if a container */
-			assert(MV_SBS == srclv->ptrs.val_ent.parent.sbs->ident);
+			/* ensure "srclv" is of type "treeNode *" or "treeNodeFlt *" */
+			assert(IS_LVAVLTREENODE(srclv));
 			isalias = (0 != (MV_ALIASCONT & srclv->v.mvtype));
 		}
 	}

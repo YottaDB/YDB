@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,31 +17,30 @@
 #include "mdq.h"
 #include "advancewindow.h"
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
-GBLREF triple 	*expr_start;
-GBLREF bool 	shift_gvrefs;
+GBLREF char		window_token;
+GBLREF mident		window_ident;
 
 int gvn(void)
 {
 	triple		*ref, *t1, *oldchain, tmpchain, *triptr, *s;
 	oprtype		subscripts[MAX_GVSUBSCRIPTS], *sb1, *sb2;
-	bool		shifting, vbar, parse_status;
+	boolean_t	shifting, vbar, parse_status;
 	opctype		ox;
 	char		x;
-
 	error_def(ERR_MAXNRSUBSCRIPTS);
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_GBLNAME);
 	error_def(ERR_EXTGBLDEL);
 	error_def(ERR_GVNAKEDEXTNM);
 	error_def(ERR_EXPR);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(window_token == TK_CIRCUMFLEX);
 	advancewindow();
 	sb1 = sb2 = subscripts;
 	ox = 0;
-	if (shifting = shift_gvrefs)
+	if (shifting = TREF(shift_side_effects))
 	{
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
@@ -72,8 +71,7 @@ int gvn(void)
 					setcurtchain(oldchain);
 				return FALSE;
 			}
-		}
-		else
+		} else
 			*sb1++ = put_str(0,0);
 		if ((!vbar && window_token != TK_RBRACKET) || (vbar && window_token != TK_VBAR))
 		{	stx_error(ERR_EXTGBLDEL);
@@ -90,8 +88,7 @@ int gvn(void)
 			ox = OC_GVNAME;
 		*sb1++ = put_str(window_ident.addr, window_ident.len);
 		advancewindow();
-	}
-	else
+	} else
 	{	if (ox)
 		{
 			stx_error(ERR_GVNAKEDEXTNM);
@@ -156,10 +153,10 @@ int gvn(void)
 	{
 		newtriple(OC_GVSAVTARG);
 		setcurtchain(oldchain);
-		dqadd(expr_start, &tmpchain, exorder);
-		expr_start = tmpchain.exorder.bl;
+		dqadd(TREF(expr_start), &tmpchain, exorder);
+		TREF(expr_start) = tmpchain.exorder.bl;
 		triptr = newtriple(OC_GVRECTARG);
-		triptr->operand[0] = put_tref(expr_start);
+		triptr->operand[0] = put_tref(TREF(expr_start));
 	}
 	return TRUE;
 }

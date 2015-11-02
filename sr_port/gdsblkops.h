@@ -58,9 +58,9 @@ typedef struct
 #define	ENSURE_UPDATE_ARRAY_SPACE(space_needed)											\
 {																\
 	GBLREF	ua_list		*first_ua, *curr_ua;										\
-	GBLREF char		*update_array, *update_array_ptr;								\
-	GBLREF uint4		update_array_size, cumul_update_array_size;							\
-	GBLREF	short		dollar_tlevel;											\
+	GBLREF	char		*update_array, *update_array_ptr;								\
+	GBLREF	uint4		update_array_size, cumul_update_array_size;							\
+	GBLREF	uint4		dollar_tlevel;											\
 	ua_list			*tmpua;												\
 																\
 	assert((0 != update_array_size) && (NULL != update_array));								\
@@ -114,13 +114,13 @@ typedef struct
 	update_array_ptr = update_array;			\
 }
 
-GBLREF	short			dollar_tlevel;
-GBLREF	unsigned char		cw_set_depth;
-
 /* the following macro does what RESET_UPDATE_ARRAY does and additionally does some integrity checks */
 #define	CHECK_AND_RESET_UPDATE_ARRAY								\
 {												\
-	assert(0 == dollar_tlevel);	/* TP should never use this update_array */		\
+	GBLREF	uint4			dollar_tlevel;						\
+	GBLREF	unsigned char		cw_set_depth;						\
+												\
+	assert(!dollar_tlevel);	/* TP should never use this update_array */			\
 	assert(0 == cw_set_depth);	/* ensure we never reset an active update_array */	\
 	RESET_UPDATE_ARRAY;									\
 }
@@ -150,8 +150,8 @@ GBLREF	unsigned char		cw_set_depth;
 
 #define BLK_SEG(BNUM, ADDR, LEN)										\
 {														\
-	sm_ulong_t	lcl_len1;										\
-	GBLREF	short	dollar_tlevel;										\
+	sm_ulong_t		lcl_len1;									\
+	GBLREF uint4		dollar_tlevel;									\
 														\
 	/* Note that name of len variable "lcl_len1" should be different					\
 	 * from the name used in the REORG_BLK_SEG macro as otherwise						\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,11 +38,6 @@
 #include "mvalconv.h"
 #include "tp_set_sgm.h"
 
-GBLDEF	bool		gv_curr_subsc_null;
-GBLDEF	bool		gv_prev_subsc_null;
-GBLDEF	gd_addr		*gd_targ_addr = 0;
-GBLDEF	gv_namehead	*prev_gv_target;
-
 GBLREF gd_addr		*gd_header;
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
@@ -52,7 +47,7 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF gd_binding	*gd_map;
 GBLREF sgm_info		*first_sgm_info;
 GBLREF sgm_info		*sgm_info_ptr;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF mstr		extnam_str;
 
 void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
@@ -63,14 +58,16 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	mval		*val;
 	short int	max_key;
 	va_list		var;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	extnam_str.len = 0;
 	if (!gd_header)
 		gvinit();
-	gd_targ_addr = gd_header;
+	TREF(gd_targ_addr) = gd_header;
 	VAR_START(var, val_arg);
-	VMS_ONLY(va_count(count);)
+	VMS_ONLY(va_count(count));
 	UNIX_ONLY(count = count_arg;)	/* need to preserve stack copy for i386 */
 	count--;
 	val = val_arg;
@@ -93,14 +90,14 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	{
 		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &(val->str));
 		DEBUG_ONLY(
-			bgormm = ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth));)
+			bgormm = ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth)));
 	}
 	assert(!bgormm || (gv_cur_region && &FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data));
 	assert(bgormm || !dollar_tlevel);
 	assert(!dollar_tlevel || sgm_info_ptr && (sgm_info_ptr->tp_csa == cs_addrs));
 	assert(gv_target->gd_csa == cs_addrs);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
-	assert(gd_targ_addr == gd_header);
+	assert(TREF(gd_targ_addr) == gd_header);
 	was_null = is_null = FALSE;
 	max_key = gv_cur_region->max_key_size;
 	for ( ; count > 0; count--)
@@ -109,10 +106,11 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 		COPY_SUBS_TO_GVCURRKEY(val, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey, was_null, is_null */
 	}
 	va_end(var);
-	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
-	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
+	TREF(gv_some_subsc_null) = was_null; /* if true, it indicates there is a null subscript (other than the last subscript)
+						in current key */
+	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
-	prev_gv_target = gv_target;	/* note down gv_target in another global for debugging purposes (C9I09-003039) */
+	TREF(prev_gv_target) = gv_target;	/* note down gv_target in another global for debugging purposes (C9I09-003039) */
 	return;
 }

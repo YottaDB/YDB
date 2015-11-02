@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,9 +14,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -24,47 +22,60 @@
 #include "gdsfhead.h"
 #include "alias.h"
 
-GBLREF lv_val	*active_lv;
-GBLREF short	dollar_tlevel;
+GBLREF lv_val		*active_lv;
+GBLREF uint4		dollar_tlevel;
 
-void	lv_kill(lv_val *lv, boolean_t dotpsave)
+void	lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree)
 {
-	lv_val		*tp_val;
- 	lv_sbs_tbl	*tbl, *tmpsbs;
+	lv_val		*base_lv;
+	tree		*lvt_child, *lvt;
+	boolean_t	is_base_var;
+	symval		*sym;
 
 	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
 					   cleanup problems */
 	if (lv)
 	{
-		if (dotpsave && dollar_tlevel)
+		is_base_var = LV_IS_BASE_VAR(lv);
+		base_lv = !is_base_var ? LV_GET_BASE_VAR(lv) : lv;
+		if (dotpsave && dollar_tlevel && (NULL != base_lv->tp_var) && !base_lv->tp_var->var_cloned)
+			TP_VAR_CLONE(base_lv);	/* clone the tree. */
+		lvt_child = LV_GET_CHILD(lv);
+		if (do_subtree && (NULL != lvt_child))
 		{
-			tp_val = lv;
-		       	tbl = tp_val->ptrs.val_ent.parent.sbs;
-			while (MV_SYM != tbl->ident)
-			{
-				tp_val = tbl->lv;
-			       	tbl = tp_val->ptrs.val_ent.parent.sbs;
-			}
-			if (NULL != tp_val->tp_var && !tp_val->tp_var->var_cloned)
-				TP_VAR_CLONE(tp_val);	/* clone the tree. */
+			LV_CHILD(lv) = NULL;
+		      	lv_killarray(lvt_child, dotpsave);
 		}
-		if (tmpsbs = lv->ptrs.val_ent.children)	/* Note assignment */
-		{
-			lv->ptrs.val_ent.children = NULL;
-		      	lv_killarray(tmpsbs, dotpsave);
-		}
-	       	tbl = lv->ptrs.val_ent.parent.sbs;
-		assert(tbl);
 		DECR_AC_REF(lv, dotpsave);		/* Decrement alias container refs and cleanup if necessary */
-		if (MV_SBS == tbl->ident)
-		{	/* Subscripted node */
-			assert(MV_SYM == tbl->sym->ident);
-			LV_FLIST_ENQUEUE(&tbl->sym->lv_flist, lv);	/* Note: clears mvtype/ident */
-		 	lv_zap_sbs(tbl, lv);
+		if (!is_base_var && (do_subtree || (NULL == lvt_child)))
+		{
+			sym = LV_GET_SYMVAL(base_lv);
+			for ( ; ; )
+			{
+				lvt = LV_GET_PARENT_TREE(lv);
+				LV_VAL_CLEAR_MVTYPE(lv); /* see comment in macro definition for why this is necessary */
+				lvTreeNodeDelete(lvt, (treeNode *)lv);
+				/* if there is at least one other sibling node to the deleted "lv" the zap stops here */
+				if (lvt->avl_height)
+					break;
+				assert(NULL == lvt->avl_root);
+				lv = (lv_val *)lvt->sbs_parent;
+				assert(NULL != lv);
+				LV_CHILD(lv) = NULL;
+				LVTREE_FREESLOT(lvt);
+				assert(MV_DEFINED(&lv->v) == (0 != lv->v.mvtype));
+				if (MV_DEFINED(&lv->v))
+					break;
+				if (lv == base_lv)
+				{	/* Base node. Do not invoke LV_FREESLOT/LV_FLIST_ENQUEUE as we will still keep the
+					 * lv_val for the non-existing base local variable pointed to by the curr_symval
+					 * hash table entry. Just clear mvtype to mark the lv_val undefined.
+					 */
+					lv->v.mvtype = 0;	/* Base node */
+					break;
+				}
+			}
 		} else
-	       	{	/* Base node */
-			assert(MV_SYM == tbl->ident);
-			lv->v.mvtype = 0;
-		}
+			lv->v.mvtype = 0;	/* Base node */
 	}
 }

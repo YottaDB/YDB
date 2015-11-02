@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -21,7 +21,6 @@
 	.sbttl	opp_tstart
 #	PAGE	+
 	.DATA
-.extern	dollar_truth 	# /* :DWORD */
 .extern	frame_pointer 	# /* :DWORD */
 
 	.text
@@ -30,8 +29,8 @@
 # PUBLIC	opp_tstart
 ENTRY opp_tstart  	# /* PROC */
 	putframe
-	movl	dollar_truth,%eax	# put $T over return call address,
-	movl	%eax,(%esp)		# we dont need it
+	movl	$0,%eax			# put arg0 over return call address since
+	movl	%eax,(%esp)		# .. we dont need it: NOT an implicit tstart
 	call	op_tstart
 	movl	12(%esp),%eax		# get number of variables to preserve
 	cmpl	$0,%eax			# -1 = not restartable,

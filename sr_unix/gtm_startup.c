@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,7 @@
 #include "mv_stent.h"
 #include "startup.h"
 #include "cmd_qlf.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "collseq.h"
 #include "patcode.h"
 #include "gdsroot.h"
@@ -92,15 +90,6 @@
 #include "cenable.h"
 #include "gtmimagename.h"
 
-#ifdef __sun
-#define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
-#endif
-
-#define MIN_INDIRECTION_NESTING 32
-#define MAX_INDIRECTION_NESTING 256
-
-GBLREF int init_xfer_table(void);
-
 GBLDEF void			(*restart)() = &mum_tstart;
 #ifdef __MVS__
 /* In zOS we cann't access function address directly, So creating function pointer
@@ -122,20 +111,16 @@ GBLREF xfer_entry_t		xfer_table[];
 GBLREF mval			dollar_system;
 GBLREF mval			dollar_ztrap;
 GBLREF mval			dollar_zstatus;
-GBLREF mval			dollar_zmode;
 GBLREF bool			compile_time;
 GBLREF spdesc			stringpool;
 GBLREF spdesc			rts_stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval			*curr_symval;
-GBLREF collseq       	  	*local_collseq;
 GBLREF pattern         		*pattern_list;
 GBLREF pattern        		*curr_pattern;
 GBLREF pattern        		mumps_pattern;
 GBLREF uint4    		*pattern_typemask;
-GBLREF bool			transform;
-GBLREF fnpc_area		fnpca;
 GBLREF int4			exi_condition;
 GBLREF global_latch_t 		defer_latch;
 GBLREF boolean_t		is_replicator;
@@ -150,10 +135,19 @@ GBLREF void             	(*cache_table_relobjs)(void);   /* Function pointer to 
 GBLREF ch_ret_type		(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
 GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
 GBLREF enum gtmImageTypes	image_type;
+GBLREF int			init_xfer_table(void);
+
 
 OS_PAGE_SIZE_DECLARE
 
 error_def(ERR_COLLATIONUNDEF);
+
+#ifdef __sun
+#define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
+#endif
+
+#define MIN_INDIRECTION_NESTING 32
+#define MAX_INDIRECTION_NESTING 256
 
 void gtm_startup(struct startup_vector *svec)
 /* Note: various references to data copied from *svec could profitably be referenced directly */
@@ -165,10 +159,12 @@ void gtm_startup(struct startup_vector *svec)
 	int		i;
 	static char 	other_mode_buf[] = "OTHER";
 	mstr		log_name;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(INVALID_IMAGE != image_type);
 	assert(svec->argcnt == SIZEOF(*svec));
-	IA64_ONLY(init_xfer_table();)
+	IA64_ONLY(init_xfer_table());
 	get_page_size();
 	cache_table_relobjs = &cache_table_rebuild;
 	ht_rhash_ch = &hashtab_rehash_ch;
@@ -180,8 +176,7 @@ void gtm_startup(struct startup_vector *svec)
 	if (svec->user_stack_size > 8388608)
 		svec->user_stack_size = 8388608;
 	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
-        msp = stackbase = mstack_ptr + svec->user_stack_size - mvs_size[MVST_STORIG];
-
+	msp = stackbase = mstack_ptr + svec->user_stack_size - mvs_size[MVST_STORIG];
 	/* mark the stack base so that if error occur during call-in gtm_init(), the unwind
 	   logic in gtmci_ch() will get rid of the stack completely */
 	fgncal_stack = stackbase;
@@ -206,10 +201,10 @@ void gtm_startup(struct startup_vector *svec)
 	ind_source_sp = ind_source_array;
 	ind_source_top = ind_source_sp + svec->user_indrcache_size;
 	rts_stringpool = stringpool;
-	compile_time = FALSE;
+	TREF(compile_time) = FALSE;
 	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */
 #	ifdef DEBUG
-	switch(image_type)
+	switch (image_type)
 	{
 		case GTM_IMAGE:
 		case GTM_SVC_DAL_IMAGE:
@@ -237,8 +232,8 @@ void gtm_startup(struct startup_vector *svec)
 	cmd_qlf.qlf = glb_cmd_qlf.qlf;
 	cache_init();
 #ifdef __sun
-        if (NULL != GETENV(PACKAGE_ENV_TYPE))	/* chose xcall (default) or rpc zcall */
-            xfer_table[xf_fnfgncal] = (xfer_entry_t)op_fnfgncal_rpc;  /* using RPC */
+	if (NULL != GETENV(PACKAGE_ENV_TYPE))	/* chose xcall (default) or rpc zcall */
+		xfer_table[xf_fnfgncal] = (xfer_entry_t)op_fnfgncal_rpc;  /* using RPC */
 #endif
 	msp -= SIZEOF(stack_frame);
 	frame_pointer = (stack_frame *)msp;
@@ -251,13 +246,12 @@ void gtm_startup(struct startup_vector *svec)
 	memset(frame_pointer->rvector, 0, SIZEOF(rhdtyp));
 	symbinit();
 	/* Variables for supporting $ZSEARCH sorting and wildcard expansion */
-	zsrch_var = lv_getslot(curr_symval);
-	zsrch_dir1 = lv_getslot(curr_symval);
-	zsrch_dir2 = lv_getslot(curr_symval);
-	LVVAL_INIT(zsrch_var, curr_symval);
-	LVVAL_INIT(zsrch_dir1, curr_symval);
-	LVVAL_INIT(zsrch_dir2, curr_symval);
-
+	TREF(zsearch_var) = lv_getslot(curr_symval);
+	TREF(zsearch_dir1) = lv_getslot(curr_symval);
+	TREF(zsearch_dir2) = lv_getslot(curr_symval);
+	LVVAL_INIT((TREF(zsearch_var)), curr_symval);
+	LVVAL_INIT((TREF(zsearch_dir1)), curr_symval);
+	LVVAL_INIT((TREF(zsearch_dir2)), curr_symval);
 	/* Initialize global pointer to control-C handler. Also used in iott_use */
 	ctrlc_handler_ptr = &ctrlc_handler;
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
@@ -276,9 +270,9 @@ void gtm_startup(struct startup_vector *svec)
 		jobchild_init();
 	else
 	{	/* Trigger enabled utilities will enable through here */
-		dollar_zmode.mvtype = MV_STR;
-		dollar_zmode.str.addr = &other_mode_buf[0];
-		dollar_zmode.str.len = SIZEOF(other_mode_buf) -1;
+		(TREF(dollar_zmode)).mvtype = MV_STR;
+		(TREF(dollar_zmode)).str.addr = other_mode_buf;
+		(TREF(dollar_zmode)).str.len = SIZEOF(other_mode_buf) -1;
 	}
 	svec->frm_ptr = (unsigned char *)frame_pointer;
 	dollar_ztrap.mvtype = MV_STR;
@@ -301,35 +295,35 @@ void gtm_startup(struct startup_vector *svec)
 	initialize_pattern_table();
 	ce_init();	/* initialize compiler escape processing */
 	/* Initialize local collating sequence */
-	transform = TRUE;
+	TREF(transform) = TRUE;
 	lct = find_local_colltype();
 	if (lct != 0)
 	{
-		local_collseq = ready_collseq(lct);
-		if (!local_collseq)
+		TREF(local_collseq) = ready_collseq(lct);
+		if (!TREF(local_collseq))
 		{
 			exi_condition = -ERR_COLLATIONUNDEF;
 			gtm_putmsg(VARLSTCNT(3) ERR_COLLATIONUNDEF, 1, lct);
 			exit(exi_condition);
 		}
 	} else
-		local_collseq = 0;
+		TREF(local_collseq) = 0;
 	prealloc_gt_timers(); /* Preallocate some timer blocks. */
 	for (i = 0; FNPC_MAX > i; i++)
-	{ /* Initialize cache structure for $Piece function */
-		fnpca.fnpcs[i].pcoffmax = &fnpca.fnpcs[i].pstart[FNPC_ELEM_MAX];
-		fnpca.fnpcs[i].indx = i;
+	{	/* Initialize cache structure for $Piece function */
+		(TREF(fnpca)).fnpcs[i].pcoffmax = &(TREF(fnpca)).fnpcs[i].pstart[FNPC_ELEM_MAX];
+		(TREF(fnpca)).fnpcs[i].indx = i;
 	}
+	(TREF(fnpca)).fnpcsteal = (TREF(fnpca)).fnpcs;		/* Starting place to look for cache reuse */
+	(TREF(fnpca)).fnpcmax = &(TREF(fnpca)).fnpcs[FNPC_MAX - 1];	/* The last element */
 	/* Initialize zwrite subsystem. Better to do it now when we have storage to allocate than
-	   if we fail and storage allocation may not be possible. To that end, pretend we have
-	   seen alias acitivity so those structures are initialized as well.
-	*/
+	 * if we fail and storage allocation may not be possible. To that end, pretend we have
+	 * seen alias acitivity so those structures are initialized as well.
+	 */
 	assert(FALSE == curr_symval->alias_activity);
 	curr_symval->alias_activity = TRUE;
 	lvzwr_init((enum zwr_init_types)0, (mval *)NULL);
 	curr_symval->alias_activity = FALSE;
-	fnpca.fnpcsteal = &fnpca.fnpcs[0];		/* Starting place to look for cache reuse */
-	fnpca.fnpcmax = &fnpca.fnpcs[FNPC_MAX - 1];	/* The last element */
 	return;
 }
 

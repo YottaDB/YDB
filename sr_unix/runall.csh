@@ -10,6 +10,8 @@
 #								#
 #################################################################
 
+#	Get rid of debug options producing huge amounts of output if set
+unsetenv gtmdbglvl
 
 if ($?RUNALL_DEBUG != 0) then
 	set verbose
@@ -213,7 +215,12 @@ gtmcrypt_ref gtmcrypt
 maskpass gtmcrypt
 LABEL
 
+# this first set of excluded modules are from the list above of modules that get built as plugins. Only plugins
+# should be metioned in this list.
 set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_pk_ref gtmcrypt_ref maskpass"
+# modules that should never be built or compiled are in this list. They are used in other capacities (e.g. used to
+# generate other routines) but are NOT part of the GTM runtime. Other scripts compile and use these routines.
+set exclude_build_list = "gtm_threadgbl_deftypes"
 # find all libnames other than mumps
 pushd $gtm_tools >& /dev/null
 set comlist_liblist = `ls *.list | sed 's/.list//' | sed 's/^lib//'`
@@ -233,6 +240,17 @@ rm -f ${TMP_DIR}_src_files >& /dev/null
 rm -f ${TMP_DIR}_latest_exe
 touch ${TMP_DIR}_inc_files
 touch ${TMP_DIR}_src_files
+
+# For all builds, gtm_threadgbl_deftypes.h needs to be generated unless we are bypassing.
+# This only updates gtm_threadgbl_deftypes.h in $gtm_inc if generation shows it changed.
+# Note shortened variable to RUNALL_BYPASS_GEN_THREADGBL due to failure on Tru64 (too long var name).
+if ($?RUNALL_BYPASS_GEN_THREADGBL == 0) then
+	tcsh $gtm_tools/gen_gtm_threadgbl_deftypes.csh
+	if (0 != $status) then
+	    echo "Failed to build gtm_threadgbl_deftypes.h - aborting build"
+	    exit 1
+	endif
+endif
 
 if ($#argv) then
 	while ($#argv > 0)
@@ -354,6 +372,15 @@ if (!(-e $gtm_src/ttt.c) || ((-M $gtm_tools/ttt.txt) > (-M $gtm_src/ttt.c))) the
 	endif
 endif
 
+# Run the list of files we are supposed to compile and delete the ones we never want to build
+if (-e ${TMP_DIR}_src_files) then
+    rm -f ${TMP_DIR}_src_files_tmp
+    foreach value ($exclude_build_list)
+	sed "/$value/d" ${TMP_DIR}_src_files > ${TMP_DIR}_src_files_tmp
+	mv ${TMP_DIR}_src_files_tmp ${TMP_DIR}_src_files
+    end
+endif
+
 if (!(-z ${TMP_DIR}_src_files)) then
 	sort -u ${TMP_DIR}_src_files >&! ${TMP_DIR}_src_files_sorted
 	mv ${TMP_DIR}_src_files_sorted ${TMP_DIR}_src_files
@@ -408,7 +435,7 @@ if (! -z ${TMP_DIR}_src_files) then
 		set objfile = ${file}.o
 
 		# Do not compile plugin files if they are modified. Compilation and subsequent build will happen in
-		# buildaux.csh
+		# buildaux.csh.
 		foreach exclude_file ($exclude_compile_list)
 			if ($exclude_file == $file) then
 				set exclude_compile_list_modified = "TRUE"

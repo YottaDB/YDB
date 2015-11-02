@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,6 @@
 #include "mdq.h"
 
 GBLREF char window_token;
-GBLREF triple *expr_start;
-GBLREF bool shift_gvrefs;
 
 int glvn(oprtype *a)
 {
@@ -25,7 +23,9 @@ int glvn(oprtype *a)
 	triple *ref, *oldchain, tmpchain, *triptr;
 	oprtype x1;
 	error_def(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	switch(window_token)
 	{
 	case TK_IDENT:
@@ -38,7 +38,7 @@ int glvn(oprtype *a)
 		*a = put_tref(newtriple(OC_GVGET));
 		return TRUE;
 	case TK_ATSIGN:
-		if (shift_gvrefs)
+		if (TREF(shift_side_effects))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);
@@ -50,12 +50,11 @@ int glvn(oprtype *a)
 			ref = newtriple(OC_INDGLVN);
 			newtriple(OC_GVSAVTARG);
 			setcurtchain(oldchain);
-			dqadd(expr_start, &tmpchain, exorder);
-			expr_start = tmpchain.exorder.bl;
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
-		}
-		else
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		} else
 		{
 			if (!indirection(&x1))
 				return FALSE;

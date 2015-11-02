@@ -78,7 +78,7 @@ boolean_t mur_ztp_lookback(void)
 				break;
 			if (mur_options.lookback_opers_specified)
 			{
-				if (IS_FUPD_TUPD(rectype) || (!IS_FENCED(rectype) && IS_SET_KILL_ZKILL(rectype)))
+				if (IS_FUPD_TUPD(rectype) || (!IS_FENCED(rectype) && IS_SET_KILL_ZKILL_ZTRIG(rectype)))
 				{
 					rctl->lookback_count++;
 					if (rctl->lookback_count > mur_options.lookback_opers)

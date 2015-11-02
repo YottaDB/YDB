@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,9 @@ GBLREF	io_pair		io_std_device;
 GBLREF	mval 		dollar_zsource;
 GBLREF	mstr		editor;
 GBLREF	int4		dollar_zeditor;
-GBLREF	zro_ent		*zro_root;
+
+error_def(ERR_FILENOTFND);
+error_def(ERR_ZEDFILSPEC);
 
 void op_zedit(mval *v, mval *p)
 {
@@ -48,10 +50,9 @@ void op_zedit(mval *v, mval *p)
 	mstr		src;
 	zro_ent		*sp, *srcdir;
 	struct		sigaction act, intr;
+	DCL_THREADGBL_ACCESS;
 
-	error_def	(ERR_ZEDFILSPEC);
-	error_def	(ERR_FILENOTFND);
-
+	SETUP_THREADGBL_ACCESS;
 	if (!editor.len)
 	{
 		edt = GETENV("EDITOR");
@@ -118,8 +119,8 @@ void op_zedit(mval *v, mval *p)
 		zro_search(0, 0, &src, &srcdir, TRUE);
 		if (NULL == srcdir)
 		{	/* find the first source directory */
-			objcnt = zro_root->count;
-			for (sp = zro_root + 1;  (NULL == srcdir) && (0 < objcnt--); ++sp)
+			objcnt = (TREF(zro_root))->count;
+			for (sp = TREF(zro_root) + 1;  (NULL == srcdir) && (0 < objcnt--); ++sp)
 			{
 				if (ZRO_TYPE_OBJECT == sp->type)
 				{

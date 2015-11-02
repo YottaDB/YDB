@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ void	db_csh_ref(sgmnt_addrs *csa)
 	if (!is_mm)
 	{
 		bp = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, OS_PAGE_SIZE);
-		bp_top = bp + csd->n_bts * buffer_size;
+		bp_top = bp + (gtm_uint64_t)csd->n_bts * buffer_size;
 		GTMCRYPT_ONLY(
 			if (csd->is_encrypted)
 			{	/* In case of an encrypted database, bp_top is actually the beginning of the encrypted global buffer

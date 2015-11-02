@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,16 +32,15 @@
 /* Whenever JNL_LABEL_TEXT changes, also change the following
  * 	1) Update JNL_VER_THIS
  * 	2) Add REPL_JNL_Vxx enum to repl_jnl_t typedef AND Vxx_JNL_VER #define in repl_filter.h
- * 	3) Add one entry to jnl2filterfmt array in repl_filter.c
- * 	4) Add an entry each to repl_filter_old2cur & repl_filter_cur2old arrays in repl_filter.c.
+ * 	3) Add an entry each to repl_filter_old2cur & repl_filter_cur2old arrays in repl_filter.c.
  * If the FILTER format is also changing, then do the following as well
- * 	5) Add REPL_FILTER_Vxx enum to repl_filter_t typedef in repl_filter.h
- * 	6) Add/Edit IF_xTOy macros in repl_filter.h to transform from/to the NEW jnl format version only.
+ * 	4) Add REPL_FILTER_Vxx enum to repl_filter_t typedef in repl_filter.h
+ * 	5) Add/Edit IF_xTOy macros in repl_filter.h to transform from/to the NEW jnl format version only.
  * 		Remove all entries that dont have the new jnl format in either the from or to part of the conversion.
- * 	7) Add/Edit prototype and implement functions jnl_xTOy() and jnl_yTOx() in repl_filter.c
- * 	8) Enhance repl_tr_endian_convert() to endian convert journal records from previous jnl formats to new format.
+ * 	6) Add/Edit prototype and implement functions jnl_xTOy() and jnl_yTOx() in repl_filter.c
+ * 	7) Enhance repl_tr_endian_convert() to endian convert journal records from previous jnl formats to new format.
  * 		This is similar to the jnl_xTOy() filter conversion functions except that lot of byte-swaps are needed.
- * 	9) Periodically determine if the size of the array repl_filter_old2cur is huge and if so trim support of
+ * 	8) Periodically determine if the size of the array repl_filter_old2cur is huge and if so trim support of
  * 		rolling upgrade (using replication internal filters) for older GT.M versions/jnl-formats.
  * 		This would mean bumping the macro JNL_VER_EARLIEST_REPL and examining all arrays that are defined
  * 		using this macro and changing the entries in all those arrays accordingly (e.g. repl_filter_old2cur
@@ -49,14 +48,15 @@
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL20"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		20
+#define JNL_LABEL_TEXT		"GDSJNL21"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		21
 #define JNL_VER_EARLIEST_REPL	15		/* Replication filter support starts here GDSJNL15 = GT.M V4.4-002 */
 #define JRT_MAX_V15		JRT_AIMG	/* Maximum jnl record type in GDSJNL15 that can be input to replication filter */
 #define JRT_MAX_V17		JRT_AIMG	/* Maximum jnl record type in GDSJNL17 that can be input to replication filter.
 						 * Actually JRT_TRIPLE is a higher record type than JRT_AIMG but it is only
 						 * sent through the replication pipe and never seen by filter routines.
 						 */
+#define JRT_MAX_V19		JRT_UZTWORM	/* Maximum jnl record type in GDSJNL19 that can be input to replication filter */
 #define	ALIGN_KEY		0xdeadbeef
 
 #ifdef UNIX
@@ -139,13 +139,19 @@
 #define	JNL_AUTOSWITCHLIMIT_DEF	8388600	/* Instead of 8388607 it is adjusted for default allocation = extension = 100 */
 #endif
 
-/* options (SIZEOF(char)) to wcs_flu() (currently flush_hdr, write_epoch, sync_epoch) are bit-wise ored */
+/* options (4-bytes unsigned integer) to wcs_flu() (currently flush_hdr, write_epoch, sync_epoch) are bit-wise ored */
 #define	WCSFLU_NONE		 0
 #define	WCSFLU_FLUSH_HDR	 1
 #define	WCSFLU_WRITE_EPOCH	 2
 #define	WCSFLU_SYNC_EPOCH	 4
 #define	WCSFLU_FSYNC_DB		 8	/* Currently used only in Unix wcs_flu() */
 #define	WCSFLU_IN_COMMIT	16	/* Set if caller is t_end or tp_tend. See wcs_flu for explanation of when this is set */
+#define	WCSFLU_MSYNC_DB		32	/* Force a full msync if NO_MSYNC is defined. Currently used only in Unix wcs_flu(). */
+
+/* options for error_on_jnl_file_lost */
+#define JNL_FILE_LOST_TURN_OFF	0	/* Turn off journaling. */
+#define JNL_FILE_LOST_ERRORS	1	/* Throw an rts_error. */
+#define MAX_JNL_FILE_LOST_OPT	JNL_FILE_LOST_ERRORS
 
 /* EPOCHs are written unconditionally in Unix (assuming jnl is ON) while they are written only for BEFORE_IMAGE in VMS */
 #define JNL_HAS_EPOCH(jnlfile)  UNIX_ONLY(TRUE) VMS_ONLY(jnlfile->before_images)
@@ -397,7 +403,7 @@ typedef struct
 				bytcnt,			/* Number of bytes written */
 				errcnt,			/* Number of errors during writing */
 				reccnt[JRT_RECTYPES];	/* Number of records written per opcode */
-	int			filler_align[31 - JRT_RECTYPES];	/* So buff below starts on even (QW) keel */
+	int			filler_align[35 - JRT_RECTYPES];	/* So buff below starts on even (QW) keel */
 	/* Note the above filler will fail if JRT_RECTYPES grows beyond 31 elements and give compiler warning in VMS
 	 * if JRT_RECTYPES equals 31. In that case, change the start num to the next odd number above MAX(31,JRT_RECTYPES).
 	 */
@@ -488,6 +494,7 @@ typedef struct jnl_private_control_struct
 	boolean_t		fd_mismatch;		/* TRUE when jpc->channel does not point to the active journal */
 	volatile boolean_t	sync_io;		/* TRUE if the process is using O_SYNC/O_DSYNC for this jnl (UNIX) */
 							/* TRUE if writers open NOCACHING to bypass XFC cache (VMS) */
+	boolean_t		error_reported;		/* TRUE if jnl_file_lost already reported the journaling error */
 	uint4			status2;		/* for secondary error status, currently used only in VMS */
 	uint4			cycle;			/* private copy of the number of this journal file generation */
 } jnl_private_control;
@@ -499,6 +506,7 @@ typedef enum
 	JNL_ZKILL,
 #	ifdef GTM_TRIGGER
 	JNL_ZTWORM,
+	JNL_ZTRIG,
 #	endif
 	JA_MAX_TYPES
 } jnl_action_code;
@@ -615,7 +623,7 @@ typedef struct
 				alloc,
 				extend,
 				buffer;
-	trans_num		tn;
+	sgmnt_data_ptr_t	csd;
 	seq_num			reg_seqno;
 	unsigned char		jnl[JNL_NAME_SIZE],
 		                *fn;
@@ -666,7 +674,7 @@ typedef struct
 #define	JS_SKIP_TRIGGERS_MASK	(1 << 3) /* 1 if MUPIP LOAD update so triggers are not invoked on replay by update process */
 #define	JS_MAX_MASK		(1 << 8) /* max of 8 bits we have for mask */
 
-/* Note that even though mumps_node, ztworm_str and align_str are members defined as type "jnl_string" below,
+/* Note that even though mumps_node, ztworm_str, ztrig_str and align_str are members defined as type "jnl_string" below,
  * the "nodeflags" field is initialized to non-zero values ONLY in the case of the mumps_node member.
  * For ztworm_str and align_str, nodeflags is guaranteed to be zero so the 24-bit "length" member
  * can even be used as a 32-bit length (if necessary) without issues. This is why nodeflags is
@@ -1053,7 +1061,7 @@ typedef struct
  * But to write it out, we should have it already built before bg_update().
  * Hence, we pre-build the block here itself before invoking t_end().
  */
-#define	BUILD_AIMG_IF_JNL_ENABLED(csa, csd, jfb, cse)					\
+#define	BUILD_AIMG_IF_JNL_ENABLED(csd, jfb, cse, tn)					\
 {											\
 	GBLREF	cw_set_element   	cw_set[];					\
 											\
@@ -1061,7 +1069,7 @@ typedef struct
 	{										\
 		cse = (cw_set_element *)(&cw_set[0]);					\
 		cse->new_buff = jfb;							\
-		gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, csa->ti->curr_tn);	\
+		gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, tn);			\
 		cse->done = TRUE;							\
 	}										\
 }
@@ -1211,7 +1219,7 @@ typedef struct
 	assert((NULL == jnlpool_ctl) || (csd->reg_seqno <= (jnlpool_ctl->jnl_seqno + 1)));		\
 }
 #ifdef GTM_CRYPT
-#define DECODE_SET_KILL_ZKILL(mumps_node_ptr, rec_size, key_handle, RC)					\
+#define DECODE_SET_KILL_ZKILL_ZTRIG(mumps_node_ptr, rec_size, key_handle, RC)				\
 {													\
 	int span_length, fixed_prefix;									\
 													\
@@ -1225,8 +1233,8 @@ typedef struct
 
 #endif /* GTM_CRYPT */
 /* jnl_ prototypes */
-int	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size); /***type int added***/
-void	jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);
+uint4	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size);
+uint4	jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat);
 uint4	jnl_qio_start(jnl_private_control *jpc);
 uint4	jnl_write_attempt(jnl_private_control *jpc, uint4 threshold);
 void	jnl_prc_vector(jnl_process_vector *pv);
@@ -1257,7 +1265,6 @@ uint4	set_jnl_file_close(set_jnl_file_close_opcode_t set_jnl_file_close_opcode);
 uint4 	jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size);
 uint4	jnl_file_open_switch(gd_region *reg, uint4 sts);
 void	jnl_file_close(gd_region *reg, bool clean, bool dummy);
-int	jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size);
 
 /* Consider putting followings in a mupip only header file  : Layek 2/18/2003 */
 boolean_t  mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info *jnl_info);

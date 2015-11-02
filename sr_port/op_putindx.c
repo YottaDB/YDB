@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,9 +16,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "collseq.h"
 #include "stringpool.h"
 #include "do_xform.h"
@@ -29,152 +27,120 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "compiler.h"
+#include "callg.h"
+#include "rtnhdr.h"
 
 GBLDEF lv_val		*active_lv;
-GBLREF int		lv_null_subs;
-GBLREF collseq		*local_collseq;
-GBLREF int4		lv_sbs_blk_size;		/* Size of an sbs_blk */
+
+error_def(ERR_LVNULLSUBS);
 
 lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 {
-	int	subs_level;
-	mval	tmp_sbs;
-        int	length;
-	va_list	var;
-	int4	temp;
-	VMS_ONLY(int	argcnt;)
-	lv_val	*lv;
- 	lv_sbs_tbl *tbl;
- 	sbs_blk	*blk;
-       	sbs_search_status status;
-	mval	*key;
-	boolean_t is_canonical;
+	boolean_t 		is_canonical, is_base_var;
+	int			length, subs_level;
+	lv_val			*lv;
+	mval			*key, tmp_sbs;
+	va_list			var;
+	tree			*lvt;
+	treeNode		*parent;
+	lv_val			*base_lv;
+	VMS_ONLY(int		argcnt;)
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_LVNULLSUBS);
-
+	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, start);
 	VMS_ONLY(va_count(argcnt);)
-	/* if this variable is marked as a Transaction Processing protected variable, clone the tree. */
-	if (NULL != start->tp_var && !start->tp_var->var_cloned)
-		TP_VAR_CLONE(start);
-	for (subs_level = 1 + ((MV_SBS != start->ptrs.val_ent.parent.sbs->ident) ? 0 : start->ptrs.val_ent.parent.sbs->level);
-				--argcnt > 0;  start = lv, subs_level++)
+	assert(0 < argcnt);
+	is_base_var = LV_IS_BASE_VAR(start);
+	/* If this variable is marked as a Transaction Processing protected variable, clone the tree.
+	 * It is possible the input "start" is NOT a base lv_val. In that case, we want to make sure that
+	 * the base lv_val, if it needs to be preserved against tp restarts, has already cloned a copy before
+	 * we go about modifying "start" here (it is the caller's responsibility to call op_putindx with
+	 * the base lv_val before calling it with a subscripted lv_val). Assert that below.
+	 */
+	if (is_base_var)
+	{
+		base_lv = start;
+		if ((NULL != start->tp_var) && !start->tp_var->var_cloned)
+			TP_VAR_CLONE(start);
+	} else
+	{
+		base_lv = LV_GET_BASE_VAR(start);
+		assert((NULL == base_lv->tp_var) || base_lv->tp_var->var_cloned);
+	}
+	lv = start;
+	assert(NULL != lv);
+	LV_SBS_DEPTH(start, is_base_var, subs_level);
+	for (subs_level++; --argcnt > 0; subs_level++)
 	{
 		key = va_arg(var, mval *);
 		MV_FORCE_DEFINED(key);	/* Subscripts for set shouldn't be undefined - check here enables lvnullsubs to work */
-		lv = NULL;
 		if (!(is_canonical = MV_IS_CANONICAL(key)))
 		{
-			if (!key->str.len && (LVNULLSUBS_OK != lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
+			assert(MV_IS_STRING(key));
+			assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype));
+			if (!key->str.len)
 			{
-				active_lv = start;
-				va_end(var);
-				rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+				if (LVNULLSUBS_OK != TREF(lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
+				{
+					active_lv = lv;
+					va_end(var);
+					rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+				}
 			}
-		}
-		if (tbl = start->ptrs.val_ent.children)
-			assert(MV_SBS == tbl->ident);
-		else
-		{
-			tbl = start->ptrs.val_ent.parent.sbs;
-			if (MV_SBS == tbl->ident)
-			{
-				assert(MV_SYM == tbl->sym->ident);
-				start->ptrs.val_ent.children = (lv_sbs_tbl *)lv_getslot(tbl->sym);
-				tbl = start->ptrs.val_ent.children;
-				memset(tbl, 0, SIZEOF(lv_sbs_tbl));
-				tbl->sym = start->ptrs.val_ent.parent.sbs->sym;
-			} else
-			{
-				assert(MV_SYM == tbl->ident);
-				assert(MV_SYM == start->ptrs.val_ent.parent.sym->ident);
-				start->ptrs.val_ent.children = (lv_sbs_tbl *)lv_getslot(start->ptrs.val_ent.parent.sym);
-				tbl = start->ptrs.val_ent.children;
-				memset(tbl, 0, SIZEOF(lv_sbs_tbl));
-				tbl->sym = start->ptrs.val_ent.parent.sym;
-			}
-			tbl->lv = start;
-			tbl->ident = MV_SBS;
-		}
-		assert(tbl->sym);
-		if (!is_canonical)
-		{
-			if (!(blk = tbl->str))
-			{
-			      	tbl->str = blk = (sbs_blk *)lv_get_sbs_blk(tbl->sym);
-				assert(0 ==blk->cnt);
-				assert(0 == blk->nxt);
-				assert(blk->sbs_que.fl && blk->sbs_que.bl);
-				status.prev = blk;
-				status.blk = blk;
-				status.ptr = (char *)&blk->ptr.sbs_str[0];
-			}
-			if (local_collseq)
-			{
-				ALLOC_XFORM_BUFF(&key->str);
+			if (TREF(local_collseq))
+			{	/* Do collation transformations */
+				ALLOC_XFORM_BUFF(key->str.len);
 				tmp_sbs.mvtype = MV_STR;
-				tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
-				assert(NULL != lcl_coll_xform_buff);
-				tmp_sbs.str.addr = lcl_coll_xform_buff;
-				do_xform(local_collseq, XFORM, &key->str, &tmp_sbs.str, &length);
+				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+				assert(NULL != TREF(lcl_coll_xform_buff));
+				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
 				tmp_sbs.str.len = length;
 				s2pool(&(tmp_sbs.str));
 				key = &tmp_sbs;
 			}
-			if (!(lv = lv_get_str_inx(blk, &key->str, &status)))
-				lv = lv_ins_str_sbs(&status, key, tbl);
+			if (lvt = LV_GET_CHILD(lv))	/* caution: assignment */
+				assert(MV_LV_TREE == lvt->ident);
+			else	/* No children exist at this level - create a child */
+				lvt = lvTreeCreate((treeNode *)lv, subs_level, base_lv);
+			lv = (lv_val *)lvAvlTreeLookupStr(lvt, key, &parent);
 		} else
-		{
+		{	/* Need to set canonical bit before calling tree search functions.
+			 * But input mval could be read-only so cannot modify that even if temporarily.
+			 * So take a copy of the mval and modify that instead.
+			 */
+			tmp_sbs = *key;
+			key = &tmp_sbs;
 			MV_FORCE_NUM(key);
-			if (!(blk = tbl->num))
-			{
-				tbl->num = blk = (sbs_blk *)lv_get_sbs_blk(tbl->sym);
-				assert(0 == blk->cnt);
-				assert(0 == blk->nxt);
-				assert(blk->sbs_que.fl && blk->sbs_que.bl);
-				if (MV_IS_INT(key))
-				{
-					temp = MV_FORCE_INT(key);
-					if (temp >= 0 && temp < SBS_NUM_INT_ELE)
-					{
-						tbl->int_flag = TRUE;
-						/* Clean the ptr section of the sbs_blk */
-						memset(&blk->ptr, 0, (lv_sbs_blk_size - OFFSETOF(sbs_blk, ptr)));
-						blk->cnt = 1;
-						lv = blk->ptr.lv[temp] = lv_getslot(tbl->sym);
-						memset(lv, 0, SIZEOF(lv_val));
-						lv->ptrs.val_ent.parent.sbs = tbl;
-					}
-				}
-			} else if (tbl->int_flag)
-			{
-				if (MV_IS_INT(key) && (temp = MV_FORCE_INT(key)) >= 0 && temp < SBS_NUM_INT_ELE)
-				{
-					if (!(lv = blk->ptr.lv[temp]))
-					{
-						lv = blk->ptr.lv[temp] = lv_getslot(tbl->sym);
-						memset(lv, 0, SIZEOF(lv_val));
-						lv->ptrs.val_ent.parent.sbs = tbl;
-						blk->cnt++;
-					}
-				} else
-				{
-					lv_cnv_int_tbl(tbl);	/* then do the lv_get_num_inx & lv_ins_num_sbs */
-					blk = tbl->num;		/* the conversion frees the old block and gets a new one */
-				}
-			}
-			if (!lv)
-			{
-				if (!(lv = lv_get_num_inx(blk, key, &status)))
-					lv = lv_ins_num_sbs(&status, key, tbl);
-			}
+			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeLookup* functions below */
+			/* Since this mval has the MV_CANONICAL bit set, reset MV_STR bit in case it is set.
+			 * This way there is no confusion as to the type of this subscript.
+			 * Also helps with stp_gcol since we dont have the tree node hanging on to the string.
+			 * There is code (e.g. op_fnascii) that expects MV_UTF_LEN bit to be set only if MV_STR is set.
+			 * Since we are turning off MV_STR, turn off MV_UTF_LEN bit also in case it is set.
+			 */
+			tmp_sbs.mvtype &= (MV_STR_OFF & MV_UTF_LEN_OFF);
+			if (lvt = LV_GET_CHILD(lv))	/* caution: assignment */
+				assert(MV_LV_TREE == lvt->ident);
+			else	/* No children exist at this level - create a child */
+				lvt = lvTreeCreate((treeNode *)lv, subs_level, base_lv);
+			if (MVTYPE_IS_INT(tmp_sbs.mvtype))
+				lv = (lv_val *)lvAvlTreeLookupInt(lvt, key, &parent);
+			else
+				lv = (lv_val *)lvAvlTreeLookupNum(lvt, key, &parent);
 		}
-		tbl->level = subs_level;
+		if (NULL == lv)
+		{
+			lv = (lv_val *)lvTreeNodeInsert(lvt, key, parent);
+			lv->v.mvtype = 0;	/* initialize mval to undefined value at this point */
+		}
 	}
 	va_end(var);
-	/* This var is about to be set/modified. If it exists and is an alias container var, that reference is going
-	   to go away. Take care of that possibility now.
-	*/
+	/* This var is about to be set/modified. If it exists and is an alias container var,
+	 * that reference is going to go away. Take care of that possibility now.
+	 */
 	if (MV_DEFINED(&lv->v))
 	{
 		DECR_AC_REF(lv, TRUE);
@@ -182,4 +148,51 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	}
 	active_lv = lv;
 	return lv;
+}
+
+/* the following two routines are stubs that should be used by m_for to "remember a subscripted control variable
+ * but are currently not used, although m_for can generate an invocation of op_rfrshindx it should always get skipped
+ * because of an error that's there in place of the desired safe behavior these two routines do not yet provide
+ */
+lv_val	*op_savputindx(UNIX_ONLY_COMMA(int count) lv_val *lvarg, ...)
+{	/* this saves the arguments as statics and then does a putindx */
+	uint4			cur_subscr;
+	mval			*base_name;
+	lvname_info_ptr		lvn_info;
+	VMS_ONLY(int		count;)
+	va_list			var;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(FALSE);
+	lvn_info = NULL;
+	VAR_START(var, lvarg);
+	VMS_ONLY(va_count(count);)
+	assert(0 < count);
+	lvn_info->start_lvp = lvarg;				/* base lv_val, which may go stale - hence the just saved name */
+	lvn_info->total_lv_subs = count;
+	for (cur_subscr = 0;  cur_subscr < lvn_info->total_lv_subs - 1;  cur_subscr++)
+		lvn_info->lv_subs[cur_subscr] = va_arg(var, mval *);
+	va_end(var);
+	/* TADR(for_ctrl_indx)[TREF(for_run_stack_lvl)] = lvn_info;	 again, tuck the pointer in an array */
+	lvn_info->end_lvp = (lv_val *)callg((INTPTR_T (*)(intszofptr_t argcnt_arg, ...))op_putindx, (gparam_list *)lvn_info);
+	return lvn_info->end_lvp;
+}
+/* this fishs the base variable out values saved by op_savputindx, looks it up again in case it moved
+ * and then calls op_putindx - this protect the control variable from for loop body acttons that
+ * might mess with an indexed control variable
+ */
+lv_val	*op_rfrshindx(boolean_t put, uint4 for_lvl) /* need to add get/put indicator */
+{
+	lvname_info_ptr 	lvn_info;
+	var_tabent		targ_key;
+	ht_ent_mname 		*tabent;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	assert(FALSE);
+	lvn_info = NULL;
+	lvn_info->end_lvp = (lv_val *)callg((INTPTR_T (*)(intszofptr_t argcnt_arg, ...))op_putindx, (gparam_list *)lvn_info);
+	return lvn_info->end_lvp;
+
 }

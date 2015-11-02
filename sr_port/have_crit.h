@@ -34,11 +34,13 @@ typedef enum
 	INTRPT_IN_TP_CLEAN_UP,
 	INTRPT_IN_CRYPT_SECTION,
 	INTRPT_IN_DB_CSH_GETN,
-	INTRPT_IN_DB_INIT,
+	INTRPT_IN_GVCST_INIT,
 	INTRPT_IN_GDS_RUNDOWN,
 	INTRPT_IN_SS_INITIATE,
 	INTRPT_IN_ZLIB_CMP_UNCMP,
-	INTRPT_NUM_STATES
+	INTRPT_IN_TRIGGER_NOMANS_LAND,	/* State where have trigger base frame but no trigger (exec) frame */
+	INTRPT_IN_MUR_OPEN_FILES,
+	INTRPT_NUM_STATES,
 } intrpt_state_t;
 
 GBLREF	intrpt_state_t	intrpt_ok_state;
@@ -68,18 +70,55 @@ GBLREF	intrpt_state_t	intrpt_ok_state;
 		VMS_ONLY(sys$exit(exi_condition);)							\
 }
 
-#define SAVE_INTRPT_OK_STATE(NEWSTATE)									\
+/* Macro to cause deferrable interrupts to be deferred recording the cause.
+ * If interrupt is already deferred, state is not changed.
+ *
+ * The normal usage of the below macros is
+ *	DEFER_INTERRUPTS
+ *	non-interruptible code
+ *	ENABLE_INTERRUPTS
+ * We want the non-interruptible code to be executed AFTER the SAVE_INTRPT_OK_STATE macro.
+ * To enforce this ordering, one would think a read memory barrier is needed in between.
+ * But it is not needed. This is because we expect the non-interruptible code to have
+ *	a) pointer dereferences OR
+ *	b) function calls
+ * Either of these will prevent the compiler from reordering the non-interruptible code.
+ * Any non-interruptible code that does not have either of the above usages (for e.g. uses C global
+ * variables) might be affected by compiler reordering. As of now, there is no known case of such
+ * usage and no such usage is anticipated in the future.
+ *
+ * We dont need to worry about machine reordering as well since there is no shared memory variable
+ * involved here (intrpt_ok_state is a process private variable) and even if any reordering occurs
+ * they will all be in-flight instructions when the interrupt occurs so the hardware will guarantee
+ * all such instructions are completely done or completely discarded before servicing the interrupt
+ * which means the interrupt service routine will never see a reordered state of the above code.
+ */
+#define DEFER_INTERRUPTS(NEWSTATE)									\
 {													\
-	save_intrpt_ok_state = intrpt_ok_state;								\
-	intrpt_ok_state = NEWSTATE;									\
+	if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)							\
+		/* Only reset state if we are in "OK" state */						\
+		intrpt_ok_state = NEWSTATE;								\
+	else												\
+		assert((NEWSTATE) != intrpt_ok_state);	/* Make sure not nesting same code */		\
 }
 
-#define RESTORE_INTRPT_OK_STATE										\
+/* Re-enable deferrable interrupts if the expected state is found. If expected state is not found, then
+ * we must have nested interrupt types. Avoid state changes in that case. When the nested state pops,
+ * interrupts will be restored.
+ */
+#define ENABLE_INTERRUPTS(OLDSTATE)									\
 {													\
-	intrpt_ok_state = save_intrpt_ok_state;								\
-	DEFERRED_EXIT_HANDLING_CHECK;	/* check if any signals were deferred while we held lock */	\
+	assert(((OLDSTATE) == intrpt_ok_state) || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state));		\
+	if ((OLDSTATE) == intrpt_ok_state)								\
+	{	/* Only reset state if in expected state - othwise state must be non-zero which is	\
+		 * asserted above.									\
+		 */											\
+		intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;						\
+		DEFERRED_EXIT_HANDLING_CHECK;	/* check if signals were deferred while held lock */	\
+	}												\
 }
 
 uint4 have_crit(uint4 crit_state);
 
 #endif /* HAVE_CRIT_H_INCLUDED */
+

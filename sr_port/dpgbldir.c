@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gbldirnam.h"
-#include "hashtab.h"
 #include "hashtab_mname.h"
 #include "iosize.h"
 #include "probe.h"
@@ -37,6 +36,11 @@
 
 GBLREF	gd_addr		*gd_header;
 GBLREF	gv_namehead	*gv_target_list;
+
+LITREF	char gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
+
+STATICDEF gdr_name	*gdr_name_head;
+STATICDEF gd_addr	*gd_addr_head;
 
 /*+
 Function:       ZGBLDIR
@@ -60,17 +64,6 @@ Side Effects:   NONE
 
 Notes:          NONE
 -*/
-
-typedef struct gdr_name_struct
-{
-	mstr		name;
-	mstr		exp_name;
-	struct gdr_name	*link;
-	gd_addr		*gd_ptr;
-}gdr_name;
-
-STATICDEF gdr_name	*gdr_name_head;
-
 gd_addr *zgbldir(mval *v)
 {
 	gd_addr		*gd_ptr;
@@ -102,7 +95,7 @@ gd_addr *zgbldir(mval *v)
 	free(tran_name);
 
 	if (gdr_name_head)
-		name->link = (struct gdr_name *)gdr_name_head;
+		name->link = (gdr_name *)gdr_name_head;
 	else
 		name->link = 0;
 	gdr_name_head = name;
@@ -134,11 +127,6 @@ Notes:          A) While checking may be done earlier for duplicate names,
 		operations useable only after the file is open, so checks
 		must be done within this function for duplicate files.
 -*/
-
-LITREF char gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
-
-STATICDEF gd_addr	*gd_addr_head;
-
 gd_addr *gd_load(mstr *v)
 {
 	void		*file_ptr;	/* This is a temporary structure as the file open and manipulations are currently stubs */
@@ -198,7 +186,7 @@ gd_addr *gd_load(mstr *v)
 	fill_gd_addr_id(gd_addr_head, file_ptr);
 	close_gd_file(file_ptr);
 	table->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-	init_hashtab_mname(table->tab_ptr, 0);
+	init_hashtab_mname(table->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 	return table;
 }
 
@@ -223,7 +211,6 @@ Side Effects:   NONE
 
 Notes:          NONE
 -*/
-
 gd_addr *get_next_gdr(gd_addr *prev)
 {
 	gd_addr	*ptr;
@@ -240,7 +227,6 @@ gd_addr *get_next_gdr(gd_addr *prev)
 }
 
 /* Maintain list of regions for GTCM_SERVER */
-
 void cm_add_gdr_ptr(gd_region *greg)
 {
 	gd_addr	*ga;
@@ -338,7 +324,7 @@ void gd_ht_kill(hash_table_mname *table, boolean_t contents)	/* wipe out the has
 			}
 		}
 	}
-	free((char *)table->base);
+	free_hashtab_mname(table);
 	/* We don't do a free(table) in this generic routine because it is called both by GT.M and GT.CM
 	 * and GT.CM retains the table for reuse while GT.M doesn't. GT.M fgncal_rundown() takes care of
 	 * this by freeing it up explicitly (after a call to ht_kill) in gd_rundown() [dpgbldir.c]

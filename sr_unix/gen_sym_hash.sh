@@ -25,8 +25,12 @@
 # please verify that UNIQ_ENC_PARAM_STRING in gtmcrypt_ref.h
 # and encr_param_string in this module match.
 
+hostos=`uname -s`
 # try to get a predictable which
-if [ -x "/usr/bin/which" ] ; then which=/usr/bin/which ; else which=which ; fi
+if [ "OS/390" = "$hostos" ] ; then which=whence ;
+elif [ -x "/usr/bin/which" ] ; then which=/usr/bin/which
+else which=which
+fi
 
 # temporary file
 if [ -x "`$which mktemp 2>&1`" ] ; then tmp_file=`mktemp`
@@ -37,7 +41,6 @@ trap 'rm -rf $tmp_file ; stty sane ; exit 1' HUP INT QUIT TERM TRAP
 
 ECHO=/bin/echo
 ECHO_OPTIONS=""
-hostos=`uname -s`
 if [ "Linux" = $hostos ] ; then ECHO_OPTIONS="-e" ; encr_param_string="AES256CFB" ;
 elif [ "AIX" = "$hostos" ]; then encr_param_string="BLOWFISHCFB"
 else encr_param_string="AES256CFB"

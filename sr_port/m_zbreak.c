@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #define CANCEL_ONE -1
 #define CANCEL_ALL -2
 
-GBLREF char		window_token;
+GBLREF char		window_token, director_token;
 GBLREF mident		window_ident;
 GBLREF boolean_t	run_time;
 GBLREF mident		routine_name;
@@ -72,7 +72,7 @@ int m_zbreak(void)
 		if (label.oprclass == TRIP_REF && label.oprval.tref->opcode == OC_COMMARG)
 			return TRUE;
 		if (window_token != TK_CIRCUMFLEX)
-		{
+		{	/* Routine not specified, assume current routine */
 			if (!run_time)
 				routine = put_str(routine_name.addr, routine_name.len);
 			else
@@ -82,17 +82,22 @@ int m_zbreak(void)
 			advancewindow();
 			switch(window_token)
 			{
-			case TK_IDENT:
-				routine = put_str(window_ident.addr, window_ident.len);
-				advancewindow();
-				break;
-			case TK_ATSIGN:
-				if (!indirection(&routine))
+				case TK_IDENT:
+#					ifdef GTM_TRIGGER
+					if (TK_HASH == director_token)
+						/* Coagulate tokens as necessary (and available) to allow '#' in the rtn name */
+						advwindw_hash_in_mname_allowed();
+#					endif
+					routine = put_str(window_ident.addr, window_ident.len);
+					advancewindow();
+					break;
+				case TK_ATSIGN:
+					if (!indirection(&routine))
+						return FALSE;
+					break;
+				default:
+					stx_error(ERR_RTNNAME);
 					return FALSE;
-				break;
-			default:
-				stx_error(ERR_RTNNAME);
-				return FALSE;
 			}
 		}
 		if (!cancel && window_token == TK_COLON)

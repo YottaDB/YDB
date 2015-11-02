@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,21 +14,14 @@
 	return < 0 if a < b and > 0 if a > b	*/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 #include "mmemory.h"
 
-int memvcmp(void *a,
-	    int a_len,
-	    void *b,
-	    int b_len)
+int memvcmp(void *a, int a_len, void *b, int b_len)
 {
-	int	i;
+	int	retval;
 
-	if (0 == (i = memcmp(a,b,a_len > b_len ? b_len : a_len)))
-	{	if (b_len > a_len)
-			return -1;
-		else if (a_len > b_len)
-			return 1;
-	}
-	return i;
+	MEMVCMP(a, a_len, b, b_len, retval);
+	return retval;
 }

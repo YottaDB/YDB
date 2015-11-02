@@ -100,10 +100,10 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		return ext_buff;
 	}
 	curr = ext_buff;
-	/* The following assumes the journal extract format is "GDSJEX04". Whenever that changes (in mur_jnl_ext.c),
+	/* The following assumes the journal extract format is "GDSJEX05". Whenever that changes (in mur_jnl_ext.c),
 	 * the below code as well as ext2jnl.c needs to change. Add an assert to let us know of that event.
 	 */
-	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX04"));
+	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX05"));
 	if (IS_TUPD(rectype))
 	{
 		if (FALSE == first_tstart)
@@ -162,6 +162,8 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		GET_SHORTP(curr, &muext_code[MUEXT_ZKILL][0]);
 	else if (IS_ZTWORM(rectype))
 		GET_SHORTP(curr, &muext_code[MUEXT_ZTWORM][0]);
+	else if (IS_ZTRIG(rectype))
+		GET_SHORTP(curr, &muext_code[MUEXT_ZTRIG][0]);
 	else /* if (JRT_NULL == rectype) */
 	{
 		assert(JRT_NULL == rectype);
@@ -184,7 +186,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	}
 	DELIMIT_CURR;
 	/* print "update_num" */
-	assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));
+	assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
 	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
 	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.update_num);
 	DELIMIT_CURR;

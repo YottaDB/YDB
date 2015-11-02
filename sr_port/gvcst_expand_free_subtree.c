@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	inctn_opcode_t		inctn_opcode;
 
@@ -56,7 +56,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 	kill_set		*ks;
     	off_chain		chain;
 	rec_hdr_ptr_t		rp, rp1, rtop;
-	short			save_dollar_tlevel;
+	uint4			save_dollar_tlevel;
 	sm_uc_ptr_t		temp_buff;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -141,14 +141,13 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 						assert(chain.flag || temp_long < csa->ti->total_blks);
 					}
 					gvcst_delete_blk(temp_long, ksb->level - 1, TRUE);
-					if ((1 == ksb->level)  &&  (0 == dollar_tlevel)  &&
-							(0 != cs_data->dsid)  &&  (FALSE == flush_cache))
+					if ((1 == ksb->level) && !dollar_tlevel && cs_data->dsid && !flush_cache)
 						rc_cpt_entry(temp_long);	/* Invalidate single block */
 				}
 				ksb->level = 0;
 			} else
 			{
-				if ((0 == dollar_tlevel)  &&  (0 != cs_data->dsid)  &&  (FALSE == flush_cache))
+				if (!dollar_tlevel && cs_data->dsid && !flush_cache)
 					rc_cpt_entry(ksb->block);
 			}
 		}

@@ -180,7 +180,6 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			(void)tcp_routines.aa_close(lsock);
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
 				   RTS_ERROR_LITERAL("bind()"), CALLFROM, save_errno);
-			assert(FALSE);
 			return -1;
 		}
 		/* establish a queue of length MAX_CONN_PENDING for incoming connections */

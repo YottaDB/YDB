@@ -21,14 +21,18 @@
 #
 #############################################################################################
 
+hostos=`uname -s`
 # try to get a predictable which
-if [ -x "/usr/bin/which" ] ; then which=/usr/bin/which ; else which=which ; fi
+if [ "OS/390" = "$hostos" ] ; then which=whence ;
+elif [ -x "/usr/bin/which" ] ; then which=/usr/bin/which
+else which=which
+fi
 
 # echo and options
 ECHO=/bin/echo
 ECHO_OPTIONS=""
 #Linux honors escape sequence only when run with -e
-if [ "Linux" = "`uname -s`" ] ; then ECHO_OPTIONS="-e" ; fi
+if [ "Linux" = "$hostos" ] ; then ECHO_OPTIONS="-e" ; fi
 
 # Path to key file and email id are required
 if [ $# -lt 2 ]; then

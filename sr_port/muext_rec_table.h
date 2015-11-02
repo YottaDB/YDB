@@ -12,8 +12,9 @@
 /* New entries should be added at the end to maintain backward compatibility with previous journal extract files */
 
 /*
-MUEXT_TABLE_ENTRY (muext_rectype,  code0  code1) : code0 and code1 are the 2-digit journal record type in the journal extract file
-*/
+ * MUEXT_TABLE_ENTRY (muext_rectype,  code0  code1) : code0 and code1 are the 2-digit journal record type
+ * in the journal extract file
+ */
 MUEXT_TABLE_ENTRY (MUEXT_NULL,     '0',	  '0')	/* 00 : NULL       record */
 MUEXT_TABLE_ENTRY (MUEXT_PINI,     '0',	  '1')	/* 01 : PINI       record */
 MUEXT_TABLE_ENTRY (MUEXT_PFIN,     '0',	  '2')	/* 02 : PFIN       record */
@@ -26,3 +27,5 @@ MUEXT_TABLE_ENTRY (MUEXT_TSTART,   '0',	  '8')	/* 08 : TSTART     record */
 MUEXT_TABLE_ENTRY (MUEXT_TCOMMIT,  '0',	  '9')	/* 09 : TCOMMIT    record */
 MUEXT_TABLE_ENTRY (MUEXT_ZKILL,    '1',	  '0')	/* 10 : ZKILL      record */
 MUEXT_TABLE_ENTRY (MUEXT_ZTWORM,   '1',	  '1')	/* 11 : ZTWORMHOLE record */
+MUEXT_TABLE_ENTRY (MUEXT_ZTRIG,	   '1',   '2')  /* 12 : ZTRIGGER   record */
+/* End of table (enforces last record has line end) */

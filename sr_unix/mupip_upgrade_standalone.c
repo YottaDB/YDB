@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 
 #include "gtm_sem.h"
 #include "iosp.h"
+#include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
 #include "ipcrmid.h"
 #include "util.h"

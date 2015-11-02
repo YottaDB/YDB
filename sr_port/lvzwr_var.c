@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,9 +13,7 @@
 
 #include "gtm_stdio.h"
 
-#include "hashtab_mname.h"
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -35,26 +33,30 @@
 #include "follow.h"
 #include "gtm_string.h"
 #include "alias.h"
+#include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
 
 #define eb_less(u, v)    (numcmp(u, v) < 0)
 
-#define COMMON_STR_PROCESSING											\
+#define COMMON_STR_PROCESSING(NODE)										\
 {														\
-	mv.mvtype = MV_STR;											\
-	mv.str.len = 0; /* makes sure stp_gcol() ignores this, in case actual points to this */			\
-	if (local_collseq)											\
+	mstr		key_mstr;										\
+	mval 		tmp_sbs;										\
+														\
+	assert(MV_STR & mv.mvtype);										\
+	if (TREF(local_collseq))										\
 	{													\
-		ALLOC_XFORM_BUFF(&s->str);									\
+		key_mstr = mv.str;										\
+		mv.str.len = 0;	/* protect from "stp_gcol", if zwr_sub->subsc_list[n].actual points to mv */	\
+		ALLOC_XFORM_BUFF(key_mstr.len);									\
 		tmp_sbs.mvtype = MV_STR;									\
-		tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;							\
-		assert(NULL != lcl_coll_xform_buff);								\
-		tmp_sbs.str.addr = lcl_coll_xform_buff;								\
-		do_xform(local_collseq, XBACK, &s->str, &tmp_sbs.str, &length);					\
+		tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);						\
+		assert(NULL != TREF(lcl_coll_xform_buff));							\
+		tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);							\
+		do_xform(TREF(local_collseq), XBACK, &key_mstr, &tmp_sbs.str, &length);				\
 		tmp_sbs.str.len = length;									\
 		s2pool(&(tmp_sbs.str));										\
 		mv.str = tmp_sbs.str;										\
-	} else													\
-		mv.str = s->str;										\
+	}													\
 	do_lev = TRUE;												\
 	if (n < lvzwrite_block->subsc_count)									\
 	{													\
@@ -86,52 +88,52 @@
 		}												\
 	}													\
 	if (do_lev)												\
-		lvzwr_var(s->lv, n + 1);									\
+		lvzwr_var((lv_val *)NODE, n + 1);								\
 }
 
-#define COMMON_NUMERIC_PROCESSING										\
-{														\
-	if (n < lvzwrite_block->subsc_count)									\
-	{													\
-		if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)					\
-		{												\
-			if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))					\
-				do_lev = FALSE;									\
-		} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)					\
-		{												\
-			if (zwr_sub->subsc_list[n].first)							\
-			{											\
-		 		if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first) ||				\
-						eb_less(&mv, zwr_sub->subsc_list[n].first))			\
-					do_lev = FALSE;								\
-			}											\
-			if (do_lev && zwr_sub->subsc_list[n].second)						\
-			{											\
-				if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second) &&				\
-						eb_less(zwr_sub->subsc_list[n].second, &mv))			\
-					do_lev = FALSE;								\
-			}											\
-		}												\
-	}													\
+#define COMMON_NUMERIC_PROCESSING(NODE)								\
+{												\
+	do_lev = TRUE;										\
+	if (n < lvzwrite_block->subsc_count)							\
+	{											\
+		if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)			\
+		{										\
+			if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))			\
+				do_lev = FALSE;							\
+		} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)			\
+		{										\
+			if (zwr_sub->subsc_list[n].first)					\
+			{									\
+		 		if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first)		\
+						|| eb_less(&mv, zwr_sub->subsc_list[n].first))	\
+					do_lev = FALSE;						\
+			}									\
+			if (do_lev && zwr_sub->subsc_list[n].second)				\
+			{									\
+				if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second)		\
+						&& eb_less(zwr_sub->subsc_list[n].second, &mv))	\
+					do_lev = FALSE;						\
+			}									\
+		}										\
+	}											\
+	if (do_lev)										\
+		lvzwr_var((lv_val *)NODE, n + 1);						\
 }
 
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF int4		outofband;
 GBLREF zshow_out	*zwr_output;
-GBLREF collseq  	*local_collseq;
-GBLREF boolean_t 	local_collseq_stdnull;
 GBLREF int		merge_args;
 GBLREF zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
 
+error_def(ERR_UNDEF);
+
+LITREF	mval		literal_null;
+
 void lvzwr_var(lv_val *lv, int4 n)
 {
-	int             length;
-	mval 		tmp_sbs;
 	mval		mv;
-	lv_sbs_tbl	*tbl;
-	sbs_blk		*blk;
-	sbs_flt_struct	*f;
-	sbs_str_struct	*s;
+	int             length;
 	lv_val		*var;
 	char		*top;
 	int4		i;
@@ -139,9 +141,11 @@ void lvzwr_var(lv_val *lv, int4 n)
 	zwr_sub_lst	*zwr_sub;
 	ht_ent_addr	*tabent_addr;
 	zwr_alias_var	*zav, *newzav;
+	tree		*lvt;
+	treeNode	*node, *nullsubsnode, *parent;
+	DCL_THREADGBL_ACCESS;
 
-	error_def	(ERR_UNDEF);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(lvzwrite_block);
 	if (lv == zwr_output->out_var.lv.child)
 		return;
@@ -155,25 +159,25 @@ void lvzwr_var(lv_val *lv, int4 n)
 	zwr_sub->subsc_list[n].actual = (mval *)NULL;
 
 	/* Before we process this var, there are some special cases to check for first when
-	   this is a base var (0 == lvzwrite_block->subsc_count) and the var is an alias.
-
-	   - Check if we have seen it before (the lvval is in the zwr_alias_var hash table), then we
-	     need to process this var with lvzwr_out NOW and we will only be processing the base
-	     var, not any of the subscripts. This is because all those subscripts (and the value
-	     of the base var itself) have been dealt with previously when we first saw this
-	     lvval. So in that case, call lvzwr_out() to output the association after which we are
-	     done with this var.
-	  -  If we haven't seen it before, set a flag so we verify if the base var gets processed by
-	     lvzwr_out or not (i.e. whether it has a value and the "subscript" or lack there of is
-	     either wildcarded or whatever so that it actually gets dumped by lvzwr_out (see conditions
-	     below). If not, then *we* need to add the lvval to the hash table to signify we have seen
-	     it before so the proper associations to this alias var can be printed at a later time
-	     when/if they are encountered.
+	 * this is a base var (0 == lvzwrite_block->subsc_count) and the var is an alias.
+	 *
+	 * - Check if we have seen it before (the lvval is in the zwr_alias_var hash table), then we
+	 *   need to process this var with lvzwr_out NOW and we will only be processing the base
+	 *   var, not any of the subscripts. This is because all those subscripts (and the value
+	 *   of the base var itself) have been dealt with previously when we first saw this
+	 *   lvval. So in that case, call lvzwr_out() to output the association after which we are
+	 *   done with this var.
+	 *-  If we haven't seen it before, set a flag so we verify if the base var gets processed by
+	 *   lvzwr_out or not (i.e. whether it has a value and the "subscript" or lack there of is
+	 *   either wildcarded or whatever so that it actually gets dumped by lvzwr_out (see conditions
+	 *   below). If not, then *we* need to add the lvval to the hash table to signify we have seen
+	 *   it before so the proper associations to this alias var can be printed at a later time
+	 *   when/if they are encountered.
 	*/
 	verify_hash_add = FALSE;	/* By default we don't need to verify add */
 	value_printed_pending = FALSE;	/* Force the "value_printed" flag on if TRUE */
 	zav = NULL;
-	if (!merge_args && IS_ALIASLV(lv))
+	if (!merge_args && LV_IS_BASE_VAR(lv) && IS_ALIASLV(lv))
 	{
 		assert(0 == n);	/* Verify base var lv_val */
 		if (tabent_addr = (ht_ent_addr *)lookup_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lv))
@@ -190,7 +194,6 @@ void lvzwr_var(lv_val *lv, int4 n)
 		} else
 			verify_hash_add = TRUE;
 	}
-
 	if ((0 == lvzwrite_block->subsc_count) && (0 == n))
 		zwr_sub->subsc_list[n].subsc_type = ZWRITE_ASTERISK;
 	if (MV_DEFINED(&(lv->v))
@@ -245,65 +248,36 @@ void lvzwr_var(lv_val *lv, int4 n)
 				rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
 			}
 		}
-	} else  if (tbl = lv->ptrs.val_ent.children)
+	} else  if (lvt = LV_GET_CHILD(lv))
 	{
 		zwr_sub->subsc_list[n].actual = &mv;
-		if (local_collseq_stdnull)
+		/* In case of standard null collation, first process null subscript if it exists */
+		if (TREF(local_collseq_stdnull))
 		{
-			if (tbl->str && 0 == tbl->str->ptr.sbs_str[0].str.len)
-			{	/* Process null subscript first */
-				s = &tbl->str->ptr.sbs_str[0];
-				COMMON_STR_PROCESSING;
-			}
-		}
-		/** processing order of numeric subscripts are same for both GT.M collation and standard collation ***/
-		mv.mvtype = 0; /* Make sure stp_gcol() ignores zwr_sub->subsc_list[n].actual for now */
-		if (tbl->int_flag)
-		{
-			blk = tbl->num;
-			for (i = 0; i < SBS_NUM_INT_ELE; i++)
+			nullsubsnode = lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &parent);
+			if (NULL != nullsubsnode)
 			{
-				if (blk->ptr.lv[i])
-				{
-					MV_FORCE_MVAL(&mv, i);
-					do_lev = TRUE;
-					COMMON_NUMERIC_PROCESSING;
-					if (do_lev)
-						lvzwr_var(blk->ptr.lv[i], n + 1);
-				}
+				assert(MVTYPE_IS_STRING(nullsubsnode->key_mvtype) && !nullsubsnode->key_len);
+				/* Process null subscript first */
+				LV_STR_NODE_GET_KEY(nullsubsnode, &mv); /* Get node key into "mv" */
+				COMMON_STR_PROCESSING(nullsubsnode);
 			}
 		} else
+			nullsubsnode = NULL;
+		for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
 		{
-			for (blk = tbl->num; blk; blk = blk->nxt)
+			if (node == nullsubsnode)
 			{
-				for (f = &blk->ptr.sbs_flt[0], top = (char*)(f + blk->cnt); f < (sbs_flt_struct *)top; f++)
-				{
-					MV_ASGN_FLT2MVAL(mv, f->flt);
-					do_lev = TRUE;
-					COMMON_NUMERIC_PROCESSING;
-					if (do_lev)
-						lvzwr_var(f->lv, n + 1);
-				}
+				assert(TREF(local_collseq_stdnull));
+				continue;	/* skip null subscript as it has already been processed */
 			}
-		}
-
-		mv.mvtype = MV_STR;
-		/* For standard collation, if there is any null subscripts we have already processed that */
-		if (blk = tbl->str) /* CAUTION: assignment */
-		{
-			s = &blk->ptr.sbs_str[0];
-			if (0 == s->str.len && local_collseq_stdnull)
-				s++;
-			for(;;)
-			{
-				for (top = (char *)(&blk->ptr.sbs_str[0] + blk->cnt); s < (sbs_str_struct *)top; s++)
-				{
-					COMMON_STR_PROCESSING;
-				}
-				if (blk = blk->nxt) /* CAUTION: assignment */
-					s = &blk->ptr.sbs_str[0];
-				else
-					break;
+			LV_NODE_GET_KEY(node, &mv); /* Get node key into "mv" depending on the structure type of "node" */
+			if (!MVTYPE_IS_STRING(mv.mvtype))
+			{	/* "node" is of type "treeNodeFlt *" */
+				COMMON_NUMERIC_PROCESSING(node);
+			} else
+			{	/* "node" is of type "treeNode *" */
+				COMMON_STR_PROCESSING(node);
 			}
 		}
 		zwr_sub->subsc_list[n].actual = (mval *)NULL;

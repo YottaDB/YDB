@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,15 +16,15 @@
 #include "toktyp.h"
 #include "mdq.h"
 
-GBLREF bool	shift_gvrefs;
-GBLREF char	window_token;
-GBLREF triple	*expr_start;
+GBLREF char		window_token;
 
 int f_query ( oprtype *a, opctype op)
 {
 	triple		*oldchain, tmpchain, *r, *r0, *r1, *triptr;
 	error_def	(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (window_token == TK_IDENT)
 	{
 		if (!lvn (a, OC_FNQUERY, 0))
@@ -49,8 +49,7 @@ int f_query ( oprtype *a, opctype op)
 			r1->operand[1] = a->oprval.tref->operand[1];
 			a->oprval.tref->operand[1] = put_tref (r1);
 			dqins (a->oprval.tref->exorder.fl, exorder, r1);
-		}
-		else
+		} else
 		{
 			assert (a->oprval.tref->opcode == OC_VAR);
 			r0 = newtriple (OC_FNQUERY);
@@ -62,11 +61,10 @@ int f_query ( oprtype *a, opctype op)
 			r1->operand[1] = *a;
 			*a = put_tref (r0);
 		}
-	}
-	else
+	} else
 	{
-	r = maketriple(op);
-	switch (window_token)
+		r = maketriple(op);
+		switch (window_token)
 	{
 	case TK_CIRCUMFLEX:
 		if (!gvn())
@@ -75,7 +73,7 @@ int f_query ( oprtype *a, opctype op)
 		ins_triple(r);
 		break;
 	case TK_ATSIGN:
-		if (shift_gvrefs)
+		if (TREF(shift_side_effects))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);
@@ -84,20 +82,19 @@ int f_query ( oprtype *a, opctype op)
 				setcurtchain(oldchain);
 				return FALSE;
 			}
-			r->operand[1] = put_ilit((mint) indir_fnquery);
+			r->operand[1] = put_ilit((mint)indir_fnquery);
 			ins_triple(r);
 			newtriple(OC_GVSAVTARG);
 			setcurtchain(oldchain);
-			dqadd(expr_start, &tmpchain, exorder);
-			expr_start = tmpchain.exorder.bl;
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
-		}
-		else
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		} else
 		{
 			if (!indirection(&(r->operand[0])))
 				return FALSE;
-			r->operand[1] = put_ilit((mint) indir_fnquery);
+			r->operand[1] = put_ilit((mint)indir_fnquery);
 			ins_triple(r);
 		}
 		r->opcode = OC_INDFUN;

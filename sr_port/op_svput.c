@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,11 +44,13 @@
 #include "gtm_newintrinsic.h"
 #include "filestruct.h"		/* needed for jnl.h */
 #include "jnl.h"
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#endif
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
-GBLREF gd_addr		*gd_targ_addr;
 GBLREF gd_binding	*gd_map;
 GBLREF gd_binding	*gd_map_top;
 GBLREF io_pair		io_curr_device;
@@ -56,8 +58,6 @@ GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zgbldir;
 GBLREF mval		dollar_zstep;
-GBLREF mstr		dollar_zcompile;
-GBLREF mstr		dollar_zroutines;
 GBLREF mval		dollar_zsource;
 GBLREF int		dollar_zmaxtptime;
 GBLREF int		ztrap_form;
@@ -69,35 +69,42 @@ GBLREF mval		dollar_zinterrupt;
 GBLREF boolean_t	ztrap_new;
 GBLREF stack_frame	*error_frame;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
-GBLREF int4		zdate_form;
 GBLREF mval		dollar_ztexit;
 GBLREF boolean_t	dollar_ztexit_bool;
 GBLREF boolean_t	dollar_zquit_anyway;
 #ifdef GTM_TRIGGER
 GBLREF mval		*dollar_ztvalue;
 GBLREF boolean_t	*ztvalue_changed_ptr;
+GBLREF mval		*dollar_ztriggerop;
 GBLREF mval		dollar_ztwormhole;
 GBLREF mval		dollar_ztslate;
 GBLREF int4		gtm_trigger_depth;
 GBLREF int4		tstart_trigger_depth;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 #endif
-GBLREF char		prombuf[MAX_MIDENT_LEN];
-GBLREF mstr		gtmprompt;
+
+#ifdef GTM_TRIGGER
+LITREF mval		gvtr_cmd_mval[GVTR_CMDTYPES];
+#endif
+
+#define SIZEOF_prombuf ggl_prombuf
+
+error_def(ERR_INVECODEVAL);
+error_def(ERR_NOZTRAPINTRIG);
+error_def(ERR_SETECODE);
+error_def(ERR_SETINSETTRIGONLY);
+error_def(ERR_SETINTRIGONLY);
+error_def(ERR_SYSTEMVALUE);
+error_def(ERR_UNIMPLOP);
+error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
 	int	i, ok, state;
 	char	*vptr;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_INVECODEVAL);
-	error_def(ERR_SETECODE);
-	error_def(ERR_SYSTEMVALUE);
-	error_def(ERR_SETINTRIGONLY);
-	error_def(ERR_ZTWORMHOLE2BIG);
-	error_def(ERR_NOZTRAPINTRIG);
-	error_def(ERR_UNIMPLOP);
-
+	SETUP_THREADGBL_ACCESS;
 	switch (varnum)
 	{
 		case SV_X:
@@ -114,11 +121,11 @@ void op_svput(int varnum, mval *v)
 			break;
 		case SV_ZCOMPILE:
 			MV_FORCE_STR(v);
-			if (dollar_zcompile.addr)
-				free (dollar_zcompile.addr);
-			dollar_zcompile.addr = (char *)malloc(v->str.len);
-			memcpy (dollar_zcompile.addr, v->str.addr, v->str.len);
-			dollar_zcompile.len = v->str.len;
+			if ((TREF(dollar_zcompile)).addr)
+				free ((TREF(dollar_zcompile)).addr);
+			(TREF(dollar_zcompile)).addr = (char *)malloc(v->str.len);
+			memcpy((TREF(dollar_zcompile)).addr, v->str.addr, v->str.len);
+			(TREF(dollar_zcompile)).len = v->str.len;
 			break;
 		case SV_ZSTEP:
 			MV_FORCE_STR(v);
@@ -163,14 +170,15 @@ void op_svput(int varnum, mval *v)
 			/* The string(v) should be parsed and loaded before setting $zroutines
 			 * to retain the old value in case errors occur while loading */
 			zro_load(&v->str);
-			if (dollar_zroutines.addr)
-				free (dollar_zroutines.addr);
-			dollar_zroutines.addr = (char *)malloc(v->str.len);
-			memcpy (dollar_zroutines.addr, v->str.addr, v->str.len);
-			dollar_zroutines.len = v->str.len;
+			if ((TREF(dollar_zroutines)).addr)
+				free ((TREF(dollar_zroutines)).addr);
+			(TREF(dollar_zroutines)).addr = (char *)malloc(v->str.len);
+			memcpy((TREF(dollar_zroutines)).addr, v->str.addr, v->str.len);
+			(TREF(dollar_zroutines)).len = v->str.len;
 			break;
 		case SV_ZSOURCE:
 			MV_FORCE_STR(v);
+			dollar_zsource.mvtype = MV_STR;
 			dollar_zsource.str = v->str;
 			break;
 		case SV_ZTRAP:
@@ -206,19 +214,20 @@ void op_svput(int varnum, mval *v)
 		case SV_PROMPT:
 			MV_FORCE_STR(v);
 			MV_FORCE_LEN_STRICT(v); /* Ensure that direct mode prompt will not have BADCHARs,
-						   otherwise the BADCHAR error may fill up the filesystem */
-			if (v->str.len <= SIZEOF(prombuf))
-				gtmprompt.len = v->str.len;
+						 * otherwise the BADCHAR error may fill up the filesystem
+						 */
+			if (v->str.len <= SIZEOF_prombuf)
+				(TREF(gtmprompt)).len = v->str.len;
 			else if (!gtm_utf8_mode)
-				gtmprompt.len = SIZEOF(prombuf);
-#ifdef UNICODE_SUPPORTED
+				(TREF(gtmprompt)).len = SIZEOF_prombuf;
+#			ifdef UNICODE_SUPPORTED
 			else
 			{
-				UTF8_LEADING_BYTE(v->str.addr + SIZEOF(prombuf), v->str.addr, vptr);
-				gtmprompt.len = INTCAST(vptr - v->str.addr);
+				UTF8_LEADING_BYTE(v->str.addr + SIZEOF_prombuf, v->str.addr, vptr);
+				(TREF(gtmprompt)).len = INTCAST(vptr - v->str.addr);
 			}
-#endif
-			memcpy(gtmprompt.addr, v->str.addr, gtmprompt.len);
+#			endif
+			memcpy((TREF(gtmprompt)).addr, v->str.addr, (TREF(gtmprompt)).len);
 			break;
 		case SV_ECODE:
 			MV_FORCE_STR(v);
@@ -295,8 +304,8 @@ void op_svput(int varnum, mval *v)
 			rts_error(VARLSTCNT(4) ERR_SYSTEMVALUE, 2, v->str.len, v->str.addr);
 			break;
 		case SV_ZDIR:
-			setzdir(v, NULL); /* change directory to v */
-			getzdir(); /* update dollar_zdir with current working directory */
+			setzdir(v, NULL); 	/* change directory to v */
+			getzdir(); 		/* update dollar_zdir with current working directory */
 			break;
 		case SV_ZINTERRUPT:
 			MV_FORCE_STR(v);
@@ -305,7 +314,7 @@ void op_svput(int varnum, mval *v)
 			break;
 		case SV_ZDATE_FORM:
 			MV_FORCE_NUM(v);
-			zdate_form = (short)MV_FORCE_INT(v);
+			TREF(zdate_form) = (short)MV_FORCE_INT(v);
 			break;
 		case SV_ZTEXIT:
 			MV_FORCE_STR(v);
@@ -313,7 +322,8 @@ void op_svput(int varnum, mval *v)
 			dollar_ztexit.str = v->str;
 			/* Coercing $ZTEXIT to boolean at SET command is more efficient than coercing before each
 			 * rethrow at TR/TRO. Since we want to maintain dollar_ztexit as a string, coercion should
-			 * not be performed on dollar_ztext, but on a temporary (i.e. parameter v) */
+			 * not be performed on dollar_ztext, but on a temporary (i.e. parameter v)
+			 */
 			dollar_ztexit_bool = MV_FORCE_BOOL(v);
 			break;
 		case SV_ZQUIT:
@@ -324,6 +334,8 @@ void op_svput(int varnum, mval *v)
 			assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
 			if (!dollar_tlevel || (tstart_trigger_depth == gtm_trigger_depth))
 				rts_error(VARLSTCNT(4) ERR_SETINTRIGONLY, 2, RTS_ERROR_TEXT("$ZTVALUE"));
+			if (dollar_ztriggerop != &gvtr_cmd_mval[GVTR_CMDTYPE_SET])
+				rts_error(VARLSTCNT(4) ERR_SETINSETTRIGONLY, 2, RTS_ERROR_TEXT("$ZTVALUE"));
 			assert(0 < gtm_trigger_depth);
 			memcpy(dollar_ztvalue, v, SIZEOF(mval));
 			dollar_ztvalue->mvtype &= ~MV_ALIASCONT;	/* Make sure to shut off alias container flag on copy */
@@ -340,7 +352,7 @@ void op_svput(int varnum, mval *v)
 			assert(MAX_ZTWORMHOLE_SIZE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));
 			if (MAX_ZTWORMHOLE_SIZE < v->str.len)
 				rts_error(VARLSTCNT(4) ERR_ZTWORMHOLE2BIG, 2, v->str.len, MAX_ZTWORMHOLE_SIZE);
-			assert(MV_STR & dollar_ztwormhole.mvtype);
+			dollar_ztwormhole.mvtype = MV_STR;
 			dollar_ztwormhole.str = v->str;
 			break;
 #			else
@@ -352,8 +364,9 @@ void op_svput(int varnum, mval *v)
 			if (!dollar_tlevel || (tstart_trigger_depth == gtm_trigger_depth))
 				rts_error(VARLSTCNT(4) ERR_SETINTRIGONLY, 2, RTS_ERROR_TEXT("$ZTSLATE"));
 			assert(0 < gtm_trigger_depth);
+			MV_FORCE_DEFINED(v);
 			memcpy((char *)&dollar_ztslate, v, SIZEOF(mval));
-			dollar_ztvalue->mvtype &= ~MV_ALIASCONT;	/* Make sure to shut off alias container flag on copy */
+			dollar_ztslate.mvtype &= ~MV_ALIASCONT;	/* Make sure to shut off alias container flag on copy */
 			break;
 #			else
 			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);

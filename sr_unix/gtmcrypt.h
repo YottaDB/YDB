@@ -103,7 +103,7 @@ void gtmcrypt_entry(void);
 #define GC_GTM_PUTMSG(err_id, FNAME)												\
 {																\
 	char 		*err;													\
-	GBLREF char	dl_err[1024];												\
+	GBLREF char	dl_err[];												\
 																\
 	error_def(ERR_CRYPTKEYFETCHFAILED);											\
 	error_def(ERR_CRYPTKEYFETCHFAILEDNF);											\
@@ -131,7 +131,7 @@ void gtmcrypt_entry(void);
 #define GC_RTS_ERROR(err_id, FNAME)												\
 {																\
 	char 		*err;													\
-	GBLREF char	dl_err[1024];												\
+	GBLREF char	dl_err[];												\
 																\
 	error_def(ERR_CRYPTKEYFETCHFAILED);											\
 	error_def(ERR_CRYPTKEYFETCHFAILEDNF);											\
@@ -210,7 +210,7 @@ void gtmcrypt_entry(void);
 #define INIT_DB_ENCRYPTION(fname, CSA, CSD, RC)											\
 {																\
 	GBLREF stack_frame		*frame_pointer;										\
-	GBLREF short			dollar_tlevel;										\
+	GBLREF uint4			dollar_tlevel;										\
 	char 				*ptr, *key_hash = CSD->encryption_hash;							\
 	boolean_t			call_ci_ret_code_quit = FALSE, prompt_passwd = FALSE;					\
 																\
@@ -219,7 +219,7 @@ void gtmcrypt_entry(void);
 	/* If we are in a TP transaction and the environment is setup in such a way that we will be doing a gtm_ci call 	\
 	 * then let's error out as gtm_ci doesn't work inside a TP transaction */						\
 	prompt_passwd = PROMPT_PASSWD;												\
-	if (prompt_passwd && 0 < dollar_tlevel)											\
+	if (prompt_passwd && dollar_tlevel)											\
 		rts_error(VARLSTCNT(1) ERR_CRYPTNOPSWDINTP);									\
 	/* Make sure we are not in gtm_ci already. */										\
 	assert(!IS_MUMPS_IMAGE || !(frame_pointer->flags & SFF_CI));								\
@@ -255,7 +255,7 @@ void gtmcrypt_entry(void);
 {																\
 	GBLREF int4			gbl_encryption_ecode;									\
 	GBLREF stack_frame		*frame_pointer;										\
-	GBLREF short			dollar_tlevel;										\
+	GBLREF uint4			dollar_tlevel;										\
 	boolean_t			call_ci_ret_code_quit = FALSE, prompt_passwd = FALSE;					\
 																\
 	error_def(ERR_CRYPTNOPSWDINTP);												\
@@ -278,7 +278,7 @@ void gtmcrypt_entry(void);
 			/* If we are in a TP transaction and the environment is setup in such a way that we will be doing a 	\
 			 * gtm_ci call then let's error out as gtm_ci doesn't work inside a TP transaction */			\
 			prompt_passwd = PROMPT_PASSWD;										\
-			if (prompt_passwd && (0 < dollar_tlevel))								\
+			if (prompt_passwd && dollar_tlevel)								\
 				rts_error(VARLSTCNT(1) ERR_CRYPTNOPSWDINTP);							\
 			/* Make sure we are not in gtm_ci already. */								\
 			assert(!IS_MUMPS_IMAGE || !(frame_pointer->flags & SFF_CI));						\
@@ -385,7 +385,6 @@ void gtmcrypt_entry(void);
 	xc_string_t		unencrypted_block, encrypted_block;								\
 	xc_status_t		status;												\
 	int             	save_fast_lock_count;										\
-	intrpt_state_t		save_intrpt_ok_state;										\
 	GBLREF int4		gbl_encryption_ecode;										\
 																\
 	RC = gbl_encryption_ecode;												\
@@ -395,14 +394,14 @@ void gtmcrypt_entry(void);
 		PACKAGE_XCSTRING(encrypted_block, outbuf, inbuf_len);								\
 		assert(NULL != gtmcrypt_encode_fnptr); 										\
 		save_fast_lock_count = fast_lock_count;										\
-		SAVE_INTRPT_OK_STATE(INTRPT_IN_CRYPT_SECTION);									\
+		DEFER_INTERRUPTS(INTRPT_IN_CRYPT_SECTION);									\
 		fast_lock_count++;												\
 		status = (*gtmcrypt_encode_fnptr)(key_handle,									\
 						&unencrypted_block,								\
 						&encrypted_block);								\
+		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION);									\
 		GC_MARK_STATUS(status, RC, ERR_CRYPTOPFAILED);									\
 		fast_lock_count = save_fast_lock_count;										\
-		RESTORE_INTRPT_OK_STATE;											\
 	}															\
 }
 
@@ -412,7 +411,6 @@ void gtmcrypt_entry(void);
 	xc_string_t		unencrypted_block, encrypted_block;								\
 	xc_status_t		status;												\
 	int             	save_fast_lock_count;										\
-	intrpt_state_t		save_intrpt_ok_state;										\
 	GBLREF int4		gbl_encryption_ecode;										\
 																\
 	RC = gbl_encryption_ecode;												\
@@ -422,14 +420,14 @@ void gtmcrypt_entry(void);
 		PACKAGE_XCSTRING(unencrypted_block, outbuf, inbuf_len);								\
 		assert(NULL != gtmcrypt_decode_fnptr); 										\
 		save_fast_lock_count = fast_lock_count;										\
-		SAVE_INTRPT_OK_STATE(INTRPT_IN_CRYPT_SECTION);									\
 		fast_lock_count++;												\
+		DEFER_INTERRUPTS(INTRPT_IN_CRYPT_SECTION);									\
 		status = (*gtmcrypt_decode_fnptr)(key_handle,									\
 						&encrypted_block,								\
 						&unencrypted_block);								\
+		ENABLE_INTERRUPTS(INTRPT_IN_CRYPT_SECTION);									\
 		GC_MARK_STATUS(status, RC, ERR_CRYPTOPFAILED);									\
 		fast_lock_count = save_fast_lock_count;										\
-		RESTORE_INTRPT_OK_STATE;											\
 	}															\
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,6 @@
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "gvsub2str.h"			/* for COPY_SUBS_TO_GVCURRKEY */
 #include "format_targ_key.h"		/* for COPY_SUBS_TO_GVCURRKEY */
-#include "hashtab.h"			/* for STR_HASH (in COMPUTE_HASH_MNAME)*/
 #include "targ_alloc.h"			/* for SETUP_TRIGGER_GLOBAL & SWITCH_TO_DEFAULT_REGION */
 #include "hashtab_str.h"
 #include "trigger_delete_protos.h"
@@ -51,30 +50,41 @@ GBLREF	gv_key			*gv_currkey;
 GBLREF	gd_addr			*gd_header;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gv_namehead		*gv_target;
+GBLREF	boolean_t		dollar_ztrigger_invoked;
+GBLREF	gv_namehead		*gv_target_list;
+GBLREF	trans_num		local_tn;
 
 LITREF	mval			literal_hasht;
+LITREF	char 			*trigger_subs[];
+
+error_def(ERR_TRIGDEFBAD);
+error_def(ERR_TRIGMODINTP);
+error_def(ERR_TRIGNAMBAD);
 
 #define MAX_CMD_LEN		20	/* Plenty of room for S,K,ZK,ZTK */
 
-#define SEARCH_AND_KILL_BY_HASH(TMP_STR, LEN, HASH_VAL, INDEX)									\
+#define SEARCH_AND_KILL_BY_HASH(TRIGVN, TRIGVN_LEN, HASH, TRIG_INDEX)								\
 {																\
-	int			hash_index;											\
 	mval			mv_hash_indx;											\
 	mval			mv_hash_val;											\
-	int			trig_index;											\
+	int			hash_index;											\
 																\
-	if (search_triggers(TMP_STR, LEN, HASH_VAL, &hash_index, &trig_index, INDEX))						\
+	if (search_trigger_hash(TRIGVN, TRIGVN_LEN, HASH, TRIG_INDEX, &hash_index)) 						\
 	{															\
-		MV_FORCE_UMVAL(&mv_hash_val, HASH_VAL);										\
+		MV_FORCE_UMVAL(&mv_hash_val, HASH->hash_code);									\
 		MV_FORCE_MVAL(&mv_hash_indx, hash_index);									\
 		BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash_val, mv_hash_indx);	\
 		gvcst_kill(FALSE);												\
 	} else															\
+	{	/* There has to be a #TRHASH entry */										\
 		assert(FALSE);													\
+		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, TRIGVN_LEN, TRIGVN, LEN_AND_LIT("\"#TRHASH\""), HASH->str.len,	\
+			HASH->str.addr);											\
+	}															\
 }
 
-STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **values, uint4 *value_len, uint4 set_hash,
-				      uint4 kill_hash, boolean_t del_kill_hash, int match_index)
+STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **values, uint4 *value_len, stringkey *set_hash,
+		stringkey *kill_hash, boolean_t del_kill_hash, int match_index)
 {
 	sgmnt_addrs		*csa;
 	uint4			len;
@@ -83,26 +93,21 @@ STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **value
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
-	char			tmp_str[MAX_HASH_INDEX_LEN + 1 + MAX_DIGITS_IN_INT];
 	mstr			trigger_key;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	assert(0 != gv_target->root);
-	trigger_key.addr = tmp_str;
 	if (NULL != strchr(values[CMD_SUB], 'S'))
 	{
-		trigger_key.len = MAX_HASH_INDEX_LEN + 1 + MAX_DIGITS_IN_INT;
-		build_set_cmp_str(trigvn, trigvn_len, values, value_len, &trigger_key);
-		SEARCH_AND_KILL_BY_HASH(tmp_str, trigger_key.len, set_hash, match_index);
+		SEARCH_AND_KILL_BY_HASH(trigvn, trigvn_len, set_hash, match_index)
 	}
 	if (del_kill_hash)
 	{
-		trigger_key.len = MAX_HASH_INDEX_LEN + 1 + MAX_DIGITS_IN_INT;
-		build_kill_cmp_str(trigvn, trigvn_len, values, value_len, &trigger_key);
-		SEARCH_AND_KILL_BY_HASH(tmp_str, trigger_key.len, kill_hash, match_index);
+		SEARCH_AND_KILL_BY_HASH(trigvn, trigvn_len, kill_hash, match_index);
 	}
-	TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
 	RESTORE_TRIGGER_REGION_INFO;
 }
 
@@ -111,7 +116,6 @@ STATICFNDEF void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigge
 	sgmnt_addrs		*csa;
 	mname_entry		gvent;
 	gv_namehead		*hasht_tree;
-	char			*ptr1;
 	int4			result;
 	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	char			save_altkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
@@ -127,48 +131,54 @@ STATICFNDEF void cleanup_trigger_name(char *trigvn, int trigvn_len, char *trigge
 	mval			*val_ptr;
 	char			val_str[MAX_DIGITS_IN_INT + 1];
 	int			var_count;
+	boolean_t		is_auto_name;
+	DCL_THREADGBL_ACCESS;
 
-	used_trigvn_len = MIN(trigvn_len, MAX_AUTO_TRIGNAME_LEN);
-	if (trigger_user_name(trigger_name, trigger_name_len) || (MAX_AUTO_TRIGNAME_LEN >= trigvn_len))
-	{
-		used_trigvn_len = trigger_name_len - 1;
-		memcpy(trunc_name, trigger_name, used_trigvn_len);
-	} else
+	SETUP_THREADGBL_ACCESS;
+	/* assume user defined name or auto gen name whose GVN < 21 chars */
+	is_auto_name = FALSE;
+	if (!trigger_user_name(trigger_name, trigger_name_len))
+	{	/* auto gen name uses #TNCOUNT and #SEQNO under #TNAME */
+		is_auto_name = TRUE;
+		used_trigvn_len = MIN(trigvn_len, MAX_AUTO_TRIGNAME_LEN);
 		memcpy(trunc_name, trigvn, used_trigvn_len);
+	}
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	if (0 != gv_target->root)
 	{
-		BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trunc_name,
-						used_trigvn_len, LITERAL_HASHTNCOUNT, STRLEN(LITERAL_HASHTNCOUNT));
-		if (gvcst_get(&val))
+		if (is_auto_name)
 		{
-			val_ptr = &val;
-			var_count = MV_FORCE_INT(val_ptr);
-			if (1 == var_count)
-			{
-				BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trunc_name,
-							    used_trigvn_len);
-				gvcst_kill(TRUE);
-			} else
-			{
-				var_count--;
-				MV_FORCE_MVAL(&val, var_count);
-				SET_TRIGGER_GLOBAL_SUB_SUB_MVAL(trunc_name, used_trigvn_len, LITERAL_HASHTNCOUNT,
-								STRLEN(LITERAL_HASHTNCOUNT), val, result);
-				assert(PUT_SUCCESS == result);		/* The count size can only decrease */
+			/* $get(^#t("#TNAME",<trunc_name>,"#TNCOUNT")) */
+			BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trunc_name,
+							used_trigvn_len, LITERAL_HASHTNCOUNT, STRLEN(LITERAL_HASHTNCOUNT));
+			if (gvcst_get(&val))
+			{	 /* only long autogenerated names have a #TNCOUNT entry */
+				val_ptr = &val;
+				var_count = MV_FORCE_INT(val_ptr);
+				if (1 == var_count)
+				{
+					/* kill ^#t("#TNAME",<trunc_name>) to kill #TNCOUNT and #SEQNO */
+					BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trunc_name,
+								    used_trigvn_len);
+					gvcst_kill(TRUE);
+				} else
+				{
+					var_count--;
+					MV_FORCE_MVAL(&val, var_count);
+					/* set ^#t("#TNAME",GVN,"#TNCOUNT")=var_count */
+					SET_TRIGGER_GLOBAL_SUB_SUB_SUB_MVAL(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME),
+									trunc_name, used_trigvn_len, LITERAL_HASHTNCOUNT,
+									STRLEN(LITERAL_HASHTNCOUNT), val, result);
+					assert(PUT_SUCCESS == result);		/* The count size can only decrease */
+				}
 			}
-			BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trigger_name,
-						    trigger_name_len - 1);
-			gvcst_kill(TRUE);
-		} else
-		{	/* User supplied and short autogenerated names won't have a #TNCOUNT entry, so delete name entry */
-			BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trunc_name,
-						    used_trigvn_len);
-			gvcst_kill(FALSE);
 		}
+		/* kill ^#t("#TNAME",<trigger_name>,:) or zkill ^#t("#TNAME",<trigger_name>) if is_auto_name==FALSE */
+		BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trigger_name,
+					    trigger_name_len - 1);
+		gvcst_kill(is_auto_name);
 	}
-	TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
 	RESTORE_TRIGGER_REGION_INFO;
 }
 
@@ -189,15 +199,21 @@ STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int 
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
 	mval			trig_gbl;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (MAX_AUTO_TRIGNAME_LEN < trigvn_len)
 		return PUT_SUCCESS;
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	assert(0 != gv_target->root);
+	/* $get(^#t("#TNAME",^#t(GVN,index,"#TRIGNAME")) */
 	BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1);
 	if (!gvcst_get(&trig_gbl))
+	{	/* There has to be a #TNAME entry */
 		assert(FALSE);
+		rts_error(VARLSTCNT(6) ERR_TRIGNAMBAD, 4, LEN_AND_LIT("\"#TNAME\""), trig_name_len - 1, trig_name);
+	}
 	len = STRLEN(trig_gbl.str.addr) + 1;
 	assert(MAX_MIDENT_LEN >= len);
 	memcpy(name_and_index, trig_gbl.str.addr, len);
@@ -205,28 +221,15 @@ STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int 
 	num_len = 0;
 	I2A(ptr, num_len, new_trig_index);
 	len += num_len;
-	if (!trigger_user_name(trig_name, trig_name_len))
-	{
-		assert(MAX_TRIGNAME_LEN >= trig_name_len);
-		memcpy(new_trig_name, trig_name, trig_name_len);
-		ptr = strchr(new_trig_name, TRIGNAME_SEQ_DELIM) + 1;
-		assert(NULL != ptr);
-		num_len = 0;
-		I2A(ptr, num_len, new_trig_index);
-		SET_TRIGGER_GLOBAL_SUB_SUB_STR(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), new_trig_name,
-			(int)((ptr + num_len) - new_trig_name), name_and_index, len, result);
-	} else
-	{
-		SET_TRIGGER_GLOBAL_SUB_SUB_STR(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1,
-			name_and_index, len, result);
-	}
-	TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
+	/* set ^#t(GVN,index,"#TRIGNAME")=trig_name $C(0) new_trig_index */
+	SET_TRIGGER_GLOBAL_SUB_SUB_STR(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name, trig_name_len - 1,
+		name_and_index, len, result);
 	RESTORE_TRIGGER_REGION_INFO;
 	return result;
 }
 
-STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **values, uint4 *value_len, uint4 set_hash,
-					   uint4 kill_hash, int old_trig_index, int new_trig_index)
+STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **values, uint4 *value_len, stringkey *set_hash,
+					   stringkey *kill_hash, int old_trig_index, int new_trig_index)
 {
 	sgmnt_addrs		*csa;
 	int			hash_index;
@@ -242,71 +245,80 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
-	char			tmp_str[MAX_HASH_INDEX_LEN + 1 + MAX_DIGITS_IN_INT];
-	int			trig_index;
-	mstr			trigger_key;
+	char			tmp_str[MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	SAVE_TRIGGER_REGION_INFO;
 	SWITCH_TO_DEFAULT_REGION;
 	assert(0 != gv_target->root);
 	if (NULL != strchr(values[CMD_SUB], 'S'))
 	{
-		trigger_key.addr = tmp_str;
-		trigger_key.len = MAX_HASH_INDEX_LEN + 1 + MAX_DIGITS_IN_INT;
-		build_set_cmp_str(trigvn, trigvn_len, values, value_len, &trigger_key);
-		len = trigger_key.len;
-		if (search_triggers(tmp_str, len, set_hash, &hash_index, &trig_index, 0))
+		if (search_trigger_hash(trigvn, trigvn_len, set_hash, old_trig_index, &hash_index))
 		{
-			len++;
-			assert(trig_index == old_trig_index);
-			MV_FORCE_UMVAL(&mv_hash, set_hash);
+			MV_FORCE_UMVAL(&mv_hash, set_hash->hash_code);
 			MV_FORCE_MVAL(&mv_hash_indx, hash_index);
 			BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx);
 			if (!gvcst_get(&key_val))
+			{	/* There has to be a #TRHASH entry */
 				assert(FALSE);
-			ptr = key_val.str.addr + len;
+				rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""),
+					set_hash->str.len, set_hash->str.addr);
+			}
+			assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
+			len = STRLEN(key_val.str.addr);
+			memcpy(tmp_str, key_val.str.addr, len);
+			ptr = tmp_str + len;
+			*ptr++ = '\0';
 			num_len = 0;
 			I2A(ptr, num_len, new_trig_index);
-			len += num_len;
+			len += num_len + 1;
 			SET_TRIGGER_GLOBAL_SUB_MSUB_MSUB_STR(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx,
-				key_val.str.addr, len, result);
+				tmp_str, len, result);
 			if (PUT_SUCCESS != result)
 			{
-				TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
 				RESTORE_TRIGGER_REGION_INFO;
 				return result;
 			}
 		} else
+		{	/* There has to be an entry with the old hash value, we just looked it up */
 			assert(FALSE);
+			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""),
+				set_hash->str.len, set_hash->str.addr);
+		}
 	}
-	trigger_key.addr = tmp_str;
-	trigger_key.len = MAX_HASH_INDEX_LEN + 1 + MAX_DIGITS_IN_INT;
-	build_kill_cmp_str(trigvn, trigvn_len, values, value_len, &trigger_key);
-	len = trigger_key.len;
-	if (search_triggers(tmp_str, len, kill_hash, &hash_index, &trig_index, old_trig_index))
+	if (search_trigger_hash(trigvn, trigvn_len, kill_hash, old_trig_index, &hash_index))
 	{
-		len++;
-		assert(trig_index == old_trig_index);
-		MV_FORCE_UMVAL(&mv_hash, kill_hash);
+		MV_FORCE_UMVAL(&mv_hash, kill_hash->hash_code);
 		MV_FORCE_MVAL(&mv_hash_indx, hash_index);
 		BUILD_HASHT_SUB_MSUB_MSUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx);
 		if (!gvcst_get(&key_val))
+		{	/* There has to be a #TRHASH entry */
 			assert(FALSE);
-		ptr = key_val.str.addr + len;
+			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""),
+				kill_hash->str.len, kill_hash->str.addr);
+		}
+		assert((MAX_MIDENT_LEN + 1 + MAX_DIGITS_IN_INT) >= key_val.str.len);
+		len = STRLEN(key_val.str.addr);
+		memcpy(tmp_str, key_val.str.addr, len);
+		ptr = tmp_str + len;
+		*ptr++ = '\0';
 		num_len = 0;
 		I2A(ptr, num_len, new_trig_index);
-		len += num_len;
+		len += num_len + 1;
 		SET_TRIGGER_GLOBAL_SUB_MSUB_MSUB_STR(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH), mv_hash, mv_hash_indx,
-			key_val.str.addr, len, result);
+			tmp_str, len, result);
 		if (PUT_SUCCESS != result)
 		{
-			TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
 			RESTORE_TRIGGER_REGION_INFO;
 			return result;
 		}
 	} else
+	{	/* There has to be an entry with the old hash value, we just looked it up */
 		assert(FALSE);
-	TP_CHANGE_REG_IF_NEEDED(save_gv_cur_region);
+		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn, LEN_AND_LIT("\"#TRHASH\""), kill_hash->str.len,
+			kill_hash->str.addr);
+	}
 	RESTORE_TRIGGER_REGION_INFO;
 	return PUT_SUCCESS;
 }
@@ -315,7 +327,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 {
 	sgmnt_addrs		*csa;
 	char			curr_name[MAX_MIDENT_LEN + 1];
-	uint4			curr_name_len;
+	uint4			curr_name_len, orig_name_len;
 	mstr			gbl_name;
 	mname_entry		gvent;
 	gv_namehead		*hasht_tree;
@@ -323,7 +335,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	mval			mv_curr_nam;
 	boolean_t		name_found;
 	char			*ptr;
-	char			*ptr1;
+	char			*name_tail_ptr;
 	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	gv_key			*save_gv_currkey;
 	gd_region		*save_gv_cur_region;
@@ -336,113 +348,122 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	char			trigvn[MAX_MIDENT_LEN + 1];
 	int			trigvn_len;
 	int			trig_indx;
+	int			badpos;
 	boolean_t		wildcard;
+	DCL_THREADGBL_ACCESS;
 
-	ptr1 = trigger_name + trigger_name_len - 1;
-	wildcard = ('*' == *ptr1);
-	if (wildcard)
-	{
-		*ptr1 = '\0';
+	SETUP_THREADGBL_ACCESS;
+	badpos = 0;
+	orig_name_len = trigger_name_len;
+	if ((0 == trigger_name_len) || (trigger_name_len !=
+			(badpos = validate_input_trigger_name(trigger_name, trigger_name_len, &wildcard))))
+	{	/* is the input name valid */
+		CONV_STR_AND_PRINT("Invalid trigger NAME string: ", orig_name_len, trigger_name);
+		/* badpos is the string position where the bad character was found, pretty print it */
+		return TRIG_FAILURE;
+	}
+	name_tail_ptr = trigger_name + trigger_name_len - 1;
+	if (TRIGNAME_SEQ_DELIM == *name_tail_ptr || wildcard )
+		/* drop the trailing # sign or wildcard */
 		trigger_name_len--;
-	}
-	if (!check_trigger_name(trigger_name, &trigger_name_len))
-	{	/* name#<number># is OK here */
-		if ((TRIGNAME_SEQ_DELIM == *ptr1)
-				&& (ptr1 != (ptr = strchr(trigger_name, TRIGNAME_SEQ_DELIM)))
-				&& (ISDIGIT_ASCII(*(ptr + 1))))
-		{
-			for (ptr++ ; ptr < ptr1; ptr++)
-			{
-				if (!ISDIGIT_ASCII(*ptr))
-				{
-					CONV_STR_AND_PRINT("Invalid trigger NAME string: ", trigger_name_len, trigger_name);
-					return TRIG_FAILURE;
-				}
-			}
-		} else
-		{
-			CONV_STR_AND_PRINT("Invalid trigger NAME string: ", trigger_name_len, trigger_name);
-			return TRIG_FAILURE;
-		}
-
-	}
+	/* $data(^#t) */
 	SWITCH_TO_DEFAULT_REGION;
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 == gv_target->root)
 	{
-		if (wildcard)
-			util_out_print_gtmio("Trigger names matching !AD* do not exist", FLUSH, trigger_name_len, trigger_name);
-		else
-			util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, trigger_name_len, trigger_name);
+		util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, orig_name_len, trigger_name);
 		return TRIG_FAILURE;
 	}
 	name_found = FALSE;
-	if (!trigger_user_name(trigger_name, trigger_name_len))
-		trigger_name_len--;
+	assert(trigger_name_len < MAX_MIDENT_LEN);
 	memcpy(save_name, trigger_name, trigger_name_len);
 	save_name[trigger_name_len] = '\0';
-	memcpy(curr_name, trigger_name, trigger_name_len);
+	memcpy(curr_name, save_name, trigger_name_len);
 	curr_name_len = trigger_name_len;
 	STR2MVAL(mv_curr_nam, trigger_name, trigger_name_len);
-	while (TRUE)
-	{
-		if (0 != memcmp(curr_name, save_name, trigger_name_len))
-			break;
+	do {
+		/* GVN = $get(^#t("#TNAME",curr_name) */
 		BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
-		if (!gvcst_get(&trig_gbl))
+		if (gvcst_get(&trig_gbl))
 		{
-			if (wildcard)
+			SAVE_TRIGGER_REGION_INFO;
+			ptr = trig_gbl.str.addr;
+			trigvn_len = STRLEN(trig_gbl.str.addr);
+			assert(MAX_MIDENT_LEN >= trigvn_len);
+			memcpy(trigvn, ptr, trigvn_len);
+			ptr += trigvn_len + 1;
+			/* the index is just beyon the length of the GVN string */
+			A2I(ptr, trig_gbl.str.addr + trig_gbl.str.len, trig_indx);
+			gbl_name.addr = trigvn;
+			gbl_name.len = trigvn_len;
+			GV_BIND_NAME_ONLY(gd_header, &gbl_name);
+			csa = gv_target->gd_csa;
+			SETUP_TRIGGER_GLOBAL;
+			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
+			/* $get(^#t(GVN,"COUNT") */
+			BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
+			/* if it does not exist, return false */
+			if (!gvcst_get(&trigger_count))
 			{
-				op_gvorder(&mv_curr_nam);
-				if (0 == mv_curr_nam.str.len)
-					break;
-				memcpy(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
-				curr_name_len = mv_curr_nam.str.len;
-				continue;
+				util_out_print_gtmio("Trigger named !AD exists in the lookup table, "
+						"but global ^!AD has no triggers",
+						FLUSH, curr_name_len, curr_name, trigvn_len, trigvn);
+				return TRIG_FAILURE;
+			}
+			/* kill the target trigger for GVN at index trig_indx */
+			if (PUT_SUCCESS != (trigger_delete(trigvn, trigvn_len, &trigger_count, trig_indx)))
+			{
+				util_out_print_gtmio("Trigger named !AD exists in the lookup table, but was not deleted!",
+						FLUSH, orig_name_len, trigger_name);
 			} else
-				util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, trigger_name_len, save_name);
-			break;
-		}
-		ptr = trig_gbl.str.addr;
-		trigvn_len = STRLEN(trig_gbl.str.addr);
-		assert(MAX_MIDENT_LEN >= trigvn_len);
-		memcpy(trigvn, ptr, trigvn_len);
-		ptr += trigvn_len + 1;
-		A2I(ptr, trig_gbl.str.addr + trig_gbl.str.len, trig_indx);
-		gbl_name.addr = trigvn;
-		gbl_name.len = trigvn_len;
-		GV_BIND_NAME_ONLY(gd_header, &gbl_name);
-		csa = gv_target->gd_csa;
-		SETUP_TRIGGER_GLOBAL;
-		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
-		BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
-		if (!gvcst_get(&trigger_count))
-			return FALSE;
-		trigger_delete(trigvn, trigvn_len, &trigger_count, trig_indx);
-		trig_stats[STATS_DELETED]++;
-		if (0 == trig_stats[STATS_ERROR])
-			util_out_print_gtmio("^!AD trigger deleted", FLUSH, trigvn_len, trigvn);
-		SWITCH_TO_DEFAULT_REGION;
-		if (wildcard)
-		{
-			if (!trigger_user_name(curr_name, curr_name_len))
-				continue;
-			BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
-			op_gvorder(&mv_curr_nam);
-			if (0 == mv_curr_nam.str.len)
-				break;
-			memcpy(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
-			curr_name_len = mv_curr_nam.str.len;
+			{
+				csa->incr_db_trigger_cycle = TRUE;
+				if (dollar_ztrigger_invoked)
+				{	/* increment db_dztrigger_cycle so that next gvcst_put/gvcst_kill in this transaction,
+					 * on this region, will re-read triggers. See trigger_update.c for a comment on why
+					 * it is okay for db_dztrigger_cycle to be incremented more than once in the same
+					 * transaction
+					 */
+					csa->db_dztrigger_cycle++;
+				}
+				trig_stats[STATS_DELETED]++;
+				if (0 == trig_stats[STATS_ERROR])
+					util_out_print_gtmio("Deleted trigger named '!AD' for global ^!AD",
+							FLUSH, curr_name_len, curr_name, trigvn_len, trigvn);
+			}
+			RESTORE_TRIGGER_REGION_INFO;
+			name_found = TRUE;
 		} else
+		{ /* no names match, if !wildcard report an error */
+			if (!wildcard)
+			{
+				util_out_print_gtmio("Trigger named !AD does not exist",
+						FLUSH, orig_name_len, trigger_name);
+				return TRIG_FAILURE;
+			}
+		}
+		if (!wildcard)
+			/* not a wild card, don't $order for the next match */
 			break;
-	}
-	return TRIG_SUCCESS;
+		op_gvorder(&mv_curr_nam);
+		if (0 == mv_curr_nam.str.len)
+			break;
+		assert(mv_curr_nam.str.len < MAX_MIDENT_LEN);
+		memcpy(curr_name, mv_curr_nam.str.addr, mv_curr_nam.str.len);
+		curr_name_len = mv_curr_nam.str.len;
+		if (0 != memcmp(curr_name, save_name, trigger_name_len))
+			/* stop when gv_order returns a string that no longer starts save_name */
+			break;
+	} while (wildcard);
+	if (name_found)
+		return TRIG_SUCCESS;
+	util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, orig_name_len, trigger_name);
+	return TRIG_FAILURE;
 }
 
 int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index)
 {
 	int			count;
-	uint4			kill_hash;
 	mval			*mv_cnt_ptr;
 	mval			mv_val;
 	mval			*mv_val_ptr;
@@ -452,7 +473,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	int4			retval;
 	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	gv_key			*save_gv_currkey;
-	uint4			set_hash;
+	stringkey		kill_hash, set_hash;
 	int			sub_indx;
 	char			tmp_trig_str[MAX_BUFF_SIZE];
 	int4			trig_len;
@@ -463,10 +484,14 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	uint4			tt_val_len[NUM_SUBS];
 	mval			trigger_value;
 	mval			trigger_index;
+	mval			xecute_index;
+	uint4			xecute_idx;
 	uint4			used_trigvn_len;
 	mval			val;
 	char			val_str[MAX_DIGITS_IN_INT + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	mv_val_ptr = &mv_val;
 	MV_FORCE_MVAL(&trigger_index, index);
 	count = MV_FORCE_INT(trigger_count);
@@ -512,19 +537,28 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	/* Get trigger name, set hash value, and kill hash values from trigger before we delete it.
 	 * The values will be used in clean ups associated with the deletion
 	 */
+	/* $get(^#t(GVN,trigger_index,"LHASH") for deletion in  cleanup_trigger_hash */
 	BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigger_index, trigger_subs[LHASH_SUB],
 		STRLEN(trigger_subs[LHASH_SUB]));
-	if (!gvcst_get(mv_val_ptr))
-		return PUT_SUCCESS;
-	kill_hash = (uint4)MV_FORCE_INT(mv_val_ptr);
+	if (gvcst_get(mv_val_ptr))
+		kill_hash.hash_code = (uint4)MV_FORCE_INT(mv_val_ptr);
+	else {
+		util_out_print_gtmio("The LHASH for global ^!AD does not exist", FLUSH, trigvn_len, trigvn);
+		kill_hash.hash_code = 0;
+	}
+	/* $get(^#t(GVN,trigger_index,"BHASH") for deletion in  cleanup_trigger_hash */
 	BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigger_index, trigger_subs[BHASH_SUB],
 		STRLEN(trigger_subs[BHASH_SUB]));
-	if (!gvcst_get(mv_val_ptr))
-		return PUT_SUCCESS;
-	set_hash = (uint4)MV_FORCE_INT(mv_val_ptr);
-	/* Delete the trigger at "index" */
+	if (gvcst_get(mv_val_ptr))
+		set_hash.hash_code = (uint4)MV_FORCE_INT(mv_val_ptr);
+	else {
+		util_out_print_gtmio("The BHASH for global ^!AD does not exist", FLUSH, trigvn_len, trigvn);
+		set_hash.hash_code = 0;
+	}
+	/* kill ^#t(GVN,trigger_index) */
 	BUILD_HASHT_SUB_MSUB_CURRKEY(trigvn, trigvn_len, trigger_index);
 	gvcst_kill(TRUE);
+	assert(0 == gvcst_data());
 	if (1 == count)
 	{ /* This is the last trigger for "trigvn" - clean up trigger name, remove #LABEL and #COUNT */
 		assert(1 == index);
@@ -533,13 +567,13 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 		BUILD_HASHT_SUB_SUB_CURRKEY(trigvn, trigvn_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
 		gvcst_kill(TRUE);
 		cleanup_trigger_name(trigvn, trigvn_len, trig_name, trig_name_len);
-		cleanup_trigger_hash(trigvn, trigvn_len, tt_val, tt_val_len, set_hash, kill_hash, TRUE, 0);
+		cleanup_trigger_hash(trigvn, trigvn_len, tt_val, tt_val_len, &set_hash, &kill_hash, TRUE, 0);
 	} else
 	{
-		cleanup_trigger_hash(trigvn, trigvn_len, tt_val, tt_val_len, set_hash, kill_hash, TRUE, index);
+		cleanup_trigger_hash(trigvn, trigvn_len, tt_val, tt_val_len, &set_hash, &kill_hash, TRUE, index);
+		cleanup_trigger_name(trigvn, trigvn_len, trig_name, trig_name_len);
 		if (index != count)
-		{
-			/* Shift the last trigger (index is #COUNT value) to the just deleted trigger's index.
+		{	/* Shift the last trigger (index is #COUNT value) to the just deleted trigger's index.
 			 * This way count is always accurate and can still be used as the index for new triggers.
 			 * Note - there is no dependence on the trigger order, or this technique wouldn't work.
 			 */
@@ -549,16 +583,40 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 			*ptr1++ = '\0';
 			for (sub_indx = 0; sub_indx < NUM_TOTAL_SUBS; sub_indx++)
 			{
+				/* $get(^#t(GVN,trigger_count,sub_indx) */
 				BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, *trigger_count, trigger_subs[sub_indx],
 								STRLEN(trigger_subs[sub_indx]));
 				if (gvcst_get(&trigger_value))
 				{
 					trig_len = trigger_value.str.len;
+					/* set ^#t(GVN,trigger_index,sub_indx)=^#t(GVN,trigger_count,sub_indx) */
 					SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MVAL(trigvn, trigvn_len, trigger_index,
 						trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), trigger_value, result);
 					assert(PUT_SUCCESS == result);
+				} else if (XECUTE_SUB == sub_indx)
+				{ /* multi line trigger broken up because it exceeds record size */
+					for (xecute_idx = 0; ; xecute_idx++)
+					{
+						i2mval(&xecute_index, xecute_idx);
+						BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(trigvn, trigvn_len, *trigger_count,
+							trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index);
+						if (!gvcst_get(&trigger_value))
+							break;
+						SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MSUB_MVAL(trigvn, trigvn_len, trigger_index,
+							trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index,
+							trigger_value, result);
+						assert(PUT_SUCCESS == result);
+					}
+					assert (xecute_idx >= 2); /* multi-line trigger, indices 0, 1 and 2 MUST be defined */
 				} else
+				{
+					/* in PRO this is a nasty case that will result in an access violation
+					 * because data that should be present is not. In the next go around
+					 * with trigger installation this case should be handled better */
+					assert(!((TRIGNAME_SUB == sub_indx) || (CMD_SUB == sub_indx) ||
+						 (CHSET_SUB == sub_indx))); /* these should not be zero length */
 					trig_len = 0;
+				}
 				if (NUM_SUBS > sub_indx)
 				{
 					tt_val[sub_indx] = ptr1;
@@ -571,51 +629,30 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 					*ptr1++ = '\0';
 				}
 			}
+			/* $get(^#t(GVN,trigger_count,"LHASH") for update_trigger_hash_value */
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, *trigger_count, trigger_subs[LHASH_SUB],
 							 STRLEN(trigger_subs[LHASH_SUB]));
 			if (!gvcst_get(mv_val_ptr))
 				return PUT_SUCCESS;
-			kill_hash = (uint4)MV_FORCE_INT(mv_val_ptr);
+			kill_hash.hash_code = (uint4)MV_FORCE_INT(mv_val_ptr);
+			/* $get(^#t(GVN,trigger_count,"BHASH") for update_trigger_hash_value */
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, *trigger_count, trigger_subs[BHASH_SUB],
 							 STRLEN(trigger_subs[BHASH_SUB]));
 			if (!gvcst_get(mv_val_ptr))
 				return PUT_SUCCESS;
-			set_hash = (uint4)MV_FORCE_INT(mv_val_ptr);
-			if (VAL_TOO_LONG == (retval = update_trigger_hash_value(trigvn, trigvn_len, tt_val, tt_val_len, set_hash,
-					kill_hash, count, index)))
+			set_hash.hash_code = (uint4)MV_FORCE_INT(mv_val_ptr);
+			/* update hash values from above */
+			if (VAL_TOO_LONG == (retval = update_trigger_hash_value(trigvn, trigvn_len, tt_val, tt_val_len,
+					&set_hash, &kill_hash, count, index)))
 				return VAL_TOO_LONG;
+			/* fix the value ^#t("#TNAME",^#t(GVN,index,"#TRIGNAME")) to point to the correct "index" */
 			if (VAL_TOO_LONG == (retval = update_trigger_name_value(trigvn_len, tt_val[TRIGNAME_SUB],
 					tt_val_len[TRIGNAME_SUB], index)))
 				return VAL_TOO_LONG;
-			if (trigger_user_name(trig_name, trig_name_len))
-			{
-				BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), trig_name,
-					trig_name_len - 1);
-				gvcst_kill(TRUE);
-			}
-			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, trigger_index, LITERAL_TRIGNAME,
-				STRLEN(LITERAL_TRIGNAME));
-			if (gvcst_get(&trigger_value))
-			{
-				if (!trigger_user_name(trigger_value.str.addr, trigger_value.str.len))
-				{	/* If trigger name is auto-generated, change its sequence number to "index" */
-					ptr1 = strchr(trigger_value.str.addr, TRIGNAME_SEQ_DELIM) + 1;
-					num_len = 0;
-					I2A(ptr1, num_len, index);
-					ptr1 += num_len;
-					*ptr1++ = TRIGNAME_SEQ_DELIM;
-					trigger_value.str.len = (int)(ptr1 - trigger_value.str.addr);
-					SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MVAL(trigvn, trigvn_len, trigger_index,
-						LITERAL_TRIGNAME, STRLEN(LITERAL_TRIGNAME), trigger_value, result);
-					assert(PUT_SUCCESS == result);
-				}
-			}
-			cleanup_trigger_name(trigvn, trigvn_len, tt_val[TRIGNAME_SUB], tt_val_len[TRIGNAME_SUB]);
-			/* Delete the last trigger (at count) which was just shifted to index */
+			/* kill ^#t(GVN,COUNT) which was just shifted to trigger_index */
 			BUILD_HASHT_SUB_MSUB_CURRKEY(trigvn, trigvn_len, *trigger_count);
 			gvcst_kill(TRUE);
-		} else
-			cleanup_trigger_name(trigvn, trigvn_len, trig_name, trig_name_len);
+		}
 		/* Update #COUNT */
 		count--;
 		MV_FORCE_MVAL(trigger_count, count);
@@ -636,7 +673,7 @@ void trigger_delete_all(void)
 	int			cycle;
 	mstr			gbl_name;
 	mname_entry		gvent;
-	gv_namehead		*hasht_tree;
+	gv_namehead		*hasht_tree, *gvt;
 	mval			*mv_count_ptr;
 	mval			*mv_cycle_ptr;
 	mval			mv_indx;
@@ -652,13 +689,27 @@ void trigger_delete_all(void)
 	mval			trigger_cycle;
 	mval			trigger_count;
 	mval			val;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	assert(0 < dollar_tlevel);
+	/* Before we delete any triggers, verify that none of the triggers have been fired in this transaction. If they have,
+	 * this creates an un-commitable transaction that will end in a TPFAIL error. Since that error indicates database
+	 * damage, we'd rather detect this avoidable condition and give a descriptive error instead (TRIGMODINTP).
+	 */
+	for (gvt = gv_target_list; NULL != gvt; gvt = gvt->next_gvnh)
+	{
+		if (gvt->trig_local_tn == local_tn)
+			rts_error(VARLSTCNT(1) ERR_TRIGMODINTP);
+	}
 	SWITCH_TO_DEFAULT_REGION;
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 != gv_target->root)
 	{
+		/* kill ^#t("#TRHASH") */
 		BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH));
 		gvcst_kill(TRUE);
+		/* kill ^#t("#TNAME") */
 		BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME));
 		gvcst_kill(TRUE);
 	}
@@ -676,42 +727,50 @@ void trigger_delete_all(void)
 			/* There might not be any ^#t in this region, so check */
 			if (0 != gv_target->root)
 			{	/* Kill all descendents of ^#t(trigvn, indx) where trigvn is any global with a trigger,
-				 * but skip the "#xxxxx" entries.
+				 * but skip the "#XYZ" entries. setup ^#t(trigvn,"$") as the PREV key for op_gvorder
 				 */
 				BUILD_HASHT_SUB_CURRKEY(LITERAL_MAXHASHVAL, STRLEN(LITERAL_MAXHASHVAL));
+				TREF(gv_last_subsc_null) = FALSE; /* We know its not null, but prior state is unreliable */
 				while (TRUE)
 				{
 					op_gvorder(&curr_gbl_name);
+					/* quit:$length(curr_gbl_name)=0 */
 					if (0 == curr_gbl_name.str.len)
 						break;
+					/* $get(^#t(curr_gbl_name,#COUNT)) */
 					BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
 						LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
 					if (gvcst_get(&trigger_count))
 					{
 						mv_count_ptr = &trigger_count;
 						count = MV_FORCE_INT(mv_count_ptr);
-					} else
-					{	/* There's no #COUNT, trigger was deleted - only the #CYCLE should be left */
-						BUILD_HASHT_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len);
-						continue;
-					}
-					BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
-						LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE));
-					if (gvcst_get(&trigger_cycle))
-					{
+						/* $get(^#t(curr_gbl_name,#CYCLE)) */
+						BUILD_HASHT_SUB_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len,
+							LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE));
+						if (!gvcst_get(&trigger_cycle))
+							assert(FALSE); /* Found #COUNT, there must be #CYCLE */
 						mv_cycle_ptr = &trigger_cycle;
 						cycle = MV_FORCE_INT(mv_cycle_ptr);
-					} else
-						return;
-					BUILD_HASHT_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len);
-					gvcst_kill(TRUE);
-					cycle++;
-					MV_FORCE_MVAL(&trigger_cycle, cycle);
-					SET_TRIGGER_GLOBAL_SUB_SUB_MVAL(curr_gbl_name.str.addr, curr_gbl_name.str.len,
-						LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE), trigger_cycle, result);
-					assert(PUT_SUCCESS == result);
+						/* kill ^#t(curr_gbl_name) */
+						BUILD_HASHT_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len);
+						gvcst_kill(TRUE);
+						cycle++;
+						MV_FORCE_MVAL(&trigger_cycle, cycle);
+						/* set ^#t(curr_gbl_name,#CYCLE)=trigger_cycle */
+						SET_TRIGGER_GLOBAL_SUB_SUB_MVAL(curr_gbl_name.str.addr, curr_gbl_name.str.len,
+							LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE), trigger_cycle, result);
+						assert(PUT_SUCCESS == result);
+					} /* else there is no #COUNT, then no triggers, leave #CYCLE alone */
 					/* get ready for op_gvorder() call for next trigger under ^#t */
 					BUILD_HASHT_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len);
+				}
+				csa->incr_db_trigger_cycle = TRUE;
+				if (dollar_ztrigger_invoked)
+				{	/* increment db_dztrigger_cycle so that next gvcst_put/gvcst_kill in this transaction,
+					 * on this region, will re-read. See trigger_update.c for a comment on why it is okay
+					 * for db_dztrigger_cycle to be incremented more than once in the same transaction
+					 */
+					csa->db_dztrigger_cycle++;
 				}
 			}
 		}

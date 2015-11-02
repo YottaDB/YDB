@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,14 +21,15 @@
 #include "sig_init.h"
 #include "gtmci_signals.h"
 
-GBLREF 	boolean_t		disable_sigcont;
-
 void	null_handler(int sig);
 
 void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)())
 {
 	struct sigaction 	ignore, act;
 	int			sig;
+        DCL_THREADGBL_ACCESS;
+
+        SETUP_THREADGBL_ACCESS;
 
 	memset(&act, 0, SIZEOF(act));
 	sigemptyset(&act.sa_mask);
@@ -122,13 +123,13 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	 * --------------------------------------------------------------
 	 */
 #ifndef DISABLE_SIGCONT_PROCESSING
-	if (FALSE == disable_sigcont)
+	if (FALSE == TREF(disable_sigcont))
 	{
 		act.sa_sigaction = continue_handler;
 		sigaction(SIGCONT, &act, 0);
 	}
 #else
-	disable_sigcont = TRUE;
+	TREF(disable_sigcont) = TRUE;
 #endif
 }
 

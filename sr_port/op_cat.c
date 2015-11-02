@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,21 +61,27 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 		in = va_arg(var, mval *);
 		srcargs--;
 	}
-	for(i = 0; ;)
+	for (i = 0; ;)
 	{
 		MV_FORCE_DEFINED(in);
+		/* Now that we have ensured enough space in the stringpool, we dont expect any more
+		 * garbage collections or expansions until we are done with the concatenation. We need
+		 * to do this AFTER the MV_FORCE_DEFINED since that can trigger an error and in that case
+		 * we dont want this debug global variable set for post-error-trap M code.
+		 */
+		DBG_MARK_STRINGPOOL_UNEXPANDABLE;
 		if (MV_IS_STRING(in))
 			memcpy(cp, in->str.addr, in->str.len);
 		else
 		{
 			stringpool.free = cp;
 			n2s(in);
-			/* Convert to string, rely on the fact that it will be converted exactly at the
-				end of the stringpool.
-			*/
+			/* Convert to string, rely on the fact that it will be converted exactly at the end of the stringpool. */
 		}
 		cp += in->str.len;
 		i++;
+		/* Now that we are done with stringpool.free initializations for this iteration, mark as free for expansion */
+		DBG_MARK_STRINGPOOL_EXPANDABLE;
 		if (i >= srcargs)
 			break;
 		in = va_arg(var, mval *);

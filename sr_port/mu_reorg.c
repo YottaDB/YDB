@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -330,7 +330,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						return FALSE;
 					} else if (cdb_sc_normal == status)
 					{
-						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), 0)))
+						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
 							continue;
@@ -389,7 +389,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 							if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
 								WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 						}
-						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), rtsib_hist)))
+						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), rtsib_hist,
+							TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
@@ -456,7 +457,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
 						assert(UPDTRNS_DB_UPDATED_MASK == update_trans);
 						update_trans = 0; /* tell t_end, this is no longer an update transaction */
-						if ((trans_num)0 == (ret_tn = t_end(rtsib_hist, NULL)))
+						if ((trans_num)0 == (ret_tn = t_end(rtsib_hist, NULL, TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
 							inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
@@ -550,7 +551,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 							WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 						/* second history not needed, because,
 						   we are reusing a free block, which does not need history */
-						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL)))
+						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)))
 						{
 							need_kip_incr = FALSE;
 							assert(NULL == kip_csa);
@@ -572,7 +573,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					/* gv_target->hist is for working block's history, and
 					   reorg_gv_target->hist is for destinition block's history.
 					   Note: gv_target and reorg_gv_target can be part of different GVT.  */
-					else if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), &(reorg_gv_target->hist))))
+					else if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), &(reorg_gv_target->hist),
+						TN_NOT_SPECIFIED)))
 					{
 						need_kip_incr = FALSE;
 						assert(NULL == kip_csa);
@@ -669,7 +671,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				need_kip_incr = TRUE;
 				if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
 					WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
-				if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL)))
+				if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL, TN_NOT_SPECIFIED)))
 				{
 					need_kip_incr = FALSE;
 					assert(NULL == kip_csa);

@@ -78,28 +78,24 @@ void gtm_zlib_init(void);
 {															\
 	GBLREF zlib_cmp_func_t		zlib_compress_fnptr;								\
 															\
-	intrpt_state_t			save_intrpt_ok_state;								\
-															\
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_ZLIB_CMP_UNCMP);									\
+	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP);									\
 	assert(0 < (signed)(CMPLEN));											\
 	assert(NULL != zlib_compress_fnptr);										\
 	RC = (*zlib_compress_fnptr)(((Bytef *)(CMPBUFF_PTR)), (uLongf *)&(CMPLEN), (const Bytef *)(UNCMPBUFF_PTR), 	\
 					(uLong)(UNCMPLEN), ZLIB_CMP_LEVEL);						\
-	RESTORE_INTRPT_OK_STATE;											\
+	ENABLE_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP);									\
 }
 
 #define ZLIB_UNCOMPRESS(UNCMPBUFF_PTR, UNCMPLEN, CMPBUFF_PTR, CMPLEN, RC)						\
 {															\
 	GBLREF zlib_uncmp_func_t	zlib_uncompress_fnptr;								\
 															\
-	intrpt_state_t			save_intrpt_ok_state;								\
-															\
-	SAVE_INTRPT_OK_STATE(INTRPT_IN_ZLIB_CMP_UNCMP);									\
+	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP);									\
 	assert(0 < (signed)(UNCMPLEN));											\
 	assert(NULL != zlib_uncompress_fnptr);										\
 	RC = (*zlib_uncompress_fnptr)(((Bytef *)(UNCMPBUFF_PTR)), (uLongf *)&(UNCMPLEN), (const Bytef *)(CMPBUFF_PTR),	\
 					(uLong)(CMPLEN));								\
-	RESTORE_INTRPT_OK_STATE;											\
+	ENABLE_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP);									\
 }
 
 #endif

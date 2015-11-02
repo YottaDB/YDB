@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,8 @@ void iorm_close(io_desc *iod, mval *pp)
 	int		p_offset;
 	pid_t  		done_pid;
 	int  		wait_status, rc;
+	unsigned int	*dollarx_ptr;
+	unsigned int	*dollary_ptr;
 
 	error_def(ERR_CLOSEFAIL);
 
@@ -53,8 +55,22 @@ void iorm_close(io_desc *iod, mval *pp)
 	    return;
 
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
+
+#ifdef __MVS__
+	/* on zos if it is a fifo device then point to the pair.out for $X and $Y */
+	if (rm_ptr->fifo)
+	{
+		dollarx_ptr = &(iod->pair.out->dollar.x);
+		dollary_ptr = &(iod->pair.out->dollar.y);
+	} else
+#endif
+	{
+		dollarx_ptr = &(iod->dollar.x);
+		dollary_ptr = &(iod->dollar.y);
+	}
+
 	iorm_use(iod,pp);
-	if (iod->dollar.x && rm_ptr->lastop == RM_WRITE && !iod->dollar.za)
+	if (*dollarx_ptr && rm_ptr->lastop == RM_WRITE && !iod->dollar.za)
 		iorm_flush(iod);
 
 	p_offset = 0;
@@ -104,8 +120,8 @@ void iorm_close(io_desc *iod, mval *pp)
 
 	iod->state = dev_closed;
 	iod->dollar.zeof = FALSE;
-	iod->dollar.x = 0;
-	iod->dollar.y = 0;
+	*dollarx_ptr = 0;
+	*dollary_ptr = 0;
 	rm_ptr->lastop = RM_NOOP;
 	if (rm_ptr->inbuf)
 	{

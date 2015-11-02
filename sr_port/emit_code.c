@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -822,8 +822,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 #		ifdef DEBUG
 		if (generated_count < MAX_CODE_COUNT)
 		{
-		generated_details[generated_count].size = code_idx;
-		generated_details[generated_count++].sav_in = sav_in;
+			generated_details[generated_count].size = code_idx;
+			generated_details[generated_count++].sav_in = sav_in;
 		}
 #		endif /* DEBUG */
 		emit_immed ((char *)&code_buf[0], (uint4)(INST_SIZE * code_idx));
@@ -1291,9 +1291,8 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
 							if (GENERIC_OPCODE_LDA == generic_inst)
 							{
-								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);
-)
-								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(trg_reg))
+								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg));
+								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(trg_reg));
 								inst_emitted = TRUE;
 							} else
 							{
@@ -1865,17 +1864,17 @@ void	emit_call_xfer(int xfer)
 	assert(0 == (xfer & 0x3));
 	offset = (int)(xfer / SIZEOF(char *));
 #	ifdef __x86_64__
-/* Set RAX to 0 for variable argument function calls. This is part of the ABI.
-	The RAX represents the # of floating of values being passed
-*/
-	if (C_VAR_ARGS == xfer_table_desc[offset])
+	/* Set RAX to 0 for variable argument function calls. This is part of the ABI.
+	 * The RAX represents the # of floating of values being passed
+	 */
+	if (GTM_C_VAR_ARGS_RTN == xfer_table_desc[offset])
 	{
 		GEN_LOAD_IMMED(I386_REG_RAX, 0);
 	}
 #	endif /* __x86_64__ */
 
 #	ifdef __ia64
-        if (ASM == xfer_table_desc[offset])
+        if (GTM_ASM_RTN == xfer_table_desc[offset])
         {
                 GEN_XFER_TBL_CALL_FAKE(xfer);
         } else

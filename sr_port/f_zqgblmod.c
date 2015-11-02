@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,14 +17,14 @@
 #include "mdq.h"
 
 GBLREF char window_token;
-GBLREF bool shift_gvrefs;
-GBLREF triple *expr_start;
 
 int f_zqgblmod(oprtype *a, opctype op)
 {
 	triple *oldchain, tmpchain, *r, *triptr;
 	error_def(ERR_VAREXPECTED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	r = maketriple(op);
 	switch (window_token)
 	{
@@ -36,7 +36,7 @@ int f_zqgblmod(oprtype *a, opctype op)
 		break;
 	case TK_ATSIGN:
 		r->opcode = OC_INDFUN;
-		if (shift_gvrefs)
+		if (TREF(shift_side_effects))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);
@@ -45,20 +45,19 @@ int f_zqgblmod(oprtype *a, opctype op)
 				setcurtchain(oldchain);
 				return FALSE;
 			}
-			r->operand[1] = put_ilit((mint) indir_fnzqgblmod);
+			r->operand[1] = put_ilit((mint)indir_fnzqgblmod);
 			ins_triple(r);
 			newtriple(OC_GVSAVTARG);
 			setcurtchain(oldchain);
-			dqadd(expr_start, &tmpchain, exorder);
-			expr_start = tmpchain.exorder.bl;
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
-		}
-		else
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		} else
 		{
 			if (!indirection(&(r->operand[0])))
 				return FALSE;
-			r->operand[1] = put_ilit((mint) indir_fnzqgblmod);
+			r->operand[1] = put_ilit((mint)indir_fnzqgblmod);
 			ins_triple(r);
 		}
 		break;

@@ -38,6 +38,7 @@
 #include "gdsdbver.h"
 #include "min_max.h"
 #include "gtmimagename.h"
+#include "memcoherency.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -51,7 +52,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	int4			size, save_errno;
 	enum db_ver		tmp_ondskblkver;
 	sm_uc_ptr_t		save_buff = NULL, enc_save_buff;
-	boolean_t		fully_upgraded;
+	boolean_t		fully_upgraded, buff_is_modified_after_lseekread;
 	int			bsiz;
 	DEBUG_ONLY(
 		blk_hdr_ptr_t	blk_hdr_val;
@@ -98,6 +99,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	fully_upgraded = cs_data->fully_upgraded;
 	if (!blk_free && !fully_upgraded) /* No V4->V5 translations required if block is FREE */
 	{
+		buff_is_modified_after_lseekread = TRUE;
 		save_buff = buff;
 		if (size > read_reformat_buffer_len)
 		{	/* do the same for the reformat_buffer used by dsk_read */
@@ -110,7 +112,8 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 			--fast_lock_count;
 		}
 		buff = read_reformat_buffer;
-	}
+	} else
+		buff_is_modified_after_lseekread = FALSE;
 	assert(NULL != cs_addrs->nl);
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
 	enc_save_buff = buff;
@@ -134,6 +137,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	{
 		bsiz = (int)((blk_hdr_ptr_t)enc_save_buff)->bsiz;
 		req_dec_blk_size = MIN(cs_data->blk_size, bsiz) - SIZEOF(blk_hdr);
+		buff_is_modified_after_lseekread = TRUE;
 		/* Do not do encryption/decryption if block is FREE */
 		if (!blk_free && (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, req_dec_blk_size)))
 		{
@@ -186,6 +190,20 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 		 */
 		if ((NULL != save_buff) && (NULL != buff))	/* Buffer not moved by upgrade, we must move */
 			memcpy(save_buff, buff, size);
+	}
+	if (buff_is_modified_after_lseekread)
+	{	/* Normally the disk read (done in LSEEKREAD macro) would do the necessary write memory barrier to make the
+		 * updated shared memory global buffer contents visible to all other processes as long as they see any later
+		 * updates done to shared memory by the reader. But in case of a V4 -> V5 upgrade or reading of an encrypted
+		 * block, the actual disk read would have happened into a different buffer. That would then be used as a
+		 * source for the upgrade or decryption before placing the final contents in the input global buffer.
+		 * We now need a write memory barrier before returning from this function to publish this shared memory
+		 * update to other processes waiting on this read. Note: it is possible in rare cases (e.g. mupip reorg upgrade)
+		 * that the input buffer is NOT a shared memory buffer in which case the write memory barrier is not necessary
+		 * but it is not easily possible to identify that and we want to save if checks on the fast path and so do
+		 * the memory barrier in all cases.
+		 */
+		SHM_WRITE_MEMORY_BARRIER;
 	}
 	DEBUG_ONLY(
 		in_dsk_read--;

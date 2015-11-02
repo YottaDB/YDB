@@ -121,7 +121,9 @@ GDEINIT
 	s minseg("BG","GLOBAL_BUFFER_COUNT")=64,minseg("BG","LOCK_SPACE")=10,minseg("BG","RESERVED_BYTES")=0
 	s maxseg("BG","ALLOCATION")=TWO(27),(maxseg("BG","BLOCK_SIZE"),maxseg("BG","RESERVED_BYTES"))=HEX(4)-SIZEOF("dsk_blk")
 	i ver'="VMS" s maxseg("BG","ALLOCATION")=TWO(28)-TWO(25) ; supports 224M blocks for UNIX only
-	s maxseg("BG","EXTENSION_COUNT")=HEX(4)-1,maxseg("BG","GLOBAL_BUFFER_COUNT")=65536,maxseg("BG","LOCK_SPACE")=65536
+	s maxseg("BG","EXTENSION_COUNT")=HEX(4)-1,maxseg("BG","LOCK_SPACE")=65536
+	i (gtm64=TRUE) s maxseg("BG","GLOBAL_BUFFER_COUNT")=2147483647 ; 2G-1
+	e  s maxseg("BG","GLOBAL_BUFFER_COUNT")=65536
 ; mm
 	s minseg("MM","ALLOCATION")=10,minseg("MM","BLOCK_SIZE")=SIZEOF("dsk_blk"),minseg("MM","DEFER")=0
 	s minseg("MM","LOCK_SPACE")=10,minseg("MM","EXTENSION_COUNT")=0,minseg("MM","RESERVED_BYTES")=0
@@ -310,6 +312,9 @@ syntabi:
 	s syntab("SHOW","NAME")=""
 	s syntab("SHOW","REGION")=""
 	s syntab("SHOW","SEGMENT")=""
+	s syntab("SHOW","COMMANDS")=""
+	s syntab("SHOW","COMMANDS","FILE")="OPTIONAL"
+	s syntab("SHOW","COMMANDS","FILE","TYPE")="TFSPEC"
 	s syntab("SPAWN")=""
 	s syntab("VERIFY","ALL")=""
 	s syntab("VERIFY","MAP")=""

@@ -33,7 +33,7 @@ GBLREF cw_set_element	cw_set[];
 GBLREF unsigned char	cw_set_depth;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgm_info		*sgm_info_ptr;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 
 void t_write_map (
 		srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
@@ -58,7 +58,7 @@ void t_write_map (
 	uint4			*updptr;
 
 	csa = cs_addrs;
-	if (dollar_tlevel == 0)
+	if (!dollar_tlevel)
 	{
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
 		cs = &cw_set[cw_set_depth];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,8 +66,79 @@
 #include "deferred_signal_handler.h"	/* needed for ZLIB_COMPRESS */
 #include "gtm_zlib.h"
 #include "repl_sort_tr_buff.h"
+#include "replgbl.h"
 
 #define MAX_HEXDUMP_CHARS_PER_LINE	26 /* 2 characters per byte + space, 80 column assumed */
+
+#define BREAK_IF_CMP_ERROR(CMPRET, SEND_TR_LEN)											\
+{																\
+	switch(CMPRET)														\
+	{															\
+		case Z_MEM_ERROR:												\
+			repl_log(gtmsource_log_fp, TRUE, FALSE, "Out-of-memory error from compress function "			\
+					"while compressing %d bytes\n", SEND_TR_LEN);						\
+			assert(FALSE);												\
+			break;													\
+		case Z_BUF_ERROR:												\
+			repl_log(gtmsource_log_fp, TRUE, FALSE, "Insufficient output buffer error from compress function "	\
+					"while compressing %d bytes\n", SEND_TR_LEN);						\
+			assert(FALSE);												\
+			break;													\
+		case Z_STREAM_ERROR:												\
+			repl_log(gtmsource_log_fp, TRUE, FALSE, "Compression level %d invalid error from compress function "	\
+					"while compressing %d bytes\n", repl_zlib_cmp_level, SEND_TR_LEN);			\
+			assert(FALSE);												\
+			break;													\
+	}															\
+}
+
+#define SET_8BYTE_CMP_MSGHDR(SEND_MSGP, SEND_TR_LEN, CMPBUFLEN, MSGHDRLEN)							\
+{																\
+	SEND_MSGP->type = (SEND_TR_LEN << REPL_TR_CMP_MSG_TYPE_BITS) | REPL_TR_CMP_JNL_RECS;					\
+	SEND_MSGP->len = (int4)cmpbuflen + msghdrlen;										\
+	/* Note that a compressed message need not be 8-byte aligned even though the input message was. So round it up to	\
+	 * the nearest align boundary. The actual message will contain the unaligned length which is what the receiver will	\
+	 * receive. But the # of bytes transmitted across will be the aligned length.						\
+	 */															\
+	SEND_TR_LEN = ROUND_UP(SEND_MSGP->len, REPL_MSG_ALIGN);									\
+}
+
+#define SET_16BYTE_CMP_MSGHDR(SEND_MSGP, SEND_TR_LEN, CMPBUFLEN, MSGHDRLEN)							\
+{																\
+	repl_cmpmsg_ptr_t		send_cmpmsgp;										\
+																\
+	send_cmpmsgp = (repl_cmpmsg_ptr_t)SEND_MSGP;										\
+	assert(&send_cmpmsgp->type == &SEND_MSGP->type);									\
+	assert(&send_cmpmsgp->len == &SEND_MSGP->len);										\
+	send_cmpmsgp->type = REPL_TR_CMP_JNL_RECS2;										\
+	/* Note that a compressed message need not be 8-byte aligned even though the input message was. So round it up to	\
+	 * the nearest align boundary. The actual message will contain the unaligned length which is what the receiver will	\
+	 * receive. But the # of bytes transmitted across will be the aligned length.						\
+	 */															\
+	send_cmpmsgp->len = (int4)(ROUND_UP(CMPBUFLEN + MSGHDRLEN, REPL_MSG_ALIGN));						\
+	send_cmpmsgp->uncmplen = SEND_TR_LEN;											\
+	send_cmpmsgp->cmplen = (int4)CMPBUFLEN;											\
+	SEND_TR_LEN = SEND_MSGP->len;												\
+}
+
+#ifdef GTM_TRIGGER
+#define ISSUE_TRIG2NOTRIG_IF_NEEDED												\
+{																\
+	DCL_THREADGBL_ACCESS;													\
+																\
+	SETUP_THREADGBL_ACCESS;													\
+	if (!REPLGBL.trig_replic_warning_issued && REPLGBL.trig_replic_suspect_seqno && !secondary_side_trigger_support)	\
+	{ 	/* Note: The below repl_log text is copied from TRIG2NOTRIG error message content from merrors.msg. Change 	\
+		 * to one should be reflected in another									\
+		 */														\
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Warning: Sending transaction sequence number %d which used "		\
+			"triggers to a replicator that does not support triggers\n", REPLGBL.trig_replic_suspect_seqno);	\
+		REPLGBL.trig_replic_warning_issued = TRUE; /* No more warnings till restart */					\
+		REPLGBL.trig_replic_suspect_seqno = seq_num_zero;								\
+	}															\
+}
+#endif
+
 
 GBLDEF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLDEF	struct timeval		gtmsource_poll_wait, gtmsource_poll_immediate;
@@ -112,16 +183,129 @@ GBLREF	unsigned char		jnl_ver, remote_jnl_ver;
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
-GBLREF	boolean_t		null_subs_xform;
 GBLREF	boolean_t 		primary_side_std_null_coll;
 GBLREF	boolean_t		primary_side_trigger_support;
 GBLREF	boolean_t 		secondary_side_std_null_coll;
 GBLREF	seq_num			lastlog_seqno;
 GBLREF	uint4			log_interval;
 GBLREF	qw_num			trans_sent_cnt, last_log_tr_sent_cnt;
-GBLREF	boolean_t		trig_replic_warning_issued;
 GBLREF	boolean_t		secondary_side_trigger_support;
-GBLREF	seq_num			trig_replic_suspect_seqno;
+
+error_def(ERR_JNLNEWREC);
+error_def(ERR_JNLSETDATA2LONG);
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLFTOKSEM);
+error_def(ERR_REPLGBL2LONG);
+error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_REPLRECFMT);
+error_def(ERR_REPLUPGRADESEC);
+error_def(ERR_REPLXENDIANFAIL);
+error_def(ERR_SECNODZTRIGINTP);
+error_def(ERR_TRIG2NOTRIG);
+error_def(ERR_TEXT);
+
+/* Endian converts the given set of journal records (possibly multiple sequence numbers) so that the secondary can consume them
+ * as-is. This is done only in the case when the primary is running on a GT.M version less than the GT.M version on secondary
+ * side. Otherwise, the secondary takes the responsibility of doing the endian conversion. Note that the endian conversion happens
+ * in-place. The below function is based on gtmsource_process.c/repl_tr_endian_convert()
+ */
+static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno)
+{
+	uchar_ptr_t		buffp, jb;
+	DEBUG_ONLY(uchar_ptr_t	jstart;)
+	int			buflen, remaining_len, jlen, reclen, status, nodeflags_keylen, temp_val, keylen;
+	jnl_record		*rec;
+	enum jnl_record_type	rectype;
+	jrec_suffix		*suffixp;
+	jnl_string		*keystr;
+	mstr_len_t		*vallen_ptr;
+	seq_num			good_seqno;
+
+	buffp = send_msgp->msg;
+	buflen = send_msgp->len - REPL_MSG_HDRLEN;
+	remaining_len = send_tr_len;
+	QWASSIGN(good_seqno, seq_num_zero);
+	while (0 < remaining_len)
+	{
+		jlen = buflen;
+		jb = buffp;
+		while (JREC_PREFIX_SIZE <= jlen)
+		{
+			DEBUG_ONLY(jstart = jb);
+			rec = (jnl_record *)(jb);
+			/* endian convert the prefix fields. Not all of the prefix fields are used by the secondary. Only rectype
+			 * and forwptr are needed.
+			 */
+			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
+			reclen = rec->prefix.forwptr;
+			rec->prefix.forwptr = GTM_BYTESWAP_24(reclen);
+			if (!IS_REPLICATED(rectype) || (0 == reclen) || (reclen > jlen) || (reclen > MAX_LOGI_JNL_REC_SIZE))
+			{
+				assert(FALSE);
+				status = -1;
+				break;
+			}
+			assert(!IS_ZTP(rectype));
+			assert(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype) || (JRT_TCOM == rectype) || (JRT_NULL == rectype));
+			/* endian convert the suffix fields. Only backptr needs endian conversion as the other field - suffix_code
+			 * is 8 bit.
+			 */
+			suffixp = ((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE));
+			suffixp->backptr = GTM_BYTESWAP_24(suffixp->backptr);
+			QWASSIGN(good_seqno, rec->jrec_null.jnl_seqno); /* update good_seqno */
+			rec->jrec_null.jnl_seqno = GTM_BYTESWAP_64(rec->jrec_null.jnl_seqno);
+			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
+			{
+				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
+				assert(keystr == (jnl_string *)&rec->jrec_ztworm.ztworm_str);
+				assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+				rec->jrec_set_kill.update_num = GTM_BYTESWAP_32(rec->jrec_set_kill.update_num);
+				/* From V19 onwards, the 'length' field is divided into 8 bit 'nodeflags' and 24 bit 'length'
+				 * fields.
+				 */
+				keylen = keystr->length;
+				nodeflags_keylen = *(jnl_str_len_t *)keystr;
+				*(jnl_str_len_t *)keystr = GTM_BYTESWAP_32(nodeflags_keylen);
+				if (IS_SET(rectype) || IS_ZTWORM(rectype))
+				{ 	/* SET and ZTWORM records have a 'value' part which needs to be endian converted */
+					vallen_ptr = (mstr_len_t *)&keystr->text[keylen];
+					GET_MSTR_LEN(temp_val, vallen_ptr);
+					temp_val = GTM_BYTESWAP_32(temp_val);
+					PUT_MSTR_LEN(vallen_ptr, temp_val);
+					/* The actual 'value' itself is a character array and hence needs no endian conversion */
+				}
+			} else if (JRT_TCOM == rectype)
+			{
+				assert((unsigned char *)&rec->jrec_tcom.token_seq
+					+ SIZEOF(token_seq_t) == (unsigned char *)&rec->jrec_tcom.filler_short);
+				/* endian convert num_participants */
+				rec->jrec_tcom.num_participants = GTM_BYTESWAP_16(rec->jrec_tcom.num_participants);
+			}
+			/* else records can only be JRT_NULL. The only relevant field in JRT_NULL is the sequence number which is
+			 * already endian converted.
+			 */
+			assert(jstart == jb); /* endian conversion should always happen in-place. */
+			jlen -= reclen;
+			jb += reclen;
+		}
+		if ((-1 == status) || (0 != jlen))
+		{
+			assert(FALSE);
+			rts_error(VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Originating"), &pre_read_seqno);
+		}
+		/* move on to the next transaction */
+		remaining_len -= (buflen + REPL_MSG_HDRLEN);
+		buffp += buflen;
+		assert((REPL_TR_JNL_RECS == ((repl_msg_ptr_t)(buffp))->type) || (0 == remaining_len));
+		buflen = ((repl_msg_ptr_t)(buffp))->len - REPL_MSG_HDRLEN;
+		buffp += REPL_MSG_HDRLEN;
+	}
+	if (0 != remaining_len)
+	{
+		rts_error(VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Originating"), &pre_read_seqno);
+		assert(FALSE);
+	}
+}
 
 /* The work-horse of the Source Server */
 int gtmsource_process(void)
@@ -136,11 +320,11 @@ int gtmsource_process(void)
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
-	int				tot_tr_len, send_tr_len;
+	int				tot_tr_len, send_tr_len, remaining_len, pre_cmpmsglen;
 	struct timeval			poll_time;
 	int				recvd_msg_type, recvd_start_flags;
-	uchar_ptr_t			in_buff, out_buff, save_filter_buff;
-	uint4				in_size, out_size, out_bufsiz, tot_out_size, pre_intlfilter_datalen;
+	uchar_ptr_t			in_buff, out_buff, out_buffmsg;
+	uint4				in_buflen, out_buflen, out_bufsiz;
 	seq_num				log_seqno, diff_seqno, pre_read_seqno, post_read_seqno, jnl_seqno;
 	char				err_string[1024];
 	boolean_t			xon_wait_logged, prev_catchup, catchup, force_recv_check, already_communicated;
@@ -163,22 +347,16 @@ int gtmsource_process(void)
 	repl_cmpmsg_ptr_t		send_cmpmsgp;
 	repl_start_reply_msg_ptr_t	reply_msgp;
 	boolean_t			rollback_first, secondary_ahead, secondary_was_rootprimary, secondary_is_dualsite;
+	boolean_t			rcvr_same_endianness;
 	int				semval, cmpret;
 	uLongf				cmpbuflen;
 	int4				msghdrlen;
 	Bytef				*cmpbufptr;
+	DEBUG_ONLY(uchar_ptr_t		save_inbuff;)
+	DEBUG_ONLY(uchar_ptr_t		save_outbuff;)
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_JNLNEWREC);
-	error_def(ERR_JNLSETDATA2LONG);
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_REPLFTOKSEM);
-	error_def(ERR_REPLGBL2LONG);
-	error_def(ERR_REPLINSTNOHIST);
-	error_def(ERR_REPLRECFMT);
-	error_def(ERR_REPLUPGRADESEC);
-	error_def(ERR_TRIG2NOTRIG);
-	error_def(ERR_TEXT);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
 								* a single attempt */
 	jctl = jnlpool.jnlpool_ctl;
@@ -260,13 +438,16 @@ int gtmsource_process(void)
 			repl_source_prev_log_time = time(NULL);
 		}
 		if (GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state &&
-		    SS_NORMAL != (status = gtmsource_recv_restart(&recvd_seqno, &recvd_msg_type, &recvd_start_flags)))
+		    SS_NORMAL != (status = gtmsource_recv_restart(&recvd_seqno, &recvd_msg_type, &recvd_start_flags,
+		    							&rcvr_same_endianness)))
 		{
 			if (EREPL_RECV == repl_errno)
 			{
 				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
 				{	/* Connection reset */
-					repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while receiving restart SEQNO\n");
+					repl_log(gtmsource_log_fp, TRUE, TRUE,
+							"Connection reset while receiving restart SEQNO. Status = %d ; %s\n",
+							status, STRERROR(status));
 					repl_close(&gtmsource_sock_fd);
 					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 					gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
@@ -282,7 +463,8 @@ int gtmsource_process(void)
 				if (REPL_CONN_RESET(status))
 				{
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
-					       "Connection reset while sending XOFF_ACK due to possible update process shutdown\n");
+					       "Connection reset while sending XOFF_ACK due to possible update process shutdown. "
+					       "Status = %d ; %s\n", status, STRERROR(status));
 					repl_close(&gtmsource_sock_fd);
 					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 					gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
@@ -712,21 +894,18 @@ int gtmsource_process(void)
 				"First triple written by update process. Source server proceeding.\n");
 		}
 		gtmsource_init_heartbeat();
-		/* Check if internal filters need to be activated for this secondary. This is definitely needed if
-		 * journal version is different between the two sides. In addition, if the versions are the same,
-		 * and triggers are supported, then we again need it because we do not want to replicate updates
-		 * that happened inside of trigger if the secondary also supports triggers.
+		/* Internal filters are needed as long as the filter format of the originating side is greater or equal to the
+		 * filter format of the secondary side
 		 */
-		if (GTMTRIG_ONLY(jnl_ver >= remote_jnl_ver) NON_GTMTRIG_ONLY(jnl_ver > remote_jnl_ver)
-			&& (IF_NONE != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]))
+		if ((jnl_ver >= remote_jnl_ver) && (IF_NONE != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]))
 		{
 			assert(IF_INVALID != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 			assert(IF_INVALID != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 			/* reverse transformation should exist */
 			assert(IF_NONE != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
-			if (FALSE != (null_subs_xform = (primary_side_std_null_coll   && !secondary_side_std_null_coll ||
+			if (FALSE != (REPLGBL.null_subs_xform = (primary_side_std_null_coll   && !secondary_side_std_null_coll ||
 					secondary_side_std_null_coll && !primary_side_std_null_coll)))
-				null_subs_xform = (primary_side_std_null_coll ?
+				REPLGBL.null_subs_xform = (primary_side_std_null_coll ?
 							STDNULL_TO_GTMNULL_COLL : GTMNULL_TO_STDNULL_COLL);
 			gtmsource_filter |= INTERNAL_FILTER;
 			gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
@@ -785,7 +964,7 @@ int gtmsource_process(void)
 				 */
 				if (REPL_PROTO_VER_MULTISITE <= gtmsource_local->remote_proto_ver)
 				{	/* Remote version supports multi-site functionality. Send REPL_NEW_TRIPLE and friends */
-					gtmsource_send_new_triple();
+					gtmsource_send_new_triple(rcvr_same_endianness);
 					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 						return (SS_NORMAL);
 					if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
@@ -967,15 +1146,17 @@ int gtmsource_process(void)
 						gtmsource_process_heartbeat((repl_heartbeat_msg_ptr_t)gtmsource_msgp);
 						break;
 					default:
-						repl_log(gtmsource_log_fp, TRUE, TRUE, "Message of unknown type %d length %d"
-								"received, hex dump follows\n", gtmsource_msgp->type, recvd_len);
+						repl_log(gtmsource_log_fp, TRUE, TRUE, "Message of unknown type %d of length %d "
+							"bytes received; hex dump follows\n", gtmsource_msgp->type, recvd_len);
 						for (index = 0; index < MIN(recvd_len, gtmsource_msgbufsiz - REPL_MSG_HDRLEN); )
 						{
 							repl_log(gtmsource_log_fp, FALSE, FALSE, "%.2x ",
 									gtmsource_msgp->msg[index]);
 							if ((++index) % MAX_HEXDUMP_CHARS_PER_LINE == 0)
-								repl_log(gtmsource_log_fp, FALSE, FALSE, "\n");
+								repl_log(gtmsource_log_fp, FALSE, TRUE, "\n");
 						}
+						repl_log(gtmsource_log_fp, FALSE, TRUE, "\n"); /* flush BEFORE the assert */
+						assert(FALSE);
 						break;
 				}
 			} else if (SS_NORMAL != status)
@@ -986,7 +1167,8 @@ int gtmsource_process(void)
 					{
 						/* Connection reset */
 						repl_log(gtmsource_log_fp, TRUE, TRUE,
-								"Connection reset while attempting to receive from secondary\n");
+							"Connection reset while attempting to receive from secondary."
+							" Status = %d ; %s\n", status, STRERROR(status));
 						repl_close(&gtmsource_sock_fd);
 						SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 						gtmsource_state = gtmsource_local->gtmsource_state
@@ -1029,8 +1211,10 @@ int gtmsource_process(void)
 			assert(gtmsource_state == GTMSOURCE_SENDING_JNLRECS);
 			if (force_recv_check) /* we want to poll the incoming pipe for possible XOFF */
 				continue;
+			assert(pre_read_seqno == gtmsource_local->read_jnl_seqno);
 			tot_tr_len = gtmsource_get_jnlrecs(&gtmsource_msgp->msg[0], &data_len,
-							   gtmsource_msgbufsiz - REPL_MSG_HDRLEN, NO_FILTER == gtmsource_filter);
+							   gtmsource_msgbufsiz - REPL_MSG_HDRLEN,
+							   !(gtmsource_filter & EXTERNAL_FILTER));
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
 			if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
@@ -1049,170 +1233,109 @@ int gtmsource_process(void)
 			{
 				if (0 < data_len)
 				{
+					APPLY_EXT_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_msgp, data_len, tot_tr_len);
+					gtmsource_msgp->type = REPL_TR_JNL_RECS;
+					gtmsource_msgp->len = data_len + REPL_MSG_HDRLEN;
 					send_msgp = gtmsource_msgp;
-					if (gtmsource_filter & EXTERNAL_FILTER)
-					{
-						assert(tot_tr_len == data_len + REPL_MSG_HDRLEN); /* only ONE transaction read */
-						QWSUBDW(filter_seqno, post_read_seqno, 1);
-						/* External filters routines (jnl2ext) combine multi-region TP transactions into
-						 * a single region TP transaction. By doing so, the update_num will no longer be
-						 * sorted within a region. This property is relied upon by the receiver server.
-						 * Hence sort the journal buffer before passing it on to external filters. Since
-						 * the journal records will be in a sorted order when consumed by the receiver side,
-						 * no sorting will happen in the receiver server. As long as the current journal
-						 * version is greater or equal to V19, the journal records will have update num
-						 * and they need to be sorted.
-						 */
-						if (V19_JNL_VER <= jnl_ver)
-						{
-							repl_sort_tr_buff(gtmsource_msgp->msg, data_len);
-							DBG_VERIFY_TR_BUFF_SORTED(gtmsource_msgp->msg, data_len);
-						}
-						if (SS_NORMAL != (status = repl_filter(filter_seqno, gtmsource_msgp->msg, &data_len,
-									     	       gtmsource_msgbufsiz)))
-							repl_filter_error(filter_seqno, status);
-						tot_tr_len = data_len + REPL_MSG_HDRLEN;
-					}
+					send_tr_len = tot_tr_len;
 					if (gtmsource_filter & INTERNAL_FILTER)
 					{
-						assert(tot_tr_len == data_len + REPL_MSG_HDRLEN); /* only ONE transaction read */
-						pre_intlfilter_datalen = data_len;
 						in_buff = gtmsource_msgp->msg;
-						in_size = pre_intlfilter_datalen;
-						out_buff = repl_filter_buff + REPL_MSG_HDRLEN;
+						in_buflen = data_len; /* size of the first journal record in the converted buffer */
+						out_buffmsg = repl_filter_buff;
+						out_buff = out_buffmsg + REPL_MSG_HDRLEN;
 						out_bufsiz = repl_filter_bufsiz - REPL_MSG_HDRLEN;
-						tot_out_size = 0;
-					     	while ((status = repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL](
-								in_buff, &in_size, out_buff, &out_size, out_bufsiz)) != SS_NORMAL
-							&& (EREPL_INTLFILTER_NOSPC == repl_errno))
+						remaining_len = tot_tr_len;
+						while (JREC_PREFIX_SIZE <= remaining_len)
 						{
-							save_filter_buff = repl_filter_buff;
-							gtmsource_alloc_filter_buff(repl_filter_bufsiz + (repl_filter_bufsiz >> 1));
-							in_buff += in_size;
-							in_size = (uint4)(pre_intlfilter_datalen - (in_buff - gtmsource_msgp->msg));
-							out_bufsiz = (uint4)(repl_filter_bufsiz -
-									     (out_buff - save_filter_buff) - out_size);
-							out_buff = repl_filter_buff + (out_buff - save_filter_buff) + out_size;
-							tot_out_size += out_size;
-						}
-						if (SS_NORMAL == status)
-						{
-							data_len = tot_out_size + out_size;
-							tot_tr_len = data_len + REPL_MSG_HDRLEN;
-							send_msgp = (repl_msg_ptr_t)repl_filter_buff;
-#							ifdef GTM_TRIGGER
-							if (!secondary_side_trigger_support
-								&& !trig_replic_warning_issued
-								&& QWNE(trig_replic_suspect_seqno, seq_num_zero))
-							{
-								/* Note: The below repl_log text is copied from TRIG2NOTRIG
-								 * error message content from merrors.msg. Change to one
-								 * should be reflect in another
+							filter_seqno = ((struct_jrec_null *)(in_buff))->jnl_seqno;
+							DEBUG_ONLY(
+								save_inbuff = in_buff;
+								save_outbuff = out_buff;
+							)
+							APPLY_INT_FILTER(in_buff, in_buflen, out_buff, out_buflen,
+											out_bufsiz, status);
+							/* Internal filters should not modify the incoming pointers. Assert that. */
+							assert((save_inbuff == in_buff) && (save_outbuff == out_buff));
+							if (SS_NORMAL == status)
+							{	/* adjust various pointers and book-keeping values to move to next
+								 * record.
 								 */
-								repl_log(gtmsource_log_fp, TRUE, TRUE,
-								"Warning: Sending transaction sequence number %d which used "
-								"triggers to a replicator that does not support triggers",
-								trig_replic_suspect_seqno);
-								send_msg(VARLSTCNT(3) ERR_TRIG2NOTRIG, 1,
-										&trig_replic_suspect_seqno);
-								/* No more warnings till restart */
-								trig_replic_warning_issued = TRUE;
-								QWASSIGN(trig_replic_suspect_seqno, seq_num_zero);
+								((repl_msg_ptr_t)(out_buffmsg))->type = REPL_TR_JNL_RECS;
+								((repl_msg_ptr_t)(out_buffmsg))->len = out_buflen + REPL_MSG_HDRLEN;
+								out_buffmsg = (out_buff + out_buflen);
+								remaining_len -= (in_buflen + REPL_MSG_HDRLEN);
+								assert(0 <= remaining_len);
+								if (0 >= remaining_len)
+									break;
+								in_buff += in_buflen;
+								in_buflen = ((repl_msg_ptr_t)(in_buff))->len - REPL_MSG_HDRLEN;
+								in_buff += REPL_MSG_HDRLEN;
+								out_buff = (out_buffmsg + REPL_MSG_HDRLEN);
+								out_bufsiz -= (out_buflen + REPL_MSG_HDRLEN);
+								assert(0 <= (int)out_bufsiz);
+							} else if (EREPL_INTLFILTER_NOSPC == repl_errno)
+							{
+								REALLOCATE_INT_FILTER_BUFF(out_buff, out_buffmsg, out_bufsiz);
+								/* note that in_buff and in_buflen is not changed so that we can
+								 * start from where we left
+								 */
+							} else
+							{
+								INT_FILTER_RTS_ERROR(status, filter_seqno);
 							}
-#							endif
-						} else
-						{
-							if (EREPL_INTLFILTER_BADREC == repl_errno)
-								rts_error(VARLSTCNT(1) ERR_REPLRECFMT);
-							else if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
-								rts_error(VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2, jnl_source_datalen,
-								  	  jnl_dest_maxdatalen);
-							else if (EREPL_INTLFILTER_NEWREC == repl_errno)
-								rts_error(VARLSTCNT(4) ERR_JNLNEWREC, 2,
-									  (unsigned int)jnl_source_rectype,
-								  	  (unsigned int)jnl_dest_maxrectype);
-							else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
-								rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);
-							else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
-								GTMASSERT;
 						}
+						assert(0 == remaining_len);
+						GTMTRIG_ONLY(ISSUE_TRIG2NOTRIG_IF_NEEDED;)
+						send_msgp = (repl_msg_ptr_t)repl_filter_buff;
+						send_tr_len = out_buffmsg - repl_filter_buff;
 					}
-					send_msgp->type = REPL_TR_JNL_RECS;
-					send_msgp->len = data_len + REPL_MSG_HDRLEN;
+					assert(send_tr_len && (0 == (send_tr_len % REPL_MSG_ALIGN)));
+					/* ensure that the head of the buffer has the correct type and len */
+					assert((REPL_TR_JNL_RECS == send_msgp->type)
+							&& (0 == (send_msgp->len % JNL_REC_START_BNDRY)));
+					/* At this point send_msgp is the buffer to be sent and send_tr_len is the send size */
+					if (!rcvr_same_endianness && (jnl_ver < remote_jnl_ver))
+					{	/* Cross-endian replication with GT.M version on primary being lesser than that
+						 * the secondary. Do the endian conversion in the primary so that the secondary
+						 * can consume it as-is.
+						 * No return if the below call to repl_tr_endian_convert fails.
+						 */
+						repl_tr_endian_convert(send_msgp, send_tr_len, pre_read_seqno);
+					}
+					pre_cmpmsglen = send_tr_len; /* send_tr_len will be updated below */
 					if (ZLIB_CMPLVL_NONE != repl_zlib_cmp_level)
 					{	/* Compress the journal records before replicating them across the pipe.
 						 * Depending on whether the total data length to be sent is within a threshold
 						 * or not (see repl_msg.h before REPL_TR_CMP_THRESHOLD #define for why), send
 						 * either a REPL_TR_CMP_JNL_RECS or REPL_TR_CMP_JNL_RECS2 message
 						 */
-						msghdrlen = (REPL_TR_CMP_THRESHOLD > tot_tr_len)
+						msghdrlen = (REPL_TR_CMP_THRESHOLD > send_tr_len)
 									? REPL_MSG_HDRLEN : REPL_MSG_HDRLEN2;
 						cmpbuflen = gtmsource_cmpmsgbufsiz - msghdrlen;
 						cmpbufptr = ((Bytef *)gtmsource_cmpmsgp) + msghdrlen;
-						ZLIB_COMPRESS(cmpbufptr, cmpbuflen, send_msgp, tot_tr_len,
+						ZLIB_COMPRESS(cmpbufptr, cmpbuflen, send_msgp, send_tr_len,
 								repl_zlib_cmp_level, cmpret);
-						switch(cmpret)
-						{
-							case Z_MEM_ERROR:
-								assert(FALSE);
-								repl_log(gtmsource_log_fp, TRUE, FALSE, "Out-of-memory error from"
-									" compress function while compressing %d bytes\n",
-									tot_tr_len);
-								break;
-							case Z_BUF_ERROR:
-								assert(FALSE);
-								repl_log(gtmsource_log_fp, TRUE, FALSE, "Insufficient output "
-									"buffer error from compress function while "
-									"compressing %d bytes\n", tot_tr_len);
-								break;
-							case Z_STREAM_ERROR:
-								assert(FALSE);
-								/* level was incorrectly specified. Default to NO compression. */
-								repl_log(gtmsource_log_fp, TRUE, FALSE, "Compression level %d "
-									"invalid error from compress function while compressing "
-									"%d bytes\n", repl_zlib_cmp_level, tot_tr_len);
-								break;
-						}
+						BREAK_IF_CMP_ERROR(cmpret, send_tr_len); /* Note: break stmt. inside the macro */
 						if (Z_OK == cmpret)
 						{	/* Send compressed buffer */
 							send_msgp = gtmsource_cmpmsgp;
-							if (REPL_TR_CMP_THRESHOLD > tot_tr_len)
+							if (REPL_TR_CMP_THRESHOLD > send_tr_len)
 							{	/* Send REPL_TR_CMP_JNL_RECS message with 8-byte header */
-								send_msgp->type = (tot_tr_len << REPL_TR_CMP_MSG_TYPE_BITS)
-											| REPL_TR_CMP_JNL_RECS;
-								send_msgp->len = (int4)cmpbuflen + msghdrlen;
-								/* Note that a compressed message need not be 8-byte aligned even
-								 * though the input message was. So round it up to the nearest
-								 * align boundary. The actual message will contain the unaligned
-								 * length which is what the receiver will receive. But the # of
-								 * bytes transmitted across will be the aligned length.
-								 */
-								send_tr_len = ROUND_UP(send_msgp->len, REPL_MSG_ALIGN);
+								SET_8BYTE_CMP_MSGHDR(send_msgp, send_tr_len, cmpbuflen, msghdrlen);
 							} else
 							{	/* Send REPL_TR_CMP_JNL_RECS2 message with 16-byte header */
-								send_cmpmsgp = (repl_cmpmsg_ptr_t)send_msgp;
-								assert(&send_cmpmsgp->type == &send_msgp->type);
-								assert(&send_cmpmsgp->len == &send_msgp->len);
-								send_cmpmsgp->type = REPL_TR_CMP_JNL_RECS2;
-								/* Note that a compressed message need not be 8-byte aligned even
-								 * though the input message was. So round it up to the nearest
-								 * align boundary.
-								 */
-								send_cmpmsgp->len = (int4)(ROUND_UP(cmpbuflen + msghdrlen,
-									REPL_MSG_ALIGN));
-								send_cmpmsgp->uncmplen = tot_tr_len;
-								send_cmpmsgp->cmplen = (int4)cmpbuflen;
-								send_tr_len = send_msgp->len;
+								SET_16BYTE_CMP_MSGHDR(send_msgp, send_tr_len, cmpbuflen, msghdrlen);
 							}
 						} else
 						{	/* Send normal buffer */
 							repl_log(gtmsource_log_fp, TRUE, FALSE, "Defaulting to NO compression\n");
 							repl_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* no compression */
 							gtmsource_local->repl_zlib_cmp_level = repl_zlib_cmp_level;
-							send_tr_len = tot_tr_len;
 						}
-					} else
-						send_tr_len = tot_tr_len;
+
+					}
+					assert((send_tr_len == pre_cmpmsglen) || (ZLIB_CMPLVL_NONE != repl_zlib_cmp_level));
 					assert(0 == (send_tr_len % REPL_MSG_ALIGN));
 					/* The following loop tries to send multiple seqnos in one shot. resync_seqno gets
 					 * updated once the send is completely successful. If an error occurs in the middle
@@ -1243,8 +1366,9 @@ int gtmsource_process(void)
 						{
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
 								"Connection reset while sending seqno data from "
-								"%llu [0x%llx] to %llu [0x%llx]\n", pre_read_seqno,
-								pre_read_seqno, post_read_seqno, post_read_seqno);
+								"%llu [0x%llx] to %llu [0x%llx]. Status = %d ; %s\n",
+								pre_read_seqno, pre_read_seqno, post_read_seqno, post_read_seqno,
+								status, STRERROR(status));
 							repl_close(&gtmsource_sock_fd);
 							SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 							gtmsource_state = gtmsource_local->gtmsource_state
@@ -1298,8 +1422,8 @@ int gtmsource_process(void)
 					if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time))
 						gtmsource_flush_fh(post_read_seqno);
 					repl_source_cmp_sent += (qw_num)send_tr_len;
-					repl_source_msg_sent += (qw_num)tot_tr_len;
-					repl_source_data_sent += (qw_num)(tot_tr_len)
+					repl_source_msg_sent += (qw_num)pre_cmpmsglen;
+					repl_source_data_sent += (qw_num)(pre_cmpmsglen)
 								- (post_read_seqno - pre_read_seqno) * REPL_MSG_HDRLEN;
 					log_seqno = post_read_seqno - 1; /* post_read_seqno is the "next" seqno to be sent,
 									      * not the last one we sent */

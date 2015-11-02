@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,6 @@
 #include "tp.h"
 
 GBLREF sgm_info		*sgm_info_ptr;
-GBLREF short		dollar_tlevel;
 
 void tp_get_cw (cw_set_element *cs, int depth, cw_set_element **cs1)
 {

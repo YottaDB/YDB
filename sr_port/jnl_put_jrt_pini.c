@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,13 +27,11 @@
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
-#include "hashtab.h"
 #include "muprec.h"
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	jnl_process_vector	*originator_prc_vec;
-GBLREF	short			dollar_tlevel;
 GBLREF 	jnl_gbls_t		jgbl;
 
 void	jnl_put_jrt_pini(sgmnt_addrs *csa)

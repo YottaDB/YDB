@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,10 @@
 
 #include "mdef.h"
 
-GBLDEF short		dollar_tlevel;
-GBLDEF unsigned short	dollar_trestart;
+#include "gdsroot.h"
+
+GBLDEF uint4		dollar_tlevel;
+GBLDEF uint4		dollar_trestart;
 GBLDEF unsigned char	*tpstackbase, *tpstacktop, *tpstackwarn, *tp_sp;
-GBLDEF int		tp_allocation_clue;
-GBLDEF bool		tp_kill_bitmaps;
+GBLDEF block_id		tp_allocation_clue;
+GBLDEF boolean_t	tp_kill_bitmaps;

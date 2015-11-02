@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,18 +36,20 @@ GBLREF gv_namehead	*reset_gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gvzwrite_datablk	gvzwrite_block;
+GBLREF gvzwrite_datablk	*gvzwrite_block;
 GBLREF gd_binding	*gd_map;
 GBLREF gd_binding	*gd_map_top;
+
+error_def(ERR_GVNAKED);
 
 void gvzwr_fini(zshow_out *out, int pat)
 {
 	char 		m[SIZEOF(mident_fixed)];
 	mval 		local, data;
 	gv_key		*old;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_GVNAKED);
-
+	SETUP_THREADGBL_ACCESS;
 	if (!gv_currkey)
 		gvinit();
 
@@ -57,16 +59,18 @@ void gvzwr_fini(zshow_out *out, int pat)
 	assert(INVALID_GV_TARGET == reset_gv_target);
 	reset_gv_target = gv_target;
 	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
-	gvzwrite_block.gd_reg = gv_cur_region;
-	gvzwrite_block.old_targ = (unsigned char *)gv_target;
+	gvzwrite_block->gd_reg = gv_cur_region;
+	gvzwrite_block->old_targ = (unsigned char *)gv_target;
 	old = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end);
-	gvzwrite_block.old_key = (unsigned char *)old;
-	memcpy(gvzwrite_block.old_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
-	gvzwrite_block.old_map = gd_map;
-	gvzwrite_block.old_map_top = gd_map_top;
+	gvzwrite_block->old_key = (unsigned char *)old;
+	memcpy(gvzwrite_block->old_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
+	gvzwrite_block->old_map = gd_map;
+	gvzwrite_block->old_map_top = gd_map_top;
+	gvzwrite_block->gv_last_subsc_null = TREF(gv_last_subsc_null);
+	gvzwrite_block->gv_some_subsc_null = TREF(gv_some_subsc_null);
 	if (!pat)
 	{
-		local = *gvzwrite_block.pat;
+		local = *gvzwrite_block->pat;
 		if (local.str.len)  /* New reference. Will get new gv_target.. */
 		{
 			gv_target = NULL;
@@ -77,7 +81,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 				sgnl_gvundef();
 			else
 			{
-				gvzwrite_block.fixed = (gvzwrite_block.fixed ? TRUE : FALSE);
+				gvzwrite_block->fixed = (gvzwrite_block->fixed ? TRUE : FALSE);
 				gvzwr_var(MV_FORCE_INTD(&data), 0);
 			}
 		} else               /* Old (naked) reference. Keep previous gv_target reference */
@@ -93,7 +97,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 				sgnl_gvundef();
 			else
 			{
-				gvzwrite_block.fixed = (gvzwrite_block.fixed ? TRUE : FALSE);
+				gvzwrite_block->fixed = (gvzwrite_block->fixed ? TRUE : FALSE);
 				gvzwr_var((int4)MV_FORCE_INTD(&data), 0);
 			}
 		}
@@ -106,11 +110,11 @@ void gvzwr_fini(zshow_out *out, int pat)
 		local.str.len = 1;
 		m[0] = '%';
 
-		gvzwrite_block.fixed = FALSE;
+		gvzwrite_block->fixed = FALSE;
 		for (; ;)
 		{
 			op_gvname(VARLSTCNT(1) &local);
-			if (do_pattern(&local, gvzwrite_block.pat))
+			if (do_pattern(&local, gvzwrite_block->pat))
 			{
 				op_gvdata(&data);
 				if ((MV_FORCE_INTD(&data)))

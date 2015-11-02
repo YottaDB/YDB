@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 		letter = src->str.addr[isrc];
 		switch (state)
 		{
-			case 0:
+			case 0:		/* start of name */
 				if ('^' == letter)	/* before start of name */
 				{
 					state = 1;	/* check for environment */
@@ -91,7 +91,7 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 					break;
 				}
 				return FALSE;
-			case 1:
+			case 1:		/* global name */
 				if (('%' == letter) ||ISALPHA_ASCII(letter))	/* found ^ allow environment */
 				{	/* found ^ allow environment */
 					if (0 == seq)
@@ -109,8 +109,8 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 					break;
 				}
 				return FALSE;
-			case 2:
-				point = 0; /* dispatch for starting a component */
+			case 2:		 /* dispatch for starting a component */
+				point = 0;
 				instring = FALSE;
 				if (envpart > 1)
 					return FALSE;	/* too many environment components */
@@ -154,7 +154,7 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 					break;
 				}
 				return FALSE;
-			case 3:
+			case 3:		/* [quoted] string */
 				if ('"' == letter)	/* in string */
 				{
 					instring = !instring;
@@ -187,7 +187,7 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 						stop = isrc - (keep_quotes ? 0 : 1);
 				}
 				break;
-			case 4:
+			case 4:		/* numeric */
 				if (ISDIGIT_ASCII(letter))	/* in number */
 				{
 					if (('-' == previous) && ('0' == letter))
@@ -214,8 +214,8 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 					stop = isrc;
 				previous = letter;
 				break;
-			case 5:
-				if (('%' == letter) || ISALPHA_ASCII(letter))		/* expect first letter of name */
+			case 5:		/* expect first letter of name */
+				if (('%' == letter) || ISALPHA_ASCII(letter))
 				{
 					if (0 == seq)
 						start = isrc;
@@ -223,8 +223,8 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 					break;
 				}
 				return FALSE;
-			case 6:
-				if ('(' == letter)	/* expect next letter of name */
+			case 6:		/* expect next letter of name */
+				if ('(' == letter)
 				{
 					term = ')';
 					envpart = 1;
@@ -235,7 +235,7 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 				} else if (!ISALNUM_ASCII(letter))
 					return FALSE;
 				break;
-			case 7:
+			case 7:		/* $[Z]CHAR() */
 				previous = letter;	/* in $CHAR() - must be ASCII */
 				if (('Z' == letter) || ('z' == letter))
 				{	if (++isrc < src->str.len)
@@ -320,8 +320,8 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 				if ((subs_count == seq) && (0 == stop))
 					stop = isrc - (keep_quotes ? 0 : 1);	/* Not returning 2nd env part - maybe problem */
 				break;
-			case 8:
-				return FALSE;	/* at end of subscript - ) */
+			case 8:		/* end of subscript but no closing paren - ")" */
+				return FALSE;
 				break;
 		}
 #		ifdef UNICODE_SUPPORTED

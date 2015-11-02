@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,63 +12,54 @@
 /*
  *--------------------------------------------------------------------------
  * Descriptipn:
- * 	Given a non-null lv_val *, this will format the entire local variable key
- * 	This will traverse the local variable tree towards root and
- *	do exhaustive search in the blocks to format all the subscripts.
- * Note:
- *	This is very inefficient way to format key. But given the
- *	local variable design there is no other simple solution
- *	to format a key from *lv_val.
+ * 	Given a non-null lv_val *, this will format the subscripted local variable key
+ *	starting from the base variable lv_val *.
  * Input:
  *	lvpin: Pointer to the last subscript's lv_val
- * 	buff: Buffer where key will be formatted
- * 	size: Size of buff
+ * 	buff : Buffer where key will be formatted
+ * 	size : Size of buff
  * Return Value:
- *	End address upto which buffer was  used to format the key
- *	(Needed for the length calculation in caller)
+ *	End address upto which buffer was used to format the key
+ *	(Needed for length calculation in caller)
  *--------------------------------------------------------------------------
  */
 
 #include "mdef.h"
 
-#include "subscript.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "gtm_string.h"
 #include "mvalconv.h"
-#include "lvname_info.h"
-
-void get_tbl_subs(lv_val *startlvp, lv_sbs_tbl *tbl, int type[], int index[], int cntfmt);
+#include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
 
 unsigned char	*format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size)
 {
-	int		cnt;
+	boolean_t	is_base_var;
+	int		cnt, cntfmt;
+	lv_val		*lv, *base_lv;
 	mval		tempmv;
-	int		cntfmt = 0, type[MAX_LVSUBSCRIPTS], index[MAX_LVSUBSCRIPTS];
-	lv_sbs_tbl      *tbl, *key_tbl[MAX_LVSUBSCRIPTS];
-	lv_val		*startlvp;
+	tree		*lvt;
+	treeNode	*node, *nodep[MAX_LVSUBSCRIPTS];
 	unsigned char	*endbuff;
 
-	if (!lvpin)
+	if (NULL == lvpin)
 		return buff;
-
-	startlvp = lvpin;
-	tbl = startlvp->ptrs.val_ent.parent.sbs;
-	assert(tbl);
-	while (MV_SYM != tbl->ident)
+	lv = lvpin;
+	is_base_var = LV_IS_BASE_VAR(lv);
+	base_lv = !is_base_var ? LV_GET_BASE_VAR(lv) : lv;
+	cntfmt = 0;
+	while (lv != base_lv)
 	{
-		key_tbl[cntfmt] = tbl;
-		get_tbl_subs(startlvp, tbl, type, index, cntfmt++);
-		startlvp = tbl->lv;
-		tbl = startlvp->ptrs.val_ent.parent.sbs;
+		assert(!LV_IS_BASE_VAR(lv));
+		nodep[cntfmt++] = (treeNode *)lv;
+		lvt = LV_GET_PARENT_TREE(lv);
+		assert(NULL != lvt);
+		assert(lvt->base_lv == base_lv);
+		lv = (lv_val *)lvt->sbs_parent;
+		assert(NULL != lv);
 	}
-	assert(MV_SYM == tbl->ident);
-
-	endbuff = format_lvname(startlvp, buff, size);
+	endbuff = format_lvname(base_lv, buff, size);
 	size -= (int)(endbuff - buff);
 	buff = endbuff;
-
 	if (cntfmt)
 	{
 		if (size < 1)
@@ -76,28 +67,13 @@ unsigned char	*format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size)
 		*buff++ = '(';
 		size--;
 	}
-	for(cnt = cntfmt - 1; cnt >= 0; cnt--)
+	for (cnt = cntfmt - 1; cnt >= 0; cnt--)
 	{
-		switch(type[cnt])
-		{
-		case SBS_BLK_TYPE_INT:
-			MV_FORCE_MVAL(&tempmv, index[cnt]);
-			MV_FORCE_STRD(&tempmv);
-			break;
-		case SBS_BLK_TYPE_FLT:
-			MV_ASGN_FLT2MVAL(tempmv, key_tbl[cnt]->num->ptr.sbs_flt[index[cnt]].flt);
-			MV_FORCE_STRD(&tempmv);
-			break;
-		case SBS_BLK_TYPE_STR:
-			tempmv.str = key_tbl[cnt]->str->ptr.sbs_str[index[cnt]].str;
-			break;
-		default:
-			GTMASSERT;
-			break;
-		}
+		node = nodep[cnt];
+		LV_NODE_GET_KEY(node, &tempmv); /* Get node key into "tempmv" depending on the structure type of "node" */
+		MV_FORCE_STRD(&tempmv);
 		if (size < tempmv.str.len)
-		{
-			/* copy as much space as we have */
+		{	/* copy as much space as we have */
 			memcpy(buff, tempmv.str.addr, size);
 			buff += size;
 			return buff;
@@ -121,52 +97,4 @@ unsigned char	*format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size)
 		size--;
 	}
 	return buff;
-}
-void get_tbl_subs(lv_val *startlvp, lv_sbs_tbl *tbl, int type[], int index[], int cntfmt)
-{
-	int cnt;
-	boolean_t found = FALSE;
-	if (tbl->num)
-	{
-		if (tbl->int_flag)
-		{
-			for (cnt = 0; cnt < SBS_NUM_INT_ELE; cnt++)
-			{
-				if (tbl->num->ptr.lv[cnt] == startlvp)
-				{
-					type[cntfmt] = SBS_BLK_TYPE_INT;
-					index[cntfmt] = cnt;
-					found = TRUE;
-					break;
-				}
-			}
-		}
-		else
-		{
-			for (cnt = 0; cnt < tbl->num->cnt; cnt++)
-			{
-				if (tbl->num->ptr.sbs_flt[cnt].lv == startlvp)
-				{
-					type[cntfmt] = SBS_BLK_TYPE_FLT;
-					index[cntfmt] = cnt;
-					found = TRUE;
-					break;
-				}
-			}
-		}
-	}
-	if (!found && tbl->str)
-	{
-		for (cnt = 0; cnt < tbl->str->cnt; cnt++)
-		{
-			if (tbl->str->ptr.sbs_str[cnt].lv == startlvp)
-			{
-				type[cntfmt] = SBS_BLK_TYPE_STR;
-				index[cntfmt] = cnt;
-				found = TRUE;
-				break;
-			}
-		}
-	}
-	assert(found);
 }

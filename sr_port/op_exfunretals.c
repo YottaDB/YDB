@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,8 +15,6 @@
 #include "stack_frame.h"
 #include "op.h"
 #include "hashtab_mname.h"
-#include "hashtab.h"
-#include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -39,7 +37,6 @@ error_def(ERR_ALIASEXPECTED);
 void op_exfunretals(mval *retval)
 {
 	unsigned short	savtyp;
-	lv_val		*srclvc;
 
 	savtyp = retval->mvtype;
 	retval->mvtype &= ~MV_RETARG;

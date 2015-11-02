@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,15 +12,23 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
+#include "gtm_stdio.h"
 
 #include "error.h"
 #include "rtnhdr.h"
 #include "srcline.h"
 #include "op.h"
 #include "stringpool.h"
+#ifdef GTM_TRIGGER
+# include "gtm_trigger_trc.h"
+#endif
 
 GBLREF spdesc stringpool;
+
+error_def(ERR_TXTNEGLIN);
+error_def(ERR_TXTSRCMAT);
+error_def(ERR_ZLINKFILE);
+error_def(ERR_ZLMODULE);
 
 void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 /* label contains label to be located or null string */
@@ -33,11 +41,7 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	mstr		*sld;
 	uint4		stat;
 	rhdtyp		*rtn_vector;
-
-	error_def(ERR_TXTNEGLIN);
-	error_def(ERR_TXTSRCMAT);
-	error_def(ERR_ZLINKFILE);
-	error_def(ERR_ZLMODULE);
+	boolean_t	is_trigger;
 
 	MV_FORCE_STR(label);
 	MV_FORCE_STR(rtn);
@@ -47,18 +51,25 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	ret->mvtype = MV_STR;
 	sld = (mstr *)NULL;
 	ESTABLISH(fntext_ch);	/* to swallow errors and permit an emptystring result */
-	if ((int_exp == 0) && ((label->str.len == 0) || (*label->str.addr == 0)))
+	GTMTRIG_ONLY(IS_TRIGGER_RTN(&temp_rtn->str, is_trigger));
+	if ((0 == int_exp) && ((0 == label->str.len) || (0 == *label->str.addr)))
 		stat = ZEROLINE;
 	else
-		stat = get_src_line(temp_rtn, label, int_exp, &sld);
-	if ((FALSE == (stat & CHECKSUMFAIL)) && (FALSE == (stat & NEGATIVELINE)))
+	{
+		GTMTRIG_ONLY(if (is_trigger) DBGTRIGR((stderr, "op_fntext: fetching $TEXT() source for a trigger\n")));
+		stat = get_src_line(temp_rtn, label, int_exp, &sld, VERIFY);
+	}
+	if (0 == (stat & (CHECKSUMFAIL | NEGATIVELINE)))
 	{
 		if (stat & ZEROLINE)
 		{
 			if (NULL == (rtn_vector = find_rtn_hdr(&temp_rtn->str)))
 			{	/* not here, so try to bring it in */
-				op_zlink(temp_rtn, 0);
-				rtn_vector = find_rtn_hdr(&temp_rtn->str);
+				GTMTRIG_ONLY(if (!is_trigger))	/* Triggers cannot be loaded in this fashion */
+				{
+					op_zlink(temp_rtn, 0);
+					rtn_vector = find_rtn_hdr(&temp_rtn->str);
+				}
 			}
 			if (NULL != rtn_vector)
 			{

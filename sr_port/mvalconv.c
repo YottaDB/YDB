@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 
 #include "arit.h"
 #include "mvalconv.h"
-#include "gtm_stdio.h"	/* this is here due to the need for an sprintf,
+#include "gtm_stdio.h"	/* this is here due to the need for an SPRINTF,
 			 * which is in turn due the kudge that is the current double2mval routine
 			 */
 
@@ -132,42 +132,6 @@ void	i2mval(mval *v, int i)
 	}
 }
 
-void	i2flt(mflt *v, int i)
-{
-	int	exp;
-	int4	n;
-
-	if (i < 0)
-	{
-		v->sgn = 1;
-		n = -i;
-	} else
-	{
-		n = i;
-		v->sgn = 0;
-	}
-	if (n < INT_HI)
-	{
-		v->e = 0;
-		v->sgn = 0;
-		v->m[1] = MV_BIAS * i;
-	} else if (n < MANT_HI)
-	{
-		exp = 8;
-		while (n < ten_pwr[exp])
-			exp--;
-		v->m[1] = n * ten_pwr[8 - exp];
-		v->m[0] = 0;
-		v->e = exp + MV_XBIAS;
-	} else
-	{
-		v->m[0] = (n % 10) * MANT_LO;
-		v->m[1] = n / 10;
-		v->e = EXP_IDX_BIAL;
-	}
-	assert(v->m[1] < MANT_HI);
-}
-
 double mval2double(mval *v)
 {
 	double	x, y;
@@ -266,23 +230,48 @@ uint4 mval2ui(mval *v)
 	return i;
 }
 
-/* isint == v can be represented as a 9 digit (or less) integer */
-bool isint (mval *v)
+/* isint == v can be represented as a 9 digit (or less) integer (positive or negative).
+ * If return value is TRUE, then "*intval" contains the integer value stored in "v".
+ * Note: "*intval" could have been updated even if return value is FALSE.
+ */
+boolean_t isint(mval *v, int4 *intval)
 {
-	int	exp;
-	int4	div;
+	int			exp, m1, mvtype, divisor, m1_div, m1_sgn;
+	DEBUG_ONLY(boolean_t	is_canonical;)
 
-	if (!(MV_IS_NUMERIC(v)))
+	mvtype = v->mvtype;
+	/* Note that input mval might have "MV_NM" bit set even though it is not a numeric (i.e. a string).
+	 * This is possible in case the input mval is a constant literal string. In this case, since these
+	 * might reside in read-only sections of the executable and the MV_FORCE_* macros might not be able
+	 * to touch them, we define the numeric portions of the mval to be 0 and set the MV_NM bit as well.
+	 * But in addition, the MV_NUM_APPROX bit will be set to indicate this is an approximation. So if we
+	 * see the MV_NM bit set, we should also check the MV_NUM_APPROX bit is unset before we go ahead
+	 * and check the numeric part of this mval for whether it is an integer.
+	 */
+	DEBUG_ONLY(
+		is_canonical = MV_IS_CANONICAL(v);
+		assert(!is_canonical || (MVTYPE_IS_NUMERIC(mvtype) && !MVTYPE_IS_NUM_APPROX(mvtype)));
+	)
+	if (!MVTYPE_IS_NUMERIC(mvtype) || MVTYPE_IS_NUM_APPROX(mvtype))
 		return FALSE;
 	assert(v->m[1] < MANT_HI);
-	if (v->mvtype & MV_INT)
-		return (v->m[1]/MV_BIAS * MV_BIAS) == v->m[1];
-	else
+	if (mvtype & MV_INT)
+	{
+		divisor = MV_BIAS;
+		m1 = v->m[1];
+	} else
 	{
 		exp = v->e;
-		if (exp < MV_XBIAS || exp > EXP_IDX_BIAL || v->m[0]!=0)
+		if ((MV_XBIAS >= exp) || (EXP_IDX_BIAL < exp) || (0 != v->m[0]))
 			return FALSE;
-		div = ten_pwr[EXP_IDX_BIAL - exp];
-		return (v->m[1] / div * div) == v->m[1];
+		divisor = ten_pwr[EXP_IDX_BIAL - exp];
+		if (v->sgn)
+			m1 = -v->m[1];
+		else
+			m1 = v->m[1];
 	}
+	m1_div = (m1 / divisor);
+	assert(NULL != intval);
+	*intval = m1_div;
+	return ((m1_div * divisor) == m1);
 }

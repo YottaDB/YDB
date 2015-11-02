@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,7 +102,7 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
                 cse->done = TRUE;
         }
 	/* Call t_end till it succeeds or aborts (error will be reported) */
-	while ((trans_num)0 == t_end(&alt_hist, 0))
+	while ((trans_num)0 == t_end(&alt_hist, NULL, TN_NOT_SPECIFIED))
 		;
 	return;
 }

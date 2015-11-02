@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,6 @@
  ****************************************************************/
 
 /*	gtmxc_types.h - GT.M, Unix Edition External Call type definitions.  */
-
 #ifndef GTMXC_TYPES_H
 #define GTMXC_TYPES_H
 
@@ -62,8 +61,15 @@ typedef xc_char_t	gtm_char_t;
 typedef xc_string_t	gtm_string_t;
 typedef xc_pointertofunc_t	gtm_pointertofunc_t;
 
+typedef struct
+{
+        gtm_string_t rtn_name;
+        void* handle;
+} ci_name_descriptor;
+
 /* call-in interface */
 xc_status_t 	gtm_ci(const char *c_rtn_name, ...);
+xc_status_t 	gtm_cip(ci_name_descriptor *ci_info, ...);
 xc_status_t 	gtm_init(void);
 xc_status_t 	gtm_exit(void);
 void 		gtm_zstatus(char* msg, int len);

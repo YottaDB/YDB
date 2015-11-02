@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,7 +89,7 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
 			/* If near end of loop, see if target is dead and/or wake it up */
 			if (RETRY_CASLATCH_CUTOFF == retries)
-				performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+				performCASLatchCheck(&base->latch, TRUE);
 		}
 	}
 	DUMP_LOCKHIST();
@@ -136,7 +136,7 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 			/* If near end of loop, see if target is dead and/or wake it up */
 			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
 			if (RETRY_CASLATCH_CUTOFF == retries)
-				performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+				performCASLatchCheck(&base->latch, TRUE);
 		}
 	}
 	DUMP_LOCKHIST();
@@ -191,7 +191,7 @@ void_ptr_t remqhi1(que_head_ptr_t base)
 			/* If near end of loop, see if target is dead and/or wake it up */
 			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
 			if (RETRY_CASLATCH_CUTOFF == retries)
-				performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+				performCASLatchCheck(&base->latch, TRUE);
 		}
 	}
 	DUMP_LOCKHIST();
@@ -246,7 +246,7 @@ void_ptr_t remqti1(que_head_ptr_t base)
 			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
 			/* If near end of loop, see if target is dead and/or wake it up */
 			if (RETRY_CASLATCH_CUTOFF == retries)
-				performCASLatchCheck(&base->latch, LOOP_CNT_SEND_WAKEUP);
+				performCASLatchCheck(&base->latch, TRUE);
 		}
 	}
 	DUMP_LOCKHIST();

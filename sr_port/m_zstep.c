@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,10 @@ GBLREF mval 		window_mval;
 GBLREF mident 		window_ident;
 GBLREF char 		director_token;
 GBLREF short int 	source_column;
-GBLREF short int 	last_source_column;
+
+error_def(ERR_INVZSTEP);
+error_def(ERR_ZSTEPARG);
+
 static readonly nametabent zstep_names[] =
 {
 	 { 1, "I"}, { 4, "INTO"}
@@ -51,12 +54,11 @@ int m_zstep(void)
 	int	x;
 	oprtype action;
 	opctype	op;
-	error_def(ERR_INVZSTEP);
-	error_def(ERR_ZSTEPARG);
+	DCL_THREADGBL_ACCESS;
 
-	assert(zstep_index[26] == (SIZEOF(zstep_names)/SIZEOF(nametabent)));
+	SETUP_THREADGBL_ACCESS;
+	assert((SIZEOF(zstep_names) / SIZEOF(nametabent)) == zstep_index[26]);
 	op = OC_ZSTEP;
-
 	switch(window_token)
 	{
 	case TK_SPACE:
@@ -64,7 +66,7 @@ int m_zstep(void)
 		type = ZSTEP_OVER;
 		break;
 	case TK_IDENT:
-		if ((x = namelook(zstep_index, zstep_names, window_ident.addr, window_ident.len)) < 0)
+		if (0 > (x = namelook(zstep_index, zstep_names, window_ident.addr, window_ident.len)))	/* assignment */
 		{
 			stx_error(ERR_INVZSTEP);
 			return FALSE;
@@ -77,7 +79,7 @@ int m_zstep(void)
 		return FALSE;
 		break;
 	}
-	if (window_token == TK_COLON)
+	if (TK_COLON == window_token)
 	{	advancewindow();
 		if (!expr(&action))
 			return FALSE;

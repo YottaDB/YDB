@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,8 +43,8 @@ GBLREF	int4		gv_keysize;
 GBLREF	gv_namehead	*gv_target;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	gd_region	*gv_cur_region;
-GBLREF	short		dollar_tlevel;
-GBLREF	short		dollar_trestart;
+GBLREF	uint4		dollar_tlevel;
+GBLREF	uint4		dollar_trestart;
 GBLREF	unsigned int	t_tries;
 GBLREF	gv_namehead	*reset_gv_target;
 GBLREF	boolean_t	mupip_jnl_recover;
@@ -136,7 +136,7 @@ void gvcst_root_search(void)
 					memcpy(global_collation_mstr.addr, rp + hdr_len + SIZEOF(block_id),
 							rlen - (hdr_len + SIZEOF(block_id)));
 				}
-				if (0 != dollar_tlevel)
+				if (dollar_tlevel)
 				{
 					status = tp_hist(NULL);
 					if (cdb_sc_normal != status)
@@ -149,9 +149,9 @@ void gvcst_root_search(void)
 					break;
 				}
 			}
-			if (0 == dollar_tlevel)
+			if (!dollar_tlevel)
 			{
-				if ((trans_num)0 != t_end(&gv_target->hist, 0))
+				if ((trans_num)0 != t_end(&gv_target->hist, NULL, TN_NOT_SPECIFIED))
 					break;
 			} else
 			{

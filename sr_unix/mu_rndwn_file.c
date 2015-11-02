@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@
 #include "lockconst.h"
 #include "interlock.h"
 #include "aswp.h"
+#include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
 #include "mu_rndwn_file.h"
 #include "performcaslatchcheck.h"
@@ -162,6 +163,20 @@ GBLREF	sm_uc_ptr_t	next_smseg;
 	}												\
 }
 
+#define REMOVE_SEMID_IF_ORPHANED(REG, UDI, TSD, SEM_CREATED, SEM_INCREMENTED)				\
+{													\
+	assert(!standalone);										\
+	if (is_orphaned_gtm_semaphore(UDI->semid))							\
+	{												\
+		if (0 != sem_rmid(UDI->semid))								\
+		{											\
+			RNDWN_ERR("!AD -> Error removing semaphore.", reg);				\
+			CLNUP_AND_RETURN(REG, UDI, TSD, SEM_CREATED, SEM_INCREMENTED);			\
+		}											\
+		UDI->semid = INVALID_SEMID;								\
+	}												\
+}
+
 /*
  * Description:
  *	This routine is used for two reasons
@@ -202,6 +217,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		sgmnt_addrs	*csa;
 	)
 	shm_snapshot_t		*ss_shm_ptr;
+	gtm_uint64_t		sec_size;
 
 	error_def (ERR_BADDBVER);
 	error_def (ERR_DBFILERR);
@@ -421,6 +437,10 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				 * So just reset the file header ipc fields and exit.
 				 */
 				assert(!sem_created);
+				/* Eventhough no shared memory exists at this point, it is possible that we have an
+				 * orphaned semaphore. If so, remove it.
+				 */
+				REMOVE_SEMID_IF_ORPHANED(reg, udi, tsd, sem_created, sem_incremented);
 				memset(tsd->machine_name, 0, MAX_MCNAMELEN);
 				tsd->freeze = 0;
 				tsd->owner_node = 0;
@@ -474,16 +494,16 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 		CLNUP_AND_RETURN(reg, udi, tsd, sem_created, sem_incremented);
        	}
 	reg->dyn.addr->acc_meth = acc_meth = tsd->acc_meth;
-	dbsecspc(reg, tsd);
+	dbsecspc(reg, tsd, &sec_size);
 #ifdef __MVS__
 	/* match gvcst_init_sysops.c shmget with __IPC_MEGA or _LP64 */
-	if (ROUND_UP(reg->sec_size, MEGA_BOUND) != shm_buf.shm_segsz)
+	if (ROUND_UP(sec_size, MEGA_BOUND) != shm_buf.shm_segsz)
 #else
-	if (reg->sec_size != shm_buf.shm_segsz)
+	if (sec_size != shm_buf.shm_segsz)
 #endif
 	{
 		util_out_print("Expected shared memory size is !SL, but found !SL",
-			TRUE, reg->sec_size, shm_buf.shm_segsz);
+			TRUE, sec_size, shm_buf.shm_segsz);
 		util_out_print("!AD -> Existing shared memory size do not match.", TRUE, DB_LEN_STR(reg));
 		CLNUP_AND_RETURN(reg, udi, tsd, sem_created, sem_incremented);
 	}
@@ -498,7 +518,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	tp_change_reg();
 #ifdef DEBUG_DB64
 	SEG_SHMATTACH(next_smseg, reg, udi, tsd, sem_created, sem_incremented);
-	next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + reg->sec_size), SHMAT_ADDR_INCS);
+	next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + sec_size), SHMAT_ADDR_INCS);
 #else
 	SEG_SHMATTACH(0, reg, udi, tsd, sem_created, sem_incremented);
 #endif
@@ -679,7 +699,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 					{
 						RELEASE_SWAPLOCK(&jpc->jnl_buff->fsync_in_prog_latch);
 					} else
-						performCASLatchCheck(&jpc->jnl_buff->fsync_in_prog_latch, 0);
+						performCASLatchCheck(&jpc->jnl_buff->fsync_in_prog_latch, FALSE);
 					if (NOJNL != jpc->channel)
 						jnl_file_close(gv_cur_region, FALSE, FALSE);
 					free(jpc);
@@ -751,15 +771,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	/* Check if it is a GT.M created orphaned semaphore and if so remove it (only if standalone access is not requested) */
 	if (!standalone)
 	{
-		if (is_orphaned_gtm_semaphore(udi->semid))
-		{
-			if (0 != sem_rmid(udi->semid))
-			{
-				RNDWN_ERR("!AD -> Error removing semaphore.", reg);
-				CLNUP_AND_RETURN(reg, udi, tsd, sem_created, sem_incremented);
-			}
-			udi->semid = INVALID_SEMID;
-		}
+		REMOVE_SEMID_IF_ORPHANED(reg, udi, tsd, sem_created, sem_incremented);
 	}
 	/* If the shared memory was found to a valid GT.M created segment and if it was properly initialized, we would
 	 * have cleared shmid in the database file header to INVALID_SHMID. If not, do the reset now as we nevertheless
@@ -808,6 +820,11 @@ CONDITION_HANDLER(mu_rndwn_file_ch)
 	unix_db_info	*udi;
 
 	START_CH;
+	/* The mu_rndwn_file_ch was introduced in revision 1.54 to account for the ERR_DBIDMISMATCH rts_error that no longer
+	 * exists. So, it is not expected that mu_rndwn_file_ch will ever be called. Add an assert(FALSE). If the assert does
+	 * not trip after an year or two, we can remove this condition handler altogether. 2010/07
+	 */
+	assert(FALSE);
 	mu_rndwn_file_dbjnl_flush = FALSE;
 	assert(NULL != rundown_reg);
 	if (NULL != rundown_reg)

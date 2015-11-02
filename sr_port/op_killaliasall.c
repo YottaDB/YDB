@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2009 Fidelity Information Services, Inc *
+ *      Copyright 2009, 2011 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -14,8 +14,6 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include "hashtab.h"
-#include "hashtab_mname.h"      /* needed for lv_val.h */
 #include "lv_val.h"
 #include "op.h"
 #include "gdsroot.h"
@@ -39,8 +37,8 @@ GBLREF int              stp_array_size;
    2) Scan ALL subscripted vars for containers, delete the data they point to maintaining
       proper maintenance of reference counts and unmark the container making it a normal value.
 
-   Note that use of lv_kill(lv, TRUE) to clear values also does the requisite TP restart
-   var protection of current values so we need not worry about it in this routine.
+   Note that use of lv_kill(lv, DOTPSAVE_TRUE, DO_SUBTREE_TRUE) to clear values also does the requisite
+   TP restart var protection of current values so we need not worry about it in this routine.
 
    Since an alias with two references ceases being an alias if a reference is killed, we
    cannot just do a simple scan and delete references. We will leave "klingons" who used to
@@ -55,7 +53,6 @@ GBLREF int              stp_array_size;
 void op_killaliasall(void)
 {
 	ht_ent_mname    *tabent, *tabent_top, **htearray, **htearraytop, **htep;
-	lv_blk		*lvbp;
 	lv_val		*lvp, *lvp_top, *lvrefp;
 
 	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
@@ -67,14 +64,13 @@ void op_killaliasall(void)
 	htearraytop = htearray + stp_array_size;
 
 	/* First pass through hash table we record HTEs that have > 1 trefcnt. We will delete these in a later
-	   loop but don't want to delete any until all are found.
-	*/
-	for (tabent = curr_symval->h_symtab.base, tabent_top = curr_symval->h_symtab.top;
-	     tabent < tabent_top;
-	     tabent++)
+	 * loop but don't want to delete any until all are found.
+	 */
+	for (tabent = curr_symval->h_symtab.base, tabent_top = curr_symval->h_symtab.top; tabent < tabent_top; tabent++)
 	{
 		if (HTENT_VALID_MNAME(tabent, lv_val, lvp) && lvp && (1 < lvp->stats.trefcnt))
 		{	/* Verify room in the table, expand if necessary */
+			assert(LV_IS_BASE_VAR(lvp));
 			if (htep >= htearraytop)
 			{	/* No room and the inn .. expand */
 				stp_expand_array();
@@ -85,32 +81,30 @@ void op_killaliasall(void)
 		}
 	}
 	/* This next, less scenic trip through the hash table entries we scan any arrays we
-	   find for containers that must be dealt with. We couldn't deal with these until all
-	   the "blatant" aliases were identified.
-	*/
-	for (tabent = curr_symval->h_symtab.base, tabent_top = curr_symval->h_symtab.top;
-	     tabent < tabent_top;
-	     tabent++)
+	 * find for containers that must be dealt with. We couldn't deal with these until all
+	 * the "blatant" aliases were identified.
+	 */
+	for (tabent = curr_symval->h_symtab.base, tabent_top = curr_symval->h_symtab.top; tabent < tabent_top; tabent++)
 	{
 		if (HTENT_VALID_MNAME(tabent, lv_val, lvp) && lvp && (1 == lvp->stats.trefcnt))
 		{	/* Var was not an alias but now need to check if var has any containers in it
-			   that likewise need to be processed (and de-container-ized).
-			*/
-			if (lvp->ptrs.val_ent.children)
+			 * that likewise need to be processed (and de-container-ized).
+			 */
+			assert(LV_IS_BASE_VAR(lvp));
+			if (LV_HAS_CHILD(lvp))
 				KILL_CNTNRS_IN_TREE(lvp);
 		}
 	}
-	/* Now we can go through the hash table entries we identified in the first step and
-	   delete them.
-	*/
+	/* Now we can go through the hash table entries we identified in the first step and delete them.  */
 	for (htearraytop = htep, htep = htearray; htep < htearraytop; ++htep)
 	{
 		assert(htep);
 		tabent = *htep;
 		lvp = (lv_val *)tabent->value;
 		assert(lvp);
+		assert(LV_IS_BASE_VAR(lvp));
 		assert(0 < lvp->stats.trefcnt);
-		lv_kill(lvp, TRUE);
+		lv_kill(lvp, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);
 		DECR_BASE_REF(tabent, lvp, TRUE);
 	}
   }

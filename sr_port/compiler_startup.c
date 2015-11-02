@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,10 +38,7 @@ GBLREF short int source_column, source_line;
  */
 GBLREF int4 			aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
 GBLREF unsigned char 		*source_buffer;
-GBLREF int4 			source_error_found;
 GBLREF src_line_struct 		src_head;
-GBLREF bool 			code_generated;
-
 GBLREF triple			t_orig, *curr_fetch_trip, *curr_fetch_opr;
 GBLREF int4			curr_fetch_count;
 GBLREF command_qualifier	cmd_qlf;
@@ -50,29 +47,29 @@ GBLREF mline			mline_root;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 GBLREF hash_table_str		*complits_hashtab;
-GTMTRIG_ONLY(GBLREF boolean_t		trigger_compile;)
+
+LITDEF char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
 
 boolean_t compiler_startup(void)
 {
 #ifdef DEBUG
 	void		dumpall();
 #endif
-	bool		compile_w_err;
+	boolean_t	compile_w_err;
 	unsigned char	err_buf[45];
 	unsigned char 	*cp, *cp2;
 	int		errknt;
 	int4            n;
-	uint4		checksum, srcint, line_count;
+	uint4		checksum, line_count;
 	mlabel		*null_lab;
 	src_line_struct	*sl;
 	mident		null_mident;
+	DCL_THREADGBL_ACCESS;
 
-	static readonly char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
-
+	SETUP_THREADGBL_ACCESS;
 	assert(NULL == complits_hashtab || NULL == complits_hashtab->base);
 	memset(&null_mident, 0, SIZEOF(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
-
 	/* Since the stringpool alignment is solely based on mstr_native_align, we need to initialize it based
 	 * on the ALIGN_STRINGS qualifier so that all strings in the literal text pool are aligned.
 	 * However, when a module is compiled at runtime, we need to preserve the existing runtime setting
@@ -81,9 +78,8 @@ boolean_t compiler_startup(void)
 	save_mstr_native_align = mstr_native_align;
 	/* mstr_native_align = (cmd_qlf.qlf & CQ_ALIGN_STRINGS) ? TRUE : FALSE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and  uncomment the above line */
-
 	cg_phase = CGP_NOSTATE;
-	source_error_found = errknt = 0;
+	TREF(source_error_found) = errknt = 0;
 	if(!open_source_file())
 	{
 		mstr_native_align = save_mstr_native_align;
@@ -103,10 +99,9 @@ boolean_t compiler_startup(void)
 	null_lab = get_mladdr(&null_mident);
 	null_lab->ml = &mline_root;
 	mlmax++;
-	/* If this is a trigger compile, use OC_FETCH to prevent interception */
-	curr_fetch_trip = curr_fetch_opr = newtriple(GTMTRIG_ONLY(trigger_compile ? OC_FETCH : ) OC_LINEFETCH);
+	curr_fetch_trip = curr_fetch_opr = newtriple(OC_LINEFETCH);
 	curr_fetch_count = 0;
-	code_generated = FALSE;
+	TREF(code_generated) = FALSE;
 	checksum = 0;
 	line_count = 1;
 	for (source_line = 1;  errknt <= HOPELESS_COMPILE;  source_line++)
@@ -129,28 +124,14 @@ boolean_t compiler_startup(void)
 			}
 		}
 		/* calculate checksum */
-		for (cp = source_buffer, cp2 = cp + n;  cp < cp2;)
-		{
-			srcint = 0;
-			if (cp2 - cp < SIZEOF(int4))
-			{
-				memcpy(&srcint, cp, cp2 - cp);
-				cp = cp2;
-			} else
-			{
-				srcint = *(int4 *)cp;
-				cp += SIZEOF(int4);
-			}
-			checksum ^= srcint;
-			checksum >>= 1;
-		}
-		source_error_found = 0;
+		RTN_SRC_CHKSUM((char *)source_buffer, n, checksum);
+		TREF(source_error_found) = 0;
 		lb_init();
 		if (cmd_qlf.qlf & CQ_CE_PREPROCESS)
 			put_ceprep_line();
 		if (!line(&line_count))
 		{
-			assert(source_error_found);
+			assert(TREF(source_error_found));
 			errknt++;
 		}
 	}
@@ -192,7 +173,7 @@ boolean_t compiler_startup(void)
 		*cp = 0;
 		list_line((char *)err_buf);
 		if (errknt > HOPELESS_COMPILE)
-			list_line(compile_terminated);
+			list_line((char *)compile_terminated);
 		if (cmd_qlf.qlf & CQ_MACHINE_CODE && compile_w_err)
 			list_head(1);
 	}
@@ -210,8 +191,5 @@ boolean_t compiler_startup(void)
 	reinit_externs();
 	mstr_native_align = save_mstr_native_align;
 	REVERT;
-	if (errknt)
-		return TRUE;
-	else
-		return FALSE;
+	return errknt ? TRUE : FALSE;
 }

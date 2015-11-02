@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,6 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -29,7 +27,7 @@
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF lv_val		*active_lv;
 
 /* Operation - Kill an alias (unsubscripted variable)
@@ -52,8 +50,9 @@ void op_killalias(int srcindx)
 	{
 		lv = (lv_val *)tabent->value;
 		assert(lv);
+		assert(LV_IS_BASE_VAR(lv));
 		/* Decrement reference count and cleanup if necessary */
-		if (dollar_tlevel && NULL != lv->tp_var && !lv->tp_var->var_cloned)
+		if (dollar_tlevel && (NULL != lv->tp_var) && !lv->tp_var->var_cloned)
 			TP_VAR_CLONE(lv);
 		DECR_BASE_REF(tabent, lv, TRUE);
 	} /* Else var has no hastable entry so this is a NOOP */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,8 +15,6 @@
 
 #include "rtnhdr.h"
 #include "stack_frame.h"
-#include "hashtab_mname.h"
-#include "hashtab.h"
 #include "lookup_variable_htent.h"
 #include "op.h"
 #include "lv_val.h"
@@ -38,8 +36,11 @@ void gtm_fetch(unsigned int indxarg, ...)
 	unsigned int 	cnt;
 	stack_frame	*fp;
 	ht_ent_mname	**htepp;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!process_exiting);	/* Verify that no process unwound the exit frame and continued */
+	assert(!TREF(in_zwrite));	/* Verify in_zwrite was not left on */
 	VAR_START(var, indxarg);
 	VMS_ONLY(va_count(cnt);)
 	UNIX_ONLY(cnt = cnt_arg;)	/* need to preserve stack copy on i386 */
@@ -54,7 +55,8 @@ void gtm_fetch(unsigned int indxarg, ...)
 			if (NULL == *htepp)
 				*htepp = lookup_variable_htent(indx);
 			assert(NULL != (*htepp)->value);
-			assert(NULL != ((lv_val *)((*htepp)->value))->ptrs.val_ent.parent.sym);
+			assert(LV_IS_BASE_VAR((*htepp)->value));
+			assert(NULL != LV_SYMVAL((lv_val *)((*htepp)->value)));
 			if (0 < --cnt)
 				indx = va_arg(var, int4);
 			else

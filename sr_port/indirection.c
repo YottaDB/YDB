@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,10 +17,6 @@
 #include "advancewindow.h"
 
 GBLREF char window_token;
-GBLREF unsigned short int expr_depth;
-GBLREF bool shift_gvrefs;
-
-GBLREF triple *expr_start, *expr_start_orig;
 
 int indirection(oprtype *a)
 {
@@ -28,24 +24,25 @@ int indirection(oprtype *a)
 	oprtype		subs[MAX_INDSUBSCRIPTS];
 	oprtype		x,*sb1,*sb2;
 	char		c;
-
 	error_def(ERR_MAXNRSUBSCRIPTS);
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_LPARENMISSING);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(window_token == TK_ATSIGN);
-	if (!expr_depth++)
-		expr_start = expr_start_orig = 0;
+	if (!(TREF(expr_depth))++)
+		TREF(expr_start) = TREF(expr_start_orig) = NULL;
 	advancewindow();
 	if (!expratom(a))
 	{
-		expr_depth = 0;
+		TREF(expr_depth) = 0;
 		return FALSE;
 	}
 	coerce(a,OCT_MVAL);
 	ex_tail(a);
-	if (!--expr_depth)
-		shift_gvrefs = FALSE;
+	if (!(--(TREF(expr_depth))))
+		TREF(shift_side_effects) = FALSE;
 	if (window_token == TK_ATSIGN)
 	{
 		advancewindow();

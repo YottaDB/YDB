@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,6 @@
 
 #include "mdef.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
 #include "toktyp.h"
 #include "compiler.h"
 #include "opcode.h"
@@ -27,8 +25,6 @@ GBLREF char 			window_token, director_token;
 GBLREF mident 			window_ident;
 GBLREF mval 			**ind_source_sp, **ind_source_top;
 GBLREF mval 			**ind_result_sp, **ind_result_top;
-GBLREF bool 			shift_gvrefs;
-GBLREF triple 			*expr_start;
 
 void	op_indo2(mval *dst, mval *target, mval *value)
 {
@@ -39,7 +35,9 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 	oprtype		v, sav_opr;
 	triple		*s, *src, *oldchain, tmpchain, *r;
 	icode_str	indir_src;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_DEFINED(value);
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
@@ -81,7 +79,7 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 			}
 			break;
 		case TK_ATSIGN:
-			if (shift_gvrefs)
+			if (TREF(shift_side_effects))
 			{
 				dqinit(&tmpchain, exorder);
 				oldchain = setcurtchain(&tmpchain);
@@ -92,16 +90,13 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 					ins_triple(s);
 					newtriple(OC_GVSAVTARG);
 					setcurtchain(oldchain);
-					dqadd(expr_start, &tmpchain, exorder);
-					expr_start = tmpchain.exorder.bl;
+					dqadd(TREF(expr_start), &tmpchain, exorder);
+					TREF(expr_start) = tmpchain.exorder.bl;
 					r = newtriple(OC_GVRECTARG);
-					r->operand[0] = put_tref(expr_start);
-				}
-				else
-				{	setcurtchain(oldchain);
-				}
-			}
-			else
+					r->operand[0] = put_tref(TREF(expr_start));
+				} else
+					setcurtchain(oldchain);
+			} else
 			{
 				if (rval = indirection(&s->operand[0]))
 				{
@@ -127,8 +122,7 @@ void	op_indo2(mval *dst, mval *target, mval *value)
 			*ind_source_sp++ = value;
 			comp_indr(&object);
 		}
-	}
-	else
+	} else
 	{
 		if (ind_source_sp + 1 >= ind_source_top || ind_result_sp + 1 >= ind_result_top)
 			rts_error(VARLSTCNT(1) ERR_INDMAXNEST);

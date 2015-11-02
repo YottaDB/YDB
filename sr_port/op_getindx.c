@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,102 +13,94 @@
 
 #include <stdarg.h>
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "collseq.h"
 #include "stringpool.h"
 #include "do_xform.h"
 #include "undx.h"
 #include "mvalconv.h"
-#include "val_iscan.h"
 
 #define IS_INTEGER 0
 
-GBLREF collseq		*local_collseq;
 GBLREF bool		undef_inhibit;
-GBLREF int		lv_null_subs;
+
 LITREF mval		literal_null ;
+
+error_def(ERR_UNDEF);
+error_def(ERR_LVNULLSUBS);
 
 lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 {
-	mval			tmp_sbs;
-	int			cur_subscr;
-	int                     length;
-	va_list			var;
 	VMS_ONLY(int		argcnt;)
-		int4			temp;
-	lv_sbs_tbl     		*tbl;
-	lv_val			*lv;
-  	sbs_search_status      	status;
-	mval			*key;
+	boolean_t		is_canonical;
 	int			arg1;
+	int                     length;
+	mval			*key;
+	mval			tmp_sbs;
+	tree			*lvt;
+	treeNode		*lv, *parent;
 	unsigned char		buff[512], *end;
+	va_list			var;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_UNDEF);
-	error_def(ERR_LVNULLSUBS);
-
+	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, start);
 	VMS_ONLY(va_count(argcnt));
-
-	if (local_collseq)
-		tmp_sbs.mvtype = MV_STR;
-
-	lv = start;
+	lv = (treeNode *)start;
 	arg1 = --argcnt;
-	cur_subscr = 1;
-	while (lv  &&  argcnt-- > 0)
+	while (lv && (0 < argcnt--))
 	{
-		cur_subscr++;
 		key = va_arg(var, mval *);
-		if (NULL == (tbl = lv->ptrs.val_ent.children))
-			lv = NULL;
-		else
+		lvt = LV_GET_CHILD(lv);
+		if (NULL == lvt)
 		{
-			assert(tbl->ident == MV_SBS);
-			MV_FORCE_DEFINED(key);
-			if (MV_IS_STRING(key) && (0 == key->str.len) && (LVNULLSUBS_NEVER == lv_null_subs))
+			lv = NULL;
+			break;
+		}
+		MV_FORCE_DEFINED(key);
+		is_canonical = MV_IS_CANONICAL(key);
+		if (!is_canonical)
+		{
+			assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype));
+			assert(MV_IS_STRING(key));
+			if ((0 == key->str.len) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
 			{
 				va_end(var);
 				rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
 			}
-			if (!(key->mvtype & MV_NM ? !(key->mvtype & MV_NUM_APPROX) : (bool)val_iscan(key)))
+			if (TREF(local_collseq))
 			{
-				if (local_collseq)
-				{
-					ALLOC_XFORM_BUFF(&key->str);
-					tmp_sbs.mvtype = MV_STR;
-					tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
-					assert(NULL != lcl_coll_xform_buff);
-					tmp_sbs.str.addr = lcl_coll_xform_buff;
-					do_xform(local_collseq, XFORM, &key->str, &tmp_sbs.str, &length);
-					tmp_sbs.str.len = length;
-					s2pool(&(tmp_sbs.str));
-					key = &tmp_sbs;
-				}
-				lv = (tbl->str) ? lv_get_str_inx(tbl->str, &key->str, &status) : NULL;
-			} else
-			{
-				MV_FORCE_NUM(key);
-				if (tbl->int_flag)
-				{
-					assert(tbl->num);
-					if (MV_IS_INT(key))
-					{
-						temp = MV_FORCE_INT(key) ;
-						lv = (temp >= 0 && temp < SBS_NUM_INT_ELE ? tbl->num->ptr.lv[temp] : NULL) ;
-					} else
-						lv = NULL;
-			 	} else
-					lv = (tbl->num) ? lv_get_num_inx(tbl->num, key, &status) : NULL;
+				ALLOC_XFORM_BUFF(key->str.len);
+				tmp_sbs.mvtype = MV_STR;
+				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+				assert(NULL != TREF(lcl_coll_xform_buff));
+				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
+				tmp_sbs.str.len = length;
+				s2pool(&(tmp_sbs.str));
+				key = &tmp_sbs;
 			}
+			lv = lvAvlTreeLookupStr(lvt, key, &parent);
+		} else
+		{	/* Need to set canonical bit before calling tree search functions.
+			 * But input mval could be read-only so cannot modify that even if temporarily.
+			 * So take a copy of the mval and modify that instead.
+			 */
+			tmp_sbs = *key;
+			key = &tmp_sbs;
+			MV_FORCE_NUM(key);
+			TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeLookup* functions below */
+			if (MVTYPE_IS_INT(tmp_sbs.mvtype))
+				lv = lvAvlTreeLookupInt(lvt, key, &parent);
+			else
+				lv = lvAvlTreeLookupNum(lvt, key, &parent);
 		}
 	}
 	va_end(var);
-	if (!lv  ||  !MV_DEFINED(&lv->v))
+	if (!lv || !MV_DEFINED(&lv->v))
 	{
 		if (undef_inhibit)
-			lv = (lv_val *)&literal_null;
+			lv = (treeNode *)&literal_null;
 		else
 		{
 			VAR_START(var, start);
@@ -117,5 +109,5 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
 		}
 	}
-	return lv;
+	return (lv_val *)lv;
 }

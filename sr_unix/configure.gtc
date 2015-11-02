@@ -1,6 +1,7 @@
+#!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2010 Fidelity Information Services, Inc #
+#	Copyright 2009, 2011 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -8,17 +9,8 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-# This script must be run with shell, not Cshell, and it must be a standard compliant sh.
-
-# In order to test future configure.csh changes, copy a modified version into /usr/library/Vxxx/pro/configure
-# and /usr/library/Vxxx/dbg/configure.  Then execute $cms_tools/kitstart.csh -ti Vxxx and check output log
-# If changes are made to this file such as removing files or changing permissions in the install
-# directory there may need to be changes made to files used by kitstart.csh to execute
-# $cms_tools/gtm_compare_dist.csh. This will be detected during the kitstart.csh described above.
 
 . ./arch.gtc
-# we need a copy for gtm_test_install since the version above will be deleted.
-cp arch.gtc ..
 
 # Path to the correct echo program
 if [ $arch = "sun"  -o  $arch = "solaris" ]; then
@@ -67,54 +59,6 @@ else
 	ext=".so"
 fi
 
-# Native super user and group
-if [ $arch = "zos" ]; then
-	# because z/OS has no predefined notion of root or bin
-	# use uid 0 for super user and group
-	defowner=0
-	rootuser=0
-	binuser=0
-else
-	rootuser=root
-	binuser=bin
-	# if bin group does not exist then ask user to define a different installation group or exit
-	touch tmp_owngrp
-	chgrp $binuser tmp_owngrp 2> /dev/null
-	if [ 0 != "$?" ] ; then
-		$echo "The default \"bin\" installation group does not exist."
-		rm tmp_owngrp
-		$echo "Do you want to use a different group for installation? (y or n) \c"
-		read resp
-		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-			$echo "Enter installation group name: \c"
-			read binuser
-			if [ "$binuser" != "" ] ; then
-				touch tmp_owngrp
-				chgrp $binuser tmp_owngrp 2> /dev/null
-				if [ 0 != "$?" ] ; then
-					$echo $binuser is not a valid group name - exiting!
-					rm tmp_owngrp
-					exit 1
-				fi
-				$echo "Should execution of GT.M be restricted to \"$binuser\"? (y or n) \c"
-				read resp
-				if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-					group="$binuser"
-				else
-					group=""
-				fi
-				group_restricted_asked=1
-			else
-				$echo "No group name entered - exiting!"
-				exit
-			fi
-		else
-			$echo "Either add the \"bin\" group or use a different installation group next time. - exiting!"
-			exit
-		fi
-	fi
-	defowner=bin
-fi
 
 # Binaries
 binaries="mupip mumps libgtmshr$ext lke dse  geteuid ftok semstat2"
@@ -165,13 +109,26 @@ if [ "`./geteuid`" != "root" ] ; then
 fi
 
 $echo "                     GT.M Configuration Script"
-$echo "Copyright 2009, 2010 Fidelity National Information Services, Inc. Use of this"
+$echo "Copyright 2009, 2011 Fidelity National Information Services, Inc. Use of this"
 $echo "software is restricted by the provisions of your license agreement."
 $echo ""
 
+# Native super user and group
+if [ $arch = "zos" ]; then
+	# because z/OS has no predefined notion of root or bin
+	# use uid 0 for super user and group
+	defowner=0
+	rootuser=0
+	binuser=0
+else
+	rootuser=root
+	binuser=bin
+	defowner=bin
+fi
+
 # create temporary file to test for valid user and group names
 touch tmp_owngrp
-$echo "What account should own the files? ($defowner) \c"
+$echo "What user account should own the files? ($defowner) \c"
 read resp
 if [ "$resp" = "" ] ; then
 	owner=$defowner
@@ -186,23 +143,23 @@ if [ 0 != "$?" ] ; then
 	exit
 fi
 
-# if user had to enter a group name because bin did not exist, then he may already have specified a restriction
-# if so, $group will be set already
-if [ -z "$group_restricted_asked" ] ; then
-	$echo "Should execution of GT.M be restricted to a group? (y or n) \c"
-	read resp
-	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-		$echo "Enter group name: \c"
-		read group
-		if [ "$group" != "" ] ; then
-			chgrp $group tmp_owngrp 2> /dev/null
-			if [ 0 != "$?" ] ; then
-				$echo $group is not a valid group name - exiting!
-				rm tmp_owngrp
-				exit 1
-			fi
-		fi
-	fi
+$echo "What group should own the files? ($binuser) \c"
+read resp
+if [ "$resp" != "" ] ; then
+	binuser=$resp
+fi
+
+chgrp $binuser tmp_owngrp 2> /dev/null
+if [ 0 != "$?" ] ; then
+	$echo $binuser is not a valid group name - exiting!
+	rm tmp_owngrp
+	exit 1
+fi
+
+$echo "Should execution of GT.M be restricted to this group? (y or n) \c"
+read resp
+if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+	group=$binuser
 fi
 
 rm tmp_owngrp
@@ -289,8 +246,10 @@ if [ -d "utf8" ]; then
 			icu_ver=`$echo $gtm_icu_version | sed 's/\.//'`
 			majmin=`$echo $icu_ver | cut -f 1 -d "."`
 			if [ "$majmin" -lt "36" ] ; then
-				$echo "WARNING: ICU version $majmin is less than 3.6. Unicode support will not be installed"
+				$echo "WARNING: ICU version $gtm_icu_version is less than 3.6. \c"
+				$echo "Unicode support will not be installed"
 				would_like_utf8=0
+				doutf8=0
 			fi
 		fi
 	else
@@ -394,6 +353,11 @@ else
 	doutf8=0
 fi
 
+#if gdedefaults exists on z/OS then remove it so tagging will occur correctly
+if [ $arch = "zos" -a -f gdedefaults ] ; then
+	rm gdedefaults
+fi
+
 # Modify the scripts as necessary for target configuration
 cat << SEDSCRIPT > sedin$$
 s|ARCH|$arch|g
@@ -413,7 +377,11 @@ do
 	fi
 done
 rm sedin$$
-
+#on z/OS gdedefaults must be tagged ascii to be used by GTM.
+if [ $arch = "zos" ]; then
+	iconv -T -f IBM-1047 -t ISO8859-1 gdedefaults > t.gdedefaults
+	mv t.gdedefaults gdedefaults
+fi
 if [ "$doutf8" -ne 0 ]; then
 	if [ ! -d $gtmdist/utf8 ]; then
 		mkdir $gtmdist/utf8
@@ -606,7 +574,8 @@ if [ -d "$plugin_gtmcrypt" ]; then
 
 	# Install gpgagent.tab
 	# This is an external call table so the path to the shared library has to be adjusted
-	sed "1c $gtmdist/plugin/libgtmcrypt.so" < $plugin/gpgagent.tab > $gtmdist/$plugin/gpgagent.tab
+	echo "$gtmdist/plugin/libgtmcrypt.so" > $gtmdist/$plugin/gpgagent.tab
+	cat $plugin/gpgagent.tab | sed 1d >> $gtmdist/$plugin/gpgagent.tab
 
 	# Tar the source files
 	(cd $plugin_gtmcrypt; chmod 0644 $gtmcryptsrcfiles; chown $owner $gtmcryptsrcfiles; chgrp $binuser $gtmcryptsrcfiles)
@@ -733,6 +702,7 @@ chgrp $binuser $gtmdist/*.o
 if [ "$doutf8" -ne 0 ]; then
 	chmod 0644 $gtmdist/utf8/*.m
 	chmod 0644 $gtmdist/utf8/*.o
+	chown $owner $gtmdist/utf8
 	chown $owner $gtmdist/utf8/*.m
 	chown $owner $gtmdist/utf8/*.o
 	chgrp $binuser $gtmdist/utf8/*.m
@@ -774,7 +744,7 @@ Exit
 GDE.in2
 
 other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHELP.o GTMHLPLD.o LOAD.o LOADOP.o"
-other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o"
+other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o GTMDefinedTypesInit.o"
 csh_script_files="lowerc.csh lowerc_cp.csh upperc.csh upperc_cp.csh"
 if [ $arch = "zos" ]; then
 	other_object_files="$other_object_files GENEXPORT.o"
@@ -802,7 +772,11 @@ fi
 # otherwise change to the default as some files were created with root group
 if [ "$group" != "" ] ; then
 	chgrp -R $group $gtmdist
-	chmod -R o-rwx $gtmdist
+	if [ "zos" = $arch ]; then
+		chmod -Rh o-rwx $gtmdist
+	else
+		chmod -R o-rwx $gtmdist
+	fi
 else
 	chgrp -R $binuser $gtmdist
 fi

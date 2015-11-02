@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -138,7 +138,7 @@ void mupip_restore(void)
 	void			(*common_read)();
 	char			*errptr;
 	pid_t			waitpid_res;
-	shmpool_blk_hdr_ptr_t	sblkh_p;
+	muinc_blk_hdr_ptr_t	sblkh_p;
 	int			rc;
 #	ifdef GTM_CRYPT
 	char			bkup_hash[GTMCRYPT_HASH_LEN], target_hash[GTMCRYPT_HASH_LEN];
@@ -229,7 +229,7 @@ void mupip_restore(void)
 	)
 	old_bit_maps = DIVIDE_ROUND_DOWN(old_tot_blks, bplmap);
 	inbuf = (char *)malloc(BACKUP_TEMPFILE_BUFF_SIZE);
-	sblkh_p = (shmpool_blk_hdr_ptr_t)inbuf;
+	sblkh_p = (muinc_blk_hdr_ptr_t)inbuf;
 	free(old_data);
 
 	msg_string.addr = msg_buffer;
@@ -462,7 +462,7 @@ void mupip_restore(void)
 				old_tot_blks = inhead->db_total_blks;
 			}
 		}
-		rsize = SIZEOF(shmpool_blk_hdr) + inhead->blk_size;
+		rsize = SIZEOF(muinc_blk_hdr) + inhead->blk_size;
 #		ifdef GTM_CRYPT
 		if (is_bkup_file_encrypted || is_target_file_encrypted)
 		{
@@ -497,7 +497,7 @@ void mupip_restore(void)
 		}
 #		endif
 		for ( ; ;)
-		{        /* All reords are of fixed size so process until we get to a zeroed record marking the end */
+		{        /* All records are of fixed size so process until we get to a zeroed record marking the end */
 			COMMON_READ(in, inbuf, rsize);	/* Note rsize == sblkh_p */
 			if (0 == sblkh_p->blkid && FALSE == sblkh_p->valid_data)
 			{	/* This is supposed to be the end of list marker (null entry */
@@ -531,7 +531,7 @@ void mupip_restore(void)
 			   This allows us to exactly match the blks_to_upgrade counter in the saved file-header without
 			   worrying about what blocks were converted (or not) in the interim.
 			*/
-			blk_ptr = inbuf + SIZEOF(shmpool_blk_hdr);
+			blk_ptr = inbuf + SIZEOF(muinc_blk_hdr);
 			size = old_blk_size;
 			if (GDSNOVER != sblkh_p->use.bkup.ondsk_blkver)
 			{	/* Specifically versioned blocks - Put them back in the version they were originally */

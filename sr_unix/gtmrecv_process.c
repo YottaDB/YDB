@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,6 +76,7 @@
 #ifdef GTM_TRIGGER
 #include "repl_sort_tr_buff.h"
 #endif
+#include "replgbl.h"
 
 #define	GTM_ZLIB_UNCMP_ERR_STR		"error from zlib uncompress function "
 #define	GTM_ZLIB_Z_MEM_ERROR_STR	"Out-of-memory " GTM_ZLIB_UNCMP_ERR_STR
@@ -127,9 +128,6 @@ GBLDEF	time_t			repl_recv_prev_log_time;
 GBLDEF	time_t			repl_recv_this_log_time;
 GBLDEF	volatile time_t		gtmrecv_now = 0;
 
-GBLDEF	boolean_t		src_node_same_endianness = TRUE;
-GBLDEF	boolean_t		src_node_endianness_known = FALSE;
-
 STATICDEF uchar_ptr_t		gtmrecv_cmpmsgp;
 STATICDEF int			gtmrecv_cur_cmpmsglen;
 STATICDEF int			gtmrecv_max_repl_cmpmsglen;
@@ -154,7 +152,6 @@ GBLREF	int			repl_filter_bufsiz;
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
-GBLREF	boolean_t		null_subs_xform;
 GBLREF	boolean_t		primary_side_std_null_coll;
 GBLREF	boolean_t		primary_side_trigger_support;
 GBLREF	boolean_t		secondary_side_std_null_coll;
@@ -167,6 +164,21 @@ GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	mur_gbls_t		murgbl;
+
+error_def(ERR_JNLNEWREC);
+error_def(ERR_JNLRECFMT);
+error_def(ERR_JNLSETDATA2LONG);
+error_def(ERR_PRIMARYNOTROOT);
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLGBL2LONG);
+error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_REPLUPGRADEPRI);
+error_def(ERR_REPLTRANS2BIG);
+error_def(ERR_REPLXENDIANFAIL);
+error_def(ERR_SECNODZTRIGINTP);
+error_def(ERR_SECONDAHEAD);
+error_def(ERR_TEXT);
+error_def(ERR_UNIMPLOP);
 
 typedef enum
 {
@@ -263,6 +275,13 @@ static	char		assumed_remote_proto_ver;
 		return;								\
 }
 
+/* The below macro is used (within this module) to check for errors (and issue appropriate message) after REPL_SEND_LOOP
+ * returns.
+ * NOTE: This macro, in its current form, cannot be used in all REPL_SEND_LOOP usages due to specific post-error processing
+ * done in a few places. There is scope to:
+ * (a) Improve the macro to adjust to post-error processing
+ * (b) Provide similar macro to be used for REPL_RECV_LOOP usages
+ */
 #define	CHECK_REPL_SEND_LOOP_ERROR(status, msgstr)		\
 {								\
 	if (SS_NORMAL != status)				\
@@ -277,13 +296,11 @@ static void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 {
 	char		print_msg[1024];
 
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
-
 	assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
 	if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 	{
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection got reset while sending %s message\n", msgtypestr);
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection got reset while sending %s message. Status = %d ; %s\n",
+				msgtypestr, status, STRERROR(status));
 		repl_connection_reset = TRUE;
 		repl_close(&gtmrecv_sock_fd);
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Closing connection on receiver side\n");
@@ -318,23 +335,27 @@ static int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_
 	mstr_len_t		temp_val;
 	mval			val_mv;
 	repl_triple_jnl_ptr_t	triplecontent;
-	jnl_str_len_t		keylength;
+	jnl_str_len_t		nodeflags_keylen;
 	unsigned short		participants;
+#	ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
-	assert(0 < jnl2filterfmt[REPL_JNL_MAX - 1]);
-	assert(-1 == jnl2filterfmt[REPL_JNL_MAX]);
-	assert(REPL_JNL_MAX > (remote_jnl_ver - JNL_VER_EARLIEST_REPL));
-	assert(REPL_JNL_MAX > (jnl_ver - JNL_VER_EARLIEST_REPL));
-	assert(remote_jnl_ver <= jnl_ver);
-	/* Journal record format is different between local and remote sides of replication.
-	 * Endian conversion supported started only in V5.3-003 (jnl format V18 and filter format V17)
-	 * and current jnl format is V20 so we expect remote_jnl_ver to be either V18 or V19 or V20. The below
-	 * endian conversion code below assumes this. Assert accordingly. If this assert fails, the code below
-	 * needs to be modified to handle the new journal record formats.
+	SETUP_THREADGBL_ACCESS;
+#	endif
+
+	/* for cross-endian conversion to happen on the replicating side, the receiver must understand the layout of the journal
+	 * records. To keep the endian conversion logic on both primary and secondary simple, the following scheme is used:
+	 * (a) if primary < secondary, endian conversion will happen on primary.
+	 * (b) if primary >= secondary, primary will apply internal filters to convert the records to secondary's format. The
+	 *     secondary on receiving them will do the necessary endian conversion before letting the update process see them.
+	 *
+	 * However, the above logic will cause the older versions (< V5.4-002) to NOT replicate to V5.4-002 as the endian-conversion
+	 * by-primary is introduced only from V5.4-002 and above. Hence, allow secondary to do endian conversion for this special
+	 * case when the primary is a GT.M version running V5.3-003 to V5.4-001. The lower limit is chosen to be V5.3-003 since that
+	 * was the first version where cross-endian conversion was supported.
 	 */
-	if (V20_JNL_VER == remote_jnl_ver)	/* If ver is V20, reset it to V19 since the journal record format is */
-		remote_jnl_ver = V19_JNL_VER;	/* essentially the same. The only changes are in the journal file header layout */
-	assert((V18_JNL_VER == remote_jnl_ver) || (V19_JNL_VER == remote_jnl_ver));
+	assert(REPLGBL.srcsrv_vms || (remote_jnl_ver >= jnl_ver) ||
+			((V18_JNL_VER <= remote_jnl_ver) && (V20_JNL_VER >= remote_jnl_ver)));
 	jb = jnl_buff;
 	status = SS_NORMAL;
 	jlen = jnl_len;
@@ -351,104 +372,79 @@ static int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_
 			status = -1;
 			break;
 		}
+		assert(!IS_ZTP(rectype));
+		assert((JRT_TRIPLE == rectype) || IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype)
+		       || (JRT_TCOM == rectype) || (JRT_NULL == rectype));
 		DEBUG_ONLY(jstart = jb;)
 		if (JRT_TRIPLE != rectype)
 		{
-			rec->prefix.pini_addr = GTM_BYTESWAP_32(rec->prefix.pini_addr);
-			rec->prefix.time = GTM_BYTESWAP_32(rec->prefix.time);
-			rec->prefix.checksum = GTM_BYTESWAP_32(rec->prefix.checksum);
-			rec->prefix.tn = GTM_BYTESWAP_64(rec->prefix.tn);
-			((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE))->backptr =
-				GTM_BYTESWAP_24(((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE))->backptr);
+			/* pini_addr, time, checksum and tn field of the journal records created by the source server are irrelevant
+			 * to the receiver server and hence no point doing the endian conversion for them.
+			 */
+			((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE))->backptr = reclen;
 			rec->jrec_null.jnl_seqno = GTM_BYTESWAP_64(rec->jrec_null.jnl_seqno);
-		}
-		assert(!IS_ZTP(rectype));
-		assert((JRT_TRIPLE == rectype) || IS_SET_KILL_ZKILL_ZTWORM(rectype)
-					|| (JRT_TCOM == rectype) || (JRT_NULL == rectype));
-		if (JRT_TRIPLE == rectype)
+			if (IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype))
+			{
+				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
+				assert(keystr == (jnl_string *)&rec->jrec_ztworm.ztworm_str);
+				if (V18_JNL_VER == remote_jnl_ver)
+				{	/* Offset of mumps_node is not same between V18_JNL_VER and V21_JNL_VER. The offset of
+					 * update_num in the V21_JNL_VER is the offset of mumps_node in V18_JNL_VER. Assign
+					 * keystr accordingly.
+					 */
+					assert((unsigned char *)&rec->jrec_set_kill.token_seq + SIZEOF(token_seq_t)
+						== (unsigned char *)&rec->jrec_set_kill.update_num);
+					assert((SIZEOF(unsigned short)) == SIZEOF(rec->jrec_set_kill.num_participants));
+					assert((SIZEOF(unsigned short)) == SIZEOF(rec->jrec_set_kill.filler_short));
+					assert((SIZEOF(uint4) == SIZEOF(rec->jrec_set_kill.update_num)));
+					/* Below assert ensures that right after the num_participants field the mumps_node field
+					 * starts in the current journal format
+					 */
+					assert((unsigned char *)&rec->jrec_set_kill.num_participants + SIZEOF(unsigned short)
+						== (unsigned char *)&rec->jrec_set_kill.mumps_node);
+					keystr = (jnl_string *)(&rec->jrec_set_kill.update_num);
+
+				} else
+				{
+					assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+					rec->jrec_set_kill.update_num = GTM_BYTESWAP_32(rec->jrec_set_kill.update_num);
+				}
+				/* In V18, the jnl_string contained a 32 bit length field followed by mumps_node
+				 * In V19, the "length" field is divided into 8 bit "nodeflags" and 24 bit "length" fields.
+				 * Byteswap the entire 32 bit value
+				 */
+				nodeflags_keylen = *(jnl_str_len_t *)keystr;
+				*(jnl_str_len_t *)keystr = GTM_BYTESWAP_32(nodeflags_keylen);
+				if (IS_SET(rectype))
+				{
+					assert(!IS_ZTWORM(rectype));
+					/* SET records have a 'value' part which needs to be endian converted */
+					vallen_ptr = (mstr_len_t *)&keystr->text[keystr->length];
+					GET_MSTR_LEN(temp_val, vallen_ptr);
+					temp_val = GTM_BYTESWAP_32(temp_val);
+					PUT_MSTR_LEN(vallen_ptr, temp_val);
+					/* The actual 'value' itself is a character array and hence needs no endian conversion */
+				}
+			} else if (JRT_TCOM == rectype)
+			{	/* TCOM record has no change since V18 journal format */
+				assert((unsigned char *)&rec->jrec_tcom.token_seq
+					+ SIZEOF(token_seq_t) == (unsigned char *)&rec->jrec_tcom.filler_short);
+				/* byte-swap num_participants */
+				rec->jrec_tcom.num_participants = GTM_BYTESWAP_16(rec->jrec_tcom.num_participants);
+			}
+			/* else records can only be JRT_NULL. The only relevant field in JRT_NULL is the sequence number which is
+			 * already endian converted.
+			 */
+			assert(reclen == REC_LEN_FROM_SUFFIX(jb, reclen));
+		} else
 		{
 			triplecontent = (repl_triple_jnl_ptr_t) rec;
 			triplecontent->cycle = GTM_BYTESWAP_32(triplecontent->cycle);
 			triplecontent->start_seqno = GTM_BYTESWAP_64(triplecontent->start_seqno);
-		} else if (IS_SET_KILL_ZKILL_ZTWORM(rectype))
-		{	/*
-			 *  V18 struct_jrec_upd layout is as follows.
-			 *	offset = 0000 [0x0000]      size = 0024 [0x0018]    ----> prefix
-			 *	offset = 0024 [0x0018]      size = 0008 [0x0008]    ----> token_seq
-			 *	offset = 0032 [0x0020]      size = 0008 [0x0008]    ----> mumps_node
-			 *  V19 struct_jrec_upd layout is as follows.
-			 *	offset = 0000 [0x0000]      size = 0024 [0x0018]    ----> prefix
-			 *	offset = 0024 [0x0018]      size = 0008 [0x0008]    ----> token_seq
-			 *	offset = 0032 [0x0020]      size = 0004 [0x0004]    ----> update_num
-			 *	offset = 0036 [0x0022]      size = 0002 [0x0002]    ----> filler_short
-			 *	offset = 0038 [0x0026]      size = 0002 [0x0002]    ----> num_participants
-			 *	offset = 0040 [0x0028]      size = 0008 [0x0008]    ----> mumps_node
-			 *
-			 * V19 has a 4-byte "update_num" field and two 2-byte fields (num_participants and
-			 * filler_short) whereas V18 does not have this. Since the num_*_participants
-			 * of the *SET, *KILL records will not be used by the reciever process, no point in endian
-			 * converting them. So, endian convert "update_num"
-			 */
-			keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
-			assert(keystr == (jnl_string *)&rec->jrec_ztworm.ztworm_str);
-			if (V19_JNL_VER == remote_jnl_ver)
-			{
-				assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
-				rec->jrec_set_kill.update_num = GTM_BYTESWAP_32(rec->jrec_set_kill.update_num);
-			} else
-			{	/* Go back 8 bytes to account for lack of "update_num" and num_*_participants fields.
-				 * Before that assert on the current V19 format surrounding "update_num" in case it changes later.
-				 */
-				assert((unsigned char *)&rec->jrec_set_kill.token_seq + SIZEOF(token_seq_t)
-					== (unsigned char *)&rec->jrec_set_kill.update_num);
-				assert((SIZEOF(unsigned short)) == SIZEOF(rec->jrec_set_kill.num_participants));
-				assert((SIZEOF(unsigned short)) == SIZEOF(rec->jrec_set_kill.filler_short));
-				assert((SIZEOF(uint4) == SIZEOF(rec->jrec_set_kill.update_num)));
-				assert((unsigned char *)&rec->jrec_set_kill.num_participants + SIZEOF(unsigned short)
-					== (unsigned char *)&rec->jrec_set_kill.mumps_node);
-				keystr = (jnl_string *)(((unsigned char *)keystr) -
-						(SIZEOF(uint4) + SIZEOF(unsigned short) + SIZEOF(unsigned short)));
-			}
-			/* In V18, mumps_node consists of a 32-bit length field
-			 * In V19, mumps_node consists of a 8-bit nodeflags and 24-bit length field
-			 * In either case, endian convert the 32-bits as a whole.
-			 */
-			keylength = *(jnl_str_len_t *)keystr;
-			*(jnl_str_len_t *)keystr = GTM_BYTESWAP_32(keylength);
-			if (IS_SET(rectype))
-			{
-				assert(!IS_ZTWORM(rectype));
-				vallen_ptr = (mstr_len_t *)&keystr->text[keystr->length];
-				GET_MSTR_LEN(temp_val, vallen_ptr);
-				temp_val = GTM_BYTESWAP_32(temp_val);
-				PUT_MSTR_LEN(vallen_ptr, temp_val);
-			}
-		} else if (JRT_TCOM == rectype)
-		{	/* The TCOMMIT record format is different in the two (V18 contains one 4-byte "participants" field
-			 * whereas V19 contains two 2-byte fields "num_participants" and "filler_short".
-			 */
-			if (V18_JNL_VER == remote_jnl_ver)
-			{
-				v18_participants_ptr = (uint4 *)((unsigned char *)&rec->jrec_tcom.token_seq + SIZEOF(token_seq_t)
-							+ TID_STR_SIZE);
-				v18_participants = *v18_participants_ptr;
-				*(uint4 *)v18_participants_ptr = GTM_BYTESWAP_32(v18_participants);
-			} else
-			{
-				assert((unsigned char *)&rec->jrec_tcom.token_seq
-					+ SIZEOF(token_seq_t) == (unsigned char *)&rec->jrec_tcom.filler_short);
-				/* byte-swap num_participants */
-				participants = rec->jrec_tcom.num_participants;
-				rec->jrec_tcom.num_participants = GTM_BYTESWAP_16(participants);
-			}
 		}
-		/* else records could be JRT_NULL.
-		 * In case of JRT_NULL, there is only a filler field so no need to convert that either.
-		 */
 		jb = jb + reclen;
 		assert(jb == jstart + reclen);
 		jlen -= reclen;
-		continue;
 	}
 	if ((-1 != status) && (0 != jlen))
 	{	/* Incomplete record */
@@ -472,7 +468,9 @@ static void do_flow_control(uint4 write_pos)
 	int			status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	int			read_pos;
 	seq_num			temp_seq_num;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
@@ -483,7 +481,7 @@ static void do_flow_control(uint4 write_pos)
 		space_used = write_pos - (read_pos = upd_proc_local->read);
 	if (space_used >= recvpool_high_watermark && !xoff_sent)
 	{	/* Send XOFF message */
-		if (src_node_same_endianness)
+		if (REPLGBL.src_node_same_endianness)
 		{
 			xoff_msg.type = REPL_XOFF;
 			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, SIZEOF(seq_num));
@@ -513,7 +511,7 @@ static void do_flow_control(uint4 write_pos)
 		gtmrecv_poll_interval.tv_usec = GTMRECV_WAIT_FOR_UPD_PROGRESS_US;
 	} else if (space_used < recvpool_low_watermark && xoff_sent)
 	{
-		if (src_node_same_endianness)
+		if (REPLGBL.src_node_same_endianness)
 		{
 			xon_msg.type = REPL_XON;
 			memcpy((uchar_ptr_t)&xon_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, SIZEOF(seq_num));
@@ -563,10 +561,9 @@ static int gtmrecv_est_conn(void)
 	unsigned long	poll_nfds;
 	struct pollfd	poll_fdlist[1];
 #endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
-
+	SETUP_THREADGBL_ACCESS;
 	/* Wait for a connection from a Source Server.
 	 * The Receiver Server is an iterative server.
 	 */
@@ -756,7 +753,7 @@ static int gtmrecv_est_conn(void)
 			repl_max_send_buffsize, repl_max_recv_buffsize);
 	repl_log_conn_info(gtmrecv_sock_fd, gtmrecv_log_fp);
 	/* re-determine endianness of other side */
-	src_node_endianness_known = FALSE;
+	REPLGBL.src_node_endianness_known = FALSE;
 	/* re-determine journal format of other side */
 	remote_jnl_ver = 0;
 	/* re-determine compression level on the replication pipe after every connection establishment */
@@ -822,22 +819,26 @@ void gtmrecv_free_msgbuff(void)
 /* This function can be used to only send fixed-size message types across the replication pipe.
  * This in turn uses REPL_SEND* macros but also does error checks and sets the global variables
  *	"repl_connection_reset" or "gtmrecv_wait_for_jnl_seqno" accordingly.
+ * It also does the endian conversion of the 'type' and 'len' fields of the repl_msg_t structure being sent.
  *
  *	msg            = Pointer to the message buffer to send
+ *	type	       = One of the various message types listed in repl_msg.h
+ *	len	       = Length of the message to be sent
  *	msgtypestr     = Message name as a string to display meaningful error messages
  *	optional_seqno = Optional seqno that needs to be printed along with the message name
  */
-void	gtmrecv_repl_send(repl_msg_ptr_t msgp, char *msgtypestr, seq_num optional_seqno)
+void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypestr, seq_num optional_seqno)
 {
 	unsigned char		*msg_ptr;				/* needed for REPL_SEND_LOOP */
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			status;					/* needed for REPL_SEND_LOOP */
 	FILE			*log_fp;
-	int4			msgp_len;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!mur_options.rollback || (NULL == recvpool.gtmrecv_local));
 	assert(mur_options.rollback || (NULL != recvpool.gtmrecv_local));
-	assert((REPL_MULTISITE_MSG_START > msgp->type)
+	assert((REPL_MULTISITE_MSG_START > type)
 		|| !mur_options.rollback && (REPL_PROTO_VER_MULTISITE <= recvpool.gtmrecv_local->remote_proto_ver)
 		|| mur_options.rollback && (REPL_PROTO_VER_MULTISITE <= murgbl.remote_proto_ver));
 	log_fp = (NULL == gtmrecv_log_fp) ? stdout : gtmrecv_log_fp;
@@ -847,11 +848,16 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, char *msgtypestr, seq_num optional_s
 			optional_seqno, optional_seqno);
 	} else
 		repl_log(log_fp, TRUE, TRUE, "Sending %s message\n", msgtypestr);
-	if (src_node_same_endianness)
-		msgp_len = msgp->len;
-	else
-		msgp_len = GTM_BYTESWAP_32(msgp->len);
-	REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, msgp_len, FALSE, &gtmrecv_poll_immediate)
+	if (REPLGBL.src_node_same_endianness)
+	{
+		msgp->type = type;
+		msgp->len = len;
+	} else
+	{
+		msgp->type = GTM_BYTESWAP_32(type);
+		msgp->len = GTM_BYTESWAP_32(len);
+	}
+	REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, len, FALSE, &gtmrecv_poll_immediate)
 	{
 		GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 	}
@@ -867,42 +873,30 @@ void gtmrecv_send_triple_info(repl_triple *triple, int4 triple_num)
 	repl_tripinfo1_msg_t	tripinfo1_msg;
 	repl_tripinfo2_msg_t	tripinfo2_msg;
 	FILE			*log_fp;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/*************** Send REPL_TRIPLE_INFO1 message ***************/
-	memset(&tripinfo1_msg, 0, SIZEOF(tripinfo1_msg));
-	if (src_node_same_endianness)
-	{
-		tripinfo1_msg.type = REPL_TRIPLE_INFO1;
-		tripinfo1_msg.len = MIN_REPL_MSGLEN;
-		tripinfo1_msg.start_seqno = triple->start_seqno;
-	} else
-	{
-		tripinfo1_msg.type = GTM_BYTESWAP_32(REPL_TRIPLE_INFO1);
-		tripinfo1_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
-		tripinfo1_msg.start_seqno = GTM_BYTESWAP_64(triple->start_seqno);
-	}
+	tripinfo1_msg.start_seqno = REPLGBL.src_node_same_endianness ? triple->start_seqno : GTM_BYTESWAP_64(triple->start_seqno);
 	memcpy(tripinfo1_msg.instname, triple->root_primary_instname, MAX_INSTNAME_LEN - 1);
-	gtmrecv_repl_send((repl_msg_ptr_t)&tripinfo1_msg, "REPL_TRIPLE_INFO1", triple->start_seqno);
+	gtmrecv_repl_send((repl_msg_ptr_t)&tripinfo1_msg, REPL_TRIPLE_INFO1, MIN_REPL_MSGLEN,
+				"REPL_TRIPLE_INFO1", triple->start_seqno);
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 		return;
 	/*************** Send REPL_TRIPLE_INFO2 message ***************/
-	memset(&tripinfo2_msg, 0, SIZEOF(tripinfo2_msg));
-	if (src_node_same_endianness)
+	if (REPLGBL.src_node_same_endianness)
 	{
-		tripinfo2_msg.type = REPL_TRIPLE_INFO2;
-		tripinfo2_msg.len = MIN_REPL_MSGLEN;
 		tripinfo2_msg.start_seqno = triple->start_seqno;
 		tripinfo2_msg.cycle = triple->root_primary_cycle;
 		tripinfo2_msg.triple_num = triple_num;
 	} else
 	{
-		tripinfo2_msg.type = GTM_BYTESWAP_32(REPL_TRIPLE_INFO2);
-		tripinfo2_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
 		tripinfo2_msg.start_seqno = GTM_BYTESWAP_64(triple->start_seqno);
 		tripinfo2_msg.cycle = GTM_BYTESWAP_32(triple->root_primary_cycle);
 		tripinfo2_msg.triple_num = GTM_BYTESWAP_32(triple_num);
 	}
-	gtmrecv_repl_send((repl_msg_ptr_t)&tripinfo2_msg, "REPL_TRIPLE_INFO2", triple->start_seqno);
+	gtmrecv_repl_send((repl_msg_ptr_t)&tripinfo2_msg, REPL_TRIPLE_INFO2, MIN_REPL_MSGLEN,
+				"REPL_TRIPLE_INFO2", triple->start_seqno);
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 		return;
 	log_fp = (NULL == gtmrecv_log_fp) ? stdout : gtmrecv_log_fp;
@@ -937,8 +931,6 @@ static boolean_t	is_active_source_server_running(void)
 static void prepare_recvpool_for_write(int datalen, int pre_filter_write_len)
 {
 	recvpool_ctl_ptr_t	recvpool_ctl;
-
-	error_def(ERR_REPLTRANS2BIG);
 
 	recvpool_ctl = recvpool.recvpool_ctl;
 	if (datalen > recvpool_size)
@@ -1049,12 +1041,9 @@ static void process_tr_buff(int msg_type)
 	repl_msg_ptr_t			msgp, msgp_top;
 	uint4				write_len, pre_filter_write_len, pre_filter_write;
 	boolean_t			uncmpfail;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_JNLRECFMT);
-	error_def(ERR_JNLSETDATA2LONG);
-	error_def(ERR_JNLNEWREC);
-	error_def(ERR_REPLGBL2LONG);
-
+	SETUP_THREADGBL_ACCESS;
 	recvpool_ctl = recvpool.recvpool_ctl;
 	is_repl_cmpc  = ((REPL_TR_CMP_JNL_RECS == msg_type) || (REPL_TR_CMP_JNL_RECS2 == msg_type));
 	is_new_triple = (REPL_NEW_TRIPLE == msg_type);
@@ -1138,7 +1127,7 @@ static void process_tr_buff(int msg_type)
 			 * before using the type and len fields (the compressed message header was already endian
 			 * converted as part of receiving the message in do_main_loop())
 			 */
-			if (!src_node_same_endianness)
+			if (!REPLGBL.src_node_same_endianness)
 			{
 				msgp->type = GTM_BYTESWAP_32(msgp->type);
 				msgp->len = GTM_BYTESWAP_32(msgp->len);
@@ -1155,12 +1144,14 @@ static void process_tr_buff(int msg_type)
 		write_len = (write_loc - write_off);
 		assert((write_off != write_wrap) || (0 == write_off));
 		assert(remote_jnl_ver);
-		if (!src_node_same_endianness)
+		assert(REPLGBL.src_node_same_endianness || (V18_JNL_VER <= remote_jnl_ver));
+		if (!REPLGBL.src_node_same_endianness && (REPLGBL.srcsrv_vms ||
+							(remote_jnl_ver >= jnl_ver) || (V21_JNL_VER > remote_jnl_ver)))
 		{
 			if (SS_NORMAL != (status = repl_tr_endian_convert(remote_jnl_ver,
 							recvpool.recvdata_base + write_off, write_len)))
-				repl_log(gtmrecv_log_fp, FALSE, TRUE,
-					"REPL ERROR - Journal records did not endian convert properly\n");
+				rts_error(VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Replicating"),
+						&recvpool.upd_proc_local->read_jnl_seqno);
 		}
 		if (!is_new_triple)
 		{
@@ -1193,7 +1184,7 @@ static void process_tr_buff(int msg_type)
 						write_len = tot_out_size + out_size;
 					else
 					{
-						assert(FALSE);
+						assert(EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno);
 						if (EREPL_INTLFILTER_BADREC == repl_errno)
 							rts_error(VARLSTCNT(1) ERR_JNLRECFMT);
 						else if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
@@ -1204,6 +1195,8 @@ static void process_tr_buff(int msg_type)
 								  (unsigned int)jnl_dest_maxrectype);
 						else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
 							rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);
+						else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)
+							rts_error(VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1, &recvpool_ctl->jnl_seqno);
 						else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
 							GTMASSERT;
 					}
@@ -1401,15 +1394,9 @@ static void do_main_loop(boolean_t crash_restart)
 	repl_cmpmsg_ptr_t		cmpmsgp;
 	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
 	uchar_ptr_t			old_buffp;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_PRIMARYNOTROOT);
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_REPLINSTNOHIST);
-	error_def(ERR_REPLUPGRADEPRI);
-	error_def(ERR_SECONDAHEAD);
-	error_def(ERR_TEXT);
-	error_def(ERR_UNIMPLOP);
-
+	SETUP_THREADGBL_ACCESS;
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
@@ -1434,7 +1421,7 @@ static void do_main_loop(boolean_t crash_restart)
 		 */
 		gtmrecv_wait_for_jnl_seqno = FALSE;
 		secondary_side_std_null_coll = recvpool_ctl->std_null_coll;
-		secondary_side_trigger_support = TRUE;
+		secondary_side_trigger_support = GTMTRIG_ONLY(TRUE) NON_GTMTRIG_ONLY(FALSE);
 		if (QWEQ(recvpool_ctl->start_jnl_seqno, seq_num_zero))
 			QWASSIGN(recvpool_ctl->start_jnl_seqno, recvpool_ctl->jnl_seqno);
 		/* If we assume remote primary is multisite capable, we need to send the journal seqno of this instance
@@ -1534,7 +1521,8 @@ static void do_main_loop(boolean_t crash_restart)
 			{
 				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
 				{
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset\n");
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset. Status = %d ; %s\n",
+							status, STRERROR(status));
 					repl_connection_reset = TRUE;
 					repl_close(&gtmrecv_sock_fd);
 					return;
@@ -1564,16 +1552,16 @@ static void do_main_loop(boolean_t crash_restart)
 			if (0 == data_len)
 			{
 				assert(0 == ((unsigned long)buffp % REPL_MSG_ALIGN));
-				if (!src_node_endianness_known)
+				if (!REPLGBL.src_node_endianness_known)
 				{
-					src_node_endianness_known = TRUE;
+					REPLGBL.src_node_endianness_known = TRUE;
 					if ((REPL_MSGTYPE_LAST < ((repl_msg_ptr_t)buffp)->type)
 							&& (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type)))
-						src_node_same_endianness = FALSE;
+						REPLGBL.src_node_same_endianness = FALSE;
 					else
-						src_node_same_endianness = TRUE;
+						REPLGBL.src_node_same_endianness = TRUE;
 				}
-				if (!src_node_same_endianness)
+				if (!REPLGBL.src_node_same_endianness)
 				{
 					((repl_msg_ptr_t)buffp)->type = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type);
 					((repl_msg_ptr_t)buffp)->len = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->len);
@@ -1604,7 +1592,7 @@ static void do_main_loop(boolean_t crash_restart)
 						break;				/* Break out of here and read more data first. */
 					msghdrlen = REPL_MSG_HDRLEN; /* reset to regular msg hdr length for future messages */
 					cmpmsgp = (repl_cmpmsg_ptr_t)buffp;
-					if (!src_node_same_endianness)
+					if (!REPLGBL.src_node_same_endianness)
 					{
 						cmpmsgp->cmplen = GTM_BYTESWAP_32(cmpmsgp->cmplen);
 						cmpmsgp->uncmplen = GTM_BYTESWAP_32(cmpmsgp->uncmplen);
@@ -1688,7 +1676,7 @@ static void do_main_loop(boolean_t crash_restart)
 							break;
 						}
 						memcpy(heartbeat.ack_seqno, buffp - msg_len, msg_len);
-						if (src_node_same_endianness)
+						if (REPLGBL.src_node_same_endianness)
 						{
 							 ack_time = *(gtm_time4_t *)&heartbeat.ack_time[0];
 							 memcpy((uchar_ptr_t)&ack_seqno,
@@ -1703,7 +1691,7 @@ static void do_main_loop(boolean_t crash_restart)
 						REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO %llu at %ld\n",
 							     ack_time, ack_seqno, time(NULL));
 						ack_seqno = upd_proc_local->read_jnl_seqno;
-						if (src_node_same_endianness)
+						if (REPLGBL.src_node_same_endianness)
 						{
 							heartbeat.type = REPL_HEARTBEAT;
 							heartbeat.len = MIN_REPL_MSGLEN;
@@ -1743,19 +1731,12 @@ static void do_main_loop(boolean_t crash_restart)
 						assert(REPL_PROTO_VER_MULTISITE <= recvpool.gtmrecv_local->remote_proto_ver);
 						/*************** Send REPL_INSTANCE_INFO message ***************/
 						memset(&instinfo_msg, 0, SIZEOF(instinfo_msg));
-						if (src_node_same_endianness)
-						{
-							instinfo_msg.type = REPL_INSTANCE_INFO;
-							instinfo_msg.len = MIN_REPL_MSGLEN;
-						} else
-						{
-							instinfo_msg.type = GTM_BYTESWAP_32(REPL_INSTANCE_INFO);
-							instinfo_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
-						}
 						memcpy(instinfo_msg.instname, jnlpool.repl_inst_filehdr->this_instname,
 							MAX_INSTNAME_LEN - 1);
 						instinfo_msg.was_rootprimary = (unsigned char)repl_inst_was_rootprimary();
-						gtmrecv_repl_send((repl_msg_ptr_t)&instinfo_msg, "REPL_INSTANCE_INFO", MAX_SEQNO);
+						gtmrecv_repl_send((repl_msg_ptr_t)&instinfo_msg,
+									REPL_INSTANCE_INFO, MIN_REPL_MSGLEN, "REPL_INSTANCE_INFO",
+									MAX_SEQNO);
 						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 							return;
 						/* Do not allow an instance which was formerly a root primary or which still
@@ -1792,7 +1773,7 @@ static void do_main_loop(boolean_t crash_restart)
 						{
 							assert(msg_len == REPL_MSG_CMPINFOLEN - REPL_MSG_HDRLEN);
 							cmptest_msg = (repl_cmpinfo_msg_ptr_t)(buffp - msg_len - REPL_MSG_HDRLEN);
-							if (src_node_same_endianness)
+							if (REPLGBL.src_node_same_endianness)
 								cmplen = cmptest_msg->datalen;
 							else
 								cmplen = GTM_BYTESWAP_32(cmptest_msg->datalen);
@@ -1859,19 +1840,11 @@ static void do_main_loop(boolean_t crash_restart)
 							cmpsolve_msg.datalen = REPL_RCVR_CMP_TEST_FAIL;
 							repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_UNCMPTRANSITION_STR);
 						}
-						if (src_node_same_endianness)
-						{
-							cmpsolve_msg.type = REPL_CMP_SOLVE;
-							cmpsolve_msg.len = REPL_MSG_CMPINFOLEN;
-							/* datalen is already initialized to the right value */
-						} else
-						{
-							cmpsolve_msg.type = GTM_BYTESWAP_32(REPL_CMP_SOLVE);
-							cmpsolve_msg.len = GTM_BYTESWAP_32(REPL_MSG_CMPINFOLEN);
+						if (!REPLGBL.src_node_same_endianness)
 							cmpsolve_msg.datalen = GTM_BYTESWAP_32(cmpsolve_msg.datalen);
-						}
 						cmpsolve_msg.proto_ver = REPL_PROTO_VER_THIS;
-						gtmrecv_repl_send((repl_msg_ptr_t)&cmpsolve_msg, "REPL_CMP_SOLVE", MAX_SEQNO);
+						gtmrecv_repl_send((repl_msg_ptr_t)&cmpsolve_msg, REPL_CMP_SOLVE,
+									REPL_MSG_CMPINFOLEN, "REPL_CMP_SOLVE", MAX_SEQNO);
 						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 							return;
 						if (!uncmpfail)
@@ -1888,7 +1861,7 @@ static void do_main_loop(boolean_t crash_restart)
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 						need_tripleinfo_msg = (repl_needtriple_msg_ptr_t)(buffp - msg_len
 													- REPL_MSG_HDRLEN);
-						if (src_node_same_endianness)
+						if (REPLGBL.src_node_same_endianness)
 							input_triple_seqno = need_tripleinfo_msg->seqno;
 						else
 							input_triple_seqno = GTM_BYTESWAP_64(need_tripleinfo_msg->seqno);
@@ -2063,7 +2036,7 @@ static void do_main_loop(boolean_t crash_restart)
 						assert((unsigned long)start_msg % SIZEOF(seq_num) == 0); /* alignment check */
 						memcpy((uchar_ptr_t)&recvd_jnl_seqno,
 							(uchar_ptr_t)start_msg->start_seqno, SIZEOF(seq_num));
-						if (!src_node_same_endianness)
+						if (!REPLGBL.src_node_same_endianness)
 						{
 							recvd_jnl_seqno = GTM_BYTESWAP_64(recvd_jnl_seqno);
 						}
@@ -2076,12 +2049,12 @@ static void do_main_loop(boolean_t crash_restart)
 							remote_jnl_ver = start_msg->jnl_ver;
 							REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
 								     jnl_ver, remote_jnl_ver);
-							repl_check_jnlver_compat();
+							repl_check_jnlver_compat(REPLGBL.src_node_same_endianness);
 							/* older versions zero filler that was in place of start_msg->start_flags,
 							 * so we are okay fetching start_msg->start_flags unconditionally.
 							 */
 							GET_ULONG(recvd_start_flags, start_msg->start_flags);
-							if (!src_node_same_endianness)
+							if (!REPLGBL.src_node_same_endianness)
 							{
 								recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
 							}
@@ -2090,18 +2063,18 @@ static void do_main_loop(boolean_t crash_restart)
 								recvd_start_flags = 0;
 							primary_side_std_null_coll = (recvd_start_flags & START_FLAG_COLL_M) ?
 								TRUE : FALSE;
-							if (FALSE != (null_subs_xform = ((primary_side_std_null_coll &&
+							REPLGBL.srcsrv_vms = (recvd_start_flags & START_FLAG_SRCSRV_IS_VMS) ?
+													TRUE : FALSE;
+							if (FALSE != (REPLGBL.null_subs_xform = ((primary_side_std_null_coll &&
 										!secondary_side_std_null_coll)
 									|| (secondary_side_std_null_coll &&
 										!primary_side_std_null_coll))))
-								null_subs_xform = (primary_side_std_null_coll ?
+								REPLGBL.null_subs_xform = (primary_side_std_null_coll ?
 									STDNULL_TO_GTMNULL_COLL : GTMNULL_TO_STDNULL_COLL);
 								/* this sets null_subs_xform regardless of remote_jnl_ver */
 							primary_side_trigger_support
 								= (recvd_start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
-							if (((jnl_ver > remote_jnl_ver)
-								NON_GTMTRIG_ONLY(|| ((jnl_ver == remote_jnl_ver)
-											&& (0 != null_subs_xform))))
+							if ((jnl_ver > remote_jnl_ver)
 								&& (IF_NONE != repl_filter_old2cur[remote_jnl_ver
 													- JNL_VER_EARLIEST_REPL]))
 							{
@@ -2151,11 +2124,12 @@ static void do_main_loop(boolean_t crash_restart)
 
 				default:
 					/* Discard the message */
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received UNKNOWN message (type = %d). "
+						"Discarding it.\n", msg_type);
+					assert(FALSE);
 					buffp += buffered_data_len;
 					buff_unprocessed -= buffered_data_len;
 					data_len -= buffered_data_len;
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received UNKNOWN message (type = %d). "
-						"Discarding it.\n", msg_type);
 					break;
 			}
 			if (repl_connection_reset)

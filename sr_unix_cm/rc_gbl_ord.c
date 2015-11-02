@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,7 +111,7 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 					}
 					rsp->size_remain.value = rc_overflow->size;
 				}
-				if ((rc_read_stamp = t_end(&gv_target->hist, NULL)) != 0)
+				if (0 != (rc_read_stamp = t_end(&gv_target->hist, NULL, TN_NOT_SPECIFIED)))
 					break;
 			}
 			if (found)

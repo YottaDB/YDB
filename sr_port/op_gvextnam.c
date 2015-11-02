@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,17 +39,12 @@
 #endif
 #include "gtm_env_xlate_init.h"
 
-GBLREF bool		gv_curr_subsc_null;
-GBLREF bool		gv_prev_subsc_null;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_region	*gv_cur_region;
-GBLREF gd_addr		*gd_targ_addr;
 GBLREF mstr             extnam_str;
 GBLREF mval		dollar_zgbldir;
 GBLREF gd_addr		*gd_header;
-
-static int	extnam_str_alloc = 0;
 
 void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 {
@@ -59,32 +54,33 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 	mstr		*tmp_mstr_ptr;
 	mval		*val, *val2, val_xlated;
 	short		max_key;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, val1);
-	VMS_ONLY(va_count(count);)
+	VMS_ONLY(va_count(count));
 	val2 = va_arg(var, mval *);
 	MV_FORCE_STR(val1);
 	val1 = gtm_env_translate(val1, val2, &val_xlated);
-
-	assert(!extnam_str_alloc || (NULL != extnam_str.addr));
+	assert(!TREF(gv_extname_size) || (NULL != extnam_str.addr));
 	if (val1->str.len)
 	{
 		tmp_mstr_ptr = &val1->str;
-		gd_targ_addr = zgbldir(val1);
+		TREF(gd_targ_addr) = zgbldir(val1);
 	} else
 	{
 		tmp_mstr_ptr = &dollar_zgbldir.str;
 		if (!gd_header)
 			gvinit();
-		gd_targ_addr = gd_header;
+		TREF(gd_targ_addr) = gd_header;
 	}
 	extnam_str.len = tmp_mstr_ptr->len;
-	if (extnam_str.len > extnam_str_alloc)
+	if (extnam_str.len > TREF(gv_extname_size))
 	{
 		if (NULL != extnam_str.addr)
 			free(extnam_str.addr);
-		extnam_str_alloc = extnam_str.len;
-		extnam_str.addr = (char *)malloc(extnam_str_alloc);
+		TREF(gv_extname_size) = extnam_str.len;
+		extnam_str.addr = (char *)malloc(TREF(gv_extname_size));
 	}
 	memcpy(extnam_str.addr, tmp_mstr_ptr->addr, tmp_mstr_ptr->len);
 	if (gv_target)
@@ -95,7 +91,7 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 	val = va_arg(var, mval *);
 	if (!MV_IS_STRING(val))
 		GTMASSERT;
-	GV_BIND_NAME_AND_ROOT_SEARCH(gd_targ_addr, &(val->str));
+	GV_BIND_NAME_AND_ROOT_SEARCH(TREF(gd_targ_addr), &(val->str));
 	was_null = is_null = FALSE;
 	max_key = gv_cur_region->max_key_size;
 	for (count -= 3;  count > 0;  count--)
@@ -104,8 +100,9 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 		COPY_SUBS_TO_GVCURRKEY(val, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey, was_null, is_null */
 	}
 	va_end(var);
-	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */
-	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
+	TREF(gv_some_subsc_null) = was_null; /* if true, it indicates there is a null subscript (other than the last subscript)
+						in current key */
+	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && (NEVER == gv_cur_region->null_subs))
 		sgnl_gvnulsubsc();
 	return;

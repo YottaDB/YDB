@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,17 +11,18 @@
 
 #include "mdef.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "mvalconv.h"
 
+error_def(ERR_ORDER2);
+
 void op_fno2(lv_val *src,mval *key,mval *dst,mval *direct)
 {
-	error_def(ERR_ORDER2);
+	int4	dummy_intval;
 
 	MV_FORCE_DEFINED(key);
 	MV_FORCE_NUM(direct);
-	if (!MV_IS_INT(direct) || (direct->m[1] != 1*MV_BIAS && direct->m[1] != -1*MV_BIAS))
+	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
 		rts_error(VARLSTCNT(1) ERR_ORDER2);
 	else
 	{	if (direct->m[1] == 1*MV_BIAS)

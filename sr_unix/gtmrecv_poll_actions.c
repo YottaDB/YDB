@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2008, 2011 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,7 @@
 
 #include "util.h"
 #include "tp_change_reg.h"
+#include "replgbl.h"
 
 GBLREF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLREF	int			gtmrecv_max_repl_msglen;
@@ -59,8 +60,11 @@ GBLREF	boolean_t		gtmrecv_bad_trans_sent;
 GBLREF	pid_t			updproc_pid;
 GBLREF	uint4			log_interval;
 GBLREF	volatile time_t		gtmrecv_now;
-GBLREF	boolean_t		src_node_same_endianness;
 GBLREF	boolean_t		gtmrecv_send_cmp2uncmp;
+
+error_def(ERR_REPLCOMM);
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_TEXT);
 
 #ifdef INT8_SUPPORTED
 static	seq_num			last_ack_seqno = 0;
@@ -101,6 +105,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	int			upd_start_status, upd_start_attempts;
 	int			buffered_data_len;
 	int			upd_exit_status;
+	seq_num			temp_send_seqno;
 	boolean_t		bad_trans_detected = FALSE;
 	uint4			jnl_status;
 	recvpool_ctl_ptr_t	recvpool_ctl;
@@ -109,11 +114,9 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	pid_t			waitpid_res;
 	int4			msg_type, msg_len;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_TEXT);
-
+	SETUP_THREADGBL_ACCESS;
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
@@ -181,19 +184,32 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	{
 		if (FD_INVALID != gtmrecv_sock_fd)
 		{	/* Send XOFF_ACK_ME */
-			xoff_msg.type = REPL_XOFF_ACK_ME;
-			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&send_seqno, SIZEOF(seq_num));
-			xoff_msg.len = MIN_REPL_MSGLEN;
-			REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, FALSE, &gtmrecv_poll_immediate)
+			send_seqno = upd_proc_local->read_jnl_seqno;
+			if (REPLGBL.src_node_same_endianness)
+			{
+				xoff_msg.type = REPL_XOFF_ACK_ME;
+				xoff_msg.len = MIN_REPL_MSGLEN;
+				memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&send_seqno, SIZEOF(seq_num));
+			} else
+			{
+				xoff_msg.type = GTM_BYTESWAP_32(REPL_XOFF_ACK_ME);
+				xoff_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
+				temp_send_seqno = GTM_BYTESWAP_64(send_seqno);
+				memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&temp_send_seqno, SIZEOF(seq_num));
+			}
+			REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_poll_immediate)
 				; /* Empty Body */
 			if (SS_NORMAL != status)
 			{
 				if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 				{
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending XOFF_ACK_ME. "
+							"Status = %d ; %s\n", status, STRERROR(status));
 					repl_close(&gtmrecv_sock_fd);
 					repl_connection_reset = TRUE;
 					xoff_sent = FALSE;
 					send_badtrans = FALSE;
+
 				} else if (EREPL_SEND == repl_errno)
 					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
@@ -324,6 +340,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			{
 				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
 				{
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while receiving XOFF_ACK. "
+							"Status = %d ; %s\n", status, STRERROR(status));
 					repl_close(&gtmrecv_sock_fd);
 					repl_connection_reset = TRUE;
 					xoff_sent = FALSE;
@@ -344,12 +362,17 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 
 	if ((STOP_POLL == return_status) && (send_badtrans || send_cmp2uncmp) && (FD_INVALID != gtmrecv_sock_fd))
 	{	/* Send REPL_BADTRANS or REPL_CMP2UNCMP message */
-		bad_trans_msg.type = send_cmp2uncmp ? REPL_CMP2UNCMP : REPL_BADTRANS;
-		bad_trans_msg.len  = MIN_REPL_MSGLEN;
-		if (src_node_same_endianness)
+		if (REPLGBL.src_node_same_endianness)
+		{
+			bad_trans_msg.type = send_cmp2uncmp ? REPL_CMP2UNCMP : REPL_BADTRANS;
+			bad_trans_msg.len  = MIN_REPL_MSGLEN;
 			bad_trans_msg.start_seqno = send_seqno;
-		else
+		} else
+		{
+			bad_trans_msg.type = send_cmp2uncmp ? GTM_BYTESWAP_32(REPL_CMP2UNCMP) : GTM_BYTESWAP_32(REPL_BADTRANS);
+			bad_trans_msg.len  = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
 			bad_trans_msg.start_seqno = GTM_BYTESWAP_64(send_seqno);
+		}
 		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, bad_trans_msg.len, FALSE, &gtmrecv_poll_immediate)
 			; /* Empty Body */
 		if (SS_NORMAL == status)
@@ -362,6 +385,15 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		{
 			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 			{
+				if (send_cmp2uncmp)
+				{
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_CMP2UNCMP. "
+							"Status = %d ; %s\n", status, STRERROR(status));
+				} else
+				{
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_BADTRANS. "
+							"Status = %d ; %s\n", status, STRERROR(status));
+				}
 				repl_close(&gtmrecv_sock_fd);
 				repl_connection_reset = TRUE;
 				return_status = STOP_POLL;

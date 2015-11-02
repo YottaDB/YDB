@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #include "zshow.h"
 
 GBLREF	gv_namehead	*gv_target;
-GBLREF	bool		transform;
 
 unsigned char *gvstrsub(unsigned char *src, unsigned char *target)
 {
@@ -31,19 +30,20 @@ unsigned char *gvstrsub(unsigned char *src, unsigned char *target)
 	unsigned char	*str;
 	mstr		mstr_x;
 	mstr		mstr_tmp;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ptr = buf;
 	for (n = 0, str = src; *str; ++n, ++str)
 	{
-                if (*str == 1)
+                if (1 == *str)
                 {
                         str++;
                         *ptr++ = *str - 1;
-                }
-                else
+                } else
                         *ptr++ = *str;
 	}
-	if (transform && gv_target && gv_target->collseq)
+	if (TREF(transform) && gv_target && gv_target->collseq)
 	{
 		mstr_x.len = n;
 		mstr_x.addr = buf;

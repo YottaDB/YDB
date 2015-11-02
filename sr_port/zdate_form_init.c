@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,26 +21,27 @@
 #include "gtm_stdlib.h"
 
 GBLREF spdesc	stringpool;
-GBLREF int4	zdate_form;
+
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_TRNLOGFAIL);
 
 void zdate_form_init(struct startup_vector *svec)
 {
 	int4		status;
 	mstr		val, tn;
 	char		buf[MAX_TRANS_NAME_LEN];
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_TRNLOGFAIL);
-
+	SETUP_THREADGBL_ACCESS;
 	val.addr = ZDATE_FORM;
 	val.len = STR_LIT_LEN(ZDATE_FORM);
 	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
 	{
 		assert(tn.len < SIZEOF(buf));
 		buf[tn.len] = '\0';
-		zdate_form = (int4)(STRTOL(buf, NULL, 10));
+		TREF(zdate_form) = (int4)(STRTOL(buf, NULL, 10));
 	} else if (SS_NOLOGNAM == status)
-		zdate_form = svec->zdate_form;
+		TREF(zdate_form) = svec->zdate_form;
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
 		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf) - 1);

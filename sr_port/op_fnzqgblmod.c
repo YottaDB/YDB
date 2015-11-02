@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,6 @@
 
 #include "mdef.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -26,13 +24,14 @@ LITREF mval *fnzqgblmod_table[2];
 
 GBLREF gv_namehead 	*gv_target;
 GBLREF gd_region	*gv_cur_region;
-GBLREF bool		gv_curr_subsc_null;
 
 void op_fnzqgblmod(mval *v)
 {
 	bool	gblmod;
+	DCL_THREADGBL_ACCESS;
 
-	if (gv_curr_subsc_null && NEVER == gv_cur_region->null_subs)
+	SETUP_THREADGBL_ACCESS;
+	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
 
 	gblmod = TRUE;

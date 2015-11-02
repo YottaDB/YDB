@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,9 @@
 #include "tp.h"
 #include "min_max.h"
 #include "tp_set_sgm.h"
+#ifdef GTM_TRIGGER
+#include "gtm_trigger_trc.h"
+#endif
 
 GBLDEF	sgm_info	*sgm_info_ptr;
 GBLDEF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
@@ -57,7 +60,9 @@ void tp_set_sgm(void)
 		/* In case triggers are supported, make sure we start with latest copy of file header's db_trigger_cycle
 		 * to avoid unnecessary cdb_sc_triggermod type of restarts.
 		 */
-		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle;)
+		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle);
+		GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_set_sgm: Updating csa->db_trigger_cycle to %d\n",
+				       csa->db_trigger_cycle)));
 		si->fresh_start = FALSE;
 		assert(0 == si->update_trans);
 	}

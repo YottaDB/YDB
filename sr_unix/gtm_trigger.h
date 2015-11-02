@@ -16,6 +16,35 @@
 
 #define TRIGGER_NAME_RESERVED_SPACE	2	/* Reserved space in trigger name to make name unique if needbe */
 
+/* This macro is used where it is possible for the top frame to be a trigger base frame if we are in
+ * "trigger-no-mans-land" which is characterized by us having created the trigger base frame but no
+ * trigger execution frame on the stack that would have incremented gtm_trigger_depth (gtm_trigger_depth
+ * is only incremented for the duration of the trigger execution frame which also means gtm_trigger and
+ * dm_start are also on the stack). To be in this state at this point, we must have driven at least one of
+ * a parallel trigger set, returned back to gvtr_match_n_invoke, then, while retrieving the trigger source
+ * for the next parallel trigger, we hit a restart condition. There are a few different handlers than can
+ * catch this condition depending on where this macro is used but they all share one thing in common:
+ * In a normal restart condition while the trigger is running, gtm_trigger itself will unwind the trigger
+ * base frame during restarts but in this condition where we are in "trigger-no-mans-land", we need to
+ * unwind the trigger. We use an interuptable state flag that contains this nomansland state to determine
+ * if we are eligible for this unwind. If not, this is an out-of-design condition we need to protect
+ * against.
+ */
+#define TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND								\
+{													\
+	if (SFT_TRIGR & frame_pointer->type)								\
+	{												\
+		if (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state)					\
+		{	/* Remove this errant frame and continue to restart */				\
+			DBGTRIGR((stderr, "%s: trigger-no-mans-land situation - removing trigger "	\
+				  "base frame\n", __FILE__));						\
+			gtm_trigger_fini(FALSE, FALSE);							\
+		} else											\
+			/* Bad mojo - not in trigger-no-mans-land - unknown issue to protect against */	\
+			GTMASSERT;									\
+	}												\
+}
+
 typedef enum
 {	/* Trigger rethrow types */
 	trigr_rethrow_nil,

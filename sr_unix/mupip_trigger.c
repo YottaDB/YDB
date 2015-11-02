@@ -33,7 +33,6 @@ void mupip_trigger(void)
 {
 	char		trigger_file_name[MAX_FN_LEN + 1], select_list[MAX_LINE], select_file_name[MAX_FN_LEN + 1];
 	unsigned short	trigger_file_len = MAX_FN_LEN + 1, select_list_len = MAX_LINE;
-	char		*ptr;
 	int		reg_max_rec, reg_max_key, reg_max_blk;
 	unsigned short	sf_name_len;
 	int		local_errno;
@@ -53,27 +52,14 @@ void mupip_trigger(void)
 			util_out_print("Error parsing TRIGGERFILE name", TRUE);
 			mupip_exit(ERR_MUPCLIERR);
 		}
-		ptr = trigger_file_name;
+		assert('\0' == trigger_file_name[trigger_file_len]); /* should have been made sure by caller */
 		if (0 == trigger_file_len)
 		{
 			util_out_print("Missing input file name", TRUE);
 			mupip_exit(ERR_MUPCLIERR);
 		}
-		if (-1 != Stat((char *)ptr, &statbuf))
-		{
-			if (!S_ISREG(statbuf.st_mode))
-			{
-				util_out_print("Invalid input file: !AD -- Invalid type", TRUE, trigger_file_len, ptr);
-				mupip_exit(ERR_MUPCLIERR);
-			}
-		}
-		else
-		{
-			util_out_print("Error opening input file: !AD -- No such file", TRUE, trigger_file_len, ptr);
-			mupip_exit(ERR_MUPCLIERR);
-		}
 		gvinit();
-		mu_trig_trgfile(ptr, (uint4)trigger_file_len, noprompt);
+		mu_trig_trgfile(trigger_file_name, (uint4)trigger_file_len, noprompt);
 	}
 	if (CLI_PRESENT == cli_present("SELECT"))
 	{

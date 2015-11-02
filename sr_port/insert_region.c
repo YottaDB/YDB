@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,6 @@
  ****************************************************************/
 
 /* 	insert_region.c
- *
  *	requirement
  *		reg		initialized (gvcst_init)
  *	parameters
@@ -21,13 +20,11 @@
  *	return
  *		pointer to the item in the list that is corresponding to the region.
  *		*reg_list and *reg_free_list are also updated if needed.
- *
  *	fid_index field in csa and tp_reg_list is maintained by gvcst_init. Maintaining tp_reg_list is
  *	important, since the regions might be re-sorted in between insert_region() calls (i.e. new
  *	regions opening). All callers of insert_region except for dse_all() either use tp_reg_list or do not
  *	have the regions open.  dse_all() opens the regions before it calls insert_region(), so maintaining
  *	fid_index in tp_reg_list is sufficient.
- *
  */
 
 #include "mdef.h"
@@ -63,11 +60,8 @@
 #include "gtmimagename.h"
 
 GBLREF	gd_region	*gv_cur_region;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
-#ifdef DEBUG
-GBLREF	boolean_t	ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
-#endif
 
 tp_region	*insert_region(	gd_region	*reg,
 		   		tp_region	**reg_list,
@@ -76,50 +70,52 @@ tp_region	*insert_region(	gd_region	*reg,
 {
 	tp_region	*tr, *tr_last, *tr_new;
 	unique_file_id	local_id;
-#ifdef 	VMS
+#	ifdef 	VMS
 	char		*local_id_fiptr;
 	file_control	*fc;
 	uint4		status;
 	gd_region	*temp_reg;
-#endif
+#	endif
 	int4		local_fid_index;
 	sgmnt_addrs	*csa;
 	int4		match;
+	DCL_THREADGBL_ACCESS;
 
-	assert(size >= SIZEOF(tp_region));
+	SETUP_THREADGBL_ACCESS;
+	assert(SIZEOF(tp_region) <= size);
 	assert(!IS_GTM_IMAGE || dollar_tlevel);
 	if (reg->open)
 		csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
-#if defined(VMS)
+#	if defined(VMS)
 	if (!reg->open)
 	{
 		temp_reg = gv_cur_region;
 		gv_cur_region = reg;
-		local_id_fiptr = &local_id.file_id[0];
+		local_id_fiptr = local_id.file_id;
 		if (!mupfndfil(reg, NULL))
 		{
 			gv_cur_region = temp_reg;
 			return NULL;
 		}
 		FILE_CNTL_INIT_IF_NULL(reg->dyn.addr);
-	  	fc = reg->dyn.addr->file_cntl;
+		fc = reg->dyn.addr->file_cntl;
 		fc->file_type = reg->dyn.addr->acc_meth;
-	  	fc->op = FC_OPEN;
-	  	status = dbfilop(fc);
-	  	if (status & 1)
-	    	{
+		fc->op = FC_OPEN;
+		status = dbfilop(fc);
+		if (status & 1)
+		{
 			local_id_fiptr = &(FILE_INFO(reg)->file_id);
-	      		sys$dassgn(FILE_INFO(reg)->fab->fab$l_stv);
-	    	} else
-	    	{
-	      		gtm_putmsg(VARLSTCNT(1) status);
+			sys$dassgn(FILE_INFO(reg)->fab->fab$l_stv);
+		} else
+		{
+			gtm_putmsg(VARLSTCNT(1) status);
 			gv_cur_region = temp_reg;
-	      		return NULL;
-	    	}
+			return NULL;
+		}
 		gv_cur_region = temp_reg;
 	} else
 		local_fid_index = csa->fid_index;
-#elif defined(UNIX)
+#	elif defined(UNIX)
 	if (!reg->open)
 	{
 		if (!mupfndfil(reg, NULL))
@@ -128,7 +124,7 @@ tp_region	*insert_region(	gd_region	*reg,
 			return NULL;
 	} else
 		local_fid_index = csa->fid_index;
-#endif
+#	endif
 	/* See if the region is already on the list or if we have to add it */
 	for (tr = *reg_list, tr_last = NULL; NULL != tr; tr = tr->fPtr)
 	{
@@ -142,7 +138,7 @@ tp_region	*insert_region(	gd_region	*reg,
 			if (local_fid_index == tr->file.fid_index)	/* Region is found */
 			{	/* assert we are not in final retry or we are in TP and have crit on the region already */
 				assert((CDB_STAGNATE > t_tries)
-					|| ((0 < dollar_tlevel) && reg->open && csa->now_crit));
+					|| (dollar_tlevel && reg->open && csa->now_crit));
 				return tr;
 			}
 			if ((tr->file.fid_index > local_fid_index))
@@ -152,22 +148,22 @@ tp_region	*insert_region(	gd_region	*reg,
 			if (reg == tr->reg)	/* Region is found */
 			{	/* assert we are not in final retry or we are in TP and have crit on the region already */
 				assert((CDB_STAGNATE > t_tries)
-					|| ((0 < dollar_tlevel) && reg->open && csa->now_crit));
+					|| (dollar_tlevel && reg->open && csa->now_crit));
 				return tr;
 			}
 			/* let's sort here */
 			if (!tr->reg->open)
 			{	/* all regions closed */
-				VMS_ONLY(match = memcmp(&(tr->file.file_id), local_id_fiptr, SIZEOF(gd_id));)
-				UNIX_ONLY(match = gdid_cmp(&(tr->file.file_id), &(local_id.uid));)
+				VMS_ONLY(match = memcmp(&(tr->file.file_id), local_id_fiptr, SIZEOF(gd_id)));
+				UNIX_ONLY(match = gdid_cmp(&(tr->file.file_id), &(local_id.uid)));
 			} else
 			{	/* the other regions are open, i.e. file is pointing to fid_index, use file_id
 				 * from node_local */
 				VMS_ONLY(match = memcmp(
 					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.file_id),
-					local_id_fiptr, SIZEOF(gd_id));)
+					local_id_fiptr, SIZEOF(gd_id)));
 				UNIX_ONLY(match = gdid_cmp(
-					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.uid), &(local_id.uid));)
+					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.uid), &(local_id.uid)));
 			}
 			if (0 == match)
 				return tr;
@@ -189,7 +185,7 @@ tp_region	*insert_region(	gd_region	*reg,
 	tr_new->reg = reg;				/* Add this region to end of list */
 	if (!reg->open)
 	{
-		VMS_ONLY(memcpy(&(tr_new->file.file_id), local_id_fiptr, SIZEOF(gd_id));)
+		VMS_ONLY(memcpy(&(tr_new->file.file_id), local_id_fiptr, SIZEOF(gd_id)));
 		UNIX_ONLY(tr_new->file.file_id = local_id.uid;)
 	} else
 		tr_new->file.fid_index = local_fid_index;
@@ -202,20 +198,20 @@ tp_region	*insert_region(	gd_region	*reg,
 		tr_new->fPtr = tr_last->fPtr;
 		tr_last->fPtr = tr_new;
 	}
-	if ((CDB_STAGNATE <= t_tries) && (0 < dollar_tlevel) && reg->open && !csa->now_crit)
+	if ((CDB_STAGNATE <= t_tries) && dollar_tlevel && reg->open && !csa->now_crit)
 	{	/* Final retry in TP and this region not locked down. Get crit on it if it is open.
 		 * reg->open needs to be checked above to take care of the case where we do an insert_region() from gvcst_init()
 		 * 	in the 3rd retry in TP when we have not yet opened the region. In case region is not open,
 		 * 	tp_restart() (invoked through t_retry from gvcst_init) will open "reg" as well as get crit on it for us.
 		 */
-		DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
+		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
 		if (FALSE == tp_grab_crit(reg))		/* Attempt lockdown now */
 		{
-			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
+			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 			t_retry(cdb_sc_needcrit);	/* avoid deadlock -- restart transaction */
 			assert(FALSE);			/* should not come here as t_retry() does not return */
 		}
-		DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
+		DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = FALSE;)
 		assert(csa->now_crit);	/* ensure we have crit now */
 		CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg);
 	}

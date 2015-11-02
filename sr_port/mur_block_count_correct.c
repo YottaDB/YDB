@@ -47,6 +47,7 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 	int4			mu_int_ovrhd;
 	uint4			total_blks;
 	uint4			status;
+	uint4                   new_bit_maps, bplmap, new_blocks;
 
 	error_def(ERR_DBUNDACCMT);
 	error_def(ERR_WAITDSKSPACE);
@@ -95,7 +96,14 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 		 */
 		assert(jgbl.dont_reset_gbl_jrec_time);
 		jgbl.dont_reset_gbl_jrec_time = FALSE;
-		if (SS_NORMAL != (status = gdsfilext(mu_data->extension_size, total_blks)))
+		/* Calculate the number of blocks to add based on the difference between the real file size and the file size
+		 * computed from the header->total_blks.  Takes into account that gdsfilext() will automatically add new_bit_maps
+		 * to the amount of blocks we request.
+		 */
+		bplmap = cs_data->bplmap;
+		new_blocks = (native_size - size)/(mu_data->blk_size / DISK_BLOCK_SIZE);
+		new_bit_maps = DIVIDE_ROUND_UP(total_blks + new_blocks, bplmap) - DIVIDE_ROUND_UP(total_blks, bplmap);
+		if (SS_NORMAL != (status = gdsfilext(new_blocks - new_bit_maps, total_blks)))
 		{
 			jgbl.dont_reset_gbl_jrec_time = TRUE;
 			return (status);

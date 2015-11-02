@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,10 +28,12 @@
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;
-GBLREF bool		gv_curr_subsc_null;
-GBLREF bool		gv_prev_subsc_null;
 GBLREF bool		gv_replication_error;
 GBLREF bool		gv_replopen_error;
+
+error_def(ERR_DBPRIVERR);
+error_def(ERR_GVIS);
+error_def(ERR_REC2BIG);
 
 void put_var(mval *var);
 
@@ -40,12 +42,10 @@ void op_gvput(mval *var)
 	gd_region	*save_reg;
 	int		temp;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_DBPRIVERR);
-	error_def(ERR_GVIS);
-	error_def(ERR_REC2BIG);
-
-	if ((!gv_curr_subsc_null && !gv_prev_subsc_null) || ALWAYS == gv_cur_region->null_subs)
+	SETUP_THREADGBL_ACCESS;
+	if ((!TREF(gv_last_subsc_null) && !TREF(gv_some_subsc_null)) || (ALWAYS == gv_cur_region->null_subs))
 	{
 		if (!gv_cur_region->read_only)
 		{

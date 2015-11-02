@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -56,7 +56,7 @@ switch ($gtm_exe:t)
 		breaksw
 endsw
 
-alias gt_ld $gt_ld_linker $gt_ld_options -L$gtm_obj $gt_ld_sysrtns $gt_ld_syslibs
+alias gt_ld $gt_ld_linker $gt_ld_options -L$gtm_obj $gt_ld_extra_libs $gt_ld_sysrtns $gt_ld_syslibs
 
 ###############################################################################################################
 

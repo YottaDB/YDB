@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
@@ -19,18 +20,19 @@
 #include "private_code_copy.h"
 #include "urx.h"
 #include "min_max.h"
-#include "hashtab.h"
 #include "stringpool.h"
 #include "gtm_text_alloc.h"
+#ifdef UNIX
+#include "srcline.h"
+#endif
 
 #define S_CUTOFF 		7
 #define FREE_RTNTBL_SPACE 	17
-#define RTNTBL_EXP_MIN SIZEOF(rtn_tabent) * FREE_RTNTBL_SPACE /* never expand the routine name table by less than 17 entries */
-#define RTNTBL_EXP_MAX 16*1024+1 /* never expand the routine name table by more than 16KB (at one time) */
+#define RTNTBL_EXP_MIN (SIZEOF(rtn_tabent) * FREE_RTNTBL_SPACE)	/* never expand the routine name table by less than 17 entries */
+#define RTNTBL_EXP_MAX ((16 * 1024) + 1)		/* never expand the routine name table by more than 16KB (at one time) */
 
 GBLREF rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_end, *rtn_names_top;
 GBLREF stack_frame	*frame_pointer;
-GBLREF hash_table_mname rt_name_tbl;	/* globally defined routine table name */
 
 bool zlput_rname (rhdtyp *hdr)
 {
@@ -41,11 +43,18 @@ bool zlput_rname (rhdtyp *hdr)
 	int		comp;
 	ht_ent_mname    *tabent;
 	mname_entry	key;
-	uint4		*src_tbl, entries;
+	uint4		entries;
 	mstr		*curline;
 	mident		*rtn_name;
 	size_t		size, src_len;
+#	ifdef VMS
+	uint4		*src_tbl;
+#	else
+	routine_source	*src_tbl;
+#	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	rtn_name = &hdr->routine_name;
 	rbot = rtn_names;
 	rtop = rtn_names_end;
@@ -81,11 +90,11 @@ bool zlput_rname (rhdtyp *hdr)
 	}
 	if (comp)
 	{	/* Entry was not found. Add in a new one */
-		old_table = (char *)0;
-		src = (char *) mid;
+		old_table = NULL;
+		src = (char *)mid;
 		src_len = (char *)rtn_names_end - (char *)mid + SIZEOF(rtn_tabent);
 		if (rtn_names_end >= rtn_names_top)
-		{ /* Not enough room, recreate table in larger area, try to expand exponentially */
+		{	/* Not enough room, recreate table in larger area, try to expand exponentially */
 			size = (char *)rtn_names_end - (char *)rtn_names;
 			size = ROUND_UP(size +
 				((RTNTBL_EXP_MIN > size) ? RTNTBL_EXP_MIN : ((RTNTBL_EXP_MAX < size) ? RTNTBL_EXP_MAX : size)),
@@ -93,7 +102,8 @@ bool zlput_rname (rhdtyp *hdr)
 			new = malloc(size);
 			memcpy(new, rtn_names, (char *)mid - (char *)rtn_names);
 			mid = (rtn_tabent *)((char *)mid + (new - (char *)rtn_names));
-			old_table = (char *) rtn_names;
+			old_table = (char *)rtn_names;
+			/* Adjust rtn_named_end to point into new table by applying offset to new block */
 			rtn_names_end = (rtn_tabent *)((char *)rtn_names_end + (new - (char *)rtn_names));
 			rtn_names = (rtn_tabent *)new;
 			rtn_names_top = (rtn_tabent *)(new + size - SIZEOF(rtn_tabent));
@@ -122,19 +132,21 @@ bool zlput_rname (rhdtyp *hdr)
 				if (fp->rvector == rhead)
 					return FALSE;
 		}
-		zr_remove(old_rhead); /* get rid of the now inactive breakpoints and release any private code section */
+		zr_remove(old_rhead, NOBREAKMSG); /* get rid of the inactive breakpoints and release private code section */
 
 		/* If source has been read in for old routine, free space. Since routine name is the key, do this before
 		   (in USHBIN builds) we release the literal text section as part of the releasable read-only section.
 		*/
 		tabent = NULL;
-		if (rt_name_tbl.base)
+		if (NULL != (TREF(rt_name_tbl)).base)
 		{
 			key.var_name = mid->rt_name;
 			COMPUTE_HASH_MNAME(&key);
-			if (NULL != (tabent = lookup_hashtab_mname(&rt_name_tbl, &key)) && tabent->value)
+			if (NULL != (tabent = lookup_hashtab_mname(TADR(rt_name_tbl), &key)) && tabent->value)
 			{
+#				ifdef VMS
 				src_tbl = (uint4 *)tabent->value;
+				/* Must delete the entries piece-meal */
 				entries = *(src_tbl + 1);
 				if (0 != entries)
 					/* Don't count line 0 which we bypass */
@@ -149,7 +161,16 @@ bool zlput_rname (rhdtyp *hdr)
 					free(curline->addr);
 				}
 				free(tabent->value);
-				tabent->value = 0;
+#				elif defined(UNIX)
+				/* Entries and source are malloc'd in two blocks on UNIX */
+				src_tbl = (routine_source *)tabent->value;
+				if (NULL != src_tbl->srcbuff)
+					free(src_tbl->srcbuff);
+				free(src_tbl);
+#				else
+#				  error "unsupported platform"
+#				endif
+				tabent->value = NULL;
 			}
 		}
 		NON_USHBIN_ONLY(

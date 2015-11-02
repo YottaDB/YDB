@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -163,7 +163,8 @@
 	SALVAGE_UNIX_LATCH_DBCRIT(X, is_exiting, dummy);							\
 }
 
-GBLREF uint4	process_id;	/* Used in xxx_SWAPLOCK macros .. has same value as rundown_process_id on UNIX */
+GBLREF	uint4		process_id;	/* Used in xxx_SWAPLOCK macros .. has same value as rundown_process_id on UNIX */
+GBLREF	volatile int4	crit_count;
 #endif
 
 GBLDEF gd_addr_fn_ptr	get_next_gdr_addrs;
@@ -177,7 +178,7 @@ GBLDEF int4		rundown_os_page_size;
 GBLDEF gd_region	**jnlpool_reg_addrs;
 GBLDEF inctn_opcode_t	*inctn_opcode_addrs;
 GBLDEF inctn_detail_t	*inctn_detail_addrs;
-GBLDEF short		*dollar_tlevel_addrs;
+GBLDEF uint4		*dollar_tlevel_addrs;
 GBLDEF uint4		*update_trans_addrs;
 GBLDEF sgmnt_addrs	**cs_addrs_addrs;
 GBLDEF sgmnt_addrs 	**kip_csa_addrs;
@@ -212,8 +213,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 {
 	unsigned char		*chain_ptr;
 	char			*wcblocked_ptr;
+	uint4			dlr_tlevel;
 	boolean_t		is_bg, jnlpool_reg, do_accounting, first_time = TRUE, is_exiting;
-	boolean_t		dlr_tlevel, kip_csa_usable, needkipincr;
+	boolean_t		kip_csa_usable, needkipincr;
 	uint4			upd_trans; /* a copy of the global variable "update_trans" which is needed for VMS STOP/ID case */
 	boolean_t		tp_update_underway = FALSE;	/* set to TRUE if TP commit was in progress or complete */
 	boolean_t		non_tp_update_underway = FALSE;	/* set to TRUE if non-TP commit was in progress or complete */
@@ -442,8 +444,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			{
 				SECSHR_ACCOUNTING(4);
 				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(csa->ti);
-				SECSHR_ACCOUNTING(&csd->trans_hist);
+				SECSHR_ACCOUNTING((INTPTR_T)csa->ti);
+				SECSHR_ACCOUNTING((INTPTR_T)&csd->trans_hist);
 				csa->ti = &csd->trans_hist;	/* better to correct and proceed than to stop */
 			}
 			SECSHR_ACCOUNTING(3);	/* 3 is the number of arguments following including self */
@@ -486,11 +488,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			set_wc_blocked = FALSE;
 			if (is_bg)
 			{
-				if ((0 == reg->sec_size) || !GTM_PROBE(reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE), cnl, WRITE))
+				if ((0 == cnl->sec_size) || !GTM_PROBE(cnl->sec_size VMS_ONLY(* OS_PAGELET_SIZE), cnl, WRITE))
 				{
 					SECSHR_ACCOUNTING(3);
 					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING(reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
+					SECSHR_ACCOUNTING(cnl->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 					assert(FALSE);
 					continue;
 				}
@@ -499,7 +501,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					SECSHR_ACCOUNTING(3);
 					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING(cache_state);
+					SECSHR_ACCOUNTING((INTPTR_T)cache_state);
 					assert(FALSE);
 					continue;
 				}
@@ -510,7 +512,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					SECSHR_ACCOUNTING(3);
 					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING(start_cr);
+					SECSHR_ACCOUNTING((INTPTR_T)start_cr);
 					assert(FALSE);
 					continue;
 				}
@@ -556,21 +558,21 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
-						SECSHR_ACCOUNTING(si);
+						SECSHR_ACCOUNTING((INTPTR_T)si);
 						assert(FALSE);
 						break;
 					} else if (!GTM_PROBE(SIZEOF(gd_region), si->gv_cur_region, READ))
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
-						SECSHR_ACCOUNTING(si->gv_cur_region);
+						SECSHR_ACCOUNTING((INTPTR_T)si->gv_cur_region);
 						assert(FALSE);
 						continue;
 					} else if (!GTM_PROBE(SIZEOF(gd_segment), si->gv_cur_region->dyn.addr, READ))
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
-						SECSHR_ACCOUNTING(si->gv_cur_region->dyn.addr);
+						SECSHR_ACCOUNTING((INTPTR_T)si->gv_cur_region->dyn.addr);
 						assert(FALSE);
 						continue;
 					} else if (si->gv_cur_region->dyn.addr->file_cntl == reg->dyn.addr->file_cntl)
@@ -587,7 +589,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									SECSHR_ACCOUNTING(3);
 									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING(cs->high_tlevel);
+									SECSHR_ACCOUNTING((INTPTR_T)cs->high_tlevel);
 									assert(FALSE);
 									first_cw_set = cs = NULL;
 									break;
@@ -604,7 +606,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					SECSHR_ACCOUNTING(3);
 					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING(cw_depth_addrs);
+					SECSHR_ACCOUNTING((INTPTR_T)cw_depth_addrs);
 					assert(FALSE);
 				} else
 				{	/* csa->t_commit_crit being TRUE is a clear cut indication that we have
@@ -666,12 +668,12 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				}
 				SECSHR_ACCOUNTING(tp_update_underway ? 6 : 7);
 				SECSHR_ACCOUNTING(__LINE__);
-				SECSHR_ACCOUNTING(first_cw_set);
+				SECSHR_ACCOUNTING((INTPTR_T)first_cw_set);
 				SECSHR_ACCOUNTING(tp_update_underway);
 				SECSHR_ACCOUNTING(non_tp_update_underway);
 				if (!tp_update_underway)
 				{
-					SECSHR_ACCOUNTING(cs_top);
+					SECSHR_ACCOUNTING((INTPTR_T)cs_top);
 					SECSHR_ACCOUNTING(*cw_depth_addrs);
 				} else
 				{
@@ -720,7 +722,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									SECSHR_ACCOUNTING(3);
 									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING(cs->high_tlevel);
+									SECSHR_ACCOUNTING((INTPTR_T)cs->high_tlevel);
 									assert(FALSE);
 									cs = NULL;
 									break;
@@ -732,7 +734,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
-						SECSHR_ACCOUNTING(cs);
+						SECSHR_ACCOUNTING((INTPTR_T)cs);
 						assert(FALSE);
 						break;
 					}
@@ -770,8 +772,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								 * expects this. For VMS, tp_tend would have done this already.
 								 */
 								if (NULL == cs->new_buff)
-									cs->new_buff = ((new_buff_buddy_list *)
-										get_new_free_element(si->new_buff_list))->new_buff;
+									cs->new_buff = (unsigned char *)
+											get_new_free_element(si->new_buff_list);
 #								endif
 								assert(NULL != cs->new_buff);
 								blk_ptr = (sm_uc_ptr_t)cs->new_buff;
@@ -781,14 +783,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									SECSHR_ACCOUNTING(10);
 									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING(cs);
+									SECSHR_ACCOUNTING((INTPTR_T)cs);
 									SECSHR_ACCOUNTING(cs->blk);
 									SECSHR_ACCOUNTING(cs->level);
 									SECSHR_ACCOUNTING(cs->done);
 									SECSHR_ACCOUNTING(cs->forward_process);
 									SECSHR_ACCOUNTING(cs->first_copy);
-									SECSHR_ACCOUNTING(cs->upd_addr);
-									SECSHR_ACCOUNTING(cs->new_buff);
+									SECSHR_ACCOUNTING((INTPTR_T)cs->upd_addr);
+									SECSHR_ACCOUNTING((INTPTR_T)cs->new_buff);
 									assert(FALSE);
 									continue;
 								} else if (cs->ins_off != 0)
@@ -800,7 +802,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									{
 										SECSHR_ACCOUNTING(7);
 										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING(cs);
+										SECSHR_ACCOUNTING((INTPTR_T)cs);
 										SECSHR_ACCOUNTING(cs->blk);
 										SECSHR_ACCOUNTING(cs->index);
 										SECSHR_ACCOUNTING(cs->ins_off);
@@ -823,9 +825,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									{
 										SECSHR_ACCOUNTING(5);
 										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING(cs);
+										SECSHR_ACCOUNTING((INTPTR_T)cs);
 										SECSHR_ACCOUNTING(cs->ins_off);
-										SECSHR_ACCOUNTING(chain_ptr);
+										SECSHR_ACCOUNTING((INTPTR_T)chain_ptr);
 										assert(FALSE);
 										continue;
 									}
@@ -877,8 +879,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							{
 								SECSHR_ACCOUNTING(4);
 								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING(cs);
-								SECSHR_ACCOUNTING(cr);
+								SECSHR_ACCOUNTING((INTPTR_T)cs);
+								SECSHR_ACCOUNTING((INTPTR_T)cr);
 								assert(FALSE);
 							} else if (rundown_process_id == cr->in_tend)
 							{	/* Not sure how this is possible */
@@ -931,7 +933,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							{
 								SECSHR_ACCOUNTING(9);
 								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING(cs);
+								SECSHR_ACCOUNTING((INTPTR_T)cs);
 								SECSHR_ACCOUNTING(cs->blk);
 								SECSHR_ACCOUNTING(cs->tn);
 								SECSHR_ACCOUNTING(cs->level);
@@ -981,8 +983,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							{
 								SECSHR_ACCOUNTING(4);
 								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING(cs);
-								SECSHR_ACCOUNTING(cr);
+								SECSHR_ACCOUNTING((INTPTR_T)cs);
+								SECSHR_ACCOUNTING((INTPTR_T)cr);
 								assert(FALSE);
 								continue;
 							}
@@ -1011,8 +1013,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								 */
 								SECSHR_ACCOUNTING(6);
 								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING(cs);
-								SECSHR_ACCOUNTING(cr);
+								SECSHR_ACCOUNTING((INTPTR_T)cs);
+								SECSHR_ACCOUNTING((INTPTR_T)cr);
 								SECSHR_ACCOUNTING(cr->blk);
 								SECSHR_ACCOUNTING(cr->data_invalid);
 								assert(FALSE);
@@ -1172,11 +1174,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						{
 							SECSHR_ACCOUNTING(7);
 							SECSHR_ACCOUNTING(__LINE__);
-							SECSHR_ACCOUNTING(cs);
+							SECSHR_ACCOUNTING((INTPTR_T)cs);
 							SECSHR_ACCOUNTING(cs->blk);
-							SECSHR_ACCOUNTING(blk_ptr);
+							SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
 							SECSHR_ACCOUNTING(csd->blk_size);
-							SECSHR_ACCOUNTING(csa->acc_meth.mm.base_addr);
+							SECSHR_ACCOUNTING((INTPTR_T)csa->acc_meth.mm.base_addr);
 							assert(FALSE);
 							continue;
 						}
@@ -1188,14 +1190,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						{
 							SECSHR_ACCOUNTING(11);
 							SECSHR_ACCOUNTING(__LINE__);
-							SECSHR_ACCOUNTING(cs);
+							SECSHR_ACCOUNTING((INTPTR_T)cs);
 							SECSHR_ACCOUNTING(cs->blk);
 							SECSHR_ACCOUNTING(cs->tn);
 							SECSHR_ACCOUNTING(cs->level);
 							SECSHR_ACCOUNTING(cs->done);
 							SECSHR_ACCOUNTING(cs->forward_process);
 							SECSHR_ACCOUNTING(cs->first_copy);
-							SECSHR_ACCOUNTING(cs->old_block);
+							SECSHR_ACCOUNTING((INTPTR_T)cs->old_block);
 							SECSHR_ACCOUNTING(csd->blk_size);
 							assert(FALSE);
 							continue;
@@ -1206,15 +1208,15 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						{
 							SECSHR_ACCOUNTING(11);
 							SECSHR_ACCOUNTING(__LINE__);
-							SECSHR_ACCOUNTING(cs);
+							SECSHR_ACCOUNTING((INTPTR_T)cs);
 							SECSHR_ACCOUNTING(cs->blk);
 							SECSHR_ACCOUNTING(cs->tn);
 							SECSHR_ACCOUNTING(cs->level);
 							SECSHR_ACCOUNTING(cs->done);
 							SECSHR_ACCOUNTING(cs->forward_process);
 							SECSHR_ACCOUNTING(cs->first_copy);
-							SECSHR_ACCOUNTING(cs->upd_addr);
-							SECSHR_ACCOUNTING(blk_ptr);
+							SECSHR_ACCOUNTING((INTPTR_T)cs->upd_addr);
+							SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
 							assert(FALSE);
 							continue;
 						}
@@ -1226,14 +1228,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							{
 								SECSHR_ACCOUNTING(10);
 								SECSHR_ACCOUNTING(__LINE__);
-								SECSHR_ACCOUNTING(cs);
+								SECSHR_ACCOUNTING((INTPTR_T)cs);
 								SECSHR_ACCOUNTING(cs->blk);
 								SECSHR_ACCOUNTING(cs->level);
 								SECSHR_ACCOUNTING(cs->done);
 								SECSHR_ACCOUNTING(cs->forward_process);
 								SECSHR_ACCOUNTING(cs->first_copy);
-								SECSHR_ACCOUNTING(cs->upd_addr);
-								SECSHR_ACCOUNTING(blk_ptr);
+								SECSHR_ACCOUNTING((INTPTR_T)cs->upd_addr);
+								SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
 								assert(FALSE);
 								continue;
 							} else if (cs->ins_off)
@@ -1247,7 +1249,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									SECSHR_ACCOUNTING(7);
 									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING(cs);
+									SECSHR_ACCOUNTING((INTPTR_T)cs);
 									SECSHR_ACCOUNTING(cs->blk);
 									SECSHR_ACCOUNTING(cs->index);
 									SECSHR_ACCOUNTING(cs->ins_off);
@@ -1269,7 +1271,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									{
 										SECSHR_ACCOUNTING(7);
 										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING(nxt);
+										SECSHR_ACCOUNTING((INTPTR_T)nxt);
 										SECSHR_ACCOUNTING(cs->blk);
 										SECSHR_ACCOUNTING(nxt->index);
 										SECSHR_ACCOUNTING(nxt->ins_off);
@@ -1292,14 +1294,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									SECSHR_ACCOUNTING(10);
 									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING(cs);
+									SECSHR_ACCOUNTING((INTPTR_T)cs);
 									SECSHR_ACCOUNTING(cs->blk);
 									SECSHR_ACCOUNTING(cs->level);
 									SECSHR_ACCOUNTING(cs->done);
 									SECSHR_ACCOUNTING(cs->forward_process);
 									SECSHR_ACCOUNTING(cs->first_copy);
-									SECSHR_ACCOUNTING(cs->upd_addr);
-									SECSHR_ACCOUNTING(blk_ptr);
+									SECSHR_ACCOUNTING((INTPTR_T)cs->upd_addr);
+									SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
 									assert(FALSE);
 									continue;
 								}
@@ -1313,7 +1315,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									{
 										SECSHR_ACCOUNTING(7);
 										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING(cs);
+										SECSHR_ACCOUNTING((INTPTR_T)cs);
 										SECSHR_ACCOUNTING(cs->blk);
 										SECSHR_ACCOUNTING(cs->index);
 										SECSHR_ACCOUNTING(cs->ins_off);
@@ -1358,11 +1360,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									{
 										SECSHR_ACCOUNTING(11);
 										SECSHR_ACCOUNTING(__LINE__);
-										SECSHR_ACCOUNTING(cs);
+										SECSHR_ACCOUNTING((INTPTR_T)cs);
 										SECSHR_ACCOUNTING(cs->blk);
 										SECSHR_ACCOUNTING(cs->index);
-										SECSHR_ACCOUNTING(blk_ptr);
-										SECSHR_ACCOUNTING(chain_ptr);
+										SECSHR_ACCOUNTING((INTPTR_T)blk_ptr);
+										SECSHR_ACCOUNTING((INTPTR_T)chain_ptr);
 										SECSHR_ACCOUNTING(chain.next_off);
 										SECSHR_ACCOUNTING(chain.cw_index);
 										SECSHR_ACCOUNTING(si->cw_set_depth);
@@ -1472,7 +1474,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									SECSHR_ACCOUNTING(7);
 									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING(cr);
+									SECSHR_ACCOUNTING((INTPTR_T)cr);
 									SECSHR_ACCOUNTING(cr->blk);
 									SECSHR_ACCOUNTING(n);
 									SECSHR_ACCOUNTING(cache_state->cacheq_active.fl);
@@ -1508,7 +1510,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									SECSHR_ACCOUNTING(7);
 									SECSHR_ACCOUNTING(__LINE__);
-									SECSHR_ACCOUNTING(cr);
+									SECSHR_ACCOUNTING((INTPTR_T)cr);
 									SECSHR_ACCOUNTING(cr->blk);
 									SECSHR_ACCOUNTING(n);
 									SECSHR_ACCOUNTING(cache_state->cacheq_active.fl);
@@ -1670,7 +1672,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					SECSHR_ACCOUNTING(4);
 					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING(csa->jnl);
+					SECSHR_ACCOUNTING((INTPTR_T)csa->jnl);
 					SECSHR_ACCOUNTING(SIZEOF(jnl_private_control));
 					assert(FALSE);
 				}
@@ -1731,6 +1733,20 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				assert(csd->trans_hist.early_tn == csd->trans_hist.curr_tn);
 				if (GTM_PROBE(CRIT_SPACE, csa->critical, WRITE))
 				{
+					/* Release crit but since it involves modifying more than one field, make sure
+					 * we prevent interrupts while in this code. The global variable "crit_count"
+					 * does this for us. See similar usage in rel_crit.c. We currently use this here
+					 * only for Unix because in VMS, a global variable in GTMSHR is not accessible
+					 * in GTMSECSHR image easily unless passed through init_secshr_addrs. Since in
+					 * VMS, if we are here, we are already in a kernel level routine, we will not be
+					 * interrupted by user level timer handlers (wcs_stale or wcs_clean_dbsync_ast)
+					 * that care about the consistency of the crit values so it is okay not to
+					 * explicitly prevent interrupts using "crit_count" in VMS.
+					 */
+					UNIX_ONLY(
+						assert(0 == crit_count);
+						crit_count++;	/* prevent interrupts */
+					)
 					if (cnl->in_crit == rundown_process_id)
 						cnl->in_crit = 0;
 					csa->hold_onto_crit = FALSE;	/* reset this just before csa->now_crit is reset */
@@ -1739,6 +1755,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						mutex_unlockw(reg, crash_count);/* roll forward step (11) */
 						assert(!csa->now_crit);
 						DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
+						crit_count = 0;
 					)
 					VMS_ONLY(
 						mutex_stoprelw(csa->critical);	/* roll forward step (11) */
@@ -1749,9 +1766,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					SECSHR_ACCOUNTING(6);
 					SECSHR_ACCOUNTING(__LINE__);
-					SECSHR_ACCOUNTING(cnl);
+					SECSHR_ACCOUNTING((INTPTR_T)cnl);
 					SECSHR_ACCOUNTING(NODE_LOCAL_SIZE_DBS);
-					SECSHR_ACCOUNTING(csa->critical);
+					SECSHR_ACCOUNTING((INTPTR_T)csa->critical);
 					SECSHR_ACCOUNTING(CRIT_SPACE);
 					assert(FALSE);
 				}

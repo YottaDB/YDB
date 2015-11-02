@@ -44,6 +44,7 @@ LITREF  int4                    gtm_release_name_len;
 void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 {
 	time_t	ctime;
+	seq_num	v15_reg_seqno;
 
 	error_def(ERR_MUINFOUINT8);
 
@@ -105,7 +106,6 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->max_tn = MAX_TN_V5;		/* New in V5.0-000 */
 	SET_TN_WARN(csd, csd->max_tn_warn);	/* New in V5.0-000 */
 	csd->trans_hist.last_mm_sync = v15_csd->trans_hist.last_mm_sync;
-	csd->trans_hist.header_open_tn = v15_csd->trans_hist.header_open_tn;
 	csd->trans_hist.mm_tn = v15_csd->trans_hist.mm_tn;
 	csd->trans_hist.lock_sequence = v15_csd->trans_hist.lock_sequence;
 	csd->trans_hist.total_blks = v15_csd->trans_hist.total_blks;
@@ -139,12 +139,22 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->rc_srv_cnt = v15_csd->rc_srv_cnt;
 	csd->dsid = v15_csd->dsid;
 	csd->rc_node = v15_csd->rc_node;
-	csd->reg_seqno = v15_csd->reg_seqno;
+	v15_reg_seqno = csd->reg_seqno = v15_csd->reg_seqno;
 	csd->repl_state = v15_csd->repl_state;
 	VMS_ONLY(
 		csd->resync_seqno = v15_csd->resync_seqno;
 		csd->resync_tn = v15_csd->resync_tn;
 		csd->old_resync_seqno = v15_csd->old_resync_seqno;
+		/* resync_seqno should never be greater the region's reg_seqno. Ensure that this is indeed the case. In PRO,
+		 * fix the fields to be at most the value of the region's reg_seqno if they are found to be greater than
+		 * reg_seqno
+		 */
+		assert((csd->resync_seqno <= v15_reg_seqno) && (csd->old_resync_seqno <= v15_reg_seqno));
+		if (csd->resync_seqno > v15_reg_seqno)
+			csd->resync_seqno = v15_reg_seqno;
+		if (csd->old_resync_seqno > v15_reg_seqno)
+			csd->old_resync_seqno = v15_reg_seqno;
+
 		assert(0 != csd->reg_seqno || (0 == csd->resync_seqno && 0 == csd->resync_tn && repl_closed == csd->repl_state));
 		assert(0 != csd->resync_seqno || (0 == csd->reg_seqno && 0 == csd->resync_tn && repl_closed == csd->repl_state));
 		assert(0 != csd->resync_tn || (0 == csd->reg_seqno && 0 == csd->resync_seqno && repl_closed == csd->repl_state));
@@ -178,6 +188,13 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 		{
 			csd->dualsite_resync_seqno = v15_csd->resync_seqno;
 			csd->pre_multisite_resync_seqno = v15_csd->resync_seqno;
+			/* resync_seqno should never be greater the region's reg_seqno. Ensure that this is indeed the case. In PRO,
+			 * fix the fields to be at most the value of the region's reg_seqno if they are found to be greater than
+			 * reg_seqno
+			 */
+			assert(v15_csd->resync_seqno <= v15_reg_seqno);
+			if (v15_csd->resync_seqno > v15_reg_seqno)
+				csd->dualsite_resync_seqno = csd->pre_multisite_resync_seqno = v15_reg_seqno;
 			assert(csd->dualsite_resync_seqno);
 			if (!csd->dualsite_resync_seqno)
 				csd->dualsite_resync_seqno = 1;

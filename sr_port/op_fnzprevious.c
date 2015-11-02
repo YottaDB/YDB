@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,165 +11,94 @@
 
 #include "mdef.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
-#include "sbs_blk.h"
 #include "collseq.h"
 #include "stringpool.h"
 #include "op.h"
 #include "do_xform.h"
 #include "numcmp.h"
 #include "mvalconv.h"
+#include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
 
-GBLREF  mval 		sbs_mval_int_ele;
-GBLREF	collseq		*local_collseq;
-GBLREF	boolean_t	local_collseq_stdnull;
-
-void op_fnzprevious (lv_val *src, mval *key, mval *dst)
+void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 {
-	int		cur_subscr;
+	int		cur_subscr, length;
 	mval		tmp_sbs;
-	int             length;
-	sbs_blk		*num, *str;
-	boolean_t	found;
-	int4		i;
-	lv_val		**lvpp;
-	lv_sbs_tbl	*tbl;
-	mstr		*strp;
-	mflt		*fltp;
+	treeNode	*node;
+	tree		*lvt;
+	boolean_t	is_canonical, get_last;
+	DCL_THREADGBL_ACCESS;
 
-	found = FALSE;
-	if (src)
+	SETUP_THREADGBL_ACCESS;
+	if (src && (lvt = LV_GET_CHILD(src)))	/* caution: assignment */
 	{
-		if (tbl = src->ptrs.val_ent.children)
+		MV_FORCE_DEFINED(key);
+		/* If last subscript is null, $zprev returns the last subscript in that level. */
+		get_last = FALSE;
+		if (MV_IS_STRING(key) && (0 == key->str.len))
+			get_last = TRUE;
+		if (get_last)
+			node = lvAvlTreeLast(lvt);
+		else
 		{
-			MV_FORCE_DEFINED(key);
-			num = tbl->num;
-			str = tbl->str;
-			assert (tbl->ident == MV_SBS);
-			if (MV_IS_STRING(key) && key->str.len == 0)
+			is_canonical = MV_IS_CANONICAL(key);
+			if (!is_canonical)
 			{
-				if (str)
+				assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype));
+				if (TREF(local_collseq))
 				{
-					assert (str->cnt);
-					while (str->nxt) str = str->nxt;
-					/* With standard collation we will skip the null sub */
-					/* if there is only one  non-null string, then it is the last entry in collation order
-					, so return it */
-					assert(0 < str->cnt);
-					if (!local_collseq_stdnull ||
-						   0 != str->ptr.sbs_str[str->cnt - 1].str.len)
-					{
-						dst->mvtype = MV_STR;
-						dst->str = str->ptr.sbs_str[str->cnt - 1].str;
-						found = TRUE;
-					}
+					ALLOC_XFORM_BUFF(key->str.len);
+					tmp_sbs.mvtype = MV_STR;
+					tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+					assert(NULL != TREF(lcl_coll_xform_buff));
+					tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+					do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
+					tmp_sbs.str.len = length;
+					s2pool(&(tmp_sbs.str));
+					key = &tmp_sbs;
 				}
 			} else
-			{
-				if (!MV_IS_CANONICAL(key))
-				{
-					if (local_collseq)
-					{
-						ALLOC_XFORM_BUFF(&key->str);
-						tmp_sbs.mvtype = MV_STR;
-						tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
-						assert(NULL != lcl_coll_xform_buff);
-						tmp_sbs.str.addr = lcl_coll_xform_buff;
-						do_xform(local_collseq, XFORM, &key->str,
-								&tmp_sbs.str, &length);
-						tmp_sbs.str.len = length;
-						s2pool(&(tmp_sbs.str));
-						key = &tmp_sbs;
-					}
-					/* here needs special handling for standard null collation, because
-					   we need to skip null subscript if exists */
-
-					if (str && (NULL != (strp = lv_prv_str_inx (str, &key->str))) &&
-						(!local_collseq_stdnull || 0 != strp->len))
-					{
-						dst->str = *strp;
-						dst->mvtype = MV_STR;
-						found = TRUE;
-					}
-				} else
-				{	MV_FORCE_NUM(key);
-					if (!tbl->int_flag)
-					{
-						if (num && (fltp = lv_prv_num_inx (num, key)))
-						{
-							MV_ASGN_FLT2MVAL((*dst),(*fltp)) ;
-							found = TRUE;
-						}
-					} else
-					{
-						assert (num);
-						if ( key->m[1] > 0 )
-						{
-							if (1 == numcmp(key, (mval *)&sbs_mval_int_ele))
-								i = SBS_NUM_INT_ELE;
-							else
-							{
-								i = MV_FORCE_INT(key) ;
-								if (!MV_IS_INT(key)) i++;
-							}
-							for (lvpp = &num->ptr.lv[i]; 0 <= --i && !*--lvpp; )
-								;
-							if (0 <= i)
-							{
-								MV_FORCE_MVAL(dst,i) ;
-								found = TRUE;
-							}
-						}
-					}
-					if (!found)
-					{
-						dst->mvtype = MV_STR;
-						dst->str.len = 0;
-						found = TRUE;
-					}
-				}
+			{	/* Need to set canonical bit before calling tree search functions.
+				 * But input mval could be read-only so cannot modify that even if temporarily.
+				 * So take a copy of the mval and modify that instead.
+				 */
+				tmp_sbs = *key;
+				key = &tmp_sbs;
+				MV_FORCE_NUM(key);
+				TREE_KEY_SUBSCR_SET_MV_CANONICAL_BIT(key);	/* used by the lvAvlTreeKeyPrev function */
 			}
-			/* it will come here if say x("x") and x(1) and $zp(x("x"))
-			   or for standard null collation x(""),x(1) and x("x") and we specify $zp(x("x"))
-			   */
-
-			if (!found && num)
-			{
-				assert (num->cnt);
-				if (!tbl->int_flag)
-				{
-					while (num->nxt) num = num->nxt;
-					MV_ASGN_FLT2MVAL((*dst),num->ptr.sbs_flt[num->cnt - 1].flt) ;
-					found = TRUE;
-				} else
-				{
-					for (i = SBS_NUM_INT_ELE, lvpp = (num->ptr.lv + SBS_NUM_INT_ELE);
-					     (--i, num->ptr.lv <= --lvpp) && !*lvpp; )
-						;
-					if (num->ptr.lv <= lvpp)
-					{
-						MV_FORCE_MVAL(dst,i) ;
-						found = TRUE;
-					}
-				}
-			}
+			node = lvAvlTreeKeyPrev(lvt, key);
 		}
-	}
-	if (!found)
+		/* If STDNULLCOLL, skip to the previous subscript should the current subscript be "" */
+		if (TREF(local_collseq_stdnull) && (NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node))
+		{
+			assert(LVNULLSUBS_OK == TREF(lv_null_subs));
+			node = lvAvlTreePrev(node);
+		}
+	} else
+		node = NULL;
+	if (NULL == node)
 	{
 		dst->mvtype = MV_STR;
 		dst->str.len = 0;
-	} else if (dst->mvtype == MV_STR && local_collseq)
+	} else
 	{
-		ALLOC_XFORM_BUFF(&dst->str);
-		assert(NULL != lcl_coll_xform_buff);
-		tmp_sbs.str.addr = lcl_coll_xform_buff;
-		tmp_sbs.str.len = max_lcl_coll_xform_bufsiz;
-		do_xform(local_collseq, XBACK, &dst->str, &tmp_sbs.str, &length);
-		tmp_sbs.str.len = length;
-		s2pool(&(tmp_sbs.str));
-		dst->str = tmp_sbs.str;
+		LV_NODE_GET_KEY(node, dst); /* Get node key into "dst" depending on the structure type of "node" */
+		/* Code outside tree.c does not currently know to make use of MV_CANONICAL bit so reset it
+		 * until the entire codebase gets fixed to maintain MV_CANONICAL bit accurately at which point,
+		 * this RESET can be removed */
+		TREE_KEY_SUBSCR_RESET_MV_CANONICAL_BIT(dst);
+		if (TREF(local_collseq) && MV_IS_STRING(dst))
+		{
+			ALLOC_XFORM_BUFF(dst->str.len);
+			assert(NULL != TREF(lcl_coll_xform_buff));
+			tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+			tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+			do_xform(TREF(local_collseq), XBACK, &dst->str, &tmp_sbs.str, &length);
+			tmp_sbs.str.len = length;
+			s2pool(&(tmp_sbs.str));
+			dst->str = tmp_sbs.str;
+		}
 	}
 	return;
 }

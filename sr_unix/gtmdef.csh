@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,7 +29,11 @@
 #
 ##############################################################
 
-setenv	gtm_gtmdev 	"/usr"			# List of directories containing subdirectories named gtm_topdir which
+if ("OS/390" != `uname -s`) then
+	setenv	gtm_gtmdev 	"/usr"		# List of directories containing subdirectories named gtm_topdir which
+else
+	setenv	gtm_gtmdev 	"/gtm"		# List of directories containing subdirectories named gtm_topdir which
+endif
 						# may contain GT.M releases.  "NULL" => subdirectory is home of library
 set	gtm_gtmdev_lcl = ( $gtm_gtmdev )	# Note: this must be a shell variable in order to use subscripts
 						# (see below).

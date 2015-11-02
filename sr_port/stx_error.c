@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,19 +26,32 @@
 
 GBLREF char 			source_file_name[];
 GBLREF unsigned char 		*source_buffer;
-GBLREF short int 		source_name_len, last_source_column, source_line;
-GBLREF int4 			source_error_found;
+GBLREF short int 		source_name_len, source_line;
 GBLREF command_qualifier	cmd_qlf;
-GBLREF bool 			shift_gvrefs, dec_nofac;
+GBLREF bool 			dec_nofac;
 GBLREF boolean_t		run_time;
 GBLREF char			cg_phase;
 GBLREF io_pair			io_curr_device, io_std_device;
 #ifdef UNIX
 GBLREF va_list			last_va_list_ptr;	/* set by util_format */
 #endif
-#ifdef GTM_TRIGGER
-GBLREF boolean_t		trigger_compile;
-#endif
+
+error_def(ERR_SRCLIN);
+error_def(ERR_SRCLOC);
+error_def(ERR_SRCNAM);
+error_def(ERR_LABELMISSING);
+error_def(ERR_FMLLSTPRESENT);
+error_def(ERR_FMLLSTMISSING);
+error_def(ERR_ACTLSTTOOLONG);
+error_def(ERR_BADCHSET);
+error_def(ERR_BADCASECODE);
+error_def(ERR_INVDLRCVAL);
+error_def(ERR_CETOOMANY);
+error_def(ERR_CEUSRERROR);
+error_def(ERR_CEBIGSKIP);
+error_def(ERR_CETOOLONG);
+error_def(ERR_CENOINDIR);
+error_def(ERR_BADCHAR);
 
 void stx_error(int in_error, ...)
 {
@@ -50,39 +63,25 @@ void stx_error(int in_error, ...)
 	char		*c;
 	mstr		msg;
 	boolean_t	is_stx_warn;	/* current error is actually of type warning and we are in CGP_PARSE phase */
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_SRCLIN);
-	error_def(ERR_SRCLOC);
-	error_def(ERR_SRCNAM);
-	error_def(ERR_LABELMISSING);
-	error_def(ERR_FMLLSTPRESENT);
-	error_def(ERR_FMLLSTMISSING);
-	error_def(ERR_ACTLSTTOOLONG);
-	error_def(ERR_BADCHSET);
-	error_def(ERR_BADCASECODE);
-	error_def(ERR_INVDLRCVAL);
-	error_def(ERR_CETOOMANY);
-	error_def(ERR_CEUSRERROR);
-	error_def(ERR_CEBIGSKIP);
-	error_def(ERR_CETOOLONG);
-	error_def(ERR_CENOINDIR);
-	error_def(ERR_BADCHAR);
-
+	SETUP_THREADGBL_ACCESS;
 	va_start(args, in_error);
 	/* In case of a IS_STX_WARN type of parsing error, we resume parsing so it is important NOT to reset
 	 * the following global variables
-	 * 	a) shift_gvrefs
+	 * 	a) shift_side_effects
 	 *	b) source_error_found
 	 */
-	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !trigger_compile);
+	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !TREF(trigger_compile));
 	if (!is_stx_warn)
-		shift_gvrefs = FALSE;
+		TREF(shift_side_effects) = FALSE;
 	if (run_time)
 	{	/* If the current error is of type STX_WARN then do not issue an error at compile time. Insert
 		 * triple to issue the error at runtime. If and when this codepath is reached at runtime (M command
 		 * could have a postconditional that bypasses this code) issue the rts_error.
 		 * See IS_STX_WARN macro definition for details.
 		 */
+		TREF(for_stack_ptr) = TADR(for_stack);
 		if (is_stx_warn)
 		{
 			ins_errtriple(in_error);
@@ -123,11 +122,11 @@ void stx_error(int in_error, ...)
 			va_end(args);
 			rts_error(VARLSTCNT(1) in_error);
 		}
-	} else if (cg_phase == CGP_PARSE)
+	} else if (CGP_PARSE == cg_phase)
 		ins_errtriple(in_error);
 	assert(!run_time);	/* From here on down, should never go ahead with printing compile-error while in run_time */
 	flush_pio();
-	if (source_error_found)
+	if (TREF(source_error_found))
 	{
 		va_end(args);
 		return;
@@ -139,7 +138,7 @@ void stx_error(int in_error, ...)
 		&& (ERR_CETOOLONG != in_error)
 		&& (ERR_CENOINDIR != in_error))
 	{
-		source_error_found = (int4 ) in_error;
+		TREF(source_error_found) = (int4 )in_error;
 	}
 	list = (cmd_qlf.qlf & CQ_LIST) != 0;
 	warn = (cmd_qlf.qlf & CQ_WARNINGS) != 0;
@@ -150,7 +149,7 @@ void stx_error(int in_error, ...)
 	}
 	if (list && io_curr_device.out == io_std_device.out)
 		warn = FALSE;		/* if listing is going to $P, don't double output */
-	if (in_error == ERR_BADCHAR)
+	if (ERR_BADCHAR == in_error)
 	{
 		memset(buf, ' ', LISTTAB);
 		show_source_line(&buf[LISTTAB], SIZEOF(buf), warn);
@@ -168,7 +167,7 @@ void stx_error(int in_error, ...)
 		if (list)
 			list_line(buf);
 		arg1 = arg2 = arg3 = arg4 = 0;
-	} else if ((in_error == ERR_LABELMISSING)
+	} else if ((ERR_LABELMISSING == in_error)
 			|| (ERR_FMLLSTPRESENT == in_error)
 			|| (ERR_FMLLSTMISSING == in_error)
 			|| (ERR_ACTLSTTOOLONG == in_error)
@@ -190,7 +189,7 @@ void stx_error(int in_error, ...)
 		show_source_line(&buf[LISTTAB], SIZEOF(buf), warn);
 		if (warn)
 		{
-			if ((in_error != ERR_CEUSRERROR) && (in_error != ERR_INVDLRCVAL))
+			if ((ERR_CEUSRERROR != in_error) && (ERR_INVDLRCVAL != in_error))
 				dec_err(VARLSTCNT(1) in_error);
 			else
 			{
@@ -212,13 +211,13 @@ void stx_error(int in_error, ...)
 		msg.len = SIZEOF(msgbuf);
 		gtm_getmsg(in_error, &msg);
 		assert(msg.len);
-#ifdef UNIX
+#		ifdef UNIX
 		cnt = va_arg(args, VA_ARG_TYPE);
 		c = util_format(msgbuf, args, LIT_AND_LEN(buf), (int)cnt);
 		va_end(last_va_list_ptr);	/* set by util_format */
-#else
+#		else
 		c = util_format(msgbuf, args, LIT_AND_LEN(buf));
-#endif
+#		endif
 		va_end(args);
 		*c = 0;
 		list_line(buf);

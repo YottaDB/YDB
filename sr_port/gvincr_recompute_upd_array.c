@@ -31,7 +31,7 @@
 #include "op.h"			/* for add_mvals prototype */
 #include "jnl_get_checksum.h"
 
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;

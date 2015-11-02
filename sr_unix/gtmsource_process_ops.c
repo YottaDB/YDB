@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@
 #include "have_crit.h"			/* needed for ZLIB_COMPRESS */
 #include "deferred_signal_handler.h"	/* needed for ZLIB_COMPRESS */
 #include "gtm_zlib.h"
+#include "replgbl.h"
 
 GBLREF	gd_addr			*gd_header;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -94,7 +95,14 @@ GBLREF	boolean_t		secondary_side_std_null_coll;
 GBLREF	boolean_t		secondary_side_trigger_support;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		gtmsource_received_cmp2uncmp_msg;
-GBLREF	boolean_t		trig_replic_warning_issued;
+
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLFTOKSEM);
+error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_REPLINSTSECMTCH);
+error_def(ERR_REPLNOXENDIAN);
+error_def(ERR_REPLWARN);
+error_def(ERR_TEXT);
 
 static	unsigned char		*tcombuff, *msgbuff, *cmpmsgbuff, *filterbuff;
 
@@ -115,10 +123,6 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 	char			print_msg[1024], msg_str[1024], *errmsg;
 	gtmsource_local_ptr_t	gtmsource_local;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
-
-	error_def(ERR_REPLWARN);
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
 
 	gtmsource_local = jnlpool.gtmsource_local;
 	gtmsource_local->remote_proto_ver = REPL_PROTO_VER_UNINITIALIZED;
@@ -358,7 +362,7 @@ void gtmsource_free_msgbuff(void)
 	}
 }
 
-int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_flags)
+int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_flags, boolean_t *rcvr_same_endianness)
 {
 	/* Receive jnl_seqno for (re)starting transmission */
 
@@ -370,16 +374,16 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 	int		status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	unsigned char	seq_num_str[32], *seq_num_ptr;
 	repl_msg_t	xoff_ack;
-	boolean_t	rcv_node_same_endianness = FALSE;
+	boolean_t	lcl_endianness;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_UNIMPLOP);
-
+	SETUP_THREADGBL_ACCESS;
 	status = SS_NORMAL;
 	jnlpool.gtmsource_local->remote_proto_ver = REPL_PROTO_VER_UNINITIALIZED;
+	*rcvr_same_endianness = FALSE;
 	for (; SS_NORMAL == status;)
 	{
-		repl_log(gtmsource_log_fp, TRUE, FALSE, "Waiting for REPL_START_JNL_SEQNO or REPL_FETCH_RESYNC message\n");
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Waiting for REPL_START_JNL_SEQNO or REPL_FETCH_RESYNC message\n");
 		REPL_RECV_LOOP(gtmsource_sock_fd, &msg, MIN_REPL_MSGLEN, FALSE, &gtmsource_poll_wait)
 		{
 			gtmsource_poll_actions(FALSE);
@@ -397,14 +401,13 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			 */
 			if (((unsigned)MIN_REPL_MSGLEN < (unsigned)msg.len)
 					&& ((unsigned)MIN_REPL_MSGLEN == GTM_BYTESWAP_32((unsigned)msg.len)))
-				rcv_node_same_endianness = FALSE;
-			else
-				rcv_node_same_endianness = TRUE;
-			if (!rcv_node_same_endianness)
 			{
+				lcl_endianness = *rcvr_same_endianness = FALSE;
 				msg.type = GTM_BYTESWAP_32(msg.type);
 				msg.len = GTM_BYTESWAP_32(msg.len);
 			}
+			else
+				lcl_endianness = *rcvr_same_endianness = TRUE;
 			assert(msg.type == REPL_START_JNL_SEQNO || msg.type == REPL_FETCH_RESYNC || msg.type == REPL_XOFF_ACK_ME);
 			assert(msg.len == MIN_REPL_MSGLEN);
 			*msg_type = msg.type;
@@ -412,24 +415,26 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			memcpy((uchar_ptr_t)recvd_jnl_seqno, (uchar_ptr_t)&msg.msg[0], SIZEOF(seq_num));
 			if (REPL_START_JNL_SEQNO == msg.type)
 			{
-				if (!rcv_node_same_endianness)
+				if (!lcl_endianness)
 					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
-				repl_log(gtmsource_log_fp, TRUE, FALSE, "Received REPL_START_JNL_SEQNO message with SEQNO "
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_START_JNL_SEQNO message with SEQNO "
 					INT8_FMT"\n", INT8_PRINT(*recvd_jnl_seqno));
-				if (!rcv_node_same_endianness)
+				if (!lcl_endianness)
 					((repl_start_msg_ptr_t)&msg)->start_flags =
 						GTM_BYTESWAP_32(((repl_start_msg_ptr_t)&msg)->start_flags);
 				*start_flags = ((repl_start_msg_ptr_t)&msg)->start_flags;
+				assert(lcl_endianness
+					|| (NODE_ENDIANNESS != ((repl_start_msg_ptr_t)&msg)->node_endianness));
 				if (*start_flags & START_FLAG_STOPSRCFILTER)
 				{
-					repl_log(gtmsource_log_fp, TRUE, FALSE,
+					repl_log(gtmsource_log_fp, TRUE, TRUE,
 						 "Start JNL_SEQNO msg tagged with STOP SOURCE FILTER\n");
 					if (gtmsource_filter & EXTERNAL_FILTER)
 					{
 						repl_stop_filter();
 						gtmsource_filter &= ~EXTERNAL_FILTER;
 					} else
-						repl_log(gtmsource_log_fp, TRUE, FALSE,
+						repl_log(gtmsource_log_fp, TRUE, TRUE,
 							 "Filter is not active, ignoring STOP SOURCE FILTER msg\n");
 					*msg_type = REPL_START_JNL_SEQNO;
 				}
@@ -447,7 +452,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				assert(*start_flags & START_FLAG_HASINFO); /* V4.2+ versions have jnl ver in the start msg */
 				remote_jnl_ver = ((repl_start_msg_ptr_t)&msg)->jnl_ver;
 				REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n", jnl_ver, remote_jnl_ver);
-				repl_check_jnlver_compat();
+				repl_check_jnlver_compat(lcl_endianness);
 				assert(remote_jnl_ver > V15_JNL_VER || 0 == (*start_flags & START_FLAG_COLL_M));
 				if (remote_jnl_ver <= V15_JNL_VER)
 					*start_flags &= ~START_FLAG_COLL_M; /* zap it for pro, just in case */
@@ -458,10 +463,10 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				secondary_side_trigger_support = (*start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
 #				ifdef GTM_TRIGGER
 				if (!secondary_side_trigger_support)
-					repl_log(gtmsource_log_fp, TRUE, FALSE, "Warning : Secondary does not support GT.M "
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "Warning : Secondary does not support GT.M "
 						"database triggers. #t updates on primary will not be replicated\n");
 #				endif
-				trig_replic_warning_issued = FALSE;
+				REPLGBL.trig_replic_warning_issued = FALSE;
 				return (SS_NORMAL);
 			} else if (REPL_FETCH_RESYNC == msg.type)
 			{	/* Determine the protocol version of the receiver side.
@@ -469,7 +474,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				 * first message gets sent back. This is so the fetchresync rollback on the other side does
 				 * not timeout before receiving a response. */
 				jnlpool.gtmsource_local->remote_proto_ver = (RECAST(repl_resync_msg_ptr_t)&msg)->proto_ver;
-				if (!rcv_node_same_endianness)
+				if (!lcl_endianness)
 					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
 				repl_log(gtmsource_log_fp, TRUE, FALSE, "Received REPL_FETCH_RESYNC message with SEQNO "
 					INT8_FMT"\n", INT8_PRINT(*recvd_jnl_seqno));
@@ -480,7 +485,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 									"Possible crash/shutdown of update process\n");
 				/* Send XOFF_ACK */
 				xoff_ack.type = REPL_XOFF_ACK;
-				if (!rcv_node_same_endianness)
+				if (!lcl_endianness)
 					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
 				memcpy((uchar_ptr_t)&xoff_ack.msg[0], (uchar_ptr_t)recvd_jnl_seqno, SIZEOF(seq_num));
 				xoff_ack.len = MIN_REPL_MSGLEN;
@@ -493,9 +498,9 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				}
 			} else
 			{	/* If unknown message is received, close connection. Caller will reopen the same. */
-				assert(FALSE);
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Received UNKNOWN message (type = %d). "
 					"Closing connection.\n", msg.type);
+				assert(FALSE);
 				repl_close(&gtmsource_sock_fd);
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 				gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
@@ -808,15 +813,10 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 			if (gtmsource_pool2file_transition /* read_pool -> read_file transition */
 				 || NULL == repl_ctl_list) /* files not opened */
 			{
-				/* Close all the file read related structures
-				 * and start afresh. The idea here is that
-				 * most of the file read info might be stale
-				 * 'cos there is usually a long gap between
-				 * pool to file read transitions (in
-				 * production environments). So, start afresh
-				 * with the latest generation journal files.
-				 * This will also prevent opening previous
-				 * generations that may not be required.
+				/* Close all the file read related structures and start afresh. The idea here is that most of the
+				 * file read info might be stale 'cos there is usually a long gap between pool to file read
+				 * transitions (in production environments). So, start afresh with the latest generation journal
+				 * files. This will also prevent opening previous generations that may not be required.
 				 */
 				REPL_DPRINT1("Pool to File read transition. Closing all the stale file read info and starting "
 						  "afresh\n");
@@ -852,9 +852,6 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	int			status;					/* needed for REPL_SEND_LOOP */
 	char			err_string[1024];
 
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
-
 	assert((REPL_MULTISITE_MSG_START > msg->type) || (REPL_PROTO_VER_MULTISITE <= jnlpool.gtmsource_local->remote_proto_ver));
 	if (MAX_SEQNO != optional_seqno)
 	{
@@ -873,8 +870,8 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	{
 		if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 		{
-			repl_log(gtmsource_log_fp, TRUE, TRUE,
-					"Connection reset while sending %s\n", msgtypestr);
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
+					msgtypestr, status, STRERROR(status));
 			repl_close(&gtmsource_sock_fd);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 			gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
@@ -915,9 +912,6 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 	repl_msg_t		xoff_ack;
 	char			err_string[1024];
 
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
-
 	repl_log(gtmsource_log_fp, TRUE, FALSE, "Waiting for %s message\n", msgtypestr);
 	assert((REPL_XOFF != msgtype) && (REPL_XON != msgtype) && (REPL_XOFF_ACK_ME != msgtype));
 	do
@@ -935,7 +929,8 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
 				{	/* Connection reset */
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
-							"Connection reset while attempting to receive %s message\n", msgtypestr);
+						"Connection reset while attempting to receive %s message. Status = %d ; %s\n",
+						msgtypestr, status, STRERROR(status));
 					repl_close(&gtmsource_sock_fd);
 					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 					gtmsource_state = jnlpool.gtmsource_local->gtmsource_state =
@@ -1099,8 +1094,6 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary)
 	char			print_msg[1024];
 	int			status;
 
-	error_def(ERR_REPLINSTSECMTCH);
-
 	/*************** Send REPL_NEED_INSTANCE_INFO message ***************/
 	memset(&needinst_msg, 0, SIZEOF(needinst_msg));
 	needinst_msg.type = REPL_NEED_INSTANCE_INFO;
@@ -1201,8 +1194,6 @@ void	gtmsource_triple_get(int4 index, repl_triple *triple)
 	char		histdetail[256];
 	int4		status;
 	repl_msg_t	instnohist_msg;
-
-	error_def(ERR_REPLINSTNOHIST);
 
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
 	assert(udi->grabbed_ftok_sem);
@@ -1334,7 +1325,7 @@ seq_num	gtmsource_find_resync_seqno(
  * On return from this routine, the caller should check the value of the global variable "gtmsource_state" to see if it is
  * either of GTMSOURCE_CHANGING_MODE or GTMSOURCE_WAITING_FOR_CONNECTION and if so take appropriate action.
  */
-void	gtmsource_send_new_triple(void)
+void	gtmsource_send_new_triple(boolean_t rcvr_same_endianness)
 {
 	repl_triple_msg_t	newtriple_msg;
 	repl_triple		triple;
@@ -1363,11 +1354,19 @@ void	gtmsource_send_new_triple(void)
 	newtriple_msg.type = REPL_NEW_TRIPLE;
 	newtriple_msg.len = SIZEOF(newtriple_msg);
 	newtriple_msg.triplecontent.jrec_type = JRT_TRIPLE;
-	newtriple_msg.triplecontent.forwptr = SIZEOF(repl_triple_jnl_t);
-	newtriple_msg.triplecontent.start_seqno = gtmsource_local->read_jnl_seqno;
+	if (!rcvr_same_endianness && (jnl_ver < remote_jnl_ver))
+	{
+		newtriple_msg.triplecontent.forwptr = GTM_BYTESWAP_24(SIZEOF(repl_triple_jnl_t));
+		newtriple_msg.triplecontent.start_seqno = GTM_BYTESWAP_64(gtmsource_local->read_jnl_seqno);
+		newtriple_msg.triplecontent.cycle = GTM_BYTESWAP_32(triple.root_primary_cycle);
+	} else
+	{
+		newtriple_msg.triplecontent.forwptr = SIZEOF(repl_triple_jnl_t);
+		newtriple_msg.triplecontent.start_seqno = gtmsource_local->read_jnl_seqno;
+		newtriple_msg.triplecontent.cycle = triple.root_primary_cycle;
+	}
 	memcpy(newtriple_msg.triplecontent.instname, triple.root_primary_instname, MAX_INSTNAME_LEN - 1);
 	memcpy(newtriple_msg.triplecontent.rcvd_from_instname, jnlpool.repl_inst_filehdr->this_instname, MAX_INSTNAME_LEN - 1);
-	newtriple_msg.triplecontent.cycle = triple.root_primary_cycle;
 	gtmsource_repl_send((repl_msg_ptr_t)&newtriple_msg, "REPL_NEW_TRIPLE", gtmsource_local->read_jnl_seqno);
 	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
 		return; /* send did not succeed */
@@ -1400,9 +1399,6 @@ void	gtmsource_set_next_triple_seqno(boolean_t detect_new_triple)
 	repl_triple		next_triple, local_triple;
 	gtmsource_local_ptr_t	gtmsource_local;
 	repl_msg_t		instnohist_msg;
-
-	error_def(ERR_REPLFTOKSEM);
-	error_def(ERR_REPLINSTNOHIST);
 
 	repl_inst_ftok_sem_lock();
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);

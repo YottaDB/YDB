@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashtab.h"
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
@@ -45,6 +44,7 @@
 #include "tp_change_reg.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */
 #include "tp_set_sgm.h"
+#include "tp_frame.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -55,7 +55,7 @@ GBLREF  gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct		mur_options;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 #ifdef DEBUG
 GBLREF 	jnl_gbls_t		jgbl;
 #endif
@@ -70,7 +70,7 @@ static	void	(* const extraction_routine[])() =
 uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 {
 	boolean_t		process_losttn;
-	boolean_t		is_set_kill_zkill_ztworm, is_set_kill_zkill, added;
+	boolean_t		is_set_kill_zkill_ztrig_ztworm, is_set_kill_zkill_ztrig, added;
 	trans_num		curr_tn;
 	enum jnl_record_type	rectype;
 	enum rec_fence_type	rec_fence;
@@ -109,14 +109,14 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	assert(rec_time <= mur_options.before_time);
 	assert(rec_time >= mur_options.after_time);
 	assert((0 == mur_options.after_time) || mur_options.forward && !rctl->db_updated);
-	is_set_kill_zkill_ztworm = (boolean_t)(IS_SET_KILL_ZKILL_ZTWORM(rectype));
-	if (is_set_kill_zkill_ztworm)
+	is_set_kill_zkill_ztrig_ztworm = (boolean_t)(IS_SET_KILL_ZKILL_ZTRIG_ZTWORM(rectype));
+	if (is_set_kill_zkill_ztrig_ztworm)
 	{
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 #		ifdef GTM_CRYPT
 		if (jctl->jfh->is_encrypted)
 		{
-			DECODE_SET_KILL_ZKILL(keystr, rec->prefix.forwptr, jctl->encr_key_handle, crypt_status);
+			DECODE_SET_KILL_ZKILL_ZTRIG(keystr, rec->prefix.forwptr, jctl->encr_key_handle, crypt_status);
 			if (0 != crypt_status)
 			{
 				GC_GTM_PUTMSG(crypt_status, NULL);
@@ -127,7 +127,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	}
 	if (mur_options.selection && !mur_select_rec(jctl))
 		return SS_NORMAL;
-	rec_token_seq = (REC_HAS_TOKEN_SEQ(rectype, rec)) ? GET_JNL_SEQNO(rec) : 0;
+	rec_token_seq = (REC_HAS_TOKEN_SEQ(rectype)) ? GET_JNL_SEQNO(rec) : 0;
 	process_losttn = rctl->process_losttn;
 	if (!process_losttn && mur_options.rollback && (rec_token_seq >= murgbl.losttn_seqno))
 		process_losttn = rctl->process_losttn = TRUE;
@@ -197,7 +197,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			 * # of participants in the TCOM records across all the participating regions.
 			 */
 			assert((NULL == multi) || (BROKEN_TN == recstat) || (FALSE == multi->this_is_broken));
-		} else if ((FENCE_ALWAYS == mur_options.fences) && is_set_kill_zkill_ztworm)
+		} else if ((FENCE_ALWAYS == mur_options.fences) && is_set_kill_zkill_ztrig_ztworm)
 		{
 			process_losttn = rctl->process_losttn = TRUE;
 			recstat = BROKEN_TN;
@@ -238,6 +238,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		if (dollar_tlevel && (NULL == forw_multi))
 		{
 			assert(FALSE);
+			murgbl.wrn_count++;
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLTPNEST, 4, jctl->jnl_fn_len,
 				jctl->jnl_fn, jctl->rec_offset, &rec->prefix.tn);
 			OP_TROLLBACK(0);
@@ -248,7 +249,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			mv.mvtype = MV_STR;
 			mv.str.len = 0;
 			mv.str.addr = NULL;
-			op_tstart(TRUE, TRUE, &mv, -1);
+			op_tstart(IMPLICIT_TSTART, TRUE, &mv, -1);
 			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = 0;)
 		}
 		tp_set_sgm();	/* needed to set "sgm_info_ptr" to correspond to "rctl" */
@@ -261,8 +262,8 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	 */
 	assert(gv_cur_region == rctl->gd);
 	assert(!mur_options.update || (gv_cur_region->open && (NULL != rctl->csa)));
-	is_set_kill_zkill = (boolean_t)(IS_SET_KILL_ZKILL(rectype));
-	if (is_set_kill_zkill)
+	is_set_kill_zkill_ztrig = (boolean_t)(IS_SET_KILL_ZKILL_ZTRIG(rectype));
+	if (is_set_kill_zkill_ztrig)
 	{
 		assert(NULL != keystr);
 		memcpy(gv_currkey->base, &keystr->text[0], keystr->length);
@@ -309,7 +310,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	}
 	if (GOOD_TN == recstat)
 	{
-		if ((is_set_kill_zkill_ztworm && !IS_TP(rectype)) || JRT_TCOM == rectype)
+		if ((is_set_kill_zkill_ztrig_ztworm && !IS_TP(rectype)) || JRT_TCOM == rectype)
 		{
 			/* Do forward journaling, detecting operations with duplicate transaction numbers.
 			 * While doing journaling on a database, a process may be killed immediately after

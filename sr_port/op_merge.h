@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,8 @@
 
 typedef struct merge_glvn_struct_type
 {
-	gvname_info 		*gblp[2];
-	struct lv_val_struct    *lclp[2];
+	gvname_info 	*gblp[2];
+	lv_val		*lclp[2];
 } merge_glvn_struct;
 typedef merge_glvn_struct *merge_glvn_ptr;
 

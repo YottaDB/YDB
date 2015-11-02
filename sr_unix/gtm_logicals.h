@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,6 +73,7 @@
 #define	GTM_NOUNDEF			"$gtm_noundef"
 #define	GTM_PROMPT			"$gtm_prompt"
 #define GTM_LVSCALE			"$gtm_lvscale"
+#define GTM_BOOLEAN			"$gtm_boolean"
 
 /* -------------------------- Unix only --------------------------  */
 
@@ -106,3 +107,4 @@
 #define	GTM_QUIET_HALT			"$gtm_quiet_halt"
 #define	GTM_NON_BLOCKED_WRITE_RETRIES	"$gtm_non_blocked_write_retries"
 #define	GTM_NOCENABLE			"$gtm_nocenable"
+#define GTM_ERROR_ON_JNL_FILE_LOST	"$gtm_error_on_jnl_file_lost"

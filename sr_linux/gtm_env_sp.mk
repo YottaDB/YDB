@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2001, 2010 Fidelity Information Services, Inc #
+#       Copyright 2001, 2011 Fidelity Information Services, Inc #
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -24,7 +24,7 @@ gt_as_option_debug=--gstabs
 gt_as_option_nooptimize=
 gt_as_option_optimize=
 gt_as_options=
-gt_as_options_common=
+gt_as_options_common=--64
 gt_as_src_suffix=.s
 
 ifeq ($(gt_machine_type), ia64)
@@ -32,6 +32,7 @@ gt_as_assembler=gcc -c
 gt_as_option_debug=
 else
 ifeq  ($(gt_machine_type), s390x)
+gt_as_options_common=-march=z9-109 -m64
 gt_as_option_debug=--gdwarf-2
 else
 ifeq  ($(gt_machine_type), CYGWIN)
@@ -40,9 +41,9 @@ gt_as_options_common=--defsym cygwin=1
 endif
 endif
 endif
-ifeq ($(linux_build_type), 32)
+ifeq ($(gt_build_type), 32)
 ifeq ($(gt_os_type),Linux)
-gt_as_options_common= --32
+gt_as_options_common=--32
 endif
 endif
 
@@ -64,12 +65,12 @@ gt_cc_option_nooptimize=
 gt_cc_option_optimize=-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store
 gt_cc_options_common+= -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_XOPEN_SOURCE=600 -fsigned-char
 
-ifeq ($(linux_build_type),32)
+ifeq ($(gt_build_type),32)
 gt_cc_option_I=-I-
 endif
 
 ifeq ($(gt_machine_type), x86_64)
-ifeq ($(linux_build_type),32)
+ifeq ($(gt_build_type),32)
 # Do not lookup the source directory before include directories specified by -I.
 # gcc complains about -I- being obsolete, but using -iquote cause build errors for gcc and as - ABS 2008.12.09
 #
@@ -96,7 +97,7 @@ ifeq ($(gt_machine_type), ia64)
 gt_cc_option_optimize=-O
 else
 gt_cc_options_common+= $(gt_cc_shl_fpic) -Wmissing-prototypes -D_LARGEFILE64_SOURCE
-ifeq ($(linux_build_type),32)
+ifeq ($(gt_build_type),32)
 gt_cc_option_optimize+= -march=i686
 endif
 endif
@@ -116,7 +117,7 @@ gt_ld_linker=$(gt_cc_compiler)
 gt_ld_m_shl_linker=ld
 gt_ld_m_shl_options=-shared
 gt_ld_option_output=-o
-gt_ld_options_all_exe=-rdynamic -Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmexe_symbols.export
+gt_ld_options_all_exe=-rdynamic -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus -Wl,--version-script,gtmexe_symbols.export
 gt_ld_options_bta=-Wl,-M
 gt_ld_options_common=-Wl,-M
 gt_ld_options_dbg=-Wl,-M
@@ -128,14 +129,14 @@ gt_ld_shl_suffix=.so
 gt_ld_syslibs= -lrt -lelf -lncurses -lm -ldl
 gt_ld_sysrtns=
 
-ifeq ($(linux_build_type),32)
+ifeq ($(gt_build_type),32)
 gt_ld_m_shl_options=
 gt_ld_syslibs= -lrt -lncurses -lm -ldl
 endif
 
 
 # -lrt for async I/O in mupip recover/rollback
-ifeq ($(linux_build_type), 64)
+ifeq ($(gt_build_type), 64)
 gt_ld_syslibs=-lrt -lelf -lncurses -lm -ldl
 else
 ifeq ($(gt_os_type),Linux)
@@ -159,7 +160,7 @@ else
 gt_echoe=echo -e
 endif
 
-ifeq ($(linux_build_type), 32)
+ifeq ($(gt_build_type), 32)
 gt_cc_options_common+=-m32
 gt_ld_options_gtmshr+=-m32
 gt_cc_shl_options+=-m32
@@ -185,7 +186,7 @@ define gt-dep
         echo $(notdir $(filter-out /usr/include% /usr/lib% /usr/local/include% /usr/local/lib/%, $(filter %.c %.h,$(shell $(gt_cc_compiler) -M $(gt_cc_options) $(gt_cc_dep_option) $<)))) >> $@
 endef
 define gt-export
-        @echo "VERSION {" >$@
+        @echo "{" >$@
         @echo "global:" >>$@
         @sed 's/\(.*\)/ \1;/g' $< >>$@
         @echo "local:" >>$@

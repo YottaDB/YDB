@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@
 #include "gtm_startup.h"
 #include "invocation_mode.h"
 #include "gtm_imagetype_init.h"
+#include "gtm_threadgbl_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -73,7 +74,6 @@
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF	bool			in_backup;
 GBLREF	bool			licensed;
-GBLREF	bool			transform;
 GBLREF	int			(*func)();
 GBLREF	mval			curr_gbl_root;
 GBLREF	global_latch_t		defer_latch;
@@ -88,7 +88,9 @@ void display_prompt(void);
 int main (int argc, char **argv)
 {
 	int		res;
+	DCL_THREADGBL_ACCESS;
 
+	GTM_THREADGBL_INIT;
 	gtm_imagetype_init(MUPIP_IMAGE);
 	invocation_mode = MUMPS_UTILTRIGR;
 	gtm_wcswidth_fnptr = gtm_wcswidth;
@@ -104,12 +106,11 @@ int main (int argc, char **argv)
 	cli_lex_setup(argc,argv);
 	if (argc < 2)			/* Interactive mode */
 		display_prompt();
-
 	/*      this call should be after cli_lex_setup() due to S390 A/E conversion    */
 	gtm_chk_dist(argv[0]);
 	INIT_GBL_ROOT(); /* Needed for GVT initialization */
 	init_gtm();
-	while(1)
+	while (TRUE)
 	{	func = 0;
 		if ((res = parse_cmd()) == EOF)
 			break;
@@ -119,13 +120,11 @@ int main (int argc, char **argv)
 				rts_error(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 			else
 				gtm_putmsg(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
-
 		}
 		if (func)
 			func();
 		if (argc > 1)		/* Non-interactive mode, exit after command */
 			break;
-
 		display_prompt();
 	}
 	mupip_exit(SS_NORMAL);

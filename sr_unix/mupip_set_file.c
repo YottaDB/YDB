@@ -136,10 +136,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	{
 		if (cli_get_int("GLOBAL_BUFFERS", &new_cache_size))
 		{
-			if (new_cache_size > WC_MAX_BUFFS)
+			if (new_cache_size > GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS))
 			{
 				util_out_print("!UL too large, maximum write cache buffers allowed is !UL", TRUE, new_cache_size,
-						WC_MAX_BUFFS);
+						GTM64_ONLY(GTM64_WC_MAX_BUFFS) NON_GTM64_ONLY(WC_MAX_BUFFS));
 				return (int4)ERR_WCWRNNOTCHG;
 			}
 			if (new_cache_size < WC_MIN_BUFFS)

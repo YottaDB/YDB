@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 #include "copy.h"
 #include "tp_incr_commit.h"
 
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF  sgm_info        	*first_sgm_info;
 GBLREF 	sgmnt_data_ptr_t	cs_data;
 GBLREF	global_tlvl_info	*global_tlvl_info_head;
@@ -73,8 +73,7 @@ void tp_incr_commit(void)
 							assert(!cse->done);
 							cse->new_buff = low_cse->new_buff;
 						} else if (low_cse->new_buff)
-							free_element(si->new_buff_list,
-									(char *)low_cse->new_buff - SIZEOF(que_ent));
+							free_element(si->new_buff_list, (char *)low_cse->new_buff);
 						free_element(si->tlvl_cw_set_list, (char *)low_cse);
 						orig_cse = cse;
 					} else
@@ -116,8 +115,7 @@ void tp_incr_commit(void)
 							assert(!cse->done);
 							cse->new_buff = low_cse->new_buff;
 						} else if (low_cse->new_buff)
-							free_element(si->new_buff_list,
-									(char *)low_cse->new_buff - SIZEOF(que_ent));
+							free_element(si->new_buff_list, (char *)low_cse->new_buff);
 						memcpy(low_cse, cse, SIZEOF(cw_set_element));
 						low_cse->next_cw_set = next_cse;
 						low_cse->prev_cw_set = prev_cse;

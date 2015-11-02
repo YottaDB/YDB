@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -355,7 +355,7 @@ void op_exp(mval *u, mval* v, mval *p)
 			}
                 }
 		p->mvtype = MV_NM;
-                if (j + MV_XBIAS > EXPHI)
+                if ((j + MV_XBIAS) >= EXPHI)
                 {
                         rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
                         return;

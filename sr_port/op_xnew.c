@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,11 +12,10 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "hashtab.h"
 #include "lv_val.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -87,6 +86,7 @@ void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
 			lv_newname(tabent1, curr_symval->last_tab);
 		lvtab1 = (lv_val *)tabent1->value;
 		assert(lvtab1);
+		assert(LV_IS_BASE_VAR(lvtab1));
 		added = add_hashtab_mname_symval(htnew, &lvent, NULL, &tabent2);
 		if (added)
 		{	/* This var has NOT been specified twice */
@@ -129,7 +129,7 @@ void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
 		for (xnewvar = curr_symval->xnew_var_list; xnewvar; xnewvar = xnewvar->next)
 		{
 			lvtab1 = xnewvar->lvval;
-			if (lvtab1->ptrs.val_ent.children)
+			if (LV_HAS_CHILD(lvtab1))
 				XNEWREF_CNTNRS_IN_TREE(lvtab1);
 		}
 	}

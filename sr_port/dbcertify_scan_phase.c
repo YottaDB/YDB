@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,6 @@
 #include "gvcst_lbm_check.h"
 #include "dbcertify.h"
 
-GBLREF  bool			transform;
 GBLREF	gv_key			*gv_altkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	pattern			*pattern_list;
@@ -123,26 +122,26 @@ void dbcertify_scan_phase(void)
 	unsigned short	buff_len;
 	gtm_off_t	dbptr;
 	boolean_t	outfile_present;
-	enum gdsblk_type blk_type;
+	enum		gdsblk_type blk_type;
 	block_id	bitmap_blk_num, last_bitmap_blk_num, blk_num;
 	integ_error_blk_list	*iebl;
 	phase_static_area *psa;
 	ZOS_ONLY(int	realfiletag;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	psa = psa_gbl;
 	DBC_DEBUG(("DBC_DEBUG: Beginning scan phase\n"));
 	psa->bsu_keys = TRUE;
 	UNIX_ONLY(atexit(dbc_scan_phase_cleanup));
-	transform = TRUE;
+	TREF(transform) = TRUE;
 	psa->block_depth = psa->block_depth_hwm = -1;		/* Initialize no cache */
 	initialize_pattern_table();
-
 	/* On VMS, file operations are in 512 byte chunks which seems to give VMS some fidgies
 	   when we rewrite the header later. Make sure the header is in one single 512 byte
 	   block.
 	*/
 	assert(DISK_BLOCK_SIZE == SIZEOF(p1hdr));
-
 	/* Check results of option parse */
 	psa->phase_one = TRUE;
 	psa->report_only = (CLI_PRESENT == cli_present("REPORT_ONLY"));
@@ -167,22 +166,21 @@ void dbcertify_scan_phase(void)
 	if (FALSE == cli_get_str("REGION", (char_ptr_t)psa->regname, &buff_len))
 		mupip_exit(ERR_MUPCLIERR);
 	psa->regname[buff_len] = '\0';
-
 	/* First order of business is to flush the database in the cache so we start with
 	   as current a version as possible.
 	*/
 	dbc_open_command_file(psa);
-#ifdef VMS
+#	ifdef VMS
 	strcpy((char_ptr_t)psa->util_cmd_buff, RESULT_ASGN);
 	strcat((char_ptr_t)psa->util_cmd_buff, (char_ptr_t)psa->tmprsltfile);
 	dbc_write_command_file(psa, (char_ptr_t)psa->util_cmd_buff);
 	dbc_write_command_file(psa, DSE_START);
-#else
+#	else
 	strcpy((char_ptr_t)psa->util_cmd_buff, DSE_START_PIPE_RSLT1);
 	strcat((char_ptr_t)psa->util_cmd_buff, (char_ptr_t)psa->tmprsltfile);
 	strcat((char_ptr_t)psa->util_cmd_buff, DSE_START_PIPE_RSLT2);
 	dbc_write_command_file(psa, (char_ptr_t)psa->util_cmd_buff);
-#endif
+#	endif
 	strcpy((char_ptr_t)psa->util_cmd_buff, DSE_FIND_REG_ALL);
 	strcat((char_ptr_t)psa->util_cmd_buff, "=");
 	strcat((char_ptr_t)psa->util_cmd_buff, (char_ptr_t)psa->regname);
@@ -193,10 +191,8 @@ void dbcertify_scan_phase(void)
 	dbc_close_command_file(psa);
 	dbc_remove_result_file(psa);
 	dbc_run_command_file(psa, "DSE", DSE_BFLUSH, TRUE);
-
 	/* Also need to find out what the database name for this region is */
 	dbc_find_database_filename(psa, psa->regname, dbfn);
-
 	/* See if a phase-1 output filename was specified. If not, create a default name */
 	if (!outfile_present)
 	{	/* No output file name specified -- supply a default */
@@ -212,7 +208,6 @@ void dbcertify_scan_phase(void)
 		strcpy((char_ptr_t)psa->outfn, (char_ptr_t)dbfn);
 		strcat((char_ptr_t)psa->outfn, DEFAULT_OUTFILE_SUFFIX);
 	}
-
 	/* Build data structures and open database */
 	MALLOC_INIT(psa->dbc_gv_cur_region, SIZEOF(gd_region));
 	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, SIZEOF(gd_segment));
@@ -220,21 +215,16 @@ void dbcertify_scan_phase(void)
 	len = strlen((char_ptr_t)dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
 	psa->dbc_gv_cur_region->dyn.addr->fname_len = (unsigned short)len;
-
 	FILE_CNTL_INIT(psa->dbc_gv_cur_region->dyn.addr);
 	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
-
 	psa->dbc_cs_data = malloc(SIZEOF(*psa->dbc_cs_data));
-
 	/* Initialize for db processing - open and read in file-header */
 	psa->fc = psa->dbc_gv_cur_region->dyn.addr->file_cntl;
 	dbc_init_db(psa);
-
 	/* If REPORT_ONLY was *NOT* specified, then we require two things:
-
-	1) The reserved bytes value must be at least 8 (UNIX) or 9 (VMS).
-	2) The maximum record size must be < blk_size - 16 to allow for new V5 block header.
-	*/
+	 * 1) The reserved bytes value must be at least 8 (UNIX) or 9 (VMS).
+	 * 2) The maximum record size must be < blk_size - 16 to allow for new V5 block header.
+	 */
 	max_max_rec_size = psa->dbc_cs_data->blk_size - SIZEOF(blk_hdr);
 	if (VMS_ONLY(9) UNIX_ONLY(8) > psa->dbc_cs_data->reserved_bytes)
 	{
@@ -249,10 +239,9 @@ void dbcertify_scan_phase(void)
 		if (!psa->report_only)
 			exit(SS_NORMAL - 1);
 	}
-
 	/* If not REPORT_ONLY, open the phase-1 output file and write header info. Note this will be
-	   re-written at the completion of the process.
-	*/
+	 * re-written at the completion of the process.
+	 */
 	if (!psa->report_only)
 	{	/* Recreate the file entirely if it exists */
 		psa->outfd = OPEN3((char_ptr_t)psa->outfn, O_WRONLY + O_CREAT + O_TRUNC, S_IRUSR + S_IWUSR RMS_OPEN_BIN);
@@ -263,15 +252,14 @@ void dbcertify_scan_phase(void)
 			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn),
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
-#ifdef __MVS__
+#	ifdef __MVS__
 		if (-1 == gtm_zos_set_tag(psa->outfd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
 			TAG_POLICY_GTM_PUTMSG((char_ptr_t)psa->outfn, errno, realfiletag, TAG_BINARY);
-#endif
+#	endif
 		memset((void *)&psa->ofhdr, 0, SIZEOF(p1hdr));
 		memcpy(psa->ofhdr.p1hdr_tag, P1HDR_TAG, SIZEOF(psa->ofhdr.p1hdr_tag));
 		dbc_write_p1out(psa, &psa->ofhdr, SIZEOF(p1hdr));	/* Initial hdr is all zeroes */
 	}
-
 	/* Initialize */
 	psa->block_buff = malloc(psa->dbc_cs_data->blk_size);		/* Current data/index block we are looking at */
 	psa->curr_lbmap_buff= malloc(psa->dbc_cs_data->blk_size);	/* Current local bit map cache */
@@ -279,10 +267,9 @@ void dbcertify_scan_phase(void)
 		/ psa->dbc_cs_data->bplmap;
 	dbptr = (psa->dbc_cs_data->start_vbn - 1) * DISK_BLOCK_SIZE;
 	blk_num = 0;
-
 	/* Loop to process every local bit map in the database. Since the flag tells us only
-	   (0) it is full or (1) it is not full, we have to completely process each local bit map.
-	*/
+	 * (0) it is full or (1) it is not full, we have to completely process each local bit map.
+	 */
 	psa->fc->op_len = psa->dbc_cs_data->blk_size;
 	for (mm_offset = 0;
 	     (mm_offset < psa->local_bit_map_cnt) && (blk_num < psa->dbc_cs_data->trans_hist.total_blks);
@@ -291,10 +278,8 @@ void dbcertify_scan_phase(void)
 		psa->fc->op_buff = psa->curr_lbmap_buff;
 		psa->fc->op_pos = (dbptr / DISK_BLOCK_SIZE) + 1;
 		dbcertify_dbfilop(psa);		/* Read local bitmap block (no return if error) */
-
 		/* Verification we haven't gotten lost */
 		assert(0 == (blk_num % psa->dbc_cs_data->bplmap));
-
 		/* Loop through each local bit map processing (checking) allocated blocks */
 		for (lm_offset = 0;
 		     (lm_offset < (psa->dbc_cs_data->bplmap * BML_BITS_PER_BLK))
@@ -314,12 +299,11 @@ void dbcertify_scan_phase(void)
 			DBC_DEBUG(("DBC_DEBUG: Partial lmap processed - blk 0x%x - lm_offset 0x%x\n", \
 				   (mm_offset * BLKS_PER_LMAP), lm_offset));
 	}
-
 	/* If there were any blocks we had trouble processing the first time through, perform a second buffer flush and
-	   retry them. If they are still broken, it is an error this time. Note all integ errors are fatal but record-too-long
-	   errors only cause the run to turn into a "report_only" type run and thus do not create the output file but
-	   scanning continues.
-	*/
+	 * retry them. If they are still broken, it is an error this time. Note all integ errors are fatal but record-too-long
+	 * errors only cause the run to turn into a "report_only" type run and thus do not create the output file but
+	 * scanning continues.
+	 */
 	if (NULL != psa->iebl)
 	{
 		DBC_DEBUG(("DBC_DEBUG: Entering block re-processing loop\n"));
@@ -391,10 +375,8 @@ void dbcertify_scan_phase(void)
 				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
 	}
-
 	psa->fc->op = FC_CLOSE;
 	dbcertify_dbfilop(psa);		/* Close database */
-
 	PRINTF("\n\n");
 	PRINTF("Total blocks in database  -------   %12d [0x%08x]\n", psa->dbc_cs_data->trans_hist.total_blks,
 	       psa->dbc_cs_data->trans_hist.total_blks);
@@ -406,10 +388,9 @@ void dbcertify_scan_phase(void)
 	PRINTF("- DT index blocks ---------------   %12d [0x%08x]\n", psa->dtlvln0, psa->dtlvln0);
 	PRINTF("- GVT leaf (data) blocks --------   %12d [0x%08x]\n", psa->gvtlvl0, psa->gvtlvl0);
 	PRINTF("- GVT index blocks --------------   %12d [0x%08x]\n", psa->gvtlvln0, psa->gvtlvln0);
-
 	/* Release resources */
 	free(psa->dbc_cs_data);
-#ifdef VMS
+#	ifdef VMS
 	/* Some extra freeing of control blocks on VMS */
 	if (NULL != FILE_INFO(psa->dbc_gv_cur_region)->fab)
 		free(FILE_INFO(psa->dbc_gv_cur_region)->fab);
@@ -423,7 +404,7 @@ void dbcertify_scan_phase(void)
 		free(FILE_INFO(psa->dbc_gv_cur_region)->xabfhc);
 	if (NULL != FILE_INFO(psa->dbc_gv_cur_region)->xabpro)
 		free(FILE_INFO(psa->dbc_gv_cur_region)->xabpro);
-#endif
+#	endif
 	free(psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_info);
 	free(psa->dbc_gv_cur_region->dyn.addr->file_cntl);
 	free(psa->dbc_gv_cur_region->dyn.addr);
@@ -440,8 +421,8 @@ void dbcertify_scan_phase(void)
 }
 
 /* Write the given output record but keep the global variable "chksum" updated with the tally.
-   Assumes that all writes are from aligned buffers (regardless of how they end up on disk).
-*/
+ * Assumes that all writes are from aligned buffers (regardless of how they end up on disk).
+ */
 void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen)
 {
 	int		save_errno;
@@ -477,7 +458,6 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 	psa->fc->op_buff = psa->block_buff;
 	psa->fc->op_pos = (dbptr / DISK_BLOCK_SIZE) + 1;
 	dbcertify_dbfilop(psa);		/* Read data/index block (no return if error) */
-
 	/* Check free space in block */
 	blk_len = ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz;
 	free_bytes = psa->dbc_cs_data->blk_size - blk_len;
@@ -486,7 +466,6 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 		blk_levl = ((v15_blk_hdr_ptr_t)psa->block_buff)->levl;
 		if (MAX_BT_DEPTH <= blk_levl)
 			dbc_integ_error(psa, blk_num, "Bad block level");
-
 		/* Isolate first record for length check */
 		rec1_ptr = psa->block_buff + SIZEOF(v15_blk_hdr);
 		rec1_cmpc = ((rec_hdr_ptr_t)rec1_ptr)->cmpc;
@@ -496,10 +475,10 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 		rec1_len = us_rec_len;
 		if ((rec1_len + SIZEOF(v15_blk_hdr)) < blk_len)
 		{	/* There is a 2nd record. It must also be checked as it is possible for a
-			   too-long record to exist as the 2nd record if it is a near clone of the
-			   first record (differing only in the last byte of the key) and the first
-			   record has no value (null value).
-			*/
+			 * too-long record to exist as the 2nd record if it is a near clone of the
+			 * first record (differing only in the last byte of the key) and the first
+			 * record has no value (null value).
+			 */
 			rec2_ptr = rec1_ptr + rec1_len;
 			rec2_cmpc = ((rec_hdr_ptr_t)rec2_ptr)->cmpc;
 			if (rec2_cmpc > rec1_len)
@@ -525,8 +504,8 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 			rec_len = 0;
 		if (rec_len)
 		{	/* One of these records exceeds the max size - might be a transitory integ on
-			   1st pass or permanent on 2nd pass.
-			*/
+			 * 1st pass or permanent on 2nd pass.
+			 */
 			assert(rec_ptr);
 			if (psa->final)
 			{	/* Should be a data block with a too-long record in it */
@@ -557,26 +536,21 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 					}
 					psa->report_only = TRUE; /* No more writing to output file */
 				}
-			} else
-				/* Not our final trip through, cause the block to be requeued for later processing */
+			} else	/* Not our final trip through, cause the block to be requeued for later processing */
 				dbc_requeue_block(psa, blk_num);
 			return;
 		}
 		/* Determine type of block (DT lvl 0, DT lvl !0, GVT lvl 0, GVT lvl !0)
-
-		   Rules for checking:
-
-		   1) If compression count of 2nd record is zero, it *must* be a directory tree block. This is a fast path
-		      check to avoid doing the strlen in the second check.
-
-		   2) If compression count of second record is less than or equal to the length of the global variable name,
-		      then this must be a directory tree block. The reason this check works is a GVT index or data block
-		      would have same GVN in the 2nd record as the first so the compression count would be a minimum of
-		      (length(GVN) + 1). The "+ 1" is for the terminating null of the GVN.
-
-		   3) If there is no second record, this must be a lvl0 data tree block as no other block could exceed
-		      the maximum block size with a single record.
-		*/
+		 * Rules for checking:
+		 * 1) If compression count of 2nd record is zero, it *must* be a directory tree block. This is a fast path
+		 *    check to avoid doing the strlen in the second check.
+		 * 2) If compression count of second record is less than or equal to the length of the global variable name,
+		 *    then this must be a directory tree block. The reason this check works is a GVT index or data block
+		 *    would have same GVN in the 2nd record as the first so the compression count would be a minimum of
+		 *    (length(GVN) + 1). The "+ 1" is for the terminating null of the GVN.
+		 * 3) If there is no second record, this must be a lvl0 data tree block as no other block could exceed
+		 *    the maximum block size with a single record.
+		 */
 		have_dt_blk = FALSE;
 		if (0 != rec2_len)
 		{	/* There is a second record .. */
@@ -625,19 +599,19 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 		}
 		if (psa->bsu_keys && gdsblk_gvtleaf == blk_type)
 		{	/* Get text representation of the key. Because we are not using the DT in the cache, there is
-			   a possibility that we cannot find this global however that chance should be slight. Not finding
-			   it only means that this record cannot be processed by v5cbsu.m and will instead have to be
-			   processed by phase-2. This is an acceptable alternative.
-
-			   The key we format is the second record in the block if it is available. This is because of the
-			   way an update in place takes place. If the block is too big, the block is split at the point
-			   of the update. If the (somewhat long) keys of the first and second records differ by only 1
-			   byte and the first record has no value, we could get into a situation where the second record
-			   is highly compressed and a split at that point will give back insufficient space for the
-			   new block to meet the block size requirements. If instead we split the record after the 2nd
-			   record in this situation, the resulting blocks will be sized sufficiently to meet the upgrade
-			   requirements.
-			*/
+			 * a possibility that we cannot find this global however that chance should be slight. Not finding
+			 * it only means that this record cannot be processed by v5cbsu.m and will instead have to be
+			 * processed by phase-2. This is an acceptable alternative.
+			 *
+			 * The key we format is the second record in the block if it is available. This is because of the
+			 * way an update in place takes place. If the block is too big, the block is split at the point
+			 * of the update. If the (somewhat long) keys of the first and second records differ by only 1
+			 * byte and the first record has no value, we could get into a situation where the second record
+			 * is highly compressed and a split at that point will give back insufficient space for the
+			 * new block to meet the block size requirements. If instead we split the record after the 2nd
+			 * record in this situation, the resulting blocks will be sized sufficiently to meet the upgrade
+			 * requirements.
+			 */
 			if (rec2_len)
 			{	/* There is a 2nd record */
 				rec_ptr = rec2_ptr;
@@ -661,7 +635,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 				PRINTF("       Blknum           Offset  Blktype  BlkLvl   Blksize   Free"
 				       "   Key\n");
 			}
-#ifndef __osf__
+#			ifndef __osf__
 			GTM64_ONLY(PRINTF("   0x%08x %16lx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
 			       (have_dt_blk ? "   DT   " : "   GVT  "),
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
@@ -674,12 +648,12 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 			       (have_dt_blk ? "   DT   " : "   GVT  "),
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr));
-#else
+#			else
 			PRINTF("   0x%08x %16lx %s %5d   %9d %6d\n   %s%s", blk_num, dbptr,
 			       (have_dt_blk ? "   DT   " : "   GVT  "),
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr);
-#endif
+#			endif
 		}
 		psa->blks_too_big++;
 		/* Prepare the record to put to the output file */
@@ -719,8 +693,8 @@ void dbc_requeue_block(phase_static_area *psa, block_id blk_num)
 }
 
 /* Routine to handle integrity errors. If first pass (not final), requeue the block. If on
-   final pass, give integrity rts_error.
-*/
+ * final pass, give integrity rts_error.
+ */
 void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg)
 {
 	char_ptr_t	errmsg;
@@ -764,21 +738,17 @@ void dbc_integ_error(phase_static_area *psa, block_id blk_num, char_ptr_t emsg)
 }
 
 /* Generate an ascii representation of the given key in the current block buffer.
-
-   This is accomplished (mainly) by:
-
-   1) Locating the key within the record.
-   2) Calling the dbc_find_dtblk() routine to locate the directory entry for us.
-   3) Setting up gv_target and friends to point to the entry.
-   4) Checking the located directory entry for collation information.
-   5) Calling format_targ_key() to do the formatting into our buffer.
-
-   Note: usage of "first_rec_key" is somewhat overloaded in this routine. Under most
-         circumstances, it is most likely the second key that is being formatted but
-	 this is a defined area that is available for use in this (scan phase) routine
-	 so we use it.
-
-*/
+ * This is accomplished (mainly) by:
+ * 1) Locating the key within the record.
+ * 2) Calling the dbc_find_dtblk() routine to locate the directory entry for us.
+ * 3) Setting up gv_target and friends to point to the entry.
+ * 4) Checking the located directory entry for collation information.
+ * 5) Calling format_targ_key() to do the formatting into our buffer.
+ * Note: usage of "first_rec_key" is somewhat overloaded in this routine. Under most
+ *       circumstances, it is most likely the second key that is being formatted but
+ *	 this is a defined area that is available for use in this (scan phase) routine
+ *	 so we use it.
+ */
 uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 {
 	int		dtblk_index, hdr_len, rec_value_len, rec_len, rec_cmpc;
@@ -789,8 +759,8 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 
 	dbc_init_key(psa, &psa->first_rec_key);
 	/* We have to parse the block down to the supplied key to make sure the compressed portions
-	   of the key are available.
-	*/
+	 * of the key are available.
+	 */
 	rec_p = psa->block_buff + SIZEOF(v15_blk_hdr);
 	while (rec_p < trec_p)
 	{

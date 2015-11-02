@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,6 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"	/* for POP_MV_STENT */
-#include "val_iscan.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"

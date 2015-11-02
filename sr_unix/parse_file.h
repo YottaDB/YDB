@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,7 +9,7 @@
  *								*
  ****************************************************************/
 
-#define MAX_FBUFF 255	/* biggest thing to fit in an unsigned char */
+#define MAX_FBUFF	255		/* max file size (why different from MAX_PATH[_LEN]? */
 #define DEF_DBEXT	"*.dat"
 #define DEF_NODBEXT	"*"
 

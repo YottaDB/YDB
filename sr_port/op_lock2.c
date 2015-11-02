@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ GBLREF	bool		out_of_time;
 GBLREF	bool		remlkreq;
 GBLREF	unsigned char	cm_action;
 GBLREF	unsigned short	lks_this_cmd;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 GBLREF	uint4		process_id;
 GBLREF	int4		outofband;
@@ -155,12 +155,13 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 			assert(pvt_ptr2->granted && (pvt_ptr2 != pvt_ptr1));
 			mlk_bckout(pvt_ptr2, action);
 		}
-		if ((0 < dollar_tlevel) && (CDB_STAGNATE <= t_tries))
+		if (dollar_tlevel && (CDB_STAGNATE <= t_tries))
 		{
 			mlk_unpend(pvt_ptr1);		/* Eliminated the dangling request block */
-			t_retry(cdb_sc_needcrit);	/* release crit to prevent a deadlock */
+			if (timer_on)
+				cancel_timer((TID)&timer_on);
+			t_retry(cdb_sc_needlock);	/* release crit to prevent a deadlock */
 		}
-
 		for (;;)
 		{
 			if (out_of_time || outofband)

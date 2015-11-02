@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +23,7 @@
 GBLREF spdesc		stringpool;
 GBLREF char		*lexical_ptr;
 GBLREF unsigned char	*source_buffer;
-GBLREF short int	source_column, last_source_column;
-GBLREF bool		shift_gvrefs;
-GBLREF triple		*expr_start;
+GBLREF short int	source_column;
 
 int compile_pattern(oprtype *opr, bool is_indirect)
 {
@@ -34,10 +32,12 @@ int compile_pattern(oprtype *opr, bool is_indirect)
 	mstr		instr;
 	int		status;
 	triple		*oldchain, tmpchain, *ref, *triptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (is_indirect)
 	{
-		if (shift_gvrefs)
+		if (TREF(shift_side_effects))
 		{
 			dqinit(&tmpchain, exorder);
 			oldchain = setcurtchain(&tmpchain);
@@ -49,10 +49,10 @@ int compile_pattern(oprtype *opr, bool is_indirect)
 			ref = newtriple(OC_INDPAT);
 			newtriple(OC_GVSAVTARG);
 			setcurtchain(oldchain);
-			dqadd(expr_start, &tmpchain, exorder);
-			expr_start = tmpchain.exorder.bl;
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
+			triptr->operand[0] = put_tref(TREF(expr_start));
 		} else
 		{
 			if (!indirection(opr))
@@ -67,8 +67,8 @@ int compile_pattern(oprtype *opr, bool is_indirect)
 		instr.addr = (char *)&source_buffer[source_column - 1];
 		instr.len = STRLEN(instr.addr);
 		status = patstr(&instr, &retstr, NULL);
-		last_source_column = (short int)(instr.addr - (char *)source_buffer);
-		assert(last_source_column);
+		TREF(last_source_column) = (short int)(instr.addr - (char *)source_buffer);
+		assert(TREF(last_source_column));
 		if (status)
 		{	/* status == syntax error when non-zero */
 			stx_error(status);

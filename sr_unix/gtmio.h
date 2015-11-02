@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -621,7 +621,7 @@
 }
 
 #define DOREADRLTO2(FDESC, FBUFF, FBUFF_LEN, TOFLAG, BLOCKED_IN, ISPIPE, FLAGS, RLEN, \
-TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF) \
+		    TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF, PIPE_OR_FIFO) \
 { \
 	ssize_t		gtmioStatus; \
 	int		skip_read = FALSE;\
@@ -691,6 +691,8 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF) \
 		} \
 		else if (EINTR != errno || TOFLAG) \
 		  break; \
+		if (PIPE_OR_FIFO && outofband)	\
+			break;\
 	} \
 	if (-1 != gtmioStatus) \
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen);		/* Return length actually read */ \

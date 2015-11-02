@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 
 trans_num gvcst_bmp_mark_free(kill_set *ks)
 {
@@ -68,6 +68,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	boolean_t	visit_blks;
 	srch_blk_status	bmphist;
 	cache_rec_ptr_t	cr;
+	enum db_ver	ondsk_blkver;
 
 	error_def(ERR_GVKILLFAIL);
 
@@ -84,7 +85,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	start_db_fmt_tn = cs_data->desired_db_format_tn;
 	visit_blks = (!cs_data->fully_upgraded);	/* Local evaluation */
 	assert(!visit_blks || (visit_blks && dba_bg == cs_addrs->hdr->acc_meth)); /* must have blks_to_upgrd == 0 for non-BG */
-	assert(0 == dollar_tlevel); 			/* Should NOT be in TP now */
+	assert(!dollar_tlevel); 			/* Should NOT be in TP now */
 	blk = &ks->blk[0];
 	blk_top = &ks->blk[ks->used];
 	if (!visit_blks)
@@ -141,7 +142,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					continue;
 				}
 				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -(int4)(nextblk - blk));
-				if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL)))
+				if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
 					continue;
 				break;
 			}
@@ -217,8 +218,11 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			 */
 			t_busy2free(&alt_hist.h[0]);
 			cr = alt_hist.h[0].cr;
-			assert((GDSV5 == cr->ondsk_blkver) || (GDSV4 == cr->ondsk_blkver));
-			if (GDSVCURR != cr->ondsk_blkver)
+			ondsk_blkver = cr->ondsk_blkver;	/* Get local copy in case cr->ondsk_blkver changes between
+								 * first and second part of the ||
+								 */
+			assert((GDSV5 == ondsk_blkver) || (GDSV4 == ondsk_blkver));
+			if (GDSVCURR != ondsk_blkver)
 				inctn_detail.blknum_struct.blknum = blk->block;
 			else
 				inctn_detail.blknum_struct.blknum = 0; /* i.e. no adjustment to "blks_to_upgrd" necessary */
@@ -230,7 +234,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				continue;
 			}
 			t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -1);
-			if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL)))
+			if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
 				continue;
 			break;
 		}

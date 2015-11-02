@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,12 +28,12 @@
 GBLREF stack_frame		*frame_pointer;
 GBLREF spdesc			stringpool;
 GBLREF spdesc			rts_stringpool;
-GBLREF bool			compile_time;
-GBLREF bool			transform;
 GBLREF unsigned short		proc_act_type;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF mval			dollar_zstatus;
 GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
+
+error_def(ERR_ERRWZINTR);
 
 /* Counterpart to trans_code_cleanup for job interrupt errors */
 void jobinterrupt_process_cleanup(void)
@@ -43,14 +43,14 @@ void jobinterrupt_process_cleanup(void)
 	unsigned char	*zstptr;
 	mstr		msgbuff;
 	int		zstlen;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_ERRWZINTR);
-
+	SETUP_THREADGBL_ACCESS;
 	assert((SFT_COUNT | SFT_ZINTR) == proc_act_type);
 	assert(dollar_zininterrupt);
-	if (compile_time)
+	if (TREF(compile_time))
 	{	/* Make sure we are using the right stringpool */
-		compile_time = FALSE;
+		TREF(compile_time) = FALSE;
 		if (stringpool.base != rts_stringpool.base)
 			stringpool = rts_stringpool;
 	}
@@ -60,9 +60,8 @@ void jobinterrupt_process_cleanup(void)
 	   caused us to drive the $zinterrupt handler and (2) we were already on a nice
 	   statement boundary when we were called to run $zinterrupt.
 	*/
-	transform = TRUE;
+	TREF(transform) = TRUE;
 	dollar_zininterrupt = FALSE;	/* No longer in a $zinterrupt */
-
 	/* Now build message for operator log with the form ERRWZINTR, compiler-error */
 	util_out_print(NULL, RESET);
 	msgbuff.addr = (char *)msgbuf;

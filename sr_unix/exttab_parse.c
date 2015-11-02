@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,12 +23,14 @@
 #include "copy.h"
 #include "gtmxc_types.h"
 #include "rtnhdr.h"
-#include "lv_val.h"
+#include "lv_val.h"	/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "gtmci.h"
 #include "eintr_wrappers.h"
 #include "error.h"
 #include "gtm_malloc.h"
+#include "trans_log_name.h"
+#include "iosp.h"
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
@@ -337,37 +339,40 @@ static uint4	array_to_mask(boolean_t ar[MAXIMUM_PARAMETERS], int n)
 	return mask;
 }
 
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_TEXT);
+error_def(ERR_ZCALLTABLE);
+error_def(ERR_ZCCOLON);
+error_def(ERR_ZCCTENV);
+error_def(ERR_ZCCTNULLF);
+error_def(ERR_ZCCTOPN);
+error_def(ERR_ZCENTNAME);
+error_def(ERR_ZCMLTSTATUS);
+error_def(ERR_ZCPREALLVALINV);
+error_def(ERR_ZCPREALLVALPAR);
+error_def(ERR_ZCRCALLNAME);
+error_def(ERR_ZCRPARMNAME);
+error_def(ERR_ZCRTENOTF);
+error_def(ERR_ZCRTNTYP);
+error_def(ERR_ZCUNAVAIL);
+error_def(ERR_ZCUNTYPE);
+error_def(ERR_ZCUSRRTN);
+
 /* Note: need condition handler to clean-up allocated structures and close intput file in the event of an error */
 struct extcall_package_list	*exttab_parse(mval *package)
 {
 	int		parameter_alloc_values[MAXIMUM_PARAMETERS], parameter_count, ret_pre_alloc_val, i, fclose_res;
+	int		path_len;
 	boolean_t	is_input[MAXIMUM_PARAMETERS], is_output[MAXIMUM_PARAMETERS], got_status;
 	mstr		callnam, rtnnam;
+	mstr 		val, trans;
 	void_ptr_t	pakhandle;
 	enum xc_types	ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
 	char		str_buffer[MAX_TABLINE_LEN], *tbp, *end;
+	char		str_temp_buffer[MAX_TABLINE_LEN];
 	FILE		*ext_table_file_handle;
 	struct extcall_package_list	*pak;
 	struct extcall_entry_list	*entry_ptr;
-
-	error_def(ERR_ZCRTENOTF);
-	error_def(ERR_ZCALLTABLE);
-	error_def(ERR_ZCUSRRTN);
-	error_def(ERR_ZCCTENV);
-	error_def(ERR_ZCCTOPN);
-	error_def(ERR_ZCCTNULLF);
-	error_def(ERR_ZCUNAVAIL);
-	error_def(ERR_ZCENTNAME);
-	error_def(ERR_ZCCOLON);
-	error_def(ERR_ZCRTNTYP);
-	error_def(ERR_ZCRCALLNAME);
-	error_def(ERR_ZCUNTYPE);
-	error_def(ERR_ZCMLTSTATUS);
-	error_def(ERR_ZCRPARMNAME);
-	error_def(ERR_ZCPREALLVALPAR);
-	error_def(ERR_ZCPREALLVALINV);
-	error_def(ERR_TEXT);
-
 	/* First, construct package name environment variable */
 	memcpy(str_buffer, PACKAGE_ENV_PREFIX, SIZEOF(PACKAGE_ENV_PREFIX));
 	tbp = &str_buffer[SIZEOF(PACKAGE_ENV_PREFIX) - 1];
@@ -400,6 +405,23 @@ struct extcall_package_list	*exttab_parse(mval *package)
 	{
 		/* External call table is a null file */
 		rts_error(VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
+	}
+	path_len = STRLEN(str_buffer);
+	STRNCPY_STR(str_temp_buffer, str_buffer);
+	str_temp_buffer[path_len] = 0;
+	val.addr = str_temp_buffer;
+	val.len = path_len;
+	/* Need to copy the str_buffer into another temp variable since
+	 * TRANS_LOG_NAME requires input and output buffers to be different.
+	 * If there is an env variable present in the pathname, TRANS_LOG_NAME
+	 * expands it and return SS_NORMAL. Else it returns SS_NOLOGNAM.
+	 * Instead of checking 2 return values, better to check against SS_LOG2LONG
+	 * which occurs if the pathname is too long after any kind of expansion.
+ 	 */
+	if (SS_LOG2LONG == TRANS_LOG_NAME(&val, &trans, str_buffer, SIZEOF(str_buffer), dont_sendmsg_on_log2long))
+	{
+		/* Env variable expansion in the pathname caused buffer overflow */
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(str_buffer) - 1);
 	}
 	pakhandle = fgn_getpak(str_buffer, INFO);
 	if (NULL == pakhandle)

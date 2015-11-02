@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -491,7 +491,7 @@ int		gtmsource_poll_actions(boolean_t poll_secondary);
 int		gtmsource_process(void);
 int		gtmsource_readfiles(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple);
 int		gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_t read_multiple, qw_num stop_read_at);
-int		gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_flags);
+int		gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_flags, boolean_t *rcvr_same_endianness);
 int		gtmsource_set_lookback(void);
 int		gtmsource_showbacklog(void);
 int		gtmsource_shutdown(boolean_t auto_shutdown, int exit_status);

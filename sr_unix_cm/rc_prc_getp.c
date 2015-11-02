@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -175,7 +175,7 @@ rc_prc_getp(rc_q_hdr *qhdr)
 		    targ_hist.h[0].buffaddr = buffaddr;
 		    targ_hist.h[1].blk_num = 0;
 	    }
-	    while ( !t_end( &targ_hist, 0) );
+	    while ( !t_end( &targ_hist, NULL, TN_NOT_SPECIFIED) );
 
 	    qhdr->a.erc.value = RC_SUCCESS;
 	    return 0;

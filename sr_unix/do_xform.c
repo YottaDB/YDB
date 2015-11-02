@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@ void do_xform(collseq *csp, int fc_type, mstr *input, mstr *output, int *length)
 
 	error_def(ERR_COLLARGLONG);
 
+	DO_XFORM_RETURN_IF_NULL_STRING(input, output, length);
 	assert (0 == csp->argtype || 1 == csp->argtype);
 	assert(XFORM == fc_type || XBACK == fc_type);
 	if (0 == csp->argtype)

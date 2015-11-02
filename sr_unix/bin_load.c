@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,18 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF int4		gv_keysize;
 GBLREF gd_region	*gv_cur_region;
-GBLREF bool             transform;
+
+error_def(ERR_CORRUPT);
+error_def(ERR_GVIS);
+error_def(ERR_TEXT);
+error_def(ERR_LDBINFMT);
+error_def(ERR_LOADCTRLY);
+error_def(ERR_LOADEOF);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_COLLTYPVERSION);
+error_def(ERR_COLLATIONUNDEF);
+error_def(ERR_OLDBINEXTRACT);
+error_def(ERR_LOADINVCHSET);
 
 #define	BIN_PUT		0
 #define BIN_BIND	1
@@ -80,6 +91,7 @@ GBLREF bool             transform;
 	}						\
 }
 #endif
+
 static readonly unsigned char gt_lit[] = "LOAD TOTAL";
 
 /* starting extract file format 3, we have an extra record for each gvn, that contains the
@@ -117,33 +129,23 @@ void bin_load(uint4 begin, uint4 end)
 	int				req_dec_blk_size, init_status, crypt_status;
 	muext_hash_hdr_ptr_t		hash_array = NULL;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_GVIS);
-	error_def(ERR_TEXT);
-	error_def(ERR_LDBINFMT);
-	error_def(ERR_LOADCTRLY);
-	error_def(ERR_LOADEOF);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_COLLTYPVERSION);
-	error_def(ERR_COLLATIONUNDEF);
-	error_def(ERR_OLDBINEXTRACT);
-	error_def(ERR_LOADINVCHSET);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(4 == SIZEOF(coll_hdr));
 	gvinit();
 	v.mvtype = MV_STR;
 	len = file_input_bin_get((char **)&ptr);
 	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
-	if (!(((hdr_lvl == '4'|| hdr_lvl == '5') && len == BIN_HEADER_SZ) || (hdr_lvl < '4' && len == V3_BIN_HEADER_SZ)))
+	if (!(((('4' == hdr_lvl) || ('5' == hdr_lvl)) && (BIN_HEADER_SZ == len)) || (('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
 	{
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
-	/* assert the assumption that the level can be represented in a single character */
+	/* expecting the level in a single character */
 	assert(' ' == *(ptr + SIZEOF(BIN_HEADER_LABEL) - 3));
-
-	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || hdr_lvl < '2' || *(BIN_HEADER_VERSION) < hdr_lvl)
-	{				/* ignore the level check */
+	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) || *(BIN_HEADER_VERSION) < hdr_lvl)
+	{	/* ignore the level check */
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
@@ -157,7 +159,6 @@ void bin_load(uint4 begin, uint4 end)
 			rts_error(VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
 		mupip_exit(ERR_LDBINFMT);
 	}
-
 	if ('4' >= hdr_lvl)
 	{	/* Binary extracts in V50000-to-V52000 (label=4) and pre-V50000 (label=3) could have a '\0' byte (NULL byte)
 		 * in the middle of the string. Replace it with ' ' (space) like it would be in V52000 binary extracts and above.
@@ -180,7 +181,6 @@ void bin_load(uint4 begin, uint4 end)
 			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupted null collation field  in header"),
 				ERR_LDBINFMT);
 			mupip_exit(ERR_LDBINFMT);
-
 		}
 	} else
 		extr_std_null_coll = 0;
@@ -188,13 +188,12 @@ void bin_load(uint4 begin, uint4 end)
 	if ('5' <= hdr_lvl)
 	{
 		int	i, num_indexes;
-
 		len = file_input_bin_get((char **)&ptr);
-		hash_array = (muext_hash_hdr *) malloc(len);
+		hash_array = (muext_hash_hdr *)malloc(len);
 		/* store hashes of all the files used during extract into muext_hash_hdr structure */
 		memcpy((char *)hash_array, ptr, len);
 		num_indexes = len / GTMCRYPT_HASH_LEN;
-		encr_key_handles = (gtmcrypt_key_t *) malloc (SIZEOF(gtmcrypt_key_t) * num_indexes);
+		encr_key_handles = (gtmcrypt_key_t *)malloc(SIZEOF(gtmcrypt_key_t) * num_indexes);
 		INIT_PROC_ENCRYPTION(crypt_status);
 		GC_BIN_LOAD_ERR(crypt_status);
 		for (index = 0; index < num_indexes; index++)
@@ -206,7 +205,7 @@ void bin_load(uint4 begin, uint4 end)
 		}
 	}
 #	endif
-	if (hdr_lvl  > '2')
+	if ('2' < hdr_lvl)
 	{
 		len = file_input_bin_get((char **)&ptr);
 		if (SIZEOF(coll_hdr) != len)
@@ -296,11 +295,11 @@ void bin_load(uint4 begin, uint4 end)
 		while (*cp1++)
 			;
 		v.str.len =INTCAST((char*)cp1 - v.str.addr - 1);
-		if (hdr_lvl <= '2' || new_gvn)
+		if (('2' >= hdr_lvl) || new_gvn)
 		{
 			if ((HASHT_GBLNAME_LEN == v.str.len) &&	(0 == memcmp(v.str.addr, HASHT_GBLNAME, HASHT_GBLNAME_LEN)))
 				continue;
- 			bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&v.str);
+			bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&v.str);
 			max_key = gv_cur_region->max_key_size;
 			db_collhdr.act = gv_target->act;
 			db_collhdr.ver = gv_target->ver;
@@ -378,8 +377,8 @@ void bin_load(uint4 begin, uint4 end)
 				current = *cp2++ = *cp1++;
 				if (0 == last && 0 == current)
 					break;
-				if (cp1 > (unsigned char *) rp + rec_len ||
-				    cp2 > (unsigned char *) gv_currkey + gv_currkey->top)
+				if (cp1 > (unsigned char *)rp + rec_len ||
+				    cp2 > (unsigned char *)gv_currkey + gv_currkey->top)
 				{
 					bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
 					mu_gvis();
@@ -426,15 +425,15 @@ void bin_load(uint4 begin, uint4 end)
 					if (extr_collseq)
 					{
 						/* undo the extract time collation */
-						transform = TRUE;
+						TREF(transform) = TRUE;
 						save_gv_target_collseq = gv_target->collseq;
 						gv_target->collseq = extr_collseq;
 					} else
-						transform = FALSE;
+						TREF(transform) = FALSE;
 						/* convert the subscript to string format */
 					end_buff = gvsub2str(src_buff, dest_buff, FALSE);
 						/* transform the string to the current subsc format */
-					transform = TRUE;
+					TREF(transform) = TRUE;
 					tmp_mval.mvtype = MV_STR;
                                 	tmp_mval.str.addr = (char *)dest_buff;
                                 	tmp_mval.str.len = INTCAST(end_buff - dest_buff);
@@ -471,7 +470,7 @@ void bin_load(uint4 begin, uint4 end)
 			if (max_subsc_len < (gv_currkey->end + 1))
 				max_subsc_len = gv_currkey->end + 1;
 			v.str.addr = (char*)cp1;
-			v.str.len =INTCAST(rec_len - (cp1 - (unsigned char *)rp) );
+			v.str.len =INTCAST(rec_len - (cp1 - (unsigned char *)rp));
 			if (max_data_len < v.str.len)
 				max_data_len = v.str.len;
 			bin_call_db(BIN_PUT, (INTPTR_T)&v, 0);
@@ -505,12 +504,10 @@ void bin_load(uint4 begin, uint4 end)
 }
 
 void bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
-{
-	error_def(ERR_CORRUPT);
-
-/* In order to duplicate the VMS functionality, which is to trap all errors in mupip_load_ch and
-	continue in bin_load after they occur, it is necessary to call these routines from a
-	subroutine due to the limitations of condition handlers and unwinding on UNIX */
+{	/* In order to duplicate the VMS functionality, which is to trap all errors in mupip_load_ch and
+	 * continue in bin_load after they occur, it is necessary to call these routines from a
+	 * subroutine due to the limitations of condition handlers and unwinding on UNIX
+	 */
 
 	ESTABLISH(mupip_load_ch);
 	switch(routine)

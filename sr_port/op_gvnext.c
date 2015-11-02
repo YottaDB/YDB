@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,6 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF spdesc		stringpool;
 GBLREF gd_region	*gv_cur_region;
-GBLREF bool		gv_curr_subsc_null;
 
 /****************** SHOULD BE IN .H FILES !!!!!!!! ***********************/
 #define MAX_SUBSC_LEN 255
@@ -40,7 +39,9 @@ void op_gvnext(mval *v)
 	boolean_t		found;
  	int4			n;
 	enum db_acc_method 	acc_meth;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	acc_meth = gv_cur_region->dyn.addr->acc_meth;
 	/* if the lowest subscript is -1, then make it null */
 	if ( 	(gv_currkey->end == gv_currkey->prev + 4) &&
@@ -63,7 +64,7 @@ void op_gvnext(mval *v)
 		}
 	} else
 	{
-		if (!gv_curr_subsc_null || gv_cur_region->std_null_coll )
+		if (!TREF(gv_last_subsc_null) || gv_cur_region->std_null_coll )
 		{
 			*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
 			*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;

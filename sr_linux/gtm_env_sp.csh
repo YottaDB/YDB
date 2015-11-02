@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -33,12 +33,20 @@ if ( "linux" == $platform_name ) then
 	set mach_type = `uname -m | sed 's/i[3456]86/ia32/' `
 endif
 
+# default to 64bit builds when object mode is not set
+if (!($?OBJECT_MODE)) then
+	setenv OBJECT_MODE 64
+endif
+
 ### 64bit vs 32bit builds
-# The only 32 bit targets are cygwin, ia32 and x86_64 without $gtm_inc/x86_64.h
-if ( ("ia32" == $mach_type) || ( "x86_64" == $mach_type && ! -e $gtm_inc/x86_64.h ) || ("cywgin" == $platform_only) ) then
-	setenv linux_build_type 32
+# The only 32 bit targets are cygwin, ia32 and x86_64 with specific settings
+if ( ( "ia32" == $mach_type ) ||  ( "cywgin" == $platform_only ) ) then
+	setenv gt_build_type 32
+# build 32 bit on x86_64 when $gtm_inc/x86_64.h does not exist with comlist.csh OR when OBJECT_MODE is set to 32 with comlist.mk
+else if ( "x86_64" == $mach_type && ((! -e $gtm_inc/x86_64.h && "inc" == "${gtm_inc:t}") || "32" == $OBJECT_MODE)) then
+	setenv gt_build_type 32
 else
-	setenv linux_build_type 64
+	setenv gt_build_type 64
 	setenv gt_ld_m_shl_options "-shared"
 endif
 
@@ -148,7 +156,7 @@ if ( $?gtm_version_change == "1" ) then
 	endif
 
 	# 32 bit ICU headers of 32 bit linux are in /emul/ia32-linux/usr/include/
-	if ( "32" == $linux_build_type ) then
+	if ( "32" == $gt_build_type ) then
 		if (-d /emul/ia32-linux/usr/include/) setenv gt_cc_option_I  "-I/emul/ia32-linux/usr/include/"
 	endif
 
@@ -176,7 +184,7 @@ if ( $?gtm_version_change == "1" ) then
 	# -ffloat-store for consistent results avoiding rounding differences
 	if ( "ia64" != $mach_type ) then
 		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store"
-		if ( "32" == $linux_build_type ) then
+		if ( "32" == $gt_build_type ) then
 			# applies to 32bit x86_64, ia32 and cygwin
 			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -march=i686"
 		endif
@@ -193,12 +201,12 @@ if ( $?gtm_version_change == "1" ) then
 	# -M		generate link map onto standard output
 	setenv	gt_ld_options_common	"-Wl,-M"
 	setenv 	gt_ld_options_gtmshr	"-Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export"
-	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id"
+	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus"
 	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,gtmexe_symbols.export"
 
 	# optimize for all 64bit platforms
         setenv	gt_ld_syslibs		" -lrt -lelf -lncurses -lm -ldl"
-	if ( 32 == $linux_build_type ) then
+	if ( 32 == $gt_build_type ) then
 		# 32bit x86_64 and ia32 - decided at the beginning of the file
 		setenv  gt_ld_syslibs           " -lrt -lncurses -lm -ldl"
 	endif
@@ -220,7 +228,7 @@ if ( $?gtm_version_change == "1" ) then
 
 	# If we are trying to force a 32 bit build on a 64 bit x86 machine, then we need to explicitly specify a 32 bit
 	# over-ride option.
-        if ( "x86_64" == $mach_type && "32" == $linux_build_type ) then
+        if ( "x86_64" == $mach_type && "32" == $gt_build_type ) then
 		setenv  gt_cc_options_common 	"$gt_cc_options_common -m32"
 		setenv  gt_ld_options_gtmshr	"$gt_ld_options_gtmshr -m32"
                 setenv  gt_cc_shl_options	"$gt_cc_shl_options -m32"
@@ -279,19 +287,19 @@ if ( "ia64" == $mach_type ) then
 endif
 
 if ( "s390x" == $mach_type) then
-	setenv assembler_op_arch_size "-m64"
-else if ( "64" == $linux_build_type) then
-	setenv assembler_op_arch_size "--64"
+	setenv gt_asm_arch_size "-m64"
+else if ( "64" == $gt_build_type) then
+	setenv gt_asm_arch_size "--64"
 else
-	setenv assembler_op_arch_size "--32"
+	setenv gt_asm_arch_size "--32"
 endif
 
 if ( "ia64" != $mach_type ) then
 	alias	gt_as_bta \
-		'gt_as $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
+		'gt_as $gt_as_option_debug $gt_as_option_nooptimize $gt_asm_arch_size -o `basename \!:1 .s`.o \!:1'
 		# If the value of the alias variable extends the 132 character limit, use a temporary variable
 		# (like gtm_as_dbg_var below) and use that in the alias value to stick to the the coding standard.
-	set gt_as_dbg_var = "$gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size"
+	set gt_as_dbg_var = "$gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize $gt_asm_arch_size"
 	alias	gt_as_dbg	'gt_as $gt_as_dbg_var -o `basename \!:1 .s`.o \!:1'
-	alias   gt_as_pro	'gt_as $gt_as_option_optimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
+	alias   gt_as_pro	'gt_as $gt_as_option_optimize $gt_asm_arch_size -o `basename \!:1 .s`.o \!:1'
 endif

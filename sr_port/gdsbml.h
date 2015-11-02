@@ -67,15 +67,18 @@
 #define MAP_RD_FAIL		-2
 #define EXTEND_SUSPECT		-3
 #define FILE_EXTENDED		-4
+#define FINAL_RETRY_FREEZE_PROG	-5
 
-#define	GET_CDB_SC_CODE(gdsfilext_code, status)		\
-{							\
-	if (MAP_RD_FAIL == gdsfilext_code)		\
-		status = (enum cdb_sc)rdfail_detail;	\
-	else if (EXTEND_SUSPECT == gdsfilext_code)	\
-		status = (enum cdb_sc)cdb_sc_extend;	\
-	else if (NO_FREE_SPACE == gdsfilext_code)	\
-		status = cdb_sc_gbloflow;		\
+#define	GET_CDB_SC_CODE(gdsfilext_code, status)			\
+{								\
+	if (MAP_RD_FAIL == gdsfilext_code)			\
+		status = (enum cdb_sc)rdfail_detail;		\
+	else if (EXTEND_SUSPECT == gdsfilext_code)		\
+		status = (enum cdb_sc)cdb_sc_extend;		\
+	else if (NO_FREE_SPACE == gdsfilext_code)		\
+		status = cdb_sc_gbloflow;			\
+	else if (FINAL_RETRY_FREEZE_PROG == gdsfilext_code)	\
+		status = cdb_sc_needcrit;			\
 }
 
 #define MASTER_MAP_BITS_PER_LMAP	1

@@ -60,24 +60,27 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 		jpc = cs_addrs->jnl;
 		if (ptr->pini_addr && clean_exit && JNL_ENABLED(cs_data) && (NOJNL != jpc->channel))
 		{
-			jpc->pini_addr = ptr->pini_addr;
 			was_crit = cs_addrs->now_crit;
 			if (!was_crit)
 				grab_crit(gv_cur_region);
-			SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_put_jrt_pfin needs this to be set */
-			jbp = jpc->jnl_buff;
-			/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl records.
-			 * This needs to be done BEFORE the jnl_ensure_open as that could write journal records
-			 * (if it decides to switch to a new journal file)
-			 */
-			ADJUST_GBL_JREC_TIME(jgbl, jbp);
-			jnl_status = jnl_ensure_open();
-			if (0 == jnl_status)
+			if (JNL_ENABLED(cs_data))
 			{
-				if (0 != jpc->pini_addr)
-					jnl_put_jrt_pfin(cs_addrs);
-			} else
-				send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
+				jpc->pini_addr = ptr->pini_addr;
+				SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_put_jrt_pfin needs this to be set */
+				jbp = jpc->jnl_buff;
+				/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
+				 * of jnl records.  This needs to be done BEFORE the jnl_ensure_open as that could write
+				 * journal records (if it decides to switch to a new journal file).
+				 */
+				ADJUST_GBL_JREC_TIME(jgbl, jbp);
+				jnl_status = jnl_ensure_open();
+				if (0 == jnl_status)
+				{
+					if (0 != jpc->pini_addr)
+						jnl_put_jrt_pfin(cs_addrs);
+				} else
+					send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
+			}
 			if (!was_crit)
 				rel_crit(gv_cur_region);
 		}

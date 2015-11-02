@@ -51,6 +51,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
 	DEBUG_ONLY(int		flush_cnt;)
 	ZOS_ONLY(int		realfiletag;)
+	int			muinc_adjust;
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	sbufh_p = csa->shmpool_buffer;
@@ -99,7 +100,16 @@ boolean_t backup_buffer_flush(gd_region *reg)
 		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 			TAG_POLICY_SEND_MSG(sbufh_p->tempfilename, errno, realfiletag, TAG_BINARY);
 #endif
-		write_size = SIZEOF(*sblkh_p) + sbufh_p->blk_size;
+		/* This adjustment is necessary since the shmpool_blk_hdr had been previously tied to the backup format.
+		 * We now have a separate structure for the backup. muinc_adjust is used to translate in a
+		 * performance sensitive-way. Currently, the structures only differ by 8 bytes at the front which is
+		 * not relevant to the backup and only on 64bit platforms. Asserts are added to assure the design
+		 * assumptions are not violated.
+		 */
+		muinc_adjust = SIZEOF(*sblkh_p) - SIZEOF(muinc_blk_hdr_t);
+		NON_GTM64_ONLY(assert(0 == muinc_adjust));
+		GTM64_ONLY(assert(8 == muinc_adjust));
+		write_size = SIZEOF(muinc_blk_hdr_t) + sbufh_p->blk_size;
 		DEBUG_ONLY(flush_cnt = 0);
 		for (sblkh_p = SBLKP_REL2ABS(&sbufh_p->que_backup, fl);
 		     sblkh_p != (shmpool_blk_hdr_ptr_t)&sbufh_p->que_backup;
@@ -122,7 +132,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 			   a possibility that the IO could be lost and an invalid block written to the temporary file
 			   or missed altogether.
 			*/
-			LSEEKWRITE(fd, sbufh_p->dskaddr, (sm_uc_ptr_t)sblkh_p, write_size, status);
+			LSEEKWRITE(fd, sbufh_p->dskaddr, ((char *)sblkh_p + muinc_adjust), write_size, status);
 			if (0 != status)
 			{
 				sbufh_p->failed = process_id;

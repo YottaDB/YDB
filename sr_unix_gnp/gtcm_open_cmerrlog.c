@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,6 +85,6 @@ void gtcm_open_cmerrlog(void)
 		else
 			fprintf(stderr, "Unable to open %s : %s\n", lfn_path, STRERROR(errno));
 	} else
-		fprintf(stderr, "Unable to resolve %s : return value = %d\n", GTCM_GNP_CMERR_FN, rval);
+		fprintf(stderr, "Unable to resolve %s : return value = %ld\n", GTCM_GNP_CMERR_FN, (long)rval);
 	gtcm_firsterr = FALSE;
 }

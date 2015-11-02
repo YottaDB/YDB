@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ GBLREF char		*update_array, *update_array_ptr;
 GBLREF uint4		update_array_size;	/* for the BLK_* macros */
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF unsigned int	t_tries;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF boolean_t	horiz_growth;
 

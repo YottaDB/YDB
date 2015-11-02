@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -157,7 +157,7 @@ void	op_forintrrpt();
 int	op_forloop();
 void	op_gvdata(mval *v);
 void	op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...);
-bool	op_gvget(mval *v);
+boolean_t op_gvget(mval *v);
 void	op_gvincr(mval *increment, mval *result);
 void	op_gvkill(void);
 void	op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...);
@@ -178,7 +178,6 @@ void	op_hardret(void);
 void	op_horolog(mval *s);
 void	op_idiv(mval *u, mval *v, mval *q);
 void	op_igetsrc(mval *v);
-int	op_incrlock(int timeout);
 int	op_incrlock(int timeout);
 void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms, mval *devpiopl);
 void	op_indfnname(mval *dst, mval *target, mval *value);
@@ -257,12 +256,13 @@ void	op_trestart(int newlevel);
 																\
 	assert(!implicit_trollback); 												\
 	implicit_trollback = TRUE;												\
-	op_trollback(RB_LEVELS);												\
-	assert(!implicit_trollback); /* Should have been reset by op_trollback at the beginning of the function entry */	\
+	op_trollback(RB_LEVELS);/*BYPASSOK*/											\
+	/* Should have been reset by op_trollback at the beginning of the function entry */					\
+	assert(!implicit_trollback);												\
 }
 
-void	op_trollback(int rb_levels);
-void	op_tstart(int dollar_t, ...);
+void	op_trollback(int rb_levels);/*BYPASSOK*/
+void	op_tstart(int implicit_flag, ...);
 void	op_unlock(void);
 void	op_unwind(void);
 void	op_use(mval *v, mval *p);
@@ -285,10 +285,12 @@ void	op_zcont(void);
 void	op_zdealloc2(int4 timeout, UINTPTR_T auxown);
 void	op_zdeallocate(int4 timeout);
 void	op_zedit(mval *v, mval *p);
-#ifdef UNIX
 void	op_zg1(int4 level);
-void	op_zgoto(rhdtyp *rtnhdr, lnr_tabent USHBIN_ONLY(*)*lnrptr, int4 level);
-#endif
+void	op_zgoto(mval *rtnname, mval *lblname, int offset, int level);
+#	ifdef UNIX
+        /* note op_ztrigger.c is present even in non-GTM_TRIGGER UNIX environments but is not runnable */
+void	op_ztrigger(void);
+#	endif
 void	op_zhelp_xfr(mval *subject, mval *lib);
 void	op_zlink(mval *v, mval *quals);
 void	op_zmess(UNIX_ONLY(unsigned int cnt) VMS_ONLY(int4 errnum), ...);
@@ -314,4 +316,5 @@ int	opp_zst_over_ret();
 int	opp_zst_over_retarg();
 int	opp_zstepret();
 int	opp_zstepretarg();
+void	op_zwritesvn(int svn);
 #endif

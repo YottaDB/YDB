@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,9 @@
 #include "cmd.h"
 #include "rwformat.h"
 
-GBLREF char window_token;
-GBLREF mval window_mval;
-GBLREF bool temp_subs;
-GBLREF triple *curtchain;
+GBLREF triple		*curtchain;
+GBLREF mval		window_mval;
+GBLREF char		window_token;
 
 int m_read(void)
 {
@@ -31,10 +30,11 @@ int m_read(void)
 	opctype		read_oc, put_oc;
 	triple		*ref, tmpchain, *s1, *sub, *put;
 	boolean_t	local;
-
 	error_def(ERR_RWARG);
+	DCL_THREADGBL_ACCESS;
 
-	temp_subs = FALSE;
+	SETUP_THREADGBL_ACCESS;
+	TREF(temp_subs) = FALSE;
 	local = TRUE;
 	dqinit(&tmpchain, exorder);
 	switch(window_token)

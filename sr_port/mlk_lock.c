@@ -49,7 +49,7 @@
 
 GBLREF	int4		process_id;
 GBLREF	short		crash_count;
-GBLREF	short		dollar_tlevel;
+GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 GBLREF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
@@ -83,7 +83,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		if (csa->critical)
 			crash_count = csa->critical->crashcnt;
 
-		if (0 < dollar_tlevel && !((t_tries < CDB_STAGNATE) || csa->now_crit)) /* Final retry and region not locked down */
+		if (dollar_tlevel && !((t_tries < CDB_STAGNATE) || csa->now_crit)) /* Final retry and region not locked down */
 		{	/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 			/* insert_region() will additionally attempt CRIT on the region and restart if not possible */

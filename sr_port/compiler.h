@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,34 +10,6 @@
  ****************************************************************/
 #ifndef COMPILER_H_INCLUDED
 #define COMPILER_H_INCLUDED
-
-/* Cutover from simple lists to hash table access - tuned by testing compilation
-   of 24K+ Vista M source routines.
-*/
-#define LIT_HASH_CUTOVER DEBUG_ONLY(4) PRO_ONLY(32)
-#define SYM_HASH_CUTOVER DEBUG_ONLY(4) PRO_ONLY(16)
-
-#define COMPLITS_HASHTAB_CLEANUP									\
-	{												\
-		GBLREF hash_table_str		*complits_hashtab;					\
-		if (complits_hashtab && complits_hashtab->base)						\
-		{	/* Release hash table itself but leave hash table descriptor if exists */ 	\
-			free(complits_hashtab->base);							\
-			complits_hashtab->base = NULL;							\
-		}											\
-	}
-#define COMPSYMS_HASHTAB_CLEANUP									\
-	{												\
-		GBLREF hash_table_str		*compsyms_hashtab;					\
-		if (compsyms_hashtab && compsyms_hashtab->base)						\
-		{	/* Release hash table itself but leave hash table descriptor if exists */ 	\
-			free(compsyms_hashtab->base);							\
-			compsyms_hashtab->base = NULL;							\
-		}											\
-	}
-#define COMPILE_HASHTAB_CLEANUP		\
-	COMPLITS_HASHTAB_CLEANUP;	\
-	COMPSYMS_HASHTAB_CLEANUP;
 
 typedef unsigned int	opctype;
 
@@ -85,7 +57,7 @@ typedef struct	mliteralstruct
 		struct	mliteralstruct	*fl,
 					*bl;
 	}			que;
-        INTPTR_T       		rt_addr;
+	INTPTR_T       		rt_addr;
 	mval			v;
 } mliteral;
 
@@ -198,11 +170,36 @@ typedef struct
 	unsigned short		opr_type;
 } toktabtype;
 
-#ifdef DEBUG
-#  define COMPDBG(x)	if (gtmDebugLevel & GDL_DebugCompiler) {x}
+#define VMS_OS  01
+#define UNIX_OS 02
+#define ALL_SYS (VMS_OS | UNIX_OS)
+#ifdef UNIX                     /* function and svn validation are a function of the OS */
+#	 define VALID_FUN(i) (fun_data[i].os_syst & UNIX_OS)
+#	 define VALID_SVN(i) (svn_data[i].os_syst & UNIX_OS)
+#	 ifdef __hppa
+#	 	 define TRIGGER_OS 0
+#	 else
+#	 	 define TRIGGER_OS UNIX_OS
+#	 endif
+#elif defined VMS
+#	 define VALID_FUN(i) (fun_data[i].os_syst & VMS_OS)
+#	 define VALID_SVN(i) (svn_data[i].os_syst & VMS_OS)
+#	 define TRIGGER_OS 0
 #else
-#  define COMPDBG(x)
+#	 error UNSUPPORTED PLATFORM
 #endif
+
+#define EXPR_FAIL	0	/* expression had syntax error */
+#define EXPR_GOOD	1	/* expression ok, no indirection at root */
+#define EXPR_INDR	2	/* expression ok, indirection at root */
+#define EXPR_SHFT	4	/* expression ok, involved shifted GV references */
+
+#define CHARMAXARGS	256
+#define	MAX_ACTUALS	32
+#define MAX_FOR_STACK	32
+#define MAX_FORARGS	127
+#define MAX_SRCLINE	8192	/* maximum length of a program source or indirection line */
+#define	NO_FORMALLIST	(-1)
 
 /* Some errors should not cause stx_error to issue an rts_error. These are the errors related to
  * 	a) Invalid Intrinsic Special Variables
@@ -212,18 +209,19 @@ typedef struct
  * PostConditionals can cause this path to be avoided in which case we do not want to issue an error at compile time.
  * Therefore issue only a warning at compile-time and proceed with compilation as if this codepath will not be reached at runtime.
  */
+error_def(ERR_DEVPARINAP);
+error_def(ERR_DEVPARUNK);
+error_def(ERR_DEVPARVALREQ);
+error_def(ERR_FORCTRLINDX);	/* until we fix the problem this guards against */
 error_def(ERR_FNOTONSYS);
 error_def(ERR_INVFCN);
 error_def(ERR_INVSVN);
 error_def(ERR_SVNONEW);
 error_def(ERR_SVNOSET);
-error_def(ERR_DEVPARUNK);
-error_def(ERR_DEVPARINAP);
-error_def(ERR_DEVPARVALREQ);
 
 #define	IS_STX_WARN(errcode)											\
 	((ERR_INVFCN == errcode) || (ERR_FNOTONSYS == errcode) || (ERR_INVSVN == errcode)			\
-		|| (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode)						\
+		|| (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode) || (ERR_FORCTRLINDX == errcode )	\
 		|| (ERR_DEVPARUNK == errcode) || (ERR_DEVPARINAP == errcode) || (ERR_DEVPARVALREQ == errcode))
 
 /* This macro does an "stx_error" of the input errcode but before that it asserts that the input errcode is one
@@ -232,18 +230,17 @@ error_def(ERR_DEVPARVALREQ);
  * triggers are included, warnings become errors so bypass the warning stuff.
  */
 #ifdef GTM_TRIGGER
-#define	STX_ERROR_WARN(errcode)						\
+#	define	STX_ERROR_WARN(errcode)					\
 {									\
-	GBLREF boolean_t trigger_compile;				\
-	if (!trigger_compile)						\
+	if (!TREF(trigger_compile))					\
 		parse_warn = TRUE;					\
 	assert(IS_STX_WARN(errcode));					\
 	stx_error(errcode);						\
-	if (trigger_compile)						\
+	if (TREF(trigger_compile))					\
 		return FALSE;						\
 }
 #else
-#define	STX_ERROR_WARN(errcode)						\
+#	define	STX_ERROR_WARN(errcode)					\
 {									\
 	parse_warn = TRUE;						\
 	assert(IS_STX_WARN(errcode));					\
@@ -251,180 +248,192 @@ error_def(ERR_DEVPARVALREQ);
 }
 #endif
 
-#define MAX_SRCLINE	8192	/* maximum length of a program source or indirection line */
-
-#define EXPR_FAIL	0	/* expression had syntax error */
-#define EXPR_GOOD	1	/* expression ok, no indirection at root */
-#define EXPR_INDR	2	/* expression ok, indirection at root */
-#define EXPR_SHFT	4	/* expression ok, involved shifted GV references */
-
-#define MAX_FOR_STACK	32
-#define MAX_FORARGS	127
-
-#define CHARMAXARGS	256
-
-#define	NO_FORMALLIST	(-1)
-#define	MAX_ACTUALS	32
-
-int	parse_until_rparen_or_space(void);
-
-triple *maketriple(opctype op);
-triple *newtriple(opctype op);
-void  ins_triple(triple *x);
-triple *setcurtchain(triple *x);
-int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len);
-void comp_init(mstr *src);
-void comp_indr(mstr *obj);
-boolean_t compiler_startup(void);
-
-oprtype put_ocnt(void);
-oprtype put_tsiz(void);
-oprtype put_cdlt(mstr *x);
-oprtype put_ilit(mint x);
-oprtype put_indr(oprtype *x);
-oprtype put_lit(mval *x);
-oprtype put_mfun(mident *l);
-oprtype put_mlab(mident *l);
-oprtype put_mnxl(void);
-oprtype put_mvar(mident *x);
-oprtype put_str(char *pt, mstr_len_t n);
-oprtype put_tjmp(triple *x);
-oprtype put_tnxt(triple *x);
-oprtype put_tref(triple *x);
-
-void	chktchain(triple *head);
-
-int bool_expr(bool op, oprtype *addr);
-int eval_expr(oprtype *a);
-int expratom(oprtype *a);
-int expritem(oprtype *a);
-int expr(oprtype *a);
-int intexpr(oprtype *a);
-int numexpr(oprtype *a);
-int strexpr(oprtype *a);
-
-int indirection(oprtype *a);
-
-void coerce(oprtype *a, unsigned short new_type);
-void ex_tail(oprtype *opr);
-
-void bx_boolop(triple *t, bool jmp_type_one, bool jmp_to_next, bool sense, oprtype *addr);
-void bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr);
-void bx_tail(triple *t, bool sense, oprtype *addr);
-
-void tnxtarg(oprtype *a);
-
-void make_commarg(oprtype *x, mint ind);
-int lvn(oprtype *a,opctype index_op,triple *parent);
-int gvn(void);
-
-void ind_code(mstr *obj);
-int resolve_ref(int errknt);
-void resolve_tref(triple *, oprtype *);
-void start_fetches(opctype op);
-
-int actuallist(oprtype *opr);
-
-int exfunc(oprtype *a, boolean_t alias_target);
-int extern_func(oprtype *a);
-
-int glvn(oprtype *a);
-
-int linetail(void);
-int nref(void);
-int for_push(void);
-void int_label(void);
-int line(uint4 *lnc);
-int lkglvn(bool gblvn);
-int lref(oprtype *label, oprtype *offset, bool no_lab_ok, mint commarg_code, bool commarg_ok,
-	bool *got_some);
-
-int name_glvn(bool gblvn, oprtype *a);		/***type int added***/
-oprtype for_end_of_scope(int depth);
-oprtype make_gvsubsc(mval *v);
-void for_declare_addr(oprtype x);
-triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_commarg, boolean_t labref);
-
-void  start_for_fetches(void);
-int zlcompile(unsigned char len, unsigned char *addr);		/***type int added***/
-mlabel *get_mladdr(mident *c);
-mvar *get_mvaddr(mident *c);
-
-void code_gen(void);
-
-void obj_code(uint4 src_lines, uint4 checksum);
-
-void for_pop(void);
-
-void walktree(mvar *n,void (*f)(),char *arg);
-
-/* VMS uses same code generator as USHBIN so treat as USHBIN for these compiler routines */
-#if defined(USHBIN_SUPPORTED) || defined(VMS)
-void shrink_trips(void);
-boolean_t litref_triple_oprcheck(oprtype *operand);
+#ifdef DEBUG
+#	 define COMPDBG(x)	if (gtmDebugLevel & GDL_DebugCompiler) {x}
 #else
-void shrink_jmps(void);
+#	 define COMPDBG(x)
 #endif
 
-void tripinit(void);
-void wrtcatopt(triple *r, triple ***lpx, triple **lptop);
+/* Cutover from simple lists to hash table access - tuned by testing compilation
+   of 24K+ Vista M source routines.
+*/
+#include "copy.h"
+#define LIT_HASH_CUTOVER DEBUG_ONLY(4) PRO_ONLY(32)
+#define SYM_HASH_CUTOVER DEBUG_ONLY(4) PRO_ONLY(16)
+#define COMPLITS_HASHTAB_CLEANUP									\
+	{												\
+		GBLREF hash_table_str		*complits_hashtab;					\
+		if (complits_hashtab && complits_hashtab->base)						\
+		{	/* Release hash table itself but leave hash table descriptor if exists */ 	\
+			free_hashtab_str(complits_hashtab);						\
+		}											\
+	}
+#define COMPSYMS_HASHTAB_CLEANUP									\
+	{												\
+		GBLREF hash_table_str		*compsyms_hashtab;					\
+		if (compsyms_hashtab && compsyms_hashtab->base)						\
+		{	/* Release hash table itself but leave hash table descriptor if exists */ 	\
+			free_hashtab_str(compsyms_hashtab);						\
+			compsyms_hashtab->base = NULL;							\
+		}											\
+	}
+#define COMPILE_HASHTAB_CLEANUP		\
+	COMPLITS_HASHTAB_CLEANUP;	\
+	COMPSYMS_HASHTAB_CLEANUP;
 
-int jobparameters (oprtype *c);
-int one_job_param(char **parptr);
+/* Macro to compute running checksum of a routine one line at a time. */
+#define RTN_SRC_CHKSUM(srcptr, srclen, chksum)								\
+{													\
+	char	*chkcalc, *cptr;									\
+	uint4	srcint;											\
+	for (chkcalc = srcptr, cptr = srcptr + srclen; chkcalc < cptr; )				\
+	{												\
+		srcint = 0;										\
+		if (INTCAST(cptr - chkcalc) < SIZEOF(uint4))						\
+		{											\
+			memcpy(&srcint, chkcalc, cptr - chkcalc);					\
+			chkcalc = cptr;		/* Stops loop after this iteration is complete */	\
+		} else											\
+		{											\
+			GET_ULONG(srcint, chkcalc);							\
+			chkcalc += SIZEOF(uint4);							\
+		}											\
+		chksum ^= srcint;									\
+		chksum >>= 1;										\
+	}												\
+}
 
-int f_ascii(oprtype *a, opctype op);
-int f_char(oprtype *a, opctype op);
-int f_data(oprtype *a, opctype op);
-int f_extract(oprtype *a, opctype op);
-int f_find(oprtype *a, opctype op);
-int f_fnumber(oprtype *a, opctype op);
-int f_fnzbitfind(oprtype *a, opctype op);
-int f_fnzbitget(oprtype *a, opctype op);
-int f_fnzbitset(oprtype *a, opctype op);
-int f_fnzbitstr(oprtype *a, opctype op);
-int f_get(oprtype *a, opctype op);
-int f_incr(oprtype *a, opctype op);
-int f_justify(oprtype *a, opctype op);
-int f_length(oprtype *a, opctype op);
-int f_mint(oprtype *a, opctype op);
-int f_mint_mstr(oprtype *a, opctype op);
-int f_mstr(oprtype *a, opctype op);
-int f_name(oprtype *a, opctype op);
-int f_next(oprtype *a, opctype op);
-int f_one_mval(oprtype *a, opctype op);
-int f_order(oprtype *a, opctype op);
-int f_order1(oprtype *a, opctype op);
-int f_piece(oprtype *a, opctype op);
-int f_qlength(oprtype *a, opctype op);
-int f_qsubscript(oprtype *a, opctype op);
-int f_query (oprtype *a, opctype op);
-int f_reverse(oprtype *a, opctype op);
-int f_select(oprtype *a, opctype op);
-int f_stack(oprtype *a, opctype op);
-int f_text(oprtype *a, opctype op);
-int f_translate(oprtype *a, opctype op);
-int f_two_mstrs(oprtype *a, opctype op);
-int f_two_mval(oprtype *a, opctype op);
-int f_view(oprtype *a, opctype op);
-int f_zahandle(oprtype *a, opctype op);
-int f_zcall(oprtype *a, opctype op);
-int f_zchar(oprtype *a, opctype op);
-int f_zdate(oprtype *a, opctype op);
-int f_zdebug(oprtype *a, opctype op);
-int f_zechar(oprtype *a, opctype op);
-int f_zgetsyi(oprtype *a, opctype op);
-int f_zjobexam(oprtype *a, opctype op);
-int f_zparse(oprtype *a, opctype op);
-int f_zprevious(oprtype *a, opctype op);
-int f_zqgblmod(oprtype *a, opctype op);
-int f_zsearch(oprtype *a, opctype op);
-int f_zsigproc(oprtype *a, opctype op);
-int f_zsqlexpr (oprtype *a, opctype op);
-int f_zsqlfield (oprtype *a, opctype op);
-int f_ztrnlnm(oprtype *a, opctype op);
-int f_zconvert(oprtype *a, opctype op);
-int f_zwidth(oprtype *a, opctype op);
-int f_zsubstr(oprtype *a, opctype op);
-int f_ztrigger(oprtype *a, opctype op);
+int		actuallist(oprtype *opr);
+int		bool_expr(bool op, oprtype *addr);
+void		bx_boolop(triple *t, bool jmp_type_one, bool jmp_to_next, bool sense, oprtype *addr);
+void		bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr);
+void		bx_tail(triple *t, bool sense, oprtype *addr);
+void		chktchain(triple *head);
+void		code_gen(void);
+void		coerce(oprtype *a, unsigned short new_type);
+int		comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len);
+void		comp_init(mstr *src);
+void		comp_indr(mstr *obj);
+boolean_t	compiler_startup(void);
+triple		*entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_commarg, boolean_t labref, boolean_t textname);
+int		eval_expr(oprtype *a);
+int		expratom(oprtype *a);
+int		exfunc(oprtype *a, boolean_t alias_target);
+int		expritem(oprtype *a);
+int		expr(oprtype *a);
+void		ex_tail(oprtype *opr);
+int		extern_func(oprtype *a);
+int		f_ascii(oprtype *a, opctype op);
+int		f_char(oprtype *a, opctype op);
+int		f_data(oprtype *a, opctype op);
+int		f_extract(oprtype *a, opctype op);
+int		f_find(oprtype *a, opctype op);
+int		f_fnumber(oprtype *a, opctype op);
+int		f_fnzbitfind(oprtype *a, opctype op);
+int		f_fnzbitget(oprtype *a, opctype op);
+int		f_fnzbitset(oprtype *a, opctype op);
+int		f_fnzbitstr(oprtype *a, opctype op);
+int		f_get(oprtype *a, opctype op);
+int		f_incr(oprtype *a, opctype op);
+int		f_justify(oprtype *a, opctype op);
+int		f_length(oprtype *a, opctype op);
+int		f_mint(oprtype *a, opctype op);
+int		f_mint_mstr(oprtype *a, opctype op);
+int		f_mstr(oprtype *a, opctype op);
+int		f_name(oprtype *a, opctype op);
+int		f_next(oprtype *a, opctype op);
+int		f_one_mval(oprtype *a, opctype op);
+int		f_order(oprtype *a, opctype op);
+int		f_order1(oprtype *a, opctype op);
+int		f_piece(oprtype *a, opctype op);
+int		f_qlength(oprtype *a, opctype op);
+int		f_qsubscript(oprtype *a, opctype op);
+int		f_query (oprtype *a, opctype op);
+int		f_reverse(oprtype *a, opctype op);
+int		f_select(oprtype *a, opctype op);
+int		f_stack(oprtype *a, opctype op);
+int		f_text(oprtype *a, opctype op);
+int		f_translate(oprtype *a, opctype op);
+int		f_two_mstrs(oprtype *a, opctype op);
+int		f_two_mval(oprtype *a, opctype op);
+int		f_view(oprtype *a, opctype op);
+int		f_zahandle(oprtype *a, opctype op);
+int		f_zcall(oprtype *a, opctype op);
+int		f_zchar(oprtype *a, opctype op);
+int		f_zconvert(oprtype *a, opctype op);
+int		f_zdate(oprtype *a, opctype op);
+int		f_zdebug(oprtype *a, opctype op);
+int		f_zechar(oprtype *a, opctype op);
+int		f_zgetsyi(oprtype *a, opctype op);
+int		f_zjobexam(oprtype *a, opctype op);
+int		f_zparse(oprtype *a, opctype op);
+int		f_zprevious(oprtype *a, opctype op);
+int		f_zqgblmod(oprtype *a, opctype op);
+int		f_zsearch(oprtype *a, opctype op);
+int		f_zsigproc(oprtype *a, opctype op);
+int		f_zsqlexpr (oprtype *a, opctype op);
+int		f_zsqlfield (oprtype *a, opctype op);
+int		f_zsubstr(oprtype *a, opctype op);
+int		f_ztrigger(oprtype *a, opctype op);
+int		f_ztrnlnm(oprtype *a, opctype op);
+int		f_zwidth(oprtype *a, opctype op);
+oprtype		for_end_of_scope(int depth);
+mlabel		*get_mladdr(mident *c);
+mvar		*get_mvaddr(mident *c);
+int		glvn(oprtype *a);
+int		gvn(void);
+void		ind_code(mstr *obj);
+int		indirection(oprtype *a);
+void		ins_triple(triple *x);
+int		intexpr(oprtype *a);
+void		int_label(void);
+int		jobparameters (oprtype *c);
+boolean_t	line(uint4 *lnc);
+int		linetail(void);
+int		lkglvn(bool gblvn);
+int		lref(oprtype *label, oprtype *offset, bool no_lab_ok, mint commarg_code, bool commarg_ok, bool *got_some);
+int		lvn(oprtype *a,opctype index_op,triple *parent);
+void		make_commarg(oprtype *x, mint ind);
+oprtype		make_gvsubsc(mval *v);
+triple		*maketriple(opctype op);
+int		name_glvn(bool gblvn, oprtype *a);
+triple		*newtriple(opctype op);
+int		nref(void);
+int		numexpr(oprtype *a);
+void		obj_code(uint4 src_lines, uint4 checksum);
+int		one_job_param(char **parptr);
+int		parse_until_rparen_or_space(void);
+oprtype		put_ocnt(void);
+oprtype		put_tsiz(void);
+oprtype		put_cdlt(mstr *x);
+oprtype		put_ilit(mint x);
+oprtype		put_indr(oprtype *x);
+oprtype		put_lit(mval *x);
+oprtype		put_mfun(mident *l);
+oprtype		put_mlab(mident *l);
+oprtype		put_mnxl(void);
+oprtype		put_mvar(mident *x);
+oprtype		put_str(char *pt, mstr_len_t n);
+oprtype		put_tjmp(triple *x);
+oprtype		put_tnxt(triple *x);
+oprtype		put_tref(triple *x);
+int		resolve_ref(int errknt);
+void		resolve_tref(triple *, oprtype *);
+triple		*setcurtchain(triple *x);
+/* VMS uses same code generator as USHBIN so treat as USHBIN for these compiler routines */
+#		if defined(USHBIN_SUPPORTED) || defined(VMS)
+void		shrink_trips(void);
+boolean_t	litref_triple_oprcheck(oprtype *operand);
+#		else
+void		shrink_jmps(void);
+#		endif
+void		start_fetches(opctype op);
+void		start_for_fetches(void);
+int		strexpr(oprtype *a);
+void		tnxtarg(oprtype *a);
+void		tripinit(void);
+void		walktree(mvar *n,void (*f)(),char *arg);
+void		wrtcatopt(triple *r, triple ***lpx, triple **lptop);
+int		zlcompile(unsigned char len, unsigned char *addr);		/***type int added***/
 
 #endif /* COMPILER_H_INCLUDED */

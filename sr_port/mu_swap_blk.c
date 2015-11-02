@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,7 +102,6 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	int			key_len, key_len_dir;
 	block_id		dest_blk_id, work_blk_id, child1, child2;
 	enum cdb_sc		status;
-	static gv_key		*dest_gv_currkey;
 	srch_hist 		*dest_hist_ptr;
 	cache_rec_ptr_t		dest_child_cr;
 	blk_segment		*bs1, *bs_ptr;
@@ -115,11 +114,13 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	cw_set_element		*tmpcse;
 	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
 	unsigned int		bsiz;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	dest_blk_id = *pdest_blk_id;
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-	if (NULL == dest_gv_currkey)
-		GVKEY_INIT(dest_gv_currkey, DBKEYSIZE(MAX_KEY_SZ));
+	if (NULL == TREF(gv_reorgkey))
+		GVKEY_INIT(TREF(gv_reorgkey), DBKEYSIZE(MAX_KEY_SZ));
 	dest_hist_ptr = &(reorg_gv_target->hist);
 	blk_size = cs_data->blk_size;
 	work_parent_ptr = gv_target->hist.h[level+1].buffaddr;
@@ -253,12 +254,12 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			else
 				return cdb_sc_blkmod;
 		}
-		memcpy(&(dest_gv_currkey->base[0]), rec_base + SIZEOF(rec_hdr), key_len_dir);
-		dest_gv_currkey->base[key_len_dir] = 0;
-		dest_gv_currkey->end = key_len_dir;
+		memcpy(&((TREF(gv_reorgkey))->base[0]), rec_base + SIZEOF(rec_hdr), key_len_dir);
+		(TREF(gv_reorgkey))->base[key_len_dir] = 0;
+		(TREF(gv_reorgkey))->end = key_len_dir;
 		if (exclude_glist_ptr->next)
 		{	/* exclude blocks for globals in the list of EXCLUDE option */
-			if  (in_exclude_list(&(dest_gv_currkey->base[0]), key_len_dir - 1, exclude_glist_ptr))
+			if  (in_exclude_list(&((TREF(gv_reorgkey))->base[0]), key_len_dir - 1, exclude_glist_ptr))
 				continue;
 		}
 		save_targ = gv_target;
@@ -273,14 +274,14 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		gv_target->root = cs_addrs->dir_tree->root;
 		gv_target->clue.end = 0;
 		/* assign Directory tree path to find dest_blk_id in dest_hist_ptr */
-		status = gvcst_search(dest_gv_currkey, dest_hist_ptr);
+		status = gvcst_search(TREF(gv_reorgkey), dest_hist_ptr);
 		if (cdb_sc_normal != status)
 		{
 			assert(t_tries < CDB_STAGNATE);
 			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 			return status;
 		}
-		if (dest_hist_ptr->h[0].curr_rec.match != dest_gv_currkey->end + 1)
+		if (dest_hist_ptr->h[0].curr_rec.match != (TREF(gv_reorgkey))->end + 1)
 		{	/* may be in a kill_set of another process */
 			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 			continue;
@@ -292,11 +293,11 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 			continue;
 		}
-		/* dest_gv_currkey will now have the first key from dest_blk_id,
+		/* gv_reorgkey will now have the first key from dest_blk_id,
 		 * or, from a descendant of dest_blk_id (in case it had a *-key only).
 		 */
-		memcpy(&(dest_gv_currkey->base[0]), rec_base + SIZEOF(rec_hdr), key_len);
-		dest_gv_currkey->end = key_len - 1;
+		memcpy(&((TREF(gv_reorgkey))->base[0]), rec_base + SIZEOF(rec_hdr), key_len);
+		(TREF(gv_reorgkey))->end = key_len - 1;
 		GET_KEY_LEN(key_len_dir, dest_hist_ptr->h[0].buffaddr + dest_hist_ptr->h[0].curr_rec.offset + SIZEOF(rec_hdr));
 		/* Get root of GVT for dest_blk_id */
 		GET_LONG(gv_target->root,
@@ -309,12 +310,12 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		}
 		/* Assign Global Variable Tree path to find dest_blk_id in dest_hist_ptr */
 		gv_target->clue.end = 0;
-		status = gvcst_search(dest_gv_currkey, dest_hist_ptr);
+		status = gvcst_search(TREF(gv_reorgkey), dest_hist_ptr);
 		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 		if (dest_blk_level >= dest_hist_ptr->depth || /* do not swap in root level */
 			dest_hist_ptr->h[dest_blk_level].blk_num != dest_blk_id) /* must be in a kill set of another process. */
 			continue;
-		if ((cdb_sc_normal != status) || (dest_hist_ptr->h[nslevel].curr_rec.match != (dest_gv_currkey->end + 1)))
+		if ((cdb_sc_normal != status) || (dest_hist_ptr->h[nslevel].curr_rec.match != ((TREF(gv_reorgkey))->end + 1)))
 		{
 			assert(t_tries < CDB_STAGNATE);
 			return (cdb_sc_normal != status ? status : cdb_sc_blkmod);
@@ -334,9 +335,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	if (!blk_was_free)
 	{	/* 1: dest_blk_id into work_blk_id */
 		BLK_INIT(bs_ptr, bs1);
-		BLK_ADDR(saved_blk, dest_blk_size, unsigned char);
-		memcpy(saved_blk, dest_blk_ptr, dest_blk_size);
-		BLK_SEG(bs_ptr, saved_blk + SIZEOF(blk_hdr), dest_blk_size - SIZEOF(blk_hdr));
+		BLK_SEG(bs_ptr, dest_blk_ptr + SIZEOF(blk_hdr), dest_blk_size - SIZEOF(blk_hdr));
 		if (!BLK_FINI (bs_ptr,bs1))
 		{
 			assert(t_tries < CDB_STAGNATE);
@@ -431,7 +430,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 					 * than the db block size.
 					 */
 					bsiz = ((blk_hdr_ptr_t)(tmpcse->old_block))->bsiz;
-					if (bsiz > cs_data->blk_size)
+					if (bsiz > blk_size)
 					{
 						assert(CDB_STAGNATE > t_tries);
 						return cdb_sc_lostbmlcr;

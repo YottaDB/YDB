@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,13 +17,15 @@
 #include "mvalconv.h"
 
 #define ZDATE_MAX_LEN	64
+#define MAX_YEAR_DIGITS	6
 #define DEFAULT1	"MM/DD/YY"
 #define DEFAULT2	"DD-MON-YY"
 #define DEFAULT3	"MM/DD/YEAR"
 
 GBLREF	spdesc		stringpool;
-GBLREF	int4		zdate_form;
 GBLREF	boolean_t	gtm_utf8_mode;
+
+error_def(ERR_ZDATEFMT);
 
 void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 {
@@ -48,9 +50,9 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 #else
 	static readonly int  comma = ',';
 #endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_ZDATEFMT);
-
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_NUM(src);
 	MV_FORCE_STR(fmt);
 	MV_FORCE_STR(mo_str);
@@ -76,9 +78,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 		}
 	}
 	date = (int)MV_FORCE_INTD(src);
-	date += 365;
-	if ((date < 0) || ((src->mvtype &MV_STR) && (0 == MV_FORCE_INTD(src))))
-		date = 0;
+	date = (0 > date) ? 0 : date + 365;
 	dow = ((date + 3) % 7) +1;
 	for (cent = 21608 + 365, n = 3; cent < date; cent += (1461 * 25), n++)
 	{
@@ -100,14 +100,14 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 		year += month;
 		day -= month * 365;
 		for (i = montab ; day >= *i ; day -= *i++)
-			;
+			assert(i < ARRAYTOP(montab));
 		month = (int)((i - montab)) + 1;
 		day++;
 		assert(month > 0 && month <= 12);
 	}
 	if ((0 == fmt->str.len) || ((1 == fmt->str.len) && ('1' == *fmt->str.addr)))
 	{
-		if (!zdate_form || ((1 == zdate_form) && (year < 2000)))
+		if (!TREF(zdate_form) || ((1 == TREF(zdate_form)) && (2000 > year)))
 		{
 			fmtptr = default1;
 			fmttop = fmtptr + STR_LIT_LEN(DEFAULT1);
@@ -203,12 +203,16 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				n = year;
 				if ('Y' == ch)
 				{
-					nlen = (0 == date) ? 0 : 2;
-					break;
+					for (nlen = 2; (MAX_YEAR_DIGITS >=nlen) && fmtptr < fmttop; ++nlen, fmtptr++)
+						if ('Y' != *fmtptr)
+							break;
+				} else
+				{
+					if (('E' != ch) || ('A' != *fmtptr++) || ('R' != *fmtptr++))
+						rts_error(VARLSTCNT(1) ERR_ZDATEFMT);
+					nlen = 4;
 				}
-				if (('E' != ch) || ('A' != *fmtptr++) || ('R' != *fmtptr++))
-					rts_error(VARLSTCNT(1) ERR_ZDATEFMT);
-				nlen = (0 == date) ? 0 : 4;
+				nlen = (0 < date) ? nlen : 0;
 				break;
 			case '1':
 				if ('2' != *fmtptr++)

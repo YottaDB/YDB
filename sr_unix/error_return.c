@@ -49,8 +49,6 @@ void error_return(void)
 		unwcnt++; /* (don't need to worry about trigger frames here as they are counted and stop the loop) */
 	DBGEHND((stderr, "error_return: cur_counted_frame found with unwind count %d\n", unwcnt));
 	cur_counted_frame = curframe;
-	assert((NULL != error_frame) || ((NULL != cur_counted_frame) && (cur_counted_frame->flags & SFF_ETRAP_ERR)));
-	assert((NULL == error_frame) || ((NULL != cur_counted_frame) && !(cur_counted_frame->flags & SFF_DEV_ACT_ERR)));
 	NULLIFY_ERROR_FRAME;	/* reset error_frame */
 	dev_act_err = ((NULL != cur_counted_frame) && (cur_counted_frame->flags & SFF_ETRAP_ERR)
 		&& (cur_counted_frame->flags & SFF_DEV_ACT_ERR));

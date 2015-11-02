@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -206,7 +206,8 @@ int gtmsource_send_heartbeat(time_t *now)
 
 	if (EREPL_SEND == repl_errno && REPL_CONN_RESET(status))
 	{
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat\n");
+		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat. Status = %d ; %s\n",
+				status, STRERROR(status));
 		repl_close(&gtmsource_sock_fd);
 		gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 		return (SS_NORMAL);

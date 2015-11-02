@@ -41,12 +41,11 @@ bool gtcmtr_terminate(bool cm_err)
 #endif
 	uint4		status;
 	struct CLB	*clb;
-	intrpt_state_t	save_intrpt_ok_state;
 
 	if (curr_entry)
 	{
 		/* We are about to rundown databases, clean up structures. Defer MUPIP STOP/signal handling until function end. */
-		SAVE_INTRPT_OK_STATE(INTRPT_IN_GTCMTR_TERMINATE);
+		DEFER_INTERRUPTS(INTRPT_IN_GTCMTR_TERMINATE);
 		cancel_timer((TID)curr_entry);
 		gtcml_lkrundown();
 		gtcmd_rundown(curr_entry, cm_err);
@@ -83,7 +82,8 @@ bool gtcmtr_terminate(bool cm_err)
 		 */
 		VMS_ONLY(free(curr_entry));
 		curr_entry = NULL;
-		RESTORE_INTRPT_OK_STATE;	/* check if any MUPIP STOP/signals were deferred while in this function */
+		ENABLE_INTERRUPTS(INTRPT_IN_GTCMTR_TERMINATE);	/* check if any MUPIP STOP/signals were deferred
+									 * while in this function */
 	}
 	gtcm_users--;
 	VMS_ONLY(gtcm_ast_avail++);

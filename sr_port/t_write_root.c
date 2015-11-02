@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
 
 GBLREF cw_set_element	cw_set[];
 GBLREF unsigned char	cw_set_depth;
-GBLREF short		dollar_tlevel;
+GBLREF uint4		dollar_tlevel;
 
 /* Create a sibling cw-set-element to store ins_off and index for new root's right child */
 
@@ -38,7 +38,7 @@ void	t_write_root (
 {
 	cw_set_element	*cse;
 
-	assert(0 == dollar_tlevel);
+	assert(!dollar_tlevel);
 	cse = &cw_set[cw_set_depth++];
 	assert(CDB_CW_SET_SIZE > cw_set_depth);
 	cse->blk_checksum = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,6 @@
 #include "obj_gen.h"
 #include "cgp.h"
 #include "mdq.h"
-#include "hashtab.h"
 #include "hashtab_str.h"
 #include "objlabel.h"
 #include "stringpool.h"
@@ -207,7 +206,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 		}
 		if (!compsyms_hashtab->base)
 		{	/* Need to initialize hash table and load it with the elements so far */
-			init_hashtab_str(compsyms_hashtab, SYM_HASH_CUTOVER * 2);
+			init_hashtab_str(compsyms_hashtab, SYM_HASH_CUTOVER * 2, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
 			assert(compsyms_hashtab->base);
 			for (sym = symbols; sym; sym = sym->next)
 			{

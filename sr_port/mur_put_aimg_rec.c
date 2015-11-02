@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 		cse->done = TRUE;
 	}
 	/* Call t_end till it succeeds or aborts (error will be reported) */
-	while ((trans_num)0 == t_end(&dummy_hist, 0))
+	while ((trans_num)0 == t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED))
 		;
 	assert(!cs_addrs->now_crit || cs_addrs->hold_onto_crit);
 	return;

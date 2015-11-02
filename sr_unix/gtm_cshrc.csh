@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -27,8 +27,6 @@
 if ( $?HOSTOS   == "0" )	setenv HOSTOS	`uname -s`	# operating system
 if ( $?MACHTYPE == "0" )	setenv MACHTYPE	`uname -m`	# hardware type
 
-if ( $HOSTOS == "Linux" )       alias mailx mail
-
 # Be careful not to re-initialize all of the environment variables for each subshell
 # (i.e., don't undo what the last invocation of the version command set up).
 
@@ -38,7 +36,11 @@ if ( $?gtm_environment_init == "0" ) then
 
 	set	gtm_cshrc_first_time =	"true"		# for gtm_env.csh (see below)
 	setenv	gtm_environment_init	"GT.M environment initialized at `date`"
-	setenv	gtm_root		'/usr/library'
+	if ( $HOSTOS != "OS/390" ) then
+		setenv	gtm_root		'/usr/library'
+	else
+		setenv	gtm_root		'/gtm/library'
+	endif
 	setenv	gtm_com			$gtm_root/com
 
 	if ( ! -f $gtm_com/gtm_cshrc.csh )  then

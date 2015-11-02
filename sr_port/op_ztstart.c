@@ -25,14 +25,14 @@ error_def(ERR_TPMIXUP);
 error_def(ERR_TRANSNEST);
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	jnl_gbls_t		jgbl;
 
 void	op_ztstart(void)
 {
-	if (dollar_tlevel != 0)
+	if (dollar_tlevel)
 		rts_error(VARLSTCNT(4) ERR_TPMIXUP, 2, "A fenced logical", "an M");
 	if (jnl_fence_ctl.level >= JNL_FENCE_MAX_LEVELS)
 		rts_error(VARLSTCNT(1) ERR_TRANSNEST);

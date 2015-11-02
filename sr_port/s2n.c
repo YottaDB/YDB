@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,171 +17,165 @@
 #define DIGIT(x)	( x >='0' && x <= '9' )
 #define NUM_MASK	( MV_NM | MV_INT | MV_NUM_APPROX )
 
-GBLDEF bool s2n_intlit ;
-GBLREF bool compile_time ;
-LITREF mval literal_null ;
-LITREF int4 ten_pwr[] ;
+error_def(ERR_NUMOFLOW);
+
+LITREF mval literal_null;
+LITREF int4 ten_pwr[];
 
 char *s2n (mval *u)
 {
-	char	*c, *d, *w, *eos ;
-	int	i, j, k, x, y, z, sign, zero, expdigits ;
-	bool	digit, dot, exp, exneg, tail ;
+	char		*c, *d, *w, *eos;
+	int		i, j, k, x, y, z, sign, zero, expdigits;
+	boolean_t	digit, dot, exp, exneg, tail, dotseen, isdot;
+	DCL_THREADGBL_ACCESS;
 
-	error_def (ERR_NUMOFLOW);
-
+	SETUP_THREADGBL_ACCESS;
 	i = 0;
 	if (!MV_DEFINED(u))
 		GTMASSERT;
 	c = u->str.addr;
-	if ( u->str.len==0 )
+	if (0 == u->str.len)
 	{
-		s2n_intlit = 1;
-		*u = literal_null ;
-		return c ;
+		TREF(s2n_intlit) = 1;
+		*u = literal_null;
+		return c;
 	}
 	eos = u->str.addr + u->str.len;
-	sign = 0 ;
-	while ( c < eos && ( *c == '-' || *c == '+' ))
-	{
-		sign += ( *c++ == '-' ? 1 : 2 ) ;
-	}
-	zero = 0 ;
-	while ( c < eos && *c == '0' )
-	{
-		zero++ ; c++ ;
-	}
-	dot = ( c < eos && *c == '.' ) ;
+	sign = 0;
+	while (c < eos && (('-'== *c) || ('+' == *c)))
+		sign += (('-' == *c++) ? 1 : 2);
+	for (zero = 0; (c < eos) && ('0'== *c ); zero++, c++)
+		 ;
+	dot = ((c < eos) && ('.' == *c));
 	if (dot)
-		c++ ;
-	y = 0 ;
-	while ( c < eos && *c == '0' )
+		c++;
+	for (y = 0; (c < eos) && ('0' == *c ); c++, y--)
+		;
+	z = u->m[0] = u->m[1] = 0;				/* R0 */
+	d = c + 9;
+	for  (w = ((d < eos) ? d : eos); (c < w) && DIGIT(*c); c++, z++)
 	{
-		c++ ; y-- ;
-	}
-	z = u->m[0] = u->m[1] = 0 ;				/* R0 */
-	d = c + 9 ;
-	w = ( d < eos ? d : eos ) ;
-	while ( c < w && DIGIT(*c) )
-	{
-		if ( *c == '0' )
+		if ('0' == *c)
 		{
-			u->m[1] *= 10 ; i++ ;
+			u->m[1] *= 10;
+			i++;
+		} else
+		{
+			i = 0;
+			u->m[1] = (u->m[1] * 10) + (*c - '0');
 		}
-		else
-		{	i = 0 ;
-			u->m[1] = u->m[1] * 10 + (*c - '0') ;
-		}
-		c++ ; z++ ;
 	}							/* R1 */
-	if ( c < w && *c == '.' && !dot )
+	if ((c < w) && ('.' == *c) && !dot)
 	{
-		y = z ; c++ ; d++ ; dot = TRUE ;
-		if ( w < eos )
-			w++ ;
+		y = z;
+		c++;
+		d++;
+		dot = TRUE;
+		if (w < eos)
+			w++;
 	}
-	while ( c < w && DIGIT(*c) )
+	for (; (c < w) && DIGIT(*c); c++)
 	{
-		if ( *c == '0' )
+		if ('0' == *c)
 		{
-			u->m[1] *= 10 ; i++ ;
+			u->m[1] *= 10;
+			i++;
+		} else
+		{	i = 0;
+			u->m[1] = (u->m[1] * 10) + (*c - '0');
 		}
-		else
-		{	i = 0 ;
-			u->m[1] = u->m[1] * 10 + (*c - '0') ;
-		}
-		c++ ;
 	}							/* R2 */
-	k = (int4)(d - c) ;
-	if ( c < eos )
-	{	d = c + 9 ;
-		w = ( d < eos ? d : eos ) ;
-		while ( c < w && DIGIT(*c) )
-		{
-			u->m[0] = u->m[0] * 10 + (*c++ - '0') ; z++ ;
-		}
-		if ( c < w && *c == '.' && !dot )
-		{
-			y = z ; c++ ; d++ ; dot = TRUE ;
-			if ( w < eos )
-				w++ ;
-		}
-		while ( c < w && DIGIT(*c) )
-		{
-			u->m[0] = u->m[0] * 10 + (*c++ - '0') ;
-		}
-		u->m[0] *= ten_pwr[d - c] ;
-		while ( c < eos && *c == '0' )
-		{
-			c++ ; z++ ;
-		}
-	}
-	tail = ( dot && ( *(c-1)=='0' || *(c-1)=='.')) || c != eos ;
-	while ( c < eos && DIGIT(*c) )
+	k = (int4)(d - c);
+	if (c < eos)
 	{
-		c++ ; z++ ;
+		d = c + 9;
+		for (w = ((d < eos) ? d : eos); (c < w) && DIGIT(*c); z++)
+			u->m[0] = (u->m[0] * 10) + (*c++ - '0');
+		if ((c < w) && ('.' == *c) && !dot )
+		{
+			y = z;
+			c++;
+			d++;
+			dot = TRUE;
+			if (w < eos)
+				w++;
+		}
+		while ((c < w) && DIGIT(*c))
+			u->m[0] = (u->m[0] * 10) + (*c++ - '0');
+		u->m[0] *= ten_pwr[d - c];
+		for (; (c < eos) && ('0' == *c); c++, z++)
+			;
 	}
-	digit = z!=0 || y!=0 || zero!=0 ;
+	tail = (c != eos) || (dot && (('0' == *(c - 1)) || ('.' == *(c - 1))));
+	dotseen = FALSE;
+	for ( ; (c < eos) && ((isdot = ('.' == *c)) || DIGIT(*c)); c++)
+	{
+		dotseen = (dotseen || isdot);
+		if (!dotseen)
+			z++;
+	}
+	digit = (0 != z) || (0 != y) || (0 != zero);
 	x = 0;
-	exp = ('E' == *c) && digit ;
+	exp = ('E' == *c) && digit;
 	if (exp && (c+1 < eos))
 	{
 		c++;
 		exneg = ('-' == *c);
 		if (exneg || ('+' == *c))
 			c++;
-		for ( ; (c < eos) && ('0' == *c); c++)
+		for (; (c < eos) && ('0' == *c); c++)
 			;	/* Do not count leading 0s towards MAX_DIGITS_IN_EXP */
 		for (expdigits = 0; (c < eos) && DIGIT(*c); c++)
 		{
 			if ((MAX_DIGITS_IN_EXP + 1) > expdigits)
 			{
-				x = x * 10 + (*c - '0') ;
+				x = (x * 10) + (*c - '0');
 				expdigits++;
 			}
 		}
 		if (exneg)
-			x = -x ;
+			x = -x;
 	}
-	s2n_intlit = sign!=0 || dot || exp ;
+	TREF(s2n_intlit) = (0 != sign) || dot || exp;
 	if (digit)
 	{
-		x += ( dot ? y : z ) ;
-		j = x+k-6 ; i += j ;
-		if ( u->m[0]==0 && x<=6 && i>=0 )
+		x += (dot ? y : z);
+		j = x + k - 6;
+		i += j;
+		if ((0 == u->m[0]) && (6 >= x) && (0 <= i))
 		{
-			u->mvtype |= ( tail || sign > 1 || (zero!=0 && u->str.len!=1)  ?
-				MV_NM | MV_INT | MV_NUM_APPROX : MV_NM | MV_INT ) ;
-			if ( j < 0 )
-			{
-				u->m[1] /= ( sign & 1 ? -ten_pwr[-j] : ten_pwr[-j] ) ;
-			}
+			u->mvtype |= (tail || (1 < sign) || ((0 != zero) && (1 != u->str.len)))
+				? (MV_NM | MV_INT | MV_NUM_APPROX) : (MV_NM | MV_INT);
+			if (0 > j)
+				u->m[1] /= ((sign & 1) ? -ten_pwr[-j] : ten_pwr[-j]);
 			else
-			{	u->m[1] *= ( sign & 1 ? -ten_pwr[j] : ten_pwr[j] ) ;
-			}
-		}
-		else
-		{	u->m[1] *= ten_pwr[k] ;
-			x += MV_XBIAS ;
-			if ( x < EXPLO || u->m[1] == 0 )
+				u->m[1] *= ((sign & 1) ? -ten_pwr[j] : ten_pwr[j]);
+		} else
+		{
+			u->m[1] *= ten_pwr[k];
+			x += MV_XBIAS;
+			if ((EXPLO > x) || (0 == u->m[1]))
 			{
-				u->mvtype |= MV_NM | MV_INT | MV_NUM_APPROX ; u->m[1] = 0 ;
-			}
-			else if ( x >= EXPHI )
+				u->mvtype |= MV_NM | MV_INT | MV_NUM_APPROX;
+				u->m[1] = 0;
+			} else if (EXPHI <= x)
 			{
-				u->mvtype &= ~NUM_MASK ;
-				if ( !compile_time )
-					rts_error(VARLSTCNT(1) ERR_NUMOFLOW) ;
+				u->mvtype &= ~NUM_MASK;
+				if (!TREF(compile_time))
+					rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
 			} else
-			{	u->e = x ; u->sgn = sign & 1 ;
-				u->mvtype |= ( tail || sign > 1 || (zero!=0 && u->str.len!=1)  ? MV_NM | MV_NUM_APPROX : MV_NM ) ;
+			{
+				u->e = x;
+				u->sgn = sign & 1;
+				u->mvtype |= (tail || (1 < sign) || ((0 != zero) && (1 != u->str.len)))
+					? (MV_NM | MV_NUM_APPROX) : MV_NM;
 			}
 		}
 		assert(u->m[1] < MANT_HI);
+	} else
+	{
+		u->mvtype |= (MV_NM | MV_INT | MV_NUM_APPROX);
+		u->m[1] = 0;
 	}
-	else
-	{	u->mvtype |= MV_NM | MV_INT | MV_NUM_APPROX ;
-		u->m[1] = 0 ;
-	}
-	return c ;
+	return c;
 }

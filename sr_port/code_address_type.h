@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007, 2008 Fidelity Information Services, Inc        *
+ *      Copyright 2007, 2011 Fidelity Information Services, Inc	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -18,8 +18,8 @@
 GBLREF int   function_type(char*);
 #endif /* __ia64 */
 
-#define C 1
-#define ASM 2
+#define GTM_C_RTN 1
+#define GTM_ASM_RTN 2
 
 #ifndef __ia64
 #define CODE_ADDRESS_TYPE(func) &func

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,8 @@
 #include "suspsigs_handler.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_imagetype_init.h"
+#include "gtm_threadgbl_init.h"
+#include "wbox_test_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -78,7 +80,6 @@ GBLREF gd_addr			*original_header;
 GBLREF bool			licensed;
 GBLREF void			(*func)(void);
 GBLREF gv_namehead		*gv_target;
-GBLREF bool			transform;
 GBLREF mval			curr_gbl_root;
 GBLREF int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF boolean_t		dse_running;
@@ -92,18 +93,20 @@ GBLREF CLI_ENTRY		dse_cmd_ary[];
 GBLDEF block_id			patch_curr_blk;
 GBLDEF CLI_ENTRY		*cmd_ary = &dse_cmd_ary[0];	/* Define cmd_ary to be the DSE specific cmd table */
 
-static bool	dse_process(int argc);
-static void display_prompt(void);
+static bool		dse_process(int argc);
+static void 		display_prompt(void);
+static readonly char	prompt[]="DSE> ";
 
 int main(int argc, char *argv[])
 {
-	static char	prompt[]="DSE> ";
+	DCL_THREADGBL_ACCESS;
 
+	GTM_THREADGBL_INIT;
 	gtm_imagetype_init(DSE_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	licensed = TRUE;
-	transform = TRUE;
+	TREF(transform) = TRUE;
 	op_open_ptr = op_open;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
@@ -128,6 +131,16 @@ int main(int argc, char *argv[])
 	cli_lex_setup(argc, argv);
 	CREATE_DUMMY_GBLDIR(gd_header, original_header, gv_cur_region, gd_map, gd_map_top);
 	gtm_chk_dist(argv[0]);
+	if ((gtm_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == gtm_white_box_test_case_number) ))
+	{
+		sgmnt_addrs     * csa;
+		node_local_ptr_t cnl;
+		csa = &FILE_INFO(gv_cur_region)->s_addrs;
+		cnl = csa->nl;
+		cnl->wbox_test_seq_num  = 1; /*Signal the first step and wait here*/
+		while (2 != cnl->wbox_test_seq_num) /*Wait for another process to get hold of the semaphore and signal next step*/
+			LONG_SLEEP(10);
+	}
 	if (argc < 2)
                 display_prompt();
 	io_init(TRUE);
@@ -135,7 +148,7 @@ int main(int argc, char *argv[])
 	{
 		if (!dse_process(argc))
 			break;
-                display_prompt();
+		display_prompt();
 	}
 	dse_exit();
 	REVERT;
@@ -171,10 +184,11 @@ static bool	dse_process(int argc)
 	{
 		if (1 < argc)
 		{
-			/*Here we need to REVERT since otherwise we stay in dse in a loop
-			  The design of dse needs to be changed to act like VMS (which is:
-			  if there is an error in the dse command (dse dumpoa), go to command
-			  prompt, but UNIX exits*/
+			/* Here we need to REVERT since otherwise we stay in dse in a loop
+			 * The design of dse needs to be changed to act like VMS (which is:
+			 * if there is an error in the dse command (dse dumpoa), go to command
+			 * prompt, but UNIX exits
+			 */
 			REVERT;
 			rts_error(VARLSTCNT(4) res, 2, LEN_AND_STR(cli_err_str));
 		} else
@@ -182,7 +196,6 @@ static bool	dse_process(int argc)
 	}
 	if (func)
 		func();
-
 	REVERT;
 	return(1 >= argc);
 }

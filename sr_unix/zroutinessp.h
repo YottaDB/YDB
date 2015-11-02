@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@
  * 	to keep dlsym() value available for incr_link during each $ZROUTINES search). */
 typedef	struct zro_ent_type
 {
-	unsigned char	type;
+	uint4		type;
 	uint4		count;
 	mstr		str;
 	void_ptr_t	shrlib; /* used only on those platforms that generate shared images */

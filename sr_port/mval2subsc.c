@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,11 @@
 #include "format_targ_key.h"
 
 GBLREF gv_namehead	*gv_target;
-GBLREF bool		transform;
 GBLREF gd_region       *gv_cur_region;
+
+error_def(ERR_GVSUBOFLOW);
+error_def(ERR_NUMOFLOW);
+error_def(ERR_GVIS);
 
 static readonly unsigned char pos_code[100] =
 {
@@ -65,13 +68,21 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 	uint4		mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
 	unsigned int	digs, exp_val;
 	int		tmp_len;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_GVSUBOFLOW);
-	error_def(ERR_NUMOFLOW);
-	error_def(ERR_GVIS);
-
+	SETUP_THREADGBL_ACCESS;
+	/* The below assert is an attempt to catch between some and many of the cases where the mvtype is
+	 * not an accurate representation of the content. This can happen (and has) when there is a bug in
+	 * op_svput() where only the string portion of an mval is set without (re)setting the type leading
+	 * to numeric or num-approx values that do not represent reality and causing trouble especially with
+	 * subscripts. In that example, "-1" was left as a string with MV_NUM_APPROX on which caused a lot
+	 * of trouble with $ORDER in a database when -1 was treated as a string. This assert is not a 100%
+	 * catchall of invalid settings but it provides at least some barrier. A full barrier would require
+	 * complete conversion which is a bit expensive to always re-do at this point - even in a dbg version.
+	 */
+	assert(!(MV_NUM_APPROX & in_val->mvtype) || (NUM_DEC_DG_2L < in_val->str.len) || !val_iscan(in_val));
 	out_ptr = out_key->base + out_key->end;
-	if (transform && gv_target->nct)
+	if (TREF(transform) && gv_target->nct)
 	{
 		MV_FORCE_STR(in_val);
 		mvt = in_val->mvtype | MV_NUM_APPROX;
@@ -79,7 +90,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		mvt = (uint4)in_val->mvtype;
 	if (!(mvt & (MV_NM | MV_NUM_APPROX)))
 	{	/* Not currently in numeric form.  Is it cannonical? */
-		if (nm_iscan(in_val))
+		if (val_iscan(in_val))
 		{	/* Yes, convert it to numeric */
 			(void)s2n(in_val);
 			mvt = in_val->mvtype;
@@ -94,7 +105,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 	{	/* It's a string */
 		in_ptr = (unsigned char *)in_val->str.addr;
 		tmp_len = in_val->str.len;
-		if (transform && gv_target->collseq)
+		if (TREF(transform) && gv_target->collseq)
 		{
 			mstr_ch.len = tmp_len;
 			mstr_ch.addr = (char *)in_ptr;
@@ -110,7 +121,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
 			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
 		}
-		if (tmp_len > 0)
+		if (0 < tmp_len)
 		{
 			*out_ptr++ = STR_SUB_PREFIX;
 			do
@@ -132,7 +143,8 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 			} while (--tmp_len > 0);
 		} else
 		{
-			*out_ptr++ = (!transform || 0 == gv_cur_region->std_null_coll) ? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL ;
+			*out_ptr++ = (!TREF(transform) || (0 == gv_cur_region->std_null_coll))
+				? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL;
 		}
 		goto FINI;
 	}
@@ -141,7 +153,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 	{	/* Yes, its an integer, convert it */
 		is_negative = FALSE;
 		cvt_table = pos_code;
-		if ((mt = in_val->m[1]) < 0)
+		if (0 > (mt = in_val->m[1]))
 		{
 			is_negative = TRUE;
 			cvt_table = neg_code;
@@ -151,45 +163,45 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 			*out_ptr++ = SUBSCRIPT_ZERO;
 			goto FINI;
 		}
-		if (mt < 10)
+		if (10 > mt)
 		{
 			*out_ptr++ = is_negative ? ~(SUBSCRIPT_BIAS - 2) : (SUBSCRIPT_BIAS - 2);
 			*out_ptr++ = cvt_table[mt * 10];
 			goto FINISH_NUMBER;
 		}
-		if (mt < 100)
+		if (100 > mt)
 		{
 			*out_ptr++ = is_negative ? ~(SUBSCRIPT_BIAS - 1) : (SUBSCRIPT_BIAS - 1);
 			*out_ptr++ = cvt_table[mt];
 			goto FINISH_NUMBER;
 		}
 		tm = temp_mantissa;
-		if (mt < 1000)
+		if (1000 > mt)
 		{
 			exp_val = SUBSCRIPT_BIAS;
 			goto ODD_INTEGER;
 		}
-		if (mt < 10000)
+		if (10000 > mt)
 		{
 			exp_val = SUBSCRIPT_BIAS + 1;
 			goto EVEN_INTEGER;
 		}
-		if (mt < 100000)
+		if (100000 > mt)
 		{
 			exp_val = SUBSCRIPT_BIAS + 2;
 			goto ODD_INTEGER;
 		}
-		if (mt < 1000000)
+		if (1000000 > mt)
 		{
 			exp_val = SUBSCRIPT_BIAS + 3;
 			goto EVEN_INTEGER;
 		}
-		if (mt < 10000000)
+		if (10000000 > mt)
 		{
 			exp_val = SUBSCRIPT_BIAS + 4;
 			goto ODD_INTEGER;
 		}
-		if (mt < 100000000)
+		if (100000000 > mt)
 		{
 			exp_val = SUBSCRIPT_BIAS + 5;
 			goto EVEN_INTEGER;
@@ -250,7 +262,6 @@ FINISH_INTEGERS:
 	 * The two msd's have now been converted.  The maximum number of
 	 * data remaining is 7 digits in "mt" and 9 digits in "mw".
 	 * If mw is zero, then we should just grind out mt till we are done
-	 *
 	 */
 	if (0 == mw)
 		goto LAST_LONGWORD;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,13 +20,14 @@
 #include "cmd.h"
 
 GBLREF char window_token;
-GBLREF triple *expr_start, *expr_start_orig;
 
 int m_xecute(void)
 {
 	triple tmpchain, *oldchain, *obp, *ref0, *ref1, *triptr;
 	oprtype *cr, x;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	dqinit(&tmpchain,exorder);
 	oldchain = setcurtchain(&tmpchain);
 	switch (strexpr(&x))
@@ -54,22 +55,21 @@ int m_xecute(void)
 		cr = (oprtype *) mcalloc(SIZEOF(oprtype));
 		if (!bool_expr((bool) FALSE,cr))
 			return FALSE;
-		if (expr_start != expr_start_orig)
+		if (TREF(expr_start) != TREF(expr_start_orig))
 		{
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
+			triptr->operand[0] = put_tref(TREF(expr_start));
 		}
 		obp = oldchain->exorder.bl;
 		dqadd(obp,&tmpchain,exorder);		/* violates info hiding */
-		if (expr_start != expr_start_orig)
+		if (TREF(expr_start) != TREF(expr_start_orig))
 		{
 			ref0 = newtriple(OC_JMP);
 			ref1 = newtriple(OC_GVRECTARG);
-			ref1->operand[0] = put_tref(expr_start);
+			ref1->operand[0] = put_tref(TREF(expr_start));
 			*cr = put_tjmp(ref1);
 			tnxtarg(&ref0->operand[0]);
-		}
-		else
+		} else
 			tnxtarg(cr);
 		return TRUE;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,25 +19,20 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF	bool		for_temps[MAX_FOR_STACK];
 GBLREF	boolean_t	run_time;
 GBLREF	char		window_token;
-GBLREF	oprtype		*for_stack[MAX_FOR_STACK],
-			**for_stack_ptr;
-GBLREF	triple		*expr_start,
-			*expr_start_orig;
 
 error_def(ERR_ACTOFFSET);
-
 
 int m_do(void)
 {
 	triple		tmpchain, *oldchain, *obp, *ref0, *tripsize,
 			*triptr, *ref1, *calltrip, *routineref, *labelref;
 	oprtype		*cr;
+	DCL_THREADGBL_ACCESS;
 
-
-	if (window_token == TK_EOL || window_token == TK_SPACE)
+	SETUP_THREADGBL_ACCESS;
+	if ((TK_SPACE == window_token) || (TK_EOL == window_token))
 	{
 		if (!run_time)	/* DO SP SP is a noop at run time */
 		{
@@ -46,7 +41,7 @@ int m_do(void)
 			calltrip->operand[1] = put_ocnt();
 		}
 		return TRUE;
-	} else if (window_token == TK_AMPERSAND)
+	} else if (TK_AMPERSAND == window_token)
 	{
 		if (!extern_func(0))
 			return FALSE;
@@ -55,15 +50,15 @@ int m_do(void)
 	}
 	dqinit(&tmpchain, exorder);
 	oldchain = setcurtchain(&tmpchain);
-	calltrip = entryref(OC_CALL, OC_EXTCALL, (mint)indir_do, TRUE, FALSE);
+	calltrip = entryref(OC_CALL, OC_EXTCALL, (mint)indir_do, TRUE, FALSE, FALSE);
 	setcurtchain(oldchain);
 	if (!calltrip)
 		return FALSE;
-	if (window_token == TK_LPAREN)
+	if (TK_LPAREN == window_token)
 	{
-		if (calltrip->opcode == OC_CALL)
+		if (OC_CALL == calltrip->opcode)
 		{
-			assert(calltrip->operand[0].oprclass == MLAB_REF);
+			assert(MLAB_REF == calltrip->operand[0].oprclass);
 			calltrip->opcode = OC_EXCAL;
 			ref0 = newtriple(OC_PARAMETER);
 			calltrip->operand[1] = put_tref(ref0);
@@ -72,26 +67,24 @@ int m_do(void)
 			assert(OC_TRIPSIZE == tripsize->opcode);
 		} else
 		{
-			if (calltrip->opcode == OC_EXTCALL)
+			if (OC_EXTCALL == calltrip->opcode)
 			{
-				assert(calltrip->operand[1].oprclass == TRIP_REF);
-				if (calltrip->operand[1].oprval.tref->opcode == OC_CDLIT)
-					assert(calltrip->operand[1].oprval.tref->operand[0].oprclass == CDLT_REF);
+				assert(TRIP_REF == calltrip->operand[1].oprclass);
+				if (OC_CDLIT == calltrip->operand[1].oprval.tref->opcode)
+					assert(CDLT_REF == calltrip->operand[1].oprval.tref->operand[0].oprclass);
 				else
 				{
-					assert(calltrip->operand[1].oprval.tref->opcode == OC_LABADDR);
-					assert(calltrip->operand[1].oprval.tref->operand[1].oprclass == TRIP_REF);
-					assert(calltrip->operand[1].oprval.tref->operand[1].oprval.tref->opcode
-						== OC_PARAMETER);
-					assert(calltrip->operand[1].oprval.tref->operand[1].oprval.tref->operand[0].oprclass
-						== TRIP_REF);
-					assert(calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
-						operand[0].oprval.tref->opcode == OC_ILIT);
-					assert(calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
-						operand[0].oprval.tref->operand[0].oprclass == ILIT_REF);
-					if (calltrip->operand[1].oprval.tref->
-						operand[1].oprval.tref->operand[0].oprval.tref->
-						operand[0].oprval.ilit != 0)
+					assert(OC_LABADDR == calltrip->operand[1].oprval.tref->opcode);
+					assert(TRIP_REF == calltrip->operand[1].oprval.tref->operand[1].oprclass);
+					assert(OC_PARAMETER == calltrip->operand[1].oprval.tref->operand[1].oprval.tref->opcode);
+					assert(TRIP_REF ==
+						calltrip->operand[1].oprval.tref->operand[1].oprval.tref->operand[0].oprclass);
+					assert(OC_ILIT == calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
+						operand[0].oprval.tref->opcode);
+					assert(ILIT_REF == calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
+						operand[0].oprval.tref->operand[0].oprclass);
+					if (0 != calltrip->operand[1].oprval.tref->operand[1].oprval.tref->
+						operand[0].oprval.tref->operand[0].oprval.ilit)
 					{
 						stx_error(ERR_ACTOFFSET);
 						return FALSE;
@@ -99,11 +92,11 @@ int m_do(void)
 				}
 			} else		/* DO _ @dlabel actuallist */
 			{
-				assert(calltrip->opcode == OC_COMMARG);
-				assert(calltrip->operand[1].oprclass == TRIP_REF);
-				assert(calltrip->operand[1].oprval.tref->opcode == OC_ILIT);
-				assert(calltrip->operand[1].oprval.tref->operand[0].oprclass == ILIT_REF);
-				assert(calltrip->operand[1].oprval.tref->operand[0].oprval.ilit == (mint) indir_do);
+				assert(OC_COMMARG == calltrip->opcode);
+				assert(TRIP_REF == calltrip->operand[1].oprclass);
+				assert(OC_ILIT == calltrip->operand[1].oprval.tref->opcode);
+				assert(ILIT_REF == calltrip->operand[1].oprval.tref->operand[0].oprclass);
+				assert((mint)indir_do == calltrip->operand[1].oprval.tref->operand[0].oprval.ilit);
 				assert(calltrip->exorder.fl == &tmpchain);
 				routineref = maketriple(OC_CURRHD);
 				labelref = maketriple(OC_LABADDR);
@@ -126,51 +119,49 @@ int m_do(void)
 		}
 		if (!actuallist(&ref0->operand[1]))
 			return FALSE;
-	} else if (calltrip->opcode == OC_CALL)
+	} else if (OC_CALL == calltrip->opcode)
 	{
 		calltrip->operand[1] = put_ocnt();
-		if (for_stack_ptr != for_stack)
+		if (TREF(for_stack_ptr) != TADR(for_stack))
 		{
-			if (for_temps[ (for_stack_ptr - &for_stack[0]) ])
+			if (TAREF1(for_temps, (TREF(for_stack_ptr) - TADR(for_stack))))
 				calltrip->opcode = OC_FORLCLDO;
 		}
 	}
-
-	if (window_token == TK_COLON)
+	if (TK_COLON == window_token)
 	{
 		advancewindow();
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
 		if (!bool_expr((bool) FALSE, cr))
 			return FALSE;
-		if (expr_start != expr_start_orig)
+		if (TREF(expr_start) != TREF(expr_start_orig))
 		{
 			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
+			triptr->operand[0] = put_tref(TREF(expr_start));
 		}
 		obp = oldchain->exorder.bl;
 		dqadd(obp, &tmpchain, exorder);   /*this is a violation of info hiding*/
-		if (calltrip->opcode == OC_EXCAL)
+		if (OC_EXCAL == calltrip->opcode)
 		{
 			triptr = newtriple(OC_JMP);
 			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
 			calltrip->operand[0].oprclass = ILIT_REF;	/* dummy placeholder */
 			tripsize->operand[0].oprval.tsize->ct = triptr;
 		}
-		if (expr_start != expr_start_orig)
+		if (TREF(expr_start) != TREF(expr_start_orig))
 		{
 			ref0 = newtriple(OC_JMP);
 			ref1 = newtriple(OC_GVRECTARG);
-			ref1->operand[0] = put_tref(expr_start);
+			ref1->operand[0] = put_tref(TREF(expr_start));
 			*cr = put_tjmp(ref1);
 			tnxtarg(&ref0->operand[0]);
-		}
-		else
+		} else
 			tnxtarg(cr);
 	} else
 	{
 		obp = oldchain->exorder.bl;
 		dqadd(obp, &tmpchain, exorder);   /*this is a violation of info hiding*/
-		if (calltrip->opcode == OC_EXCAL)
+		if (OC_EXCAL == calltrip->opcode)
 		{
 			triptr = newtriple(OC_JMP);
 			triptr->operand[0] = put_mfun(&calltrip->operand[0].oprval.lab->mvname);
@@ -178,6 +169,5 @@ int m_do(void)
 			tripsize->operand[0].oprval.tsize->ct = triptr;
 		}
 	}
-
 	return TRUE;
 }

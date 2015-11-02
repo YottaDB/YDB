@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,28 +68,18 @@
 #define INCR_CNT(X,Y)			INTERLOCK_ADD(X,Y,1)
 #define DECR_CNT(X,Y)			INTERLOCK_ADD(X,Y,-1)
 
-#define BIT0_SETI(X,Z)                  (ASWP((sm_int_ptr_t)(X),1,Z))
-#define BIT0_CLEARI(X,Z)                (!ASWP((sm_int_ptr_t)(X),0,Z))
-
-#define IS_BIT0_SET(X)			((X) == 1)
-#define IS_BIT0_CLEAR(X)		((X) == 0)
-
 #ifndef __ia64
-#define GET_SWAPLOCK(X)			(COMPSWAP((X), LOCK_AVAILABLE, 0, process_id, 0))
+#define GET_SWAPLOCK(X)			(COMPSWAP_LOCK((X), LOCK_AVAILABLE, 0, process_id, 0))
 #else
 /* Doing the simple test before COMPSWAP_LOCK can help performance when a lock is highly contended
  */
 #define GET_SWAPLOCK(X)		(((X)->u.parts.latch_pid == LOCK_AVAILABLE) && COMPSWAP_LOCK((X), LOCK_AVAILABLE, 0, process_id, 0))
 #endif /* __ia64 */
-/* Use COMPSWAP to release the lock because of the memory barrier and other-processor notification it implies. Also
-   the usage of COMPSWAP allows us to check (with low cost) that we have/had the lock we are trying to release. If we
-   don't have the lock and are trying to release it, a GTMASSERT seems the logical choice as the logic is very broken
-   at that point. If this macro is used in part of an expression, the GTMASSERT path must also return a value (to keep
-   the compiler happy) thus the construct (GTMASSERT, 0) which returns a zero (see usage with assert() on UNIX).
+/* Use COMPSWAP_UNLOCK to release the lock because of the memory barrier and other-processor notification it implies. Also
+ * the usage of COMPSWAP_UNLOCK allows us to check (with low cost) that we have/had the lock we are trying to release.
+ * If we don't have the lock and are trying to release it, a GTMASSERT seems the logical choice as the logic is very broken
+ * at that point. If this macro is used in part of an expression, the GTMASSERT path must also return a value (to keep
+ * the compiler happy) thus the construct (GTMASSERT, 0) which returns a zero (see usage with assert() on UNIX).
  */
-#ifndef __ia64
-#define RELEASE_SWAPLOCK(X)		(COMPSWAP((X), process_id, 0, LOCK_AVAILABLE, 0) ? 1 : (GTMASSERT, 0))
-#else
 #define RELEASE_SWAPLOCK(X)		(COMPSWAP_UNLOCK((X), process_id, 0, LOCK_AVAILABLE, 0) ? 1 : (GTMASSERT, 0))
-#endif /* __ia64 */
 

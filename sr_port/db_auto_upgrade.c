@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,8 @@
 #include "wcs_phase2_commit_wait.h"
 
 #include "gvcst_protos.h"	/* for gvcst_init_sysops prototype */
+
+error_def(ERR_DBBADUPGRDSTATE);
 
 void db_auto_upgrade(gd_region *reg)
 {
@@ -106,7 +108,11 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV53004:		/* New encryption fields */
 				csd->db_trigger_cycle = 0;
 				break;
-			case GDSMV54000:		/* New trigger fields */
+			case GDSMV54000:		/* New ztrigger count field */
+				csa->gvstats_rec.n_ztrigger = 0;
+				csd->gvstats_rec.n_ztrigger = 0;
+				break;
+			case GDSMV54002:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
@@ -116,5 +122,11 @@ void db_auto_upgrade(gd_region *reg)
 			csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	}
 	csd->last_mdb_ver = GDSMVCURR;
+	if (csd->fully_upgraded && !csd->db_got_to_v5_once)
+	{	/* Database is fully upgraded but the db_got_to_v5_once field says different. Don't know how that could happen */
+		assert(FALSE);
+		csd->db_got_to_v5_once = TRUE; /* fix it in PRO */
+		send_msg(VARLSTCNT(6) ERR_DBBADUPGRDSTATE, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
+	}
 	return;
 }

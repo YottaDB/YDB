@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ void bt_refresh(sgmnt_addrs *csa)
 		ptr->blk = BT_NOTVALID;
 		ptr->cache_index = CR_NOTVALID;
 		insqt((que_ent_ptr_t)ptr, (que_ent_ptr_t)bt1);
-		insqt((que_ent_ptr_t)((sm_uc_ptr_t)ptr + (2 * SIZEOF(int4))), (que_ent_ptr_t)csa->th_base);
+		insqt((que_ent_ptr_t)((sm_uc_ptr_t)ptr + (2 * SIZEOF(sm_off_t))), (que_ent_ptr_t)csa->th_base);
 	}
 	((th_rec *)((uchar_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn = csa->ti->curr_tn - 1;
 	csa->ti->mm_tn = 0;

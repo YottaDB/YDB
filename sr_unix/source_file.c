@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,13 +45,28 @@ GBLREF short		object_name_len;
 GBLREF int		object_file_des;
 GBLREF command_qualifier cmd_qlf;
 
+error_def(ERR_ASSERT);
+error_def(ERR_ERRORSUMMARY);
+error_def(ERR_FILENOTFND);
+error_def(ERR_FILEPARSE);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_OBJFILERR);
+error_def(ERR_SRCFILERR);
+error_def(ERR_STACKOFLOW);
+
 static bool	tt_so_do_once;
 static io_pair	compile_src_dev;
 static io_pair	dev_in_use;	/*	before opening source file	*/
 static io_pair	tmp_list_dev;	/*	before reading source file	*/
 				/*	it equal to dev_in_use if list file not open	*/
-
-error_def(ERR_SRCFILERR);
+static readonly unsigned char open_params_list[] =
+{
+	(unsigned char)iop_readonly,
+	(unsigned char)iop_m,
+	(unsigned char)iop_eol
+};
 
 void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 {
@@ -60,16 +75,13 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 	int		i;
 	unsigned char	*p;
 	int		rc;
+	DCL_THREADGBL_ACCESS;
 
-	error_def	(ERR_FILEPARSE);
-	error_def	(ERR_FILENOTFND);
-	error_def	(ERR_ERRORSUMMARY);
-        error_def	(ERR_OBJFILERR);
-
+	SETUP_THREADGBL_ACCESS;
 	if (MAX_FBUFF < flen)
 	{
 		dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, flen, faddr);
-		dollar_zcstatus = ERR_ERRORSUMMARY;
+		TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 	} else
 	{
 		object_file_des = FD_INVALID;
@@ -86,7 +98,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 				if (!i)
 				{
 					dec_err(VARLSTCNT(4) ERR_FILENOTFND, 2, fstr.str.len, fstr.str.addr);
-					dollar_zcstatus = ERR_ERRORSUMMARY;
+					TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 				}
 				break;
 			}
@@ -102,11 +114,11 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 									  &&  'm' != p[plen.p.pblk.b_name + 1])))
 			{	/* M filetype is required but not present */
 				dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, source_name_len, source_file_name);
-				dollar_zcstatus = ERR_ERRORSUMMARY;
+				TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 				continue;
 			}
 			if (compiler_startup())
-				dollar_zcstatus = ERR_ERRORSUMMARY;
+				TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 			if (FD_INVALID != object_file_des)
 			{
 				CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
@@ -124,33 +136,22 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 CONDITION_HANDLER(source_ch)
 {
 	int	dummy1, dummy2;
-	error_def(ERR_ASSERT);
-	error_def(ERR_ERRORSUMMARY);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_GTMCHECK);
-        error_def(ERR_MEMORY);
-	error_def(ERR_STACKOFLOW);
+	DCL_THREADGBL_ACCESS;
 
 	START_CH;
+	SETUP_THREADGBL_ACCESS;
 	if (DUMP)
 	{
 		NEXTCH;
 	}
 	zsrch_clr(0);
-	dollar_zcstatus = ERR_ERRORSUMMARY;
+	TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 	UNWIND(dummy1, dummy2);
 }
 
 
 bool	open_source_file (void)
 {
-	static readonly unsigned char open_params_list[] =
-        {
-		(unsigned char)iop_readonly,
-		(unsigned char)iop_m,
-                (unsigned char)iop_eol
-        };
-
 	mstr		fstr;
 	int		status, n;
 	parse_blk	pblk;
@@ -161,8 +162,6 @@ bool	open_source_file (void)
 	mval		pars;
 	unsigned short	clen;
 
-	error_def	(ERR_FILEPARSE);
-
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = buff;
 	pblk.buff_size = MAX_FBUFF;
@@ -172,7 +171,6 @@ bool	open_source_file (void)
 	status = parse_file(&fstr, &pblk);
 	if (!(status & 1))
 		rts_error(VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
-
 	pars.mvtype = MV_STR;
 	pars.str.len = SIZEOF(open_params_list);
 	pars.str.addr = (char *)open_params_list;
@@ -183,7 +181,6 @@ bool	open_source_file (void)
 	dev_in_use = io_curr_device;	/*	save list file info in use if it is opened	*/
 	op_use(&val, &pars);
 	compile_src_dev = io_curr_device;
-
 	if (tt_so_do_once)
 	{
 		clock = time(0);
@@ -191,7 +188,7 @@ bool	open_source_file (void)
 		n = STR_LIT_LEN("MDEFAULT");
 	} else
 	{
-		STAT_FILE((char *)&source_file_name[0], &statbuf, status);
+		STAT_FILE((char *)source_file_name, &statbuf, status);
 		assert(status == 0);
 		clock = statbuf.st_mtime;
 		p = pblk.l_name;
@@ -200,12 +197,12 @@ bool	open_source_file (void)
 			n = MAX_MIDENT_LEN;
 	}
 	/* routine_name is the internal name of the routine (with '%' translated to '_') which can be
-	      different from module_name if the NAMEOFRTN parm is used (by trigger compilation code).
-	   module_name is the external file name of the module (file.m, file.o).
-	   int_module_name is the external symbol that gets exposed (in the GTM context) and is normally
-	      the same as module_name except when NAMEOFRTN is specified in which case it takes on the
-	      untranslated value of routine_name.
-	*/
+	 * different from module_name if the NAMEOFRTN parm is used (by trigger compilation code).
+	 * module_name is the external file name of the module (file.m, file.o).
+	 * int_module_name is the external symbol that gets exposed (in the GTM context) and is normally
+	 * the same as module_name except when NAMEOFRTN is specified in which case it takes on the
+	 * untranslated value of routine_name.
+	 */
 	memcpy(module_name.addr, p, n);
 	module_name.len = n;
 	if (!(cmd_qlf.qlf & CQ_NAMEOFRTN))
@@ -223,10 +220,8 @@ bool	open_source_file (void)
 	int_module_name.len = routine_name.len;
 	if ('_' == *routine_name.addr)
 		routine_name.addr[0] = '%';
-
 	p = (char *)GTM_CTIME(&clock);
 	memcpy(rev_time_buf, p + 4, REV_TIME_BUFF_LEN);
-
 	io_curr_device = dev_in_use;	/*	set it back to make open_list_file save the device	*/
 	return TRUE;
 }
@@ -236,7 +231,6 @@ bool	open_source_file (void)
  *  Return:
  *	length of line read
  */
-
 int4	read_source_file (void)
 {
 	unsigned char	*cp;
@@ -257,9 +251,7 @@ int4	read_source_file (void)
 	if ( FALSE != io_curr_device.in->dollar.zeof )
 		return -1;
 	io_curr_device = tmp_list_dev;	/*	restore list file after reading	if it's opened	*/
-
 	return (int4)(cp - source_buffer);	/*	var.str.len	*/
-
 }
 
 CONDITION_HANDLER(read_source_ch)

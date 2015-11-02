@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,18 +36,25 @@
 #include "gtmsource.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	volatile boolean_t	in_wcs_recover;
+GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
+GBLREF	int			process_exiting;
 
 static	const	unsigned short	zero_fid[3];
 
-void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
+uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 {	/* Notify operator and terminate journaling */
 	unsigned int	status;
 	sgmnt_addrs	*csa;
 	seq_num		reg_seqno, jnlseqno;
+	bool		was_lockid = FALSE;
 
 	error_def(ERR_REPLJNLCLOSED);
 	error_def(ERR_JNLCLOSED);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	switch(jpc->region->dyn.addr->acc_meth)
 	{
 	case dba_mm:
@@ -63,6 +70,23 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	 */
 #endif
 	assert(csa->now_crit);
+	if (JNL_FILE_LOST_ERRORS == TREF(error_on_jnl_file_lost))
+	{
+#ifdef VMS
+		assert(FALSE); /* Not fully implemented / supported on VMS. */
+#endif
+		if (!process_exiting || !csa->jnl->error_reported)
+		{
+			csa->jnl->error_reported = TRUE;
+			in_wcs_recover = FALSE;	/* in case we're called in wcs_recover() */
+			DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
+			if (SS_NORMAL != jpc->status)
+				rts_error(VARLSTCNT(7) jnl_stat, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region), jpc->status);
+			else
+				rts_error(VARLSTCNT(6) jnl_stat, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));
+		}
+		return jnl_stat;
+	}
 	if (0 != jnl_stat)
 		jnl_send_oper(jpc, jnl_stat);
 	csa->hdr->jnl_state = jnl_closed;
@@ -77,17 +101,25 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	} else
 		send_msg(VARLSTCNT(5) ERR_JNLCLOSED, 3, DB_LEN_STR(jpc->region), &csa->ti->curr_tn);
 #ifdef VMS
-	assert(0 != csa->jnl->jnllsb->lockid);
-	status = gtm_enqw(EFN$C_ENF, LCK$K_EXMODE, csa->jnl->jnllsb, LCK$M_CONVERT | LCK$M_NODLCKBLK,
-			NULL, 0, NULL, 0, NULL, PSL$C_USER, 0);
-	if (SS$_NORMAL == status)
-		status = csa->jnl->jnllsb->cond;
+	/* We can get a jnl_file_lost before the file is even created, so locking is done only if the lock exist */
+	if (0 != csa->jnl->jnllsb->lockid)
+	{
+		was_lockid = TRUE;
+		status = gtm_enqw(EFN$C_ENF, LCK$K_EXMODE, csa->jnl->jnllsb, LCK$M_CONVERT | LCK$M_NODLCKBLK,
+				NULL, 0, NULL, 0, NULL, PSL$C_USER, 0);
+		if (SS$_NORMAL == status)
+			status = csa->jnl->jnllsb->cond;
+	}
 	jnl_file_close(jpc->region, FALSE, FALSE);
-	if (SS$_NORMAL == status)
-		status = gtm_deq(csa->jnl->jnllsb->lockid, NULL, PSL$C_USER, 0);
-	if (SS$_NORMAL != status)
-		GTMASSERT;
+	if (was_lockid)
+	{
+		if (SS$_NORMAL == status)
+			status = gtm_deq(csa->jnl->jnllsb->lockid, NULL, PSL$C_USER, 0);
+		if (SS$_NORMAL != status)
+			GTMASSERT;
+	}
 # else
 	jnl_file_close(jpc->region, FALSE, FALSE);
 #endif
+	return EXIT_NRM;
 }

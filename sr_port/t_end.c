@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,22 +85,6 @@
 #include "bml_status_check.h"
 #include "is_proc_alive.h"
 
-#define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
-
-#define	RESTORE_CURRTN_IF_NEEDED(csa, write_inctn, decremented_currtn)					\
-{													\
-	if (write_inctn && decremented_currtn)								\
-	{	/* decremented curr_tn above; need to restore to original state due to the restart */	\
-		assert(csa->now_crit);									\
-		if (csa->now_crit)									\
-		{	/* need crit to update curr_tn and early_tn */					\
-			csa->ti->curr_tn++;								\
-			csa->ti->early_tn++;								\
-		}											\
-		decremented_currtn = FALSE;								\
-	}												\
-}
-
 GBLREF	bool			rc_locked;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
@@ -112,7 +96,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	short			dollar_tlevel;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	trans_num		start_tn;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err, process_id;
@@ -140,21 +124,36 @@ GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified
 GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by REORG UP/DOWNGRADE */
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-
+GBLREF	boolean_t		block_is_free;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 #endif
-
-#ifdef DEBUG
-GBLREF	uint4		donot_commit;		/* see gdsfhead.h for the purpose of this debug-only global */
-GBLREF	boolean_t	ready2signal_gvundef;	/* TRUE if GET operation is about to signal a GVUNDEF */
-GBLREF	boolean_t	gtm_gvundef_fatal;
-#endif
-
 #ifdef UNIX
 GBLREF	recvpool_addrs		recvpool;
 #endif
-GBLREF	boolean_t		block_is_free;
+
+error_def(ERR_GVKILLFAIL);
+error_def(ERR_GVPUTFAIL);
+error_def(ERR_JNLFILOPN);
+error_def(ERR_JNLFLUSH);
+error_def(ERR_NOTREPLICATED);
+error_def(ERR_TEXT);
+
+#define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
+
+#define	RESTORE_CURRTN_IF_NEEDED(csa, write_inctn, decremented_currtn)					\
+{													\
+	if (write_inctn && decremented_currtn)								\
+	{	/* decremented curr_tn above; need to restore to original state due to the restart */	\
+		assert(csa->now_crit);									\
+		if (csa->now_crit)									\
+		{	/* need crit to update curr_tn and early_tn */					\
+			csa->ti->curr_tn++;								\
+			csa->ti->early_tn++;								\
+		}											\
+		decremented_currtn = FALSE;								\
+	}												\
+}
 
 /* This macro isn't enclosed in parantheses to allow for optimizations */
 #define VALIDATE_CYCLE(is_mm, history)					\
@@ -172,7 +171,7 @@ if (history)								\
 	}								\
 }
 
-trans_num t_end(srch_hist *hist1, srch_hist *hist2)
+trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 {
 	srch_hist		*hist;
 	bt_rec_ptr_t		bt;
@@ -219,21 +218,16 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 #	ifdef GTM_TRIGGER
 	uint4			cycle;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_GVKILLFAIL);
-	error_def(ERR_GVPUTFAIL);
-	error_def(ERR_JNLFILOPN);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_NOTREPLICATED);
-	error_def(ERR_TEXT);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(hist1 != hist2);
 	DEBUG_ONLY(
 		/* Store global variable ready2signal_gvundef in a local variable and reset the global right away to ensure that
 		 * the global value does not incorrectly get carried over to the next call of "t_end".
 		 */
-		ready2signal_gvundef_lcl = ready2signal_gvundef;
-		ready2signal_gvundef = FALSE;
+		ready2signal_gvundef_lcl = TREF(ready2signal_gvundef);
+		TREF(ready2signal_gvundef) = FALSE;
 	)
 	csa = cs_addrs;
 	csd = csa->hdr;
@@ -242,7 +236,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	status = cdb_sc_normal;
 	assert(cs_data == csd);
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit);
-	assert(0 == dollar_tlevel);
+	assert(!dollar_tlevel);
 	/* whenever cw_set_depth is non-zero, ensure update_trans is also non-zero */
 	assert(!cw_set_depth || (UPDTRNS_DB_UPDATED_MASK == update_trans));
 	assert(cw_set_depth || !update_trans || gvdupsetnoop); /* whenever cw_set_depth is zero, ensure that update_trans
@@ -261,7 +255,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			VALIDATE_CYCLE(is_mm, hist1);	/* updates n_blks_validated */
 			VALIDATE_CYCLE(is_mm, hist2);	/* updates n_blks_validated */
 			/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
-			assert(!gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
+			assert(!TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
 			if (csa->now_crit && !csa->hold_onto_crit)
 				rel_crit(gv_cur_region);
 			if (unhandled_stale_timer_pop)
@@ -314,7 +308,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
 		jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 		read_before_image = ((NULL != jbbp) || csa->backup_in_prog || lcl_ss_in_prog);
-		for (cs = &cw_set[0], cs_top = cs + cw_depth; cs < cs_top; cs++)
+		for (cs = cw_set, cs_top = cs + cw_depth; cs < cs_top; cs++)
 		{
 			assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
 							 * t_write/t_create/t_write_map/t_write_root/mu_write_map [D9B11-001991] */
@@ -415,7 +409,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		 */
 		assert((CDB_CW_SET_SIZE * MAX_JNL_REC_SIZE + MAX_LOGI_JNL_REC_SIZE +
 			MIN_TOTAL_NONTPJNL_REC_SIZE + JNL_FILE_TAIL_PRESERVE) <= (JNL_AUTOSWITCHLIMIT_MIN * DISK_BLOCK_SIZE));
-		DEBUG_ONLY(tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size);)
+		DEBUG_ONLY(tot_jrec_size = MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size));
 		assert(tot_jrec_size <= csd->autoswitchlimit);
 		/* The SET_GBL_JREC_TIME done below should be done before any journal writing activity
 		 * on this region's journal file. This is because all the jnl record writing routines assume
@@ -476,37 +470,37 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	 */
 	release_crit = (CDB_STAGNATE - 1) > t_tries;
 	assert(!cw_depth || update_trans);
+#	ifdef GTM_TRIGGER
+	if (!skip_dbtriggers)
+	{
+		cycle = csd->db_trigger_cycle;
+		if (csa->db_trigger_cycle != cycle)
+		{	/* the process' view of the triggers could be potentially stale. restart to be safe. */
+			/* On an originating instance, in addition to the run-time, utilities can collide with
+			 * with concurrent triggers definition updates
+			 * The following asserts verify that:
+			 * (1) Activities on a replicating instance don't see concurrent trigger changes as update
+			 * process is the only updater in the replicating instance.
+			 * (2) Journal recover operates in standalone mode. So, it should NOT see any concurrent
+			 * trigger changes as well
+			 */
+			assert(!is_updproc);
+			assert(!jgbl.forw_phase_recovery);
+			assert(cycle > csa->db_trigger_cycle);
+			/* csa->db_trigger_cycle will be set to csd->db_trigger_cycle in t_retry */
+			status = cdb_sc_triggermod;
+			if ((CDB_STAGNATE - 1) == t_tries)
+				release_crit = TRUE;
+			goto failed;
+		}
+	}
+#	endif
 	/* If inctn_opcode has a valid value, then we better be doing an update. The only exception to this rule is if we are
 	 * in MUPIP REORG UPGRADE/DOWNGRADE (mu_reorg_upgrd_dwngrd.c) where update_trans is explicitly set to 0 in some cases.
 	 */
 	assert((inctn_invalid_op == inctn_opcode) || mu_reorg_upgrd_dwngrd_in_prog || update_trans);
 	if (update_trans)
 	{
-#		ifdef GTM_TRIGGER
-		if (!skip_dbtriggers)
-		{
-			cycle = csd->db_trigger_cycle;
-			if (csa->db_trigger_cycle != cycle)
-			{	/* the process' view of the triggers could be potentially stale. restart to be safe. */
-				/* On an originating instance, in addition to the run-time, utilities can collide with
-				 * with concurrent triggers definition updates
-				 * The following asserts verify that:
-				 * (1) Activities on a replicating instance don't see concurrent trigger changes as update
-				 * process is the only updater in the replicating instance.
-				 * (2) Journal recover operates in standalone mode. So, it should NOT see any concurrent
-				 * trigger changes as well
-				 */
-				assert(!is_updproc);
-				assert(!jgbl.forw_phase_recovery);
-				assert(cycle > csa->db_trigger_cycle);
-				/* csa->db_trigger_cycle will be set to csd->db_trigger_cycle in t_retry */
-				status = cdb_sc_triggermod;
-				if ((CDB_STAGNATE - 1) == t_tries)
-					release_crit = TRUE;
-				goto failed;
-			}
-		}
-#		endif
 		if (JNL_ALLOWED(csa))
 		{
 			if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
@@ -691,7 +685,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 							goto failed;
 						} else
 						{
-							status = gvincr_recompute_upd_array(t1, &cw_set[0], cr);
+							status = gvincr_recompute_upd_array(t1, cw_set, cr);
 							if (cdb_sc_normal != status)
 							{
 								status = cdb_sc_blkmod;
@@ -768,7 +762,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		DEBUG_GVT_CLUE_VALIDATE(gv_target);	/* Validate that gvt has valid first_rec, clue & last_rec fields */
 #	endif
 	/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
-	assert(!gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
+	assert(!TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
 	/* check bit maps for usage */
 	if (0 != cw_map_depth)
 	{	/* Bit maps on end from mu_reorg (from a call to mu_swap_blk) or mu_reorg_upgrd_dwngrd */
@@ -779,7 +773,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	for (cs = &cw_set[cw_bmp_depth], cs_top = &cw_set[cw_set_depth]; cs < cs_top; cs++)
 	{
 		assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
-						 * t_write/t_create/{t,mu}_write_map/t_write_root [D9B11-001991] */
+						 * t_write/t_create/{t,mu}_write_map/t_write_root [D9B11-001991]
+						 */
 		/* A bitmap block update will cause us to restart with "cdb_sc_bmlmod". TP transactions on the other hand
 		 * try reallocating blocks using the function "reallocate_bitmap". That is not presently used here because
 		 * there are cases like MUPIP REORG or MUPIP REORG UPGRADE etc. where we do not want this functionality.
@@ -991,7 +986,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			QWASSIGN(tjpl->write_addr, jpl->write_addr);
 			QWASSIGN(tjpl->write, jpl->write);
 			QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
-			INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size);)
+			INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size));
 			assert(jgbl.cumul_jnl_rec_len);
 			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + SIZEOF(jnldata_hdr_struct));
 			tjpl->write += SIZEOF(jnldata_hdr_struct);
@@ -1038,8 +1033,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			 */
 			assert(jgbl.gbl_jrec_time);
 			jnl_status = jnl_ensure_open();
-			assert((csa->jnl_state == csd->jnl_state) &&
-				(csa->jnl_before_image == csd->jnl_before_image));
 			GTM_WHITE_BOX_TEST(WBTEST_T_END_JNLFILOPN, jnl_status, ERR_JNLFILOPN);
 			if (jnl_status == 0)
 			{	/* tmp_cw_set_depth was used to do TOTAL_NONTPJNL_REC_SIZE calculation earlier in this function.
@@ -1052,6 +1045,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				assert(cw_set_depth == tmp_cw_set_depth
 					|| mu_reorg_upgrd_dwngrd_in_prog && cw_map_depth && cw_set_depth < tmp_cw_set_depth);
 				assert(jbp->before_images == csa->jnl_before_image);
+				assert((csa->jnl_state == csd->jnl_state) && (csa->jnl_before_image == csd->jnl_before_image));
 				if (DISK_BLOCKS_SUM(jbp->freeaddr, total_jnl_rec_size) > jbp->filesize)
 				{	/* Moved as part of change to prevent journal records splitting
 					 * across multiple generation journal files. */
@@ -1065,7 +1059,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						if ((CDB_STAGNATE - 1) == t_tries)
 							release_crit = TRUE;
 						goto failed;
-					} else if (-1 == jnl_file_extend(jpc, total_jnl_rec_size))
+					} else if (EXIT_ERR == jnl_file_extend(jpc, total_jnl_rec_size))
 					{
 						assert(csd == csa->hdr);	/* jnl_file_extend() shouldn't reset csd in MM */
 						assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
@@ -1103,10 +1097,17 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					}
 				}
 			} else
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+			{
+				if (SS_NORMAL != jpc->status)
+					rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region),
+						jpc->status);
+				else
+					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+			}
 		}
-		assert(!donot_commit);	/* We should never commit a transaction that was determined restartable */
-		blktn = dbtn;
+		assert(!TREF(donot_commit));	/* We should never commit a transaction that was determined restartable */
+		assert(TN_NOT_SPECIFIED > MAX_TN_V5); /* Ensure TN_NOT_SPECIFIED isn't a valid TN number */
+		blktn = (TN_NOT_SPECIFIED == ctn) ? dbtn : ctn;
 		csa->ti->early_tn = dbtn + 1;
 		if (JNL_ENABLED(csa))
 		{
@@ -1202,7 +1203,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			{	/* either DSE or MUPIP RECOVER playing an AIMG record */
 				assert(1 == cw_set_depth); /* only one block at a time */
 				assert(!replication);
-				cs = &cw_set[0];
+				cs = cw_set;
 				jnl_write_aimg_rec(csa, cs);
 			} else if (write_inctn)
 			{
@@ -1210,7 +1211,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				if ((inctn_blkupgrd == inctn_opcode) || (inctn_blkdwngrd == inctn_opcode))
 				{
 					assert(1 == cw_set_depth); /* upgrade/downgrade one block at a time */
-					cs = &cw_set[0];
+					cs = cw_set;
 					assert(inctn_detail.blknum_struct.blknum == cs->blk);
 					assert(mu_reorg_upgrd_dwngrd_blktn < dbtn);
 					if (mu_reorg_nosafejnl)
@@ -1249,7 +1250,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
 				jnl_write_logical(csa, non_tp_jfb_ptr);
 			} else
-                                jnl_write_ztp_logical(csa, non_tp_jfb_ptr);
+				jnl_write_ztp_logical(csa, non_tp_jfb_ptr);
 		}
 		if (replication)
 		{
@@ -1403,7 +1404,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		 * either one or no update.  If no update, we would have no cw_depth and we wouldn't enter
 		 * this path.  If there is an update, then both the indices should be 1.
 		 */
-		INT8_ONLY(assert(jgbl.cumul_index == jgbl.cu_jnl_index);)
+		INT8_ONLY(assert(jgbl.cumul_index == jgbl.cu_jnl_index));
 		jpl->lastwrite_len = jnl_header->jnldata_len;
 		/* For systems with UNORDERED memory access (example, ALPHA, POWER4, PA-RISC 2.0), on a
 		 * multi processor system, it is possible that the source server notices the change in
@@ -1516,7 +1517,6 @@ skip_cr_array:
 failed:
 	assert(cdb_sc_normal != status);
 	REVERT;
-
 failed_skip_revert:
 	RESTORE_CURRTN_IF_NEEDED(csa, write_inctn, decremented_currtn);
 	retvalue = t_commit_cleanup(status, 0);	/* we expect to get a return value indicating update was NOT underway */

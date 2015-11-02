@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 #include "filestruct.h"
 #include "gbldirnam.h"
 #include "hashtab_mname.h"
+#include "hashtab.h"
 
 #ifdef GTM64
 #define SAVE_ADDR_REGION			\
@@ -39,14 +40,6 @@
 #define SAVE_ADDR_REGION			\
 	*int4_ptr++ = (int4)addr->regions;
 #endif /* GTM64 */
-
-
-typedef struct gdr_name_struct
-{
-	mstr		name;
-	struct gdr_name	*link;
-	gd_addr		*gd_ptr;
-} gdr_name;
 
 static gdr_name	*gdr_name_head;
 
@@ -115,11 +108,13 @@ gd_addr *create_dummy_gbldir(void)
 	memcpy(region->rname,"DEFAULT",7);
 
 	for (map = addr->maps, map_top = map + addr->n_maps; map < map_top ; map++)
-	{	t_offset = map->reg.offset;
+	{
+		t_offset = map->reg.offset;
 		map->reg.addr = (gd_region *)((char *)addr + t_offset);
 	}
 	for (region = addr->regions, region_top = region + addr->n_regions; region < region_top ; region++)
-	{	t_offset = region->dyn.offset;
+	{
+		t_offset = region->dyn.offset;
 		region->dyn.addr = (gd_segment *)((char *)addr + t_offset);
 	}
 	/* Should be using gd_id_ptr_t below, but ok for now since malloc won't return > 4G
@@ -129,12 +124,12 @@ gd_addr *create_dummy_gbldir(void)
 	memset(addr->id, 0, SIZEOF(gd_id));
 
 	addr->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
-	init_hashtab_mname((hash_table_mname *)addr->tab_ptr,0);
+	init_hashtab_mname((hash_table_mname *)addr->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE );
 
 	name = (gdr_name *)malloc(SIZEOF(gdr_name));
 	MALLOC_CPY_LIT(name->name.addr, "DUMMY.GLD");
 	if (gdr_name_head)
-		name->link = (struct gdr_name *)gdr_name_head;
+		name->link = (gdr_name *)gdr_name_head;
 	else
 		name->link = 0;
 	gdr_name_head = name;

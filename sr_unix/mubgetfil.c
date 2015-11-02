@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,9 +109,10 @@ bool mubgetfil(backup_reg_list *list, char *name, unsigned short len)
 		mubexpfilnam(name, len, list);
 	} else
 	{	/* the file already exists */
-		util_out_print("File !AD already exists.", TRUE, len, name);
-		error_mupip = TRUE;
-		return FALSE;
+		list->backup_file.len = len;
+		list->backup_file.addr = (char *)malloc(len + 1);
+		memcpy(list->backup_file.addr, name, len);
+		*(list->backup_file.addr + len) = 0;
 	}
 	name[len] = temp;
 	return TRUE;

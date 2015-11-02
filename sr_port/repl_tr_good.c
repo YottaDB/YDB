@@ -65,7 +65,7 @@ boolean_t repl_tr_good(uchar_ptr_t tr, int tr_len, seq_num seqno)
 				}
 			} else
 			{
-				if (!IS_SET_KILL_ZKILL(rectype) && JRT_NULL != rectype)
+				if (!IS_SET_KILL_ZKILL_ZTRIG(rectype) && JRT_NULL != rectype)
 				{
 					assert(FALSE);
 					return FALSE;

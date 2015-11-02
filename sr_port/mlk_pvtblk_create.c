@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 
 /*the header files below are for environment translation*/
 #ifdef UNIX
-#include "lv_val.h"
+#include "lv_val.h"	/* needed for "fgncalsp.h" */
 #include "fgncalsp.h"
 #endif
 #include "gtm_env_xlate_init.h"

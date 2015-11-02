@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,22 +10,17 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "hashtab_mname.h"	/* needed for lv_val.h */
-#include "lv_val.h"
-#include "sbs_blk.h"
-#include "collseq.h"
-#include "stringpool.h"
-#include "do_xform.h"
-#include "mvalconv.h"
 
-GBLREF	boolean_t	in_op_fnnext;
+#include "lv_val.h"
 
 void op_fnnext(lv_val *src, mval *key, mval *dst)
 {
+	DCL_THREADGBL_ACCESS;
 
-	assert(!in_op_fnnext);
-	in_op_fnnext = TRUE;
+	SETUP_THREADGBL_ACCESS;
+	assert(!TREF(in_op_fnnext));
+	TREF(in_op_fnnext) = TRUE;
 	op_fnorder(src, key, dst);
-	assert(!in_op_fnnext); /* should have been reset by op_fnorder */
-	in_op_fnnext = FALSE;
+	assert(!TREF(in_op_fnnext)); /* should have been reset by op_fnorder */
+	TREF(in_op_fnnext) = FALSE;
 }

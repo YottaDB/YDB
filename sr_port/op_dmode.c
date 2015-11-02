@@ -53,7 +53,9 @@ GBLREF	io_pair		io_std_device;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	unsigned char	*restart_pc;
 GBLREF	unsigned char	*restart_ctxt;
-GBLREF	mstr		gtmprompt;
+
+error_def(ERR_NOTPRINCIO);
+error_def(ERR_NOPRINCIO);
 
 void	op_dmode(void)
 {
@@ -61,16 +63,15 @@ void	op_dmode(void)
 	mval		prompt, dummy, *input_line;
 	static io_pair	save_device;
 	static bool	dmode_intruptd;
-#ifdef UNIX
+#	ifdef UNIX
 	static int	loop_cnt = 0;
 	static int	old_errno = 0;
 	d_tt_struct	*tt_ptr;
-#endif
+#	endif
 	static bool	kill = FALSE;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_NOTPRINCIO);
-	error_def(ERR_NOPRINCIO);
-
+	SETUP_THREADGBL_ACCESS;
 	dummy.mvtype = dummy.str.len = 0;
 	input_line = push_mval(&dummy);
 	if (dmode_intruptd)
@@ -97,7 +98,7 @@ void	op_dmode(void)
 	and an eventual return to this location.
 	*****************************************************/
 
-#ifdef UNIX
+#	ifdef UNIX
 	if ((loop_cnt > 0) && (errno == old_errno))
 	{	/* Tried and failed 2x to write to principal device */
 		kill = TRUE;
@@ -106,12 +107,12 @@ void	op_dmode(void)
 	}
 	++loop_cnt;
 	old_errno = errno;
-#endif
+#	endif
 
 	*((INTPTR_T **)&restart_pc) = (INTPTR_T *)CODE_ADDRESS(call_dm);
 	*((INTPTR_T **)&restart_ctxt) = (INTPTR_T *)GTM_CONTEXT(call_dm);
 
-#ifdef UNIX
+#	ifdef UNIX
 	loop_cnt = 0;
 	old_errno = 0;
 	if (tt == io_curr_device.in->type)
@@ -119,7 +120,7 @@ void	op_dmode(void)
 	else
 		tt_ptr = NULL;
 	if (!tt_ptr || !tt_ptr->mupintr)
-#endif
+#	endif
 		op_wteol(1);
 
 	TPNOTACID_CHECK(DIRECTMODESTR);
@@ -128,7 +129,7 @@ void	op_dmode(void)
 	else
 	{
 		prompt.mvtype = MV_STR;
-		prompt.str = gtmprompt;
+		prompt.str = TREF(gtmprompt);
 		op_write(&prompt);
 		op_read(input_line, NO_M_TIMEOUT);
 	}
