@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #ifndef SOURCE_FILE_INCLUDED
 #define SOURCE_FILE_INCLUDED
 
-void    compile_source_file(unsigned short flen, char *faddr);
+void    compile_source_file(unsigned short flen, char *faddr, boolean_t mExtReqd);
 bool    open_source_file (void);
 int4    read_source_file (void);
 void    close_source_file (void);

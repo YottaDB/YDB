@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ MSTR_CONST(regkeyword, REG_KEYWORD);
 MSTR_CONST(keywordseparator, KEYWORD_SEPARATOR);
 MSTR_CONST(keywordterminator, KEYWORD_TERMINATOR);
 
-STATICFNREF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats);
+STATICFNDCL void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats);
 
 STATICFNDEF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats)
 {
@@ -79,7 +79,7 @@ void zshow_gvstats(zshow_out *output)
 	sgmnt_addrs		*csa;
 	enum db_acc_method	acc_meth;
 
-	memset(&cumul_gvstats, 0, sizeof(gvstats_rec_t));
+	memset(&cumul_gvstats, 0, SIZEOF(gvstats_rec_t));
 	/* First determine aggregated statistics across ALL <gld,reg> combinations */
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{

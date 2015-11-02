@@ -71,7 +71,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 		}
 		temp_1 = 1;
 		if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
-				SOL_SOCKET, SO_REUSEADDR, &temp_1, sizeof(temp_1)))
+				SOL_SOCKET, SO_REUSEADDR, &temp_1, SIZEOF(temp_1)))
 		{
 		        real_errno = errno;
 			errptr = (char *)STRERROR(real_errno);
@@ -83,7 +83,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 #ifdef TCP_NODELAY
 		temp_1 = socketptr->nodelay ? 1 : 0;
 		if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
-				IPPROTO_TCP, TCP_NODELAY, &temp_1, sizeof(temp_1)))
+				IPPROTO_TCP, TCP_NODELAY, &temp_1, SIZEOF(temp_1)))
 		{
 		        real_errno = errno;
 			errptr = (char *)STRERROR(real_errno);
@@ -96,7 +96,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 		if (update_bufsiz)
 		{
 			if (-1 == tcp_routines.aa_setsockopt(socketptr->sd,
-				SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, sizeof(socketptr->bufsiz)))
+				SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, SIZEOF(socketptr->bufsiz)))
 			{
 			        real_errno = errno;
 				errptr = (char *)STRERROR(real_errno);
@@ -107,7 +107,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 			}
 		} else
 		{
-			sockbuflen = sizeof(socketptr->bufsiz);
+			sockbuflen = SIZEOF(socketptr->bufsiz);
 			if (-1 == tcp_routines.aa_getsockopt(socketptr->sd,
 				SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, &sockbuflen))
 			{
@@ -120,7 +120,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
 			}
 		}
 		temp_1 = tcp_routines.aa_bind(socketptr->sd,
-				(struct sockaddr *)&socketptr->local.sin, sizeof(struct sockaddr));
+				(struct sockaddr *)&socketptr->local.sin, SIZEOF(struct sockaddr));
 		if (temp_1 < 0)
 		{
 			real_errno = errno;
@@ -164,7 +164,7 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update
         	socketptr->local.port = actual_port;
        	assert(socketptr->local.port == actual_port);
 	socketptr->state = socket_bound;
-	len = sizeof(BOUND) - 1;
+	len = SIZEOF(BOUND) - 1;
         memcpy(&dsocketptr->dollar_key[0], BOUND, len);
         dsocketptr->dollar_key[len++] = '|';
         memcpy(&dsocketptr->dollar_key[len], socketptr->handle, socketptr->handle_len);

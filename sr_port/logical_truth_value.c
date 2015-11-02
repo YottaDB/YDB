@@ -44,7 +44,7 @@ boolean_t logical_truth_value(mstr *log, boolean_t negate, boolean_t *is_defined
 	tn.addr = buf;
 	if (NULL != is_defined)
 		*is_defined = FALSE;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(log, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(log, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
 	{
 		if (NULL != is_defined)
 			*is_defined = TRUE;
@@ -75,7 +75,7 @@ boolean_t logical_truth_value(mstr *log, boolean_t negate, boolean_t *is_defined
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
 	{
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log->len, log->addr, sizeof(buf) - 1);
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log->len, log->addr, SIZEOF(buf) - 1);
 		return (FALSE);
 	}
 #	endif

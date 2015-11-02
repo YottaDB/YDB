@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,8 +85,8 @@ boolean_t dse_r_dmp(void)
 
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
-	else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-		b_top = bp + sizeof(blk_hdr);
+	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+		b_top = bp + SIZEOF(blk_hdr);
 	else
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
 

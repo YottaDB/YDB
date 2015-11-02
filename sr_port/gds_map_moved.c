@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,12 +27,11 @@
 #include "hashtab.h"
 #include "hashtab_mname.h"
 #include "dpgbldir.h"
+#include "gtmimagename.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF boolean_t	run_time;
 GBLREF gd_addr		*gd_header;
-GBLREF hash_table_mname	*gd_tab_ptr;
 
 void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top, off_t new_eof)
 {
@@ -47,10 +46,10 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 
 	assert(cs_addrs->now_crit);
 	/* It's possible to arrive here via mupip_backup --> wcs_flu --> wcs_mm_recover --> gds_map_moved and have
-	 * cs_addrs->dir_tree be NULL.  To distinguish that case, we can also check run_time (which would be FALSE)
+	 * cs_addrs->dir_tree be NULL.  To distinguish that case, we can also check if this this is the GTM image
 	 * in the following assert and then return because there's nothing to do here.
 	 */
-	assert((FALSE == run_time) || ((NULL != cs_addrs->dir_tree) && (NULL != &cs_addrs->dir_tree->hist)));
+	assert(!IS_GTM_IMAGE || ((NULL != cs_addrs->dir_tree) && (NULL != &cs_addrs->dir_tree->hist)));
 	/* This initialization has to be done irrespective of whether new_base is different from old_base or not. */
 	cs_data = cs_addrs->hdr = (sgmnt_data_ptr_t)new_base;
 	cs_addrs->db_addrs[1] = new_base + new_eof - 1;
@@ -90,16 +89,10 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 	 * In this case, the search histories in the gv_targets hash tables of all those glds should be fixed.  Hence,
 	 * we go through all open glds (instead of just the currently active gd_header).
 	 */
-	if (NULL != gd_tab_ptr)
-		tbl = gd_tab_ptr;
-	else
+	assert(NULL != get_next_gdr(NULL));	/* assert that we have at least one open global directory */
+	for (addr_ptr = get_next_gdr(NULL); NULL != addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
-		addr_ptr = get_next_gdr(NULL);
-		assert(NULL != addr_ptr);
 		tbl = addr_ptr->tab_ptr;
-	}
-	for ( ; ; tbl = addr_ptr->tab_ptr)
-	{
 		assert(NULL != tbl);
 		for (tabent = tbl->base, topent = tbl->top; tabent < topent; tabent++)
 		{
@@ -137,8 +130,6 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 				}
 			}
 		}
-		if ((NULL != gd_tab_ptr) || (NULL == (addr_ptr = get_next_gdr(addr_ptr))))
-			break;
 	}
 	return;
 }

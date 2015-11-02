@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,101 +20,100 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "copy.h"
-#include "gdscc.h"
-#include "filestruct.h"
-#include "jnl.h"
+#include "gdscc.h"		/* needed for tp.h */
+#include "filestruct.h"		/* needed for tp.h */
+#include "jnl.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "op.h"
-#include "gvcst_protos.h"	/* for gvcst_root_search prototype */
-#include "tp_set_sgm.h"
 
 #define DIR_ROOT 1
 
-GBLREF	gd_addr		*gd_header;
-GBLREF	gd_binding	*gd_map;
+GBLREF	bool		gv_curr_subsc_null;
+GBLREF	bool		gv_prev_subsc_null;
 GBLREF	gd_addr		*gd_targ_addr;
+GBLREF	gd_binding	*gd_map;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
+GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	sgm_info	*first_sgm_info;
+GBLREF	sgmnt_data	*cs_data;
 GBLREF	short		dollar_tlevel;
-GBLREF	bool		gv_curr_subsc_null;
-GBLREF	bool		gv_prev_subsc_null;
 
-void op_gvrectarg (mval *v)
+void op_gvrectarg(mval *v)
 {
-	int		len, n;
-	mstr		temp;
-	unsigned char	*c;
+	int			len;
+	unsigned char		*c;
+	short			end;
+	gd_region		*reg;
+	gvsavtarg_t		*gvsavtarg, gvst_tmp;
+	DEBUG_ONLY(
+		int		n;
+		unsigned char	*tmpc;
+	)
 
-	/* You might be somewhat apprehensive at the seemingly cavalier use of GTMASSERT
-		in this routine.  First, let me explain myself.  The mvals passed to
-		RECTARG are supposed to come only from SAVTARG, and are to represent
-		the state of gv_currkey when SAVTARG was done.  Consequently, there are
-		certain preconditions that one can expect.  Namely,
-
-	1)	SAVTARG makes all mvals MV_STR's.  If this one isn't, it should be.
-   	2)	If gv_currkey existed for SAVTARG (len is > 0), it had better exist for RECTARG.
-	3)	All gv_keys end with 00.  When reading this mval, if you run out of characters
-		before you see a 0, something is amiss.
-	*/
-
+	/* You might be somewhat apprehensive at the seemingly cavalier use of GTMASSERT in this routine.
+	 * First, let me explain myself.  The mvals passed to RECTARG are supposed to come only from SAVTARG,
+	 * and are to represent the state of gv_currkey when SAVTARG was done.  Consequently, there are
+	 * certain preconditions that one can expect.  Namely,
+	 *	1) SAVTARG makes all mvals MV_STR's.  If this one isn't, it should be.
+	 *	2) If gv_currkey existed for SAVTARG (len is > 0), it had better exist for RECTARG.
+	 *	3) All gv_keys end with 00.  When reading this mval, if you run out of characters
+	 *		before you see a 0, something is amiss.
+	 */
 	if (!MV_IS_STRING(v))
 		GTMASSERT;
-
-	n = len = v->str.len - SIZEOF(short) - SIZEOF(gd_targ_addr) - SIZEOF(gv_curr_subsc_null) - SIZEOF(gv_prev_subsc_null);
-	if (len <= 0)
+	len = v->str.len;
+	if (0 == len)
 	{
-		if (gv_currkey)
-		{	/* the following code (reset gv_currkey) should be maintained in parallel with similar code in op_svput.c */
+		if (NULL != gv_currkey)
+		{	/* Reset gv_currkey.
+			 * The following code (should be maintained in parallel with similar code in op_svput.c.
+			 */
 			gv_currkey->end = gv_currkey->prev = 0;
-			gv_currkey->base[0] = '\0';
+			gv_currkey->base[0] = KEY_DELIMITER;
 		}
 		return;
 	}
-	if (!gv_currkey)
+	if (NULL == gv_currkey)
 		GTMASSERT;
-
-	c = (unsigned char *) (v->str.addr + sizeof(short) + sizeof(gd_targ_addr)
-				+ sizeof(gv_curr_subsc_null) + sizeof(gv_prev_subsc_null));
-	temp.addr = (char *)c;
-	while (*c++)
-	{	n--;
-		if (n <= 0)
-			GTMASSERT;
-	}
-
-	temp.len = INTCAST((char *)c - temp.addr - 1);
-	if ((NULL != gd_header) && (gd_header->maps == gd_map)
-	    && (0 == gv_currkey->base[temp.len]) && (0 == memcmp(gv_currkey->base, temp.addr, temp.len)))
-	{
-		gv_currkey->end = temp.len + 1;
-		gv_currkey->prev = 0;
-		gv_currkey->base[temp.len + 1] = 0;
-		if (gv_cur_region->dyn.addr->acc_meth == dba_bg || gv_cur_region->dyn.addr->acc_meth == dba_mm)
-		{
-			if (dollar_tlevel != 0  &&  first_sgm_info == NULL)
-				tp_set_sgm();
-			if (gv_target->root == 0 || gv_target->root == DIR_ROOT)
-				gvcst_root_search();
-		}
-	} else
-	{
-		memcpy(&gd_targ_addr, v->str.addr + sizeof(short), sizeof(gd_targ_addr));
-		gv_bind_name(gd_targ_addr, &(temp));
-	}
+	assert(GVSAVTARG_FIXED_SIZE <= len);
 	c = (unsigned char *)v->str.addr;
-	GET_SHORT(gv_currkey->prev,c);
-	c += sizeof(short) + sizeof(gd_targ_addr);
-	memcpy(&gv_curr_subsc_null, c, sizeof(gv_curr_subsc_null));
-	c += sizeof(gv_curr_subsc_null);
-	memcpy(&gv_prev_subsc_null, c, sizeof(gv_prev_subsc_null));
-	c += sizeof(gv_prev_subsc_null);
-	gv_currkey->end  = len;
-	memcpy(gv_currkey->base, c, len);
-	gv_currkey->base[len] = 0;
+	/* op_gvsavtarg had ensured 8-byte alignment of v->str.addr but it is possible a "stp_gcol" was invoked in between
+	 * which could have repointed v->str.addr to a non-8-byte-aligned address. In this rare case, do special processing
+	 * before dereferencing the fields of the structure.
+	 */
+	if ((UINTPTR_T)c == ROUND_UP2((UINTPTR_T)c, GVSAVTARG_ALIGN_BNDRY))
+		gvsavtarg = (gvsavtarg_t *)c;
+	else
+	{
+		gvsavtarg = &gvst_tmp;
+		memcpy(gvsavtarg, c, GVSAVTARG_FIXED_SIZE);
+	}
+	gd_targ_addr = gvsavtarg->gd_targ_addr;
+	gd_map = gvsavtarg->gd_map;
+	reg = gvsavtarg->gv_cur_region;
+	TP_CHANGE_REG(reg);	/* sets gv_cur_region, cs_addrs, cs_data */
+	gv_target = gvsavtarg->gv_target;
+	if (dollar_tlevel)
+		sgm_info_ptr = gvsavtarg->sgm_info_ptr;
+	assert(dollar_tlevel || (NULL == sgm_info_ptr));
+	gv_curr_subsc_null = gvsavtarg->gv_curr_subsc_null;
+	gv_prev_subsc_null = gvsavtarg->gv_prev_subsc_null;
+	gv_currkey->prev = gvsavtarg->prev;
+	gv_currkey->end = end = gvsavtarg->end;
+	assert(gv_currkey->end < gv_currkey->top);
+	c += GVSAVTARG_FIXED_SIZE;
+	assert(end == (len - GVSAVTARG_FIXED_SIZE));
+	if (0 < end)
+	{
+		memcpy(gv_currkey->base, c, end);
+		assert(KEY_DELIMITER == gv_currkey->base[end - 1]);
+	}
+	gv_currkey->base[end] = KEY_DELIMITER;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 	return;
 }

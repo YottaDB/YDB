@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 	assert(csa->now_crit || (ctn < csa->hdr->trans_hist.curr_tn));
 	assert(!csa->now_crit || (ctn == csa->hdr->trans_hist.curr_tn));
 	((blk_hdr *)base_addr)->tn = ctn;
-	base_addr += sizeof(blk_hdr);
+	base_addr += SIZEOF(blk_hdr);
 	if (!GTM_PROBE(bplmap / 8, base_addr, WRITE))
 	{
 		assert(FALSE);
@@ -44,13 +44,13 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 	busy = (cs->reference_cnt > 0);
 	if (!busy)
 	{
-		if (!GTM_PROBE(sizeof(sgmnt_addrs), csa, READ))
+		if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, READ))
 		{
 			assert(FALSE);
 			return FALSE;
 		}
 		csd = csa->hdr;
-		if (!GTM_PROBE(sizeof(sgmnt_data), csd, READ))
+		if (!GTM_PROBE(SIZEOF(sgmnt_data), csd, READ))
 		{
 			assert(FALSE);
 			return FALSE;
@@ -60,7 +60,7 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 	DEBUG_ONLY(prev_bitnum = -1;)
 	for (;;)
 	{
-		if (!GTM_PROBE(sizeof(*array), array, READ))
+		if (!GTM_PROBE(SIZEOF(*array), array, READ))
 		{
 			assert(FALSE);
 			return FALSE;
@@ -76,7 +76,7 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 		DEBUG_ONLY(prev_bitnum = (int4)bitnum);
 		setbit = bitnum * BML_BITS_PER_BLK;
 		ptr = base_addr + setbit / 8;
-		if (!GTM_PROBE(sizeof(*ptr), ptr, WRITE))
+		if (!GTM_PROBE(SIZEOF(*ptr), ptr, WRITE))
 		{
 			assert(FALSE);
 			return FALSE;

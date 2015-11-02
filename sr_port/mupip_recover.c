@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,9 @@
 #include "gtmmsg.h"
 #include "mupip_recover.h"
 #include "wbox_test_init.h"
-
+#ifdef GTM_TRIGGER
+#include "error_trap.h"
+#endif
 #ifdef UNIX
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -70,15 +72,20 @@ GBLREF 	jnl_gbls_t		jgbl;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF  jnl_process_vector	*prc_vec;
-
 #ifdef UNIX
 GBLREF	jnlpool_addrs		jnlpool;
+#endif
+#ifdef GTM_TRIGGER
+DEBUG_ONLY(GBLREF ch_ret_type	(*ch_at_trigger_init)();)
+GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
 #endif
 
 void		gtm_ret_code();
 
 CONDITION_HANDLER(mupip_recover_ch)
 {
+	int	rc;
+
 	error_def(ERR_TPRETRY);
 	error_def(ERR_ASSERT);
 	error_def(ERR_GTMCHECK);
@@ -86,13 +93,15 @@ CONDITION_HANDLER(mupip_recover_ch)
         error_def(ERR_MEMORY);
         error_def(ERR_VMSMEMORY);
 	error_def(ERR_STACKOFLOW);
+	error_def(ERR_REPEATERROR);
 
 	START_CH;
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		assert(gtm_white_box_test_case_enabled && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
 		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
-		tp_restart(1);			/* This SHOULD generate an error (TPFAIL or other) */
+		rc = tp_restart(1);			/* This SHOULD generate an error (TPFAIL or other) */
+		GTMTRIG_ONLY(assert(ERR_TPRETRY != rc));
 #ifdef UNIX
 		if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
 #elif defined VMS
@@ -109,12 +118,16 @@ CONDITION_HANDLER(mupip_recover_ch)
 			   information with that saved from tp_restart. */
 			/* Assert we have room for these arguments - the array malloc is in tp_restart */
 			assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-			memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * sizeof(int));
+			memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * SIZEOF(int));
 			tp_restart_fail_sig_used = FALSE;
 		}
 #endif
 		/* At this point SIGNAL would correspond to TPFAIL (not a TPRETRY) error */
 	}
+#	ifdef GTM_TRIGGER
+	else if (ERR_REPEATERROR == SIGNAL)
+		SIGNAL = dollar_ecode.error_last_ecode;	/* Error rethrown from a trigger */
+#	endif
 	if (SEVERITY == SEVERE || DUMP || SEVERITY == ERROR)
 	{
 		/* Dont do a PRN_ERROR here as NEXTCH will transfer control to util_base_ch() which does the PRN_ERROR for us */
@@ -157,6 +170,7 @@ void	mupip_recover(void)
 	error_def(ERR_RLBKLOSTTNONLY);
 
 	ESTABLISH(mupip_recover_ch);
+	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mupip_recover_ch);
 	/* PHASE 1: Process user input, open journal files, create rctl for phase 2 */
 	JNL_PUT_MSG_PROGRESS("Initial processing started");
 	mur_init();
@@ -248,14 +262,17 @@ void	mupip_recover(void)
 	}
 	if (mur_options.update && intrrupted_recov_processing)
 	{
-		assert(!mur_options.rollback_losttnonly);
 		JNL_PUT_MSG_PROGRESS("Interrupted recovery processing started");
 		/* Additional steps because recover was interrupted earlier */
+		assert(!mur_options.rollback_losttnonly);
+		murgbl.ok_to_update_db = TRUE;	/* Allow db to be updated by the PBLKs */
 		if (SS_NORMAL != mur_apply_pblk(TRUE))
 			mupip_exit(ERR_MUNOACTION);
+		murgbl.ok_to_update_db = FALSE;	/* Reset flag until it is safe to allow updates to the db */
 		if (!mur_jctl_from_next_gen())
 			mupip_exit(ERR_MUNOACTION);
 	}
+	assert(FALSE == murgbl.ok_to_update_db);
 	if (mur_options.rollback_losttnonly)
 		gtm_putmsg(VARLSTCNT(1) ERR_RLBKLOSTTNONLY);
 	/* The current resync_seqno of this replication instance needs to be calculated before the call to "gtmrecv_fetchresync" */
@@ -328,7 +345,8 @@ void	mupip_recover(void)
 
 	/* PHASE 2: Create list of broken transactions for both forward and backward recovery
 	 *          In addition apply PBLK for backward recover with noverify */
-	apply_pblk = (mur_options.update && !mur_options.forward && !mur_options.verify);
+	apply_pblk = (mur_options.update && !mur_options.forward && !mur_options.rollback_losttnonly && !mur_options.verify);
+	murgbl.ok_to_update_db = apply_pblk;	/* Allow db to be updated by the PBLKs if we chose to apply them */
 	if (!mur_back_process(apply_pblk, &losttn_seqno))
 		mupip_exit(ERR_MUNOACTION);
 	if (!mur_options.rollback)
@@ -386,7 +404,15 @@ void	mupip_recover(void)
 			 * invoke "mur_apply_pblk" as it does other things that we need.
 			 */
 			if (!mur_options.rollback_losttnonly)
+			{
 				JNL_PUT_MSG_PROGRESS("Before image applying started");
+				/* At this time, murgbl.ok_to_update_db could be FALSE if mur_options.verify was TRUE.
+				 * Set it to TRUE to let updates to the database now that journals have been verified to be clean.
+				 */
+				assert(mur_options.verify || murgbl.ok_to_update_db);
+				assert(!mur_options.verify || !murgbl.ok_to_update_db);
+				murgbl.ok_to_update_db = TRUE;
+			}
 			if (SS_NORMAL != mur_apply_pblk(FALSE))
 				mupip_exit(ERR_MUNOACTION);
 
@@ -412,9 +438,10 @@ void	mupip_recover(void)
 		}
 		min_broken_time = MAXUINT4;
 	}
+	murgbl.ok_to_update_db = (mur_options.update && !mur_options.rollback_losttnonly);
 	if (SS_NORMAL != mur_forward(min_broken_time, min_broken_seqno, losttn_seqno))
 		mupip_exit(ERR_MUNOACTION);
-	prc_vec = murgbl.prc_vec;
+	assert(prc_vec == murgbl.prc_vec);	/* should have been modified temporarily but finally reset by mur_forward */
 	if (mur_options.show)
 		mur_output_show();
 

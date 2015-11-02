@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,10 +29,10 @@ GBLREF symval		*curr_symval;
 GBLREF short		dollar_tlevel;
 
 /* Operation - Copy alias container to another alias container
-
-   Note that this cannot happen as the result of a normal copy via regular SET command (we
-   do not allow it).
-*/
+ *
+ * Note that this cannot happen as the result of a normal copy via regular SET command (we
+ * do not allow it).
+ */
 void op_setalsct2alsct(lv_val *srclv, lv_val *dstlv)
 {
 	lv_val		*lvref, *tp_val;
@@ -70,14 +70,14 @@ void op_setalsct2alsct(lv_val *srclv, lv_val *dstlv)
 		INCR_TREFCNT(lvref);
 		INCR_CREFCNT(lvref);
 		/* Potentially 3 symvals need to be marked active. Pick the oldest of them to feed to the
-		   macro to get them all marked. */
+		 * macro to get them all marked. */
 		MARK_ALIAS_ACTIVE(MIN(MIN(srclv->ptrs.val_ent.parent.sbs->sym->symvlvl,
 					  dstlv->ptrs.val_ent.parent.sbs->sym->symvlvl),
 				      lvref->ptrs.val_ent.parent.sym->symvlvl));
+		/* Last operation is to mark the base var for our container array that it now has a container in it.
+		 * But first it must be found by going backwards through the levels.
+		 */
+		MARK_CONTAINER_ONBOARD(dstlv);
 	}
 	assert(lvref->stats.trefcnt >= lvref->stats.crefcnt);
-	/* Last operation is to mark the base var for our container array that it now has a container in it.
-	   But first it must be found by going backwards through the levels.
-	*/
-	MARK_CONTAINER_ONBOARD(dstlv);
 }

@@ -56,7 +56,7 @@ bool incr_link(int file_desc)
 	int4 		rhd_diff,lab_miss_off,*olnt_ent,*olnt_top, read_size;
 	char		*literal_ptr;
 	var_tabent	*curvar;
-	char		module_name[sizeof(mident_fixed)];
+	char		module_name[SIZEOF(mident_fixed)];
 	lab_tabent	*lbt_ent, *lbt_bot, *lbt_top, *olbt_ent, *olbt_bot, *olbt_top, *curlab;
 	urx_rtnref	urx_lcl_anchor;
 	int		order;
@@ -72,8 +72,8 @@ bool incr_link(int file_desc)
 	urx_lcl_anchor.next = 0;
 	code = NULL;
 
-	DOREADRL(file_desc, &file_hdr, sizeof(file_hdr), read_size);
-	if (read_size != sizeof(file_hdr))
+	DOREADRL(file_desc, &file_hdr, SIZEOF(file_hdr), read_size);
+	if (read_size != SIZEOF(file_hdr))
 	{
 		if (-1 == read_size)
 		{
@@ -105,7 +105,7 @@ bool incr_link(int file_desc)
 			zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("reading code"));
 	}
 	hdr = (rhdtyp *)code;
-	if (memcmp(&hdr->jsb[0], "GTM_CODE", sizeof(hdr->jsb)))
+	if (memcmp(&hdr->jsb[0], "GTM_CODE", SIZEOF(hdr->jsb)))
 		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT, RTS_ERROR_TEXT("missing GTM_CODE"));
 	if ((hdr->compiler_qlf & CQ_UTF8) && !gtm_utf8_mode)
 		zl_error(file_desc, ERR_INVOBJ, ERR_TEXT,
@@ -196,14 +196,14 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 	urx_addr	*urx_tmpaddr;
 
 	res_root = 0;
-	numrel = (fhead->a_trsize + fhead->a_drsize) / sizeof(struct relocation_info);
-	if (numrel * sizeof(struct relocation_info) != fhead->a_trsize + fhead->a_drsize)
+	numrel = (fhead->a_trsize + fhead->a_drsize) / SIZEOF(struct relocation_info);
+	if (numrel * SIZEOF(struct relocation_info) != fhead->a_trsize + fhead->a_drsize)
 		return FALSE;
 
 	for ( ; numrel;)
 	{
 		rel_read = numrel < RELREAD ? numrel : RELREAD;
-		DOREADRC(file, rel, rel_read * sizeof(struct relocation_info), status);
+		DOREADRC(file, rel, rel_read * SIZEOF(struct relocation_info), status);
                 if (0 != status)
 		{
 			res_free(res_root);
@@ -212,7 +212,7 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 		numrel -= rel_read;
 		for (i = 0; i < rel_read; i++)
 		{	if (rel[i].r_extern)
-			{	new_res = (res_list *) malloc(sizeof(*new_res));
+			{	new_res = (res_list *) malloc(SIZEOF(*new_res));
 				new_res->symnum = rel[i].r_symbolnum;
 				new_res->addr = rel[i].r_address;
 				new_res->next = new_res->list = 0;
@@ -254,7 +254,7 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 		}
 	}
 	/* All relocations within the routine should have been done, so copy the routine_name */
-	assert(code->routine_name.len < sizeof(zlink_mname.c));
+	assert(code->routine_name.len < SIZEOF(zlink_mname.c));
 	memcpy(&zlink_mname.c[0], code->routine_name.addr, code->routine_name.len);
 	zlink_mname.c[code->routine_name.len] = 0;
 	if (!res_root)
@@ -264,13 +264,13 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 	{	res_free(res_root);
 		return FALSE;
 	}
-	DOREADRC(file, &string_size, sizeof(string_size), status);
+	DOREADRC(file, &string_size, SIZEOF(string_size), status);
 	if (0 != status)
 	{
 		res_free(res_root);
 		return FALSE;
 	}
-	string_size -= sizeof(string_size);
+	string_size -= SIZEOF(string_size);
 	symbols = malloc(string_size);
 	DOREADRC(file, symbols, string_size, status);
 	if (0 != status)
@@ -384,7 +384,7 @@ bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 			if (labsym)
 				urx_putlab(&labid.c[0], sym_size, urx_rp, ((char *)code) + res_root->addr);
 			else
-			{	urx_tmpaddr = (urx_addr *) malloc(sizeof(urx_addr));
+			{	urx_tmpaddr = (urx_addr *) malloc(SIZEOF(urx_addr));
 				urx_tmpaddr->next = urx_rp->addr;
 				urx_tmpaddr->addr = (INTPTR_T *)(((char *)code) + res_root->addr);
 				urx_rp->addr = urx_tmpaddr;

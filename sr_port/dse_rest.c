@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,7 +109,7 @@ void dse_rest(void)
 	if (cli_present("REGION") == CLI_PRESENT)
 	{
 
-		rn_len = sizeof(rn);
+		rn_len = SIZEOF(rn);
 		if (!cli_get_str("REGION", rn, &rn_len))
 			return;
 		for (i = rn_len; i < MAX_RN_LEN + 1; i++)
@@ -173,7 +173,7 @@ void dse_rest(void)
 	lbp = (uchar_ptr_t)patch_save_set[i].bp;
 
 	BLK_INIT(bs_ptr, bs1);
-	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + sizeof(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - sizeof(blk_hdr));
+	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		util_out_print("Error: bad blk build.", TRUE);

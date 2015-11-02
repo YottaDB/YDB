@@ -67,17 +67,17 @@ void	mu_int_err(
 	mu_int_errknt++;
 	mu_int_plen--;
 	util_len=0;
-	memcpy(&util_buff[util_len], NEWLINE, sizeof(NEWLINE) - 1);
+	memcpy(&util_buff[util_len], NEWLINE, SIZEOF(NEWLINE) - 1);
 	util_len += SIZEOF(NEWLINE) - 1;
 	i2hex_blkfill(mu_int_path[mu_int_plen], &util_buff[util_len], BLOCK_WINDOW);
 	util_len += BLOCK_WINDOW;
-	memcpy(&util_buff[util_len], TEXT1, sizeof(TEXT1) - 1);	/* OFFSET_WINDOW + 1 spaces */
+	memcpy(&util_buff[util_len], TEXT1, SIZEOF(TEXT1) - 1);	/* OFFSET_WINDOW + 1 spaces */
 	util_len += SIZEOF(TEXT3) - 1;				/* Using TEXT1 to clear space? */
 	i2hex_nofill(mu_int_offset[mu_int_plen], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
 	util_len += OFFSET_WINDOW + 1;
 	i2hex_blkfill(level, (uchar_ptr_t)&util_buff[util_len], LEVEL_WINDOW);
 	util_len += LEVEL_WINDOW;
-	memcpy(&util_buff[util_len], TEXT2, sizeof(TEXT2) - 1);
+	memcpy(&util_buff[util_len], TEXT2, SIZEOF(TEXT2) - 1);
 	util_len += SIZEOF(TEXT2) - 1;
 	util_buff[util_len] = 0;
 	gtm_putmsg(VARLSTCNT(4) err, 2, LEN_AND_STR((char*)util_buff));
@@ -89,16 +89,16 @@ void	mu_int_err(
 			for (i = 0;  trees->path[i + 1];  i++)
 			{
 				util_len = i2hex_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
-				memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
+				memcpy(&util_buff[util_len], TEXT3, SIZEOF(TEXT3) - 1);
 				util_len += SIZEOF(TEXT3) - 1;
 				util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
-				memcpy(&util_buff[util_len], TEXT4, sizeof(TEXT4) - 1);
+				memcpy(&util_buff[util_len], TEXT4, SIZEOF(TEXT4) - 1);
 				util_len += SIZEOF(TEXT4) - 1;
 				util_buff[util_len] = 0;
 				util_out_print((caddr_t)util_buff, FALSE);
 			}
 			util_len = i2hex_nofill(trees->path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
-			memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
+			memcpy(&util_buff[util_len], TEXT3, SIZEOF(TEXT3) - 1);
 			util_len += SIZEOF(TEXT3) - 1;
 			util_len += i2hex_nofill(trees->offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
 			util_buff[util_len] = 0;
@@ -109,16 +109,16 @@ void	mu_int_err(
 		for (i = 0;  i < mu_int_plen;  i++)
 		{
 			util_len = i2hex_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
-			memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
+			memcpy(&util_buff[util_len], TEXT3, SIZEOF(TEXT3) - 1);
 			util_len += SIZEOF(TEXT3) - 1;
 			util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
-			memcpy(&util_buff[util_len], TEXT4, sizeof(TEXT4) - 1);
+			memcpy(&util_buff[util_len], TEXT4, SIZEOF(TEXT4) - 1);
 			util_len += SIZEOF(TEXT4) - 1;
 			util_buff[util_len] = 0;
 			util_out_print((caddr_t)util_buff, FALSE);
 		}
 		util_len = i2hex_nofill(mu_int_path[i], (uchar_ptr_t)util_buff, BLOCK_WINDOW);
-		memcpy(&util_buff[util_len], TEXT3, sizeof(TEXT3) - 1);
+		memcpy(&util_buff[util_len], TEXT3, SIZEOF(TEXT3) - 1);
 		util_len += SIZEOF(TEXT3) - 1;
 		util_len += i2hex_nofill(mu_int_offset[i], (uchar_ptr_t)&util_buff[util_len], OFFSET_WINDOW);
 		util_buff[util_len] = 0;

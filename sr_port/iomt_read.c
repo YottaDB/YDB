@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +37,7 @@ int iomt_read(mval *v, int4 t)
 	assert(stringpool.free <= stringpool.top);
 	dv = io_curr_device.in;
 	mt_ptr = (d_mt_struct *) dv->dev_sp;
-	if (stringpool.free + mt_ptr->record_sz > stringpool.top)
-		stp_gcol(mt_ptr->record_sz);
+	ENSURE_STP_FREE_SPACE(mt_ptr->record_sz);
 	v->str.addr = (char *) stringpool.free;
 
 #ifdef UNIX

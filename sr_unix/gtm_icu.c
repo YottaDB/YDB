@@ -128,18 +128,21 @@ error_def(ERR_ICUVERLT36);
 static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char **major_verptr, char **minor_verptr)
 {
 	char		*ptr, *top, ch;
-	char		tmp_errstr[sizeof(GTM_ICU_VERSION) + STR_LIT_LEN(GTM_ICU_VERSION_SUFFIX)]; /* "$gtm_icu_version is" */
+	char		tmp_errstr[SIZEOF(GTM_ICU_VERSION) + STR_LIT_LEN(GTM_ICU_VERSION_SUFFIX)]; /* "$gtm_icu_version is" */
 	int4		major_ver, minor_ver;
+	boolean_t	dot_seen;
 
 	if (NULL == icu_ver_buf)
 		return FALSE;	/* empty string */
 	major_ver = 0;	/* Initialize to values that are guaranteed to be < 3.6 */
 	minor_ver = 0;	/* This way if these dont get set inside the for loop, the IS_ICU_VER* check fails later */
+	dot_seen = FALSE;
 	for (ptr = icu_ver_buf, top = ptr + len; ptr < top; ptr++)
 	{
 		ch = *ptr;
 		if ('.' == ch)
 		{	/* major version scanned. determine the integer value */
+			dot_seen = TRUE;
 			if (-1 == (major_ver = asc2i((uchar_ptr_t)icu_ver_buf, INTCAST(ptr - icu_ver_buf))))
 				return FALSE;
 			*ptr++ = '\0';	/* skip the '.' byte */
@@ -152,6 +155,8 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char **major_
 			break;
 		}
 	}
+	if (!dot_seen)
+		return FALSE;	/* empty minor version */
 	/* Check if the formatted version is greater than or equal to 3.6 */
 	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver)))
 	{
@@ -167,9 +172,9 @@ void gtm_icu_init(void)
 	char		*locale, *chset, *libname, err_msg[MAX_ERRSTR_LEN];
 	char		icu_final_fname[MAX_ICU_FNAME_LEN + 1 + MAX_ICU_VERSION_STRLEN];	/* 1 for '_' in between */
 	char		icu_ver_buf[MAX_ICU_VERSION_STRLEN];
-	char		tmp_errstr[sizeof(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX)]; /* "libicuio.so has version" */
+	char		tmp_errstr[SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX)]; /* "libicuio.so has version" */
 	char		*major_ver_ptr, *minor_ver_ptr;
-	char		icu_libname[sizeof(ICU_LIBNAME) + MAX_ICU_VERSION_STRLEN];
+	char		icu_libname[SIZEOF(ICU_LIBNAME) + MAX_ICU_VERSION_STRLEN];
 	const char	*cur_icu_fname;
 	int		icu_final_fname_len, icu_libname_len, len;
 	void_ptr_t	handle;
@@ -209,7 +214,7 @@ void gtm_icu_init(void)
 	icu_ver.addr = GTM_ICU_VERSION;
 	icu_ver.len = STR_LIT_LEN(GTM_ICU_VERSION);
 	gtm_icu_ver_defined = FALSE;
-	if (SS_NORMAL == TRANS_LOG_NAME(&icu_ver, &trans, icu_ver_buf, sizeof(icu_ver_buf), do_sendmsg_on_log2long))
+	if (SS_NORMAL == TRANS_LOG_NAME(&icu_ver, &trans, icu_ver_buf, SIZEOF(icu_ver_buf), do_sendmsg_on_log2long))
 	{	/* GTM_ICU_VERSION is defined. Do edit check on the value before considering it really defined */
 		gtm_icu_ver_defined = parse_gtm_icu_version(trans.addr, trans.len, &major_ver_ptr, &minor_ver_ptr);
 	}
@@ -245,7 +250,7 @@ void gtm_icu_init(void)
 		icu_libname_len += len;
 #		endif
 		icu_libname[icu_libname_len] = '\0';
-		assert(sizeof(icu_libname) > icu_libname_len);
+		assert(SIZEOF(icu_libname) > icu_libname_len);
 		libname = icu_libname;
 	} else
 		libname = ICU_LIBNAME;	/* go with default name */
@@ -333,7 +338,7 @@ void gtm_icu_init(void)
 		memcpy(&icu_final_fname[icu_final_fname_len], cur_icu_fname, len);
 		icu_final_fname_len += len;
 		icu_final_fname[icu_final_fname_len] = '\0';
-		assert(sizeof(icu_final_fname) > icu_final_fname_len);
+		assert(SIZEOF(icu_final_fname) > icu_final_fname_len);
 		fptr = NULL;
 		assert((0 != findx) || (-1 == symbols_renamed));
 		assert((0 == findx) || (FALSE == symbols_renamed) || (TRUE == symbols_renamed));
@@ -352,7 +357,7 @@ void gtm_icu_init(void)
 				memcpy(&icu_final_fname[icu_final_fname_len], minor_ver_ptr, len);
 				icu_final_fname_len += len;
 				icu_final_fname[icu_final_fname_len] = '\0';
-				assert(sizeof(icu_final_fname) > icu_final_fname_len);
+				assert(SIZEOF(icu_final_fname) > icu_final_fname_len);
 				fptr = (icu_func_t)dlsym(handle, icu_final_fname);
 			}
 			if (NULL == fptr)

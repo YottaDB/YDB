@@ -42,7 +42,7 @@ void	op_commarg(mval *v, unsigned char argcode)
 	error_def	(ERR_INDEXTRACHARS);
 
 	MV_FORCE_STR(v);
-	assert(argcode >=3 && argcode < sizeof(indir_fcn) / sizeof(indir_fcn[0]));
+	assert(argcode >=3 && argcode < SIZEOF(indir_fcn) / SIZEOF(indir_fcn[0]));
 	indir_src.str = v->str;
 	indir_src.code = argcode;
 	if (NULL == (obj = cache_get(&indir_src)))

@@ -74,7 +74,7 @@ typedef muext_hash_hdr	*muext_hash_hdr_ptr_t;
 #define BIN_HEADER_NULLCOLLOFFSET	(STR_LIT_LEN(BIN_HEADER_LABEL) + STR_LIT_LEN(BIN_HEADER_DATEFMT) + 3 * BIN_HEADER_NUMSZ)
 #define BIN_HEADER_SZ		92 /* V4 (GTM V5.0) binary header stores null collation information [5 bytes numeric] */
 #define V3_BIN_HEADER_SZ	87
-#define EXTR_HEADER_LEVEL(extr_lbl)	*(extr_lbl + sizeof(BIN_HEADER_LABEL) - 2)
+#define EXTR_HEADER_LEVEL(extr_lbl)	*(extr_lbl + SIZEOF(BIN_HEADER_LABEL) - 2)
 					/* the assumption here is - level wont go beyond a single char representation */
 
 char *mu_extr_ident(mstr *a);
@@ -92,7 +92,7 @@ boolean_t mu_extr_gblout(mval *gn, mu_extr_stats *st, int format);
 	mval	val;				\
 	val.mvtype = MV_STR;			\
 	val.str.addr = (char *)(&BSIZE);	\
-	val.str.len = sizeof(BSIZE);		\
+	val.str.len = SIZEOF(BSIZE);		\
 	op_write(&val);				\
 	val.mvtype = MV_STR;			\
 	val.str.addr = (char *)(BUFF);		\

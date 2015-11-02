@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,11 +82,11 @@ int do_patsplit(mval *str, mval *pat)
 	}
 	)
 	assert(count <= MAX_PATTERN_ATOMS);
-	memcpy(&min[0], patptr, sizeof(*patptr) * count);
+	memcpy(&min[0], patptr, SIZEOF(*patptr) * count);
 	patptr += count;
-	memcpy(&max[0], patptr, sizeof(*patptr) * count);
+	memcpy(&max[0], patptr, SIZEOF(*patptr) * count);
 	patptr += count;
-	memcpy(&size[0], patptr, sizeof(*patptr) * count);
+	memcpy(&size[0], patptr, SIZEOF(*patptr) * count);
 	patptr = patptr_start;
 	right = FALSE;	/* start with left side */
 	fixed[right] = TRUE;
@@ -133,7 +133,7 @@ int do_patsplit(mval *str, mval *pat)
 				patptr++;
 				GET_ULONG(flags, patptr);
 				patptr++;
-				patptr += DIVIDE_ROUND_UP(bytelen, sizeof(*patptr));
+				patptr += DIVIDE_ROUND_UP(bytelen, SIZEOF(*patptr));
 			}
 			if ((min[index] == max[index]) && (bound = (gtm_uint64_t)min[index] * size[index]))
 			{	/* fixed_length */

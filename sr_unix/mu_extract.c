@@ -62,12 +62,12 @@ GBLREF io_desc          *active_device;
 GBLREF gv_namehead	*gv_target;
 LITREF mstr		chset_names[];
 
-LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(BIN_HEADER_DATEFMT) - 1, BIN_HEADER_DATEFMT, 0, 0);
+LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(BIN_HEADER_DATEFMT) - 1, BIN_HEADER_DATEFMT, 0, 0);
 
 static readonly unsigned char	datefmt_txt[] = "DD-MON-YEAR  24:60:SS";
 static readonly unsigned char	gt_lit[] = "TOTAL";
 static readonly unsigned char	select_text[] = "SELECT";
-static readonly mval		datefmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(datefmt_txt) - 1, (char *)datefmt_txt, 0, 0);
+static readonly mval		datefmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(datefmt_txt) - 1, (char *)datefmt_txt, 0, 0);
 static readonly mval		null_str = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
 static char			outfilename[256];
 static unsigned short		filename_len;
@@ -91,7 +91,7 @@ static unsigned short		filename_len;
 	outptr += val.str.len;						\
 }
 
-#define GET_BIN_HEADER_SIZE(LABEL) (sizeof(LABEL) + sizeof(BIN_HEADER_DATEFMT) - 1 + 4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ)
+#define GET_BIN_HEADER_SIZE(LABEL) (SIZEOF(LABEL) + SIZEOF(BIN_HEADER_DATEFMT) - 1 + 4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ)
 CONDITION_HANDLER(mu_extract_handler)
 {
 	mval				op_val, op_pars;
@@ -101,7 +101,7 @@ CONDITION_HANDLER(mu_extract_handler)
 	op_val.mvtype = op_pars.mvtype = MV_STR;
 	op_val.str.addr = (char *)outfilename;
 	op_val.str.len = filename_len;
-	op_pars.str.len = sizeof(delete_params);
+	op_pars.str.len = SIZEOF(delete_params);
 	op_pars.str.addr = (char *)delete_params;
 	op_close(&op_val, &op_pars);
 
@@ -170,17 +170,17 @@ void mu_extract(void)
 
         /* Initialize all local character arrays to zero before using */
 
-        memset(cli_buff, 0, sizeof(cli_buff));
-        memset(outfilename, 0, sizeof(outfilename));
-        memset(label_buff, 0, sizeof(label_buff));
-        memset(format_buffer, 0, sizeof(format_buffer));
+        memset(cli_buff, 0, SIZEOF(cli_buff));
+        memset(outfilename, 0, SIZEOF(outfilename));
+        memset(label_buff, 0, SIZEOF(label_buff));
+        memset(format_buffer, 0, SIZEOF(format_buffer));
 	active_device = io_curr_device.out;
 
 	mu_outofband_setup();
 
 	if (CLI_PRESENT == cli_present("OCHSET"))
 	{
-		ch_set_len = sizeof(ch_set_name);
+		ch_set_len = SIZEOF(ch_set_name);
 		if (cli_get_str("OCHSET", ch_set_name, &ch_set_len))
 		{
 			if (0 == ch_set_len)
@@ -204,10 +204,10 @@ void mu_extract(void)
 	if (CLI_PRESENT == cli_present("FREEZE"))
 		freeze = TRUE;
 
-	n_len = sizeof(format_buffer);
+	n_len = SIZEOF(format_buffer);
 	if (FALSE == cli_get_str("FORMAT", format_buffer, &n_len))
 	{
-		n_len = sizeof(ZWR_FORMAT_STRING) - 1;
+		n_len = SIZEOF(ZWR_FORMAT_STRING) - 1;
 		memcpy(format_buffer, ZWR_FORMAT_STRING, n_len);
 	}
 	int_nlen = n_len;
@@ -229,7 +229,7 @@ void mu_extract(void)
 		util_out_print("Extract error: bad format type", TRUE);
 		mupip_exit(ERR_MUPCLIERR);
 	}
-	n_len = sizeof(cli_buff);
+	n_len = SIZEOF(cli_buff);
 	if (FALSE == cli_get_str((char *)select_text, cli_buff, &n_len))
 	{
 		n_len = 1;
@@ -246,7 +246,7 @@ void mu_extract(void)
 	if (MU_FMT_BINARY == format)
 	{
 		GTMCRYPT_ONLY(
-			hash_buff_len = (sizeof(muext_hash_hdr) * gd_header->n_regions);
+			hash_buff_len = (SIZEOF(muext_hash_hdr) * gd_header->n_regions);
 			hash_array = (muext_hash_hdr *)malloc(hash_buff_len);
 			memset(hash_array, 0, hash_buff_len);
 		)
@@ -280,7 +280,7 @@ void mu_extract(void)
 	grand_total.recknt = grand_total.reclen = grand_total.keylen = grand_total.datalen = 0;
 	global_total.recknt = global_total.reclen = global_total.keylen = global_total.datalen = 0;
 
-	n_len = sizeof(outfilename);
+	n_len = SIZEOF(outfilename);
 	if (FALSE == cli_get_str("FILE", outfilename, &n_len))
 	{
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
@@ -301,7 +301,7 @@ void mu_extract(void)
 		mupip_exit(ERR_MUNOACTION);
 	}
 	op_pars.mvtype = MV_STR;
-	op_pars.str.len = sizeof(open_params_list);
+	op_pars.str.len = SIZEOF(open_params_list);
 	op_pars.str.addr = (char *)open_params_list;
 	op_val.mvtype = MV_STR;
 	op_val.str.len = filename_len = n_len;
@@ -316,7 +316,7 @@ void mu_extract(void)
 		 *	fixed length max blk size, fixed length max rec size, fixed length max key size, fixed length std_null_coll
 		 *	32-byte padded user-supplied string
 		 */
-		outbuf = (unsigned char *)malloc(sizeof(BIN_HEADER_LABEL) + sizeof(BIN_HEADER_DATEFMT) - 1 +
+		outbuf = (unsigned char *)malloc(SIZEOF(BIN_HEADER_LABEL) + SIZEOF(BIN_HEADER_DATEFMT) - 1 +
 				4 * BIN_HEADER_NUMSZ + BIN_HEADER_LABELSZ);
 		outptr = outbuf;
 
@@ -349,7 +349,7 @@ void mu_extract(void)
 			outptr[label_len++] = ' ';
 		} else
 			label_len = 0;
-		buflen = sizeof(label_buff);
+		buflen = SIZEOF(label_buff);
 		if (FALSE == cli_get_str("LABEL", label_buff, &buflen))
 		{
 			MEMCPY_LIT(&outptr[label_len], EXTR_DEFAULT_LABEL);
@@ -386,7 +386,7 @@ void mu_extract(void)
 #endif
 		}
 		op_val.str.addr = (char *)(&label_len);
-		op_val.str.len = sizeof(label_len);
+		op_val.str.len = SIZEOF(label_len);
 		op_write(&op_val);
 		op_val.str.addr = (char *)outbuf;
 		op_val.str.len = label_len;
@@ -395,7 +395,7 @@ void mu_extract(void)
 		if (is_any_file_encrypted)
 		{
 			op_val.str.addr = (char *)(&hash_buff_len);
-			op_val.str.len = sizeof(hash_buff_len);
+			op_val.str.len = SIZEOF(hash_buff_len);
 			op_write(&op_val);
 			op_val.str.addr = (char *)hash_array;
 			op_val.str.len = hash_buff_len;
@@ -405,7 +405,7 @@ void mu_extract(void)
 	} else
 	{
 		assert((MU_FMT_GO == format) || (MU_FMT_ZWR == format));
-		label_len = sizeof(label_buff);
+		label_len = SIZEOF(label_buff);
 		if (FALSE == cli_get_str("LABEL", label_buff, &label_len))
 		{
 			MEMCPY_LIT(label_buff, EXTR_DEFAULT_LABEL);
@@ -432,7 +432,7 @@ void mu_extract(void)
 		if (MU_FMT_ZWR == format)
 		{
 			op_val.str.addr = " ZWR";
-			op_val.str.len = sizeof(" ZWR") - 1;
+			op_val.str.len = SIZEOF(" ZWR") - 1;
 			op_write(&op_val);
 		}
 		op_wteol(1);
@@ -456,16 +456,16 @@ void mu_extract(void)
 		gv_bind_name(gd_header, &gl_ptr->name.str);
 		if (MU_FMT_BINARY == format)
 		{
-			label_len = sizeof(extr_collhdr);
+			label_len = SIZEOF(extr_collhdr);
 			op_val.mvtype = MV_STR;
 			op_val.str.addr = (char *)(&label_len);
-			op_val.str.len = sizeof(label_len);
+			op_val.str.len = SIZEOF(label_len);
 			op_write(&op_val);
 			extr_collhdr.act = gv_target->act;
 			extr_collhdr.nct = gv_target->nct;
 			extr_collhdr.ver = gv_target->ver;
 			op_val.str.addr = (char *)(&extr_collhdr);
-			op_val.str.len = sizeof(extr_collhdr);
+			op_val.str.len = SIZEOF(extr_collhdr);
 			op_write(&op_val);
 		}
 #		ifdef GTM_CRYPT
@@ -500,7 +500,7 @@ void mu_extract(void)
 	op_val.mvtype = op_pars.mvtype = MV_STR;
 	op_val.str.addr = (char *)outfilename;;
 	op_val.str.len = filename_len;
-	op_pars.str.len = sizeof(no_param);
+	op_pars.str.len = SIZEOF(no_param);
 	op_pars.str.addr = (char *)&no_param;
 	op_close(&op_val, &op_pars);
 	REVERT;

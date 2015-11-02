@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,11 +53,10 @@
 
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
-GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 
-int4 mur_cre_file_extfmt(int recstat)
+int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 {
 	fi_type			*file_info;
 	char			*ptr, rename_fn[MAX_FN_LEN];
@@ -83,16 +82,16 @@ int4 mur_cre_file_extfmt(int recstat)
 	assert(1 == BROKEN_TN);
 	assert(2 == LOST_TN);
 	assert(GOOD_TN != recstat || mur_options.extr[GOOD_TN]);
-	ptr = (char *)&mur_jctl->jnl_fn[mur_jctl->jnl_fn_len];
+	ptr = (char *)&jctl->jnl_fn[jctl->jnl_fn_len];
 	while (DOT != *ptr)	/* we know journal file name alway has a DOT */
 		ptr--;
-	base_len = (int)(ptr - (char *)&mur_jctl->jnl_fn[0]);
-	file_info = murgbl.file_info[recstat] = (void *)malloc(sizeof(fi_type));
+	base_len = (int)(ptr - (char *)&jctl->jnl_fn[0]);
+	file_info = murgbl.file_info[recstat] = (void *)malloc(SIZEOF(fi_type));
 	if (0 == mur_options.extr_fn_len[recstat])
 	{
 		mur_options.extr_fn[recstat] = malloc(MAX_FN_LEN);
 		mur_options.extr_fn_len[recstat] = base_len;
-		memcpy(mur_options.extr_fn[recstat], mur_jctl->jnl_fn, base_len);
+		memcpy(mur_options.extr_fn[recstat], jctl->jnl_fn, base_len);
 		fn_exten_size = STRLEN(fn_exten[recstat]);
 		memcpy(mur_options.extr_fn[recstat] + base_len, fn_exten[recstat], fn_exten_size);
 		mur_options.extr_fn_len[recstat] += fn_exten_size;
@@ -102,7 +101,7 @@ int4 mur_cre_file_extfmt(int recstat)
 	if (RENAME_FAILED == rename_file_if_exists(file_info->fn, file_info->fn_len, rename_fn, &rename_fn_len, &status))
 		return status;
 	op_pars.mvtype = MV_STR;
-	op_pars.str.len = sizeof(open_params_list);
+	op_pars.str.len = SIZEOF(open_params_list);
 	op_pars.str.addr = (char *)open_params_list;
 	op_val.mvtype = MV_STR;
 	op_val.str.len = file_info->fn_len;

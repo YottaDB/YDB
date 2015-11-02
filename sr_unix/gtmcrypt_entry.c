@@ -56,7 +56,7 @@ void gtmcrypt_entry()
 				(void **)&gtmcrypt_strerror_fnptr
 			};
 	int		findx;
-	int		num_dlsyms = sizeof(gtmcryptlib_fptr) / sizeof(gtmcryptlib_fptr[0]); /* number of functions in library */
+	int		num_dlsyms = SIZEOF(gtmcryptlib_fptr) / SIZEOF(gtmcryptlib_fptr[0]); /* number of functions in library */
 	void		*fptr;
 	char		*gtm_dist_path;
 	char		libpath[GTM_PATH_MAX];

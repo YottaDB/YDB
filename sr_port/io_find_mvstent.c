@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007 Fidelity Information Services, Inc *
+ *      Copyright 2007, 2009 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -9,7 +9,6 @@
  *                                                              *
  ****************************************************************/
 
-/* io_find_mvstent.c */
 #include "mdef.h"
 
 #include "gt_timer.h"
@@ -36,7 +35,7 @@ mv_stent *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent)
         mv_zintdev = NULL;
         for (mvc = mv_chain; mvc < (mv_stent *)frame_pointer ; mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc))
         {
-                if (MVST_ZINTDEV == mvc->mv_st_type)
+                if (MVST_ZINTDEV == mvc->mv_st_type && io_ptr == mvc->mv_st_cont.mvs_zintdev.io_ptr)
                 {
                         mv_zintdev = mvc;
                         break;
@@ -44,8 +43,6 @@ mv_stent *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent)
                 if (!mvc->mv_st_next)
                         GTMASSERT;
         }
-        if (mv_zintdev && io_ptr != mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr)
-                mv_zintdev = NULL;      /* ignore if already processed */
         if (mv_zintdev && clear_mvstent)
         {
                 if (mv_chain == mv_zintdev)

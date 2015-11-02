@@ -52,7 +52,7 @@ boolean_t file_head_read(char *fn, sgmnt_data_ptr_t header, int4 len)
 	error_def(ERR_TEXT);
 	ZOS_ONLY(error_def(ERR_BADTAG);)
 
-	header_size = sizeof(sgmnt_data);
+	header_size = SIZEOF(sgmnt_data);
 	OPENFILE(fn, O_RDONLY, fd);
 	if (FD_INVALID == fd)
 	{

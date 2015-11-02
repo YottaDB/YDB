@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,12 +86,12 @@ void mupip_rundown(void)
 	if (region)
 	{
 		gvinit();
-		mu_getlst("WHAT", sizeof(tp_region));
+		mu_getlst("WHAT", SIZEOF(tp_region));
 		rptr = grlist;
 	} else if (file)
 	{
 		mu_gv_cur_reg_init();
-		gv_cur_region->dyn.addr->fname_len = sizeof(gv_cur_region->dyn.addr->fname);
+		gv_cur_region->dyn.addr->fname_len = SIZEOF(gv_cur_region->dyn.addr->fname);
 		if (!cli_get_str("WHAT",  (char *)&gv_cur_region->dyn.addr->fname[0], &gv_cur_region->dyn.addr->fname_len))
 			mupip_exit(ERR_MUNODBNAME);
 		*(gv_cur_region->dyn.addr->fname + gv_cur_region->dyn.addr->fname_len) = 0;
@@ -112,11 +112,11 @@ void mupip_rundown(void)
 				{
 					gv_cur_region->dyn.addr->acc_meth = dba_bg;
 					gv_cur_region->dyn.addr->file_cntl =
-						(file_control *)malloc(sizeof(*gv_cur_region->dyn.addr->file_cntl));
-					memset(gv_cur_region->dyn.addr->file_cntl, 0, sizeof(*gv_cur_region->dyn.addr->file_cntl));
+						(file_control *)malloc(SIZEOF(*gv_cur_region->dyn.addr->file_cntl));
+					memset(gv_cur_region->dyn.addr->file_cntl, 0, SIZEOF(*gv_cur_region->dyn.addr->file_cntl));
 					gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
-					gv_cur_region->dyn.addr->file_cntl->file_info = (GDS_INFO *)malloc(sizeof(GDS_INFO));
-					memset(gv_cur_region->dyn.addr->file_cntl->file_info, 0, sizeof(GDS_INFO));
+					gv_cur_region->dyn.addr->file_cntl->file_info = (GDS_INFO *)malloc(SIZEOF(GDS_INFO));
+					memset(gv_cur_region->dyn.addr->file_cntl->file_info, 0, SIZEOF(GDS_INFO));
 				}
 			}
 
@@ -130,7 +130,7 @@ void mupip_rundown(void)
 		}
 		if (region && mu_star_specified)		/* rundown repl pools belonging to this global directory */
 		{
-			if (repl_inst_get_name((char *)replpool_id.instfilename, &full_len, sizeof(replpool_id.instfilename),
+			if (repl_inst_get_name((char *)replpool_id.instfilename, &full_len, SIZEOF(replpool_id.instfilename),
 					return_on_error))
 			{
 				if (!mu_rndwn_repl_instance(&replpool_id, TRUE, TRUE))

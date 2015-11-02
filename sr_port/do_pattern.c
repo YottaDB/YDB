@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,7 +140,7 @@ int do_pattern(mval *str, mval *pat)
 			return match;
 	}
 	size = (int4 *)patptr;
-	memcpy(repeat, min, count * sizeof(*min));
+	memcpy(repeat, min, count * SIZEOF(*min));
 	rtop = &repeat[0] + count;
 	count--;
 	attempt = FALSE;
@@ -393,7 +393,7 @@ int do_pattern(mval *str, mval *pat)
 							}
 						}
 						)
-						patptr += DIVIDE_ROUND_UP(bytelen, sizeof(*patptr));
+						patptr += DIVIDE_ROUND_UP(bytelen, SIZEOF(*patptr));
 					}
 				}
 				idx++;

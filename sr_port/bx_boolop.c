@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@ void bx_boolop(triple *t, bool jmp_type_one, bool jmp_to_next, bool sense, oprty
 
 	if (jmp_to_next)
 	{
-		p = (oprtype *) mcalloc(sizeof(oprtype));
+		p = (oprtype *) mcalloc(SIZEOF(oprtype));
 		*p = put_tjmp(t);
 	}
 	else

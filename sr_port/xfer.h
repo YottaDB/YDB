@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,7 @@ XFER(xf_svput, op_svput),
 XFER(xf_view, op_view),
 XFER(xf_xnew, opp_xnew),
 XFER(xf_zcont, opp_zcont),
-XFER(xf_zgoto, op_zgoto),
+XFER(xf_zgoto, UNIX_ONLY(opp_zgoto)VMS_ONLY(op_zgoto)),
 XFER(xf_zlink, op_zlink),
 XFER(xf_zmess, op_zmess),
 XFER(xf_zprint, op_zprint),
@@ -167,7 +167,7 @@ XFER(xf_exfun, op_exfun),
 XFER(xf_extexfun, op_extexfun),
 XFER(xf_zhelp, op_zhelp),
 XFER(xf_fnp1, op_fnp1),
-XFER(xf_zg1, op_zg1),
+XFER(xf_zg1, UNIX_ONLY(opp_zg1)VMS_ONLY(op_zg1)),
 XFER(xf_newintrinsic, opp_newintrinsic),
 XFER(xf_gvzwithdraw, op_gvzwithdraw),
 XFER(xf_lvzwithdraw, op_lvzwithdraw),
@@ -274,4 +274,8 @@ XFER(xf_killalias, op_killalias),
 XFER(xf_killaliasall, op_killaliasall),
 XFER(xf_fnzdata, op_fnzdata),
 XFER(xf_clralsvars, op_clralsvars),
-XFER(xf_fnzahandle, op_fnzahandle)
+XFER(xf_fnzahandle, op_fnzahandle),
+XFER(xf_fnztrigger, op_fnztrigger),
+XFER(xf_exfunretals, op_exfunretals),
+XFER(xf_setfnretin2als, op_setfnretin2als),
+XFER(xf_setfnretin2alsct, op_setfnretin2alsct)

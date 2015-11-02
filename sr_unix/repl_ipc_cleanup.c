@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,12 +94,10 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 		{
 			assert((INVALID_SEMID == jnlpool.repl_inst_filehdr->recvpool_semid)
 				|| (gtm_white_box_test_case_enabled
-					&& ((WBTEST_UPD_GVSUBOFLOW_ERROR == gtm_white_box_test_case_number)
-						|| (WBTEST_UPD_REC2BIG_ERROR == gtm_white_box_test_case_number))));
+					&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number)));
 			assert((INVALID_SHMID == jnlpool.repl_inst_filehdr->recvpool_shmid)
 				|| (gtm_white_box_test_case_enabled
-					&& ((WBTEST_UPD_GVSUBOFLOW_ERROR == gtm_white_box_test_case_number)
-						|| (WBTEST_UPD_REC2BIG_ERROR == gtm_white_box_test_case_number))));
+					&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number)));
 			repl_inst_flush_jnlpool(TRUE);
 		}
 	}

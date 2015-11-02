@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,12 +83,12 @@ gd_addr *zgbldir(mval *v)
 	if (!v->str.len)
 	{
 		temp_mstr.addr = GTM_GBLDIR;
-		temp_mstr.len = sizeof(GTM_GBLDIR) - 1;
+		temp_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
 		tran_name = get_name(&temp_mstr);
 	} else
 		tran_name = get_name(&v->str);
 	gd_ptr = gd_load(tran_name);
-	name = (gdr_name *)malloc(sizeof(gdr_name));
+	name = (gdr_name *)malloc(SIZEOF(gdr_name));
 	if (name->name.len = v->str.len)	/* Note embedded assignment */
 	{
 		name->name.addr = (char *)malloc(v->str.len);
@@ -160,7 +160,7 @@ gd_addr *gd_load(mstr *v)
 			return gd_addr_ptr;
 		}
 	}
-	file_read(file_ptr, sizeof(header_struct), (uchar_ptr_t)&temp_head, 1);		/* Read in header and verify is valid GD */
+	file_read(file_ptr, SIZEOF(header_struct), (uchar_ptr_t)&temp_head, 1);		/* Read in header and verify is valid GD */
 	for (i = 0;  i < GDE_LABEL_NUM;  i++)
 	{
 		if (!memcmp(temp_head.label, gde_labels[i], GDE_LABEL_SIZE - 1))
@@ -170,12 +170,12 @@ gd_addr *gd_load(mstr *v)
 	{
 		close_gd_file(file_ptr);
 		rts_error(VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
-				sizeof(temp_head.label), temp_head.label);
+				SIZEOF(temp_head.label), temp_head.label);
 	}
 	size = LEGAL_IO_SIZE(temp_head.filesize);
 	header = (header_struct *)malloc(size);
 	file_read(file_ptr, size, (uchar_ptr_t)header, 1);			/* Read in body of file */
-	table = (gd_addr *)((char *)header + sizeof(header_struct));
+	table = (gd_addr *)((char *)header + SIZEOF(header_struct));
         table->local_locks = (struct gd_region_struct *)((UINTPTR_T)table->local_locks + (UINTPTR_T)table);
 	table->maps = (struct gd_binding_struct *)((UINTPTR_T)table->maps + (UINTPTR_T)table);
 	table->regions = (struct gd_region_struct *)((UINTPTR_T)table->regions + (UINTPTR_T)table);
@@ -197,7 +197,7 @@ gd_addr *gd_load(mstr *v)
 	gd_addr_head = table;
 	fill_gd_addr_id(gd_addr_head, file_ptr);
 	close_gd_file(file_ptr);
-	table->tab_ptr = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+	table->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 	init_hashtab_mname(table->tab_ptr, 0);
 	return table;
 }
@@ -232,9 +232,9 @@ gd_addr *get_next_gdr(gd_addr *prev)
 		return gd_addr_head;
 
 	for (ptr = gd_addr_head;  ptr && ptr != prev;  ptr = ptr->link)
-		if (!GTM_PROBE(sizeof(*ptr), ptr, READ)) /* Called from secshr, have to check access to memory */
+		if (!GTM_PROBE(SIZEOF(*ptr), ptr, READ)) /* Called from secshr, have to check access to memory */
 			return NULL;
-	if (ptr && GTM_PROBE(sizeof(*ptr), ptr, READ))
+	if (ptr && GTM_PROBE(SIZEOF(*ptr), ptr, READ))
 		return ptr->link;
 	return NULL;
 }
@@ -245,7 +245,7 @@ void cm_add_gdr_ptr(gd_region *greg)
 {
 	gd_addr	*ga;
 
-	ga = (gd_addr *)malloc(sizeof(gd_addr));
+	ga = (gd_addr *)malloc(SIZEOF(gd_addr));
 	ga->end = 0;	/* signifies a GT.CM gd_addr */
 	ga->regions = greg;
 	ga->n_regions = 1;
@@ -302,7 +302,7 @@ void gd_rundown(void)		/* Wipe out the global directory structures */
 			gd_ht_kill(gda_cur->tab_ptr, TRUE);
 			free(gda_cur->tab_ptr);		/* free up hashtable malloced in gd_load() */
 			free(gda_cur->id);		/* free up gd_id malloced in gd_load()/fill_gd_addr_id() */
-			free((char *)gda_cur - sizeof(header_struct));	/* free up global directory itself */
+			free((char *)gda_cur - SIZEOF(header_struct));	/* free up global directory itself */
 		} else
 			free(gda_cur);	/* GT.CM gd_addr and hence header_struct wasn't malloced in cm_add_gdr_ptr */
 	}

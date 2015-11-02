@@ -47,16 +47,16 @@ void    initialize_list(buddy_list *list, int4 elemSize, int4 initAlloc)
         list->initAlloc = initAlloc;
         list->cumulMaxElems = initAlloc;
         list->nElems = 0;
-        list->ptrArray = (char **)malloc(sizeof(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
+        list->ptrArray = (char **)malloc(SIZEOF(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
 							/* 1 for holding the NULL pointer and 1 for ptrArray[0] */
-        memset(list->ptrArray, 0, sizeof(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
+        memset(list->ptrArray, 0, SIZEOF(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
         list->ptrArrayCurr = list->ptrArray;
         list->nextFreePtr = list->ptrArray[0] = (char *)malloc(initAlloc * elemSize);
         list->itrptrArrayCurr = 0;      /* null-initialise the iteration fields */
         list->itrnElems = 0;
         list->itrcumulMaxElems = 0;
         list->itrnextFreePtr = 0;
-	list->free_que = (buddy_que_head *)malloc(sizeof(buddy_que_head));
+	list->free_que = (buddy_que_head *)malloc(SIZEOF(buddy_que_head));
 	list->free_que->fl = list->free_que->bl = 0;
 }
 

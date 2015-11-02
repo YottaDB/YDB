@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,7 @@
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "min_max.h"
+#include "gtmimagename.h"
 
 #ifdef UNIX
 #include "gtmrecv.h"
@@ -77,7 +78,12 @@
 #include "jnl_get_checksum.h"
 #include "wbox_test_init.h"
 #include "have_crit.h"
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
+#include "shmpool.h"
 #include "bml_status_check.h"
+#include "is_proc_alive.h"
 
 #define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
 
@@ -100,7 +106,7 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
 GBLREF	boolean_t		block_saved;
-GBLREF	int4			update_trans;
+GBLREF	uint4			update_trans;
 GBLREF	cw_set_element		cw_set[];		/* create write set. */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_namehead		*gv_target;
@@ -136,6 +142,10 @@ GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block 
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
+#endif
+
 #ifdef DEBUG
 GBLREF	uint4		donot_commit;		/* see gdsfhead.h for the purpose of this debug-only global */
 GBLREF	boolean_t	ready2signal_gvundef;	/* TRUE if GET operation is about to signal a GVUNDEF */
@@ -145,6 +155,7 @@ GBLREF	boolean_t	gtm_gvundef_fatal;
 #ifdef UNIX
 GBLREF	recvpool_addrs		recvpool;
 #endif
+GBLREF	boolean_t		block_is_free;
 
 /* This macro isn't enclosed in parantheses to allow for optimizations */
 #define VALIDATE_CYCLE(is_mm, history)					\
@@ -204,6 +215,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	)
 #	endif
 	int			n_blks_validated;
+	boolean_t		do_restart, before_image_needed, lcl_ss_in_prog = FALSE, reorg_ss_in_prog = FALSE;
+	bkup_chng_status	bkup_st_chng;
+	ss_chng_status		ss_st_chng;
+	GTM_SNAPSHOT_ONLY(
+		long			lcl_ss_shmid = INVALID_SHMID;
+		int			lcl_ss_shmcycle = 0;
+		shm_snapshot_t		*ss_shm_ptr;
+		snapshot_context_ptr_t	lcl_ss_ctx;
+	)
+#	ifdef GTM_TRIGGER
+	uint4			cycle;
+#	endif
 
 	error_def(ERR_GVKILLFAIL);
 	error_def(ERR_GVPUTFAIL);
@@ -228,7 +251,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	assert(cs_data == csd);
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit);
 	assert(0 == dollar_tlevel);
-	assert(!cw_set_depth || update_trans); /* whenever cw_set_depth is non-zero, ensure that update_trans is TRUE */
+	/* whenever cw_set_depth is non-zero, ensure update_trans is also non-zero */
+	assert(!cw_set_depth || (UPDTRNS_DB_UPDATED_MASK == update_trans));
 	assert(cw_set_depth || !update_trans || gvdupsetnoop); /* whenever cw_set_depth is zero, ensure that update_trans
 								* is FALSE except when set noop optimization is enabled */
 	assert(0 == cr_array_index);
@@ -275,14 +299,34 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		cw_depth = cw_set_depth;
 		cw_bmp_depth = cw_depth;
 	}
-	if (0 != cw_depth)
-	{	/* Caution : since csa->backup_in_prog and read_before_image are initialized below only if (cw_depth),
-		 * 	these variables should be used below only within an if (cw_depth).
+#	ifdef GTM_SNAPSHOT
+	if (update_trans && SNAPSHOTS_IN_PROG(cnl))
+	{
+		/* If snapshots are already in progress, then try to release the existing context if a new one has started
+		 * after we last updated csa->snapshot_in_prog
 		 */
-		assert(sizeof(bsiz) == sizeof(old_block->bsiz));
+		if (SNAPSHOTS_IN_PROG(csa))
+			SS_RELEASE_IF_NEEDED(csa, cnl);
+		/* Try to create a new context if a new one has started after we last updated csa->snapshot_in_prog. After this,
+		 * with respect to snapshots all the remaining transaction logic in t_end, bg_update_phase2 and secshr_db_clnup
+		 * should use csa and should not rely on cnl
+		 */
+		SS_INIT_IF_NEEDED(csa, cnl);
+	} else
+		csa->snapshot_in_prog = FALSE;
+	lcl_ss_in_prog = SNAPSHOTS_IN_PROG(csa); /* store in local variable to avoid pointer access */
+	reorg_ss_in_prog = (mu_reorg_process && lcl_ss_in_prog); /* store in local variable if both snapshots and MUPIP REORG
+								  * are in progress */
+#	endif
+	if (0 != cw_depth)
+	{	/* Caution : since csa->backup_in_prog and read_before_image are initialized below
+	 	 * only if (cw_depth), these variables should be used below only within an if (cw_depth).
+		 */
+		assert(SIZEOF(bsiz) == SIZEOF(old_block->bsiz));
+		assert(update_trans);
 		csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
 		jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
-		read_before_image = ((NULL != jbbp) || csa->backup_in_prog);
+		read_before_image = ((NULL != jbbp) || csa->backup_in_prog || lcl_ss_in_prog);
 		for (cs = &cw_set[0], cs_top = cs + cw_depth; cs < cs_top; cs++)
 		{
 			assert(0 == cs->jnl_freeaddr);	/* ensure haven't missed out resetting jnl_freeaddr for any cse in
@@ -303,15 +347,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					}
 					goto failed_skip_revert;
 				}
-				/* No need to write before-image in case the block is FREE. In case the database had never
-				 * been fully upgraded from V4 to V5 format (after the MUPIP UPGRADE), all RECYCLED blocks
-				 * can basically be considered FREE (i.e. no need to write before-images since backward journal
-				 * recovery will never be expected to take the database to a point BEFORE the mupip upgrade).
-				 */
-				if (!read_before_image || !blk_used || !csd->db_got_to_v5_once)
+				cs->was_free = !blk_used;
+				BEFORE_IMAGE_NEEDED(read_before_image, cs, csa, csd, cs->blk, before_image_needed);
+				if (!before_image_needed)
 					cs->old_block = NULL;
 				else
 				{
+					block_is_free = cs->was_free;
 					cs->old_block = t_qread(cs->blk, (sm_int_ptr_t)&cs->cycle, &cs->cr);
 					old_block = (blk_hdr_ptr_t)cs->old_block;
 					if (NULL == old_block)
@@ -319,7 +361,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						status = (enum cdb_sc)rdfail_detail;
 						goto failed_skip_revert;
 					}
-					if ((NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
+					if (!cs->was_free && (NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))
 					{	/* Compute CHECKSUM for writing PBLK record before getting crit.
 						 * It is possible that we are reading a block that is actually marked free in
 						 * the bitmap (due to concurrency issues at this point). Therefore we might be
@@ -346,6 +388,27 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				assert((CDB_STAGNATE > t_tries) || (cs->blk < csa->ti->total_blks));
 				cs->mode = gds_t_acquired;
 				assert(GDSVCURR == cs->ondsk_blkver);
+			} else if (reorg_ss_in_prog && cs->was_free)
+			{
+				assert((gds_t_acquired == cs->mode) && (NULL == cs->old_block));
+				/* If snapshots are in progress, we might want to read the before images of the FREE blocks also.
+				 * Since mu_swap_blk mimics a small part of t_end, it sets cse->mode to gds_t_acquired and hence
+				 * will not read the before images of the FREE blocks in t_end. To workaround this, set
+				 * cse->was_free to TRUE so that in t_end, this condition can be used to read the before images of
+				 * the FREE blocks if needed.
+				 */
+				BEFORE_IMAGE_NEEDED(read_before_image, cs, csa, csd, cs->blk, before_image_needed);
+				if (before_image_needed)
+				{
+					block_is_free = TRUE; /* To tell t_qread that the block it's trying to read is
+							       * actually a FREE block */
+					cs->old_block = t_qread(cs->blk, (sm_int_ptr_t)&cs->cycle, &cs->cr);
+					if (NULL == cs->old_block)
+					{
+						status = (enum cdb_sc)rdfail_detail;
+						goto failed_skip_revert;
+					}
+				}
 			}
 		}
 	}
@@ -416,18 +479,40 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	/* Any retry transition where the destination state is the 3rd retry, we don't want to release crit,
 	 * i.e. for 2nd to 3rd retry transition or 3rd to 3rd retry transition.
 	 * Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries
-	 * But 2nd to 3rd retry transition doesn't occur if in 2nd retry we get jnlstatemod, jnlclose, backupstatemod,
+	 * But 2nd to 3rd retry transition doesn't occur if in 2nd retry we get jnlstatemod, jnlclose, bkupss_statemod,
 	 * helpedout, or cacheprob code.
 	 * Hence the variable release_crit to track the above.
 	 */
 	release_crit = (CDB_STAGNATE - 1) > t_tries;
 	assert(!cw_depth || update_trans);
 	/* If inctn_opcode has a valid value, then we better be doing an update. The only exception to this rule is if we are
-	 * in MUPIP REORG UPGRADE/DOWNGRADE (mu_reorg_upgrd_dwngrd.c) where update_trans is explicitly set to FALSE in some cases.
+	 * in MUPIP REORG UPGRADE/DOWNGRADE (mu_reorg_upgrd_dwngrd.c) where update_trans is explicitly set to 0 in some cases.
 	 */
 	assert((inctn_invalid_op == inctn_opcode) || mu_reorg_upgrd_dwngrd_in_prog || update_trans);
 	if (update_trans)
 	{
+#		ifdef GTM_TRIGGER
+		if (!skip_dbtriggers)
+		{
+			cycle = csd->db_trigger_cycle;
+			if (csa->db_trigger_cycle != cycle)
+			{	/* the process' view of the triggers could be potentially stale. restart to be safe. */
+				/* Triggers can be invoked only by GT.M, Journal recovery and Update process. Out of these,
+				 * we dont expect journal recovery to see restarts due to concurrent trigger changes. This
+				 * is because it operates standalone. Update process is the only updater on the secondary
+				 * so we dont expect that to see any concurrent changes either. Assert accordingly.
+				 */
+				assert(!jgbl.forw_phase_recovery);
+				assert(!is_updproc);
+				assert(cycle > csa->db_trigger_cycle);
+				/* csa->db_trigger_cycle will be set to csd->db_trigger_cycle in t_retry */
+				status = cdb_sc_triggermod;
+				if ((CDB_STAGNATE - 1) == t_tries)
+					release_crit = TRUE;
+				goto failed;
+			}
+		}
+#		endif
 		if (JNL_ALLOWED(csa))
 		{
 			if ((csa->jnl_state != csd->jnl_state) || (csa->jnl_before_image != csd->jnl_before_image))
@@ -458,21 +543,68 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			status = cdb_sc_inhibitkills;
 			goto failed;
 		}
-		if (cw_depth && (csa->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != cnl->nbb)))
+		ss_st_chng = SS_NO_STATE_CHANGE;
+#		ifdef GTM_SNAPSHOT
+		if (SNAPSHOTS_IN_PROG(csa))
 		{
-			if (!csa->backup_in_prog && !(JNL_ENABLED(csa) && csa->jnl_before_image))
-			{	/* If online backup is in progress now and before-image journaling is not enabled,
+			/* init done in t_end or wcs_recover called via grab_crit */
+			assert(NULL != SS_CTX_CAST(csa->ss_ctx));
+			lcl_ss_shmcycle = SS_CTX_CAST(csa->ss_ctx)->ss_shmcycle;
+			lcl_ss_shmid = SS_CTX_CAST(csa->ss_ctx)->ss_shmid;
+			assert(INVALID_SHMID != lcl_ss_shmid);
+		}
+		SS_STATE_CHANGE(cnl, csa, ss_st_chng, lcl_ss_shmid, lcl_ss_shmcycle);
+#		endif
+		BKUP_STATE_CHANGE(cnl, csa, bkup_st_chng);
+		if ((cw_depth && (BKUP_NO_STATE_CHANGE != bkup_st_chng)) || (update_trans && (SS_NO_STATE_CHANGE != ss_st_chng)))
+		{
+			do_restart = FALSE;
+			if (NEW_SS_STARTED == ss_st_chng)
+			{
+				/* If new snapshots are started for this region after we grab crit, then
+				 * GT.M should mmap the most recent snapshot which is costly doing
+				 * while holding crit. Since, this will be rare, it is okay to restart. Note,
+				 * this restart will happen irrespective of whether before image journaling
+				 * is enabled
+				 */
+				do_restart = TRUE;
+			}
+			else if ((NEW_BKUP_STARTED == bkup_st_chng) && !(JNL_ENABLED(csa) && csa->jnl_before_image))
+			{
+				/* If online backup is in progress now and before-image journaling is not enabled,
 				 * we would not have read before-images for created blocks. Although it is possible
 				 * that this transaction might not have blocks with gds_t_create at all, we expect
 				 * this backup_in_prog state change to be so rare that it is ok to restart.
 				 */
-				status = cdb_sc_backupstatemod;
+				do_restart = TRUE;
+			}
+			if (do_restart)
+			{
+				status = cdb_sc_bkupss_statemod;
 				if ((CDB_STAGNATE - 1) == t_tries)
 					release_crit = TRUE;
 				goto failed;
 			}
-			csa->backup_in_prog = !csa->backup_in_prog;	/* reset csa->backup_in_prog to current state */
-			read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog); /* recalculate */
+			if (BKUP_NO_STATE_CHANGE != bkup_st_chng) /* Toggle if backup state has changed since we grabbed crit */
+				csa->backup_in_prog = !csa->backup_in_prog;
+			/* if snapshots have stopped since we grabbed crit, then reset snapshot_in_prog flag accordingly
+			 * so that we don't write before images in bg_update_phase2.
+			 */
+			if (ALL_SS_STOPPED == ss_st_chng)
+			{
+				csa->snapshot_in_prog = FALSE;
+				csa->num_snapshots_in_effect = 0;
+			} else
+				assert(SS_NO_STATE_CHANGE == ss_st_chng);
+			/* recalculate based on the new values of snapshot_in_prog and backup_in_prog. Since read_before_image used
+			 * only in the context of acquired blocks, recalculation should happen only for non-zero cw_depth
+			 */
+			if (cw_depth)
+			{
+				read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image)
+						     || csa->backup_in_prog
+						     || SNAPSHOTS_IN_PROG(csa));
+			}
 		}
 		/* in crit, ensure cache-space is available. the out-of-crit check done above might not have been enough */
 		if (!is_mm && (cnl->wc_in_free < (int4)(cw_set_depth + 1))
@@ -794,7 +926,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				if ((gds_t_acquired == cs->mode) && (NULL != cs->old_block))
 				{
 					assert(read_before_image == ((JNL_ENABLED(csa) && csa->jnl_before_image)
-										|| csa->backup_in_prog));
+								     || csa->backup_in_prog
+								     || SNAPSHOTS_IN_PROG(csa)));
 					cr = db_csh_get(cs->blk);
 					if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 					{
@@ -824,8 +957,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
 					assert((cs->cr != cr) || (cs->old_block == (sm_uc_ptr_t)old_block));
 					old_block_tn = old_block->tn;
-					/* Need checksums if before imaging and if a PBLK record is going to be written. */
-					cksum_needed = ((NULL != jbbp) && (old_block_tn < jbbp->epoch_tn));
+					/* Need checksums if before imaging and if a PBLK record is going to be written. However,
+					 * while doing the bm_getfree, if we got a free block, then no need to compute checksum
+					 * as we would NOT be writing before images of free blocks to journal files
+					 */
+					cksum_needed = (!cs->was_free && (NULL != jbbp) && (old_block_tn < jbbp->epoch_tn));
 					if ((cs->cr != cr) || (cs->cycle != cr->cycle))
 					{	/* Block has relocated in the cache. Adjust pointers to new location. */
 						cs->cr = cr;
@@ -856,7 +992,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						 * in the earlier call to jnl_get_checksum.
 						 */
 						assert(NULL != jbbp);
-						assert(sizeof(bsiz) == sizeof(old_block->bsiz));
+						assert(SIZEOF(bsiz) == SIZEOF(old_block->bsiz));
 						bsiz = old_block->bsiz;
 						assert(bsiz <= csd->blk_size);
 						cs->blk_checksum = jnl_get_checksum((uint4*)old_block, csa, bsiz);
@@ -892,7 +1028,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
 			INT8_ONLY(assert(tjpl->write == tjpl->write_addr % tjpl->jnlpool_size);)
 			assert(jgbl.cumul_jnl_rec_len);
-			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + sizeof(jnldata_hdr_struct));
+			tmp_cumul_jnl_rec_len = (uint4)(jgbl.cumul_jnl_rec_len + SIZEOF(jnldata_hdr_struct));
 			tjpl->write += SIZEOF(jnldata_hdr_struct);
 			if (tjpl->write >= tjpl->jnlpool_size)
 			{
@@ -1016,7 +1152,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				{
 					epoch_tn = jbp->epoch_tn; /* store in a local as it is used in a loop below */
 					for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
-					{	/* write out before-update journal image records */
+					{
+						/* PBLK computations for FREE blocks are not needed */
+						if (cs->was_free)
+							continue;
+						/* write out before-update journal image records */
 						mode = cs->mode;
 						if (gds_t_committed < mode)
 						{	/* There are two possibilities at this point.
@@ -1039,7 +1179,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						{
 							bsiz = old_block->bsiz;
 							assert((bsiz <= csd->blk_size) || dse_running);
-							assert(bsiz >= sizeof(blk_hdr) || dse_running);
+							assert(bsiz >= SIZEOF(blk_hdr) || dse_running);
 							/* For acquired or gds_t_busy2free blocks, we should have computed
 							 * checksum already. The only exception is if we found no need to
 							 * compute checksum outside of crit but before we got crit, an
@@ -1073,7 +1213,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 								old_block = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(old_block,
 														      csa);
 								/* Ensure that the unencrypted block and it's twin counterpart are
-								 *in sync. */
+								 * in sync.
+								 */
 								assert(save_old_block->tn == old_block->tn);
 								assert(save_old_block->bsiz == old_block->bsiz);
 								assert(save_old_block->levl == old_block->levl);
@@ -1105,7 +1246,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				{
 					assert(1 == cw_set_depth); /* upgrade/downgrade one block at a time */
 					cs = &cw_set[0];
-					assert(inctn_detail.blknum == cs->blk);
+					assert(inctn_detail.blknum_struct.blknum == cs->blk);
 					assert(mu_reorg_upgrd_dwngrd_blktn < dbtn);
 					if (mu_reorg_nosafejnl)
 					{
@@ -1122,10 +1263,12 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				jnl_write_inctn_rec(csa);
 			} else if (0 == jnl_fence_ctl.level)
 			{
+				assert(!replication || !jgbl.forw_phase_recovery);
 				if (replication)
 					QWASSIGN(jnl_fence_ctl.token, tjpl->jnl_seqno);
-				else
+				else if (!jgbl.forw_phase_recovery)
 					QWASSIGN(jnl_fence_ctl.token, seq_num_zero);
+				/* In case of forw-phase of recovery, token would have been set by mur_output_record */
 				jnl_write_logical(csa, non_tp_jfb_ptr);
 			} else
 				jnl_write_ztp_logical(csa, non_tp_jfb_ptr);
@@ -1255,7 +1398,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			}
 		}
 		/* signal secshr_db_clnup/t_commit_cleanup, roll-back is no longer possible */
-		update_trans = T_COMMIT_STARTED;
+		update_trans |= UPDTRNS_TCOMMIT_STARTED_MASK;
 		assert(cdb_sc_normal == status);
 		assert(!csd->freeze);	/* should never increment curr_tn on a frozen database */
 		INCREMENT_CURR_TN(csd);
@@ -1272,6 +1415,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			need_kip_incr = FALSE;
 		}
 		start_tn = dbtn; /* start_tn temporarily used to store currtn (for bg_update_phase2) before releasing crit */
+		GTM_SNAPSHOT_ONLY(SS_ORPHAN_RELEASE_IF_NEEDED(csa);)
 	}
 	if (!is_mm && busy2free_seen)
 	{
@@ -1359,6 +1503,15 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	UNPIN_CR_ARRAY_ON_COMMIT(cr_array, cr_array_index);
 	assert(!cr_array_index);
 	csa->t_commit_crit = FALSE;
+	/* Phase 2 commits are completed. See if we had done a snapshot init (csa->snapshot_in_prog == TRUE). If so,
+	 * try releasing the resources obtained while snapshot init.
+	 */
+	if (SNAPSHOTS_IN_PROG(csa))
+	{
+		assert(update_trans);
+		SS_RELEASE_IF_NEEDED(csa, cnl);
+	}
+
 skip_cr_array:
 	assert(!csa->now_crit);
 	assert(cdb_sc_normal == status);
@@ -1389,7 +1542,7 @@ skip_cr_array:
 	 * or if update_trans is set to T_COMMIT_STARTED. Now that the transaction is complete, reset these fields.
 	 */
 	cw_set_depth = 0;
-	update_trans = FALSE;
+	update_trans = 0;
 	CWS_RESET;
 	t_tries = 0;	/* commit was successful so reset t_tries */
 	assert(0 == cr_array_index);

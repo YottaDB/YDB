@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ sm_uc_ptr_t get_lmap (block_id blk, unsigned char *bits, sm_int_ptr_t cycle, cac
 	bp = t_qread (index, cycle, cr);
 	if (bp)
 	{
-		ptr =  bp + sizeof(blk_hdr) + (offset * BML_BITS_PER_BLK) / 8;
+		ptr =  bp + SIZEOF(blk_hdr) + (offset * BML_BITS_PER_BLK) / 8;
 		*bits = *ptr;
 		switch (blk % (8 / BML_BITS_PER_BLK))
 		{	case 0:	break;

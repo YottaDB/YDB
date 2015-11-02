@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@ static readonly CLI_ENTRY mumps_qual[] = {
 { "LINE_ENTRY", 	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, 	VAL_N_A, 0},
 { "LIST", 		0, 0, 0, 0, 0, 0, VAL_NOT_REQ, 	  1, NEG, 	VAL_STR, 0},
 { "MACHINE_CODE", 	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
+{ "NAMEOFRTN",		0, 0, 0, 0, 0, 0, VAL_REQ,	  1, NON_NEG,	VAL_STR, 0},
 { "OBJECT", 		0, 0, 0, 0, 0, 0, VAL_NOT_REQ, 	  1, NEG, 	VAL_STR, 0},
 { "RUN", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
 { "SPACE", 		0, 0, 0, 0, 0, 0, VAL_REQ, 	  1, NON_NEG, 	VAL_NUM, 0},
@@ -44,8 +45,7 @@ static readonly CLI_ENTRY mumps_qual[] = {
 { 0 }
 };
 
-GBLDEF CLI_ENTRY cmd_ary[] = {
+GBLDEF CLI_ENTRY mumps_cmd_ary[] = {
 { "MUMPS", 0, mumps_qual, mumps_parm, 0, 0, 0, VAL_DISALLOWED, 1, 0, VAL_LIST, 0},
 { 0 }
 };
-

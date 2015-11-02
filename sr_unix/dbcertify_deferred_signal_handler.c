@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,9 +40,10 @@ GBLREF	int4			exi_condition;
 GBLREF	int			forced_exit_err;
 GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
-GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
+
+LITREF	gtmImageName		gtmImageNames[];
 
 void dbcertify_deferred_signal_handler(void)
 {

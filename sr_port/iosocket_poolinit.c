@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,20 +39,20 @@ void iosocket_poolinit(void)
 	int   		t;
 	io_log_name	*nl;
 
-	memset(&sockv, 0, sizeof(mval));
-	memset(&sockp, 0, sizeof(mval));
-	memset(&sockm, 0, sizeof(mval));
+	memset(&sockv, 0, SIZEOF(mval));
+	memset(&sockp, 0, SIZEOF(mval));
+	memset(&sockm, 0, SIZEOF(mval));
 
 	sockv.mvtype = MV_STR;
-	sockv.str.len = sizeof(socketpoolv) - 1;
+	sockv.str.len = SIZEOF(socketpoolv) - 1;
 	sockv.str.addr = &socketpoolv[0];
 
 	sockp.mvtype = MV_STR;
-	sockp.str.len = sizeof(socketpoolp);
+	sockp.str.len = SIZEOF(socketpoolp);
 	sockp.str.addr = &socketpoolp;
 
 	sockm.mvtype = MV_STR;
-	sockm.str.len = sizeof(socketpoolm) - 1;
+	sockm.str.len = SIZEOF(socketpoolm) - 1;
 	sockm.str.addr = &socketpoolm[0];
 
 	t = NO_M_TIMEOUT;

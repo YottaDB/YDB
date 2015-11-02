@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,9 +19,9 @@
 #define MOD_BYTE_SZ	3
 #define MOD_LONG_SZ	6
 
-GBLDEF int4 rtnhdr_off,labaddr_off;
 short opcode_correct(unsigned char *curr_pc, short opcode, short reg_opcode, short is_rm, short r_m);
 short valid_calling_sequence(unsigned char *pc);
+
 #define VALID_CALLING_SEQUENCE(pc) 	valid_calling_sequence(pc)
 #define RTNHDR_PV_OFF(pc)	rtnhdr_off
 #define LABADDR_PV_OFF(pc)	labaddr_off

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 		memcpy(full_fn, orig_fn, length);
 	} else
 	{
-		if (NULL == GETCWD(cwdbuf, sizeof(cwdbuf), getcwd_res))
+		if (NULL == GETCWD(cwdbuf, SIZEOF(cwdbuf), getcwd_res))
 		{
 			*status = errno;
 			return FALSE;

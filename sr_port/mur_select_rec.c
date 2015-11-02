@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,14 +32,12 @@
 #include "iosp.h"		/* for SS_NORMAL */
 #include "real_len.h"		/* for real_len() prototype */
 
-GBLREF 	mur_rab_t	mur_rab;
 GBLREF	mur_opt_struct	mur_options;
-LITREF	int		jrt_update[JRT_RECTYPES];
 
-boolean_t	mur_select_rec()
+boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 {
 	boolean_t		exc_item_seen, inc_item_seen, inc_seen, wildcard_match;
-	char			key_buff[MAX_KEY_SZ + 1 + sizeof(uint4) * 2], asc_key_buff[MAX_ZWR_KEY_SZ], *ptr;
+	char			key_buff[MAX_KEY_SZ + 1 + SIZEOF(uint4) * 2], asc_key_buff[MAX_ZWR_KEY_SZ], *ptr;
 	int			i, key_len, pat_pos, subs_pos;
 	uint4			pini_addr;
 	gv_key			*key;
@@ -54,22 +52,19 @@ boolean_t	mur_select_rec()
 	int4			pv_len, sl_len;
 
 	assert(mur_options.selection);
-	rec = (jnl_record *)mur_rab.jnlrec;
+	rec = jctl->reg_ctl->mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 	pini_addr = rec->prefix.pini_addr;
 	key = NULL;
 	if (JRT_NULL == rectype || JRT_ALIGN == rectype)
 		return TRUE;
-	status = mur_get_pini(pini_addr, &plst);
+	status = mur_get_pini(jctl, pini_addr, &plst);
 	if (SS_NORMAL != status)
 		return TRUE;
 	pv = &plst->jpv;
 	if (IS_SET_KILL_ZKILL(rectype))
 	{	/* Translate internal format of jnl_record key to ascii */
-		if (IS_ZTP(rectype))	/* ZTP has different record format than TP or non-TP */
-			keystr = (jnl_string *)&rec->jrec_fkill.mumps_node;
-		else	/* TP and non-TP has same format */
-			keystr = (jnl_string *)&rec->jrec_kill.mumps_node;
+		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 		key = (gv_key *)key_buff;
 		key->top = MAX_KEY_SZ;
 		key->end = keystr->length;

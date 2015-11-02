@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ GBLREF mident		routine_name;
 triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_commarg, boolean_t labref)
 {
 	oprtype 	offset ,label, routine, rte1;
-	char		rtn_text[sizeof(mident_fixed)], lab_text[sizeof(mident_fixed)];
+	char		rtn_text[SIZEOF(mident_fixed)], lab_text[SIZEOF(mident_fixed)];
 	mident		rtnname, labname;
 	mstr 		rtn_str, lbl_str;
 	triple 		*ref,*next,*rettrip;

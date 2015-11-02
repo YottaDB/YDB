@@ -25,7 +25,7 @@ void gvzwr_init(unsigned short t, mval *val, int4 pat)
 	MV_FORCE_STR(val);
 	gvzwrite_block.type = pat;
 	if (!gvzwrite_block.sub)
-		gvzwrite_block.sub = (zwr_sub_lst *)malloc(sizeof(zwr_sub_lst) * MAX_GVSUBSCRIPTS);
+		gvzwrite_block.sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_GVSUBSCRIPTS);
 	gvzwrite_block.pat = val;
 	gvzwrite_block.mask = gvzwrite_block.subsc_count = 0;
 	gvzwrite_block.fixed = TRUE;

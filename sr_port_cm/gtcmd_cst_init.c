@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,30 +47,7 @@ void gtcmd_cst_init(cm_region_head *ptr)
 	else
 		rts_error(VARLSTCNT(1) CMERR_CMEXCDASTLM);
 	VMS_ONLY(gtcm_ast_avail--);
-	if (DBKEYSIZE(reg->max_rec_size) > gv_keysize)
-	{
-		gv_keysize = DBKEYSIZE(reg->max_rec_size);
-		temp_key = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
-		if (gv_currkey)
-		{
-			assert(gv_keysize > gv_currkey->end);
-			memcpy(temp_key, gv_currkey, sizeof(gv_key) + gv_currkey->end);
-			free(gv_currkey);
-		} else
-			temp_key->base[0] = '\0';
-		gv_currkey = temp_key;
-		gv_currkey->top = gv_keysize;
-		temp_key = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
-		if (gv_altkey)
-		{
-			assert(gv_keysize > gv_altkey->end);
-			memcpy(temp_key, gv_altkey, sizeof(gv_key) + gv_altkey->end);
-			free(gv_altkey);
-		} else
-			temp_key->base[0] = '\0';
-		gv_altkey = temp_key;
-		gv_altkey->top = gv_keysize;
-	}
+	GVKEYSIZE_INCREASE_IF_NEEDED(DBKEYSIZE(reg->max_key_size));
 	csa = &FILE_INFO(reg)->s_addrs;
 	assert(NULL == csa->dir_tree);
 	SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);

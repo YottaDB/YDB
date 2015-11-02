@@ -16,6 +16,7 @@ LITREF mval		literal_null;
 
 int op_fngvget2(mval *res, mval *val, mval *optional)
 {
+	MV_FORCE_DEFINED(optional);
 	if (MV_DEFINED(val))
 		*res = *val;
 	else

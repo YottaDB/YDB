@@ -14,6 +14,7 @@
 
 void op_fnget2(mval *dst, mval *src, mval *defval)
 {
+	MV_FORCE_DEFINED(defval);
 	if (src && MV_DEFINED(src))
 		*dst = *src;
 	else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,12 +64,17 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	sm_uc_ptr_t		cp1, buffaddr;
 	unsigned short		rec_size;
 	jnl_format_buffer	*jfb;
-	jnl_action		*ja;
 	blk_hdr_ptr_t		old_block;
 	sgmnt_addrs		*csa;
 
 	csa = cs_addrs;
 	assert(!dollar_tlevel);	/* this recomputation is currently supported only for non-TP */
+	/* To support this for TP would require addressing a lot more issues. Examples are
+	 * 	a) Currently we format jnl records only for explicit updates and not for implicit updates (updates in trigger code).
+	 * 		All such triggers updates currently happen inside of a TP (even if the explicit update is non-TP, there
+	 * 		is an implicit TP wrapper). Therefore we need to record more information as to whether this update
+	 * 		to the database needs a corresponding format of the logical journal record or not.
+	 */
 	assert(0 == cse->level);	/* better be a leaf-level block */
 	assert(csa->now_crit);
 	assert(!cse->level && (gds_t_write == cse->mode) && (NULL == cse->new_buff) && (GDS_WRITE_PLAIN == cse->write_type));
@@ -141,11 +146,11 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	assert(ROUND_UP2((INTPTR_T)update_array, UPDATE_ELEMENT_ALIGN_SIZE) == (INTPTR_T)cse->upd_addr);
 	RESET_UPDATE_ARRAY; /* do not use CHECK_AND_RESET_UPDATE_ARRAY since we are knowingly resetting an active update array */
 	BLK_INIT(bs_ptr, bs1);
-	BLK_SEG(bs_ptr, buffaddr + sizeof(blk_hdr), bh->curr_rec.offset - sizeof(blk_hdr));
-	BLK_ADDR(curr_rec_hdr, sizeof(rec_hdr), rec_hdr);
+	BLK_SEG(bs_ptr, buffaddr + SIZEOF(blk_hdr), bh->curr_rec.offset - SIZEOF(blk_hdr));
+	BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 	curr_rec_hdr->rsiz = new_rec_size;
 	curr_rec_hdr->cmpc = bh->prev_rec.match;
-	BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, sizeof(rec_hdr));
+	BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
 	BLK_ADDR(cp1, target_key_size - bh->prev_rec.match, unsigned char);
 	memcpy(cp1, gv_currkey->base + bh->prev_rec.match, target_key_size - bh->prev_rec.match);
 	BLK_SEG(bs_ptr, cp1, target_key_size - bh->prev_rec.match);
@@ -179,18 +184,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	 * only cares about logical records. Hence the separation of the code below into two "if" blocks.
 	 */
 	if (JNL_WRITE_LOGICAL_RECS(csa))
-	{	/* Re-format the logical SET jnl-record */
-		jfb = non_tp_jfb_ptr;
-		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
-		ja = &(jfb->ja);
-		ja->key = gv_currkey;
-		ja->val = post_incr_mval;
-		ja->operation = JNL_SET;
-		jnl_format(jfb);
-		jgbl.cumul_jnl_rec_len = jfb->record_size;
-		assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
-		DEBUG_ONLY(jgbl.cumul_index++;)
-	}
+		jfb = jnl_format(JNL_SET, gv_currkey, post_incr_mval, 0); /* Re-format the logical SET jnl-record */
 	if (JNL_ENABLED(csa))
 	{	/* Recompute checksums in case necessary */
 		if (csa->jnl_before_image && (NULL != cse->old_block))

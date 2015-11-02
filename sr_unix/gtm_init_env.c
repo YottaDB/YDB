@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +24,6 @@ void gtm_init_env(rhdtyp *base_addr, unsigned char *transfer_addr)
 
 #ifdef HAS_LITERAL_SECT
 	new_stack_frame(base_addr, (unsigned char *)LINKAGE_ADR(base_addr), transfer_addr);
-	/* new_stack_frame doesn't initialize literal_ptr field */
-	frame_pointer->literal_ptr = (int4 *)LITERAL_ADR(base_addr);
-
 #else
 	/* Any platform that does not follow pv-based linkage model either
 	 *	(1) uses the following calculation to determine the context pointer value, or

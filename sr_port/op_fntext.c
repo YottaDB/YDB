@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,8 +74,7 @@ void op_fntext(mval *label, int int_exp, mval *rtn, mval *ret)
 	 */
 	if (ret->str.len)
 	{
-		if (stringpool.free + ret->str.len > stringpool.top)
-				stp_gcol(ret->str.len);
+		ENSURE_STP_FREE_SPACE(ret->str.len);
 		cp = (char *)stringpool.free;
 		for (i = 0, lbl = 1; i < ret->str.len; i++)
 		{

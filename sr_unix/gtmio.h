@@ -439,7 +439,7 @@
 {									\
 	GBLREF	boolean_t	*lseekIoInProgress_flags;		\
 	if ((boolean_t *)0 == lseekIoInProgress_flags)								\
-		lseekIoInProgress_flags = (boolean_t *)malloc(sysconf(_SC_OPEN_MAX) * sizeof(boolean_t));	\
+		lseekIoInProgress_flags = (boolean_t *)malloc(sysconf(_SC_OPEN_MAX) * SIZEOF(boolean_t));	\
 }
 
 #define GET_LSEEK_FLAG(FDESC, VAL) \
@@ -626,7 +626,7 @@
 }
 
 #define DOREADRLTO2(FDESC, FBUFF, FBUFF_LEN, TOFLAG, BLOCKED_IN, ISPIPE, FLAGS, RLEN, \
-TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
+TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF) \
 { \
 	ssize_t		gtmioStatus; \
 	int		skip_read = FALSE;\
@@ -686,6 +686,13 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 			if (0 == gtmioBuffLen || 0 == gtmioStatus) \
 				break; \
 			gtmioBuff += gtmioStatus; \
+		/* If it is pipe or fifo, read data that is currently available. If pipe contains data less than 		\
+		   the CHUNK_SIZE, no need to read once again since it is in BLOCKING mode, in which case it will return -1.	\
+		   So in the first read itself (after a successful read) break from the infinite loop. This variable is TRUE    \
+		   if DOREADRLTO2 macro is called for a CHUNK_SIZE read. In other places (eg: iorm_get) it will be FALSE.	\
+		   */											 			\
+			if (UTF_VAR_PF)	\
+				break;	\
 		} \
 		else if (EINTR != errno || TOFLAG) \
 		  break; \
@@ -694,8 +701,8 @@ TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen);		/* Return length actually read */ \
 	else						/* Had legitimate error - return it */ \
 	{\
-		if (ISPIPE)\
-			*TOT_BYTES_READ = (int)(FBUFF_LEN - gtmioBuffLen); \
+		/* Store the number of bytes read in this invocation before we error out */ \
+		*TOT_BYTES_READ = (int)(FBUFF_LEN - gtmioBuffLen); \
 		RLEN = -1;						\
 	}								\
 }

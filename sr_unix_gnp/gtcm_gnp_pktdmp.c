@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,11 +23,11 @@ void gtcm_gnp_cpktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, si
 {
     char newmsg[512];
 
-    if ((sizeof(newmsg)-strlen(msg)) > 25)
+    if ((SIZEOF(newmsg)-strlen(msg)) > 25)
     {
-    	newmsg[sizeof(newmsg)-1] = '\0';
+    	newmsg[SIZEOF(newmsg)-1] = '\0';
     	strcpy(newmsg, "Client: ");
-	cmi_peer_info(lnk, &newmsg[strlen(newmsg)], sizeof(newmsg)-strlen(newmsg)-1);
+	cmi_peer_info(lnk, &newmsg[strlen(newmsg)], SIZEOF(newmsg)-strlen(newmsg)-1);
 	if (strlen(newmsg) && strlen(newmsg) < (strlen(msg) + 3))
 	{
 		strcat(newmsg, " - ");

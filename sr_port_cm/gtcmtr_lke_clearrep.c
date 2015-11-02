@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 		rel_crit(cur_region);
 	}
 	srep.code = CMMS_U_LKEDELETE;
-	lnk->cbl = sizeof(srep.code);
+	lnk->cbl = SIZEOF(srep.code);
 	lnk->ast = NULL;
 #ifndef vinu_marker
 	assert(0 == offsetof(show_reply, code));

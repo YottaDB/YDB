@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,10 +42,7 @@ GBLREF	uint4			process_id;
 GBLREF	sm_uc_ptr_t		jnldata_base;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF jnl_gbls_t		jgbl;
-LITREF	int			jrt_fixed_size[];
-LITREF	int			jrt_is_replicated[];
-LITREF  int			jrt_update[JRT_RECTYPES];
+GBLREF	jnl_gbls_t		jgbl;
 
 /* This function does a subset of what "jnl_write" does. While "jnl_write" writes the journal record to the journal buffer,
  * journal file and journal pool, this function writes the journal records ONLY TO the journal pool. This function should
@@ -93,7 +90,7 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	if (jrt_fixed_size[rectype])
 		jnlrecptr = (uchar_ptr_t)jnl_rec;
 #	ifdef GTM_CRYPT
-	else if(csa->hdr->is_encrypted && IS_SET_KILL_ZKILL(rectype))
+	else if(csa->hdr->is_encrypted && IS_SET_KILL_ZKILL_ZTWORM(rectype))
 		jnlrecptr = (uchar_ptr_t)jfb->alt_buff;
 #	endif
 	else

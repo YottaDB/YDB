@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@ typedef struct
 	int		cl;				/* dm_read only */
 	int		length;
 	int		exp_length;
+	boolean_t	insert_mode;
 	ABS_TIME	end_time;
 	unsigned char	*more_ptr;
 	unsigned char	*zb_ptr;

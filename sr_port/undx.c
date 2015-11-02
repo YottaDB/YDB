@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ unsigned char	*undx (lv_val *start, va_list pkeys, int cnt, unsigned char *buff,
 	int			cur_subscr;
 
 	if (!lvn_info)
-		lvn_info = (lvname_info_ptr) malloc(sizeof(struct lvname_info_struct));
+		lvn_info = (lvname_info_ptr) malloc(SIZEOF(struct lvname_info_struct));
 	lvn_info->total_lv_subs = cnt + 1;
 	lvn_info->start_lvp = start;
 	for (cur_subscr = 0;  cur_subscr < cnt;  cur_subscr++)

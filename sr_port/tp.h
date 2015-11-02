@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,16 +32,11 @@
 #define	JFB_ELE_SIZE_IN_BITS		3		/* log2 of JFB_ELE_SIZE */
 
 #define TP_BATCH_ID		"BATCH"
-#define TP_BATCH_LEN		(sizeof(TP_BATCH_ID) - 1)
+#define TP_BATCH_LEN		(SIZEOF(TP_BATCH_ID) - 1)
 #define TP_BATCH_SHRT		2	/* permit abbreviation to two characters */
 #define TP_DEADLOCK_FACTOR	5	/* multiplied by dollar_trestart to produce an argument for wcs_backoff */
 #define MAX_VISIBLE_TRESTART	4	/* Per Bhaskar on 10/20/98: dollar_trestart is not allowed to visibly exceed 4
 					 * because of errors this causes in legacy Profile versions (any < 6.1)        */
-
-#define	T_COMMIT_STARTED	MAXPOSINT4	/* a non-zero positive value to temporarily assign to si->update_trans.
-						 * this will indicate to secshr_db_clnup() that this transaction is
-						 * beyond the point of rolling back by t_commit_cleanup() and can
-						 * ONLY be rolled forward by secshr_db_clnup() */
 
 /* structure to hold transaction level specific info per segment.
  * Aids in incremental rollback, to identify the state of various elements at the BEGINNING of a new transaction level. */
@@ -55,11 +50,9 @@ typedef struct tlevel_info_struct
 	int4		tlvl_kill_used;
 	jnl_format_buffer
 			*tlvl_jfb_info;		/* state of the tp_jnl_format_buff_info list before this t_level started */
-	uint4		tlvl_cumul_jrec_len,
-			tlvl_cumul_index;	/* tlvl_cumul_index is maintained only #ifdef DEBUG (similar to cumul_index) */
 	srch_blk_status	*tlvl_tp_hist_info;	/* state of the tp_hist array (tail) before this t_level started */
 	int4		t_level;
-	int4		update_trans;		/* a copy of sgm_info_ptr->update_trans before this t_level started */
+	uint4		update_trans;		/* a copy of sgm_info_ptr->update_trans before this t_level started */
 } tlevel_info;
 
 /* structure to hold the global (across all segments) dollar_tlevel specific information.
@@ -72,6 +65,14 @@ typedef struct global_tlvl_info_struct
 			*next_global_tlvl_info;
 	sgmnt_addrs	*global_tlvl_fence_info;
 	short		t_level;
+	uint4		tlvl_cumul_jrec_len;
+#	ifdef DEBUG
+	uint4		tlvl_cumul_index;
+#	endif
+	uint4		tlvl_tp_ztp_jnl_upd_num;
+#	ifdef GTM_TRIGGER
+	unsigned char	*tlvl_prev_ztworm_ptr;
+#	endif
 } global_tlvl_info;
 
 /* A note on the buddy lists used in sgm_info structure,
@@ -107,8 +108,12 @@ typedef struct sgm_info_struct
 						 * multiple regions could point to the same csa (and hence same sgm_info
 						 * structure) with all but one of them having reg->was_open set to TRUE.
 						 */
-	int4			update_trans;	/* was this region updated; TRUE if cw_set_depth is non-zero, but additionally
-						 * TRUE in case of a duplicate set (cw_set_depth is zero in that case) */
+	uint4			update_trans;	/* bitmask indicating among other things whether this region was updated;
+						 * Bit-0 is 1 if cw_set_depth is non-zero or if it is a duplicate set
+						 * (cw_set_depth is zero in that case).
+						 * Bit-1 is 1 if there was a journaled logical update in this region.
+						 * Bit-2 is 1 if transaction commit in this region is beyond point of rollback
+						 */
 	cw_set_element		*first_cw_set,
 				*last_cw_set,
 				*first_cw_bitmap;
@@ -197,6 +202,39 @@ typedef struct tp_region_struct
 		}									\
 	}										\
 }
+
+#define	DBG_CHECK_SI_BUDDY_LIST_IS_REINITIALIZED(si)					\
+{											\
+	sgmnt_addrs	*csa;								\
+											\
+	csa = si->tp_csa;								\
+	assert(NULL == si->kill_set_head);						\
+	assert(NULL == si->kill_set_tail);						\
+	assert(NULL == si->jnl_head);							\
+	assert(NULL == csa->next_fenced);						\
+	if (JNL_ALLOWED(csa))								\
+	{										\
+		assert(si->total_jnl_rec_size == csa->min_total_tpjnl_rec_size);	\
+		VERIFY_LIST_IS_REINITIALIZED(si->jnl_list);				\
+		VERIFY_LIST_IS_REINITIALIZED(si->format_buff_list);			\
+		assert(si->jnl_tail == &si->jnl_head);					\
+	} else										\
+	{										\
+		assert(NULL == si->jnl_list);						\
+		assert(NULL == si->format_buff_list);					\
+		assert(NULL == si->jnl_tail);						\
+	}										\
+	VERIFY_LIST_IS_REINITIALIZED(si->recompute_list);				\
+	VERIFY_LIST_IS_REINITIALIZED(si->cw_set_list);					\
+	VERIFY_LIST_IS_REINITIALIZED(si->new_buff_list);				\
+	VERIFY_LIST_IS_REINITIALIZED(si->tlvl_cw_set_list);				\
+	assert(NULL == si->first_cw_set);						\
+	assert(NULL == si->last_cw_set);						\
+	assert(NULL == si->first_cw_bitmap);						\
+	assert(0 == si->cw_set_depth);							\
+	assert(0 == si->update_trans);							\
+}
+
 #else
 #define	DBG_CHECK_TP_REG_LIST_SORTING(REGLIST)
 #endif
@@ -423,7 +461,7 @@ GBLREF	short	dollar_trestart;
 #endif
 
 /* the following macros T_BEGIN_READ_NONTP_OR_TP and T_BEGIN_SETORKILL_NONTP_OR_TP are similar except for one difference
- * which is that for the SETORKILL case, sgm_info_ptr->update_trans needs to be set to TRUE. They need to be maintained
+ * which is that for the SETORKILL case, sgm_info_ptr->update_trans needs to be set. They need to be maintained
  * in parallel always. The reason for choosing this duplication is because it saves us an if check which would have
  * otherwise been had the two macros been merged and this is used in database code where performance is a concern.
  */
@@ -431,16 +469,17 @@ GBLREF	short	dollar_trestart;
 #define T_BEGIN_SETORKILL_NONTP_OR_TP(err_code)										\
 {															\
 	GBLREF	sgm_info	*sgm_info_ptr;										\
+	GBLREF	sgmnt_addrs	*cs_addrs;										\
 	GBLREF	uint4		t_err;											\
 	error_def(err_code);												\
 															\
 	if (0 == dollar_tlevel)												\
-		t_begin(err_code, TRUE);										\
+		t_begin(err_code, UPDTRNS_DB_UPDATED_MASK);								\
 	else														\
 	{														\
 		t_err = err_code;											\
-		assert(NULL != sgm_info_ptr);										\
-		sgm_info_ptr->update_trans = TRUE;									\
+		assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));				\
+		sgm_info_ptr->update_trans |= UPDTRNS_DB_UPDATED_MASK;							\
 	}														\
 }
 
@@ -448,12 +487,73 @@ GBLREF	short	dollar_trestart;
 #define T_BEGIN_READ_NONTP_OR_TP(err_code)										\
 {															\
 	GBLREF	uint4		t_err;											\
+	GBLREF	sgm_info	*sgm_info_ptr;										\
+	GBLREF	sgmnt_addrs	*cs_addrs;										\
+															\
 	error_def(err_code);												\
 															\
 	if (0 == dollar_tlevel)												\
-		t_begin(err_code, FALSE);										\
+		t_begin(err_code, 0);											\
 	else														\
+	{														\
+		assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));				\
 		t_err = err_code;											\
+	}														\
+}
+
+/* The following GBLREFs are needed by the IS_TP_AND_FINAL_RETRY macro */
+GBLREF	short		dollar_tlevel;
+GBLREF	unsigned int	t_tries;
+
+#define	IS_TP_AND_FINAL_RETRY 	(dollar_tlevel && (CDB_STAGNATE <= t_tries))
+
+#define	TP_REL_CRIT_ALL_REG							\
+{										\
+	sgmnt_addrs		*csa;						\
+	tp_region		*tr;						\
+										\
+	GBLREF	tp_region	*tp_reg_list;					\
+										\
+	for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)			\
+	{									\
+		assert(tr->reg->open);						\
+		if (!tr->reg->open)						\
+			continue;						\
+		csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;		\
+		if (csa->now_crit)						\
+			rel_crit(tr->reg);					\
+	}									\
+	assert(!have_crit(CRIT_HAVE_ANY_REG));					\
+}
+
+#define	TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK									\
+{														\
+	GBLREF	boolean_t	mupip_jnl_recover;								\
+														\
+	assert(dollar_tlevel);											\
+	assert(CDB_STAGNATE == t_tries);									\
+	/* In case of journal recovery, it operates at t_tries=CDB_STAGNATE but we should not adjust t_tries	\
+	 * in that case and it is ok to not print the TPNOTACID message in that case. Since we have standalone	\
+	 * access, we dont expect anyone else to interfere with us and cause a restart anyways.			\
+	 */													\
+	if (!mupip_jnl_recover)											\
+		t_tries = CDB_STAGNATE - 1;									\
+}
+
+#define	TPNOTACID_CHECK(CALLER_STR)											\
+{															\
+	mval		zpos;												\
+															\
+	error_def(ERR_TPNOTACID);											\
+															\
+	if (IS_TP_AND_FINAL_RETRY)											\
+	{														\
+		TP_REL_CRIT_ALL_REG;											\
+		TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;									\
+		getzposition(&zpos);											\
+		gtm_putmsg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr);	\
+		send_msg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(CALLER_STR), zpos.str.len, zpos.str.addr);		\
+	}														\
 }
 
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);

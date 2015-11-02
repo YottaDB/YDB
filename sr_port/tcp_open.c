@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,9 +73,9 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	error_def(ERR_INVADDRSPEC);
 
 	temp_sin_addr = 0;
-	msg_string.len = sizeof(msg_buffer);
+	msg_string.len = SIZEOF(msg_buffer);
 	msg_string.addr = msg_buffer;
-	memset((char *)&sin, 0, sizeof(struct sockaddr_in));
+	memset((char *)&sin, 0, SIZEOF(struct sockaddr_in));
 
 	/* ============================= initialize structures ============================== */
 	if (NULL != host)
@@ -128,14 +128,14 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			return -1;
 		}
 		/* allow multiple connections to the same IP address */
-		if (-1 == tcp_routines.aa_setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)))
+		if (-1 == tcp_routines.aa_setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
 		{
 			errptr = (char *)STRERROR(errno);
 			(void)tcp_routines.aa_close(lsock);
 			util_out_print(errptr, TRUE);
 			return -1;
 		}
-		if (-1 == tcp_routines.aa_bind(lsock, (struct sockaddr *)&sin, sizeof(struct sockaddr)))
+		if (-1 == tcp_routines.aa_bind(lsock, (struct sockaddr *)&sin, SIZEOF(struct sockaddr)))
 		{
 			errptr = (char *)STRERROR(errno);
 			(void)tcp_routines.aa_close(lsock);
@@ -198,7 +198,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				(void)tcp_routines.aa_close(lsock);
 				return -1;
 			}
-			size = sizeof(struct sockaddr_in);
+			size = SIZEOF(struct sockaddr_in);
 			sock = tcp_routines.aa_accept(lsock, &peer, &size);
 			if (-1 == sock)
 			{
@@ -301,14 +301,14 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				return -1;
 			}
 			/*      allow multiple connections to the same IP address */
-			if      (-1 == tcp_routines.aa_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)))
+			if      (-1 == tcp_routines.aa_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
 			{
 				(void)tcp_routines.aa_close(sock);
 				errptr = (char *)STRERROR(errno);
 			        util_out_print(errptr, TRUE);
 				return -1;
 			}
-			temp_1 = tcp_routines.aa_connect(sock, (struct sockaddr *)(&sin), sizeof(sin));
+			temp_1 = tcp_routines.aa_connect(sock, (struct sockaddr *)(&sin), SIZEOF(sin));
 			/*
 			 * the check for EINTR below is valid and should not be converted to an EINTR
 			 * wrapper macro, because other error conditions are checked, and a retry is not

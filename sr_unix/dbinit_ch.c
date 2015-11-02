@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,6 @@
 
 GBLREF gd_region		*db_init_region;
 GBLREF boolean_t		sem_incremented;
-GBLREF enum gtmImageTypes	image_type;
 GBLREF boolean_t		new_dbinit_ipc;
 
 CONDITION_HANDLER(dbinit_ch)
@@ -109,7 +108,7 @@ CONDITION_HANDLER(dbinit_ch)
 
 		if (udi->grabbed_ftok_sem)
 			ftok_sem_release(db_init_region, TRUE, TRUE);
-		if (GTCM_GNP_SERVER_IMAGE != image_type) /* gtcm_gnp_server reuses file_cntl */
+		if (!IS_GTCM_GNP_SERVER_IMAGE) /* gtcm_gnp_server reuses file_cntl */
 		{
 			free(seg->file_cntl->file_info);
 			free(seg->file_cntl);

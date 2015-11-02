@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +104,7 @@ typedef struct
 										only with interlocked instructions */
 	double			filler_q2;		/* QUAD reset to insure quadword alignment in comment below */
         global_latch_t          jb_latch;               /* needed by aswp on HPPA, 16 bytes */
-        CACHELINE_PAD(sizeof(global_latch_t), 1)	/* ; supplied by macro */
+        CACHELINE_PAD(SIZEOF(global_latch_t), 1)	/* ; supplied by macro */
 	/************************************************************************************/
 	/* Important: must keep header structure quadword aligned for buffers used in QIO's */
 	/************************************************************************************/
@@ -195,7 +195,7 @@ typedef struct
 
 typedef struct
 {
-	char			label[sizeof(JNL_LABEL_TEXT) - 1];
+	char			label[SIZEOF(JNL_LABEL_TEXT) - 1];
 	jnl_process_vector	who_created,
 				who_opened;
 	uint4			end_of_data;
@@ -345,9 +345,9 @@ typedef struct
 	unsigned int		suffix_code : 8;
 } jrec_suffix;
 
-#define JREC_PREFIX_SIZE	sizeof(jrec_prefix)
-#define JREC_SUFFIX_SIZE	sizeof(jrec_suffix)
-#define JNL_SHARE_SIZE(X) (JNL_ALLOWED(X) ? ((DIVIDE_ROUND_UP(JNL_NAME_EXP_SIZE + sizeof(jnl_buffer), OS_PAGELET_SIZE) \
+#define JREC_PREFIX_SIZE	SIZEOF(jrec_prefix)
+#define JREC_SUFFIX_SIZE	SIZEOF(jrec_suffix)
+#define JNL_SHARE_SIZE(X) (JNL_ALLOWED(X) ? ((DIVIDE_ROUND_UP(JNL_NAME_EXP_SIZE + SIZEOF(jnl_buffer), OS_PAGELET_SIZE) \
 		+ ((sgmnt_data_ptr_t)X)->jnl_buffer_size) * OS_PAGELET_SIZE) : 0)
     /*  pass address of jnl_buffer to get address of expanded jnl file name */
 #define JNL_NAME_EXP_PTR(X) ((sm_uc_ptr_t)(X) - JNL_NAME_EXP_SIZE)

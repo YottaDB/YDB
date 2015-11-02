@@ -178,10 +178,11 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
 	assert(dev_open == io_ptr->state);
 	iott_flush(io_curr_device.out);
+	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);	/* get initial mode */
 	ioptr_width = io_ptr->width;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	/* if utf8_active, need room for multi byte characters plus wint_t buffer */
-	exp_length = utf8_active ? (int)(((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t))) : length;
+	exp_length = utf8_active ? (int)(((SIZEOF(wint_t) * length) + (GTM_MB_LEN_MAX * length) + SIZEOF(gtm_int64_t))) : length;
 	zint_restart = FALSE;
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
@@ -211,15 +212,15 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			{	/* need to properly align U32 buffer */
 				assert(exp_length == tt_state->exp_length);
 				buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(buffer_start + (GTM_MB_LEN_MAX * length)),
-							sizeof(gtm_int64_t));
-				if (buffer_moved &&
-				    (((INTPTR_T)buffer_32_start & 0x7) != ((INTPTR_T)tt_state->buffer_32_start & 0x7)))
+							SIZEOF(gtm_int64_t));
+				if (buffer_moved && (((unsigned char *)buffer_32_start - buffer_start)
+						!= ((unsigned char *)tt_state->buffer_32_start - tt_state->buffer_start)))
 					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
-						- tt_state->buffer_start), (sizeof(wint_t) * length));
+						- tt_state->buffer_start), (SIZEOF(wint_t) * length));
 				current_32_ptr = buffer_32_start;
 				utf8_more = tt_state->utf8_more;
 				more_ptr = tt_state->more_ptr;
-				memcpy(more_buf, tt_state->more_buf, sizeof(more_buf));
+				memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
 			}
 			instr = tt_state->instr;
 			outlen = tt_state->outlen;
@@ -227,6 +228,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 			dx_start = tt_state->dx_start;
 			dx_instr = tt_state->dx_instr;
 			dx_outlen = tt_state->dx_outlen;
+			insert_mode = tt_state->insert_mode;
 			end_time = tt_state->end_time;
 			zb_ptr = tt_state->zb_ptr;
 			zb_top = tt_state->zb_top;
@@ -237,13 +239,12 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	}
 	if (!zint_restart)
 	{
-		if (stringpool.free + exp_length > stringpool.top)
-			stp_gcol(exp_length);
+		ENSURE_STP_FREE_SPACE(exp_length);
 		buffer_start = current_ptr = stringpool.free;
 		if (utf8_active)
 		{
 			buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(stringpool.free + (GTM_MB_LEN_MAX * length)),
-					sizeof(gtm_int64_t));
+					SIZEOF(gtm_int64_t));
 			current_32_ptr = buffer_32_start;
 		}
 		instr = outlen = 0;
@@ -256,7 +257,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		 * ---------------------------------------------------------
 		 */
 		zb_ptr = io_ptr->dollar.zb;
-		zb_top = zb_ptr + sizeof(io_ptr->dollar.zb) - 1;
+		zb_top = zb_ptr + SIZEOF(io_ptr->dollar.zb) - 1;
 		*zb_ptr = 0;
 		io_ptr->esc_state = START;
 		io_ptr->dollar.za = 0;
@@ -269,7 +270,6 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	mask_term = tt_ptr->mask_term;
 	/* keep test in next line in sync with test in iott_rdone.c */
 	edit_mode = (0 != (TT_EDITING & tt_ptr->ext_cap) && !((TRM_NOECHO|TRM_PASTHRU) & mask));
-	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);	/* get initial mode */
 	if (!zint_restart)
 	{
 		if (mask & TRM_NOTYPEAHD)
@@ -358,7 +358,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					tt_state->buffer_32_start = buffer_32_start;
 					tt_state->utf8_more = utf8_more;
 					tt_state->more_ptr = more_ptr;
-					memcpy(tt_state->more_buf, more_buf, sizeof(more_buf));
+					memcpy(tt_state->more_buf, more_buf, SIZEOF(more_buf));
 				}
 				if (buffer_start == stringpool.free)
 					stringpool.free += exp_length;	/* reserve space */
@@ -368,6 +368,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				tt_state->dx_start = dx_start;
 				tt_state->dx_instr = dx_instr;
 				tt_state->dx_outlen = dx_outlen;
+				tt_state->insert_mode = insert_mode;
 				tt_state->end_time = end_time;
 				tt_state->zb_ptr = zb_ptr;
 				tt_state->zb_top = zb_top;
@@ -605,7 +606,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 								for (i = 0; i < delchar_width; i++)
 								{
 									DOWRITERC(tt_ptr->fildes, eraser,
-										sizeof(eraser), status)
+										SIZEOF(eraser), status)
 									if (0 != status)
 										break;
 								}
@@ -1078,10 +1079,10 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				escape_edit = TRUE;
 			if (escape_edit || (0 == (TRM_ESCAPE & mask)))
 			{	/* reset dollar zb if editing function or not trm_escape */
-				memset(io_ptr->dollar.zb, '\0', sizeof(io_ptr->dollar.zb));
+				memset(io_ptr->dollar.zb, '\0', SIZEOF(io_ptr->dollar.zb));
 				io_ptr->esc_state = START;
 				zb_ptr = io_ptr->dollar.zb;
-				zb_top = zb_ptr + sizeof(io_ptr->dollar.zb) - 1;
+				zb_top = zb_ptr + SIZEOF(io_ptr->dollar.zb) - 1;
 			} else
 				break;	/* not edit function and TRM_ESCAPE */
 		}

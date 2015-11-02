@@ -43,10 +43,12 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 	jrec_suffix		*suffix;
 	blk_hdr_ptr_t		buffer, save_buffer;
 	jnl_private_control	*jpc;
+	sgmnt_data_ptr_t	csd;
 #ifdef GTM_CRYPT
 	char			*buff;
 	int			req_enc_blk_size, init_status, crypt_status;
 #endif
+	csd = csa->hdr;
 	assert(csa->now_crit);
 	jpc = csa->jnl;
 	assert(0 != jpc->pini_addr);
@@ -60,9 +62,9 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 	aimg_record.blknum = cse->blk;
 	/* in case we have a bad block-size, we dont want to write an AIMG larger than the GDS block size (maximum block size) */
 	buffer = (blk_hdr_ptr_t)cse->new_buff;
-	assert(buffer->bsiz <= csa->hdr->blk_size);
-	assert(buffer->bsiz >= sizeof(blk_hdr));
-	aimg_record.bsiz = MIN(csa->hdr->blk_size, buffer->bsiz);
+	assert(buffer->bsiz <= csd->blk_size);
+	assert(buffer->bsiz >= SIZEOF(blk_hdr));
+	aimg_record.bsiz = MIN(csd->blk_size, buffer->bsiz);
 	aimg_record.ondsk_blkver = cse->ondsk_blkver;
 	tmp_jrec_size = (int)FIXED_AIMG_RECLEN + aimg_record.bsiz + JREC_SUFFIX_SIZE;
 	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
@@ -73,18 +75,18 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse)
 	suffix = (jrec_suffix *)&local_buff[JNL_REC_START_BNDRY];
 	aimg_record.prefix.forwptr = suffix->backptr = jrec_size;
 	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
-	assert(sizeof(uint4) == sizeof(jrec_suffix));
+	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
 	save_buffer = buffer;
 #	ifdef GTM_CRYPT
-	req_enc_blk_size = buffer->bsiz - SIZEOF(*buffer);
-	if (BLOCK_REQUIRE_ENCRYPTION(csa->hdr->is_encrypted, buffer->levl, req_enc_blk_size))
+	req_enc_blk_size = aimg_record.bsiz - SIZEOF(*buffer);
+	if (BLOCK_REQUIRE_ENCRYPTION(csd->is_encrypted, buffer->levl, req_enc_blk_size))
 	{
 		ASSERT_ENCRYPTION_INITIALIZED;
-		memcpy(csa->encrypted_blk_contents, buffer, sizeof(*buffer));
+		memcpy(csa->encrypted_blk_contents, buffer, SIZEOF(*buffer));
 		GTMCRYPT_ENCODE_FAST(csa->encr_key_handle,
 				     (char *)(buffer + 1),
 				     req_enc_blk_size,
-				     (csa->encrypted_blk_contents + sizeof(*buffer)),
+				     (csa->encrypted_blk_contents + SIZEOF(*buffer)),
 				     crypt_status);
 		if (0 != crypt_status)
 			GC_RTS_ERROR(crypt_status, NULL);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ int4 op_fnfind(mval *src, mval *del, mint first, mval *dst)
 {
 	mint 	result;
 	char 	*match, *srcptr, *srctop;
-	int 	match_res, bytelen, skip, srclen;
+	int 	match_res, bytelen, skip, srclen, numpcs;
 
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(del);
@@ -57,9 +57,9 @@ int4 op_fnfind(mval *src, mval *del, mint first, mval *dst)
 	{
 		if (MV_IS_SINGLEBYTE(src) && badchar_inhibit)
 		{	/* If BADCHARs are to be checked, matchb() shouldn't be used even if the source is entirely single byte */
+			numpcs = 1;
 			match = (char *)matchb(del->str.len, (uchar_ptr_t)del->str.addr,
-				src->str.len - first, (uchar_ptr_t)src->str.addr + first,
-				&match_res);
+				src->str.len - first, (uchar_ptr_t)src->str.addr + first, &match_res, &numpcs);
 			result = match_res ? first + match_res : 0;
 		} else
 		{	/* either the string contains multi-byte characters or BADCHAR check is required */
@@ -75,8 +75,9 @@ int4 op_fnfind(mval *src, mval *del, mint first, mval *dst)
 			if (skip <= 0)
 			{
 				srclen = (int)(srctop - srcptr);
+				numpcs = 1;
 				match = (char *)matchc(del->str.len, (uchar_ptr_t)del->str.addr,
-					srclen, (uchar_ptr_t)srcptr, &match_res);
+					srclen, (uchar_ptr_t)srcptr, &match_res, &numpcs);
 				result = match_res ? first + match_res : 0;
 			}
 		}
@@ -88,9 +89,9 @@ int4 op_fnfind(mval *src, mval *del, mint first, mval *dst)
 
 int4 op_fnzfind(mval *src, mval *del, mint first, mval *dst)
 {
-	mint result;
-	char *match;
-	int match_res;
+	mint	result;
+	char	*match;
+	int	match_res, numpcs;
 
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(del);
@@ -104,9 +105,9 @@ int4 op_fnzfind(mval *src, mval *del, mint first, mval *dst)
 		result = first + 1 ;
 	else if (src->str.len > first)
 	{
+		numpcs = 1;
 		match = (char *)matchb(del->str.len, (uchar_ptr_t)del->str.addr,
-				src->str.len - first, (uchar_ptr_t)src->str.addr + first,
-				&match_res);
+				src->str.len - first, (uchar_ptr_t)src->str.addr + first, &match_res, &numpcs);
 		result = match_res ? first + match_res : 0;
 	} else
 		result = 0 ;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,8 +87,8 @@ static	void	mur_show_jpv(jnl_process_vector *pv, boolean_t print_header)
 	int	jpv_time_len, node_len, user_len, term_len, proc_len, login_time_len;
 	char	*mode_str, login_time_str[LENGTH_OF_TIME + 1], jpv_time_str[LENGTH_OF_TIME + 1];
 
-	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, sizeof(jpv_time_str), LONG_TIME_FORMAT);
-	login_time_len = format_time(pv->jpv_login_time, login_time_str, sizeof(login_time_str), LONG_TIME_FORMAT);
+	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, SIZEOF(jpv_time_str), LONG_TIME_FORMAT);
+	login_time_len = format_time(pv->jpv_login_time, login_time_str, SIZEOF(login_time_str), LONG_TIME_FORMAT);
 	node_len = real_len(JPV_LEN_NODE,	(uchar_ptr_t)pv->jpv_node);
 	user_len = real_len(JPV_LEN_USER,	(uchar_ptr_t)pv->jpv_user);
 	proc_len = real_len(JPV_LEN_PRCNAM,	(uchar_ptr_t)pv->jpv_prcnam);
@@ -106,7 +106,7 @@ static	void	mur_show_jpv(jnl_process_vector *pv, boolean_t print_header)
 	if (print_header)
 	{
 		util_out_print(proc_header, TRUE);
-		util_out_print(dashes_fao, TRUE, sizeof(proc_header) - 1);
+		util_out_print(dashes_fao, TRUE, SIZEOF(proc_header) - 1);
 	}
 	util_out_print(proc_fao, TRUE, pv->jpv_pid, node_len, pv->jpv_node, user_len, pv->jpv_user,
 		term_len, pv->jpv_terminal, jpv_time_len, jpv_time_str,
@@ -146,14 +146,14 @@ static	void	mur_show_jpv(jnl_process_vector	*pv, boolean_t print_header)
 	int	jpv_time_len, node_len, user_len, term_len;
 	char	jpv_time_str[LENGTH_OF_TIME + 1];
 
-	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, sizeof(jpv_time_str), LONG_TIME_FORMAT);
+	jpv_time_len = format_time(pv->jpv_time, jpv_time_str, SIZEOF(jpv_time_str), LONG_TIME_FORMAT);
 	node_len = real_len(JPV_LEN_NODE,	(uchar_ptr_t)pv->jpv_node);
 	user_len = real_len(JPV_LEN_USER,	(uchar_ptr_t)pv->jpv_user);
 	term_len = real_len(JPV_LEN_TERMINAL,	(uchar_ptr_t)pv->jpv_terminal);
 	if (print_header)
 	{
 		util_out_print((caddr_t)proc_header, TRUE);
-		util_out_print((caddr_t)dashes_fao, TRUE, sizeof(proc_header) - 1);
+		util_out_print((caddr_t)dashes_fao, TRUE, SIZEOF(proc_header) - 1);
 	}
 	util_out_print((caddr_t)proc_fao, TRUE, pv->jpv_pid, node_len, pv->jpv_node, user_len, pv->jpv_user,
 		term_len, pv->jpv_terminal, jpv_time_len, jpv_time_str);
@@ -170,7 +170,7 @@ void	mur_show_header(jnl_ctl_list * jctl)
 
 	hdr = jctl->jfh;
 	util_out_print("!/Journal file name       !AD", TRUE, jctl->jnl_fn_len, jctl->jnl_fn);
-	util_out_print("Journal file label      !AD", TRUE, sizeof(JNL_LABEL_TEXT) - 1, hdr->label);
+	util_out_print("Journal file label      !AD", TRUE, SIZEOF(JNL_LABEL_TEXT) - 1, hdr->label);
 	util_out_print("Database file name      !AD", TRUE, hdr->data_file_name_length, hdr->data_file_name);
 	util_out_print(" Prev journal file name !AD", TRUE, hdr->prev_jnl_file_name_length, hdr->prev_jnl_file_name);
 	util_out_print(" Next journal file name !AD", TRUE, hdr->next_jnl_file_name_length, hdr->next_jnl_file_name);
@@ -192,9 +192,10 @@ void	mur_show_header(jnl_ctl_list * jctl)
 		DOUBLE_ARG(hdr->prev_recov_blks_to_upgrd_adjust));
 	util_out_print(" End of Data                            !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->end_of_data));
 	util_out_print(" Prev Recovery End of Data              !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->prev_recov_end_of_data));
-	time_len = format_time(hdr->bov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
+	util_out_print(" Endian Format                              !AD", TRUE, STR_LIT_LEN(ENDIANTHISJUSTIFY), ENDIANTHISJUSTIFY);
+	time_len = format_time(hdr->bov_timestamp, time_str, SIZEOF(time_str), SHORT_TIME_FORMAT);
 	util_out_print(" Journal Creation Time        "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
-	time_len = format_time(hdr->eov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
+	time_len = format_time(hdr->eov_timestamp, time_str, SIZEOF(time_str), SHORT_TIME_FORMAT);
 	util_out_print(" Time of last update          "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
 	util_out_print(" Begin Transaction            !20@UQ [0x!16@XQ]", TRUE, DOUBLE_ARG(&hdr->bov_tn));
 	util_out_print(" End Transaction              !20@UQ [0x!16@XQ]", TRUE, DOUBLE_ARG(&hdr->eov_tn));
@@ -209,11 +210,10 @@ void	mur_show_header(jnl_ctl_list * jctl)
 	util_out_print(" Jnlfile SwitchLimit              !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->autoswitchlimit));
 	util_out_print(" Jnlfile Allocation               !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_alq));
 	util_out_print(" Jnlfile Extension                !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_deq));
-	util_out_print(" Maximum Physical Record Length   !16UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->max_phys_reclen));
-	util_out_print(" Maximum Logical Record Length    !16UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->max_logi_reclen));
+	util_out_print(" Maximum Journal Record Length    !16UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->max_jrec_len));
 	util_out_print(" Turn Around Point Offset               !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->turn_around_offset));
 	if (hdr->turn_around_time)
-		time_len = format_time(hdr->turn_around_time, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
+		time_len = format_time(hdr->turn_around_time, time_str, SIZEOF(time_str), SHORT_TIME_FORMAT);
 	else
 	{
 		time_len = STR_LIT_LEN(ZERO_TIME_LITERAL);

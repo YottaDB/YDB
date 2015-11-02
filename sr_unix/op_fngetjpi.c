@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,8 +61,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 
 	assert (stringpool.free >= stringpool.base);
 	assert (stringpool.top >= stringpool.free);
-	if (stringpool.top - stringpool.free < MAX_STR)
-		stp_gcol(MAX_STR);
+	ENSURE_STP_FREE_SPACE(MAX_STR);
 
 	MV_FORCE_STR(kwd);
 	if (kwd->str.len == 0)

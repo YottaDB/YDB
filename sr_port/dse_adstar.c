@@ -100,25 +100,25 @@ void dse_adstar(void)
 	}
 	if (((blk_hdr_ptr_t) lbp)->bsiz > blk_size)
 		b_top = lbp + blk_size;
-	else if (((blk_hdr_ptr_t) lbp)->bsiz < sizeof(blk_hdr))
-		b_top = lbp + sizeof(blk_hdr);
+	else if (((blk_hdr_ptr_t) lbp)->bsiz < SIZEOF(blk_hdr))
+		b_top = lbp + SIZEOF(blk_hdr);
 	else
 		b_top = lbp + ((blk_hdr_ptr_t) lbp)->bsiz;
-	if (b_top - lbp > blk_size - sizeof(rec_hdr) - sizeof(block_id))
+	if (b_top - lbp > blk_size - SIZEOF(rec_hdr) - SIZEOF(block_id))
 	{
 		util_out_print("Error:  not enough free space in block for a star record.", TRUE);
 		free(lbp);
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	rsize = sizeof(rec_hdr) + sizeof(block_id);
+	rsize = SIZEOF(rec_hdr) + SIZEOF(block_id);
 	PUT_SHORT(&((rec_hdr_ptr_t)b_top)->rsiz, rsize);
 	((rec_hdr_ptr_t) b_top)->cmpc = 0;
-	PUT_LONG((block_id_ptr_t)(b_top + sizeof(rec_hdr)), blk);
-	((blk_hdr_ptr_t)lbp)->bsiz += (unsigned int)(sizeof(rec_hdr) + sizeof(block_id));
+	PUT_LONG((block_id_ptr_t)(b_top + SIZEOF(rec_hdr)), blk);
+	((blk_hdr_ptr_t)lbp)->bsiz += (unsigned int)(SIZEOF(rec_hdr) + SIZEOF(block_id));
 
 	BLK_INIT(bs_ptr, bs1);
-	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + sizeof(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - sizeof(blk_hdr));
+	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		util_out_print("Error: bad blk build.", TRUE);

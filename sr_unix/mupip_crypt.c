@@ -26,7 +26,7 @@ void mupip_crypt(void)
 	int4			len, off;
 
 	error_def(ERR_MUPCLIERR);
-	fname_len = sizeof(fname);
+	fname_len = SIZEOF(fname);
 	if (!cli_get_str("FILE", fname, &fname_len))
 		mupip_exit(ERR_MUPCLIERR);
 	if (!cli_get_int("OFFSET", &off))

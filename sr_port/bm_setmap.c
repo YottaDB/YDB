@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,11 +87,11 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	{	/* Initialize update array with non-zero bitnum only if reference_cnt is non-zero. */
 		assert(bitnum);
 		*((block_id_ptr_t)update_array_ptr) = bitnum;
-		update_array_ptr += sizeof(block_id);
+		update_array_ptr += SIZEOF(block_id);
 	}
 	/* Terminate update array unconditionally with zero bitnum. */
 	*((block_id_ptr_t)update_array_ptr) = 0;
-	update_array_ptr += sizeof(block_id);
+	update_array_ptr += SIZEOF(block_id);
 	t_write_map(&blkhist, (uchar_ptr_t)update_array, ctn, reference_cnt);
 	if (JNL_ENABLED(cs_data))
         {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,7 @@ GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	kill_set		*kill_set_tail;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		need_kip_incr;
-GBLREF	int4			update_trans;
+GBLREF	uint4			update_trans;
 GBLREF	boolean_t		mu_reorg_in_swap_blk;
 
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn);
@@ -267,7 +267,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 			}
 			complete_merge = FALSE;
 			blks_processed++;
-			t_begin(ERR_MUREORGFAIL, TRUE);
+			t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
 			/* Folllowing for loop is to handle concurrency retry for split/coalesce */
 			for (; ;)		/* === SPLIT-COALESCE LOOP STARTS === */
 			{
@@ -280,7 +280,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					continue;
 				} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
                                 {
-					if (sizeof(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
+					if (SIZEOF(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
 						&& 1 == gv_target->hist.depth)
 					{
 						if (cs_addrs->now_crit)
@@ -380,7 +380,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						if (level) /* delete lower elements of array, t_end might confuse */
 						{
 							memmove(&rtsib_hist->h[0], &rtsib_hist->h[level],
-								sizeof(srch_blk_status)*(rtsib_hist->depth - level + 2));
+								SIZEOF(srch_blk_status)*(rtsib_hist->depth - level + 2));
 							rtsib_hist->depth = rtsib_hist->depth - level;
 						}
 						if (0 < kill_set_list.used)     /* increase kill_in_prog */
@@ -447,26 +447,26 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					 *	here gv_currkey_next_reorg will be set from right sibling
 					 */
 					cw_set_depth = cw_map_depth = 0;
-					GET_KEY_LEN(tkeysize, rtsib_hist->h[0].buffaddr + sizeof(blk_hdr) + sizeof(rec_hdr));
+					GET_KEY_LEN(tkeysize, rtsib_hist->h[0].buffaddr + SIZEOF(blk_hdr) + SIZEOF(rec_hdr));
 					if (2 < tkeysize && MAX_KEY_SZ >= tkeysize)
 					{
 						memcpy(&(gv_currkey_next_reorg->base[0]), rtsib_hist->h[0].buffaddr
-							+ sizeof(blk_hdr) +sizeof(rec_hdr), tkeysize);
+							+ SIZEOF(blk_hdr) +SIZEOF(rec_hdr), tkeysize);
 						gv_currkey_next_reorg->end = tkeysize - 1;
 						inctn_opcode = inctn_invalid_op; /* temporary reset; satisfy an assert in t_end() */
-						assert(update_trans);
-						update_trans = FALSE; /* tell t_end, this is no longer an update transaction */
+						assert(UPDTRNS_DB_UPDATED_MASK == update_trans);
+						update_trans = 0; /* tell t_end, this is no longer an update transaction */
 						if ((trans_num)0 == (ret_tn = t_end(rtsib_hist, NULL)))
 						{
 							need_kip_incr = FALSE;
 							inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
-							update_trans = TRUE;	/* reset update_trans to its old value */
+							update_trans = UPDTRNS_DB_UPDATED_MASK;/* reset update_trans to old value */
 							assert(NULL == kip_csa);
 							continue;
 						}
-						/* there is no need to reset update_trans to TRUE in case of a successful t_end()
-						 * call. this is because before the next call to t_end() we should have a call to
-						 * t_begin() which will reset update_trans anyways.
+						/* There is no need to reset update_trans in case of a successful "t_end" call.
+						 * This is because before the next call to "t_end" we should have a call to
+						 * "t_begin" which will reset update_trans anyways.
 						 */
 						inctn_opcode = inctn_mu_reorg;	/* reset inctn_opcode to its default */
 						if (detailed_log)
@@ -492,7 +492,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 		/* Now swap the working block */
 		if (0 == (reorg_op & NOSWAP))
 		{
-			t_begin(ERR_MUREORGFAIL, TRUE);
+			t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
 			/* Following loop is to handle concurrency retry for swap */
 			for (; ;)	/* === START OF SWAP LOOP === */
 			{
@@ -506,7 +506,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					continue;
 				} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
                                 {
-					if (sizeof(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
+					if (SIZEOF(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
 						&& 1 == gv_target->hist.depth)
 					{
 						if (cs_addrs->now_crit)
@@ -622,7 +622,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	gv_currkey->end = gn->str.len + 1;
 	for (;;)	/* Reduce level continues until it fails to reduce */
 	{
-		t_begin(ERR_MUREORGFAIL, TRUE);
+		t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
 		cnt1 = 0;
 		for (; ;) 	/* main reduce level loop starts */
 		{
@@ -636,7 +636,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				continue;
 			} else if (gv_currkey->end + 1 != gv_target->hist.h[0].curr_rec.match)
 			{
-				if (sizeof(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
+				if (SIZEOF(blk_hdr) == ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz
 					&& 1 == gv_target->hist.depth)
 				{
 					if (cs_addrs->now_crit)

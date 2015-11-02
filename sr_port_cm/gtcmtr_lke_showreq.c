@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ bool gtcmtr_lke_showreq(struct CLB *lnk, char rnum, bool all, bool wait, int4 pi
 	assert(node && node->addr);
 	sreq.nodelength = node->len;
 	memcpy(sreq.node, node->addr, node->len);
-	lnk->cbl = sizeof(sreq);
+	lnk->cbl = SIZEOF(sreq);
 	lnk->mbf = (unsigned char *)&sreq;
 	lnk->ast = NULL;
 	status = cmi_write(lnk);
@@ -69,7 +69,7 @@ bool gtcmtr_lke_showreq(struct CLB *lnk, char rnum, bool all, bool wait, int4 pi
 		gvcmz_error(CMMS_U_LKESHOW, status);
 		return FALSE;
 	}
-	lnk->mbl = sizeof(srep);
+	lnk->mbl = SIZEOF(srep);
 	lnk->mbf = (unsigned char *)&srep;
 	for (;;)
 	{

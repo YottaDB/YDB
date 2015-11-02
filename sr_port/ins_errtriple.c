@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,17 +15,20 @@
 #include "opcode.h"
 #include "mdq.h"
 
-GBLREF	triple	*curtchain,pos_in_chain;
-GBLREF	int4	pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
-GBLREF	triple	t_orig;
+GBLREF	triple		*curtchain, pos_in_chain;
+GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
+GBLREF	triple		t_orig;
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t	trigger_compile;
+#endif
 
 void ins_errtriple(int4 in_error)
 {
 	triple 		*x, *triptr;
 	boolean_t	add_rterror_triple;
 
-	if (!IS_STX_WARN(in_error))
-	{	/* For IS_STX_WARN errors, parsing continues, so dont strip the chain */
+	if (!IS_STX_WARN(in_error) GTMTRIG_ONLY( || trigger_compile))
+	{	/* Not a warning and not a trigger, we have a real error (warnings become errors in triggers) */
 		if (curtchain != &t_orig)
 		{	/* If working with more than 1 chain defer until back to 1 because dqdelchain cannot delete across
 			 * multiple chains. Set global variable "pending_errtriplecode" and let "setcurtchain" call here again.
@@ -52,6 +55,7 @@ void ins_errtriple(int4 in_error)
 		assert(!add_rterror_triple || (pos_in_chain.exorder.bl->exorder.fl == curtchain));
 		assert(!add_rterror_triple || (curtchain->exorder.bl == pos_in_chain.exorder.bl));
 	} else
+		/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain */
 		add_rterror_triple = TRUE;
 	if (add_rterror_triple)
 	{

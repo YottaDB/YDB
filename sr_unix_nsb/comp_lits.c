@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ rhdtyp *rhead;
 		if (p->rt_addr < 0)
 		{
 			p->rt_addr = offset;
-			offset += sizeof(mval);
+			offset += SIZEOF(mval);
 			if (p->v.str.len)
 				cnt++;
 		}

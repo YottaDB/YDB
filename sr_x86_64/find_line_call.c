@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,18 +61,18 @@ zb_code  *find_line_call(void *addr)
 		call_addr++;
 		if (I386_MOD32_BASE_DISP_32 == modrm_byte.modrm.mod)
 		{
-			if (*((int4 *)call_addr) == xf_linestart * sizeof(INTPTR_T) ||
-				*((int4 *)call_addr) == xf_zbstart * sizeof(INTPTR_T))
+			if (*((int4 *)call_addr) == xf_linestart * SIZEOF(INTPTR_T) ||
+				*((int4 *)call_addr) == xf_zbstart * SIZEOF(INTPTR_T))
 				return (zb_code *)call_addr;
 
-			if (*((int4 *)call_addr) != xf_isformal * sizeof(INTPTR_T))
+			if (*((int4 *)call_addr) != xf_isformal * SIZEOF(INTPTR_T))
 				return (zb_code *)addr;
 
-			call_addr += sizeof(int4);
+			call_addr += SIZEOF(int4);
 		} else if (I386_MOD32_BASE_DISP_8 == modrm_byte.modrm.mod)
 		{
-			if (*((char *)call_addr) == xf_linestart * sizeof(INTPTR_T) ||
-				*((char *)call_addr) == xf_zbstart * sizeof(INTPTR_T))
+			if (*((char *)call_addr) == xf_linestart * SIZEOF(INTPTR_T) ||
+				*((char *)call_addr) == xf_zbstart * SIZEOF(INTPTR_T))
 				return (zb_code *)call_addr;
 
 			/* XF_ISFORMAL cannot be encoded in a one-byte offset, no point checking for it */
@@ -105,13 +105,13 @@ zb_code  *find_line_call(void *addr)
 		call_addr++;
 		if (I386_MOD32_BASE_DISP_32 == modrm_byte.modrm.mod)
 		{
-			if (*(int4 *)call_addr != xf_linefetch * sizeof(INTPTR_T) &&
-				*(int4 *)call_addr != xf_zbfetch * sizeof(INTPTR_T))
+			if (*(int4 *)call_addr != xf_linefetch * SIZEOF(INTPTR_T) &&
+				*(int4 *)call_addr != xf_zbfetch * SIZEOF(INTPTR_T))
 				return (zb_code *)addr;
 		} else if (I386_MOD32_BASE_DISP_8 == modrm_byte.modrm.mod)
 		{
-			if (*(char *)call_addr != xf_linefetch * sizeof(INTPTR_T) &&
-				*(char *)call_addr != xf_zbfetch * sizeof(INTPTR_T))
+			if (*(char *)call_addr != xf_linefetch * SIZEOF(INTPTR_T) &&
+				*(char *)call_addr != xf_zbfetch * SIZEOF(INTPTR_T))
 				return (zb_code *)addr;
 		}
 	}
@@ -124,13 +124,13 @@ zb_code  *find_line_call(void *addr)
 		call_addr++;
 		if (I386_MOD32_BASE_DISP_32 == modrm_byte.modrm.mod)
 		{
-			if (*(int4 *)call_addr != xf_linestart * sizeof(INTPTR_T) &&
-				*(int4 *)call_addr != xf_zbstart * sizeof(INTPTR_T))
+			if (*(int4 *)call_addr != xf_linestart * SIZEOF(INTPTR_T) &&
+				*(int4 *)call_addr != xf_zbstart * SIZEOF(INTPTR_T))
 				return (zb_code *)addr;
 		} else if (I386_MOD32_BASE_DISP_8 == modrm_byte.modrm.mod)
 		{
-			if (*(char *)call_addr != xf_linestart * sizeof(INTPTR_T) &&
-				*(char *)call_addr != xf_zbstart * sizeof(INTPTR_T))
+			if (*(char *)call_addr != xf_linestart * SIZEOF(INTPTR_T) &&
+				*(char *)call_addr != xf_zbstart * SIZEOF(INTPTR_T))
 				return (zb_code *)addr;
 		}
 	}

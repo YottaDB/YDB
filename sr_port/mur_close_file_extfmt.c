@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@
 									\
 	no_param = (unsigned char)iop_eol;				\
 	pars.mvtype = MV_STR;						\
-	pars.str.len = sizeof(no_param);				\
+	pars.str.len = SIZEOF(no_param);				\
 	pars.str.addr = (char *)&no_param;				\
 	val.mvtype = MV_STR;						\
 									\
@@ -61,7 +61,6 @@
 
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
-GBLREF	jnl_ctl_list	*mur_jctl;
 
 void mur_close_file_extfmt()
 {

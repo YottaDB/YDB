@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,11 +120,13 @@ void op_merge(void)
 	/* Need to protect value from stpgcol */
 	PUSH_MV_STENT(MVST_MVAL);
 	value = &mv_chain->mv_st_cont.mvs_mval;
+	value->mvtype = 0; /* initialize mval in the M-stack in case stp_gcol gets called before value gets initialized below */
 	if (MARG2_IS_GBL(merge_args))
 	{
 		/* Need to protect mkey returned from gvcst_queryget from stpgcol */
 		PUSH_MV_STENT(MVST_MVAL);
 		mkey = &mv_chain->mv_st_cont.mvs_mval;
+		mkey->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before mkey gets initialized below */
 		gvname_env_restore(mglvnp->gblp[IND2]);
 		/* now $DATA will be done for gvn2. op_gvdata input parameters are set in the form of some GBLREF */
 		op_gvdata(value);
@@ -138,10 +140,9 @@ void op_merge(void)
 			return;
 		}
 		if (first_time)
-		{
-			/* We need to save gvn2 (right hand side). */
-			gvn2_org_key = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ - 1);
-			gvn2_org_key->top = MAX_KEY_SZ;
+		{	/* We need to save gvn2 (right hand side). */
+			assert(NULL == gvn2_org_key);
+			GVKEY_INIT(gvn2_org_key, DBKEYSIZE(MAX_KEY_SZ));
 			first_time = FALSE;
 		}
 		org_glvn1_keysz = mglvnp->gblp[IND1]->s_gv_currkey->end + 1;
@@ -343,7 +344,7 @@ void op_merge(void)
 		/* not memsetting output to 0 here can cause garbage value of output.out_var.lv.child which in turn can
 		 * cause a premature return from lvzwr_var resulting in op_merge() returning without having done the merge.
 		 */
-		memset(&output, 0, sizeof(output));
+		memset(&output, 0, SIZEOF(output));
 		if (MARG1_IS_LCL(merge_args))
 		{	/*==================== MERGE lvn1=lvn2 =====================*/
 			assert(mglvnp->lclp[IND1]);

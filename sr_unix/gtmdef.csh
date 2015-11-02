@@ -51,6 +51,7 @@ setenv	gtm_ver		$vernam
 setenv	gtm_vrt		$vernam			# /translate=(concealed) on VMS
 
 setenv	gtm_tools	$gtm_vrt/tools
+setenv	gtm_inc		$gtm_vrt/inc
 
 source	$gtm_tools/synch_env_version.csh	# set up dependent environment variables
 

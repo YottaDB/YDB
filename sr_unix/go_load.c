@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@
 #include "str2gvkey.h"
 #include "gtmmsg.h"
 #include "gtm_utf8.h"
+#include "rtnhdr.h"
+#include "gv_trigger.h"
 
 GBLREF bool	mupip_error_occurred;
 GBLREF bool	mu_ctrly_occurred;
@@ -160,8 +162,10 @@ void go_load(uint4 begin, uint4 end)
 			continue;
 		if (MU_FMT_GO != fmt)
 		{
-			/* Determine the ZWR key length. -1 (sizeof(=)) is needed since ZWR allows '^x(1,2)='*/
+			/* Determine the ZWR key length. -1 (SIZEOF(=)) is needed since ZWR allows '^x(1,2)='*/
 			keylength = zwrkeylength(ptr, len - 1);
+			if ((HASHT_FULL_GBLNM_LEN <= keylength) && (0 == memcmp(ptr, HASHT_FULL_GBLNAME, HASHT_FULL_GBLNM_LEN)))
+				continue;
 			go_call_db(GO_PUT_SUB, ptr, keylength);
 			if (mupip_error_occurred)
 			{
@@ -203,6 +207,13 @@ void go_load(uint4 begin, uint4 end)
 			key_count++;
 		} else
 		{
+			if ((HASHT_FULL_GBLNM_LEN <= len) && (0 == memcmp(ptr, HASHT_FULL_GBLNAME, HASHT_FULL_GBLNM_LEN)))
+			{
+				if (0 > (len = mu_load_get(&ptr)))
+					break;
+				iter++;
+				continue;
+			}
 		        go_call_db(GO_PUT_SUB, ptr, len);
 			if (mupip_error_occurred)
 			{

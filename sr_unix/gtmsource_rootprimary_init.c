@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 	jnlpool.jnlpool_ctl->upd_disabled = FALSE;
 	rel_lock(jnlpool.jnlpool_dummy_reg);
 	/* Initialize triple fields */
-	memset(&triple, 0, sizeof(repl_triple));
+	memset(&triple, 0, SIZEOF(repl_triple));
 	memcpy(triple.root_primary_instname, jnlpool.repl_inst_filehdr->this_instname, MAX_INSTNAME_LEN - 1);
 	assert('\0' != triple.root_primary_instname[0]);
 	triple.start_seqno = start_seqno;

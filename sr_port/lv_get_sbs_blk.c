@@ -24,7 +24,7 @@
 	multiple as closely as possible.
 */
 
-#define SBS_MALLOC_SIZE (((6 * 1024) - offsetof(storElem, userStorage)) / sizeof(sbs_blk))
+#define SBS_MALLOC_SIZE (((6 * 1024) - offsetof(storElem, userStorage)) / SIZEOF(sbs_blk))
 
 GBLDEF sbs_blk	*sbs_blk_hdr = 0;
 
@@ -39,7 +39,7 @@ sbs_blk *lv_get_sbs_blk (symval *sym)
 		sbs_blk_hdr = sbs_blk_hdr->sbs_que.fl;
 	} else
        	{
-		temp = (sbs_blk *)malloc(sizeof(sbs_blk) * SBS_MALLOC_SIZE);
+		temp = (sbs_blk *)malloc(SIZEOF(sbs_blk) * SBS_MALLOC_SIZE);
 		for (temp1 = temp , i = 1; i < SBS_MALLOC_SIZE; i++)
 		{
 			temp1++;

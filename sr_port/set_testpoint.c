@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@ GBLDEF testpt_struct testpoint;
 void set_testpoint(int4 testvalue)
 {
 	switch( testvalue)
-	{	case 0: memset(&testpoint,0,sizeof(testpoint));
+	{	case 0: memset(&testpoint,0,SIZEOF(testpoint));
 			break;
 		case TSTPT_RECOVER:
 			testpoint.wc_recover = TRUE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 		str32 = (wint_t *)str832;
 		for (written = 0; 0 < len; )
 		{
-			for (outptr = string, outtop = (unsigned char *)(string + sizeof(string)); 0 < len &&
+			for (outptr = string, outtop = (unsigned char *)(string + SIZEOF(string)); 0 < len &&
 				(outptr + GTM_MB_LEN_MAX) < outtop; str32++, len--)
 			{
 				temp32 = *str32;	/* so argument not modified */
@@ -150,7 +150,7 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 				len -= outlen;
 			} else
 			{
-				for (outptr = string, outtop = string + sizeof(string);
+				for (outptr = string, outtop = string + SIZEOF(string);
 					(0 < len) && ((outptr + GTM_MB_LEN_MAX) < outtop);
 						str32++, len--)
 				{
@@ -361,7 +361,7 @@ int	write_loop(int fildes, unsigned char *str, int num_times)
 	*string = '\0';
 	size_required = num_times * STRLEN((char *)str);
 
-	if (size_required > sizeof(string))
+	if (size_required > SIZEOF(string))
 	{
 		for (i = 0;  i < num_times;  i++)
 		{

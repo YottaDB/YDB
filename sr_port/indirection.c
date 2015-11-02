@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,11 +24,11 @@ GBLREF triple *expr_start, *expr_start_orig;
 
 int indirection(oprtype *a)
 {
+	triple		*ref,*next;
+	oprtype		subs[MAX_INDSUBSCRIPTS];
+	oprtype		x,*sb1,*sb2;
+	char		c;
 
-	triple *ref,*next;
-	oprtype subs[MAX_INDSUBSCRIPTS];
-	oprtype x,*sb1,*sb2;
-	char c;
 	error_def(ERR_MAXNRSUBSCRIPTS);
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_LPARENMISSING);
@@ -58,7 +58,7 @@ int indirection(oprtype *a)
 		sb1 = sb2 = subs;
 		for (;;)
 		{
-			if (sb1 >= &subs[MAX_INDSUBSCRIPTS])
+			if (sb1 >= ARRAYTOP(subs))
 			{
 				stx_error(ERR_MAXNRSUBSCRIPTS);
 				return FALSE;

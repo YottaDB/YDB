@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ void copy_stack_frame(void)
 	error_def(ERR_STACKCRIT);
 
 	msp_save = msp;
-	sf = (stack_frame *) (msp -= sizeof(stack_frame));
+	sf = (stack_frame *) (msp -= SIZEOF(stack_frame));
 	if (msp <= stackwarn)
 	{
 		if (msp <= stacktop)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,11 +47,12 @@
 #include "setzdir.h"
 #include "get_reference.h"
 #include "sgtm_putmsg.h"
+#include "dollar_quit.h"
 
 #define ESC_OFFSET 		4
 #define MAX_COMMAND_LINE_LENGTH 255
 #define ZS_ONE_OUT(V,TEXT) 	((V)->len = 1, (V)->addr = (TEXT), zshow_output(output,V))
-#define ZS_VAR_EQU(V,TEXT) 	((V)->len = sizeof(TEXT) - 1, (V)->addr = TEXT, \
+#define ZS_VAR_EQU(V,TEXT) 	((V)->len = SIZEOF(TEXT) - 1, (V)->addr = TEXT, \
 				 zshow_output(output,(V)), ZS_ONE_OUT((V),equal_text))
 
 static readonly char equal_text[] = {'='};
@@ -105,8 +106,22 @@ static readonly char zsource_text[] = "$ZSOURCE";
 static readonly char zstatus_text[] = "$ZSTATUS";
 static readonly char zstep_text[] = "$ZSTEP";
 static readonly char zsystem_text[] = "$ZSYSTEM";
+#ifdef GTM_TRIGGER
+static readonly char ztcode_text[] = "$ZTCODE";
+static readonly char ztdata_text[] = "$ZTDATA";
+#endif
 static readonly char ztexit_text[] = "$ZTEXIT";
+GTMTRIG_ONLY(static readonly char ztlevel_text[] = "$ZTLEVEL";)
+#ifdef GTM_TRIGGER
+static readonly char ztoldval_text[] = "$ZTOLDVAL";
+#endif
 static readonly char ztrap_text[] = "$ZTRAP";
+#ifdef GTM_TRIGGER
+static readonly char ztriggerop_text[] = "$ZTRIGGEROP";
+static readonly char ztupdate_text[] = "$ZTUPDATE";
+static readonly char ztvalue_text[] = "$ZTVALUE";
+static readonly char ztwormhole_text[] = "$ZTWORMHOLE";
+#endif
 static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zyerror_text[] = "$ZYERROR";
@@ -129,7 +144,7 @@ GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zstep;
 GBLREF char		*zro_root;  /* ACTUALLY some other pointer type! */
 GBLREF mstr		gtmprompt;
-GBLREF mstr		dollar_zsource;
+GBLREF mval		dollar_zsource;
 GBLREF int		dollar_zmaxtptime;
 GBLREF int4		dollar_zsystem;
 GBLREF int4		dollar_zcstatus;
@@ -147,8 +162,18 @@ GBLREF size_t		totalUsed;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF boolean_t	dollar_zquit_anyway;
+GBLREF mval		*dollar_ztcode;
+GBLREF mval		*dollar_ztdata;
+GBLREF mval		*dollar_ztoldval;
+GBLREF mval		*dollar_ztriggerop;
+GBLREF mval		*dollar_ztupdate;
+GBLREF mval		*dollar_ztvalue;
+GBLREF mval		dollar_ztwormhole;
+#ifdef GTM_TRIGGER
+GBLREF int4		gtm_trigger_depth;
+#endif
 
-LITREF mval		literal_zero,literal_one;
+LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
 
@@ -233,7 +258,7 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, principal_text);
 		mval_write(output, &var, TRUE);
 	/* SV_QUIT */
-		count = ((NULL == get_ret_targ()) ? 0 : 1);
+		count = dollar_quit();
 		MV_FORCE_MVAL(&var, count);
 		ZS_VAR_EQU(&x, quit_text);
 		mval_write(output, &var, TRUE);
@@ -247,7 +272,8 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, stack_text);
 		mval_write(output, &var, TRUE);
 	/* SV_STORAGE */
-		double2mval(&var, getstorage());
+		/* double2mval(&var, getstorage()); Causes issues with unaligned stack on x86_64 - remove until fixed */
+		i2mval(&var, getstorage());
 		ZS_VAR_EQU(&x, storage_text);
 		mval_write(output, &var, TRUE);
 	/* SV_SYSTEM */
@@ -290,7 +316,7 @@ void zshow_svn(zshow_out *output)
 		mval_write(output, &var, TRUE);
 	/* SV_ZB */
 		c1 = (char *)io_curr_device.in->dollar.zb;
-		c2 = c1 + sizeof(io_curr_device.in->dollar.zb);
+		c2 = c1 + SIZEOF(io_curr_device.in->dollar.zb);
 		var.mvtype = MV_STR;
 		var.str.addr = (char *)io_curr_device.in->dollar.zb;
 		while (c1 < c2 && *c1)
@@ -427,10 +453,8 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, zroutines_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZSOURCE */
-		var.mvtype = MV_STR;
-		var.str = dollar_zsource;
 		ZS_VAR_EQU(&x, zsource_text);
-		mval_write(output, &var, TRUE);
+		mval_write(output, &dollar_zsource, TRUE);
 	/* SV_ZSTATUS */
 		ZS_VAR_EQU(&x, zstatus_text);
 		mval_write(output, &dollar_zstatus, TRUE);
@@ -441,16 +465,85 @@ void zshow_svn(zshow_out *output)
 		MV_FORCE_MVAL(&var, dollar_zsystem);
 		ZS_VAR_EQU(&x, zsystem_text);
 		mval_write(output, &var, TRUE);
+#	ifdef GTM_TRIGGER
+	/* SV_ZTCODE */
+		if (NULL != dollar_ztcode)
+		{
+			var.mvtype = MV_STR;
+			var.str = dollar_ztcode->str;
+		} else
+			memcpy(&var, &literal_null, SIZEOF(mval));
+		ZS_VAR_EQU(&x, ztcode_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZTDATA */
+		if (NULL != dollar_ztdata)
+		{
+			var.mvtype = MV_STR;
+			var.str = dollar_ztdata->str;
+		} else
+			memcpy(&var, &literal_zero, SIZEOF(mval));
+		ZS_VAR_EQU(&x, ztdata_text);
+		mval_write(output, &var, TRUE);
+#	endif
 	/* SV_ZTEXIT */
 		var.mvtype = MV_STR;
 		var.str = dollar_ztexit.str;
 		ZS_VAR_EQU(&x, ztexit_text);
 		mval_write(output, &var, TRUE);
+#	ifdef GTM_TRIGGER
+	/* SV_ZTLEVEL */
+		MV_FORCE_MVAL(&var, gtm_trigger_depth);
+		ZS_VAR_EQU(&x, ztlevel_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZTOLDVAL */
+		if (NULL != dollar_ztoldval)
+		{
+			var.mvtype = MV_STR;
+			var.str = dollar_ztoldval->str;
+		} else
+			memcpy(&var, &literal_null, SIZEOF(mval));
+		ZS_VAR_EQU(&x, ztoldval_text);
+		mval_write(output, &var, TRUE);
+#	endif
 	/* SV_ZTRAP */
 		var.mvtype = MV_STR;
 		var.str = dollar_ztrap.str;
 		ZS_VAR_EQU(&x, ztrap_text);
 		mval_write(output, &var, TRUE);
+#	ifdef GTM_TRIGGER
+	/* SV_ZTRIGGEROP */
+		if (NULL != dollar_ztriggerop)
+		{
+			var.mvtype = MV_STR;
+			var.str = dollar_ztriggerop->str;
+		} else
+			memcpy(&var, &literal_null, SIZEOF(mval));
+		ZS_VAR_EQU(&x, ztriggerop_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZTUPDATE */
+		if (NULL != dollar_ztupdate)
+		{
+			var.mvtype = MV_STR;
+			var.str = dollar_ztupdate->str;
+		} else
+			memcpy(&var, &literal_null, SIZEOF(mval));
+		ZS_VAR_EQU(&x, ztupdate_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZTVALUE */
+		if (NULL != dollar_ztvalue)
+		{
+			var.mvtype = MV_STR;
+			var.str = dollar_ztvalue->str;
+		} else
+			memcpy(&var, &literal_null, SIZEOF(mval));
+		ZS_VAR_EQU(&x, ztvalue_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZTWORMHOLE */
+		var.mvtype = MV_STR;
+		var.str = dollar_ztwormhole.str;
+		ZS_VAR_EQU(&x, ztwormhole_text);
+		mval_write(output, &var, TRUE);
+#	endif
 	/* SV_ZUSEDSTOR */
 		count = (int)totalUsed;		/* WARNING: downcasting possible 64bit value to 32bits */
 		MV_FORCE_UMVAL(&var, (unsigned int)count);

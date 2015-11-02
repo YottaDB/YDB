@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,11 +35,18 @@ GBLREF	short			dollar_tlevel, dollar_trestart;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
-GBLREF  gd_region		*gv_cur_region;
-GBLREF  sgmnt_data_ptr_t	cs_data;
-GBLREF  sgmnt_addrs		*cs_addrs;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	void			(*tp_timeout_clear_ptr)(void);
 GBLREF	int			process_exiting;
+#ifdef GTM_TRIGGER
+GBLREF	int4			gtm_trigger_depth;
+GBLREF	int4			tstart_trigger_depth;
+#endif
+#ifdef DEBUG
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
 
 #define	RESTORE_GV_CUR_REGION						\
 {									\
@@ -82,12 +89,13 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		}
 	)
 	save_cur_region = gv_cur_region;
+	GTMTRIG_ONLY(assert(tstart_trigger_depth <= gtm_trigger_depth);) /* see similar assert in op_tcommit.c for why */
 	if (!newlevel)
 	{
-		(*tp_timeout_clear_ptr)();				/* Cancel or clear any pending TP timeout */
+		(*tp_timeout_clear_ptr)();	/* Cancel or clear any pending TP timeout */
 		/* Do a rollback type cleanup (invalidate gv_target clues of read as well as
-         	 * updated blocks). This is typically needed for a restart.
-	 	 */
+		 * updated blocks). This is typically needed for a restart.
+		 */
 		tp_clean_up(TRUE);
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{
@@ -99,7 +107,9 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 			if (csa->now_crit)
 				rel_crit(curreg);			/* release any crit regions */
 		}
-		tp_unwind(newlevel, ROLLBACK_INVOCATION);
+		tp_unwind(newlevel, ROLLBACK_INVOCATION, NULL);
+		/* Now that we are out of TP, reset the debug-only global variable that is relevant only if we are in TP */
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE;)
 		dollar_trestart = 0;
 		if (gv_currkey != NULL)
 		{
@@ -114,7 +124,7 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	{
 		tp_incr_clean_up(newlevel);
 		RESTORE_GV_CUR_REGION;
-		tp_unwind(newlevel, ROLLBACK_INVOCATION);
+		tp_unwind(newlevel, ROLLBACK_INVOCATION, NULL);
 	}
 	DEBUG_ONLY(
 		if (!process_exiting)

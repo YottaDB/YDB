@@ -105,7 +105,7 @@ void dse_all(void)
 	if (cli_present("RENEW") == CLI_PRESENT)
 	{
 		crit = ref = wc = nofreeze = TRUE;
-		len = sizeof(confirm);
+		len = SIZEOF(confirm);
 		GET_CONFIRM(confirm,len);
 		if (confirm[0] != 'Y' && confirm[0] != 'y')
 		{
@@ -121,7 +121,7 @@ void dse_all(void)
 		if (cli_present("WCINIT") == CLI_PRESENT)
 		{
 			wc = TRUE;
-			len = sizeof(confirm);
+			len = SIZEOF(confirm);
 			GET_CONFIRM(confirm,len);
 			if (confirm[0] != 'Y' && confirm[0] != 'y')
 			{
@@ -175,7 +175,7 @@ void dse_all(void)
 		{
 			/* put on region list in order of ftok value so processed in same order that crits are obtained */
 			csa = &FILE_INFO(ptr)->s_addrs;
-			insert_region(ptr, &(region_list), NULL, sizeof(tp_region));
+			insert_region(ptr, &(region_list), NULL, SIZEOF(tp_region));
 		}
 	}
 	if (!dump)

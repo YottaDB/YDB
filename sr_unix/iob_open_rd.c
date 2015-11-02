@@ -61,7 +61,7 @@ BFILE *iob_open_rd(path, blksiz, blkfactor)
 #endif
 
 
-    file = malloc(sizeof(BFILE));
+    file = malloc(SIZEOF(BFILE));
     file->fd = fd;
     file->path = malloc(strlen(path) + 1);
     strcpy(file->path, path);

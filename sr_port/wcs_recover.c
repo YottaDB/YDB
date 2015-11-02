@@ -71,6 +71,9 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "memcoherency.h"
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
 
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -124,6 +127,7 @@ void wcs_recover(gd_region *reg)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	sgm_info		*si;
+	boolean_t		lcl_ss_in_prog;
 
 	error_def(ERR_BUFRDTIMEOUT);
 	error_def(ERR_DBADDRALIGN);
@@ -203,9 +207,9 @@ void wcs_recover(gd_region *reg)
 	bt_refresh(csa);	/* this resets all bt->cache_index links to CR_NOTVALID */
 	/* the following queue head initializations depend on the wc_blocked mechanism for protection from wcs_wtstart */
 	wip_head = &csa->acc_meth.bg.cache_state->cacheq_wip;
-	memset(wip_head, 0, sizeof(cache_que_head));
+	memset(wip_head, 0, SIZEOF(cache_que_head));
 	active_head = &csa->acc_meth.bg.cache_state->cacheq_active;
-	memset(active_head, 0, sizeof(cache_que_head));
+	memset(active_head, 0, SIZEOF(cache_que_head));
 	UNIX_ONLY(wip_head = active_head);	/* all inserts into wip_que in VMS should be done in active_que in UNIX */
 	UNIX_ONLY(SET_LATCH_GLOBAL(&active_head->latch, LOCK_AVAILABLE));
 	cnl->wcs_active_lvl = 0;
@@ -220,9 +224,26 @@ void wcs_recover(gd_region *reg)
 	blk_size = csd->blk_size;
 	buffptr = (sm_uc_ptr_t)ROUND_UP((sm_ulong_t)cr_top, OS_PAGE_SIZE);
 	backup_block_saved = FALSE;
-	if (BACKUP_NOT_IN_PROGRESS != cnl->nbb)
-	{	/* Online backup is in progress. Check if secshr_db_clnup has created any cache-records with pointers to
-		 * before-images that need to be backed up. If so take care of that first before doing any cache recovery.
+#	ifdef GTM_SNAPSHOT
+	if (SNAPSHOTS_IN_PROG(cnl))
+	{
+		/* If snapshots are already in progress, then try to release the existing context if a new one has started
+		 * after we last updated csa->snapshot_in_prog
+		 */
+		if (SNAPSHOTS_IN_PROG(csa))
+			SS_RELEASE_IF_NEEDED(csa, cnl);
+		/* Try to create a new context if a new one has started after we last updated csa->snapshot_in_prog. After this,
+		 * with respect to snapshots all the remaining transaction logic in t_end, bg_update_phase2 and secshr_db_clnup
+		 * should use csa and should not rely on cnl
+		 */
+		SS_INIT_IF_NEEDED(csa, cnl);
+	} else
+		csa->snapshot_in_prog = FALSE;
+#	endif
+	lcl_ss_in_prog = SNAPSHOTS_IN_PROG(csa);
+	if ((BACKUP_NOT_IN_PROGRESS != cnl->nbb) || lcl_ss_in_prog)
+	{	/* Online backup or snapshots are in progress. Check if secshr_db_clnup has created any cache-records with pointers
+		 * to before-images that need to be backed up. If so take care of that first before doing any cache recovery.
 		 */
 		bp_lo = (INTPTR_T)buffptr;
 		bp_top = bp_lo + (csd->n_bts * csd->blk_size);
@@ -301,6 +322,13 @@ void wcs_recover(gd_region *reg)
 					backup_block(csa, cr_alt->blk, cr_alt, NULL);
 					backup_block_saved = TRUE;
 				}
+#				ifdef GTM_SNAPSHOT
+				if (lcl_ss_in_prog)
+				{
+					assert(NULL != (SS_CTX_CAST(csa->ss_ctx)));
+					WRITE_SNAPSHOT_BLOCK(csa, cr_alt, NULL, cr_alt->blk, (SS_CTX_CAST(csa->ss_ctx)));
+				}
+#				endif
 			}
 		}
 	}
@@ -389,7 +417,7 @@ void wcs_recover(gd_region *reg)
 		}
 		/* reset cr->rip_latch. it is unused in VMS, but wcs_verify() checks it hence the reset in both Unix and VMS */
 		UNIX_ONLY(SET_LATCH_GLOBAL(&(cr->rip_latch), LOCK_AVAILABLE);)
-		VMS_ONLY(memset((sm_uc_ptr_t)&cr->rip_latch, 0, sizeof(global_latch_t));)
+		VMS_ONLY(memset((sm_uc_ptr_t)&cr->rip_latch, 0, SIZEOF(global_latch_t));)
 		cr->r_epid = 0;		/* the processing above should make this appropriate */
 		cr->tn = csd->trans_hist.curr_tn;
 		cr->blkque.fl = cr->blkque.bl = 0;		/* take no chances that the blkques are messed up */
@@ -456,7 +484,7 @@ void wcs_recover(gd_region *reg)
 					total_blks = csd->trans_hist.total_blks - cr->blk;
 				else
 					total_blks = bplmap;
-				bml_full = bml_find_free(0, (sm_uc_ptr_t)(GDS_ANY_REL2ABS(csa, cr->buffaddr)) + sizeof(blk_hdr),
+				bml_full = bml_find_free(0, (sm_uc_ptr_t)(GDS_ANY_REL2ABS(csa, cr->buffaddr)) + SIZEOF(blk_hdr),
 						total_blks);
 				if (NO_FREE_SPACE == bml_full)
 				{
@@ -497,7 +525,7 @@ void wcs_recover(gd_region *reg)
 					if ((cr_alt < cr) && cr_alt->state_que.fl)
 					{	/* cr_alt has already been processed and is in the state_que. hence remove it */
 						wq = (cache_que_head_ptr_t)((sm_uc_ptr_t)&cr_alt->state_que + cr_alt->state_que.fl);
-						assert(0 == (((UINTPTR_T)wq) % sizeof(que_ent)));
+						assert(0 == (((UINTPTR_T)wq) % SIZEOF(que_ent)));
 						assert((UINTPTR_T)wq + wq->bl == (UINTPTR_T)&cr_alt->state_que);
 						back_link = (que_ent_ptr_t)remqt((que_ent_ptr_t)wq);
 						assert(EMPTY_QUEUE != back_link);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,6 @@ Restrictions :
 
 #include "gtm_malloc.h"		/* For raise_gtmmemory_error() definition */
 
-GBLREF	boolean_t	run_time;
 LITREF	int		ht_sizes[];
 
 #if defined(INT4_HASH)
@@ -269,8 +268,8 @@ void INIT_HASHTAB(HASH_TABLE *table, int minsize)
  		cur_ht_size = ht_sizes[index];
 	if (cur_ht_size)
 	{
-		table->base = (void *)malloc(cur_ht_size * sizeof(HT_ENT));
-		memset((char *)table->base, 0, cur_ht_size * sizeof(HT_ENT));
+		table->base = (void *)malloc(cur_ht_size * SIZEOF(HT_ENT));
+		memset((char *)table->base, 0, cur_ht_size * SIZEOF(HT_ENT));
 		table->size = cur_ht_size;
 		table->top = table->base + cur_ht_size;
 		HT_FIELDS_COMMON_INIT(table);
@@ -474,7 +473,7 @@ void FREE_HASHTAB(HASH_TABLE *table)
  */
 void REINITIALIZE_HASHTAB(HASH_TABLE *table)
 {
-	memset((char *)table->base, 0, table->size * sizeof(HT_ENT));
+	memset((char *)table->base, 0, table->size * SIZEOF(HT_ENT));
 	HT_FIELDS_COMMON_INIT(table);
 }
 

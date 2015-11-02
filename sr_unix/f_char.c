@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,8 +64,7 @@ int f_char(oprtype *a, opctype op)
 	if (all_lits)
 	{	/* All literals, build the function inline */
 		size = argc * GTM_MB_LEN_MAX;
-		if (stringpool.top - stringpool.free < size)
-			stp_gcol(size);
+		ENSURE_STP_FREE_SPACE(size);
 		base = stringpool.free;
 		argp = &argv[0];
 		for (outptr = base, char_len = 0; argc > 0; --argc, argp++)

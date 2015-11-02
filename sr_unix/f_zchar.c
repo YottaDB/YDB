@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,8 +69,7 @@ int f_zchar(oprtype *a, opctype op)
 	}
 	if (all_lits)
 	{
-		if (stringpool.top - stringpool.free < (argc + 1))
-			stp_gcol(argc + 1);
+		ENSURE_STP_FREE_SPACE(argc + 1);
 		v.mvtype = MV_STR;
 		v.str.addr = c = (char *) stringpool.free;
 		argp = &argv[0];

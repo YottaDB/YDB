@@ -22,22 +22,22 @@
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_limits.h"
-
 #include "stringpool.h"
 #include "io.h"
 #include "iormdef.h"
 #include "io_params.h"
 #include "eintr_wrappers.h"
 #include "gtmio.h"
+#include "iosp.h"
+#include "jobsp.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #include "gtm_zos_chset.h"
 #endif
 
 LITREF	unsigned char		io_params_size[];
-GBLREF io_pair			io_curr_device;
-GBLREF io_log_name 		*io_root_log_name;
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
+GBLREF	boolean_t		gtm_pipe_child;
 
 #define FREE_ALL { if (NULL != copy_cmd_string) free(copy_cmd_string); if (NULL != temp) free(temp);\
 		if (NULL != buf)  free(buf); if (NULL != dir_in_path) free(dir_in_path);if (NULL != command2) free(command2); }
@@ -455,9 +455,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	{
 		/* in child */
 		int ret;
-		io_desc *iod;
-		io_log_name	*l, *prev;
-		d_rm_struct	*d_rm;
 
 		CLOSEFILE_RESET(pfd_write[1], rc);          /* Close unused write end; Resets "pfd_write[1]" to FD_INVALID */
 		ZOS_ONLY(if (-1 == gtm_zos_setcvtmode(pfd_write[0], write_cvt[CHILDCVT]))
@@ -470,20 +467,16 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 		if (return_stderr)
 			CLOSEFILE_RESET(pfd_read_stderr[0], rc); /* Close unused read end for stderr return; Set fd to FD_INVALID */
-		/* close any other pipe output file_des_write */
-		assert (0 != io_root_log_name);
-		assert(0 == io_root_log_name->len);
-		for (prev = io_root_log_name, l = prev->next;  0 != l;  prev = l, l = l->next)
-		{
-			iod = l->iod;
-			d_rm = (d_rm_struct *) iod->dev_sp;
-			/* If a pipe device, it is possible that the file descriptor could be closed even though the device
-			 * structure is not (due to a "write /eof"). Therefore check if the file descriptor is not already
-			 * closed before attempting to close it.
-			 */
-			if (d_rm && d_rm->pipe && (FD_INVALID != d_rm->fildes))
-				CLOSEFILE_RESET(d_rm->fildes, rc);	/* resets "d_rm->fildes" to FD_INVALID */
-		}
+		/* need to let iorm_close() know not to reap any pipe devices during io_rundown.  They should only
+		 be reaped by the parent process. */
+		gtm_pipe_child = TRUE;
+
+		/* rundown io devices in child */
+		io_rundown(RUNDOWN_EXCEPT_STD);
+
+		/* do common cleanup in child */
+		ojchildioclean();
+
 		CLOSEFILE(0, rc);
 		/* stdin becomes pfd_write[0] */
 		if (-1 == dup2(pfd_write[0], 0))
@@ -646,7 +639,6 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			io_desc		*io_ptr;
 			d_rm_struct	*in_d_rm;
-			io_log_name	dev_name;	/*	dummy	*/
 
 			io_ptr = ( stderr_iod->pair.in);
 			if (!(in_d_rm = (d_rm_struct *) io_ptr->dev_sp))

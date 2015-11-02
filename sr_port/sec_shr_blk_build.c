@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,21 +39,21 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 	assert(csa->read_write);
 	if (csa->now_crit)	/* csa->now_crit can be FALSE if we are finishing bg_update_phase2 part of the commit */
 		do_accounting = TRUE;	/* used by SECSHR_ACCOUNTING macro */
-	if (!(GTM_PROBE(sizeof(blk_segment), array, READ)))
+	if (!(GTM_PROBE(SIZEOF(blk_segment), array, READ)))
 	{
 		SECSHR_ACCOUNTING(4);
 		SECSHR_ACCOUNTING(__LINE__);
 		SECSHR_ACCOUNTING(cse->upd_addr);
-		SECSHR_ACCOUNTING(sizeof(blk_segment));
+		SECSHR_ACCOUNTING(SIZEOF(blk_segment));
 		assert(FALSE);
 		return FALSE;
 	}
-	if (!(GTM_PROBE(sizeof(blk_hdr), base_addr, WRITE)))
+	if (!(GTM_PROBE(SIZEOF(blk_hdr), base_addr, WRITE)))
 	{
 		SECSHR_ACCOUNTING(4);
 		SECSHR_ACCOUNTING(__LINE__);
 		SECSHR_ACCOUNTING(base_addr);
-		SECSHR_ACCOUNTING(sizeof(blk_hdr));
+		SECSHR_ACCOUNTING(SIZEOF(blk_hdr));
 		assert(FALSE);
 		return FALSE;
 	}
@@ -67,15 +67,15 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 
 	if (cse->forward_process)
 	{
-		ptr = base_addr + sizeof(blk_hdr);
+		ptr = base_addr + SIZEOF(blk_hdr);
 		for (seg = array + 1, stop_ptr = (blk_segment *)array->addr;  seg <= stop_ptr;  seg++)
 		{
-			if (!(GTM_PROBE(sizeof(blk_segment), seg, READ)))
+			if (!(GTM_PROBE(SIZEOF(blk_segment), seg, READ)))
 			{
 				SECSHR_ACCOUNTING(4);
 				SECSHR_ACCOUNTING(__LINE__);
 				SECSHR_ACCOUNTING(seg);
-				SECSHR_ACCOUNTING(sizeof(blk_segment));
+				SECSHR_ACCOUNTING(SIZEOF(blk_segment));
 				assert(FALSE);
 				return FALSE;
 			}
@@ -111,12 +111,12 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 		ptr = base_addr + array->len;
 		for  (seg = (blk_segment*)array->addr, stop_ptr = array;  seg > stop_ptr;  seg--)
 		{
-			if (!(GTM_PROBE(sizeof(blk_segment), seg, READ)))
+			if (!(GTM_PROBE(SIZEOF(blk_segment), seg, READ)))
 			{
 				SECSHR_ACCOUNTING(4);
 				SECSHR_ACCOUNTING(__LINE__);
 				SECSHR_ACCOUNTING(seg);
-				SECSHR_ACCOUNTING(sizeof(blk_segment));
+				SECSHR_ACCOUNTING(SIZEOF(blk_segment));
 				assert(FALSE);
 				return FALSE;
 			}

@@ -114,8 +114,8 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 		private_blk = (unsigned char *)malloc(private_blksz);
 	}
 	if (NULL == beg_gv_currkey)
-		beg_gv_currkey = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ);
-	memcpy(beg_gv_currkey->base, gv_currkey->base, (sizeof(gv_key) + gv_currkey->end));
+		beg_gv_currkey = (gv_key *)malloc(SIZEOF(gv_key) + MAX_KEY_SZ);
+	memcpy(beg_gv_currkey->base, gv_currkey->base, (SIZEOF(gv_key) + gv_currkey->end));
 	gname_size = gv_currkey->end;
 	keytop = &gv_currkey->base[gv_currkey->top];
 	st->recknt = st->reclen = st->keylen = st->datalen = 0;
@@ -158,9 +158,9 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 		if (!mu_extr_getblk(private_blk))
 			break;
 		bp = (blk_hdr_ptr_t)private_blk;
-		if (bp->bsiz == sizeof(blk_hdr))
+		if (bp->bsiz == SIZEOF(blk_hdr))
 			break;
-		if (0 != bp->levl || bp->bsiz < sizeof(blk_hdr) || bp->bsiz > cs_data->blk_size ||
+		if (0 != bp->levl || bp->bsiz < SIZEOF(blk_hdr) || bp->bsiz > cs_data->blk_size ||
 				gv_target->hist.h[0].curr_rec.match < gname_size)
 			INTEG_ERROR_RETURN
 		/* Note that rp may not be the beginning of a block */
@@ -182,7 +182,7 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 					GTMCRYPT_ENCODE_FAST(encr_key_handle,
 								inbuf,
 								out_size,
-								cs_addrs->encrypted_blk_contents + sizeof(int4),
+								cs_addrs->encrypted_blk_contents + SIZEOF(int4),
 								crypt_status);
 					if (0 != crypt_status)
 					{
@@ -198,15 +198,15 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 					{
 						if (NULL != unencrypted_blk_buff)
 							free(unencrypted_blk_buff);
-						unencrypted_blk_buff = (unsigned char *) malloc(out_size + sizeof(int4));
+						unencrypted_blk_buff = (unsigned char *) malloc(out_size + SIZEOF(int4));
 						prev_allocated_size = out_size;
 					}
 					*(int4 *)(unencrypted_blk_buff) = -1;
-					memcpy(unencrypted_blk_buff + (sizeof(int4)), rp, out_size);
+					memcpy(unencrypted_blk_buff + (SIZEOF(int4)), rp, out_size);
 				}
 				rp = (cs_data->is_encrypted) ? (rec_hdr_ptr_t)cs_addrs->encrypted_blk_contents
 							     : (rec_hdr_ptr_t)unencrypted_blk_buff;
-				out_size += sizeof(int4);
+				out_size += SIZEOF(int4);
 			}
 #			endif
 			WRITE_BIN_EXTR_BLK(rp, out_size); /* output records of current block */
@@ -217,7 +217,7 @@ boolean_t mu_extr_gblout(mval *gn, struct RAB *outrab, mu_extr_stats *st, int fo
 			GET_USHORT(rec_size, &rp->rsiz);
 			rectop = (sm_uc_ptr_t)rp + rec_size;
 			if (rectop > blktop || rp->cmpc > gv_currkey->end ||
-				(((unsigned char *)rp != private_blk + sizeof(blk_hdr)) && rp->cmpc < gname_size))
+				(((unsigned char *)rp != private_blk + SIZEOF(blk_hdr)) && rp->cmpc < gname_size))
 				INTEG_ERROR_RETURN
 			cp1 = (sm_uc_ptr_t)(rp + 1);
 			cp2 = gv_currkey->base + rp->cmpc;

@@ -37,7 +37,7 @@ int gtm_get_group_id(struct stat *stat_buff)
 {
 	char		*env_var;
 	int		ret_stat;
-	char		temp[PATH_MAX + sizeof("libgtmshr.dll")];
+	char		temp[PATH_MAX + SIZEOF("libgtmshr.dll")];
 
 	env_var = GETENV("gtm_dist");
 	if (NULL != env_var)
@@ -61,7 +61,11 @@ int gtm_member_group_id(int uid, int gid)
 	int		lp;
 	/* get group id for database */
 	grp = getgrgid(gid);
+	if (NULL == grp)
+		return(FALSE); 	/* if group id not found then assume uid not a member */
 	pwd = getpwuid(uid);
+	if (NULL == pwd)
+		return(FALSE); 	/* if user id not found then assume uid not a member */
 	/* if the gid of the file is the same as the gid for the process uid we are done */
 	if (gid == pwd->pw_gid)
 		return(TRUE);
@@ -73,6 +77,8 @@ int gtm_member_group_id(int uid, int gid)
 		for (lp = 0; NULL != *(grp->gr_mem); lp++, (grp->gr_mem)++)
 		{
 			pwd2 = getpwnam(*(grp->gr_mem));
+			if (NULL == pwd2)
+				return(FALSE); 	/* if uid not found then assume uid not a member */
 			if (uid == pwd2->pw_uid)
 				break;
 		}

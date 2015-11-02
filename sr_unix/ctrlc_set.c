@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,8 @@
 #include "outofband.h"
 #include "deferred_events.h"
 #include "fix_xfer_entry.h"
-
+#include "op.h"
+#include "gtmimagename.h"
 
 /* ------------------------------------------------------------------
  * Set flags and transfer table for synchronous handling of cntl-C.
@@ -24,15 +25,12 @@
  * ------------------------------------------------------------------
  */
 GBLREF xfer_entry_t			xfer_table[];
-GBLREF volatile boolean_t		run_time;
 GBLREF volatile bool			ctrlc_on;
-GBLREF volatile int4			ctrap_action_is,outofband;
+GBLREF volatile int4			ctrap_action_is, outofband;
 
 void ctrlc_set(int4 dummy_param)
 {
-	int 		op_fetchintrrpt(), op_startintrrpt(), op_forintrrpt();
-
-	if (!outofband && run_time)
+	if (!outofband && IS_MCODE_RUNNING)
 	{
 		if (ctrlc_on)
 		{

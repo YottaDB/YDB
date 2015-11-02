@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,15 @@
 #include "gtmimagename.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "wcs_clean_dbsync.h"
+#include "is_proc_alive.h"
+#include "shmpool.h"
+#include "db_snapshot.h"
+#include "tp_grab_crit.h"
+
+#ifndef GTM_SNAPSHOT
+# error "Snapshot facility not available on this platform"
+#endif
 
 #define CANCEL_DB_TIMERS(region, csa, cancelled_timer, cancelled_dbsync_timer)	\
 {										\
@@ -78,9 +87,8 @@
 	}									\
 	if (csa->dbsync_timer)							\
 	{									\
-		cancel_timer((TID)csa);						\
+		CANCEL_DBSYNC_TIMER(csa, FALSE);				\
 		cancelled_dbsync_timer = TRUE;					\
-		csa->dbsync_timer = FALSE;					\
 	}									\
 }
 
@@ -93,7 +101,6 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			process_id;
 GBLREF	ipcs_mesg		db_ipcs;
-GBLREF	enum gtmImageTypes	image_type;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
@@ -124,6 +131,9 @@ void gds_rundown(void)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	int			save_intrpt_ok_state;
+	shm_snapshot_t		*ss_shm_ptr;
+	boolean_t		is_cur_process_ss_initiator;
+	uint4			ss_pid;
 
 	error_def(ERR_CRITSEMFAIL);
 	error_def(ERR_DBCCERR);
@@ -186,6 +196,7 @@ void gds_rundown(void)
 */
 			shmdt((caddr_t)csa->nl);
 			csa->nl = NULL;
+			REMOVE_CSA_FROM_CSADDRSLIST(csa); /* remove "csa" from list of open regions (cs_addrs_list) */
 		}
 		REVERT;
 		return;
@@ -288,6 +299,24 @@ void gds_rundown(void)
 	assert(!(have_standalone_access && !reg->read_only) || we_are_last_writer); /* recover + R/W region => one writer */
 	if (-1 == (ftok_semval = semctl(udi->ftok_semid, 1, GETVAL)))
 		rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
+	if (NULL != csa->ss_ctx)
+		ss_destroy_context(csa->ss_ctx);
+	/* SS_MULTI: If multiple snapshots are supported, then we have to run through each of the snapshots */
+	assert(1 == MAX_SNAPSHOTS);
+	ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(csa);
+	ss_pid = ss_shm_ptr->ss_info.ss_pid;
+	is_cur_process_ss_initiator = (process_id == ss_pid);
+	if (ss_pid && (is_cur_process_ss_initiator || we_are_last_user))
+	{
+		/* Try getting crit using tp_grab_crit. If we don't get crit, we would not hang for eternity and will skip
+		 * doing the orphaned snapshot cleanup. It will be cleaned up eventually.
+		 */
+		if (tp_grab_crit(reg) && (ss_pid == ss_shm_ptr->ss_info.ss_pid) && !is_proc_alive(ss_pid, 0))
+		{
+			ss_release(NULL);
+			rel_crit(reg);
+		}
+	}
 	/* If csa->nl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we should
 	 * 	not flush shared memory contents to disk as they might be in an inconsistent state.
 	 * In this case, we will go ahead and remove shared memory (without flushing the contents) in this routine.
@@ -315,7 +344,7 @@ void gds_rundown(void)
 			BG_TRACE_PRO_ANY(csa, lost_block_recovery);
 			rel_crit(reg);
 		}
-		if (JNL_ENABLED(csd) && (GTCM_GNP_SERVER_IMAGE == image_type))
+		if (JNL_ENABLED(csd) && IS_GTCM_GNP_SERVER_IMAGE)
 			originator_prc_vec = NULL;
 		/* If we are the last writing user, then everything must be flushed */
 		if (we_are_last_writer)
@@ -521,8 +550,8 @@ void gds_rundown(void)
 	csa->nl = NULL; /* dereferencing nl after detach is not right, so we set it to NULL so that we can test before dereference*/
 	if (-1 == status)
 		send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_TEXT, 2, LEN_AND_LIT("Error during shmdt"), errno);
+	REMOVE_CSA_FROM_CSADDRSLIST(csa);	/* remove "csa" from list of open regions (cs_addrs_list) */
 	reg->open = FALSE;
-
 	/* If file is still not in good shape, die here and now before we get rid of our storage */
 	if (csa->wbuf_dqd)
 		GTMASSERT;
@@ -650,6 +679,8 @@ CONDITION_HANDLER(gds_rundown_ch)
 	if (udi->grabbed_ftok_sem)
 		ftok_sem_release(gv_cur_region, !have_standalone_access, TRUE);
 	gv_cur_region->open = FALSE;
+	csa->nl = NULL;
+	REMOVE_CSA_FROM_CSADDRSLIST(csa); /* remove "csa" from list of open regions (cs_addrs_list) */
 	PRN_ERROR;
 	gtm_putmsg(VARLSTCNT(4) ERR_DBRNDWN, 2, REG_LEN_STR(gv_cur_region));
 	UNWIND(NULL, NULL);

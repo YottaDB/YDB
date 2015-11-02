@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,11 +105,11 @@ CONDITION_HANDLER(gtcm_ch)
 		*mbfptr++ = 0;			/* Msg continue indicator */
 		*mbfptr++ = msgnum++;
 		PUT_SHORT(mbfptr, szero);	/* Room for msg length */
-		mbfptr += sizeof(short);
+		mbfptr += SIZEOF(short);
 		PUT_LONG(mbfptr, SIGNAL);
-		mbfptr += sizeof(int4);
+		mbfptr += SIZEOF(int4);
 		PUT_LONG(mbfptr, SEVERITY);
-		mbfptr += sizeof(int4);
+		mbfptr += SIZEOF(int4);
 		do
 		{
 			assert(msglen);
@@ -135,7 +135,7 @@ CONDITION_HANDLER(gtcm_ch)
 				*mbfptr++ = 0;
 				*mbfptr++ = msgnum++;
 				PUT_SHORT(mbfptr, szero);	/* Room for msg length */
-				mbfptr += sizeof(short);
+				mbfptr += SIZEOF(short);
 			}
 		} while(msglen);
 		if (mbfptr > curr_entry->clb_ptr->mbf + 3)

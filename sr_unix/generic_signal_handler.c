@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,6 @@ GBLDEF gtm_sigcontext_t exi_context;
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;
-GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
@@ -57,12 +56,13 @@ GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
 GBLREF	volatile boolean_t	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
-GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	int			process_exiting;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
+
+LITREF	gtmImageName		gtmImageNames[];
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
@@ -86,15 +86,15 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	if (NULL != info)
 		exi_siginfo = *info;
 	else
-		memset(&exi_siginfo, 0, sizeof(*info));
+		memset(&exi_siginfo, 0, SIZEOF(*info));
 #if defined(__ia64) && defined(__hpux)
 	context_ptr = (gtm_sigcontext_t *)context;	/* no way to make a copy of the context */
-	memset(&exi_context, 0, sizeof(exi_context));
+	memset(&exi_context, 0, SIZEOF(exi_context));
 #else
 	if (NULL != context)
 		exi_context = *(gtm_sigcontext_t *)context;
 	else
-		memset(&exi_context, 0, sizeof(exi_context));
+		memset(&exi_context, 0, SIZEOF(exi_context));
 	context_ptr = &exi_context;
 #endif
 	/* Check if we are fielding nested immediate shutdown signals */
@@ -124,10 +124,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	switch(sig)
 	{
 		case SIGTERM:
-			if (GTMSECSHR_IMAGE == image_type)
-				forced_exit_err = ERR_GTMSECSHRSHUTDN;
-			else
-				forced_exit_err = ERR_FORCEDHALT;
+			forced_exit_err = (IS_GTMSECSHR_IMAGE ? ERR_GTMSECSHRSHUTDN : ERR_FORCEDHALT);
 			/* If nothing pending AND we have crit or in wcs_wtstart() or already in exit processing, wait to
 			 * invoke shutdown. wcs_wtstart() manipulates the active queue that a concurrent process in crit
 			 * in bt_put() might be waiting for. interrupting it can cause deadlocks (see C9C11-002178).
@@ -136,7 +133,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
-				assert(GTMSECSHR_IMAGE != image_type);
+				assert(!IS_GTMSECSHR_IMAGE);
 				return;
 			}
 			exit_state = EXIT_IMMED;
@@ -176,7 +173,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
-				assert(GTMSECSHR_IMAGE != image_type);
+				assert(!IS_GTMSECSHR_IMAGE);
 				return;
 			}
 			exit_state = EXIT_IMMED;
@@ -220,7 +217,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
-				assert(GTMSECSHR_IMAGE != image_type);
+				assert(!IS_GTMSECSHR_IMAGE);
 				return;
 			}
 			exit_state = EXIT_IMMED;
@@ -244,7 +241,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					/* If nothing pending AND we have crit or already exiting, wait to invoke shutdown */
 					if (DEFER_EXIT_PROCESSING)
 					{
-						assert(GTMSECSHR_IMAGE != image_type);
+						assert(!IS_GTMSECSHR_IMAGE);
 						forced_exit = TRUE;
 						exit_state++;		/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
@@ -307,7 +304,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		call_on_signal = NULL;		/* So we don't recursively call ourselves */
 		(*signal_routine)();
 	}
-	if (GTMSECSHR_IMAGE != image_type)
+	if (!IS_GTMSECSHR_IMAGE)
 	{
 		assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
 		exit(-exi_condition);

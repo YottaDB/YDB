@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,19 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "interlock.h"
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#include "gv_trigger_protos.h"
+#include "tp_restart.h"
+#include "mv_stent.h"
+#include "stringpool.h"
+#	ifdef DEBUG
+#	include "stack_frame.h"
+#	include "tp_frame.h"
+#	endif
+#endif
 
 /* Include prototypes */
 #include "gvcst_kill_blk.h"
@@ -57,10 +70,16 @@
 #include "wbox_test_init.h"
 #include "memcoherency.h"
 #include "util.h"
+#include "op.h"			/* for op_tstart prototype */
+#include "format_targ_key.h"	/* for format_targ_key prototype */
+#include "tp_set_sgm.h"		/* for tp_set_sgm prototype */
+#include "op_tcommit.h"		/* for op_tcommit prototype */
 
-GBLREF	boolean_t		is_updproc;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	boolean_t		pool_init;
+#ifdef GTM_TRIGGER
+LITREF	mval	literal_null;
+LITREF	mval	*fndata_table[2][2];
+#endif
+
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
@@ -68,7 +87,6 @@ GBLREF	int4			gv_keysize;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	uint4			update_array_size, cumul_update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
 GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	kill_set		*kill_set_tail;
 GBLREF	short			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -77,89 +95,174 @@ GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		need_kip_incr;
-GBLREF	boolean_t		is_replicator;
-GBLREF	jnl_gbls_t		jgbl;
-GBLREF	int4			update_trans;
+GBLREF	uint4			update_trans;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	sgmnt_addrs		*kip_csa;
+#ifdef GTM_TRIGGER
+GBLREF	int4			gtm_trigger_depth;
+GBLREF	int4			tstart_trigger_depth;
+GBLREF	boolean_t		skip_INVOKE_RESTART;
+GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
+GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
+GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
+GBLREF	mval			dollar_ztwormhole;
+#endif
+#ifdef DEBUG
+GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#endif
 
 void	gvcst_kill(bool do_subtree)
 {
 	bool			clue, flush_cache;
+	boolean_t		next_fenced_was_null, write_logical_jnlrecs, jnl_format_done;
 	boolean_t		left_extra, right_extra;
-	boolean_t		actual_update, next_fenced_was_null, write_logical_recs;
-	int4			prev_update_trans, sleep_counter;
 	cw_set_element		*tp_cse;
 	enum cdb_sc		cdb_status;
-	int			lev;
-	uint4			segment_update_array_size;
-	jnl_action		*ja;
-	jnl_format_buffer	*jfb;
+	int			lev, end;
+	uint4			prev_update_trans, actual_update;
+	jnl_format_buffer	*jfb, *ztworm_jfb;
+	jnl_action_code		operation;
 	kill_set		kill_set_head, *ks, *temp_ks;
-	srch_hist		*alt_hist;
-	srch_blk_status		*left,*right;
-	srch_rec_status		*left_rec_stat, local_srch_rec;
-	sm_uc_ptr_t		jnlpool_instfilename;
-	unsigned char		instfilename_copy[MAX_FN_LEN + 1];
+	node_local_ptr_t	cnl;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t	cnl;
+	srch_blk_status		*left,*right;
+	srch_hist		*alt_hist;
+	srch_rec_status		*left_rec_stat, local_srch_rec;
+	uint4			segment_update_array_size;
+	unsigned char		*base;
+	int			lcl_dollar_tlevel;
+	uint4			nodeflags;
+	sgm_info		*si;
+#	ifdef GTM_TRIGGER
+	mint			dlr_data;
+	boolean_t		is_tpwrap;
+	boolean_t		lcl_implicit_tstart;	/* local copy of the global variable "implicit_tstart" */
+	gtm_trigger_parms	trigparms;
+	gvt_trigger_t		*gvt_trigger;
+	gvtr_invoke_parms_t	gvtr_parms;
+	int			gtm_trig_status;
+	unsigned char		*save_msp;
+	mv_stent		*save_mv_chain;
+	mval			*ztold_mval = NULL, ztvalue_new, ztworm_val;
+#	endif
+#	ifdef DEBUG
+	boolean_t		is_mm;
+	uint4			dbg_research_cnt;
+#	endif
 
-	error_def(ERR_SCNDDBNOUPD);
-	error_def(ERR_REPLINSTMISMTCH);
+	error_def(ERR_TPRETRY);
 
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
-	if (REPL_ALLOWED(csd) && is_replicator)
-	{
-		if (FALSE == pool_init)
-			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
-		assert(pool_init);
-		if (!csa->replinst_matches_db)
-		{
-			if (jnlpool_ctl->upd_disabled && !is_updproc)
-			{	/* Updates are disabled in this journal pool. Detach from journal pool and issue error. */
-				assert(NULL != jnlpool.jnlpool_ctl);
-				jnlpool_detach();
-				assert(NULL == jnlpool.jnlpool_ctl);
-				assert(FALSE == pool_init);
-				rts_error(VARLSTCNT(1) ERR_SCNDDBNOUPD);
-			}
-			UNIX_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instfilename;)
-			VMS_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
-			if (STRCMP(cnl->replinstfilename, jnlpool_instfilename))
-			{	/* Replication instance file mismatch. Issue error. But before that detach from journal pool.
-				 * Copy replication instance file name in journal pool to temporary memory before detaching.
-				 */
-				UNIX_ONLY(assert(sizeof(instfilename_copy) == sizeof(jnlpool_ctl->jnlpool_id.instfilename));)
-				VMS_ONLY(assert(sizeof(instfilename_copy) == sizeof(jnlpool_ctl->jnlpool_id.gtmgbldir));)
-				memcpy(&instfilename_copy[0], jnlpool_instfilename, sizeof(instfilename_copy));
-				assert(NULL != jnlpool.jnlpool_ctl);
-				jnlpool_detach();
-				assert(NULL == jnlpool.jnlpool_ctl);
-				assert(FALSE == pool_init);
-				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(instfilename_copy),
-					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cnl->replinstfilename));
-			}
-			csa->replinst_matches_db = TRUE;
+	DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth);)
+	GTMTRIG_ONLY(
+		TRIG_CHECK_REPLSTATE_MATCHES_EXPLICIT_UPDATE(gv_cur_region, csa);
+		assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
+		if (!dollar_tlevel || (gtm_trigger_depth == tstart_trigger_depth))
+		{	/* This is an explicit update. Set ztwormhole_used to FALSE. Note that we initialize this only at the
+			 * beginning of the transaction and not at the beginning of each try/retry. If the application used
+			 * $ztwormhole in any retsarting try of the transaction, we consider it necessary to write the
+			 * TZTWORM/UZTWORM record even though it was not used in the succeeding/committing try.
+			 */
+			ztwormhole_used = FALSE;
 		}
-	}
-	clue = (0 != gv_target->clue.end);
+	)
+	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl);
 	if (0 == dollar_tlevel)
 	{
 		kill_set_head.next_kill_set = NULL;
 		if (jnl_fence_ctl.level)	/* next_fenced_was_null is reliable only if we are in ZTransaction */
 			next_fenced_was_null = (NULL == csa->next_fenced) ? TRUE : FALSE;
+		/* In case of non-TP explicit updates that invoke triggers the kills happen inside of TP. If those kills
+		 * dont cause any actual update, we need prev_update_trans set appropriately so update_trans can be reset.
+		 */
+		GTMTRIG_ONLY(prev_update_trans = 0;)
 	} else
 		prev_update_trans = sgm_info_ptr->update_trans;
+	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);
 	assert(NULL != update_array);
 	assert(NULL != update_array_ptr);
 	assert(0 != update_array_size);
 	assert(update_array + update_array_size >= update_array_ptr);
+	alt_hist = gv_target->alt_hist;
+	GTMTRIG_ONLY(
+		lcl_implicit_tstart = FALSE;
+		trigparms.ztvalue_new = NULL;
+	)
+	operation = (do_subtree ? JNL_KILL : JNL_ZKILL);
 	for (;;)
 	{
+		actual_update = 0;
+		DEBUG_ONLY(dbg_research_cnt = 0;)
+		jnl_format_done = FALSE;
+		write_logical_jnlrecs = JNL_WRITE_LOGICAL_RECS(csa);
+#		ifdef GTM_TRIGGER
+		gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
+		GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap, ERR_GVKILLFAIL);
+		assert(skip_dbtriggers || (gvt_trigger == gv_target->gvt_trigger));
+		dlr_data = 0;
+		if (!skip_dbtriggers && (NULL != gvt_trigger))
+		{
+			PUSH_ZTOLDMVAL_ON_M_STACK(ztold_mval, save_msp, save_mv_chain);
+			/* Determine $ZTOLDVAL & $ZTDATA to fill in trigparms */
+			cdb_status = gvcst_dataget(&dlr_data, ztold_mval);
+                        if (cdb_sc_normal != cdb_status)
+                                goto retry;
+			assert((11 >= dlr_data) && (1 >= (dlr_data % 10)));
+			/* Invoke triggers for KILL as long as $data is nonzero (1 or 10 or 11).
+			 * Invoke triggers for ZKILL only if $data is 1 or 11 (for 10 case, ZKILL is a no-op).
+			 */
+			if (do_subtree ? dlr_data : (dlr_data & 1))
+			{	/* Either node or its descendants exists. Invoke KILL triggers for this node.
+				 * But first write journal records (ZTWORM and/or KILL) for the triggering nupdate.
+				 * "ztworm_jfb", "jfb" and "jnl_format_done" are set by the below macro.
+				 */
+				JNL_FORMAT_ZTWORM_IF_NEEDED(csa, write_logical_jnlrecs,
+						operation, gv_currkey, NULL, ztworm_jfb, jfb, jnl_format_done);
+				/* Initialize trigger parms that dont depend on the context of the matching trigger */
+				trigparms.ztoldval_new = ztold_mval;
+				trigparms.ztdata_new = fndata_table[dlr_data / 10][dlr_data & 1];
+				if (NULL == trigparms.ztvalue_new)
+				{	/* Do not pass literal_null directly since $ztval can be modified inside trigger code
+					 * and literal_null is in read-only segment so will not be modifiable. Hence the
+					 * need for a dummy local variable mval "ztvalue_new" in the C stack.
+					 */
+					ztvalue_new = literal_null;
+					trigparms.ztvalue_new = &ztvalue_new;
+				}
+				gvtr_parms.gvtr_cmd = do_subtree ? GVTR_CMDTYPE_KILL : GVTR_CMDTYPE_ZKILL;
+				gvtr_parms.gvt_trigger = gvt_trigger;
+				/* gvtr_parms.duplicate_set : No need to initialize as it is SET-specific */
+				/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
+				gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
+				assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
+				if (ERR_TPRETRY == gtm_trig_status)
+				{	/* A restart has been signalled inside trigger code for this implicit TP wrapped
+					 * transaction. Redo gvcst_kill logic. The t_retry/tp_restart call has already
+					 * been done on our behalf by gtm_trigger so we need to skip that part and do
+					 * everything else before redoing gvcst_kill.
+					 */
+					assert(lcl_implicit_tstart);
+					assert(0 < t_tries);
+					assert(CDB_STAGNATE >= t_tries);
+					cdb_status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
+					goto retry;
+				}
+				REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, sgm_info_ptr);
+			}
+			/* else : we dont invoke any KILL/ZTKILL type triggers for a node whose $data is 0 */
+			POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
+		}
+#		endif
+		assert(csd == cs_data);	/* assert csd is in sync with cs_data even if there were MM db file extensions */
+		assert(csd == csa->hdr);
+		si = sgm_info_ptr;	/* Has to be AFTER the GVTR_INIT_AND_TPWRAP_IF_NEEDED macro in case that sets
+					 * sgm_info_ptr to a non-NULL value (if a non-TP transaction is tp wrapped for triggers).
+					 */
 		assert(t_tries < CDB_STAGNATE || csa->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 		if (0 == dollar_tlevel)
 		{
@@ -172,24 +275,28 @@ void	gvcst_kill(bool do_subtree)
 			segment_update_array_size = UA_NON_BM_SIZE(csd);
 			ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
 		}
+		clue = (0 != gv_target->clue.end);
+research:
 		if (cdb_sc_normal != (cdb_status = gvcst_search(gv_currkey, NULL)))
 			goto retry;
 		assert(gv_altkey->top == gv_currkey->top);
 		assert(gv_altkey->top == gv_keysize);
-		assert(gv_currkey->end < gv_currkey->top);
-		memcpy(gv_altkey, gv_currkey, sizeof(gv_key) + gv_currkey->end);
+		end = gv_currkey->end;
+		assert(end < gv_currkey->top);
+		memcpy(gv_altkey, gv_currkey, SIZEOF(gv_key) + end);
+		base = &gv_altkey->base[0];
 		if (do_subtree)
 		{
-			gv_altkey->base[gv_altkey->end - 1] = 1;
-			assert(0 == gv_altkey->base[gv_altkey->end]);
-			gv_altkey->base[++gv_altkey->end] = 0;
+			base[end - 1] = 1;
+			assert(KEY_DELIMITER == base[end]);
+			base[++end] = KEY_DELIMITER;
 		} else
 		{
-			gv_altkey->base[gv_altkey->end] = 1;
-			gv_altkey->base[++gv_altkey->end] = 0;
-			gv_altkey->base[++gv_altkey->end] = 0;
+			base[end] = 1;
+			base[++end] = KEY_DELIMITER;
+			base[++end] = KEY_DELIMITER;
 		}
-		alt_hist = gv_target->alt_hist;
+		gv_altkey->end = end;
 		if (cdb_sc_normal != (cdb_status = gvcst_search(gv_altkey, alt_hist)))
 			goto retry;
 		if (alt_hist->depth != gv_target->hist.depth)
@@ -199,7 +306,6 @@ void	gvcst_kill(bool do_subtree)
 		}
 		right_extra = FALSE;
 		left_extra = TRUE;
-		actual_update = FALSE;
 		for (lev = 0; 0 != gv_target->hist.h[lev].blk_num; ++lev)
 		{
 			left = &gv_target->hist.h[lev];
@@ -213,14 +319,14 @@ void	gvcst_kill(bool do_subtree)
 				assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
 				assert( dollar_tlevel || (NULL == tp_cse));
 				if (tp_cse)
-					actual_update = TRUE;
+					actual_update = UPDTRNS_DB_UPDATED_MASK;
 				if (cdb_sc_normal == cdb_status)
 					break;
-				gv_target->clue.end = 0;	/* If need to go up from leaf (or higher),
-								   history will cease to be valid */
+				gv_target->clue.end = 0;/* If need to go up from leaf (or higher), history will cease to be valid */
 				if (clue)
 				{	/* Clue history valid only for data block, need to re-search */
 					clue = FALSE;
+					DEBUG_ONLY(dbg_research_cnt++;)
 					goto research;
 				}
 				if (cdb_sc_delete_parent != cdb_status)
@@ -229,11 +335,11 @@ void	gvcst_kill(bool do_subtree)
 					   = TRUE;
 			} else
 			{
-				gv_target->clue.end = 0;	/* If more than one block involved,
-								   history will cease to be valid */
+				gv_target->clue.end = 0; /* If more than one block involved, history will cease to be valid */
 				if (clue)
 				{	/* Clue history valid only for data block, need to re-search */
 					clue = FALSE;
+					DEBUG_ONLY(dbg_research_cnt++;)
 					goto research;
 				}
 				local_srch_rec.offset = ((blk_hdr_ptr_t)left->buffaddr)->bsiz;
@@ -242,7 +348,7 @@ void	gvcst_kill(bool do_subtree)
 				assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
 				assert( dollar_tlevel || (NULL == tp_cse));
 				if (tp_cse)
-					actual_update = TRUE;
+					actual_update = UPDTRNS_DB_UPDATED_MASK;
 				if (cdb_sc_normal == cdb_status)
 					left_extra = FALSE;
 				else if (cdb_sc_delete_parent == cdb_status)
@@ -258,7 +364,7 @@ void	gvcst_kill(bool do_subtree)
 				assert(!dollar_tlevel || (NULL == tp_cse) || (right->cse == tp_cse));
 				assert( dollar_tlevel || (NULL == tp_cse));
 				if (tp_cse)
-					actual_update = TRUE;
+					actual_update = UPDTRNS_DB_UPDATED_MASK;
 				if (cdb_sc_normal == cdb_status)
 					right_extra = FALSE;
 				else if (cdb_sc_delete_parent == cdb_status)
@@ -271,47 +377,72 @@ void	gvcst_kill(bool do_subtree)
 		}
 		if (!dollar_tlevel)
 		{
-			assert(FALSE == actual_update);
-			actual_update = (0 != cw_set_depth); /* for non-TP, tp_cse is NULL even if cw_set_depth is non-zero */
-			/* reset update_trans to TRUE in case it got set to FALSE in previous retry */
+			assert(!jnl_format_done);
+			assert(0 == actual_update); /* for non-TP, tp_cse is NULL even if cw_set_depth is non-zero */
+			if (0 != cw_set_depth)
+				actual_update = UPDTRNS_DB_UPDATED_MASK;
+			/* reset update_trans (to potentially non-zero value) in case it got set to 0 in previous retry */
 			/* do not treat redundant KILL as an update-transaction */
 			update_trans = actual_update;
 		} else
 		{
-			assert(!actual_update || sgm_info_ptr->cw_set_depth);
-			/* no need to reset sgm_info_ptr->update_trans in case actual_update is TRUE (like is done above for
-			 * non-TP) as retry in TP will have caused flow of control to restart from the beginning of transaction
-			 * and tp_clean_up would have reset sgm_info_ptr->update_trans anyways.
-			 */
+			GTMTRIG_ONLY(
+				if (!actual_update) /* possible only if the node we are attempting to KILL does not exist now */
+				{	/* Note that it is possible that the node existed at the time of the "gvcst_dataget" but
+					 * got killed later when we did the gvcst_search (right after the "research:" label). This
+					 * is possible if any triggers invoked in between KILLed the node and/or all its
+					 * descendants. We still want to consider this case as an actual update to the database
+					 * as far as journaling is concerned (this is because we have already formatted the
+					 * KILL journal record) so set actual_update to UPDTRNS_DB_UPDATED_MASK in this case.
+					 * Note that it is possible that the node does not exist now due to a restartable
+					 * situation (instead of due to a KILL inside trigger code). In that case, it is safe to
+					 * set actual_update to UPDTRNS_DB_UPDATED_MASK (even though we did not do any update to
+					 * the database) since we will be restarting anyways. For ZKILL, check if dlr_data was
+					 * 1 or 11 and for KILL, check if it was 1, 10 or 11.
+					 */
+					DEBUG_ONLY(
+						if (!gvtr_parms.num_triggers_invoked && (do_subtree ? dlr_data : (dlr_data & 1)))
+						{	/* Triggers were not invoked but still the node that existed a few
+							 * steps above does not exist now. This is a restartable situation.
+							 * Assert that.
+							 */
+							assert(!skip_dbtriggers);
+							donot_commit |= DONOTCOMMIT_GVCST_KILL_ZERO_TRIGGERS;
+						}
+					)
+					if (do_subtree ? dlr_data : (dlr_data & 1))
+						actual_update = UPDTRNS_DB_UPDATED_MASK;
+				}
+			)
+			NON_GTMTRIG_ONLY(assert(!jnl_format_done);)
+			assert(!actual_update || si->cw_set_depth
+							GTMTRIG_ONLY(|| gvtr_parms.num_triggers_invoked || donot_commit));
+			assert(!(prev_update_trans & ~UPDTRNS_VALID_MASK));
 			if (!actual_update)
-				sgm_info_ptr->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
+				si->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
 		}
-		if ((write_logical_recs = JNL_WRITE_LOGICAL_RECS(csa)) && actual_update)
-		{	/* Maintain journal records only if the kill actually resulted in an update. */
+		if (write_logical_jnlrecs && actual_update)
+		{	/* Maintain journal records only if the kill actually resulted in a database update. */
 			if (0 == dollar_tlevel)
 			{
-				jfb = non_tp_jfb_ptr; /* Already malloced in gvcst_init() */
-				jgbl.cumul_jnl_rec_len = 0;
-				DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
-			} else
+				assert(!jnl_format_done);
+				jfb = jnl_format(operation, gv_currkey, NULL, 0);
+				assert(NULL != jfb);
+			} else if (!jnl_format_done)
 			{
-				jfb = (jnl_format_buffer *)get_new_element(sgm_info_ptr->jnl_list, 1);
-				jfb->next = NULL;
-				assert(NULL == *sgm_info_ptr->jnl_tail);
-				*sgm_info_ptr->jnl_tail = jfb;
-				sgm_info_ptr->jnl_tail = &jfb->next;
+				nodeflags = 0;
+				GTMTRIG_ONLY(
+					if (skip_dbtriggers)
+						nodeflags = JS_SKIP_TRIGGERS_MASK;
+					/* Do not replicate implicit updates */
+					assert(tstart_trigger_depth <= gtm_trigger_depth);
+					if (gtm_trigger_depth > tstart_trigger_depth)
+						nodeflags = JS_NOT_REPLICATED_MASK;
+				)
+				/* Write KILL journal record */
+				jfb = jnl_format(operation, gv_currkey, NULL, nodeflags);
+				assert(NULL != jfb);
 			}
-			ja = &(jfb->ja);
-			ja->key = gv_currkey;
-			ja->val = NULL;
-			if (do_subtree)
-				ja->operation = JNL_KILL;
-			else
-				ja->operation = JNL_ZKILL;
-			jnl_format(jfb);
-			jgbl.cumul_jnl_rec_len += jfb->record_size;
-			assert(0 == jgbl.cumul_jnl_rec_len % JNL_REC_START_BNDRY);
-			DEBUG_ONLY(jgbl.cumul_index++;)
 		}
 		flush_cache = FALSE;
 		if (0 == dollar_tlevel)
@@ -330,11 +461,11 @@ void	gvcst_kill(bool do_subtree)
 			}
 			if ((trans_num)0 == t_end(&gv_target->hist, alt_hist))
 			{	/* In case this is MM and t_end caused a database extension, reset csd */
-				assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+				assert(is_mm || (csd == cs_data));
 				csd = cs_data;
-				if (jnl_fence_ctl.level && next_fenced_was_null && actual_update && write_logical_recs)
+				if (jnl_fence_ctl.level && next_fenced_was_null && actual_update && write_logical_jnlrecs)
 				{	/* If ZTransaction and first KILL and the kill resulted in an update
-					 * Note that "write_logical_recs" is used above instead of JNL_WRITE_LOGICAL_RECS(csa)
+					 * Note that "write_logical_jnlrecs" is used above instead of JNL_WRITE_LOGICAL_RECS(csa)
 					 * since the value of the latter macro might have changed inside the call to t_end()
 					 * (since jnl state changes could change the JNL_ENABLED check which is part of the macro).
 					 */
@@ -348,7 +479,7 @@ void	gvcst_kill(bool do_subtree)
 				continue;
 			}
 			/* In case this is MM and t_end caused a database extension, reset csd */
-			assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+			assert(is_mm || (csd == cs_data));
 			csd = cs_data;
 		} else
                 {
@@ -356,7 +487,17 @@ void	gvcst_kill(bool do_subtree)
                         if (cdb_sc_normal != cdb_status)
                                 goto retry;
                 }
-		INCR_GVSTATS_COUNTER(csa, csa->nl, n_kill, 1);
+		/* Note down $tlevel (used later) before it is potentially changed by op_tcommit below */
+		lcl_dollar_tlevel = dollar_tlevel;
+#		ifdef GTM_TRIGGER
+		if (lcl_implicit_tstart)
+		{
+			GVTR_OP_TCOMMIT(cdb_status);
+			if (cdb_sc_normal != cdb_status)
+                                goto retry;
+		}
+#		endif
+		INCR_GVSTATS_COUNTER(csa, cnl, n_kill, 1);
 		if (0 != gv_target->clue.end)
 		{	/* If clue is still valid, then the deletion was confined to a single block */
 			assert(gv_target->hist.h[0].blk_num == alt_hist->h[0].blk_num);
@@ -367,8 +508,10 @@ void	gvcst_kill(bool do_subtree)
 			gv_target->hist.h[0].curr_rec.match = alt_hist->h[0].curr_rec.match;
 			COPY_CURRKEY_TO_GVTARGET_CLUE(gv_target, gv_altkey);
 		}
-		if (0 == dollar_tlevel)
+		NON_GTMTRIG_ONLY(assert(lcl_dollar_tlevel == dollar_tlevel);)
+		if (0 == lcl_dollar_tlevel)
 		{
+			assert(0 == dollar_tlevel);
 			assert(0 < kill_set_head.used || (NULL == kip_csa));
 			if (0 < kill_set_head.used)     /* free subtree, decrease kill_in_prog */
 			{	/* If csd->dsid is non-zero then some rc code was exercised before the changes
@@ -379,7 +522,7 @@ void	gvcst_kill(bool do_subtree)
 				gvcst_expand_free_subtree(&kill_set_head);
 				/* In case this is MM and gvcst_expand_free_subtree() called gvcst_bmp_mark_free() called t_retry()
 				 * which remapped an extended database, reset csd */
-				assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+				assert(is_mm || (csd == cs_data));
 				csd = cs_data;
 				DECR_KIP(csd, csa, kip_csa);
 			}
@@ -391,11 +534,44 @@ void	gvcst_kill(bool do_subtree)
 			}
 			assert(0 < kill_set_head.used || (NULL == kip_csa));
 		}
+		GTMTRIG_ONLY(assert(NULL == ztold_mval);)
 		return;
-retry:		t_retry(cdb_status);
+retry:
+		GTMTRIG_ONLY(POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);)
+#		ifdef GTM_TRIGGER
+		if (lcl_implicit_tstart)
+		{
+			assert(!skip_dbtriggers);
+			assert(!skip_INVOKE_RESTART);
+			assert((cdb_sc_normal != cdb_status) || (ERR_TPRETRY == gtm_trig_status));
+			if (cdb_sc_normal != cdb_status)
+				skip_INVOKE_RESTART = TRUE; /* causes t_retry to invoke only tp_restart * without any rts_error */
+			/* else: t_retry has already been done by gtm_trigger so no need to do it again for this try */
+		}
+#		endif
+		assert((cdb_sc_normal != cdb_status) GTMTRIG_ONLY(|| lcl_implicit_tstart));
+		if (cdb_sc_normal != cdb_status)
+			t_retry(cdb_status);
+		else
+		{	/* else: t_retry has already been done so no need to do that again but need to still invoke tp_restart
+			 * to complete pending "tprestart_state" related work.
+			 */
+			GTMTRIG_ONLY(assert(ERR_TPRETRY == gtm_trig_status);)
+			tp_restart(1);
+		}
+		GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART);) /* if set to TRUE above, should have been reset by t_retry */
+		/* At this point, we can be in TP only if we implicitly did a tstart in gvcst_kill (as part of a trigger update).
+		 * Assert that. Since the t_retry/tp_restart would have reset si->update_trans, we need to set it again.
+		 * So reinvoke the T_BEGIN call only in case of TP. For non-TP, update_trans is unaffected by t_retry.
+		 */
+		assert((0 == dollar_tlevel) GTMTRIG_ONLY(|| lcl_implicit_tstart));
+		if (dollar_tlevel)
+		{
+			tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start */
+			T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);	/* set update_trans and t_err for wrapped TP */
+		}
 		/* In case this is MM and t_retry() remapped an extended database, reset csd */
-		assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+		assert(is_mm || (csd == cs_data));
 		csd = cs_data;
-research:	;
 	}
 }

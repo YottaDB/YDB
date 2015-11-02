@@ -53,7 +53,7 @@ oprtype put_lit(mval *x)
 	{	/* Use hash table -- load it up if haven't created it yet */
 		if (!complits_hashtab)
 		{
-			complits_hashtab = (hash_table_str *)malloc(sizeof(hash_table_str));
+			complits_hashtab = (hash_table_str *)malloc(SIZEOF(hash_table_str));
 			complits_hashtab->base = NULL;
 		}
 		if (!complits_hashtab->base)
@@ -85,7 +85,7 @@ oprtype put_lit(mval *x)
 			return put_tref(ref);
 		}
 	}
-	ref->operand[0].oprval.mlit = a = (mliteral *)mcalloc(sizeof(mliteral));
+	ref->operand[0].oprval.mlit = a = (mliteral *)mcalloc(SIZEOF(mliteral));
 	dqins(&literal_chain, que, a);
 	a->rt_addr = -1;
 	a->v = *x;

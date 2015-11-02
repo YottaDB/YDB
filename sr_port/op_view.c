@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,13 @@
 #include "gtmdbglvl.h"
 #include "gtm_malloc.h"
 #include "alias.h"
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#endif
 
-#define WRITE_LITERAL(x) (outval.str.len = sizeof(x) - 1, outval.str.addr = (x), op_write(&outval))
+#define WRITE_LITERAL(x) (outval.str.len = SIZEOF(x) - 1, outval.str.addr = (x), op_write(&outval))
 
 /* if changing noisolation status within TP and already referenced the global, then error */
 #define SET_GVNH_NOISOLATION_STATUS(gvnh, status)							\
@@ -313,11 +318,11 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			jobpid = (0 != MV_FORCE_INT(parmblk.value));
 			break;
 		case VTK_LABELS:
-			if ((sizeof(upper) - 1) == parmblk.value->str.len)
+			if ((SIZEOF(upper) - 1) == parmblk.value->str.len)
 			{
-				if (!memcmp(upper, parmblk.value->str.addr, sizeof(upper) - 1))
+				if (!memcmp(upper, parmblk.value->str.addr, SIZEOF(upper) - 1))
 					glb_cmd_qlf.qlf &= ~CQ_LOWER_LABELS;
-				else  if (!memcmp(lower, parmblk.value->str.addr, sizeof(lower) - 1))
+				else  if (!memcmp(lower, parmblk.value->str.addr, SIZEOF(lower) - 1))
 					glb_cmd_qlf.qlf |= CQ_LOWER_LABELS;
 				cmd_qlf.qlf = glb_cmd_qlf.qlf;
 			}
@@ -364,7 +369,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 						case dba_mm:
 						case dba_bg:
 							csa = &FILE_INFO(reg)->s_addrs;
-							memset(&csa->gvstats_rec, 0, sizeof(gvstats_rec_t));
+							memset(&csa->gvstats_rec, 0, SIZEOF(gvstats_rec_t));
 							break;
 						case dba_cm:
 						case dba_usr:
@@ -413,7 +418,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			outval.str.len = ydirt_str_len;
 			outval.str.addr = (char *)ydirt_str;
 			op_gvput(&outval);
-			RESET_GV_TARGET;
+			RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 			gv_target->root = 0;
 			/* Now that root is set to 0, the next access to this global will go through gvcst_root_search which will
 			 * re-initialize "nct", "act" and "ver" accordingly and also initialize "collseq" ONLY IF "act" is non-zero.
@@ -575,7 +580,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			gv_fillfactor = testvalue;
 			break;
 		case VTK_STPGCOL:
-			stp_gcol(INTCAST(stringpool.top - stringpool.free) + 1);  /* computation to avoid assert in stp_gcol */
+			INVOKE_STP_GCOL(INTCAST(stringpool.top - stringpool.free) + 1);/* computation to avoid assert in stp_gcol */
 			break;
 		case VTK_LVGCOL:
 			als_lvval_gc();

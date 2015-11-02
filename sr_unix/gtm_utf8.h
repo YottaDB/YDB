@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,6 +74,10 @@
  */
 
 #define UTF8_NAME		"UTF-8"
+
+#define	CHSET_M_STR		"M"
+#define	CHSET_UTF8_STR		UTF8_NAME
+
 #define	UTF8_1BYTE_MAX		(unsigned)(wint_t)ASCII_MAX
 #define	UTF8_2BYTE_MAX		(unsigned)(wint_t)0x7FF
 #define	UTF8_3BYTE_MAX		(unsigned)(wint_t)0xFFFF

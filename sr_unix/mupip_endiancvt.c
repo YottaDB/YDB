@@ -171,12 +171,12 @@ void mupip_endiancvt(void)
 	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
 	{
 		outdb_specified = TRUE;
-		outdb_len = sizeof(outdb) - 1;
+		outdb_len = SIZEOF(outdb) - 1;
 		if (!cli_get_str("OUTDB", outdb, &outdb_len))
 			mupip_exit(ERR_MUPCLIERR);
 	} else
 		outdb_specified = FALSE;
-	n_len = sizeof(db_name) - 1;
+	n_len = SIZEOF(db_name) - 1;
 	if (cli_get_str("DATABASE", db_name, &n_len) == FALSE)
 		mupip_exit(ERR_MUPCLIERR);
 
@@ -193,8 +193,8 @@ void mupip_endiancvt(void)
 	if (-1 == gtm_zos_tag_to_policy(db_fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(db_name, realfiletag, TAG_BINARY, errno);
 #endif
-	old_data = (sgmnt_data *)malloc(sizeof(sgmnt_data));
-	LSEEKREAD(db_fd, 0, old_data, sizeof(sgmnt_data), save_errno);
+	old_data = (sgmnt_data *)malloc(SIZEOF(sgmnt_data));
+	LSEEKREAD(db_fd, 0, old_data, SIZEOF(sgmnt_data), save_errno);
 	if (0 != save_errno)
 	{
 		free(old_data);
@@ -226,7 +226,7 @@ void mupip_endiancvt(void)
 	{
 		endian_native = FALSE;		/* nobody can be using the db */
 		/* do checks after swapping fields */
-		assert(sizeof(int4) == sizeof(old_data->desired_db_format));
+		assert(SIZEOF(int4) == SIZEOF(old_data->desired_db_format));
 		/* If OVERRIDE is specified, skip checking for those fields that are not critical for the integrity of the db.
 		 * Any field that indicates the db is potentially damaged cannot be overridden.
 		 */
@@ -263,7 +263,7 @@ void mupip_endiancvt(void)
 			check_error = NOTCURRDBFORMAT;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
-		assert(sizeof(int4) == sizeof(old_data->fully_upgraded));
+		assert(SIZEOF(int4) == SIZEOF(old_data->fully_upgraded));
 		swap_boolean = GTM_BYTESWAP_32(old_data->fully_upgraded);
 		if (!swap_boolean)
 		{
@@ -428,8 +428,8 @@ void mupip_endiancvt(void)
 		CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
 		mupip_exit(ERR_MUNOACTION);
 	}
-	new_data = (sgmnt_data *)malloc(sizeof(sgmnt_data));
-	memcpy(new_data, old_data, sizeof(sgmnt_data));
+	new_data = (sgmnt_data *)malloc(SIZEOF(sgmnt_data));
+	memcpy(new_data, old_data, SIZEOF(sgmnt_data));
 	new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(TRUE) : TRUE;
 	info.db_fd = db_fd;
 	info.inplace = !outdb_specified;
@@ -463,7 +463,7 @@ void mupip_endiancvt(void)
 			TAG_POLICY_GTM_PUTMSG(outdb, realfiletag, TAG_BINARY, errno);
 #endif
 		new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(TRUE) : TRUE;
-		LSEEKWRITE(outdb_fd, 0, new_data, sizeof(sgmnt_data), save_errno);
+		LSEEKWRITE(outdb_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
 		if (0 != save_errno)
 		{
 			free(new_data);
@@ -559,7 +559,7 @@ void mupip_endiancvt(void)
 		mupip_exit(ERR_MUNOFINISH);	/* endian_process issued specific message */
 	}
 	new_data->file_corrupt = endian_native ? GTM_BYTESWAP_32(FALSE) : FALSE;
-	LSEEKWRITE(outdb_specified ? outdb_fd : db_fd, 0, new_data, sizeof(sgmnt_data), save_errno);
+	LSEEKWRITE(outdb_specified ? outdb_fd : db_fd, 0, new_data, SIZEOF(sgmnt_data), save_errno);
 	if (0 != save_errno)
 	{
 		free(new_data);
@@ -629,7 +629,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(master_map_len);
 	SWAP_SD4(bplmap);
 	SWAP_SD4(start_vbn);
-	assert(sizeof(int4) == sizeof(old->acc_meth));		/* enum */
+	assert(SIZEOF(int4) == SIZEOF(old->acc_meth));		/* enum */
 	SWAP_SD4_CAST(acc_meth, enum db_acc_method);
 	SWAP_SD4(max_bts);
 	SWAP_SD4(n_bts);
@@ -641,7 +641,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(extension_size);
 	SWAP_SD4(def_coll);
 	SWAP_SD4(def_coll_ver);
-	assert(sizeof(int4) == sizeof(old->std_null_coll));	/* boolean_t */
+	assert(SIZEOF(int4) == SIZEOF(old->std_null_coll));	/* boolean_t */
 	SWAP_SD4(std_null_coll);
 	SWAP_SD4(null_subs);
 	SWAP_SD4(free_space);
@@ -651,24 +651,24 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(max_update_array_size);
 	SWAP_SD4(max_non_bm_update_array_size);
 	/* SWAP_SD4(file_corrupt); is set in main routine	*/
-	assert(sizeof(int4) == sizeof(old->minor_dbver));	/* enum */
+	assert(SIZEOF(int4) == SIZEOF(old->minor_dbver));	/* enum */
 	SWAP_SD4_CAST(minor_dbver, enum mdb_ver);
 	SWAP_SD4(jnl_checksum);
 	SWAP_SD4(wcs_phase2_commit_wait_spincnt);
 	/* SWAP_SD4(createinprogress);	checked above as FALSE so no need */
-	assert(sizeof(int4) == sizeof(old->creation_time4));
+	assert(SIZEOF(int4) == SIZEOF(old->creation_time4));
 	time(&ctime);
-	assert(sizeof(ctime) >= sizeof(int4));
+	assert(SIZEOF(ctime) >= SIZEOF(int4));
 	new->creation_time4 = (int4)ctime;/* Take only lower order 4-bytes of current time */
 	if (!new_is_native)
 		SWAP_SD4(creation_time4);
-	assert(sizeof(gtm_int64_t) == sizeof(old->max_tn));	/* trans_num */
+	assert(SIZEOF(gtm_int64_t) == SIZEOF(old->max_tn));	/* trans_num */
 	SWAP_SD8(max_tn);
 	SWAP_SD8(max_tn_warn);
 	SWAP_SD8(last_inc_backup);
 	SWAP_SD8(last_com_backup);
 	SWAP_SD8(last_rec_backup);
-	assert(sizeof(int4) == sizeof(old->last_inc_bkup_last_blk));	/* block_id */
+	assert(SIZEOF(int4) == SIZEOF(old->last_inc_bkup_last_blk));	/* block_id */
 	SWAP_SD4(last_inc_bkup_last_blk);
 	SWAP_SD4(last_com_bkup_last_blk);
 	SWAP_SD4(last_rec_bkup_last_blk);
@@ -684,7 +684,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(reorg_upgrd_dwngrd_restart_block);
 	SWAP_SD4(blks_to_upgrd);
 	SWAP_SD4(blks_to_upgrd_subzero_error);
-	assert(sizeof(int4) == sizeof(old->desired_db_format));	/* enum */
+	assert(SIZEOF(int4) == SIZEOF(old->desired_db_format));	/* enum */
 	SWAP_SD4_CAST(desired_db_format, enum db_ver);
 	SWAP_SD4(fully_upgraded);	/* should be TRUE */
 	assert(new->fully_upgraded);
@@ -742,7 +742,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(rc_srv_cnt);
 	SWAP_SD4(dsid);
 	SWAP_SD4(rc_node);
-	assert(sizeof(gtm_int64_t) == sizeof(old->reg_seqno));	/* seq_num */
+	assert(SIZEOF(gtm_int64_t) == SIZEOF(old->reg_seqno));	/* seq_num */
 	SWAP_SD8(reg_seqno);
 	SWAP_SD8(pre_multisite_resync_seqno);
 	/* Note some of the following names were added or renamed in V5.1 but
@@ -772,9 +772,9 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(alignsize);
 	SWAP_SD4(jnl_sync_io);
 	SWAP_SD4(yield_lmt);
-	assert(sizeof(gtm_int64_t) == sizeof(old->intrpt_recov_resync_seqno));
+	assert(SIZEOF(gtm_int64_t) == SIZEOF(old->intrpt_recov_resync_seqno));
 	SWAP_SD8(intrpt_recov_resync_seqno);
-	assert(sizeof(int4) == sizeof(old->intrpt_recov_tp_resolve_time));
+	assert(SIZEOF(int4) == SIZEOF(old->intrpt_recov_tp_resolve_time));
 	SWAP_SD4(intrpt_recov_tp_resolve_time);
 	SWAP_SD4(recov_interrupted);
 	SWAP_SD4(intrpt_recov_jnl_state);
@@ -917,7 +917,8 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 					bp_native = (blk_hdr_ptr_t)blk_buff[buff_native];
 					if (new_is_native)
 						endian_cvt_blk_hdr(bp_new, new_is_native, BLK_RECYCLED == lbm_status);
-					crypt_blk_size = (bp_new->bsiz) - (SIZEOF(*bp_new));
+					assert((bp_new->bsiz <= bsize) && (bp_new->bsiz >= SIZEOF(*bp_new)));
+					crypt_blk_size = MIN(bsize, bp_new->bsiz) - (SIZEOF(*bp_new));
 					blk_needs_encryption = BLK_NEEDS_ENCRYPTION(bp_new->levl, crypt_blk_size);
 					if (blk_needs_encryption)
 					{
@@ -1023,16 +1024,16 @@ void endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t
 	blkhdr->bver = GTM_BYTESWAP_16(blkhdr->bver);
 	if (new_is_native)
 		v15bsiz = blkhdr->bver;		/* now it is native endian */
-	if (sizeof(v15_blk_hdr) <= v15bsiz)
+	if (SIZEOF(v15_blk_hdr) <= v15bsiz)
 	{	/* old format block so it must be recycled and not upgraded */
 		assert(FALSE);		/* should have been changed to FREE  above */
 		assert(make_empty);
 		v15levl = ((v15_blk_hdr *)blkhdr)->levl;
 		v15tn = ((v15_blk_hdr *)blkhdr)->tn;
-		assert(sizeof(char) == sizeof(blkhdr->levl));	/* no need to swap */
+		assert(SIZEOF(char) == SIZEOF(blkhdr->levl));	/* no need to swap */
 		blkhdr->levl = v15levl;
 		bver = GDSV5;
-		bsiz = sizeof(v15_blk_hdr);
+		bsiz = SIZEOF(v15_blk_hdr);
 		if (!new_is_native)
 		{
 			tn = ((v15_blk_hdr *)blkhdr)->tn;	/* expand while native; */
@@ -1048,9 +1049,9 @@ void endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t
 		blkhdr->bsiz = bsiz;
 		return;
 	}
-	assert(sizeof(char) == sizeof(blkhdr->levl));	/* no need to swap */
+	assert(SIZEOF(char) == SIZEOF(blkhdr->levl));	/* no need to swap */
 	if (make_empty)
-		blkhdr->bsiz = new_is_native ? USIZEOF(blk_hdr) : GTM_BYTESWAP_32(USIZEOF(blk_hdr));
+		blkhdr->bsiz = new_is_native ? SIZEOF(blk_hdr) : GTM_BYTESWAP_32(SIZEOF(blk_hdr));
 	else
 		blkhdr->bsiz = GTM_BYTESWAP_32(blkhdr->bsiz);
 	blkhdr->tn = GTM_BYTESWAP_64(blkhdr->tn);
@@ -1104,7 +1105,8 @@ char *endian_read_dbblk(endian_info *info, block_id blk_to_get)
 	if (is_encrypted)
 	{
 		bp = (blk_hdr_ptr_t)buff;
-		req_dec_blk_size = (bp->bsiz) - (SIZEOF(*bp));
+		assert((bp->bsiz <= info->bsize) && (bp->bsiz >= SIZEOF(*bp)));
+		req_dec_blk_size = MIN(info->bsize, bp->bsiz) - (SIZEOF(*bp));
 		if (BLOCK_REQUIRE_ENCRYPTION(is_encrypted, bp->levl, req_dec_blk_size))
 		{
 			ASSERT_ENCRYPTION_INITIALIZED;
@@ -1141,7 +1143,7 @@ void endian_find_key(endian_info *info, end_gv_key *targ_gv_key, char *rec_p, in
 	}
 	cmpc = ((rec_hdr_ptr_t)rec_p)->cmpc;
 	targ_key = targ_gv_key->key + cmpc;
-	rec_key = rec_p + sizeof(rec_hdr);
+	rec_key = rec_p + SIZEOF(rec_hdr);
 	while (TRUE)
 	{
 		for (; *rec_key; ++targ_key, ++rec_key)
@@ -1212,7 +1214,7 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 	{
 		blk_top = buff + ((blk_hdr_ptr_t)buff)->bsiz;
 		blk_levl = ((blk_hdr_ptr_t)buff)->levl;
-		rec_p = buff + sizeof(blk_hdr);
+		rec_p = buff + SIZEOF(blk_hdr);
 		while (rec_p < blk_top)
 		{
 			GET_USHORT(us_rec_len, &((rec_hdr *)rec_p)->rsiz);
@@ -1223,7 +1225,7 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 				return -1;
 			if (0 != blk_levl && BSTAR_REC_SIZE == rec_len)
 			{	/* down to the next level */
-				GET_ULONG(blk_ptr, rec_p + sizeof(rec_hdr));
+				GET_ULONG(blk_ptr, rec_p + SIZEOF(rec_hdr));
 				if (!blk_is_native)
 					blk_ptr = GTM_BYTESWAP_32(blk_ptr);
 				if (blk_ptr > info->tot_blks)
@@ -1237,7 +1239,7 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 				if (0 == blk_levl)
 					return blk_to_get;	/* found dtleaf block we are looking for */
 				ptroffset = found_gv_key.end - ((rec_hdr *)rec_p)->cmpc + 1;
-				GET_ULONG(blk_ptr, (rec_p + sizeof(rec_hdr) + ptroffset));
+				GET_ULONG(blk_ptr, (rec_p + SIZEOF(rec_hdr) + ptroffset));
 				if (!blk_is_native)
 					blk_ptr = GTM_BYTESWAP_32(blk_ptr);
 				if (blk_ptr > info->tot_blks)
@@ -1269,12 +1271,12 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 	boolean_t	have_gvtleaf;
 	end_gv_key	gv_key;
 
-	if (sizeof(v15_blk_hdr) <= blkhdr->bver)
+	if (SIZEOF(v15_blk_hdr) <= blkhdr->bver)
 		return;		/* pre V5 version so ignore records */
 	new_is_native = !info->endian_native;
 	blk_levl = blkhdr->levl;
 	blk_top = (unsigned char *)new_block + blkhdr->bsiz;
-	rec1_ptr = (unsigned char *)new_block + sizeof(blk_hdr);
+	rec1_ptr = (unsigned char *)new_block + SIZEOF(blk_hdr);
 	GET_USHORT(us_rec_len, &((rec_hdr *)rec1_ptr)->rsiz);
 	rec1_len = new_is_native ? GTM_BYTESWAP_16(us_rec_len) : us_rec_len;
 	/* May not need this whole thing, just do what dump_record does
@@ -1306,7 +1308,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 		have_dt_blk = TRUE;
 	else
 	{
-		rec1_gvn_len = STRLEN((char *)rec1_ptr + sizeof(rec_hdr));
+		rec1_gvn_len = STRLEN((char *)rec1_ptr + SIZEOF(rec_hdr));
 		if (-1 != rec2_cmpc && rec2_cmpc <= rec1_gvn_len)
 			have_dt_blk = TRUE;
 	}
@@ -1325,19 +1327,19 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 		/* if subscripts at level 0, it must be gvtleaf */
 		/* find key_top to check if it has four bytes of data which look like a valid pointer */
 		/* note dtleaf may have collation info after the pointer */
-		for (key_top = rec1_ptr + sizeof(rec_hdr); *key_top && key_top < (rec1_ptr + rec1_len); key_top++)
+		for (key_top = rec1_ptr + SIZEOF(rec_hdr); *key_top && key_top < (rec1_ptr + rec1_len); key_top++)
 			;
 		if (*++key_top)
 			have_gvtleaf = TRUE;		/* gdsblk_gvtleaf subscript so must be */
-		else if (sizeof(block_id) <= ((rec1_ptr + rec1_len) - ++key_top) &&
-			 (sizeof(block_id) + MAX_SPEC_TYPE_LEN) >= ((rec1_ptr + rec1_len) - key_top))
+		else if (SIZEOF(block_id) <= ((rec1_ptr + rec1_len) - ++key_top) &&
+			 (SIZEOF(block_id) + MAX_SPEC_TYPE_LEN) >= ((rec1_ptr + rec1_len) - key_top))
 		{	/* record value long enough for block_id but not longer than block_id plus collation information */
 			GET_LONG(ptr2blk, key_top);
 			if (new_is_native)
 				ptr2blk = GTM_BYTESWAP_32(ptr2blk);
 			if (ptr2blk <= info->tot_blks)
 			{	/* might be a pointer so need to check the hard way */
-				gv_key.key = rec1_ptr + sizeof(rec_hdr);
+				gv_key.key = rec1_ptr + SIZEOF(rec_hdr);
 				gv_key.top = gv_key.end = gv_key.gvn_len = (unsigned int)(key_top - gv_key.key - 1);
 				dtblk = endian_find_dtblk(info, &gv_key);
 				if (dtblk != blknum)
@@ -1358,19 +1360,19 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 		/* clear left over char after cmpc */
 		recp = (rec_hdr *)rec1_ptr;
 		tmp_ptr = &recp->cmpc + 1;
-		assert(sizeof(rec_hdr) > (tmp_ptr - rec1_ptr));
+		assert(SIZEOF(rec_hdr) > (tmp_ptr - rec1_ptr));
 		*tmp_ptr = 0;
 		if (!have_gvtleaf)
 		{	/* fix up pointers as well */
-			key_top = rec1_ptr + sizeof(rec_hdr);
+			key_top = rec1_ptr + SIZEOF(rec_hdr);
 			if (BSTAR_REC_SIZE != rec1_len || 0 == blk_levl)
 			{	/* find pointer after subscripts */
 				for ( ; key_top < (rec1_ptr + rec1_len); )
 					if (!*key_top++ && !*key_top++)
 						break;		/* 2 nulls is end of subscripts */
 			} else
-				assert((key_top + sizeof(block_id) == blk_top) || blk_levl);	/* must be last if not leaf */
-			assert((key_top + sizeof(block_id)) <= (rec1_ptr + rec1_len));
+				assert((key_top + SIZEOF(block_id) == blk_top) || blk_levl);	/* must be last if not leaf */
+			assert((key_top + SIZEOF(block_id)) <= (rec1_ptr + rec1_len));
 			GET_LONG(ptr2blk, key_top);
 			ptr2blk_swap = GTM_BYTESWAP_32(ptr2blk);
 			PUT_LONG(key_top, ptr2blk_swap);

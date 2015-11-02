@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,31 +43,31 @@ void dse_find_roots(block_id index)
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
-	else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-		b_top = bp + sizeof(blk_hdr);
+	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+		b_top = bp + SIZEOF(blk_hdr);
 	else
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
-	for (rp = bp + sizeof(blk_hdr); rp < b_top ;rp = r_top)
+	for (rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top)
 	{	GET_SHORT(temp_short,&((rec_hdr_ptr_t)rp)->rsiz);
 		r_top = rp + temp_short;
 		if (r_top > b_top)
 			r_top = b_top;
-		if (r_top - rp < sizeof(block_id))
+		if (r_top - rp < SIZEOF(block_id))
 			break;
-		global_roots_tail->link = (global_root_list *)malloc(sizeof(global_root_list));
+		global_roots_tail->link = (global_root_list *)malloc(SIZEOF(global_root_list));
 		global_roots_tail = global_roots_tail->link;
 		global_roots_tail->link = 0;
-		for (key_top = rp + sizeof(rec_hdr); key_top < r_top; )
+		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
 			if(!*key_top++ && !*key_top++)
 				break;
 		GET_LONG(global_roots_tail->root,key_top);
-		global_roots_tail->dir_path = (global_dir_path *)malloc(sizeof(global_dir_path));
+		global_roots_tail->dir_path = (global_dir_path *)malloc(SIZEOF(global_dir_path));
 		d_ptr = global_roots_tail->dir_path;
 		for (count = 0; ; count++)
 		{	d_ptr->block = patch_path[count];
 			d_ptr->offset = patch_offset[count];
 			if (count < patch_path_count - 1)
-				d_ptr->next = (global_dir_path *)malloc(sizeof(global_dir_path));
+				d_ptr->next = (global_dir_path *)malloc(SIZEOF(global_dir_path));
 			else
 			{	d_ptr->next = 0;
 				d_ptr->offset = (int4)(rp - bp);

@@ -188,8 +188,8 @@ DEBUG_ONLY( struct rlimit rlim;)
 					if ((NULL != tmp_csd) && (MM_MALLOC_ALREADY_TRIED != csa->mm_core_hdr))
 					{
 						csa->mm_core_hdr = MM_MALLOC_ALREADY_TRIED;
-						csd = (sgmnt_data_ptr_t)malloc(sizeof(*csd));
-						memcpy((sm_uc_ptr_t)csd, (uchar_ptr_t)tmp_csd, sizeof(*csd));
+						csd = (sgmnt_data_ptr_t)malloc(SIZEOF(*csd));
+						memcpy((sm_uc_ptr_t)csd, (uchar_ptr_t)tmp_csd, SIZEOF(*csd));
 						csa->mm_core_hdr = csd;
 					}
 				}

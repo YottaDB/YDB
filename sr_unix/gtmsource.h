@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "gtm_inet.h"
 #else
 #include <netinet/in.h>
+GBLREF gd_addr	*gd_header;
 #endif
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
@@ -81,7 +82,7 @@ typedef enum
 #define GTMSOURCE_WAIT_FOR_SOURCESTART		(1000 - 1) /* ms, almost 1 sec */
 #define	GTMSOURCE_WAIT_FOR_FIRSTTRIPLE		(1000 - 1) /* ms, almost 1 sec */
 
-#define	GTMSOURCE_MAX_SHUTDOWN_WAITLOOP	(4*60)	/* 240 times each GTMSOURCE_WAIT_FOR_SHUTDOWN (1 second) = total of 4 minutes */
+#define	GTMSOURCE_MAX_SHUTDOWN_WAITLOOP	((gd_header->n_regions) * 90) /*Wait for one and a half minutes per region*/
 
 #define GTMSOURCE_SHUTDOWN_PAD_TIME		5 /* seconds */
 
@@ -202,7 +203,7 @@ typedef struct gtmsrc_lcl_struct	*gtmsrc_lcl_ptr_t;
  */
 
 /********************** VERY IMPORTANT ********************************
- * Keep sizeof(jnldata_hdr_struct) == ~JNL_WRT_END_MASK + 1 and
+ * Keep SIZEOF(jnldata_hdr_struct) == ~JNL_WRT_END_MASK + 1 and
  * jnlpool_size should be a multiple of (~JNL_WRT_END_MASK + 1).
  * This is to avoid jnldata_hdr_struct from wrapping, so that fields
  * remain contiguous.
@@ -345,8 +346,8 @@ typedef gtmsource_local_struct *gtmsource_local_ptr_t;
 
 /* Push the jnldata_base_off to be aligned to (~JNL_WRT_END_MASK + 1)-byte boundary */
 
-#define JNLPOOL_CTL_SIZE	ROUND_UP(sizeof(jnlpool_ctl_struct), CACHELINE_SIZE)	/* align crit semaphore at cache line */
-#define	JNLPOOL_CRIT_SIZE	(CRIT_SPACE + sizeof(mutex_spin_parms_struct) + sizeof(node_local))
+#define JNLPOOL_CTL_SIZE	ROUND_UP(SIZEOF(jnlpool_ctl_struct), CACHELINE_SIZE)	/* align crit semaphore at cache line */
+#define	JNLPOOL_CRIT_SIZE	(CRIT_SPACE + SIZEOF(mutex_spin_parms_struct) + SIZEOF(node_local))
 #define JNLDATA_BASE_OFF	(JNLPOOL_CTL_SIZE + JNLPOOL_CRIT_SIZE + REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE + GTMSOURCE_LOCAL_SIZE)
 
 #ifdef VMS

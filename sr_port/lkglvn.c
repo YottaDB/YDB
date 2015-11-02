@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,11 +24,12 @@ GBLREF mident 	window_ident;
 
 int lkglvn(bool gblvn)
 {
-	triple 	*ref, *t1;
-	char	x, lkname_buf[MAX_MIDENT_LEN + 1], *lknam;
-	oprtype subscripts[MAX_LVSUBSCRIPTS], *sb1, *sb2;
-	opctype ox;
-	bool vbar, parse_status;
+	triple		*ref, *t1;
+	char		x, lkname_buf[MAX_MIDENT_LEN + 1], *lknam;
+	oprtype		subscripts[MAX_LVSUBSCRIPTS], *sb1, *sb2;
+	opctype		ox;
+	bool		vbar, parse_status;
+
 	error_def(ERR_COMMA);
 	error_def(ERR_EXTGBLDEL);
 	error_def(ERR_MAXNRSUBSCRIPTS);
@@ -39,18 +40,16 @@ int lkglvn(bool gblvn)
 	lknam = lkname_buf;
 	if (gblvn)
 		*lknam++ = '^';
-
-	if (window_token == TK_LBRACKET || window_token == TK_VBAR)
-	{	vbar = (window_token == TK_VBAR);
+	if ((TK_LBRACKET == window_token) || (TK_VBAR == window_token))
+	{
+		vbar = (TK_VBAR == window_token);
 		advancewindow();
 		if (vbar)
 			parse_status = expr(sb1++);
 		else
 			parse_status = expratom(sb1++);
 		if (!parse_status)
-		{
 			return FALSE;
-		}
 		if (window_token == TK_COMMA)
 		{
 			advancewindow();
@@ -62,18 +61,16 @@ int lkglvn(bool gblvn)
 			{
 				return FALSE;
 			}
-		}
-		else
+		} else
 			*sb1++ = put_str(0,0);
-		if ((!vbar && window_token != TK_RBRACKET) || (vbar && window_token != TK_VBAR))
+		if ((!vbar && (TK_RBRACKET != window_token)) || (vbar && (TK_VBAR != window_token)))
 		{
 			stx_error(ERR_EXTGBLDEL);
 			return FALSE;
 		}
 		advancewindow();
 		ox = OC_LKEXTNAME;
-	}
-	else
+	} else
 		*sb1++ = put_ilit(0);
 
 	if (window_token != TK_IDENT)
@@ -86,22 +83,26 @@ int lkglvn(bool gblvn)
 	*sb1++ = put_str(lkname_buf,(mstr_len_t)(lknam - lkname_buf));
 	advancewindow();
 	if (window_token == TK_LPAREN)
-	{	for (;;)
-		{	if (sb1 >= &subscripts[MAX_LVSUBSCRIPTS])
-			{	stx_error(ERR_MAXNRSUBSCRIPTS);
+	{
+		for (;;)
+		{
+			if (sb1 >= ARRAYTOP(subscripts))
+			{
+				stx_error(ERR_MAXNRSUBSCRIPTS);
 				return FALSE;
 			}
 			advancewindow();
 			if (!expr(sb1))
-			{	return FALSE;
-			}
+				return FALSE;
 			sb1++;
 			if ((x = window_token) == TK_RPAREN)
-			{	advancewindow();
+			{
+				advancewindow();
 				break;
 			}
 			if (x != TK_COMMA)
-			{	stx_error(ERR_COMMA);
+			{
+				stx_error(ERR_COMMA);
 				return FALSE;
 			}
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,9 @@ GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF global_latch_t		defer_latch;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF char			cli_err_str[];
+GBLREF CLI_ENTRY		lke_cmd_ary[];
+
+GBLDEF CLI_ENTRY		*cmd_ary = &lke_cmd_ary[0];	/* Define cmd_ary to be the LKE specific cmd table */
 
 static bool lke_process(int argc);
 static void display_prompt(void);

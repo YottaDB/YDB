@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,9 +34,6 @@
 #include "mur_read_file.h"
 
 GBLDEF 	mur_gbls_t		murgbl;
-GBLDEF 	mur_rab_t		mur_rab;	/* To access a record */
-GBLDEF	jnl_ctl_list		*mur_jctl;
-GBLDEF	reg_ctl_list		*mur_ctl;
-GBLDEF 	int			mur_regno;
+GBLDEF	reg_ctl_list		*mur_ctl, *rctl_start;
 GBLDEF	mur_opt_struct 		mur_options;
-GBLDEF	mur_read_desc_t		mur_desc;	/* Only for mur_read_files.c and mur_get_pini.c */
+GBLDEF	boolean_t		mur_close_files_done;

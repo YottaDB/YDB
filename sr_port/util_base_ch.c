@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,6 @@ GBLREF boolean_t		created_core;
 GBLREF boolean_t		dont_want_core;
 GBLREF int4            		exi_condition;
 GBLREF int4            		error_condition;
-GBLREF enum gtmImageTypes	image_type;
 
 CONDITION_HANDLER(util_base_ch)
 {
@@ -81,7 +80,7 @@ CONDITION_HANDLER(util_base_ch)
 				}
 			}
 		}
-		if (MUPIP_IMAGE == image_type)
+		if (IS_MUPIP_IMAGE)
 			preemptive_ch(SEVERITY);	/* for other utilities, preemptive_ch() is called from util_ch() */
 		UNIX_ONLY(
 			if ((DUMPABLE) && !SUPPRESS_DUMP)
@@ -115,8 +114,8 @@ CONDITION_HANDLER(util_base_ch)
 				if (status & 1)
 				{
 					if (0 < msginfo[1])
-						exi_condition = ((MUPIP_IMAGE == image_type) ? ERR_MUNOFINISH :
-								((DSE_IMAGE == image_type) ? ERR_DSENOFINISH : ERR_LKENOFINISH));
+						exi_condition = (IS_MUPIP_IMAGE ? ERR_MUNOFINISH :
+								(IS_DSE_IMAGE ? ERR_DSENOFINISH : ERR_LKENOFINISH));
 				}
 			}
 		)

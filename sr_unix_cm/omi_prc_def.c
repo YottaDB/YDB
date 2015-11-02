@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ omi_prc_def(omi_conn *cptr, char *xend, char *buff, char *bend)
 /*  We want to make sure there is plenty of space in the string pool
  *  for all three operations ($ORDER, $GET, $DATA) */
     if (cptr->exts & OMI_XTF_NEWOP)
-	stp_gcol(0);
+	INVOKE_STP_GCOL(0);
 
 /*  $DATA */
     op_gvdata(&vd);

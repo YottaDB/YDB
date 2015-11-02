@@ -15,8 +15,7 @@
 #	building encryption plugin are available
 #	Returns :
 #		TRUE - if ksh, gpg, crypt headers and libraries are available
-#		FALSE - if none of them is available or the host does not support encryption
-#		ERROR - if either of them is unavailable
+#		FALSE - if not all of them are available i.e the host does not support encryption
 ###########################################################################################
 
 hostos=`uname -s`
@@ -28,7 +27,7 @@ fi
 
 file $gtm_dist/mumps | grep "64" > /dev/null
 if [ $? -eq 0 ]; then
-	lib_search_path="/usr/lib /usr/lib64 /usr/local/lib64 /usr/local/lib"
+	lib_search_path="/usr/lib /usr/lib64 /usr/local/lib64 /lib64 /usr/local/lib"
 else
 	lib_search_path="/usr/lib /usr/local/lib"
 fi
@@ -61,6 +60,8 @@ do
 	done
 	if [ $find_flag -eq 0 ]; then
 		found_libs="FALSE"
+		echo "FALSE"
+		exit 0
 		break
 	fi
 done
@@ -76,6 +77,8 @@ do
 	done
 	if [ $find_flag -eq 0 ]; then
 		found_headers="FALSE"
+		echo "FALSE"
+		exit 0
 		break
 	fi
 done
@@ -92,17 +95,16 @@ do
 	done
 	if [ $find_flag -eq 0 ]; then
 		found_bins="FALSE"
+		echo "FALSE"
+		exit 0
 		break
 	fi
 done
 
-if [ $found_headers = "TRUE" -a $found_libs="TRUE" -a $found_bins="TRUE" ];then
+if [ $found_headers = "TRUE" -a $found_libs = "TRUE" -a $found_bins = "TRUE" ];then
 	echo "TRUE"
 	exit 0
-elif [ $found_headers = "FALSE" -a $found_libs="FALSE" -a $found_bins="FALSE" ]; then
+else
 	echo "FALSE"
 	exit 0
-else
-	echo "ERROR"
-	exit 1
 fi

@@ -36,10 +36,10 @@ extern int	can_prompt_passwd;
 /* Cleanup the db key entries and also remove the plain text passwd stored there */
 void gc_dbk_scrub_entries()
 {
-	/* Walk through the linked list and free each member of the structure.*/
-	db_key_map *temp;
+	db_key_map *temp, *temp1;
 
 	temp = GC_DBK_GET_FIRST_ENTRY();
+	/* Walk through the linked list and free each member of the structure.*/
 	while (NULL != temp)
 	{
 #		ifdef USE_GCRYPT
@@ -48,8 +48,9 @@ void gc_dbk_scrub_entries()
 		if (temp->decr_key_handle)
 			gcry_cipher_close(temp->decr_key_handle);
 #		endif
+		temp1 = GC_DBK_GET_NEXT_ENTRY(temp);
 		GC_FREE_DB_KEY_MAP(temp); /* Note, this will memset the key_string to 0 before free'ing */
-		temp = GC_DBK_GET_NEXT_ENTRY(temp);
+		temp = temp1;
 	}
 	if (NULL != fast_lookup_entry)
 		GC_FREE(fast_lookup_entry);
@@ -320,7 +321,7 @@ xc_status_t gc_dbk_load_entries_from_file()
 				return GC_FAILURE;
 		}
 	}
-	GC_MALLOC(fast_lookup_entry, (sizeof(fast_lookup_entry) * num_entries), db_key_map*);
+	GC_MALLOC(fast_lookup_entry, (SIZEOF(fast_lookup_entry) * num_entries), db_key_map*);
 	node = GC_DBK_GET_FIRST_ENTRY();
 	while (NULL != node)
 	{

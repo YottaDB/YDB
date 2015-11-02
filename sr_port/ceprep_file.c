@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,7 +62,7 @@ void open_ceprep_file(void)
 #endif
 	int		mname_len;
 	uint4		status;
-	char		charspace, ceprep_name_buff[MAX_MIDENT_LEN + sizeof(".MCI") - 1], fname[255];
+	char		charspace, ceprep_name_buff[MAX_MIDENT_LEN + SIZEOF(".MCI") - 1], fname[255];
 	mval		file, params;
 	struct NAM	ceprep_nam;	/* name block for file access block for compiler escape preprocessor output */
 
@@ -74,12 +74,12 @@ void open_ceprep_file(void)
 	if (0 == mname_len)
 	{
 		MEMCPY_LIT(ceprep_name_buff, "MDEFAULT.MCI");
-		ceprep_fab.fab$b_dns = sizeof("MDEFAULT.MCI") - 1;
+		ceprep_fab.fab$b_dns = SIZEOF("MDEFAULT.MCI") - 1;
 	} else
 	{
 		memcpy(ceprep_name_buff, module_name.addr, mname_len);
 		MEMCPY_LIT(&ceprep_name_buff[mname_len], ".MCI");
-		ceprep_fab.fab$b_dns = mname_len + sizeof(".MCI") - 1;
+		ceprep_fab.fab$b_dns = mname_len + SIZEOF(".MCI") - 1;
 	}
 	if (MV_DEFINED(&cmd_qlf.ceprep_file))
 	{
@@ -88,7 +88,7 @@ void open_ceprep_file(void)
 	}
 	ceprep_nam = cc$rms_nam;
 	ceprep_nam.nam$l_esa = fname;
-	ceprep_nam.nam$b_ess = sizeof(fname);
+	ceprep_nam.nam$b_ess = SIZEOF(fname);
 	ceprep_nam.nam$b_nop = (NAM$M_SYNCHK);
 	ceprep_fab.fab$l_nam = &ceprep_nam;
 	ceprep_fab.fab$l_fop = FAB$M_NAM;
@@ -97,7 +97,7 @@ void open_ceprep_file(void)
 	file.mvtype = params.mvtype = MV_STR;
 	file.str.len = ceprep_nam.nam$b_esl;
 	file.str.addr = fname;
-	params.str.len = sizeof(open_params_list);
+	params.str.len = SIZEOF(open_params_list);
 	params.str.addr = &open_params_list;
 	op_open(&file, &params, CEPREP_OPEN_TIMEOUT, 0);
 	params.str.len = 1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,8 +47,7 @@ void view_jnlfile(mval *dst, gd_region *reg)
 	{	/* this is basically s2pool replicated because an mstr can only hold a 4 byte address */
 		assert(stringpool.free >= stringpool.base);
 		assert(stringpool.free <= stringpool.top);
-		if ((int)dst->str.len > stringpool.top - stringpool.free)
-			stp_gcol(dst->str.len);
+		ENSURE_STP_FREE_SPACE(dst->str.len);
 		memcpy(stringpool.free, jnl_name_addr, dst->str.len);
 		dst->str.addr = (char *)stringpool.free;
 		stringpool.free += dst->str.len;

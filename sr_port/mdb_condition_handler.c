@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,7 @@
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_inet.h"	/* Required for gtmsource.h */
+#include "gtm_stdio.h"
 
 #ifdef VMS
 #include <descrip.h>		/* required for gtmsource.h */
@@ -23,7 +24,6 @@
 #include <signal.h>
 #endif
 
-#include "gtm_stdio.h"
 #include "ast.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
@@ -79,10 +79,14 @@
 #include "fix_xfer_entry.h"
 #include "change_reg.h"
 #include "tp_change_reg.h"
-
+#include "alias.h"
 #ifdef UNIX
 #include "iormdef.h"
 #include "ftok_sems.h"
+#endif
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
 #endif
 
 GBLREF	spdesc		stringpool, rts_stringpool, indr_stringpool;
@@ -90,7 +94,6 @@ GBLREF	volatile int4	outofband;
 GBLREF	volatile bool	std_dev_outbnd;
 GBLREF	volatile bool	compile_time;
 GBLREF	unsigned char   *restart_pc;
-GBLREF	unsigned int	t_tries;
 GBLREF	unsigned char	*restart_ctxt;
 GBLREF	unsigned char	*stackwarn, *tpstackwarn;
 GBLREF	unsigned char	*stacktop, *tpstacktop;
@@ -101,7 +104,6 @@ GBLREF	tp_frame	*tp_pointer;
 GBLREF	io_desc		*active_device;
 GBLREF	lv_val		*active_lv;
 GBLREF	io_pair		io_std_device, io_curr_device;
-GBLREF	short		dollar_tlevel;
 GBLREF	mval		dollar_ztrap;
 GBLREF	volatile bool	neterr_pending;
 GBLREF	xfer_entry_t	xfer_table[];
@@ -138,34 +140,64 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*first_sgm_info;
+GBLREF	dollar_stack_type	dollar_stack;
+GBLREF	mval			*alias_retarg;
 #ifdef UNIX
-GBLREF	io_desc		*gtm_err_dev;
+GBLREF	io_desc			*gtm_err_dev;
+GBLREF	char			*util_outptr, util_outbuff[OUT_BUFF_SIZE];
+#endif
+#ifdef DEBUG
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
+#ifdef GTM_TRIGGER
+GBLREF	int			tprestart_state;		/* When triggers restart, multiple states possible.
+								   See tp_restart.h */
+GBLREF	int4			gtm_trigger_depth;
 #endif
 
 #define	RUNTIME_ERROR_STR		"Following runtime error"
 #define GTMFATAL_ERROR_DUMP_FILENAME	"GTM_FATAL_ERROR"
 
-static readonly mval gtmfatal_error_filename = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(GTMFATAL_ERROR_DUMP_FILENAME) - 1,
+static readonly mval gtmfatal_error_filename = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(GTMFATAL_ERROR_DUMP_FILENAME) - 1,
 							 		GTMFATAL_ERROR_DUMP_FILENAME, 0, 0);
 
 boolean_t clean_mum_tstart(void);
 
-boolean_t clean_mum_tstart(void)
-{ /* We ignore errors in the $ZYERROR routine. When an error occurs, we unwind all stack frames upto and including
-   * zyerr_frame. MUM_TSTART then transfers control to the $ZTRAP frame */
+#ifdef GTM_TRIGGER
+/* When we go to restart generated code after handling an error, verify that we are not in frame or one created on its
+ * behalf that invoked a trigger and caused a dynamic TSTART to be done on its behalf. This can happen for example if
+ * a trigger is invoked for the first time but get a compilation or link failure error. This error is thrown from
+ * gtm_trigger() while no trigger based error handling is in effect so no rollback of the dynamic frame occurs which
+ * will result in unhandled TPQUIT errors, perhaps interminably.
+ */
+#define MUM_TSTART_FRAME_CHECK								\
+{											\
+	if ((0 == gtm_trigger_depth) && tp_pointer && tp_pointer->implicit_tstart)	\
+	{										\
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);				\
+		op_trollback(-1);	/* Unroll implicit TP frame */			\
+	}										\
+}
+#else
+#define MUM_TSTART_FRAME_CHECK
+#endif
 
-	stack_frame	*save_zyerr_frame, *fp;
+
+/* We ignore errors in the $ZYERROR routine. When an error occurs, we unwind all stack frames upto and including
+ * zyerr_frame. MUM_TSTART then transfers control to the $ZTRAP frame.
+ */
+boolean_t clean_mum_tstart(void)
+{
+	stack_frame	*save_zyerr_frame, *fp, *fpprev;
 	boolean_t	save_check_flag;
 
 	if (NULL != zyerr_frame)
 	{
-		for (fp = frame_pointer; zyerr_frame; fp = fp->old_frame_pointer)
+		while ((NULL != frame_pointer) && (NULL != zyerr_frame))
 		{
-			assert(fp <= zyerr_frame);
-			while (tp_pointer && tp_pointer->fp <= frame_pointer)
-				op_trollback(-1);
-			op_unwind();
+			GOFRAMES(1, TRUE);
 		}
+		assert(NULL != frame_pointer);
 		proc_act_type = 0;
 		if (indr_stringpool.base == stringpool.base)
 		{ /* switch to run time stringpool */
@@ -183,7 +215,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
 	char			src_line[MAX_ENTRYREF_LEN];
-	char			source_line_buff[MAX_SRCLINE + sizeof(ARROW)];
+	char			source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
+	char			*saved_msg;
 	mstr			src_line_d;
 	io_desc			*err_dev;
 	tp_region		*tr;
@@ -194,11 +227,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 	stack_frame		*fp;
 	boolean_t		error_in_zyerror;
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
-	int			level;
+	int			level, rc, saved_msg_len;
+	lv_val			*lvptr;
+	int4			save_SIGNAL;
 
-#ifdef UNIX
+#	ifdef UNIX
 	unix_db_info		*udi;
-#endif
+#	endif
 
 	static unsigned char dumpable_error_dump_file_parms[2] = {iop_newversion, iop_eol};
 	static unsigned char dumpable_error_dump_file_noparms[1] = {iop_eol};
@@ -232,7 +267,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	error_def(ERR_GTMERREXIT);
 
 	START_CH;
-#ifdef UNIX
+	DBGEHND((stderr, "mdb_condition_handler: Entered with SIGNAL=%d frame_pointer=%016lx\n", SIGNAL, frame_pointer));
+#	ifdef UNIX
 	/* It is possible that we entered here from a bad compile of the open exception handler
 	   for an rm device.  If gtm_err_dev is still set and SFT_DEV_ACT is equal to
 	   proc_act_type then its structures should be released now. */
@@ -245,10 +281,26 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(FALSE);
 		gtm_err_dev = NULL;
 	}
-#endif
+#	endif
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
 		SIGNAL = dollar_ecode.error_last_ecode;
 	preemptive_ch(SEVERITY);
+	if (NULL != alias_retarg)
+	{	/* An error has occurred while an alias return arg was in-flight. Delivery won't happen now
+		 * so we need to remove the extra counts that were added in unw_retarg() and dis-enchant
+		 * the alias container itself.
+		 */
+		assert(alias_retarg->mvtype & MV_ALIASCONT);
+		if (alias_retarg->mvtype & MV_ALIASCONT)
+		{	/* Protect the refs were are about to make in case ptr got banged up somehow */
+			lvptr = (lv_val *)alias_retarg->str.addr;
+			assert(MV_SYM == lvptr->ptrs.val_ent.parent.sym->ident);	/* Verify a base var */
+			DECR_CREFCNT(lvptr);
+			DECR_TREFCNT(lvptr);
+		}
+		alias_retarg->mvtype = 0;	/* Kill the temp var (no longer a container) */
+		alias_retarg = NULL;		/* .. and no more in-flight return argument */
+	}
 	assert((NULL == cs_addrs) || (FALSE == cs_addrs->read_lock));
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{
@@ -289,15 +341,57 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * all sorts of linking overlaps.
 		 * ----------------------------------------------------
 		 */
-		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
-		tp_restart(1);
-#ifdef UNIX
+		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used));
+#		ifdef GTM_TRIGGER
+		/* Assert that we never end up invoking the MUM_TSTART macro handler in case of an implicit tstart restart.
+		 * See GBLDEF of skip_INVOKE_RESTART and donot_INVOKE_MUMTSTART in gbldefs.c for more information.
+		 * Note that it is possible for this macro to be invoked from generated code in a trigger frame (in which
+		 * case gtm_trigger/tp_restart ensure control passed to mdb_condition_handler only until the outermost
+		 * implicit tstart in which case they return). Assert accordingly.
+		 */
+		assert(!donot_INVOKE_MUMTSTART || gtm_trigger_depth);
+		if (SFT_TRIGR & frame_pointer->type)
+			/* If a trigger base frame is on top, then this restart was not caused by M code but by
+			 * C code manipulations (perhaps the imbedded restart). This is an out-of-design situation.
+			 */
+			GTMASSERT;
+#		endif
+		rc = tp_restart(1);
+
+#		ifdef GTM_TRIGGER
+		if (0 != rc)
+		{	/* The only time tp_restart() will return non-zero is if the error needs to be
+			   rethrown. To accomplish that, we will unwind this handler which will return to
+			   the inner most initiating dm_start() with the return code set to whatever mumps_status
+			   is set to.
+			*/
+			assert(TPRESTART_STATE_NORMAL != tprestart_state);
+			assert(rc == SIGNAL);
+			if (!(SFT_TRIGR & frame_pointer->type) || (0 == gtm_trigger_depth))
+				/* protect against unwind/exit */
+				GTMASSERT;
+			mumps_status = rc;
+			DBGTRIGR((stderr, "mdb_condition_handler: Rethrowing TPRETRY to earlier level\n"));
+			UNWIND(NULL, NULL);
+		}
+		/* tp_restart() has succeeded so we have unwound back to the return point but check if the
+		 * transaction was initiated by an implicit trigger TSTART. This can occur if an error was
+		 * encountered in a trigger before the trigger base-frame was setup. It can occur at any trigger
+		 * level if a triggered update is preceeded by a TROLLBACK.
+		 */
+		if (!(SFT_TRIGR & frame_pointer->type) && tp_pointer->implicit_tstart)
+		{
+			mumps_status = rc;
+			DBGTRIGR((stderr, "mdb_condition_handler: Returning to implicit TSTART originator\n"));
+			UNWIND(NULL, NULL);
+		}
+		assert(!donot_INVOKE_MUMTSTART);
+#		endif
+#		ifdef UNIX
 		if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
-#elif defined VMS
+#		elif defined VMS
 		if (!tp_restart_fail_sig_used)		/* If tp_restart ran clean */
-#else
-#error unsupported platform
-#endif
+#		endif
 		{
 			/* ------------------------------------
 			 * clean up both stacks, and set mumps
@@ -308,16 +402,16 @@ CONDITION_HANDLER(mdb_condition_handler)
 			ind_source_sp = ind_source_array;
 			MUM_TSTART;
 		}
-#ifdef VMS
+#		ifdef VMS
 		else
 		{	/* Otherwise tp_restart had a signal that we must now deal with -- replace the TPRETRY
 			   information with that saved from tp_restart. */
 			/* Assert that we have room for these arguments - the array malloc is in tp_restart */
 			assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-			memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * sizeof(int));
+			memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * SIZEOF(int));
 			tp_restart_fail_sig_used = FALSE;
 		}
-#endif
+#		endif
 	}
 	/* Ensure gv_target and cs_addrs are in sync. If not, make them so. */
 	if (NULL != gv_target)
@@ -380,7 +474,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 			/* On Unix, we need to push out our error now before we potentially overlay it in jobexam_process() */
 			UNIX_ONLY(PRN_ERROR);
 			/* Create dump file */
+			UNIX_ONLY(save_SIGNAL = SIGNAL); /* Signal might be modified by jobexam_process() */
 			jobexam_process(&gtmfatal_error_filename, &dummy_mval);
+			UNIX_ONLY(SIGNAL = save_SIGNAL);
 		} else
 		{
 			UNIX_ONLY(PRN_ERROR);
@@ -402,9 +498,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 
 		if (!(GDL_DumpOnStackOFlow & gtmDebugLevel) &&
 		    VMS_ONLY((int)ERR_VMSMEMORY == SIGNAL)
-		    UNIX_ONLY(((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_MEMORY == SIGNAL)))
+		    UNIX_ONLY(((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
+			       || (int)ERR_MEMORY == SIGNAL)  || (int)ERR_MEMORY == arg))
 		{
-#ifdef VMS
+#			ifdef VMS
 			/* Inside this ifdef, we are definitely here because of ERR_VMSMEMORY. If the conditions
 			   of the above if change, revisit these assmuptions.
 
@@ -420,13 +517,16 @@ CONDITION_HANDLER(mdb_condition_handler)
 			gtm_putmsg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),
 				   *(int **)(&sig->chf$is_sig_arg1 + 2));
 			SIGNAL = ERR_GTMERREXIT;	/* Override reason for "stop" */
-#endif
+#			endif
 			MUMPS_EXIT;	/* Do a clean exit rather than messy core exit */
 		}
-
 		gtm_dump();
 		TERMINATE;
 	}
+#	ifdef GTM_TRIGGER
+	if (TPRESTART_STATE_NORMAL != tprestart_state)
+		GTMASSERT;	/* Can't leave half-restarted transaction around - out of design */
+#	endif
 	if (active_lv)
 	{
 		if (!MV_DEFINED(&active_lv->v) && !active_lv->ptrs.val_ent.children)
@@ -450,18 +550,32 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * -----------------------------------------------------------
 	 */
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
-	{	/* Note the existence of similar code in op_dmode.c and op_zsystem.c.
-		 * Any changes here should be reflected there too. We don't have a macro for this because
-		 * 	(a) This code is considered pretty much stable.
-		 * 	(b) Making it a macro makes it less readable.
+	{	/* Note the existence of similar (and yet largely different) code in the TPNOTACID_CHECK macro.
+		 * Any changes here might need to be reflected there too.
 		 */
-		if ((CDB_STAGNATE <= t_tries) && (0 < dollar_tlevel))
+		if (IS_TP_AND_FINAL_RETRY)
 		{
-			assert(CDB_STAGNATE == t_tries);
-			t_tries = CDB_STAGNATE - 1;
+			TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;
 			getzposition(&zpos);
+#			ifdef UNIX
+			/* We want to put a message out to the operator log to warn of potential loss of ACID qualities
+			 * but doing so in UNIX will overlay the message buffer in util_output so we save and restore
+			 * that buffer. Since this code is seldom hit and allocating a full sized message buffer permanently
+			 * is a waste, we allocate and free the buffer.
+			 */
+			assert(0 < (util_outptr - util_outbuff));
+			saved_msg_len = INTCAST(util_outptr - util_outbuff);
+			saved_msg = (char *)malloc(saved_msg_len);
+			memcpy(saved_msg, util_outbuff, saved_msg_len);
+			send_msg(VARLSTCNT(9) ERR_TPNOTACID, 8, LEN_AND_LIT(RUNTIME_ERROR_STR), zpos.str.len, zpos.str.addr,
+				 RTS_ERROR_TEXT("-"), saved_msg_len, saved_msg);
+			memcpy(util_outbuff, saved_msg, saved_msg_len);
+			util_outptr = util_outbuff + saved_msg_len;
+			free(saved_msg);
+#			else
 			send_msg(VARLSTCNT(8) ERR_TPNOTACID, 4, LEN_AND_LIT(RUNTIME_ERROR_STR), zpos.str.len, zpos.str.addr,
-						SIGNAL, 0);
+				 SIGNAL, 0);
+#			endif
 		}
 		ENABLE_AST
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
@@ -500,12 +614,37 @@ CONDITION_HANDLER(mdb_condition_handler)
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 		}
 	}
-	err_dev = active_device;
-	active_device = (io_desc *)0;
+#	ifdef GTM_TRIGGER
+	/* At this point, we are past the point where the frame pointer is allowed to be resting on a trigger frame
+	 * (this is possible in a TPRETRY situation where gtm_trigger must return to gtm_trigger() signaling a
+	 * restart is necessary). If we are on a trigger base frame, unwind it so the error is recognized in
+	 * the invoker's frame.
+	 */
+	if (SFT_TRIGR & frame_pointer->type)
+	{
+		/* Better be an error in here info or success messages want to continue, not be unwound but
+		 * we cannot go past this point in a trigger frame or the frame_pointer back reference below
+		 * will fail.
+		 */
+		assert((SUCCESS != SEVERITY) && (INFO != SEVERITY));
+		/* These outofband conditions depend on saving the current stack frame info in restart_pc which
+		 * is of course no longer valid once the frame is unrolled so they must be avoided. At the time
+		 * of this writing, there are no conditions that these should validly be called in this
+		 * situation so this check is more for the future.
+		 */
+		assert(((int)ERR_CTRLY != SIGNAL) && ((int)ERR_CTRLC != SIGNAL) && ((int)ERR_CTRAP != SIGNAL)
+		       && ((int)ERR_JOBINTRRQST != SIGNAL) && ((int)ERR_JOBINTRRETHROW != SIGNAL));
+		gtm_trigger_fini(TRUE);
+		DBGEHND((stderr, "mdb_condition_handler: Current trigger frame unwound so error is thrown"
+			 " on trigger invoker's frame instead.\n"));
+	}
+#	endif
+ 	err_dev = active_device;
+	active_device = (io_desc *)NULL;
 	ind_result_sp = ind_result_array;	/* clean up any active indirection pool usages */
 	ind_source_sp = ind_source_array;
 	dm_action = (frame_pointer->old_frame_pointer->type & SFT_DM)
-				|| (compile_time && (frame_pointer->type & SFT_DM));
+		|| (compile_time && (frame_pointer->type & SFT_DM));
 	/* The errors are said to be transcendental when they occur during compilation/execution
 	 * of the error trap ({z,e}trap, device exception) or $zinterrupt. The errors in other
 	 * indirect code frames (zbreak, zstep, xecute etc.) aren't defined to be trancendental
@@ -542,6 +681,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			frame_pointer->ctxt = GTM_CONTEXT(pseudo_ret);
 			frame_pointer->mpc = CODE_ADDRESS(pseudo_ret);
 		}
+		frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
 		PRN_ERROR;
 		if (io_curr_device.out != io_std_device.out)
 		{
@@ -562,7 +702,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			}
 			if (!repeat_error)
 			{
-				dollar_ecode.error_last_b_line = SET_ZSTATUS(0);
+				dollar_ecode.error_last_b_line = SET_ZSTATUS(NULL);
 			}
 			if (sp_base != rts_stringpool.base)
 			{
@@ -576,7 +716,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			err_act = NULL;
 			dollar_ecode.error_last_ecode = SIGNAL;
 			if (std_dev_outbnd && io_std_device.in && io_std_device.in->type == tt &&
-				io_std_device.in->error_handler.len)
+			    io_std_device.in->error_handler.len)
 			{
 				proc_act_type = SFT_DEV_ACT;
 				err_act = &io_std_device.in->error_handler;
@@ -610,7 +750,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 					assert(0 == dollar_etrap.str.len);
 					for (level = dollar_zlevel() - 1; level > 0; level--)
 					{
-						golevel(level);
+						GOLEVEL(level, FALSE);
 						assert(level == dollar_zlevel());
 						if (!ztrap_explicit_null && !dollar_ztrap.str.len)
 							break;
@@ -622,11 +762,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 					}
 				}
 				if (SFF_CI & frame_pointer->flags)
-				{ /* Unhandled errors from called-in routines should return to gtm_ci() with error status */
+				{ 	/* Unhandled errors from called-in routines should return to gtm_ci() with error status */
 					mumps_status = SIGNAL;
+					MUM_TSTART_FRAME_CHECK;
 					MUM_TSTART;
-				}
-				else if (etrap_handling)
+				} else if (etrap_handling)
 				{
 					proc_act_type = SFT_ZTRAP;
 					err_act = &dollar_etrap.str;
@@ -637,7 +777,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 				}
 			}
 			if (clean_mum_tstart())
+			{
+				MUM_TSTART_FRAME_CHECK;
 				MUM_TSTART;
+			}
 		} else  if (frame_pointer->type & SFT_DM)
 		{
 			frame_pointer->ctxt = GTM_CONTEXT(call_dm);
@@ -648,6 +791,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
 			frame_pointer->ctxt = GTM_CONTEXT(pseudo_ret);
 			frame_pointer->mpc = CODE_ADDRESS(pseudo_ret);
+			frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
 		}
 		PRN_ERROR;
 		if (io_curr_device.out != io_std_device.out)
@@ -655,6 +799,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			dec_err(VARLSTCNT(4) ERR_NOTPRINCIO, 2, io_curr_device.out->trans_name->len,
 				io_curr_device.out->trans_name->dollar_io);
 		}
+		MUM_TSTART_FRAME_CHECK;
 		MUM_TSTART;
 	} else  if ((int)ERR_JOBINTRRQST == SIGNAL)
 	{
@@ -667,7 +812,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		proc_act_type = SFT_ZINTR | SFT_COUNT;	/* trans_code will invoke jobinterrupt_process for us */
 		MUM_TSTART;
 	} else  if ((int)ERR_JOBINTRRETHROW == SIGNAL)
-	{ /* job interrupt is rethrown from TC/TRO */
+	{ 	/* job interrupt is rethrown from TC/TRO */
 		assert(!dollar_zininterrupt);
 		dollar_zininterrupt = TRUE;
 		proc_act_type = SFT_ZINTR | SFT_COUNT; /* trans_code will invoke jobinterrupt_process for us */
@@ -727,6 +872,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 */
 	if (!dm_action && !trans_action)
 	{
+		DBGEHND((stderr, "mdb_condition_handler: Handler to dispatch selection checks\n"));
 		err_act = NULL;
 		dollar_ecode.error_last_ecode = SIGNAL;
 		reset_mpc = FALSE;
@@ -736,12 +882,17 @@ CONDITION_HANDLER(mdb_condition_handler)
 			err_act = &err_dev->error_handler;
 			/* Reset mpc to beginning of the current line (to retry after processing the IO exception handler) */
 			reset_mpc = TRUE;
+			DBGEHND((stderr, "mdb_condition_handler: dispatching device error handler [%.*s]\n", err_act->len,
+				 err_act->addr));
 		} else if (NULL != error_frame)
 		{	/* a primary error occurred already. irrespective of whether ZTRAP or ETRAP is active now, we need to
 			 * consider this as a nested error and trigger nested error processing.
 			 */
 			goerrorframe();	/* unwind upto error_frame */
 			proc_act_type = 0;
+			DBGEHND((stderr, "mdb_condition_handler: Have unwound to error frame via goerrorframe() and am "
+				 "re-dispatching error frame\n"));
+			MUM_TSTART_FRAME_CHECK;
 			MUM_TSTART;	/* unwind the current C-stack and restart executing from the top of the current M-stack */
 			assert(FALSE);
 		} else if (0 != dollar_ztrap.str.len)
@@ -749,6 +900,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(!ztrap_explicit_null);
 			proc_act_type = SFT_ZTRAP;
 			err_act = &dollar_ztrap.str;
+			DBGEHND((stderr, "mdb_condition_handler: Dispatching $ZTRAP error handler [%.*s]\n", err_act->len,
+				 err_act->addr));
 			/* Reset mpc to beginning of the current line (to retry after invoking $ZTRAP) */
 			reset_mpc = TRUE;
 		} else
@@ -764,10 +917,12 @@ CONDITION_HANDLER(mdb_condition_handler)
 			etrap_handling = TRUE;
 			if (ztrap_explicit_null)
 			{
+				GTMTRIG_ONLY(assert(0 == gtm_trigger_depth));	/* Should never happen in a trigger */
+				DBGEHND((stderr, "mdb_condition_handler: ztrap_explicit_null set - unwinding till find handler\n"));
 				assert(0 == dollar_etrap.str.len);
 				for (level = dollar_zlevel() - 1; level > 0; level--)
 				{
-					golevel(level);
+					GOLEVEL(level, FALSE);
 					assert(level == dollar_zlevel());
 					if (!ztrap_explicit_null && !dollar_ztrap.str.len)
 						break;
@@ -779,13 +934,17 @@ CONDITION_HANDLER(mdb_condition_handler)
 				}
 			}
 			if (SFF_CI & frame_pointer->flags)
-			{ /* Unhandled errors from called-in routines should return to gtm_ci() with error status */
+			{ 	/* Unhandled errors from called-in routines should return to gtm_ci() with error status */
 				mumps_status = SIGNAL;
+				DBGEHND((stderr, "mdb_condition_handler: Call in base frame found - returnning to callins\n"));
+				MUM_TSTART_FRAME_CHECK;
 				MUM_TSTART;
 			} else if (etrap_handling)
 			{
 				proc_act_type = SFT_ZTRAP;
 				err_act = &dollar_etrap.str;
+				DBGEHND((stderr, "mdb_condition_handler: $ETRAP handler being dispatched [%.*s]\n", err_act->len,
+					 err_act->addr));
 			}
 		}
 		if (reset_mpc)
@@ -800,17 +959,18 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 *	processed) because the error did not occur in this line and therefore re-executing the same
 			 *	line could cause undesirable effects at the M-user level. We will resume normal execution
 			 *	once the error is handled. Not that it matters, but note that in the case of a rethrown error
-			 *	(repeat_error is FALSE), we would NOT have noted down dollar_ecode.error_last_b_line so cannot
+			 *	(repeat_error is TRUE), we would NOT have noted down dollar_ecode.error_last_b_line so cannot
 			 *	use that to reset mpc anyways.
 			 * ----------------------------------------------------------------------------------------------------
 			 */
 			if ((NULL == zyerr_frame) && !repeat_error)
 			{
+				DBGEHND((stderr, "mdb_condition_handler: reset_mpc triggered\n"));
 				for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 				{	/* See if this is a $ZINTERRUPT frame. If yes, we want to restart *this* line
 					 * at the beginning. Since it is always an indirect frame, we can use the context
-					 * pointer to start over. Only do this if $ZTRAP is active though. $ETRAP does
-					 * things somewhat differently in that the current frame is always returned from.
+					 * pointer to start over. $ETRAP does things somewhat differently in that the current
+					 * frame is always returned from.
 					 */
 					if (SFT_ZINTR & fp->type)
 					{
@@ -835,25 +995,28 @@ CONDITION_HANDLER(mdb_condition_handler)
 						fp->ctxt = GTM_CONTEXT(pseudo_ret);
 						fp->mpc = CODE_ADDRESS(pseudo_ret);
 					}
+					fp->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
 				}
 			}
 		}
 		if (clean_mum_tstart())
 		{
-#ifdef UNIX
+#			ifdef UNIX
 			if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
 			{
 				gtm_err_dev = err_dev;
 				/* structures pointed to by err_dev were freed so make sure it's not used again */
 				err_dev = NULL;
 			}
-#endif
+#			endif
+			MUM_TSTART_FRAME_CHECK;
 			MUM_TSTART;
-		}
-	}
-#ifdef UNIX
-	else
+		} else
+			DBGEHND((stderr, "mdb_condition_handler: clean_mum_tstart returned FALSE\n"));
+	} else
 	{
+		DBGEHND((stderr, "mdb_condition_handler: Transient or direct mode frame -- bypassing handler dispatch\n"));
+#		ifdef UNIX
 		/* executed from the direct mode so do the rms check and cleanup if necessary */
 		if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
 		{
@@ -861,12 +1024,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 			/* structures pointed to by err_dev were freed so make sure it's not used again */
 			err_dev = NULL;
 		}
+#		endif
 	}
-#endif
 	if ((SFT_ZINTR | SFT_COUNT) != proc_act_type || 0 == dollar_ecode.error_last_b_line)
 	{	/* No user console error for $zinterrupt compile problems and if not direct mode. Accomplish
 		   this by bypassing the code inside this if which *will* be executed for most cases
 		*/
+		DBGEHND((stderr, "mdb_condition_handler: Printing error status\n"));
 		PRN_ERROR;
 		if (compile_time && ((int)ERR_LABELMISSING) != SIGNAL)
 			show_source_line(source_line_buff, TRUE);
@@ -881,16 +1045,28 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{	/* If true transcendental, do trans_code_cleanup. If our counted frame that
 			 * is masquerading as a transcendental frame, run jobinterrupt_process_clean
 			 */
+			DBGEHND((stderr, "mdb_condition_handler: trans_code_cleanup() or jobinterrupt_process_cleanup being "
+				 "dispatched\n"));
 			if (!(SFT_ZINTR & proc_act_type))
 				trans_code_cleanup();
 			else
 				jobinterrupt_process_cleanup();
+			MUM_TSTART_FRAME_CHECK;
 			MUM_TSTART;
-		} else
-		{
-			if (MSG_OUTPUT)
+		} else if (MSG_OUTPUT)
+		{	/* If a message about the location is needed, it should be possible to pull the location
+			 * out of the $STACK array. If it exists, use it instead.
+			 */
+			if ((NULL != dollar_stack.array) && (0 < dollar_stack.index))
+			{	/* Error entry exists */
+				src_line_d = dollar_stack.array[dollar_stack.index - 1].place_str;
+				assert(src_line_d.len);
+				assert(src_line_d.addr);
+				dec_err(VARLSTCNT(4) ERR_RTSLOC, 2, src_line_d.len, src_line_d.addr);
+			} else
 				dec_err(VARLSTCNT(1) ERR_SRCLOCUNKNOWN);
 		}
 	}
+	DBGEHND((stderr, "mdb_condition_handler: Condition not handled -- defaulting to process exit\n"));
 	MUMPS_EXIT;
 }

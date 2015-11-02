@@ -56,7 +56,7 @@ void mu_load_init(char *fn, short fn_len)
 
 	ESTABLISH(mupip_load_ch);
 	pars.mvtype = MV_STR;
-	pars.str.len = sizeof(open_params_list);
+	pars.str.len = SIZEOF(open_params_list);
 	pars.str.addr = (char *)open_params_list;
 	val.mvtype = MV_STR;
 	val.str.len = fn_len;
@@ -81,7 +81,7 @@ void mu_load_close(void)
 	val.mvtype = pars.mvtype = MV_STR;
 	val.str.addr = (char *)load_fn_ptr;
 	val.str.len = load_fn_len;
-	pars.str.len = sizeof(iop_eol);
+	pars.str.len = SIZEOF(iop_eol);
 	pars.str.addr = (char *)&no_param;
 	op_close(&val, &pars);
 }
@@ -97,7 +97,7 @@ short	mu_bin_get(char **in_ptr)
 	error_def(ERR_LOADFILERR);
 
 	ESTABLISH_RET(mupip_load_ch, 0);
-	if (buff1_end - buff1_ptr < sizeof(short))
+	if (buff1_end - buff1_ptr < SIZEOF(short))
 	{
 		if ((rd_len = mu_bin_read()) <= 0)
 		{
@@ -114,7 +114,7 @@ short	mu_bin_get(char **in_ptr)
 		buff1_end += rd_len;
 	}
 	GET_SHORT(s1s, buff1_ptr);
-	buff1_ptr += sizeof(short);
+	buff1_ptr += SIZEOF(short);
 	s1 = s1s;
 	if (buff1_end - buff1_ptr < s1)
 	{

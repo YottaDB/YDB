@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ void mval_nongraphic(zshow_out *output,char *cp, int len, int num)
 	tmpmval.str.addr = cp;
 	tmpmval.str.len = len;
 	zshow_output(output,&tmpmval.str);
-	for (ptr = buff + sizeof(buff) , n = num, m = sizeof(buff) ; m > 0 ; m--)
+	for (ptr = buff + SIZEOF(buff) , n = num, m = SIZEOF(buff) ; m > 0 ; m--)
 	{
 		*--ptr = (n % 10) + '0';
 		n /= 10;
@@ -33,7 +33,7 @@ void mval_nongraphic(zshow_out *output,char *cp, int len, int num)
 			break;
 	}
 	tmpmval.str.addr = ptr;
-	tmpmval.str.len = INTCAST(buff - ptr + sizeof(buff));
+	tmpmval.str.len = INTCAST(buff - ptr + SIZEOF(buff));
 	zshow_output(output,&tmpmval.str);
 	return;
 }

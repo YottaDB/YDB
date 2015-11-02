@@ -48,6 +48,10 @@
 #include "send_msg.h"
 #include "eintr_wrappers.h"
 
+#ifdef UNIX
+#include "wcs_clean_dbsync.h"
+#endif
+
 #if defined(VMS)
 GBLREF	short	astq_dyn_avail;
 static	const	unsigned short	zero_fid[3];
@@ -83,10 +87,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	jpc = csa->jnl;
 #if defined(UNIX)
 	if (csa->dbsync_timer)
-	{
-		cancel_timer((TID)csa);
-		csa->dbsync_timer = FALSE;
-	}
+		CANCEL_DBSYNC_TIMER(csa, FALSE);
 #elif defined(VMS)
 	/* See comment about ordering of the two statements below, in similar code in gds_rundown */
 	if (csa->dbsync_timer)

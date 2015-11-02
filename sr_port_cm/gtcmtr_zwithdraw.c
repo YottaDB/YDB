@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ bool gtcmtr_zwithdraw(void)
 	assert(*ptr == CMMS_Q_ZWITHDRAW);
 	ptr++;
 	GET_USHORT(len, ptr);
-	ptr += sizeof(unsigned short);
+	ptr += SIZEOF(unsigned short);
 	regnum = *ptr++;
 	reg_ref = gtcm_find_region(curr_entry,regnum);
 	len--; /* subtract size of regnum */

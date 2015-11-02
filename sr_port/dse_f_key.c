@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,13 +28,13 @@ GBLREF bool		patch_find_root_search;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 
-#define MAX_UTIL_LEN 64
+#define MAX_UTIL_LEN	64
 
 void dse_f_key(void)
 {
 	block_id	path[MAX_BT_DEPTH + 1], root_path[MAX_BT_DEPTH + 1];
 	int4		offset[MAX_BT_DEPTH + 1], root_offset[MAX_BT_DEPTH + 1], nocrit_present;
-	char		targ_key[256], targ_key_root[256], *key_top, util_buff[MAX_UTIL_LEN];
+	char		targ_key[MAX_KEY_SZ + 1], targ_key_root[MAX_KEY_SZ + 1], *key_top, util_buff[MAX_UTIL_LEN];
 	int		size, size_root, root_path_count, count, util_len;
 	bool		found, was_crit;
 
@@ -42,7 +42,7 @@ void dse_f_key(void)
 		return;
 	patch_path_count = 1;
 	root_path[0] = get_dir_root();
-	for (key_top = &targ_key[0]; key_top <= &targ_key[256]; )
+	for (key_top = &targ_key[0]; key_top < ARRAYTOP(targ_key); )
 		if (!*key_top++)
 			break;
 	size_root = (int)(key_top - &targ_key[0] + 1);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ GBLDEF int4		rtnhdr_off;
 GBLDEF int4		labaddr_off;
 #endif
 
-rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent **line)
+rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 {
 	lnk_tabent	*A_rtnhdr;
 	lnk_tabent	*A_labaddr;
@@ -103,8 +103,8 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent **line)
 		rtn.str.addr = rname.addr;
 		op_zlink(&rtn, 0);
 		if (0 != (rhead = find_rtn_hdr(&rname)))
-		{
-			*line = (lnr_tabent *)(A_labaddr->ext_ref);
+		{	/* Pull the linkage table reference out and return it to caller */
+			*line = (lnr_tabent **)(A_labaddr->ext_ref);
 			if (0 == *line)
 				rts_error(VARLSTCNT(1) ERR_LABELUNKNOWN);
 			return rhead;

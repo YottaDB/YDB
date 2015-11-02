@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,18 +39,14 @@
 #include "memcoherency.h"
 #include "is_proc_alive.h"
 #include "wbox_test_init.h"
+#include "gtmimagename.h"
 
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
-DEBUG_ONLY( GBLREF boolean_t	run_time;)
-
 GBLREF	uint4			process_id;
 GBLREF	sm_uc_ptr_t		jnldata_base;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF jnl_gbls_t		jgbl;
-LITREF	int			jrt_fixed_size[];
-LITREF	int			jrt_is_replicated[];
-LITREF 	int			jrt_update[JRT_RECTYPES];
+GBLREF	jnl_gbls_t		jgbl;
 
 #ifdef DEBUG
 /* The fancy ordering of operators/operands in the JNL_SPACE_AVAILABLE calculation is to avoid overflows. */
@@ -93,7 +89,7 @@ LITREF 	int			jrt_update[JRT_RECTYPES];
  * rectype : Record type
  * jnl_rec : This contains fixed part of a variable size record or the complete fixed size records.
  * blk_ptr : For JRT_PBLK and JRT_AIMG this has the block image
- * jfb     : For SET/KILL/ZKILL records entire record is formatted in this.
+ * jfb     : For SET/KILL/ZKILL/ZTWORM records entire record is formatted in this.
  * 	     For JRT_PBLK and JRT_AIMG it contains partial records
  */
 void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, blk_hdr_ptr_t blk_ptr,
@@ -102,6 +98,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	int4			align_rec_len, rlen, rlen_with_align, dstlen, lcl_size, lcl_free, lcl_orig_free;
 	jnl_buffer_ptr_t	jb;
 	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 	struct_jrec_align	align_rec;
 	uint4 			status;
 	jrec_suffix		suffix;
@@ -112,16 +109,16 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	sm_uc_ptr_t		lcl_buff;
 	gd_region		*reg;
 	char			*ptr;
-	GTMCRYPT_ONLY(int	save_pos;)
 
 	error_def(ERR_JNLWRTNOWWRTR);
 	error_def(ERR_JNLWRTDEFER);
 
 	reg = jpc->region;
 	csa = &FILE_INFO(reg)->s_addrs;
+	csd = csa->hdr;
 	/* Ensure that no replicated journal record is written by this routine if REPL-WAS_ENABLED(csa) is TRUE */
 	assert((JNL_ENABLED(csa) && !REPL_WAS_ENABLED(csa)) || !jrt_is_replicated[rectype]);
-	assert(csa->now_crit  ||  (csa->hdr->clustered  &&  csa->nl->ccp_state == CCST_CLOSED));
+	assert(csa->now_crit  ||  (csd->clustered  &&  csa->nl->ccp_state == CCST_CLOSED));
 	assert(rectype > JRT_BAD  &&  rectype < JRT_RECTYPES && JRT_ALIGN != rectype);
 	jb = jpc->jnl_buff;
 	/* Before taking a copy of jb->freeaddr, determine if both free and freeaddr are in sync. If not fix that first. */
@@ -137,6 +134,12 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	++jb->reccnt[rectype];
 	assert(NULL != jnl_rec);
 	rlen = jnl_rec->prefix.forwptr;
+	/* Do high-level check on rlen */
+	assert(rlen <= jb->max_jrec_len);
+	/* Do fine-grained checks on rlen */
+	GTMTRIG_ONLY(assert(!IS_ZTWORM(rectype) || (MAX_ZTWORM_JREC_LEN >= rlen));)	/* ZTWORMHOLE */
+	assert(!IS_SET_KILL_ZKILL(rectype) || (JNL_MAX_SET_KILL_RECLEN(csd) >= rlen));	/* SET, KILL, ZKILL */
+	assert((NULL == blk_ptr) || (JNL_MAX_PBLK_RECLEN(csd) >= rlen));		/* PBLK and AIMG */
 	jb->bytcnt += rlen;
 	assert (0 == rlen % JNL_REC_START_BNDRY);
 	rlen_with_align = rlen + (int4)MIN_ALIGN_RECLEN;
@@ -175,7 +178,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		jb->blocked = 0;
 		if (jb->filesize < DISK_BLOCKS_SUM(lcl_freeaddr, align_rec_len)) /* not enough room in jnl file, extend it. */
 		{	/* We should never reach here if we are called from t_end/tp_tend */
-			assert(!run_time || csa->ti->early_tn == csa->ti->curr_tn);
+			assert(!IS_GTM_IMAGE || csa->ti->early_tn == csa->ti->curr_tn);
 			if (SS_NORMAL != jnl_flush(reg))
 			{
 				assert(NOJNL == jpc->channel); /* jnl file lost */
@@ -196,6 +199,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			}
 		}
 		align_rec.prefix.jrec_type = JRT_ALIGN;
+		assert(align_rec_len <= jb->max_jrec_len);
 		align_rec.prefix.forwptr = suffix.backptr = align_rec_len;
 		align_rec.prefix.time = jnl_rec->prefix.time;
 		align_rec.prefix.tn = jnl_rec->prefix.tn;
@@ -205,7 +209,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		 */
 		align_rec.prefix.pini_addr = (JRT_PINI == rectype) ? JNL_FILE_FIRST_RECORD : jnl_rec->prefix.pini_addr;
 		checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, lcl_freeaddr);
-		checksum = ADJUST_CHECKSUM(checksum, csa->hdr->jnl_checksum);
+		checksum = ADJUST_CHECKSUM(checksum, csd->jnl_checksum);
 		assert(checksum);
 		align_rec.prefix.checksum = checksum;
 		suffix.suffix_code = JNL_REC_SUFFIX_CODE;
@@ -217,7 +221,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		} else
 		{
 			JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)&align_rec, (int4)FIXED_ALIGN_RECLEN, lcl_size);
-			if (lcl_size >= (lcl_free + align_rec.align_str.length + sizeof(jrec_suffix)))
+			if (lcl_size >= (lcl_free + align_rec.align_str.length + SIZEOF(jrec_suffix)))
 				lcl_free += align_rec.align_str.length;	/* zeroing is not necessary */
 			else
 			{
@@ -231,7 +235,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			}
 		}
 		/* Now copy suffix */
-		assert(0 == (UINTPTR_T)(&lcl_buff[0] + lcl_free) % sizeof(jrec_suffix));
+		assert(0 == (UINTPTR_T)(&lcl_buff[0] + lcl_free) % SIZEOF(jrec_suffix));
 		*(jrec_suffix *)(lcl_buff + lcl_free) = *(jrec_suffix *)&suffix;
 		lcl_free += SIZEOF(jrec_suffix);
 		if (lcl_size == lcl_free)
@@ -265,7 +269,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	checksum = jnl_rec->prefix.checksum;
 	assert(checksum);
 	checksum = ADJUST_CHECKSUM(checksum, lcl_freeaddr);
-	checksum = ADJUST_CHECKSUM(checksum, csa->hdr->jnl_checksum);
+	checksum = ADJUST_CHECKSUM(checksum, csd->jnl_checksum);
 	jnl_rec->prefix.checksum = checksum;
 	UNIX_ONLY(assert((!jb->blocked) || (FALSE == is_proc_alive(jb->blocked, 0)));)
 	VMS_ONLY(assert(!jb->blocked || (jb->blocked == process_id) && lib$ast_in_prog())); /* wcs_wipchk_ast can set jb->blocked */
@@ -286,7 +290,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	jb->blocked = 0;
 	if (jb->filesize < DISK_BLOCKS_SUM(lcl_freeaddr, rlen)) /* not enough room in jnl file, extend it. */
 	{	/* We should never reach here if we are called from t_end/tp_tend */
-		assert(!run_time || csa->ti->early_tn == csa->ti->curr_tn);
+		assert(!IS_GTM_IMAGE || csa->ti->early_tn == csa->ti->curr_tn);
 		if (SS_NORMAL != jnl_flush(reg))
 		{
 			assert(NOJNL == jpc->channel); /* jnl file lost */
@@ -348,6 +352,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			}
 		} else
 		{	/* SET, KILL, ZKILL for TP, ZTP, non-TP */
+			assert(IS_TP(rectype) || IS_ZTP(rectype) || (0 == ((struct_jrec_upd *)jfb->buff)->update_num));
+			assert((!IS_TP(rectype) && !IS_ZTP(rectype)) || (0 != ((struct_jrec_upd *)jfb->buff)->update_num));
 			assert(((jrec_prefix *)jfb->buff)->forwptr == jfb->record_size);
 			if (nowrap)
 			{
@@ -367,8 +373,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	jpc->new_freeaddr = lcl_freeaddr + rlen;
 	assert(lcl_free == jpc->new_freeaddr % lcl_size);
 	if (REPL_ENABLED(csa) && jrt_is_replicated[rectype])
-	{
-		/* If the database is encrypted, then at this point jfb->buff will contain encrypted
+	{	/* If the database is encrypted, then at this point jfb->buff will contain encrypted
 		 * data which we don't want to to push into the jnlpool. Instead, we make use of the
 		 * alternate alt_buff which is guaranteed to contain the original unencrypted data.
 		 * */
@@ -377,7 +382,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		else
 		{
 #			ifdef GTM_CRYPT
-			if (csa->hdr->is_encrypted && IS_SET_KILL_ZKILL(rectype))
+			if (csd->is_encrypted && IS_SET_KILL_ZKILL_ZTWORM(rectype))
 			 	ptr = jfb->alt_buff;
 			else
 #			endif

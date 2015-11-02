@@ -44,9 +44,9 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	time_t	temp_time;
 	error_def(ERR_MUINFOUINT8);
 
-	memset(v15_csd, 0, sizeof(v15_sgmnt_data));
+	memset(v15_csd, 0, SIZEOF(v15_sgmnt_data));
 	MEMCPY_LIT(v15_csd->label, GDS_LABEL_GENERIC);
-	MEMCPY_LIT((v15_csd->label + sizeof(GDS_LABEL_GENERIC) - 1), GDS_V40);
+	MEMCPY_LIT((v15_csd->label + SIZEOF(GDS_LABEL_GENERIC) - 1), GDS_V40);
 	v15_csd->blk_size = csd->blk_size;
 	v15_csd->bplmap = csd->bplmap;
 	v15_csd->start_vbn = csd->start_vbn;
@@ -159,7 +159,7 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 		gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Resync sequence number"),
 					&v15_csd->resync_seqno, &v15_csd->resync_seqno);
 	}
-	memcpy(v15_csd->reorg_restart_key, csd->reorg_restart_key, sizeof(csd->reorg_restart_key));
+	memcpy(v15_csd->reorg_restart_key, csd->reorg_restart_key, SIZEOF(csd->reorg_restart_key));
 	memcpy(v15_csd->machine_name, csd->machine_name, MAX_MCNAMELEN);
 	v15_csd->certified_for_upgrade_to = GDSV4;		/* ust re-certify to upgrade again */
 	v15_csd->creation_db_ver = csd->creation_db_ver;	/* Retain creation major/minor version */

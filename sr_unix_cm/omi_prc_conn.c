@@ -242,7 +242,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     cptr->xptr += ss_len.value;
 
 /*  Implementation ID (out) */
-    len = sizeof(GTM_RELEASE_NAME) - 1;
+    len = SIZEOF(GTM_RELEASE_NAME) - 1;
     OMI_SI_WRIT(len, bptr);
     (void) memcpy(bptr, GTM_RELEASE_NAME, len);
     bptr += len;

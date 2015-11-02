@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2009 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2010 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -395,7 +395,7 @@ MUNOTALLSEC	<WARNING: not all global sections accessed were successfully rundown
 MUSECDEL	<Section !AD deleted>/info/fao=2!/ansi=0
 MUSECNOTDEL	<Section !AD not deleted>/info/fao=2!/ansi=0
 RPARENREQD	<!_!AD!/!_!_!_Right parenthesis expected>/error/fao=2!/ansi=0
-ZGBLDIRACC	<Cannot access global directory !AD.  !AD!AD.>/error/fao=6!/ansi=26
+ZGBLDIRACC	<Cannot access global directory !AD!AD!AD.>/error/fao=6!/ansi=26
 GVNAKEDEXTNM	<Cannot reference different global directory in a naked reference>/error/fao=0!/ansi=0
 EXTGBLDEL	<Invalid delimiter for extended global syntax>/error/fao=0!/ansi=0
 DSEWCINITCON	<No action taken, enter YES at CONFIRMATION prompt to initialize global buffers>/info/fao=0!/ansi=0
@@ -635,8 +635,8 @@ ORDER2		<Invalid second argument to $ORDER.  Must be -1 or 1.>/error/fao=0!/ansi
 MUNOUPGRD	<Database not upgraded because of preceding errors>/error/fao=0!/ansi=0
 REORGCTRLY	<User interrupt encountered during database reorg -- halting>/info/fao=0!/ansi=0
 TSTRTPARM	<Error parsing TSTART qualifier>/error/fao=0!/ansi=0
-TPSTACKCRIT	<TP Stack space critical>/error/fao=0!/ansi=0
-TPSTACKOFLOW	<TP Stack overflow>/fatal/fao=0!/ansi=0
+UNUSEDMSG638	<Was TPSTACKCRIT. last used in V5.3-004A (release-date 2009/08/12)>/error/fao=0!/ansi=0
+UNUSEDMSG639	<Was TPSTACKOFLOW. last used in V5.3-004A (release-date 2009/08/12)>/error/fao=0!/ansi=0
 TLVLZERO	<Transaction is not in progress>/error/fao=0!/ansi=44
 TRESTNOT	<Cannot TRESTART, transaction is not restartable>/error/fao=0!/ansi=27
 TPLOCK		<Cannot release lock(s) held prior to current TSTART>/error/fao=0!/ansi=41
@@ -802,7 +802,7 @@ EVENTLOGERR	<Error in event logging subsystem>/error/fao=0!/ansi=0
 UPDATEFILEOPEN	<Update file open error>/error/fao=0!/ansi=0
 JNLBADRECFMT	<Journal File Record Format Error encountered for file !AD at disk address 0x!XL>/error/fao=3!/ansi=0
 NULLCOLLDIFF	<Null collation order must be the same for all regions> /error/fao=0!/ansi=0
-MUKILLIP	<Kill in progress indicator is set for file !AD, incorrectly marked busy errors should follow>/warning/fao=2!/ansi=0
+MUKILLIP	<Kill in progress indicator is set for file !AD - this !AD operation is likely to result in incorrectly marked busy errors>/warning/fao=4!/ansi=0
 JNLRDONLY	<Journal file !AD read only>/error/fao=2!/ansi=0
 ANCOMPTINC	<Deviceparameter !AD is not compatible with any other deviceparameters in the !AD command>/error/fao=4!/ansi=0
 ABNCOMPTINC	<Deviceparameter !AD and deviceparameter !AD are not compatible in the !AD command>/error/fao=6!/ansi=0
@@ -988,7 +988,7 @@ FILERENAME	<File !AD is renamed to !AD>/info/fao=4!/ansi=0
 JNLBUFINFO	<Pid 0x!XL!/     dsk 0x!XL     free 0x!XL  bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL!/ dskaddr 0x!XL freeaddr 0x!XL  qiocnt 0x!XL now_writer 0x!XL     fsync_pid 0x!XL!/filesize 0x!XL    cycle 0x!XL  errcnt 0x!XL    wrtsize 0x!XL fsync_dskaddr 0x!XL>/info/fao=16!/ansi=0
 JNLQIOLOCKED	<Error obtaining io_in_prog lock on jnl-file !AD>/error/fao=2!/ansi=0
 JNLEOFPREZERO	<Error while zeroing jnl-file !AD>/error/fao=2!/ansi=0
-TPNOTACID	<!AD at !AD in a final TP retry violates ACID properties of a TRANSACTION; indefinite RESTARTs may occur>/info/fao=4!/ansi=0
+TPNOTACID	<!AD at !AD in a final TP retry violates ACID properties of a TRANSACTION; indefinite RESTARTs may occur !AD !AD>/info/fao=8!/ansi=0
 JNLSETDATA2LONG	<SET journal record has data of length !UL.  Target system cannot handle data more than !UL bytes.>/error/fao=2!/ansi=0
 JNLNEWREC	<Target system cannot recognize journal record of type !UL, last recognized type is !UL>/error/fao=2!/ansi=0
 REPLFTOKSEM	<Error with replication semaphores for instance file !AD>/error/fao=2!/ansi=0
@@ -1163,7 +1163,7 @@ GETSOCKNAMERR	<Getting the socket name failed from getsockname(): (errno==!UL) !
 INVGTMEXIT	<Inappropriate invocation of gtm_exit. gtm_exit cannot be invoked from external calls.>/error/fao=0!/ansi=0
 CIMAXPARAM	<Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 32 parameters.>/error/fao=0!/ansi=0
 CITPNESTED	<Call-ins can not be used inside a TP transaction>/error/fao=0!/ansi=0
-CIMAXLEVELS	<Too many nested Call-ins. Nested resources exhaused at level !UL.>/error/fao=1!/ansi=0
+CIMAXLEVELS	<Too many nested Call-ins. Nested resources exhausted at level !UL.>/error/fao=1!/ansi=0
 JOBINTRRETHROW	<Job interrupt redelivered>/error/fao=0!/ansi=0
 STARFILE	<Star(*) argument cannot be specified with !AD>/error/fao=2!/ansi=0
 NOSTARFILE	<Only star(*) argument can be specified with !AD>/error/fao=2!/ansi=0
@@ -1319,7 +1319,41 @@ CRYPTHASHGENFAILED	<Error generating encryption hash. !AD>/error/fao=2!/ansi=0
 CRYPTNOPSWDINTP	<Cannot prompt for password inside a TP transaction.>/error/fao=0!/ansi=0
 BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
 ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used>/error/fao=4!/ansi=0
-ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be specified>/error/fao=2!/ansi=0
+ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified>/error/fao=2!/ansi=0
+STUCKACT	<Process stuck script invoked: !AD : !AD>/info/fao=4!/ansi=0
+CALLINAFTERXIT	<After a gtm_exit, a process can never create a valid GT.M context>/error/fao=0!/ansi=0
+LOCKSPACEFULL	<No room for LOCK. Use MUPIP SET to increase lock space for region !AD>/error/fao=2!/ansi=0
+IOERROR		<Error occured while doing !AD in !AD operation -- called from module !AD at line !UL>/error/fao=7!/ansi=0
+MAXSSREACHED 	<Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.>/error/fao=3!/ansi=0
+SNAPSHOTNOV4	<Cannot downgrade (to V4) while snapshots are in progress. Currently !UL snapshots are in progress for region !AD.>/error/fao=3!/ansi=0
+SSV4NOALLOW	<Database snapshots are supported only on fully upgraded V5 databases. !AD has V4 format blocks.>/error/fao=2!/ansi=0
+SSTMPDIRSTAT	<Cannot access temporary directory !AD>/error/fao=2!/ansi=0
+SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested snapshot>/error/fao=2!/ansi=0
+SSTMPFILOPEN	<Failed to open shadow snapshot file !AD>/error/fao=2!/ansi=0
+SSPREMATEOF	<Premature end of file while reading block !UL of size: !UL bytes at offset: !UL from !AD>/error/fao=5!/ansi=0
+SSFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
+REGSSFAIL	<Process !UL encountered error contributing to the snapshot for region !AD - the snapshot is no longer valid>/error/fao=3!/ansi=0
+SSSHMCLNUPFAIL	<Error while doing snapshot shared memory cleanup. Operation -- !AD. Identifier -- !UL>/error/fao=3!/ansi=0
+SSFILCLNUPFAIL	<Error while unlinking snapshot file -- !AD>/error/fao=2!/ansi=0
+SETINTRIGONLY	<ISV !AD cannot be modified outside of the trigger environment>/error/fao=2!/ansi=0
+MAXTRIGNEST	<Maximum trigger nesting level (!UL) exceeded>/error/fao=1!/ansi=0
+TRIGCOMPFAIL	<Compilation of database trigger named !AD failed>/error/fao=2!/ansi=0
+NOZTRAPINTRIG	<Use of $ZTRAP in a database trigger environment ($ZTLEVEL greater than 0) is not supported>/error/fao=0!/ansi=0
+ZTWORMHOLE2BIG	<String length of !UL bytes exceeds maximum length of !UL bytes for $ZTWORMHOLE>/error/fao=2!/ansi=0
+JNLENDIANLITTLE	<Journal file !AD is LITTLE endian on a BIG endian system>/error/fao=2!/ansi=0
+JNLENDIANBIG	<Journal file !AD is BIG endian on a LITTLE endian system>/error/fao=2!/ansi=0
+TRIGINVCHSET	<Trigger !AD for global ^!AD was created with CHSET=!AD which is different from the current $ZCHSET of this process>/error/fao=6!/ansi=0
+TRIGREPLSTATE	<Trigger cannot update replicated database file !AD since triggering update was not replicated>/error/fao=2!/ansi=0
+GVDATAGETFAIL	<Global variable DATAGET sub-operation (in KILL function) failed. Failure code: !AD.>/error/fao=2!/ansi=0
+TRIG2NOTRIG	<Sending transaction sequence number 0x!16@XQ which used triggers to a replicator that does not support triggers>/warning/fao=1!/ansi=0
+ZGOTOINVLVL	<ZGOTO in a trigger running in !AD cannot ZGOTO level !UL>/error/fao=3!/ansi=0
+TRIGTCOMMIT	<TCOMMIT at $ZTLEVEL=!UL not allowed as corresponding TSTART was done at lower $ZTLEVEL=!UL>/error/fao=2!/ansi=0
+TRIGTLVLCHNG	<Detected a net transaction level ($TLEVEL) change during trigger !AD. Transaction level must be the same at exit as when the trigger started>/error/fao=2!/ansi=0
+TRIGNAMEUNIQ	<Unable to make trigger name !AD unique beyond !UL versions already loaded>/error/fao=3!/ansi=0
+ZTRIGINVACT	<Missing or invalid subcode (first) parameter given to $ZTRIGGER()>/error/fao=0!/ansi=0
+ZTRIGNOTP	<$ZTRIGGER() cannot use update subcodes FILE or ITEM when a TP transaction is in progress ($TLEVEL greater than zero)>/error/fao=0!/ansi=0
+QUITALSINV	<QUIT * return when the extrinsic was not invoked with SET *>/error/fao=0!/ansi=0
+PROCTERM	<!AD process termination due to !AD from !AD>/warning/fao=6!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

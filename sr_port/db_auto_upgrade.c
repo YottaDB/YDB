@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,6 +104,9 @@ void db_auto_upgrade(gd_region *reg)
 				memset(csd->encryption_hash, 0, GTMCRYPT_HASH_LEN);
 				break;
 			case GDSMV53004:		/* New encryption fields */
+				csd->db_trigger_cycle = 0;
+				break;
+			case GDSMV54000:		/* New trigger fields */
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

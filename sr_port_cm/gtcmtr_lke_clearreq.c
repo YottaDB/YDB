@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ bool gtcmtr_lke_clearreq(struct CLB *lnk, char rnum, bool all, bool interactive,
 	creq.pid = pid;
 	creq.nodelength = node->len;
 	memcpy(creq.node, node->addr, node->len);
-	lnk->cbl = sizeof(creq);
+	lnk->cbl = SIZEOF(creq);
 	lnk->mbf = (unsigned char *)&creq;
 	lnk->ast = NULL;
 	status = cmi_write(lnk);
@@ -83,7 +83,7 @@ bool gtcmtr_lke_clearreq(struct CLB *lnk, char rnum, bool all, bool interactive,
 		removed = FALSE;
 		for (;;)
 		{
-			lnk->mbl = sizeof(srep);
+			lnk->mbl = SIZEOF(srep);
 			lnk->mbf = (unsigned char *)&srep;
 			status = cmi_read(lnk);
 			if (CMI_ERROR(status))
@@ -105,7 +105,7 @@ bool gtcmtr_lke_clearreq(struct CLB *lnk, char rnum, bool all, bool interactive,
 			res = getchar();
 			conf.clear = ('y' == res || 'Y' == res);
 			removed |= conf.clear;
-			lnk->cbl = sizeof(conf);
+			lnk->cbl = SIZEOF(conf);
 			lnk->mbf = (unsigned char *)&conf;
 			status = cmi_write(lnk);
 			if (CMI_ERROR(status))
@@ -117,7 +117,7 @@ bool gtcmtr_lke_clearreq(struct CLB *lnk, char rnum, bool all, bool interactive,
 		}
 	} else
 	{
-		lnk->mbl = sizeof(crep);
+		lnk->mbl = SIZEOF(crep);
 		lnk->mbf = (unsigned char *)&crep;
 		for (;;)
 		{

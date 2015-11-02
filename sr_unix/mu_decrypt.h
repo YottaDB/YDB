@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,8 +18,8 @@
 	sgmnt_data_ptr_t	csd;											\
 	void			*header;										\
 	int			save_errno, hdr_sz;									\
+	uint4			status;											\
 															\
-	error_def(ERR_JNLBADLABEL);											\
 	OPENFILE(FNAME, O_RDONLY, FD);											\
 	if (-1 == FD)													\
 	{														\
@@ -35,11 +35,10 @@
 		GC_DISPLAY_FILE_ERROR_AND_RETURN("Error reading file !AD.", FNAME, FLEN, save_errno);			\
 	}														\
 	jfh = (jnl_file_header *) header;										\
-	if (0 != MEMCMP_LIT(jfh->label, JNL_LABEL_TEXT))								\
-	{														\
-		gtm_putmsg(VARLSTCNT(4) ERR_JNLBADLABEL, 2, LEN_AND_STR(FNAME));					\
-		return FALSE;												\
-	}														\
+	status = 0;													\
+	CHECK_JNL_FILE_IS_USABLE(jfh, status, TRUE, FLEN, FNAME);							\
+	if (0 != status)												\
+		return FALSE;	/* gtm_putmsg would have already been done by CHECK_JNL_FILE_IS_USABLE macro */		\
 	memcpy(HASH, jfh->encryption_hash, GTMCRYPT_HASH_LEN);								\
 	IS_ENCRYPTED = jfh->is_encrypted;										\
 	free(header);													\

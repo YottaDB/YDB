@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,20 +97,6 @@ GBLREF char cli_err_str[];
 #pragma pointer_size (restore)
 #endif
 
-GBLDEF bool			cm_timeout = FALSE;
-GBLDEF bool			cm_shutdown = FALSE;
-GBLDEF unsigned short		procnum;
-GBLDEF int			gtcm_users = 0;
-GBLDEF int4			gtcm_exi_condition;
-GBLDEF connection_struct 	*curr_entry;
-GBLDEF relque ALIGN_QUAD	action_que;
-GBLDEF struct CLB       	*proc_to_clb[USHRT_MAX + 1];    /* for index 0 */
-GBLDEF gd_region		*action_que_dummy_reg;
-/* the file is the actual file being used */
-GBLDEF char			gtcm_gnp_server_log[MAX_FN_LEN + 1];
-/* the length is the orignal length */
-GBLDEF int			gtcm_gnp_log_path_len;
-
 GBLREF FILE			*gtcm_errfs;
 GBLREF bool			licensed;
 GBLREF boolean_t		run_time;
@@ -127,6 +113,22 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF boolean_t		is_replicator;
+GBLREF CLI_ENTRY		gtcm_gnp_cmd_ary[];
+
+GBLDEF CLI_ENTRY		*cmd_ary = &gtcm_gnp_cmd_ary[0]; /* Define cmd_ary to be the GTCM_GNP server specific cmd table */
+GBLDEF bool			cm_timeout = FALSE;
+GBLDEF bool			cm_shutdown = FALSE;
+GBLDEF unsigned short		procnum;
+GBLDEF int			gtcm_users = 0;
+GBLDEF int4			gtcm_exi_condition;
+GBLDEF connection_struct 	*curr_entry;
+GBLDEF relque ALIGN_QUAD	action_que;
+GBLDEF struct CLB       	*proc_to_clb[USHRT_MAX + 1];    /* for index 0 */
+GBLDEF gd_region		*action_que_dummy_reg;
+/* the file is the actual file being used */
+GBLDEF char			gtcm_gnp_server_log[MAX_FN_LEN + 1];
+/* the length is the orignal length */
+GBLDEF int			gtcm_gnp_log_path_len;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -387,13 +389,13 @@ int main(int argc, char **argv, char **envp)
 		cli_gettoken(&eof);
 	cli_token_buf[0] = '\0';
 	ptr = cli_lex_in_ptr->in_str;
-	memmove(ptr + sizeof("GTCM_GNP_SERVER ") - 1, ptr, strlen(ptr) + 1);
+	memmove(ptr + SIZEOF("GTCM_GNP_SERVER ") - 1, ptr, strlen(ptr) + 1);
 	MEMCPY_LIT(ptr, "GTCM_GNP_SERVER ");
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 	parse_ret = parse_cmd();
 	if (parse_ret && (EOF != parse_ret))
 		rts_error(VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
-	service_len = (unsigned short)sizeof(service);
+	service_len = (unsigned short)SIZEOF(service);
 	CMI_DESC_SET_POINTER(&service_descr, service);
 	service[0] = '\0';
 	if (CLI_PRESENT == cli_present("SERVICE") && cli_get_str("SERVICE", CMI_DESC_POINTER(&service_descr), &service_len))
@@ -407,7 +409,7 @@ int main(int argc, char **argv, char **envp)
 			timout = (1 << 21);
 		closewait = (timout << 10); /* s -> ms; approx */
 	}
-	log_path_len = (unsigned short)sizeof(gtcm_gnp_server_log) - 1;
+	log_path_len = (unsigned short)SIZEOF(gtcm_gnp_server_log) - 1;
 	CMI_DESC_SET_POINTER(&log_path_descr, gtcm_gnp_server_log);
 	if (CLI_PRESENT != cli_present("LOG") || !cli_get_str("LOG", CMI_DESC_POINTER(&log_path_descr), &log_path_len))
 		log_path_len = 0;
@@ -424,7 +426,7 @@ int main(int argc, char **argv, char **envp)
 	sig_init(generic_signal_handler, null_handler, suspsigs_handler); /* should do be done before cmi_init */
 
 	/* Redefine handler for SIGHUP to switch log file */
-	memset(&act, 0, sizeof(act));
+	memset(&act, 0, SIZEOF(act));
 	act.sa_handler  = gtcm_gnp_switch_interrupt;
 	sigaction(SIGHUP, &act, 0);
 	act.sa_handler  = gtcm_gnp_trace_on;
@@ -433,7 +435,7 @@ int main(int argc, char **argv, char **envp)
 	sigaction(SIGUSR2, &act, 0);
 
 	procnum = 0;
-        memset(proc_to_clb, 0, sizeof(proc_to_clb));
+        memset(proc_to_clb, 0, SIZEOF(proc_to_clb));
 
 	/* child continues here */
 	gtcm_connection = FALSE;
@@ -460,7 +462,7 @@ int main(int argc, char **argv, char **envp)
 	 * until we are ready.
 	 */
 	status = cmi_init(&service_descr, '\0', gtcm_neterr, NULL, gtcm_link_accept, gtcm_urgread_ast, CM_CLB_POOL_SIZE,
-			  sizeof(connection_struct), CM_MSG_BUF_SIZE + CM_BUFFER_OVERHEAD);
+			  SIZEOF(connection_struct), CM_MSG_BUF_SIZE + CM_BUFFER_OVERHEAD);
 	if (CMI_ERROR(status))
 	{
 		gtm_putmsg(VARLSTCNT(7) ERR_NETFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Network interface initialization failed"),
@@ -478,8 +480,8 @@ int main(int argc, char **argv, char **envp)
 	mu_gv_cur_reg_init();
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 	cs_data = cs_addrs->hdr;
-	cs_addrs->nl = (node_local_ptr_t)malloc(sizeof(node_local));
-	memset((char *)cs_addrs->nl, 0, sizeof(node_local));
+	cs_addrs->nl = (node_local_ptr_t)malloc(SIZEOF(node_local));
+	memset((char *)cs_addrs->nl, 0, SIZEOF(node_local));
 	action_que_dummy_reg = gv_cur_region;
 	/* ... now we are ready! */
 	ntd_root->crq = gtcm_init_ast;

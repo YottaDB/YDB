@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ GBLREF	trans_num		start_tn;
 GBLREF	uint4			t_err;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
-GBLREF	int4			update_trans;
+GBLREF	uint4			update_trans;
 GBLREF	boolean_t		write_after_image;
 GBLREF	volatile int4		fast_lock_count;
 #ifdef DEBUG
@@ -62,7 +62,7 @@ void t_begin_crit(uint4 err)
 	 * all of them set "write_after_image" to TRUE. hence the assert below.
 	 */
 	assert(write_after_image);
-	update_trans = TRUE;
+	update_trans = UPDTRNS_DB_UPDATED_MASK;
 	/* We are going to grab_crit. If csd->wc_blocked is set to TRUE, we will end up calling wcs_recover as part of
 	 * grab_crit. Set variable to indicate it is ok to do so even though t_tries is CDB_STAGNATE since we are not
 	 * in the middle of any transaction.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@
 GBLDEF char	cli_token_buf[MAX_LINE + 1];	/* Token buffer */
 GBLREF int	cmd_cnt;
 GBLREF char	**cmd_arg;
-
+GBLDEF boolean_t gtm_cli_interpret_string = TRUE;
 GBLDEF IN_PARMS *cli_lex_in_ptr;
 
 #ifdef UNICODE_SUPPORTED
@@ -75,10 +75,20 @@ static int tok_string_extract(void)
 			{
 				if (!have_quote)
 				{
+					if (!gtm_cli_interpret_string)
+					{
+						out_sp = CLI_PUT_CHAR(out_sp, ch);
+						token_len++;
+					}
 					have_quote = TRUE;
 					in_next = CLI_GET_CHAR(in_next, bufend, ch);
 				} else
 				{
+					if (!gtm_cli_interpret_string)
+					{
+						out_sp = CLI_PUT_CHAR(out_sp, ch);
+						token_len++;
+					}
 					in_next = CLI_GET_CHAR(in_next, bufend, ch);
 					if (ch == '"')
 					{ /* double quote, one goes in string, still have quote */
@@ -95,13 +105,11 @@ static int tok_string_extract(void)
 				token_len++;
 			}
 		}
-
 		if (ch == '\0')
 		{
 			in_sp = last_in_next;	/* Points to start of null char so scan ends next call */
 			break;
 		}
-
 		if (have_quote)
 		{
 			out_sp = CLI_PUT_CHAR(out_sp, ch);
@@ -155,7 +163,7 @@ void	cli_lex_setup (int argc, char **argv)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-		cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + parmlen);
+		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + parmlen);
 		cli_lex_in_ptr->buflen = parmlen;
 	}
 	cli_lex_in_ptr->argc = argc;
@@ -172,13 +180,14 @@ void cli_str_setup(int length, char *addr)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-		cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + length);
+		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + length);
 		cli_lex_in_ptr->buflen = length;
 	}
 	cli_lex_in_ptr->argv = NULL;
 	cli_lex_in_ptr->argc = 0;
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 	memcpy(cli_lex_in_ptr->in_str, addr, length);
+	(cli_lex_in_ptr->in_str)[length] = '\0';
 }
 
 /*
@@ -347,7 +356,7 @@ static void cli_lex_in_expand(int in_len)
 {
 	IN_PARMS	*new_cli_lex_in_ptr;
 
-	new_cli_lex_in_ptr = (IN_PARMS *)malloc(sizeof(IN_PARMS) + in_len);
+	new_cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + in_len);
 	new_cli_lex_in_ptr->argc = cli_lex_in_ptr->argc;
 	new_cli_lex_in_ptr->argv = cli_lex_in_ptr->argv;
 	new_cli_lex_in_ptr->buflen = in_len;		/* in_str[1] accounts for null */
@@ -381,7 +390,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			do
 			{	/* no f_ferror */
 				uc_fgets_ret = u_fgets(cli_fgets_Ubuffer,
-					(int32_t)(sizeof(cli_fgets_Ubuffer) / sizeof(UChar)) - 1, u_fp);
+					(int32_t)(SIZEOF(cli_fgets_Ubuffer) / SIZEOF(UChar)) - 1, u_fp);
 			} while (NULL == uc_fgets_ret && !u_feof(u_fp) && ferror(fp) && EINTR == errno);
 			if (NULL == uc_fgets_ret)
 			{
@@ -439,7 +448,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 	{
 #endif
 		cli_fgets_buffer[0] = '\0';
-		FGETS_FILE(cli_fgets_buffer, sizeof(cli_fgets_buffer), fp, retptr);
+		FGETS_FILE(cli_fgets_buffer, SIZEOF(cli_fgets_buffer), fp, retptr);
 		if (NULL != retptr)
 		{
 			in_len = strlen(cli_fgets_buffer);
@@ -450,7 +459,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				destbuffer = cli_lex_in_ptr->in_str;
 			} else
 			{
-				assert(sizeof(cli_fgets_buffer) >= buffersize);
+				assert(SIZEOF(cli_fgets_buffer) >= buffersize);
 				destbuffer = buffer;
 			}
 			retptr = destbuffer;	/* return proper buffer */
@@ -485,6 +494,7 @@ int	cli_gettoken (int *eof)
 	int		arg_no, token_len, in_len;
 	char		*from, *to;
 	IN_PARMS	*new_cli_lex_in_ptr;
+	char		*tmp_tp;
 
 	assert(cli_lex_in_ptr);
 	/* Reading from program argument list */
@@ -508,7 +518,11 @@ int	cli_gettoken (int *eof)
 	if (NULL == cli_lex_in_ptr->tp || strlen(cli_lex_in_ptr->tp) < 1)
 	{
 		cli_token_buf[0] = '\0';
-		cli_lex_in_ptr->tp = cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
+		/* cli_fgets can malloc/free cli_lex_in_ptr.  Passing in TRUE as last parameter will do the set
+		 * to cli_lex_in_ptr->tp within cli_fgets() after any malloc/free, thus avoiding the problem of
+		 * writing to freed memory if the set were done here.
+		 */
+		cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
     		if (NULL != cli_lex_in_ptr->tp)
       			*eof = 0;
            	else
@@ -609,7 +623,11 @@ int cli_get_string_token(int *eof)
 	if (NULL == cli_lex_in_ptr->tp || strlen(cli_lex_in_ptr->tp) < 1)
 	{
 		cli_token_buf[0] = '\0';
-		cli_lex_in_ptr->tp = cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
+		/* cli_fgets can malloc/free cli_lex_in_ptr.  Passing in TRUE as last parameter will do the set
+		 * to cli_lex_in_ptr->tp within cli_fgets() after any malloc/free, thus avoiding the problem of
+		 * writing to freed memory if the set were done here.
+		 */
+		cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
     		if (NULL != cli_lex_in_ptr->tp)
       			*eof = 0;
            	else

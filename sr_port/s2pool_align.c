@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,7 @@ void s2pool_align(mstr *string)
 		align_padlen = PADLEN(stringpool.free, NATIVE_WSIZE);
 	else
 		align_padlen = 0;
-	if (length + align_padlen > stringpool.top - stringpool.free)
-		stp_gcol(length + align_padlen);
+	ENSURE_STP_FREE_SPACE(length + align_padlen);
 	stringpool.free += align_padlen;
 	memcpy(stringpool.free, string->addr, length);
 	string->addr = (char *)stringpool.free;

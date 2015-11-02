@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,13 +25,19 @@
 #define UNIX_OS 02
 #define ALL_SYS (VMS_OS | UNIX_OS)
 #ifdef UNIX			/* function and svn validation are a function of the OS */
-#define VALID_FUN(i) (fun_data[i].os_syst & UNIX_OS)
-#define VALID_SVN(i) (svn_data[i].os_syst & UNIX_OS)
+#  define VALID_FUN(i) (fun_data[i].os_syst & UNIX_OS)
+#  define VALID_SVN(i) (svn_data[i].os_syst & UNIX_OS)
+#  ifdef __hppa
+#    define TRIGGER_OS 0
+#  else
+#    define TRIGGER_OS UNIX_OS
+#  endif
 #elif defined VMS
-#define VALID_FUN(i) (fun_data[i].os_syst & VMS_OS)
-#define VALID_SVN(i) (svn_data[i].os_syst & VMS_OS)
+#  define VALID_FUN(i) (fun_data[i].os_syst & VMS_OS)
+#  define VALID_SVN(i) (svn_data[i].os_syst & VMS_OS)
+#  define TRIGGER_OS 0
 #else
-#error UNSUPPORTED PLATFORM
+#  error UNSUPPORTED PLATFORM
 #endif
 
 GBLREF	char	window_token;
@@ -102,7 +108,15 @@ LITDEF nametabent svn_names[] =
 	,{ 2, "ZS" }, { 4, "ZSTA*" }
 	,{ 5, "ZSTEP"}
 	,{ 3, "ZSY*"}
-	,{ 3, "ZTE" }, { 6, "ZTEXIT"}
+	,{ 4, "ZTCO*"}
+	,{ 4, "ZTDA*"}
+	,{ 3, "ZTE" }, { 6, "ZTEX*"}
+	,{ 4, "ZTLE*"}
+	,{ 4, "ZTOL*"}
+	,{ 4, "ZTRI*"}
+	,{ 4, "ZTUP*"}
+	,{ 4, "ZTVA*"}
+	,{ 4, "ZTWO*"}
 	,{ 2, "ZT*" }
 	,{ 3, "ZUS*" }
 	,{ 2, "ZV*" }
@@ -113,7 +127,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 79	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 87	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -168,10 +182,18 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZREALSTOR, FALSE, ALL_SYS }
 	,{ SV_ZROUTINES, TRUE, ALL_SYS }
 	,{ SV_ZSOURCE, TRUE, ALL_SYS }
-	,{ SV_ZSTATUS, TRUE, ALL_SYS },{ SV_ZSTATUS, TRUE, ALL_SYS }
+	,{ SV_ZSTATUS, TRUE, ALL_SYS }, { SV_ZSTATUS, TRUE, ALL_SYS }
 	,{ SV_ZSTEP, TRUE, ALL_SYS }
 	,{ SV_ZSYSTEM, FALSE, ALL_SYS }
+	,{ SV_ZTCODE, FALSE, TRIGGER_OS }
+	,{ SV_ZTDATA, FALSE, TRIGGER_OS }
 	,{ SV_ZTEXIT, TRUE, ALL_SYS }, { SV_ZTEXIT, TRUE, ALL_SYS }
+	,{ SV_ZTLEVEL, FALSE, TRIGGER_OS}
+	,{ SV_ZTOLDVAL, FALSE, TRIGGER_OS }
+	,{ SV_ZTRIGGEROP, FALSE, TRIGGER_OS}
+	,{ SV_ZTUPDATE, FALSE, TRIGGER_OS }
+	,{ SV_ZTVALUE, TRUE, TRIGGER_OS }
+	,{ SV_ZTWORMHOLE, TRUE, TRIGGER_OS }
 	,{ SV_ZTRAP, TRUE, ALL_SYS }
 	,{ SV_ZUSEDSTOR, FALSE, ALL_SYS }
 	,{ SV_ZVERSION, FALSE, ALL_SYS }
@@ -253,6 +275,7 @@ LITDEF nametabent fun_names[] =
 	,{8, "ZSIGPROC"}
 	,{4, "ZSUB"}, {7, "ZSUBSTR"}
 	,{3, "ZTR"}, {8, "ZTRANSLA*"}
+	,{4, "ZTRI"}, {8, "ZTRIGGER"}
 	,{7, "ZTRNLNM"}
 	,{2, "ZW"}, {6, "ZWIDTH"}
 };
@@ -262,7 +285,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 112	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 114	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -340,6 +363,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZSIGPROC, ALL_SYS }
 	,{ OC_FNZSUBSTR, UNIX_OS }, { OC_FNZSUBSTR, UNIX_OS }
 	,{ OC_FNZTRANSLATE, UNIX_OS }, { OC_FNZTRANSLATE, UNIX_OS }
+	,{ OC_FNZTRIGGER, TRIGGER_OS }, { OC_FNZTRIGGER, TRIGGER_OS }
 	,{ OC_FNZTRNLNM, ALL_SYS }
 	,{ OC_FNZWIDTH, UNIX_OS }, { OC_FNZWIDTH, UNIX_OS }
 };
@@ -415,6 +439,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 	f_zsigproc,
 	f_extract, f_extract,		/* $ZSUBSTR */
 	f_translate, f_translate,
+	f_ztrigger, f_ztrigger,
 	f_ztrnlnm,
 	f_zwidth, f_zwidth
 };
@@ -435,10 +460,10 @@ int expritem(oprtype *a)
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_VAREXPECTED);
 
-	assert(svn_index[26] == (sizeof(svn_names)/sizeof(nametabent)));
-	assert(sizeof(svn_names)/sizeof(nametabent) == sizeof(svn_data)/sizeof(svn_data_type)); /* are all SVNs covered? */
-	assert(fun_index[26] == (sizeof(fun_names)/sizeof(nametabent)));
-	assert(sizeof(fun_names)/sizeof(nametabent) == sizeof(fun_data)/sizeof(fun_data_type)); /* are all functions covered? */
+	assert(svn_index[26] == (SIZEOF(svn_names)/SIZEOF(nametabent)));
+	assert(SIZEOF(svn_names)/SIZEOF(nametabent) == SIZEOF(svn_data)/SIZEOF(svn_data_type)); /* are all SVNs covered? */
+	assert(fun_index[26] == (SIZEOF(fun_names)/SIZEOF(nametabent)));
+	assert(SIZEOF(fun_names)/SIZEOF(nametabent) == SIZEOF(fun_data)/SIZEOF(fun_data_type)); /* are all functions covered? */
 	if (i = tokentable[window_token].uo_type)	/* Note assignment */
 	{
 		type = tokentable[window_token].opr_type;
@@ -485,7 +510,7 @@ int expritem(oprtype *a)
 			if (director_token == TK_DOLLAR)
 			{
 				temp_subs = TRUE;
-				if (!exfunc(a))
+				if (!exfunc(a, FALSE))
 					return FALSE;
 			} else if (TK_AMPERSAND == director_token)
 			{
@@ -510,7 +535,7 @@ int expritem(oprtype *a)
 						STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
 					} else
 					{
-						assert(sizeof(fun_names) / sizeof(fun_data_type) > index);
+						assert(SIZEOF(fun_names) / SIZEOF(fun_data_type) > index);
 						if (!VALID_FUN(index))
 						{
 							STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
@@ -553,7 +578,7 @@ int expritem(oprtype *a)
 						STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
 					} else
 					{
-						assert(sizeof(svn_names)/sizeof(svn_data_type) > index);
+						assert(SIZEOF(svn_names)/SIZEOF(svn_data_type) > index);
 						if (!VALID_SVN(index))
 						{
 							STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */

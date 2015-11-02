@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -47,7 +47,8 @@ l1:	jmp	opp_ret
 
 # PUBLIC	opp_zstepretarg
 ENTRY opp_zstepretarg
-	pushq   REG64_ACCUM
+	pushq   REG64_RET0
+	pushq	REG64_RET1
 	movq	frame_pointer(REG_IP),REG64_ACCUM
 	movw	msf_typ_off(REG64_ACCUM),REG16_ARG2
 	testw	$1,REG16_ARG2
@@ -56,7 +57,8 @@ ENTRY opp_zstepretarg
 	cmpq	REG64_ACCUM, REG64_ARG2
 	jg	l2
 	call	op_zstepret
-l2:	popq	REG64_ACCUM
+l2:	popq	REG64_RET1
+	popq	REG64_RET0
 	jmp	op_retarg
 # opp_zstepretarg ENDP
 
@@ -236,7 +238,8 @@ l11:	jmp	opp_ret
 
 # PUBLIC	opp_zst_over_retarg
 ENTRY opp_zst_over_retarg
-	pushq	REG64_ACCUM
+	pushq	REG64_RET0
+	pushq	REG64_RET1
 	movq	frame_pointer(REG_IP),REG64_ACCUM
 	movw	msf_typ_off(REG64_ACCUM),REG16_ARG2
 	testw	$1,REG16_ARG2
@@ -246,7 +249,8 @@ ENTRY opp_zst_over_retarg
 	cmpq	REG64_ACCUM,REG64_ARG2
 	jg	l12
 	call	op_zstepret
-l12:	popq	REG64_ACCUM
+l12:	popq	REG64_RET1
+	popq	REG64_RET0
 	jmp	op_retarg
 # opp_zst_over_retarg ENDP
 

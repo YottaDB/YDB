@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 	fname = cnx->clb_ptr->mbf;
 	fname++;
 	GET_USHORT(len, fname); 	/* len = *((unsigned short *)fname); */
-	fname += sizeof(unsigned short);
+	fname += SIZEOF(unsigned short);
 	buff[len] = 0;
 	memcpy(buff, fname, len);
 	STAT_FILE((char *)buff, &stat_buf, status);
@@ -73,7 +73,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 	if (!ptr)
 	{
 		/* open region */
-		ptr = (cm_region_head*)malloc(sizeof(*ptr));
+		ptr = (cm_region_head*)malloc(SIZEOF(*ptr));
 		ptr->next = NULL;
 		ptr->last = NULL;
 		ptr->head.fl = ptr->head.bl = 0;
@@ -92,13 +92,13 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 		ptr->reg->open = FALSE;
 		csa = &FILE_INFO(ptr->reg)->s_addrs;
 		csa->now_crit = FALSE;
-		csa->nl = (node_local_ptr_t)malloc(sizeof(node_local));
+		csa->nl = (node_local_ptr_t)malloc(SIZEOF(node_local));
 		assert(MAX_FN_LEN > len);
 		memcpy(ptr->reg->dyn.addr->fname, fname, len);
 		ptr->reg->dyn.addr->fname_len = len;
 		set_gdid_from_stat(&FILE_INFO(ptr->reg)->fileid, &stat_buf);
-		ptr->reg_hash = (hash_table_mname *)malloc(sizeof(hash_table_mname));
-		if (-1 != gethostname((char *)node, sizeof(node)))
+		ptr->reg_hash = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
+		if (-1 != gethostname((char *)node, SIZEOF(node)))
 		{
 			retlen = USTRLEN((char *)node);
 			retlen = MIN(retlen, MAX_RN_LEN - 1);

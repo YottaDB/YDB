@@ -78,9 +78,9 @@ static void prompt_passwd(char passwd[])
 
 int main()
 {
-	char            tmp[MAX_LEN], passwd[MAX_LEN], inode[MAX_LEN], user[MAX_LEN], out[MAX_LEN * 2];
-	char		mumps_ex[GTM_PATH_MAX], *ptr;
-	int             i;
+	char		tmp[MAX_LEN], passwd[MAX_LEN], inode[MAX_LEN], user[MAX_LEN], out[MAX_LEN * 2];
+	char		mumps_ex[GTM_PATH_MAX], save_user_env[MAX_LEN], *user_ptr, *dist_ptr;
+	int		i;
 	size_t		passwd_len, ilen;
 	struct stat	stat_info;
 
@@ -89,33 +89,33 @@ int main()
 	memset(user, 0, MAX_LEN);
 	memset(out, 0, MAX_LEN * 2);
 	memset(mumps_ex, 0, GTM_PATH_MAX);
-	prompt_passwd(passwd);
-	passwd_len = strlen(passwd);
-	if (NULL != (ptr = (char *)getenv("USER")))
-		strncpy(user, ptr, MIN(passwd_len, MAX_LEN));
-	else
+	/* We need $USER and $gtm_dist to be defined to do the proper masking */
+	if (NULL == (user_ptr = (char *)getenv("USER")))
 	{
-		printf("Environment variable USER not defined.");
+		printf("Environment variable USER not defined.\n");
 		exit(1);
 	}
-	if (NULL != (ptr = (char *)getenv(GTM_DIST)))
+	strcpy(save_user_env, user_ptr);
+	if (NULL == (dist_ptr = (char *)getenv(GTM_DIST)))
 	{
-		sprintf(mumps_ex, "%s/%s", ptr, "mumps");
-		if (0 == stat(mumps_ex, &stat_info))
-		{
-			sprintf(tmp, "%ld", stat_info.st_ino);
-                        ilen = strlen(tmp);
-		 	if (ilen < passwd_len)
-		              strncpy(inode + (passwd_len - ilen), tmp, ilen);
-		        else
-		              strncpy(inode, tmp, passwd_len);
-		} else
-		{
-			printf("gtm_dist environment variable not set.");
-			exit(1);
-		}
-
+		printf("Enivronment variable gtm_dist not defined.\n");
+		exit(1);
 	}
+	snprintf(mumps_ex, GTM_PATH_MAX, "%s/%s", dist_ptr, "mumps");
+	if (0 != stat(mumps_ex, &stat_info))
+	{
+		printf("Cannot stat %s\n", mumps_ex);
+		exit(1);
+	}
+	prompt_passwd(passwd);
+	passwd_len = strlen(passwd);
+	strncpy(user, save_user_env, MIN(passwd_len, MAX_LEN));
+	snprintf(tmp, MAX_LEN, "%ld", stat_info.st_ino);
+	ilen = strlen(tmp);
+	if (ilen < passwd_len)
+	      strncpy(inode + (passwd_len - ilen), tmp, ilen);
+	else
+	      strncpy(inode, tmp, passwd_len);
 	maskpass(passwd, inode, user, passwd_len);
 	HEX(passwd, out, passwd_len * 2);
 	printf("%s\n", out);

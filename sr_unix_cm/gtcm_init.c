@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +62,8 @@
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
+
+GBLDEF	CLI_ENTRY	*cmd_ary = NULL; /* The GTCM server does not have any command tables so initialize command array to NULL */
 
 GBLREF short 			gtcm_ast_avail;
 GBLREF bool			licensed;
@@ -174,7 +176,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 		gtcm_rep_err("Unable to get system resource limits", errno);
 		exit(errno);
 	}
-	assert(sizeof(gtcm_ast_avail) == 2);	/* check that short is size 2 bytes as following code relies on that */
+	assert(SIZEOF(gtcm_ast_avail) == 2);	/* check that short is size 2 bytes as following code relies on that */
 	gtcm_ast_avail = (maxfds > MAXINT2) ? MAXINT2 : maxfds;
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;

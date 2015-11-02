@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,11 @@
 #include "jnl_typedef.h"
 #include "iosp.h"		/* for SS_NORMAL */
 #include "send_msg.h"
-
+#include "svnames.h"		/* for SV_ZTWORMHOLE */
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"
+#include "gv_trigger.h"
+#endif
 /* Include prototypes */
 #include "t_qread.h"
 #include "t_begin_crit.h"
@@ -46,16 +50,13 @@
 #include "dbfilop.h"
 #include "gvcst_blk_build.h"
 #include "jnl_write.h"
+#include "op_tcommit.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
 
 GBLREF  mur_opt_struct  	mur_options;
 GBLREF 	jnl_gbls_t		jgbl;
-GBLREF 	mur_rab_t		mur_rab;
-GBLREF	jnl_ctl_list		*mur_jctl;
-GBLREF 	int			mur_regno;
-GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -66,15 +67,15 @@ GBLREF	jnl_fence_control	jnl_fence_ctl; /* Needed to set the token, optimize jnl
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF  jnl_process_vector	*prc_vec;
 GBLREF 	mur_gbls_t		murgbl;
-
-LITREF	int			jrt_update[];
-LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		incr_db_trigger_cycle;
+#endif
 
 /* This routine is called only for recover and rollback (that is, mur_options.update).
  * It applies the set/kill/zkill, tcom, inctn, and aimg records during forward processing.
  * Some fields like jnl_seqno, rec_seqno and prefix.time are saved here from original journal files.
  * Later jnl_write routines copies them to journal records instead of generating them like the runtime system */
-uint4	mur_output_record()
+uint4	mur_output_record(reg_ctl_list *rctl)
 {
 	mval			mv;
 	jnl_record		*rec;
@@ -87,6 +88,11 @@ uint4	mur_output_record()
 	pini_list_struct	*plst;
 	boolean_t		jnl_enabled, was_crit;
 	struct_jrec_null	null_record;
+	gd_region		*reg;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	jnl_ctl_list		*jctl;
+	jnl_format_buffer	*ztworm_jfb;
 	GTMCRYPT_ONLY(
 		blk_hdr_ptr_t	aimg_blk_ptr;
 		int		req_dec_blk_size;
@@ -96,69 +102,78 @@ uint4	mur_output_record()
 	error_def(ERR_JNLBADRECFMT);
 
 	assert(mur_options.update);
-	rec = mur_rab.jnlrec;
+	rec = rctl->mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 	if (JRT_ALIGN == rectype || JRT_EOF == rectype || JRT_EPOCH == rectype || JRT_PBLK == rectype || JRT_PINI == rectype)
 		return SS_NORMAL;
 	jgbl.gbl_jrec_time = rec->prefix.time;
 	pini_addr = rec->prefix.pini_addr;
-	assert(cs_addrs == mur_ctl[mur_regno].csa);
-	jnl_enabled = JNL_ENABLED(cs_addrs);
+	reg = rctl->gd;
+	jctl = rctl->jctl;
+	assert(jctl->reg_ctl == rctl);
+	assert(gv_cur_region == reg);
+	csa = rctl->csa;
+	assert(cs_addrs == csa);
+	csd = csa->hdr;
+	assert(cs_data == csd);
+	jnl_enabled = JNL_ENABLED(csa);
 	if (jnl_enabled)
 	{
-		status = mur_get_pini(pini_addr, &plst);
+		status = mur_get_pini(jctl, pini_addr, &plst);
 		if (SS_NORMAL != status)
 			return status;
 		prc_vec = &plst->jpv;
-		cs_addrs->jnl->pini_addr = plst->new_pini_addr;
-		jgbl.mur_plst = plst;
+		csa->jnl->pini_addr = plst->new_pini_addr;
+		rctl->mur_plst = plst;
 		if (mur_options.rollback && IS_REPLICATED(rectype))
 		{
-			jgbl.mur_jrec_seqno = ((struct_jrec_ztp_upd *)mur_rab.jnlrec)->jnl_seqno;
+			jgbl.mur_jrec_seqno = ((struct_jrec_upd *)rec)->token_seq.jnl_seqno;
 			if (jgbl.mur_jrec_seqno >= murgbl.consist_jnl_seqno)
 				murgbl.consist_jnl_seqno = jgbl.mur_jrec_seqno + 1;
 		}
 	}
 	if (IS_SET_KILL_ZKILL(rectype))
-	{
-		if (IS_ZTP(rectype))
-		{	/* ZTP has different record format than TP or non-TP */
-			keystr = (jnl_string *)&rec->jrec_fkill.mumps_node;
-			if (jnl_enabled)
-				jgbl.mur_jrec_token_seq.token = rec->jrec_fset.token;
-		} else
-		{	/* TP and non-TP has same format */
-			keystr = (jnl_string *)&rec->jrec_kill.mumps_node;
-			if (jnl_enabled)
-				jgbl.mur_jrec_token_seq = rec->jrec_set.token_seq;
+	{	/* TP and non-TP has same format */
+		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
+		if (jnl_enabled)
+		{
+			jnl_fence_ctl.token = rec->jrec_set_kill.token_seq.token;
+			jgbl.tp_ztp_jnl_upd_num = rec->jrec_set_kill.update_num;
+			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = MAX(jgbl.max_tp_ztp_jnl_upd_num, jgbl.tp_ztp_jnl_upd_num);)
+			jgbl.mur_jrec_nodeflags = keystr->nodeflags;
 		}
 		if (IS_FENCED(rectype))
 		{	/* Even for FENCE_NONE we apply fences. Otherwise an [F/G/T/U]UPD becomes UPD etc. */
-			/* op_tstart is called in mur_forward already */
+			/* op_tstart is called in "mur_forward_play_cur_jrec" already */
 			if (IS_FUPD(rectype))
 			{
 				jnl_fence_ctl.level = 1;
 				if (jnl_enabled)
 				{
 					jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
-					cs_addrs->next_fenced = NULL;
+					csa->next_fenced = NULL;
 				}
 			} else if (IS_GUPD(rectype))
 			{
 				jnl_fence_ctl.level = 1;
 				if (jnl_enabled)
 				{
-					jnl_fence_ctl.fence_list = cs_addrs;
-					cs_addrs->next_fenced = JNL_FENCE_LIST_END;
+					jnl_fence_ctl.fence_list = csa;
+					csa->next_fenced = JNL_FENCE_LIST_END;
 				}
 			} else if (IS_TP(rectype))
 				tp_set_sgm();
 		}
+#		ifdef GTM_TRIGGER
+		/* Check if ^#t and if so need to increment trigger cycle in file header */
+		if (IS_GVKEY_HASHT_GBLNAME(keystr->length, keystr->text))
+			incr_db_trigger_cycle = TRUE;
+#		endif
 		if (IS_SET(rectype))
 		{
 			val_ptr = &keystr->text[keystr->length];
 			GET_MSTR_LEN(mv.str.len, val_ptr);
-			mv.str.addr = val_ptr + sizeof(mstr_len_t);
+			mv.str.addr = val_ptr + SIZEOF(mstr_len_t);
 			mv.mvtype = MV_STR;
 			op_gvput(&mv);
 		} else if (IS_KILL(rectype))
@@ -174,81 +189,106 @@ uint4	mur_output_record()
 		}
 		if (IS_ZTP(rectype))
 		{	/* Even for FENCE_NONE we apply fences. Otherwise an FUPD/GUPD becomes UPD etc. */
-			assert(jnl_enabled || (JNL_FENCE_LIST_END == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
+			assert(jnl_enabled || (JNL_FENCE_LIST_END == jnl_fence_ctl.fence_list && NULL == csa->next_fenced));
 			jnl_fence_ctl.level = 0;
 			if (jnl_enabled)
 			{
 				jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
-				cs_addrs->next_fenced = NULL;
+				csa->next_fenced = NULL;
 			}
 		}
 		return SS_NORMAL;
 	}
 	switch(rectype)
 	{
-	case JRT_TCOM:
-		/* Even for FENCE_NONE we apply fences. Otherwise an TUPD/UUPD becomes UPD etc. */
+#	ifdef GTM_TRIGGER
+	case JRT_TZTWORM:
+	case JRT_UZTWORM:
 		if (jnl_enabled)
-		{
-			jgbl.mur_jrec_token_seq = rec->jrec_tcom.token_seq;
-			jgbl.mur_jrec_participants = rec->jrec_tcom.participants;
-			memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
+		{	/* Format the ZTWORM journal record */
+			assert(dollar_tlevel);	/* op_tstart should already have been done by mur_forward */
+			jnl_fence_ctl.token = rec->jrec_ztworm.token_seq.token;
+			jgbl.tp_ztp_jnl_upd_num = rec->jrec_ztworm.update_num;
+			DEBUG_ONLY(jgbl.max_tp_ztp_jnl_upd_num = MAX(jgbl.max_tp_ztp_jnl_upd_num, jgbl.tp_ztp_jnl_upd_num);)
+			jgbl.mur_jrec_nodeflags = 0;
+			keystr = (jnl_string *)&rec->jrec_ztworm.ztworm_str;
+			mv.str.addr = &keystr->text[0];
+			mv.str.len = keystr->length;
+			mv.mvtype = MV_STR;
+			ztworm_jfb = jnl_format(JNL_ZTWORM, NULL, &mv, 0);
+			assert(NULL != ztworm_jfb);
 		}
-		op_tcommit();
+		break;
+#	endif
+	case JRT_TCOM:
+		/* If forw_multi is non-NULL, it means we are playing a multi-region TP transaction as ONE TP transaction.
+		 * While we will come to mur_output_record for each TCOM record, we will do the actual commit AFTER we
+		 * are done playing the journal records of ALL regions involved in the TP.
+		 */
+		if (NULL == rctl->forw_multi)
+		{	/* Even for FENCE_NONE we apply fences. Otherwise an TUPD/UUPD becomes UPD etc. */
+			if (jnl_enabled)
+			{
+				jnl_fence_ctl.token = rec->jrec_tcom.token_seq.token;
+				jgbl.mur_jrec_participants = rec->jrec_tcom.num_participants;
+				memcpy(tcom_record.jnl_tid, rec->jrec_tcom.jnl_tid, TID_STR_SIZE);
+			}
+			assert(dollar_tlevel);
+			op_tcommit();
+		}
 		break;
 	case JRT_ZTCOM:
 		/* Even for FENCE_NONE we apply fences. Otherwise an FUPD/GUPD becomes UPD etc. */
 		if (jnl_enabled)
 		{
-			jgbl.mur_jrec_token_seq.token = rec->jrec_ztcom.token;
+			jnl_fence_ctl.token = rec->jrec_ztcom.token;
 			jgbl.mur_jrec_participants = rec->jrec_ztcom.participants;
 		}
 		jnl_fence_ctl.level = 1;
 		if (jnl_enabled)
 		{
-			jnl_fence_ctl.fence_list = cs_addrs;
-			cs_addrs->next_fenced = JNL_FENCE_LIST_END;
+			jnl_fence_ctl.fence_list = csa;
+			csa->next_fenced = JNL_FENCE_LIST_END;
 		}
 		op_ztcommit(1);
-		assert(jnl_enabled || (JNL_FENCE_LIST_END == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
+		assert(jnl_enabled || (JNL_FENCE_LIST_END == jnl_fence_ctl.fence_list && NULL == csa->next_fenced));
 		jnl_fence_ctl.level = 0;
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
-		cs_addrs->next_fenced = NULL;
+		csa->next_fenced = NULL;
 		break;
 	case JRT_INCTN:
-		assert(mur_ctl[mur_regno].gd == gv_cur_region);
-		assert(cs_addrs == (sgmnt_addrs *)&FILE_INFO(mur_ctl[mur_regno].gd)->s_addrs);
-		assert(cs_data == cs_addrs->hdr);
+		assert(csa == (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs);
+		assert(csd == csa->hdr);
 		if (mur_options.forward)
 		{
-			assert(rec->jrec_inctn.prefix.tn == cs_data->trans_hist.curr_tn || mur_options.notncheck);
-			if (FALSE == ((was_crit = cs_addrs->now_crit)))
-				grab_crit(gv_cur_region);
-			CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-			cs_data->trans_hist.early_tn = cs_data->trans_hist.curr_tn + 1;
-			INCREMENT_CURR_TN(cs_data);
+			assert(rec->jrec_inctn.prefix.tn == csd->trans_hist.curr_tn || mur_options.notncheck);
+			if (FALSE == ((was_crit = csa->now_crit)))
+				grab_crit(reg);
+			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
+			csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
+			INCREMENT_CURR_TN(csd);
 			if (!was_crit)
-				rel_crit(gv_cur_region);
+				rel_crit(reg);
 		}
 		break;
 	case JRT_AIMG:
-		assert(mur_ctl[mur_regno].gd == gv_cur_region);
-		assert(cs_addrs == (sgmnt_addrs *)&FILE_INFO(mur_ctl[mur_regno].gd)->s_addrs);
-		assert(cs_data == cs_addrs->hdr);
+		assert(csa == (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs);
+		assert(csd == csa->hdr);
 		assert(!dollar_tlevel);
 		if (!mur_options.apply_after_image)
 			return SS_NORMAL;
 		write_after_image = TRUE;
 #		ifdef GTM_CRYPT
 		/* Decrypt AIMG records if applicable. */
-		if (cs_data->is_encrypted)
+		aimg_blk_ptr = (blk_hdr_ptr_t)&rec->jrec_aimg.blk_contents[0];
+		if (csd->is_encrypted)
 		{
-			aimg_blk_ptr = (blk_hdr_ptr_t)&rec->jrec_aimg.blk_contents[0];
-			req_dec_blk_size = aimg_blk_ptr->bsiz - SIZEOF(blk_hdr);
+			assert((aimg_blk_ptr->bsiz <= csd->blk_size) && (aimg_blk_ptr->bsiz >= SIZEOF(blk_hdr)));
+			req_dec_blk_size = MIN(csd->blk_size, aimg_blk_ptr->bsiz) - SIZEOF(blk_hdr);
 			ASSERT_ENCRYPTION_INITIALIZED;
 			if (IS_BLK_ENCRYPTED(aimg_blk_ptr->levl, req_dec_blk_size))
 			{
-				GTMCRYPT_DECODE_FAST(mur_jctl->encr_key_handle,
+				GTMCRYPT_DECODE_FAST(jctl->encr_key_handle,
 						     (char *)(aimg_blk_ptr + 1),
 						     req_dec_blk_size,
 						     NULL,
@@ -264,50 +304,48 @@ uint4	mur_output_record()
 	case JRT_PFIN:
 		if (jnl_enabled)
 		{
-			if (FALSE == ((was_crit = mur_ctl[mur_regno].csa->now_crit)))
-				grab_crit(mur_ctl[mur_regno].gd);
-			assert(gv_cur_region == mur_ctl[mur_regno].gd);
+			if (FALSE == ((was_crit = rctl->csa->now_crit)))
+				grab_crit(reg);
 			jnl_status = jnl_ensure_open();
 			if (0 != jnl_status)
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
-			assert(plst->new_pini_addr == cs_addrs->jnl->pini_addr);
-			if (0 != cs_addrs->jnl->pini_addr)
-				jnl_put_jrt_pfin(mur_ctl[mur_regno].csa);
+				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+			assert(plst->new_pini_addr == csa->jnl->pini_addr);
+			if (0 != csa->jnl->pini_addr)
+				jnl_put_jrt_pfin(rctl->csa);
 			if (!was_crit)
-				rel_crit(mur_ctl[mur_regno].gd);
+				rel_crit(reg);
 		}
 		break;
 	case JRT_NULL:
 		if (jnl_enabled)
 		{
-			if (FALSE == ((was_crit = mur_ctl[mur_regno].csa->now_crit)))
-				grab_crit(mur_ctl[mur_regno].gd);
-			assert(gv_cur_region == mur_ctl[mur_regno].gd);
-			CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-			cs_addrs->ti->early_tn = cs_addrs->ti->curr_tn + 1;
+			if (FALSE == ((was_crit = rctl->csa->now_crit)))
+				grab_crit(reg);
+			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
+			csa->ti->early_tn = csa->ti->curr_tn + 1;
 			jnl_status = jnl_ensure_open();
 			if (0 == jnl_status)
 			{
-				if (0 == cs_addrs->jnl->pini_addr)
-					jnl_put_jrt_pini(cs_addrs);
+				if (0 == csa->jnl->pini_addr)
+					jnl_put_jrt_pini(csa);
 				null_record.prefix.jrec_type = JRT_NULL;
 				null_record.prefix.forwptr = null_record.suffix.backptr = NULL_RECLEN;
 				null_record.prefix.time = jgbl.gbl_jrec_time;
-				null_record.prefix.tn = cs_addrs->ti->curr_tn;
-				null_record.prefix.pini_addr = cs_addrs->jnl->pini_addr;
+				null_record.prefix.tn = csa->ti->curr_tn;
+				null_record.prefix.pini_addr = csa->jnl->pini_addr;
 				null_record.jnl_seqno = jgbl.mur_jrec_seqno;
 				null_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-				jnl_write(cs_addrs->jnl, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
+				jnl_write(csa->jnl, JRT_NULL, (jnl_record *)&null_record, NULL, NULL);
 			} else
-				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
-			INCREMENT_CURR_TN(cs_data);
+				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+			INCREMENT_CURR_TN(csd);
 			if (!was_crit)
-				rel_crit(mur_ctl[mur_regno].gd);
+				rel_crit(reg);
 		}
 		break;
 	default:
 		assert(FALSE);
-		mur_report_error(MUR_JNLBADRECFMT);
+		mur_report_error(jctl, MUR_JNLBADRECFMT);
 		return ERR_JNLBADRECFMT;
 	}
 	return SS_NORMAL;

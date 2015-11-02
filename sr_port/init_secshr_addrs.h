@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@ void init_secshr_addrs(gd_addr_fn_ptr getnxtgdr, cw_set_element *cwsetaddrs,
 		       uint4 icnt, int4 gtmospagesize, gd_region **jpool_reg_address,
 		       inctn_opcode_t *inctn_opcode_address,
 		       inctn_detail_t *inctn_detail_address, short *dollar_tlevel_address,
-		       int4 *update_trans_address, sgmnt_addrs **cs_addrs_address,
+		       uint4 *update_trans_address, sgmnt_addrs **cs_addrs_address,
 		       sgmnt_addrs **kip_csa_addrs, boolean_t *need_kip_incr_address,
 		       trans_num *start_tn_address);
 
@@ -34,7 +34,7 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	short			dollar_tlevel;
-GBLREF	int4			update_trans;
+GBLREF	uint4			update_trans;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_addrs 		*kip_csa;
 GBLREF	boolean_t		need_kip_incr;

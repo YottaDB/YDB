@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 GBLREF	spdesc			stringpool;
 GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related information */
 
-void	get_dollar_stack_info(int level, int mode,  mval *result)
+void	get_dollar_stack_info(int level, stack_mode_t mode,  mval *result)
 {
 	assert(0 <= level);
 	assert(level < dollar_stack.index);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,24 +11,43 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "golevel.h"
+#include "error.h"
 #include "error_trap.h"
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#endif
 
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	stack_frame	*error_frame;
 
 void	goerrorframe()
 {
-        stack_frame     *fp;
+        stack_frame     *fp, *fpprev;
         int4            unwind;
 
-        for (unwind = 0, fp = frame_pointer; fp < error_frame; fp = fp->old_frame_pointer)
+        for (unwind = 0, fp = frame_pointer; fp < error_frame; fp = fpprev)
+	{
+		fpprev = fp->old_frame_pointer;
+#		ifdef GTM_TRIGGER
+		if (SFT_TRIGR & fpprev->type)
+			fpprev = *(stack_frame **)(fpprev + 1);
+		else
+			unwind++;
+#		else
 		unwind++;
+#		endif
+		assert(fpprev);
+	}
 	assert(fp == error_frame);
-	goframes(unwind);
+	DBGEHND((stderr, "goerrorframe: Unwinding %d frames\n", unwind));
+	GOFRAMES(unwind, FALSE);
 	assert(error_frame == frame_pointer);
 	/* Now that we (the caller mdb_condition_handler) are going to rethrow an error, ensure that the
 	 * SFF_ETRAP_ERR bit is set in "error_frame" in case it got reset by flush_jmp.

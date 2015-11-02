@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	mur_opt_struct	mur_options;
+GBLREF 	jnl_gbls_t	jgbl;
 
 void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 {
@@ -41,19 +42,19 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 	{
 		if (!mur_options.verify)
 		{
-			murgbl.tp_resolve_time = mur_ctl[0].lvrec_time;
+			jgbl.mur_tp_resolve_time = mur_ctl[0].lvrec_time;
 			for (rctl = mur_ctl + 1, rctl_top = mur_ctl + reg_total; rctl < rctl_top; rctl++)
 			{
-				if (rctl->lvrec_time < murgbl.tp_resolve_time)
-					murgbl.tp_resolve_time = rctl->lvrec_time;
+				if (rctl->lvrec_time < jgbl.mur_tp_resolve_time)
+					jgbl.mur_tp_resolve_time = rctl->lvrec_time;
 			}
-			assert(murgbl.tp_resolve_time);
+			assert(jgbl.mur_tp_resolve_time);
 		} else
-			murgbl.tp_resolve_time = 0; /* verify continues till the beginning of journal file */
+			jgbl.mur_tp_resolve_time = 0; /* verify continues till the beginning of journal file */
 		return;
 	}
 	mur_sort_files();
-	murgbl.tp_resolve_time = MAXUINT4;
+	jgbl.mur_tp_resolve_time = MAXUINT4;
 	assert(max_lvrec_time == mur_ctl[reg_total - 1].lvrec_time);
 	for (rctl = mur_ctl, rctl_top = mur_ctl + reg_total; rctl < rctl_top; rctl++)
 	{
@@ -63,11 +64,11 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 		reg_tp_resolve_time = max_lvrec_time - rctl->jctl->jfh->epoch_interval - MAX_EPOCH_DELAY;
 		if (rctl->lvrec_time > reg_tp_resolve_time)
 			reg_tp_resolve_time = rctl->lvrec_time;
-		if (reg_tp_resolve_time < murgbl.tp_resolve_time)
-			murgbl.tp_resolve_time = reg_tp_resolve_time;
+		if (reg_tp_resolve_time < jgbl.mur_tp_resolve_time)
+			jgbl.mur_tp_resolve_time = reg_tp_resolve_time;
 		assert(!mur_options.update || NULL != rctl->csd);
 		if (mur_options.update && rctl->recov_interrupted && rctl->csd->intrpt_recov_tp_resolve_time &&
-				rctl->csd->intrpt_recov_tp_resolve_time < murgbl.tp_resolve_time)
+				rctl->csd->intrpt_recov_tp_resolve_time < jgbl.mur_tp_resolve_time)
 			/* Previous backward recovery/rollback was interrupted.
 			 * Update tp_resolve_time to reflect the minimum of the previous and
 			 * 	current recovery/rollback's turn-around-points.
@@ -75,10 +76,10 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 			 * rctl->csd->intrpt_recov_tp_resolve_time are zero in case previous recover
 			 * was killed after mur_open_files, (which sets csd->recov_interrupted)
 			 * but before mur_back_process() which would have set csd->intrpt_recov_tp_resolve_time */
-			murgbl.tp_resolve_time = rctl->csd->intrpt_recov_tp_resolve_time;
+			jgbl.mur_tp_resolve_time = rctl->csd->intrpt_recov_tp_resolve_time;
 	}
-	if (mur_options.since_time < murgbl.tp_resolve_time)
-		murgbl.tp_resolve_time = (jnl_tm_t)mur_options.since_time;
+	if (mur_options.since_time < jgbl.mur_tp_resolve_time)
+		jgbl.mur_tp_resolve_time = (jnl_tm_t)mur_options.since_time;
 	if (FENCE_NONE == mur_options.fences && !mur_options.since_time_specified && !murgbl.intrpt_recovery)
-		murgbl.tp_resolve_time = max_lvrec_time;
+		jgbl.mur_tp_resolve_time = max_lvrec_time;
 }

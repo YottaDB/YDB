@@ -78,8 +78,7 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 		vari = FALSE;
 		width = (width < MAX_READLEN) ? width : MAX_READLEN;
 	}
-	if (stringpool.free + width > stringpool.top)
-		stp_gcol(width);
+	ENSURE_STP_FREE_SPACE(width);
 	io_ptr = io_curr_device.in;
 	assert(dev_open == io_ptr->state);
 	tcpptr = (d_tcp_struct *)(io_ptr->dev_sp);
@@ -241,7 +240,7 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 #ifdef DEBUG_TCP
 	PRINTF("%s <<<\n", __FILE__);
 #endif
-	len = sizeof("1,") - 1;
+	len = SIZEOF("1,") - 1;
 	if (status >= 0)
 	{	/* no real problems */
 		io_ptr->dollar.za = 0;
@@ -256,13 +255,13 @@ int	iotcp_readfl(mval *v, int4 width, int4 timeout)
 			memcpy(tcpptr->dollar_device, "1,", len);
 			if (tcpptr->urgent)
 			{
-				memcpy(&tcpptr->dollar_device[len], "No ",sizeof("No "));
-				len += sizeof("No ") - 1;
+				memcpy(&tcpptr->dollar_device[len], "No ",SIZEOF("No "));
+				len += SIZEOF("No ") - 1;
 			}
-			memcpy(&tcpptr->dollar_device[len], "Urgent Data", sizeof("Urgent Data"));
+			memcpy(&tcpptr->dollar_device[len], "Urgent Data", SIZEOF("Urgent Data"));
 		} else
 */
-			memcpy(tcpptr->dollar_device, "0", sizeof("0"));
+			memcpy(tcpptr->dollar_device, "0", SIZEOF("0"));
 	} else
 	{	/* there's a significant problem */
 		if (0 == i)

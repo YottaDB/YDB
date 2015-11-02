@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,12 +78,12 @@ int mval2fao(
 								outparm[parmcnt++] = (UINTPTR_T)(fao)->str.addr;
 								break;
 /* ascii string descriptor */			case 'S':
-								if (buf + sizeof(desc_struct) >= buftop)
+								if (buf + SIZEOF(desc_struct) >= buftop)
 									return -1;
 								((desc_struct *)buf)->len = (fao)->str.len;
 								((desc_struct *)buf)->addr = (fao)->str.addr;
 								outparm[parmcnt++] = (UINTPTR_T)buf;
-								buf += sizeof(desc_struct);
+								buf += SIZEOF(desc_struct);
 								break;
 						default:	return -1;
 					}

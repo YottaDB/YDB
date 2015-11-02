@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
 #include <errno.h>
-#include <sys/stat.h>
+#include "gtm_stat.h"
 #include <sys/types.h>
 #include "gtm_unistd.h"
 
@@ -42,7 +42,7 @@ GBLREF int4		mvmax, mlmax, mlitmax, psect_use_tab[], sa_temps[], sa_temps_offset
 GBLREF mlabel 		*mlabtab;
 GBLREF mline 		mline_root;
 GBLREF mvar 		*mvartab;
-GBLREF mident		module_name;
+GBLREF mident		module_name, int_module_name;
 GBLREF spdesc		stringpool;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF char		cg_phase_last;	/* previous code generation phase */
@@ -84,21 +84,18 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
 	var_tabent	*vptr;
-	mstr		rname_mstr;
 	int4		lnr_pad_len;
 	error_def(ERR_TEXT);
 	assert(!run_time);
 	obj_init();
 
 	/* Define the routine name global symbol. */
-	rname_mstr.addr = module_name.addr;
-	rname_mstr.len = module_name.len;
-	define_symbol(GTM_MODULE_DEF_PSECT, &rname_mstr, 0);
+	define_symbol(GTM_MODULE_DEF_PSECT, (mstr *)&int_module_name, 0);
 
-	memset(&rhead, 0, sizeof(rhead));
+	memset(&rhead, 0, SIZEOF(rhead));
 	alloc_reg();
 	jmp_opto();
-	curr_addr = sizeof(rhdtyp);
+	curr_addr = SIZEOF(rhdtyp);
 	cg_phase = CGP_APPROX_ADDR;
 	cg_phase_last = CGP_NOSTATE;
 	code_gen();
@@ -114,20 +111,20 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	if (!(cmd_qlf.qlf & CQ_OBJECT))
 		return;
 
-	rhead.ptext_ptr = sizeof(rhead);
+	rhead.ptext_ptr = SIZEOF(rhead);
 	rhead.checksum = checksum;
 	rhead.vartab_ptr = code_size;
 	rhead.vartab_len = mvmax;
-	code_size += mvmax * sizeof(var_tabent);
+	code_size += mvmax * SIZEOF(var_tabent);
 	rhead.labtab_ptr = code_size;
 	rhead.labtab_len = mlmax;
-	code_size += mlmax * sizeof(lab_tabent);
+	code_size += mlmax * SIZEOF(lab_tabent);
 	rhead.lnrtab_ptr = code_size;
 	rhead.lnrtab_len = src_lines;
 	rhead.compiler_qlf = cmd_qlf.qlf;
 	rhead.temp_mvals = sa_temps[TVAL_REF];
 	rhead.temp_size = sa_temps_offset[TCAD_REF];
-	code_size += src_lines * sizeof(int4);
+	code_size += src_lines * SIZEOF(int4);
 	lnr_pad_len = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);
 	code_size += lnr_pad_len;
 
@@ -136,12 +133,12 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	code_gen();
 
 	/* Variable table: */
-	vptr = (var_tabent *)mcalloc(mvmax * sizeof(var_tabent));
+	vptr = (var_tabent *)mcalloc(mvmax * SIZEOF(var_tabent));
 	if (mvartab)
 		walktree(mvartab, cg_var, (char *)&vptr);
 	else
 		assert(0 == mvmax);
-	emit_immed((char *)vptr, mvmax * sizeof(var_tabent));
+	emit_immed((char *)vptr, mvmax * SIZEOF(var_tabent));
 
 	/* Label table: */
 	if (mlabtab)
@@ -150,11 +147,11 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 		assert(0 == mlmax);
 
 	/* External entry definitions: */
-	emit_immed((char *)&(mline_root.externalentry->rtaddr), sizeof(mline_root.externalentry->rtaddr));	/* line 0 */
+	emit_immed((char *)&(mline_root.externalentry->rtaddr), SIZEOF(mline_root.externalentry->rtaddr));	/* line 0 */
 	for (mlx = mline_root.child ; mlx ; mlx = mly)
 	{
 		if (mlx->table)
-			emit_immed((char *)&(mlx->externalentry->rtaddr), sizeof(mlx->externalentry->rtaddr));
+			emit_immed((char *)&(mlx->externalentry->rtaddr), SIZEOF(mlx->externalentry->rtaddr));
 		if ((mly = mlx->child) == 0)
 		{
 			if ((mly = mlx->sibling) == 0)
@@ -190,9 +187,9 @@ void	cg_lab (mlabel *l, int4 base)
 	{
 		lent.lab_name.len = l->mvname.len;
 		lent.lab_name.addr = (char *)(l->mvname.addr - (char *)stringpool.base);
-		lent.LABENT_LNR_OFFSET = (sizeof(lnr_tabent) * l->ml->line_number) + base;
-		emit_immed((char *)&lent, sizeof(lent));
-		mlabel2xtern(&glob_name, &module_name, &l->mvname);
+		lent.LABENT_LNR_OFFSET = (SIZEOF(lnr_tabent) * l->ml->line_number) + base;
+		emit_immed((char *)&lent, SIZEOF(lent));
+		mlabel2xtern(&glob_name, &int_module_name, &l->mvname);
 		define_symbol(GTM_CODE, &glob_name, lent.LABENT_LNR_OFFSET);
 	}
 }

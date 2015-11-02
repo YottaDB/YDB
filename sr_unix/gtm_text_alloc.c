@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 /* Storage manager for mmap() allocated storage used for executable code.
    Uses power-of-two "buddy" system as described by Knuth. Allocations up to
-   size <pagesize> - sizeof(header) are managed by the buddy system. Larger
+   size <pagesize> - SIZEOF(header) are managed by the buddy system. Larger
    sizes are only "tracked" and then released via munmap() when they are freed.
 
    The algorithms used in this module are very similar to those used in
@@ -87,33 +87,6 @@ error_def(ERR_TEXT);
 #define SET_ELEM_MAX(idx) SET_MAX(freeElemMax[idx], freeElemCnt[idx])
 #define CALLERID ((unsigned char *)caller_id())
 
-/* States a storage element may be in (which need to be different from malloc states). */
-enum ElemState {Allocated = 0x43, Free = 0x34};
-
-/* Each allocated block (in the mmap build) has the following structure. The actual address
-   returned to the user for allocation and supplied by the user for release
-   is actually the storage beginning at the 'userStorage.userStart' area.
-   This holds true even for storage that is truely mmap'd.
-*/
-typedef struct storElemStruct
-{	/* This flavor of header is 16 bytes. This is required on IA64 and we have just adopted it for
-	   the other platforms as well as it is a minor expense given the sizes of chunks we are using
-	*/
-	int		queueIndex;			/* Index into TwoTable for this size of element */
-	enum ElemState	state;				/* State of this block */
-	unsigned int	realLen;			/* Real (total) length of allocation */
-	int		filler;
-	union						/* The links are used only when element is free */
-	{
-		struct					/* Free block information */
-		{
-			struct	storElemStruct	*fPtr;	/* Next storage element on free queue */
-			struct	storElemStruct	*bPtr;	/* Previous storage element on free queue */
-		} links;
-		unsigned char	userStart;		/* First byte of user useable storage */
-	} userStorage;
-} storElem;
-
 #ifdef __MVS__
 
 static  uint4  		TwoTable[MAXINDEX + 2];
@@ -125,11 +98,11 @@ static  uint4  		TwoTable[MAXINDEX + 2];
 
 /* This function is meant as a temporary replacement for the gtm_text_alloc code that uses mmap.
    ABS 2008/12 - It is deficient in two regards:
-   1) It abuses storElem - the abuse stems from account needs.  It was hoped that we could simply
-   abuse storElem to hold the actual length of memory allocated and then use the size of storElem
+   1) It abuses textElem - the abuse stems from account needs.  It was hoped that we could simply
+   abuse textElem to hold the actual length of memory allocated and then use the size of textElem
    as the offset to the original start of memory address that was malloc'ed.  However, the
    userStart of memory needs to be SECTION_ALIGN_BOUNDARY byte aligned.
-	action: don't use storElem
+	action: don't use textElem
    2) SECTION_ALIGN_BOUNDARY is 16 bytes in 64bit world.  Since __malloc31 is returning 8 byte
    aligned memory, we really only needed a pad of 8 bytes.  But that left no real mechanism to
    return to the original start of memory. So we have a pad of 24 bytes.  The first 8 bytes point
@@ -140,11 +113,11 @@ static  uint4  		TwoTable[MAXINDEX + 2];
  */
 void *gtm_text_alloc(size_t size)
 {
-	storElem	*uStor;
+	textElem	*uStor;
 	unsigned long	*aligned, *memStart;
 	int		hdrSize, tSize, save_errno;
 
-	hdrSize = SIZEOF(storElem);
+	hdrSize = SIZEOF(textElem);
 	/* Pad the memory area for SECTION_ALIGN_BOUNDARY alignment required by comp_indr() */
 	tSize = (int)size + hdrSize + (SECTION_ALIGN_BOUNDARY * 2);
 	uStor = __malloc31(tSize);
@@ -188,11 +161,11 @@ void gtm_text_free(void *addr)
 {
 	int		size;
 	long		*storage;
-	storElem	*uStor;
+	textElem	*uStor;
 
 	storage = (long *)addr;
 	storage--;
-	uStor = (storElem *)*storage;
+	uStor = (textElem *)*storage;
 	size = uStor->realLen;
 
 	free(uStor);
@@ -262,7 +235,7 @@ void gtm_text_free(void *addr)
    have to depend on each implementation's compiler inlining to get efficient code here */
 #define ENQUEUE_STOR_ELEM(idx, elem)			\
 {							\
-	  storElem *qHdr, *fElem;			\
+	  textElem *qHdr, *fElem;			\
 	  qHdr = &freeStorElemQs[idx];			\
 	  STE_FP(elem) = fElem = STE_FP(qHdr);		\
 	  STE_BP(elem) = qHdr;				\
@@ -298,14 +271,14 @@ GBLREF readonly struct
 } NullStruct;
 
 static  uint4  		TwoTable[MAXINDEX + 2];
-static  storElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anchor for dbl-linked
+static  textElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anchor for dbl-linked
 							   list since ptrs not at top of element */
 static	volatile int4	gtaSmDepth;			/* If we get nested... */
 static	boolean_t	gtaSmInitialized;		/* Initialized indicator */
 
 /* Internal prototypes */
 void gtaSmInit(void);
-storElem *gtaFindStorElem(int sizeIndex);
+textElem *gtaFindStorElem(int sizeIndex);
 int getSizeIndex(size_t size);
 
 error_def(ERR_TRNLOGFAIL);
@@ -329,7 +302,7 @@ error_def(ERR_TEXT);
 void gtaSmInit(void)
 {
 	char		*ascNum;
-	storElem	*uStor;
+	textElem	*uStor;
 	int		i, sizeIndex, twoSize;
 
 	/* WARNING!! Since this is early initialization, the assert(s) below are not well behaved if they do
@@ -363,10 +336,10 @@ void gtaSmInit(void)
    new smaller size. If we run out of queues, we obtain a fresh new 'hunk' of
    storage, carve it up into the largest block size we handle and process as
    before. */
-storElem *gtaFindStorElem(int sizeIndex)
+textElem *gtaFindStorElem(int sizeIndex)
 {
 	unsigned char	*uStorAlloc;
-	storElem	*uStor, *uStor2, *qHdr;
+	textElem	*uStor, *uStor2, *qHdr;
 	int		hdrSize;
 
 	++sizeIndex;
@@ -379,21 +352,21 @@ storElem *gtaFindStorElem(int sizeIndex)
                 INCR_CNTR(elemSplits[sizeIndex]);
 		--sizeIndex;					/* Dealing now with smaller element queue */
 		assert(0 <= sizeIndex && MAXINDEX >= sizeIndex);
-		uStor2 = (storElem *)((unsigned long)uStor + TwoTable[sizeIndex]);
-		uStor2->state = Free;
+		uStor2 = (textElem *)((unsigned long)uStor + TwoTable[sizeIndex]);
+		uStor2->state = TextFree;
 		uStor2->queueIndex = sizeIndex;
 		assert(0 == ((unsigned long)uStor2 & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
 		ENQUEUE_STOR_ELEM(sizeIndex, uStor2);		/* Place on free queue */
 	} else
 	{	/* Nothing left to search, [real] allocation must occur */
 		TEXT_ALLOC((size_t)MAXTWO, uStorAlloc);
-		uStor2 = (storElem *)uStorAlloc;
+		uStor2 = (textElem *)uStorAlloc;
 		/* Make addr "MAXTWO" byte aligned */
-		uStor = (storElem *)(((unsigned long)(uStor2) + MAXTWO - 1) & (unsigned long) -MAXTWO);
+		uStor = (textElem *)(((unsigned long)(uStor2) + MAXTWO - 1) & (unsigned long) -MAXTWO);
                 totalRallocGta += MAXTWO;
                 SET_MAX(rAllocMax, totalRallocGta);
 		DEBUGSM(("debuggta: Allocating block at 0x%08lx\n", uStor));
-		uStor->state = Free;
+		uStor->state = TextFree;
 		sizeIndex = MAXINDEX;
 	}
 
@@ -436,7 +409,7 @@ int getSizeIndex(size_t size)
 void *gtm_text_alloc(size_t size)
 {
 	unsigned char	*retVal;
-	storElem 	*uStor, *qHdr;
+	textElem 	*uStor, *qHdr;
 	size_t		tSize;
 	int		sizeIndex, hdrSize;
 	boolean_t	reentered;
@@ -445,7 +418,7 @@ void *gtm_text_alloc(size_t size)
 	   be near the end of this entry point */
 	if (gtaSmInitialized)
 	{
-		hdrSize = OFFSETOF(storElem, userStorage);		/* Size of storElem header */
+		hdrSize = OFFSETOF(textElem, userStorage);		/* Size of textElem header */
 		GTM64_ONLY(if (MAXUINT4 < (size + hdrSize)) GTMASSERT); /* Only deal with < 4GB requests */
 		NON_GTM64_ONLY(if ((size + hdrSize) < size) GTMASSERT); /* Check for wrap with 32 bit platforms */
 		assert(hdrSize < MINTWO);
@@ -480,7 +453,7 @@ void *gtm_text_alloc(size_t size)
 			totalUsedGta += tSize;
 			totalAllocGta += tSize;
 			INCR_CNTR(allocCnt[sizeIndex]);
-			uStor->state = Allocated;
+			uStor->state = TextAllocated;
 			retVal = &uStor->userStorage.userStart;
 			/* Assert we have an appropriate boundary */
 			assert(((long)retVal & (long)IA64_ONLY(-16)NON_IA64_ONLY(-8)) == (long)retVal);
@@ -500,7 +473,7 @@ void *gtm_text_alloc(size_t size)
 /* Release the free storage at the given address */
 void gtm_text_free(void *addr)
 {
-	storElem 	*uStor, *buddyElem;
+	textElem 	*uStor, *buddyElem;
 	int 		sizeIndex, hdrSize, saveIndex;
 	size_t		allocSize;
 
@@ -522,8 +495,8 @@ void gtm_text_free(void *addr)
 	INCR_CNTR(totalFrees);
 	if ((unsigned char *)addr != &NullStruct.nullStr[0])
 	{
-		hdrSize = OFFSETOF(storElem, userStorage);
-		uStor = (storElem *)((unsigned long)addr - hdrSize);		/* Backup ptr to element header */
+		hdrSize = OFFSETOF(textElem, userStorage);
+		uStor = (textElem *)((unsigned long)addr - hdrSize);		/* Backup ptr to element header */
 		sizeIndex = uStor->queueIndex;
 		totalUsedGta -= uStor->realLen;
 		if (sizeIndex >= 0)
@@ -531,18 +504,18 @@ void gtm_text_free(void *addr)
 			assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
 			assert(0 <= sizeIndex && MAXINDEX >= sizeIndex);
 			assert(uStor->realLen == TwoTable[sizeIndex]);
-			uStor->state = Free;
+			uStor->state = TextFree;
 			INCR_CNTR(freeCnt[sizeIndex]);
 			totalAllocGta -= TwoTable[sizeIndex];
 			/* First, if there are larger queues than this one, see if it has a buddy that it can
 			   combine with */
 			while (sizeIndex < MAXINDEX)
 			{
-				buddyElem = (storElem *)((unsigned long)uStor ^ TwoTable[sizeIndex]);/* Address of buddy */
+				buddyElem = (textElem *)((unsigned long)uStor ^ TwoTable[sizeIndex]);/* Address of buddy */
 				assert(0 == ((unsigned long)buddyElem & (TwoTable[sizeIndex] - 1)));/* Verify alignment */
-				assert(Allocated == buddyElem->state || Free == buddyElem->state);
+				assert(TextAllocated == buddyElem->state || TextFree == buddyElem->state);
 				assert(0 <= buddyElem->queueIndex && buddyElem->queueIndex <= sizeIndex);
-				if (Allocated == buddyElem->state || buddyElem->queueIndex != sizeIndex)
+				if (TextAllocated == buddyElem->state || buddyElem->queueIndex != sizeIndex)
 					/* All possible combines done */
 					break;
 
@@ -578,7 +551,7 @@ void gtm_text_free(void *addr)
 */
 void printAllocInfo(void)
 {
-        storElem        *eHdr, *uStor;
+        textElem        *eHdr, *uStor;
         int             i;
 
 	if (0 == totalAllocs)

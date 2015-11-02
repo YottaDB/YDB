@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,18 +62,18 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
 
  	blk_size = cs_data->blk_size;
 	kill_set_ptr->used = 0;
-	memset(kill_set_ptr, 0, sizeof(kill_set));
+	memset(kill_set_ptr, 0, SIZEOF(kill_set));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	old_blk_base = gv_target->hist.h[level].buffaddr;
 	old_blk_sz = ((blk_hdr_ptr_t)(old_blk_base))->bsiz;
-	if (sizeof(blk_hdr) + BSTAR_REC_SIZE != old_blk_sz)
+	if (SIZEOF(blk_hdr) + BSTAR_REC_SIZE != old_blk_sz)
 		return cdb_sc_oprnotneeded;
 	old_blk_base = gv_target->hist.h[level-1].buffaddr;
 	old_blk_sz = ((blk_hdr_ptr_t)(old_blk_base))->bsiz;
-	BLK_ADDR(save_blk, old_blk_sz - sizeof(blk_hdr), unsigned char);
-	memcpy(save_blk, old_blk_base + sizeof(blk_hdr), old_blk_sz - sizeof(blk_hdr));
+	BLK_ADDR(save_blk, old_blk_sz - SIZEOF(blk_hdr), unsigned char);
+	memcpy(save_blk, old_blk_base + SIZEOF(blk_hdr), old_blk_sz - SIZEOF(blk_hdr));
 	BLK_INIT(bs_ptr2, bs_ptr1);
-    	BLK_SEG(bs_ptr2, save_blk, old_blk_sz - sizeof(blk_hdr));
+    	BLK_SEG(bs_ptr2, save_blk, old_blk_sz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr2, bs_ptr1))
 	{
 		assert(t_tries < CDB_STAGNATE);

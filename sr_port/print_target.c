@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ LITDEF char 		spaces[] = "    ";
 void print_target(unsigned char *c)
 {
 	unsigned char	ctemp, *p, *ptop, *ptop1, *ptr, *ptr1, *top, *p_next;
-	unsigned char	buff[MAX_ZWR_KEY_SZ + sizeof("?.0")];
+	unsigned char	buff[MAX_ZWR_KEY_SZ + SIZEOF("?.0")];
 	uint4		ch;
 	boolean_t	bad_sub = FALSE;
 	boolean_t	is_string;
@@ -83,7 +83,7 @@ void print_target(unsigned char *c)
 		top = gvsub2str(ptr, buff, FALSE);
 		if (!is_string && (0x80 != *ptr++) && (KEY_DELIMITER == *ptr))
 		{
-			top = (unsigned char *)(buff + sizeof("?.0"));	/* to allow a bit of garbage, in case it's helpful */
+			top = (unsigned char *)(buff + SIZEOF("?.0"));	/* to allow a bit of garbage, in case it's helpful */
 			*top++ = '*';					/* to keep the garbage short and identified as garbage */
 		}
 		*top = 0;

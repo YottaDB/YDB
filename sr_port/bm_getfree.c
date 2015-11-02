@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -186,7 +186,7 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 		}
 		if (offset < map_size)
 		{
-			free_bit = bm_find_blk(offset, (sm_uc_ptr_t)bmp + sizeof(blk_hdr), map_size, blk_used);
+			free_bit = bm_find_blk(offset, (sm_uc_ptr_t)bmp + SIZEOF(blk_hdr), map_size, blk_used);
 			if (MAP_RD_FAIL == free_bit)
 				return MAP_RD_FAIL;
 		} else
@@ -215,7 +215,7 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 		*b_ptr = free_bit;
 	} else
 	{
-		space_needed = (BLKS_PER_LMAP + 1) * sizeof(block_id);
+		space_needed = (BLKS_PER_LMAP + 1) * SIZEOF(block_id);
 		if (dollar_tlevel)
 		{
 			ENSURE_UPDATE_ARRAY_SPACE(space_needed);	/* have brackets for "if" for macros */
@@ -271,7 +271,7 @@ boolean_t	is_free_blks_ctr_ok(void)
 		maxbitsthismap = (free_bml != (local_maps - 1)) ? BLKS_PER_LMAP : total_blks - bml;
 		for (free_bit = 0; free_bit < maxbitsthismap; free_bit++)
 		{
-			free_bit = bm_find_blk(free_bit, (sm_uc_ptr_t)bmp + sizeof(blk_hdr), maxbitsthismap, &blk_used);
+			free_bit = bm_find_blk(free_bit, (sm_uc_ptr_t)bmp + SIZEOF(blk_hdr), maxbitsthismap, &blk_used);
 			assert(NO_FREE_SPACE <= free_bit);
 			if (0 > free_bit)
 				break;

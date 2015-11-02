@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,10 @@
 #define	LCT_PREFIX			"$gtm_local_collate"
 #define	LCT_STDNULL			"$gtm_lct_stdnull"
 
+/* GTM processing versus M standard */
+/* (see gtm_local_collate above) */
+#define GTM_STDXKILL			"$gtm_stdxkill"
+
 /* Miscellaneous */
 #define	GTM_DEBUG_LEVEL_ENVLOG		"$gtmdbglvl"
 #define	GTM_PRINCIPAL			"$gtm_principal"
@@ -72,6 +76,7 @@
 /* Database */
 #define	GTM_TMP_ENV			"$gtm_tmp"
 #define	GTM_SHMFLAGS			"$gtm_shmatflags"
+#define GTM_TRIGGER_ETRAP		"$gtm_trigger_etrap"
 
 /* Replication */
 #define	GTM_REPL_INSTANCE		"$gtm_repl_instance"

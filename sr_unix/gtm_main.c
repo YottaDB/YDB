@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,10 +48,14 @@
 #define GTM_PASSWD "gtm_passwd"
 #endif
 
-GBLREF enum gtmImageTypes	image_type;
-GBLREF IN_PARMS			*cli_lex_in_ptr;
-GBLREF char			cli_token_buf[];
-GBLREF char			cli_err_str[];
+GBLREF	enum gtmImageTypes		image_type;
+GBLREF	IN_PARMS			*cli_lex_in_ptr;
+GBLREF	char				cli_token_buf[];
+GBLREF	char				cli_err_str[];
+GBLREF	CLI_ENTRY			mumps_cmd_ary[];
+GTMTRIG_DBG_ONLY(GBLREF	ch_ret_type	(*ch_at_trigger_init)();)
+
+GBLDEF	CLI_ENTRY			*cmd_ary = &mumps_cmd_ary[0]; /* Define cmd_ary to be the MUMPS specific cmd table */
 
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -82,6 +86,7 @@ int gtm_main (int argc, char **argv, char **envp)
 
 	gtmenvp = envp;
 	image_type = GTM_IMAGE;
+	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(stop_image_conditional_core);

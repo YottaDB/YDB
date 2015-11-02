@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_WCBLOCKED);
 	error_def(ERR_CRYPTNOV4);
-
+	error_def(ERR_SNAPSHOTNOV4);
 	assert(reg->open);
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
@@ -73,6 +73,14 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_CRYPTNOV4, 2, DB_LEN_STR(reg));
 			return ERR_CRYPTNOV4;
+		}
+	)
+	GTM_SNAPSHOT_ONLY(
+		/* We don't allow databases to be downgraded when snapshots are in progress */
+		if (SNAPSHOTS_IN_PROG(csa->nl) && (GDSV4 == new_db_format))
+		{
+			gtm_putmsg(VARLSTCNT(5) ERR_SNAPSHOTNOV4, 3, csa->nl->num_snapshots_in_effect, DB_LEN_STR(reg));
+			return ERR_SNAPSHOTNOV4;
 		}
 	)
 	was_crit = csa->now_crit;
@@ -168,7 +176,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		}
 		save_inctn_opcode = inctn_opcode;
 		inctn_opcode = inctn_db_format_change;
-		inctn_detail.blks_to_upgrd_delta = csd->blks_to_upgrd;
+		inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta = csd->blks_to_upgrd;
 		if (0 == jpc->pini_addr)
 			jnl_put_jrt_pini(csa);
 		jnl_write_inctn_rec(csa);

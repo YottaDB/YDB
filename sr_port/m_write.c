@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ GBLREF spdesc stringpool;
 GBLREF bool devctlexp;
 
 #define STO_LLPTR(X) (llptr ? *++llptr = (X) : 0)
-#define LITLST_TOP (&litlst[(sizeof(litlst) / sizeof(triple *)) - 2])
+#define LITLST_TOP (&litlst[(SIZEOF(litlst) / SIZEOF(triple *)) - 2])
 int m_write(void)
 {
 	error_def(ERR_STRINGOFLOW);

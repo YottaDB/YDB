@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ void dec_err(uint4 argcnt, ...)
 		em = ec->fst_msg + j - 1;
 	}
 	msgstr.addr = msgbuff;
-	msgstr.len = sizeof(msgbuff);
+	msgstr.len = SIZEOF(msgbuff);
 	gtm_getmsg(err, &msgstr);
 
 	if (!em)

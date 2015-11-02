@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,8 @@ void base_frame(rhdtyp *base_address)
 {
 	void		gtm_ret_code();	/* This is an external which points to code without an entry mask */
 	unsigned char	*msp_save;
+	stack_frame	*fp;
+
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 
@@ -36,7 +38,7 @@ void base_frame(rhdtyp *base_address)
 #endif /* GTM64 */
 
 	msp_save = msp;
-	msp -= sizeof(stack_frame) + sizeof (stack_frame *);
+	msp -= SIZEOF(stack_frame) + SIZEOF(stack_frame *);
    	if (msp <= stackwarn)
    	{
 		if (msp <= stacktop)
@@ -48,13 +50,13 @@ void base_frame(rhdtyp *base_address)
    			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
    	}
 	*(stack_frame **)((stack_frame *)msp + 1) = frame_pointer;
-	frame_pointer = (stack_frame *)msp;
-	memset(frame_pointer, 0, sizeof(stack_frame));
-	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
-	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
-	frame_pointer->rvector = base_address;
-	frame_pointer->temps_ptr = (unsigned char *)frame_pointer;
-	frame_pointer->vartab_len = 0;
-	frame_pointer->vartab_ptr = (char *)frame_pointer;
-	frame_pointer->type = SFT_COUNT;
+	frame_pointer = fp = (stack_frame *)msp;
+	memset(fp, 0, SIZEOF(stack_frame));
+	fp->ctxt = GTM_CONTEXT(gtm_ret_code);
+	fp->mpc = CODE_ADDRESS(gtm_ret_code);
+	fp->rvector = base_address;
+	fp->temps_ptr = (unsigned char *)fp;
+	fp->vartab_len = 0;
+	fp->vartab_ptr = (char *)fp;
+	fp->type = SFT_COUNT;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,8 +48,8 @@ io_log_name *get_log_name(mstr *v, bool insert)
         if (insert == INSERT)
         {
                 assert(prev != 0);
-                new =(io_log_name *) malloc(sizeof(*new) + v_len);
-                memset(new, 0, sizeof(*new) - 1);
+                new =(io_log_name *) malloc(SIZEOF(*new) + v_len);
+                memset(new, 0, SIZEOF(*new) - 1);
                 new->len = v_len;
                 memcpy(new->dollar_io, buf, v_len);
 		new->dollar_io[v_len] = 0;

@@ -23,9 +23,9 @@ void bt_malloc(sgmnt_addrs *csa)
 
 	csd = csa->hdr;
 	/* check that the file header is quad word aligned */
-	if ((-(sizeof(uint4) * 2) & (sm_long_t)csd) != (sm_long_t)csd)
+	if ((-(SIZEOF(uint4) * 2) & (sm_long_t)csd) != (sm_long_t)csd)
 		GTMASSERT;
-	if ((-(sizeof(uint4) * 2) & SIZEOF_FILE_HDR(csd)) != SIZEOF_FILE_HDR(csd))
+	if ((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR(csd)) != SIZEOF_FILE_HDR(csd))
 		GTMASSERT;
 	csa->nl->bt_header_off = (n = (uint4)(SIZEOF_FILE_HDR(csd)));
 	csa->nl->th_base_off = (n += csd->bt_buckets * SIZEOF(bt_rec));	/* hash table */

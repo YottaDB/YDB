@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,7 +109,7 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_rmisalign;
 		}
-		GET_LONG(blk, ((sm_int_ptr_t)((sm_uc_ptr_t)rp + rec_size - sizeof(block_id))));
+		GET_LONG(blk, ((sm_int_ptr_t)((sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id))));
 		new->tn = cs_addrs->ti->curr_tn;
 		new->cse = NULL;
 		if (NULL == (buffer_address = t_qread(blk, &new->cycle, &new->cr)))
@@ -122,8 +122,8 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 		new->prev_rec.match = 0;
 		new->prev_rec.offset = 0;
 		new->curr_rec.match = 0;
-		new->curr_rec.offset = sizeof(blk_hdr);
-		rp = (rec_hdr_ptr_t)(buffer_address + sizeof(blk_hdr));
+		new->curr_rec.offset = SIZEOF(blk_hdr);
+		rp = (rec_hdr_ptr_t)(buffer_address + SIZEOF(blk_hdr));
 	}
 	return cdb_sc_normal;
 }

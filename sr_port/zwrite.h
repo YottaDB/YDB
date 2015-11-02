@@ -23,7 +23,7 @@
 
 #define ZWR_HTAB_INIT_SIZE  16		/* Initial # elems in ZWR addr hash table */
 /* Number of entries in zwr_zav_blk */
-#define ZWR_ZAV_BLK_CNT	    ((GTM64_ONLY(256)NON_GTM64_ONLY(128) - sizeof(storElem) - sizeof(zwr_zav_blk)) / sizeof(zwr_alias_var))
+#define ZWR_ZAV_BLK_CNT	    ((GTM64_ONLY(256)NON_GTM64_ONLY(128) - SIZEOF(storElem) - SIZEOF(zwr_zav_blk)) / SIZEOF(zwr_alias_var))
 
 #include "hashtab_addr.h"
 #include "lv_val.h"

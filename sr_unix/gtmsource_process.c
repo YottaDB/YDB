@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,7 @@
 #include "gtmmsg.h"
 #include "repl_sem.h"
 #include "gtm_zlib.h"
+#include "repl_sort_tr_buff.h"
 
 #define MAX_HEXDUMP_CHARS_PER_LINE	26 /* 2 characters per byte + space, 80 column assumed */
 
@@ -111,10 +112,14 @@ GBLREF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	boolean_t		null_subs_xform;
 GBLREF	boolean_t 		primary_side_std_null_coll;
+GBLREF	boolean_t		primary_side_trigger_support;
 GBLREF	boolean_t 		secondary_side_std_null_coll;
 GBLREF	seq_num			lastlog_seqno;
 GBLREF	uint4			log_interval;
 GBLREF	qw_num			trans_sent_cnt, last_log_tr_sent_cnt;
+GBLREF	boolean_t		trig_replic_warning_issued;
+GBLREF	boolean_t		secondary_side_trigger_support;
+GBLREF	seq_num			trig_replic_suspect_seqno;
 
 /* The work-horse of the Source Server */
 int gtmsource_process(void)
@@ -168,9 +173,10 @@ int gtmsource_process(void)
 	error_def(ERR_REPLINSTNOHIST);
 	error_def(ERR_REPLRECFMT);
 	error_def(ERR_REPLUPGRADESEC);
+	error_def(ERR_TRIG2NOTRIG);
 	error_def(ERR_TEXT);
 
-	assert(REPL_MSG_HDRLEN == sizeof(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
+	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
 								* a single attempt */
 	jctl = jnlpool.jnlpool_ctl;
 	gtmsource_local = jnlpool.gtmsource_local;
@@ -264,7 +270,7 @@ int gtmsource_process(void)
 					continue;
 				} else
 				{
-					SNPRINTF(err_string, sizeof(err_string),
+					SNPRINTF(err_string, SIZEOF(err_string),
 							"Error receiving RESTART SEQNO. Error in recv : %s", STRERROR(status));
 					rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
 				}
@@ -279,12 +285,12 @@ int gtmsource_process(void)
 					gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 					continue;
 				}
-				SNPRINTF(err_string, sizeof(err_string), "Error sending XOFF_ACK_ME message. Error in send : %s",
+				SNPRINTF(err_string, SIZEOF(err_string), "Error sending XOFF_ACK_ME message. Error in send : %s",
 						STRERROR(status));
 				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
 			} else if (EREPL_SELECT == repl_errno)
 			{
-				SNPRINTF(err_string, sizeof(err_string), "Error receiving RESTART SEQNO/sending XOFF_ACK_ME.  "
+				SNPRINTF(err_string, SIZEOF(err_string), "Error receiving RESTART SEQNO/sending XOFF_ACK_ME.  "
 						"Error in select : %s", STRERROR(status));
 				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
 			}
@@ -428,7 +434,7 @@ int gtmsource_process(void)
 						 */
 						instnohist_msg.type = REPL_INST_NOHIST;
 						instnohist_msg.len = MIN_REPL_MSGLEN;
-						memset(&instnohist_msg.msg[0], 0, sizeof(instnohist_msg.msg));
+						memset(&instnohist_msg.msg[0], 0, SIZEOF(instnohist_msg.msg));
 						gtmsource_repl_send((repl_msg_ptr_t)&instnohist_msg, "REPL_INST_NOHIST", MAX_SEQNO);
 						repl_log(gtmsource_log_fp, TRUE, TRUE,
 						       "Connection reset due to above REPLINSTNOHIST error\n");
@@ -445,7 +451,7 @@ int gtmsource_process(void)
 		}
 		QWASSIGN(sav_read_jnl_seqno, gtmsource_local->read_jnl_seqno);
 		reply_msgp = (repl_start_reply_msg_ptr_t)gtmsource_msgp;
-		memset(reply_msgp, 0, sizeof(*reply_msgp)); /* to identify older releases in the future */
+		memset(reply_msgp, 0, SIZEOF(*reply_msgp)); /* to identify older releases in the future */
 		reply_msgp->len = MIN_REPL_MSGLEN;
 		reply_msgp->proto_ver = REPL_PROTO_VER_THIS;
 		reply_msgp->node_endianness = NODE_ENDIANNESS;
@@ -476,6 +482,10 @@ int gtmsource_process(void)
 				reply_msgp->type = REPL_WILL_RESTART_WITH_INFO;
 				reply_msgp->jnl_ver = jnl_ver;
 				temp_ulong = (0 == primary_side_std_null_coll) ?  START_FLAG_NONE : START_FLAG_COLL_M;
+				GTMTRIG_ONLY(
+					assert(primary_side_trigger_support);
+					temp_ulong |= START_FLAG_TRIGGER_SUPPORT;
+				)
 				PUT_ULONG(reply_msgp->start_flags, temp_ulong);
 				recvd_start_flags = START_FLAG_NONE;
 				gtmsource_repl_send((repl_msg_ptr_t)reply_msgp, "REPL_WILL_RESTART_WITH_INFO", resync_seqno);
@@ -697,24 +707,22 @@ int gtmsource_process(void)
 				"First triple written by update process. Source server proceeding.\n");
 		}
 		gtmsource_init_heartbeat();
-		if (jnl_ver > remote_jnl_ver && IF_NONE != repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
-									       [remote_jnl_ver - JNL_VER_EARLIEST_REPL])
+		/* Check if internal filters need to be activated for this secondary. This is definitely needed if
+		 * journal version is different between the two sides. In addition, if the versions are the same,
+		 * and triggers are supported, then we again need it because we do not want to replicate updates
+		 * that happened inside of trigger if the secondary also supports triggers.
+		 */
+		if (GTMTRIG_ONLY(jnl_ver >= remote_jnl_ver) NON_GTMTRIG_ONLY(jnl_ver > remote_jnl_ver)
+			&& (IF_NONE != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]))
 		{
-			assert(IF_INVALID != repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
-								 [remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
-			assert(IF_INVALID != repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
-								 [jnl_ver - JNL_VER_EARLIEST_REPL]);
+			assert(IF_INVALID != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
+			assert(IF_INVALID != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 			/* reverse transformation should exist */
-			assert(IF_NONE != repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
-							      [jnl_ver - JNL_VER_EARLIEST_REPL]);
+			assert(IF_NONE != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 			if (FALSE != (null_subs_xform = (primary_side_std_null_coll   && !secondary_side_std_null_coll ||
 					secondary_side_std_null_coll && !primary_side_std_null_coll)))
 				null_subs_xform = (primary_side_std_null_coll ?
 							STDNULL_TO_GTMNULL_COLL : GTMNULL_TO_STDNULL_COLL);
-			/* note that if jnl_ver == remote_jnl_ver and jnl_ver > V15_JNL_VER, the two sides may be running
-			 * different null collation. However, we leave the overhead of null collation transformation to
-			 * the receiver as source server is generally more loaded than the receiver.
-			 */
 			gtmsource_filter |= INTERNAL_FILTER;
 			gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
 		} else
@@ -981,14 +989,14 @@ int gtmsource_process(void)
 						break;
 					} else
 					{
-						SNPRINTF(err_string, sizeof(err_string),
+						SNPRINTF(err_string, SIZEOF(err_string),
 								"Error receiving Control message from Receiver. Error in recv : %s",
 								STRERROR(status));
 						rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
 					}
 				} else if (EREPL_SELECT == repl_errno)
 				{
-					SNPRINTF(err_string, sizeof(err_string),
+					SNPRINTF(err_string, SIZEOF(err_string),
 							"Error receiving Control message from Receiver. Error in select : %s",
 							STRERROR(status));
 					rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
@@ -1041,6 +1049,20 @@ int gtmsource_process(void)
 					{
 						assert(tot_tr_len == data_len + REPL_MSG_HDRLEN); /* only ONE transaction read */
 						QWSUBDW(filter_seqno, post_read_seqno, 1);
+						/* External filters routines (jnl2ext) combine multi-region TP transactions into
+						 * a single region TP transaction. By doing so, the update_num will no longer be
+						 * sorted within a region. This property is relied upon by the receiver server.
+						 * Hence sort the journal buffer before passing it on to external filters. Since
+						 * the journal records will be in a sorted order when consumed by the receiver side,
+						 * no sorting will happen in the receiver server. As long as the current journal
+						 * version is greater or equal to V19, the journal records will have update num
+						 * and they need to be sorted.
+						 */
+						if (V19_JNL_VER <= jnl_ver)
+						{
+							repl_sort_tr_buff(gtmsource_msgp->msg, data_len);
+							DBG_VERIFY_TR_BUFF_SORTED(gtmsource_msgp->msg, data_len);
+						}
 						if (SS_NORMAL != (status = repl_filter(filter_seqno, gtmsource_msgp->msg, &data_len,
 									     	       gtmsource_msgbufsiz)))
 							repl_filter_error(filter_seqno, status);
@@ -1055,11 +1077,9 @@ int gtmsource_process(void)
 						out_buff = repl_filter_buff + REPL_MSG_HDRLEN;
 						out_bufsiz = repl_filter_bufsiz - REPL_MSG_HDRLEN;
 						tot_out_size = 0;
-					     	while ((status =
-							repl_internal_filter[jnl_ver - JNL_VER_EARLIEST_REPL]
-									    [remote_jnl_ver - JNL_VER_EARLIEST_REPL](
-								in_buff, &in_size, out_buff, &out_size, out_bufsiz)) != SS_NORMAL &&
-						       EREPL_INTLFILTER_NOSPC == repl_errno)
+					     	while ((status = repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL](
+								in_buff, &in_size, out_buff, &out_size, out_bufsiz)) != SS_NORMAL
+							&& (EREPL_INTLFILTER_NOSPC == repl_errno))
 						{
 							save_filter_buff = repl_filter_buff;
 							gtmsource_alloc_filter_buff(repl_filter_bufsiz + (repl_filter_bufsiz >> 1));
@@ -1075,6 +1095,26 @@ int gtmsource_process(void)
 							data_len = tot_out_size + out_size;
 							tot_tr_len = data_len + REPL_MSG_HDRLEN;
 							send_msgp = (repl_msg_ptr_t)repl_filter_buff;
+#							ifdef GTM_TRIGGER
+							if (!secondary_side_trigger_support
+								&& !trig_replic_warning_issued
+								&& QWNE(trig_replic_suspect_seqno, seq_num_zero))
+							{
+								/* Note: The below repl_log text is copied from TRIG2NOTRIG
+								 * error message content from merrors.msg. Change to one
+								 * should be reflect in another
+								 */
+								repl_log(gtmsource_log_fp, TRUE, TRUE,
+								"Warning: Sending transaction sequence number %d which used "
+								"triggers to a replicator that does not support triggers",
+								trig_replic_suspect_seqno);
+								send_msg(VARLSTCNT(3) ERR_TRIG2NOTRIG, 1,
+										&trig_replic_suspect_seqno);
+								/* No more warnings till restart */
+								trig_replic_warning_issued = TRUE;
+								QWASSIGN(trig_replic_suspect_seqno, seq_num_zero);
+							}
+#							endif
 						} else
 						{
 							if (EREPL_INTLFILTER_BADREC == repl_errno)
@@ -1209,14 +1249,14 @@ int gtmsource_process(void)
 						}
 						if (EREPL_SEND == repl_errno)
 						{
-							SNPRINTF(err_string, sizeof(err_string),
+							SNPRINTF(err_string, SIZEOF(err_string),
 								"Error sending DATA. Error in send : %s", STRERROR(status));
 							rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 								  RTS_ERROR_STRING(err_string));
 						}
 						if (EREPL_SELECT == repl_errno)
 						{
-							SNPRINTF(err_string, sizeof(err_string),
+							SNPRINTF(err_string, SIZEOF(err_string),
 								"Error sending DATA. Error in select : %s", STRERROR(status));
 							rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 								  RTS_ERROR_STRING(err_string));

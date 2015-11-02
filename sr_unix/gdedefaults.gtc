@@ -1,0 +1,5 @@
+template -segment -access_method=mm -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000
+template -segment -access_method=bg -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000
+template -region -stdnull -key_size=255 -record_size=4080 -journal=before
+change -segment DEFAULT  -block_size=4096 -allocation=5000 -extension=10000 -global_buffer_count=1000 -file_name=$gtmdir/$gtmver/g/gtm.dat
+change -region DEFAULT -stdnull -key_size=255 -record_size=4080 -journal=(before,file="$gtmdir/$gtmver/g/gtm.mjl")

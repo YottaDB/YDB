@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef __UNW_RETARG_H__
 #define __UNW_RETARG_H__
 
-int unw_retarg(mval *src);
+int unw_retarg(mval *src, boolean_t alias_return);
 
 #endif

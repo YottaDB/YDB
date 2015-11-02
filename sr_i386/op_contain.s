@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -45,20 +45,24 @@ ENTRY op_contain
 	movl	%edx, sav_edx(%ebp)
 	mv_force_str %edx, l4
 
-	subl	$4, %esp
+	pushl	$1			# pieces argument but have to pass its addr
+	movl	%esp, %edx
+	subl	$4, %esp		# returned value
 	movl	%esp, %eax
-	pushl	%eax
+	pushl	%edx			# parm 6
+	pushl	%eax			# parm 5
 	movl	sav_eax(%ebp), %eax
 	movl	sav_edx(%ebp), %edx
-	pushl	mval_a_straddr(%eax)
+	pushl	mval_a_straddr(%eax)	# parm 4
 	movl	mval_l_strlen(%eax), %eax
-	pushl	%eax
-	pushl	mval_a_straddr(%edx)
+	pushl	%eax			# parm 3
+	pushl	mval_a_straddr(%edx)	# parm 2
 	movl	mval_l_strlen(%edx), %eax
-	pushl	%eax
+	pushl	%eax			# parm 1
 	call	matchc
-	leal	20(%esp), %esp
-	popl	%eax
+	leal	24(%esp), %esp		# remove args
+	popl	%eax			# return value
+	popl	%edx			# updated pieces value (ignored)
 	cmpl	$0, %eax
 
 	popl	%ebx

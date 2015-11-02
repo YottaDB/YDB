@@ -78,14 +78,14 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 				assert(MV_SYM == tbl->sym->ident);
 				start->ptrs.val_ent.children = (lv_sbs_tbl *)lv_getslot(tbl->sym);
 				tbl = start->ptrs.val_ent.children;
-				memset(tbl, 0, sizeof(lv_sbs_tbl));
+				memset(tbl, 0, SIZEOF(lv_sbs_tbl));
 				tbl->sym = start->ptrs.val_ent.parent.sbs->sym;
 			} else
 			{	assert(MV_SYM == tbl->ident);
 				assert(MV_SYM == start->ptrs.val_ent.parent.sym->ident);
 				start->ptrs.val_ent.children = (lv_sbs_tbl *)lv_getslot(start->ptrs.val_ent.parent.sym);
 				tbl = start->ptrs.val_ent.children;
-				memset(tbl, 0, sizeof(lv_sbs_tbl));
+				memset(tbl, 0, SIZEOF(lv_sbs_tbl));
 				tbl->sym = start->ptrs.val_ent.parent.sym;
 			}
 			tbl->lv = start;
@@ -133,10 +133,10 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 					if (temp >= 0 && temp < SBS_NUM_INT_ELE)
 					{
 						tbl->int_flag = TRUE;
-						memset(&blk->ptr, 0, sizeof(blk->ptr));
+						memset(&blk->ptr, 0, SIZEOF(blk->ptr));
 						blk->cnt = 1;
 						lv = blk->ptr.lv[temp] = lv_getslot(tbl->sym);
-						memset(lv, 0, sizeof(lv_val));
+						memset(lv, 0, SIZEOF(lv_val));
 						lv->ptrs.val_ent.parent.sbs = tbl;
 					}
 				}
@@ -147,7 +147,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 					if (!(lv = blk->ptr.lv[temp]))
 					{
 						lv = blk->ptr.lv[temp] = lv_getslot(tbl->sym);
-						memset(lv, 0, sizeof(lv_val));
+						memset(lv, 0, SIZEOF(lv_val));
 						lv->ptrs.val_ent.parent.sbs = tbl;
 						blk->cnt++;
 					}

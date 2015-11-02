@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,11 +56,11 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 		rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
 	}
 	CM_GET_SHORT(msglen, bufptr, li->convert_byteorder);
-	bufptr += sizeof(short);
+	bufptr += SIZEOF(short);
 	CM_GET_LONG(SIGNAL, bufptr, li->convert_byteorder);
-	bufptr += sizeof(SIGNAL);
+	bufptr += SIZEOF(SIGNAL);
 	CM_GET_LONG(SEVERITY, bufptr, li->convert_byteorder);
-	bufptr += sizeof(SEVERITY);
+	bufptr += SIZEOF(SEVERITY);
 
 	memcpy(util_outptr, bufptr, msglen);
 	util_outptr += msglen;
@@ -79,7 +79,7 @@ void gvcmz_errmsg(struct CLB *c, bool close)
 			break;
 		}
 		CM_GET_SHORT(msglen, bufptr, li->convert_byteorder);
-		bufptr += sizeof(short);
+		bufptr += SIZEOF(short);
 		memcpy(util_outptr, bufptr, msglen);
 		util_outptr += msglen;
 	}

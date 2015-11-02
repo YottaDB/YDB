@@ -37,7 +37,7 @@ void ztrap_form_init(void)
 	ztrap_form = ZTRAP_CODE;	/* default */
 	val.addr = ZTRAP_FORM;
 	val.len = STR_LIT_LEN(ZTRAP_FORM);
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
 	{
 		if (STR_LIT_LEN(ZTRAP_FORM_POP) < tn.len && !STRNCASECMP(buf_ptr, ZTRAP_FORM_POP, STR_LIT_LEN(ZTRAP_FORM_POP)))
 		{
@@ -55,7 +55,7 @@ void ztrap_form_init(void)
 	{
 #		ifdef UNIX
 		if (SS_LOG2LONG == status)
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, sizeof(buf) - 1);
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf) - 1);
 		else
 #		endif
 			rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZTRAP_FORM), status);

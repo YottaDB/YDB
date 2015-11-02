@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,20 +19,31 @@
 
 #define	COMMAND			"MUMPS "
 
-GBLREF	char	cli_err_str[];
+GBLREF	char		cli_err_str[];
+GBLREF	CLI_ENTRY	*cmd_ary;
+GBLREF	CLI_ENTRY	mumps_cmd_ary[];
 
 void zl_cmd_qlf (mstr *quals, command_qualifier *qualif)
 {
 	char		cbuf[MAX_LINE];
-	error_def	(ERR_COMPILEQUALS);
 	int		parse_ret;
+	CLI_ENTRY	*save_cmd_ary;
 
-	if (quals->len + sizeof(COMMAND) > MAX_LINE)
+	error_def	(ERR_COMPILEQUALS);
+
+	if (quals->len + SIZEOF(COMMAND) > MAX_LINE)
 		rts_error(VARLSTCNT(4) ERR_COMPILEQUALS, 2, quals->len, quals->addr);
 
-	memcpy(cbuf, COMMAND, sizeof(COMMAND) - 1);
-	memcpy(cbuf + sizeof(COMMAND) -1, quals->addr, quals->len);
-	cbuf[sizeof(COMMAND) - 1 + quals->len] = 0;
+	MEMCPY_LIT(cbuf, COMMAND);
+	memcpy(cbuf + SIZEOF(COMMAND) -1, quals->addr, quals->len);
+	cbuf[SIZEOF(COMMAND) - 1 + quals->len] = 0;
+	/* The caller of this function could be GT.M, DSE, MUPIP, GTCM GNP server, GTCM OMI server etc. Most of them have their
+	 * own command parsing tables and some dont even have one. Nevertheless, we need to parse the string as if it was a
+	 * MUMPS compilation command. So we switch temporarily to the MUMPS parsing table "mumps_cmd_ary".
+	 * TODO: What to do in case of errors in between the save and restore. Does it really matter if cmd_ary is not restored?
+	 */
+	save_cmd_ary = cmd_ary;
+	cmd_ary = &mumps_cmd_ary[0];
 	cli_str_setup((SIZEOF(COMMAND) + quals->len), cbuf);
 	parse_ret = parse_cmd();
 	if (parse_ret)
@@ -40,4 +51,5 @@ void zl_cmd_qlf (mstr *quals, command_qualifier *qualif)
 
 	qualif->object_file.mvtype = qualif->list_file.mvtype = qualif->ceprep_file.mvtype = 0;
 	get_cmd_qlf (qualif);
+	cmd_ary = save_cmd_ary;	/* restore cmd_ary */
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ void comp_lits(rhdtyp *rhead)
 		if (p->rt_addr < 0)
 		{
 			p->rt_addr = offset;
-			offset += sizeof(mval);
+			offset += SIZEOF(mval);
 		}
 	lits_mval_size = UINTCAST(offset);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,9 +120,9 @@ short iomt_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 #endif
 	ioptr = dev_name->iod;
 	buff = 0;
-	memset(&newmt, 0, sizeof(newmt));	/* zero structure to start */
+	memset(&newmt, 0, SIZEOF(newmt));	/* zero structure to start */
 	if (ioptr->state == dev_never_opened)
-		ioptr->dev_sp = (void *)(malloc(sizeof(d_mt_struct)));
+		ioptr->dev_sp = (void *)(malloc(SIZEOF(d_mt_struct)));
 	mt = (d_mt_struct *)dev_name->iod->dev_sp;
 	if (ioptr->state == dev_open && mt->buffer)
 	{

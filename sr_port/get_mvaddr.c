@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ mvar *get_mvaddr(mident *var_name)
 	(*p)->mvidx = mvmax++;
 	(*p)->lson = (*p)->rson = NULL;
 	(*p)->last_fetch = NULL;
-	px = (mvax *)mcalloc(sizeof(mvax));
+	px = (mvax *)mcalloc(SIZEOF(mvax));
 	px->var = *p;
 	px->last = px->next = 0;
 	px->mvidx = (*p)->mvidx;

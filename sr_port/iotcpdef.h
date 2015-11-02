@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@
 #define TCP_WRITE		1
 #define TCP_READ		2
 
-#define SA_MAXLEN		32   /* sizeof(123.567.901.345,78901) */
+#define SA_MAXLEN		32   /* SIZEOF(123.567.901.345,78901) */
 #define SA_MAXLITLEN		128  /* maximun size of beowulf.sanchez.com */
 #define DD_BUFLEN		80
 

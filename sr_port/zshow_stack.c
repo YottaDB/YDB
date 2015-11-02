@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,18 @@ void zshow_stack(zshow_out *output)
 	flush_pio();
 	nfp = &nocount_frames[0];
 	line_reset = FALSE;
-	for (fp = frame_pointer; fp->old_frame_pointer; fp = fp->old_frame_pointer)
+	for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
 	{
+		if (NULL == fp->old_frame_pointer)
+		{	/* This frame is a base frame - endpoint or jump it? */
+#		ifdef GTM_TRIGGER
+			if (fp->type & SFT_TRIGR)
+				/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
+				fp = *(stack_frame **)(fp + 1);
+			else
+#		endif
+				break;	/* Endpoint.. */
+		}
 		if (!(fp->type & SFT_COUNT) || (fp->type & SFT_ZINTR))
 		{
 			*nfp++ = fp->type;
@@ -71,7 +81,7 @@ void zshow_stack(zshow_out *output)
 			if (v.len == 0)
 			{
 				MEMCPY_LIT(&buff[0], UNK_LOC_MESS);
-				v.len = sizeof(UNK_LOC_MESS) - 1;
+				v.len = SIZEOF(UNK_LOC_MESS) - 1;
 			}
 			if (nfp != &nocount_frames[0])
 			{

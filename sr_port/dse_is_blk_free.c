@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ bool dse_is_blk_free (block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr)
 	if(!(bp = t_qread (index, cycle, cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 
-	status = dse_lm_blk_free(offset * BML_BITS_PER_BLK, bp + sizeof(blk_hdr));
+	status = dse_lm_blk_free(offset * BML_BITS_PER_BLK, bp + SIZEOF(blk_hdr));
 	if (0 == status)	/* status == 00 => blk is busy */
 		return FALSE;
 	else 			/* status == 01 and 11 => blk is free.

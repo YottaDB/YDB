@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@
 GBLREF spdesc stringpool;
 
 #define GTCM_ENVVAR_PFX "GTCM_"
-#define GTCM_ENVVAR_PFXLEN (sizeof(GTCM_ENVVAR_PFX) - 1)
+#define GTCM_ENVVAR_PFXLEN (SIZEOF(GTCM_ENVVAR_PFX) - 1)
 
 #ifdef VMS
 void gvcmy_open(gd_region *reg, struct NAM *nb)
@@ -83,8 +83,8 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	node.dsc$w_length = nb->nam$b_node - 2;
 	node.dsc$a_pointer = nb->nam$l_node;
 	task1.addr = "GTCMSVRNAM";
-	task1.len = sizeof("GTCMSVRNAM") - 1;
-	status = TRANS_LOG_NAME(&task1, &task2, (char *)buff, sizeof(buff), dont_sendmsg_on_log2long);
+	task1.len = SIZEOF("GTCMSVRNAM") - 1;
+	status = TRANS_LOG_NAME(&task1, &task2, (char *)buff, SIZEOF(buff), dont_sendmsg_on_log2long);
 #elif defined(UNIX)
 	if (!pb->b_node)
 		rts_error(VARLSTCNT(1) ERR_INVNETFILNM);
@@ -121,7 +121,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		{
 #			ifdef UNIX
 			if (SS_LOG2LONG == status)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, sizeof(buff) - 1);
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, SIZEOF(buff) - 1);
 			else
 #			endif
 				rts_error(VARLSTCNT(1) status);
@@ -146,8 +146,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		len = (int)(top - fn + 2 + S_HDRSIZE);
 		if (len <  CM_MINBUFSIZE)
 			len = CM_MINBUFSIZE;
-		if (stringpool.top - stringpool.free < len)
-			stp_gcol(len);
+		ENSURE_STP_FREE_SPACE(len);
 		clb_ptr->mbf = stringpool.free;
 		clb_ptr->mbl = len;
 	}
@@ -157,7 +156,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	ptr = clb_ptr->mbf + 1;
 	temp_short = top - fn;
 	CM_PUT_SHORT(ptr, temp_short, li->convert_byteorder);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	memcpy(ptr, fn, top - fn);
 	status = cmi_write(clb_ptr);
 	if (CMI_ERROR(status))
@@ -187,7 +186,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	reg->cmx_regnum = *ptr++;
 	reg->null_subs = *ptr++;
 	CM_GET_SHORT(reg->max_rec_size, ptr, li->convert_byteorder);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	if (reg->max_rec_size + CM_BUFFER_OVERHEAD > li->buffer_size)
 	{
 		if (li->buffered_count)
@@ -205,7 +204,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		li->buffer_size = reg->max_rec_size + CM_BUFFER_OVERHEAD;
 	}
 	CM_GET_SHORT(reg->max_key_size, ptr, li->convert_byteorder);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	reg->std_null_coll = (li->server_supports_std_null_coll) ? *ptr++ : 0;
 		/* From level 210 (GT.M V5), server will send null subscript collation info into CMMS_S_INITREG message */
 	reg->dyn.addr->cm_blk = clb_ptr;

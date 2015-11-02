@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ int gvusr_zprevious(void)
 int gvusr_get(mval *v)
 {
 	v->mvtype = MV_STR;
-	v->str.len = sizeof("TestData") - 1;
+	v->str.len = SIZEOF("TestData") - 1;
 	v->str.addr = "TestData";
 	return 1;
 }

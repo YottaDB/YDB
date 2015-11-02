@@ -28,7 +28,7 @@
 {													\
 	sm_uc_ptr_t	ptr;										\
 													\
-	ptr = ((sm_uc_ptr_t)(bp) + sizeof(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));			\
+	ptr = ((sm_uc_ptr_t)(bp) + SIZEOF(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));			\
 	bml_status = (*ptr >> ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR)) & ((1 << BML_BITS_PER_BLK) - 1);	\
 }
 
@@ -38,13 +38,13 @@
 	sm_uc_ptr_t	ptr;										\
 													\
 	assert(2 == BML_BITS_PER_BLK);									\
-	ptr = ((sm_uc_ptr_t)(bp) + sizeof(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));			\
+	ptr = ((sm_uc_ptr_t)(bp) + SIZEOF(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));			\
 	*ptr = (*ptr & ~(0x03 << ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR)))			\
 		| ((new_bml_status & 0x03) << ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR));		\
 }
 
 #define	BM_MINUS_BLKHDR_SIZE(bplm)	((bplm) / (BITS_PER_UCHAR / BML_BITS_PER_BLK))
-#define BM_SIZE(bplm)			(USIZEOF(blk_hdr) + BM_MINUS_BLKHDR_SIZE(bplm))
+#define BM_SIZE(bplm)			(SIZEOF(blk_hdr) + BM_MINUS_BLKHDR_SIZE(bplm))
 
 #define	VALIDATE_BM_BLK(blk, bp, csa, region, status)								\
 {														\

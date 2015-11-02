@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,12 +33,16 @@
 #include "mmemory.h"
 #include "gtm_ffs.h"
 #include "cert_blk.h"
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"
+#include "gv_trigger.h"
+#endif
 
 GBLREF	short		dollar_tlevel;
 GBLREF	boolean_t	dse_running;
 
 #define BITS_PER_UCHAR	8
-#define BLKS_PER_UINT4	((sizeof(uint4) / sizeof(unsigned char)) * BITS_PER_UCHAR) / BML_BITS_PER_BLK
+#define BLKS_PER_UINT4	((SIZEOF(uint4) / SIZEOF(unsigned char)) * BITS_PER_UCHAR) / BML_BITS_PER_BLK
 #define BLOCK_WINDOW 8
 #define LEVEL_WINDOW 3
 #define OFFSET_WINDOW 4
@@ -148,7 +152,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			RTS_ERROR_FUNC(ERR_DBBMSIZE, util_buff);
 			return FALSE;
 		}
-		mp = (sm_uc_ptr_t)bp + sizeof(blk_hdr);
+		mp = (sm_uc_ptr_t)bp + SIZEOF(blk_hdr);
 		if ((*mp & 1) != 0)
 		{	/* bitmap doesn't protect itself */
 			RTS_ERROR_FUNC(ERR_DBBMBARE, util_buff);
@@ -164,7 +168,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			mask1 = chunk & SIXTEEN_BLKS_FREE;	/* mask 'recycled' blocks to 'free' blocks */
 			if ((mask1 != 0) && full)		/* check for free blocks */
 			{	/* if (full bitmap || full chunk || regular scan of a "short" bitmap) */
-				if ((offset == bplmap) || ((blk_top - (sm_uc_ptr_t)chunk_p) > sizeof(chunk))
+				if ((offset == bplmap) || ((blk_top - (sm_uc_ptr_t)chunk_p) > SIZEOF(chunk))
 					|| (NO_FREE_SPACE != bml_find_free((int4)((sm_uc_ptr_t)chunk_p - mp), mp, offset)))
 				{
 					full = FALSE;
@@ -209,14 +213,14 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			RTS_ERROR_FUNC(ERR_DBROOTBURN, util_buff);
 			return FALSE;
 		}
-		if (blk_size < sizeof(blk_hdr))
+		if (blk_size < SIZEOF(blk_hdr))
 		{
 			RTS_ERROR_FUNC(ERR_DBBSIZMN, util_buff);
 			return FALSE;
 		}
 	} else
 	{	/* index block */
-		if (blk_size < (sizeof(blk_hdr) + sizeof(rec_hdr) + sizeof(block_id)))
+		if (blk_size < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + SIZEOF(block_id)))
 		{	/* must have at least one record */
 			RTS_ERROR_FUNC(ERR_DBBSIZMN, util_buff);
 			return FALSE;
@@ -245,12 +249,12 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	first_key = TRUE;
 	min_cmpc = 0;
 	prior_expkeylen = 0;
-	comp_length = 2 * sizeof(char);		/* for double NUL to indicate no prior key */
+	comp_length = 2 * SIZEOF(char);		/* for double NUL to indicate no prior key */
 	prior_expkey[0] = prior_expkey[1] = 0;	/* double NUL also works for memvcmp test for key order */
 	next_tp_child_ptr = NULL;
 	prev_child = 0;
 
-	for (rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)bp + sizeof(blk_hdr)) ;  rp < (rec_hdr_ptr_t)blk_top ;  rp = r_top)
+	for (rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)bp + SIZEOF(blk_hdr)) ;  rp < (rec_hdr_ptr_t)blk_top ;  rp = r_top)
 	{
 		GET_RSIZ(rec_size, rp);
 		rec_offset = (int)((sm_ulong_t)rp - (sm_ulong_t)bp);
@@ -269,7 +273,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		util_len += SIZEOF(TEXT2) - 1;
 		util_buff[util_len] = 0;
 
-		if (rec_size <= sizeof(rec_hdr))
+		if (rec_size <= SIZEOF(rec_hdr))
 		{
 			RTS_ERROR_FUNC(ERR_DBRSIZMN, util_buff);
 			return FALSE;
@@ -290,14 +294,14 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			}
 			if (0 == blk_levl)
 			{
-				ch = *((sm_uc_ptr_t)rp + sizeof(rec_hdr));
-				if (!(ISALPHA(ch) || '%' == ch))
+				ch = *((sm_uc_ptr_t)rp + SIZEOF(rec_hdr));
+				if (!(VALFIRSTCHAR_WITH_TRIG(ch)))
 					GTMASSERT;
 			}
 		}
 		if (r_top == (rec_hdr_ptr_t)blk_top && blk_levl)
 		{	/* star key */
-			if (rec_size != sizeof(rec_hdr) + sizeof(block_id))
+			if (rec_size != SIZEOF(rec_hdr) + SIZEOF(block_id))
 			{
 				RTS_ERROR_FUNC(ERR_DBSTARSIZ, util_buff);
 				return FALSE;
@@ -307,10 +311,10 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 				RTS_ERROR_FUNC(ERR_DBSTARCMP, util_buff);
 				return FALSE;
 			}
-			blk_id_ptr = (sm_uc_ptr_t)rp + sizeof(rec_hdr);
+			blk_id_ptr = (sm_uc_ptr_t)rp + SIZEOF(rec_hdr);
 		} else
 		{	/* non-star key */
-			key_base = (sm_uc_ptr_t)rp + sizeof(rec_hdr);
+			key_base = (sm_uc_ptr_t)rp + SIZEOF(rec_hdr);
 			/* num_subscripts = number of full subscripts found in the key (including the compressed part) */
 			num_subscripts = 0;
 			prev_char_is_delimiter = FALSE;
@@ -380,7 +384,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 				RTS_ERROR_FUNC(ERR_DBMAXNRSUBS, util_buff);
 				return FALSE;
 			}
-			if (blk_levl && (key_size != (rec_size - sizeof(block_id) - sizeof(rec_hdr))))
+			if (blk_levl && (key_size != (rec_size - SIZEOF(block_id) - SIZEOF(rec_hdr))))
 			{
 				RTS_ERROR_FUNC(ERR_DBKEYMN, util_buff);
 				return FALSE;

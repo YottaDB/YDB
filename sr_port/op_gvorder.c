@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,9 @@ void op_gvorder (mval *v)
 		} else
 		{
 			assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
+			assert(2 == (gv_currkey->end - gv_currkey->prev));
 			*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
 		}
 	}
@@ -78,12 +81,13 @@ void op_gvorder (mval *v)
 			found = gvcmx_order();
 		else
 		 	found = gvusr_order();
-		v->mvtype = MV_STR;
+		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by
+				* this to-be-overwritten mval */
 		if (found)
 		{
 			gv_altkey->prev = gv_currkey->prev;
 
-	 		if (stringpool.top - stringpool.free < MAX_KEY_SZ)
+			if (!(IS_STP_SPACE_AVAILABLE(MAX_KEY_SZ)))
  			{
 				if (*(&gv_altkey->base[0] + gv_altkey->prev) != 0xFF)
 		 			n = MAX_FORM_NUM_SUBLEN;
@@ -92,11 +96,7 @@ void op_gvorder (mval *v)
 					n = gv_altkey->end - gv_altkey->prev;
 					assert (n > 0);
 				}
-		 		if (stringpool.top - stringpool.free < n)
-				{
-					v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval */
-					stp_gcol(n);
-				}
+				ENSURE_STP_FREE_SPACE(n);
 			}
 	 		v->str.addr = (char *)stringpool.free;
 	 		stringpool.free = gvsub2str (&gv_altkey->base[0] + gv_altkey->prev, stringpool.free, FALSE);
@@ -106,6 +106,7 @@ void op_gvorder (mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
+		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 		if (ok_to_change_currkey)
 		{	/* Restore gv_currkey to what it was at function entry time */
 			if (!gv_curr_subsc_null || gv_cur_region->std_null_coll)
@@ -180,7 +181,7 @@ void op_gvorder (mval *v)
 				break;
 			else
 			{
-				assert(sizeof(map->name) == sizeof(mident_fixed));
+				assert(SIZEOF(map->name) == SIZEOF(mident_fixed));
 				gv_currkey->end = mid_len((mident_fixed *)map->name);
 				memcpy(&gv_currkey->base[0], map->name, gv_currkey->end);
 				gv_currkey->base[ gv_currkey->end - 1 ] -= 1;
@@ -195,13 +196,14 @@ void op_gvorder (mval *v)
 		 */
 		gv_currkey->end = 0;
 		gv_currkey->base[0] = 0;
-		v->mvtype = MV_STR;
+		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by
+				* this to-be-overwritten mval */
 		if (found)
 		{
-			if (stringpool.free + name.len + 1 > stringpool.top)
+			if (!IS_STP_SPACE_AVAILABLE(name.len + 1))
 			{
-				v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
-				stp_gcol (name.len + 1);
+				v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval */
+				INVOKE_STP_GCOL(name.len + 1);
 			}
 #ifdef mips
 			/* the following line works around a tandem compiler bug. */
@@ -217,6 +219,7 @@ void op_gvorder (mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
+		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 	}
 	return;
 }

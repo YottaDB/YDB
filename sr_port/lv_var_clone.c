@@ -52,7 +52,7 @@ void lv_var_clone(lv_val *clone_var)
 		assert(MV_SYM == tbl->sym->ident);
 		clone_var->ptrs.val_ent.children = (lv_sbs_tbl *)lv_getslot(ownsym);
 		newtbl = clone_var->ptrs.val_ent.children;
-		memcpy(newtbl, tbl, sizeof(lv_sbs_tbl));
+		memcpy(newtbl, tbl, SIZEOF(lv_sbs_tbl));
 		newtbl->lv = clone_var;
 		newtbl->sym = ownsym;	/* Needed in clone calls from xnew processing since sym is going to be different */
 		num = &newtbl->num;
@@ -67,7 +67,7 @@ void lv_var_clone(lv_val *clone_var)
 				assert(0 == newsbs->nxt);
 				assert(newsbs->sbs_que.fl && newsbs->sbs_que.bl);
 				newsbs->cnt = (*num)->cnt;
-				memcpy(&newsbs->ptr, &(*num)->ptr, sizeof(newsbs->ptr));
+				memcpy(&newsbs->ptr, &(*num)->ptr, SIZEOF(newsbs->ptr));
 				for (i = 0;  i < SBS_NUM_INT_ELE;  i++)
 				{
 					if (newsbs->ptr.lv[i])
@@ -94,7 +94,7 @@ void lv_var_clone(lv_val *clone_var)
 					assert(0 == newsbs->nxt);
 					assert(newsbs->sbs_que.fl && newsbs->sbs_que.bl);
 					newsbs->cnt = (*num)->cnt;
-					memcpy(&newsbs->ptr, &(*num)->ptr, sizeof(newsbs->ptr));
+					memcpy(&newsbs->ptr, &(*num)->ptr, SIZEOF(newsbs->ptr));
 					for (i = 0;  i < newsbs->cnt;  i++)
 					{
 						lv = lv_getslot(ownsym);
@@ -117,7 +117,7 @@ void lv_var_clone(lv_val *clone_var)
 			assert(0 == newsbs->nxt);
 			assert(newsbs->sbs_que.fl && newsbs->sbs_que.bl);
 			newsbs->cnt = (*str)->cnt;
-			memcpy(&newsbs->ptr, &(*str)->ptr, sizeof(newsbs->ptr));
+			memcpy(&newsbs->ptr, &(*str)->ptr, SIZEOF(newsbs->ptr));
 			for (i = 0;  i < newsbs->cnt;  i++)
 			{
 				lv = lv_getslot(ownsym);

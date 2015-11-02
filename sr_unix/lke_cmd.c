@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,15 +51,11 @@ static readonly CLI_ENTRY show_qual[] = {
 	{ 0 }
 };
 
-/*
- * Main command table.
- * It has to be names cmd_ary, because it is being referred to by the cli_parse module.
- *
+/* Main command table (cmd_ary is defined to this array in lke.c)
  * This table contains the names of all commands, and corresponding functions to be
  * dispatched to, and the qualifier sub-tables, containing all legal qualifiers.
  */
-
-GBLDEF CLI_ENTRY cmd_ary[] = {
+GBLDEF CLI_ENTRY lke_cmd_ary[] = {
 	{ "CLEAR",  lke_clear,  clear_qual, 0, 0, cli_disallow_lke_clear, 0, VAL_NOT_REQ,    2, 0, VAL_STR, 0},
 	{ "EXIT",   lke_exit,   0,          0, 0, 0, 0, VAL_DISALLOWED, 0, 0, 0,       0},
 	{ "HELP",   lke_help,   0,          0, 0, 0, 0, VAL_NOT_REQ,    5, 0, 0,       0},

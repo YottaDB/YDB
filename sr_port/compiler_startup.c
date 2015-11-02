@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ GBLREF short int source_column, source_line;
 /* ensure source_buffer is aligned on a int4 word boundary so that
  * we can calculate the checksum a longword at a time.
  */
-GBLREF int4 			aligned_source_buffer[MAX_SRCLINE / sizeof(int4) + 1];
+GBLREF int4 			aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
 GBLREF unsigned char 		*source_buffer;
 GBLREF int4 			source_error_found;
 GBLREF src_line_struct 		src_head;
@@ -50,8 +50,9 @@ GBLREF mline			mline_root;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
 GBLREF hash_table_str		*complits_hashtab;
+GTMTRIG_ONLY(GBLREF boolean_t		trigger_compile;)
 
-bool compiler_startup(void)
+boolean_t compiler_startup(void)
 {
 #ifdef DEBUG
 	void		dumpall();
@@ -69,7 +70,7 @@ bool compiler_startup(void)
 	static readonly char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
 
 	assert(NULL == complits_hashtab || NULL == complits_hashtab->base);
-	memset(&null_mident, 0, sizeof(null_mident));
+	memset(&null_mident, 0, SIZEOF(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
 
 	/* Since the stringpool alignment is solely based on mstr_native_align, we need to initialize it based
@@ -102,7 +103,8 @@ bool compiler_startup(void)
 	null_lab = get_mladdr(&null_mident);
 	null_lab->ml = &mline_root;
 	mlmax++;
-	curr_fetch_trip = curr_fetch_opr = newtriple(OC_LINEFETCH);
+	/* If this is a trigger compile, use OC_FETCH to prevent interception */
+	curr_fetch_trip = curr_fetch_opr = newtriple(GTMTRIG_ONLY(trigger_compile ? OC_FETCH : ) OC_LINEFETCH);
 	curr_fetch_count = 0;
 	code_generated = FALSE;
 	checksum = 0;
@@ -115,7 +117,7 @@ bool compiler_startup(void)
 		{
 			if (cmd_qlf.qlf & CQ_MACHINE_CODE)
 			{
-				sl = (src_line_struct *)mcalloc(sizeof(src_line_struct));
+				sl = (src_line_struct *)mcalloc(SIZEOF(src_line_struct));
 				dqins(&src_head, que, sl);
 				sl->addr = mcalloc(n + 1);	/* +1 for zero termination */
 				sl->line = source_line;
@@ -130,14 +132,14 @@ bool compiler_startup(void)
 		for (cp = source_buffer, cp2 = cp + n;  cp < cp2;)
 		{
 			srcint = 0;
-			if (cp2 - cp < sizeof(int4))
+			if (cp2 - cp < SIZEOF(int4))
 			{
 				memcpy(&srcint, cp, cp2 - cp);
 				cp = cp2;
 			} else
 			{
 				srcint = *(int4 *)cp;
-				cp += sizeof(int4);
+				cp += SIZEOF(int4);
 			}
 			checksum ^= srcint;
 			checksum >>= 1;
@@ -160,7 +162,14 @@ bool compiler_startup(void)
 		newtriple(OC_LINESTART);
 	newtriple(OC_RET);			/* always provide a default QUIT */
 	mline_root.externalentry = t_orig.exorder.fl;
-	stp_gcol(0);
+	INVOKE_STP_GCOL(0);
+	/* The above invocation of stp_gcol with a parameter of 0 is a critical part of compilation
+	 * (both routine compilations and indirect dynamic compilations). This collapses the indirect
+	 * (compilation) stringpool so that only the literals are left. This stringpool is then written
+	 * out to the compiled object as the literal pool for that compilation. Temporary stringpool
+	 * use for conversions or whatever are eliminated. Note the path is different in stp_gcol for
+	 * the indirect stringpool which is only used during compilations.
+	 */
 	start_fetches(OC_NOOP);
 	resolve_blocks();
 	errknt = resolve_ref(errknt);
@@ -176,8 +185,8 @@ bool compiler_startup(void)
 			*cp++ = 'n';
 			*cp++ = 'o';
 		}
-		memcpy(cp, " error", sizeof(" error"));
-		cp += sizeof(" error") - 1;
+		memcpy(cp, " error", SIZEOF(" error"));
+		cp += SIZEOF(" error") - 1;
 		if (1 != errknt)
 			*cp++ = 's';
 		*cp = 0;

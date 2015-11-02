@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,7 @@ s2pool(mstr *a)
 		return;
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
-	if (al > stringpool.top - stringpool.free)
-		stp_gcol(al);
+	ENSURE_STP_FREE_SPACE(al);
 	memcpy(stringpool.free,a->addr,al);
 	a->addr = (char *)stringpool.free;
 	stringpool.free += al;

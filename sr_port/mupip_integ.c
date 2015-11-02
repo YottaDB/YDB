@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "error.h"
-#include "mupint.h"
 #include "cli.h"
 #include "iosp.h"
 #include "gdscc.h"
@@ -44,9 +43,13 @@
 #include "mupip_integ.h"
 #include "gtmmsg.h"
 #include "collseq.h"
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
+#include "mupint.h"
 
 #define DUMMY_GLOBAL_VARIABLE   "%D%DUMMY_VARIABLE"
-#define DUMMY_GLOBAL_VARIABLE_LEN sizeof(DUMMY_GLOBAL_VARIABLE)
+#define DUMMY_GLOBAL_VARIABLE_LEN SIZEOF(DUMMY_GLOBAL_VARIABLE)
 #define MAX_UTIL_LEN 80
 #define APPROX_ALL_ERRORS 1000000
 #define DEFAULT_ERR_LIMIT 10
@@ -59,8 +62,7 @@
 #define TEXT1 " is incorrect, should be "
 #define TEXT2 "!/Largest transaction number found in database was "
 #define TEXT3 "Current transaction number is                    "
-
-
+#define MSG1  "!/!/WARNING: Transaction number reset complete on all active blocks. Please do a DATABASE BACKUP before proceeding"
 /* The QWPERCENTCALC calculates the percent used compatibly with the code fragment below.
  * The size is no longer int_size but is now a qw_num, so the QW macros are now used to
  * do the calculation.
@@ -116,6 +118,7 @@ GBLDEF block_id			mu_int_path[MAX_BT_DEPTH + 1];
 GBLDEF global_list		*trees_tail;
 GBLDEF global_list		*trees;
 GBLDEF sgmnt_data		mu_int_data;
+GBLDEF unsigned char		*mu_int_master;
 GBLDEF trans_num		largest_tn;
 GBLDEF int4			mu_int_blks_to_upgrd;
 /* The following global variable is used to store the encryption information for the current database. The
@@ -131,10 +134,17 @@ GBLREF short			crash_count;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gv_namehead		*gv_target;
 GBLREF gv_key			*gv_altkey;
+GBLREF gv_key			*gv_currkey;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF tp_region		*grlist;
 GBLREF bool			region;
 GBLREF boolean_t		debug_mupip;
+GBLDEF boolean_t		ointeg_this_reg;
+GTM_SNAPSHOT_ONLY(
+	GBLDEF util_snapshot_ptr_t	util_ss_ptr;
+	GBLDEF boolean_t		preserve_snapshot;
+	GBLDEF boolean_t		online_specified;
+)
 
 void mupip_integ(void)
 {
@@ -154,7 +164,12 @@ void mupip_integ(void)
 	block_id		dir_root;
 	tp_region		*rptr;
 	file_control		*fc;
-	boolean_t		retvalue_mu_int_reg;
+	boolean_t		retvalue_mu_int_reg, online_integ = FALSE, region_was_frozen;
+	GTM_SNAPSHOT_ONLY(
+		char		ss_filename[GTM_PATH_MAX];
+		unsigned short	ss_file_len = GTM_PATH_MAX;
+	)
+	sgmnt_data_ptr_t	csd;
 
 	error_def(ERR_CTRLY);
 	error_def(ERR_CTRLC);
@@ -176,10 +191,9 @@ void mupip_integ(void)
 	error_mupip = FALSE;
 	if (NULL == gv_target)
 		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
- 	gv_altkey = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ - 1);
 	if (CLI_PRESENT == (cli_status = cli_present("MAXKEYSIZE")))
 	{
-		assert(sizeof(disp_maxkey_errors) == sizeof(int4));
+		assert(SIZEOF(disp_maxkey_errors) == SIZEOF(int4));
 		if (0 == cli_get_int("MAXKEYSIZE", (int4 *)&disp_maxkey_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_maxkey_errors < 1)
@@ -190,7 +204,7 @@ void mupip_integ(void)
 		disp_maxkey_errors = DEFAULT_ERR_LIMIT;
 	if (CLI_PRESENT == (cli_status = cli_present("TRANSACTION")))
 	{
-		assert(sizeof(disp_trans_errors) == sizeof(int4));
+		assert(SIZEOF(disp_trans_errors) == SIZEOF(int4));
 		if (0 == cli_get_int("TRANSACTION", (int4 *)&disp_trans_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_trans_errors < 1)
@@ -201,7 +215,7 @@ void mupip_integ(void)
 		disp_trans_errors = DEFAULT_ERR_LIMIT;
 	if (CLI_PRESENT == (cli_status = cli_present("MAP")))
 	{
-		assert(sizeof(disp_map_errors) == sizeof(int4));
+		assert(SIZEOF(disp_map_errors) == SIZEOF(int4));
 		if (0 == cli_get_int("MAP", (int4 *)&disp_map_errors))
 			mupip_exit(ERR_MUPCLIERR);
 		if (disp_map_errors < 1)
@@ -212,7 +226,7 @@ void mupip_integ(void)
 		disp_map_errors = DEFAULT_ERR_LIMIT;
 	if (CLI_PRESENT == cli_present("ADJACENCY"))
 	{
-		assert(sizeof(muint_adj) == sizeof(int4));
+		assert(SIZEOF(muint_adj) == SIZEOF(int4));
 		if (0 == cli_get_int("ADJACENCY", (int4 *)&muint_adj))
 			mupip_exit(ERR_MUPCLIERR);
 	} else
@@ -229,9 +243,9 @@ void mupip_integ(void)
 		muint_fast = FALSE;
 	if (CLI_PRESENT == cli_present("REGION"))
 	{
-		gvinit();
+		gvinit(); /* side effect: initializes gv_altkey (used by code below) & gv_currkey (not used by below code) */
 		region = TRUE;
-		mu_getlst("WHAT", sizeof(tp_region));
+		mu_getlst("WHAT", SIZEOF(tp_region));
                 if (!grlist)
                 {
 			error_mupip = TRUE;
@@ -240,10 +254,11 @@ void mupip_integ(void)
                         mupip_exit(ERR_MUNOACTION);
                 }
 		rptr = grlist;
-	}
+	} else
+		GVKEY_INIT(gv_altkey, DBKEYSIZE(MAX_KEY_SZ));	/* used by code below */
 	if (CLI_PRESENT == cli_present("SUBSCRIPT"))
 	{
-		keylen = sizeof(key_buff);
+		keylen = SIZEOF(key_buff);
 		if (0 == cli_get_str("SUBSCRIPT", (char *)key_buff, &keylen))
 			mupip_exit(ERR_MUPCLIERR);
 		if (FALSE == mu_int_getkey(key_buff, keylen))
@@ -251,22 +266,59 @@ void mupip_integ(void)
 		if (muint_key)
 			disp_map_errors = 0;
 	}
+	mu_int_master = malloc(MASTER_MAP_SIZE_MAX);
 	tn_reset_specified = (CLI_PRESENT == cli_present("TN_RESET"));
+	/* Note if -ONLINE is explicitly specified */
+	GTM_SNAPSHOT_ONLY(online_specified = (CLI_PRESENT == cli_present("ONLINE"));)
+	/* DEFAULT option for INTEG will be -ONLINE */
+	GTM_SNAPSHOT_ONLY(online_integ = ((TRUE != cli_negated("ONLINE")) && region);)
+	/* Should the snapshot shadow file be preserved ?*/
+	GTM_SNAPSHOT_ONLY(preserve_snapshot = (CLI_PRESENT == cli_present("PRESERVE"));)
 	/* DBG qualifier prints extra debug messages while waiting for KIP in region freeze */
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
+#	ifdef GTM_SNAPSHOT
+	if (online_specified)
+	{
+		/* if MUPIP INTEG -ONLINE -ANALYZE=<filename> is given then display details about the snapshot file
+		 * and do early return
+		 */
+		if (cli_get_str("ANALYZE", ss_filename, &ss_file_len))
+		{
+			ss_anal_shdw_file(ss_filename, ss_file_len);
+			return;
+		}
+		assert(region && !tn_reset_specified);
+	}
+#	endif
 	mu_outofband_setup();
 #ifdef UNIX
 	ESTABLISH(mu_int_ch);
 #endif
 	if (region)
-		ESTABLISH(mu_freeze_ch);
+	{
+		if (online_integ)
+		{
+#			ifdef GTM_SNAPSHOT
+			/* The below structure members will be assigned in ss_initiate done in mu_int_reg.
+			 * No free required as will be gone when process dies
+			 */
+			util_ss_ptr = malloc(SIZEOF(util_snapshot_t));
+			util_ss_ptr->header = &mu_int_data;
+			util_ss_ptr->master_map = mu_int_master;
+			util_ss_ptr->native_size = 0;
+#			endif
+		}
+		else /* Establish the condition handler ONLY if ONLINE INTEG was not requested */
+			ESTABLISH(mu_freeze_ch);
+	}
 	for (total_errors = mu_int_errknt = 0;  ;  total_errors += mu_int_errknt, mu_int_errknt = 0)
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			break;
 		if (region)
 		{
-			if ((NULL == rptr) || (!mupfndfil(rptr->reg, NULL)))
+			assert(NULL != rptr);
+			if (!mupfndfil(rptr->reg, NULL))
 			{
 				mu_int_errknt++;
 				rptr = rptr->fPtr;
@@ -294,11 +346,13 @@ void mupip_integ(void)
 		mu_int_path[0] = 0;
 		mu_int_offset[0] = 0;
 		mu_int_plen = 1;
-		memset(mu_int_adj, 0, sizeof(mu_int_adj));
+		memset(mu_int_adj, 0, SIZEOF(mu_int_adj));
 		if (region)
 		{
 			util_out_print("!/!/Integ of region !AD", TRUE, REG_LEN_STR(rptr->reg));
+			ointeg_this_reg = online_integ;
 			mu_int_reg(rptr->reg, &retvalue_mu_int_reg);
+			region_was_frozen = !ointeg_this_reg;
 			if (TRUE != retvalue_mu_int_reg)
 			{
 				rptr = rptr->fPtr;
@@ -306,10 +360,26 @@ void mupip_integ(void)
 					break;
 				continue;
 			}
-		} else  if (FALSE == mu_int_init())
-			mupip_exit(ERR_INTEGERRS);
-		trees_tail = trees = (global_list *)malloc(sizeof(global_list));
-		memset(trees, 0, sizeof(global_list));
+			/* If the region was frozen (INTEG -REG -NOONLINE) then use cs_addrs->hdr for verification of
+			 * blks_to_upgrd, free blocks calculation. Otherwise (ONLINE INTEG) then use mu_int_data for
+			 * the verification.
+			 */
+			if (region_was_frozen)
+				csd = cs_addrs->hdr;
+			else
+				csd = &mu_int_data;
+		} else
+		{
+			region_was_frozen = FALSE; /* For INTEG -FILE, region is not frozen as we would have standalone access */
+			if (FALSE == mu_int_init())
+				mupip_exit(ERR_INTEGERRS);
+			/* Since we have standalone access, there is no need for cs_addrs->hdr. So, use mu_int_data for
+			 * verifications
+			 */
+			csd = &mu_int_data;
+		}
+		trees_tail = trees = (global_list *)malloc(SIZEOF(global_list));
+		memset(trees, 0, SIZEOF(global_list));
 		trees->root = dir_root = get_dir_root();
 		master_dir = TRUE;
 		trees_tail->nct = 0;
@@ -334,7 +404,7 @@ void mupip_integ(void)
 		{
 			if (0 == cli_get_hex("BLOCK", (uint4 *)&trees->root))
 			{
-				if (region)
+				if (region_was_frozen)
 				{
 					region_freeze(rptr->reg, FALSE, FALSE, FALSE);
 					if (!rptr->reg->read_only)
@@ -342,7 +412,7 @@ void mupip_integ(void)
 						fc = rptr->reg->dyn.addr->file_cntl;
 						fc->op = FC_WRITE;
 						fc->op_buff = (unsigned char *)FILE_INFO(rptr->reg)->s_addrs.hdr;
-						fc->op_len = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+						fc->op_len = ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
 						fc->op_pos = 1;
 						dbfilop(fc);
 					}
@@ -357,7 +427,7 @@ void mupip_integ(void)
 		{
 			if (mu_ctrly_occurred || mu_ctrlc_occurred)
 			{
-				if (region)
+				if (region_was_frozen)
 				{
 					region_freeze(rptr->reg, FALSE, FALSE, FALSE);
 					if (!rptr->reg->read_only)
@@ -365,7 +435,7 @@ void mupip_integ(void)
 						fc = gv_cur_region->dyn.addr->file_cntl;
 						fc->op = FC_WRITE;
 						fc->op_buff = (unsigned char *)FILE_INFO(rptr->reg)->s_addrs.hdr;
-						fc->op_len = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+						fc->op_len = ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
 						fc->op_pos = 1;
 						dbfilop(fc);
 					}
@@ -393,7 +463,7 @@ void mupip_integ(void)
 				continue;
 			}
 			mu_int_plen = 0;
-			memset(mu_int_adj_prev, 0, sizeof(mu_int_adj_prev));
+			memset(mu_int_adj_prev, 0, SIZEOF(mu_int_adj_prev));
  			gv_target->nct = trees->nct;
  			gv_target->act = trees->act;
  			gv_target->ver = trees->ver;
@@ -490,15 +560,18 @@ void mupip_integ(void)
 				blocks_free = mu_int_data.trans_hist.total_blks -
 					(mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap -
 					mu_data_blks - mu_index_blks - mu_dir_blks;
-				if ((region ? cs_addrs->hdr->trans_hist.free_blocks : mu_int_data.trans_hist.free_blocks)
-					!= blocks_free)
+				/* If ONLINE INTEG, then cs_addrs->hdr->trans_hist.free_blocks can no longer be expected to remain
+				 * the same as it was during the time INTEG started as updates are allowed when ONLINE INTEG is
+				 * in progress and hence use mu_int_data.trans_hist.free_blocks as it is the copy of the file header
+				 * right when ONLINE INTEG starts.
+				 */
+				if (csd->trans_hist.free_blocks != blocks_free)
 				{
 					if (gv_cur_region->read_only)
 						mu_int_errknt++;
-					util_len = sizeof("!/Free blocks counter in file header:  ") - 1;
+					util_len = SIZEOF("!/Free blocks counter in file header:  ") - 1;
 					memcpy(util_buff, "!/Free blocks counter in file header:  ", util_len);
-					util_len += i2hex_nofill(region ? cs_addrs->hdr->trans_hist.free_blocks :
-							mu_int_data.trans_hist.free_blocks, (uchar_ptr_t)&util_buff[util_len], 8);
+					util_len += i2hex_nofill(csd->trans_hist.free_blocks, (uchar_ptr_t)&util_buff[util_len], 8);
 					MEMCPY_LIT(&util_buff[util_len], TEXT1);
 					util_len += SIZEOF(TEXT1) - 1;
 					util_len += i2hex_nofill(blocks_free, (uchar_ptr_t)&util_buff[util_len], 8);
@@ -508,10 +581,9 @@ void mupip_integ(void)
 					blocks_free = LEAVE_BLOCKS_ALONE;
 			}
 			if (!muint_fast &&
-				(mu_int_blks_to_upgrd != (region ? cs_addrs->hdr->blks_to_upgrd : mu_int_data.blks_to_upgrd)))
+				(mu_int_blks_to_upgrd != csd->blks_to_upgrd))
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_DBBTUWRNG, 2, mu_int_blks_to_upgrd,
-					region ? cs_addrs->hdr->blks_to_upgrd : mu_int_data.blks_to_upgrd);
+				gtm_putmsg(VARLSTCNT(4) ERR_DBBTUWRNG, 2, mu_int_blks_to_upgrd, csd->blks_to_upgrd);
 				if (gv_cur_region->read_only || mu_int_errknt)
 					mu_int_errknt++;
 				else
@@ -582,12 +654,12 @@ void mupip_integ(void)
 				util_out_print("!UL transaction number errors encountered.", TRUE, trans_errors);
 			}
 			MEMCPY_LIT(util_buff, TEXT2);
-			util_len = sizeof(TEXT2) - 1;
+			util_len = SIZEOF(TEXT2) - 1;
 			util_len += i2hexl_nofill(largest_tn, (uchar_ptr_t)&util_buff[util_len], 16);
 			util_buff[util_len] = 0;
 			util_out_print(util_buff, TRUE);
 			MEMCPY_LIT(util_buff, TEXT3);
-			util_len = sizeof(TEXT3) - 1;
+			util_len = SIZEOF(TEXT3) - 1;
 			util_len += i2hexl_nofill(mu_int_data.trans_hist.curr_tn, (uchar_ptr_t)&util_buff[util_len], 16);
 			util_buff[util_len] = 0;
 			util_out_print(util_buff, TRUE);
@@ -600,29 +672,48 @@ void mupip_integ(void)
 		}
 		if (region)
 		{
-			if (!gv_cur_region->read_only)
+			/* Below logic updates the database file header in the shared memory with values calculated
+			 * by INTEG during it's course of tree traversal and writes it to disk. If ONLINE INTEG is
+			 * in progress, then these values could legally be out-of-date and hence avoid writing the header if
+			 * ONLINE INTEG is in progress.
+			 */
+			if (!gv_cur_region->read_only && !ointeg_this_reg)
 			{
 				if (LEAVE_BLOCKS_ALONE != blocks_free)
-					cs_addrs->hdr->trans_hist.free_blocks = blocks_free;	/* Not if "online" integ */
+					csd->trans_hist.free_blocks = blocks_free;
 				if (!mu_int_errknt && !muint_fast)
 				{
-					if (mu_int_blks_to_upgrd != cs_addrs->hdr->blks_to_upgrd)
-						cs_addrs->hdr->blks_to_upgrd = mu_int_blks_to_upgrd;
+					if (mu_int_blks_to_upgrd != csd->blks_to_upgrd)
+						csd->blks_to_upgrd = mu_int_blks_to_upgrd;
 				}
 				region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
 				fc->op_buff = (unsigned char *)FILE_INFO(gv_cur_region)->s_addrs.hdr;
-				fc->op_len = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+				fc->op_len = ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
 				fc->op_pos = 1;
 				dbfilop(fc);
-			} else
+			}
+			else if (region_was_frozen)
+			{
+				/* If online_integ, then database is not frozen, so no need to unfreeze. */
 				region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
+			}
+#			ifdef GTM_SNAPSHOT
+			else
+			{
+				assert(cs_addrs->snapshot_in_prog);
+				assert(NULL != cs_addrs->ss_ctx);
+				ss_release(&cs_addrs->ss_ctx);
+				cs_addrs->snapshot_in_prog = FALSE;
+			}
+#			endif
 			rptr = rptr->fPtr;
 			if (NULL == rptr)
 				break;
 		} else  if (!gv_cur_region->read_only)
 		{
+			assert(!online_integ);
 			update_filehdr = FALSE;
 			if ((FALSE == block) && (FALSE == muint_key))
 			{
@@ -633,7 +724,7 @@ void mupip_integ(void)
 					update_filehdr = TRUE;
 				}
 				if ((LEAVE_BLOCKS_ALONE != blocks_free) && (mu_int_data.trans_hist.free_blocks != blocks_free))
-				{	/* this update should NOT be made if other updates are permitted during [online] integ */
+				{
 					mu_int_data.trans_hist.free_blocks = blocks_free;
 					update_filehdr = TRUE;
 				}
@@ -648,19 +739,31 @@ void mupip_integ(void)
 			}
 			if (update_header_tn)
 			{
-				mu_int_data.trans_hist.early_tn = mu_int_data.trans_hist.header_open_tn = 1;
-				mu_int_data.trans_hist.curr_tn = 0;
-				/* curr_tn = 0 + 1 is done (instead of = 1) so as to use INCREMENT_CURR_TN macro.
-				 * this way all places that update db curr_tn are easily obtained by searching for the macro */
+				mu_int_data.trans_hist.early_tn = mu_int_data.trans_hist.header_open_tn = 2;
+				mu_int_data.trans_hist.curr_tn = 1;
+				/* curr_tn = 1 + 1 is done (instead of = 2) so as to use INCREMENT_CURR_TN macro.
+				 * this way all places that update db curr_tn are easily obtained by searching for the macro.
+				 * Reason for setting the transaction number to 2 (instead of 1) is so as to let a BACKUP in
+				 * all forms to proceed, which earlier used to error out on seeing the database transaction
+				 * number as 1.
+				 */
 				INCREMENT_CURR_TN(&mu_int_data);
+				/* Reset all last backup transaction numbers to 1. */
+				mu_int_data.last_inc_backup = 1;
+				mu_int_data.last_com_backup = 1;
+				mu_int_data.last_rec_backup = 1;
+				mu_int_data.last_inc_bkup_last_blk = 0;
+				mu_int_data.last_com_bkup_last_blk = 0;
+				mu_int_data.last_rec_bkup_last_blk = 0;
 				update_filehdr = TRUE;
+				util_out_print(MSG1, TRUE);
 			}
 			if (FALSE != update_filehdr)
 			{
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
 				fc->op_buff = (unsigned char *)&mu_int_data;
-				fc->op_len = ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+				fc->op_len = ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
 				fc->op_pos = 1;
 				dbfilop(fc);
 				fc->op = FC_CLOSE;

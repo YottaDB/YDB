@@ -81,6 +81,7 @@ void mu_int_maps(void)
 	{
 		assert(mapsize == mu_int_data.bplmap);
 		blkno = mcnt * mu_int_data.bplmap;
+		bml_busy(blkno, mu_int_locals);
 		disk = mu_int_read(blkno, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV5 (GDSVCURR) */
 		if (!disk)
 		{
@@ -134,9 +135,9 @@ void mu_int_maps(void)
 		master_full = !bit_set(mcnt, mu_int_master);
 		if (last_bmp == blkno)
 			mapsize = (mu_int_data.trans_hist.total_blks - blkno);
-		disk_full = (NO_FREE_SPACE == bml_find_free(0, disk + sizeof(blk_hdr), mapsize));
+		disk_full = (NO_FREE_SPACE == bml_find_free(0, disk + SIZEOF(blk_hdr), mapsize));
 		agree = TRUE;
-		for (lcnt = 0, dskmap_p = (uint_ptr_t)(disk + sizeof(blk_hdr)), lmap = (uint4 *)local;
+		for (lcnt = 0, dskmap_p = (uint_ptr_t)(disk + SIZEOF(blk_hdr)), lmap = (uint4 *)local;
 			lcnt < mapsize;
 			lcnt += SIZEOF(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK,
 			dskmap_p++, lmap++)  /* # of bits/ bits per blk */
@@ -184,7 +185,7 @@ void mu_int_maps(void)
 					else
 						mu_int_errknt++;
 				}
-				for (bcnt = 0;  bcnt < sizeof(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK;  bcnt++)
+				for (bcnt = 0;  bcnt < SIZEOF(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK;  bcnt++)
 				{
 					if (!(mu_int_isvalid_mask[bcnt] ^ (dskmap & mu_int_mask[bcnt])))
 					{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@ void		db_init(gd_region *reg, sgmnt_data_ptr_t tsd);
 gd_region	*dbfilopn (gd_region *reg);
 void		dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd);
 mint		gvcst_data(void);
+enum cdb_sc	gvcst_dataget(mint *dollar_data, mval *val);
 bool		gvcst_gblmod(mval *v);
 bool		gvcst_get(mval *v);
 void		gvcst_incr(mval *increment, mval *result);

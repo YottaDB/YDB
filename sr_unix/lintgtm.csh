@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -182,7 +182,7 @@ foreach i ( $lintgtm_liblist )
 		# Exclude files that define the same externals (e.g., "main" and the VMS CLI [command line interpreter]
 		# emulator arrays):
 		pwd
-		rm -f gtm.c gtm_svc.c mumps_clitab.c \
+		rm -f gtm.c gtm_svc.c \
 			lke.c lke_cmd.c \
 			dse.c dse_cmd.c \
 			mupip.c mupip_cmd.c \
@@ -200,13 +200,13 @@ foreach i ( $lintgtm_liblist )
 end
 
 # $shell $gtm_tools/lintshr.csh $p1	# for true parallelism, the following commands would be in lintshr.csh
-cp $gtm_src/{gtm,mumps_clitab}.c .
-gt_lint $gt_lint_options {gtm,mumps_clitab}.c llib-l{mumps,stub}.ln $gt_lint_gtmrpc_library_option $gt_lint_syslibs \
+cp $gtm_src/{gtm.c .
+gt_lint $gt_lint_options gtm.c llib-l{mumps,stub}.ln $gt_lint_gtmrpc_library_option $gt_lint_syslibs \
 	>& lint.mumps.log
 
 if ( $gt_ar_gtmrpc_name != "" ) then
-	cp $gtm_src/{gtm_svc,mumps_clitab}.c .
-	gt_lint $gt_lint_options {gtm_svc,mumps_clitab}.c \
+	cp $gtm_src/gtm_svc.c .
+	gt_lint $gt_lint_options gtm_svc.c \
 		llib-l{mumps,stub}.ln $gt_lint_gtmrpc_library_option $gt_lint_syslibs >& lint.gtm_svc.log
 endif
 

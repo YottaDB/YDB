@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void	mupcli_get_offset_size_value(uint4 *offset, uint4 *size, gtm_uint64_t *valu
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
 	if (!cli_get_hex("SIZE", size))
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
-	if (!((sizeof(char) == *size) || (sizeof(short) == *size) || (sizeof(int4) == *size) || (sizeof(gtm_int64_t) == *size)))
+	if (!((SIZEOF(char) == *size) || (SIZEOF(short) == *size) || (SIZEOF(int4) == *size) || (SIZEOF(gtm_int64_t) == *size)))
                 rts_error(VARLSTCNT(1) ERR_SIZENOTVALID8);
 	if (0 > (int4)*size)
 	{
@@ -74,41 +74,41 @@ void	mupcli_edit_offset_size_value(sm_uc_ptr_t buff, uint4 offset, uint4 size, g
 
 	memset(temp_str, 0, 256);
 	memset(temp_str1, 0, 256);
-	if (sizeof(char) == size)
+	if (SIZEOF(char) == size)
 	{
 		SPRINTF(temp_str, "!UB [0x!XB]");
 		old_value = *(sm_uc_ptr_t)buff;
 	}
-	else if (sizeof(short) == size)
+	else if (SIZEOF(short) == size)
 	{
 		SPRINTF(temp_str, "!UW [0x!XW]");
 		old_value = *(sm_ushort_ptr_t)buff;
 	}
-	else if (sizeof(int4) == size)
+	else if (SIZEOF(int4) == size)
 	{
 		SPRINTF(temp_str, "!UL [0x!XL]");
 		old_value = *(sm_uint_ptr_t)buff;
 	}
-	else if (sizeof(gtm_int64_t) == size)
+	else if (SIZEOF(gtm_int64_t) == size)
 	{
 		SPRINTF(temp_str, "!@UQ [0x!@XQ]");
 		old_value = *(qw_num_ptr_t)buff;
 	}
 	if (value_present)
 	{
-		if (sizeof(char) == size)
+		if (SIZEOF(char) == size)
 			*(sm_uc_ptr_t)buff = (unsigned char)value;
-		else if (sizeof(short) == size)
+		else if (SIZEOF(short) == size)
 			*(sm_ushort_ptr_t)buff = (unsigned short)value;
-		else if (sizeof(int4) == size)
+		else if (SIZEOF(int4) == size)
 			*(sm_uint_ptr_t)buff = (unsigned int)value;
-		else if (sizeof(gtm_int64_t) == size)
+		else if (SIZEOF(gtm_int64_t) == size)
 			*(qw_num_ptr_t)buff = value;
 	} else
 		value = old_value;
 	SPRINTF(temp_str1, "Offset !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
 		temp_str, temp_str);
-	if (sizeof(int4) >= size)
+	if (SIZEOF(int4) >= size)
 		util_out_print(temp_str1, TRUE, offset, offset, (uint4)old_value, (uint4)old_value,
 			(uint4)value, (uint4)value, size, size);
 	else

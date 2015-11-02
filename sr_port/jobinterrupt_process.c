@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,52 +20,74 @@
 #include "stack_frame.h"
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
+#include "error_trap.h"
 #include "mv_stent.h"
 #include "gtm_stdio.h"
+#include "stringpool.h"
 #include "jobinterrupt_process.h"
 
-GBLREF stack_frame	*frame_pointer;
-GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
-GBLREF mval		dollar_zinterrupt;
-GBLREF boolean_t	dollar_zininterrupt;
-GBLREF unsigned short	proc_act_type;
-GBLREF mv_stent		*mv_chain;
-GBLREF int		dollar_truth;
-GBLREF mstr		extnam_str;
+GBLREF stack_frame		*frame_pointer, *error_frame;
+GBLREF unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
+GBLREF spdesc			stringpool;
+GBLREF mval			dollar_zinterrupt;
+GBLREF boolean_t		dollar_zininterrupt;
+GBLREF unsigned short		proc_act_type;
+GBLREF mv_stent			*mv_chain;
+GBLREF int			dollar_truth;
+GBLREF mstr			extnam_str;
+GBLREF unsigned char		*restart_pc, *restart_ctxt;
+GBLREF dollar_ecode_type	dollar_ecode;
+GBLREF dollar_stack_type	dollar_stack;
 
 void jobinterrupt_process(void)
 {
+	mv_stent	*mv_st_ent;
+
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 
 	assert(dollar_zininterrupt);
 	/* Compile and push new (counted) frame onto the stack to drive the
-	   $zinterrupt handler.
-	*/
+	 * $zinterrupt handler.
+	 */
 	assert((SFT_COUNT | SFT_ZINTR) == proc_act_type);
 	op_commarg(&dollar_zinterrupt, indir_linetail);
 	frame_pointer->type = proc_act_type;	/* The mark of zorro.. */
 	proc_act_type = 0;
-
-	/* Now that the frame is set up, we need to preserve our current environment. This
-	   is a job for MVST_ZINTR which will hold the current dollar_truth value and
-	   provide an mval for op_gvrectarg to save the current key info into. When this
-	   entry is popped off the stack, these values will be restored. Note that we are
-	   specifically NOT saving/restoring the current I/O device here. The reason is we
-	   were able to envision uses for job interrupt that might involve legitimate changes
-	   in the current IO device (for example application log switches). So in the
-	   interest of flexibilty, we leave this big gun pointed at the user's feet..
-	   2006-03-06 se: add any extended reference in $REFERENCE to the things being saved/restored
+	/* Save restart_pc/ctxt so a resumed frame or ztrap can resume in the corrct place and
+	 * not and inappropriate resume point determined by the interrupting code.
+	 */
+	PUSH_MV_STENT(MVST_RSTRTPC);
+	mv_st_ent = mv_chain;
+	mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_pc_save = restart_pc;
+	mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_ctxt_save = restart_ctxt;
+	/* Now we need to preserve our current environment. This MVST_ZINTR mv_stent type will hold
+	 * the items deemed necessary to preserve. All other items are the user's responsibility.
+	 *
+	 * Initialize the mv_stent elements processed by stp_gcol which can be called for either the
+	 * op_gvsavtarg() or extnam items. This initialization keeps stp_gcol from attempting to
+	 * process unset fields with garbage in them as valid mstr address/length pairs.
 	*/
 	PUSH_MV_STENT(MVST_ZINTR);
-	mv_chain->mv_st_cont.mvs_zintr.saved_dollar_truth = dollar_truth;
-	op_gvsavtarg(&mv_chain->mv_st_cont.mvs_zintr.savtarg);
-	mv_chain->mv_st_cont.mvs_zintr.savextref.len = extnam_str.len;
+	mv_st_ent = mv_chain;
+	mv_st_ent->mv_st_cont.mvs_zintr.savtarg.str.len = 0;
+	mv_st_ent->mv_st_cont.mvs_zintr.savextref.len = 0;
+	mv_st_ent->mv_st_cont.mvs_zintr.saved_dollar_truth = dollar_truth;
+	op_gvsavtarg(&mv_st_ent->mv_st_cont.mvs_zintr.savtarg);
 	if (extnam_str.len)
 	{
-		mv_chain->mv_st_cont.mvs_zintr.savextref.addr = (char *)malloc(extnam_str.len);
-		memcpy(mv_chain->mv_st_cont.mvs_zintr.savextref.addr, extnam_str.addr, extnam_str.len);
-	} else
-		mv_chain->mv_st_cont.mvs_zintr.savextref.addr = NULL;
+		ENSURE_STP_FREE_SPACE(extnam_str.len);
+		mv_st_ent->mv_st_cont.mvs_zintr.savextref.addr = (char *)stringpool.free;
+		memcpy(mv_st_ent->mv_st_cont.mvs_zintr.savextref.addr, extnam_str.addr, extnam_str.len);
+		stringpool.free += extnam_str.len;
+		assert(stringpool.free <= stringpool.top);
+	}
+	mv_st_ent->mv_st_cont.mvs_zintr.savextref.len = extnam_str.len;
+	/* save/restore $ECODE/$STACK over this invocation */
+	mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save = error_frame;
+	memcpy(&mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, &dollar_ecode, SIZEOF(dollar_ecode));
+	memcpy(&mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, &dollar_stack, SIZEOF(dollar_stack));
+	NULLIFY_ERROR_FRAME;
+	ecode_init();
 	return;
 }

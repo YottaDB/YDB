@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,8 @@ void init_hist(void)
 {
 	int	i;
 
-	omi_hist = malloc(sizeof(omi_hist_rec) * HISTORY);
-	rc_hist = malloc(sizeof(rc_hist_rec) * HISTORY);
+	omi_hist = malloc(SIZEOF(omi_hist_rec) * HISTORY);
+	rc_hist = malloc(SIZEOF(rc_hist_rec) * HISTORY);
 
 	for(i = 0; i < HISTORY; i++)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size)
 	sm_uc_ptr_t	key_top;
 	char		targ_key[256];
 
-	memcpy(&targ_key[0], rp + sizeof(rec_hdr), size);
+	memcpy(&targ_key[0], rp + SIZEOF(rec_hdr), size);
 	if ( patch_find_blk != patch_path[0]
 	    && !dse_order(patch_path[0], &patch_path[1], &patch_offset[0],
 		&targ_key[0], size, 0))
@@ -49,15 +49,15 @@ int dse_is_blk_in(sm_uc_ptr_t rp, sm_uc_ptr_t r_top, short size)
 		|| patch_path[patch_path_count] > cs_addrs->ti->total_blks)
 			return FALSE;
 	    patch_find_root_search = FALSE;
-	    for (key_top = rp + sizeof(rec_hdr); key_top < r_top ; )
+	    for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top ; )
 		if (!*key_top++ && !*key_top++)
 		    break;
-	    size = key_top - rp - sizeof(rec_hdr);
+	    size = key_top - rp - SIZEOF(rec_hdr);
 	    if (size < 0)
 		size = 0;
-	    else if (size > sizeof(targ_key))
-		size = sizeof(targ_key);
-	    memcpy(&targ_key[0], rp + sizeof(rec_hdr), size);
+	    else if (size > SIZEOF(targ_key))
+		size = SIZEOF(targ_key);
+	    memcpy(&targ_key[0], rp + SIZEOF(rec_hdr), size);
 	    patch_path1[0] = patch_path[patch_path_count - 1];
 	    patch_path[patch_path_count - 1] = 0;
 	    patch_path_count = 1;

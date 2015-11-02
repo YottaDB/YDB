@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,9 +60,9 @@
 #include "tp_grab_crit.h"
 #include "t_retry.h"
 #include "wcs_mm_recover.h"
+#include "gtmimagename.h"
 
 GBLREF	gd_region	*gv_cur_region;
-GBLREF	boolean_t	run_time;
 GBLREF	short		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
 #ifdef DEBUG
@@ -86,8 +86,8 @@ tp_region	*insert_region(	gd_region	*reg,
 	sgmnt_addrs	*csa;
 	int4		match;
 
-	assert(size >= sizeof(tp_region));
-	assert(!run_time || dollar_tlevel);
+	assert(size >= SIZEOF(tp_region));
+	assert(!IS_GTM_IMAGE || dollar_tlevel);
 	if (reg->open)
 		csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 #if defined(VMS)
@@ -158,14 +158,14 @@ tp_region	*insert_region(	gd_region	*reg,
 			/* let's sort here */
 			if (!tr->reg->open)
 			{	/* all regions closed */
-				VMS_ONLY(match = memcmp(&(tr->file.file_id), local_id_fiptr, sizeof(gd_id));)
+				VMS_ONLY(match = memcmp(&(tr->file.file_id), local_id_fiptr, SIZEOF(gd_id));)
 				UNIX_ONLY(match = gdid_cmp(&(tr->file.file_id), &(local_id.uid));)
 			} else
 			{	/* the other regions are open, i.e. file is pointing to fid_index, use file_id
 				 * from node_local */
 				VMS_ONLY(match = memcmp(
 					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.file_id),
-					local_id_fiptr, sizeof(gd_id));)
+					local_id_fiptr, SIZEOF(gd_id));)
 				UNIX_ONLY(match = gdid_cmp(
 					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.uid), &(local_id.uid));)
 			}
@@ -183,13 +183,13 @@ tp_region	*insert_region(	gd_region	*reg,
 	} else						/* get a new one */
 	{
 		tr_new = (tp_region *)malloc(size);
-		if (size > sizeof(tp_region))
+		if (size > SIZEOF(tp_region))
 			memset(tr_new, 0, size);
 	}
 	tr_new->reg = reg;				/* Add this region to end of list */
 	if (!reg->open)
 	{
-		VMS_ONLY(memcpy(&(tr_new->file.file_id), local_id_fiptr, sizeof(gd_id));)
+		VMS_ONLY(memcpy(&(tr_new->file.file_id), local_id_fiptr, SIZEOF(gd_id));)
 		UNIX_ONLY(tr_new->file.file_id = local_id.uid;)
 	} else
 		tr_new->file.fid_index = local_fid_index;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,7 @@ void jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	}
 #ifdef VMS
 	/* The following assert has been removed as it could be FALSE if the caller is "jnl_file_extend"
-	 *	assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)));
+	 *	assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid)));
 	 */
 #endif
 	assert(csa->now_crit);

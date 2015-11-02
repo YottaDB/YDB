@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ int op_rdone(mval *v, int4 timeout)
 	if (timeout < 0)
 		timeout = 0;
 	x = -1;
-	assert(sizeof(mint) == sizeof(x));
+	assert(SIZEOF(mint) == SIZEOF(x));
 	stat = (io_curr_device.in->disp_ptr->rdone)((mint *)&x, timeout);
 
 #if defined(KEEP_zOS_EBCDIC) || defined(VMS)

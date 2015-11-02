@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,9 +81,9 @@ void shmpool_buff_init(gd_region *reg)
 	csa = &FILE_INFO(reg)->s_addrs;
 	sbufh_p = csa->shmpool_buffer;
 	assert(0 == ((INTPTR_T)sbufh_p & (OS_PAGE_SIZE - 1)));	/* Locks and such optimally aligned */
-	memset(sbufh_p, 0, sizeof(shmpool_buff_hdr));
+	memset(sbufh_p, 0, SIZEOF(shmpool_buff_hdr));
 	SET_LATCH_GLOBAL(&sbufh_p->shmpool_crit_latch, LOCK_AVAILABLE);
-	len = SHMPOOL_BUFFER_SIZE - sizeof(shmpool_buff_hdr);	/* Length to build buffers with */
+	len = SHMPOOL_BUFFER_SIZE - SIZEOF(shmpool_buff_hdr);	/* Length to build buffers with */
 	elem_len = csa->hdr->blk_size + SIZEOF(shmpool_blk_hdr);
 	assert((len & ~7) == len);				/* Verify 8 byte alignment */
 	assert((elem_len & ~7) == elem_len);
@@ -446,7 +446,7 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 	*/
 	for (sblkh_p = (shmpool_blk_hdr_ptr_t)(sbufh_p + 1), blks = sbufh_p->total_blks;
 	     blks > 0;
-	     sblkh_p = (shmpool_blk_hdr_ptr_t)((char_ptr_t)sblkh_p + sizeof(shmpool_blk_hdr) + sbufh_p->blk_size), --blks)
+	     sblkh_p = (shmpool_blk_hdr_ptr_t)((char_ptr_t)sblkh_p + SIZEOF(shmpool_blk_hdr) + sbufh_p->blk_size), --blks)
 	{	/* For each block not free, check if it is assigned to a process and if so if that process exists.
 		   If not or if the block is already free, put on the free queue after a thorough cleaning.
 		*/

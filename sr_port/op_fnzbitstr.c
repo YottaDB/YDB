@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +26,7 @@ void op_fnzbitstr(mval *bitstr, int size, int truthval)
 	error_def(ERR_INVBITLEN);
 
 	n = (size + 7) / 8;
-	if (stringpool.top - stringpool.free < n + 1)
-		stp_gcol(n + 1);
+	ENSURE_STP_FREE_SPACE(n + 1);
 	byte_1 = (unsigned char *)stringpool.free;
 	if ((size <= 0) || (size > 253952))
 	{
@@ -39,8 +38,7 @@ void op_fnzbitstr(mval *bitstr, int size, int truthval)
 		memset((char *)stringpool.free + 1, 0xFF, n);
 		byte_n = byte_1 + n;
 		*byte_n &= mask[*byte_1];
-	}
-	else
+	} else
 		memset((char *)stringpool.free + 1, 0, n);
 	bitstr->mvtype = MV_STR;
 	bitstr->str.addr = (char *)stringpool.free;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,12 +31,12 @@
  * mur_forward() call to this routine does not change state of BROKEN_PROC
  * When mur_forward() finds correspinding PFIN record, it marks it FINISHED.
  */
-uint4		mur_pini_state(uint4 pini_addr, int state)
+uint4		mur_pini_state(jnl_ctl_list *jctl, uint4 pini_addr, int state)
 {
 	pini_list_struct	*plst;
 	uint4			status;
 
-	status = mur_get_pini(pini_addr, &plst);
+	status = mur_get_pini(jctl, pini_addr, &plst);
 	if (SS_NORMAL != status)
 		return status;
 	if (BROKEN_PROC == plst->state)

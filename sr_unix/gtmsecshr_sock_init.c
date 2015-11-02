@@ -64,6 +64,7 @@ int4 gtmsecshr_pathname_init(int caller)
 	mstr			secshrsock_lognam, secshrsock_transnam;
 	mstr			gtmsecshr_logname;
 	struct stat		buf;
+	int4			max_sock_path_len;
 
 	error_def(ERR_GTMSECSHRSOCKET);
 	error_def(ERR_LOGTOOLONG);
@@ -73,18 +74,27 @@ int4 gtmsecshr_pathname_init(int caller)
 		getjobnum();
 
 	secshrsock_lognam.addr = GTMSECSHR_SOCK_DIR;
-	secshrsock_lognam.len = sizeof(GTMSECSHR_SOCK_DIR) - 1;
+	secshrsock_lognam.len = SIZEOF(GTMSECSHR_SOCK_DIR) - 1;
 
-	status = TRANS_LOG_NAME(&secshrsock_lognam, &secshrsock_transnam, gtmsecshr_sockpath, sizeof(gtmsecshr_sockpath),
-					dont_sendmsg_on_log2long);
+	/* Get the maximum size of the path excluding the socket filename */
+	max_sock_path_len = SIZEOF(gtmsecshr_sock_name.sun_path) - MAX_SOCKFILE_NAME_LEN;
+	/* Make sure this length is atmost equal to the size of the buffer that will hold the socket path */
+	if (MAX_TRANS_NAME_LEN < max_sock_path_len)
+		max_sock_path_len = MAX_TRANS_NAME_LEN - MAX_SOCKFILE_NAME_LEN;
+
+	/* Get the value of the GTMSECSHR_SOCK_DIR logical from the environment. status will be SS_LOG2LONG if
+	 * the value is greater than max_sock_path_len
+	 */
+	status = TRANS_LOG_NAME(&secshrsock_lognam, &secshrsock_transnam, gtmsecshr_sockpath, max_sock_path_len,
+					do_sendmsg_on_log2long);
 	if ((SS_NORMAL != status) || !ABSOLUTE_PATH(gtmsecshr_sockpath))
 	{
 		if (SS_LOG2LONG == status)
 			gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, secshrsock_lognam.len, secshrsock_lognam.addr,
-				sizeof(gtmsecshr_sockpath) - 1);
+				max_sock_path_len);
 		ret_status = INVLOGNAME;
 		strcpy(gtmsecshr_sockpath, DEFAULT_GTMSECSHR_SOCK_DIR);
-		gtmsecshr_sockpath_len = sizeof(DEFAULT_GTMSECSHR_SOCK_DIR) - 1;
+		gtmsecshr_sockpath_len = SIZEOF(DEFAULT_GTMSECSHR_SOCK_DIR) - 1;
 	} else
 		gtmsecshr_sockpath_len = secshrsock_transnam.len;
 
@@ -114,15 +124,15 @@ int4 gtmsecshr_pathname_init(int caller)
 	gtmsecshr_sockpath_len += (SIZEOF(GTMSECSHR_SOCK_PREFIX) - 1);
 
 	gtmsecshr_logname.addr = GTMSECSHR_PATH;
-	gtmsecshr_logname.len = sizeof(GTMSECSHR_PATH) - 1;
+	gtmsecshr_logname.len = SIZEOF(GTMSECSHR_PATH) - 1;
 
 	if (SS_NORMAL !=
-		(status = TRANS_LOG_NAME(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path, sizeof(gtmsecshr_path),
+		(status = TRANS_LOG_NAME(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path, SIZEOF(gtmsecshr_path),
 						dont_sendmsg_on_log2long)))
 	{
 		if (SS_LOG2LONG == status)
 			gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_logname.len, gtmsecshr_logname.addr,
-				sizeof(gtmsecshr_path) - 1);
+				SIZEOF(gtmsecshr_path) - 1);
 		gtmsecshr_pathname.len = 0;
 		gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSOCKET, 3,
 			RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id, ERR_TEXT, 2,
@@ -150,7 +160,7 @@ int4 gtmsecshr_sock_init(int caller)
 	int			id_str_len;
 	int4			init_pathname_status;
 	unsigned char		id_str[MAX_ID_LEN+1], suffix;
-	unsigned char		pid_str[2 * sizeof(pid_t) + 1];
+	unsigned char		pid_str[2 * SIZEOF(pid_t) + 1];
 	int			i2hex_nofill(int , uchar_ptr_t, int);
 	int			stat_res;
 	struct stat     	stat_buf;
@@ -299,11 +309,11 @@ int4 gtmsecshr_sock_init(int caller)
 
 unsigned char *mypid2ascx(unsigned char *pid_str, pid_t pid)
 {
-	/* pid_str should accommodate atleast 2*sizeof(pid_t) + 1 characters */
+	/* pid_str should accommodate atleast 2*SIZEOF(pid_t) + 1 characters */
 
 	register unsigned char *cp;
 
-	cp = &pid_str[2*sizeof(pid_t)];
+	cp = &pid_str[2*SIZEOF(pid_t)];
 	*cp = '\0'; /* Null terminate the string */
 	while(cp > pid_str)
 	{

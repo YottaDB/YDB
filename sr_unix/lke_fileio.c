@@ -49,7 +49,7 @@ bool open_fileio(int *save_stderr)
 
 	*save_stderr = SYS_STDERR;
 	ofname.addr=ofnamebuf;
-	ofname.len=sizeof(ofnamebuf);
+	ofname.len=SIZEOF(ofnamebuf);
 	if (cli_present("OUTPUT") == CLI_PRESENT)
 	{
 		len = ofname.len;

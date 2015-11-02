@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@
    The low order bit can be used to denote busy or free so that is what
    is actually tested.
 
-   Inputs: 1) pointer to local bit map data (blk_ptr + sizeof(blk_hdr)).
+   Inputs: 1) pointer to local bit map data (blk_ptr + SIZEOF(blk_hdr)).
            2) bit offset to test into bitmap.
 */
 boolean_t gvcst_blk_is_allocated(uchar_ptr_t lbmap, int lm_offset)

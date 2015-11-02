@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@ void gtm_tempnam(char *dir, char *prefix, char *fullname)
 
 	if (NULL == dir)
 	{
-		len = sizeof(SCRATCH_DIR) - 1;
+		len = SIZEOF(SCRATCH_DIR) - 1;
 		memcpy(fullname, SCRATCH_DIR, len);
 	} else
 	{
@@ -42,7 +42,7 @@ void gtm_tempnam(char *dir, char *prefix, char *fullname)
 	if (NULL == prefix)
 	{
 		prefix = def_prefix;
-		len = sizeof(def_prefix) - 1;
+		len = SIZEOF(def_prefix) - 1;
 		memcpy(ptr, def_prefix, len);
 	} else
 	{

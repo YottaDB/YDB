@@ -217,7 +217,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
                         rts_error(VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
                         return FALSE;
                 }
-		size = sizeof(struct sockaddr_in);
+		size = SIZEOF(struct sockaddr_in);
 		rv = tcp_routines.aa_accept(socketptr->sd, &peer, &size);
 		if (-1 == rv)
 		{
@@ -292,10 +292,10 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		}
 	}
 		/* got the connection, create a new socket in the device socket list */
-		newsocketptr = (socket_struct *)malloc(sizeof(socket_struct));
+		newsocketptr = (socket_struct *)malloc(SIZEOF(socket_struct));
 		*newsocketptr = *socketptr;
 		newsocketptr->sd = rv;
-		memcpy(&newsocketptr->remote.sin, &peer, sizeof(struct sockaddr_in));
+		memcpy(&newsocketptr->remote.sin, &peer, SIZEOF(struct sockaddr_in));
 		SPRINTF(newsocketptr->remote.saddr_ip, "%s", tcp_routines.aa_inet_ntoa(peer.sin_addr));
 		newsocketptr->remote.port = GTM_NTOHS(peer.sin_port);
 		newsocketptr->state = socket_connected;
@@ -309,7 +309,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 		iosocket_handle(newsocketptr->handle, &newsocketptr->handle_len, TRUE, dsocketptr);
 		dsocketptr->socket[dsocketptr->n_socket++] = newsocketptr;
 		dsocketptr->current_socket = dsocketptr->n_socket - 1;
-		len = sizeof(CONNECTED) - 1;
+		len = SIZEOF(CONNECTED) - 1;
 		memcpy(&dsocketptr->dollar_key[0], CONNECTED, len);
 		dsocketptr->dollar_key[len++] = '|';
 		memcpy(&dsocketptr->dollar_key[len], newsocketptr->handle, newsocketptr->handle_len);
@@ -320,7 +320,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	{
 		assert(socket_connected == socketptr->state);
 		dsocketptr->current_socket = ii;
-		len = sizeof(READ) - 1;
+		len = SIZEOF(READ) - 1;
 		memcpy(&dsocketptr->dollar_key[0], READ, len);
 		dsocketptr->dollar_key[len++] = '|';
 		memcpy(&dsocketptr->dollar_key[len], socketptr->handle, socketptr->handle_len);

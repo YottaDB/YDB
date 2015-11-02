@@ -99,7 +99,7 @@ void op_gvquery (mval *v)
 			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 		}
 	}
-	v->mvtype = MV_STR;
+	v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
 	if (found)
 	{
 		if (acc_meth != dba_usr)
@@ -116,11 +116,7 @@ void op_gvquery (mval *v)
 		/* Need to return a double-quote for every single-quote; assume worst case. */
 		/* Account for ^ in both cases - extnam and no extnam */
 		maxlen = size + ((0 == extnam_str.len) ? 1 : ((extnam_str.len * 2) + (int)(STR_LIT_LEN(extnamdelim))));
-		if ((stringpool.top - stringpool.free) < maxlen)
-		{
-			v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
-			stp_gcol(maxlen);
-		}
+		ENSURE_STP_FREE_SPACE(maxlen);
 		extnamdst = stringpool.free;
 		*extnamdst++ = extnamdelim[0];
 		if (extnam_str.len > 0)
@@ -147,5 +143,6 @@ void op_gvquery (mval *v)
 			v->str.addr + v->str.len >= (char *)stringpool.base);
 	} else /* !found */
 		v->str.len = 0;
+	v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 	return;
 }

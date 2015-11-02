@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,12 @@
 #include "format_targ_key.h"
 #include "mlkdef.h"
 #include "zshow.h"
+#include "buddy_list.h"		/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "muprec.h"
+#include "real_len.h"		/* for real_len() prototype */
 
 #define	DELIMIT_CURR	*curr++ = '\\';
 #define ZERO_TIME_DELIM	"0,0\\"
@@ -44,8 +50,6 @@
 
 GBLREF	char		*jb_stop;
 GBLREF	char		muext_code[][2];
-LITREF	int		jrt_update[JRT_RECTYPES];
-LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 
 static	boolean_t	first_tstart = FALSE;
 static	int4		num_tstarts = 0;
@@ -71,15 +75,16 @@ char 	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char *ext_buff)
  * optimize things, and thus not update the buffer correctly. Problem shows up only in optimized builds. Moving it to
  * global status fixed the issue
  */
-GBLDEF char key_buff[sizeof(gv_key) + MAX_KEY_SZ + 7];
+GBLDEF char key_buff[SIZEOF(gv_key) + MAX_KEY_SZ + 7];
 
 char	*jnl2ext(char *jnl_buff, char *ext_buff)
 {
-  	char		*curr, *val_ptr, *ptr, rectype;
+  	char		*curr, *val_ptr, rectype;
+	unsigned char	*ptr;
 	jnl_record	*rec;
 	gv_key		*key;
-	jnl_string	*keystr;
-	int		val_extr_len, val_len, rec_len;
+	jnl_string	*keystr, *ztwormstr;
+	int		val_extr_len, val_len, rec_len, tid_len;
 
 	rec = (jnl_record *)jnl_buff;
 	rectype = rec->prefix.jrec_type;
@@ -95,6 +100,10 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		return ext_buff;
 	}
 	curr = ext_buff;
+	/* The following assumes the journal extract format is "GDSJEX04". Whenever that changes (in mur_jnl_ext.c),
+	 * the below code as well as ext2jnl.c needs to change. Add an assert to let us know of that event.
+	 */
+	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX04"));
 	if (IS_TUPD(rectype))
 	{
 		if (FALSE == first_tstart)
@@ -104,11 +113,11 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, ZERO_TIME_DELIM);
 			curr += STR_LIT_LEN(ZERO_TIME_DELIM);
-			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_kill.prefix.tn);
+			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.prefix.tn);
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, PIDS_DELIM);
 			curr += STR_LIT_LEN(PIDS_DELIM);
-			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_kill.token_seq.jnl_seqno);
+			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.token_seq.jnl_seqno);
 			*curr++ = '\n';
 			*curr = '\0';
 			first_tstart = TRUE;
@@ -132,7 +141,13 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 			curr += STR_LIT_LEN(PIDS_DELIM);
 			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_tcom.token_seq.jnl_seqno);
 			DELIMIT_CURR;
-			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_tcom.participants);
+			*curr = '1'; /* Only ONE TSTART..TCOM in the external filter format */
+			curr++;
+			DELIMIT_CURR;
+			ptr = (unsigned char *)rec->jrec_tcom.jnl_tid;
+			tid_len = real_len(SIZEOF(rec->jrec_tcom.jnl_tid), ptr);
+			memcpy(curr, ptr, tid_len);
+			curr += tid_len;
 			*curr++ = '\n';
 			*curr = '\0';
 			return curr;
@@ -145,6 +160,8 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		GET_SHORTP(curr, &muext_code[MUEXT_KILL][0]);
 	else if (IS_ZKILL(rectype))
 		GET_SHORTP(curr, &muext_code[MUEXT_ZKILL][0]);
+	else if (IS_ZTWORM(rectype))
+		GET_SHORTP(curr, &muext_code[MUEXT_ZTWORM][0]);
 	else /* if (JRT_NULL == rectype) */
 	{
 		assert(JRT_NULL == rectype);
@@ -154,22 +171,40 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	DELIMIT_CURR;
 	MEMCPY_LIT(curr, ZERO_TIME_DELIM);
 	curr += STR_LIT_LEN(ZERO_TIME_DELIM);
-	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_kill.prefix.tn);
+	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.prefix.tn);
 	DELIMIT_CURR;
 	MEMCPY_LIT(curr, PIDS_DELIM);
 	curr += STR_LIT_LEN(PIDS_DELIM);
-	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_kill.token_seq.jnl_seqno);
+	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.token_seq.jnl_seqno);
 	if (rectype == JRT_NULL)
 	{
 		*curr++ = '\n';
 		*curr='\0';
 		return curr;
 	}
-	assert(IS_SET_KILL_ZKILL(rectype));
 	DELIMIT_CURR;
-	keystr = (jnl_string *)&rec->jrec_kill.mumps_node;
-	ptr = (char *)ROUND_UP((unsigned long)key_buff, 8);
-	key = (gv_key *)ptr;
+	/* print "update_num" */
+	assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));
+	assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.update_num);
+	DELIMIT_CURR;
+	if (IS_ZTWORM(rectype))
+	{
+		ztwormstr = &rec->jrec_ztworm.ztworm_str;
+		val_len = ztwormstr->length;
+		val_ptr = &ztwormstr->text[0];
+		format2zwr((sm_uc_ptr_t)val_ptr, val_len, (uchar_ptr_t)curr, &val_extr_len);
+		curr += val_extr_len;
+		*curr++ = '\n';
+		*curr='\0';
+		return curr;
+	}
+	/* print "nodeflags" */
+	keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
+	curr = (char *)i2ascl((uchar_ptr_t)curr, keystr->nodeflags);
+	DELIMIT_CURR;
+	/* print "node" */
+	key = (gv_key *)ROUND_UP((unsigned long)key_buff, 8);
 	key->top = MAX_KEY_SZ;
 	key->end = keystr->length;
 	if (key->end > key->top)
@@ -185,7 +220,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		*curr++ = '=';
 		val_ptr = &keystr->text[keystr->length];
 		GET_MSTR_LEN(val_len, val_ptr);
-		val_ptr += sizeof(mstr_len_t);
+		val_ptr += SIZEOF(mstr_len_t);
 		format2zwr((sm_uc_ptr_t)val_ptr, val_len, (uchar_ptr_t)curr, &val_extr_len);
 		curr += val_extr_len;
 	}

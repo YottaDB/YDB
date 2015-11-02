@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -288,15 +288,16 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 	last_sub_null = (SBS_BLK_TYPE_STR == h1->type &&  0 == h1->addr.str->str.len && !local_collseq_stdnull);
 
 	/* format the output string */
-	if (stringpool.top - stringpool.free < varname->str.len + 1)
-		stp_gcol(varname->str.len + 1);
+	ENSURE_STP_FREE_SPACE(varname->str.len + 1);
 	PUSH_MV_STENT(MVST_MVAL);
 	v1 = &mv_chain->mv_st_cont.mvs_mval;
-	PUSH_MV_STENT(MVST_MVAL);
-	v2 = &mv_chain->mv_st_cont.mvs_mval;
 	v1->mvtype = MV_STR;
 	v1->str.len = 0;
 	v1->str.addr = (char *)stringpool.free;
+	PUSH_MV_STENT(MVST_MVAL);
+	v2 = &mv_chain->mv_st_cont.mvs_mval;
+	v2->mvtype = 0;	/* initialize it to 0 to avoid stp_gcol from getting confused if it gets invoked before v2 has been
+			 * completely setup. */
 	memcpy(stringpool.free, varname->str.addr, varname->str.len);
 	if (last_sub_null)
 	{
@@ -333,11 +334,11 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 				assert((unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv <=
 					(unsigned char *)h2->addr.intnum);
 				assert((unsigned char *)h2->addr.intnum <
-					(unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv + sizeof(sbs_blk));
-				if (stringpool.top - stringpool.free < MAX_NUM_SIZE)
+					(unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv + SIZEOF(sbs_blk));
+				if (!IS_STP_SPACE_AVAILABLE(MAX_NUM_SIZE))
 				{
 					v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
-					stp_gcol(MAX_NUM_SIZE);
+					INVOKE_STP_GCOL(MAX_NUM_SIZE);
 					assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 				}
 				j = (int)(h2->addr.intnum - parent->ptrs.val_ent.children->num->ptr.lv);
@@ -347,10 +348,10 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 					last_fnquery_return_sub[last_fnquery_return_subcnt++] = *v2;
 				break;
 			case SBS_BLK_TYPE_FLT:
-				if (stringpool.top - stringpool.free < MAX_NUM_SIZE)
+				if (!IS_STP_SPACE_AVAILABLE(MAX_NUM_SIZE))
 				{
 					v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
-					stp_gcol(MAX_NUM_SIZE);
+					INVOKE_STP_GCOL(MAX_NUM_SIZE);
 					assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 				}
 				MV_ASGN_FLT2MVAL(*v2, h2->addr.flt->flt);
@@ -360,7 +361,6 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 				break;
 			case SBS_BLK_TYPE_STR:
 				v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
-				v2->mvtype = MV_STR;
 				if (local_collseq)
 				{
 					ALLOC_XFORM_BUFF(&h2->addr.str->str);
@@ -373,15 +373,20 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 					v2->str = tmp_sbs.str;
 				} else
 					v2->str = h2->addr.str->str;
+				/* Now that v2->str has been initialized, initialize mvtype as well (doing this in the other
+				 * order could cause stp_gcol (if invoked in between) to get confused since v2->str is
+				 * uninitialized (in the M-stack).
+				 */
+				v2->mvtype = MV_STR;
 				mval_lex(v2, &format_out);
 				if (format_out.addr != (char *)stringpool.free)
 				{	/* We must put the string on the string pool ourself - mval_lex didn't do it
 					   because v2 is a canonical numeric string. It is canonical but has too many
 					   digits to be treated as a number. It must be output as a quoted string. */
-					if (stringpool.top - stringpool.free < v2->str.len + 2)
+					if (!IS_STP_SPACE_AVAILABLE(v2->str.len + 2))
 					{
 						v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
-						stp_gcol(v2->str.len + 2);
+						INVOKE_STP_GCOL(v2->str.len + 2);
 						assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 					}
 					*stringpool.free++ = '\"';
@@ -410,10 +415,10 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 			default:
 				GTMASSERT;
 		}
-		if (stringpool.top == stringpool.free)
+		if (!IS_STP_SPACE_AVAILABLE(1))
 		{
 			v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
-			stp_gcol(1);
+			INVOKE_STP_GCOL(1);
 			assert((char *)stringpool.free - v1->str.addr == v1->str.len);
 		}
 		*stringpool.free++ = (h2 < h1 ? ',' : ')');

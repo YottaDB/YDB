@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,18 +44,13 @@
 #include "gtmmsg.h"
 #include "wcs_flu.h"	/* for wcs_flu() prototype */
 
-GBLREF	jnl_ctl_list		*mur_jctl;
 GBLREF	reg_ctl_list		*mur_ctl;
-GBLREF	int			mur_regno;
 GBLREF	mur_gbls_t		murgbl;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	mur_opt_struct		mur_options;
-GBLREF	mur_rab_t		mur_rab;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-
-LITREF	int			jrt_update[];
 
 uint4 mur_process_intrpt_recov()
 {
@@ -78,14 +73,13 @@ uint4 mur_process_intrpt_recov()
 	error_def(ERR_JNLFSYNCERR);
 	error_def(ERR_TEXT);
 
-	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
+	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
-		gv_cur_region = rctl->gd;	/* mur_blocks_free and wcs_flu require this to be set */
+		gv_cur_region = rctl->gd;	/* wcs_flu requires this to be set */
 		cs_addrs = rctl->csa;
-		csd = cs_data = rctl->csd;	/* mur_blocks_free requires this to be set */
-		assert(rctl->csd == rctl->csa->hdr);
-		mur_jctl = jctl = rctl->jctl_turn_around;
-		assert(rctl->csd == rctl->csa->hdr);
+		csd = cs_data = rctl->csd;	/* MM logic after wcs_flu call requires this to be set */
+		assert(csd == rctl->csa->hdr);
+		jctl = rctl->jctl_turn_around;
 		max_jnl_alq = max_jnl_deq = max_autoswitchlimit = 0;
 		for (last_jctl = NULL ; (NULL != jctl); last_jctl = jctl, jctl = jctl->next_gen)
 		{
@@ -122,7 +116,7 @@ uint4 mur_process_intrpt_recov()
 		csd->blks_to_upgrd += rctl->blks_to_upgrd_adjust;
 		if (csd->blks_to_upgrd)
 			csd->fully_upgraded = FALSE;
-		jctl = mur_jctl;
+		jctl = rctl->jctl_turn_around;
 		csd->trans_hist.early_tn = csd->trans_hist.header_open_tn = jctl->turn_around_tn;
 		csd->trans_hist.curr_tn = csd->trans_hist.early_tn;	/* INCREMENT_CURR_TN macro not used but noted in comment
 									 * to identify all places that set curr_tn */
@@ -151,7 +145,7 @@ uint4 mur_process_intrpt_recov()
 		csd->trans_hist.free_blocks = rctl->trnarnd_free_blocks + (csd->trans_hist.total_blks - rctl->trnarnd_total_blks)
 			- DIVIDE_ROUND_UP(csd->trans_hist.total_blks, BLKS_PER_LMAP)
 			+ DIVIDE_ROUND_UP(rctl->trnarnd_total_blks, BLKS_PER_LMAP);
-		assert((freeblks = mur_blocks_free()) == csd->trans_hist.free_blocks);
+		assert((freeblks = mur_blocks_free(rctl)) == csd->trans_hist.free_blocks);
 		if (dba_bg == csd->acc_meth)
 			/* This is taken from bt_refresh() */
 			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = jctl->turn_around_tn - 1;
@@ -160,7 +154,7 @@ uint4 mur_process_intrpt_recov()
 		assert((dba_mm == cs_data->acc_meth) || (rctl->csd == cs_data));
 		rctl->csd = cs_data;
 	}
-	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
+	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
 		if (!rctl->jfh_recov_interrupted)
 			jctl = rctl->jctl_turn_around;
@@ -254,7 +248,7 @@ uint4 mur_process_intrpt_recov()
 			}
 			jfh_changed = FALSE;
 		}
-		memset(&jnl_info, 0, sizeof(jnl_info));
+		memset(&jnl_info, 0, SIZEOF(jnl_info));
 		jnl_info.status = jnl_info.status2 = SS_NORMAL;
 		jnl_info.prev_jnl = &prev_jnl_fn[0];
 		set_jnl_info(rctl->gd, &jnl_info);

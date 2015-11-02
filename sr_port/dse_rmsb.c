@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,6 +66,6 @@ void dse_rmsb(void)
 	patch_save_count--;
 	free(patch_save_set[i].bp);
 	memcpy(&patch_save_set[i], &patch_save_set[i + 1],
-				(patch_save_count - i) * sizeof(save_strct));
+				(patch_save_count - i) * SIZEOF(save_strct));
 	return;
 }

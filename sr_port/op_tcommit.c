@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,11 +57,25 @@
 #include "wbox_test_init.h"
 #include "memcoherency.h"
 #include "util.h"
+#include "op_tcommit.h"
+
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
+
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#endif
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
 error_def(ERR_TLVLZERO);
 error_def(ERR_TPRETRY);
+#ifdef GTM_TRIGGER
+error_def(ERR_TRIGTCOMMIT);
+#endif
 
 GBLREF	short			dollar_tlevel, dollar_trestart;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
@@ -84,16 +98,23 @@ GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	boolean_t		block_is_free;
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		skip_INVOKE_RESTART;
+GBLREF	int4			gtm_trigger_depth;
+GBLREF	int4			tstart_trigger_depth;
+#endif
 
-void	op_tcommit(void)
+enum cdb_sc	op_tcommit(void)
 {
 	boolean_t		blk_used, is_mm;
 	sm_uc_ptr_t		bmp;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned int		ctn;
-	int			cw_depth, cycle, len, old_cw_depth, sleep_counter;
+	int			cw_depth, cycle, len, old_cw_depth;
 	sgmnt_addrs		*csa, *next_csa;
 	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
 	sgm_info		*si, *temp_si;
 	enum cdb_sc		status;
 	cw_set_element		*cse, *last_cw_set_before_maps, *csetemp, *first_cse;
@@ -115,15 +136,43 @@ void	op_tcommit(void)
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	unsigned int		bsiz;
 	gd_region		*save_cur_region;	/* saved copy of gv_cur_region before TP_CHANGE_REG modifies it */
+	boolean_t		before_image_needed;
+	boolean_t		skip_invoke_restart;
+	uint4			update_trans;
 
+#	ifdef GTM_TRIGGER
+	DBGTRIGR((stderr, "op_tcommit: Entry \n"));
+	skip_invoke_restart = skip_INVOKE_RESTART;	/* note down global value in local variable */
+	skip_INVOKE_RESTART = FALSE;	/* reset global variable to default state as soon as possible */
+#	else
+	skip_invoke_restart = FALSE;	/* no triggers so set local variable to default state */
+#	endif
 	if (0 == dollar_tlevel)
 		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
 	assert(0 == jnl_fence_ctl.level);
 	status = cdb_sc_normal;
 	tp_kill_bitmaps = FALSE;
 
-	if (1 == dollar_tlevel)					/* real commit */
+	GTMTRIG_ONLY(
+		/* The value of $ztlevel at the time of the TSTART, i.e. tstart_trigger_depth, can never be GREATER than
+		 * the current $ztlevel as otherwise a TPQUIT error would have been issued as part of the QUIT of the
+		 * M frame of the TSTART (which has a deeper trigger depth). Assert that.
+		 */
+		assert(tstart_trigger_depth <= gtm_trigger_depth);
+	)
+	if (1 == dollar_tlevel)		/* real commit */
 	{
+		GTMTRIG_ONLY(
+			if (gtm_trigger_depth != tstart_trigger_depth)
+			{	/* TCOMMIT to $tlevel=0 is being attempted at a trigger depth which is NOT EQUAL TO the trigger
+				 * depth at the time of the TSTART. This means we have a gvcst_put/gvcst_kill frame in the
+				 * C stack that invoked us through gtm_trigger and is in an incomplete state waiting for the
+				 * trigger invocation to be done before completing the explicit (outside-trigger) update.
+				 * Cannot commit such a transaction. Issue error.
+				 */
+				rts_error(VARLSTCNT(1) ERR_TRIGTCOMMIT, gtm_trigger_depth, tstart_trigger_depth);
+			}
+		)
 		save_cur_region = gv_cur_region;
 		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 		if (NULL != first_sgm_info)	/* if (database work in the transaction) */
@@ -134,6 +183,7 @@ void	op_tcommit(void)
 				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 				csa = cs_addrs;
 				csd = cs_data;
+				cnl = csa->nl;
 				is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 				si->cr_array_index = 0;
 				if (!is_mm && (si->cr_array_size < (si->num_of_blks + (si->cw_set_depth * 2))))
@@ -142,24 +192,44 @@ void	op_tcommit(void)
 					 */
 					free(si->cr_array);
 					si->cr_array_size = si->num_of_blks + (si->cw_set_depth * 2);
-					si->cr_array = (cache_rec_ptr_ptr_t)malloc(sizeof(cache_rec_ptr_t) * si->cr_array_size);
+					si->cr_array = (cache_rec_ptr_ptr_t)malloc(SIZEOF(cache_rec_ptr_t) * si->cr_array_size);
 				}
 				assert(!is_mm || (0 == si->cr_array_size && NULL == si->cr_array));
-				/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is TRUE */
+				/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is non-zero */
 				assert((NULL == si->first_cw_set) || si->update_trans);
-				/* whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE
-				 * except when the set noop optimization is enabled */
-				assert((NULL != si->first_cw_set) || !si->update_trans || gvdupsetnoop);
+				/* Whenever si->first_cw_set is NULL, ensure that si->update_trans is FALSE
+				 * except when the duplicate set noop optimization is enabled in which case also ensure
+				 * that if the database is journaled, at least one journal record is being written.
+				 */
+				assert((NULL != si->first_cw_set) || !si->update_trans
+					|| (gvdupsetnoop && (!JNL_ENABLED(csa) || (NULL != si->jnl_head))));
 				if (NULL != si->first_cw_set)
-				{
+				{	/* at least one update to this region in this TP transaction */
 					assert(0 != si->cw_set_depth);
 					cw_depth = si->cw_set_depth;
 					/* Caution : since csa->backup_in_prog is initialized below only if si->first_cw_set is
 					 * non-NULL, it should be used in "tp_tend" only within an if (NULL != si->first_cw_set)
 					 */
-					csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb);
+					csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
 					jbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
-					read_before_image = ((NULL != jbp) || csa->backup_in_prog);
+#					ifdef GTM_SNAPSHOT
+					if (SNAPSHOTS_IN_PROG(cnl))
+					{
+						/* If snapshots are already in progress, then try to release the existing context
+						 * if a new one has started after we last updated csa->snapshot_in_prog
+						 */
+						if (SNAPSHOTS_IN_PROG(csa))
+							SS_RELEASE_IF_NEEDED(csa, cnl);
+						/* Try to create a new context if a new one has started after we last updated
+						 * csa->snapshot_in_prog. After this, with respect to snapshots all the remaining
+						 * transaction logic in t_end, bg_update_phase2 and secshr_db_clnup should use csa
+						 * and should not rely on cnl
+						 */
+						SS_INIT_IF_NEEDED(csa, cnl);
+					} else
+						csa->snapshot_in_prog = FALSE;
+#					endif
+					read_before_image = ((NULL != jbp) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));
 					/* The following section allocates new blocks required by the transaction it is done
 					 * before going crit in order to reduce the change of having to wait on a read while crit.
 					 * The trade-off is that if a newly allocated block is "stolen," it will cause a restart.
@@ -239,16 +309,15 @@ void	op_tcommit(void)
 							{
 								GET_CDB_SC_CODE(new_blk, status); /* code is set in status */
 								break;	/* transaction must attempt restart */
-							}
-							/* No need to write before-image in case the block is FREE. In case the
-							 * database had never been fully upgraded from V4 to V5 format (after the
-							 * MUPIP UPGRADE), all RECYCLED blocks can basically be considered FREE
-							 * (i.e. no need to write before-images since backward journal recovery
-							 * will never be expected to take the database to a point BEFORE the
-							 * mupip upgrade).
-							 */
-							if (read_before_image && blk_used && csd->db_got_to_v5_once)
+							} else
+								cse->was_free = !blk_used;
+							BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, new_blk,
+										before_image_needed);
+							if (!before_image_needed)
+								cse->old_block = NULL;
+							else
 							{
+								block_is_free = cse->was_free;
 								cse->old_block = t_qread(new_blk,
 										(sm_int_ptr_t)&cse->cycle, &cse->cr);
 								old_block = (blk_hdr_ptr_t)cse->old_block;
@@ -257,7 +326,9 @@ void	op_tcommit(void)
 									status = (enum cdb_sc)rdfail_detail;
 									break;
 								}
-								if ((NULL != jbp) && (old_block->tn < jbp->epoch_tn))
+								if (!cse->was_free
+									&& (NULL != jbp) && (old_block->tn < jbp->epoch_tn))
+
 								{	/* Compute CHECKSUM for writing PBLK record before crit.
 									 * It is possible that we are reading a block that is
 									 * actually marked free in the bitmap (due to concurrency
@@ -275,8 +346,7 @@ void	op_tcommit(void)
 									JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, csa,
 													old_block, bsiz);
 								}
-							} else
-								cse->old_block = NULL;
+							}
 							cse->blk = new_blk;
 							cse->mode = gds_t_acquired;
 							assert(GDSVCURR == cse->ondsk_blkver);
@@ -305,26 +375,28 @@ void	op_tcommit(void)
 								assert(csa->now_crit == (FILE_INFO(tr->reg)->s_addrs.now_crit));
 						)
 						if (!csa->now_crit)
-							WAIT_ON_INHIBIT_KILLS(csa->nl, MAXWAIT2KILL);
+							WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 						/* temp_si is to maintain index into sgm_info_ptr list till which DECR_CNTs
 						 * have to be done incase abnormal status or tp_tend fails/succeeds
 						 */
 						temp_si = si->next_sgm_info;
 					}
-				} else	/* if (at least one set in segment) */
+				} else	/* if (at least one update in segment) */
 					assert(0 == si->cw_set_depth);
 			}	/* for (all segments in the transaction) */
 			if (cdb_sc_normal != status)
 			{
 				t_fail_hist[t_tries] = status;
 				SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-				TP_RETRY_ACCOUNTING(csa, csa->nl, status);
+				TP_RETRY_ACCOUNTING(csa, cnl, status);
 			}
 			if ((cdb_sc_normal == status) && tp_tend())
 				;
 			else	/* commit failed BEFORE invoking or DURING "tp_tend" */
 			{
-				assert(cdb_sc_normal != t_fail_hist[t_tries]);	/* else will go into an infinite try loop */
+				if (cdb_sc_normal == status) /* get failure return code from tp_tend (stored in t_fail_hist) */
+					status = t_fail_hist[t_tries];
+				assert(cdb_sc_normal != status);	/* else will go into an infinite try loop */
 				DEBUG_ONLY(
 					for (si = first_sgm_info;  si != temp_si; si = si->next_sgm_info)
 						assert(NULL == si->kip_csa);
@@ -334,23 +406,26 @@ void	op_tcommit(void)
 					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, cse->blk_target->last_rec, TRUE)))
 						end = &buff[MAX_ZWR_KEY_SZ - 1];
 					rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
-				} else
+				} else if (!skip_invoke_restart)
 					INVOKE_RESTART;
-				return;
+				GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return status = %d\n", status));)
+				return status;	/* return status to caller who cares about it */
 			}
 			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
-			if (jgbl.wait_for_jnl_hard && !is_updproc && !mupip_jnl_recover)
+			csa = jnl_fence_ctl.fence_list;
+			if ((JNL_FENCE_LIST_END != csa) && jgbl.wait_for_jnl_hard && !is_updproc && !mupip_jnl_recover)
 			{	/* For mupip journal recover all transactions applied during forward phase are treated as
 			   	 * BATCH transaction for performance gain, since the recover command can be reissued like
 			   	 * a batch restart. Similarly update process considers all transactions as BATCH */
-				if (JNL_FENCE_LIST_END != (csa = jnl_fence_ctl.fence_list))
-				{
-					for ( ; JNL_FENCE_LIST_END != csa;  csa = csa->next_fenced)
-					{	/* only those regions that are actively journaling will appear in the list: */
-						TP_CHANGE_REG_IF_NEEDED(csa->jnl->region);
-						jnl_wait(csa->jnl->region);
-					}
-				}
+				do
+				{	/* only those regions that are actively journaling and had a TCOM record
+					 * written as part of this TP transaction will appear in the list.
+					 */
+					assert(NULL != csa);
+					TP_CHANGE_REG_IF_NEEDED(csa->jnl->region);
+					jnl_wait(csa->jnl->region);
+					csa = csa->next_fenced;
+				} while (JNL_FENCE_LIST_END != csa);
 			}
 		} else if ((CDB_STAGNATE <= t_tries) && (NULL != tp_reg_list))
 		{	/* this is believed to be a case of M-lock work with no database work. release crit on all regions */
@@ -392,7 +467,9 @@ void	op_tcommit(void)
 	} else		/* an intermediate commit */
 		tp_incr_commit();
 	assert(0 < dollar_tlevel);
-	tp_unwind(dollar_tlevel - 1, COMMIT_INVOCATION);
+	tp_unwind(dollar_tlevel - 1, COMMIT_INVOCATION, NULL);
 	if (0 == dollar_tlevel) /* real commit */
 		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
+	GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return NORMAL status\n"));)
+	return cdb_sc_normal;
 }

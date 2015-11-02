@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,17 +33,17 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 	/* Write the file header */
 	memset((char *)header, 0, JNL_HDR_LEN);
 	memcpy(header->label, JNL_LABEL_TEXT, STR_LIT_LEN(JNL_LABEL_TEXT));
+	header->is_little_endian = GTM_IS_LITTLE_ENDIAN;
 	assert(NULL != prc_vec);
 	JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, jgbl.gbl_jrec_time);
-	memcpy(&header->who_created, (unsigned char*)prc_vec, sizeof(jnl_process_vector));
-	memcpy(&header->who_opened,  (unsigned char*)prc_vec, sizeof(jnl_process_vector));
+	memcpy(&header->who_created, (unsigned char*)prc_vec, SIZEOF(jnl_process_vector));
+	memcpy(&header->who_opened,  (unsigned char*)prc_vec, SIZEOF(jnl_process_vector));
 	/* EPOCHs are written unconditionally in Unix while they are written only for BEFORE_IMAGE in VMS */
 	if (JNL_HAS_EPOCH(info))
 		header->end_of_data = JNL_HDR_LEN + PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN;
 	else
 		header->end_of_data = JNL_HDR_LEN + PINI_RECLEN + PFIN_RECLEN;
-	header->max_phys_reclen = info->max_phys_reclen;
-	header->max_logi_reclen = info->max_logi_reclen;
+	header->max_jrec_len = info->max_jrec_len;
 	header->bov_timestamp = jgbl.gbl_jrec_time;
 	header->eov_timestamp = jgbl.gbl_jrec_time;
 	header->bov_tn = info->tn;

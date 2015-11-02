@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
@@ -18,6 +20,18 @@
 #include "unw_retarg.h"
 #include "unwind_nocounts.h"
 #include "error_trap.h"
+#include "error.h"
+#include "hashtab_mname.h"
+#include "hashtab.h"
+#include "lv_val.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "alias.h"
+#include "min_max.h"
+#include "get_ret_targ.h"
 
 GBLREF	void		(*unw_prof_frame_ptr)(void);
 GBLREF	stack_frame	*frame_pointer, *zyerr_frame;
@@ -25,35 +39,96 @@ GBLREF	unsigned char	*msp,*stackbase,*stacktop;
 GBLREF	mv_stent	*mv_chain;
 GBLREF	tp_frame	*tp_pointer;
 GBLREF	boolean_t	is_tracing_on;
+GBLREF	symval		*curr_symval;
+GBLREF	mval		*alias_retarg;
+
+LITREF	mval 		literal_null;
 
 /* this has to be maintained in parallel with op_unwind(), the unwind without a return argument (intrinsic quit) routine */
-int unw_retarg(mval *src)
+int unw_retarg(mval *src, boolean_t alias_return)
 {
 	mval		ret_value, *trg;
-	bool		got_ret_target;
+	boolean_t	got_ret_target;
+	stack_frame	*prevfp;
+	lv_val		*srclv, *srclvc;
+	int4		srcsymvlvl;
 
-	error_def(ERR_STACKUNDERFLO);
+	error_def(ERR_ALIASEXPECTED);
 	error_def(ERR_NOTEXTRINSIC);
+	error_def(ERR_STACKUNDERFLO);
 	error_def(ERR_TPQUIT);
 
+	assert(NULL == alias_retarg);
+	alias_retarg = NULL;
+	DBGEHND_ONLY(prevfp = frame_pointer);
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)
 		rts_error(VARLSTCNT(1) ERR_TPQUIT);
 	assert(msp <= stackbase && msp > stacktop);
 	assert(mv_chain <= (mv_stent *)stackbase && mv_chain > (mv_stent *)stacktop);
 	assert(frame_pointer <= (stack_frame *)stackbase && frame_pointer > (stack_frame *)stacktop);
-	MV_FORCE_DEFINED(src);
-	ret_value = *src;
+	got_ret_target = FALSE;
+	/* Before we do any unwinding or even verify the existence of the return var, check to see if we are returning
+	 * an alias (or container). We do this now because (1) alias returns don't need to be defined and (2) the returning
+	 * item could go out of scope in the unwinds so we have to bump the returned item's reference counts NOW.
+	 */
+	if (!alias_return)
+	{	/* Return of "regular" value - Verify it exists */
+		MV_FORCE_DEFINED(src);
+		ret_value = *src;
+		ret_value.mvtype &= ~MV_ALIASCONT;	/* Make sure alias container of regular return does not propagate */
+	} else
+	{	/* QUIT *var or *var(indx..) syntax was used - see which one it was */
+		srclv = (lv_val *)src;		/* Since can never be an expression, this relationship is guarranteed */
+		if (MV_SBS == srclv->ptrs.val_ent.parent.sbs->ident)
+		{	/* Have a potential container var - verify */
+			if (!(MV_ALIASCONT & srclv->v.mvtype))
+				rts_error(VARLSTCNT(1) ERR_ALIASEXPECTED);
+			ret_value = *src;
+			srclvc = (lv_val *)srclv->v.str.addr;
+			assert(MV_SYM == srclvc->ptrs.val_ent.parent.sym->ident);	/* Verify base var */
+			assert(srclvc->stats.trefcnt >= srclvc->stats.crefcnt);
+			assert(1 <= srclvc->stats.crefcnt);				/* Verify is existing container ref */
+			MARK_ALIAS_ACTIVE(MIN(srclv->ptrs.val_ent.parent.sbs->sym->symvlvl,
+					      srclvc->ptrs.val_ent.parent.sym->symvlvl));
+			DBGRFCT((stderr, "unw_retarg: Returning alias container 0x"lvaddr" pointing to 0x"lvaddr" to caller\n",
+				 src, srclvc));
+		} else
+		{	/* Creating a new alias - create a container to pass back */
+			memcpy(&ret_value, &literal_null, SIZEOF(mval));
+			ret_value.mvtype |= MV_ALIASCONT;
+			ret_value.str.addr = (char *)srclv;
+			srclvc = srclv;
+			MARK_ALIAS_ACTIVE(srclv->ptrs.val_ent.parent.sym->symvlvl);
+			DBGRFCT((stderr, "unw_retarg: Returning alias 0x"lvaddr" to caller\n", srclvc));
+		}
+		INCR_TREFCNT(srclvc);
+		INCR_CREFCNT(srclvc);		/* This increment will be reversed if this container gets put into an alias */
+		/* We have a slight chicken-and-egg problem now. The mv_stent unwind loop below may pop a symbol table thus
+		 * destroying the lv_val in our container. To prevent this, we need to locate the parm block before the symval is
+		 * unwound and set the return value and alias_retarg appropriately so the symtab unwind logic called by
+		 * unw_mv_ent() can work any necessary relocation magic on the return var.
+		 */
+		trg = get_ret_targ(NULL);
+		if (NULL != trg)
+		{
+			*trg = ret_value;
+			alias_retarg = trg;
+			got_ret_target = TRUE;
+		} /* else fall into below which will raise the NOTEXTRINSIC error */
+	}
 	/* Note: we are unwinding uncounted (indirect) frames here to allow
 	   the QUIT command to have indirect arguments and thus be executed by
 	   commarg in an indirect frame. By unrolling the indirect frames here
 	   we get back to the point where we can find where to put the quit value.
 	*/
 	unwind_nocounts();
-	got_ret_target = FALSE;
 	while (mv_chain < (mv_stent *)frame_pointer)
 	{
 		msp = (unsigned char *)mv_chain;
-		if (trg = unw_mv_ent(mv_chain)) /* CAUTION : Assignment */
+		/* If this is an alias_return arg, still do the unwind but bypass the arg set logic which was
+		 * already taken care of above.
+		 */
+		if ((trg = unw_mv_ent(mv_chain)) && !alias_return) /* CAUTION : Assignment */
 		{
 			assert(!got_ret_target);
 			got_ret_target = TRUE;
@@ -69,8 +144,9 @@ int unw_retarg(mval *src)
 	INVOKE_ERROR_RET_IF_NEEDED;
 	if (is_tracing_on)
 		(*unw_prof_frame_ptr)();
-	msp = (unsigned char *)frame_pointer + sizeof(stack_frame);
+	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	frame_pointer = frame_pointer->old_frame_pointer;
+	DBGEHND((stderr, "unw_retarg: Stack frame 0x%016lx unwound - frame 0x%016lx now current\n", prevfp, frame_pointer));
 	if (NULL != zyerr_frame && frame_pointer > zyerr_frame)
 		zyerr_frame = NULL;
 	if (!frame_pointer)

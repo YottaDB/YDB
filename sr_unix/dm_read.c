@@ -195,8 +195,8 @@ void	dm_read (mval *v)
 
 	if (comline_base == NULL)
 	{
-		comline_base = (mstr *)malloc(MAX_RECALL * sizeof(mstr));
-		memset(comline_base, 0, (MAX_RECALL * sizeof(mstr)));
+		comline_base = (mstr *)malloc(MAX_RECALL * SIZEOF(mstr));
+		memset(comline_base, 0, (MAX_RECALL * SIZEOF(mstr)));
 	}
 	active_device = io_curr_device.in;
 	io_ptr = io_curr_device.in;
@@ -204,6 +204,7 @@ void	dm_read (mval *v)
 	assert (io_ptr->state == dev_open);
 	if (tt == io_curr_device.out->type)
 		iott_flush(io_curr_device.out);
+	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 
 	/* -----------------------------
@@ -212,7 +213,7 @@ void	dm_read (mval *v)
 	 */
 
 	length = tt_ptr->in_buf_sz + ESC_LEN;
-	exp_length = utf8_active ? (uint4)((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t)) : length;
+	exp_length = utf8_active ? (uint4)((SIZEOF(wint_t) * length) + (GTM_MB_LEN_MAX * length) + SIZEOF(gtm_int64_t)) : length;
 	zint_restart = FALSE;
 	if (tt_ptr->mupintr)
 	{	/* restore state to before job interrupt */
@@ -242,15 +243,15 @@ void	dm_read (mval *v)
 			{	/* need to properly align U32 buffer */
 				assert(exp_length == tt_state->exp_length);
 				buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(buffer_start + (GTM_MB_LEN_MAX * length)),
-							sizeof(gtm_int64_t));
-				if (buffer_moved &&
-				    (((INTPTR_T)buffer_32_start & 0x7) != ((INTPTR_T)tt_state->buffer_32_start & 0x7)))
+							SIZEOF(gtm_int64_t));
+				if (buffer_moved && (((unsigned char *)buffer_32_start - buffer_start)
+						!= ((unsigned char *)tt_state->buffer_32_start - tt_state->buffer_start)))
 					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
-						- tt_state->buffer_start), (sizeof(wint_t) * length));
+						- tt_state->buffer_start), (SIZEOF(wint_t) * length));
 				current_32_ptr = buffer_32_start;
 				utf8_more = tt_state->utf8_more;
 				more_ptr = tt_state->more_ptr;
-				memcpy(more_buf, tt_state->more_buf, sizeof(more_buf));
+				memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
 			}
 			instr = tt_state->instr;
 			outlen = tt_state->outlen;
@@ -259,6 +260,7 @@ void	dm_read (mval *v)
 			dx_instr = tt_state->dx_instr;
 			dx_outlen = tt_state->dx_outlen;
 			index = tt_state->index;
+			insert_mode = tt_state->insert_mode;
 			cl = tt_state->cl;
 			escape_length = tt_state->escape_length;
 			memcpy(escape_sequence, tt_state->escape_sequence, ESC_LEN);
@@ -269,13 +271,12 @@ void	dm_read (mval *v)
 	}
 	if (!zint_restart)
 	{
-		if (stringpool.free + exp_length > stringpool.top)
-			stp_gcol(exp_length);
+		ENSURE_STP_FREE_SPACE(exp_length);
 		buffer_start = current_ptr = stringpool.free;
 		if (utf8_active)
 		{
 			buffer_32_start = (wint_t *)ROUND_UP2((INTPTR_T)(stringpool.free + (GTM_MB_LEN_MAX * length)),
-					sizeof(gtm_int64_t));
+					SIZEOF(gtm_int64_t));
 			current_32_ptr = buffer_32_start;
 		}
 		instr = outlen = 0;
@@ -291,7 +292,6 @@ void	dm_read (mval *v)
 	mask = tt_ptr->term_ctrl;
 	mask_term = tt_ptr->mask_term;
 	mask_term.mask[ESC / NUM_BITS_IN_INT4] &= ~(1 << ESC);
-	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);
 	ioptr_width = io_ptr->width;
 	if (!zint_restart)
 	{
@@ -326,7 +326,7 @@ void	dm_read (mval *v)
 					tt_state->buffer_32_start = buffer_32_start;
 					tt_state->utf8_more = utf8_more;
 					tt_state->more_ptr = more_ptr;
-					memcpy(tt_state->more_buf, more_buf, sizeof(more_buf));
+					memcpy(tt_state->more_buf, more_buf, SIZEOF(more_buf));
 				}
 				if (buffer_start == stringpool.free)
 					stringpool.free += exp_length;	/* reserve space */
@@ -337,6 +337,7 @@ void	dm_read (mval *v)
 				tt_state->dx_instr = dx_instr;
 				tt_state->dx_outlen = dx_outlen;
 				tt_state->index = index;
+				tt_state->insert_mode = insert_mode;
 				tt_state->cl = cl;
 				tt_state->escape_length = escape_length;
 				memcpy(tt_state->escape_sequence, escape_sequence, ESC_LEN);
@@ -556,7 +557,7 @@ void	dm_read (mval *v)
 				{	/* recall buffer kept as UTF-8 */
 					boolean_t	matched = TRUE;
 					char		*recptr = RECALL;
-					for (match_length = 0; (sizeof(RECALL) - 1) > match_length && outlen > match_length;
+					for (match_length = 0; (SIZEOF(RECALL) - 1) > match_length && outlen > match_length;
 							match_length++)
 					{
 						if (ASCII_MAX < GET_OFF(match_length) ||
@@ -566,13 +567,13 @@ void	dm_read (mval *v)
 							break;
 						}
 					}
-					if (!matched && outlen > match_length && ((sizeof(REC) - 1) == match_length ||
-						sizeof(RECALL) == match_length) && (' ' == GET_OFF(match_length) ||
+					if (!matched && outlen > match_length && ((SIZEOF(REC) - 1) == match_length ||
+						SIZEOF(RECALL) == match_length) && (' ' == GET_OFF(match_length) ||
 						'\t' == GET_OFF(match_length)))
 							matched = TRUE;		/* REC or RECALL then space or tab */
 					else if (matched)
-						if ((sizeof(RECALL) - 1) != match_length &&
-							(sizeof(REC) - 1) != match_length)
+						if ((SIZEOF(RECALL) - 1) != match_length &&
+							(SIZEOF(REC) - 1) != match_length)
 							matched = FALSE;	/* wrong size */
 						else if (outlen > match_length && (' ' != GET_OFF(match_length) &&
 									'\t' != GET_OFF(match_length)))
@@ -638,9 +639,9 @@ void	dm_read (mval *v)
 						}
 
 						cur_cl = clmod(comline_index - m);
-						DOWRITE_A(tt_ptr->fildes, temp_str, sizeof(temp_str));
+						DOWRITE_A(tt_ptr->fildes, temp_str, SIZEOF(temp_str));
 						write_str((unsigned char *)comline_base[cur_cl].addr,
-							comline_base[cur_cl].len, sizeof(temp_str), TRUE, TRUE);
+							comline_base[cur_cl].len, SIZEOF(temp_str), TRUE, TRUE);
 						DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
 					}
 

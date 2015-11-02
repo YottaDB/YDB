@@ -38,7 +38,7 @@ void	db_csh_ref(sgmnt_addrs *csa)
 	if (!is_mm)
 	{
 		longset((uchar_ptr_t)csa->acc_meth.bg.cache_state,
-			sizeof(cache_que_heads) + (csd->bt_buckets + csd->n_bts - 1) * sizeof(cache_rec),
+			SIZEOF(cache_que_heads) + (csd->bt_buckets + csd->n_bts - 1) * SIZEOF(cache_rec),
 			0);						/* -1 since there is a cache_rec in cache_que_heads */
 		cr = cr1 = csa->acc_meth.bg.cache_state->cache_array;
 		buffer_size = csd->blk_size;
@@ -46,17 +46,17 @@ void	db_csh_ref(sgmnt_addrs *csa)
 		assert(0 == buffer_size % DISK_BLOCK_SIZE);
 		SET_LATCH_GLOBAL(&csa->acc_meth.bg.cache_state->cacheq_active.latch, LOCK_AVAILABLE);
 		SET_LATCH_GLOBAL(&csa->acc_meth.bg.cache_state->cacheq_wip.latch, LOCK_AVAILABLE);
-		rec_size = sizeof(cache_rec);
+		rec_size = SIZEOF(cache_rec);
 	}
 	else
 	{
 		longset((uchar_ptr_t)csa->acc_meth.mm.mmblk_state,
-			sizeof(mmblk_que_heads) + (csd->bt_buckets + csd->n_bts - 1) * sizeof(mmblk_rec),
+			SIZEOF(mmblk_que_heads) + (csd->bt_buckets + csd->n_bts - 1) * SIZEOF(mmblk_rec),
 			0);						/* -1 since there is a mmblk_rec in mmblk_que_heads */
 		cr = cr1 = (cache_rec_ptr_t)csa->acc_meth.mm.mmblk_state->mmblk_array;
 		SET_LATCH_GLOBAL(&csa->acc_meth.mm.mmblk_state->mmblkq_active.latch, LOCK_AVAILABLE);
 		SET_LATCH_GLOBAL(&csa->acc_meth.mm.mmblk_state->mmblkq_wip.latch, LOCK_AVAILABLE);
-		rec_size = sizeof(mmblk_rec);
+		rec_size = SIZEOF(mmblk_rec);
 	}
 
 	cnl = csa->nl;

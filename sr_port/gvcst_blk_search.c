@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,6 +99,31 @@ GBLREF unsigned int	t_tries;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 
+#ifdef DEBUG
+#include "gdscc.h"
+
+#define	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat)				\
+{										\
+	GBLREF	short		dollar_tlevel;					\
+										\
+	srch_blk_status		*tp_srch_status;				\
+	cw_set_element		*cse;						\
+										\
+	if (dollar_tlevel)							\
+	{									\
+		tp_srch_status = pStat->first_tp_srch_status;			\
+		if (NULL != tp_srch_status)					\
+		{								\
+			cse = tp_srch_status->cse;				\
+			if (NULL != cse)					\
+				assert(cse->new_buff == pStat->buffaddr);	\
+		}								\
+	}									\
+}
+#else
+#define	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat)
+#endif
+
 #define	INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat)	if (CDB_STAGNATE <= t_tries) gvcst_search_fail(pStat);
 
 static	void	gvcst_search_fail(srch_blk_status *pStat)
@@ -139,21 +164,21 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 {
 	/* register variables named in perceived order of declining impact */
-	register int	nFlg, nTargLen, nMatchCnt, nTmp;
-	sm_uc_ptr_t	pBlkBase, pRecBase, pTop, pRec, pPrevRec;
-	unsigned char	*pCurrTarg, *pTargKeyBase;
-	unsigned short	nRecLen;
+	register int		nFlg, nTargLen, nMatchCnt, nTmp;
+	sm_uc_ptr_t		pBlkBase, pRecBase, pTop, pRec, pPrevRec;
+	unsigned char		*pCurrTarg, *pTargKeyBase;
+	unsigned short		nRecLen;
 
 	/* the following load code (and code in a few other places) is coded in a "assember" style
 	 * in an attempt to encourage the compiler to get it efficient;
 	 * if instance, memory and non-memory instructions are interlaced to encourge pipelining.
 	 * of course a great compiler doesn't need help, but this is portable code and ...
 	 */
-
+	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat);
 	pBlkBase = pStat->buffaddr;
 	pRecBase = pBlkBase;
 	pTop = pBlkBase + ((blk_hdr_ptr_t)pBlkBase)->bsiz;
-	nRecLen = sizeof(blk_hdr);
+	nRecLen = SIZEOF(blk_hdr);
 	pCurrTarg = pKey->base;
 	nMatchCnt = 0;
 	nTargLen = (int)pKey->end;
@@ -201,7 +226,7 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 		{	/* Terminate on compression count < previous match,
 			   this key is after the target */
 			if (nRecLen == BSTAR_REC_SIZE  &&  ((blk_hdr_ptr_t)pBlkBase)->levl != 0)
-				/* Star key has size of sizeof(rec_hdr) + sizeof(block_id), make match = 0 */
+				/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
 				nTargLen = 0;
 			else
 				/* Data block, make match = current compression count */
@@ -210,7 +235,7 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 		}
 
 		/* Compression count == match count;  Compare current target with current record */
-		pRec += sizeof(rec_hdr);
+		pRec += SIZEOF(rec_hdr);
 
 		do
 		{
@@ -224,7 +249,7 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 		else
 		{	/* Key is after target*/
 			if (nRecLen == BSTAR_REC_SIZE  &&  (((blk_hdr_ptr_t)pBlkBase)->levl != 0))
-				/* Star key has size of sizeof(rec_hdr) + sizeof(block_id), make match = 0 */
+				/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
 				nTargLen = 0;
 			else
 				nTargLen = (int)(pCurrTarg - pTargKeyBase);
@@ -246,15 +271,16 @@ enum cdb_sc 	gvcst_search_blk (gv_key *pKey, srch_blk_status *pStat)
 enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOldKey)
 {
 	/* register variables named in perceived order of declining impact */
-	register int	nFlg, nTargLen, nMatchCnt, nTmp;
-	sm_uc_ptr_t	pBlkBase, pRecBase, pRec, pTop, pPrevRec;
-	unsigned char	*pCurrTarg, *pTargKeyBase, *pOldKeyBase, *pCurrTargPos;
-	unsigned short	nRecLen;
+	register int		nFlg, nTargLen, nMatchCnt, nTmp;
+	sm_uc_ptr_t		pBlkBase, pRecBase, pRec, pTop, pPrevRec;
+	unsigned char		*pCurrTarg, *pTargKeyBase, *pOldKeyBase, *pCurrTargPos;
+	unsigned short		nRecLen;
 
 	/* see comment in gvcst_search_blk above on coding style */
 
 	if (pStat->prev_rec.offset == 0)
 		return gvcst_search_blk(pKey, pStat);	/* nice clean start at the begining of a block */
+	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat);
 	pBlkBase = pStat->buffaddr;
 	pRecBase = pBlkBase + pStat->curr_rec.offset;
 	pRec = pRecBase;
@@ -370,7 +396,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 /* cc_term: */		{	/* Terminated on compression count < previous match,
 				   this key is after the target */
 				if (nRecLen == BSTAR_REC_SIZE  &&  ((blk_hdr_ptr_t)pBlkBase)->levl != 0)
-					/* Star key has size of sizeof(rec_hdr) + sizeof(block_id), make match = 0 */
+					/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
 					nTargLen = 0;
 				else
 					/* Data block, make match = current compression count */
@@ -378,7 +404,7 @@ enum cdb_sc	gvcst_search_tail (gv_key *pKey, srch_blk_status *pStat, gv_key *pOl
 				break;
 			}
 alt_loop_entry:		/* Compression count == match count;  Compare current target with current record */
-			pRec += sizeof(rec_hdr);
+			pRec += SIZEOF(rec_hdr);
 			do
 			{
 				if ((nFlg = *pCurrTarg - *pRec++) != 0)
@@ -390,7 +416,7 @@ alt_loop_entry:		/* Compression count == match count;  Compare current target wi
 			else
 match_term:		{	/* Key is after target*/
 				if (nRecLen == BSTAR_REC_SIZE  &&  (((blk_hdr_ptr_t)pBlkBase)->levl != 0))
-					/* Star key has size of sizeof(rec_hdr) + sizeof(block_id), make match = 0 */
+					/* Star key has size of SIZEOF(rec_hdr) + SIZEOF(block_id), make match = 0 */
 					nTargLen = 0;
 				else
 					nTargLen = (int)(pCurrTarg - pTargKeyBase);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void gvcmz_lksublist(struct CLB *lnk)
 	while (lk_walk)
 	{
 		len = 1 + 1 + 1 + lk_walk->total_length; /* regnum + translev + subsc count + key */
-		if (msg_len + len + sizeof(len) >= lnk->mbl)
+		if (msg_len + len + SIZEOF(len) >= lnk->mbl)
 		{
 			*hdr = CMMS_L_LKREQNODE;
 			*list_len = count;
@@ -64,7 +64,7 @@ void gvcmz_lksublist(struct CLB *lnk)
 		}
 		len = 1 + 1 + 1 + lk_walk->total_length; /* regnum + translev + subsc count + key */
 		CM_PUT_USHORT(ptr, len, ((link_info *)(lnk->usr))->convert_byteorder);
-		ptr += sizeof(unsigned short);
+		ptr += SIZEOF(unsigned short);
 		*ptr++ = lk_walk->region->cmx_regnum;
 		*ptr++ = lk_walk->translev;
 		assert(256 > lk_walk->subscript_cnt); /* else the assignment "*ptr++ = lk_walk->subscript_cnt" could be lossy */
@@ -72,7 +72,7 @@ void gvcmz_lksublist(struct CLB *lnk)
 		memcpy(ptr, lk_walk->value, lk_walk->total_length);
 		ptr += lk_walk->total_length;
 		count++;
-		msg_len += len + sizeof(len);
+		msg_len += len + SIZEOF(len);
 		lk_walk = lk_walk->next;
 	}
 	if (count)

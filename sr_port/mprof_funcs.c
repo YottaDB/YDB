@@ -147,8 +147,8 @@ void turn_tracing_on(mval *gvn)
 		rts_error(VARLSTCNT(4) ERR_NOTGBL, 2, gvn->str.len, gvn->str.addr);
 	if (!mprof_ptr)
 	{
-		mprof_ptr = (struct mprof_struct *)malloc(sizeof(struct mprof_struct));
-		memset(mprof_ptr, 0, sizeof(struct mprof_struct));
+		mprof_ptr = (struct mprof_struct *)malloc(SIZEOF(struct mprof_struct));
+		memset(mprof_ptr, 0, SIZEOF(struct mprof_struct));
 	}
 	parse_gvn(gvn);
 	mprof_ptr->gbl_to_fill = *gvn;
@@ -160,15 +160,15 @@ void turn_tracing_on(mval *gvn)
 		*mprof_ptr->pcavailbase = 0;
 	}
 	mprof_ptr->pcavailptr = mprof_ptr->pcavailbase;
-	mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
+	mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - SIZEOF(char *);
 	memset(mprof_ptr->pcavailptr + 1, 0, mprof_ptr->pcavail);
 	TIMES(&curr);
 	prof_stackptr = (unsigned char *)malloc(TOTAL_SIZE_OF_PROFILING_STACKS);
 	prof_msp = profstack_base = prof_stackptr + (TOTAL_SIZE_OF_PROFILING_STACKS - GUARD_RING_FOR_PROFILING_STACK);
 	profstack_top = prof_stackptr;
 	profstack_warn = profstack_top + GUARD_RING_FOR_PROFILING_STACK;
-	prof_fp = (stack_frame_prof *) (prof_msp -= sizeof(stack_frame_prof));
-	memset(prof_fp, 0, sizeof(*prof_fp));
+	prof_fp = (stack_frame_prof *) (prof_msp -= SIZEOF(stack_frame_prof));
+	memset(prof_fp, 0, SIZEOF(*prof_fp));
 	get_entryref_information(FALSE, NULL);
 	tmp_trc_tbl_entry.rout_name = NULL; /* initialize */
 	tmp_trc_tbl_entry.label_name = NULL;
@@ -185,7 +185,7 @@ void turn_tracing_on(mval *gvn)
 static void pcfree(void)
 {
 	mprof_ptr->pcavailptr = mprof_ptr->pcavailbase;
-	mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
+	mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - SIZEOF(char *);
 	return;
 }
 
@@ -364,12 +364,12 @@ char *pcalloc(unsigned int n)
 			mprof_ptr->pcavailptr = x;
 			*mprof_ptr->pcavailptr = 0;
 		}
-		mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - sizeof(char *);
+		mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - SIZEOF(char *);
 		memset(mprof_ptr->pcavailptr + 1, 0, mprof_ptr->pcavail);
 	}
 	mprof_ptr->pcavail -= n;
 	assert(mprof_ptr->pcavail >= 0);
-	return (char *) mprof_ptr->pcavailptr + mprof_ptr->pcavail + sizeof(char *);
+	return (char *) mprof_ptr->pcavailptr + mprof_ptr->pcavail + SIZEOF(char *);
 }
 
 void new_prof_frame(int dummy)
@@ -436,7 +436,7 @@ void new_prof_frame(int dummy)
 		TIMES(&curr);
 		prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
 		prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
-		psf = (stack_frame_prof *) (prof_msp -= sizeof(stack_frame_prof));
+		psf = (stack_frame_prof *) (prof_msp -= SIZEOF(stack_frame_prof));
 		psf->prev = prof_fp;
 		psf->sys_time = curr.tms_stime;
 		psf->usr_time = curr.tms_utime;
@@ -516,7 +516,7 @@ void unw_prof_frame(void)
 			} else
 				GTMASSERT;
 			/* move back up to parent frame */
-			prof_msp = (unsigned char *)prof_fp + sizeof(stack_frame_prof);
+			prof_msp = (unsigned char *)prof_fp + SIZEOF(stack_frame_prof);
 			prof_fp = prof_fp->prev;
 			prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
 			prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
@@ -583,7 +583,7 @@ void crt_gbl(mprof_tree *p, int info_level)
 		memcpy(spt->str.addr, p->e.label_name->addr, spt->str.len);
 	} else
 	{	/* place holder before first label */
-		spt->str.len = sizeof(MPROF_NULL_LABEL) - 1;
+		spt->str.len = SIZEOF(MPROF_NULL_LABEL) - 1;
 		spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
 		memcpy(spt->str.addr, MPROF_NULL_LABEL, spt->str.len);
 	}
@@ -600,7 +600,7 @@ void crt_gbl(mprof_tree *p, int info_level)
 		spt++;
 	} else if (0 == p->e.line_num)
 	{
-		spt->str.len = sizeof("*unk*") - 1;
+		spt->str.len = SIZEOF("*unk*") - 1;
 		spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
 		memcpy(spt->str.addr, "*unk*", spt->str.len);
 		mprof_ptr->gvargs.args[count] = spt;
@@ -609,8 +609,8 @@ void crt_gbl(mprof_tree *p, int info_level)
 	if (info_level)
 	{
 		spt->mvtype = MV_STR;
-		spt->str.len = sizeof(MPROF_FOR_LOOP) - 1;
-		spt->str.addr = (char *)pcalloc(USIZEOF(MPROF_FOR_LOOP) - 1);
+		spt->str.len = SIZEOF(MPROF_FOR_LOOP) - 1;
+		spt->str.addr = (char *)pcalloc(SIZEOF(MPROF_FOR_LOOP) - 1);
 		memcpy(spt->str.addr, MPROF_FOR_LOOP, spt->str.len);
 		mprof_ptr->gvargs.args[count++] = spt++;
 		/*write for level into the subscript as well*/

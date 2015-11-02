@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -239,8 +239,7 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 	str_len = expr->str.len + pfx_str_len + delim_cnt + sfx_str_len;
 	if (str_len > MAX_STRLEN)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
-	if (str_len > (stringpool.top - stringpool.free))
-		stp_gcol(str_len);
+	ENSURE_STP_FREE_SPACE(str_len);
 	str_addr = stringpool.free;
 	start_pfx = (unsigned char *)src->str.addr;
 
@@ -297,7 +296,7 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 		cfnpc->byte_oriented = TRUE;
 		dst->fnpc_indx = cfnpc->indx + 1;	/* Save where we are putting this element
 							   (1 based index in mval so 0 isn't so common) */
-		memcpy(&cfnpc->pstart[0], &pfnpc->pstart[0], (cfnpc->npcs + 1) * sizeof(unsigned int));
+		memcpy(&cfnpc->pstart[0], &pfnpc->pstart[0], (cfnpc->npcs + 1) * SIZEOF(unsigned int));
 	} else
 	{	/* No cache available -- just reset index pointer to get fastest cache validation failure */
 		dst->fnpc_indx = (unsigned char)-1;

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -46,32 +46,38 @@ if ( $?gtm_environment_init == "0" ) then
 		echo "gtm_cshrc-E-nogtm_cshrc, There is no gtm_cshrc.csh in $gtm_com"	# I am not here!
 	endif
 
-	if ( ! -f $gtm_com/gtmdef.csh )  then
+	if ( -f $gtm_com/gtmdef.csh )  then
+		source	$gtm_com/gtmdef.csh	# initialize non-version-specific GT.M environment variables
+	else
 		echo "gtm_cshrc-E-nogtmdef, There is no gtmdef.csh in $gtm_com"
 	endif
 
-	source	$gtm_com/gtmdef.csh	# initialize non-version-specific GT.M environment variables
-
-	if ( -f $gtm_com/gtm_cshrc.csh ) then	# this test should be unnecessary at this point
-		diff {$gtm_com/,$gtm_root/V990/tools/}gtm_cshrc.csh >& /dev/null
-		if ( $status != 0 ) then
-			echo "gtm_cshrc-W-gtm_cshrc_mismatch, Development and installed versions of gtm_cshrc.csh are different."
-		endif
-	endif
-
-	if ( -f $gtm_com/gtmdef.csh ) then	# this test should be unnecessary at this point
-		diff {$gtm_com/,$gtm_root/V990/tools/}gtmdef.csh >& /dev/null
-		if ( $status != 0 ) then
-			echo "gtm_cshrc-W-gtmdef_mismatch, Development and installed versions of gtmdef.csh are different."
-		endif
-	endif
-
-	if ( ! -f $gtm_com/versions.csh )  then
+	if (! -f $gtm_com/versions.csh )  then
 		echo "gtm_cshrc-E-noversions, There is no versions.csh in $gtm_com"
-	else
-		diff {$gtm_com/,$gtm_root/V990/tools/}versions.csh >& /dev/null
-		if ( $status != 0 ) then
-			echo "gtm_cshrc-W-versions_mismatch, Development and installed versions of versions.csh are different."
+	endif
+
+
+	if (-d $gtm_root/V990) then
+		set errmsg = "Development ($gtm_root/V990/tools) and installed ($gtm_com) versions of"
+		if ( -f $gtm_com/gtm_cshrc.csh ) then	# this test should be unnecessary at this point
+			diff {$gtm_com/,$gtm_root/V990/tools/}gtm_cshrc.csh >& /dev/null
+			if ( $status != 0 ) then
+				echo "gtm_cshrc-W-gtm_cshrc_mismatch, $errmsg gtm_cshrc.csh are different."
+			endif
+		endif
+
+		if ( -f $gtm_com/gtmdef.csh ) then	# this test should be unnecessary at this point
+			diff {$gtm_com/,$gtm_root/V990/tools/}gtmdef.csh >& /dev/null
+			if ( $status != 0 ) then
+				echo "gtm_cshrc-W-gtmdef_mismatch, $errmsg gtmdef.csh are different."
+			endif
+		endif
+
+		if ( -f $gtm_com/versions.csh )  then
+			diff {$gtm_com/,$gtm_root/V990/tools/}versions.csh >& /dev/null
+			if ( $status != 0 ) then
+				echo "gtm_cshrc-W-versions_mismatch, $errmsg versions.csh are different."
+			endif
 		endif
 	endif
 endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ short iomb_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	assert(iod->type == mb);
 	if (iod->state == dev_never_opened)
 	{
-		iod->dev_sp = (void *)malloc(sizeof(d_mb_struct));
+		iod->dev_sp = (void *)malloc(SIZEOF(d_mb_struct));
 		d_mb = (d_mb_struct *)iod->dev_sp;
 		d_mb->maxmsg = DEF_MB_MAXMSG;
 		d_mb->promsk = 0;

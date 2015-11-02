@@ -54,13 +54,13 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	int			option, optsize;
 
 	/*  Accept the connection from the network layer */
-	sln = sizeof(sin);
+	sln = SIZEOF(sin);
 	if ((fd = accept(cll->nve, (struct sockaddr *)&sin, (GTM_SOCKLEN_TYPE *)&sln)) < 0)
 		return -1;
 #endif				/* defined(BSD_TCP) */
 
 	/*  Build the client data structure */
-	if (!(cptr = (omi_conn *)malloc(sizeof(omi_conn))) || !(cptr->buff = (char *)malloc(OMI_BUFSIZ)))
+	if (!(cptr = (omi_conn *)malloc(SIZEOF(omi_conn))) || !(cptr->buff = (char *)malloc(OMI_BUFSIZ)))
 	{
 		if (cptr)
 			free(cptr);
@@ -79,11 +79,11 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	cptr->exts  = 0;
 	cptr->state = OMI_ST_DISC;
 	cptr->ga    = (ga_struct *)0; /* struct gd_addr_struct */
-	cptr->of = (oof_struct *) malloc(sizeof(struct rc_oflow));
-	memset(cptr->of, 0, sizeof(struct rc_oflow));
+	cptr->of = (oof_struct *) malloc(SIZEOF(struct rc_oflow));
+	memset(cptr->of, 0, SIZEOF(struct rc_oflow));
 	cptr->pklog = FD_INVALID;
 	/*  Initialize the statistics */
-	memcpy(&cptr->stats.sin,&sin,sizeof(sin));
+	memcpy(&cptr->stats.sin,&sin,SIZEOF(sin));
 	cptr->stats.bytes_recv = 0;
 	cptr->stats.bytes_send = 0;
 	cptr->stats.start      = time((time_t *)0);
@@ -156,7 +156,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	OMI_DBG((omi_debug, "%s: connection %d from %s by user <%s> at %s", SRVR_NAME,
 		cptr->stats.id, gtcm_hname(&cptr->stats.sin), cptr->ag_name, GTM_CTIME(&cptr->stats.start)));
 	option = -1;
-	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&option, sizeof(option)) < 0)
+	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&option, SIZEOF(option)) < 0)
 	{
 		PERROR("setsockopt:");
 		return -1;

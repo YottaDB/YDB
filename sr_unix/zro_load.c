@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void zro_load (mstr *str)
 	error_def		(ERR_NOLBRSRC);
 	error_def		(ERR_INVZROENT);
 
-	memset(array, 0, sizeof(array));
+	memset(array, 0, SIZEOF(array));
 	lp = str->addr;
 	top = lp + str->len;
 	while (lp < top && *lp == ZRO_DEL)
@@ -57,7 +57,7 @@ void zro_load (mstr *str)
 
 	array[0].type = ZRO_TYPE_COUNT;
 	array[0].count = 0;
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = tranbuf;
 
 	GETTOK;
@@ -79,7 +79,7 @@ void zro_load (mstr *str)
 				rts_error(VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FSEXP);
 			if (oi + 1 >= ZRO_MAX_ENTS)
 				rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
-			if (tok.len >= sizeof (tranbuf))
+			if (tok.len >= SIZEOF(tranbuf))
 				rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr, ERR_FILEPARSE, 2, tok.len, tok.addr);
 			pblk.buff_size = MAX_FBUFF;
 			pblk.fnb = 0;
@@ -131,7 +131,7 @@ void zro_load (mstr *str)
 					if (si >= ZRO_MAX_ENTS)
 						rts_error(VARLSTCNT(7) ERR_ZROSYNTAX, 2, str->len, str->addr,
 								ERR_MAXARGCNT, 1, ZRO_MAX_ENTS);
-					if (tok.len >= sizeof (tranbuf))
+					if (tok.len >= SIZEOF(tranbuf))
 						rts_error(VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 							ERR_FILEPARSE, 2, tok.len, tok.addr);
 					pblk.buff_size = MAX_FBUFF;
@@ -204,8 +204,8 @@ void zro_load (mstr *str)
 		}
 		free (zro_root);
 	}
-	zro_root = (zro_ent *) malloc (total_ents * sizeof (zro_ent));
-	longcpy ((uchar_ptr_t)zro_root, (uchar_ptr_t)array, total_ents * sizeof (zro_ent));
+	zro_root = (zro_ent *) malloc (total_ents * SIZEOF(zro_ent));
+	longcpy ((uchar_ptr_t)zro_root, (uchar_ptr_t)array, total_ents * SIZEOF(zro_ent));
 	assert (zro_root->type == ZRO_TYPE_COUNT);
 	oi = zro_root->count;
 	assert (oi);

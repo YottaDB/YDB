@@ -375,7 +375,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	va_end(var);
         /* Double the size, to take care of any alignments in the middle  */
 	param_list = (gparam_list *)malloc(n * 2);
-	free_space_pointer = (xc_long_t *)((char *)param_list + sizeof(intszofptr_t) + (sizeof(void *) * argcnt));
+	free_space_pointer = (xc_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* load-up the parameter list */
 	VAR_START(var, argcnt);
@@ -502,10 +502,10 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				   alignment requirement on those platforms.
 				*/
 				NON_GTM64_ONLY(free_space_pointer = (xc_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),
-											    sizeof(double))));
+											    SIZEOF(double))));
 				param_list->arg[i] = free_space_pointer;
 				*((double *)free_space_pointer) = (m1 & 1) ? (double)mval2double(v) : (double)0.0;
-				free_space_pointer = (xc_long_t *)((char *)free_space_pointer + sizeof(double));
+				free_space_pointer = (xc_long_t *)((char *)free_space_pointer + SIZEOF(double));
 				break;
 			case xc_pointertofunc:
 				if (((callintogtm_vectorindex = (int4)mval2i(v)) >= xc_unknown_function)
@@ -519,7 +519,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				break;
 			case xc_pointertofunc_star:
 				/* cannot pass in a function address to be modified by the user program */
-				free_space_pointer = (xc_long_t *)ROUND_UP2(((INTPTR_T)free_space_pointer), sizeof(INTPTR_T));
+				free_space_pointer = (xc_long_t *)ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(INTPTR_T));
 				param_list->arg[i] = free_space_pointer;
 				*((INTPTR_T *)free_space_pointer) = 0;
 				free_space_pointer++;
@@ -556,8 +556,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	va_end(var);
 	if (dst)
 		n += extarg_getsize((void *)&status, xc_status, dst);
-	if (stringpool.free + n > stringpool.top)
-		stp_gcol(n);
+	ENSURE_STP_FREE_SPACE(n);
 	/* convert return values */
 	VAR_START(var, argcnt);
 	for (i = 0, m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
@@ -573,11 +572,11 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			extarg2mval((void *)status, entry_ptr->return_type, dst);
 		else
 		{
-			memcpy(str_buffer, PACKAGE_ENV_PREFIX, sizeof(PACKAGE_ENV_PREFIX));
-			tmp_buff_ptr = &str_buffer[sizeof(PACKAGE_ENV_PREFIX) - 1];
+			memcpy(str_buffer, PACKAGE_ENV_PREFIX, SIZEOF(PACKAGE_ENV_PREFIX));
+			tmp_buff_ptr = &str_buffer[SIZEOF(PACKAGE_ENV_PREFIX) - 1];
 			if (package->str.len)
 			{
-				assert(package->str.len < MAX_NAME_LENGTH - sizeof(PACKAGE_ENV_PREFIX) - 1);
+				assert(package->str.len < MAX_NAME_LENGTH - SIZEOF(PACKAGE_ENV_PREFIX) - 1);
 				*tmp_buff_ptr++ = '_';
 				memcpy(tmp_buff_ptr, package->str.addr, package->str.len);
 				tmp_buff_ptr += package->str.len;

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -60,6 +60,12 @@ ENTRY gtm_ret_code
 	movl	(%eax),%eax
 	movl	%eax,frame_pointer
 	addl	$4,msp
+	jmp	return
+
+# Used by triggers (and eventually call-ins) to return from a nested generated code call
+# (a call not at the base C stack level).
+ENTRY gtm_levl_ret_code
+	REVERT
 	jmp	return
 
 # dm_start ENDP

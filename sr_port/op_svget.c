@@ -1,5 +1,6 @@
 /****************************************************************
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +47,7 @@
 #include "error_trap.h"
 #include "setzdir.h"
 #include "get_reference.h"
+#include "dollar_quit.h"
 #ifdef UNIX
 #include "iormdef.h"
 #endif
@@ -74,7 +76,7 @@ GBLREF mval		dollar_zstep;
 GBLREF char		*zro_root;  /* ACTUALLY some other pointer type! */
 GBLREF mstr		gtmprompt;
 GBLREF int		dollar_zmaxtptime;
-GBLREF mstr		dollar_zsource;
+GBLREF mval		dollar_zsource;
 GBLREF int4		dollar_zsystem;
 GBLREF int4		dollar_zcstatus;
 GBLREF int4		dollar_zeditor;
@@ -99,8 +101,19 @@ GBLREF size_t		totalUsedGta;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF boolean_t	dollar_zquit_anyway;
+#ifdef GTM_TRIGGER
+GBLREF	mval		*dollar_ztcode;
+GBLREF	mval		*dollar_ztdata;
+GBLREF	mval		*dollar_ztoldval;
+GBLREF	mval		*dollar_ztriggerop;
+GBLREF	mval		*dollar_ztupdate;
+GBLREF	mval		*dollar_ztvalue;
+GBLREF	mval		dollar_ztwormhole;
+GBLREF	int4		gtm_trigger_depth;
+GBLREF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
+#endif
 
-LITREF mval		literal_zero,literal_one;
+LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
 
@@ -110,9 +123,10 @@ void op_svget(int varnum, mval *v)
 	int 		count;
 	unsigned int	ucount;
 	char		*c1, *c2;
-#ifdef UNIX
+	mval		*mvp;
+#	ifdef UNIX
  	d_rm_struct	*d_rm;
-#endif
+#	endif
 
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
@@ -157,8 +171,9 @@ void op_svget(int varnum, mval *v)
 				if (5 > v->str.len)
 					v->str.len = 0;
 				else
-				{	v->str.addr += ESC_OFFSET;
-				v->str.len -= ESC_OFFSET;
+				{
+					v->str.addr += ESC_OFFSET;
+					v->str.len -= ESC_OFFSET;
 				}
 			}
 			s2pool(&(v->str));
@@ -173,7 +188,8 @@ void op_svget(int varnum, mval *v)
 			*v = dollar_system;
 			break;
 		case SV_STORAGE:
-			double2mval(v, getstorage());
+			/* double2mval(v, getstorage()); Causes issues with unaligned stack on x86_64 - remove until fixed */
+			i2mval(v, getstorage());
 			break;
 		case SV_TLEVEL:
 			count = (int)dollar_tlevel;
@@ -196,9 +212,8 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZB:
 			c1 = (char *)io_curr_device.in->dollar.zb;
-			c2 = c1 + sizeof(io_curr_device.in->dollar.zb);
-			if (sizeof(io_curr_device.in->dollar.zb) > stringpool.top - stringpool.free)
-				stp_gcol(sizeof(io_curr_device.in->dollar.zb));
+			c2 = c1 + SIZEOF(io_curr_device.in->dollar.zb);
+			ENSURE_STP_FREE_SPACE(SIZEOF(io_curr_device.in->dollar.zb));
 			v->mvtype = MV_STR;
 			v->str.addr = (char *)stringpool.free;
 			while (c1 < c2 && *c1)
@@ -213,7 +228,7 @@ void op_svget(int varnum, mval *v)
 							   (i.e. processed not actual command line) */
 			break;
 		case SV_ZEOF:
-#ifdef UNIX
+#			ifdef UNIX
 			if (rm == io_curr_device.in->type)
 			{
 				d_rm = (d_rm_struct *)io_curr_device.in->dev_sp;
@@ -223,7 +238,7 @@ void op_svget(int varnum, mval *v)
 					break;
 				}
 			}
-#endif
+#			endif
 			*v = io_curr_device.in->dollar.zeof ? literal_one : literal_zero;
 			break;
 		case SV_ZQUIT:
@@ -294,7 +309,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZSOURCE:
 			v->mvtype = MV_STR;
-			v->str = dollar_zsource;
+			v->str = dollar_zsource.str;
 			break;
 		case SV_ZSTATUS:
 			*v = dollar_zstatus;
@@ -321,13 +336,14 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, dollar_zsystem);
 			break;
 		case SV_ZCSTATUS:
-			MV_FORCE_MVAL(v, dollar_zcstatus);
+			/* Maintain the external $ZCSTATUS == 1 for SUCCESS on UNIX while internal good is 0 */
+			MV_FORCE_MVAL(v, UNIX_ONLY((0 == dollar_zcstatus) ? 1 : ) dollar_zcstatus);
 			break;
 		case SV_ZEDITOR:
 			MV_FORCE_MVAL(v, dollar_zeditor);
 			break;
 		case SV_QUIT:
-			MV_FORCE_MVAL(v, (NULL == get_ret_targ()) ? 0 : 1);
+			MV_FORCE_MVAL(v, dollar_quit());
 			break;
 		case SV_ECODE:
 			ecode_get(-1, v);
@@ -393,6 +409,71 @@ void op_svget(int varnum, mval *v)
 			v->mvtype = MV_STR;
 			v->str = dollar_zpatnumeric;
 			break;
+		case SV_ZTCODE:
+#			ifdef GTM_TRIGGER
+			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			memcpy(v, (NULL != dollar_ztcode) ? dollar_ztcode : &literal_null, SIZEOF(mval));
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTDATA:
+#			ifdef GTM_TRIGGER
+			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			memcpy(v, (NULL != dollar_ztdata) ? dollar_ztdata : &literal_null, SIZEOF(mval));
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTOLDVAL:
+#			ifdef GTM_TRIGGER
+			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			memcpy(v, (NULL != dollar_ztoldval) ? dollar_ztoldval : &literal_null, SIZEOF(mval));
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTRIGGEROP:
+#			ifdef GTM_TRIGGER
+			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			memcpy(v, (NULL != dollar_ztriggerop) ? dollar_ztriggerop : &literal_null, SIZEOF(mval));
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTUPDATE:
+#			ifdef GTM_TRIGGER
+			memcpy(v, ((NULL != dollar_ztupdate && (MV_STR & dollar_ztupdate->mvtype)) ? dollar_ztupdate
+				   : &literal_null), SIZEOF(mval));
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTVALUE:
+#			ifdef GTM_TRIGGER
+			assert(!dollar_ztcode || (MV_STR & dollar_ztcode->mvtype));
+			memcpy(v, (NULL != dollar_ztvalue) ? dollar_ztvalue : &literal_null, SIZEOF(mval));
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTWORMHOLE:
+#			ifdef GTM_TRIGGER
+			mvp = &dollar_ztwormhole;
+			MV_FORCE_STR(mvp);
+			memcpy(v, mvp, SIZEOF(mval));
+			ztwormhole_used = TRUE;
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTLEVEL:
+#			ifdef GTM_TRIGGER
+			MV_FORCE_MVAL(v, gtm_trigger_depth);
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
 		default:
 			GTMASSERT;
 	}

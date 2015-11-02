@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,7 @@
 
 void zr_init(z_records *zrecs, int4 count)
 {
-	zrecs->beg = (zbrk_struct *)malloc(count * sizeof(zbrk_struct));
+	zrecs->beg = (zbrk_struct *)malloc(count * SIZEOF(zbrk_struct));
 	zrecs->free = zrecs->beg;
 	zrecs->end = zrecs->beg + count;
 	return;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,8 +116,8 @@ boolean_t dse_b_dmp(void)
 			}
 			if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 				b_top = bp + cs_addrs->hdr->blk_size;
-			else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-				b_top = bp + sizeof(blk_hdr);
+			else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+				b_top = bp + SIZEOF(blk_hdr);
 			else
 				b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
 			if (CLI_NEGATED != head && !patch_is_fdmp)
@@ -141,7 +141,7 @@ boolean_t dse_b_dmp(void)
 				util_buff[util_len] = 0;
 				util_out_print((caddr_t)util_buff, TRUE, ((blk_hdr_ptr_t) bp)->levl );
 			}
-			rp = bp + sizeof(blk_hdr);
+			rp = bp + SIZEOF(blk_hdr);
 			if (CLI_PRESENT != head && (!patch_is_fdmp || ((blk_hdr_ptr_t) bp)->levl == 0))
 			{
 				while (!util_interrupt && (rp = dump_record(rp, blk, bp, b_top)))
@@ -224,7 +224,7 @@ boolean_t dse_b_dmp(void)
 					{
 						for (iter2 = 0; iter2 < 8; iter2++)
 						{
-							mask = dse_lm_blk_free(lmap_num * BML_BITS_PER_BLK, bp + sizeof(blk_hdr));
+							mask = dse_lm_blk_free(lmap_num * BML_BITS_PER_BLK, bp + SIZEOF(blk_hdr));
 							if (!mask)
 								util_out_print("!AD", FALSE, 1, BUSY_CHAR);
 							else if (BLK_FREE == mask)

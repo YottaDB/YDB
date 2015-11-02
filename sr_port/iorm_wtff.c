@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@ void iorm_wtff(void)
 
 	iod = io_curr_device.out;
 	iorm_flush(iod);
-	temp.len = sizeof(FORM_FEED) - 1;
+	temp.len = SIZEOF(FORM_FEED) - 1;
 	temp.addr = FORM_FEED;
 	iorm_write(&temp);
 	iorm_wteol(1,iod);

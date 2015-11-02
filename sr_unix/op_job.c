@@ -144,7 +144,7 @@ int	op_job(int4 argcnt, ...)
 
 	if (argcnt)
 	{
-		jp = job_params.parms = (job_parm *)malloc(sizeof(job_parm) * argcnt);
+		jp = job_params.parms = (job_parm *)malloc(SIZEOF(job_parm) * argcnt);
 		i = argcnt;
 		for(;;)
 		{
@@ -173,7 +173,7 @@ int	op_job(int4 argcnt, ...)
 		{
 			/* check if it was a try_again kind of failure */
 #ifdef _BSD
-			assert(sizeof(wait_stat) == sizeof(int4));
+			assert(SIZEOF(wait_stat) == SIZEOF(int4));
 			wait_stat.w_status = status;
 				/* waitpid() in ojstartchild() expects an int wait_status whereas the WIF* macros expect a
 				 * union wait_stat as an arg */
@@ -198,8 +198,8 @@ int	op_job(int4 argcnt, ...)
 	/* the child process (M), that wrote to pipe, would have been exited by now */
 	CLOSEFILE_RESET(pipe_fds[1], pipe_status);	/* close the write-end to make the following read non-blocking;
 							 * also resets "pipe_fds[1]" to FD_INVALID */
-	assert(sizeof(pid_t) == sizeof(zjob_pid));
-	DOREADRC(pipe_fds[0], &zjob_pid, sizeof(zjob_pid), pipe_status); /* read jobbed off PID from pipe */
+	assert(SIZEOF(pid_t) == SIZEOF(zjob_pid));
+	DOREADRC(pipe_fds[0], &zjob_pid, SIZEOF(zjob_pid), pipe_status); /* read jobbed off PID from pipe */
 	if (0 < pipe_status) /* empty pipe (pipe_status == -1) is ignored and not reported as error */
 		rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Error reading from pipe"), errno);
 	CLOSEFILE_RESET(pipe_fds[0], pipe_status); /* release the pipe; also resets "pipe_fds[0]" to FD_INVALID */

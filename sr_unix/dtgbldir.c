@@ -192,25 +192,25 @@ int main(int argc, char **argv)
 	if (-1 == gtm_zos_set_tag(fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
 		PERROR("Error tagging file with TAG_BINARY");
 #endif
-	size = sizeof(header_struct) + sizeof(gd_addr) + 3 * sizeof(gd_binding) + 1 * sizeof(gd_region) + 1 * sizeof(gd_segment);
+	size = SIZEOF(header_struct) + SIZEOF(gd_addr) + 3 * SIZEOF(gd_binding) + 1 * SIZEOF(gd_region) + 1 * SIZEOF(gd_segment);
 	header = (header_struct *)malloc(ROUND_UP(size, DISK_BLOCK_SIZE));
 	memset(header, 0, ROUND_UP(size, DISK_BLOCK_SIZE));
 	header->filesize = size;
 	size = ROUND_UP(size, DISK_BLOCK_SIZE);
 	MEMCPY_LIT(header->label, GDE_LABEL_LITERAL);
-	addr = (gd_addr *)((char *)header + sizeof(header_struct));
+	addr = (gd_addr *)((char *)header + SIZEOF(header_struct));
 	addr->max_rec_size = 256;
-	addr->maps = (gd_binding*)(sizeof(gd_addr));
+	addr->maps = (gd_binding*)(SIZEOF(gd_addr));
 	addr->n_maps = 3;
-	addr->regions = (gd_region *)((INTPTR_T)(addr->maps) + 3 * sizeof(gd_binding));
+	addr->regions = (gd_region *)((INTPTR_T)(addr->maps) + 3 * SIZEOF(gd_binding));
 	addr->n_regions = 1;
-	addr->segments = (gd_segment *)((INTPTR_T)(addr->regions) + sizeof(gd_region));
+	addr->segments = (gd_segment *)((INTPTR_T)(addr->regions) + SIZEOF(gd_region));
 	addr->n_segments = 1;
 	addr->link = 0;
 	addr->tab_ptr = 0;
 	addr->id = 0;
 	addr->local_locks = 0;
-	addr->end = (INTPTR_T)((char *)addr->segments + 1 * sizeof(gd_segment));
+	addr->end = (INTPTR_T)((char *)addr->segments + 1 * SIZEOF(gd_segment));
 	int4_ptr = (int4*)((char *)addr + (INTPTR_T)(addr->maps));
 	*int4_ptr++ = FIRST_ONE;
 	*int4_ptr++ = 0xFFFFFFFF;

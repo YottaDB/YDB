@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,9 @@
 #include "hashtab_mname.h"
 #include "hashtab_str.h"
 #include "hashtab_objcode.h"
+/* The define of CHEXPAND below causes error.h to create GBLDEFs */
+#define CHEXPAND
+#include "error.h"
 #include "rtnhdr.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -104,10 +107,6 @@
 #include "op_merge.h"
 
 #ifdef UNIX
-/* The define of CHEXPAND below causes error.h to create GBLDEFs */
-#define CHEXPAND
-#include "error.h"
-
 #include "cli.h"
 #include "invocation_mode.h"
 #include "fgncal.h"
@@ -136,12 +135,18 @@
 # include "muextr.h"
 # endif
 
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#endif
+
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
-#define DEFAULT_ZERROR_LEN	(sizeof(DEFAULT_ZERROR_STR) - 1)
+#define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
 GBLDEF	sgmnt_addrs		*cs_addrs;
+GBLDEF	sgmnt_addrs		*cs_addrs_list;	/* linked list of csa corresponding to all currently open databases */
 
 GBLDEF	unsigned short	proc_act_type;
 GBLDEF	volatile bool	ctrlc_pending;
@@ -170,12 +175,12 @@ GBLDEF	bool		error_mupip = FALSE,
 	                view_debug2 = FALSE,
 	                view_debug3 = FALSE,
 	                view_debug4 = FALSE,
+			mupip_error_occurred,
 	                dec_nofac;
 
 GBLDEF	boolean_t	is_updproc = FALSE,
 			is_updhelper = FALSE,
 			mupip_jnl_recover = FALSE,
-			is_standalone = FALSE,
 			repl_allowed = FALSE,
 			suspend_lvgcol = FALSE,
 			run_time = FALSE,
@@ -184,7 +189,8 @@ GBLDEF	boolean_t	is_updproc = FALSE,
 			is_replicator = FALSE,	/* TRUE => this process can write jnl records to the jnlpool for replicated db */
 	                tp_in_use = FALSE,	/* TRUE => TP has been used by this process and is thus initialized */
 			dollar_truth = TRUE,
-			have_standalone_access = FALSE;
+			have_standalone_access = FALSE,
+			gtm_stdxkill = FALSE;	/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
 
 GBLDEF	VSIG_ATOMIC_T	forced_exit = FALSE;	/* Asynchronous signal/interrupt handler sets this variable to TRUE,
 						 * hence the VSIG_ATOMIC_T type in the definition.
@@ -212,7 +218,6 @@ GBLDEF	lvzwrite_datablk	*lvzwrite_block;
 GBLDEF	io_log_name	*io_root_log_name;
 GBLDEF	mliteral	literal_chain;
 GBLDEF	mstr		*comline_base,
-			dollar_zsource,
 			*err_act,
 			**stp_array,
 			extnam_str,
@@ -221,6 +226,7 @@ GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");
 GBLDEF int              (*gtm_env_xlate_entry)() = NULL;
 GBLDEF void             (*gtm_sigusr1_handler)() = NULL;
 GBLDEF	mval		dollar_zgbldir,
+			dollar_zsource = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_zstatus,
 			dollar_zstep = DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 1, "B", 0, 0),
 			dollar_ztrap,
@@ -283,7 +289,6 @@ GBLDEF	boolean_t	certify_all_blocks = FALSE;	/* If flag is set all blocks are ch
 							 * VIEW "GDSCERT":1. */
 GBLDEF	mval		curr_gbl_root;
 GBLDEF	gd_addr		*original_header;
-GBLDEF	hash_table_mname *gd_tab_ptr = NULL;
 GBLDEF	hash_table_str	*complits_hashtab = NULL;
 GBLDEF	hash_table_str	*compsyms_hashtab = NULL;
 GBLDEF	mem_list	*mem_list_head;
@@ -307,12 +312,12 @@ GBLDEF	mval		window_mval;
 GBLDEF	char		director_token;
 GBLDEF	mval		director_mval;
 LITDEF	MIDENT_DEF(zero_ident, 0, NULL);		/* the null mident */
-static char 		ident_buff1[sizeof(mident_fixed)];
-static char 		ident_buff2[sizeof(mident_fixed)];
+static char 		ident_buff1[SIZEOF(mident_fixed)];
+static char 		ident_buff2[SIZEOF(mident_fixed)];
 GBLDEF	MIDENT_DEF(window_ident, 0, &ident_buff1[0]);	/* the current identifier */
 GBLDEF	MIDENT_DEF(director_ident, 0, &ident_buff2[0]);	/* the look-ahead identifier */
 GBLDEF	char		*lexical_ptr;
-GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / sizeof(int4) + 1];
+GBLDEF	int4		aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
 GBLDEF	unsigned char	*source_buffer = (unsigned char *)aligned_source_buffer;
 GBLDEF	int4		source_error_found;
 GBLDEF	src_line_struct	src_head;
@@ -396,18 +401,11 @@ GBLDEF	int			gtmsecshr_log_file;
 GBLDEF	int			gtmsecshr_sockfd = FD_INVALID;
 GBLDEF	boolean_t		gtmsecshr_sock_init_done = FALSE;
 GBLDEF	char			muext_code[MUEXT_MAX_TYPES][2] =
-				{	{'0', '0'},
-					{'0', '1'},
-					{'0', '2'},
-					{'0', '3'},
-					{'0', '4'},
-					{'0', '5'},
-					{'0', '6'},
-					{'0', '7'},
-					{'0', '8'},
-					{'0', '9'},
-					{'1', '0'}
-				};
+{
+#	define MUEXT_TABLE_ENTRY(muext_rectype, code0, code1)	{code0, code1},
+#	include "muext_rec_table.h"
+#	undef MUEXT_TABLE_ENTRY
+};
 GBLDEF	int			patch_is_fdmp;
 GBLDEF	int			patch_fdmp_recs;
 GBLDEF	boolean_t		horiz_growth = FALSE;
@@ -446,6 +444,8 @@ GBLDEF	int			gtmrecv_srv_count = 0;
 GBLDEF	volatile int4		db_fsync_in_prog;
 GBLDEF	volatile int4		jnl_qio_in_prog;
 #ifdef UNIX
+GBLDEF	void			(*op_write_ptr)(mval *);
+GBLDEF	void			(*op_wteol_ptr)(int4 n);
 GBLDEF	gtmsiginfo_t		signal_info;
 #ifndef MUTEX_MSEM_WAKE
 GBLDEF	int			mutex_sock_fd = FD_INVALID;
@@ -457,12 +457,6 @@ GBLDEF	fd_set			mutex_wait_on_descs;
 #endif
 #endif
 GBLDEF	void			(*call_on_signal)();
-GBLDEF	gtmImageName		gtmImageNames[n_image_types] =
-{
-#define IMAGE_TABLE_ENTRY(A,B)	{LIT_AND_LEN(B)},
-#include "gtmimagetable.h"
-#undef IMAGE_TABLE_ENTRY
-};
 GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, lke.c, gtm.c, mupip.c, gtmsecshr.c etc. */
 GBLDEF	volatile boolean_t	semwt2long;
 
@@ -472,6 +466,7 @@ GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invo
 GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
 GBLDEF	char			*cli_err_str_ptr = NULL;
 GBLDEF	io_desc			*gtm_err_dev = NULL;
+GBLDEF	boolean_t		gtm_pipe_child = FALSE;
 #endif
 
 /* this array is indexed by file descriptor */
@@ -543,7 +538,6 @@ GBLDEF	uint4	check_channel_id = 0;		/* stores the qio channel id */
 
 GBLDEF	boolean_t		write_after_image = FALSE;	/* true for after-image jnlrecord writing by recover/rollback */
 GBLDEF	int			iott_write_error;
-GBLDEF	boolean_t		recovery_success = FALSE; /* To Indicate successful recovery */
 GBLDEF	int4			write_filter;
 GBLDEF	int4			zdate_form = 0;
 GBLDEF	boolean_t		need_no_standalone = FALSE;
@@ -703,49 +697,52 @@ GBLDEF	int4			gtm_object_size;	/* Size of entire gtm object for compiler use */
 GBLDEF	int4			linkage_size;		/* Size of linkage section during compile */
 GBLDEF	uint4			lnkrel_cnt;		/* number of entries in linkage Psect to relocate */
 GBLDEF  int4			sym_table_size;		/* size of the symbol table during compilation */
-GBLDEF	boolean_t		disallow_forced_expansion, forced_expansion; /* Used in stringpool managment */
+GBLDEF	boolean_t		stop_non_mandatory_expansion, non_mandatory_expansion; /* Used in stringpool managment */
 GBLDEF	jnl_fence_control	jnl_fence_ctl;
 GBLDEF	jnl_process_vector	*prc_vec = NULL;		/* for current process */
 GBLDEF	jnl_process_vector	*originator_prc_vec = NULL;	/* for client/originator */
 LITDEF	char	*jrt_label[JRT_RECTYPES] =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	label,
-#include "jnl_rec_table.h"
+#include "jnl_rec_table.h"	/* BYPASSOK */
 #undef JNL_TABLE_ENTRY
 };
 LITDEF	int	jrt_update[JRT_RECTYPES] =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	update,
-#include "jnl_rec_table.h"
+#include "jnl_rec_table.h"	/* BYPASSOK */
 #undef JNL_TABLE_ENTRY
 };
 LITDEF	boolean_t	jrt_fixed_size[JRT_RECTYPES] =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	fixed_size,
-#include "jnl_rec_table.h"
+#include "jnl_rec_table.h"	/* BYPASSOK */
 #undef JNL_TABLE_ENTRY
 };
 LITDEF	boolean_t	jrt_is_replicated[JRT_RECTYPES] =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	is_replicated,
-#include "jnl_rec_table.h"
+#include "jnl_rec_table.h"	/* BYPASSOK */
 #undef JNL_TABLE_ENTRY
 };
 /* Change the initialization if struct_jrec_tcom in jnl.h changes */
 GBLDEF	struct_jrec_tcom	tcom_record = {{JRT_TCOM, TCOM_RECLEN, 0, 0, 0},
-					0, "", 0, {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
-GBLDEF 	jnl_gbls_t		jgbl;
-GBLDEF short 		crash_count;
-GBLDEF trans_num	start_tn;
-GBLDEF cw_set_element	cw_set[CDB_CW_SET_SIZE];
-GBLDEF unsigned char	cw_set_depth, cw_map_depth;
-GBLDEF unsigned int	t_tries;
-GBLDEF uint4		t_err;
-GBLDEF int4		update_trans;	/* TRUE whenever a non-TP transaction needs to increment the database transaction number.
-					 * usually TRUE if cw_set_depth/cw_map_depth of the current non-TP transaction is non-zero,
-					 * but additionally TRUE in case of a redundant set in gvcst_put.c
-					 * can take on a special value T_COMMIT_STARTED in t_end/tp_tend hence is not "boolean_t"
+					0, 0, 0, "", {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
+GBLDEF	jnl_gbls_t		jgbl;
+GBLDEF	short 		crash_count;
+GBLDEF	trans_num	start_tn;
+GBLDEF	cw_set_element	cw_set[CDB_CW_SET_SIZE];
+GBLDEF	unsigned char	cw_set_depth, cw_map_depth;
+GBLDEF	unsigned int	t_tries;
+GBLDEF	uint4		t_err;
+GBLDEF	uint4		update_trans;	/* Bitmask indicating among other things whether this region was updated;
+					 * See gdsfhead.h for UPDTRNS_* bitmasks
+					 * Bit-0 is 1 if cw_set_depth is non-zero or if it is a duplicate set
+					 * 	(cw_set_depth is zero in that case).
+					 * Bit-1 is unused for non-TP.
+					 * Bit-2 is 1 if transaction commit in this region is beyond point of rollback.
 					 */
+
 GBLDEF	boolean_t	mu_rndwn_file_dbjnl_flush;	/* to indicate standalone access is available to shared memory so
 							 * wcs_recover() need not increment db curr_tn or write inctn record */
 
@@ -754,7 +751,7 @@ GBLDEF	boolean_t	is_uchar_wcs_code[] = 	/* uppercase failure codes that imply da
 #define	CDB_SC_NUM_ENTRY(code, value)
 #define CDB_SC_UCHAR_ENTRY(code, is_wcs_code, value)	is_wcs_code,
 #define	CDB_SC_LCHAR_ENTRY(code, is_wcs_code, value)
-#include "cdb_sc_table.h"
+#include "cdb_sc_table.h"	/* BYPASSOK */
 #undef CDB_SC_NUM_ENTRY
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
@@ -765,7 +762,7 @@ GBLDEF	boolean_t	is_lchar_wcs_code[] = 	/* lowercase failure codes that imply da
 #define	CDB_SC_NUM_ENTRY(code, value)
 #define CDB_SC_UCHAR_ENTRY(code, is_wcs_code, value)
 #define	CDB_SC_LCHAR_ENTRY(code, is_wcs_code, value)	is_wcs_code,
-#include "cdb_sc_table.h"
+#include "cdb_sc_table.h"	/* BYPASSOK */
 #undef CDB_SC_NUM_ENTRY
 #undef CDB_SC_UCHAR_ENTRY
 #undef CDB_SC_LCHAR_ENTRY
@@ -786,7 +783,7 @@ GBLDEF	uint4	gtm_memory_noaccess_defined;	/* count of the number of GTM_MEMORY_N
 GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_init_sp.c */
 #endif
 
-GBLDEF	volatile boolean_t	in_wcs_recover = FALSE;	/* TRUE if in wcs_recover(), used by "bt_put" and "generic_exit_handler" */
+GBLDEF	volatile boolean_t	in_wcs_recover = FALSE;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
 
 /* Following definitions are related to white_box testing */
 GBLDEF	boolean_t	gtm_white_box_test_case_enabled = FALSE;
@@ -801,7 +798,6 @@ GBLDEF	mval		increment_delta_mval;	/* mval holding the INTEGER increment value, 
 						 * used by gvcst_put/gvincr_recompute_upd_array which is invoked by t_end */
 GBLDEF	boolean_t	is_dollar_incr = FALSE;	/* valid only if gvcst_put is in the call-stack (i.e. t_err == ERR_GVPUTFAIL);
 						 * is a copy of "in_gvcst_incr" just before it got reset to FALSE */
-GBLDEF	boolean_t	pre_incr_update_trans;	/* copy of "sgm_info_ptr->update_trans" before the $INCR */
 GBLDEF	int		indir_cache_mem_size;	/* Amount of memory currently in use by indirect cache */
 GBLDEF	hash_table_mname   rt_name_tbl;
 GBLDEF	hash_table_objcode cache_table;
@@ -820,9 +816,11 @@ GBLDEF	mline		*mline_tail;
 GBLDEF	short int	block_level;
 GBLDEF	triple		t_orig;
 GBLDEF	int		mvmax, mlmax, mlitmax;
-static	char		routine_name_buff[sizeof(mident_fixed)], module_name_buff[sizeof(mident_fixed)];
+static	char		routine_name_buff[SIZEOF(mident_fixed)], module_name_buff[SIZEOF(mident_fixed)];
+static	char		int_module_name_buff[SIZEOF(mident_fixed)];
 GBLDEF	MIDENT_DEF(routine_name, 0, &routine_name_buff[0]);
 GBLDEF	MIDENT_DEF(module_name, 0, &module_name_buff[0]);
+GBLDEF	MIDENT_DEF(int_module_name, 0, &int_module_name_buff[0]);
 GBLDEF	char		rev_time_buf[REV_TIME_BUFF_LEN];
 GBLDEF	unsigned short	source_name_len;
 GBLDEF	short		object_name_len;
@@ -1002,7 +1000,11 @@ GBLDEF	int4		SPGC_since_LVGC;			/* stringpool GCs since the last lv_val GC */
 GBLDEF	int4		LVGC_interval = MIN_SPGC_PER_LVGC;	/* dead data GC is done every LVGC_interval stringpool GCs */
 GBLDEF	lv_xnew_var	*xnewvar_anchor;		/* Anchor for unused lv_xnew_var blocks */
 GBLDEF	lv_xnew_ref	*xnewref_anchor;		/* Anchor for unused lv_xnew_ref blocks */
-
+GBLDEF	mval		*alias_retarg;			/* Points to an alias return arg created by a "QUIT *" recorded here so
+							 * symtab-unwind logic can find it and modify it if necessary if a
+							 * symtab popped during the return and the retarg points to an lv_val
+							 * that is going to be destroyed.
+							 */
 #ifdef DEBUG_ALIAS
 GBLDEF	boolean_t	lvmon_enabled;			/* Enable lv_val monitoring */
 #endif
@@ -1056,3 +1058,93 @@ GBLDEF	gtmcrypt_getkey_by_name_t	gtmcrypt_getkey_by_name_fnptr;
 GBLDEF	gtmcrypt_strerror_t		gtmcrypt_strerror_fnptr;
 
 #endif /* GTM_CRYPT */
+
+#ifdef DEBUG
+GBLDEF	boolean_t	stringpool_unusable = FALSE;	/* Set to TRUE by any function that does not expect any of its function
+							 * callgraph to use/expand the stringpool. */
+GBLDEF	boolean_t	stringpool_unexpandable = FALSE;/* Set to TRUE by any function for a small period when it has ensured
+							 * enough space in the stringpool so it does not expect any more garbage
+							 * collections or expansions.
+							 */
+GBLDEF	boolean_t	donot_INVOKE_MUMTSTART = FALSE;	/* Set to TRUE whenever an implicit TSTART is done in gvcst_put/kill as
+							 * part of an explicit + trigger update. In this situation, we dont expect
+							 * MUM_TSTART macro to be invoked at all (see skip_INVOKE_RESTART below
+							 * for description on why this is needed). So we keep this debug-only
+							 * flag turned on throughout the gvcst_put/kill. An assert in
+							 * mdb_condition_handler (invoked by INVOKE_RESTART macro when it does
+							 * an rts_error) checks it never gets invoked while this is set.
+							 */
+#endif
+
+GBLDEF	boolean_t	block_is_free;			/* Set to TRUE if the caller wants to let t_qread know that the block it is
+							 * attempting to read is actually a FREE block
+							 */
+GBLDEF	int4		gv_keysize;
+GBLDEF	gd_addr		*gd_header;
+GBLDEF	gd_binding	*gd_map;
+GBLDEF	gd_binding	*gd_map_top;
+
+#ifdef GTM_TRIGGER
+GBLDEF	int4		gtm_trigger_depth;		/* 0 if no trigger, 1 if inside trigger; 2 if inside nested trigger etc. */
+GBLDEF	int4		tstart_trigger_depth;		/* gtm_trigger_depth at the time of the outermost "op_tstart"
+							 * (i.e. explicit update). This should be used only if dollar_tlevel
+							 * is non-zero as it is not otherwise maintained.
+							 */
+GBLDEF	uint4		trigger_name_cntr;		/* Counter from which trigger names are constructed */
+GBLDEF	boolean_t	implicit_tstart = FALSE;	/* Set to TRUE by gv_trigger_db_tpwrap. Set to FALSE by op_tstart.
+							 * Used by op_tstart to do special direct mode TPHOLD processing.
+							 * Ideally this should have been passed as a parameter to op_tstart
+							 * but due to the non-trivial nature of adding an extra parameter
+							 * to it, we decide on this approach.
+							 */
+GBLDEF	boolean_t 	*ztvalue_changed_ptr;		/* -> boolean in current gtm_trigger_parms signaling if ztvalue has
+							      been updated */
+GBLDEF	boolean_t	trigger_compile;		/* A trigger compilation is active */
+GBLDEF	boolean_t	ztwormhole_used;		/* TRUE if $ztwormhole was used by trigger code */
+GBLDEF	mval		*dollar_ztcode,
+			*dollar_ztdata,
+			*dollar_ztoldval,
+			*dollar_ztriggerop,
+			*dollar_ztupdate,
+			*dollar_ztvalue,
+			dollar_ztwormhole = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0),
+			gtm_trigger_etrap;  		/* Holds $ETRAP value for inside trigger */
+GBLDEF	int		tprestart_state;		/* When triggers restart, multiple states possible. See tp_restart.h */
+GBLDEF	boolean_t	skip_INVOKE_RESTART = FALSE;	/* set to TRUE if caller of op_tcommit/t_retry does not want it to
+							 * use the INVOKE_RESTART macro (which uses an rts_error to trigger
+							 * the restart) instead return code. The reason we dont want to do
+							 * rts_error is that this is an implicit tstart situation where we
+							 * did not do opp_tstart.s so we dont want control to be transferred
+							 * using the MUM_TSTART macro by mdb_condition_handler (which assumes
+							 * opp_tstart.s invocation).
+							 */
+GBLDEF	boolean_t	skip_dbtriggers = FALSE;	/* Set to FALSE by default (i.e. triggers are invoked). Set to TRUE
+							 * unconditionally by MUPIP LOAD as it always skips triggers. Also set
+							 * to TRUE by journal recovery/update-process only when they encounter
+							 * updates done by MUPIP LOAD so they too skip trigger processing. In the
+							 * case of update process, this keeps primary/secondary in sync. In the
+							 * case of journal recovery, this keeps the db and jnl in sync.
+							 */
+GBLDEF	boolean_t	goframes_unwound_trigger;	/* goframes() unwound a trigger base frame during its unwinds */
+GBLDEF	symval		*trigr_symval_list;		/* List of availalable symvals for use in (nested) triggers */
+# ifdef DEBUG
+  GBLDEF gv_trigger_t		*gtm_trigdsc_last;	/* For debugging purposes - parms gtm_trigger called with */
+  GBLDEF gtm_trigger_parms	*gtm_trigprm_last;
+  GBLDEF ch_ret_type		(*ch_at_trigger_init)();	/* Condition handler in effect when gtm_trigger called */
+# endif
+GBLDEF	boolean_t	incr_db_trigger_cycle = FALSE;
+GBLDEF	boolean_t	explicit_update_repl_state;	/* Initialized just before an explicit update invokes any triggers.
+							 * Set to 1 if triggering update is to a replicated database.
+							 * Set to 0 if triggering update is to a non-replicated database.
+							 * Value stays untouched across nested trigger invocations.
+							 */
+#endif
+
+GBLDEF	boolean_t expansion_failed, retry_if_expansion_fails; /* used by string pool when trying to expand */
+
+GBLDEF	boolean_t	mupip_exit_status_displayed;	/* TRUE if mupip_exit has already displayed a message for non-zero status.
+							 * Used by mur_close_files to ensure some message gets printed in case
+							 * of abnormal exit status (in some cases mupip_exit might not have been
+							 * invoked but we will still go through mur_close_files e.g. if exit is
+							 * done directly without invoking mupip_exit).
+							 */

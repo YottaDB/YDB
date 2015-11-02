@@ -32,7 +32,7 @@ xc_status_t gtm_filename_to_id(xc_string_t *filename, xc_fileid_ptr_t *fileid)
 	if (!filename)
 		return FALSE;
 	assert(fileid && !*fileid);
-	tmp_fileid = (gd_id_ptr_t)malloc(sizeof(gd_id));
+	tmp_fileid = (gd_id_ptr_t)malloc(SIZEOF(gd_id));
 	status = filename_to_id(tmp_fileid, filename->address);
 	*fileid = (xc_fileid_ptr_t)tmp_fileid;
 	return status;

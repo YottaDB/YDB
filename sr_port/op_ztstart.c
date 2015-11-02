@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,8 @@ error_def(ERR_TRANSNEST);
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	short			dollar_tlevel;
 GBLREF	seq_num			seq_num_zero;
+GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	jnl_gbls_t		jgbl;
 
 void	op_ztstart(void)
 {
@@ -38,6 +40,13 @@ void	op_ztstart(void)
 	{
 		jnl_fence_ctl.token = 0;
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
+		++local_tn;		/* Begin new local transaction */
+		/* In journal recovery forward phase, we set jgbl.tp_ztp_jnl_upd_num to whatever update_num the journal record
+		 * has so it is ok for the global variable to be a non-zero value at the start of a ZTP transaction (possible if
+		 * ZTP of one process is in progress when ZTP of another process starts in the journal file). But otherwise
+		 * (in GT.M runtime) we expect it to be 0 at beginning of each TP or ZTP.
+		 */
+		assert((0 == jgbl.tp_ztp_jnl_upd_num) || jgbl.forw_phase_recovery);
 	}
 	++jnl_fence_ctl.level;
 }

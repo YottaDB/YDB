@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,10 @@
 #include "zshow.h"
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
+#endif
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"
+#include "gv_trigger.h"
 #endif
 
 static mval subsc[MAX_GVSUBSCRIPTS]; 	/* At return, op_gvargs elements will be pointing to elements of this array, hence static */
@@ -54,7 +58,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	error_def(ERR_RPARENREQD);
 	error_def(ERR_DLRCILLEGAL);
 
-	assert(sizeof(op_gvargs->count) == sizeof(op_gvargs->args[0]));
+	assert(SIZEOF(op_gvargs->count) == SIZEOF(op_gvargs->args[0]));
 	naked = FALSE;
 	concat = FALSE;
 	c_ref = cp;
@@ -81,7 +85,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 	} else
 	{
 		cp++;
-		if (!ISALPHA(ch) && '%' != ch)
+		if (!(VALFIRSTCHAR_WITH_TRIG(ch)))
 			rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
 		for ( ; cp < c_top && *cp != '('; )
 		{

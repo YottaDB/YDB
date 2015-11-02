@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,21 +13,6 @@
 
 #define IS_ETRAP	(err_act == &dollar_etrap.str)
 
-void		ecode_init(void);
-void		ecode_get(int level, mval *result);	/* return $ECODE (if "level" < 0) or $STACK(level,"ECODE") in "result" */
-void		ecode_set(int errnum);			/* convert "errnum" to error-string and call ecode_add() */
-boolean_t	ecode_add(mstr *str);			/* add "str" to $ECODE */
-void		error_return(void);
-#ifdef VMS
-void		error_return_vms(void);
-#endif
-
-typedef	void	(*error_ret_fnptr)(void);
-
-void	get_dollar_stack_info(int level, int mode,  mval *result);
-void	get_frame_creation_info(int level, int cur_zlevel, mval *result);
-void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result);
-
 #define	DOLLAR_ECODE_MAXINDEX	32	/* maximum of 32 ecodes in $ECODE */
 #define	DOLLAR_STACK_MAXINDEX	256	/* maximum of 256 levels will be stored for $STACK(level) */
 
@@ -35,6 +20,8 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result);
 #define	DOLLAR_STACK_ALLOC	(1 << 15)	/* 32K chunk memory malloced for $STACK(level) */
 
 #define	STACK_ZTRAP_EXPLICIT_NULL	-1	/* used to indicate an explicit SET $ZTRAP = "" */
+
+typedef	void	(*error_ret_fnptr)(void);
 
 typedef struct dollar_ecode
 {
@@ -49,15 +36,17 @@ typedef struct dollar_stack	/* contents of a single $STACK(level) entry */
 	mstr			place_str;	/* $STACK(level,"PLACE") */
 } dollar_stack_struct;
 
-enum stack_mode {
+typedef enum stack_mode
+{
 	DOLLAR_STACK_INVALID,
 	DOLLAR_STACK_ECODE,	/* $STACK(level,"ECODE") */
 	DOLLAR_STACK_PLACE,	/* $STACK(level,"PLACE") */
 	DOLLAR_STACK_MCODE,	/* $STACK(level,"MCODE") */
 	DOLLAR_STACK_MODE	/* $STACK(level) i.e. how this frame got created */
-};
+} stack_mode_t;
 
-typedef	struct {
+typedef	struct
+{
 	char			*begin;	/* beginning of malloced memory holding the complete $ECODE */
 	char			*end;	/* pointer to where next $ECODE can be added */
 	char			*top;	/* allocated end of malloced memory holding the complete $ECODE */
@@ -71,7 +60,8 @@ typedef	struct {
 	error_ret_fnptr		error_return_addr;	/* CODE_ADDRESS(ERROR_RETURN) */
 } dollar_ecode_type;
 
-typedef struct {
+typedef struct
+{
 	char			*begin;		/* beginning of malloced memory holding all $STACK(level) detail */
 	char			*end;		/* pointer to where next $STACK(level) detail can be added */
 	char			*top;		/* allocated end of malloced memory holding all $STACK(level) detail */
@@ -146,5 +136,18 @@ typedef struct {
 		}												\
 	}													\
 }
+
+void		ecode_init(void);
+void		ecode_get(int level, mval *result);	/* return $ECODE (if "level" < 0) or $STACK(level,"ECODE") in "result" */
+void		ecode_set(int errnum);			/* convert "errnum" to error-string and call ecode_add() */
+boolean_t	ecode_add(mstr *str);			/* add "str" to $ECODE */
+void		error_return(void);
+#ifdef VMS
+void		error_return_vms(void);
+#endif
+
+void	get_dollar_stack_info(int level, stack_mode_t mode,  mval *result);
+void	get_frame_creation_info(int level, int cur_zlevel, mval *result);
+void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *result);
 
 #endif /* ERROR_TRAP_H */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,8 +44,7 @@ void op_indname(UNIX_ONLY_COMMA(int argcnt) mval *dst, ...)
 		MV_FORCE_STR(subs);
 	}
 	va_end(sublst);
-	if (stringpool.free + MAX_SRCLINE > stringpool.top)
-		stp_gcol(MAX_SRCLINE);
+	ENSURE_STP_FREE_SPACE(MAX_SRCLINE);
 	out = stringpool.free;
 	if (out + src->str.len > stringpool.top)
 		rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
@@ -91,7 +90,7 @@ void op_indname(UNIX_ONLY_COMMA(int argcnt) mval *dst, ...)
 	for (i = argcnt - 2 ; i > 0 ; i--)
 	{
 		subs = va_arg(sublst, mval * );
-		/* Note that in this second pass of the mvals, if the mval was undefined in the first pass and we are in 
+		/* Note that in this second pass of the mvals, if the mval was undefined in the first pass and we are in
 		   NOUNDEF mode, that the mval was not modified and is again undefined. Make sure this incarnation is defined..
 		*/
 		MV_FORCE_DEFINED(subs);

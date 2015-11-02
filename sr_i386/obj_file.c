@@ -67,7 +67,7 @@ void create_object_file(rhdtyp *rhead)
 	int status;
 	unsigned char rout_len;
 	uint4 stat;
-	char		obj_name[sizeof(mident_fixed) + 5];
+	char		obj_name[SIZEOF(mident_fixed) + 5];
 	mstr		fstr;
 	parse_blk	pblk;
 	struct exec	hdr;
@@ -75,7 +75,7 @@ void create_object_file(rhdtyp *rhead)
 
 	assert(!run_time);
 
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = object_file_name;
 	pblk.buff_size = MAX_FBUFF;
 	/* create the object file */
@@ -98,7 +98,7 @@ void create_object_file(rhdtyp *rhead)
 	OPEN_OBJECT_FILE(object_file_name, O_CREAT | O_RDWR, object_file_des);
 	if (FD_INVALID == object_file_des)
 		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
-	memcpy(&rhead->jsb[0], "GTM_CODE", sizeof(rhead->jsb));
+	memcpy(&rhead->jsb[0], "GTM_CODE", SIZEOF(rhead->jsb));
 	emit_addr((char *)&rhead->src_full_name.addr - (char *)rhead,
 		(int4)rhead->src_full_name.addr, (int4 *)&rhead->src_full_name.addr);
 	emit_addr((char *)&rhead->routine_name.addr - (char *)rhead,
@@ -114,12 +114,12 @@ void create_object_file(rhdtyp *rhead)
 	hdr.a_text = code_size;
 	assert(0 == PADLEN(lits_size, NATIVE_WSIZE));
 	hdr.a_data = lits_size;		/* and pad to even # */
-	hdr.a_syms = (mlmax + cdlits) * sizeof(struct nlist);
-	hdr.a_trsize = txtrel_cnt * sizeof(struct relocation_info);
-	hdr.a_drsize = lit_addrs * sizeof(struct relocation_info);
-	emit_immed((char *)&hdr, sizeof(hdr));
-	memset(psect_use_tab, 0, sizeof(psect_use_tab));
-	emit_immed((char *)rhead, sizeof(*rhead));
+	hdr.a_syms = (mlmax + cdlits) * SIZEOF(struct nlist);
+	hdr.a_trsize = txtrel_cnt * SIZEOF(struct relocation_info);
+	hdr.a_drsize = lit_addrs * SIZEOF(struct relocation_info);
+	emit_immed((char *)&hdr, SIZEOF(hdr));
+	memset(psect_use_tab, 0, SIZEOF(psect_use_tab));
+	emit_immed((char *)rhead, SIZEOF(*rhead));
 }
 
 void close_object_file(void)
@@ -159,7 +159,7 @@ void emit_addr(int4 refaddr, int4 offset, int4 *result)
 		*result = offset - (int4) ptr;
 	} else
 	{	*result = offset + code_size;
-		newrel = (struct rel_table *) mcalloc(sizeof(struct rel_table));
+		newrel = (struct rel_table *) mcalloc(SIZEOF(struct rel_table));
 		newrel->next = (struct rel_table *) 0;
 		newrel->resolve = 0;
 		newrel->r.r_address = refaddr;
@@ -187,7 +187,7 @@ void emit_pidr(int4 refoffset, int4 data_offset, int4 *result)
 	refoffset += code_size;
 	data_offset += code_size;
 	*result = data_offset;
-	newrel = (struct rel_table *) mcalloc(sizeof(struct rel_table));
+	newrel = (struct rel_table *) mcalloc(SIZEOF(struct rel_table));
 	newrel->next = (struct rel_table *)0;
 	newrel->resolve = 0;
 	newrel->r.r_address = refoffset;
@@ -216,7 +216,7 @@ void emit_reference(uint4 refaddr, mstr *name, uint4 *result)
 		*result = sym->n.n_value;
 	else
 	{
-		newrel = (struct rel_table *) mcalloc(sizeof(struct rel_table));
+		newrel = (struct rel_table *) mcalloc(SIZEOF(struct rel_table));
 		newrel->next = (struct rel_table *)0;
 		newrel->resolve = 0;
 		newrel->r.r_address = refaddr;
@@ -259,7 +259,7 @@ void emit_immed(char *source, uint4 size)
 	} else
 	{	while(size > 0)
 		{
-			write = sizeof(emit_buff) - emit_buff_used;
+			write = SIZEOF(emit_buff) - emit_buff_used;
 			write = size < write ? size : write;
 			memcpy(emit_buff + emit_buff_used, source, write);
 			size -= write;
@@ -320,7 +320,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name, int4 value)
 		sym = sym->next;
 	}
 	if (cmp || !sym)
-	{	newsym = (struct sym_table *) mcalloc(sizeof(struct sym_table) + name->len);
+	{	newsym = (struct sym_table *) mcalloc(SIZEOF(struct sym_table) + name->len);
 		newsym->name_len = name->len + 1;
 		memcpy(&newsym->name[0], name->addr, name->len);
 		newsym->name[ name->len ] = 0;
@@ -378,7 +378,7 @@ void output_relocation(void)
 	rel = text_rel;
 	while (rel)
 	{
-		emit_immed((char *)&rel->r, sizeof(rel->r));
+		emit_immed((char *)&rel->r, SIZEOF(rel->r));
 		rel = rel->next;
 		DEBUG_ONLY(cnt++;)
 	}
@@ -388,7 +388,7 @@ void output_relocation(void)
 	rel = data_rel;
 	while (rel)
 	{
-		emit_immed((char *)&rel->r, sizeof(rel->r));
+		emit_immed((char *)&rel->r, SIZEOF(rel->r));
 		rel = rel->next;
 		DEBUG_ONLY(cnt++;)
 	}
@@ -401,16 +401,16 @@ void output_symbol(void)
 	uint4 string_length;
 	struct sym_table *sym;
 
-	string_length = sizeof(int4);
+	string_length = SIZEOF(int4);
 	sym = symbols;
 	while (sym)
 	{
 		sym->n.n_strx = string_length;
-		emit_immed((char *)&sym->n, sizeof(sym->n));
+		emit_immed((char *)&sym->n, SIZEOF(sym->n));
 		string_length += sym->name_len;
 		sym = sym->next;
 	}
-	emit_immed((char *)&string_length, sizeof(string_length));
+	emit_immed((char *)&string_length, SIZEOF(string_length));
 	sym = symbols;
 	while (sym)
 	{
@@ -472,8 +472,8 @@ void emit_literals(void)
 				 p->v.str.addr - (char *) stringpool.base, (int4 *)&p->v.str.addr);
 		else
 			p->v.str.addr = 0;
-		emit_immed((char *)&p->v, sizeof(p->v));
-		offset += sizeof(p->v);
+		emit_immed((char *)&p->v, SIZEOF(p->v));
+		offset += SIZEOF(p->v);
 	}
 	assert(lits_size == offset);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,19 +80,19 @@ void op_merge_arg(int m_opr_type, lv_val *lvp)
 
 	if (!mglvnp)
 	{
-		mglvnp = (merge_glvn_ptr) malloc(sizeof(struct merge_glvn_struct_type));
-		memset(mglvnp, 0, sizeof(struct merge_glvn_struct_type));
+		mglvnp = (merge_glvn_ptr) malloc(SIZEOF(struct merge_glvn_struct_type));
+		memset(mglvnp, 0, SIZEOF(struct merge_glvn_struct_type));
 	}
 	if ((MARG1_GBL == m_opr_type || MARG2_GBL == m_opr_type) && !mglvnp->gblp[IND1])
 	{
 		assert(!mglvnp->gblp[IND1] && !mglvnp->gblp[IND2]);
 		maxkeysz = DBKEYSIZE(MAX_KEY_SZ);
-		mglvnp->gblp[IND1] = (gvname_info *)malloc(sizeof(struct gvname_info_struct));
-		mglvnp->gblp[IND1]->s_gv_currkey =  (gv_key *)malloc(sizeof(gv_key) + maxkeysz - 1);
-		mglvnp->gblp[IND1]->s_gv_currkey->top = maxkeysz;
-		mglvnp->gblp[IND2] = (gvname_info *)malloc(sizeof(struct gvname_info_struct));
-		mglvnp->gblp[IND2]->s_gv_currkey =  (gv_key *)malloc(sizeof(gv_key) + maxkeysz - 1);
-		mglvnp->gblp[IND2]->s_gv_currkey->top = maxkeysz;
+		mglvnp->gblp[IND1] = (gvname_info *)malloc(SIZEOF(struct gvname_info_struct));
+		mglvnp->gblp[IND1]->s_gv_currkey = NULL;	/* needed for GVKEY_INIT macro */
+		GVKEY_INIT(mglvnp->gblp[IND1]->s_gv_currkey, maxkeysz);
+		mglvnp->gblp[IND2] = (gvname_info *)malloc(SIZEOF(struct gvname_info_struct));
+		mglvnp->gblp[IND2]->s_gv_currkey = NULL;	/* needed for GVKEY_INIT macro */
+		GVKEY_INIT(mglvnp->gblp[IND2]->s_gv_currkey, maxkeysz);
 	}
 	merge_args |= m_opr_type;
 	switch(m_opr_type)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,7 @@
 #include "trans_log_name.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
+#include "gtmimagename.h"
 
 #define  LOGNAME_LEN 255
 
@@ -49,7 +50,6 @@ GBLREF int4			lkid,lid;
 LITREF mstr			chset_names[];
 
 LITREF	unsigned char		io_params_size[];
-GBLREF	boolean_t		run_time;
 GBLDEF	io_desc			*active_device;
 GBLREF	mstr			sys_input;
 GBLREF	mstr			sys_output;
@@ -90,7 +90,7 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 			licensed= FALSE ;
 		}
 #		endif
-		switch(stat = TRANS_LOG_NAME(&v->str, &tn, &buf1[0], sizeof(buf1), dont_sendmsg_on_log2long))
+		switch(stat = TRANS_LOG_NAME(&v->str, &tn, &buf1[0], SIZEOF(buf1), dont_sendmsg_on_log2long))
 		{
 		case SS_NORMAL:
 			tl = get_log_name(&tn, INSERT);
@@ -99,7 +99,7 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 			tl = naml;
 			break;
 		case SS_LOG2LONG:
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, sizeof(buf1) - 1);
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf1) - 1);
 			break;
 		default:
 			rts_error(VARLSTCNT(1) stat);
@@ -145,8 +145,8 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	{
 		if (0 == tl->iod)
 		{
-			tl->iod =  (io_desc *)malloc(sizeof(io_desc));
-			memset((char*)tl->iod, 0, sizeof(io_desc));
+			tl->iod =  (io_desc *)malloc(SIZEOF(io_desc));
+			memset((char*)tl->iod, 0, SIZEOF(io_desc));
 			tl->iod->pair.in  = tl->iod;
 			tl->iod->pair.out = tl->iod;
 			tl->iod->trans_name = tl;
@@ -421,7 +421,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	active_device = 0;
 	naml->iod->newly_created = FALSE;
 
-	if (run_time)
+	if (IS_MCODE_RUNNING)
 		return (status);
 	return TRUE;
 }

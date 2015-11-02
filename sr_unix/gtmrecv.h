@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -237,10 +237,10 @@ typedef struct
  * zero or more journal records
  */
 
-#define RECVPOOL_CTL_SIZE	ROUND_UP(sizeof(recvpool_ctl_struct),   CACHELINE_SIZE)
-#define UPD_PROC_LOCAL_SIZE	ROUND_UP(sizeof(upd_proc_local_struct), CACHELINE_SIZE)
-#define GTMRECV_LOCAL_SIZE	ROUND_UP(sizeof(gtmrecv_local_struct),  CACHELINE_SIZE)
-#define UPD_HELPER_CTL_SIZE	ROUND_UP(sizeof(upd_helper_ctl_struct), CACHELINE_SIZE)
+#define RECVPOOL_CTL_SIZE	ROUND_UP(SIZEOF(recvpool_ctl_struct),   CACHELINE_SIZE)
+#define UPD_PROC_LOCAL_SIZE	ROUND_UP(SIZEOF(upd_proc_local_struct), CACHELINE_SIZE)
+#define GTMRECV_LOCAL_SIZE	ROUND_UP(SIZEOF(gtmrecv_local_struct),  CACHELINE_SIZE)
+#define UPD_HELPER_CTL_SIZE	ROUND_UP(SIZEOF(upd_helper_ctl_struct), CACHELINE_SIZE)
 
 #define RECVDATA_BASE_OFF	ROUND_UP(RECVPOOL_CTL_SIZE + UPD_HELPER_CTL_SIZE + GTMRECV_LOCAL_SIZE + UPD_HELPER_CTL_SIZE, \
 						JNL_REC_START_BNDRY)

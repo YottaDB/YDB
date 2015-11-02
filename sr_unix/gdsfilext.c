@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,7 @@
 #include "gtmmsg.h"
 #include "gdsfilext.h"
 #include "bm_getfree.h"
+#include "gtmimagename.h"
 
 #define	      GDSFILEXT_CLNUP { if (need_to_restore_mask)				\
 					sigprocmask(SIG_SETMASK, &savemask, NULL);	\
@@ -65,7 +66,6 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	boolean_t	mu_reorg_process;
 GBLREF	uint4		process_id;
-GBLREF	boolean_t	run_time;
 GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	unsigned int	t_tries;
 GBLREF	jnl_gbls_t	jgbl;
@@ -174,7 +174,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			 *	for this region's freeze to be removed before grabbing crit.
 			 * (ii) Final retry and not in TP. In that case too, it is better to restart in case there is
 			 *	some validation code that shortcuts the checking for the final retry assuming we were
-			 *	in crit from t_begin() to t_end(). t_retry() has logic that will wait for unfreeze.
+			 *	in crit from "t_begin" to "t_end". "t_retry" has logic that will wait for unfreeze.
 			 * In either case, we need to restart. Returning EXTEND_UNFREEZECRIT will cause one in t_end/tp_tend.
 			 */
 			return (uint4)(EXTEND_UNFREEZECRIT);
@@ -191,7 +191,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		GDSFILEXT_CLNUP;
 		return (SS_NORMAL);
 	}
-	if (run_time && (2 * ((0 < dollar_tlevel) ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks))
+	if (IS_GTM_IMAGE && (2 * ((0 < dollar_tlevel) ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks))
 	{
 		if (FALSE == was_crit)
 		{
@@ -240,8 +240,8 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
 			need_to_restore_mask = TRUE;
 			tmp_csd = cs_data;
-			cs_data = (sgmnt_data_ptr_t)malloc(sizeof(*cs_data));
-			memcpy((sm_uc_ptr_t)cs_data, (uchar_ptr_t)tmp_csd, sizeof(*cs_data));
+			cs_data = (sgmnt_data_ptr_t)malloc(SIZEOF(*cs_data));
+			memcpy((sm_uc_ptr_t)cs_data, (uchar_ptr_t)tmp_csd, SIZEOF(*cs_data));
 			status = munmap((caddr_t)cs_addrs->db_addrs[0],
 					     (size_t)(cs_addrs->db_addrs[1] - cs_addrs->db_addrs[0]));
 #ifdef DEBUG_DB64
@@ -277,7 +277,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	buff = (char *)malloc(DISK_BLOCK_SIZE);
 	memset(buff, 0, DISK_BLOCK_SIZE);
 	LSEEKWRITE(udi->fd, new_eof, buff, DISK_BLOCK_SIZE, save_errno);
-	if ((ENOSPC == save_errno) && run_time)
+	if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
 	{
 		/* try to write it every second, and send message to operator
 		 * log every 1/20 of cs_data->wait_disk_space
@@ -319,7 +319,8 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	}
 	DEBUG_ONLY(prev_extend_blks_to_upgrd = cs_data->blks_to_upgrd;)
 	/* inctn_detail.blks_to_upgrd_delta holds the increase in "csd->blks_to_upgrd" due to the file extension */
-	inctn_detail.blks_to_upgrd_delta = (IS_GDS_BLK_DOWNGRADE_NEEDED(cs_data->desired_db_format) ? new_bit_maps : 0);
+	inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta =
+			(IS_GDS_BLK_DOWNGRADE_NEEDED(cs_data->desired_db_format) ? new_bit_maps : 0);
 	if (JNL_ENABLED(cs_data))
 	{
 		save_inctn_opcode = inctn_opcode;
@@ -361,7 +362,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		}
 		assert(0 == new_bit_maps);
 	}
-	assert(cs_data->blks_to_upgrd == (inctn_detail.blks_to_upgrd_delta + prev_extend_blks_to_upgrd));
+	assert(cs_data->blks_to_upgrd == (inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta + prev_extend_blks_to_upgrd));
 	if (dba_mm == cs_addrs->hdr->acc_meth)
 	{	/* On 32 bit aix, is it possible we can have now increased the file size past what we can map ? */
 		mm_prot = cs_addrs->read_write ? (PROT_READ | PROT_WRITE) : PROT_READ;

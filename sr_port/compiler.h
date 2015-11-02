@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -228,16 +228,30 @@ error_def(ERR_DEVPARVALREQ);
 
 /* This macro does an "stx_error" of the input errcode but before that it asserts that the input errcode is one
  * of the known error codes that are to be handled as a compile-time warning (instead of an error). It also set
- * the variable "parse_warn" to TRUE which is relied upon by the functions that invoke this macro.
+ * the variable "parse_warn" to TRUE which is relied upon by the functions that invoke this macro. Note that when
+ * triggers are included, warnings become errors so bypass the warning stuff.
  */
+#ifdef GTM_TRIGGER
+#define	STX_ERROR_WARN(errcode)						\
+{									\
+	GBLREF boolean_t trigger_compile;				\
+	if (!trigger_compile)						\
+		parse_warn = TRUE;					\
+	assert(IS_STX_WARN(errcode));					\
+	stx_error(errcode);						\
+	if (trigger_compile)						\
+		return FALSE;						\
+}
+#else
 #define	STX_ERROR_WARN(errcode)						\
 {									\
 	parse_warn = TRUE;						\
 	assert(IS_STX_WARN(errcode));					\
 	stx_error(errcode);						\
 }
+#endif
 
-#define MAX_SRCLINE	8192	/* maximum length of a program source or indirection line - increased for Iselin */
+#define MAX_SRCLINE	8192	/* maximum length of a program source or indirection line */
 
 #define EXPR_FAIL	0	/* expression had syntax error */
 #define EXPR_GOOD	1	/* expression ok, no indirection at root */
@@ -261,7 +275,7 @@ triple *setcurtchain(triple *x);
 int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len_t src_len);
 void comp_init(mstr *src);
 void comp_indr(mstr *obj);
-bool compiler_startup(void);
+boolean_t compiler_startup(void);
 
 oprtype put_ocnt(void);
 oprtype put_tsiz(void);
@@ -311,7 +325,7 @@ void start_fetches(opctype op);
 
 int actuallist(oprtype *opr);
 
-int exfunc(oprtype *a);
+int exfunc(oprtype *a, boolean_t alias_target);
 int extern_func(oprtype *a);
 
 int glvn(oprtype *a);
@@ -411,5 +425,6 @@ int f_ztrnlnm(oprtype *a, opctype op);
 int f_zconvert(oprtype *a, opctype op);
 int f_zwidth(oprtype *a, opctype op);
 int f_zsubstr(oprtype *a, opctype op);
+int f_ztrigger(oprtype *a, opctype op);
 
 #endif /* COMPILER_H_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ void ex_tail(oprtype *opr)
 	assert(t->operand[1].oprclass == TRIP_REF || t->operand[1].oprclass == 0);
 	if (!(w & OCT_BOOL))
 	{
-		for (i = t->operand ; i < &(t->operand[2]) ; i++)
+		for (i = t->operand ; i < ARRAYTOP(t->operand); i++)
 			if (i->oprclass == TRIP_REF)
 				ex_tail(i);
 		if (c == OC_COMINT && (t1 = t->operand[0].oprval.tref)->opcode == OC_BOOLINIT)
@@ -59,7 +59,7 @@ void ex_tail(oprtype *opr)
 		t1->operand[0] = put_tref(bitrip);
 		opr->oprval.tref = bitrip;
 		dqins(t, exorder, t1);
-		i = (oprtype *) mcalloc(sizeof(oprtype));
+		i = (oprtype *) mcalloc(SIZEOF(oprtype));
 		bx_tail(t,(bool) FALSE, i);
 		*i = put_tnxt(t1);
 	}

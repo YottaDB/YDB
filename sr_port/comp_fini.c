@@ -62,7 +62,14 @@ int comp_fini(bool status, mstr *obj, opctype retcode, oprtype *retopr, mstr_len
 			start_fetches(OC_NOOP);
 			resolve_ref(0);	/* cannot fail because there are no MLAB_REF's in indirect code */
 			alloc_reg();
-			stp_gcol(0);
+			INVOKE_STP_GCOL(0);
+			/* The above invocation of stp_gcol with a parameter of 0 is a critical part of compilation
+			 * (both routine compilations and indirect dynamic compilations). This collapses the indirect
+			 * (compilation) stringpool so that only the literals are left. This stringpool is then written
+			 * out to the compiled object as the literal pool for that compilation. Temporary stringpool
+			 * use for conversions or whatever are eliminated. Note the path is different in stp_gcol for
+			 * the indirect stringpool which is only used during compilations.
+			 */
 			assert(indr_stringpool.base == stringpool.base);
 			indr_stringpool = stringpool;
 			stringpool = rts_stringpool;

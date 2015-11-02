@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -521,8 +521,8 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_wrap /* for ZWRAP; ZWRA* is a synonym for WR, and WRA* */
 	} ;
 
-	assert(dev_param_index[26] == (sizeof(dev_param_names)/sizeof(nametabent)));
-	assert(dev_param_index[26] == (sizeof(dev_param_data)/sizeof(unsigned char)));
+	assert(dev_param_index[26] == (SIZEOF(dev_param_names)/SIZEOF(nametabent)));
+	assert(dev_param_index[26] == (SIZEOF(dev_param_data)/SIZEOF(unsigned char)));
 	is_parm_list = (window_token == TK_LPAREN);
 	if (is_parm_list)
 		advancewindow();
@@ -562,7 +562,7 @@ int deviceparameters(oprtype *c, char who_calls)
 				   safety)  Must check before cvtparm, due to the fact that tmpmval could otherwise
 				   be garbage collected by a later putstr
 				*/
-				if (parptr - parstr + x.oprval.tref->operand[0].oprval.mlit->v.str.len + 5 > sizeof(parstr))
+				if (parptr - parstr + x.oprval.tref->operand[0].oprval.mlit->v.str.len + 5 > SIZEOF(parstr))
 				{
 					cat_list[cat_cnt++] = put_str(parstr, INTCAST(parptr - parstr));
 					parptr = parstr;

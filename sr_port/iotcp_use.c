@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void	iotcp_use(io_desc *iod, mval *pp)
 	p_offset = 0;
 	tcpptr = (d_tcp_struct *)iod->dev_sp;
 	/* copy existing parameters */
-	memcpy(&newtcp, tcpptr, sizeof(d_tcp_struct));
+	memcpy(&newtcp, tcpptr, SIZEOF(d_tcp_struct));
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{
 		assert((params) *(pp->str.addr + p_offset) < (params) n_iops);
@@ -114,7 +114,7 @@ void	iotcp_use(io_desc *iod, mval *pp)
 	}
 
 	/* commit changes */
-	memcpy(tcpptr, &newtcp, sizeof(d_tcp_struct));
+	memcpy(tcpptr, &newtcp, SIZEOF(d_tcp_struct));
 #ifdef DEBUG_TCP
 	PRINTF("%s <<<\n", __FILE__);
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -191,7 +191,7 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 	/* assert that the identifiers are at the top of replpool control structure */
 	assert(0 == offsetof(jnlpool_ctl_struct, jnlpool_id));
 	assert(0 == offsetof(recvpool_ctl_struct, recvpool_id));
-	memcpy((void *)replpool_id, (void *)start_addr, sizeof(replpool_identifier));
+	memcpy((void *)replpool_id, (void *)start_addr, SIZEOF(replpool_identifier));
 	if (memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 1))
 	{
 		if (!memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ bool reg_cmcheck(gd_region *reg)
 	seg = reg->dyn.addr;
 	file.addr = (char *)seg->fname;
 	file.len = seg->fname_len;
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = fbuff;
 	pblk.buff_size = MAX_FBUFF;
 	pblk.fop = (F_SYNTAXO | F_PARNODE);
@@ -42,19 +42,19 @@ bool reg_cmcheck(gd_region *reg)
 	if (is_raw_dev(fbuff))
 	{
 		pblk.def1_buf = DEF_NODBEXT;
-		pblk.def1_size = sizeof(DEF_NODBEXT) - 1;
+		pblk.def1_size = SIZEOF(DEF_NODBEXT) - 1;
 	}
 	else
 	{
 		pblk.def1_buf = DEF_DBEXT;
-		pblk.def1_size = sizeof(DEF_DBEXT) - 1;
+		pblk.def1_size = SIZEOF(DEF_DBEXT) - 1;
 	}
 
 	status = parse_file(&file, &pblk);
 	if (!(status & 1))
 		rts_error(VARLSTCNT(5) ERR_DBFILERR,2, seg->fname_len, seg->fname, status);
 
-	assert((int)pblk.b_esl + 1 <= sizeof(seg->fname));
+	assert((int)pblk.b_esl + 1 <= SIZEOF(seg->fname));
 	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
 	pblk.buffer[pblk.b_esl] = 0;
 	seg->fname[pblk.b_esl] = 0;

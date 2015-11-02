@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,12 +36,10 @@
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	reg_ctl_list		*mur_ctl;
-GBLREF	int			mur_regno;
 
 #define BPL	SIZEOF(int4)*8/BML_BITS_PER_BLK					/* blocks masked by a int4 */
 
-int4 mur_blocks_free()
+int4 mur_blocks_free(reg_ctl_list *rctl)
 {
 	int4		x;
 	block_id 	bnum;
@@ -54,8 +52,9 @@ int4 mur_blocks_free()
 	error_def(ERR_DBRDERR);
 	error_def(ERR_DYNUPGRDFAIL);
 
-	db_ctl = mur_ctl[mur_regno].db_ctl;
-	cs_data = mur_ctl[mur_regno].csd;
+	db_ctl = rctl->db_ctl;
+	cs_data = rctl->csd;
+	assert(FILE_INFO(gv_cur_region)->s_addrs.hdr == cs_data);
 	fcnt = 0;
 	maps = (cs_data->trans_hist.total_blks + cs_data->bplmap - 1) / cs_data->bplmap;
 	map_blk_size = BM_SIZE(cs_data->bplmap);
@@ -87,10 +86,10 @@ int4 mur_blocks_free()
 		mapsize = (bnum == (cs_data->trans_hist.total_blks/cs_data->bplmap) * cs_data->bplmap ?
 				     cs_data->trans_hist.total_blks - bnum : cs_data->bplmap);
 		j = BPL;
-		dskmap = (uint4*)(disk + sizeof(blk_hdr));
+		dskmap = (uint4*)(disk + SIZEOF(blk_hdr));
 		while (j < mapsize)
 		{
-			for (k = 0; k != sizeof(int4) * 8; k += BML_BITS_PER_BLK)
+			for (k = 0; k != SIZEOF(int4) * 8; k += BML_BITS_PER_BLK)
 				fcnt += (*dskmap >> k) & 1;
 			j += BPL;
 			dskmap++;

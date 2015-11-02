@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,9 +45,9 @@ int find_local_colltype(void)
 	char	transbuf[MAX_TRANS_NAME_LEN];
 	mstr	lognam, transnam;
 
-	lognam.len = sizeof(LCT_PREFIX) - 1;
+	lognam.len = SIZEOF(LCT_PREFIX) - 1;
 	lognam.addr = LCT_PREFIX;
-	status = TRANS_LOG_NAME(&lognam, &transnam, transbuf, sizeof(transbuf), do_sendmsg_on_log2long);
+	status = TRANS_LOG_NAME(&lognam, &transnam, transbuf, SIZEOF(transbuf), do_sendmsg_on_log2long);
 	if (SS_NORMAL != status)
 		return 0;
 	lct = asc2i((uchar_ptr_t)transnam.addr, transnam.len);
@@ -56,7 +56,7 @@ int find_local_colltype(void)
 
 collseq *ready_collseq(int act)
 {
-	unsigned char	filespec[sizeof(CT_PREFIX) + 4];	/* '4' to hold the chars in the max allowable
+	unsigned char	filespec[SIZEOF(CT_PREFIX) + 4];	/* '4' to hold the chars in the max allowable
 								 * collation sequence (255) plus the terminating null */
 	unsigned char	*fsp;
 	collseq		temp_csp, *csp;
@@ -75,14 +75,14 @@ collseq *ready_collseq(int act)
 		/* If not found, create a structure and attempt to map in the collating support package.*/
 		temp_csp.act = act;
 		temp_csp.flink = collseq_list;
-		memcpy(filespec, CT_PREFIX, sizeof(CT_PREFIX));
-		fsp = i2asc(&filespec[sizeof(CT_PREFIX) - 1], act);
+		memcpy(filespec, CT_PREFIX, SIZEOF(CT_PREFIX));
+		fsp = i2asc(&filespec[SIZEOF(CT_PREFIX) - 1], act);
 		*fsp = 0;
 		fspec.len =  INTCAST(fsp - filespec);
 		fspec.addr = (char *)filespec;
 		if (!map_collseq(&fspec, &temp_csp))
 			return NULL;
-		csp = (collseq *) malloc(sizeof(collseq));
+		csp = (collseq *) malloc(SIZEOF(collseq));
 		*csp = temp_csp;
 		collseq_list = csp;
 	}

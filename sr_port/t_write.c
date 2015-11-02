@@ -82,8 +82,8 @@ cw_set_element *t_write (
 	/* When the following two asserts trip, we should change the data types of prev_first_off
 	 * and prev_next_off, so they satisfy the assert.
 	 */
-	assert(sizeof(prev_first_off) >= sizeof(block_offset));
-	assert(sizeof(prev_next_off) >= sizeof(block_offset));
+	assert(SIZEOF(prev_first_off) >= SIZEOF(block_offset));
+	assert(SIZEOF(prev_next_off) >= SIZEOF(block_offset));
 
 	blk = blkhist->blk_num;
 	if (dollar_tlevel == 0)
@@ -135,13 +135,13 @@ cw_set_element *t_write (
 				horiz_growth = TRUE;
 				old_cse = cse;
 				cse = (cw_set_element *)get_new_free_element(sgm_info_ptr->tlvl_cw_set_list);
-				memcpy(cse, old_cse, sizeof(cw_set_element));
+				memcpy(cse, old_cse, SIZEOF(cw_set_element));
 				cse->low_tlevel = old_cse;
 				cse->high_tlevel = NULL;
 				old_cse->high_tlevel = cse;
 				cse->t_level = dollar_tlevel;
-				assert(2 == (sizeof(cse->undo_offset) / sizeof(cse->undo_offset[0])));
-				assert(2 == (sizeof(cse->undo_next_off) / sizeof(cse->undo_next_off[0])));
+				assert(2 == (SIZEOF(cse->undo_offset) / SIZEOF(cse->undo_offset[0])));
+				assert(2 == (SIZEOF(cse->undo_next_off) / SIZEOF(cse->undo_next_off[0])));
 				for (iter = 0; iter < 2; iter++)
 					cse->undo_next_off[iter] = cse->undo_offset[iter] = 0;
 				assert(old_cse->new_buff);
@@ -220,6 +220,7 @@ cw_set_element *t_write (
 	cse->index = index;
 	cse->reference_cnt = 0;
 	cse->level = level;
+	cse->was_free = FALSE; /* t_write operates on BUSY blocks and hence cse->was_free is set to FALSE unconditionally */
 	if (horiz_growth)
 		cse->first_copy = TRUE;
 	else

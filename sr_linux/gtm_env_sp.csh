@@ -270,10 +270,9 @@ if ( "ia64" != $mach_type ) then
 	endif
 	alias	gt_as_bta \
 		'gt_as $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
-		# Do not split alias definitions across multiple lines as tcsh will then use the last partial line
-		# as the definition. So it is ok even if the definition goes more than 132 columns (coding standard).
-	alias	gt_as_dbg	\
-		'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size \
-				-o `basename \!:1 .s`.o \!:1'
+		# If the value of the alias variable extends the 132 character limit, use a temporary variable
+		# (like gtm_as_dbg_var below) and use that in the alias value to stick to the the coding standard.
+	set gt_as_dbg_var = "$gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size"
+	alias	gt_as_dbg	'gt_as $gt_as_dbg_var -o `basename \!:1 .s`.o \!:1'
 	alias   gt_as_pro	'gt_as $gt_as_option_optimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
 endif

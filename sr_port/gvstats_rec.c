@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,12 +22,12 @@
 
 void	gvstats_rec_csd2cnl(sgmnt_addrs *csa)
 {
-	memcpy(&csa->nl->gvstats_rec, &csa->hdr->gvstats_rec, sizeof(gvstats_rec_t));
+	memcpy(&csa->nl->gvstats_rec, &csa->hdr->gvstats_rec, SIZEOF(gvstats_rec_t));
 }
 
 void	gvstats_rec_cnl2csd(sgmnt_addrs *csa)
 {
-	memcpy(&csa->hdr->gvstats_rec, &csa->nl->gvstats_rec, sizeof(gvstats_rec_t));
+	memcpy(&csa->hdr->gvstats_rec, &csa->nl->gvstats_rec, SIZEOF(gvstats_rec_t));
 }
 
 void	gvstats_rec_upgrade(sgmnt_addrs *csa)

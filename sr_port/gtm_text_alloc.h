@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,33 @@
 
 #ifndef GTM_TEXT_ALLOC_H
 #define GTM_TEXT_ALLOC_H
+
+/* States a storage element may be in (which need to be different from malloc states). */
+enum TextState {TextAllocated = 0x43, TextFree = 0x34};
+
+/* Each allocated block (in the mmap build) has the following structure. The actual address
+   returned to the user for allocation and supplied by the user for release
+   is actually the storage beginning at the 'userStorage.userStart' area.
+   This holds true even for storage that is truely mmap'd.
+*/
+typedef struct textElemStruct
+{	/* This flavor of header is 16 bytes. This is required on IA64 and we have just adopted it for
+	   the other platforms as well as it is a minor expense given the sizes of chunks we are using
+	*/
+	int		queueIndex;			/* Index into TwoTable for this size of element */
+	enum TextState	state;				/* State of this block */
+	unsigned int	realLen;			/* Real (total) length of allocation */
+	int		filler;
+	union						/* The links are used only when element is free */
+	{
+		struct					/* Free block information */
+		{
+			struct	textElemStruct	*fPtr;	/* Next storage element on free queue */
+			struct	textElemStruct	*bPtr;	/* Previous storage element on free queue */
+		} links;
+		unsigned char	userStart;		/* First byte of user useable storage */
+	} userStorage;
+} textElem;
 
 /* The below macros are used to allocate and release areas of storage that will be used
    to contain executable code. Traditionally, GTM has just used malloc() and free() and

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -345,11 +345,11 @@ typedef struct
 	/* if we want to keep gv_currkey->top, why bother changing it; vinu Jul 17, 2000 */	\
 	/* top = gv_currkey->top; */								\
 	/* GET_USHORT(gv_currkey->top, ptr); */							\
-	(PTR) += sizeof(unsigned short);							\
+	(PTR) += SIZEOF(unsigned short);							\
 	GET_USHORT(gv_currkey->end, (PTR));							\
-	(PTR) += sizeof(unsigned short);							\
+	(PTR) += SIZEOF(unsigned short);							\
 	GET_USHORT(gv_currkey->prev, (PTR));							\
-	(PTR) += sizeof(unsigned short);							\
+	(PTR) += SIZEOF(unsigned short);							\
 	memcpy(gv_currkey->base, (PTR), (LEN) - 6);						\
 	(PTR) += ((LEN) - 6);									\
 	/* gv_currkey->top = top; */

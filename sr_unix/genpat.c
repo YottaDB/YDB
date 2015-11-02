@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,6 @@ void genpat(mstr *input, mval *patbuf)
 	}
 	if (patopen)
 		*pat_str++ = '"';
-	*pat_str++ = ' ';
 	instr.addr = source_buffer;
 	instr.len = INTCAST(pat_str - source_buffer);
 	if (status = patstr(&instr, &pat_ptstr, NULL))

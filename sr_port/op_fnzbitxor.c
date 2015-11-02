@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,11 +46,8 @@ void op_fnzbitxor(mval *dst, mval *bitstr1, mval *bitstr2)
 		new_str_len = str_len2 - byte2_len;
 	else
 		new_str_len = str_len1 - byte1_len;
-
 	n = (new_str_len + 7)/8 ;
-
-	if (stringpool.top - stringpool.free < n + 1)
-		stp_gcol(n + 1);
+	ENSURE_STP_FREE_SPACE(n + 1);
 	byte_1 = (unsigned char *)stringpool.free;
 	*byte_1 = n * 8 - new_str_len;
 	byte1_1 = (unsigned char *)bitstr1->str.addr;

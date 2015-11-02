@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,15 @@
 
 #ifndef MU_GV_STACK_DEFINED
 #define  MU_GV_STACK_DEFINED
-void mu_gv_stack_init(unsigned char **mstack_ptr);
+
+#include "obj_file.h"		/* Needed for SECTION_ALIGN_BOUNDARY */
+
+#define UTIL_BASE_FRAME_NAME	"UTIL.BASE.FRAME"
+#define UTIL_BASE_LABEL_NAME	"running"
+#define UTIL_BASE_FRAME_CODE	"N/A"
+#define RLEN			SECTION_ALIGN_BOUNDARY	/* "Routine" length (pseudo not-so-executable) maintains alignment */
+
+void mu_gv_stack_init(void);
+
 #endif
 

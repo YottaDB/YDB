@@ -43,6 +43,7 @@
 #include "wbox_test_init.h"
 #include "wcs_mm_recover.h"
 #include "memcoherency.h"
+#include "gtm_c_stack_trace.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		process_id;
@@ -54,6 +55,7 @@ GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 
 #define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)								\
 {															\
+	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (cnl->in_wtstart), 1);						\
 	if (WRITERS_ACTIVE(cnl))											\
 	{														\
 		DEBUG_ONLY(int4	in_wtstart;) 		/* temporary for debugging purposes */				\
@@ -67,6 +69,8 @@ GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 		{													\
 			DEBUG_ONLY(in_wtstart = cnl->in_wtstart;)							\
 			DEBUG_ONLY(intent_wtstart = cnl->intent_wtstart;)						\
+			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, lcnt, (MAXGETSPACEWAIT * 2) - 1);		\
+			GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, cnl->wtstart_pid[0], process_id);		\
 			if (MAXGETSPACEWAIT DEBUG_ONLY( * 2) == ++lcnt)							\
 			{	/* We have noticed the below assert to fail occasionally on some platforms (mostly	\
 				 * AIX and Linux). We suspect it is because of waiting for another writer that is 	\
@@ -74,11 +78,18 @@ GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 				 * to finish. To avoid false failures (where the other writer finishes its job in	\
 				 * a little over a minute) we wait for twice the time in the debug version.		\
 				 */											\
-				assert(FALSE);										\
+				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);	\
+				assert((gtm_white_box_test_case_enabled) && 						\
+				(WBTEST_BUFOWNERSTUCK_STACK == gtm_white_box_test_case_number));			\
 				cnl->wcsflu_pid = 0;									\
 				SIGNAL_WRITERS_TO_RESUME(csd);								\
-				if (!was_crit)										\
-					rel_crit(gv_cur_region);							\
+				rel_crit(gv_cur_region);								\
+				/* Disable white box testing after the first time the					\
+				WBTEST_BUFOWNERSTUCK_STACK mechanism has kicked in. This is because as			\
+				part of the exit handling process, the control once agin comes to wcs_flu		\
+				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box		\
+				mechanism to kick in.*/									\
+				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);	\
 				send_msg(VARLSTCNT(5) ERR_WRITERSTUCK, 3, cnl->in_wtstart, DB_LEN_STR(gv_cur_region));	\
 				return FALSE;										\
 			}												\
@@ -177,7 +188,7 @@ boolean_t wcs_flu(uint4 options)
 		WAIT_FOR_WRITERS_TO_STOP(cnl, lcnt, MAXGETSPACEWAIT);
 		if (MAXGETSPACEWAIT == lcnt)
 		{
-			DEBUG_ONLY(GET_C_STACK_WTSTART_WRITERS(cnl->wtstart_pid));
+			GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
 			assert(FALSE);
 			cnl->wcsflu_pid = 0;
 			if (!was_crit)
@@ -409,7 +420,7 @@ boolean_t wcs_flu(uint4 options)
 		{
 			if (MAXJNLQIOLOCKWAIT == lcnt)	/* tried too long */
 			{
-				DEBUG_ONLY(GET_C_STACK_WTSTART_WRITERS(cnl->wtstart_pid));
+				GET_C_STACK_MULTIPLE_PIDS("MAXJNLQIOLOCKWAIT", cnl->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);
 				assert(FALSE);
 				cnl->wcsflu_pid = 0;
 				if (!was_crit)

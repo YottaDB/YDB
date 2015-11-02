@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,13 +31,16 @@
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
+#include "gdskill.h"		/* needed for tp.h */
+#include "gdscc.h"		/* needed for tp.h */
+#include "tp.h"
 
 GBLREF 	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data_ptr_t 	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF 	jnl_gbls_t		jgbl;
 
-uint4 mur_block_count_correct(void)
+uint4 mur_block_count_correct(reg_ctl_list *rctl)
 {
 	unsigned int		native_size, size;
 	sgmnt_data_ptr_t 	mu_data;
@@ -50,6 +53,7 @@ uint4 mur_block_count_correct(void)
 	error_def(ERR_TEXT);
 	error_def(ERR_DBFILERR);
 
+	MUR_CHANGE_REG(rctl);
 	mu_data = cs_data;
 	switch (mu_data->acc_meth)
 	{

@@ -147,7 +147,7 @@ void	gtm_dbjnl_dupfd_check(void)
 	sgmnt_addrs	*csa;
 	unix_db_info	*udi;
 
-	memset(open_fdarray, 0, sizeof(open_fdarray));
+	memset(open_fdarray, 0, SIZEOF(open_fdarray));
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
 		for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -246,7 +246,7 @@ dep_list:=$(addsuffix .d,$(filter-out $(basename $(sfile_list)),$(basename $(cfi
 
 # objects on link command lines
 mumps_obj=gtm.o
-gtmshr_obj=mumps_clitab.o gtm_main.o
+gtmshr_obj=gtm_main.o
 lke_obj=lke.o lke_cmd.o
 dse_obj=dse.o dse_cmd.o
 mupip_obj=mupip.o mupip_cmd.o
@@ -257,7 +257,7 @@ geteuid_obj=geteuid.o
 semstat2_obj=semstat2.o
 ftok_obj=ftok.o
 gtcm_server_obj=gtcm_main.o omi_srvc_xct.o
-gtcm_gnp_server_obj=gtcm_gnp_server.o gtcm_gnp_clitab.o
+gtcm_gnp_server_obj=gtcm_gnp_server.o
 gtcm_play_obj=gtcm_play.o omi_sx_play.o
 gtcm_pkdisp_obj=gtcm_pkdisp.o
 gtcm_shmclean_obj=gtcm_shmclean.o
@@ -466,19 +466,19 @@ endif
 ../dbcertify: $(dbcertify_obj) libdbcertify.a libmupip.a libmumps.a libstub.a $(gt_ld_aio_syslib)
 	$(gt-ld)
 
-../gtcm_server: $(gtcm_server_obj) $(dummy_gtmci_obj) libgtcm.a libmumps.a libstub.a
+../gtcm_server: $(gtcm_server_obj) libgtcm.a libmumps.a libstub.a
 	$(gt-ld)
 
-../gtcm_gnp_server: $(gtcm_gnp_server_obj) $(dummy_gtmci_obj) libgnpserver.a liblke.a libmumps.a libcmisockettcp.a libstub.a
+../gtcm_gnp_server: $(gtcm_gnp_server_obj) libgnpserver.a liblke.a libmumps.a libcmisockettcp.a libstub.a
 	$(gt-ld)
 
-../gtcm_play: $(gtcm_play_obj) $(dummy_gtmci_obj) libgtcm.a libmumps.a libstub.a
+../gtcm_play: $(gtcm_play_obj) libgtcm.a libmumps.a libstub.a
 	$(gt-ld)
 
-../gtcm_pkdisp: $(gtcm_pkdisp_obj) $(dummy_gtmci_obj) libgtcm.a libmumps.a libstub.a
+../gtcm_pkdisp: $(gtcm_pkdisp_obj) libgtcm.a libmumps.a libstub.a
 	$(gt-ld)
 
-../gtcm_shmclean: $(gtcm_shmclean_obj) $(dummy_gtmci_obj) libgtcm.a libmumps.a libstub.a
+../gtcm_shmclean: $(gtcm_shmclean_obj) libgtcm.a libmumps.a libstub.a
 	$(gt-ld)
 
 ../semstat2: $(semstat2_obj)

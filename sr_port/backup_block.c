@@ -65,12 +65,14 @@ boolean_t backup_block(sgmnt_addrs *csa, block_id blk, cache_rec_ptr_t backup_cr
 	{
 		assert(NULL != backup_cr);
 		sblkh_p->use.bkup.ondsk_blkver = backup_cr->ondsk_blkver;
-		assert(((blk_hdr_ptr_t)backup_blk_p)->bsiz >= sizeof(blk_hdr));
+		assert(((blk_hdr_ptr_t)backup_blk_p)->bsiz >= SIZEOF(blk_hdr));
 	} else /* For MM version, no dynamic conversions take place so just record block as we know it is */
 		sblkh_p->use.bkup.ondsk_blkver = csd->desired_db_format;
 	bkp_src_blk = backup_blk_p;
 #	ifdef GTM_CRYPT
-	/* If the database is encrypted, we need to copy the block to the twin buffer */
+	/* If the database is encrypted, the old_block will be in the encrypted twin buffer. Fetch it from the encrypted
+	 * twin counter part and write that to the backup buffer instead.
+	 */
 	if (csd->is_encrypted)
 	{
 		DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, backup_blk_p);

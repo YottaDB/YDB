@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,7 @@ int m_xecute(void)
 	if (window_token == TK_COLON)
 	{
 		advancewindow();
-		cr = (oprtype *) mcalloc(sizeof(oprtype));
+		cr = (oprtype *) mcalloc(SIZEOF(oprtype));
 		if (!bool_expr((bool) FALSE,cr))
 			return FALSE;
 		if (expr_start != expr_start_orig)

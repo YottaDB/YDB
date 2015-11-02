@@ -47,7 +47,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 	mstr		*base, *current, *top;
 	uint4		srcstat, *src_tbl;
 	char		buff[MAX_SRCLINE], *c1, *c2, *c, *chkcalc;
-	char		srcnamebuf[sizeof(mident_fixed) + STR_LIT_LEN(DOTM)];
+	char		srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
 	ht_ent_mname	*tabent;
 	var_tabent	rtnent;
 	int		rc;
@@ -126,7 +126,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		n = found ? (int)rtn_vector->lnrtab_len : 0;
 		assert((found && n >= 1) || (n == 0));
 		/* first two words are the status code and the number of entries */
-		src_tbl = (uint4 *)malloc(n * sizeof(mstr) + sizeof(uint4) * 2);
+		src_tbl = (uint4 *)malloc(n * SIZEOF(mstr) + SIZEOF(uint4) * 2);
 		base = RECAST(mstr *)(src_tbl + 2);
 		*(src_tbl + 1) = n;
 		badfmt = FALSE;
@@ -158,14 +158,14 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 				for (chkcalc = buff; chkcalc < c2; )
 				{
 					srcint = 0;
-					if (c2 - chkcalc < sizeof (int4))
+					if (c2 - chkcalc < SIZEOF(int4))
 					{
 						memcpy(&srcint, chkcalc, c2 - chkcalc);
 						chkcalc = c2;
 					} else
 					{
 						srcint = *(int4 *)chkcalc;
-						chkcalc += sizeof(int4);
+						chkcalc += SIZEOF(int4);
 					}
 					checksum ^= srcint;
 					checksum >>= 1;

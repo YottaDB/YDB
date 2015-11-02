@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,17 +59,15 @@ mstr *get_name(mstr *ms)
 	parse_blk pblk;
 	mstr	*new;
 
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = c;
 	pblk.buff_size = MAX_FBUFF;
 	pblk.def1_buf = DEF_GDR_EXT;
-	pblk.def1_size = sizeof(DEF_GDR_EXT) - 1;
+	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(ms,&pblk);
 	if (!(status & 1))
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr,
-			 LEN_AND_LIT(""), dollar_zgbldir.str.len, dollar_zgbldir.str.addr, status);
-
-	new = (mstr *)malloc(sizeof(mstr));
+		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, ms->len, ms->addr, LEN_AND_LIT(""), LEN_AND_LIT(""), status);
+	new = (mstr *)malloc(SIZEOF(mstr));
 	new->len = pblk.b_esl;
 	new->addr = (char *)malloc(pblk.b_esl);
 	memcpy(new->addr, pblk.buffer, pblk.b_esl);
@@ -82,25 +80,22 @@ void *open_gd_file(mstr *v)
 	file_pointer	*fp;
 	ZOS_ONLY(int	realfiletag;)
 
-	fp = (file_pointer*)malloc(sizeof(*fp));
+	fp = (file_pointer*)malloc(SIZEOF(*fp));
 	fp->v.len = v->len;
 	fp->v.addr = (char *)malloc(v->len + 1);
 	memcpy(fp->v.addr, v->addr, v->len);
 	*((char*)((char*)fp->v.addr + v->len)) = 0;	/* Null terminate string */
 	if (FD_INVALID == (fp->fd = OPEN(fp->v.addr, O_RDONLY)))
 	{
-		if (dollar_zgbldir.str.len &&
-			dollar_zgbldir.str.len == fp->v.len &&
-			!memcmp(dollar_zgbldir.str.addr, fp->v.addr, fp->v.len))
-			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6,
-				fp->v.len, fp->v.addr,
-				LEN_AND_LIT("Cannot continue"),
-				LEN_AND_LIT(""), errno);
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6,
-			fp->v.len, fp->v.addr,
-			LEN_AND_LIT("Retaining "),
-			dollar_zgbldir.str.len,
-			dollar_zgbldir.str.addr, errno);
+		if (!dollar_zgbldir.str.len || ((dollar_zgbldir.str.len == fp->v.len)
+							&& !memcmp(dollar_zgbldir.str.addr, fp->v.addr, fp->v.len)))
+		{
+			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr,
+				LEN_AND_LIT(".  Cannot continue"), LEN_AND_LIT(""), errno);
+			assert(FALSE);
+		}
+		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, fp->v.len, fp->v.addr, LEN_AND_LIT(".  Retaining "),
+			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
 	}
 #ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(fp->fd, TAG_BINARY, &realfiletag))
@@ -116,8 +111,8 @@ bool comp_gd_addr(gd_addr *gd_ptr, file_pointer *file_ptr)
 
 	FSTAT_FILE(file_ptr->fd, &buf, fstat_res);
 	if (-1 == fstat_res)
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr, LEN_AND_LIT(""),
-			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
+		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
+			LEN_AND_LIT(""), LEN_AND_LIT(""), errno);
 	return is_gdid_stat_identical(gd_ptr->id, &buf);
 }
 
@@ -126,11 +121,11 @@ void fill_gd_addr_id(gd_addr *gd_ptr, file_pointer *file_ptr)
 	int fstat_res;
 	struct stat buf;
 
-	gd_ptr->id = (gd_id *) malloc(sizeof(gd_id));	/* Need to convert to gd_id_ptr_t during the 64-bit port */
+	gd_ptr->id = (gd_id *) malloc(SIZEOF(gd_id));	/* Need to convert to gd_id_ptr_t during the 64-bit port */
 	FSTAT_FILE(file_ptr->fd, &buf, fstat_res);
 	if (-1 == fstat_res)
-		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr, LEN_AND_LIT(""),
-			dollar_zgbldir.str.len, dollar_zgbldir.str.addr, errno);
+		rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
+			LEN_AND_LIT(""), LEN_AND_LIT(""), errno);
 	set_gdid_from_stat(gd_ptr->id, &buf);
 	return;
 }
@@ -153,8 +148,8 @@ void file_read(file_pointer *file_ptr, int4 size, uchar_ptr_t buff, int4 pos)
 		if (-1 == save_errno)
 			rts_error(VARLSTCNT(1) ERR_IOEOF);
 		else
-			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr, LEN_AND_LIT(""),
-				dollar_zgbldir.str.len, dollar_zgbldir.str.addr, save_errno);
+			rts_error(VARLSTCNT(9) ERR_ZGBLDIRACC, 6, file_ptr->v.len, file_ptr->v.addr,
+				LEN_AND_LIT(""), LEN_AND_LIT(""), save_errno);
 	return;
 }
 
@@ -166,16 +161,16 @@ void dpzgbini(void)
 	parse_blk pblk;
 
 	temp_mstr.addr = GTM_GBLDIR;
-	temp_mstr.len = sizeof(GTM_GBLDIR) - 1;
-	memset(&pblk, 0, sizeof(pblk));
+	temp_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = temp_buff;
 	pblk.buff_size = MAX_FBUFF;
 	pblk.def1_buf = DEF_GDR_EXT;
-	pblk.def1_size = sizeof(DEF_GDR_EXT) - 1;
+	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(&temp_mstr, &pblk);
 
 	dollar_zgbldir.mvtype = MV_STR;
-	dollar_zgbldir.str.len = sizeof(GTM_GBLDIR) - 1;
+	dollar_zgbldir.str.len = SIZEOF(GTM_GBLDIR) - 1;
 	dollar_zgbldir.str.addr = GTM_GBLDIR;
 	if (status & 1)
 	{

@@ -33,7 +33,7 @@
 										\
 	if ((err_ptr = dlerror()) != NULL)					\
 	{									\
-		len = real_len(sizeof(err_buf)-1, (uchar_ptr_t)err_ptr);	\
+		len = real_len(SIZEOF(err_buf)-1, (uchar_ptr_t)err_ptr);	\
 		strncpy(err_buf, err_ptr, len);					\
 		err_buf[len] = '\0';						\
 	} else									\

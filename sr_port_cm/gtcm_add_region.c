@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,8 +35,8 @@ void gtcm_add_region(connection_struct *cnx,cm_region_head *rh)
 
 	if (!ptr)
 	{
-		ptr = (cm_region_list *)malloc(sizeof(*ptr));
-		memset(ptr,0,sizeof(*ptr));
+		ptr = (cm_region_list *)malloc(SIZEOF(*ptr));
+		memset(ptr,0,SIZEOF(*ptr));
 		ptr->regnum = cnx->maxregnum++;
 		assert(!cnx->region_array[ptr->regnum]);
 		cnx->region_array[ptr->regnum] = ptr;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,17 +18,17 @@
 
 #define BML_LEVL ((unsigned char)-1)
 
-#define CST_BSIZ(b)		((b)->bsiz - sizeof(blk_hdr))
-#define CST_RSIZ(r)		((r)->rsiz - sizeof(rec_hdr))
+#define CST_BSIZ(b)		((b)->bsiz - SIZEOF(blk_hdr))
+#define CST_RSIZ(r)		((r)->rsiz - SIZEOF(rec_hdr))
 #define CST_TOR(r)		((uchar_ptr_t)(r) + (r)->rsiz)
 #define CST_TOB(b)		((uchar_ptr_t)(b) + (b)->bsiz)
 #define CST_RIB(r,b)		((uchar_ptr_t)(r) + (r)->rsiz <= CST_TOB(b))
-#define CST_1ST_REC(b)		((rec_hdr_ptr_t)((uchar_ptr_t)(b) + sizeof(blk_hdr)))
+#define CST_1ST_REC(b)		((rec_hdr_ptr_t)((uchar_ptr_t)(b) + SIZEOF(blk_hdr)))
 #define CST_NXT_REC(r)		((uchar_ptr_t)(r) + (r)->rsiz)
-#define CST_BOK(r)		((uchar_ptr_t)(r) + sizeof(rec_hdr))
+#define CST_BOK(r)		((uchar_ptr_t)(r) + SIZEOF(rec_hdr))
 #define CST_USAR(b, r)		((b)->bsiz - ((uchar_ptr_t(r) + (r)->rsiz - (uchar_ptr_t)(b)))
 #define CST_KSIZ		(gv_curr_key->end - gv_curr_key->base + 1)
-#define BSTAR_REC_SIZE		INTCAST((sizeof(rec_hdr) + sizeof(block_id)))
+#define BSTAR_REC_SIZE		INTCAST((SIZEOF(rec_hdr) + SIZEOF(block_id)))
 #define BSTAR_REC(r)		((rec_hdr_ptr_t)(r))->rsiz = BSTAR_REC_SIZE; ((rec_hdr_ptr_t)(r))->cmpc = 0;
 #define IS_LEAF(b)		(0 == ((blk_hdr_ptr_t)(b))->levl)
 #define IS_BML(b)		(BML_LEVL == ((blk_hdr_ptr_t)(b))->levl)
@@ -96,7 +96,7 @@ typedef rec_hdr *rec_hdr_ptr_t;
 # endif
 #endif
 
-#define MAX_RESERVE_B(X) ((X)->blk_size - (X)->max_rec_size - sizeof(blk_hdr))
+#define MAX_RESERVE_B(X) ((X)->blk_size - (X)->max_rec_size - SIZEOF(blk_hdr))
 #define CHKRECLEN(r,b,n) ((unsigned int)((n) + (uchar_ptr_t)(r) - (uchar_ptr_t)(b)) <= (unsigned int)((blk_hdr_ptr_t)(b))->bsiz)
 
 /*********************************************************************

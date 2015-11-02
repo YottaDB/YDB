@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -136,7 +136,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		gtmrecv_fetchresync_poll.tv_usec = FETCHRESYNC_PRIMARY_POLL;
 		gtmrecv_comm_init(port);
 
-		primary_addr_len = sizeof(primary_addr);
+		primary_addr_len = SIZEOF(primary_addr);
 		murgbl.remote_proto_ver = REPL_PROTO_VER_UNINITIALIZED;
 		repl_log(stdout, TRUE, TRUE, "Waiting for a connection...\n");
 		FD_ZERO(&input_fds);
@@ -238,7 +238,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		repl_log_conn_info(gtmrecv_sock_fd, stdout);
 
 		/* Send REPL_FETCH_RESYNC message */
-		memset(&resync_msg, 0, sizeof(resync_msg));
+		memset(&resync_msg, 0, SIZEOF(resync_msg));
 		resync_msg.type = REPL_FETCH_RESYNC;
 		resync_msg.len = MIN_REPL_MSGLEN;
 		/* If we assume remote primary is multisite capable, we need to send the journal seqno of this instance
@@ -307,7 +307,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 					assert(REPL_PROTO_VER_DUALSITE != murgbl.remote_proto_ver);
 					assert(REPL_PROTO_VER_UNINITIALIZED != murgbl.remote_proto_ver);
 					assert(REPL_PROTO_VER_MULTISITE <= murgbl.remote_proto_ver);
-					memset(&instinfo_msg, 0, sizeof(instinfo_msg));
+					memset(&instinfo_msg, 0, SIZEOF(instinfo_msg));
 					if ( src_node_same_endianness )
 					{
 						instinfo_msg.type = REPL_INSTANCE_INFO;
@@ -353,9 +353,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 					break;
 
 				case REPL_INST_NOHIST:
-					repl_log(stdout, TRUE, TRUE, "Received REPL_INST_NOHIST message. "
-						"Primary encountered a REPLINSTNOHIST error due to lack of history in "
-						"the instance file. Rollback exiting.\n");
+					repl_log(stdout, TRUE, TRUE, "Originating instance encountered a REPLINSTNOHIST error."
+						" JNL_SEQNO of this replicating instance precedes the current history in the "
+						"originating instance file. Rollback exiting.\n");
 					status = ERR_REPLINSTNOHIST;
 					repl_log(stdout, TRUE, TRUE, "Connection reset due to REPLINSTNOHIST error on primary\n");
 					repl_connection_reset = TRUE;

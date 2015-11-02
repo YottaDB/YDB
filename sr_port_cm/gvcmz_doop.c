@@ -59,12 +59,12 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	lnk->ast = 0;	/* all database queries are sync */
 	lnk->cbl = 1 + /* HDR */
 		   gv_currkey->end + /* key */
-		   sizeof(unsigned short) + /* gv_key.top */
-		   sizeof(unsigned short) + /* gv_key.end */
-		   sizeof(unsigned short) + /* gv_key.prev */
-		   sizeof(unsigned char) + /* gv_key.base */
-		   sizeof(unsigned char) + /* regnum */
-		   sizeof(unsigned short); /* size for variable len SUBSC */
+		   SIZEOF(unsigned short) + /* gv_key.top */
+		   SIZEOF(unsigned short) + /* gv_key.end */
+		   SIZEOF(unsigned short) + /* gv_key.prev */
+		   SIZEOF(unsigned char) + /* gv_key.base */
+		   SIZEOF(unsigned char) + /* regnum */
+		   SIZEOF(unsigned short); /* size for variable len SUBSC */
 	/* the current GT.CM maximum message buffer length is bounded by the size of a short which is 64K. but the
 	 * calculation below of lnk->cbl and max_reply_len takes into account the fact that the value that is sent in as
 	 * input or read in from the server side can be at most MAX_DBSTRLEN in size. therefore, there is a dependency
@@ -72,7 +72,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	 * case, the following assert is added so that whenever MAX_DBSTRLEN is increased, we will fail this assert
 	 * and reexamine the code below.
 	 */
-	assert(sizeof(lnk->cbl) == 2);	/* assert it is a short. when it becomes a uint4 the assert can be removed
+	assert(SIZEOF(lnk->cbl) == 2);	/* assert it is a short. when it becomes a uint4 the assert can be removed
 					 * if the macro CM_MAX_BUF_LEN (used below) is changed appropriately */
 	assert(MAX_DBSTRLEN == (32 * 1024 - 1));
 	if (CMMS_Q_PUT == query_code || CMMS_Q_INCREMENT == query_code)
@@ -84,8 +84,8 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		   with V5.0-FT01 */
 			lnk->cbl++;
 		}
-		assert((uint4)lnk->cbl + sizeof(unsigned short) + (uint4)MAX_DBSTRLEN <= (uint4)CM_MAX_BUF_LEN);
-		lnk->cbl += (sizeof(unsigned short) + v->str.len); /* VALUE + length */
+		assert((uint4)lnk->cbl + SIZEOF(unsigned short) + (uint4)MAX_DBSTRLEN <= (uint4)CM_MAX_BUF_LEN);
+		lnk->cbl += (SIZEOF(unsigned short) + v->str.len); /* VALUE + length */
 	}
 	if ((CMMS_Q_GET == query_code)
 			|| (CMMS_Q_INCREMENT == query_code)
@@ -94,22 +94,21 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	else
 		max_reply_len = lnk->mbl;
 	assert(max_reply_len <= (int4)CM_MAX_BUF_LEN);
-	if (stringpool.top < stringpool.free + max_reply_len)
-		stp_gcol(max_reply_len);
+	ENSURE_STP_FREE_SPACE(max_reply_len);
 	lnk->mbf = stringpool.free;
 	ptr = lnk->mbf;
 	*ptr++ = query_code;
-	/* temp_short = gv_currkey->end + sizeof(gv_key) + 1; */
-	temp_short = gv_currkey->end + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(char) + 1;
+	/* temp_short = gv_currkey->end + SIZEOF(gv_key) + 1; */
+	temp_short = gv_currkey->end + SIZEOF(unsigned short) + SIZEOF(unsigned short) + SIZEOF(unsigned short) + SIZEOF(char) + 1;
 	CM_PUT_SHORT(ptr, temp_short, ((link_info *)(lnk->usr))->convert_byteorder);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	*ptr++ = gv_cur_region->cmx_regnum;
 	CM_PUT_SHORT(ptr, gv_currkey->top, ((link_info *)(lnk->usr))->convert_byteorder);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	CM_PUT_SHORT(ptr, gv_currkey->end, ((link_info *)(lnk->usr))->convert_byteorder);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	CM_PUT_SHORT(ptr, gv_currkey->prev, ((link_info *)(lnk->usr))->convert_byteorder);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	memcpy(ptr, gv_currkey->base, gv_currkey->end + 1);
 	if (CMMS_Q_PUT == query_code || CMMS_Q_INCREMENT == query_code)
 	{
@@ -117,11 +116,11 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		temp_short = (short)v->str.len;
 		assert((int4)temp_short == v->str.len); /* short <- int4 assignment lossy? */
 		CM_PUT_SHORT(ptr, temp_short, ((link_info *)(lnk->usr))->convert_byteorder);
-		ptr += sizeof(short);
+		ptr += SIZEOF(short);
 		memcpy(ptr,v->str.addr, v->str.len);
 		if (CMMS_Q_INCREMENT == query_code)
 		{ /* UNDEF flag is no longer relevant, but set the flag to ensure compatibility with V5.0-FT01 */
-			assert(sizeof(undef_inhibit) == 1);
+			assert(SIZEOF(undef_inhibit) == 1);
 			ptr[v->str.len] = (unsigned char)undef_inhibit;
 		}
 	}
@@ -168,7 +167,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		CM_GET_SHORT(temp_short, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 		if (1 != temp_short)
 			rts_error(VARLSTCNT(1) ERR_BADSRVRNETMSG);
-		ptr += sizeof(short);
+		ptr += SIZEOF(short);
 		status = *ptr;	/* Temp assignment to status gets rid of compiler warning in MV_FORCE_MVAL macro */
 		MV_FORCE_MVAL(v, status);
 		return;
@@ -176,7 +175,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 	if (reply_code == CMMS_R_PREV || reply_code == CMMS_R_QUERY || reply_code == CMMS_R_ORDER)
 	{
 		CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
-		ptr += sizeof(short);
+		ptr += SIZEOF(short);
 		if (1 == len)
 		{
 			MV_FORCE_MVAL(v, 0);
@@ -189,18 +188,18 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 			assert(srv_buff_size == gv_altkey->top);
 			/* Check gv_altkey has enough size allocated for the data to be copied*/
 			/*gv_init_reg would have got the correct key length from server*/
-			assert(srv_buff_size >= (len - 1 - sizeof(unsigned short) - sizeof(unsigned short) -
-							sizeof(unsigned short)));
+			assert(srv_buff_size >= (len - 1 - SIZEOF(unsigned short) - SIZEOF(unsigned short) -
+							SIZEOF(unsigned short)));
 #endif
-			ptr += sizeof(unsigned short);
+			ptr += SIZEOF(unsigned short);
 			CM_GET_USHORT(gv_altkey->end, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
 			DEBUG_ONLY(assert(gv_altkey->end <= gv_altkey->top));
-  			ptr += sizeof(unsigned short);
+  			ptr += SIZEOF(unsigned short);
 			CM_GET_USHORT(gv_altkey->prev, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
-			ptr += sizeof(unsigned short);
-			memcpy(gv_altkey->base, ptr, len - 1 - sizeof(unsigned short) - sizeof(unsigned short) -
-						     sizeof(unsigned short));
-			ptr += (len - 1 - sizeof(unsigned short) - sizeof(unsigned short) - sizeof(unsigned short));
+			ptr += SIZEOF(unsigned short);
+			memcpy(gv_altkey->base, ptr, len - 1 - SIZEOF(unsigned short) - SIZEOF(unsigned short) -
+						     SIZEOF(unsigned short));
+			ptr += (len - 1 - SIZEOF(unsigned short) - SIZEOF(unsigned short) - SIZEOF(unsigned short));
 			MV_FORCE_MVAL(v, 1);
 		}
 		if (CMMS_R_QUERY != reply_code || 1 == len || !((link_info *)lnk->usr)->query_is_queryget)
@@ -214,7 +213,7 @@ void gvcmz_doop(unsigned char query_code, unsigned char reply_code, mval *v)
 		|| CMMS_R_INCREMENT == reply_code
 		|| CMMS_R_QUERY == reply_code && ((link_info *)lnk->usr)->query_is_queryget && 1 < len);
 	CM_GET_SHORT(len, ptr, ((link_info *)(lnk->usr))->convert_byteorder);
-	ptr += sizeof(unsigned short);
+	ptr += SIZEOF(unsigned short);
 	assert(ptr >= stringpool.base && ptr + len < stringpool.top); /* incoming message is in stringpool */
 	v->mvtype = MV_STR;
 	v->str.len = len;

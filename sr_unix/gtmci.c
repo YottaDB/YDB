@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,12 @@
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "code_address_type.h"
 #include "push_lvval.h"
-
+#include "send_msg.h"
+#include "gtmmsg.h"
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#endif
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
@@ -60,6 +65,7 @@ GBLREF  mval			dollar_zstatus;
 GBLREF  unsigned char		*fgncal_stack;
 GBLREF  short			dollar_tlevel;
 GBLREF  enum gtmImageTypes	image_type;
+GBLREF	int			process_exiting;
 
 static  callin_entry_list	*ci_table = NULL;
 
@@ -99,6 +105,17 @@ int gtm_ci (const char *c_rtn_name, ...)
 	error_def(ERR_MAXSTRLEN);
 	error_def(ERR_CIRCALLNAME);
 	error_def(ERR_CINOENTRY);
+	error_def(ERR_CALLINAFTERXIT);
+
+	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
+	 * invoked after a gtm_exit
+	 */
+	if (process_exiting)
+	{
+		gtm_putmsg(VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		send_msg(VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		return ERR_CALLINAFTERXIT;
+	}
 
 	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
 	{
@@ -117,7 +134,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	job_addr(&routine, &label, 0, (char **)&base_addr, (char **)&transfer_addr);
 
-	memset(&param_blk, sizeof(param_blk), 0);
+	memset(&param_blk, SIZEOF(param_blk), 0);
 	param_blk.rtnaddr = (void *)base_addr;
 	/* lnr_entry below is a pointer to the code offset for this label from the
 	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
@@ -379,6 +396,17 @@ int gtm_init()
 	unsigned char   	*transfer_addr;
 	error_def(ERR_CITPNESTED);
 	error_def(ERR_CIMAXLEVELS);
+	error_def(ERR_CALLINAFTERXIT);
+
+	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_init to be
+	 * invoked after a gtm_exit
+	 */
+	if (process_exiting)
+	{
+		gtm_putmsg(VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		send_msg(VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		return ERR_CALLINAFTERXIT;
+	}
 
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
@@ -406,10 +434,8 @@ int gtm_init()
 		/* Mark the beginning of the new stack so that initialization errors in
 		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch).*/
 		fgncal_stack = msp;
-		/* Report if condition handlers stack may overrun during this callin level.
-		 * Every underlying level can not have more than 2 active condition handlers,
-		 * plus extra MAX_HANDLERS are reserved for this level. */
-		if (chnd_end - ctxt <= MAX_HANDLERS)
+		/* generate CIMAXLEVELS error if nested_level > CALLIN_MAX_LEVEL */
+		if (CALLIN_MAX_LEVEL < nested_level)
 			rts_error(VARLSTCNT(3) ERR_CIMAXLEVELS, 1, nested_level);
 		/* Disallow call-ins within a TP boundary since TP restarts are not supported
 		 * currently across nested call-ins. When we implement TP restarts across call-ins,
@@ -448,7 +474,14 @@ int gtm_exit()
 	while (NULL != frame_pointer)
 	{
 		while (NULL != frame_pointer && !(frame_pointer->flags & SFF_CI))
-			op_unwind();
+		{
+#			ifdef GTM_TRIGGER
+			if (SFT_TRIGR & frame_pointer->type)
+				gtm_trigger_fini(TRUE);
+			else
+#			endif
+				op_unwind();
+		}
 		if (NULL != frame_pointer)
 		{	/* unwind the current invocation of call-in environment */
 			assert(frame_pointer->flags & SFF_CI);

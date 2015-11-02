@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,7 @@ VIEWTAB("GVSTATS",	VTP_DBREGION,		VTK_GVSTATS,	MV_STR),
 VIEWTAB("ICHITS",	VTP_NULL,		VTK_ICHITS,	MV_NM),
 VIEWTAB("ICMISS",	VTP_NULL,		VTK_ICMISS,	MV_NM),
 VIEWTAB("ICSIZE",	VTP_NULL,		VTK_ICSIZE,	MV_NM),
+VIEWTAB("IMAGENAME", 	VTP_NULL,		VTK_IMAGENAME,	MV_STR), /* nodoc : test system use returns running executable */
 VIEWTAB("JNLACTIVE",	VTP_DBREGION,		VTK_JNLACTIVE,	MV_NM),
 VIEWTAB("JNLFILE",	VTP_DBREGION,		VTK_JNLFILE,	MV_STR),
 VIEWTAB("JNLFLUSH",	VTP_DBREGION | VTP_NULL, VTK_JNLFLUSH,	MV_STR),

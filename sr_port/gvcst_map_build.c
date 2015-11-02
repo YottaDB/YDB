@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ void gvcst_map_build(uint4 *array, sm_uc_ptr_t base_addr, cw_set_element *cs, tr
 	DEBUG_ONLY(VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);)
 	assert(status); /* assert it is a valid bitmap block */
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
-	base_addr += sizeof(blk_hdr);
+	base_addr += SIZEOF(blk_hdr);
 	bml_func = (cs->reference_cnt > 0) ? bml_busy : (cs_addrs->hdr->db_got_to_v5_once ? bml_recycled : bml_free);
 	DEBUG_ONLY(prev_bitnum = -1;)
 	while (bitnum = *array)		/* caution : intended assignment */

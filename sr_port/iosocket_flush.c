@@ -53,15 +53,15 @@ void iosocket_flush(io_desc *iod)
 		rts_error(VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return;
 	}
-        memcpy(dsocketptr->dollar_device, "0", sizeof("0"));
-        if( -1 == tcp_routines.aa_setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &on, sizeof(on)) ||
-		(-1 == tcp_routines.aa_setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &off, sizeof(off))))
+        memcpy(dsocketptr->dollar_device, "0", SIZEOF("0"));
+        if( -1 == tcp_routines.aa_setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &on, SIZEOF(on)) ||
+		(-1 == tcp_routines.aa_setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &off, SIZEOF(off))))
         {
 		errptr = (char *)STRERROR(errno);
                 errlen = strlen(errptr);
                 iod->dollar.za = 9;
 		MEMCPY_LIT(dsocketptr->dollar_device, "1,");
-                memcpy(&dsocketptr->dollar_device[sizeof("1,") - 1], errptr, errlen + 1);	/* we want the null */
+                memcpy(&dsocketptr->dollar_device[SIZEOF("1,") - 1], errptr, errlen + 1);	/* we want the null */
 		if (socketptr->ioerror)
 			rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
 		return;

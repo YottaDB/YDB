@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ oprtype put_tsiz(void)
 
 	ref = newtriple(OC_TRIPSIZE);
 	ref->operand[0].oprclass = TSIZ_REF;
-	ref->operand[0].oprval.tsize = tsize = (tripsize *)mcalloc(sizeof(tripsize));
+	ref->operand[0].oprval.tsize = tsize = (tripsize *)mcalloc(SIZEOF(tripsize));
 	tsize->ct = NULL;
 	tsize->size = 0;
 	return put_tref(ref);

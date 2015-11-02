@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,8 +89,10 @@ GBLREF	boolean_t		gtmsource_pool2file_transition;
 GBLREF	repl_ctl_element	*repl_ctl_list;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	boolean_t		secondary_side_std_null_coll;
+GBLREF	boolean_t		secondary_side_trigger_support;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		gtmsource_received_cmp2uncmp_msg;
+GBLREF	boolean_t		trig_replic_warning_issued;
 
 static	unsigned char		*tcombuff, *msgbuff, *cmpmsgbuff, *filterbuff;
 
@@ -99,7 +101,7 @@ void gtmsource_init_sec_addr(struct sockaddr_in *secondary_addr)
 	gtmsource_local_ptr_t	gtmsource_local;
 
 	gtmsource_local = jnlpool.gtmsource_local;
-	memset((char *)secondary_addr, 0, sizeof(*secondary_addr));
+	memset((char *)secondary_addr, 0, SIZEOF(*secondary_addr));
 	(*secondary_addr).sin_family = AF_INET;
 	(*secondary_addr).sin_addr.s_addr = gtmsource_local->secondary_inet_addr;
 	(*secondary_addr).sin_port = htons(gtmsource_local->secondary_port);
@@ -126,7 +128,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 		 gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD]);
 	do
 	{
-		CONNECT_SOCKET(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, sizeof(*secondary_addr), status);
+		CONNECT_SOCKET(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, SIZEOF(*secondary_addr), status);
 		if (0 == status)
 			break;
 		repl_log(gtmsource_log_fp, FALSE, FALSE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
@@ -156,7 +158,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 		connection_attempts = 0;
 		do
 		{
-			CONNECT_SOCKET(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, sizeof(*secondary_addr), status);
+			CONNECT_SOCKET(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, SIZEOF(*secondary_addr), status);
 			if (0 == status)
 				break;
 			repl_close(&gtmsource_sock_fd);
@@ -170,7 +172,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 			connection_attempts++;
 			if (0 == connection_attempts % alert_attempts)
 			{ /* Log ALERT message */
-				SNPRINTF(msg_str, sizeof(msg_str),
+				SNPRINTF(msg_str, SIZEOF(msg_str),
 					 "GTM Replication Source Server : Could not connect to secondary in %d seconds\n",
 					connection_attempts *
 					gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
@@ -182,7 +184,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 	}
 	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &send_buffsize)))
 	{
-		SNPRINTF(msg_str, sizeof(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
+		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	if (send_buffsize < GTMSOURCE_TCP_SEND_BUFSIZE)
@@ -194,7 +196,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 			;
 		if (tcp_s_bufsize < GTMSOURCE_MIN_TCP_SEND_BUFSIZE)
 		{
-			SNPRINTF(msg_str, sizeof(msg_str), "Could not set TCP send buffer size in range [%d, %d], last "
+			SNPRINTF(msg_str, SIZEOF(msg_str), "Could not set TCP send buffer size in range [%d, %d], last "
 					"known error : %s", GTMSOURCE_MIN_TCP_SEND_BUFSIZE, GTMSOURCE_TCP_SEND_BUFSIZE,
 					STRERROR(status));
 			rts_error(VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
@@ -202,7 +204,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 	}
 	if (0 != (status = get_send_sock_buff_size(gtmsource_sock_fd, &repl_max_send_buffsize))) /* may have changed */
 	{
-		SNPRINTF(msg_str, sizeof(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
+		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket send buffsize : %s", STRERROR(status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &recv_buffsize)))
@@ -217,7 +219,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 		{
 			if (recv_buffsize < GTMSOURCE_MIN_TCP_RECV_BUFSIZE)
 			{
-				SNPRINTF(msg_str, sizeof(msg_str), "Could not set TCP recv buffer size to %d : %s",
+				SNPRINTF(msg_str, SIZEOF(msg_str), "Could not set TCP recv buffer size to %d : %s",
 						GTMSOURCE_MIN_TCP_RECV_BUFSIZE, STRERROR(status));
 				rts_error(VARLSTCNT(6) MAKE_MSG_INFO(ERR_REPLCOMM), 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 			}
@@ -225,7 +227,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &repl_max_recv_buffsize))) /* may have changed */
 	{
-		SNPRINTF(msg_str, sizeof(msg_str), "Error getting socket recv buffsize : %s", STRERROR(status));
+		SNPRINTF(msg_str, SIZEOF(msg_str), "Error getting socket recv buffsize : %s", STRERROR(status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(msg_str));
 	}
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connected to secondary, using TCP send buffer size %d receive buffer size %d\n",
@@ -405,7 +407,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			assert(msg.len == MIN_REPL_MSGLEN);
 			*msg_type = msg.type;
 			*start_flags = START_FLAG_NONE;
-			memcpy((uchar_ptr_t)recvd_jnl_seqno, (uchar_ptr_t)&msg.msg[0], sizeof(seq_num));
+			memcpy((uchar_ptr_t)recvd_jnl_seqno, (uchar_ptr_t)&msg.msg[0], SIZEOF(seq_num));
 			if (REPL_START_JNL_SEQNO == msg.type)
 			{
 				if (!rcv_node_same_endianness)
@@ -448,6 +450,16 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				if (remote_jnl_ver <= V15_JNL_VER)
 					*start_flags &= ~START_FLAG_COLL_M; /* zap it for pro, just in case */
 				secondary_side_std_null_coll = (*start_flags & START_FLAG_COLL_M) ? TRUE : FALSE;
+				assert((remote_jnl_ver >= V19_JNL_VER) || (0 == (*start_flags & START_FLAG_TRIGGER_SUPPORT)));
+				if (remote_jnl_ver < V19_JNL_VER)
+					*start_flags &= ~START_FLAG_TRIGGER_SUPPORT; /* zap it for pro, just in case */
+				secondary_side_trigger_support = (*start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
+#				ifdef GTM_TRIGGER
+				if (!secondary_side_trigger_support)
+					repl_log(gtmsource_log_fp, TRUE, FALSE, "Warning : Secondary does not support GT.M "
+						"database triggers. #t updates on primary will not be replicated\n");
+#				endif
+				trig_replic_warning_issued = FALSE;
 				return (SS_NORMAL);
 			} else if (REPL_FETCH_RESYNC == msg.type)
 			{	/* Determine the protocol version of the receiver side.
@@ -468,7 +480,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				xoff_ack.type = REPL_XOFF_ACK;
 				if (!rcv_node_same_endianness)
 					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
-				memcpy((uchar_ptr_t)&xoff_ack.msg[0], (uchar_ptr_t)recvd_jnl_seqno, sizeof(seq_num));
+				memcpy((uchar_ptr_t)&xoff_ack.msg[0], (uchar_ptr_t)recvd_jnl_seqno, SIZEOF(seq_num));
 				xoff_ack.len = MIN_REPL_MSGLEN;
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sending REPL_XOFF_ACK message\n");
 				REPL_SEND_LOOP(gtmsource_sock_fd, &xoff_ack, xoff_ack.len, FALSE, &gtmsource_poll_immediate)
@@ -604,7 +616,7 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 				 QWGT(cur_read_jnl_seqno, recvd_jnl_seqno) &&
 						QWGT(cur_read_jnl_seqno, jctl->start_jnl_seqno))
 		{
-			assert(cur_read + sizeof(jnldata_hdr_struct) <= jnlpool_size);
+			assert(cur_read + SIZEOF(jnldata_hdr_struct) <= jnlpool_size);
 			prev_tr_size = ((jnldata_hdr_ptr_t)(jnlpool.jnldata_base + cur_read))->prev_jnldata_len;
 			if (jnlpool_hasnt_overflowed(jctl, jnlpool_size, cur_read_addr))
 			{
@@ -864,13 +876,13 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 		}
 		if (EREPL_SEND == repl_errno)
 		{
-			SNPRINTF(err_string, sizeof(err_string), "Error sending %s message. "
+			SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
 				"Error in send : %s", msgtypestr, STRERROR(status));
 			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
 		}
 		if (EREPL_SELECT == repl_errno)
 		{
-			SNPRINTF(err_string, sizeof(err_string), "Error sending %s message. "
+			SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
 				"Error in select : %s", msgtypestr, STRERROR(status));
 			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
 		}
@@ -925,14 +937,14 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 					return FALSE;
 				} else
 				{
-					SNPRINTF(err_string, sizeof(err_string),
+					SNPRINTF(err_string, SIZEOF(err_string),
 							"Error receiving %s message from Receiver. Error in recv : %s",
 							msgtypestr, STRERROR(status));
 					rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
 				}
 			} else if (EREPL_SELECT == repl_errno)
 			{
-				SNPRINTF(err_string, sizeof(err_string),
+				SNPRINTF(err_string, SIZEOF(err_string),
 						"Error receiving %s message from Receiver. Error in select : %s",
 						msgtypestr, STRERROR(status));
 				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(err_string));
@@ -949,7 +961,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 		 */
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Received REPL_XOFF_ACK_ME message\n", msgtypestr);
 		xoff_ack.type = REPL_XOFF_ACK;
-		memcpy((uchar_ptr_t)&xoff_ack.msg[0], (uchar_ptr_t)&gtmsource_msgp->msg[0], sizeof(seq_num));
+		memcpy((uchar_ptr_t)&xoff_ack.msg[0], (uchar_ptr_t)&gtmsource_msgp->msg[0], SIZEOF(seq_num));
 		xoff_ack.len = MIN_REPL_MSGLEN;
 		gtmsource_repl_send((repl_msg_ptr_t)&xoff_ack, "REPL_XOFF_ACK", MAX_SEQNO);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
@@ -987,7 +999,7 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 
 	assert(gtm_zlib_cmp_level);
 	/*************** Send REPL_CMP_TEST message ***************/
-	memset(&test_msg, 0, sizeof(test_msg));
+	memset(&test_msg, 0, SIZEOF(test_msg));
 	test_msg.type = REPL_CMP_TEST;
 	test_msg.len = REPL_MSG_CMPINFOLEN;
 	test_msg.proto_ver = REPL_PROTO_VER_THIS;
@@ -998,7 +1010,7 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 	for (start = (process_id & REPL_MSG_CMPDATAMASK), index = 0; index < REPL_MSG_CMPDATALEN; index++)
 		inputdata[index] = (start + index) % REPL_MSG_CMPDATALEN;
 	/* Compress the data */
-	cmplen = sizeof(cmpbuf);	/* initialize it to the available compressed buffer space */
+	cmplen = SIZEOF(cmpbuf);	/* initialize it to the available compressed buffer space */
 	cmpret = (*zlib_compress_fnptr)(((Bytef *)&cmpbuf[0]), (uLongf *)&cmplen,
 				(const Bytef *)inputdata, (uLong)REPL_MSG_CMPDATALEN, gtm_zlib_cmp_level);
 	switch(cmpret)
@@ -1086,7 +1098,7 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary)
 	error_def(ERR_REPLINSTSECMTCH);
 
 	/*************** Send REPL_NEED_INSTANCE_INFO message ***************/
-	memset(&needinst_msg, 0, sizeof(needinst_msg));
+	memset(&needinst_msg, 0, SIZEOF(needinst_msg));
 	needinst_msg.type = REPL_NEED_INSTANCE_INFO;
 	needinst_msg.len = MIN_REPL_MSGLEN;
 	assert(NULL != jnlpool.repl_inst_filehdr);	/* journal pool should be set up */
@@ -1135,7 +1147,7 @@ boolean_t	gtmsource_get_triple_info(seq_num seqno, repl_triple *triple, int4 *tr
 	char			err_string[1024];
 
 	/*************** Send REPL_NEED_TRIPLE_INFO message ***************/
-	memset(&needtriple_msg, 0, sizeof(needtriple_msg));
+	memset(&needtriple_msg, 0, SIZEOF(needtriple_msg));
 	needtriple_msg.type = REPL_NEED_TRIPLE_INFO;
 	needtriple_msg.len = MIN_REPL_MSGLEN;
 	needtriple_msg.seqno = seqno;
@@ -1166,7 +1178,7 @@ boolean_t	gtmsource_get_triple_info(seq_num seqno, repl_triple *triple, int4 *tr
 		gtmsource_state = jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 		return FALSE;
 	}
-	memset(triple, 0, sizeof(*triple));
+	memset(triple, 0, SIZEOF(*triple));
 	memcpy(triple->root_primary_instname, tripinfo1_msg.instname, MAX_INSTNAME_LEN - 1);
 	triple->start_seqno = tripinfo1_msg.start_seqno;
 	triple->root_primary_cycle = tripinfo2_msg.cycle;
@@ -1204,7 +1216,7 @@ void	gtmsource_triple_get(int4 index, repl_triple *triple)
 		 */
 		instnohist_msg.type = REPL_INST_NOHIST;
 		instnohist_msg.len = MIN_REPL_MSGLEN;
-		memset(&instnohist_msg.msg[0], 0, sizeof(instnohist_msg.msg));
+		memset(&instnohist_msg.msg[0], 0, SIZEOF(instnohist_msg.msg));
 		gtmsource_repl_send((repl_msg_ptr_t)&instnohist_msg, "REPL_INST_NOHIST", MAX_SEQNO);
 		/* Close the connection */
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset due to above REPLINSTNOHIST error\n");
@@ -1343,11 +1355,11 @@ void	gtmsource_send_new_triple(void)
 	}
 	assert(gtmsource_local->read_jnl_seqno >= triple.start_seqno);
 	/*************** Send REPL_NEW_TRIPLE message ***************/
-	memset(&newtriple_msg, 0, sizeof(newtriple_msg));
+	memset(&newtriple_msg, 0, SIZEOF(newtriple_msg));
 	newtriple_msg.type = REPL_NEW_TRIPLE;
-	newtriple_msg.len = sizeof(newtriple_msg);
+	newtriple_msg.len = SIZEOF(newtriple_msg);
 	newtriple_msg.triplecontent.jrec_type = JRT_TRIPLE;
-	newtriple_msg.triplecontent.forwptr = sizeof(repl_triple_jnl_t);
+	newtriple_msg.triplecontent.forwptr = SIZEOF(repl_triple_jnl_t);
 	newtriple_msg.triplecontent.start_seqno = gtmsource_local->read_jnl_seqno;
 	memcpy(newtriple_msg.triplecontent.instname, triple.root_primary_instname, MAX_INSTNAME_LEN - 1);
 	memcpy(newtriple_msg.triplecontent.rcvd_from_instname, jnlpool.repl_inst_filehdr->this_instname, MAX_INSTNAME_LEN - 1);
@@ -1412,7 +1424,7 @@ void	gtmsource_set_next_triple_seqno(boolean_t detect_new_triple)
 			 */
 			instnohist_msg.type = REPL_INST_NOHIST;
 			instnohist_msg.len = MIN_REPL_MSGLEN;
-			memset(&instnohist_msg.msg[0], 0, sizeof(instnohist_msg.msg));
+			memset(&instnohist_msg.msg[0], 0, SIZEOF(instnohist_msg.msg));
 			gtmsource_repl_send((repl_msg_ptr_t)&instnohist_msg, "REPL_INST_NOHIST", MAX_SEQNO);
 			repl_inst_ftok_sem_release();
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset due to above REPLINSTNOHIST error\n");

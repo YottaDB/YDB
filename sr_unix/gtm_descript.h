@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #ifndef GTM_DESCRIPT_INCLUDED
 #define GTM_DESCRIPT_INCLUDED
+#include "gtm_sizeof.h"
 
 int mumps_call();
 
@@ -59,11 +60,11 @@ typedef struct  {
 #define GTM_MODE	10
 #define GTM_DELIMITER	10
 
-#define DESCRIPTOR(x,y)	{x.type = GTM_ARRAY_OF_CHARS; x.len = sizeof(y) - 1; x.val = y;}
-#define DESC_MODE(x,y) {x.type=GTM_MODE; x.len=sizeof(y); x.val=(void*)&y;}
-#define DESC_CHAR(x,y) {x.type=GTM_ARRAY_OF_CHARS; x.len=sizeof(y)-1; x.val=y;}
+#define DESCRIPTOR(x,y)	{x.type = GTM_ARRAY_OF_CHARS; x.len = SIZEOF(y) - 1; x.val = y;}
+#define DESC_MODE(x,y) {x.type=GTM_MODE; x.len=SIZEOF(y); x.val=(void*)&y;}
+#define DESC_CHAR(x,y) {x.type=GTM_ARRAY_OF_CHARS; x.len=SIZEOF(y)-1; x.val=y;}
 #define DESC_ZERO(x) {x.type=0; x.len=0;}
-#define DESC_LONG(x,y) {x.type=GTM_LONG; x.len=sizeof(y); x.val=&y;}
-#define DESC_DELIM(x,y) {x.type=GTM_DELIMITER;x.len=sizeof(y);x.val=(void *)&y;}
+#define DESC_LONG(x,y) {x.type=GTM_LONG; x.len=SIZEOF(y); x.val=&y;}
+#define DESC_DELIM(x,y) {x.type=GTM_DELIMITER;x.len=SIZEOF(y);x.val=(void *)&y;}
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,8 @@ GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilatio
 GBLREF	boolean_t	gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 GBLREF	char		prombuf[MAX_MIDENT_LEN];
 GBLREF	mstr		gtmprompt;
-
+GBLREF	boolean_t	gtm_environment_init;
+GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 #ifdef DEBUG
 GBLREF	boolean_t	gtm_gvundef_fatal;
 #endif
@@ -85,7 +86,7 @@ void	gtm_env_init(void)
 		*/
 		gtmDebugLevel = INITIAL_DEBUG_LEVEL;
 		val.addr = GTM_DEBUG_LEVEL_ENVLOG;
-		val.len = sizeof(GTM_DEBUG_LEVEL_ENVLOG) - 1;
+		val.len = SIZEOF(GTM_DEBUG_LEVEL_ENVLOG) - 1;
 		if (tdbglvl = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
 		{	/* Some kind of debugging was asked for.. */
 			tdbglvl |= GDL_Simple;			/* Make sure simple debugging turned on if any is */
@@ -99,7 +100,7 @@ void	gtm_env_init(void)
 
 		/* Duplicate Set Noop environment/logical */
 		val.addr = GTM_GVDUPSETNOOP;
-		val.len = sizeof(GTM_GVDUPSETNOOP) - 1;
+		val.len = SIZEOF(GTM_GVDUPSETNOOP) - 1;
 		assert(FALSE == gvdupsetnoop);	/* should have been set to FALSE in gbldefs.c */
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
@@ -107,7 +108,7 @@ void	gtm_env_init(void)
 
 		/* NOUNDEF environment/logical */
 		val.addr = GTM_NOUNDEF;
-		val.len = sizeof(GTM_NOUNDEF) - 1;
+		val.len = SIZEOF(GTM_NOUNDEF) - 1;
 		assert(FALSE == undef_inhibit);	/* should have been set to FALSE at global variable definition time */
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
@@ -116,7 +117,7 @@ void	gtm_env_init(void)
 #		ifdef DEBUG
 		/* GTM_GVUNDEF_FATAL environment/logical */
 		val.addr = GTM_GVUNDEF_FATAL;
-		val.len = sizeof(GTM_GVUNDEF_FATAL) - 1;
+		val.len = SIZEOF(GTM_GVUNDEF_FATAL) - 1;
 		assert(FALSE == gtm_gvundef_fatal);	/* should have been set to FALSE in gbldefs.c */
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
@@ -125,31 +126,38 @@ void	gtm_env_init(void)
 
 		/* Initialize variable that controls TP allocation clue (for created blocks) */
 		val.addr = GTM_TP_ALLOCATION_CLUE;
-		val.len = sizeof(GTM_TP_ALLOCATION_CLUE) - 1;
+		val.len = SIZEOF(GTM_TP_ALLOCATION_CLUE) - 1;
 		gtm_tp_allocation_clue = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_tp_allocation_clue = MAXTOTALBLKS_MAX;
 
 		/* Full Database-block Write mode */
 		val.addr = GTM_FULLBLOCKWRITES;
-		val.len = sizeof(GTM_FULLBLOCKWRITES) - 1;
+		val.len = SIZEOF(GTM_FULLBLOCKWRITES) - 1;
 		gtm_fullblockwrites = logical_truth_value(&val, FALSE, &is_defined);
 		if (!is_defined)
 			gtm_fullblockwrites = DEFAULT_FBW_FLAG;
 
 		/* GDS Block certification */
 		val.addr = GTM_GDSCERT;
-		val.len = sizeof(GTM_GDSCERT) - 1;
+		val.len = SIZEOF(GTM_GDSCERT) - 1;
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			certify_all_blocks = ret; /* if the logical is not defined, we want to take default value */
 
 		/* Initialize null subscript's collation order */
 		val.addr = LCT_STDNULL;
-		val.len = sizeof(LCT_STDNULL) - 1;
+		val.len = SIZEOF(LCT_STDNULL) - 1;
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			local_collseq_stdnull = ret;
+
+		/* Initialize eXclusive Kill variety (GTM vs M Standard) */
+		val.addr = GTM_STDXKILL;
+		val.len = SIZEOF(GTM_STDXKILL) - 1;
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			gtm_stdxkill = ret;
 
 		/* Initialize variables for white box testing. Even though these white-box test variables only control the
 		 * flow of the DBG builds, the PRO builds check on these variables (for example, in tp_restart.c to decide
@@ -159,12 +167,12 @@ void	gtm_env_init(void)
 
 		/* Initialize variable that controls dynamic GT.M block upgrade */
 		val.addr = GTM_BLKUPGRADE_FLAG;
-		val.len = sizeof(GTM_BLKUPGRADE_FLAG) - 1;
+		val.len = SIZEOF(GTM_BLKUPGRADE_FLAG) - 1;
 		gtm_blkupgrade_flag = trans_numeric(&val, &is_defined, TRUE);
 
 		/* Initialize whether database file extensions need to be logged in the operator log */
 		val.addr = GTM_DBFILEXT_SYSLOG_DISABLE;
-		val.len = sizeof(GTM_DBFILEXT_SYSLOG_DISABLE) - 1;
+		val.len = SIZEOF(GTM_DBFILEXT_SYSLOG_DISABLE) - 1;
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			gtm_dbfilext_syslog_disable = ret; /* if the logical is not defined, we want to take default value */
@@ -172,49 +180,52 @@ void	gtm_env_init(void)
 		/* Initialize maximum sockets in a single socket device createable by this process */
 		gtm_max_sockets = MAX_N_SOCKET;
 		val.addr = GTM_MAX_SOCKETS;
-		val.len = sizeof(GTM_MAX_SOCKETS) - 1;
+		val.len = SIZEOF(GTM_MAX_SOCKETS) - 1;
 		if ((tmsock = trans_numeric(&val, &is_defined, TRUE)) && MAX_MAX_N_SOCKET > tmsock) /* Note assignment!! */
 			gtm_max_sockets = tmsock;
 
 		/* Initialize storage to allocate and keep in our back pocket in case run out of memory */
 		outOfMemoryMitigateSize = GTM_MEMORY_RESERVE_DEFAULT;
 		val.addr = GTM_MEMORY_RESERVE;
-		val.len = sizeof(GTM_MEMORY_RESERVE) - 1;
+		val.len = SIZEOF(GTM_MEMORY_RESERVE) - 1;
 		if (reservesize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
 			outOfMemoryMitigateSize = reservesize;
 
 		/* Initialize indirect cache limits (max memory, max entries) */
 		max_cache_memsize = MAX_CACHE_MEMSIZE * 1024;
 		val.addr = GTM_MAX_INDRCACHE_MEMORY;
-		val.len = sizeof(GTM_MAX_INDRCACHE_MEMORY) - 1;
+		val.len = SIZEOF(GTM_MAX_INDRCACHE_MEMORY) - 1;
 		if (memsize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
 			max_cache_memsize = memsize * 1024;
 		max_cache_entries = MAX_CACHE_ENTRIES;
 		val.addr = GTM_MAX_INDRCACHE_COUNT;
-		val.len = sizeof(GTM_MAX_INDRCACHE_COUNT) - 1;
+		val.len = SIZEOF(GTM_MAX_INDRCACHE_COUNT) - 1;
 		if (cachent = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
 			max_cache_entries = cachent;
 
 		/* Initialize ZQUIT to control funky QUIT compilation */
 		val.addr = GTM_ZQUIT_ANYWAY;
-		val.len = sizeof(GTM_ZQUIT_ANYWAY) - 1;
+		val.len = SIZEOF(GTM_ZQUIT_ANYWAY) - 1;
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			dollar_zquit_anyway = ret;
 
 		/* Initialize ZPROMPT to desired GTM prompt or default */
 		val.addr = GTM_PROMPT;
-		val.len = sizeof(GTM_PROMPT) - 1;
-		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, sizeof(buf), do_sendmsg_on_log2long)))
+		val.len = SIZEOF(GTM_PROMPT) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
 		{	/* Non-standard prompt requested */
-			assert(sizeof(buf) > trans.len);
-			if (sizeof(prombuf) >= trans.len)
+			assert(SIZEOF(buf) > trans.len);
+			if (SIZEOF(prombuf) >= trans.len)
 			{
 				gtmprompt.len = trans.len;
 				memcpy(gtmprompt.addr, trans.addr, trans.len);
 			}
 		}
-
+		if (GETENV("gtm_environment_init"))
+		{
+			gtm_environment_init = TRUE;
+		}
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 		gtm_env_init_done = TRUE;

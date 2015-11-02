@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ boolean_t op_gvqueryget(mval *key, mval *val)
 		/* We rely on the fact that *gv_altkey area is not modified by gvusr_queryget, and don't change gv_altkey.
 		 * If and when *gv_altkey area is modified by gvusr_queryget, we have to set up a spare key area
 		 * (apart from gv_altkey and gv_currkey), and make gv_altkey point the spare area before calling gvusr_queryget */
-		memcpy(gv_currkey, save_key, sizeof(*save_key) + save_key->end);
+		memcpy(gv_currkey, save_key, SIZEOF(*save_key) + save_key->end);
 		gotit = gvusr_queryget(val);
 		gv_altkey = gv_currkey;
 		gv_currkey = save_key;

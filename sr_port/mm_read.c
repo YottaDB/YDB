@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,15 +17,15 @@
 #include "fileinfo.h"
 #include "gdsfhead.h"
 #include "mm_read.h"
+#include "gtmimagename.h"
 
 GBLREF	sgmnt_addrs 	*cs_addrs;
 GBLREF	unsigned char	rdfail_detail;
-GBLREF	boolean_t	run_time;
 
 sm_uc_ptr_t mm_read(block_id blk)
 {
 	/* --- extended or dse (dse is able to edit any header fields freely) --- */
-	assert((cs_addrs->total_blks <= cs_addrs->ti->total_blks) || (!run_time));
+	assert((cs_addrs->total_blks <= cs_addrs->ti->total_blks) || !IS_MCODE_RUNNING);
 	assert(blk >= 0);
 
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,16 @@
 #include "gtmimagename.h"
 
 #ifndef STP_MOVE
+GBLDEF int	indr_stp_low_reclaim_passes = 0;
+GBLDEF int	rts_stp_low_reclaim_passes = 0;
+GBLDEF int	indr_stp_incr_factor = 1;
+GBLDEF int	rts_stp_incr_factor = 1;
 GBLDEF symval		*first_symval;
+#else
+GBLREF int	indr_stp_low_reclaim_passes;
+GBLREF int	rts_stp_low_reclaim_passes;
+GBLREF int	indr_stp_incr_factor;
+GBLREF int	rts_stp_incr_factor;
 #endif
 
 GBLREF mvar 		*mvartab;
@@ -73,16 +82,16 @@ GBLREF gvzwrite_datablk	gvzwrite_block;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF mliteral		literal_chain;
-GBLREF mstr		*comline_base, dollar_zsource, **stp_array;
+GBLREF mstr		*comline_base, **stp_array;
 GBLREF mval		dollar_etrap, dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus, dollar_zstep, dollar_ztrap;
-GBLREF mval		dollar_zyerror, zstep_action, dollar_zinterrupt, dollar_ztexit;
+GBLREF mval		dollar_zyerror, zstep_action, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
 GBLREF mv_stent		*mv_chain;
 GBLREF sgm_info		*first_sgm_info;
 GBLREF spdesc		indr_stringpool, rts_stringpool, stringpool;
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 GBLREF tp_frame		*tp_pointer;
-GBLREF boolean_t	disallow_forced_expansion, forced_expansion;
+GBLREF boolean_t	stop_non_mandatory_expansion, expansion_failed, retry_if_expansion_fails;
 GBLREF mval		last_fnquery_return_varname;			/* Return value of last $QUERY (on stringpool) (varname) */
 GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];	/* .. (subscripts) */
 GBLREF int		last_fnquery_return_subcnt;			/* .. (count of subscripts) */
@@ -94,6 +103,8 @@ GBLREF int4		LVGC_interval;					/* dead data GC done every LVGC_interval stringp
 GBLREF boolean_t	suspend_lvgcol;
 GBLREF hash_table_str	*complits_hashtab;
 GBLREF mval		director_mval, window_mval;
+GBLREF mval		*alias_retarg;
+GTMTRIG_ONLY(GBLREF mval dollar_ztwormhole;)
 
 OS_PAGE_SIZE_DECLARE
 
@@ -200,14 +211,26 @@ static mstr		**topstr, **array, **arraytop;
 	} \
 }
 
-GBLREF	enum gtmImageTypes	image_type;
+/* Macro used intermittently in code to debug string pool garbage collection. Set to 1
+ * to enable.
+*/
+#if 0
+/* Debug fprintf with pre and post requisite flushing of appropriate streams  */
+#define DBGSTPGCOL(x) {flush_pio(); fprintf x; fflush(stderr);}
+#else
+#define DBGSTPGCOL(x)
+#endif
 
 static void expand_stp(unsigned int new_size)
 {
-	ESTABLISH(stp_gcol_ch);
-	assert((GTM_IMAGE == image_type) || (MUPIP_IMAGE == image_type));
+	if (retry_if_expansion_fails)
+		ESTABLISH(stp_gcol_ch);
+	assert(IS_GTM_IMAGE || IS_MUPIP_IMAGE || IS_GTM_SVC_DAL_IMAGE);
+	assert(!stringpool_unexpandable);
+	DBGSTPGCOL((stderr, "expand_stp(new_size=%u)\n", new_size));
 	stp_init(new_size);
-	REVERT;
+	if (retry_if_expansion_fails)
+		REVERT;
 	return;
 }
 
@@ -261,6 +284,14 @@ void stp_vfy_mval(void)
 		}
 	}
 }
+
+boolean_t	is_stp_space_available(int space_needed)
+{
+	/* Asserts added here are tested every time any module in the codebase does stringpool space checks */
+	assert(!stringpool_unusable);
+	return IS_STP_SPACE_AVAILABLE_PRO(space_needed);
+}
+
 #endif  /* DEBUG */
 
 void mv_parse_tree_collect(mvar *node);
@@ -284,7 +315,7 @@ void mv_parse_tree_collect(mvar *node)
 void stp_move(char *from, char *to) /* garbage collect and move range (from,to] to stringpool adjusting all mvals/mstrs pointing
 				     * in this range */
 #else
-	void stp_gcol(int space_asked) /* garbage collect and create enough space for space_asked bytes */
+void stp_gcol(int space_asked) /* garbage collect and create enough space for space_asked bytes */ /* BYPASSOK */
 #endif
 {
 #ifdef STP_MOVE
@@ -310,20 +341,10 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 	zwr_sub_lst		*zwr_sub;
 	ihdtyp			*ihdr;
 	zbrk_struct		*z_ptr;
-	static int		indr_stp_low_reclaim_passes = 0;
-	static int		rts_stp_low_reclaim_passes = 0;
 	int			*low_reclaim_passes;
-	static int		indr_stp_spc_needed_passes = 0;
-	static int		rts_stp_spc_needed_passes = 0;
-	int			*spc_needed_passes;
-	static int		indr_stp_incr_factor = 1;
-	static int		rts_stp_incr_factor = 1;
 	int			*incr_factor;
-	static int		indr_stp_maxnoexp_passes = STP_INITMAXNOEXP_PASSES;
-	static int		rts_stp_maxnoexp_passes = STP_INITMAXNOEXP_PASSES;
-	int			*maxnoexp_passes;
-	int			stp_incr, killcnt;
-	boolean_t		maxnoexp_growth;
+	int			killcnt;
+	long		stp_incr, space_needed_rounded_up;
 	ht_ent_objcode 		*tabent_objcode, *topent;
 	ht_ent_mname		*tabent_mname, *topent_mname;
 	ht_ent_addr		*tabent_addr, *topent_addr;
@@ -335,8 +356,12 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 	symval			*symtab;
 	lv_xnew_var		*xnewvar;
 	tp_var			*restore_ent;
+	boolean_t		non_mandatory_expansion, exp_gt_spc_needed, first_expansion_try;
 	error_def		(ERR_STPEXPFAIL);
 
+	/* Asserts added here are tested every time any module in the codebase does stringpool garbage collection */
+	assert(!stringpool_unusable);
+	assert(!stringpool_unexpandable);
 #ifndef STP_MOVE
 	/* Before we get cooking with our stringpool GC, check if it is appropriate to call lv_val garbage collection.
 	   This is data that can get orphaned with no way to access it when aliases are used. This form of GC is only done
@@ -390,22 +415,18 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 	if (stringpool.base == rts_stringpool.base)
 	{
 		low_reclaim_passes = &rts_stp_low_reclaim_passes;
-		spc_needed_passes = &rts_stp_spc_needed_passes;
 		incr_factor = &rts_stp_incr_factor;
-		maxnoexp_passes = &rts_stp_maxnoexp_passes;
 	} else if (stringpool.base == indr_stringpool.base)
 	{
 		low_reclaim_passes = &indr_stp_low_reclaim_passes;
-		spc_needed_passes = &indr_stp_spc_needed_passes;
 		incr_factor = &indr_stp_incr_factor;
-		maxnoexp_passes = &indr_stp_maxnoexp_passes;
 	} else
 	{
 		GTMASSERT; /* neither rts_stringpool, nor indr_stringpool */
 	}
 
 	if (NULL == stp_array)
-		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * sizeof(mstr *));
+		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
 
 	topstr = array = stp_array;
 	arraytop = topstr + stp_array_size;
@@ -573,7 +594,7 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 		x = MV_STPG_GET(&dollar_system);
 		if (x)
 			MV_STPG_PUT(x);
-		x = STR_STPG_GET(&dollar_zsource);
+		x = MV_STPG_GET(&dollar_zsource);
 		if (x)
 			MV_STPG_PUT(x);
 		x = MV_STPG_GET(&dollar_ztrap);
@@ -603,6 +624,11 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 		x = MV_STPG_GET(&dollar_zyerror);
 		if (x)
 			MV_STPG_PUT(x);
+#		ifdef GTM_TRIGGER
+		x = MV_STPG_GET(&dollar_ztwormhole);
+		if (x)
+			MV_STPG_PUT(x);
+#		endif
 		x = MV_STPG_GET(&last_fnquery_return_varname);
 		if (x)
 			MV_STPG_PUT(x);
@@ -658,7 +684,7 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 							}
 						}
 					}
-					continue;
+					continue;	/* continue loop, not after switch stmt */
 				case MVST_IARR:
 					m = (mval *)mvs->mv_st_cont.mvs_iarr.iarr_base;
 					for (mtop = m + mvs->mv_st_cont.mvs_iarr.iarr_mvals;  m < mtop;  m++)
@@ -675,17 +701,44 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 				case MVST_STCK:
 				case MVST_STCK_SP:
 				case MVST_PVAL:
+				case MVST_RSTRTPC:
+					continue;
 				case MVST_TPHOLD:
+#					ifdef GTM_TRIGGER
+					if (0 == mvs->mv_st_cont.mvs_tp_holder.tphold_tlevel)
+					{	/* $ZTWORMHOLE only saved at initial TP level */
+						x = MV_STPG_GET(&mvs->mv_st_cont.mvs_tp_holder.ztwormhole_save);
+						if (x)
+							MV_STPG_PUT(x);
+					}
+#					endif
 					continue;
 				case MVST_NVAL:
-#ifdef DEBUG
+#					ifdef DEBUG
 					/* The var_name field is only present in a debug build */
 					x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_nval.name.var_name);
 					if (x)
 						MV_STPG_PUT(x);
-#endif
+#					endif
 					continue;
+#				ifdef GTM_TRIGGER
+				case MVST_TRIGR:
+					/* Top elements of MVST_TRIGR and MVST_ZINTR structures are the same. These common
+					 * elements are processed when we fall through to the MVST_ZINTR entry below. Here
+					 * we process the unique MVST_TRIGR elements.
+					 */
+					x = MV_STPG_GET(&mvs->mv_st_cont.mvs_trigr.dollar_etrap_save);
+					if (x)
+						MV_STPG_PUT(x);
+					x = MV_STPG_GET(&mvs->mv_st_cont.mvs_trigr.dollar_ztrap_save);
+					if (x)
+						MV_STPG_PUT(x);
+					/* Note fall into MVST_ZINTR to process common entries */
+#				endif
 				case MVST_ZINTR:
+					x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_zintr.savextref);
+					if (x)
+                                                MV_STPG_PUT(x);
 					m = &mvs->mv_st_cont.mvs_zintr.savtarg;
 					break;
 				case MVST_ZINTDEV:
@@ -703,8 +756,21 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 			if (x)
 				MV_STPG_PUT(x);
 		}
-		for (sf = frame_pointer;  sf < (stack_frame *)stackbase && sf->old_frame_pointer;  sf = sf->old_frame_pointer)
+		for (sf = frame_pointer;  sf < (stack_frame *)stackbase;  sf = sf->old_frame_pointer)
 		{	/* Cover temp mvals in use */
+			if (NULL == sf->old_frame_pointer)
+			{	/* If trigger enabled, may need to jump over a base frame */
+				/* TODO - fix this to jump over call-ins base frames as well */
+#				ifdef GTM_TRIGGER
+				if (SFT_TRIGR & sf->type)
+				{	/* We have a trigger base frame, back up over it */
+					sf = *(stack_frame **)(sf + 1);
+					assert(sf);
+					assert(sf->old_frame_pointer);
+				} else
+#				endif
+					break;
+			}
 			assert(sf->temps_ptr);
 			if (sf->temps_ptr >= (unsigned char *)sf)
 				continue;
@@ -720,7 +786,18 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 				}
 			}
 		}
-
+		if (NULL != alias_retarg)
+		{	/* An alias return value is in-flight - process it */
+			assert(alias_retarg->mvtype & MV_ALIASCONT);
+			if (alias_retarg->mvtype & MV_ALIASCONT)
+			{	/* Protect the refs were are about to make in case ptr got banged up somehow */
+				lvp = (lv_val *)alias_retarg;
+				assert(MV_SYM == lvp->ptrs.val_ent.parent.sym->ident);	/* Verify a base var */
+				x = MV_STPG_GET(&lvp->v);
+				if (x)
+					MV_STPG_PUT(x);
+			}
+		}
 		if (tp_pointer)
 		{
 			tf = tp_pointer;
@@ -776,53 +853,67 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 #endif
 	space_reclaim = space_after_compact - space_before_compact; /* this can be -ve, if alignment causes expansion */
 	space_needed -= (int)space_after_compact;
-	if (0 < space_needed && STP_RECLAIMLIMIT > space_reclaim)
-	{
-		(*spc_needed_passes)++;
-		if (STP_MINRECLAIM > space_reclaim)
-			(*low_reclaim_passes)++;
-		else
-		{
-			*low_reclaim_passes = 0;
-			if (STP_ENOUGHRECLAIMED <= space_reclaim)
-				*spc_needed_passes = 0;
-		}
-	}
-	forced_expansion = maxnoexp_growth = FALSE;
-	if (0 < space_needed || /* i */
-	    STP_MINFREE > space_after_compact /* ii */
-#ifndef STP_MOVE /* do forced expansion only for stp_gcol, no forced expansion for stp_move */
-	    || (forced_expansion =
-	        (!disallow_forced_expansion && /* iii */
-	         STP_LIMITFRCDEXPN >= stringpool.top - stringpool.base && /* iv */
-	         (STP_MAXLOWRECLAIM_PASSES <= *low_reclaim_passes || /* v */
-		  (maxnoexp_growth = (*maxnoexp_passes < STP_MAXNOEXP_PASSES && *spc_needed_passes >= *maxnoexp_passes))))) /* vi */
+	DBGSTPGCOL((stderr, "space_needed=%i\n", space_needed));
+	/* After compaction if less than 31.25% of space is avail, consider it a low reclaim pass */
+	if (STP_LOWRECLAIM_LEVEL(stringpool.top - stringpool.base) > space_after_compact)
+		(*low_reclaim_passes)++;
+	else
+		*low_reclaim_passes = 0;
+	non_mandatory_expansion = FALSE;
+	if (0 < space_needed /* i */
+#ifndef STP_MOVE /* do expansion only for stp_gcol, no forced expansion for stp_move */
+	    || (non_mandatory_expansion =
+	        (!stop_non_mandatory_expansion && /* ii */
+	         (STP_MAXLOWRECLAIM_PASSES <= *low_reclaim_passes ))) /* iii */
 #endif
 	    )
 	{
-		/* i   - more space needed than available
-		 * ii  - very less space available
-		 * iii - all cases of forced expansions disabled 'cos a previous attempt at forced expansion failed due to lack of
-		 * 	 memory
-		 * iv  - no forced expansions after the size of the stringpool crosses a threshold
-		 * v   - not much reclaimed the past low_reclaim_passes, stringpool is relatively compact, time to grow
-		 * vi  - stringpool was found lacking in space maxnoexp_passes times and we reclaimed only between STP_MINFREE
-		 * 	 and STP_ENOUGHRECLAIMED, time to grow. The motivation is to avoid scenarios where there is repeated
-		 * 	 occurrences of the stringpool filling up, and compaction reclaiming enough space. In such cases,
-		 *       if the stringpool is expanded, we create more room, resulting in fewer calls to stp_gcol.
+		/* i   - more space needed than available so do a mandatory expansion
+		 * ii  - non-mandatory expansions disabled because a previous attempt failed due to lack of memory
+		 * iii - after compaction, if at least 31.25% of string pool is not free for STP_MAXLOWRECLAIM_PASSES
+		 *       do a non-mandatory expansion. This is done to avoid scenarios where there is repeated
+		 * 	     occurrences of the stringpool filling up, and compaction not reclaiming enough space.
+		 *       In such cases, if the stringpool is expanded, we create more room, resulting in fewer calls
+		 *       to stp_gcol.
 		 */
 		strpool_base = stringpool.base;
-		if ((stringpool.top - stringpool.base) < STP_MAXGEOMGROWTH)
+		/* Grow stringpool geometrically */
+		stp_incr = (stringpool.top - stringpool.base) * *incr_factor / STP_NUM_INCRS;
+		space_needed_rounded_up = ROUND_UP(space_needed, OS_PAGE_SIZE);
+		first_expansion_try = TRUE;
+		while (first_expansion_try || (retry_if_expansion_fails && expansion_failed))
 		{
-			stp_incr = STP_GEOM_INCREMENT * (*incr_factor);
-			*incr_factor *= STP_GEOMGROWTH_FACTOR;
-		} else
-			stp_incr = STP_LINEAR_INCREMENT;
-		stp_incr = ROUND_UP(stp_incr, OS_PAGE_SIZE);
-		if (stp_incr < space_needed)
-			stp_incr = ROUND_UP(space_needed, OS_PAGE_SIZE);
-		assert(stp_incr + stringpool.top - stringpool.base >= space_needed + blklen);
-		expand_stp((unsigned int)(stp_incr + stringpool.top - stringpool.base));
+			if (!first_expansion_try)
+			{
+				/* Once we hit the memory wall no more non_mandatory expansions */
+				if (non_mandatory_expansion)
+					stop_non_mandatory_expansion = TRUE;
+				/* We were not able to get the memory we wanted. Plan B it to get as much of what we wanted
+				 * (down to what was actually needed). If we can't get what was actually needed allow
+				 * the user to get a memory error.
+				 */
+				if (*incr_factor > 1)
+				{
+					/* if we hit the memory wall with an elevated incr_factor drop back a notch and retry */
+					*incr_factor = *incr_factor - 1;
+					stp_incr = (stringpool.top - stringpool.base) * *incr_factor / STP_NUM_INCRS;
+				} else
+					/* if we are already at the lowest incr_factor half our way down */
+					if (stp_incr > space_needed_rounded_up)
+						stp_incr = stp_incr / 2;
+			}
+			first_expansion_try = FALSE;
+			stp_incr = ROUND_UP(stp_incr, OS_PAGE_SIZE);
+			if (stp_incr < space_needed)
+				stp_incr = space_needed_rounded_up;
+			/* If we are asking for more than is actually needed we want to try again if we do not get it. */
+			retry_if_expansion_fails = (stp_incr > space_needed_rounded_up);
+			expansion_failed = FALSE; /* will be set to TRUE by condition handler if can't get memory */
+			assert(stp_incr + stringpool.top - stringpool.base >= space_needed + blklen);
+			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%i\n", *incr_factor, stp_incr,
+					space_needed_rounded_up));
+			expand_stp((unsigned int)(stp_incr + stringpool.top - stringpool.base));
+		}
 		if (strpool_base != stringpool.base) /* expanded successfully */
 		{
 			cstr = array;
@@ -833,20 +924,21 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 		 	 */
 			(strpool_base == rts_stringpool.base) ? (rts_stringpool = stringpool) : (indr_stringpool = stringpool);
 			free(strpool_base);
+			/* Adjust incr_factor */
+			if (*incr_factor < STP_NUM_INCRS) *incr_factor = *incr_factor + 1;
 		} else
 		{
 			/* could not expand during forced expansion */
-			assert(forced_expansion && disallow_forced_expansion);
+			assert(non_mandatory_expansion && stop_non_mandatory_expansion);
 			if (space_after_compact < space_needed)
 				rts_error(VARLSTCNT(3) ERR_STPEXPFAIL, 1, stp_incr + stringpool.top - stringpool.base);
 		}
-		*spc_needed_passes = 0;
-		if (maxnoexp_growth && (*maxnoexp_passes < STP_MAXNOEXP_PASSES))
-			*maxnoexp_passes += STP_NOEXP_PASSES_INCR;
 		*low_reclaim_passes = 0;
 	} else
 	{
 		assert(stringpool.free == stringpool.base);
+		/* Adjust incr_factor */
+		if (*incr_factor > 1) *incr_factor = *incr_factor - 1;
 		if (topstr != array)
 		{
 #ifdef STP_MOVE
@@ -854,7 +946,8 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 			{	/* All stp_move elements must be contiguous in the 'array'. They point outside
 				 * the range of stringpool.base and stringpool.top. In the 'array' of (mstr *) they
 				 * must be either at the beginning, or at the end. */
-				if ((*array)->addr >= (char *)stringpool.base && (*array)->addr < (char *)stringpool.top)
+				if ((*array)->addr >= (char *)stringpool.base	/* BYPASSOK */
+				    && (*array)->addr < (char *)stringpool.top) /* BYPASSOK */
 					topstr -= move_count; /* stringpool elements before move elements in stp_array */
 				else
 					array += move_count; /* stringpool elements after move elements or no stringpool elements in

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,13 +94,13 @@ void merge_desc_check(void)
 	{
 		if (lcl_arg1_is_desc_of_arg2(mglvnp->lclp[IND1], mglvnp->lclp[IND2]))
 		{
-			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, sizeof(buff1));
-			end2 = format_key_lv_val(mglvnp->lclp[IND2], buff2, sizeof(buff2));
+			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, SIZEOF(buff1));
+			end2 = format_key_lv_val(mglvnp->lclp[IND2], buff2, SIZEOF(buff2));
 			rts_error(VARLSTCNT(6) ERR_MERGEDESC, 4, end1 - buff1, buff1, end2 - buff2, buff2);
 		} else if (lcl_arg1_is_desc_of_arg2(mglvnp->lclp[IND2], mglvnp->lclp[IND1]))
 		{
-			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, sizeof(buff1));
-			end2 = format_key_lv_val(mglvnp->lclp[IND2], buff2, sizeof(buff2));
+			end1 = format_key_lv_val(mglvnp->lclp[IND1], buff1, SIZEOF(buff1));
+			end2 = format_key_lv_val(mglvnp->lclp[IND2], buff2, SIZEOF(buff2));
 			rts_error(VARLSTCNT(6) ERR_MERGEDESC, 4, end2 - buff2, buff2, end1 - buff1, buff1);
 		}
 	}

@@ -45,17 +45,19 @@
 
 #define MAX_DB_WTSTARTS		2			/* Max number of "flush-timer driven" simultaneous writers in wcs_wtstart */
 #define MAX_WTSTART_PID_SLOTS	4 * MAX_DB_WTSTARTS	/* Max number of PIDs for wcs_wtstart to save */
+#define MAX_KIP_PID_SLOTS 	8
 
 #define BT_FACTOR(X) (X)
 #define FLUSH_FACTOR(X) ((X)-(X)/16)
 #define BT_QUEHEAD (-2)
 #define BT_NOTVALID (-1)
 #define BT_MAXRETRY 3
-#define BT_SIZE(X) ((((sgmnt_data_ptr_t)X)->bt_buckets + 1 + ((sgmnt_data_ptr_t)X)->n_bts) * sizeof(bt_rec))
+#define BT_SIZE(X) ((((sgmnt_data_ptr_t)X)->bt_buckets + 1 + ((sgmnt_data_ptr_t)X)->n_bts) * SIZEOF(bt_rec))
 			/* parameter is *sgmnt_data*/
 			/* note that the + 1 above is for the th_queue head which falls between the hash table and the */
 			/* actual bts */
 #define HEADER_UPDATE_COUNT 1024
+#define LAST_WBOX_SEQ_NUM 1000
 
 typedef struct
 {
@@ -159,16 +161,16 @@ typedef struct
 {
 #if defined(UNIX)
 	global_latch_t	semaphore;
-	CACHELINE_PAD(sizeof(global_latch_t), 1)
+	CACHELINE_PAD(SIZEOF(global_latch_t), 1)
 	latch_t		crashcnt;
 	int4		filler1;	/* for alignment */
 	global_latch_t	crashcnt_latch;
-	CACHELINE_PAD(sizeof(latch_t) + sizeof(latch_t) + sizeof(global_latch_t), 2)
+	CACHELINE_PAD(SIZEOF(latch_t) + SIZEOF(latch_t) + SIZEOF(global_latch_t), 2)
 	latch_t		queslots;
 	int4		filler2;	/* for alignment */
-	CACHELINE_PAD(sizeof(latch_t) + sizeof(latch_t), 3)
+	CACHELINE_PAD(SIZEOF(latch_t) + SIZEOF(latch_t), 3)
 	mutex_que_head	prochead;
-	CACHELINE_PAD(sizeof(mutex_que_head), 4)
+	CACHELINE_PAD(SIZEOF(mutex_que_head), 4)
 	mutex_que_head	freehead;
 #elif defined(VMS)
 	short		semaphore;
@@ -178,11 +180,11 @@ typedef struct
 #ifdef __alpha
 /* use constant instead of defining CACHELINE_SIZE since we do not want to affect other structures
       the 64 must match padding in mutex.mar and mutex_stoprel.mar */
-        char            filler1[64 - sizeof(short)*4];
+        char            filler1[64 - SIZEOF(short)*4];
 #endif
         mutex_que_entry prochead;
 #ifdef __alpha
-        char            filler2[64 - sizeof(mutex_que_entry)];
+        char            filler2[64 - SIZEOF(mutex_que_entry)];
 #endif
         mutex_que_entry freehead;
 #else
@@ -266,9 +268,9 @@ typedef struct node_local_struct
 	uint4		wtstart_pid[MAX_WTSTART_PID_SLOTS];	/* Maintain pids of wcs_wtstart processes */
 	int4		filler8_int;				/* 8-byte alignment filler */
 	global_latch_t	wc_var_lock;                            /* latch used for access to various wc_* ref counters */
-	CACHELINE_PAD(sizeof(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;                               /* latch for interlocking on hppa and tandem */
-	CACHELINE_PAD(sizeof(global_latch_t), 2)
+	CACHELINE_PAD(SIZEOF(global_latch_t), 2)
 	int4		cache_hits;
 	int4		wc_in_free;                             /* number of write cache records in free queue */
 	/* All the counters below (declared using CNTR4DCL are 4-byte counters. We would like to keep them in separate
@@ -322,12 +324,15 @@ typedef struct node_local_struct
    	INTPTR_T	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 4K(on 32-bit platform) and 8K(on 64-bit platforms) */
 	gvstats_rec_t	gvstats_rec;
 	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
-#	ifdef GTM_CRYPT
 	sm_off_t	encrypt_glo_buff_off;	/* offset from unencrypted global buffer to its encrypted counterpart */
-	NON_GTM64_ONLY(
-		int	tmp_filler;		/* Added so that the structure is aligned properly in 32 bit machines */
-	)
-#	endif
+	long		ss_shmid;		 /* Identifier of the shared memory for the snapshot that started
+						  * recently.
+						  */
+	uint4		ss_shmcycle;	 	 /* incremented everytime a new snapshot creates a new shared memory identifier */
+	boolean_t	snapshot_in_prog;	 /* Tells GT.M if any snapshots are in progress */
+	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
+	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
+	uint4		kip_pid_array[MAX_KIP_PID_SLOTS]; /* Processes actively doing kill (0 denotes empty slots) */
 } node_local;
 
 #ifdef DEBUG
@@ -459,15 +464,15 @@ typedef struct node_local_struct
 #define DUMP_LOCKHIST()
 #endif
 
-#define BT_NOT_ALIGNED(bt, bt_base)		(!IS_PTR_ALIGNED((bt), (bt_base), sizeof(bt_rec)))
+#define BT_NOT_ALIGNED(bt, bt_base)		(!IS_PTR_ALIGNED((bt), (bt_base), SIZEOF(bt_rec)))
 #define BT_NOT_IN_RANGE(bt, bt_lo, bt_hi)	(!IS_PTR_IN_RANGE((bt), (bt_lo), (bt_hi)))
 
 #define NUM_CRIT_ENTRY		1024
-#define CRIT_SPACE		(NUM_CRIT_ENTRY * sizeof(mutex_que_entry) + sizeof(mutex_struct))
-#define NODE_LOCAL_SIZE		(ROUND_UP(sizeof(node_local), OS_PAGE_SIZE))
+#define CRIT_SPACE		(NUM_CRIT_ENTRY * SIZEOF(mutex_que_entry) + SIZEOF(mutex_struct))
+#define NODE_LOCAL_SIZE		(ROUND_UP(SIZEOF(node_local), OS_PAGE_SIZE))
 #define NODE_LOCAL_SPACE	(ROUND_UP(CRIT_SPACE + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
 /* In order for gtmsecshr not to pull in OTS library, NODE_LOCAL_SIZE_DBS is used in secshr_db_clnup instead of NODE_LOCAL_SIZE */
-#define NODE_LOCAL_SIZE_DBS	(ROUND_UP(sizeof(node_local), DISK_BLOCK_SIZE))
+#define NODE_LOCAL_SIZE_DBS	(ROUND_UP(SIZEOF(node_local), DISK_BLOCK_SIZE))
 
 /* Define pointer types for above structures that may be in shared memory and need 64
    bit pointers. */

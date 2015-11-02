@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,8 @@
 
 GBLREF spdesc			stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
-GBLREF mstr			dollar_zsource, dollar_zcompile;
+GBLREF mval			dollar_zsource;
+GBLREF mstr			dollar_zcompile;
 GBLREF int			object_file_des;
 
 void op_zlink (mval *v, mval *quals)
@@ -71,7 +72,7 @@ void op_zlink (mval *v, mval *quals)
 	expdir = FALSE;
 	if (quals)
 	{ /* explicit ZLINK */
-		memset(&pblk, 0, sizeof(pblk));
+		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buff_size = MAX_FBUFF;
 		pblk.buffer = inputf;
 		pblk.fop = F_SYNTAXO;
@@ -101,11 +102,10 @@ void op_zlink (mval *v, mval *quals)
 			file.len = pblk.b_name;
 		}
 
-		if (stringpool.free + file.len > stringpool.top)
-			stp_gcol(file.len);
+		ENSURE_STP_FREE_SPACE(file.len);
 		memcpy(stringpool.free, file.addr, file.len);
-		dollar_zsource.addr = (char *) stringpool.free;
-		dollar_zsource.len = file.len;
+		dollar_zsource.str.addr = (char *) stringpool.free;
+		dollar_zsource.str.len = file.len;
 		stringpool.free += file.len;
 
 		if (type == OBJ)
@@ -124,23 +124,23 @@ void op_zlink (mval *v, mval *quals)
 			if (pblk.b_name > MAX_MIDENT_LEN)
 				objnamelen = expdir ? (pblk.b_dir + MAX_MIDENT_LEN) : MAX_MIDENT_LEN;
 			memcpy(&objnamebuf[0], file.addr, objnamelen);
-			memcpy(&objnamebuf[objnamelen], DOTOBJ, sizeof(DOTOBJ));
+			memcpy(&objnamebuf[objnamelen], DOTOBJ, SIZEOF(DOTOBJ));
 			objnamelen += STR_LIT_LEN(DOTOBJ);
-			assert (objnamelen + sizeof(DOTOBJ) <= MAX_FBUFF + 1);
+			assert (objnamelen + SIZEOF(DOTOBJ) <= MAX_FBUFF + 1);
 		} else
 		{
-			if (file.len + sizeof(DOTM) > sizeof(srcnamebuf) ||
-				file.len + sizeof(DOTOBJ) > sizeof(objnamebuf))
+			if (file.len + SIZEOF(DOTM) > SIZEOF(srcnamebuf) ||
+				file.len + SIZEOF(DOTOBJ) > SIZEOF(objnamebuf))
 				rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 
 			memmove(&srcnamebuf[0], file.addr, file.len);
-			memcpy(&srcnamebuf[file.len], DOTM, sizeof(DOTM));
+			memcpy(&srcnamebuf[file.len], DOTM, SIZEOF(DOTM));
 			srcnamelen = file.len + SIZEOF(DOTM) - 1;
-			assert (srcnamelen + sizeof(DOTM) <= MAX_FBUFF + 1);
+			assert (srcnamelen + SIZEOF(DOTM) <= MAX_FBUFF + 1);
 			memcpy(&objnamebuf[0],file.addr,file.len);
-			memcpy(&objnamebuf[file.len], DOTOBJ, sizeof(DOTOBJ));
+			memcpy(&objnamebuf[file.len], DOTOBJ, SIZEOF(DOTOBJ));
 			objnamelen = file.len + SIZEOF(DOTOBJ) - 1;
-			assert (objnamelen + sizeof(DOTOBJ) <= MAX_FBUFF + 1);
+			assert (objnamelen + SIZEOF(DOTOBJ) <= MAX_FBUFF + 1);
 		}
 		if (!expdir)
 		{
@@ -152,8 +152,8 @@ void op_zlink (mval *v, mval *quals)
 			{
 				zro_search(&objstr, &objdir, 0, 0, TRUE);
 				if (!objdir)
-					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr,
-						ERR_FILENOTFND, 2, dollar_zsource.len, dollar_zsource.addr);
+					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
+						ERR_FILENOTFND, 2, dollar_zsource.str.len, dollar_zsource.str.addr);
 			} else  if (type == SRC)
 			{
 				zro_search(&objstr, &objdir, &srcstr, &srcdir, TRUE);
@@ -164,21 +164,21 @@ void op_zlink (mval *v, mval *quals)
 			{
 				zro_search(&objstr, &objdir, &srcstr, &srcdir, NON_USHBIN_ONLY(TRUE) USHBIN_ONLY(FALSE));
 				if (!objdir && !srcdir)
-					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr,
-						ERR_FILENOTFND, 2, dollar_zsource.len, dollar_zsource.addr);
+					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
+						ERR_FILENOTFND, 2, dollar_zsource.str.len, dollar_zsource.str.addr);
 			}
 		}
 	} else
 	{ /* auto-ZLINK */
 		type = NOTYPE;
 		memcpy(&srcnamebuf[0],v->str.addr,v->str.len);
-		memcpy(&srcnamebuf[v->str.len], DOTM, sizeof(DOTM));
+		memcpy(&srcnamebuf[v->str.len], DOTM, SIZEOF(DOTM));
 		srcnamelen = v->str.len + SIZEOF(DOTM) - 1;
 		if (srcnamebuf[0] == '%')
 			srcnamebuf[0] = '_';
 
 		memcpy(&objnamebuf[0],&srcnamebuf[0],v->str.len);
-		memcpy(&objnamebuf[v->str.len], DOTOBJ, sizeof(DOTOBJ));
+		memcpy(&objnamebuf[v->str.len], DOTOBJ, SIZEOF(DOTOBJ));
 		objnamelen = v->str.len + SIZEOF(DOTOBJ) - 1;
 
 		srcstr.addr = &srcnamebuf[0];
@@ -202,7 +202,7 @@ void op_zlink (mval *v, mval *quals)
 		if (objdir)
 		{
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
-			if (objdir->str.len + objnamelen + 2 > sizeof(objnamebuf))
+			if (objdir->str.len + objnamelen + 2 > SIZEOF(objnamebuf))
 				rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (objdir->str.len)
 			{
@@ -217,12 +217,12 @@ void op_zlink (mval *v, mval *quals)
 		}
 		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
 		if (FD_INVALID == object_file_des)
-			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, errno);
+			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr, errno);
 		if (USHBIN_ONLY(!incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(!incr_link(object_file_des)))
-			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, ERR_VERSION);
+			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr, ERR_VERSION);
 		CLOSEFILE_RESET(object_file_des, status);	/* resets "object_file_des" to FD_INVALID */
 		if (-1 == status)
-			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, errno);
+			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr, errno);
 	} else	/* either NO type or SOURCE type */
 	{
 		struct stat obj_stat, src_stat;
@@ -238,7 +238,7 @@ void op_zlink (mval *v, mval *quals)
 		if (srcdir)
 		{
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
-			if (srcdir->str.len + srcnamelen > sizeof(srcnamebuf) - 1)
+			if (srcdir->str.len + srcnamelen > SIZEOF(srcnamebuf) - 1)
 				rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (srcdir->str.len)
 			{
@@ -264,7 +264,7 @@ void op_zlink (mval *v, mval *quals)
 				)
 				return;
 			}
-			if (objdir->str.len + objnamelen > sizeof(objnamebuf) - 1)
+			if (objdir->str.len + objnamelen > SIZEOF(objnamebuf) - 1)
 				rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (objdir->str.len)
 			{

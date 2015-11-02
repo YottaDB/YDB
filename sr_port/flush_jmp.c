@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,33 +31,7 @@ GBLREF	stack_frame	*frame_pointer;
 GBLREF	stack_frame	*error_frame;
 GBLREF	symval		*curr_symval;
 
-/* All mv_stent types that need to be preserved are indicated by the mvs_save[] array.
- * MVST_STCK_SP (which is the same as the MVST_STCK type everywhere else is handled specially here.
- * This entry is created by mdb_condition_handler to stack the "stackwarn" global variable.
- * This one needs to be preserved since our encountering this type in flush_jmp.c indicates that we are currently
- * in the error-handler of a STACKCRIT error which in turn has "GOTO ..." in the $ZTRAP/$ETRAP that is
- * causing us to mutate the current frame we are executing in with the contents pointed to by the GOTO.
- * In that case, we do not want to restore "stackwarn" to its previous value since we are still handling
- * the STACKCRIT error. So we set MVST_STCK_SP type as needing to be preserved.
- */
-LITDEF	boolean_t	mvs_save[] =
-{
-	TRUE,	/* MVST_MSAV */
-	FALSE,	/* MVST_MVAL */
-	TRUE,	/* MVST_STAB */
-	FALSE,	/* MVST_IARR */
-	TRUE,	/* MVST_NTAB */
-	TRUE,	/* MVST_PARM */
-	TRUE,	/* MVST_PVAL */
-	FALSE,	/* MVST_STCK */
-	TRUE,	/* MVST_NVAL */
-	TRUE,	/* MVST_TVAL */
-	TRUE,	/* MVST_TPHOLD */
-	TRUE,	/* MVST_ZINTR */
-	FALSE,	/* MVST_ZINTDEV */
-	TRUE,	/* MVST_STCK_SP */
-	TRUE	/* MVST_LVAL */
-};
+LITREF	boolean_t	mvs_save[];
 
 void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr)
 {
@@ -83,15 +57,18 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	 * this frame so whenever we unwind out of this, we will rethrow the error at the parent frame.
 	 */
 	assert(!(frame_pointer->flags & SFF_ETRAP_ERR) || (NULL == error_frame) || (error_frame == frame_pointer));
-	if (frame_pointer->flags & SFF_ETRAP_ERR)
-		frame_pointer->flags &= SFF_ETRAP_ERR_OFF;	/* clear the SFF_ETRAP_ERR bit */
+	assert(!(SFT_TRIGR & frame_pointer->type));
+	frame_pointer->flags &= SFF_ETRAP_ERR_OFF;	/* clear the SFF_ETRAP_ERR bit */
+	frame_pointer->flags &= SFF_TRIGR_CALLD_OFF;	/* clear the SFF_TRIGR_CALLD bit since this frame is being rewritten */
 	frame_pointer->rvector = rtn_base;
 	frame_pointer->vartab_ptr = (char *)VARTAB_ADR(rtn_base);
 	frame_pointer->vartab_len = frame_pointer->rvector->vartab_len;
 	frame_pointer->mpc = transfer_addr;
 	frame_pointer->ctxt = context;
 #ifdef HAS_LITERAL_SECT
-	frame_pointer->literal_ptr = (int4 *)NULL;
+	/* VMS *may* need this to still be NULL in this case but UNIX does NOT */
+	VMS_ONLY(frame_pointer->literal_ptr = (int4 *)NULL);
+	UNIX_ONLY(frame_pointer->literal_ptr = (int4 *)LITERAL_ADR(rtn_base));
 #endif
 	frame_pointer->temp_mvals = frame_pointer->rvector->temp_mvals;
 	size = rtn_base->temp_size;
@@ -103,6 +80,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 
 	while ((char *)mv_chain < (char *)frame_pointer && !mvs_save[mv_chain->mv_st_type])
 	{
+		assert(MVST_TRIGR != mv_chain->mv_st_type);	/* Should never unwind a trigger frame here */
 		msp = (unsigned char *)mv_chain;
 		op_oldvar();
 	}
@@ -128,6 +106,7 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	while ((char *)mv_st_prev < (char *)frame_pointer)
 	{
 		mv_st_type = mv_st_prev->mv_st_type;
+		assert(MVST_TRIGR != mv_st_type);	/* Should never unwind a trigger frame here */
 		if (!mvs_save[mv_st_type])
 		{
 			unw_mv_ent(mv_st_prev);

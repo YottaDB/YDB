@@ -73,7 +73,7 @@ boolean_t	skip;		if TRUE, skip over shared libraries. If FALSE, probe shared lib
 				op++;
 				continue;
 			}
-			if (op->str.len + objstr->len + 2 > sizeof(objfn))
+			if (op->str.len + objstr->len + 2 > SIZEOF(objfn))
 				rts_error(VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, op->str.len, op->str.addr);
 			obp = &objfn[0];
 			if (op->str.len)
@@ -106,7 +106,7 @@ boolean_t	skip;		if TRUE, skip over shared libraries. If FALSE, probe shared lib
 			for ( ; !sp_result && srccnt-- > 0; sp++)
 			{
 				assert(sp->type == ZRO_TYPE_SOURCE);
-				if (sp->str.len + srcstr->len + 2 > sizeof(srcfn)) /* extra 2 for '/' & null */
+				if (sp->str.len + srcstr->len + 2 > SIZEOF(srcfn)) /* extra 2 for '/' & null */
 					rts_error(VARLSTCNT(4) ERR_ZFILENMTOOLONG, 2, sp->str.len, sp->str.addr);
 				sbp = &srcfn[0];
 				if (sp->str.len)

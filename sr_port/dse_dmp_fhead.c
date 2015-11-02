@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,10 @@
 #include "gtmmsg.h"
 #include "stringpool.h"		/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
 #include "op.h"
+#include "shmpool.h"	/* Needed for the shmpool structures */
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
 
 #define MAX_UTIL_LEN    	64
 #define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
@@ -89,7 +93,7 @@ void dse_dmp_fhead (void)
 	enum jnl_state_codes	jnl_state;
 	gds_file_id		zero_fid;
 	mval			dollarh_mval, zdate_mval;
-	char			dollarh_buffer[MAXNUMLEN], zdate_buffer[sizeof(DSE_DMP_TIME_FMT)];
+	char			dollarh_buffer[MAXNUMLEN], zdate_buffer[SIZEOF(DSE_DMP_TIME_FMT)];
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
@@ -100,6 +104,8 @@ void dse_dmp_fhead (void)
 	uint4			pid;
 	boolean_t		new_line;
 	unsigned char		outbuf[GTMCRYPT_HASH_HEX_LEN + 1];
+	GTM_SNAPSHOT_ONLY(
+		shm_snapshot_t	*ss_shm_ptr;)
 
 	is_dse_all = dse_all_dump;
 	dse_all_dump = FALSE;
@@ -108,8 +114,8 @@ void dse_dmp_fhead (void)
 	cnl = csa->nl;
         jnl_state = (enum jnl_state_codes)csd->jnl_state;
 	VMS_ONLY(
-		memset(&zero_fid, 0, sizeof(zero_fid));
-		jnl_buff_open = (0 != memcmp(cnl->jnl_file.jnl_file_id.fid, zero_fid.fid, sizeof(zero_fid.fid)));
+		memset(&zero_fid, 0, SIZEOF(zero_fid));
+		jnl_buff_open = (0 != memcmp(cnl->jnl_file.jnl_file_id.fid, zero_fid.fid, SIZEOF(zero_fid.fid)));
 	)
 	UNIX_ONLY(
 		jnl_buff_open = (0 != cnl->jnl_file.u.inode);
@@ -286,6 +292,8 @@ void dse_dmp_fhead (void)
 		util_out_print("  Process(es) inhibiting KILLs        !5UL", TRUE, cnl->inhibit_kills);
 
 		util_out_print(0, TRUE);
+		util_out_print("  DB Trigger cycle of ^#t      !12UL", TRUE, csd->db_trigger_cycle);
+		util_out_print(0, TRUE);
 		util_out_print("  MM defer_time                       !5SL", TRUE, csd->defer_time);
 		/* Print the database encryption hash information */
 		GET_HASH_IN_HEX(csd->encryption_hash, outbuf, GTMCRYPT_HASH_HEX_LEN);
@@ -458,5 +466,27 @@ void dse_dmp_fhead (void)
 		util_out_print("  Pre read trigger factor [% upd rsrvd] !3UL", FALSE, csd->pre_read_trigger_factor);
 		util_out_print("  Upd writer trigger [%flshTrgr] !3UL", TRUE, csd->writer_trigger_factor);
 	}
+#	ifdef GTM_SNAPSHOT
+	if (NEED_TO_DUMP("SNAPSHOT"))
+	{
+		util_out_print(0, TRUE);
+		util_out_print("  Snapshot in progress                 !AD", FALSE, 5,
+			(cnl->snapshot_in_prog ? " TRUE" : "FALSE"));
+		util_out_print("   Number of active snapshots                 !12UL", TRUE, cnl->num_snapshots_in_effect);
+		util_out_print("  Snapshot cycle                 !12UL", FALSE, cnl->ss_shmcycle);
+		/* SS_MULTI: Note that if we have multiple snapshots, then we have to run through each active
+		 * snapshot region and dump their informations respectively
+		 */
+		ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(csa));
+		util_out_print("  Active snapshot PID                        !12UL", TRUE, ss_shm_ptr->ss_info.ss_pid);
+		util_out_print("  Snapshot TN                    !12UL", FALSE, ss_shm_ptr->ss_info.snapshot_tn);
+		util_out_print("  Total blocks                               !12UL", TRUE, ss_shm_ptr->ss_info.total_blks);
+		util_out_print("  Free blocks                    !12UL", FALSE, ss_shm_ptr->ss_info.free_blks);
+		util_out_print("  Process failed                             !12UL", TRUE, ss_shm_ptr->failed_pid);
+		util_out_print("  Failure errno                  !12UL", FALSE, ss_shm_ptr->failure_errno);
+		util_out_print("  Snapshot shared memory identifier          !12SL", TRUE, ss_shm_ptr->ss_info.ss_shmid);
+		util_out_print("  Snapshot file name                   !AD", TRUE, LEN_AND_STR(ss_shm_ptr->ss_info.shadow_file));
+	}
+#	endif
         return;
 }

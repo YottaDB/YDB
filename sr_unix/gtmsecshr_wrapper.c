@@ -15,7 +15,6 @@
  * are reducing code bloat.
  */
 #undef malloc
-#include <sys/un.h>
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
@@ -31,7 +30,6 @@
 
 #define MAX_ENV_VAR_VAL_LEN 1024
 #define MAX_ALLOWABLE_LEN 256
-#define MAX_SOCKFILE_NAME_LEN 25
 
 #define OVERWRITE 1
 
@@ -147,9 +145,6 @@ int main()
 	int gtm_tmp_exists = 0;
 	int gtm_dbglvl_exists = 0;
 
-	/* used to get size of sockaddr_un struct used to limit gtm_tmp size */
-	struct sockaddr_un	token_socket;
-
 	openlog("GTMSECSHRINIT", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
 
 	ret = 0; /* start positive */
@@ -190,7 +185,7 @@ int main()
 
 	if (env_var_ptr = getenv(GTM_TMP))
 	{
-		if (sizeof(token_socket.sun_path) < (strlen(env_var_ptr) + MAX_SOCKFILE_NAME_LEN))
+		if (MAX_ALLOWABLE_LEN < strlen(env_var_ptr))
 		{
 			syslog(LOG_USER | LOG_INFO, "gtm_tmp env var too long. gtmsecshr will not be started.\n");
 			ret = -1;

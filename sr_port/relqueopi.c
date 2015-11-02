@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,7 @@
 /* These are instructions/library routines on VMS so this module is unnecessary for those platforms. */
 #ifndef VMS
 
+#include <errno.h>
 #include "aswp.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -47,6 +48,7 @@
 #include "caller_id.h"
 #include "rel_quant.h"
 #include "sleep_cnt.h"
+#include "gtm_c_stack_trace.h"
 
 GBLREF	volatile	int4	fast_lock_count;
 GBLREF	int4		process_id;
@@ -56,6 +58,7 @@ GBLREF	int		num_additional_processors;
 int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 {
 	int	retries, spins, maxspins;
+	uint4	stuck_cnt = 0;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
@@ -91,6 +94,8 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
+	stuck_cnt++;
+	GET_C_STACK_FROM_SCRIPT("INTERLOCK_FAIL", process_id, base->latch.u.parts.latch_pid, stuck_cnt);
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
 	return INTERLOCK_FAIL;
@@ -100,6 +105,7 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 {
 	int	retries, spins, maxspins;
+	uint4	stuck_cnt = 0;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
@@ -135,6 +141,8 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
+	stuck_cnt++;
+	GET_C_STACK_FROM_SCRIPT("INTERLOCK_FAIL", process_id, base->latch.u.parts.latch_pid, stuck_cnt);
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
 	return INTERLOCK_FAIL;
@@ -145,6 +153,7 @@ void_ptr_t remqhi1(que_head_ptr_t base)
 {
 	int		retries, spins, maxspins;
 	que_ent_ptr_t	ret;
+	uint4		stuck_cnt = 0;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
@@ -187,6 +196,8 @@ void_ptr_t remqhi1(que_head_ptr_t base)
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
+	stuck_cnt++;
+	GET_C_STACK_FROM_SCRIPT("INTERLOCK_FAIL", process_id, base->latch.u.parts.latch_pid, stuck_cnt);
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
 	return (void_ptr_t)INTERLOCK_FAIL;
@@ -197,6 +208,7 @@ void_ptr_t remqti1(que_head_ptr_t base)
 {
 	int		retries, spins, maxspins;
 	que_ent_ptr_t	ret;
+	uint4		stuck_cnt = 0;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
@@ -239,6 +251,8 @@ void_ptr_t remqti1(que_head_ptr_t base)
 	}
 	DUMP_LOCKHIST();
 	--fast_lock_count;
+	stuck_cnt++;
+	GET_C_STACK_FROM_SCRIPT("INTERLOCK_FAIL", process_id, base->latch.u.parts.latch_pid, stuck_cnt);
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
 	return (void_ptr_t)INTERLOCK_FAIL;

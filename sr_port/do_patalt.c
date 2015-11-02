@@ -189,7 +189,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 			} else if (PTE_MAX_ENTRIES > pte_csh_alloc_size[curalt_depth])
 			{
 				new_pte_csh_size = (cur_pte_csh_size << 1);
-				tmp_pte = malloc(sizeof(pte_csh) * new_pte_csh_size);
+				tmp_pte = malloc(SIZEOF(pte_csh) * new_pte_csh_size);
 				free(cur_pte_csh_array);
 				pte_csh_alloc_size[curalt_depth] = new_pte_csh_size;
 				pte_csh_array[curalt_depth] = tmp_pte;
@@ -198,7 +198,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 				do_patalt_maxed_out[curalt_depth]++;
 			if (new_pte_csh_size != cur_pte_csh_size)
 			{
-				memset(pte_csh_array[curalt_depth], 0, sizeof(pte_csh) * new_pte_csh_size);
+				memset(pte_csh_array[curalt_depth], 0, SIZEOF(pte_csh) * new_pte_csh_size);
 				pte_csh_cur_size[curalt_depth] *= 2;
 				pte_csh_entries_per_len[curalt_depth] *= 2;
 				pte_csh_tail_count[curalt_depth] *= 2;

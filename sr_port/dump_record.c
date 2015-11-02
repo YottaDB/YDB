@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,13 +24,20 @@
 #include "gdsblk.h"
 #include "cli.h"
 #include "copy.h"
-#include "min_max.h"          /* needed for init_root_gv.h */
+#include "min_max.h"		/* needed for init_root_gv.h */
 #include "init_root_gv.h"
 #include "util.h"
 #include "dse.h"
 #include "print_target.h"
 #include "op.h"
 
+#ifdef GTM_TRIGGER
+#include "hashtab.h"		/* for STR_HASH (in COMPUTE_HASH_MNAME)*/
+#include "hashtab_mname.h"
+#include "rtnhdr.h"		/* needed for gv_trigger.h */
+#include "gv_trigger.h"		/* needed for INIT_ROOT_GVT */
+#include "targ_alloc.h"
+#endif
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
@@ -46,6 +53,10 @@ GBLREF VSIG_ATOMIC_T	util_interrupt;
 GBLREF mval             curr_gbl_root;
 GBLREF int              patch_is_fdmp;
 GBLREF int              patch_fdmp_recs;
+GBLREF	gv_key		*gv_currkey;
+GBLREF	gv_namehead	*gv_target;
+
+LITREF	mval		literal_hasht;
 
 #define MAX_UTIL_LEN		80
 #define	NUM_BYTES_PER_LINE	20
@@ -63,6 +74,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
         ssize_t   	chlen;
 	block_id	blk_id;
 	boolean_t	rechdr_displayed = FALSE;
+	sgmnt_addrs	*csa;
 
 	if (rp >= b_top)
 		return NULL;
@@ -94,24 +106,24 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	r_top = rp + size;
 	if (r_top > b_top)
 		r_top = b_top;
-	else  if (r_top < rp + sizeof(rec_hdr))
-		r_top = rp + sizeof(rec_hdr);
+	else  if (r_top < rp + SIZEOF(rec_hdr))
+		r_top = rp + SIZEOF(rec_hdr);
 	if (cc > patch_comp_count)
 		cc = patch_comp_count;
 	if (((blk_hdr_ptr_t)bp)->levl)
-		key_top = r_top - sizeof(block_id);
+		key_top = r_top - SIZEOF(block_id);
 	else
 	{
-		for (key_top = rp + sizeof(rec_hdr);  key_top < r_top;)
+		for (key_top = rp + SIZEOF(rec_hdr);  key_top < r_top;)
 			if (!*key_top++ && !*key_top++)
 				break;
 	}
-	size = key_top - rp - sizeof(rec_hdr);
-	if (size > sizeof(patch_comp_key) - 2 - cc)
-		size = sizeof(patch_comp_key) - 2 - cc;
+	size = key_top - rp - SIZEOF(rec_hdr);
+	if (size > SIZEOF(patch_comp_key) - 2 - cc)
+		size = SIZEOF(patch_comp_key) - 2 - cc;
 	if (size < 0)
 		size = 0;
-	memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
+	memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
 	patch_comp_count = cc + size;
 	patch_comp_key[patch_comp_count] = patch_comp_key[patch_comp_count + 1] = 0;
 	if (patch_is_fdmp)
@@ -120,14 +132,14 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 			patch_fdmp_recs++;
 	} else
 	{
-		if (r_top - sizeof(block_id) >= key_top)
+		if (r_top - SIZEOF(block_id) >= key_top)
 		{
 			GET_LONG(blk_id, key_top);
 			if ((((blk_hdr_ptr_t)bp)->levl) || (blk_id <= cs_addrs->ti->total_blks))
 			{
 				MEMCPY_LIT(util_buff, "Ptr ");
 				util_len = SIZEOF("Ptr ") - 1;
-				util_len += i2hex_nofill(blk_id, (uchar_ptr_t)&util_buff[util_len], sizeof(blk_id) * 2);
+				util_len += i2hex_nofill(blk_id, (uchar_ptr_t)&util_buff[util_len], SIZEOF(blk_id) * 2);
 				MEMCPY_LIT(&util_buff[util_len], "  ");
 				util_len += SIZEOF("  ") - 1;
 				util_buff[util_len] = 0;
@@ -137,11 +149,12 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		util_out_print("Key ", FALSE);
 		if (r_top == b_top
 			&& ((blk_hdr_ptr_t)bp)->levl && !((rec_hdr_ptr_t)rp)->cmpc
-			&& r_top - rp == sizeof(rec_hdr) + sizeof(block_id))
+			&& r_top - rp == SIZEOF(rec_hdr) + SIZEOF(block_id))
 				util_out_print("*", FALSE);
 		else  if (patch_comp_key[0])
 		{
 			util_out_print("^", FALSE);
+			csa = cs_addrs;
 			RETRIEVE_ROOT_VAL(patch_comp_key, key_buf, temp_ptr, temp_key, buf_len);
 			INIT_ROOT_GVT(key_buf, buf_len, curr_gbl_root);
 		}
@@ -193,10 +206,10 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 				/* Display character/wide-character glyphs */
 				for (cptr1 = cptr0, cptr_top = cptr0 + NUM_BYTES_PER_LINE;  cptr1 < cptr_top;  cptr1++)
 				{
-					if (!rechdr_displayed && (cptr1 == (rp + sizeof(rec_hdr))))
+					if (!rechdr_displayed && (cptr1 == (rp + SIZEOF(rec_hdr))))
 						rechdr_displayed = TRUE;
-					assert(rechdr_displayed || (cptr1 < (rp + sizeof(rec_hdr))));
-					assert(!rechdr_displayed || (cptr1 >= (rp + sizeof(rec_hdr))));
+					assert(rechdr_displayed || (cptr1 < (rp + SIZEOF(rec_hdr))));
+					assert(!rechdr_displayed || (cptr1 >= (rp + SIZEOF(rec_hdr))));
 					switch (fastate)
 					{
 					case 0: /* prints single-byte characters or intepret

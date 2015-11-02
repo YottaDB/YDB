@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@ void	mur_rem_jctls(reg_ctl_list *rctl)
 			|| (0 != memcmp(rctl->csd->jnl_file_name, jctl->jnl_fn, jctl->jnl_fn_len)));
 		if (!jctl->jfh->recover_interrupted)
 			GTMASSERT; /* Out of design situation */
+		assert(jctl->reg_ctl == rctl);
 		if (!mur_fclose(jctl))
 			murgbl.wrn_count++;	/* mur_fclose() would have done the appropriate gtm_putmsg() */
 		if (SS_NORMAL != (status = gtm_file_remove((char *)jctl->jnl_fn, jctl->jnl_fn_len, &ustatus)))

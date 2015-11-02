@@ -297,7 +297,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			   a major performance concern.
 			*/
 			SOCKET_DEBUG2(PRINTF("socsnrupb: Char won't fit in buffer, slide it down\n"); DEBUGSOCKFLUSH);
-			assert(sizeof(int) > socketptr->buffered_length);
+			assert(SIZEOF(int) > socketptr->buffered_length);
 			assert(socketptr->buffered_offset > socketptr->buffered_length); /* Assert no overlap */
 			memcpy(socketptr->buffer, (socketptr->buffer + socketptr->buffered_offset), socketptr->buffered_length);
 			socketptr->buffered_offset = 0;

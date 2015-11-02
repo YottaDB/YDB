@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ typedef struct post_restore_lvscan_struct
 	int	elemcnt;
 } lvscan_blk;
 
-void tp_unwind(short newlevel, enum tp_unwind_invocation);
-void tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvscan_blk **lvscan_anchor);
+void tp_unwind(short newlevel, enum tp_unwind_invocation, int *tprestart_rc);
+int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvscan_blk **lvscan_anchor, int *tprestart_lc);
 
 #endif

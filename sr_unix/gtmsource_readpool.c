@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,7 +89,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 		{	/* No overflow yet. Before we read the content (including the jnldata_len read below), we have to ensure
 			 * we read up-to-date content. We rely on the memory barrier done in jnlpool_hasnt_overflowed for this.
 			 */
-			assert(read + sizeof(jnldata_hdr_struct) <= jnlpool_size);
+			assert(read + SIZEOF(jnldata_hdr_struct) <= jnlpool_size);
 			jnl_header = (jnldata_hdr_ptr_t)(jnldata_base + read);
 			first_tr_len = jnldata_len = jnl_header->jnldata_len;
 			if (read_multiple)
@@ -102,14 +102,14 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 				if (read_multiple)
 					jnldata_len = avail_data;
 			}
-			if (sizeof(jnldata_hdr_struct) < jnldata_len && jnldata_len <= jnlpool_size)
+			if (SIZEOF(jnldata_hdr_struct) < jnldata_len && jnldata_len <= jnlpool_size)
 			{
-				read_size = jnldata_len - USIZEOF(jnldata_hdr_struct);
+				read_size = jnldata_len - SIZEOF(jnldata_hdr_struct);
 				if (0 < read_size && read_size <= maxbufflen)
 				{
 					if (0 < (wrap_size = (int4)(read - (jnlpool_size - jnldata_len))))
 						read_size -= wrap_size;
-					memcpy(buff, (sm_uc_ptr_t)jnl_header + sizeof(jnldata_hdr_struct), read_size);
+					memcpy(buff, (sm_uc_ptr_t)jnl_header + SIZEOF(jnldata_hdr_struct), read_size);
 					if (0 < wrap_size)
 						memcpy(buff + read_size, jnldata_base, wrap_size);
 					/* Now that we have read the content, we have to ensure that we haven't read content
@@ -120,7 +120,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 					{	/* No overflow. Only now are we guaranteed a good value of "first_tr_len". */
 						assert(first_tr_len % JNL_WRT_END_MODULUS == 0);
 						REPL_DEBUG_ONLY(
-							assert(repl_tr_good(buff, first_tr_len - sizeof(jnldata_hdr_struct),
+							assert(repl_tr_good(buff, first_tr_len - SIZEOF(jnldata_hdr_struct),
 									read_jnl_seqno));
 							num_tr_read = 1;
 						)
@@ -134,9 +134,9 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 							 */
 							assert(first_tr_len < jnldata_len); /* must hold if multiple transactions
 												were read */
-							tr_p = buff + first_tr_len - sizeof(jnldata_hdr_struct);
-							buf_top = buff + jnldata_len - sizeof(jnldata_hdr_struct);
-							while (sizeof(jnldata_hdr_struct) < (buf_top - tr_p))
+							tr_p = buff + first_tr_len - SIZEOF(jnldata_hdr_struct);
+							buf_top = buff + jnldata_len - SIZEOF(jnldata_hdr_struct);
+							while (SIZEOF(jnldata_hdr_struct) < (buf_top - tr_p))
 							{	/* more than hdr available */
 								tr_len = ((jnldata_hdr_ptr_t)tr_p)->jnldata_len;
 								assert(tr_len % JNL_WRT_END_MODULUS == 0);
@@ -182,7 +182,7 @@ int gtmsource_readpool(uchar_ptr_t buff, int *data_len, int maxbufflen, boolean_
 										buf_top - tr_p);
 								}
 							)
-							jnldata_len = (uint4)((tr_p - buff) + sizeof(jnldata_hdr_struct));
+							jnldata_len = (uint4)((tr_p - buff) + SIZEOF(jnldata_hdr_struct));
 							wrap_size = (int4)(read - (jnlpool_size - jnldata_len));
 						}
 						REPL_DPRINT4("Pool read seqno : "INT8_FMT" Num Tr read : %d Total Tr len : %d\n",

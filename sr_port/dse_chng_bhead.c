@@ -127,8 +127,8 @@ void dse_chng_bhead(void)
 	 	new_hdr.levl = (unsigned char)x;
 
 		chng_blk = TRUE;
-		if (new_hdr.bsiz < sizeof(blk_hdr))
-			new_hdr.bsiz = sizeof(blk_hdr);
+		if (new_hdr.bsiz < SIZEOF(blk_hdr))
+			new_hdr.bsiz = SIZEOF(blk_hdr);
 		if (new_hdr.bsiz  > blk_size)
 			new_hdr.bsiz = blk_size;
 	}
@@ -144,7 +144,7 @@ void dse_chng_bhead(void)
 			util_out_print("Error: invalid bsiz.", TRUE);
 			t_abort(gv_cur_region, csa);
 			return;
-		} else if (x < sizeof(blk_hdr) || x > blk_size)
+		} else if (x < SIZEOF(blk_hdr) || x > blk_size)
 		{
 			util_out_print("Error: invalid bsiz.", TRUE);
 			t_abort(gv_cur_region, csa);
@@ -158,7 +158,7 @@ void dse_chng_bhead(void)
 	else
 	{
 		BLK_INIT(bs_ptr, bs1);
-		BLK_SEG(bs_ptr, blkhist.buffaddr + sizeof(new_hdr), new_hdr.bsiz - sizeof(new_hdr));
+		BLK_SEG(bs_ptr, blkhist.buffaddr + SIZEOF(new_hdr), new_hdr.bsiz - SIZEOF(new_hdr));
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			util_out_print("Error: bad block build.", TRUE);
@@ -184,12 +184,12 @@ void dse_chng_bhead(void)
 			t_abort(gv_cur_region, csa);
 			return;
 		}
-		if (new_hdr.bsiz < sizeof(blk_hdr))
-			new_hdr.bsiz = sizeof(blk_hdr);
+		if (new_hdr.bsiz < SIZEOF(blk_hdr))
+			new_hdr.bsiz = SIZEOF(blk_hdr);
 		if (new_hdr.bsiz  > blk_size)
 			new_hdr.bsiz = blk_size;
 		BLK_INIT(bs_ptr, bs1);
-		BLK_SEG(bs_ptr, blkhist.buffaddr + sizeof(new_hdr), new_hdr.bsiz - sizeof(new_hdr));
+		BLK_SEG(bs_ptr, blkhist.buffaddr + SIZEOF(new_hdr), new_hdr.bsiz - SIZEOF(new_hdr));
 		BLK_FINI(bs_ptr, bs1);
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0,
 			((blk_hdr_ptr_t)blkhist.buffaddr)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);

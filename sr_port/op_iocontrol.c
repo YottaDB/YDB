@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,8 +52,7 @@ void op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...)
 	*/
 	VAR_START(var, vparg);
 	vp = vparg;
-	if (stringpool.top - stringpool.free < MAX_DEVCTL_LENGTH + 3)
-		stp_gcol(MAX_DEVCTL_LENGTH + 3);
+	ENSURE_STP_FREE_SPACE(MAX_DEVCTL_LENGTH + 3);
 	for (cp = stringpool.free, count = 0 ; count < n ; count++)
 	{
 		if (count > 0)

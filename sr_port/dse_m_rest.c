@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,15 +69,15 @@ void dse_m_rest (
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
-	else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-		b_top = bp + sizeof(blk_hdr);
+	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+		b_top = bp + SIZEOF(blk_hdr);
 	else
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
 
 	level = ((blk_hdr_ptr_t)bp)->levl;
 	bplmap = cs_addrs->hdr->bplmap;
 
-	for (rp = bp + sizeof (blk_hdr); rp < b_top ;rp = r_top)
+	for (rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top)
 	{	if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read	*/
 		{	if (!(np = t_qread(blk,&dummy_int,&dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
 				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest.	*/
@@ -92,11 +92,11 @@ void dse_m_rest (
 		r_top = rp + rsize;
 		if (r_top > b_top)
 			r_top = b_top;
-		if (r_top - rp < (sizeof (rec_hdr) + sizeof (block_id)))
+		if (r_top - rp < (SIZEOF(rec_hdr) + SIZEOF(block_id)))
 			break;
 		if (in_dir_tree && level == 0)
 		{
-			for (ptr = rp + sizeof(rec_hdr); ; )
+			for (ptr = rp + SIZEOF(rec_hdr); ; )
 			{
 				if (*ptr++ == 0 && *ptr++ == 0)
 					break;
@@ -104,7 +104,7 @@ void dse_m_rest (
 			GET_LONG(next,ptr);
 		}
 		else
-			GET_LONG(next,r_top - sizeof (block_id));
+			GET_LONG(next,r_top - SIZEOF(block_id));
 		if (next < 0 || next >= cs_addrs->ti->total_blks ||
 			(next / bplmap * bplmap == next))
 		{	memcpy(util_buff,"Invalid pointer in block ",25);
@@ -119,7 +119,7 @@ void dse_m_rest (
 		}
 		bml_index = next / bplmap;
 		bml_ptr = bml_list + bml_index * bml_size;
-		if (bml_busy(next - next / bplmap * bplmap, bml_ptr + sizeof(blk_hdr)))
+		if (bml_busy(next - next / bplmap * bplmap, bml_ptr + SIZEOF(blk_hdr)))
 		{	*blks_ptr = *blks_ptr - 1;
 			if (((blk_hdr_ptr_t) bp)->levl > 1)
 			{	dse_m_rest (next, bml_list, bml_size, blks_ptr, in_dir_tree);

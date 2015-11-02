@@ -47,8 +47,8 @@ void lvzwr_init(enum zwr_init_types zwrpattyp, mval *val)
 	}
 	if (!lvzwrite_block)
 	{
-		lvzwrite_block = (lvzwrite_datablk *)malloc(sizeof(lvzwrite_datablk));
-		memset(lvzwrite_block, 0, sizeof(lvzwrite_datablk));
+		lvzwrite_block = (lvzwrite_datablk *)malloc(SIZEOF(lvzwrite_datablk));
+		memset(lvzwrite_block, 0, SIZEOF(lvzwrite_datablk));
 	} else
 	{	/* Get back to one zwrite_block if multiples were stacked (and left over) */
 		for (prevzwrb = lvzwrite_block->prev; prevzwrb; lvzwrite_block = prevzwrb, prevzwrb = lvzwrite_block->prev)
@@ -67,7 +67,7 @@ void lvzwr_init(enum zwr_init_types zwrpattyp, mval *val)
 		lvzwrite_block->pat = NULL;
 	lvzwrite_block->mask = lvzwrite_block->subsc_count = 0;
 	if (!lvzwrite_block->sub)
-		lvzwrite_block->sub = (zwr_sub_lst *)malloc(sizeof(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
+		lvzwrite_block->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
 	lvzwrite_block->fixed = TRUE;
 	return;
 }

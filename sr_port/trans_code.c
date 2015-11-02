@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,20 @@
 #include "svnames.h"
 #include "error_trap.h"
 #include "jobinterrupt_process.h"
+#include "gdsroot.h"
+#include "gdsblk.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "gdscc.h"
+#include "gdskill.h"
+#include "jnl.h"
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#endif
 
 #define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
 
@@ -43,6 +57,7 @@ GBLREF mval		dollar_etrap;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF mv_stent		*mv_chain;
 GBLREF bool		transform;
+GBLREF unsigned char	*restart_pc, *restart_ctxt;
 #ifdef UNIX
 GBLREF	io_desc		*gtm_err_dev;
 #endif
@@ -97,6 +112,10 @@ void trans_code_finish(void)
 
 	frame_pointer->type = proc_act_type;
 	proc_act_type = 0;
+	/* Save/restore restart_pc over dispatch of this error handler */
+	PUSH_MV_STENT(MVST_RSTRTPC);
+	mv_chain->mv_st_cont.mvs_rstrtpc.restart_pc_save = restart_pc;
+	mv_chain->mv_st_cont.mvs_rstrtpc.restart_ctxt_save = restart_ctxt;
 	if (0 != dollar_zyerror.str.len)
 	{
 		dummy.mvtype = MV_STR;
@@ -142,7 +161,7 @@ CONDITION_HANDLER(trans_code_ch)
 	}
 	if (POP_SPECIFIED)
 	{ /* pop to the level of last 'set $ztrap' */
-		golevel(level2go);
+		GOLEVEL(level2go, TRUE);
 		/* previous dummy_ptr would have been popped out */
 		dummy.mvtype = MV_STR;
 		dummy.str = *err_act;
@@ -181,7 +200,9 @@ void trans_code(void)
 	if (IS_ETRAP)
 		SET_ERROR_FRAME(frame_pointer);	/* reset error_frame to point to frame_pointer */
 	if (!(ztrap_form & ZTRAP_CODE) && !IS_ETRAP && POP_SPECIFIED)
-		golevel(level2go);
+	{
+		GOLEVEL(level2go, TRUE);
+	}
 	dummy.mvtype = MV_STR;
 	dummy.str = *err_act;
 	dummy_ptr = push_mval(&dummy);

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -49,6 +49,7 @@ l1:	jmp	opp_ret
 # PUBLIC	opp_zstepretarg
 ENTRY opp_zstepretarg
 	pushl	%eax
+	pushl	%edx
 	movl	frame_pointer,%eax
 	movw	msf_typ_off(%eax),%dx
 	testw	$1,%dx
@@ -57,7 +58,8 @@ ENTRY opp_zstepretarg
 	cmpl	%eax, %edx
 	jg	l2
 	call	op_zstepret
-l2:	popl	%eax
+l2:	popl	%edx
+	popl	%eax
 	jmp	op_retarg
 # opp_zstepretarg ENDP
 
@@ -244,6 +246,7 @@ l11:	jmp	opp_ret
 # PUBLIC	opp_zst_over_retarg
 ENTRY opp_zst_over_retarg
 	pushl	%eax
+	pushl	%edx
 	movl	frame_pointer,%eax
 	movw	msf_typ_off(%eax),%dx
 	testw	$1,%dx
@@ -253,7 +256,8 @@ ENTRY opp_zst_over_retarg
 	cmpl	%eax,%edx
 	jg	l12
 	call	op_zstepret
-l12:	popl	%eax
+l12:	popl	%edx
+	popl	%eax
 	jmp	op_retarg
 # opp_zst_over_retarg ENDP
 

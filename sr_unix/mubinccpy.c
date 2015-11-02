@@ -165,7 +165,7 @@ bool	mubinccpy (backup_reg_list *list)
 	   that end on a 4 byte boundary and some do not. It is critical that this structure is the same size on
 	   all platforms as it is sent across TCP connections when doing TCP backup.
 	*/
-	assert(0 == (sizeof(inc_header) % 8));
+	assert(0 == (SIZEOF(inc_header) % 8));
 
 	/* ================= Initialization and some checks ======================== */
 	header	=	list->backup_hdr;
@@ -222,7 +222,7 @@ bool	mubinccpy (backup_reg_list *list)
 		case backup_to_exec:
 			pipe_child = 0;
 			common_write = exec_write;
-			backup = (BFILE *)malloc(sizeof(BFILE));
+			backup = (BFILE *)malloc(SIZEOF(BFILE));
 			backup->blksiz = DISK_BLOCK_SIZE;
 			backup->remaining = 0;		/* number of zeros to be added in the end, just use this field */
 			if (0 > (backup->fd = gtm_pipe(file->addr, output_to_comm)))
@@ -235,7 +235,7 @@ bool	mubinccpy (backup_reg_list *list)
 		case backup_to_tcp:
 			common_write = tcp_write;
 			iotcp_fillroutine();
-			backup = (BFILE *)malloc(sizeof(BFILE));
+			backup = (BFILE *)malloc(SIZEOF(BFILE));
 			backup->blksiz = DISK_BLOCK_SIZE;
 			backup->remaining = 0; /* number of zeros to be added in the end, just use this field */
 			/* parse it first */
@@ -250,7 +250,7 @@ bool	mubinccpy (backup_reg_list *list)
 						TRUE);
 					return FALSE;
 			}
-			assert(sizeof(timeout) == sizeof(int));
+			assert(SIZEOF(timeout) == SIZEOF(int));
 			if ((0 == cli_get_int("NETTIMEOUT", (int4 *)&timeout)) || (0 > timeout))
 				timeout = DEFAULT_BKRS_TIMEOUT;
 			if (0 > (backup->fd = tcp_open(addr, port, timeout, FALSE)))
@@ -267,7 +267,7 @@ bool	mubinccpy (backup_reg_list *list)
 	}
 
 	/* ============================= write inc_header =========================================== */
-	outbuf = (inc_header*)malloc(sizeof(inc_header));
+	outbuf = (inc_header*)malloc(SIZEOF(inc_header));
 	if (header->is_encrypted)
 		MEMCPY_LIT(&outbuf->label[0], INC_HEADER_LABEL);
 	else
@@ -283,9 +283,10 @@ bool	mubinccpy (backup_reg_list *list)
 	outbuf->db_total_blks = header->trans_hist.total_blks;
 	outbuf->blk_size = header->blk_size;
 	outbuf->blks_to_upgrd = header->blks_to_upgrd;
-	GTMCRYPT_ONLY(
-		outbuf->is_encrypted = header->is_encrypted;
-	)
+	/* is_encrypted field of incremental header is defined for all platforms.
+	 * Hence set the is_encrypted field unconditionally.
+	 */
+	outbuf->is_encrypted = header->is_encrypted;
 	util_out_print("MUPIP backup of database file !AD to !AD", TRUE, DB_LEN_STR(gv_cur_region), file->len, file->addr);
 	COMMON_WRITE(backup, (char *)outbuf, SIZEOF(inc_header));
 #	ifdef GTM_CRYPT
@@ -311,9 +312,9 @@ bool	mubinccpy (backup_reg_list *list)
 	sblkh_p		= (shmpool_blk_hdr_ptr_t)outptr;
 	data_ptr	= (char_ptr_t)(sblkh_p + 1);
 	bp		= (blk_hdr_ptr_t)mubbuf;
-	bm_blk_buff	= (uchar_ptr_t)malloc(sizeof(blk_hdr) + (BLKS_PER_LMAP * BML_BITS_PER_BLK / BITS_PER_UCHAR));
+	bm_blk_buff	= (uchar_ptr_t)malloc(SIZEOF(blk_hdr) + (BLKS_PER_LMAP * BML_BITS_PER_BLK / BITS_PER_UCHAR));
 	save_blks	= 0;
-	memset(sblkh_p, 0, sizeof(*sblkh_p));
+	memset(sblkh_p, 0, SIZEOF(*sblkh_p));
 	sblkh_p->use.bkup.ondsk_blkver = GDSNOVER;
 
 	if (-1 == lseek(db_fd, (off_t)(header->start_vbn - 1) * DISK_BLOCK_SIZE, SEEK_SET))
@@ -371,12 +372,12 @@ bool	mubinccpy (backup_reg_list *list)
 			*/
 			if (0 != ((BLKS_PER_LMAP - 1) & blk_num))
 			{	/* Not a local bitmap block */
-				if (!gvcst_blk_ever_allocated(bm_blk_buff + sizeof(blk_hdr),
+				if (!gvcst_blk_ever_allocated(bm_blk_buff + SIZEOF(blk_hdr),
 							      ((blk_num * BML_BITS_PER_BLK)
 							       % (BLKS_PER_LMAP * BML_BITS_PER_BLK))))
 					continue;		/* Bypass never-set blocks to avoid conversion problems */
 				is_bitmap_blk = FALSE;
-				if (sizeof(v15_blk_hdr) <= (blk_bsiz = ((v15_blk_hdr_ptr_t)bptr)->bsiz))
+				if (SIZEOF(v15_blk_hdr) <= (blk_bsiz = ((v15_blk_hdr_ptr_t)bptr)->bsiz))
 				{	/* We have either a V4 block or uninitialized garbage */
 					if (blk_bsiz > bsize)
 						/* This is not a valid V4 block so ignore it */
@@ -405,7 +406,7 @@ bool	mubinccpy (backup_reg_list *list)
 #endif
 				is_bitmap_blk = TRUE;
 				memcpy(bm_blk_buff, bptr, BM_SIZE(header->bplmap));
-				if (sizeof(v15_blk_hdr) <= ((v15_blk_hdr_ptr_t)bm_blk_buff)->bsiz)
+				if (SIZEOF(v15_blk_hdr) <= ((v15_blk_hdr_ptr_t)bm_blk_buff)->bsiz)
 				{	/* This is a V4 format block -- needs upgrading */
 					status = gds_blk_upgrade(bm_blk_buff, bm_blk_buff, bsize, &dummy_odbv);
 					if (SS_NORMAL != status)
@@ -419,7 +420,7 @@ bool	mubinccpy (backup_reg_list *list)
 				}
 				assert(BM_SIZE(header->bplmap) == ((blk_hdr_ptr_t)bm_blk_buff)->bsiz);
 				assert(LCL_MAP_LEVL == ((blk_hdr_ptr_t)bm_blk_buff)->levl);
-				assert(gvcst_blk_is_allocated(bm_blk_buff + sizeof(blk_hdr),
+				assert(gvcst_blk_is_allocated(bm_blk_buff + SIZEOF(blk_hdr),
 							      ((blk_num * BML_BITS_PER_BLK)
 							       % (BLKS_PER_LMAP * BML_BITS_PER_BLK))));
 				blk_bsiz = BM_SIZE(header->bplmap);
@@ -545,30 +546,30 @@ bool	mubinccpy (backup_reg_list *list)
 		}
 	}
 	/* Write one last (zero-filled) block into this file that designates the end of the blocks */
-	memset(outptr, 0, sizeof(shmpool_blk_hdr) + bsize);
+	memset(outptr, 0, SIZEOF(shmpool_blk_hdr) + bsize);
 	COMMON_WRITE(backup, outptr, outsize);
 
 	/* ============================= write end_msg and fileheader =============================== */
 	if ((!online) || (0 == cs_addrs->shmpool_buffer->failed))
 	{	/* Write a secondary end-of-block list marker used for further validation on restore */
-		rsize = sizeof(END_MSG) + sizeof(int4);
-		COMMON_WRITE(backup, (char *)&rsize, sizeof(int4));
-		COMMON_WRITE(backup, END_MSG, sizeof(END_MSG));
+		rsize = SIZEOF(END_MSG) + SIZEOF(int4);
+		COMMON_WRITE(backup, (char *)&rsize, SIZEOF(int4));
+		COMMON_WRITE(backup, END_MSG, SIZEOF(END_MSG));
 
 		ptr1 = (uchar_ptr_t)header;
-		ptr1_top = ptr1 + ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE);
+		ptr1_top = ptr1 + ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE);
 		for ( ;  ptr1 < ptr1_top;  ptr1 += size1)
 		{
 			if ((size1 = (int4)(ptr1_top - ptr1)) > mubmaxblk)
 				size1 = (mubmaxblk / DISK_BLOCK_SIZE) * DISK_BLOCK_SIZE;
 			size1 += SIZEOF(int4);
-			COMMON_WRITE(backup, (char *)&size1, sizeof(int4));
+			COMMON_WRITE(backup, (char *)&size1, SIZEOF(int4));
 			size1 -= SIZEOF(int4);
 			COMMON_WRITE(backup, (char *)ptr1, size1);
 		}
-		rsize = sizeof(HDR_MSG) + sizeof(int4);
-		COMMON_WRITE(backup, (char *)&rsize, sizeof(int4));
-		COMMON_WRITE(backup, HDR_MSG, sizeof(HDR_MSG));
+		rsize = SIZEOF(HDR_MSG) + SIZEOF(int4);
+		COMMON_WRITE(backup, (char *)&rsize, SIZEOF(int4));
+		COMMON_WRITE(backup, HDR_MSG, SIZEOF(HDR_MSG));
 		ptr1 = MM_ADDR(header);
 		ptr1_top = ptr1 + ROUND_UP(MASTER_MAP_SIZE(header), DISK_BLOCK_SIZE);
 		for ( ; ptr1 < ptr1_top ; ptr1 += size1)
@@ -576,15 +577,15 @@ bool	mubinccpy (backup_reg_list *list)
 			if ((size1 = (int4)(ptr1_top - ptr1)) > mubmaxblk)
 				size1 = (mubmaxblk / DISK_BLOCK_SIZE) * DISK_BLOCK_SIZE;
 			size1 += SIZEOF(int4);
-			COMMON_WRITE(backup, (char *)&size1, sizeof(int4));
+			COMMON_WRITE(backup, (char *)&size1, SIZEOF(int4));
 			size1 -= SIZEOF(int4);
 			COMMON_WRITE(backup, (char *)ptr1, size1);
 		}
-		rsize = sizeof(MAP_MSG) + sizeof(int4);
-		COMMON_WRITE(backup, (char *)&rsize, sizeof(int4));
-		COMMON_WRITE(backup, MAP_MSG, sizeof(MAP_MSG));
+		rsize = SIZEOF(MAP_MSG) + SIZEOF(int4);
+		COMMON_WRITE(backup, (char *)&rsize, SIZEOF(int4));
+		COMMON_WRITE(backup, MAP_MSG, SIZEOF(MAP_MSG));
 		rsize = 0;
-		COMMON_WRITE(backup, (char *)&rsize, sizeof(rsize));
+		COMMON_WRITE(backup, (char *)&rsize, SIZEOF(rsize));
 	}
 
 	/* ========================== close backup destination ======================================== */

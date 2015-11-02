@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,21 +36,23 @@
 #include "gtmcrypt.h"
 #endif
 #include "gdsdbver.h"
+#include "min_max.h"
+#include "gtmimagename.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	boolean_t		run_time;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		dse_running;
 
-int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
+int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolean_t blk_free)
 {
 	unix_db_info		*udi;
 	int4			size, save_errno;
 	enum db_ver		tmp_ondskblkver;
 	sm_uc_ptr_t		save_buff = NULL, enc_save_buff;
 	boolean_t		fully_upgraded;
+	int			bsiz;
 	DEBUG_ONLY(
 		blk_hdr_ptr_t	blk_hdr_val;
 		static int	in_dsk_read;
@@ -74,6 +76,10 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	)
 	error_def(ERR_DYNUPGRDFAIL);
 
+	/* Note: Even in snapshots, only INTEG requires dsk_read to read FREE blocks. The assert below should be modified
+	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
+	 */
+	assert(!blk_free || SNAPSHOTS_IN_PROG(cs_addrs)); /* Only SNAPSHOTS require dsk_read to read a FREE block from the disk */
 	assert(0 == in_dsk_read);	/* dsk_read should never be nested. the read_reformat_buffer logic below relies on this */
 	DEBUG_ONLY(in_dsk_read++;)
 	udi = (unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info);
@@ -90,7 +96,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	 * so no concurrent process could be changing the format of this block. For MM there might be an issue.
 	 */
 	fully_upgraded = cs_data->fully_upgraded;
-	if (!fully_upgraded)
+	if (!blk_free && !fully_upgraded) /* No V4->V5 translations required if block is FREE */
 	{
 		save_buff = buff;
 		if (size > read_reformat_buffer_len)
@@ -126,15 +132,22 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 #	ifdef GTM_CRYPT
 	if (is_encrypted)
 	{
-		req_dec_blk_size = (((blk_hdr_ptr_t)enc_save_buff)->bsiz) - SIZEOF(blk_hdr);
-		if (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, req_dec_blk_size))
+		bsiz = (int)((blk_hdr_ptr_t)enc_save_buff)->bsiz;
+		req_dec_blk_size = MIN(cs_data->blk_size, bsiz) - SIZEOF(blk_hdr);
+		/* Do not do encryption/decryption if block is FREE */
+		if (!blk_free && (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, req_dec_blk_size)))
 		{
+			/* The below assert cannot be moved before BLOCK_REQUIRE_ENCRYPTION check done above as tmp_ptr could
+			 * potentially point to a V4 block in which case the assert might fail when a V4 block is casted to
+			 * a V5 block header.
+			 */
+			assert((bsiz <= cs_data->blk_size) && (bsiz >= SIZEOF(blk_hdr)));
 			ASSERT_ENCRYPTION_INITIALIZED;
-			memcpy(buff, enc_save_buff, sizeof(blk_hdr));
+			memcpy(buff, enc_save_buff, SIZEOF(blk_hdr));
 			GTMCRYPT_DECODE_FAST(cs_addrs->encr_key_handle,
-					     (char *)enc_save_buff + sizeof(blk_hdr),
+					     (char *)enc_save_buff + SIZEOF(blk_hdr),
 					     req_dec_blk_size,
-					     (char *)buff + sizeof(blk_hdr),
+					     (char *)buff + SIZEOF(blk_hdr),
 					     crypt_status);
 			if (0 != crypt_status)
 			{
@@ -145,15 +158,15 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 			memcpy(buff, enc_save_buff, size);
 	}
 #	endif
-	if (0 == save_errno)
+	if (!blk_free && (0 == save_errno))
 	{	/* See if block needs to be converted to current version. Assuming buffer is at least short aligned */
 		assert(0 == (long)buff % 2);
-		/* GDSV4 (0) version uses "buff->bver" as a block length so should always be > 0 when run_time.
+		/* GDSV4 (0) version uses "buff->bver" as a block length so should always be > 0 when M code is running.
 		 * The only exception is if the block has not been initialized (possible if it is BLK_FREE status in the
 		 * bitmap). This is possible due to concurrency issues while traversing down the tree. But if we have
-		 * crit on this region, we should not see these either. Assert accordingly.
+		 * crit on this region, we should not see these either.
 		 */
-		assert(!run_time || !cs_addrs->now_crit || ((blk_hdr_ptr_t)buff)->bver);
+		assert(!IS_MCODE_RUNNING || !cs_addrs->now_crit || ((blk_hdr_ptr_t)buff)->bver);
 		/* Block must be converted to current version (if necessary) for use by internals.
 		 * By definition, all blocks are converted from/to their on-disk version at the IO point.
 		 */
@@ -176,7 +189,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	}
 	DEBUG_ONLY(
 		in_dsk_read--;
-		if (cs_addrs->now_crit && !dse_running)
+		if (!blk_free && cs_addrs->now_crit && !dse_running)
 		{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
 			 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.
 			 */

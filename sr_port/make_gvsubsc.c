@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,11 +24,10 @@ GBLREF spdesc stringpool;
 
 oprtype make_gvsubsc(mval *v)
 {
-	mval w;
-	gv_key *gp;
-	if (stringpool.top - stringpool.free < MAX_SRCLINE + sizeof(gv_key))
-	{	stp_gcol(MAX_SRCLINE + sizeof(gv_key));
-	}
+	mval	w;
+	gv_key	*gp;
+
+	ENSURE_STP_FREE_SPACE(MAX_SRCLINE + SIZEOF(gv_key));
 	if ((INTPTR_T)stringpool.free & 1)
 		stringpool.free++;	/* word align key for structure refs */
 	gp = (gv_key *) stringpool.free;

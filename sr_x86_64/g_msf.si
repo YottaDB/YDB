@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -186,10 +186,8 @@ ARG_COUNT_OFFSET	   =   ARG_SAVE_OFFSET - (8*NO_REG_SAVED)
 lab1\@:
 	movq	msf_temps_ptr_off(REG_FRAME_POINTER),REG_FRAME_TMP_PTR
 	movq	msf_l_symtab_off(REG_FRAME_POINTER),REG_FRAME_VAR_PTR
-	cmpq	$0,msf_literal_ptr_off(REG_FRAME_POINTER)
-	je	lab2\@
 	movq	msf_literal_ptr_off(REG_FRAME_POINTER),REG_LITERAL_BASE
-lab2\@:	movq	msf_ctxt_off(REG_FRAME_POINTER),REG_PV
+	movq	msf_ctxt_off(REG_FRAME_POINTER),REG_PV
 	pushq	msf_mpc_off(REG_FRAME_POINTER)
 .endm
 

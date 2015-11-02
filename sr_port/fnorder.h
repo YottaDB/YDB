@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef _FNORDER_H_INC_
+#define _FNORDER_H_INC_
 
 enum order_obj {
 	global = 0,
@@ -23,3 +26,7 @@ enum order_dir {
 	undecided,
 	last_dir
 };
+
+STATICFNDCL boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr, oprtype *second_opr, enum order_obj object);
+
+#endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ void	iosocket_iocontrol(mstr *d)
 
 	if (0 == d->len)
 		return;
-	memset(&action[0], 0, sizeof(action));
+	memset(&action[0], 0, SIZEOF(action));
 	if (2 != (n = SSCANF(d->addr, "%[^(](%hu)", &action[0], &depth)))
 		memcpy(&action[0], d->addr, d->len);
 	if (0 == (length = STRLEN(&action[0])))

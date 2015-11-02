@@ -36,7 +36,7 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 	int		first_item, len, word_cnt;
 	unsigned char	*cp;
 
-	result->mvtype = MV_STR;
+	result->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
 	len = -1;							/* to compensate for no space at the end */
 	if (cmd_cnt > 1)
 	{
@@ -57,17 +57,15 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 	if (0 >= len)
 	{
 		result->str.len = 0;
+		result->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 		return;
 	}
-	if (stringpool.free + len > stringpool.top)
-	{
-		result->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
-		stp_gcol(len);
-	}
+	ENSURE_STP_FREE_SPACE(len);
 	cp = stringpool.free;
 	stringpool.free += len;
 	result->str.addr = (char *)cp;
 	result->str.len = len;
+	result->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 	for (word_cnt = first_item; ; *cp++ = ' ')
 	{
 		len = STRLEN(cmd_arg[word_cnt]);

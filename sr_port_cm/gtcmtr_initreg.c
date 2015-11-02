@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,11 +72,11 @@ bool gtcmtr_initreg(void)
 	temp_short = (unsigned short)region->reg->max_rec_size;
 	assert((int4)temp_short == region->reg->max_rec_size); /* ushort <- int4 assignment lossy? */
 	PUT_USHORT(reply, temp_short);
-	reply += sizeof(unsigned short);
+	reply += SIZEOF(unsigned short);
 	temp_short = (unsigned short)region->reg->max_key_size;
 	assert((int4)temp_short == region->reg->max_key_size); /* ushort <- int4 assignment lossy? */
 	PUT_USHORT(reply, temp_short);
-	reply += sizeof(unsigned short);
+	reply += SIZEOF(unsigned short);
 	if (curr_entry->cli_supp_allowexisting_stdnullcoll)
 		*reply++ = region->reg->std_null_coll;
 	curr_entry->clb_ptr->cbl = reply - curr_entry->clb_ptr->mbf;

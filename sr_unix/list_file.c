@@ -37,7 +37,7 @@ static readonly struct
 	unsigned char	newversion;
 	unsigned char	wrap;
 	unsigned char	width;
-	unsigned char	v_width[sizeof(int4)];
+	unsigned char	v_width[SIZEOF(int4)];
 #ifdef __MVS__
 	unsigned char	chsetebcdic[8];
 #endif
@@ -70,7 +70,7 @@ void open_list_file(void)
 	lst_param.list_line = 1;
 	lst_param.page = 0;
 
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	assert(module_name.len <= MAX_MIDENT_LEN);
 	pblk.def1_size = module_name.len;
 	memcpy(&list_name[0], module_name.addr, pblk.def1_size);
@@ -88,7 +88,7 @@ void open_list_file(void)
 	file.mvtype = parms.mvtype = MV_STR;
 	file.str.len = pblk.b_esl;
 	file.str.addr = &fname[0];
-	parms.str.len = sizeof(open_params_list);
+	parms.str.len = SIZEOF(open_params_list);
 	parms.str.addr = (char *)&open_params_list;
 	(*op_open_ptr)(&file, &parms, 30, 0);
 	parms.str.len = 1;
@@ -98,7 +98,7 @@ void open_list_file(void)
 	op_use(&file,&parms);
 	clock = time(0);
 	p = GTM_CTIME(&clock);
-	memcpy (print_time_buf, p + 4, sizeof(print_time_buf));
+	memcpy (print_time_buf, p + 4, SIZEOF(print_time_buf));
 	list_head(0);
 	return;
 }
@@ -167,7 +167,7 @@ void list_head(bool newpage)
 	op_wttab(100);
 	lst_param.page++;
 	head.str.addr = (char *)page_lit;
-	head.str.len = sizeof(page_lit) - 1;
+	head.str.len = SIZEOF(page_lit) - 1;
 	op_write(&head);
 
 	head.str.addr = (char *)page_no_buf;
@@ -243,7 +243,7 @@ void list_line_number(void)
 
 	n = lst_param.list_line++;
 	pt = &buf[5];
-	memset(&buf[0],SP,sizeof(buf));
+	memset(&buf[0],SP,SIZEOF(buf));
 	do
 	{
 		i = n / 10;
@@ -253,7 +253,7 @@ void list_line_number(void)
 	} while(i > 0);
 	out.mvtype = MV_STR;
 	out.str.addr = (char*)buf;
-	out.str.len = sizeof(buf);
+	out.str.len = SIZEOF(buf);
 	op_write(&out);
 }
 

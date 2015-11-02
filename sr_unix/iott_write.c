@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -185,7 +185,7 @@ void iott_write(mstr *v)
 			start_timer((TID)io_ptr,
 				    IOTT_FLUSH_WAIT,
 				    &iott_flush_time,
-				    sizeof(flush_parm),
+				    SIZEOF(flush_parm),
 				    (char *)&flush_parm);
 		}
 

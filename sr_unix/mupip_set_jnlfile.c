@@ -45,7 +45,7 @@ GBLREF boolean_t	need_no_standalone;
 int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 {
 	int 		jnl_fd, status;
-	char		hdr_buffer[sizeof(jnl_file_header)];
+	char		hdr_buffer[SIZEOF(jnl_file_header)];
 	jnl_file_header	*header;
 	char		*errptr;
 	int		save_no;
@@ -72,7 +72,7 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 	if (-1 == gtm_zos_tag_to_policy(jnl_fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(jnl_fname, realfiletag, TAG_BINARY, errno);
 #endif
-	LSEEKREAD(jnl_fd, 0, (sm_uc_ptr_t)hdr_buffer, sizeof(hdr_buffer), status);
+	LSEEKREAD(jnl_fd, 0, (sm_uc_ptr_t)hdr_buffer, SIZEOF(hdr_buffer), status);
 	if (0 != status)
 	{
 		if (-1 != status)
@@ -90,7 +90,7 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 	header = (jnl_file_header *)hdr_buffer;
 	if (SS_NORMAL != (status = mupip_set_jnlfile_aux(header, jnl_fname)))
 		return status;
-	LSEEKWRITE(jnl_fd, 0, (sm_uc_ptr_t)hdr_buffer, sizeof(hdr_buffer), status);
+	LSEEKWRITE(jnl_fd, 0, (sm_uc_ptr_t)hdr_buffer, SIZEOF(hdr_buffer), status);
 	if (0 != status)
 	{
 		save_no = errno;

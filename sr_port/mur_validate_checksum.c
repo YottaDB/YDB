@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,31 +28,33 @@
 #include "mur_validate_checksum.h"
 #include "jnl_get_checksum.h"
 
-GBLREF 	mur_rab_t	mur_rab;
-GBLREF	jnl_ctl_list	*mur_jctl;
-LITREF	int		jrt_update[JRT_RECTYPES];
-
-boolean_t mur_validate_checksum(void)
+boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 {
 	enum jnl_record_type 	rectype;
 	uint4			rec_checksum;
 	unsigned char		*start_ptr, *end_ptr;
+	jnl_record		*jnlrec;
+	reg_ctl_list		*rctl;
+	mur_read_desc_t		*mur_desc;
 
 	rec_checksum = INIT_CHECKSUM_SEED;
-	rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
-	if (IS_SET_KILL_ZKILL(rectype))	/* TUPD/UUPD/FUPD/GUPD */
+	rctl = jctl->reg_ctl;
+	mur_desc = rctl->mur_desc;
+	jnlrec = mur_desc->jnlrec;
+	rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
+	if (IS_SET_KILL_ZKILL_ZTWORM(rectype))	/* TUPD/UUPD/FUPD/GUPD */
 	{
-		start_ptr = (IS_ZTP(rectype)) ? (unsigned char *)&mur_rab.jnlrec->jrec_fkill.mumps_node :
-				 		 (unsigned char *)&mur_rab.jnlrec->jrec_kill.mumps_node;
-		end_ptr =  (unsigned char *)(mur_rab.jnlrec) + mur_rab.jreclen - JREC_SUFFIX_SIZE;
+		assert(&jnlrec->jrec_set_kill.mumps_node == &jnlrec->jrec_ztworm.ztworm_str);
+		start_ptr = (unsigned char *)&jnlrec->jrec_set_kill.mumps_node;
+		end_ptr =  (unsigned char *)(jnlrec) + mur_desc->jreclen - JREC_SUFFIX_SIZE;
 		rec_checksum = jnl_get_checksum((uint4 *)start_ptr, NULL, (int)(end_ptr - start_ptr));
 	} else if (JRT_PBLK == rectype)
 	{
-		start_ptr = (unsigned char *)mur_rab.jnlrec->jrec_pblk.blk_contents;
-		rec_checksum = jnl_get_checksum((uint4 *)start_ptr, NULL, mur_rab.jnlrec->jrec_pblk.bsiz);
+		start_ptr = (unsigned char *)jnlrec->jrec_pblk.blk_contents;
+		rec_checksum = jnl_get_checksum((uint4 *)start_ptr, NULL, jnlrec->jrec_pblk.bsiz);
 	}
-	rec_checksum = ADJUST_CHECKSUM(rec_checksum, mur_jctl->rec_offset);
-	rec_checksum = ADJUST_CHECKSUM(rec_checksum, mur_jctl->jfh->checksum);
-	/*assert(mur_rab.jnlrec->prefix.checksum == rec_checksum); Can fail only for journal after crash or with holes */
-	return (mur_rab.jnlrec->prefix.checksum == rec_checksum);
+	rec_checksum = ADJUST_CHECKSUM(rec_checksum, jctl->rec_offset);
+	rec_checksum = ADJUST_CHECKSUM(rec_checksum, jctl->jfh->checksum);
+	/* assert(jnlrec->prefix.checksum == rec_checksum); Can fail only for journal after crash or with holes */
+	return (jnlrec->prefix.checksum == rec_checksum);
 }

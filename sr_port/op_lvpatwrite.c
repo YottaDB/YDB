@@ -54,11 +54,11 @@ void op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...)
 	{	/* If ZWRite, this parm is NULL */
 		local_buff = TRUE;
 		MAXSTR_BUFF_INIT;
-		memset(&output, 0, sizeof(output));
+		memset(&output, 0, SIZEOF(output));
 		output.code = 'V';
 		output.type = ZSHOW_DEVICE;
 		output.buff = &buff[0];
-		output.size = sizeof(buff);
+		output.size = SIZEOF(buff);
 		output.ptr = output.buff;
 		out = &output;
 	} else

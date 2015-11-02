@@ -51,7 +51,7 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 	 * be of use for debugging.
 	 */
 
-	unsigned char   	mutex_wake_this_proc_str[2 * sizeof(pid_t) + 1];
+	unsigned char   	mutex_wake_this_proc_str[2 * SIZEOF(pid_t) + 1];
 	mutex_wake_msg_t	msg;
 	int			status;
 	ssize_t			sendto_res;

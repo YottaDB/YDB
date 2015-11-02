@@ -165,7 +165,7 @@ void dse_maps(void)
 			total_blks = (csa->ti->total_blks - bml_blk);
 		else
 			total_blks = bplmap;
-		if (NO_FREE_SPACE == bml_find_free(0, bp + sizeof(blk_hdr), total_blks))
+		if (NO_FREE_SPACE == bml_find_free(0, bp + SIZEOF(blk_hdr), total_blks))
 			bit_clear(bml_blk / bplmap, csa->bmm);
 		else
 			bit_set(bml_blk / bplmap, csa->bmm);
@@ -183,7 +183,7 @@ void dse_maps(void)
 			return;
 		}
 		total_blks = csa->ti->total_blks;
-		assert(ROUND_DOWN2(blk_size, 2 * sizeof(int4)) == blk_size);
+		assert(ROUND_DOWN2(blk_size, 2 * SIZEOF(int4)) == blk_size);
 		bml_size = BM_SIZE(bplmap);
 		bml_list_size = (total_blks + bplmap - 1) / bplmap * bml_size;
 		bml_list = (unsigned char *)malloc(bml_list_size);
@@ -194,7 +194,7 @@ void dse_maps(void)
 		blk = get_dir_root();
 		assert(blk < bplmap);
 		csa->ti->free_blocks = total_blks - DIVIDE_ROUND_UP(total_blks, bplmap);
-		bml_busy(blk, bml_list + sizeof(blk_hdr));
+		bml_busy(blk, bml_list + SIZEOF(blk_hdr));
 		csa->ti->free_blocks =  csa->ti->free_blocks - 1;
 		dse_m_rest(blk, bml_list, bml_size, &csa->ti->free_blocks, TRUE);
 		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
@@ -209,7 +209,7 @@ void dse_maps(void)
 			if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			BLK_INIT(bs_ptr, bs1);
-			BLK_SEG(bs_ptr, blk_ptr + sizeof(blk_hdr), bml_size - sizeof(blk_hdr));
+			BLK_SEG(bs_ptr, blk_ptr + SIZEOF(blk_hdr), bml_size - SIZEOF(blk_hdr));
 			BLK_FINI(bs_ptr, bs1);
 			t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
 			dse_simulate_t_end(gv_cur_region, csa, csa->ti->curr_tn);
@@ -219,7 +219,7 @@ void dse_maps(void)
 		{
 			blks_in_bitmap = (blk_index + bplmap <= total_blks) ? bplmap : total_blks - blk_index;
 			assert(1 < blks_in_bitmap);	/* the last valid block in the database should never be a bitmap block */
-			if (NO_FREE_SPACE != bml_find_free(0, (bml_list + bml_index * bml_size) + sizeof(blk_hdr), blks_in_bitmap))
+			if (NO_FREE_SPACE != bml_find_free(0, (bml_list + bml_index * bml_size) + SIZEOF(blk_hdr), blks_in_bitmap))
 				bit_set(blk_index / bplmap, csa->bmm);
 			else
 				bit_clear(blk_index / bplmap, csa->bmm);
@@ -235,10 +235,10 @@ void dse_maps(void)
 		return;
 	}
 	MEMCPY_LIT(util_buff, "!/Block ");
-	util_len = sizeof("!/Block ") - 1;
+	util_len = SIZEOF("!/Block ") - 1;
 	util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
 	memcpy(&util_buff[util_len], " is marked !AD in its local bit map.!/",
-		sizeof(" is marked !AD in its local bit map.!/") - 1);
+		SIZEOF(" is marked !AD in its local bit map.!/") - 1);
 	util_len += SIZEOF(" is marked !AD in its local bit map.!/") - 1;
 	util_buff[util_len] = 0;
 	if (!was_crit)

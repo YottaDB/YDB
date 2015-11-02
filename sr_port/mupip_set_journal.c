@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@
 #include "wcs_flu.h"
 #include "tp_change_reg.h"
 #include "gtm_file_stat.h"
-#include "min_max.h"		/* for MAX macro */
+#include "min_max.h"		/* for MAX and JNL_MAX_RECLEN macro */
 #include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
 
 #define	DB_OR_REG_SIZE	MAX(STR_LIT_LEN(FILE_STR), STR_LIT_LEN(REG_STR))
@@ -122,8 +122,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	error_def(ERR_JNLINVSWITCHLMT);
 	error_def(ERR_JNLALIGNTOOSM);
 
-	assert(SGMNT_HDR_LEN == ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE));
-	memset(&jnl_info, 0, sizeof(jnl_info));
+	assert(SGMNT_HDR_LEN == ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
+	memset(&jnl_info, 0, SIZEOF(jnl_info));
 	jnl_info.status = jnl_info.status2 = SS_NORMAL;
 	max_reg_seqno = 1;
 	if (!mupip_set_journal_parse(&jnl_options, &jnl_info))
@@ -177,12 +177,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			{
 				gv_cur_region->dyn.addr->acc_meth = dba_bg;
 				gv_cur_region->dyn.addr->file_cntl =
-					(file_control *)malloc(sizeof(*gv_cur_region->dyn.addr->file_cntl));
-				memset(gv_cur_region->dyn.addr->file_cntl, 0, sizeof(*gv_cur_region->dyn.addr->file_cntl));
+					(file_control *)malloc(SIZEOF(*gv_cur_region->dyn.addr->file_cntl));
+				memset(gv_cur_region->dyn.addr->file_cntl, 0, SIZEOF(*gv_cur_region->dyn.addr->file_cntl));
 				gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
 				gds_info = FILE_INFO(gv_cur_region);
-				gds_info = (GDS_INFO *)malloc(sizeof(GDS_INFO));
-				memset(gds_info, 0, sizeof(GDS_INFO));
+				gds_info = (GDS_INFO *)malloc(SIZEOF(GDS_INFO));
+				memset(gds_info, 0, SIZEOF(GDS_INFO));
 			}
 		} else
 		{
@@ -296,7 +296,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			 */
 			if (JNL_ENABLED(cs_data)
 				UNIX_ONLY( && (0 != cs_addrs->nl->jnl_file.u.inode))
-				VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))))
+				VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid)))))
 			{
 				jpc = cs_addrs->jnl;
 				jbp = jpc->jnl_buff;
@@ -331,13 +331,13 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		if (region)
 		{
 			strcpy(db_or_reg, REG_STR);
-			db_or_reg_len = sizeof(REG_STR) - 1;
+			db_or_reg_len = SIZEOF(REG_STR) - 1;
 			db_reg_name = (char *)gv_cur_region->rname;
 			db_reg_name_len = (gv_cur_region)->rname_len;
 		} else
 		{
 			strcpy(db_or_reg, FILE_STR);
-			db_or_reg_len = sizeof(FILE_STR) - 1;
+			db_or_reg_len = SIZEOF(FILE_STR) - 1;
 			db_reg_name = (char *)jnl_info.fn;
 			db_reg_name_len = jnl_info.fn_len;
 		}
@@ -397,7 +397,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				|| rptr->exclusive);
 			if (!jnl_options.epoch_interval_specified)
 				jnl_info.epoch_interval = (0 == csd->epoch_interval) ? DEFAULT_EPOCH_INTERVAL : csd->epoch_interval;
-			JNL_MAX_PHYS_LOGI_RECLEN(&jnl_info, csd);
+			JNL_MAX_RECLEN(&jnl_info, csd);
 			jnl_info.tn = csd->trans_hist.curr_tn;
 			jnl_info.reg_seqno = max_reg_seqno;
 			jnl_info.prev_jnl = (char *)prev_jnl_fn;
@@ -450,11 +450,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			if (!jnl_options.yield_limit_specified)
 				jnl_options.yield_limit = csd->yield_lmt;
 			tmpjnlfile.addr = (char *)tmp_full_jnl_fn;
-			tmpjnlfile.len = sizeof(tmp_full_jnl_fn);
+			tmpjnlfile.len = SIZEOF(tmp_full_jnl_fn);
 			jnlfile.addr = (char *)jnl_info.jnl;
 			jnlfile.len = jnl_info.jnl_len;
 			jnldef.addr = JNL_EXT_DEF;
-			jnldef.len = sizeof(JNL_EXT_DEF) - 1;
+			jnldef.len = SIZEOF(JNL_EXT_DEF) - 1;
 			if (FILE_STAT_ERROR == (new_stat_res = gtm_file_stat(&jnlfile, &jnldef, &tmpjnlfile, TRUE, &status)))
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, jnlfile.len, jnlfile.addr, status);
@@ -515,7 +515,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				{
 					assert(NULL != cs_addrs->nl);
 					UNIX_ONLY(if (cs_addrs->nl->jnl_file.u.inode))
-					VMS_ONLY(if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid))))
+					VMS_ONLY(if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid))))
 					{
 						if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_SETJNL)))
 						{

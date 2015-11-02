@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,9 +40,9 @@
 #include "gtm_startup_chk.h"
 #include "gtmimagename.h"
 
-GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	boolean_t		gtm_environment_init;
-GBLREF	enum gtmImageTypes	image_type;
+
+LITREF	gtmImageName		gtmImageNames[];
 
 int gtm_chk_dist(char *image)
 {
@@ -64,12 +64,12 @@ int gtm_chk_dist(char *image)
 
 	if (NULL != (ptr1 = (char *)GETENV(GTM_DIST)))
 	{
-		assert((INVALID_IMAGE != image_type) && (n_image_types > image_type));	/* assert image_type is initialized */
+		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
 		if ((GTM_PATH_MAX - 2) <= (STRLEN(ptr1) + gtmImageNames[image_type].imageNameLen))
 			rts_error(VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_PATH_MAX - gtmImageNames[image_type].imageNameLen - 2);
 	} else
 		rts_error(VARLSTCNT(1) ERR_GTMDISTUNDEF);
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = mbuff;
 	pblk.buff_size = MAX_FBUFF;
 	pblk.fop = F_SYNTAXO;
@@ -101,9 +101,7 @@ int gtm_chk_dist(char *image)
 		if (DIR_SEPARATOR == prefix[pblk.b_dir])
 			prefix[pblk.b_dir] = 0;
 	}
-	if ((GTM_IMAGE == image_type) && memcmp(pblk.l_name, GTM_IMAGE_NAME, GTM_IMAGE_NAMELEN))
+	if (IS_GTM_IMAGE && memcmp(pblk.l_name, GTM_IMAGE_NAME, GTM_IMAGE_NAMELEN))
 		rts_error(VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), pblk.b_name, pblk.l_name);
-	if (GETENV("gtm_environment_init"))
-		gtm_environment_init = TRUE;
 	return 0;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,6 +116,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		ready2signal_gvundef = FALSE;
 	)
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
+	assert((NULL != sgm_info_ptr) && (cs_addrs->sgm_info_ptr == sgm_info_ptr));
 	si = sgm_info_ptr;
 	gvt = gv_target;
 	store_history = (!gvt->noisolation || ERR_GVKILLFAIL == t_err || ERR_GVPUTFAIL == t_err);
@@ -359,7 +360,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					/* If history array is full, allocate more */
 					if (si->last_tp_hist - si->first_tp_hist == si->cur_tp_hist_size)
 						gds_tp_hist_moved(si, hist1);
-					memcpy(si->last_tp_hist, t1, sizeof(srch_blk_status));
+					memcpy(si->last_tp_hist, t1, SIZEOF(srch_blk_status));
 					t1->first_tp_srch_status = si->last_tp_hist;
 					si->last_tp_hist++;
 					/* Ensure that we are doing an M-kill if for a non-isolated global we end up
@@ -463,7 +464,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 
 	assert(si->cur_tp_hist_size < si->tp_hist_size);
 	si->cur_tp_hist_size <<= 1;
-	new_first_tp_hist = (srch_blk_status *)malloc(sizeof(srch_blk_status) * si->cur_tp_hist_size);
+	new_first_tp_hist = (srch_blk_status *)malloc(SIZEOF(srch_blk_status) * si->cur_tp_hist_size);
 	longcpy((uchar_ptr_t)new_first_tp_hist, (uchar_ptr_t)si->first_tp_hist,
 		(sm_uc_ptr_t)si->last_tp_hist - (sm_uc_ptr_t)si->first_tp_hist);
 	delta = (sm_long_t)((sm_uc_ptr_t)new_first_tp_hist - (sm_uc_ptr_t)si->first_tp_hist);

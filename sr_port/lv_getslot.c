@@ -43,7 +43,7 @@ lv_val *lv_getslot(symval *sym)
 		{
 			if (!p)
 			{
-				p = lv_newblock(malloc(sizeof(lv_blk)), &sym->first_block, n > 64 ? 128 : n * 2);
+				p = lv_newblock(malloc(SIZEOF(lv_blk)), &sym->first_block, n > 64 ? 128 : n * 2);
 				p->next = sym->first_block.next;
 				sym->first_block.next = p;
 			}

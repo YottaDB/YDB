@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void dse_cache(void)
 	mval		dollarh_mval, zdate_mval;
 	int4		size;
 	uint4		offset, value, old_value;
-	char		dollarh_buffer[MAXNUMLEN], zdate_buffer[sizeof(DSE_DMP_TIME_FMT)];
+	char		dollarh_buffer[MAXNUMLEN], zdate_buffer[SIZEOF(DSE_DMP_TIME_FMT)];
 	char		temp_str[256], temp_str1[256];
 	sm_uc_ptr_t	chng_ptr;
 	cache_rec_ptr_t	cr_que_lo;
@@ -77,7 +77,7 @@ void dse_cache(void)
 	{
 		if (!cli_get_int("SIZE",   &size))
 			return;
-		if (!((sizeof(char) == size) || (sizeof(short) == size) || (sizeof(int4) == size)))
+		if (!((SIZEOF(char) == size) || (SIZEOF(short) == size) || (SIZEOF(int4) == size)))
 			rts_error(VARLSTCNT(1) ERR_SIZENOTVALID4);
 	}
 	if (value_present  && !cli_get_hex("VALUE",  &value))
@@ -131,26 +131,26 @@ void dse_cache(void)
 			else
 			{
 				chng_ptr = (sm_uc_ptr_t)csa->nl + offset;
-				if (sizeof(char) == size)
+				if (SIZEOF(char) == size)
 				{
 					SPRINTF(temp_str, "!UB [0x!XB]");
 					old_value = *(sm_uc_ptr_t)chng_ptr;
-				} else if (sizeof(short) == size)
+				} else if (SIZEOF(short) == size)
 				{
 					SPRINTF(temp_str, "!UW [0x!XW]");
 					old_value = *(sm_ushort_ptr_t)chng_ptr;
-				} else if (sizeof(int4) == size)
+				} else if (SIZEOF(int4) == size)
 				{
 					SPRINTF(temp_str, "!UL [0x!XL]");
 					old_value = *(sm_uint_ptr_t)chng_ptr;
 				}
 				if (value_present)
 				{
-					if (sizeof(char) == size)
+					if (SIZEOF(char) == size)
 						*(sm_uc_ptr_t)chng_ptr = value;
-					else if (sizeof(short) == size)
+					else if (SIZEOF(short) == size)
 						*(sm_ushort_ptr_t)chng_ptr = value;
-					else if (sizeof(int4) == size)
+					else if (SIZEOF(int4) == size)
 						*(sm_uint_ptr_t)chng_ptr = value;
 				} else
 					value = old_value;
@@ -193,10 +193,10 @@ void dse_cache(void)
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->acc_meth.bg.cache_state));
 				cr_que_lo = &csa->acc_meth.bg.cache_state->cache_array[0];
 				util_out_print("Region !AD :  cache_que_header   = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo), csa->hdr->bt_buckets, sizeof(cache_rec));
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo), csa->hdr->bt_buckets, SIZEOF(cache_rec));
 				util_out_print("Region !AD :  cache_record       = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets), csa->hdr->n_bts,
-					sizeof(cache_rec));
+					SIZEOF(cache_rec));
 				util_out_print("Region !AD :  global_buffer      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg),
 					ROUND_UP2(DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets + csa->hdr->n_bts), OS_PAGE_SIZE),
@@ -204,11 +204,11 @@ void dse_cache(void)
 				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE,
 					REG_LEN_STR(reg), DB_ABS2REL(csa->hdr));
 				util_out_print("Region !AD :  bt_que_header      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_header), csa->hdr->bt_buckets, sizeof(bt_rec));
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_header), csa->hdr->bt_buckets, SIZEOF(bt_rec));
 				util_out_print("Region !AD :  th_base            = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->th_base));
 				util_out_print("Region !AD :  bt_record          = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), csa->hdr->n_bts, sizeof(bt_rec));
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), csa->hdr->n_bts, SIZEOF(bt_rec));
 				util_out_print("Region !AD :  shared_memory_size = 0x!XL",
 					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 			} else
@@ -217,10 +217,10 @@ void dse_cache(void)
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->acc_meth.mm.mmblk_state));
 				mr_que_lo = &csa->acc_meth.mm.mmblk_state->mmblk_array[0];
 				util_out_print("Region !AD :  mmblk_que_header   = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
-					TRUE, REG_LEN_STR(reg), DB_ABS2REL(mr_que_lo), csa->hdr->bt_buckets, sizeof(mmblk_rec));
+					TRUE, REG_LEN_STR(reg), DB_ABS2REL(mr_que_lo), csa->hdr->bt_buckets, SIZEOF(mmblk_rec));
 				util_out_print("Region !AD :  mm_cache_record    = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(mr_que_lo + csa->hdr->bt_buckets), csa->hdr->n_bts,
-					sizeof(mmblk_rec));
+					SIZEOF(mmblk_rec));
 				util_out_print("Region !AD :  shared_memory_size = 0x!XL",
 					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));
 				util_out_print("Region !AD :  db_file_header     = 0x!XJ", TRUE, REG_LEN_STR(reg), csa->hdr);

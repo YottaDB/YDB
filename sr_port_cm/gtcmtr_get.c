@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ bool gtcmtr_get(void)
 	assert(CMMS_Q_GET == *ptr);
 	ptr++;
 	GET_USHORT(len, ptr);
-	ptr += sizeof(unsigned short);
+	ptr += SIZEOF(unsigned short);
 	regnum = *ptr++;
 	len--;	/* subtract size of regnum */
 	reg_ref = gtcm_find_region(curr_entry, regnum);
@@ -54,15 +54,15 @@ bool gtcmtr_get(void)
 		temp_short = (unsigned short)v.str.len;
 		assert((int4)temp_short == v.str.len); /* ushort <- int4 assignment lossy? */
 		if (curr_entry->clb_ptr->mbl < 1 +  /* msg header */
-					       sizeof(temp_short) + /* size of length of $GET return value */
+					       SIZEOF(temp_short) + /* size of length of $GET return value */
 					       temp_short) /* length of $GET return value */
 		{ /* resize buffer */
-			cmi_realloc_mbf(curr_entry->clb_ptr, 1 + sizeof(temp_short) + temp_short);
+			cmi_realloc_mbf(curr_entry->clb_ptr, 1 + SIZEOF(temp_short) + temp_short);
 			ptr = curr_entry->clb_ptr->mbf;
 		}
 		*ptr++ = CMMS_R_GET;
 		PUT_USHORT(ptr, temp_short);
-		ptr += sizeof(unsigned short);
+		ptr += SIZEOF(unsigned short);
 		memcpy(ptr, v.str.addr, temp_short);
 		ptr += temp_short;
 	} else

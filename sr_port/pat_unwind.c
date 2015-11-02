@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ boolean_t pat_unwind(
 			{
 				for (charpos = 0; leaves->letter[leaf_cnt][charpos] >= 0; charpos++)
 				{
-					assert((sizeof(strlit.buff) / sizeof(strlit.buff[0])) > (offset + charpos));
+					assert((SIZEOF(strlit.buff) / SIZEOF(strlit.buff[0])) > (offset + charpos));
 					strlit.buff[offset + charpos] = leaves->letter[leaf_cnt][charpos];
 				}
 				leaf_cnt++;

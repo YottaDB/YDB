@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,8 +52,7 @@
 #include "iosp.h"
 #include "gtm_env_init.h"
 #include "dbcertify.h"
-
-GBLDEF	phase_static_area	*psa_gbl;			/* Global anchor for static area */
+#include "cli.h"
 
 GBLREF  enum gtmImageTypes      image_type;
 GBLREF	uint4			process_id;
@@ -62,6 +61,14 @@ GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	desblk			exi_blk;
 GBLREF	int4			exi_condition;
 #endif
+#ifdef UNIX
+GBLREF	CLI_ENTRY		dbcertify_cmd_ary[];
+#endif
+
+GBLDEF	phase_static_area	*psa_gbl;			/* Global anchor for static area */
+#ifdef UNIX
+GBLDEF	CLI_ENTRY		*cmd_ary = &dbcertify_cmd_ary[0]; /* Define cmd_ary to be the DBCERTIFY specific cmd table */
+#endif
 
 int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 {
@@ -69,8 +76,8 @@ int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 	image_type = DBCERTIFY_IMAGE;
 	gtm_env_init();
 	gtm_utf8_mode = FALSE; 		/* Only ever runs in V4 database so NO utf8 mode -- ever */
-	psa_gbl = malloc(sizeof(*psa_gbl));
-	memset(psa_gbl, 0, sizeof(*psa_gbl));
+	psa_gbl = malloc(SIZEOF(*psa_gbl));
+	memset(psa_gbl, 0, SIZEOF(*psa_gbl));
 	UNIX_ONLY(err_init(dbcertify_base_ch));
 	UNIX_ONLY(sig_init(dbcertify_signal_handler, dbcertify_signal_handler, NULL));
 	VMS_ONLY(util_out_open(0));
@@ -79,7 +86,7 @@ int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 	process_id = getpid();
 
 	/* Structure checks .. */
-	assert((24 * 1024) == sizeof(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
+	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 
 	/* Platform dependent method to get the option scan going and invoke necessary driver routine */
 	dbcertify_parse_and_dispatch(argc, argv);

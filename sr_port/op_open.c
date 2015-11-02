@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 		if (!licensed || LP_CONFIRM(lid, lkid)==LP_NOTACQ)
 			licensed= FALSE;
 #		endif
-		switch(stat = TRANS_LOG_NAME(&device->str, &tn, &buf1[0], sizeof(buf1), dont_sendmsg_on_log2long))
+		switch(stat = TRANS_LOG_NAME(&device->str, &tn, &buf1[0], SIZEOF(buf1), dont_sendmsg_on_log2long))
 		{
 		case SS_NORMAL:
 			tl = get_log_name(&tn, INSERT);
@@ -75,7 +75,7 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 			}
 #			ifdef UNIX
 			if (SS_LOG2LONG == stat)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, device->str.len, device->str.addr, sizeof(buf1) - 1);
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, device->str.len, device->str.addr, SIZEOF(buf1) - 1);
 			else
 #			endif
 				rts_error(VARLSTCNT(1) stat);

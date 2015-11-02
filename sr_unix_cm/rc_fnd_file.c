@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,12 +76,12 @@ short rc_fnd_file(rc_xdsid *xdsid)
 
     if (!dsid_list) {
     /*	open special database, set up entry */
-	dsid_list = (rc_dsid_list *)malloc(sizeof(rc_dsid_list));
+	dsid_list = (rc_dsid_list *)malloc(SIZEOF(rc_dsid_list));
 	dsid_list->dsid = RC_NSPACE_DSID;
 	dsid_list->next = NULL;
 	fpath1.addr = RC_NSPACE_PATH;
-	fpath1.len = sizeof(RC_NSPACE_PATH);
-	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
+	fpath1.len = SIZEOF(RC_NSPACE_PATH);
+	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 	{
 		char msg[256];
 
@@ -94,10 +94,10 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	dsid_list->fname = (char *)malloc(fpath2.len + 1);
 	memcpy(dsid_list->fname, fpath2.addr, fpath2.len);
 	*((char*)(dsid_list->fname + fpath2.len)) = 0;
-	gv_cur_region = (gd_region *)malloc(sizeof(gd_region));
-	memset(gv_cur_region, 0, sizeof(gd_region));
-	gv_cur_region->dyn.addr = (gd_segment *)malloc(sizeof(gd_segment));
-	memset(gv_cur_region->dyn.addr, 0, sizeof(gd_segment));
+	gv_cur_region = (gd_region *)malloc(SIZEOF(gd_region));
+	memset(gv_cur_region, 0, SIZEOF(gd_region));
+	gv_cur_region->dyn.addr = (gd_segment *)malloc(SIZEOF(gd_segment));
+	memset(gv_cur_region->dyn.addr, 0, SIZEOF(gd_segment));
 	memcpy(gv_cur_region->dyn.addr->fname, fpath2.addr, fpath2.len);
 	gv_cur_region->dyn.addr->fname_len = fpath2.len;
 	gv_cur_region->dyn.addr->acc_meth = dba_bg;
@@ -127,32 +127,30 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	    return RC_FILEACCESS;
 	}
 	gv_keysize = DBKEYSIZE(gv_cur_region->max_key_size);
-	cs_addrs->dir_tree = (gv_namehead*)malloc(sizeof(gv_namehead) + 2*sizeof(gv_key) + 3*(gv_keysize - 1));
-	gv_altkey = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
-	gv_currkey = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
-	gv_currkey->top = gv_altkey->top = gv_keysize;
-	gv_currkey->end = gv_currkey->prev = gv_altkey->end = gv_altkey->prev = 0;
+	GVKEY_INIT(gv_currkey, gv_keysize);
+	GVKEY_INIT(gv_altkey, gv_keysize);
+	cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * (gv_keysize - 1));
 	g = cs_addrs->dir_tree;
 	g->first_rec = (gv_key*)(g->clue.base + gv_keysize);
 	g->last_rec = (gv_key*)(g->first_rec->base + gv_keysize);
 	g->clue.top = g->last_rec->top = g->first_rec->top = gv_keysize;
 	g->clue.prev = g->clue.end = 0;
 	g->root = DIR_ROOT;
-	dsid_list->gda = (gd_addr*)malloc(sizeof(gd_addr) + 3 * sizeof(gd_binding));
+	dsid_list->gda = (gd_addr*)malloc(SIZEOF(gd_addr) + 3 * SIZEOF(gd_binding));
 	dsid_list->gda->n_maps = 3;
 	dsid_list->gda->n_regions = 1;
 	dsid_list->gda->n_segments = 1;
-	dsid_list->gda->maps = (gd_binding*)((char*)dsid_list->gda + sizeof(gd_addr));
+	dsid_list->gda->maps = (gd_binding*)((char*)dsid_list->gda + SIZEOF(gd_addr));
 	dsid_list->gda->max_rec_size = gv_cur_region->max_rec_size;
 	map = dsid_list->gda->maps;
 	map ++;
-	memset(map->name, 0, sizeof(map->name));
+	memset(map->name, 0, SIZEOF(map->name));
 	map->name[0] = '%';
 	map->reg.addr = gv_cur_region;
 	map++;
 	map->reg.addr = gv_cur_region;
-	memset(map->name, -1, sizeof(map->name));
-	dsid_list->gda->tab_ptr = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+	memset(map->name, -1, SIZEOF(map->name));
+	dsid_list->gda->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 	init_hashtab_mname(dsid_list->gda->tab_ptr, 0);
 	change_reg();
 	if (rc_overflow->top < cs_addrs->hdr->blk_size)
@@ -179,7 +177,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	{	return RC_UNDEFNAMSPC;
 	    }
 	v.mvtype = MV_STR;
-	v.str.len = sizeof(RC_NSPACE_DSI_SUB)-1;
+	v.str.len = SIZEOF(RC_NSPACE_DSI_SUB)-1;
 	v.str.addr = RC_NSPACE_DSI_SUB;
 	mval2subsc(&v,gv_currkey);
 
@@ -203,15 +201,15 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	if (len > MAX_FN_LEN)
 	    return RC_BADFILESPEC;
 
-	fdi_ptr = (rc_dsid_list *)malloc(sizeof(rc_dsid_list));
+	fdi_ptr = (rc_dsid_list *)malloc(SIZEOF(rc_dsid_list));
 	fdi_ptr->fname = (char *)malloc(len+1);
 	fdi_ptr->dsid = dsid;
 	memcpy(fdi_ptr->fname, cp, len);
 	*(fdi_ptr->fname + (len)) = 0;
-	gv_cur_region = (gd_region *)malloc(sizeof(gd_region));
-	memset(gv_cur_region, 0, sizeof(gd_region));
-	gv_cur_region->dyn.addr = (gd_segment *)malloc(sizeof(gd_segment));
-	memset(gv_cur_region->dyn.addr, 0, sizeof(gd_segment));
+	gv_cur_region = (gd_region *)malloc(SIZEOF(gd_region));
+	memset(gv_cur_region, 0, SIZEOF(gd_region));
+	gv_cur_region->dyn.addr = (gd_segment *)malloc(SIZEOF(gd_segment));
+	memset(gv_cur_region->dyn.addr, 0, SIZEOF(gd_segment));
 	memcpy(gv_cur_region->dyn.addr->fname, cp, len);
 	gv_cur_region->dyn.addr->fname_len = len;
 	gv_cur_region->dyn.addr->acc_meth = dba_bg;
@@ -269,37 +267,29 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	}
 	rel_crit(gv_cur_region);
 	keysize = DBKEYSIZE(gv_cur_region->max_key_size);
-	cs_addrs->dir_tree = (gv_namehead*)malloc(sizeof(gv_namehead) + 2*sizeof(gv_key) + 3*(keysize - 1));
-	if (keysize > gv_keysize) {
-	    gv_keysize = keysize;;
-	    free(gv_altkey);
-	    free(gv_currkey);
-	    gv_altkey = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
-	    gv_currkey = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
-	    gv_currkey->top = gv_altkey->top = gv_keysize;
-	    gv_currkey->end = gv_currkey->prev = gv_altkey->end = gv_altkey->prev = 0;
-	}
+	GVKEYSIZE_INCREASE_IF_NEEDED(keysize);
+	cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * (keysize - 1));
 	g = cs_addrs->dir_tree;
 	g->first_rec = (gv_key*)(g->clue.base + keysize);
 	g->last_rec = (gv_key*)(g->first_rec->base + keysize);
 	g->clue.top = g->last_rec->top = g->first_rec->top = keysize;
 	g->clue.prev = g->clue.end = 0;
 	g->root = DIR_ROOT;
-	fdi_ptr->gda = (gd_addr*)malloc(sizeof(gd_addr) + 3 * sizeof(gd_binding));
+	fdi_ptr->gda = (gd_addr*)malloc(SIZEOF(gd_addr) + 3 * SIZEOF(gd_binding));
 	fdi_ptr->gda->n_maps = 3;
 	fdi_ptr->gda->n_regions = 1;
 	fdi_ptr->gda->n_segments = 1;
-	fdi_ptr->gda->maps = (gd_binding*)((char*)fdi_ptr->gda + sizeof(gd_addr));
+	fdi_ptr->gda->maps = (gd_binding*)((char*)fdi_ptr->gda + SIZEOF(gd_addr));
 	fdi_ptr->gda->max_rec_size = gv_cur_region->max_rec_size;
 	map = fdi_ptr->gda->maps;
 	map ++;
-	memset(map->name, 0, sizeof(map->name));
+	memset(map->name, 0, SIZEOF(map->name));
 	map->name[0] = '%';
 	map->reg.addr = gv_cur_region;
 	map++;
 	map->reg.addr = gv_cur_region;
-	memset(map->name, -1, sizeof(map->name));
-	fdi_ptr->gda->tab_ptr = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+	memset(map->name, -1, SIZEOF(map->name));
+	fdi_ptr->gda->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 	init_hashtab_mname(fdi_ptr->gda->tab_ptr, 0);
 	fdi_ptr->next = dsid_list->next;
 	dsid_list->next = fdi_ptr;

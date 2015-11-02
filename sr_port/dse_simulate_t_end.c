@@ -42,8 +42,12 @@
 #include "mupipbckup.h"
 #include "jnl_write_pblk.h"
 #include "jnl_get_checksum.h"
-
+#include "memcoherency.h"
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
 GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
+
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	boolean_t		dse_running;
 GBLREF	boolean_t		write_after_image;
@@ -68,6 +72,7 @@ void	dse_simulate_t_end(gd_region *reg, sgmnt_addrs *csa, trans_num ctn)
 	sgm_info		*dummysi = NULL;
 	unsigned int		bsiz;
 	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
 #	ifdef GTM_CRYPT
 	int			req_enc_blk_size;
 	int			crypt_status;
@@ -81,10 +86,26 @@ void	dse_simulate_t_end(gd_region *reg, sgmnt_addrs *csa, trans_num ctn)
 	assert(dse_running && write_after_image);
 	assert(1 == cw_set_depth);
 	csd = csa->hdr;
+	cnl = csa->nl;
 	cse = (cw_set_element *)(&cw_set[0]);
 	is_mm = (dba_mm == csd->acc_meth);
 	cr_array_index = 0;
 	block_saved = FALSE;
+#	ifdef GTM_SNAPSHOT
+	if (SNAPSHOTS_IN_PROG(cnl))
+	{
+		/* If snapshots are already in progress, then try to release the existing context if a new one has started
+		 * after we last updated csa->snapshot_in_prog
+		 */
+		if (SNAPSHOTS_IN_PROG(csa))
+			SS_RELEASE_IF_NEEDED(csa, cnl);
+		/* Try to create a new context if a new one has started after we last updated csa->snapshot_in_prog. After this,
+		 * with respect to snapshots all the remaining transaction logic in t_end, bg_update_phase2 and secshr_db_clnup
+		 * should use csa and should not rely on cnl
+		 */
+		SS_INIT_IF_NEEDED(csa, cnl);
+	}
+#	endif
 	if (JNL_ENABLED(csd))
 	{
 		SET_GBL_JREC_TIME;	/* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_aimg_rec */
@@ -139,7 +160,7 @@ void	dse_simulate_t_end(gd_region *reg, sgmnt_addrs *csa, trans_num ctn)
 				DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd);
 				if (old_block->tn < jbp->epoch_tn)
 				{
-					assert(sizeof(bsiz) == sizeof(old_block->bsiz));
+					assert(SIZEOF(bsiz) == SIZEOF(old_block->bsiz));
 					bsiz = old_block->bsiz;
 					/* It is possible that the block has a bad block-size.
 					 * Before computing checksum ensure bsiz passed is safe.
@@ -196,11 +217,12 @@ void	dse_simulate_t_end(gd_region *reg, sgmnt_addrs *csa, trans_num ctn)
 			DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)bp);
 			save_bp = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(bp, csa);
 			DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)save_bp);
-			req_enc_blk_size = bp->bsiz - (SIZEOF(*bp));
+			assert((bp->bsiz <= csd->blk_size) && (bp->bsiz >= SIZEOF(*bp)));
+			req_enc_blk_size = MIN(csd->blk_size, bp->bsiz) - SIZEOF(*bp);
 			if (BLK_NEEDS_ENCRYPTION(bp->levl, req_enc_blk_size))
 			{
 				ASSERT_ENCRYPTION_INITIALIZED;
-				memcpy(save_bp, bp, sizeof(blk_hdr));
+				memcpy(save_bp, bp, SIZEOF(blk_hdr));
 				GTMCRYPT_ENCODE_FAST(csa->encr_key_handle, (char *)(bp + 1), req_enc_blk_size,
 						     (char *)(save_bp + 1), crypt_status);
 				if (0 != crypt_status)

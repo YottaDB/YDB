@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ GBLREF	io_desc		*active_device;
 
 void trans_code_cleanup(void)
 {
-	stack_frame	*fp;
+	stack_frame	*fp, *fpprev;
 	uint4		err;
 
 	error_def(ERR_STACKCRIT);
@@ -67,8 +67,13 @@ void trans_code_cleanup(void)
 		if (stringpool.base != rts_stringpool.base)
 			stringpool = rts_stringpool;
 	}
-	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
+	for (fp = frame_pointer; fp; fp = fpprev)
 	{
+		fpprev = fp->old_frame_pointer;
+#		ifdef GTM_TRIGGER
+		if (SFT_TRIGR & fpprev->type)
+			fpprev = *(stack_frame **)(fpprev + 1);
+#		endif
 		if (fp->type & SFT_DM)
 			break;
 		if (fp->type & SFT_COUNT)
@@ -115,6 +120,7 @@ void trans_code_cleanup(void)
 		IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
 		fp->mpc = CODE_ADDRESS(pseudo_ret);
 		fp->ctxt = GTM_CONTEXT(pseudo_ret);
+		fp->flags &= SFF_TRIGR_CALLD_OFF;	/* Frame enterable now with mpc reset */
 	}
 	transform = TRUE;
 	if (err)

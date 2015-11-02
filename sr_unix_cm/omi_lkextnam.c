@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,8 +95,8 @@ omi_lkextnam(
     lck.mvtype = ext.mvtype = MV_STR;
     reg        = mlk_region_lookup(&lck, cptr->ga);
     OMI_SI_READ(&si, data);
-    r          = (mlk_pvtblk *)malloc(sizeof(mlk_pvtblk) + elen + si.value);
-    memset(r, 0, sizeof(mlk_pvtblk) - 1);
+    r          = (mlk_pvtblk *)malloc(SIZEOF(mlk_pvtblk) + elen + si.value);
+    memset(r, 0, SIZEOF(mlk_pvtblk) - 1);
     r->translev      = 1;
     r->subscript_cnt = subcnt;
     r->total_length  = elen;

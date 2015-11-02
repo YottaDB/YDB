@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@ GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_crea
 
 #ifdef DEBUG
 GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+GBLREF	unsigned int		t_tries;
 #endif
 
 void	tp_clean_up(boolean_t rollback_flag)
@@ -184,9 +185,13 @@ void	tp_clean_up(boolean_t rollback_flag)
 					REINITIALIZE_LIST(si->format_buff_list);
 					REINITIALIZE_LIST(si->jnl_list);		/* reinitialize the jnl buddy_list */
 					si->jnl_tail = &si->jnl_head;
-					cs_addrs->next_fenced = NULL;
 					si->jnl_head = NULL;
 				}
+				/* Note that cs_addrs->next_fenced could be non-NULL not just for those regions with a non-NULL
+				 * value of si->jnl_head but also for those regions where an INCTN record (with opcode
+				 * inctn_tp_upd_no_logical_rec) was written. So reset cs_addrs->next_fenced unconditionally.
+				 */
+				cs_addrs->next_fenced = NULL;
 				if (FALSE == rollback_flag)
 				{	/* Non-rollback case (op_tcommit) validates clues in the targets we are updating */
 					sgm_info_ptr = si;	/* for tp_get_cw to work */
@@ -209,7 +214,9 @@ void	tp_clean_up(boolean_t rollback_flag)
 							if (chain1.flag)
 							{
 								assert(blk_target != cs_addrs->dir_tree);
-								blk_target->root = 0;
+								tp_get_cw(si->first_cw_set, (int)chain1.cw_index, &cse1);
+								assert(NULL != cse1);
+								blk_target->root = cse1->blk;
 							}
 							continue;
 						}
@@ -282,41 +289,18 @@ void	tp_clean_up(boolean_t rollback_flag)
 				REINITIALIZE_LIST(si->tlvl_info_list);		/* reinitialize the tlvl_info buddy_list */
 				si->first_cw_set = si->last_cw_set = si->first_cw_bitmap = NULL;
 				si->cw_set_depth = 0;
-				si->update_trans = FALSE;
+				si->update_trans = 0;
 			} else if (rollback_flag)
 				REINITIALIZE_LIST(si->tlvl_info_list);		/* reinitialize the tlvl_info buddy_list */
 #			ifdef DEBUG
 			/* Verify that all fields that were reset in the if code above are already at the reset value.
-			 * There are NO exceptions to this rule. If this transaction had si->update_trans TRUE at some
+			 * There are NO exceptions to this rule. If this transaction had si->update_trans non-zero at some
 			 * point but later did rollbacks which caused it to become FALSE, the incremental rollback would
 			 * have taken care to reset these fields explicitly.
 			 */
-			assert(NULL == si->kill_set_head);
-			assert(NULL == si->kill_set_tail);
-			assert(NULL == si->jnl_head);
-			assert(NULL == cs_addrs->next_fenced);
-			if (JNL_ALLOWED(cs_addrs))
-			{
-				assert(si->total_jnl_rec_size == cs_addrs->min_total_tpjnl_rec_size);
-				VERIFY_LIST_IS_REINITIALIZED(si->jnl_list);
-				VERIFY_LIST_IS_REINITIALIZED(si->format_buff_list);
-				assert(si->jnl_tail == &si->jnl_head);
-			} else
-			{
-				assert(NULL == si->jnl_list);
-				assert(NULL == si->format_buff_list);
-				assert(NULL == si->jnl_tail);
-			}
-			VERIFY_LIST_IS_REINITIALIZED(si->recompute_list);
-			VERIFY_LIST_IS_REINITIALIZED(si->cw_set_list);
-			VERIFY_LIST_IS_REINITIALIZED(si->new_buff_list);
-			VERIFY_LIST_IS_REINITIALIZED(si->tlvl_cw_set_list);
+			assert(si->tp_csa == cs_addrs);
+			DBG_CHECK_SI_BUDDY_LIST_IS_REINITIALIZED(si);
 			VERIFY_LIST_IS_REINITIALIZED(si->tlvl_info_list);
-			assert(NULL == si->first_cw_set);
-			assert(NULL == si->last_cw_set);
-			assert(NULL == si->first_cw_bitmap);
-			assert(0 == si->cw_set_depth);
-			assert(FALSE == si->update_trans);
 #			endif
 			if (si->num_of_blks)
 			{	/* Check that it is the same as the # of used entries in the hashtable.
@@ -336,6 +320,10 @@ void	tp_clean_up(boolean_t rollback_flag)
 			si->next_sgm_info = NULL;
 		}	/* for (all segments in the transaction) */
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
+		/* No need to clean up jnl_fence_ctl.inctn_fence_list as it is used only by tp_tend and op_tcommit (after
+		 * tp_tend is invoked) and is initialized to JNL_FENCE_LIST_END before both those usages. If any more
+		 * usages of jnl_fence_ctl.inctn_fence_list occur, then this comment needs to be revisited.
+		 */
 #		ifdef DEBUG
 		if (!process_exiting)
 		{	/* Ensure that we did not miss out on clearing any gv_target->root which had chain.flag set.
@@ -346,11 +334,16 @@ void	tp_clean_up(boolean_t rollback_flag)
 			{
 				chain1 = *(off_chain *)&gvnh->root;
 				assert(!chain1.flag);
+				/* If there was a gvnh->write_local_tn, we could assert that if ever that field was updated
+				 * in this transaction, then gvnh->root better be non-zero. Otherwise gvnh could have been
+				 * used only for reads in this TP and in that case it is ok for the root to be 0.
+				 */
 				if (gvnh->root)
 				{	/* check that gv_target->root falls within total blocks range */
 					csa = gvnh->gd_csa;
 					assert(NULL != csa);
 					assert(gvnh->root < csa->ti->total_blks);
+					assert(!IS_BITMAP_BLK(gvnh->root));
 				}
 				if (gvnh->clue.end)
 				{
@@ -369,6 +362,13 @@ void	tp_clean_up(boolean_t rollback_flag)
 		}
 #		endif
 		jgbl.cumul_jnl_rec_len = 0;
+		jgbl.tp_ztp_jnl_upd_num = 0;
+		GTMTRIG_ONLY(
+			/* reset jgbl.prev_ztworm_ptr as we are now ready to start a new transaction
+			 * and thus need to write new ztwormhole records if needed
+			 */
+			jgbl.prev_ztworm_ptr = NULL;
+		)
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		global_tlvl_info_head = NULL;
 		REINITIALIZE_LIST(global_tlvl_info_list);		/* reinitialize the global_tlvl_info buddy_list */
@@ -379,6 +379,8 @@ void	tp_clean_up(boolean_t rollback_flag)
 	tp_allocation_clue = gtm_tp_allocation_clue + 1;
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
+	/* ensure that we don't have crit on any region at the end of a TP transaction (be it GT.M or MUPIP) */
+	assert((CDB_STAGNATE == t_tries) || (0 == have_crit(CRIT_HAVE_ANY_REG)));
 	assert((NULL == first_tp_si_by_ftok) || process_exiting);
 	RESTORE_INTRPT_OK_STATE;	/* check if any MUPIP STOP/signals were deferred while in this function */
 }

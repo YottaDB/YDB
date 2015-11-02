@@ -88,12 +88,12 @@ void dbc_open_command_file(phase_static_area *psa)
 	if (!psa->tmp_file_names_gend)
 		dbc_gen_temp_file_names(psa);
 	gtm_dist_m.addr = UNIX_ONLY("$")GTM_DIST;
-	gtm_dist_m.len = sizeof(UNIX_ONLY("$")GTM_DIST) - 1;
-	status = TRANS_LOG_NAME(&gtm_dist_m, &gtm_dist_path, gtm_dist_path_buff, sizeof(gtm_dist_path_buff),
+	gtm_dist_m.len = SIZEOF(UNIX_ONLY("$")GTM_DIST) - 1;
+	status = TRANS_LOG_NAME(&gtm_dist_m, &gtm_dist_path, gtm_dist_path_buff, SIZEOF(gtm_dist_path_buff),
 					dont_sendmsg_on_log2long);
 #ifdef UNIX
 	if (SS_LOG2LONG == status)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtm_dist_m.len, gtm_dist_m.addr, sizeof(gtm_dist_path_buff) - 1);
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtm_dist_m.len, gtm_dist_m.addr, SIZEOF(gtm_dist_path_buff) - 1);
 	else
 #endif
 	if (SS_NORMAL != status)
@@ -110,8 +110,8 @@ void dbc_open_command_file(phase_static_area *psa)
 	}
 	UNIX_ONLY(dbc_write_command_file(psa, SHELL_START));
 	MEMCPY_LIT(psa->util_cmd_buff, SETDISTLOGENV);
-	memcpy(psa->util_cmd_buff + sizeof(SETDISTLOGENV) - 1, gtm_dist_path.addr, gtm_dist_path.len);
-	psa->util_cmd_buff[sizeof(SETDISTLOGENV) - 1 + gtm_dist_path.len] = 0;	/* Null temrinator */
+	memcpy(psa->util_cmd_buff + SIZEOF(SETDISTLOGENV) - 1, gtm_dist_path.addr, gtm_dist_path.len);
+	psa->util_cmd_buff[SIZEOF(SETDISTLOGENV) - 1 + gtm_dist_path.len] = 0;	/* Null temrinator */
 	dbc_write_command_file(psa, (char_ptr_t)psa->util_cmd_buff);
 }
 
@@ -160,7 +160,7 @@ void dbc_run_command_file(phase_static_area *psa, char_ptr_t cmdname, char_ptr_t
 	assert(NULL != psa && NULL == psa->tcfp);
 	assert(psa->tmp_file_names_gend);
 	MEMCPY_LIT(cmdbuf1, RUN_CMD);
-	cp = cmdbuf1 + sizeof(RUN_CMD) - 1;
+	cp = cmdbuf1 + SIZEOF(RUN_CMD) - 1;
 	memcpy(cp, psa->tmpcmdfile, psa->tmpcmdfile_len);
 	cp += psa->tmpcmdfile_len;
 	cmd_len = (int)(cp - cmdbuf1);
@@ -173,7 +173,7 @@ void dbc_run_command_file(phase_static_area *psa, char_ptr_t cmdname, char_ptr_t
 		{	/* Output result file so they can see what happened -- this may or may not work but it is
 			   the best we can do at this point */
 			MEMCPY_LIT(cmdbuf2, DUMPRSLTFILE);
-			cp = cmdbuf2 + sizeof(DUMPRSLTFILE) - 1;
+			cp = cmdbuf2 + SIZEOF(DUMPRSLTFILE) - 1;
 			memcpy(cp, psa->tmprsltfile, psa->tmprsltfile_len);
 			cp += psa->tmprsltfile_len;
 			*cp = '\0';
@@ -332,13 +332,13 @@ void dbc_gen_temp_file_names(phase_static_area *psa)
 	} else
 		dir_len = 0;
 	MEMCPY_LIT(cp, TMPFILEPFX);
-	cp = psa->tmpcmdfile + sizeof(TMPFILEPFX) - 1;
+	cp = psa->tmpcmdfile + SIZEOF(TMPFILEPFX) - 1;
 	*cp++ = '_';
 	len = STRLEN((char_ptr_t)regname_p);
 	memcpy(cp, regname_p, len);
 	cp += len;
 	MEMCPY_LIT(cp, TMPCMDFILSFX);
-	cp += sizeof(TMPCMDFILSFX) - 1;
+	cp += SIZEOF(TMPCMDFILSFX) - 1;
 	psa->tmpcmdfile_len = (int)(cp - psa->tmpcmdfile);
 	*cp = '\0';	/* Null terminate */
 
@@ -350,13 +350,13 @@ void dbc_gen_temp_file_names(phase_static_area *psa)
 		cp += dir_len;
 	}
 	MEMCPY_LIT(cp, TMPFILEPFX);
-	cp = psa->tmprsltfile + sizeof(TMPFILEPFX) - 1;
+	cp = psa->tmprsltfile + SIZEOF(TMPFILEPFX) - 1;
 	*cp++ = '_';
 	len = STRLEN((char_ptr_t)regname_p);
 	memcpy(cp, regname_p, len);
 	cp += len;
 	MEMCPY_LIT(cp, TMPRSLTFILSFX);
-	cp += sizeof(TMPRSLTFILSFX) - 1;
+	cp += SIZEOF(TMPRSLTFILSFX) - 1;
 	psa->tmprsltfile_len = (int)(cp - psa->tmprsltfile);
 	*cp = '\0';	/* Null terminate */
 
@@ -445,25 +445,25 @@ void dbc_find_database_filename(phase_static_area *psa, uchar_ptr_t regname, uch
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);	/* Should have filename */
 		if (0 != MEMCMP_LIT(rptr, FILETAB))
 			GTMASSERT;
-		len = STRLEN(((char_ptr_t)rptr + sizeof(FILETAB) - 1)) - 1;
+		len = STRLEN(((char_ptr_t)rptr + SIZEOF(FILETAB) - 1)) - 1;
 		assert(MAX_FN_LEN >= len);
 		assert(len);
-		memcpy(dbfn, (rptr + sizeof(FILETAB) - 1), len);
+		memcpy(dbfn, (rptr + SIZEOF(FILETAB) - 1), len);
 		dbfn[len] = 0;
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);
 		if (0 != MEMCMP_LIT(rptr, REGIONTAB))
 			GTMASSERT;
-		len = STRLEN((char_ptr_t)rptr + sizeof(REGIONTAB) - 1) - 1;
+		len = STRLEN((char_ptr_t)rptr + SIZEOF(REGIONTAB) - 1) - 1;
 		assert(len);
-		*(rptr + sizeof(REGIONTAB) - 1 + len) = 0;	/* Get rid of trailing \n */
-		if (0 == strcmp(((char_ptr_t)rptr + sizeof(REGIONTAB) - 1), (char_ptr_t)regname))
+		*(rptr + SIZEOF(REGIONTAB) - 1 + len) = 0;	/* Get rid of trailing \n */
+		if (0 == strcmp(((char_ptr_t)rptr + SIZEOF(REGIONTAB) - 1), (char_ptr_t)regname))
 			break;				/* Found match */
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);	/* Ingored blank line */
 		len = STRLEN((char_ptr_t)rptr);
 		if ('\n' == rptr[len - 1]) --len;	/* Note last record of output file does not have '\n' so test
 							   before adjusting 'len' */
 		if ('\r' == rptr[len - 1]) --len;	/* Same for carriage return (mostly for VMS) */
-		if (0 != len && ((sizeof("DSE> ") - 1) != len || 0 != memcmp(rptr, "DSE> ", len)))
+		if (0 != len && ((SIZEOF("DSE> ") - 1) != len || 0 != memcmp(rptr, "DSE> ", len)))
 			GTMASSERT;
 	}
 	dbc_close_result_file(psa);
@@ -480,8 +480,8 @@ int dbc_read_dbblk(phase_static_area *psa, int blk_num, enum gdsblk_type blk_typ
 	assert(0 <= blk_num);
 	if (NULL == psa->blk_set)
 	{	/* Need a few of these.. */
-		psa->blk_set = malloc(sizeof(block_info) * MAX_BLOCK_INFO_DEPTH);
-		memset(psa->blk_set, 0, sizeof(block_info) * MAX_BLOCK_INFO_DEPTH);
+		psa->blk_set = malloc(SIZEOF(block_info) * MAX_BLOCK_INFO_DEPTH);
+		memset(psa->blk_set, 0, SIZEOF(block_info) * MAX_BLOCK_INFO_DEPTH);
 		assert(-1 == psa->block_depth);
 	}
 
@@ -646,7 +646,7 @@ void dbc_find_key(phase_static_area *psa, dbc_gv_key *key, uchar_ptr_t rec_p, in
 	}
 	/* Loop till we find key termination */
 	key_targ_p = key->base + cmpc;
-	key_src_p = rec_p + sizeof(rec_hdr);
+	key_src_p = rec_p + SIZEOF(rec_hdr);
 	while (1)
 	{
 		for (; *key_src_p; ++key_targ_p, ++key_src_p)
@@ -674,7 +674,7 @@ int dbc_find_dtblk(phase_static_area *psa, dbc_gv_key *key, int min_levl)
 
 	assert(MAX_MIDENT_LEN >= key->gvn_len);
 	dbc_init_key(psa, &psa->gvn_key);
-	memcpy(psa->gvn_key, key, sizeof(dbc_gv_key) + key->gvn_len);	/* Make key with GVN only (including trailing null) */
+	memcpy(psa->gvn_key, key, SIZEOF(dbc_gv_key) + key->gvn_len);	/* Make key with GVN only (including trailing null) */
 	psa->gvn_key->end = key->gvn_len;
 	/* Look up GVN in directory tree */
 	blk_index = dbc_find_record(psa, psa->gvn_key, (psa->phase_one ? 0 : 1), min_levl, gdsblk_dtroot, FALSE);
@@ -724,7 +724,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 	}
 	/* Find first block that is greater than or equal to our gvn or if we find a star-key */
 	blk_p = blk_set_p->old_buff;
-	rec_p = blk_p + sizeof(v15_blk_hdr);
+	rec_p = blk_p + SIZEOF(v15_blk_hdr);
 	blk_top = blk_p + ((v15_blk_hdr_ptr_t)blk_set_p->old_buff)->bsiz;
 	while (rec_p < blk_top)
 	{
@@ -769,7 +769,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 			*/
 			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via keyed index record at offset 0x%lx\n", \
 				   (rec_p - blk_p)));
-			GET_ULONG(blk_ptr, (rec_p + sizeof(rec_hdr) + blk_set_p->curr_blk_key->end
+			GET_ULONG(blk_ptr, (rec_p + SIZEOF(rec_hdr) + blk_set_p->curr_blk_key->end
 					   - ((rec_hdr *)rec_p)->cmpc + 1));
 			blk_index = dbc_read_dbblk(psa, blk_ptr, blk_type);
 			return dbc_find_record(psa, key, blk_index, min_levl, blk_type, fail_ok);
@@ -777,7 +777,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 		/* We want to be able to find the previous record */
 		blk_set_p->prev_rec = rec_p;
 		memcpy(blk_set_p->prev_blk_key, blk_set_p->curr_blk_key,
-		       (sizeof(dbc_gv_key) + blk_set_p->curr_blk_key->end));
+		       (SIZEOF(dbc_gv_key) + blk_set_p->curr_blk_key->end));
 		rec_p += rec_len;					/* Point to next record in block */
 		blk_set_p->curr_rec = rec_p;
 	}
@@ -842,8 +842,8 @@ void dbc_init_key(phase_static_area *psa, dbc_gv_key **key)
 {
 	if (NULL == *key)
 	{	/* Need a key allocated for this block */
-		*key = malloc(sizeof(dbc_gv_key) + psa->dbc_cs_data->max_key_size);
-		(*key)->top = (uint4)(sizeof(dbc_gv_key) + psa->dbc_cs_data->max_key_size);
+		*key = malloc(SIZEOF(dbc_gv_key) + psa->dbc_cs_data->max_key_size);
+		(*key)->top = (uint4)(SIZEOF(dbc_gv_key) + psa->dbc_cs_data->max_key_size);
 	}
 	(*key)->end  = (*key)->gvn_len = 0;
 	return;
@@ -867,7 +867,7 @@ void dbc_init_blk(phase_static_area *psa, block_info *blk_set_p, int blk_num, en
 		blk_set_p->old_buff = malloc(psa->dbc_cs_data->blk_size);
 	if (NULL == blk_set_p->new_buff)
 		blk_set_p->new_buff = malloc(psa->dbc_cs_data->blk_size);
-	blk_set_p->curr_rec = blk_set_p->prev_rec = blk_set_p->old_buff + sizeof(v15_blk_hdr);
+	blk_set_p->curr_rec = blk_set_p->prev_rec = blk_set_p->old_buff + SIZEOF(v15_blk_hdr);
 	blk_set_p->upd_addr = NULL;
 	blk_set_p->ins_blk_id_p = NULL;
 	return;
@@ -912,7 +912,7 @@ void dbc_init_db(phase_static_area *psa)
 	/* Read in database file header */
 	psa->fc->op = FC_READ;
 	psa->fc->op_buff = (sm_uc_ptr_t)psa->dbc_cs_data;
-	psa->fc->op_len = sizeof(*psa->dbc_cs_data);
+	psa->fc->op_len = SIZEOF(*psa->dbc_cs_data);
 	psa->fc->op_pos = 1;
 	dbcertify_dbfilop(psa);
 
@@ -944,9 +944,9 @@ void dbc_init_db(phase_static_area *psa)
 		/* Verify reserved_bytes and max_rec_len again and verify kill_in_prog is not set */
 		if (VMS_ONLY(9) UNIX_ONLY(8) > psa->dbc_cs_data->reserved_bytes)
 			rts_error(VARLSTCNT(4) ERR_DBMINRESBYTES, 2, VMS_ONLY(9) UNIX_ONLY(8), psa->dbc_cs_data->reserved_bytes);
-		if (sizeof(blk_hdr) > (psa->dbc_cs_data->blk_size - psa->dbc_cs_data->max_rec_size))
+		if (SIZEOF(blk_hdr) > (psa->dbc_cs_data->blk_size - psa->dbc_cs_data->max_rec_size))
 			rts_error(VARLSTCNT(5) ERR_DBMAXREC2BIG, 3, psa->dbc_cs_data->max_rec_size, psa->dbc_cs_data->blk_size,
-				  (psa->dbc_cs_data->blk_size - sizeof(blk_hdr)));
+				  (psa->dbc_cs_data->blk_size - SIZEOF(blk_hdr)));
 		if (0 != psa->dbc_cs_data->kill_in_prog)
 			rts_error(VARLSTCNT(4) ERR_DBCKILLIP, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn));
 		/* Turn off replication and/or journaling for our trip here */

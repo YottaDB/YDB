@@ -46,7 +46,7 @@ LITREF zshow_index	zshow_param_index[];
 static readonly char	space_text[] = {' '};
 
 #define ZS_ONE_OUT(V,TEXT) ((V)->str.len = 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
-#define ZS_STR_OUT(V,TEXT) ((V)->str.len = sizeof((TEXT)) - 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
+#define ZS_STR_OUT(V,TEXT) ((V)->str.len = SIZEOF((TEXT)) - 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
 #define ZS_VAR_STR_OUT(V,TEXT) ((V)->str.len = STRLEN((TEXT)), (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
 #define ZS_PARM_SP(V,TEXT) ((V)->str.len = dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].len, \

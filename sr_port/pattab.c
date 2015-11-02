@@ -182,7 +182,7 @@ static int getaline(void)
 	patline[rab.rab$w_rsz + 1] = '\0';
 #else
 	char		*fgets_res;
-	if (NULL == FGETS(patline, sizeof(patline), patfile, fgets_res))
+	if (NULL == FGETS(patline, SIZEOF(patline), patfile, fgets_res))
 		return 0;
 #endif
 	return 1;
@@ -215,13 +215,13 @@ int initialize_pattern_table(void)
 	for (pat_allmaskbits = 0, letter = 0; letter < max_patents; letter++)
 		pat_allmaskbits |= pattern_typemask[letter];	/* used in do_patfixed/do_pattern */
 	/* Locate default pattern file and load it. */
-        status = TRANS_LOG_NAME(&pat_file, &transnam, buffer, sizeof(buffer), do_sendmsg_on_log2long);
+        status = TRANS_LOG_NAME(&pat_file, &transnam, buffer, SIZEOF(buffer), do_sendmsg_on_log2long);
 	if (SS_NORMAL != status)
 		return 0;
 	if (!load_pattern_table(transnam.len, transnam.addr))
 		return 0;
 	/* Establish default pattern table. */
-	status = TRANS_LOG_NAME(&pat_table,&transnam,buffer, sizeof(buffer), do_sendmsg_on_log2long);
+	status = TRANS_LOG_NAME(&pat_table,&transnam,buffer, SIZEOF(buffer), do_sendmsg_on_log2long);
 	if (SS_NORMAL != status)
 		return 0;
 	patname.len = transnam.len;
@@ -267,7 +267,7 @@ int load_pattern_table(int name_len,char *file_name)
 			while (T_NL == (token = pat_lex()))
 				;
 			/* Process PATCODE directives */
-			memset(&newtable[0], 0, max_patents * sizeof(newtable[0]));
+			memset(&newtable[0], 0, max_patents * SIZEOF(newtable[0]));
 			for (cnt = 0; cnt < PAT_YZMAXNUM; cnt++)
 				newYZlen[cnt] = 0;
 			newYZnum = -1;
@@ -370,16 +370,16 @@ int load_pattern_table(int name_len,char *file_name)
 				} else if (cmp < 0)
 					break;
 			}
-			newpat = (pattern *) malloc(sizeof(pattern) + newnamlen);
+			newpat = (pattern *) malloc(SIZEOF(pattern) + newnamlen);
 			newpat->flink = (*patp);
 			newpat->namlen = newnamlen;
 			memcpy(newpat->name, newtabnam, newnamlen + 1);
-			newpat->typemask = (uint4 *) malloc(max_patents * sizeof(typemask[0]));
-			memcpy(newpat->typemask, newtable, max_patents * sizeof(typemask[0]));
-			newpat->patYZnam = (unsigned char *) malloc(sizeof(newYZnam));
-			memcpy(newpat->patYZnam, newYZnam, sizeof(newYZnam));
-			newpat->patYZlen = (int *) malloc(sizeof(newYZlen));
-			memcpy(newpat->patYZlen, newYZlen, sizeof(newYZlen));
+			newpat->typemask = (uint4 *) malloc(max_patents * SIZEOF(typemask[0]));
+			memcpy(newpat->typemask, newtable, max_patents * SIZEOF(typemask[0]));
+			newpat->patYZnam = (unsigned char *) malloc(SIZEOF(newYZnam));
+			memcpy(newpat->patYZnam, newYZnam, SIZEOF(newYZnam));
+			newpat->patYZlen = (int *) malloc(SIZEOF(newYZlen));
+			memcpy(newpat->patYZlen, newYZlen, SIZEOF(newYZlen));
 			newpat->patYZnum = newYZnum;
 			(*patp) = newpat;
 		}
@@ -418,7 +418,7 @@ static int open_patfile(int name_len, char *file_name)
 	rab = cc$rms_rab;
 	rab.rab$l_fab = &fab;
 	rab.rab$l_ubf = patline;
-	rab.rab$w_usz = sizeof(patline);
+	rab.rab$w_usz = SIZEOF(patline);
 	status = sys$connect(&rab);
 	if (RMS$_NORMAL != status)
 		return 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	error_def(ERR_NEGFRACPWR);
 
 	u1_p = &u1;
-	memcpy(u1_p, u, sizeof(mval));
+	memcpy(u1_p, u, SIZEOF(mval));
 
         MV_FORCE_NUM(u1_p);
         MV_FORCE_NUM(v);

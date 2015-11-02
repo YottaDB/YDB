@@ -19,20 +19,10 @@
 
 GBLREF spdesc stringpool;
 
-/*
- * ----------------------------------------------------------
- * NOTE:
- * 	Following code is a transliteration of VAX macro.
- *	No attempts to convert this code to native C
- *	style was performed. Goto's were reduced to minimum
- *	without modifying the original code structure.
- *	Labels of format lnn in the comments are those of the
- *	original code.
- *
- *      Note also this module is a near copy of op_fnpiece.c
- *	differing only in that it calls matchb() instead of
- *	matchc() to do matching.
- * ----------------------------------------------------------
+/* --------------------------------------------------------------------
+ * NOTE: This module is a near copy of sr_unix/op_setpiece.c differing
+ * only in that it calls "matchb" instead of "matchc" to do matching.
+ * --------------------------------------------------------------------
  */
 
 /*
@@ -55,20 +45,17 @@ GBLREF spdesc stringpool;
 void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval *dst)
 {
 	int 		match_res, len, src_len, str_len, delim_cnt;
-	int 		first_src_ind, second_src_ind;
+	int 		first_src_ind, second_src_ind, numpcs;
 	unsigned char 	*match_ptr, *src_str, *str_addr, *tmp_str;
 	delimfmt	unichar;
 
 	error_def(ERR_MAXSTRLEN);
 
-	/* --- code start --- */
-
 	if (--first < 0)
 		first = 0;
-
+	assert(last >= first);
 	second_src_ind = last - first;
 	MV_FORCE_STR(del);
-
 	/* Null delimiter */
 	if (0 == del->str.len)
 	{
@@ -82,101 +69,79 @@ void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval 
 		*dst = *expr;
 		return;
 	}
-
 	MV_FORCE_STR(expr);
-	if (! MV_DEFINED(src))
+	if (!MV_DEFINED(src))
 	{
 		first_src_ind = 0;
 		second_src_ind = -1;
-		goto moveit;
-	}
-
-	/* Valid delimiter -  See if we can take a short cut to op_fnzp1. If so, the delimiter value needs to be reformated */
-	if (1 == second_src_ind && 1 == del->str.len)
-	{	/* Count of pieces to retrieve is 1 so see what we can do quickly */
-		unichar.unichar_val = 0;
-		unichar.unibytes_val[0] = *del->str.addr;
-		op_setzp1(src, unichar.unichar_val, expr, last, dst);	/* Use "last" since it has not been modified */
-		return;
-	}
-
-	/* We have a valid src with something in it */
-	MV_FORCE_STR(src);
-	src_str = (unsigned char *)src->str.addr;
-	src_len = src->str.len;
-	match_ptr = src_str;
-
-
-	/* skip all pieces before start one */
-	while (first > 0)
+	} else
 	{
-		match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr,
-				   src_len, src_str, &match_res);
-		src_len -= (int)(match_ptr - src_str);
-		src_str = match_ptr;
+		/* Valid delimiter -  See if we can take a short cut to op_fnzp1. If so, delimiter value needs to be reformated */
+		if ((1 == second_src_ind) && (1 == del->str.len))
+		{	/* Count of pieces to retrieve is 1 so see what we can do quickly */
+			unichar.unichar_val = 0;
+			unichar.unibytes_val[0] = *del->str.addr;
+			op_setzp1(src, unichar.unichar_val, expr, last, dst);	/* Use "last" since it has not been modified */
+			return;
+		}
+		/* We have a valid src with something in it */
+		MV_FORCE_STR(src);
+		src_str = (unsigned char *)src->str.addr;
+		src_len = src->str.len;
+		/* skip all pieces until start one */
+		if (first)
+		{
+			numpcs = first;	/* copy int4 type "first" into "int" type numpcs for passing to matchc */
+			match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr, src_len, src_str, &match_res, &numpcs);
+			/* Note: "numpcs" is modified above by the function "matchb" to reflect the # of unmatched pieces */
+			first = numpcs;	/* copy updated "numpcs" value back into "first" */
+		} else
+		{
+			match_ptr = src_str;
+			match_res = 1;
+		}
+		first_src_ind = INTCAST(match_ptr - (unsigned char *)src->str.addr);
 		if (0 == match_res) /* if match not found */
-			goto l80;
-		first--;
+			second_src_ind = -1;
+		else
+		{
+			src_len -= INTCAST(match_ptr - src_str);
+			src_str = match_ptr;
+			/* skip # delimiters this piece will replace, e.g. if we are setting
+			 * pieces 2 - 4, then the pieces 2-4 will be replaced by one piece - expr.
+			 */
+			match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr, src_len, src_str, &match_res, &second_src_ind);
+			second_src_ind = (0 == match_res) ? -1 : INTCAST(match_ptr - (unsigned char *)src->str.addr - del->str.len);
+		}
 	}
-	/*
-	 * skip # delimiters this piece will replace, e.g. if we are setting
-	 * pieces 2 - 4, then the pieces 2-4 will be replaced by one piece - expr.
-	 */
-
-	first_src_ind = (int)(match_ptr - (unsigned char *)src->str.addr);
-	do {
-		match_ptr = matchb(del->str.len, (uchar_ptr_t)del->str.addr,
-				   src_len, src_str, &match_res);
-		src_len -= (int)(match_ptr - src_str);
-		src_str = match_ptr;
-		if (0 == match_res) /* if match not found */
-			goto l90;
-	} while (--second_src_ind > 0);
-
-	second_src_ind = (int)(match_ptr - (unsigned char *)src->str.addr - del->str.len);
-	goto moveit;
-  l80:
-	first_src_ind = (int)(match_ptr - (unsigned char *)src->str.addr);
-  l90:
-	second_src_ind = -1;
-
-  moveit:
 	delim_cnt = first;
-
 	/* Calculate total string len. */
 	str_len = expr->str.len + (first_src_ind + del->str.len * delim_cnt);
 	/* add len. of trailing chars past insertion point */
 	if (second_src_ind >= 0)
 		str_len += (src->str.len - second_src_ind);
-
 	if (str_len > MAX_STRLEN)
 	{
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 		return;
 	}
-
-	if (str_len > (stringpool.top - stringpool.free))
-		stp_gcol(str_len);
+	ENSURE_STP_FREE_SPACE(str_len);
 	str_addr = stringpool.free;
-
 	/* copy prefix */
 	if (first_src_ind)
 	{
 		memcpy(str_addr, src->str.addr, first_src_ind);
 		str_addr += first_src_ind;
 	}
-
 	/* copy delimiters */
 	while (delim_cnt-- > 0)
 	{
 		memcpy(str_addr, del->str.addr, del->str.len);
 		str_addr += del->str.len;
 	}
-
 	/* copy expression */
 	memcpy(str_addr, expr->str.addr, expr->str.len);
 	str_addr += expr->str.len;
-
 	/* copy trailing pieces */
 	if (second_src_ind >= 0)
 	{
@@ -185,7 +150,6 @@ void op_setzpiece(mval *src, mval *del, mval *expr, int4 first, int4 last, mval 
 		memcpy(str_addr, tmp_str, len);
 		str_addr += len;
 	}
-
 	assert(str_addr - stringpool.free == str_len);
 	dst->mvtype = MV_STR;
 	dst->str.len = INTCAST(str_addr - stringpool.free);

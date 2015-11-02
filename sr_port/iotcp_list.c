@@ -94,7 +94,7 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 	}
 
 	/* allow multiple connections to the same IP address */
-	if (tcp_routines.aa_setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1)
+	if (tcp_routines.aa_setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)) == -1)
 	{
 		errptr = (char *)STRERROR(errno);
 		errlen = STRLEN(errptr);
@@ -103,7 +103,7 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 		return 0;
 	}
 
-	if (tcp_routines.aa_bind(lsock, (struct sockaddr *)&tcpptr->sin, sizeof(struct sockaddr)) == -1)
+	if (tcp_routines.aa_bind(lsock, (struct sockaddr *)&tcpptr->sin, SIZEOF(struct sockaddr)) == -1)
 	{
 		errptr = (char *)STRERROR(errno);
 		errlen = STRLEN(errptr);
@@ -137,22 +137,22 @@ int	iotcp_newlsock(io_log_name *dev, d_tcp_struct *tcpptr)
 	/* copy all state information from the current device */
 
 	/* io descriptor */
-	ldev->iod = (io_desc *)malloc(sizeof(io_desc));
-	memcpy(ldev->iod, dev->iod, sizeof(io_desc));
+	ldev->iod = (io_desc *)malloc(SIZEOF(io_desc));
+	memcpy(ldev->iod, dev->iod, SIZEOF(io_desc));
 	ldev->iod->state = dev_open;
 	ldev->iod->pair.in  = ldev->iod;
 	ldev->iod->pair.out = ldev->iod;
 
 	/* tcp-specific information */
-	ldev->iod->dev_sp = (void *)malloc(sizeof(d_tcp_struct));
+	ldev->iod->dev_sp = (void *)malloc(SIZEOF(d_tcp_struct));
 	lsock_tcp=(d_tcp_struct *)ldev->iod->dev_sp;
-	memcpy(lsock_tcp, tcpptr, sizeof(d_tcp_struct));
+	memcpy(lsock_tcp, tcpptr, SIZEOF(d_tcp_struct));
 
 	lsock_tcp->socket = lsock;
 	ldev->iod->state = dev_open;
 
 	/* add to our list of tcp listening sockets */
-	new_lsock = (lsock_rec *)malloc(sizeof(lsock_rec));
+	new_lsock = (lsock_rec *)malloc(SIZEOF(lsock_rec));
 	new_lsock->socket = lsock;
 	new_lsock->sin = tcpptr->sin;
 	new_lsock->next = lsock_list;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void mupip_create(void)
 	gvinit();
 	if (CLI_PRESENT == cli_present("REGION"))
 	{
-		reglen = sizeof(buff);
+		reglen = SIZEOF(buff);
 	 	if (0 == cli_get_str("REGION", buff, &reglen))
 			mupip_exit(ERR_MUPCLIERR);
 	 	for (i=0; (MAX_RN_LEN + 1 > i) && (' ' != buff[i]); i++)

@@ -27,9 +27,7 @@ void fgn_glopref(mval *v)
 {
 	unsigned char *p;
 
-	if (stringpool.free + v->str.len + 1 > stringpool.top)
-		stp_gcol(v->str.len + 1);
-
+	ENSURE_STP_FREE_SPACE(v->str.len + 1);
 	p = stringpool.free;
 	*stringpool.free++ = '^';
 	memcpy(stringpool.free,v->str.addr,v->str.len);

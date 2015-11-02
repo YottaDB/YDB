@@ -31,6 +31,7 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include "min_max.h"
 
 GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
@@ -81,11 +82,11 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 		size = (((v15_blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
 		/* Represents a block state change from V5 -> V4 */
 		INCR_BLKS_TO_UPGRD(csa, csd, 1);
-		assert(sizeof(v15_blk_hdr) <= size);
+		assert(SIZEOF(v15_blk_hdr) <= size);
 	} else DEBUG_ONLY(if (GDSV5 == ondsk_blkver))
 	{
 		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
-		assert(sizeof(blk_hdr) <= size);
+		assert(SIZEOF(blk_hdr) <= size);
 		/* no adjustment to blks_to_upgrd counter is needed since the format we are going to write is GDSVCURR */
 	}
 	DEBUG_ONLY(else GTMASSERT);
@@ -103,17 +104,17 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	if (csd->is_encrypted)
 	{
 		this_blk_size = ((blk_hdr_ptr_t)buff)->bsiz;
-		req_enc_blk_size = this_blk_size - SIZEOF(blk_hdr);
+		assert((this_blk_size <= csd->blk_size) && (this_blk_size >= SIZEOF(blk_hdr)));
+		req_enc_blk_size = MIN(csd->blk_size, this_blk_size) - SIZEOF(blk_hdr);
 		if (BLK_NEEDS_ENCRYPTION(((blk_hdr_ptr_t)buff)->levl, req_enc_blk_size))
 		{
 			ASSERT_ENCRYPTION_INITIALIZED;
 			assert(csa->encrypted_blk_contents);
-			assert(req_enc_blk_size < this_blk_size);
-			memcpy(csa->encrypted_blk_contents, buff, sizeof(blk_hdr));
+			memcpy(csa->encrypted_blk_contents, buff, SIZEOF(blk_hdr));
 			GTMCRYPT_ENCODE_FAST(csa->encr_key_handle,
-					     (char *)(buff + sizeof(blk_hdr)),
+					     (char *)(buff + SIZEOF(blk_hdr)),
 					     req_enc_blk_size,
-					     (csa->encrypted_blk_contents + sizeof(blk_hdr)),
+					     (csa->encrypted_blk_contents + SIZEOF(blk_hdr)),
 					     crypt_status);
 			if (0 != crypt_status)
 				GC_RTS_ERROR(crypt_status, reg->dyn.addr->fname);

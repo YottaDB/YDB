@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,24 +56,24 @@ void mupip_set(void)
 	if (region)
 	{
 		gvinit();
-		mu_getlst("WHAT", sizeof(mu_set_rlist));
+		mu_getlst("WHAT", SIZEOF(mu_set_rlist));
 		if (error_mupip)
 			mupip_exit(ERR_MUNOACTION);
 		db_fn_len = 0;
 	} else if (file)
 	{
-		db_fn_len = sizeof(db_fn);
+		db_fn_len = SIZEOF(db_fn);
 		memset(db_fn, 0, db_fn_len);
 		if (!cli_get_str("WHAT", db_fn, &db_fn_len))
 			mupip_exit(ERR_MUNODBNAME);
 	} else
 	{
 		assert(jnlfile);
-		jnl_fn_len = sizeof(jnl_fn);
+		jnl_fn_len = SIZEOF(jnl_fn);
 		memset(jnl_fn, 0, jnl_fn_len);
 		if (!cli_get_str("WHAT", jnl_fn, &jnl_fn_len))
 			mupip_exit(ERR_MUNOACTION);
-		status = mupip_set_jnlfile(jnl_fn, sizeof(jnl_fn));
+		status = mupip_set_jnlfile(jnl_fn, SIZEOF(jnl_fn));
 		mupip_exit(status);
 	}
 	if (cli_present("ACCESS_METHOD")   	== CLI_PRESENT  ||

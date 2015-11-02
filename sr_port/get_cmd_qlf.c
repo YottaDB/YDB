@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -123,10 +123,10 @@ void get_cmd_qlf(command_qualifier *qualif)
 
 	if (cli_present("LABELS") == CLI_PRESENT)
 	{
-		len = sizeof(inbuf);
+		len = SIZEOF(inbuf);
 		if (cli_get_str("LABELS", (char *)&inbuf[0], &len))
 		{
-			if (len == sizeof(upper) - 1)
+			if (len == SIZEOF(upper) - 1)
 			{
 				if (!memcmp(upper, &inbuf[0], len))
 					qualif->qlf &= ~CQ_LOWER_LABELS;
@@ -135,7 +135,10 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		}
 	}
-
+#	ifdef UNIX
+	if (CLI_PRESENT == cli_present("NAMEOFRTN"))
+		qualif->qlf |= CQ_NAMEOFRTN;
+#	endif
 	if (cli_present("CE_PREPROCESS") == CLI_PRESENT)
         {
 		qualif->qlf |= CQ_CE_PREPROCESS;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,9 +27,9 @@ void jnl_setver(void)
 	char		*jnl_label = JNL_LABEL_TEXT;
 	unsigned char	jnl_ver_lower, jnl_ver_higher;
 
-	jnl_ver_lower = jnl_label[sizeof(JNL_LABEL_TEXT) - 2] - '0';
+	jnl_ver_lower = jnl_label[SIZEOF(JNL_LABEL_TEXT) - 2] - '0';
 	assert('\012' > jnl_ver_lower); /* assert(10 > jnl_ver_lower); */
-	jnl_ver_higher = jnl_label[sizeof(JNL_LABEL_TEXT) - 3] - '0';
+	jnl_ver_higher = jnl_label[SIZEOF(JNL_LABEL_TEXT) - 3] - '0';
 	assert('\012' > jnl_ver_higher); /* assert(10 > jnl_ver_higher); */
 	jnl_ver = jnl_ver_higher * 10 + jnl_ver_lower;
 	assert(JNL_VER_THIS == jnl_ver);

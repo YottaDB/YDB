@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,7 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "gvcst_blk_build.h"
+#include "gtmimagename.h"
 
 #ifdef DEBUG
 GBLDEF	boolean_t		skip_block_chain_tail_check;
@@ -41,7 +42,6 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	boolean_t		write_after_image;
 GBLREF	unsigned int		t_tries;
-GBLREF	boolean_t		run_time;
 
 void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
@@ -56,9 +56,9 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	assert((dba_mm != cs_data->acc_meth) || dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
 	array = (blk_segment *)cse->upd_addr;
-	assert(array->len >= sizeof(blk_hdr));
+	assert(array->len >= SIZEOF(blk_hdr));
 	assert(array->len <= cs_data->blk_size);
-	assert((cse->ins_off + sizeof(block_id)) <= array->len);
+	assert((cse->ins_off + SIZEOF(block_id)) <= array->len);
 	assert((short)cse->index >= 0);
 	assert(!cse->undo_next_off[0] && !cse->undo_offset[0]);
 	assert(!cse->undo_next_off[1] && !cse->undo_offset[1]);
@@ -110,8 +110,8 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	 *		Hence in case of VMS, we relax the check so buffertn == ctn is allowed.
 	 */
 	DEBUG_ONLY(blktn = ((blk_hdr_ptr_t)base_addr)->tn);
-	assert(!run_time || !cs_addrs->t_commit_crit || (dba_bg != cs_data->acc_meth) || (n_gds_t_op < cse->mode)
-			|| (cse->mode == gds_t_acquired) || (blktn UNIX_ONLY(<) VMS_ONLY(<=) ctn));
+	assert(!IS_MCODE_RUNNING || !cs_addrs->t_commit_crit || (dba_bg != cs_data->acc_meth) || (n_gds_t_op < cse->mode)
+	       || (cse->mode == gds_t_acquired) || (blktn UNIX_ONLY(<) VMS_ONLY(<=) ctn));
 	assert((ctn < cs_addrs->ti->early_tn) || write_after_image);
 	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
@@ -122,7 +122,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	{
 		stop_ptr = (blk_segment *)array->addr;
 		seg = cse->first_copy ? array + 1: array + 2;
-		ptr = base_addr + sizeof(blk_hdr);
+		ptr = base_addr + SIZEOF(blk_hdr);
 		if (!cse->first_copy)
 			ptr += ((blk_segment *)(array + 1))->len;
 		for ( ; seg <= stop_ptr; )
@@ -152,8 +152,8 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		if (cse->ins_off)
 		{	/* if the cw set has a reference to resolve, move it to the block */
 			assert(cse->index < sgm_info_ptr->cw_set_depth);
-			assert((int)cse->ins_off >= (int)(sizeof(blk_hdr) + sizeof(rec_hdr)));
-			assert((int)(cse->next_off + cse->ins_off + sizeof(block_id)) <= array->len);
+			assert((int)cse->ins_off >= (int)(SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
+			assert((int)(cse->next_off + cse->ins_off + SIZEOF(block_id)) <= array->len);
 			if (cse->first_off == 0)
 				cse->first_off = cse->ins_off;
 			chain.flag = 1;

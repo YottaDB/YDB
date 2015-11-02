@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +37,7 @@ void op_write(mval *v)
 		cnt = insize = outsize = v->str.len;
 		assert(stringpool.free >= stringpool.base);
 		assert(stringpool.free <= stringpool.top);
-		if (cnt > stringpool.top - stringpool.free)
-			stp_gcol(cnt);
+		ENSURE_STP_FREE_SPACE(cnt);
 		temp_ch = stringpool.free;
 
 		save_ptr = v->str.addr;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,8 +63,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 	if (!gtm_utf8_mode)
 	{
 		dstlen = src->str.len;
-		if (stringpool.top - stringpool.free < dstlen)
-			stp_gcol(dstlen);
+		ENSURE_STP_FREE_SPACE(dstlen);
 		dstbase = (char *)stringpool.free;
 		assert(NULL != casemaps[index].m);
 		(*casemaps[index].m)((unsigned char *)dstbase, (unsigned char *)src->str.addr, dstlen);
@@ -86,7 +85,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 				utf8_len_strict((unsigned char *)src->str.addr, src->str.len);
 				GTMASSERT; /* should never reach here */
 			}
-			src_ustr_ptr = (UChar*)malloc(src_ustr_len * sizeof(UChar));
+			src_ustr_ptr = (UChar*)malloc(src_ustr_len * SIZEOF(UChar));
 		}
 		/* Convert UTF-8 src to UTF-16 (UChar*) representation */
 		status = U_ZERO_ERROR;
@@ -103,7 +102,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		dst_chlen = (*casemaps[index].u)(NULL, 0, src_ustr_ptr, src_chlen, NULL, &status);
 		assert(U_BUFFER_OVERFLOW_ERROR == status);
 		if (dst_chlen >  MAX_ZCONVBUFF) /* conversion increases the string length, allocate in heap instead */
-			dst_ustr_ptr = (UChar*)malloc(dst_chlen * sizeof(UChar));
+			dst_ustr_ptr = (UChar*)malloc(dst_chlen * SIZEOF(UChar));
 		else
 			dst_ustr_ptr = dst_ustr;
 		/* Now, perform the real conversion with sufficient buffers */
@@ -122,8 +121,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
 			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 		}
-		if (stringpool.top - stringpool.free < dstlen)
-			stp_gcol(dstlen);
+		ENSURE_STP_FREE_SPACE(dstlen);
 		dstbase = (char *)stringpool.free;
 		status = U_ZERO_ERROR;
 		u_strToUTF8(dstbase, dstlen, &ulen, dst_ustr_ptr, dst_chlen, &status);

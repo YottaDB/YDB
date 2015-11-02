@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ unsigned char *gvstrsub(unsigned char *src, unsigned char *target)
 	{
 		mstr_x.len = n;
 		mstr_x.addr = buf;
-		mstr_tmp.len = sizeof(buf1);
+		mstr_tmp.len = SIZEOF(buf1);
 		mstr_tmp.addr = buf1;
 		do_xform(gv_target->collseq, XBACK, &mstr_x, &mstr_tmp, &length);
 		n = length;

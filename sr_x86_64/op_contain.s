@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -40,16 +40,19 @@ ENTRY op_contain
 	movq    REG64_RET1,sav_rdx(REG_FRAME_POINTER)
 	mv_force_str	REG64_RET1, l4
 	subq	$8,REG_SP
-	movq	REG_SP,REG64_ARG4					#5th Argument
+	movq	REG_SP,REG64_ARG5					# 6th Argument
+	movq	$1,(REG_SP)						# init arg to 1.
+	subq	$8,REG_SP
+	movq	REG_SP,REG64_ARG4					# 5th Argument
 	movq	sav_rax(REG_FRAME_POINTER),REG64_RET0
 	movq	sav_rdx(REG_FRAME_POINTER),REG64_RET1
-	movq 	mval_a_straddr(REG64_RET0),REG64_ARG3			#4th Argument
-	movl	mval_l_strlen(REG64_RET0),REG32_ARG2
-	movq	mval_a_straddr(REG64_RET1),REG64_ARG1	#2nd Argument
+	movq 	mval_a_straddr(REG64_RET0),REG64_ARG3			# 4th Argument
+	movl	mval_l_strlen(REG64_RET0),REG32_ARG2			# 3rd Argument
+	movq	mval_a_straddr(REG64_RET1),REG64_ARG1			# 2nd Argument
 	movl	mval_l_strlen(REG64_RET1),REG32_ARG0
 	call	matchc
 	movl	(REG_SP), REG32_RET0    # The 5th argument is a pointer to a int. So read only 4 bytes
-	addq    $8, REG_SP
+	addq    $1, REG_SP
 	cmpl	$0,REG32_RET0
 	leave
 	ret

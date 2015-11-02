@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #include "invocation_mode.h"
 #include "fnpc.h"
 #include "gtm_malloc.h"
+#include "stp_parms.h"
 
 GBLREF void		(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
 GBLREF void		(*tp_timeout_clear_ptr)(void);
@@ -42,6 +43,8 @@ GBLREF void		(*tp_timeout_action_ptr)(void);
 GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF void		(*unw_prof_frame_ptr)(void);
+GBLREF void		(*op_write_ptr)(mval *v);
+GBLREF void		(*op_wteol_ptr)(int4 n);
 
 GBLREF mstr			default_sysid;
 GBLDEF boolean_t		gtm_startup_active = FALSE;
@@ -51,43 +54,46 @@ void init_gtm(void)
 	struct startup_vector   svec;
 
 	/* We believe much of our code depends on these relationships.  */
-	assert(sizeof(int) == 4);
-	assert(sizeof(int4) == 4);
-	assert(sizeof(short) == 2);
+	assert(SIZEOF(int) == 4);
+	assert(SIZEOF(int4) == 4);
+	assert(SIZEOF(short) == 2);
 #ifdef OFF_T_LONG
-	assert(sizeof(off_t) == 8);
+	assert(SIZEOF(off_t) == 8);
 #else
-	assert(sizeof(off_t) == 4);
+	assert(SIZEOF(off_t) == 4);
 #endif
-	assert(sizeof(sgmnt_data) == ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE));
+	assert(SIZEOF(sgmnt_data) == ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
 #ifdef KEY_T_LONG
-	assert(8 == sizeof(key_t));
+	assert(8 == SIZEOF(key_t));
 #else
-	assert(sizeof(key_t) == sizeof(int4));
+	assert(SIZEOF(key_t) == SIZEOF(int4));
 #endif
-	assert(sizeof(boolean_t) == 4); /* generated code passes 4 byte arguments, run time rtn might be expecting boolean_t arg */
+	assert(SIZEOF(boolean_t) == 4); /* generated code passes 4 byte arguments, run time rtn might be expecting boolean_t arg */
 	assert(BITS_PER_UCHAR == 8);
-	assert(sizeof(enum db_ver) == sizeof(int4));
+	assert(SIZEOF(enum db_ver) == SIZEOF(int4));
 	assert(254 >= FNPC_MAX);	/* The value 255 is reserved */
 
 	tp_timeout_start_timer_ptr = tp_start_timer;
 	tp_timeout_clear_ptr = tp_clear_timeout;
 	tp_timeout_action_ptr = tp_timeout_action;
 	ctrlc_handler_ptr = ctrlc_handler;
-	op_open_ptr = op_open;
+	if (MUMPS_UTILTRIGR != invocation_mode)
+		op_open_ptr = op_open;
+	op_write_ptr = op_write;
+	op_wteol_ptr = op_wteol;
 	unw_prof_frame_ptr = unw_prof_frame;
 
 	if (MUMPS_COMPILE == invocation_mode)
 		exit(gtm_compile());
 
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
-	memset(&svec, 0, sizeof(svec));
-	svec.argcnt = sizeof(svec);
-	svec.rtn_start = svec.rtn_end = malloc(sizeof(rtn_tabent));
-	memset(svec.rtn_start, 0, sizeof(rtn_tabent));
-	svec.user_stack_size = (256 * 1024) - sizeof(storElem); /* So doesn't overflow a storage alloc bucket size */
+	memset(&svec, 0, SIZEOF(svec));
+	svec.argcnt = SIZEOF(svec);
+	svec.rtn_start = svec.rtn_end = malloc(SIZEOF(rtn_tabent));
+	memset(svec.rtn_start, 0, SIZEOF(rtn_tabent));
+	svec.user_stack_size = 256 * 1024;
 	svec.user_indrcache_size = 32;
-	svec.user_strpl_size = 20480;
+	svec.user_strpl_size = STP_INITSIZE_REQUESTED;
 	svec.ctrlc_enable = 1;
 	svec.break_message_mask = 15;
 	svec.labels = 1;

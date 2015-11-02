@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,13 +51,13 @@ cmi_status_t cmj_setupfd(int fd)
 		return (cmi_status_t)errno;
 #endif
 	rval = setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
-			(const void *)&on, sizeof(on));
+			(const void *)&on, SIZEOF(on));
 	if (rval < 0)
 		return (cmi_status_t)errno;
 #ifdef TCP_NODELAY
 	/* z/OS only does setsockop on SOL and IP */
 	rval = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
-			(const void *)&on, sizeof(on));
+			(const void *)&on, SIZEOF(on));
 	if (rval < 0)
 		return (cmi_status_t)errno;
 #endif

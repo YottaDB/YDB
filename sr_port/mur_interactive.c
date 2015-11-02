@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ boolean_t mur_interactive(void)
 		VMS_ONLY(lib$get_input(&dres, &dprm, &len);)
 		UNIX_ONLY(util_out_print(PROCEED_PROMPT, TRUE);
 			FGETS(res, 8, stdin, fgets_res);
-			fgets_res = util_input(res, sizeof(res), stdin, FALSE);
+			fgets_res = util_input(res, SIZEOF(res), stdin, FALSE);
 			if (NULL != fgets_res) {
 			len = strlen(res);)
 		for (index = 0; index < len; index++)

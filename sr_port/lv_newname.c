@@ -71,7 +71,7 @@ void lv_newname(ht_ent_mname *hte, symval *sym)
 	}
 	assert(first_tf_saveall);
 	var = lv_getslot(lv->ptrs.val_ent.parent.sym);
-	restore_ent = (tp_var *)malloc(sizeof(*restore_ent));
+	restore_ent = (tp_var *)malloc(SIZEOF(*restore_ent));
 	restore_ent->current_value = lv;
 	restore_ent->save_value = var;
 	restore_ent->key = hte->key;

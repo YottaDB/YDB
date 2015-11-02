@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ int lvn(oprtype *a,opctype index_op,triple *parent)
 	*sb1++ = *a;
 	for (;;)
 	{
-		if (sb1 >= &subscripts[MAX_LVSUBSCRIPTS])
+		if (sb1 >= ARRAYTOP(subscripts))
 		{
 			stx_error(ERR_MAXNRSUBSCRIPTS);
 			return FALSE;

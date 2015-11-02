@@ -36,11 +36,11 @@ void cenable(void)
 
 	if (io_std_device.in->type == tt)
 	{
-		valstr.len = sizeof(GTM_NOCENABLE) - 1;
+		valstr.len = SIZEOF(GTM_NOCENABLE) - 1;
 		valstr.addr = GTM_NOCENABLE;
 		if (!logical_truth_value(&valstr, FALSE, &is_defined))
 		{	/* if they don't ask for nocenable, the default is enable */
-			pars.str.len = sizeof(cenable_params_list);
+			pars.str.len = SIZEOF(cenable_params_list);
 			pars.str.addr = (char *)cenable_params_list;
 			pars.mvtype = val.mvtype = MV_STR;
 			val.str.len = io_std_device.in->trans_name->len;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ void dse_save(void)
 	{
 		if (was_block)
 		{
-			util_len = sizeof("!/Saved versions of block ");
+			util_len = SIZEOF("!/Saved versions of block ");
 			memcpy(util_buff, "!/Saved versions of block ", util_len);
 			util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], 8);
 			util_buff[util_len-1] = 0;
@@ -89,7 +89,7 @@ void dse_save(void)
 		util_out_print("!/Save history:!/", TRUE);
 		for (i = j = 0;  i < patch_save_count;  i++)
 		{
-			util_len = sizeof("Block ");
+			util_len = SIZEOF("Block ");
 			memcpy(util_buff, "Block ", util_len);
 			util_len += i2hex_nofill(patch_save_set[i].blk, (uchar_ptr_t)&util_buff[util_len-1], 8);
 			util_buff[util_len-1] = 0;
@@ -116,7 +116,7 @@ void dse_save(void)
 		if (patch_save_set[i].blk == blk && patch_save_set[i].region == gv_cur_region
 			&& patch_save_set[i].ver >= j)
 			j = patch_save_set[i].ver + 1;
-	util_len = sizeof("!/Saving version !UL of block ");
+	util_len = SIZEOF("!/Saving version !UL of block ");
 	memcpy(util_buff, "!/Saving version !UL of block ", util_len);
 	util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], 8);
 	util_buff[util_len-1] = 0;
@@ -148,7 +148,7 @@ void dse_save(void)
 		else
 			rel_crit(gv_cur_region);
 	}
-	buff_len = sizeof(buff);
+	buff_len = SIZEOF(buff);
 	if ((cli_present("COMMENT") == CLI_PRESENT) && cli_get_str("COMMENT", buff, &buff_len))
 	{
 		ptr = &buff[buff_len];

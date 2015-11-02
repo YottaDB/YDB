@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,26 +56,26 @@ void mucblkini (void)
 		PERROR("Error reading first bitmap");
 		return;
 	}
-	bml_busy(DIR_ROOT, bmp + sizeof(blk_hdr));
-	bml_busy(DIR_DATA, bmp + sizeof(blk_hdr));
+	bml_busy(DIR_ROOT, bmp + SIZEOF(blk_hdr));
+	bml_busy(DIR_DATA, bmp + SIZEOF(blk_hdr));
 	LSEEKWRITE(udi->fd, (off_t)(cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE, bmp, bmpsize, status);
 	if (0 != status)
 	{
 		PERROR("Error writing out first bitmap");
 		return;
 	}
-	rp = (rec_hdr_ptr_t)((uchar_ptr_t)bp1 + sizeof(blk_hdr));
+	rp = (rec_hdr_ptr_t)((uchar_ptr_t)bp1 + SIZEOF(blk_hdr));
 	BSTAR_REC(rp);
 	c = CST_BOK(rp);
 	tmp = DIR_DATA;
 	PUT_LONG(c, tmp);
 	bp1->bver = GDSVCURR;
 	bp1->levl = 1;
-	bp1->bsiz = BSTAR_REC_SIZE + sizeof(blk_hdr);
+	bp1->bsiz = BSTAR_REC_SIZE + SIZEOF(blk_hdr);
 	bp1->tn = 0;
 	bp2->bver = GDSVCURR;
 	bp2->levl =0;
-	bp2->bsiz = sizeof(blk_hdr);
+	bp2->bsiz = SIZEOF(blk_hdr);
 	bp2->tn = 0;
 	DSK_WRITE_NOCACHE(gv_cur_region, DIR_ROOT, (uchar_ptr_t)bp1, cs_addrs->hdr->desired_db_format, status);
 	if (0 != status)

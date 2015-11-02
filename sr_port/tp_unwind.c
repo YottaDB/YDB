@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #include "tp_frame.h"
 #include "mlkdef.h"
 #include "hashtab_mname.h"	/* needed for lv_val.h */
+#include "hashtab_int4.h"	/* needed for tp.h */
 #include "hashtab.h"
 #include "lv_val.h"
 #include "op.h"
@@ -33,9 +34,20 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "filestruct.h"
+#include "gdscc.h"
 #include "have_crit.h"
+#include "gdskill.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "jnl.h"
+#include "tp.h"
+#include "tp_restart.h"
 #ifdef UNIX
 #include "deferred_signal_handler.h"
+#endif
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
 #endif
 
 GBLREF	stack_frame	*frame_pointer;
@@ -46,8 +58,14 @@ GBLREF	unsigned char	*tp_sp, *tpstackbase, *tpstacktop;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	short		dollar_tlevel;
 GBLREF	symval		*curr_symval;
+#ifdef GTM_TRIGGER
+GBLREF	int		tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
+#endif
 
-void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type)
+error_def(ERR_STACKUNDERFLO);
+error_def(ERR_TPRETRY);
+
+void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *tprestart_rc)
 {
 	mlk_pvtblk	**prior, *mlkp;
 	mlk_tp		*oldlock, *nextlock;
@@ -57,10 +75,8 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type)
 	mv_stent	*mvc;
 	boolean_t	restore_lv, rollback_locks;
 	lvscan_blk	*lvscan, *lvscan_next, first_lvscan;
-	int		elemindx;
+	int		elemindx, rc;
 	int		save_intrpt_ok_state;
-
-	error_def(ERR_STACKUNDERFLO);
 
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
 	SAVE_INTRPT_OK_STATE(INTRPT_IN_TP_UNWIND);
@@ -96,8 +112,18 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type)
 			/* In order to restart sub-transactions, this would have to maintain
 			   the chain that currently is not built by op_tstart() */
 			if (restore_lv)
-				tp_unwind_restlv(curr_lv, save_lv, restore_ent, NULL);
-			else if (NULL != save_lv->ptrs.val_ent.children)
+			{
+				rc = tp_unwind_restlv(curr_lv, save_lv, restore_ent, NULL, tprestart_rc);
+#				ifdef GTM_TRIGGER
+				if (0 != rc)
+				{
+					RESTORE_INTRPT_OK_STATE;	/* drive any MUPIP STOP/signals deferred while
+									 * in this function */
+					dollar_tlevel = tl;		/* Record fact if we unwound some tp_frames */
+					INVOKE_RESTART;
+				}
+#				endif
+			} else if (NULL != save_lv->ptrs.val_ent.children)
 			{
 				DBGRFCT((stderr, "\ntp_unwind: Not restoring curr_lv and has children\n"));
 				if (curr_lv->tp_var->var_cloned)
@@ -162,7 +188,16 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type)
 			assert(curr_lv->tp_var);
 			assert(curr_lv->tp_var == restore_ent);
 			assert(0 < curr_lv->stats.trefcnt);
-			tp_unwind_restlv(curr_lv, save_lv, restore_ent, &lvscan);
+			rc = tp_unwind_restlv(curr_lv, save_lv, restore_ent, &lvscan, tprestart_rc);
+#			ifdef GTM_TRIGGER
+			if (0 != rc)
+			{
+				RESTORE_INTRPT_OK_STATE;	/* drive any MUPIP STOP/signals deferred while
+								 * in this function */
+				dollar_tlevel = tl;		/* Record fact if we unwound some levels */
+				INVOKE_RESTART;
+			}
+#			endif
 			assert(0 < curr_lv->stats.trefcnt);	/* Should have its own hash table ref plus the extras we added */
 			assert(0 < curr_lv->stats.crefcnt);
 		}
@@ -247,8 +282,11 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type)
 /* Restore given local variable from supplied TP restore entry into given symval. Note lvscan_anchor will only be non-NULL
    for the final level we are restoring (but not unwinding). We don't need to restore counters for any vars except the
    very last level.
+
+   The return code is only used when unrolling the M stack runs into a trigger base frame which must be unrolled
+   by gtm_trigger. A non-zero return code signals to tp_unwind() that it needs to rethrow the tprestart error.
  */
-void tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvscan_blk **lvscan_anchor)
+int tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvscan_blk **lvscan_anchor, int *tprestart_rc)
 {
 	ht_ent_mname	*tabent;
 	lv_val		*inuse_lv;
@@ -276,13 +314,27 @@ void tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvs
 	if (curr_symval != tp_pointer->sym)
 	{	/* Unwind as many stackframes as are necessary up to the max */
 		while(curr_symval != tp_pointer->sym && frame_pointer < tp_pointer->fp)
+		{
+#			ifdef GTM_TRIGGER
+			if (SFT_TRIGR & frame_pointer->type)
+			{	/* We have encountered a trigger base frame. We cannot unroll it because there are C frames
+				   associated with it so we must interrupt this tp_restart and return to gtm_trigger() so
+				   it can unroll the base frame and rethrow the error to properly unroll the C stack.
+				*/
+				*tprestart_rc = ERR_TPRETRY;
+				tprestart_state = TPRESTART_STATE_TPUNW;
+				DBGTRIGR((stderr, "tp_unwind: Encountered trigger base frame during M-stack unwind - "
+					  "rethrowing\n"));
+				return -1;
+			}
+#			endif
 			op_unwind();
+		}
 		if (curr_symval != tp_pointer->sym)
 		{	/* Unwind as many mv_stents as are necessary up to the max */
 			mvc = mv_chain;
 			while(curr_symval != tp_pointer->sym && mvc < tp_pointer->mvc)
 			{
-
 				unw_mv_ent(mvc);
 				mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 			}
@@ -322,7 +374,7 @@ void tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvs
 		if (tmpsbs = curr_lv->ptrs.val_ent.children)	/* Note assignment */
 		{
 			DBGRFCT((stderr, "\ntp_unwind_restlv: Killing children of curr_lv 0x"lvaddr"\n", curr_lv));
-			assert(curr_lv == tmpsbs->lv);			\
+			assert(curr_lv == tmpsbs->lv);
 			curr_lv->ptrs.val_ent.children = NULL;	/* prevent recursion due to alias containers */
 			lv_killarray(tmpsbs, FALSE);
 		}
@@ -359,7 +411,7 @@ void tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvs
 				if (ARY_SCNCNTNR_MAX < elemindx)
 				{	/* Present block is full so allocate a new one and chain it on */
 					lvscan->elemcnt--;		/* New element ended up not being in that block.. */
-					newlvscan = (lvscan_blk *)malloc(sizeof(lvscan_blk));
+					newlvscan = (lvscan_blk *)malloc(SIZEOF(lvscan_blk));
 					newlvscan->next = lvscan;
 					newlvscan->elemcnt = 1;		/* Going to use first one *now* */
 					elemindx = 0;
@@ -371,4 +423,5 @@ void tp_unwind_restlv(lv_val *curr_lv, lv_val *save_lv, tp_var *restore_ent, lvs
 			}
 		}
 	}
+	return 0;
 }

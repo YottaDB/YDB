@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ void setzdir(mval *newdir, mval *full_path_of_newdir)
 	if (NULL != newdir)
 	{
 		MV_FORCE_STR(newdir);
-		assert(sizeof(directory) > newdir->str.len);
+		assert(SIZEOF(directory) > newdir->str.len);
 		memcpy(directory, newdir->str.addr, newdir->str.len);
 		directory[newdir->str.len] = '\0';
 		if (-1 == CHDIR(directory))
@@ -56,7 +56,7 @@ void setzdir(mval *newdir, mval *full_path_of_newdir)
 	 * $ZDIR will show up as a relative path */
 	if (NULL != full_path_of_newdir)
 	{
-		if (NULL != GETCWD(directory_buffer, sizeof(directory_buffer), getcwd_res))
+		if (NULL != GETCWD(directory_buffer, SIZEOF(directory_buffer), getcwd_res))
 		{
 			length = USTRLEN(directory_buffer);
 			UNIX_ONLY(directory_buffer[length++] = '/';)

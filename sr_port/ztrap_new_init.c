@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,6 @@ void ztrap_new_init(void)
 	mstr		val;
 
 	val.addr = ZTRAP_NEW;
-	val.len = sizeof(ZTRAP_NEW) - 1;
+	val.len = SIZEOF(ZTRAP_NEW) - 1;
 	ztrap_new = logical_truth_value(&val, FALSE, NULL);
 }

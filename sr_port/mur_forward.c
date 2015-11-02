@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 
 #include <stddef.h> /* for offsetof() macro */
 
+#include "gtm_time.h"
 #include "gtm_string.h"
 #include "min_max.h"
 #ifdef VMS
@@ -35,6 +36,9 @@
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
+#include "gdskill.h"		/* needed for tp.h */
+#include "gdscc.h"		/* needed for tp.h */
+#include "tp.h"
 #include "mur_jnl_ext.h"
 #include "iosp.h"
 #include "gtmmsg.h"
@@ -47,27 +51,23 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gv_namehead	*gv_target;
-GBLREF  gd_region       *gv_cur_region;
-GBLREF  int4		gv_keysize;
-GBLREF  gv_key		*gv_altkey;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	sgmnt_data_ptr_t cs_data;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF 	mur_gbls_t	murgbl;
-GBLREF 	mur_rab_t	mur_rab;
-GBLREF	reg_ctl_list	*mur_ctl;
-GBLREF	jnl_ctl_list	*mur_jctl;
-GBLREF 	int		mur_regno;
-GBLREF	mur_opt_struct	mur_options;
-GBLREF	short		dollar_tlevel;
-GBLREF 	jnl_gbls_t	jgbl;
-GBLREF	seq_num		seq_num_zero;
+
+GBLREF	gv_namehead		*gv_target;
+GBLREF  gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t 	cs_data;
+GBLREF  int4			gv_keysize;
+GBLREF 	mur_gbls_t		murgbl;
+GBLREF	reg_ctl_list		*mur_ctl, *rctl_start;
+GBLREF  jnl_process_vector	*prc_vec;
+GBLREF	mur_opt_struct		mur_options;
+GBLREF	short			dollar_tlevel;
+GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
-GBLREF	hash_table_mname	*gd_tab_ptr;
-LITREF	int		jrt_update[JRT_RECTYPES];
-LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
+#endif
+
 static	void	(* const extraction_routine[])() =
 {
 #define JNL_TABLE_ENTRY(rectype, extract_rtn, label, update, fixed_size, is_replicated)	extract_rtn,
@@ -77,379 +77,326 @@ static	void	(* const extraction_routine[])() =
 
 uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num losttn_seqno)
 {
-	char			new;
-	boolean_t		process_losttn, extr_file_create[TOT_EXTR_TYPES], added, is_set_kill_zkill;
-	trans_num		curr_tn, last_tn;
+	boolean_t		added, this_reg_stuck;
+	boolean_t		is_set_kill_zkill_ztworm, is_set_kill_zkill;
+	jnl_record		*rec;
 	enum jnl_record_type	rectype;
 	enum rec_fence_type	rec_fence;
 	enum broken_type	recstat;
 	jnl_tm_t		rec_time;
 	int4			rec_image_count = 0;	/* This is a dummy variable for UNIX */
-	uint4			rec_pid, status;
+	uint4			status, regcnt_stuck, num_partners;
 	mval			mv;
+	reg_ctl_list		*rctl, *rctl_top, *prev_rctl;
+	jnl_ctl_list		*jctl;
+	gd_region		*reg;
+	sgmnt_addrs		*csa;
 	seq_num 		rec_token_seq;
-	jnl_record		*rec;
-	jnl_string		*keystr;
+	forw_multi_struct	*forw_multi;
 	multi_struct 		*multi;
-	pini_list_struct	*plst;
-	reg_ctl_list		*rctl, *rctl_top;
-	unsigned char		*mstack_ptr;
-	ht_ent_mname		*tabent;
-	mname_entry	 	gvent;
-	gvnh_reg_t		*gvnh_reg;
-	GTMCRYPT_ONLY(
-	int			crypt_status;
-	)
-	error_def(ERR_JNLREADEOF);
-	error_def(ERR_DUPTN);
-	error_def(ERR_BLKCNTEDITFAIL);
-	error_def(ERR_JNLTPNEST);
 
+	error_def(ERR_JNLREADEOF);
+	error_def(ERR_BLKCNTEDITFAIL);
+
+	GTMTRIG_ONLY(skip_dbtriggers = TRUE;)	/* do not want to invoke any triggers for updates done by journal recovery */
 	murgbl.extr_buff = (char *)malloc(murgbl.max_extr_record_length);
 	for (recstat = (enum broken_type)0; recstat < TOT_EXTR_TYPES; recstat++)
-		extr_file_create[recstat] = TRUE;
+		murgbl.extr_file_create[recstat] = TRUE;
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = TRUE;
+	assert(NULL == jgbl.mur_pini_addr_reset_fnptr);
 	jgbl.mur_pini_addr_reset_fnptr = (pini_addr_reset_fnptr)mur_pini_addr_reset;
 	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
-	mu_gv_stack_init(&mstack_ptr);
-	assert(!mur_options.rollback_losttnonly || !murgbl.db_updated);
-	if (!mur_options.rollback_losttnonly)
-		murgbl.db_updated = mur_options.update;
-	/* At this point, murgbl.db_updated is the same as mur_options.update except in the case of LOSTTNONLY rollback in which
-	 * case it is FALSE while mur_options.update is TRUE. Both these variables are used in the below code depending on
-	 * whichever is appropriate. Note that we do NOT want to update the database (i.e. play forward any jnl records forward)
-	 * in case of a LOSTTNONLY rollback.
-	 */
+	mu_gv_stack_init();
 	murgbl.consist_jnl_seqno = 0;
-	assert(!mur_options.rollback || (losttn_seqno <= min_broken_seqno));
-	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
+	/* Note down passed in values in murgbl global so "mur_forward_play_cur_jrec" function can see it as well */
+	murgbl.min_broken_time = min_broken_time;
+	murgbl.min_broken_seqno = min_broken_seqno;
+	murgbl.losttn_seqno = losttn_seqno;
+	assert(!mur_options.rollback || (murgbl.losttn_seqno <= murgbl.min_broken_seqno));
+	prev_rctl = NULL;
+	rctl_start = NULL;
+	assert(0 == murgbl.regcnt_remaining);
+	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
-		process_losttn = FALSE;
-		gd_tab_ptr = &rctl->gvntab;
 		if (mur_options.forward)
 		{
 			assert(NULL == rctl->jctl_turn_around);
-			mur_jctl = rctl->jctl = rctl->jctl_head;
-			mur_jctl->rec_offset = JNL_HDR_LEN;
+			jctl = rctl->jctl = rctl->jctl_head;
+			assert(jctl->reg_ctl == rctl);
+			jctl->rec_offset = JNL_HDR_LEN;
 			jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END; /* initialized to reflect journaling is not enabled */
 		} else
 		{
-			mur_jctl = rctl->jctl = (NULL == rctl->jctl_turn_around) ? rctl->jctl_head : rctl->jctl_turn_around;
-			mur_jctl->rec_offset = mur_jctl->turn_around_offset;
-			jgbl.mur_jrec_seqno = mur_jctl->turn_around_seqno;
+			jctl = rctl->jctl = (NULL == rctl->jctl_turn_around) ? rctl->jctl_head : rctl->jctl_turn_around;
+			assert(jctl->reg_ctl == rctl);
+			jctl->rec_offset = jctl->turn_around_offset;
+			jgbl.mur_jrec_seqno = jctl->turn_around_seqno;
 			if (mur_options.rollback && murgbl.consist_jnl_seqno < jgbl.mur_jrec_seqno)
 				murgbl.consist_jnl_seqno = jgbl.mur_jrec_seqno;
-			assert(murgbl.consist_jnl_seqno <= losttn_seqno);
-			assert((NULL != rctl->jctl_turn_around) || (0 == mur_jctl->rec_offset));
+			assert(murgbl.consist_jnl_seqno <= murgbl.losttn_seqno);
+			assert((NULL != rctl->jctl_turn_around) || (0 == jctl->rec_offset));
 		}
 		if (mur_options.update || mur_options.extr[GOOD_TN])
 		{
-			gv_cur_region = rctl->gd;
-			tp_change_reg();
-			SET_CSA_DIR_TREE(cs_addrs, MAX_KEY_SZ, gv_cur_region);
-			/* Keep gv_target and gv_cur_region in sync always. Now that region is changed, set gv_target to
-			 * csa->dir_tree. We dont want to set it to NULL as there is code in t_begin that assumes it is non-NULL.
-			 */
+			reg = rctl->gd;
+			gv_cur_region = reg;
+			tp_change_reg();	/* note : sets cs_addrs to non-NULL value even if gv_cur_region->open is FALSE
+						 * (cs_data could still be NULL). */
+			rctl->csa = cs_addrs;
+			cs_addrs->rctl = rctl;
+			rctl->csd = cs_data;
+			rctl->sgm_info_ptr = cs_addrs->sgm_info_ptr;
+			SET_CSA_DIR_TREE(cs_addrs, MAX_KEY_SZ, reg);
 			gv_target = cs_addrs->dir_tree;
 		}
-		curr_tn = 0;
-		rec_token_seq = 0;
-		for (mur_jctl->after_end_of_data = FALSE, status = mur_next(mur_jctl->rec_offset);
-							SS_NORMAL == status; status = mur_next_rec())
+		jctl->after_end_of_data = FALSE;
+		status = mur_next(jctl, jctl->rec_offset);
+		assert(ERR_JNLREADEOF != status);	/* cannot get EOF at start of forward processing */
+		if (SS_NORMAL != status)
+			return status;
+		PRINT_VERBOSE_STAT(jctl, "mur_forward:at the start");
+		/* Any multi-region TP transaction will be processed as multiple single-region TP transactions up
+		 * until the tp-resolve-time is reached. From then on, they will be treated as one multi-region TP
+		 * transaction. This is needed for proper lost-tn determination (any multi-region transaction that
+		 * gets played in a region AFTER it has already encountered a broken tn should treat this as a lost tn).
+		 */
+		do
 		{
-			rec = mur_rab.jnlrec;
-			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
+			assert(jctl == rctl->jctl);
+			rec = rctl->mur_desc->jnlrec;
 			rec_time = rec->prefix.time;
-			is_set_kill_zkill = (boolean_t)(IS_SET_KILL_ZKILL(rectype));
 			if (rec_time > mur_options.before_time)
-				/* Even they do not go to losttrans or brkntrans files */
-				break;
-			if (is_set_kill_zkill)
-			{
-				boolean_t is_ztp = (boolean_t)(IS_ZTP(rectype));
-				keystr = is_ztp ? (jnl_string *)&rec->jrec_fkill.mumps_node
-							   : (jnl_string *)&rec->jrec_kill.mumps_node;
-#				ifdef GTM_CRYPT
-				if (mur_jctl->jfh->is_encrypted)
-				{
-					DECODE_SET_KILL_ZKILL(keystr, is_ztp, rec->prefix.forwptr,
-							      mur_jctl->encr_key_handle, crypt_status);
-					if (0 != crypt_status)
-					{
-						GC_GTM_PUTMSG(crypt_status, NULL);
-						return crypt_status;
-					}
-				}
-#				endif
-			}
-			if (mur_options.selection && !mur_select_rec())
-				continue;
-			assert((0 == mur_options.after_time) || mur_options.forward && !murgbl.db_updated);
+				break;	/* Records after -BEFORE_TIME do not go to extract or losttrans or brkntrans files */
 			if (rec_time < mur_options.after_time)
-				continue;
-			if (REC_HAS_TOKEN_SEQ(rectype))
-				rec_token_seq = GET_JNL_SEQNO(rec);
-			if (!process_losttn && mur_options.rollback && rec_token_seq >= losttn_seqno)
-				process_losttn = TRUE;
-			/* Note: Broken transaction determination is done below only based on the records that got selected as
-			 * part of the mur_options.selection criteria. Therefore depending on whether a broken transaction gets
-			 * selected or not, future complete transactions might either go to the lost transaction or extract file.
+			{
+				status = mur_next_rec(&jctl);
+				continue; /* Records before -AFTER_TIME do not go to extract or losttrans or brkntrans files */
+			}
+			if (rec_time >= jgbl.mur_tp_resolve_time)
+				break;	/* Records after tp-resolve-time will be processed below */
+			/* TODO: what do we do if we find a BROKEN tn here? */
+			status = mur_forward_play_cur_jrec(rctl);
+			if (SS_NORMAL != status)
+				break;
+			status = mur_next_rec(&jctl);
+		} while (SS_NORMAL == status);
+		CHECK_IF_EOF_REACHED(rctl, status); /* sets rctl->forw_eof_seen if needed; resets "status" to SS_NORMAL */
+		if (SS_NORMAL != status)
+			return status;
+		if (rctl->forw_eof_seen)
+		{
+			PRINT_VERBOSE_STAT(jctl, "mur_forward:Reached EOF before tp_resolve_time");
+			continue;	/* Reached EOF before even getting to tp_resolve_time.
+					 * Do not even consider region for next processing loop */
+		}
+		rctl->last_tn = 0;
+		rctl->process_losttn = FALSE;
+		murgbl.regcnt_remaining++;	/* # of regions participating in recovery at this point */
+		if (NULL == rctl_start)
+			rctl_start = rctl;
+		if (NULL != prev_rctl)
+		{
+			prev_rctl->next_rctl = rctl;
+			rctl->prev_rctl = prev_rctl;
+		}
+		prev_rctl = rctl;
+		assert(murgbl.ok_to_update_db || !rctl->db_updated);
+		PRINT_VERBOSE_STAT(jctl, "mur_forward:at tp_resolve_time");
+	}
+	assert(NULL != prev_rctl);	/* there should have been at least one region with records AFTER tp-resolve-time */
+	if (prev_rctl != rctl_start)
+	{
+		prev_rctl->next_rctl = rctl_start;
+		rctl_start->prev_rctl = prev_rctl;
+	}
+	assert((prev_rctl != rctl_start) || (NULL == rctl_start->next_rctl));
+	assert((prev_rctl != rctl_start) || (NULL == rctl_start->prev_rctl));
+	rctl = rctl_start;
+	regcnt_stuck = 0; /* # of regions we are stuck in waiting for other regions to resolve a multi-region TP transaction */
+	assert((NULL == rctl) || (NULL == rctl->forw_multi));
+	gv_cur_region = NULL;	/* clear out any previous value to ensure gv_cur_region/cs_addrs/cs_data
+				 * all get set in sync by the MUR_CHANGE_REG macro below.
+				 */
+	while (NULL != rctl)
+	{	/* while there is at least one region remaining with unprocessed journal records */
+		assert(NULL != rctl_start);
+		assert(0 < murgbl.regcnt_remaining);
+		if (NULL != rctl->forw_multi)
+		{	/* This region's current journal record is part of a TP transaction waiting for other regions */
+			regcnt_stuck++;
+			if (regcnt_stuck >= murgbl.regcnt_remaining)
+				GTMASSERT;	/* Out-of-design situation. Stuck in ALL regions. */
+			rctl = rctl->next_rctl;	/* Move on to the next available region */
+			assert(NULL != rctl);
+			continue;
+		}
+		regcnt_stuck = 0;	/* restart the counter now that we found at least one non-stuck region */
+		MUR_CHANGE_REG(rctl);
+		jctl = rctl->jctl;
+		this_reg_stuck = FALSE;
+		for ( status = SS_NORMAL; SS_NORMAL == status; )
+		{
+			assert(jctl == rctl->jctl);
+			rec = rctl->mur_desc->jnlrec;
+			rec_time = rec->prefix.time;
+			assert(rec_time >= jgbl.mur_tp_resolve_time);
+			if (rec_time > mur_options.before_time)
+				break;	/* Records after -BEFORE_TIME do not go to extract or losttrans or brkntrans files */
+			assert((0 == mur_options.after_time) || mur_options.forward && !rctl->db_updated);
+			if (rec_time < mur_options.after_time)
+			{
+				status = mur_next_rec(&jctl);
+				continue; /* Records before -AFTER_TIME do not go to extract or losttrans or brkntrans files */
+			}
+			/* Check if current journal record can be played right away or need to wait for corresponding journal
+			 * records from other participating TP regions to be reached. A non-TP or ZTP transaction can be played
+			 * without issues (i.e. has no dependencies with any other regions). A single-region TP transaction too
+			 * falls in the same category. A multi-region TP transaction needs to wait until all participating regions
+			 * have played all journal records BEFORE this TP in order to ensure recover plays records in the exact
+			 * same order that GT.M performed them in.
 			 */
-			recstat = GOOD_TN;
+			/* If FENCE_NONE is specified, we would not have maintained any multi hashtable in mur_back_process for
+			 * broken transaction processing. So we process multi-region TP transactions as multiple single-region
+			 * TP transactions in forward phase.
+			 */
 			if (FENCE_NONE != mur_options.fences)
 			{
-				if (IS_FENCED(rectype))
+				rectype = rec->prefix.jrec_type;
+				if (IS_TP(rectype) && IS_TUPD(rectype))
 				{
-					assert(IS_REPLICATED(rectype));
-					DEBUG_ONLY(
-						/* assert that all TP records before min_broken_time are not broken */
-						if (IS_TP(rectype) &&
-							((!mur_options.rollback && rec_time < min_broken_time) ||
-							  (mur_options.rollback && rec_token_seq < min_broken_seqno)))
-						{
-							status = mur_get_pini(rec->prefix.pini_addr, &plst);
-							assert(SS_NORMAL == status);
-							rec_pid = plst->jpv.jpv_pid;
-							VMS_ONLY(rec_image_count = plst->jpv.jpv_image_count;)
-							rec_fence = GET_REC_FENCE_TYPE(rectype);
-							if (NULL != (multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_pid,
-								rec_image_count, rec_time, rec_fence)))
-								assert(0 == multi->partner);
-						}
-					)
-					if ((!mur_options.rollback && rec_time >= min_broken_time) ||
-					     (mur_options.rollback && rec_token_seq >= min_broken_seqno))
-					{	/* the above if checks are to avoid hash table lookup (performance),
-						 * when it is not needed */
-						assert(!mur_options.rollback || process_losttn);
-						status = mur_get_pini(rec->prefix.pini_addr, &plst);
-						if (SS_NORMAL != status)
-							break;
-						rec_pid = plst->jpv.jpv_pid;
-						VMS_ONLY(rec_image_count = plst->jpv.jpv_image_count;)
-						rec_fence = GET_REC_FENCE_TYPE(rectype);
-						if (ZTPFENCE == rec_fence)
-							rec_token_seq = ((struct_jrec_ztp_upd *)rec)->token;
-						if ((NULL != (multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_pid,
-								rec_image_count, rec_time, rec_fence))) && (0 < multi->partner))
-						{
-							process_losttn = TRUE;
-							recstat = BROKEN_TN;
-						}
-					}
-				} else if ((FENCE_ALWAYS == mur_options.fences) && is_set_kill_zkill)
-				{
-					process_losttn = TRUE;
-					recstat = BROKEN_TN;
-				}
-			}
-			if (GOOD_TN == recstat && process_losttn)
-			{
-				if (!mur_options.rollback)
-				{
-					murgbl.err_cnt = murgbl.err_cnt + 1;
-					/* JRT_INCTN will not be applied to database after a broken transaction is found */
-					if (murgbl.err_cnt > mur_options.error_limit || JRT_INCTN == rectype)
-						recstat = LOST_TN;
-					/* the above check needs to be transaction based instead of record based ??? */
-				} else
-					recstat = LOST_TN;
-			}
-			if (mur_options.show)
-			{
-				assert(SS_NORMAL == status);
-				if (BROKEN_TN != recstat)
-				{
-					if (JRT_PFIN == rectype)
-						status = mur_pini_state(rec->prefix.pini_addr, FINISHED_PROC);
-					else if ((JRT_EOF != rectype)
-							&& ((JRT_ALIGN != rectype) || (JNL_HDR_LEN != rec->prefix.pini_addr)))
-					{	/* Note that it is possible that we have a PINI record followed by a PFIN record
-						 * and later an ALIGN record with the pini_addr pointing to the original PINI
-						 * record (see comment in jnl_write.c where pini_addr gets assigned to JNL_HDR_LEN)
-						 * In this case we do not want the ALIGN record to cause the process to become
-						 * ACTIVE although it has written a PFIN record. Hence the check above.
-						 */
-						status = mur_pini_state(rec->prefix.pini_addr, ACTIVE_PROC);
-					}
-				} else
-					status = mur_pini_state(rec->prefix.pini_addr, BROKEN_PROC);
-				if (SS_NORMAL != status)
-					break;	/* mur_pini_state() failed due to bad pini_addr */
-				++mur_jctl->jnlrec_cnt[rectype];	/* for -show=STATISTICS */
-			}
-			if (!mur_options.update && !mur_options.extr[GOOD_TN])
-				continue;
-			if (murgbl.db_updated && IS_TUPD(rectype) && GOOD_TN == recstat)
-			{	/* Even for FENCE_NONE we apply fences. Otherwise an TUPD becomes UPD etc. */
-				if (dollar_tlevel)
-				{
-					assert(FALSE);
-					gtm_putmsg(VARLSTCNT(6) ERR_JNLTPNEST, 4, mur_jctl->jnl_fn_len,
-						mur_jctl->jnl_fn, mur_jctl->rec_offset, &rec->prefix.tn);
-					op_trollback(0);
-				}
-				/* Note: op_tstart resets gv_currkey. So set gv_currkey later. */
-				/* mv is used to determine transaction id. But it is ignored by recover/rollback */
-				mv.mvtype = MV_STR;
-				mv.str.len = 0;
-				mv.str.addr = NULL;
-				op_tstart(TRUE, TRUE, &mv, -1);
-				tp_set_sgm();
-			}
-			/* For extract, if database was present we would have done gvcst_init().
-			 * For recover/rollback gvcst_init() should definitely have been done.
-			 * In both cases rctl->csa will be non-NULL.
-			 * Only then can we call gvcst_root_search() to find out collation set up for this global.
-			 */
-			assert(!mur_options.update || (NULL != rctl->csa));
-			if (is_set_kill_zkill)
-			{	/* ZTP has different record format than TP or non-TP. TP and non-TP has same format */
-				assert(NULL != keystr);
-				memcpy(gv_currkey->base, &keystr->text[0], keystr->length);
-				gv_currkey->base[keystr->length] = '\0';
-				gv_currkey->end = keystr->length;
-				if (NULL != rctl->csa)
-				{/* find out collation of key in the jnl-record from the database corresponding to the jnl file */
-					gvent.var_name.addr = (char *)gv_currkey->base;
-					gvent.var_name.len = STRLEN((char *)gv_currkey->base);
-					COMPUTE_HASH_MNAME(&gvent);
-					if ((NULL !=  (tabent = lookup_hashtab_mname(&rctl->gvntab, &gvent)))
-						&& (NULL != (gvnh_reg = (gvnh_reg_t *)tabent->value)))
+					assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));
+					assert(&rec->jrec_set_kill.num_participants == &rec->jrec_ztworm.num_participants);
+					num_partners = rec->jrec_set_kill.num_participants;
+					assert(0 < num_partners);
+					if (1 < num_partners)
 					{
-						gv_target = gvnh_reg->gvt;
-						gv_cur_region = gvnh_reg->gd_reg;
-						assert(gv_cur_region->open);
-					} else
-					{
-						assert(gv_cur_region->max_key_size <= MAX_KEY_SZ);
-						gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size,
-							&gvent, gv_cur_region);
-						gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
-						gvnh_reg->gvt = gv_target;
-						gvnh_reg->gd_reg = gv_cur_region;
-						if (NULL != tabent)
-						{	/* Since the global name was found but gv_target was null and
-							 * now we created a new gv_target, the hash table key must point
-							 * to the newly created gv_target->gvname. */
-							tabent->key = gv_target->gvname;
-							tabent->value = (char *)gvnh_reg;
-						} else
-						{
-							added = add_hashtab_mname(&rctl->gvntab, &gv_target->gvname,
-									gvnh_reg, &tabent);
-							assert(added);
-						}
-					}
-					if ((0 == gv_target->root) || (DIR_ROOT == gv_target->root))
-					{
-						assert(gv_target != cs_addrs->dir_tree);
-						gvcst_root_search();
+						this_reg_stuck = TRUE;
+						assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
 					}
 				}
 			}
-			if (GOOD_TN == recstat)
+			if (this_reg_stuck)
 			{
-				if ((is_set_kill_zkill && !IS_TP(rectype)) || JRT_TCOM == rectype)
-				{
-					/*
-					 * Do forward journaling, eliminating operations with duplicate transaction
-					 * numbers.
-					 *
-					 * While doing journaling on a database, a process may be killed immediately
-					 * after updating (or partially updating) the journal file, but before the
-					 * database gets updated.  Since the transaction was never fully committed,
-					 * the database transaction number has not been updated, and the last journal
-					 * record does not reflect the actual state of the database.  The next process
-					 * to update the database writes a journal record with the same transaction
-					 * number as the previous record.  While processing the journal file, we must
-					 * recognize this and delete the uncommitted transaction.
-					 *
-					 * This process is fairly straightforward (queue up the journal records,
-					 * writing out the ones in the queue when prev_tn != curr_tn), except for
-					 * the following special conditions:
-					 *
-					 *	-------------------------------------------
-					 *	|  tn  | PBLK | PBLK | PBLK | PBLK | tn+1 |    case 1 (normal)
-					 *	-------------------------------------------
-					 *	       ^
-					 *
-					 *	-------------------------------------------
-					 *	|  tn  | PBLK | PBLK | PBLK | PBLK |  tn  |    case 2
-					 *	-------------------------------------------
-					 *	       ^
-					 *
-					 * PBLK records (before-image database blocks) don't have a transaction
-					 * number associated with them.  We may have any number of these PBLKs
-					 * before the next record with a transaction number, so we must queue up
-					 * the record prior to the first PBLK, and not update prev_tn until we
-					 * have seen the record following the sequence of PBLKs.  When we encounter
-					 * it, we do the comparison.  If prev_tn == curr_tn, we delete all the records
-					 * in the queue.  If prev_tn != curr_tn, we commit all the records in the
-					 * queue, then start the process over again, queueing up the current record.
-					 *
-					 * Similarly, although ZTCOM records do have a transaction number associated
-					 * with them, they do not represent a separate database update;  thus, the
-					 * next record following a ZTCOM that corresponds to an update may have the
-					 * same transaction number as the ZTCOM.  Therefore, We do not update prev_tn
-					 * after encountering a ZTCOM record.
-					 *
-					 * Transaction processing:
-					 * Each journal record has the same transaction number, so we queue them
-					 * up and when we reach the record following the tcommit, we check its
-					 * transaction number.  If it matches, we throw away the queue, otherwise
-					 * commit.
-					 *
+				rec_token_seq = GET_JNL_SEQNO(rec);
+				VMS_ONLY(
+					/* In VMS, pid is not unique. We need "image_count" as well. But this is not needed
+					 * in case of rollback as the token is guaranteed to be unique in that case.
 					 */
-					last_tn = curr_tn;
-					curr_tn =  rec->prefix.tn;
-					if (last_tn == curr_tn)
+					if (!mur_options.rollback)
 					{
-						assert(FALSE); /* We want to debug this */
-						murgbl.wrn_count++;
-						gtm_putmsg(VARLSTCNT(6) ERR_DUPTN, 4, &curr_tn, mur_jctl->rec_offset,
-							mur_jctl->jnl_fn_len, mur_jctl->jnl_fn);
-						if (murgbl.db_updated && dollar_tlevel)
-							op_trollback(0);
+						MUR_GET_IMAGE_COUNT(jctl, rec, rec_image_count, status);
+						if (SS_NORMAL != status)
+						{
+							this_reg_stuck = FALSE;	/* so abnormal "status" gets checked below */
+							break;
+						}
 					}
+				)
+				/* In Unix, "rec_image_count" is ignored by the MUR_FORW* macros */
+				MUR_FORW_TOKEN_LOOKUP(forw_multi, rec_token_seq, rec_time, rec_image_count);
+				if (NULL != forw_multi)
+				{	/* This token has already been seen in another region in forward processing.
+					 * Add current region as well. If all regions have been resolved, then play
+					 * the entire transaction maintaining the exact same order of updates within.
+					 */
+					MUR_FORW_TOKEN_ONE_MORE_REG(forw_multi, rctl);
+				} else
+				{	/* First time we are seeing this token in forward processing. Check if this
+					 * has already been determined to be a broken transaction.
+					 */
+					recstat = GOOD_TN;
+					multi = NULL;
+					if (IS_REC_POSSIBLY_BROKEN(rec_time, rec_token_seq))
+					{
+						multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_image_count, rec_time, TPFENCE);
+						if ((NULL != multi) && (0 < multi->partner))
+							recstat = BROKEN_TN;
+					}
+					MUR_FORW_TOKEN_ADD(forw_multi, rec_token_seq, rec_time, rctl, num_partners,
+								recstat, multi, rec_image_count);
 				}
-				if (murgbl.db_updated)
-				{
-					assert(!mur_options.rollback || (rec_token_seq < losttn_seqno));
-					if (SS_NORMAL != (status = mur_output_record())) /* updates murgbl.consist_jnl_seqno */
+				/* Check that "tabent" field has been initialized above (by either the MUR_FORW_TOKEN_LOOKUP
+				 * or MUR_FORW_TOKEN_ADD macros). This is relied upon by "mur_forward_play_multireg_tp" below.
+				 */
+				assert(NULL != forw_multi->u.tabent);
+				assert(forw_multi->num_reg_seen_forward <= forw_multi->num_reg_seen_backward);
+				if (forw_multi->num_reg_seen_forward == forw_multi->num_reg_seen_backward)
+				{	/* All regions have been seen in forward processing. Now play it.
+					 * Note that the TP could be BROKEN_TN or GOOD_TN. The callee handles it.
+					 */
+					assert(forw_multi == rctl->forw_multi);
+					status = mur_forward_play_multireg_tp(forw_multi, rctl);
+					this_reg_stuck = FALSE;
+					/* Note that as part of playing the TP transaction, we could have reached
+					 * the EOF of rctl. In this case, we need to break out of the loop.
+					 */
+					if ((SS_NORMAL != status) || rctl->forw_eof_seen)
 						break;
-					assert(!mur_options.rollback || (murgbl.consist_jnl_seqno <= losttn_seqno));
+					assert(NULL == rctl->forw_multi);
+					assert(!dollar_tlevel);
+					jctl = rctl->jctl;	/* In case the first record after the most recently processed
+								 * TP transaction is in the next generation journal file */
+					continue;
 				}
-			}
-			if (GOOD_TN != recstat || mur_options.extr[GOOD_TN])
+				break;
+			} else
 			{
-				if (extr_file_create[recstat])
-				{
-					if (SS_NORMAL != (status = mur_cre_file_extfmt(recstat)))
-						break;
-					extr_file_create[recstat] = FALSE;
-				}
-				/* extract "rec" using routine "extraction_routine[rectype]" into broken transaction file */
-				EXTRACT_JNLREC(rec, extraction_routine[rectype], murgbl.file_info[recstat], status);
+				status = mur_forward_play_cur_jrec(rctl);
 				if (SS_NORMAL != status)
 					break;
 			}
+			assert(!this_reg_stuck);
+			status = mur_next_rec(&jctl);
 		}
-		if (SS_NORMAL != status && ERR_JNLREADEOF != status)
-		{
-			gd_tab_ptr = NULL;
-			return status;
+		assert((NULL == rctl->forw_multi) || this_reg_stuck);
+		assert((NULL != rctl->forw_multi) || !this_reg_stuck);
+		if (!this_reg_stuck)
+		{	/* We are not stuck in this region (to resolve a multi-region TP).
+			 * This means we are done processing all the records of this region.
+			 */
+			assert(NULL == rctl->forw_multi);
+			if (!rctl->forw_eof_seen)
+			{
+				CHECK_IF_EOF_REACHED(rctl, status);
+					/* sets rctl->forw_eof_seen if needed; resets "status" to SS_NORMAL */
+				if (SS_NORMAL != status)
+					return status;
+				assert(!dollar_tlevel);
+				DELETE_RCTL_FROM_UNPROCESSED_LIST(rctl); /* since all of its records should have been processed */
+			} else
+			{	/* EOF was seen in rctl inside "mur_forward_play_multireg_tp" and it was removed
+				 * from the unprocessed list of rctls. At the time rctl was removed, its "next_rctl"
+				 * field could have been pointing to another <rctl> that has since then also been
+				 * removed inside the same function. Therefore the "next_rctl" field is not reliable
+				 * in this case but instead we should rely on the global variable "rctl_start" which
+				 * points to the list of unprocessed rctls. Set "next_rctl" accordingly.
+				 */
+				rctl->next_rctl = rctl_start;
+			}
+			assert(rctl->deleted_from_unprocessed_list);
 		}
-		jgbl.mur_plst = NULL;	/* No more simulation of GT.M activity for this region. */
-		if (murgbl.db_updated && SS_NORMAL != mur_block_count_correct())
+		assert(!this_reg_stuck || !rctl->forw_eof_seen);
+		assert((NULL == rctl->next_rctl) || (NULL != rctl_start));
+		assert((NULL == rctl->next_rctl) || (0 < murgbl.regcnt_remaining));
+		rctl = rctl->next_rctl;	/* Note : even though "rctl" could have been deleted from the doubly linked list above,
+					 * rctl->next_rctl is not touched so we can still use it to get to the next element. */
+	}
+	assert(0 == murgbl.regcnt_remaining);
+	jgbl.mur_pini_addr_reset_fnptr = NULL;	/* No more simulation of GT.M activity for any region */
+	prc_vec = murgbl.prc_vec;	/* Use process-vector of MUPIP RECOVER (not any simulating GT.M process) now onwards */
+	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
+	{
+		PRINT_VERBOSE_STAT(rctl->jctl, "mur_forward:at the end");
+		assert(!mur_options.rollback || (0 != murgbl.consist_jnl_seqno));
+		assert(mur_options.rollback || (0 == murgbl.consist_jnl_seqno));
+		assert(!dollar_tlevel);	/* In case it applied a broken TUPD */
+		assert(murgbl.ok_to_update_db || !rctl->db_updated);
+		rctl->mur_plst = NULL;	/* reset now that simulation of GT.M updates is done */
+		if (rctl->db_updated && (SS_NORMAL != mur_block_count_correct(rctl)))
 		{
-			gtm_putmsg(VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(gv_cur_region));
+			gtm_putmsg(VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(rctl->gd));
 			murgbl.wrn_count++;
 		}
-		assert(!mur_options.rollback || 0 != murgbl.consist_jnl_seqno);
-		assert(mur_options.rollback || 0 == murgbl.consist_jnl_seqno);
-		assert(!dollar_tlevel);	/* In case it applied a broken TUPD */
 	}
-	gd_tab_ptr = NULL;
 	return SS_NORMAL;
 }

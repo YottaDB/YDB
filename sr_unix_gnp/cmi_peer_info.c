@@ -31,7 +31,7 @@ void cmi_peer_info(struct CLB *lnk, char *buf, size_t sz)
     struct hostent	*he;
 
     if ((he = gethostbyaddr((char *)&sin->sin_addr.s_addr,
-			    sizeof(struct in_addr), AF_INET)))
+			    SIZEOF(struct in_addr), AF_INET)))
 	snprintf(buf, sz, "%s (%d.%d.%d.%d:%d)",he->h_name,
 		   sin->sin_addr.s_addr >> 24,
 		   sin->sin_addr.s_addr >> 16 & 0xFF,

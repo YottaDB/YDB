@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@ void get_dlr_key(mval *v)
 	mstr x;
 	char buff[128], *cp, *cend;
 
-	x.len = sizeof(buff);
+	x.len = SIZEOF(buff);
 	x.addr = buff;
 	(io_curr_device.in->disp_ptr->dlr_key)(&x);
 	v->mvtype = MV_STR;

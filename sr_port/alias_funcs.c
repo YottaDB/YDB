@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,8 +140,8 @@
 /* Macro to initialize a ZWR_ZAV_BLK structure */
 #define ZAV_BLK_INIT(zavb, zavbnext)											\
 	(zavb)->next = (zavbnext);											\
-	(zavb)->zav_base = (zavb)->zav_free = (zwr_alias_var *)((char *)(zavb) + sizeof(zwr_zav_blk));			\
-	(zavb)->zav_top = (zwr_alias_var *)((char *)(zavb)->zav_base + (sizeof(zwr_alias_var) * ZWR_ZAV_BLK_CNT));
+	(zavb)->zav_base = (zavb)->zav_free = (zwr_alias_var *)((char *)(zavb) + SIZEOF(zwr_zav_blk));			\
+	(zavb)->zav_top = (zwr_alias_var *)((char *)(zavb)->zav_base + (SIZEOF(zwr_alias_var) * ZWR_ZAV_BLK_CNT));
 
 /* Macro to run a given tree looking for container vars. Process what they point to in order to make sure what they point to
    doesn't live in the symbol tree being popped. If so, move to the current tree (copying if necessary). If what is being pointed
@@ -175,6 +175,7 @@ GBLREF short		dollar_trestart;
 GBLREF boolean_t	suspend_lvgcol;
 GBLREF lv_xnew_var	*xnewvar_anchor;
 GBLREF lv_xnew_ref	*xnewref_anchor;
+GBLREF mval		*alias_retarg;
 
 LITREF mname_entry	null_mname_entry;
 
@@ -266,6 +267,9 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 		if (SFF_CI & fpprev->flags)
 		{	/* Callins needs to be able to crawl past apparent end of stack to earlier stack segments */
 			/* We should be in the base frame now. See if an earlier frame exists */
+			/* Note we don't worry about trigger base frames here because triggers *always* have a
+			   different symbol table - previous symbol tables and stack levels are not affected
+			*/
 			fp = *(stack_frame **)(fp + 1);	/* Backups up to "prev pointer" created by base_frame() */
 			if (NULL == fp || fp >= (stack_frame *)stackbase || fp < (stack_frame *)stacktop)
 				break;	/* Pointer not within the stack -- must be earliest occurence */
@@ -306,7 +310,7 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 	   the SmInitAlloc gtmdgblvl flag here, this is so critical for debugging we want to do this even when general
 	   checking is not being done. SE 09/2008
 	*/
-	DEBUG_ONLY(memset(table_base_orig, 0xfe, table_size_orig * sizeof(ht_ent_mname)));
+	DEBUG_ONLY(memset(table_base_orig, 0xfe, table_size_orig * SIZEOF(ht_ent_mname)));
 	free(table_base_orig);
 }
 
@@ -351,6 +355,7 @@ CONDITION_HANDLER(als_check_xnew_var_aliases_ch)
       exists. These vars were recorded because we may not be able to get to them still just by traversing the reference list vars
       so they were pre-recorded so we could scan the worst case of vars that could have containers pointing to the symtab about
       to be popped.
+   6) If a pending alias return value exists, check it to see if it also needs to be processed.
 
       Note: to prevent re-scanning of already scanned array, this routine uses the lvtaskcycle value. To do this, we use the
       suspend_lvgcol global variable to tell stp_gcol() to not do LVGC processing (which also uses lvtaskcycle).
@@ -363,14 +368,15 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	hash_table_mname	*popdsymtab, *cursymtab;
 	ht_ent_mname		*htep, *htep_top;
 	lv_val			*lv, *prevlv, *currlv, *popdlv;
+	lv_val			*newlv, *oldlv;
 	boolean_t		bypass_lvscan, bypass_lvrepl;
 	DBGRFCT_ONLY(mident_fixed vname;)
 
 	ESTABLISH(als_check_xnew_var_aliases_ch);
 	suspend_lvgcol = TRUE;
-	assert(popdsymval);
-	assert(cursymval);
-	assert(popdsymval->xnew_var_list);
+	assert(NULL != popdsymval);
+	assert(NULL != cursymval);
+	assert((NULL != popdsymval->xnew_var_list) || (NULL != alias_retarg));
 
 	DBGRFCT((stderr, "\nals_check_xnew_var_aliases: Beginning xvar pop processing\n"));
 	/* Step 2: (step 1 done in op_xnew()) - Run the list of vars that were passed through the xnew and remove them
@@ -386,7 +392,6 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 		xnewvar->lvval = (lv_val *)tabent->value;	/* Cache lookup results for 2nd pass in step 4 */
 		DELETE_HTENT(popdsymtab, tabent);
 	}
-
 	/* Step 3: Run popped hash table undoing alias references. */
 	DBGRFCT((stderr, "als_check_xnew_var_aliases: Step 3 - running popped symtab tree undoing local refcounts\n"));
 	for (htep = popdsymtab->base, htep_top = popdsymtab->top; htep < htep_top; htep++)
@@ -412,7 +417,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 
 	   a) prevlv == popdlv					Scan prevlv for alias containers pointing to popped symtab.
 	   b) prevlv != popdlv && popdlv in popd symtab.	Clone popdlv into currlv & do alias container scan.
-	   c) prevlv != popdlv && popdlv not in popd symtab.	Same as case (b). Note this includes the case where popdlv
+	   c) prevlv != popdlv && popdlv not in popd symtab.	Same as case (a). Note this includes the case where popdlv
 	                                                        already resides in cursymtab.
 	 */
 	DBGRFCT((stderr, "als_check_xnew_var_aliases: Step 4 - beginning unwind scan of passed through vars\n"));
@@ -435,7 +440,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 			currlv = prevlv;
 			bypass_lvrepl = TRUE;
 		} else if (popdsymval == popdlv->ptrs.val_ent.parent.sym)
-		{	/* Case (c) - Clone the var and tree into blocks owned by current symtab with the caveat that we need not
+		{	/* Case (b) - Clone the var and tree into blocks owned by current symtab with the caveat that we need not
 			   do this if the array has already been cloned (because more than one var that was passed through it
 			   pointing to it.
 			*/
@@ -484,7 +489,6 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 		xnewvar->next = xnewvar_anchor;
 		xnewvar_anchor = xnewvar;
 	}
-
 	/* Step 5: See if anything on the xnew_ref_list needs to be handled */
 	DBGRFCT((stderr, "als_check_xnew_var_aliases: Step 5: Process xnew_ref_list if any\n"));
 	for (xnewref = popdsymval->xnew_ref_list; xnewref; xnewref = xnewref_next)
@@ -508,7 +512,43 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 		xnewref->next = xnewref_anchor;
 		xnewref_anchor = xnewref;
 	}
-
+	/* Step 6: Check if a pending alias return value exists and if so if it needs to be processed.
+	 *         This type of value is created by unw_retarg() as the result of a "QUIT *" statement. It is an alias container
+	 *	   mval that lives in the compiler temps of the caller with a pointer in an mv_stent of the callee in the mvs_parm
+	 *	   block allocated by push_parm. Since this mval-container is just an mval and not an lv_val, we have to largely
+	 *         do similar processing to the als_prcs_xnew_alias_cntnr_node() with this block type difference in mind.
+	 */
+	if (NULL != alias_retarg)
+	{
+		assert(0 != (MV_ALIASCONT & alias_retarg->mvtype));
+		oldlv = (lv_val *)alias_retarg->str.addr;
+		if (MV_LVCOPIED == oldlv->v.mvtype)
+		{	/* This lv_val has been copied over already so use that pointer instead */
+			newlv = oldlv->ptrs.copy_loc.newtablv;
+			alias_retarg->str.addr = (char *)newlv;			/* Replace container ptr */
+			DBGRFCT((stderr, "\nals_check_xnew_var_aliases: alias retarg var found - referenced array already copied"
+				 " - Setting pointer in aliascont mval 0x"lvaddr" to lv 0x"lvaddr"\n", alias_retarg, newlv));
+		} else
+		{
+			assert(MV_SYM == oldlv->ptrs.val_ent.parent.sym->ident);
+			if (popdsymval == oldlv->ptrs.val_ent.parent.sym)
+			{	/* lv_val is owned by the popped symtab .. clone it to the new current tree */
+				CLONE_LVVAL(oldlv, newlv, cursymval);
+				alias_retarg->str.addr = (char *)newlv;		/* Replace container ptr */
+				DBGRFCT((stderr, "\nals_check_xnew_var_aliases: alias retarg var found - aliascont mval 0x"lvaddr
+					 " being reset to point to lv 0x"lvaddr" which is a clone of lv 0x"lvaddr"\n",
+					 alias_retarg, newlv, oldlv));
+			} else
+			{	/* lv_val is owned by current or older symval .. just use it in the subsequent scan in case it
+				 * leads us to other lv_vals owned by the popped symtab.
+				 */
+				DBGRFCT((stderr, "\nals_check_xnew_var_aliases: alias retarg var found - aliascont mval 0x"lvaddr
+				 " just being (potentially) scanned for container vars\n", alias_retarg));
+				newlv = oldlv;
+			}
+			RESOLV_ALIAS_CNTNRS_IN_TREE(newlv, popdsymval, cursymval);
+		}
+	}
 	DBGRFCT((stderr, "als_check_xnew_var_aliases: Completed xvar pop processing\n"));
 	suspend_lvgcol = FALSE;
 	REVERT;
@@ -864,7 +904,7 @@ void als_prcs_xnewref_cntnr_node(lv_val *lv, void *dummy1, void *dummy2)
 			xnewref = xnewref_anchor;
 			xnewref_anchor = xnewref->next;
 		} else
-			xnewref = (lv_xnew_ref *)malloc(sizeof(lv_xnew_ref));
+			xnewref = (lv_xnew_ref *)malloc(SIZEOF(lv_xnew_ref));
 		xnewref->lvval = lv_base;
 		xnewref->next = curr_symval->xnew_ref_list;
 		curr_symval->xnew_ref_list = xnewref;
@@ -884,7 +924,7 @@ void als_zwrhtab_init(void)
 		return;
 	if (NULL == zwrhtab)
 	{	/* none yet .. allocate and init one */
-		zwrhtab = (zwr_hash_table *)malloc(sizeof(zwr_hash_table));
+		zwrhtab = (zwr_hash_table *)malloc(SIZEOF(zwr_hash_table));
 		zwrhtab->first_zwrzavb = NULL;
 		zwrhtab->zav_flist = NULL;
 		init_hashtab_addr(&zwrhtab->h_zwrtab, ZWR_HTAB_INIT_SIZE);
@@ -905,7 +945,7 @@ void als_zwrhtab_init(void)
 		reinitialize_hashtab_addr(&zwrhtab->h_zwrtab);
 	}
 	if (NULL == zwrhtab->first_zwrzavb)
-		zwrhtab->first_zwrzavb = (zwr_zav_blk *)malloc(sizeof(zwr_zav_blk) + (sizeof(zwr_alias_var) * ZWR_ZAV_BLK_CNT));
+		zwrhtab->first_zwrzavb = (zwr_zav_blk *)malloc(SIZEOF(zwr_zav_blk) + (SIZEOF(zwr_alias_var) * ZWR_ZAV_BLK_CNT));
 	ZAV_BLK_INIT(zwrhtab->first_zwrzavb, NULL);
 	zwrhtab->cleaned = TRUE;
 }
@@ -930,7 +970,7 @@ zwr_alias_var *als_getzavslot(void)
 		zavb = zwrhtab->first_zwrzavb;
 		if (zavb->zav_free >= zavb->zav_top)
 		{	/* This block is full too .. need a new one */
-			zavb = (zwr_zav_blk *)malloc(sizeof(zwr_zav_blk) + (sizeof(zwr_alias_var) * ZWR_ZAV_BLK_CNT));
+			zavb = (zwr_zav_blk *)malloc(SIZEOF(zwr_zav_blk) + (SIZEOF(zwr_alias_var) * ZWR_ZAV_BLK_CNT));
 			ZAV_BLK_INIT(zavb, zwrhtab->first_zwrzavb);
 			zwrhtab->first_zwrzavb = zavb;
 		}
@@ -1000,7 +1040,8 @@ ht_ent_mname *als_lookup_base_lvval(lv_val *lvp)
    7)  Do the same by running the mv_stent chain marking the temporarily displaced vars for parameters and NEW's as
        "reachable".
    8)  Do the same by running the TP stack marking local variable copies made for this symbol table as reachable.
-   9)  Once the "reachable" search is complete, run through the created list of lv_vals and locate any that were
+   9)  Mark any pending return argument as "reachable".
+   10) Once the "reachable" search is complete, run through the created list of lv_vals and locate any that were
        not reachable. If they remain undeleted (deleted will have parent.sym field zeroed), delete them.
 
    Note this routine uses the same buffer structure that stp_gcol() uses except it loads its array with lv_val*
@@ -1024,7 +1065,7 @@ int als_lvval_gc(void)
 	DBGRFCT((stderr, "als_lvval_gc: Beginning lv_val garbage collection\n"));
 	if (NULL == stp_array)
 		/* Same initialization as is in stp_gcol_src.h */
-		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * sizeof(mstr *));
+		stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
 
 	lvarraycur = lvarray = (lv_val **)stp_array;
 	lvarraytop = lvarraycur + stp_array_size;
@@ -1139,7 +1180,17 @@ int als_lvval_gc(void)
 			MARK_REACHABLE(restore_ent->save_value);
 		}
 	}
-	/* Step 9 - Run the list of base lv_vals we created earlier and see which ones were not marked with the current
+	/* Step 9 - Mark any pending alias return argument as reachable */
+	if (NULL != alias_retarg)
+	{	/* There is a pending alias return arg (container). Find the lv it is pointing to and mark it and its progeny
+		 * as reachable.
+		 */
+		assert(0 != (MV_ALIASCONT & alias_retarg->mvtype));
+		lvp = (lv_val *)alias_retarg->str.addr;
+		assert(MV_SYM == lvp->ptrs.val_ent.parent.sym->ident);
+		MARK_REACHABLE(lvp);
+	}
+	/* Step 10 - Run the list of base lv_vals we created earlier and see which ones were not marked with the current
 	   cycle. Note they may have already been deleted after the first one gets deleted so we can check for that
 	   by looking for a zeroed parent field. Note the object of this code is not to force-delete the vars as we
 	   encounter them but by performing a deletion of their arrays, we will kill the interlinking container vars that

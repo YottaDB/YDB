@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@
 #define	MAX_ID_LEN			8
 #define	MAX_MESG			2048
 #define MAX_GTMSECSHR_FAIL_MESG_LEN	70
+#define MAX_SOCKFILE_NAME_LEN		25
 
 typedef struct ipcs_mesg_struct {
 	int		semid;

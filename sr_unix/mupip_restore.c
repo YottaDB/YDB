@@ -143,7 +143,7 @@ void mupip_restore(void)
 #	ifdef GTM_CRYPT
 	char			bkup_hash[GTMCRYPT_HASH_LEN], target_hash[GTMCRYPT_HASH_LEN];
 	char			*enc_inbuf;
-	int			blk_size, req_enc_blk_size, req_dec_blk_size, init_status, crypt_status;
+	int			blk_size, req_dec_blk_size, init_status, crypt_status;
 	gtmcrypt_key_t		bkup_key_handle, target_key_handle;
 	boolean_t		is_bkup_file_encrypted, is_target_file_encrypted;
 	boolean_t		is_same_hash = FALSE;
@@ -164,7 +164,7 @@ void mupip_restore(void)
 		extend = FALSE;
 	mu_outofband_setup();
 	mu_gv_cur_reg_init();
-	n_len = sizeof(db_name);
+	n_len = SIZEOF(db_name);
 	if (cli_get_str("DATABASE", db_name, &n_len) == FALSE)
 		mupip_exit(ERR_MUPCLIERR);
 	strcpy((char *)gv_cur_region->dyn.addr->fname, db_name);
@@ -188,8 +188,8 @@ void mupip_restore(void)
 		TAG_POLICY_GTM_PUTMSG(db_name, realfiletag, TAG_BINARY, errno);
 #endif
 	murgetlst();
-	old_data = (sgmnt_data *)malloc(sizeof(sgmnt_data));
-	LSEEKREAD(db_fd, 0, old_data, sizeof(sgmnt_data), save_errno);
+	old_data = (sgmnt_data *)malloc(SIZEOF(sgmnt_data));
+	LSEEKREAD(db_fd, 0, old_data, SIZEOF(sgmnt_data), save_errno);
 	if (0 != save_errno)
 	{
 		util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
@@ -233,9 +233,9 @@ void mupip_restore(void)
 	free(old_data);
 
 	msg_string.addr = msg_buffer;
-	msg_string.len = sizeof(msg_buffer);
+	msg_string.len = SIZEOF(msg_buffer);
 
-	inhead = (inc_header *)malloc(sizeof(inc_header) + 8);
+	inhead = (inc_header *)malloc(SIZEOF(inc_header) + 8);
 	inhead = (inc_header *)((((INTPTR_T)inhead) + 7) & -8);
 	rest_blks = 0;
 
@@ -291,7 +291,7 @@ void mupip_restore(void)
 			case backup_to_exec:
 				pipe_child = 0;
 				common_read = exec_read;
-				in = (BFILE *)malloc(sizeof(BFILE));
+				in = (BFILE *)malloc(SIZEOF(BFILE));
 				if (0 > (in->fd = gtm_pipe(ptr->input_file.addr, input_from_comm)))
 				{
 					util_out_print("Error creating input pipe from !AD.",
@@ -322,10 +322,10 @@ void mupip_restore(void)
 						mu_gv_cur_reg_free();
 						mupip_exit(ERR_MUPRESTERR);
 				}
-				assert(sizeof(timeout) == sizeof(int));
+				assert(SIZEOF(timeout) == SIZEOF(int));
 				if ((0 == cli_get_int("NETTIMEOUT", (int4 *)&timeout)) || (0 > timeout))
 					timeout = DEFAULT_BKRS_TIMEOUT;
-				in = (BFILE *)malloc(sizeof(BFILE));
+				in = (BFILE *)malloc(SIZEOF(BFILE));
 				iotcp_fillroutine();
 				if (0 > (in->fd = tcp_open(addr, port, timeout, TRUE)))
 				{
@@ -345,7 +345,7 @@ void mupip_restore(void)
 				mu_gv_cur_reg_free();
 				mupip_exit(ERR_MUPRESTERR);
 		}
-		COMMON_READ(in, inhead, sizeof(inc_header));
+		COMMON_READ(in, inhead, SIZEOF(inc_header));
 		if (memcmp(&inhead->label[0], V5_INC_HEADER_LABEL, INC_HDR_LABEL_SZ) &&
 		    (memcmp(&inhead->label[0], INC_HEADER_LABEL, INC_HDR_LABEL_SZ)))
 		{
@@ -438,9 +438,9 @@ void mupip_restore(void)
 					((blk_hdr *)newmap)->bsiz = (unsigned int)(BM_SIZE(bplmap));
 					((blk_hdr *)newmap)->levl = LCL_MAP_LEVL;
 					((blk_hdr *)newmap)->tn = curr_tn;
-					newmap_bptr = newmap + sizeof(blk_hdr);
+					newmap_bptr = newmap + SIZEOF(blk_hdr);
 					*newmap_bptr++ = THREE_BLKS_FREE;
-					memset(newmap_bptr, FOUR_BLKS_FREE, BM_SIZE(bplmap) - sizeof(blk_hdr) - 1);
+					memset(newmap_bptr, FOUR_BLKS_FREE, BM_SIZE(bplmap) - SIZEOF(blk_hdr) - 1);
 					for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead->db_total_blks; ii += bplmap)
 					{
 						new_eof = (off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)ii * old_blk_size;
@@ -501,10 +501,10 @@ void mupip_restore(void)
 			COMMON_READ(in, inbuf, rsize);	/* Note rsize == sblkh_p */
 			if (0 == sblkh_p->blkid && FALSE == sblkh_p->valid_data)
 			{	/* This is supposed to be the end of list marker (null entry */
-				COMMON_READ(in, &rsize, sizeof(rsize));
-				if (sizeof(END_MSG) + sizeof(int4) == rsize)
+				COMMON_READ(in, &rsize, SIZEOF(rsize));
+				if (SIZEOF(END_MSG) + SIZEOF(int4) == rsize)
 				{	/* the length of our secondary check is correct .. now check substance */
-					COMMON_READ(in, inbuf, rsize - sizeof(int4));
+					COMMON_READ(in, inbuf, rsize - SIZEOF(int4));
 					if (0 == MEMCMP_LIT(inbuf, END_MSG))
 						break;	/* We are done */
 				}
@@ -531,7 +531,7 @@ void mupip_restore(void)
 			   This allows us to exactly match the blks_to_upgrade counter in the saved file-header without
 			   worrying about what blocks were converted (or not) in the interim.
 			*/
-			blk_ptr = inbuf + sizeof(shmpool_blk_hdr);
+			blk_ptr = inbuf + SIZEOF(shmpool_blk_hdr);
 			size = old_blk_size;
 			if (GDSNOVER != sblkh_p->use.bkup.ondsk_blkver)
 			{	/* Specifically versioned blocks - Put them back in the version they were originally */
@@ -543,7 +543,8 @@ void mupip_restore(void)
 					size = (((blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
 			}
 #			ifdef GTM_CRYPT
-			req_dec_blk_size = ((blk_hdr_ptr_t)blk_ptr)->bsiz - SIZEOF(blk_hdr);
+			assert((size <= old_blk_size) && (size >= SIZEOF(blk_hdr)));
+			req_dec_blk_size = MIN(old_blk_size, size) - SIZEOF(blk_hdr);
 			if (!is_same_hash && (BLOCK_REQUIRE_ENCRYPTION(is_bkup_file_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl),
 							req_dec_blk_size)))
 			{
@@ -561,14 +562,12 @@ void mupip_restore(void)
 #			endif
 			offset = (old_start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)old_blk_size * blk_num);
 #			ifdef GTM_CRYPT
-			blk_size = ((blk_hdr_ptr_t)blk_ptr)->bsiz;
-			req_enc_blk_size = blk_size - SIZEOF(blk_hdr);
 			if (!is_same_hash && (BLOCK_REQUIRE_ENCRYPTION(is_target_file_encrypted,
-							(((blk_hdr_ptr_t)blk_ptr)->levl), req_enc_blk_size)))
+							(((blk_hdr_ptr_t)blk_ptr)->levl), req_dec_blk_size)))
 			{
 				GTMCRYPT_ENCODE_FAST(target_key_handle,
 							blk_ptr + SIZEOF(blk_hdr),
-							req_enc_blk_size,
+							req_dec_blk_size,
 							NULL,
 							crypt_status);
 				if (0 != crypt_status)
@@ -592,8 +591,8 @@ void mupip_restore(void)
 			}
 		}
 		/* Next section is the file header which we need to restore */
-		COMMON_READ(in, &rsize, sizeof(rsize));
-		assert((sizeof(sgmnt_data) + sizeof(int4)) == rsize);
+		COMMON_READ(in, &rsize, SIZEOF(rsize));
+		assert((SIZEOF(sgmnt_data) + SIZEOF(int4)) == rsize);
 		COMMON_READ(in, inbuf, rsize);
 		((sgmnt_data_ptr_t)inbuf)->start_vbn = old_start_vbn;
 		((sgmnt_data_ptr_t)inbuf)->free_space = (uint4)(((old_start_vbn - 1) * DISK_BLOCK_SIZE) - SIZEOF_FILE_HDR(inbuf));
@@ -601,7 +600,7 @@ void mupip_restore(void)
 			memcpy(((sgmnt_data_ptr_t)inbuf)->encryption_hash, target_hash, GTMCRYPT_HASH_LEN);
 			((sgmnt_data_ptr_t)inbuf)->is_encrypted = is_target_file_encrypted;
 		)
-		LSEEKWRITE(db_fd, 0, inbuf, rsize - sizeof(int4), save_errno);
+		LSEEKWRITE(db_fd, 0, inbuf, rsize - SIZEOF(int4), save_errno);
 		if (0 != save_errno)
 		{
 			util_out_print("Error accessing output file !AD. Aborting restore.",
@@ -612,7 +611,7 @@ void mupip_restore(void)
 			mu_gv_cur_reg_free();
 			mupip_exit(save_errno);
 		}
-		GET_LONG(temp, (inbuf + rsize - sizeof(int4)));
+		GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
 		rsize = temp;
 		COMMON_READ(in, inbuf, rsize);
 		if (0 != MEMCMP_LIT(inbuf, HDR_MSG))
@@ -626,7 +625,7 @@ void mupip_restore(void)
 			mupip_exit(save_errno);
 		}
 
-		GET_LONG(temp, (inbuf + rsize - sizeof(int4)));
+		GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
 		rsize = temp;
 		offset = (MM_BLOCK - 1) * DISK_BLOCK_SIZE;
 		assert(SGMNT_HDR_LEN == offset);	/* Still have contiguou master map for now */
@@ -638,7 +637,7 @@ void mupip_restore(void)
 			LSEEKWRITE(db_fd,
 				   offset,
 				   inbuf,
-				   rsize - sizeof(int4),
+				   rsize - SIZEOF(int4),
 				   save_errno);
 			if (0 != save_errno)
 			{
@@ -650,8 +649,8 @@ void mupip_restore(void)
 				mu_gv_cur_reg_free();
 				mupip_exit(save_errno);
 			}
-			offset += rsize - sizeof(int4);
-			GET_LONG(temp, (inbuf + rsize - sizeof(int4)));
+			offset += rsize - SIZEOF(int4);
+			GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
 			rsize = temp;
 		}
 		curr_tn = inhead->end_tn;

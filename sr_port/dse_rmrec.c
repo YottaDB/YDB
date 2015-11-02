@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,8 +99,8 @@ void dse_rmrec(void)
 
 	if (((blk_hdr_ptr_t)lbp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = lbp + cs_addrs->hdr->blk_size;
-	else if (((blk_hdr_ptr_t)lbp)->bsiz < sizeof(blk_hdr))
-		b_top = lbp + sizeof(blk_hdr);
+	else if (((blk_hdr_ptr_t)lbp)->bsiz < SIZEOF(blk_hdr))
+		b_top = lbp + SIZEOF(blk_hdr);
 	else
 		b_top = lbp + ((blk_hdr_ptr_t)lbp)->bsiz;
 	if (cli_present("RECORD") == CLI_PRESENT)
@@ -117,13 +117,13 @@ void dse_rmrec(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	memcpy(&comp_key[0], &patch_comp_key[0], sizeof(patch_comp_key));
+	memcpy(&comp_key[0], &patch_comp_key[0], SIZEOF(patch_comp_key));
 	cc_base = patch_comp_count;
 	for ( ; ; )
 	{
 		GET_SHORT(rsize, &((rec_hdr_ptr_t)rp)->rsiz);
-		if (rsize < sizeof(rec_hdr))
-			r_top = rp + sizeof(rec_hdr);
+		if (rsize < SIZEOF(rec_hdr))
+			r_top = rp + SIZEOF(rec_hdr);
 		else
 			r_top = rp + rsize;
 		if (r_top >= b_top)
@@ -134,8 +134,8 @@ void dse_rmrec(void)
 					util_out_print("Warning:  removed a star record from the end of this block.", TRUE);
 				((blk_hdr_ptr_t)lbp)->bsiz = (unsigned int)(rp_base - lbp);
 				BLK_INIT(bs_ptr, bs1);
-				BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + sizeof(blk_hdr),
-					(int)((blk_hdr_ptr_t)lbp)->bsiz - sizeof(blk_hdr));
+				BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr),
+					(int)((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 				if (!BLK_FINI(bs_ptr, bs1))
 				{
 					util_out_print("Error: bad blk build.",TRUE);
@@ -153,10 +153,10 @@ void dse_rmrec(void)
 			r_top = b_top;
 		}
 		if (((blk_hdr_ptr_t)lbp)->levl)
-			key_top = r_top - sizeof(block_id);
+			key_top = r_top - SIZEOF(block_id);
 		else
 		{
-			for (key_top = rp + sizeof(rec_hdr); key_top < r_top; )
+			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
 				if (!*key_top++ && !*key_top++)
 					break;
 		}
@@ -164,12 +164,12 @@ void dse_rmrec(void)
 			cc = patch_comp_count;
 		else
 			cc = ((rec_hdr_ptr_t)rp)->cmpc;
-		size = key_top - rp - sizeof(rec_hdr);
-		if (size > sizeof(patch_comp_key) - 2 - cc)
-			size = sizeof(patch_comp_key) - 2 - cc;
+		size = key_top - rp - SIZEOF(rec_hdr);
+		if (size > SIZEOF(patch_comp_key) - 2 - cc)
+			size = SIZEOF(patch_comp_key) - 2 - cc;
 		if (size < 0)
 			size = 0;
-		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
+		memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
 		patch_comp_count = cc + size;
 		if (--count >= 0)
 		{
@@ -180,13 +180,13 @@ void dse_rmrec(void)
 		for (i = 0; i < size && patch_comp_key[i] == comp_key[i]; i++)
 			;
 		((rec_hdr_ptr_t)rp_base)->cmpc = i;
-		rsize = r_top - key_top + sizeof(rec_hdr) + patch_comp_count - i;
+		rsize = r_top - key_top + SIZEOF(rec_hdr) + patch_comp_count - i;
 		PUT_SHORT(&((rec_hdr_ptr_t)rp_base)->rsiz, rsize);
-		memcpy(rp_base + sizeof(rec_hdr), &patch_comp_key[i], patch_comp_count - i);
-		memcpy(rp_base + sizeof(rec_hdr) + patch_comp_count - i, key_top, b_top - key_top);
+		memcpy(rp_base + SIZEOF(rec_hdr), &patch_comp_key[i], patch_comp_count - i);
+		memcpy(rp_base + SIZEOF(rec_hdr) + patch_comp_count - i, key_top, b_top - key_top);
 		((blk_hdr_ptr_t)lbp)->bsiz = (unsigned int)(rp_base + rsize - lbp + b_top - r_top);
 		BLK_INIT(bs_ptr, bs1);
-		BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + sizeof(blk_hdr), ((blk_hdr_ptr_t)lbp)->bsiz - sizeof(blk_hdr));
+		BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), ((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			util_out_print("Error: bad blk build.", TRUE);

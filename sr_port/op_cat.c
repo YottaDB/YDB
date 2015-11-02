@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,8 +49,7 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 		}
 	}
 	va_end(var);
-	if (stringpool.free + maxlen > stringpool.top)
-		stp_gcol(maxlen);
+	ENSURE_STP_FREE_SPACE(maxlen);
 	base = cp = stringpool.free;
 	/* if the first string is at the end of the stringpool, then don't recopy the first string */
 	VAR_START(var, dst);

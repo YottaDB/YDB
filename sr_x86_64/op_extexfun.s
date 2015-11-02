@@ -1,6 +1,6 @@
 ##################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -82,7 +82,6 @@ l1:	movq	0(REG64_ARG1),REG64_ACCUM
 	je	l5
 	movq	mrt_ptext_adr(REG64_ARG0),REG_XFER_TABLE
 	movslq	0(REG64_ACCUM),REG64_ARG2
-	movq	mrt_lit_ptr(REG64_ARG0),REG_LITERAL_BASE
 	addq	REG_XFER_TABLE,REG64_ARG2
 
 	movq	mrt_lnk_ptr(REG64_ARG0),REG64_ARG1
@@ -95,8 +94,6 @@ l1:	movq	0(REG64_ARG1),REG64_ACCUM
 	cmpl    $ISFORMAL,2(REG64_ARG2)
 	jne	l6
 	call	new_stack_frame
-	movq	frame_pointer(REG_IP),REG64_ACCUM
-	movq	REG_LITERAL_BASE,msf_literal_ptr_off(REG64_ACCUM)
 
 	movq    frame_pointer(REG_IP),REG64_ARG2
         movq    msf_old_frame_off(REG64_ARG2),REG64_ACCUM

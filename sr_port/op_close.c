@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ void op_close(mval *v, mval *p)
 
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
-	stat = TRANS_LOG_NAME(&v->str, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long);
+	stat = TRANS_LOG_NAME(&v->str, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long);
 	if (SS_NORMAL == stat)
 	{
 	        if (0 == (tl = get_log_name(&tn, NO_INSERT)))
@@ -64,7 +64,7 @@ void op_close(mval *v, mval *p)
 	}
 #	ifdef UNIX
 	else if (SS_LOG2LONG == stat)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, sizeof(buf) - 1);
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, SIZEOF(buf) - 1);
 #	endif
 	else
 		rts_error(VARLSTCNT(1) stat);

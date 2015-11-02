@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -194,7 +194,6 @@ gtm_dal_svc gtm_svc
 gtm_rpc_init gtm_svc
 gtmsecshr gtmsecshr
 gtmsecshr_wrapper gtmsecshr
-mumps_clitab mumps
 gtm_main mumps
 semstat2 semstat2
 ftok ftok
@@ -205,7 +204,6 @@ omi_sx_play gtcm_play
 gtcm_shmclean gtcm_shmclean
 gtcm_pkdisp gtcm_pkdisp
 gtcm_gnp_server gtcm_gnp_server
-gtcm_gnp_clitab gtcm_gnp_server
 dbcertify dbcertify
 dbcertify_cmd dbcertify
 gtmcrypt_dbk_ref gtmcrypt

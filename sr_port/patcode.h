@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -238,7 +238,7 @@ typedef struct pte_csh_struct {
 	{															\
 		if (NULL == pte_csh_array[curalt_depth])									\
 		{														\
-			pte_csh_array[curalt_depth] = malloc(sizeof(pte_csh) * PTE_BEGIN_ENTRIES);				\
+			pte_csh_array[curalt_depth] = malloc(SIZEOF(pte_csh) * PTE_BEGIN_ENTRIES);				\
 			pte_csh_alloc_size[curalt_depth] = PTE_BEGIN_ENTRIES;							\
 		}														\
 		pte_csh_entries_per_len[curalt_depth] = ((PTE_BEGIN_ENTRIES / PTE_FILL_RATIO_DEN) * PTE_FILL_RATIO_NUM)		\
@@ -247,7 +247,7 @@ typedef struct pte_csh_struct {
 								(PTE_FILL_RATIO_DEN - PTE_FILL_RATIO_NUM);			\
 		pte_csh_cur_size[curalt_depth] = PTE_BEGIN_ENTRIES;								\
 		assert(pte_csh_cur_size[curalt_depth] <= pte_csh_alloc_size[curalt_depth]);					\
-		memset(pte_csh_array[curalt_depth], 0, sizeof(pte_csh) * PTE_BEGIN_ENTRIES);					\
+		memset(pte_csh_array[curalt_depth], 0, SIZEOF(pte_csh) * PTE_BEGIN_ENTRIES);					\
 		/* reset cur_pte_csh* globals to point to new curalt_depth */							\
 		UPDATE_CUR_PTE_CSH(cur_pte_csh_array, cur_pte_csh_size, cur_pte_csh_entries_per_len, cur_pte_csh_tail_count); 	\
 		do_patalt_hits[curalt_depth] = do_patalt_calls[curalt_depth] = 1;						\

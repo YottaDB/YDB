@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,8 +53,6 @@
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TPMIXUP);
-error_def(ERR_TPSTACKCRIT);
-error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTOODEEP);
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
@@ -69,12 +67,11 @@ GBLREF	tp_frame		*tp_pointer;
 GBLREF	mv_stent		*mv_chain;
 GBLREF	mlk_pvtblk		*mlk_pvt_root;
 GBLREF	symval			*curr_symval;
-GBLREF	unsigned char		*msp, *stacktop, *stackwarn, *tpstackbase, *tpstacktop, *tpstackwarn,
-				*tp_sp, t_fail_hist[CDB_MAX_TRIES];
+GBLREF	unsigned char		*msp, *stacktop, *stackwarn, *tpstackbase, *tpstacktop, *tp_sp, t_fail_hist[CDB_MAX_TRIES];
 GBLREF  unsigned int		t_tries;
 GBLREF	tp_region		*tp_reg_list, *tp_reg_free_list;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	boolean_t		is_standalone;
+GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF 	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec);
 GBLREF  sgm_info                *first_sgm_info;
 GBLREF  global_tlvl_info	*global_tlvl_info_head;
@@ -87,6 +84,12 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		tp_in_use;
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	uint4			tstartcycle;
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
+GBLREF	mval			dollar_ztwormhole;
+GBLREF	int4			gtm_trigger_depth;
+GBLREF	int4			tstart_trigger_depth;
+#endif
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
@@ -97,7 +100,7 @@ GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only
 
 #define NORESTART -1
 #define ALLLOCAL  -2
-#define TP_STACK_SIZE (32768 GTM64_ONLY(* 2))	/* 64 bit has pointers twice size so needs more room */
+#define TP_STACK_SIZE ((TP_MAX_NEST + 1) * SIZEOF(tp_frame))	/* Size of TP stack frame with no-overflow pad */
 
 /* Note gv_orig_key[i] is assigned to tp_pointer->orig_key which then tries to dereference the "begin", "end", "prev", "top"
  * 	fields like it were a gv_currkey pointer. Since these members are 2-byte fields, we need atleast 2 byte alignment.
@@ -105,7 +108,7 @@ GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only
  */
 struct gv_orig_key_struct
 {
-	int4	gv_orig_key[TP_MAX_NEST + 1][DIVIDE_ROUND_UP((sizeof(gv_key) + MAX_KEY_SZ + 1), sizeof(int4))];
+	int4	gv_orig_key[TP_MAX_NEST + 1][DIVIDE_ROUND_UP((SIZEOF(gv_key) + MAX_KEY_SZ + 1), SIZEOF(int4))];
 };
 static  struct gv_orig_key_struct *gv_orig_key_ptr;
 
@@ -142,7 +145,25 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	ht_ent_mname		*tabent, *curent, *topent;
 	sgmnt_addrs		*csa;
 	int4			shift_size;
+	boolean_t		tphold_noshift = FALSE;
+	boolean_t		lcl_implicit_tstart = FALSE;
 
+#	ifdef GTM_TRIGGER
+	if (implicit_tstart)
+	{	/* Set the global variable to FALSE right away to avoid incorrect values from persisting in case of
+		 * errors down below. Before the reset of the global variable, copy it into a local variable.
+		 */
+		lcl_implicit_tstart = implicit_tstart;
+		implicit_tstart = FALSE;
+		/* An implicit op_tstart is being done by gvcst_put/gvcst_kill as part of a trigger operation.
+		 * In this case, even if we are in direct mode, we want to do regular TPHOLD processing (no setting
+		 * of tphold in the parent frame and shifting of all mv_stents). This is ok because the life of the
+		 * TP transaction will be done before the gvcst_put/gvcst_kill is done so it will not persist across
+		 * M lines like it normally would in direct mode.
+		 */
+		tphold_noshift = TRUE;
+	}
+#	endif
 	/* If we haven't done any TP until now, turn the flag on to tell gvcst_init to
 	   initialize it in any regions it opens from now on and initialize it in any
 	   regions that are already open.
@@ -179,7 +200,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		jgbl.cumul_jnl_rec_len = 0;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
-		t_tries = (FALSE == is_standalone) ? 0 : CDB_STAGNATE;
+		t_tries = (FALSE == mupip_jnl_recover) ? 0 : CDB_STAGNATE;
 		t_fail_hist[t_tries] = cdb_sc_normal;
 		/* ensure that we don't have crit on any region at the beginning of a TP transaction (be it GT.M or MUPIP) */
 		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
@@ -190,8 +211,20 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 			tp_reg_free_list = tr; 			/* Place on free queue */
 		}
 		++local_tn;					/* Begin new local transaction */
+		/* In journal recovery forward phase, we set jgbl.tp_ztp_jnl_upd_num to whatever update_num the journal record
+		 * has so it is ok for the global variable to be a non-zero value at the start of a TP transaction (possible if
+		 * ZTP of one process is in progress when TP of another process starts in the journal file). But otherwise
+		 * (in GT.M runtime) we expect it to be 0 at beginning of each TP or ZTP.
+		 */
+		assert((0 == jgbl.tp_ztp_jnl_upd_num) || jgbl.forw_phase_recovery);
 		INCR_TSTARTCYCLE;
 		jgbl.wait_for_jnl_hard = TRUE;
+		GTMTRIG_ONLY(
+			assert(NULL == jgbl.prev_ztworm_ptr);	/* should have been cleared by tp_clean_up of previous TP */
+			assert(NULL == jgbl.save_ztworm_ptr);
+				/* should have been NULL almost always except for a small window in gvcst_put/gvcst_kill */
+			tstart_trigger_depth = gtm_trigger_depth; /* note down what trigger depth an outermost tstart occurs in */
+		)
 		memset(tcom_record.jnl_tid, 0, TID_STR_SIZE);
 		if (0 != tid->str.len)
 		{
@@ -245,7 +278,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	if (NULL == gd_header)
 		gvinit();
 	assert(NULL != gd_header);
-	if (frame_pointer->old_frame_pointer->type & SFT_DM)
+	if (!tphold_noshift && (SFT_DM & frame_pointer->old_frame_pointer->type))
 	{	/* Put a TPHOLD underneath dmode frame */
 		assert(frame_pointer->old_frame_pointer->old_frame_pointer);
 		fp = frame_pointer->old_frame_pointer->old_frame_pointer;
@@ -287,7 +320,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 			mv_chain = mv_st_ent;
 		} else
 		{
-			top -= shift_size + sizeof(stack_frame);
+			top -= shift_size + SIZEOF(stack_frame);
 			mv_chain = (mv_stent *)((char *)mv_chain - shift_size);
 			mvst_tmp = mv_chain;
 			mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
@@ -298,7 +331,6 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 			}
 			mvst_tmp->mv_st_next = (unsigned int)((char *)mv_st_ent - (char *)mvst_tmp);
 			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + shift_size);
-
 		}
 	} else
 	{
@@ -306,24 +338,26 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		mv_st_ent = mv_chain;
 		fp = frame_pointer;
 	}
-	mv_st_ent->mv_st_cont.mvs_tp_holder = dollar_tlevel;
+	mv_st_ent->mv_st_cont.mvs_tp_holder.tphold_tlevel = dollar_tlevel;
+#	ifdef GTM_TRIGGER
+	if (0 == dollar_tlevel)
+		/* We only save this on level 0 - Note if this is made further conditional, be sure to visit
+		 * stp_gcol_src.h where it is GC'd and tp_restart() to adjust the conditions there as well.
+		 */
+		memcpy(&mv_st_ent->mv_st_cont.mvs_tp_holder.ztwormhole_save, &dollar_ztwormhole, SIZEOF(mval));
+#	endif
 	if (NULL == tpstackbase)
 	{
 		tstack_ptr = (unsigned char *)malloc(TP_STACK_SIZE);
 		tp_sp = tpstackbase = tstack_ptr + TP_STACK_SIZE;
 		tpstacktop = tstack_ptr;
-		tpstackwarn = tpstacktop + 1024;
 		tp_pointer = NULL;
 	}
 
 	/* Add a new tp_frame in the TP stack */
 	DBGRFCT((stderr, "\n*** op_tstart: *** Entering $TLEVEL = %d\n", dollar_tlevel + 1));
-	tf = (tp_frame *)(tp_sp -= sizeof(tp_frame));
-	if (tp_sp < tpstackwarn)
-	{
-		va_end(varlst);
-		rts_error(VARLSTCNT(1) tp_sp < tpstacktop ? ERR_TPSTACKOFLOW : ERR_TPSTACKCRIT);
-	}
+	tf = (tp_frame *)(tp_sp -= SIZEOF(tp_frame));
+	assert((unsigned char *)tf > tpstacktop);	/* Block should lie entirely within tp stack area */
 	tf->dlr_t = dollar_t;
 	tf->restart_pc = fp->mpc;
 	tf->restart_ctxt = fp->ctxt;
@@ -345,18 +379,19 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	/* If the TP structures have not yet been initialized, do that now. */
 	if (NULL == gv_orig_key_ptr)
 	{	/* This need only be set once */
-		gv_orig_key_ptr = (struct gv_orig_key_struct *)malloc(sizeof(struct gv_orig_key_struct));
-		memset(gv_orig_key_ptr, 0, sizeof(struct gv_orig_key_struct));
+		gv_orig_key_ptr = (struct gv_orig_key_struct *)malloc(SIZEOF(struct gv_orig_key_struct));
+		memset(gv_orig_key_ptr, 0, SIZEOF(struct gv_orig_key_struct));
 	}
 	tf->orig_key = (gv_key *)&(gv_orig_key_ptr->gv_orig_key[dollar_tlevel][0]);
 	assert(NULL != gv_currkey);
-	memcpy(tf->orig_key, gv_currkey, sizeof(gv_key) + gv_currkey->end);
+	memcpy(tf->orig_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
 	tf->gd_header = gd_header;
 	tf->gd_reg = gv_cur_region;
 	tf->zgbldir = dollar_zgbldir;
 	tf->mvc = mv_st_ent;
 	tf->sym = curr_symval;
 	tf->tp_save_all_flg = FALSE;
+	tf->implicit_tstart = (NULL == tp_pointer) ? lcl_implicit_tstart : tp_pointer->implicit_tstart;
 	tf->vars = (tp_var *)NULL;
 	tf->old_tp_frame = tp_pointer;
 	tp_pointer = tf;
@@ -440,7 +475,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		if ((NULL == pre_lock->tp) || (pre_lock->tp->level != pre_lock->level)
 			|| (pre_lock->tp->zalloc != pre_lock->zalloc))
 		{	/* Only stack locks that have changed since last TSTART */
-			lck_tp = (mlk_tp *)malloc(sizeof(mlk_tp));
+			lck_tp = (mlk_tp *)malloc(SIZEOF(mlk_tp));
 			lck_tp->tplevel = dollar_tlevel;
 			lck_tp->level = pre_lock->level;
 			lck_tp->zalloc = pre_lock->zalloc;
@@ -457,6 +492,10 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		new_gtli = (global_tlvl_info *)get_new_element(global_tlvl_info_list, 1);
 		new_gtli->global_tlvl_fence_info = jnl_fence_ctl.fence_list;
 		new_gtli->t_level = dollar_tlevel;
+		GTMTRIG_ONLY(new_gtli->tlvl_prev_ztworm_ptr = jgbl.prev_ztworm_ptr;)
+		new_gtli->tlvl_cumul_jrec_len = jgbl.cumul_jnl_rec_len;
+		DEBUG_ONLY(new_gtli->tlvl_cumul_index = jgbl.cumul_index;)
+		new_gtli->tlvl_tp_ztp_jnl_upd_num = jgbl.tp_ztp_jnl_upd_num;
 		new_gtli->next_global_tlvl_info = NULL;
 		if (prev_gtli)
 		{
@@ -490,8 +529,6 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 			for (prev_jfb = NULL, jfb = si->jnl_head; jfb; jfb = jfb->next)
 				prev_jfb = jfb;
 			new_tli->tlvl_jfb_info = prev_jfb;
-			new_tli->tlvl_cumul_jrec_len = jgbl.cumul_jnl_rec_len;
-			DEBUG_ONLY(new_tli->tlvl_cumul_index = jgbl.cumul_index;)
 		}
 		new_tli->next_tlevel_info = NULL;
 		new_tli->update_trans = si->update_trans;

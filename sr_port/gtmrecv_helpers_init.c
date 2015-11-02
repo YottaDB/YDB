@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,14 +98,14 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 		helper->helper_pid_prev = process_id; /* identify owner of slot */
 		helper_log_cmd.len  = STR_LIT_LEN(UPDHELPER_CMD);
 		helper_log_cmd.addr = UPDHELPER_CMD;
-		if (SS_NORMAL != (i4status = TRANS_LOG_NAME(&helper_log_cmd, &helper_trans_cmd, helper_cmd, sizeof(helper_cmd),
+		if (SS_NORMAL != (i4status = TRANS_LOG_NAME(&helper_log_cmd, &helper_trans_cmd, helper_cmd, SIZEOF(helper_cmd),
 								dont_sendmsg_on_log2long)))
 		{
 			helper->helper_shutdown = save_shutdown;
 			gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   LEN_AND_LIT("Could not find path of Helper Process. Check value of $gtm_dist"));
 			if (SS_LOG2LONG == i4status)
-				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDHELPER_CMD), sizeof(helper_cmd) - 1);
+				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDHELPER_CMD), SIZEOF(helper_cmd) - 1);
 			repl_errno = EREPL_UPDSTART_BADPATH;
 			return UPDPROC_START_ERR;
 		}
@@ -123,8 +123,8 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	}
 #elif defined(VMS)
 	/* Create detached server and write startup commands to it */
-	i2hex(helper - upd_helper_ctl->helper_list, mbx_suffix, sizeof(mbx_suffix) - 1);
-	mbx_suffix[sizeof(mbx_suffix) - 1] = '\0';
+	i2hex(helper - upd_helper_ctl->helper_list, mbx_suffix, SIZEOF(mbx_suffix) - 1);
+	mbx_suffix[SIZEOF(mbx_suffix) - 1] = '\0';
 	/* A mailbox is created per helper, and the mailbox name is assigned to a logical. This logical will persist until the
 	 * helper terminates. So, we need to assign a unique logical per helper. Hence the suffix. */
 	if (SS_NORMAL != (status = repl_create_server((UPD_HELPER_READER == helper_type) ?  &cmd_desc_reader : &cmd_desc_writer,

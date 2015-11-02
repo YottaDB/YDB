@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -72,12 +72,24 @@ set buildshr_verbose = $?verbose
 set verbose
 set echo
 
-set gt_ld_linklib_options = "-L$gtm_obj $gtm_obj/gtm_main.o $gtm_obj/mumps_clitab.o -lmumps -lgnpclient -lcmisockettcp"
+set gt_ld_linklib_options = "-L$gtm_obj $gtm_obj/gtm_main.o -lmumps -lgnpclient -lcmisockettcp"
 set nolibgtmshr = "no"	# by default build libgtmshr
 
 if ($gt_image == "bta") then
 	set nolibgtmshr = "yes"	# if bta build, build a static mumps executable
 endif
+
+if ("OS/390" == $HOSTOS) then
+	set exp = "x"
+else
+	set exp = "export"
+endif
+$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.$exp
+
+# The below is used to generate an export file that is specific to executables. Typically used to export
+# some symbols from utility progs like mupip, dse, lke etc
+
+$shell $gtm_tools/genexport.csh $gtm_tools/gtmexe_symbols.exp gtmexe_symbols.$exp
 
 if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 	# Building libgtmshr.so shared library
@@ -91,18 +103,6 @@ if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 		# Define gtmci_cleanup as a termination routine for libgtmshr on AIX.
 		set aix_binitfini_option = "-binitfini::gtmci_cleanup"
 	endif
-
-	if ("OS/390" == $HOSTOS) then
-		set exp = "x"
-	else
-		set exp = "export"
-	endif
-	$shell $gtm_tools/genexport.csh $gtm_tools/gtmshr_symbols.exp gtmshr_symbols.$exp
-
-	# The below is used to generate an export file that is specific to executables. Typically used to export
-	# some symbols from utility progs like mupip, dse, lke etc
-
-	$shell $gtm_tools/genexport.csh $gtm_tools/gtmexe_symbols.exp gtmexe_symbols.$exp
 
 	gt_ld $gt_ld_options $gt_ld_shl_options $aix_binitfini_option $gt_ld_ci_options $aix_loadmap_option \
 		${gt_ld_option_output}$3/libgtmshr$gt_ld_shl_suffix \
@@ -153,7 +153,7 @@ if ( $gt_ar_gtmrpc_name != "" ) then
 	endif
 	# export gtm_filename_to_id and dependent modules from gtm_svc.
 	gt_ld $gt_ld_options $gt_ld_options_all_exe $aix_loadmap_option ${gt_ld_option_output}$3/gtm_svc \
-		-L$gtm_obj $gtm_obj/{gtm_svc,mumps_clitab,gtm_rpc_init,gtm_dal_svc}.o $gt_ld_sysrtns \
+		-L$gtm_obj $gtm_obj/{gtm_svc,gtm_rpc_init,gtm_dal_svc}.o $gt_ld_sysrtns \
 		-lmumps -lgnpclient -lcmisockettcp -L$gtm_exe -l$gt_ar_gtmrpc_name $gt_ld_syslibs >& $gtm_map/gtm_svc.map
 	if ( $status != 0  ||  ! -x $3/gtm_svc ) then
 		set buildshr_status = `expr $buildshr_status + 1`

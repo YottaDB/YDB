@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,26 +12,22 @@
 #include "mdef.h"
 #include "compiler.h"
 
-GBLREF	oprtype		*for_stack[MAX_FOR_STACK],
-			**for_stack_ptr;
+GBLREF	oprtype		*for_stack[MAX_FOR_STACK], **for_stack_ptr;
 GBLREF	bool		for_temps[MAX_FOR_STACK];
-
 
 int	for_push(void)
 {
 	unsigned short	level;
+
 	error_def(ERR_FOROFLOW);
 
-
-	if (++for_stack_ptr >= &for_stack[MAX_FOR_STACK])
+	if (++for_stack_ptr >= ARRAYTOP(for_stack))
 	{
 		stx_error(ERR_FOROFLOW);
 		return FALSE;
 	}
-
 	assert(for_stack_ptr >= for_stack);
-	assert(for_stack_ptr < &for_stack[MAX_FOR_STACK]);
-
+	assert(for_stack_ptr < ARRAYTOP(for_stack));
 	*for_stack_ptr = 0;
 	level = for_stack_ptr - for_stack;
 	for_temps[level] = for_temps[level - 1];

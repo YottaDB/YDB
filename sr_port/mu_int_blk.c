@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,11 +29,15 @@
 #include "gdsbml.h"
 #include "gtmmsg.h"
 #include "get_spec.h"
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"		/* for rtn_tabent in gv_trigger.h */
+#include "gv_trigger.h"
+#endif
 
 #define NEG_SUB	127
 #define NO_SUBSCRIPTS -1
 #define MAX_UTIL_SIZE 32
-#define MIN_DATA (3 * sizeof(char)) /* a non-empty data block rec must have at least one character of key and two of terminator */
+#define MIN_DATA (3 * SIZEOF(char)) /* a non-empty data block rec must have at least one character of key and two of terminator */
 #define TEXT2 "Block "
 #define TEXT3 " doubly allocated"
 
@@ -138,13 +142,13 @@ boolean_t mu_int_blk(
 	} sub_list;
 
 	unsigned char	buff[MAX_KEY_SZ + 1], old_buff[MAX_KEY_SZ + 1], temp_buff[MAX_MIDENT_LEN + 1], util_buff[MAX_UTIL_SIZE];
-	unsigned char	blk_levl, *c1, cc, rec_cmpc;
+	unsigned char	blk_levl, *c1, cc, ch, rec_cmpc;
 	uchar_ptr_t	c0, c2, c_base, blk_base, blk_top, key_base, ptr, rec_base, rec_top;
 	unsigned short	temp_ushort;
-	boolean_t	first_key, is_top, pstar;
+	boolean_t	first_key, is_top, pstar, valid_gbl, hasht_global;
 	boolean_t	muint_range_done = FALSE;
 	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len,
-			num_len, rec_size, s_index, start_index, hdr_len;
+			num_len, rec_size, s_index, start_index, hdr_len, idx;
 	block_id	child, root_pointer;
 	sub_list	mu_sub_list[MAX_GVSUBSCRIPTS + 1];
 	sub_num		check_vals;
@@ -186,18 +190,20 @@ boolean_t mu_int_blk(
 	mu_int_offset[mu_int_plen] = 0;
 	mu_int_path[mu_int_plen++] = blk;
 	mu_int_path[mu_int_plen] = 0;
-	blk_base = mu_int_read(blk, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV5 (GDSVCURR) */
-	if (!blk_base)
+	if (!bml_busy(blk, mu_int_locals)) /* block already marked busy */
 	{
 		mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, bot_key, bot_len, top_key, top_len, (unsigned int)(level));
 		return FALSE;
 	}
+	blk_base = mu_int_read(blk, &ondsk_blkver);	/* ondsk_blkver set to GDSV4 or GDSV5 (GDSVCURR) */
+	if (!blk_base)
+		return FALSE;
 	blk_size = (int)((blk_hdr_ptr_t)blk_base)->bsiz;
 	if (!muint_fast)
 	{
 		if (tn_reset_this_reg)
 		{
-			((blk_hdr_ptr_t)blk_base)->tn = 0;
+			((blk_hdr_ptr_t)blk_base)->tn = 1;
 			mu_int_write(blk, blk_base);
 			if (GDSVCURR != mu_int_data.desired_db_format)
 				mu_int_blks_to_upgrd++;
@@ -206,8 +212,8 @@ boolean_t mu_int_blk(
 	}
 	/* pstar indicates that the current block is a (root block with only a star key) or not.
 		This is passed into mu_int_blk() as eb_ok */
-	pstar = (is_root && (sizeof(blk_hdr) + sizeof(rec_hdr) + sizeof(block_id) == blk_size));
-	if (blk_size < (sizeof(blk_hdr) + (eb_ok ? 0 : (sizeof(rec_hdr) + (level ? sizeof(block_id) : MIN_DATA)))))
+	pstar = (is_root && (SIZEOF(blk_hdr) + SIZEOF(rec_hdr) + SIZEOF(block_id) == blk_size));
+	if (blk_size < (SIZEOF(blk_hdr) + (eb_ok ? 0 : (SIZEOF(rec_hdr) + (level ? SIZEOF(block_id) : MIN_DATA)))))
 	{
 		mu_int_err(ERR_DBBSIZMN, TRUE, TRUE, bot_key, bot_len, top_key, top_len,
 				(unsigned int)((blk_hdr_ptr_t)blk_base)->levl);
@@ -278,7 +284,7 @@ boolean_t mu_int_blk(
 	is_top = FALSE;
 	memcpy(buff, bot_key, bot_len);
 	mu_sub_list[0].index = NO_SUBSCRIPTS;
-	for (rec_base = blk_base + sizeof(blk_hdr);  (rec_base < blk_top) && (FALSE == muint_range_done);
+	for (rec_base = blk_base + SIZEOF(blk_hdr);  (rec_base < blk_top) && (FALSE == muint_range_done);
 		rec_base = rec_top, comp_length = buff_length)
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -287,7 +293,7 @@ boolean_t mu_int_blk(
 		GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)rec_base)->rsiz));
 		rec_size = temp_ushort;
 		mu_int_offset[mu_int_plen - 1] = (uint4)(rec_base - blk_base);
-		if (rec_size <= sizeof(rec_hdr))
+		if (rec_size <= SIZEOF(rec_hdr))
 		{
 			mu_int_err(ERR_DBRSIZMN, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
 			free(blk_base);
@@ -304,7 +310,7 @@ boolean_t mu_int_blk(
 		if (level && (rec_top == blk_top))
 		{
 			is_top = TRUE;
-			if (sizeof(rec_hdr) + sizeof(block_id) != rec_size)
+			if (SIZEOF(rec_hdr) + SIZEOF(block_id) != rec_size)
 			{
 				mu_int_err(ERR_DBLRCINVSZ, TRUE, TRUE, buff, comp_length, top_key, top_len, (unsigned int)blk_levl);
 				free(blk_base);
@@ -316,7 +322,7 @@ boolean_t mu_int_blk(
 				free(blk_base);
 				return FALSE;
 			}
-			ptr = rec_base + sizeof(rec_hdr);
+			ptr = rec_base + SIZEOF(rec_hdr);
 		} else
 		{
 			if (first_key)
@@ -349,22 +355,9 @@ boolean_t mu_int_blk(
 				free(blk_base);
 				return FALSE;
 			}
-			key_base = rec_base + sizeof(rec_hdr);
+			key_base = rec_base + SIZEOF(rec_hdr);
 			for (ptr = key_base;  ;)
 			{
-				if (master_dir && !level)
-				{
-					if (((ptr == key_base) && !rec_cmpc) ? !VALFIRST(*ptr) : (*ptr && !VALKEY(*ptr)))
-					{
-						mu_int_err(ERR_DBBADKYNM, TRUE, TRUE, buff, comp_length, top_key, top_len,
-							(unsigned int)blk_levl);
-						mu_int_plen++;	/* continuing, so compensate for mu_int_err decrement */
-						for (;;)
-							if ((KEY_DELIMITER == *ptr++) && (KEY_DELIMITER == *ptr++))
-								break;
-						break;
-					}
-				}
 				if (ptr >= rec_top)
 				{
 					mu_int_err(ERR_DBKEYMX, TRUE, TRUE, buff, comp_length, top_key, top_len,
@@ -398,7 +391,7 @@ boolean_t mu_int_blk(
 				}
 			}
 			key_size = (int)(ptr - key_base);
-			if (level && (rec_size - sizeof(block_id) - sizeof(rec_hdr) != key_size))
+			if (level && (rec_size - SIZEOF(block_id) - SIZEOF(rec_hdr) != key_size))
 			{
 				mu_int_err(ERR_DBKEYMN, TRUE, TRUE, buff, comp_length, top_key, top_len,
 						(unsigned int)blk_levl);
@@ -451,6 +444,45 @@ boolean_t mu_int_blk(
 			memcpy(old_buff, buff, comp_length);
 			memcpy(buff + rec_cmpc, key_base, key_size);
 			buff_length = rec_cmpc + key_size;
+			/* Now that we have the uncompressed global variable name, check for global name validity.
+			 * Note that it is enough to check the validity on the leaf level directory tree and not
+			 * for every block. Invalid global names in non-directory tree blocks will encounter
+			 * either DBKEYORD error or DBINVGBL. Below are the rules for validating.
+			 * a) The first character should be ALPHA or '%' or '#'
+			 * b) If first character is '#' then the following character should be 't' followed by 2 KEY_DELIMITERS
+			 * c) If first character is '%' then the following characters should be ALPHANUMERIC and 2 KEY_DELIMITERS
+			 */
+			if (master_dir && !level)
+			{
+				hasht_global = FALSE;
+				ch = buff[0];
+				switch (ch)
+				{
+#					ifdef GTM_TRIGGER
+					case HASHT_GBL_CHAR1:
+						hasht_global = valid_gbl = (HASHT_GBL_CHAR2 == buff[1]);
+						idx = 2;
+						break;
+#					endif
+					case '%':
+					default:
+						valid_gbl = VALFIRSTCHAR(ch);
+						idx = 1;
+						break;
+				}
+				if (!hasht_global)
+				{
+					for (; valid_gbl && (idx <= buff_length - 3); idx++)
+						valid_gbl = (valid_gbl && VALKEY(buff[idx]));
+				}
+				valid_gbl = (valid_gbl && (KEY_DELIMITER == buff[idx]) && (KEY_DELIMITER == buff[idx + 1]));
+				if (!valid_gbl)
+				{
+					mu_int_err(ERR_DBBADKYNM, TRUE, TRUE, buff, buff_length, top_key, top_len,
+						(unsigned int)blk_levl);
+					mu_int_plen++;  /* continuing, so compensate for mu_int_err decrement */
+				}
+			}
 			if (!master_dir)
 			{	/* master_directory has no subscripts; block splits don't preserve numeric integrity in index */
 				if (muint_subsc)
@@ -634,7 +666,7 @@ boolean_t mu_int_blk(
 		{
 			if (master_dir)
 			{
-				for (c0 = c_base = (uchar_ptr_t)rec_base + sizeof(rec_hdr);  *c0;  c0++);
+				for (c0 = c_base = (uchar_ptr_t)rec_base + SIZEOF(rec_hdr);  *c0;  c0++);
 				GET_LONG(root_pointer, ((block_id *)(c0 + 2)));
 				if (root_pointer > mu_int_data.trans_hist.total_blks || root_pointer < 2)
 				{	/* 0=master map, 1=dir root*/
@@ -649,8 +681,8 @@ boolean_t mu_int_blk(
 				for (;  c_base < c0;)
 					*c1++ = *c_base++;
 				*c1 = 0;
-				assert(sizeof(muint_temp_buff) == sizeof(temp_buff));
-				memcpy(muint_temp_buff, temp_buff, sizeof(temp_buff));
+				assert(SIZEOF(muint_temp_buff) == SIZEOF(temp_buff));
+				memcpy(muint_temp_buff, temp_buff, SIZEOF(temp_buff));
 				if (muint_key)
 				{
 					if (muint_end_key)	/* range */
@@ -668,25 +700,25 @@ boolean_t mu_int_blk(
 								continue;
 					}
 				}
-				trees_tail->link = (global_list *)malloc(sizeof(global_list));
+				trees_tail->link = (global_list *)malloc(SIZEOF(global_list));
 				trees_tail = trees_tail->link;
 				trees_tail->link = 0;
 				trees_tail->root = root_pointer;
 
-				memcpy(trees_tail->path, mu_int_path, sizeof(block_id) * (MAX_BT_DEPTH + 1));
-				memcpy(trees_tail->offset, mu_int_offset, sizeof(uint4) * (MAX_BT_DEPTH + 1));
-				assert(sizeof(trees_tail->key) == sizeof(muint_temp_buff));
-				memcpy(trees_tail->key, muint_temp_buff, sizeof(muint_temp_buff));
+				memcpy(trees_tail->path, mu_int_path, SIZEOF(block_id) * (MAX_BT_DEPTH + 1));
+				memcpy(trees_tail->offset, mu_int_offset, SIZEOF(uint4) * (MAX_BT_DEPTH + 1));
+				assert(SIZEOF(trees_tail->key) == SIZEOF(muint_temp_buff));
+				memcpy(trees_tail->key, muint_temp_buff, SIZEOF(muint_temp_buff));
 				trees_tail->keysize = STRLEN((char *)muint_temp_buff);
 				hdr_len = SIZEOF(rec_hdr) + STRLEN(trees_tail->key) + 2 - rec_cmpc; /* We cannot use
 									mid_len() which expects mident_fixed structure */
 				/* +2 in the above hdr_len calculation is to take into account
 				   two \0's after the end of the key
 				*/
-				if (rec_size > hdr_len + sizeof(block_id))
+				if (rec_size > hdr_len + SIZEOF(block_id))
 				{
-					subrec_ptr = get_spec((sm_uc_ptr_t)rec_base + hdr_len + sizeof(block_id),
-									(int)(rec_size - (hdr_len + sizeof(block_id))), COLL_SPEC);
+					subrec_ptr = get_spec((sm_uc_ptr_t)rec_base + hdr_len + SIZEOF(block_id),
+									(int)(rec_size - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
 					if (subrec_ptr)
 					{
 						trees_tail->nct = *(subrec_ptr + COLL_NCT_OFFSET);

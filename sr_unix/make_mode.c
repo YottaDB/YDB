@@ -65,14 +65,14 @@ static dyn_modes our_modes[2] =
 {
 	{
 		GTM_DMOD,
-		sizeof(GTM_DMOD) - 1,
+		SIZEOF(GTM_DMOD) - 1,
 		dm_setup,
 		mum_tstart,
 		opp_ret
 	},
 	{
 		GTM_CIMOD,
-		sizeof(GTM_CIMOD) - 1,
+		SIZEOF(GTM_CIMOD) - 1,
 		ci_restart,
 		ci_ret_code,
 		opp_ret
@@ -116,10 +116,10 @@ rhdtyp *make_mode (int mode_index)
 	lnr_tabent	*lnr;
 	CODEBUF_TYPE	*code;
 	dyn_modes	*dmode;
-	int algnd_rtnhdr_size = (int)ROUND_UP2(sizeof(rhdtyp), SECTION_ALIGN_BOUNDARY);
+	int algnd_rtnhdr_size = (int)ROUND_UP2(SIZEOF(rhdtyp), SECTION_ALIGN_BOUNDARY);
 	int algnd_code_size   = (int)ROUND_UP2(CODE_SIZE, NATIVE_WSIZE);
-	int algnd_lbltab_size = (int)ROUND_UP2(sizeof(lab_tabent), NATIVE_WSIZE);
-	int algnd_lnrtab_size = (int)ROUND_UP2(CODE_LINES * sizeof(lnr_tabent), NATIVE_WSIZE);
+	int algnd_lbltab_size = (int)ROUND_UP2(SIZEOF(lab_tabent), NATIVE_WSIZE);
+	int algnd_lnrtab_size = (int)ROUND_UP2(CODE_LINES * SIZEOF(lnr_tabent), NATIVE_WSIZE);
 
 	assert(DM_MODE == mode_index || CI_MODE == mode_index);
         base_address = (rhdtyp *)GTM_TEXT_ALLOC(algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
@@ -207,7 +207,7 @@ rhdtyp *make_mode (int mode_index)
 	*lnr++ = 0;								/* line 0 */
 	*lnr++ = 0;								/* line 1 */
 	IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST_SIZE;)			/* line 2 */
-	NON_IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST * sizeof(int);)	/* line 2 */
+	NON_IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST * SIZEOF(int);)	/* line 2 */
 
 	lbl = base_address->labtab_adr;
 	lbl->lnr_adr = base_address->lnrtab_adr;

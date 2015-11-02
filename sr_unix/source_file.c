@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,17 +29,21 @@
 #include "zroutines.h"
 #include "gtmio.h"
 #include "iotimer.h"
+#include "cmd_qlf.h"
+#include "min_max.h"
+#include "cli.h"
 
 GBLREF unsigned short	source_name_len;
 GBLREF unsigned char	source_file_name[];
 GBLREF char		rev_time_buf[];
-GBLREF mident		routine_name, module_name;
+GBLREF mident		routine_name, module_name, int_module_name;
 GBLREF unsigned char	*source_buffer;
 GBLREF int4		dollar_zcstatus;
 GBLREF io_pair          io_curr_device;
 GBLREF char		object_file_name[];
 GBLREF short		object_name_len;
 GBLREF int		object_file_des;
+GBLREF command_qualifier cmd_qlf;
 
 static bool	tt_so_do_once;
 static io_pair	compile_src_dev;
@@ -49,7 +53,7 @@ static io_pair	tmp_list_dev;	/*	before reading source file	*/
 
 error_def(ERR_SRCFILERR);
 
-void	compile_source_file(unsigned short flen, char *faddr)
+void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 {
 	plength		plen;
 	mval		fstr, ret;
@@ -92,11 +96,11 @@ void	compile_source_file(unsigned short flen, char *faddr)
 			memcpy(source_file_name, ret.str.addr, source_name_len);
 			source_file_name[source_name_len] = 0;
 			p = &source_file_name[plen.p.pblk.b_dir];
-			if ((plen.p.pblk.b_dir >= sizeof("/dev/") - 1) && !MEMCMP_LIT(source_file_name, "/dev/"))
+			if ((plen.p.pblk.b_dir >= SIZEOF("/dev/") - 1) && !MEMCMP_LIT(source_file_name, "/dev/"))
 				tt_so_do_once = TRUE;
-			else if (plen.p.pblk.b_ext != 2
-				 || ('M' != p[plen.p.pblk.b_name + 1]  &&  'm' != p[plen.p.pblk.b_name + 1]))
-			{
+			else if (MFtIsReqd && (plen.p.pblk.b_ext != 2 || ('M' != p[plen.p.pblk.b_name + 1]
+									  &&  'm' != p[plen.p.pblk.b_name + 1])))
+			{	/* M filetype is required but not present */
 				dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, source_name_len, source_file_name);
 				dollar_zcstatus = ERR_ERRORSUMMARY;
 				continue;
@@ -140,7 +144,6 @@ CONDITION_HANDLER(source_ch)
 
 bool	open_source_file (void)
 {
-
 	static readonly unsigned char open_params_list[] =
         {
 		(unsigned char)iop_readonly,
@@ -156,9 +159,11 @@ bool	open_source_file (void)
 	struct stat	statbuf;
 	mval		val;
 	mval		pars;
+	unsigned short	clen;
+
 	error_def	(ERR_FILEPARSE);
 
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = buff;
 	pblk.buff_size = MAX_FBUFF;
 	pblk.fop = F_SYNTAXO;
@@ -169,7 +174,7 @@ bool	open_source_file (void)
 		rts_error(VARLSTCNT(5) ERR_FILEPARSE, 2, fstr.len, fstr.addr, status);
 
 	pars.mvtype = MV_STR;
-	pars.str.len = sizeof(open_params_list);
+	pars.str.len = SIZEOF(open_params_list);
 	pars.str.addr = (char *)open_params_list;
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;
@@ -194,11 +199,31 @@ bool	open_source_file (void)
 		if (n > MAX_MIDENT_LEN)
 			n = MAX_MIDENT_LEN;
 	}
-	memcpy(routine_name.addr, p, n);
+	/* routine_name is the internal name of the routine (with '%' translated to '_') which can be
+	      different from module_name if the NAMEOFRTN parm is used (by trigger compilation code).
+	   module_name is the external file name of the module (file.m, file.o).
+	   int_module_name is the external symbol that gets exposed (in the GTM context) and is normally
+	      the same as module_name except when NAMEOFRTN is specified in which case it takes on the
+	      untranslated value of routine_name.
+	*/
 	memcpy(module_name.addr, p, n);
-	routine_name.len = module_name.len = n;
-	if ('_' == *p)
+	module_name.len = n;
+	if (!(cmd_qlf.qlf & CQ_NAMEOFRTN))
+	{
+		memcpy(routine_name.addr, p, n);
+		routine_name.len = n;
+	} else
+	{	/* Routine name specified */
+		clen = MAX_MIDENT_LEN;
+		cli_get_str("NAMEOFRTN", routine_name.addr, &clen);
+		routine_name.len = MIN(clen, MAX_MIDENT_LEN);
+		cmd_qlf.qlf &= ~CQ_NAMEOFRTN;	/* Can only be used for first module in list */
+	}
+	memcpy(int_module_name.addr, routine_name.addr, routine_name.len);
+	int_module_name.len = routine_name.len;
+	if ('_' == *routine_name.addr)
 		routine_name.addr[0] = '%';
+
 	p = (char *)GTM_CTIME(&clock);
 	memcpy(rev_time_buf, p + 4, REV_TIME_BUFF_LEN);
 
@@ -252,7 +277,7 @@ void	close_source_file (void)
 
 	no_param = (unsigned char)iop_eol;
 	pars.mvtype = MV_STR;
-	pars.str.len = sizeof(no_param);
+	pars.str.len = SIZEOF(no_param);
 	pars.str.addr = (char *)&no_param;
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;

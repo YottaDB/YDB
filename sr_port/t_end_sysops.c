@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,7 +99,24 @@
 #include "wcs_read_in_progress_wait.h"
 #include "wcs_phase2_commit_wait.h"
 #include "wcs_recover.h"
+#include "shmpool.h"	/* Needed for the shmpool structures */
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
 
+/* Set the cr->ondsk_blkver to the csd->desired_db_format */
+#define SET_ONDSK_BLKVER(cr, csd, ctn)											\
+{															\
+	/* Note that even though the corresponding blks_to_uprd adjustment for this cache-record happened in phase1 	\
+	 * while holding crit, we are guaranteed that csd->desired_db_format did not change since then because the 	\
+	 * function that changes this ("desired_db_format_set") waits for all phase2 commits to	complete before 	\
+	 * changing the format. Before resetting cr->ondsk_blkver, ensure db_format in file header did not change in 	\
+	 * between phase1 (inside of crit) and phase2 (outside of crit). This is needed to ensure the correctness of 	\
+	 * the blks_to_upgrd counter.											\
+	 */														\
+	assert((ctn > csd->desired_db_format_tn) || ((ctn == csd->desired_db_format_tn) && (1 == ctn)));		\
+	cr->ondsk_blkver = csd->desired_db_format;									\
+}
 /* check for online backup - ATTN: this part of code is similar to that in mm_update */
 #define	BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, nontp_block_saved, tp_block_saved, ctn)\
 {															\
@@ -107,7 +124,8 @@
 	trans_num		bkup_blktn;										\
 	shmpool_buff_hdr_ptr_t	sbufh_p;										\
 															\
-	DEBUG_ONLY(read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);)		\
+	DEBUG_ONLY(read_before_image = 											\
+		((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));)	\
 	assert(!read_before_image || (NULL == cs->old_block) || (backup_blk_ptr == cs->old_block));			\
 	assert(csd == cs_data);	/* backup_block uses cs_data hence this check */					\
 	if ((blkid >= cnl->nbb) && (NULL != cs->old_block))								\
@@ -130,16 +148,6 @@
 			}												\
 		}													\
 	}														\
-	/* Now that we are done invoking "backup_block", we can update cr->ondsk_blkver to reflect the current		\
-	 * desired_db_format. Note that even though the corresponding blks_to_uprd adjustment for this cache-record	\
-	 * happened in phase1 while holding crit, we are guaranteed that csd->desired_db_format did not change since	\
-	 * then because the function that changes this ("desired_db_format_set") waits for all phase2 commits to	\
-	 * complete before changing the format. Before resetting cr->ondsk_blkver, ensure db_format in file header	\
-	 * did not change in between phase1 (inside of crit) and phase2 (outside of crit). This is needed to ensure	\
-	 * the correctness of the blks_to_upgrd counter.								\
-	 */														\
-	assert((ctn > csd->desired_db_format_tn) || ((ctn == csd->desired_db_format_tn) && (1 == ctn)));		\
-	cr->ondsk_blkver = csd->desired_db_format;									\
 }
 
 #if defined(UNIX)
@@ -167,7 +175,6 @@ GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	boolean_t		block_saved;
 GBLREF	boolean_t		write_after_image;
 GBLREF	boolean_t		dse_running;
-GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
 GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
@@ -310,7 +317,7 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 	assert(mu_reorg_upgrd_dwngrd_in_prog || dse_running || (0 != reference_cnt));
 	if (0 < reference_cnt)
 	{	/* Blocks were allocated in this bitmap. Check if local bitmap became full as a result. If so update mastermap. */
-		bml_full = bml_find_free(0, (sizeof(blk_hdr) + (is_mm ? lclmap : ((sm_uc_ptr_t)GDS_REL2ABS(lclmap)))), total_blks);
+		bml_full = bml_find_free(0, (SIZEOF(blk_hdr) + (is_mm ? lclmap : ((sm_uc_ptr_t)GDS_REL2ABS(lclmap)))), total_blks);
 		if (NO_FREE_SPACE == bml_full)
 		{
 			bit_clear(blkid / bplmap, MM_ADDR(csd));
@@ -329,7 +336,7 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 			 * previous cw-set-element is of type gds_t_busy2free (which does not go through bg_update) */
 			assert((1 == cw_set_depth)
 				|| (2 == cw_set_depth) && (gds_t_busy2free == (cs-1)->old_mode));
-			if (0 != inctn_detail.blknum)
+			if (0 != inctn_detail.blknum_struct.blknum)
 				DECR_BLKS_TO_UPGRD(csa, csd, 1);
 		}
 	}
@@ -372,6 +379,9 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	cw_set_element		*cs_ptr, *nxt;
 	off_chain		chain;
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
+	GTM_SNAPSHOT_ONLY(
+		snapshot_context_ptr_t	lcl_ss_ctx;
+	)
 #if defined(VMS)
 	unsigned int		status;
 	io_status_block_disk	iosb;
@@ -396,7 +406,6 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 		unix_db_info	*udi;
 		int4		save_errno;
 #		endif
-
 	error_def(ERR_DBFILERR);
 	error_def(ERR_TEXT);
 #	endif
@@ -543,6 +552,18 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 		else
 			si->backup_block_saved = TRUE;
 	}
+#	ifdef GTM_SNAPSHOT
+	lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
+	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block))
+		WRITE_SNAPSHOT_BLOCK(cs_addrs, NULL, db_addr[0], blkid, lcl_ss_ctx);
+	/* If snapshots are in progress then the current block better be before imaged in the snapshot file. The
+	 * only exception is when the current database transaction number is greater than the snapshot transaction
+	 * number in which case the block's before image is not expected to be written to the snapshot file
+	 */
+	assert(!SNAPSHOTS_IN_PROG(cs_addrs)
+		|| (cs_data->trans_hist.curr_tn > lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn)
+		|| (ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)));
+#	endif
 	if (gds_t_writemap == cs->mode)
 	{
 		assert(0 == (blkid & (BLKS_PER_LMAP - 1)));
@@ -572,7 +593,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 				((blk_hdr_ptr_t)db_addr[0])->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
 			memcpy(db_addr[0], cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
-		assert(sizeof(blk_hdr) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
+		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) > 0);
 		assert((int)(((blk_hdr_ptr_t)db_addr[0])->bsiz) <= cs_data->blk_size);
 		if (0 == dollar_tlevel)
@@ -581,8 +602,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 			{	/* reference to resolve: insert real block numbers in the buffer */
 				assert(0 <= (short)cs->index);
 				assert(&cw_set[cs->index] < cs);
-				assert((sizeof(blk_hdr) + sizeof(rec_hdr)) <= cs->ins_off);
-				assert((cs->ins_off + sizeof(block_id)) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
+				assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= cs->ins_off);
+				assert((cs->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
 				PUT_LONG(db_addr[0] + cs->ins_off, cw_set[cs->index].blk);
 				if (((nxt = cs + 1) < &cw_set[cw_set_depth]) && (gds_t_write_root == nxt->mode))
 				{	/* If the next cse is a WRITE_ROOT, it contains a second block pointer
@@ -590,8 +611,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 					 */
 					assert(0 <= (short)nxt->index);
 					assert(&cw_set[nxt->index] < nxt);
-					assert((sizeof(blk_hdr) + sizeof(rec_hdr)) <= nxt->ins_off);
-					assert((nxt->ins_off + sizeof(block_id)) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
+					assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= nxt->ins_off);
+					assert((nxt->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
 					PUT_LONG(db_addr[0] + nxt->ins_off, cw_set[nxt->index].blk);
 				}
 			}
@@ -761,7 +782,8 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	if (cs->write_type & GDS_WRITE_KILLTN)
 		bt->killtn = ctn;
 	cr = (cache_rec_ptr_t)(INTPTR_T)bt->cache_index;
-	DEBUG_ONLY(read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);)
+	DEBUG_ONLY(read_before_image =
+			((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));)
 	if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 	{	/* no cache record associated with the bt_rec */
 		cr = db_csh_get(blkid);
@@ -1172,7 +1194,9 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	/* RECYCLED blocks could be converted by MUPIP REORG UPGRADE/DOWNGRADE. In this case do NOT update blks_to_upgrd */
 	assert((gds_t_write_recycled != mode) || mu_reorg_upgrd_dwngrd_in_prog);
 	if (gds_t_acquired == mode)
-	{	/* It is a created block. It should inherit the desired db format. If that format is V4, increase blks_to_upgrd. */
+	{	/* It is a created block. It should inherit the desired db format. This is done as a part of call to
+		 * SET_ONDSK_BLKVER in bg_update_phase1 and bg_update_phase2. Also, if that format is V4, increase blks_to_upgrd.
+		 */
 		if (GDSV4 == desired_db_format)
 		{
 			INCR_BLKS_TO_UPGRD(csa, csd, 1);
@@ -1244,6 +1268,8 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		assert(gds_t_write_root != mode);
 	}
 	BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved, ctn);
+	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
+	SET_ONDSK_BLKVER(cr, csd, ctn);
 #	endif
 	cs->cr = cr;		/* note down "cr" so phase2 can find it easily (given "cs") */
 	cs->cycle = cr->cycle;	/* update "cycle" as well (used later in tp_clean_up to update cycle in history) */
@@ -1287,6 +1313,9 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	gv_namehead		*targ;
 	srch_blk_status		*blk_hist;
 #	endif
+	GTM_SNAPSHOT_ONLY(
+		snapshot_context_ptr_t	lcl_ss_ctx = NULL;
+	)
 
 	error_def(ERR_WCBLOCKED);
 
@@ -1327,7 +1356,22 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	 */
 	backup_cr = cr;
 	backup_blk_ptr = blk_ptr;
-	BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved, ctn);
+	if (!cs->was_free) /* dont do before image write for backup for FREE blocks */
+		BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved, ctn);
+#	endif
+	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
+	SET_ONDSK_BLKVER(cr, csd, ctn);
+#	ifdef GTM_SNAPSHOT
+	lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
+	if (SNAPSHOTS_IN_PROG(csa) && (NULL != cs->old_block))
+		WRITE_SNAPSHOT_BLOCK(csa, cr, NULL, blkid, lcl_ss_ctx);
+	/* If snapshots are in progress then the current block better be before imaged in the snapshot file. The
+	 * only exception is when the current database transaction number is greater than the snapshot transaction
+	 * number in which case the block's before image is not expected to be written to the snapshot file
+	 */
+	assert(!SNAPSHOTS_IN_PROG(csa)
+		|| (csd->trans_hist.curr_tn > lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn)
+		|| (ss_chk_shdw_bitmap(csa, SS_CTX_CAST(csa->ss_ctx), cs->blk)));
 #	endif
 	SET_DATA_INVALID(cr);	/* data_invalid should be set signaling intent to update contents of a valid block */
 	if (gds_t_writemap == mode)
@@ -1369,7 +1413,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 				((blk_hdr *)blk_ptr)->tn = ((blk_hdr_ptr_t)cs->new_buff)->tn = ctn;
 			memcpy(blk_ptr, cs->new_buff, ((blk_hdr_ptr_t)cs->new_buff)->bsiz);
 		}
-		assert(sizeof(blk_hdr) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
+		assert(SIZEOF(blk_hdr) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
 		assert((int)((blk_hdr_ptr_t)blk_ptr)->bsiz > 0);
 		assert((int)((blk_hdr_ptr_t)blk_ptr)->bsiz <= csd->blk_size);
 		if (0 == dollar_tlevel)
@@ -1378,8 +1422,8 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			{	/* reference to resolve: insert real block numbers in the buffer */
 				assert(0 <= (short)cs->index);
 				assert(cs - cw_set > cs->index);
-				assert((sizeof(blk_hdr) + sizeof(rec_hdr)) <= cs->ins_off);
-				assert((cs->ins_off + sizeof(block_id)) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
+				assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= cs->ins_off);
+				assert((cs->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
 				PUT_LONG((blk_ptr + cs->ins_off), cw_set[cs->index].blk);
 				if (((nxt = cs + 1) < &cw_set[cw_set_depth]) && (gds_t_write_root == nxt->mode))
 				{	/* If the next cse is a WRITE_ROOT, it contains a second block pointer
@@ -1387,7 +1431,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 					 */
 					assert(0 <= (short)nxt->index);
 					assert(nxt - cw_set > nxt->index);
-					assert(sizeof(blk_hdr) <= nxt->ins_off);
+					assert(SIZEOF(blk_hdr) <= nxt->ins_off);
 					assert(nxt->ins_off <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
 					PUT_LONG((blk_ptr + nxt->ins_off), cw_set[nxt->index].blk);
 				}
@@ -1400,7 +1444,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 				{
 					GET_LONGP(&chain, chain_ptr);
 					assert(1 == chain.flag);
-					assert((chain_ptr - blk_ptr + chain.next_off + sizeof(block_id))
+					assert((chain_ptr - blk_ptr + chain.next_off + SIZEOF(block_id))
 							<= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
 					assert((int)chain.cw_index < sgm_info_ptr->cw_set_depth);
 					tp_get_cw(si->first_cw_set, (int)chain.cw_index, &cs_ptr);
@@ -1544,7 +1588,7 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 			INCR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
 			start_timer((TID)reg,
 				    csd->flush_time[0] * (dba_bg == acc_meth ? 1 : csd->defer_time),
-				    &wcs_stale, sizeof(reg_parm), (char *)&reg_parm);
+				    &wcs_stale, SIZEOF(reg_parm), (char *)&reg_parm);
 			BG_TRACE_ANY(csa, stale_timer_started);
 		}
 	}
@@ -1667,11 +1711,13 @@ uint4	jnl_ensure_open(void)
 	}
 	if (need_to_open_jnl)
 	{
+		/* Whenever journal file get switch, reset the pini_addr and new_freeaddr. */
 		jpc->pini_addr = 0;
-		if (GTCM_GNP_SERVER_IMAGE == image_type)
+		jpc->new_freeaddr = 0;
+		if (IS_GTCM_GNP_SERVER_IMAGE)
 			gtcm_jnl_switched(jpc->region); /* Reset pini_addr of all clients that had any older journal file open */
 		UNIX_ONLY(first_open_of_jnl = (0 == csa->nl->jnl_file.u.inode);)
-		VMS_ONLY(first_open_of_jnl = (0 == memcmp(csa->nl->jnl_file.jnl_file_id.fid, file.fid, sizeof(file.fid))));
+		VMS_ONLY(first_open_of_jnl = (0 == memcmp(csa->nl->jnl_file.jnl_file_id.fid, file.fid, SIZEOF(file.fid))));
 		jnl_status = jnl_file_open(gv_cur_region, first_open_of_jnl, NULL);
 	}
 	assert((0 != jnl_status) || !JNL_FILE_SWITCHED(jpc)
@@ -1807,7 +1853,7 @@ void	wcs_stale(gd_region *reg)
 		UNIX_ONLY(start_timer((TID)reg,
 			    csd->flush_time[0] * (dba_bg == acc_meth ? 1 : csd->defer_time),
 			    &wcs_stale,
-			    sizeof(region),
+			    SIZEOF(region),
 			    (char *)region);)
 		VMS_ONLY(sys$setimr(efn_ignore, csd->flush_time, wcs_stale, reg, 0);)
 		BG_TRACE_ANY(csa, stale_timer_started);

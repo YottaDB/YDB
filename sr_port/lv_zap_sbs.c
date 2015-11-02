@@ -73,8 +73,7 @@ void lv_zap_sbs(lv_sbs_tbl *tbl, lv_val *lv)
 		if (tbl->int_flag)
 		{
 			blk = tbl->num;
-			for (lvp = &blk->ptr.lv[0], top = (char *)&blk->ptr.lv[SBS_NUM_INT_ELE];
-			     lvp < (lv_val **)top; lvp++)
+			for (lvp = &blk->ptr.lv[0], top = (char *)ARRAYTOP(blk->ptr.lv); lvp < (lv_val **)top; lvp++)
 			{
 				if (*lvp == lv)
 				{

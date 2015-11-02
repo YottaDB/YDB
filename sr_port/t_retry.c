@@ -39,6 +39,7 @@
 #include "have_crit.h"
 #include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
 #include "wcs_backoff.h"
+#include "tp_restart.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -54,7 +55,10 @@ GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_dollar_incr;
-GBLREF	int4			update_trans;
+GBLREF	uint4			update_trans;
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t		skip_INVOKE_RESTART;
+#endif
 #ifdef DEBUG
 GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
 GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
@@ -67,6 +71,7 @@ void t_retry(enum cdb_sc failure)
 	short			tl;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	boolean_t		skip_invoke_restart;
 
 	error_def(ERR_GBLOFLOW);
 	error_def(ERR_GVIS);
@@ -75,6 +80,18 @@ void t_retry(enum cdb_sc failure)
 	error_def(ERR_GVINCRFAIL);
 	UNIX_ONLY(error_def(ERR_GVFAILCORE);)
 
+#	ifdef GTM_TRIGGER
+	skip_invoke_restart = skip_INVOKE_RESTART;	/* note down global value in local variable */
+	skip_INVOKE_RESTART = FALSE;	/* reset global variable to default state as soon as possible */
+#	else
+	skip_invoke_restart = FALSE;	/* no triggers so set local variable to default state */
+#	endif
+	/* We expect t_retry to be invoked with an abnormal failure code. mupip reorg is the only exception and can pass
+	 * cdb_sc_normal failure code in case it finds a global variable existed at start of reorg, but not when it came
+	 * into mu_reorg and did a gvcst_search. It cannot confirm this unless it holds crit for which it has to wait
+	 * until the final retry which is why we accept this way of invoking t_retry. Assert accordingly.
+	 */
+	assert((cdb_sc_normal != failure) || mu_reorg_process);
 	t_fail_hist[t_tries] = (unsigned char)failure;
 	if (mu_reorg_process)
 		CWS_RESET;
@@ -111,7 +128,7 @@ void t_retry(enum cdb_sc failure)
 		 */
 		assert(CDB_STAGNATE >= t_tries);
 		if ((CDB_STAGNATE <= t_tries)
-			&& ((cdb_sc_jnlclose == failure) || (cdb_sc_jnlstatemod == failure) || (cdb_sc_backupstatemod == failure)
+			&& ((cdb_sc_jnlclose == failure) || (cdb_sc_jnlstatemod == failure) || (cdb_sc_bkupss_statemod == failure)
 				|| (cdb_sc_future_read == failure) || (cdb_sc_helpedout == failure)))
 			t_tries = CDB_STAGNATE - 1;
 		if (CDB_STAGNATE <= ++t_tries)
@@ -135,7 +152,7 @@ void t_retry(enum cdb_sc failure)
 			{
 				assert((failure != cdb_sc_helpedout) && (failure != cdb_sc_future_read)
 					&& (failure != cdb_sc_jnlclose) && (failure != cdb_sc_jnlstatemod)
-					&& (failure != cdb_sc_backupstatemod) && (failure != cdb_sc_inhibitkills));
+					&& (failure != cdb_sc_bkupss_statemod) && (failure != cdb_sc_inhibitkills));
 				if (cdb_sc_unfreeze_getcrit == failure)
 				{
 					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, csd);
@@ -180,13 +197,17 @@ void t_retry(enum cdb_sc failure)
 		}
 		cw_set_depth = 0;
 		cw_map_depth = 0;
+		/* In case triggers are supported, make sure we start with latest copy of file header's db_trigger_cycle
+		 * to avoid unnecessary cdb_sc_triggermod type of restarts.
+		 */
+		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle;)
 		start_tn = csa->ti->curr_tn;
 		assert(NULL != gv_target);
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
 	} else
 	{	/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
-		t_fail_hist[t_tries] = failure;
+		assert(failure == t_fail_hist[t_tries]);
 		assert((NULL == csa) || (NULL != csa->hdr));	/* both csa and csa->hdr should be NULL or non-NULL. */
 		assert((NULL != csa) || (cdb_sc_needcrit == failure)); /* csa can be NULL in case of retry in op_lock2 */
 		if (NULL != csa)					/*  in which case failure code should be cdb_sc_needcrit. */
@@ -203,6 +224,10 @@ void t_retry(enum cdb_sc failure)
 				TP_TRACE_HIST(CR_BLKEMPTY, gv_target);
 			gv_target->clue.end = 0;
 		}
-		INVOKE_RESTART;
+		if (!skip_invoke_restart)
+		{
+			INVOKE_RESTART;
+		} else	/* explicit trigger update caused implicit tp wrap so should return to caller without rts_error */
+			tp_restart(1);
 	}
 }

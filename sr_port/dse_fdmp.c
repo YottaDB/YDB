@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,9 +33,8 @@ static unsigned int	work_buff_length;
 
 boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 {
-	unsigned char	*key_char_ptr, temp[MAX_ZWR_KEY_SZ], *temp_char_ptr, *work_char_ptr;
-	int 		dest_len, chlen;
-	int4		ch;
+	unsigned char	*key_char_ptr, *work_char_ptr;
+	int 		dest_len;
 
 	if (work_buff_length < ZWR_EXP_RATIO(gv_cur_region->max_rec_size))
 	{

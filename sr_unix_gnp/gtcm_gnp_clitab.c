@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ static readonly CLI_ENTRY gtcm_gnp_qual[] = {
 { 0 }
 };
 
-GBLDEF CLI_ENTRY cmd_ary[] = {
+GBLDEF CLI_ENTRY gtcm_gnp_cmd_ary[] = {
 { "GTCM_GNP_SERVER", 0, gtcm_gnp_qual, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0},
 { 0 }
 };

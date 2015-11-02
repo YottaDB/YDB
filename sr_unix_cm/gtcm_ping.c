@@ -123,7 +123,7 @@ int icmp_ping(int conn)
 {
 	fd_set			fdmask;
 	struct sockaddr_in	paddr;
-	GTM_SOCKLEN_TYPE	paddr_len = sizeof(struct sockaddr_in);
+	GTM_SOCKLEN_TYPE	paddr_len = SIZEOF(struct sockaddr_in);
 	struct icmp		*icp;
 	struct ip		*ip;
 	struct timeval		timeout;
@@ -151,8 +151,8 @@ int icmp_ping(int conn)
 		*((int *)(&pingsend[ICMP_MINLEN])) = (int) time_val;	/* time stamp */
 	}
 	/* compute ICMP checksum here */
-	icp->icmp_cksum = in_cksum((u_short *)icp, ICMP_MINLEN + sizeof(int));
-	while (cc = sendto(pingsock, (char *)pingsend, ICMP_MINLEN + sizeof(int), 0, (struct sockaddr *)&paddr, paddr_len) < 0)
+	icp->icmp_cksum = in_cksum((u_short *)icp, ICMP_MINLEN + SIZEOF(int));
+	while (cc = sendto(pingsock, (char *)pingsend, ICMP_MINLEN + SIZEOF(int), 0, (struct sockaddr *)&paddr, paddr_len) < 0)
 	{
 		if (errno == EINTR)
 			continue;
@@ -166,7 +166,7 @@ int icmp_ping(int conn)
 		char msg[64];
 #ifndef SUNOS
 		host = inet_ntoa(paddr.sin_addr.s_addr);
-		if ((he = gethostbyaddr(paddr.sin_addr.s_addr, sizeof(paddr.sin_addr.s_addr), 0)))
+		if ((he = gethostbyaddr(paddr.sin_addr.s_addr, SIZEOF(paddr.sin_addr.s_addr), 0)))
 			host = he->h_name;
 #else
 	 (void) sprintf(msg, "%d.%d.%d.%d",
@@ -201,7 +201,7 @@ int get_ping_rsp(void)
 		fprintf(stderr,"icmp_ping:  no ping socket.\n");
 		exit(1);
 	}
-	fromlen = sizeof(from);
+	fromlen = SIZEOF(from);
 	while ((cc = (int)(recvfrom(pingsock, (char *)pingrcv, IP_MAXPACKET, 0, (struct sockaddr *)&from,
 					(GTM_SOCKLEN_TYPE *)&fromlen))) < 0)
 	{
@@ -221,7 +221,7 @@ int get_ping_rsp(void)
 #ifndef SUNOS
 		host = inet_ntoa(from.sin_addr.s_addr);
 		if ((he = gethostbyaddr(from.sin_addr.s_addr,
-					sizeof(from.sin_addr.s_addr), 0)))
+					SIZEOF(from.sin_addr.s_addr), 0)))
 			host = he->h_name;
 #else
 	 (void) sprintf(msg, "%d.%d.%d.%d",

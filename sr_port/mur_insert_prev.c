@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,12 +34,9 @@
 #include "iosp.h"
 #include "gtmmsg.h"
 
-GBLREF	reg_ctl_list	*mur_ctl;
-GBLREF	int		mur_regno;
-GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF	mur_opt_struct	mur_options;
 
-boolean_t mur_insert_prev(void)
+boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 {
 	reg_ctl_list	*rctl;
 	jnl_ctl_list	*new_jctl, *cur_jctl, *jctl;
@@ -52,26 +49,24 @@ boolean_t mur_insert_prev(void)
 	error_def(ERR_JNLTNOUTOFSEQ);
 	error_def(ERR_JNLCYCLE);
 
-	rctl = &mur_ctl[mur_regno];
-	jctl = mur_jctl;
+	jctl = *jjctl;
+	rctl = jctl->reg_ctl;
    	assert(rctl->jctl_head == jctl);
    	assert(rctl->jctl == jctl);
-	new_jctl = (jnl_ctl_list *)malloc(sizeof(jnl_ctl_list));
-	memset(new_jctl, 0, sizeof(jnl_ctl_list));
+	new_jctl = (jnl_ctl_list *)malloc(SIZEOF(jnl_ctl_list));
+	memset(new_jctl, 0, SIZEOF(jnl_ctl_list));
 	memcpy(new_jctl->jnl_fn, jctl->jfh->prev_jnl_file_name, jctl->jfh->prev_jnl_file_name_length);
 	new_jctl->jnl_fn_len = jctl->jfh->prev_jnl_file_name_length;
 	assert(0 != new_jctl->jnl_fn_len);
 	if (FALSE == mur_fopen(new_jctl))
 	{
 		free(new_jctl);
-		return FALSE;	/* mur_fopen() would have printed the appropriate error message */
+		return FALSE;	/* "mur_fopen" would have printed the appropriate error message */
 	}
-	mur_jctl = new_jctl;	/* note: mur_fread_eof must be done after setting mur_ctl, mur_regno and mur_jctl */
-	if (SS_NORMAL != (new_jctl->status = mur_fread_eof(new_jctl)))
+	if (SS_NORMAL != (new_jctl->status = mur_fread_eof(new_jctl, rctl)))
 	{
 		gtm_putmsg(VARLSTCNT(6) ERR_JNLBADRECFMT, 3, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
 				new_jctl->rec_offset, new_jctl->status);
-		mur_jctl = jctl;
 		free(new_jctl);
 		return FALSE;
 	}
@@ -84,10 +79,9 @@ boolean_t mur_insert_prev(void)
 	{
 		if (!new_jctl->properly_closed)
 		{
-			proceed = (FALSE == mur_report_error(MUR_PREVJNLNOEOF));/* mur_report_error() will print error message */
+			proceed = (FALSE == mur_report_error(jctl, MUR_PREVJNLNOEOF)); /* message report left to mur_report_error */
 			if (mur_options.update || !proceed)
 			{
-				mur_jctl = jctl;
 				free(new_jctl);
 				return FALSE;
 			}
@@ -97,7 +91,6 @@ boolean_t mur_insert_prev(void)
 			gtm_putmsg(VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
 				&new_jctl->jfh->eov_tn, new_jctl->jnl_fn_len, new_jctl->jnl_fn,
 				&jctl->jfh->bov_tn, jctl->jnl_fn_len, jctl->jnl_fn);
-			mur_jctl = jctl;
 			free(new_jctl);
 			return FALSE;
 		}
@@ -117,7 +110,6 @@ boolean_t mur_insert_prev(void)
 			gtm_putmsg(VARLSTCNT(8) ERR_DBJNLNOTMATCH, 6, DB_LEN_STR(rctl->gd), new_jctl->jnl_fn_len,
 					new_jctl->jnl_fn, new_jctl->jfh->data_file_name_length,
 					new_jctl->jfh->data_file_name);
-			mur_jctl = jctl;
 			free(new_jctl);
 			return FALSE;
 		}
@@ -128,7 +120,6 @@ boolean_t mur_insert_prev(void)
 			0 == memcmp(new_jctl->jfh->prev_jnl_file_name, cur_jctl->jnl_fn, cur_jctl->jnl_fn_len))
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLCYCLE, 4, cur_jctl->jnl_fn_len, cur_jctl->jnl_fn, DB_LEN_STR(rctl->gd));
-			mur_jctl = jctl;
 			free(new_jctl);
 			return FALSE;
 		}
@@ -152,6 +143,8 @@ boolean_t mur_insert_prev(void)
 	new_jctl->next_gen = jctl;
 	jctl->prev_gen = new_jctl;
 	rctl->jctl = rctl->jctl_head = new_jctl;
-	gtm_putmsg(VARLSTCNT(6) ERR_MUJNLPREVGEN, 4, new_jctl->jnl_fn_len, new_jctl->jnl_fn, DB_LEN_STR(mur_ctl[mur_regno].gd));
+	assert(new_jctl->reg_ctl == rctl);
+	*jjctl = new_jctl;
+	gtm_putmsg(VARLSTCNT(6) ERR_MUJNLPREVGEN, 4, new_jctl->jnl_fn_len, new_jctl->jnl_fn, DB_LEN_STR(rctl->gd));
 	return TRUE;
 }

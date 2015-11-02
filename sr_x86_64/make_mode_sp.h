@@ -18,7 +18,7 @@
     *((char *)code)++ = 0x48;				       \
     *((char *)code)++ = I386_INS_MOV_eAX;		       \
     *((intptr_t *)code) = (intptr_t)(unsigned char *)func;     \
-    code += sizeof(intptr_t);				       \
+    code += SIZEOF(intptr_t);				       \
     *((char *)code)++ = I386_INS_Grp5_Prefix;		       \
     *((char *)code)++ = 0xd0;				       \
 }

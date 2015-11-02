@@ -62,7 +62,7 @@ void op_killaliasall(void)
 					   cleanup problems */
         if (NULL == stp_array)
                 /* Same initialization as is in stp_gcol_src.h */
-                stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * sizeof(mstr *));
+                stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
 	htearray = htep = (ht_ent_mname **)stp_array;
 	htearraytop = htearray + stp_array_size;
 

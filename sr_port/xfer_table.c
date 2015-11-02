@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ int init_xfer_table()
 {
         int i;
 
-        for (i = 0; i < (sizeof(xfer_table) / sizeof(xfer_entry_t)); i++)
+        for (i = 0; i < (SIZEOF(xfer_table) / SIZEOF(xfer_entry_t)); i++)
         {
                 xfer_table[i] = (int (*)())CODE_ADDRESS(xfer_table[i]);
         }

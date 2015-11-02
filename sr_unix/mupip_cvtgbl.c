@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,9 @@
 GBLREF	int		gv_fillfactor;
 GBLREF	bool		mupip_error_occurred;
 GBLREF	boolean_t	is_replicator;
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t	skip_dbtriggers;
+#endif
 
 void mupip_cvtgbl(void)
 {
@@ -52,6 +55,7 @@ void mupip_cvtgbl(void)
 	error_def(ERR_LOADEDSZ2);
 
 	is_replicator = TRUE;
+	GTMTRIG_ONLY(skip_dbtriggers = TRUE;)
 	fn_len = 256;
 	if (!cli_get_str("FILE", fn, &fn_len))
 		mupip_exit(ERR_MUPCLIERR);
@@ -88,7 +92,7 @@ void mupip_cvtgbl(void)
 		end = MAXUINT4;
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
 	{
-		assert(sizeof(gv_fillfactor) == sizeof(int4));
+		assert(SIZEOF(gv_fillfactor) == SIZEOF(int4));
 	        if (!cli_get_int("FILL_FACTOR", (int4 *)&gv_fillfactor))
 			gv_fillfactor = MAX_FILLFACTOR;
 		if (gv_fillfactor < MIN_FILLFACTOR)
@@ -100,7 +104,7 @@ void mupip_cvtgbl(void)
 
 	if (cli_present("FORMAT") == CLI_PRESENT)
 	{
-	        len = sizeof("FORMAT");
+	        len = SIZEOF("FORMAT");
 		if (!cli_get_str("FORMAT", (char *)buff, &len))
 			go_load(begin, end);
 		else

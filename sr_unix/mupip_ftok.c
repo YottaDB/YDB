@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,10 +72,10 @@ void mupip_ftok (void)
 	recvpool = (CLI_PRESENT == cli_present("RECVPOOL"));
 	if (jnlpool || recvpool)
 	{
-		if (!repl_inst_get_name(instfilename, &full_len, sizeof(instfilename), issue_rts_error))
+		if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error))
 			GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
 		in_mupip_ftok = TRUE;
-		repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+		repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		in_mupip_ftok = FALSE;
 		if (jnlpool)
 		{
@@ -88,7 +88,7 @@ void mupip_ftok (void)
 		}
 	} else
 	{
-		if (!file_head_read(fn, &header, sizeof(header)))
+		if (!file_head_read(fn, &header, SIZEOF(header)))
 			mupip_exit(ERR_MUNOACTION);
 		semid = header.semid;
 		shmid = header.shmid;
@@ -98,7 +98,7 @@ void mupip_ftok (void)
 	PRINTF("%20s  ::  %10d [0x%.8x]  ::  %10d [0x%.8x]  ::  0x", fn, semid, semid, shmid, shmid);
 	fid_ptr = (sm_uc_ptr_t)&fid;
 	filename_to_id((gd_id_ptr_t)fid_ptr, fn);
-	fid_top = fid_ptr + sizeof(fid);
+	fid_top = fid_ptr + SIZEOF(fid);
 	for ( ; fid_ptr < fid_top; fid_ptr++)
 		PRINTF("%.2x", *(sm_uc_ptr_t)fid_ptr);
 	PRINTF("\n");

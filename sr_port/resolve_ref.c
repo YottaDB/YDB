@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ int resolve_ref(int errknt)
 		{
 			COMPDBG(printf(" ************************ Triple Start **********************\n"););
 			COMPDBG(cdbg_dump_triple(curtrip, 0););
-			for (opnd = curtrip->operand ; opnd < &(curtrip->operand[2]) ; opnd++)
+			for (opnd = curtrip->operand ; opnd < ARRAYTOP(curtrip->operand); opnd++)
 			{
 				if (opnd->oprclass == INDR_REF)
 					*opnd = *(opnd->oprval.indr);
@@ -66,7 +66,7 @@ int resolve_ref(int errknt)
 					opnd->oprval.tref = opnd->oprval.tref->exorder.fl;
 					/* caution:  fall through */
 				case TJMP_REF:
-					tripbp = (tbp *) mcalloc(sizeof(tbp));
+					tripbp = (tbp *) mcalloc(SIZEOF(tbp));
 					tripbp->bpt = curtrip;
 					dqins(&opnd->oprval.tref->jmplist, que, tripbp);
 					continue;
@@ -221,7 +221,7 @@ void resolve_tref(triple *curtrip, oprtype *opnd)
 	COMPDBG(printf(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
 		       opnd, &tripref->operand[0]););
 
-	tripbp = (tbp *) mcalloc(sizeof(tbp));
+	tripbp = (tbp *) mcalloc(SIZEOF(tbp));
 	tripbp->bpt = curtrip;
 	dqins(&opnd->oprval.tref->backptr, que, tripbp);
 }

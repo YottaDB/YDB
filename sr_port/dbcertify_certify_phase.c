@@ -133,12 +133,12 @@ void dbcertify_certify_phase(void)
 		psa->blocks_to_process = MAXTOTALBLKS_V4;
 	if (CLI_PRESENT == cli_present("TEMPFILE_DIR"))
 	{	/* Want to put temp files in this directory */
-		buff_len = sizeof(psa->tmpfiledir) - 1;
+		buff_len = SIZEOF(psa->tmpfiledir) - 1;
 		if (0 == cli_get_str("TEMPFILE_DIR", (char_ptr_t)psa->tmpfiledir, &buff_len))
 			mupip_exit(ERR_MUPCLIERR);
 	}
 	psa->keep_temp_files = (CLI_PRESENT == cli_present("KEEP_TEMPS"));
-	buff_len = sizeof(psa->outfn) - 1;
+	buff_len = SIZEOF(psa->outfn) - 1;
 	if (0 == cli_get_str("P1OUTFILE", (char_ptr_t)psa->outfn, &buff_len))
 		mupip_exit(ERR_MUPCLIERR);
 
@@ -160,8 +160,8 @@ void dbcertify_certify_phase(void)
 	if (-1 == gtm_zos_tag_to_policy(psa->outfd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG((char_ptr_t)psa->outfn, errno, realfiletag, TAG_BINARY);
 #endif
-	dbc_read_p1out(psa, &psa->ofhdr, sizeof(p1hdr));		/* Read phase 1 output file header */
-	if (0 != memcmp(psa->ofhdr.p1hdr_tag, P1HDR_TAG, sizeof(psa->ofhdr.p1hdr_tag)))
+	dbc_read_p1out(psa, &psa->ofhdr, SIZEOF(p1hdr));		/* Read phase 1 output file header */
+	if (0 != memcmp(psa->ofhdr.p1hdr_tag, P1HDR_TAG, SIZEOF(psa->ofhdr.p1hdr_tag)))
 		rts_error(VARLSTCNT(4) ERR_DBCBADFILE, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
 	if (0 == psa->ofhdr.tot_blocks)
 		/* Sanity check that the output file was finished and completed */
@@ -188,8 +188,8 @@ void dbcertify_certify_phase(void)
 	util_out_print("Certification phase for database !AD beginning", FLUSH, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 
 	/* Build database structures */
-	MALLOC_INIT(psa->dbc_gv_cur_region, sizeof(gd_region));
-	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, sizeof(gd_segment));
+	MALLOC_INIT(psa->dbc_gv_cur_region, SIZEOF(gd_region));
+	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, SIZEOF(gd_segment));
 	psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;
 	len = STRLEN((char_ptr_t)psa->ofhdr.dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
@@ -198,7 +198,7 @@ void dbcertify_certify_phase(void)
 	FILE_CNTL_INIT(psa->dbc_gv_cur_region->dyn.addr);
 	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
 
-	psa->dbc_cs_data = malloc(sizeof(*psa->dbc_cs_data));
+	psa->dbc_cs_data = malloc(SIZEOF(*psa->dbc_cs_data));
 	fc = psa->fc = psa->dbc_gv_cur_region->dyn.addr->file_cntl;
 	fc->file_type = psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;	/* Always treat as BG mode */
 
@@ -212,7 +212,7 @@ void dbcertify_certify_phase(void)
 	psa->max_blk_len = psa->dbc_cs_data->blk_size - psa->dbc_cs_data->reserved_bytes;
 
 	/* Initialize maximum key we may need later if we encounter gvtroot blocks */
-	maxkeystructsize = sizeof(dbc_gv_key) + MAX_DBC_KEY_SZ - 1;
+	maxkeystructsize = SIZEOF(dbc_gv_key) + MAX_DBC_KEY_SZ - 1;
 	MALLOC_INIT(psa->max_key, maxkeystructsize);
 	psa->max_key->top = maxkeystructsize;
 	psa->max_key->gvn_len = 1;
@@ -246,7 +246,7 @@ void dbcertify_certify_phase(void)
 			{
 				psa->gvtroot_rchildren_cnt--;
 				memcpy((char *)&psa->rhdr, (char *)&psa->gvtroot_rchildren[psa->gvtroot_rchildren_cnt],
-				       sizeof(p1rec));
+				       SIZEOF(p1rec));
 				psa->gvtrchildren++;	/* counter */
 				DBC_DEBUG(("DBC_DEBUG: Pulling p1rec from queued gvtroot_rchildren array (%d)\n",
 					   psa->gvtroot_rchildren_cnt));
@@ -260,10 +260,10 @@ void dbcertify_certify_phase(void)
 				}
 				DBC_DEBUG(("DBC_DEBUG: ****************** Reading new p1out record (%d) *****************\n", \
 					   (rec_num + 1)));
-				dbc_read_p1out(psa, &psa->rhdr, sizeof(p1rec));
+				dbc_read_p1out(psa, &psa->rhdr, SIZEOF(p1rec));
 				if (0 != psa->rhdr.akey_len)
 				{	/* This module does not need the ascii key so just bypass it if it exists */
-					if (0 != psa->rhdr.blk_levl || sizeof(psa->rslt_buff) < psa->rhdr.akey_len )
+					if (0 != psa->rhdr.blk_levl || SIZEOF(psa->rslt_buff) < psa->rhdr.akey_len )
 						GTMASSERT;		/* Must be corrupted file? */
 					dbc_read_p1out(psa, (char_ptr_t)psa->rslt_buff, psa->rhdr.akey_len);
 				}
@@ -476,7 +476,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 
 	/* Isolate the full key in the first record of the block */
 	dbc_init_key(psa, &psa->first_rec_key);
-	dbc_find_key(psa, psa->first_rec_key, blk_p + sizeof(v15_blk_hdr), psa->blk_set[0].blk_levl);
+	dbc_find_key(psa, psa->first_rec_key, blk_p + SIZEOF(v15_blk_hdr), psa->blk_set[0].blk_levl);
 	psa->first_rec_key->gvn_len = USTRLEN((char_ptr_t)psa->first_rec_key->base);	/* The GVN we need to lookup in the DT */
 
 	/* Possibilities at this point:
@@ -522,7 +522,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			/* Note level 0 directory blocks can have collation data in them but it would be AFTER
 			   the block pointer which is the first thing in the record after the key.
 			*/
-			GET_ULONG(blk_ptr, (psa->blk_set[dtblk_index].curr_rec + sizeof(rec_hdr)
+			GET_ULONG(blk_ptr, (psa->blk_set[dtblk_index].curr_rec + SIZEOF(rec_hdr)
 					    + psa->blk_set[dtblk_index].curr_blk_key->end + 1
 					    - ((rec_hdr *)psa->blk_set[dtblk_index].curr_rec)->cmpc));
 			gvtblk_index = dbc_read_dbblk(psa, blk_ptr, gdsblk_gvtroot);
@@ -659,7 +659,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	   least one record in it. We already know that this block has at least 2 records in it or it would not
 	   need splitting.
 	*/
-	rec_p = blk_p + sizeof(v15_blk_hdr);
+	rec_p = blk_p + SIZEOF(v15_blk_hdr);
 	blk_set_p->curr_rec = rec_p;
 	dbc_find_key(psa, blk_set_p->curr_blk_key, rec_p, blk_set_p->blk_levl);
 	GET_USHORT(us_rec_len, &((rec_hdr *)rec_p)->rsiz);
@@ -675,7 +675,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		 * enter the processing loop below.
 		 */
 		blk_set_p->prev_match = blk_set_p->curr_match;
-		memcpy(blk_set_p->prev_blk_key, blk_set_p->curr_blk_key, (sizeof(dbc_gv_key) + blk_set_p->curr_blk_key->end));
+		memcpy(blk_set_p->prev_blk_key, blk_set_p->curr_blk_key, (SIZEOF(dbc_gv_key) + blk_set_p->curr_blk_key->end));
 		rec_p = next_rec_p;	/* Must be at least one record in LHS and one in RHS */
 		blk_set_p->prev_rec = blk_set_p->curr_rec;
 		blk_set_p->curr_rec = rec_p;
@@ -705,7 +705,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			/* assert that the LHS block without the current record is guaranteed not to be too-full */
 			assert((new_lh_blk_len - (next_rec_p - rec_p)) <= psa->max_blk_len);
 			/* Right hand side has key of curr_rec expanded since is first key of blcok */
-			new_rh_blk_len = (int)(sizeof(v15_blk_hdr) + blk_set_p->curr_match + blk_len - (rec_p - blk_p) );
+			new_rh_blk_len = (int)(SIZEOF(v15_blk_hdr) + blk_set_p->curr_match + blk_len - (rec_p - blk_p) );
 			assert(0 < new_rh_blk_len);
 			if ((new_rh_blk_len <= psa->max_blk_len) || (new_lh_blk_len > psa->max_blk_len))
 				break;
@@ -768,7 +768,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		   blocks that themselves are (still) too full.
 		*/
 		assert(gdsblk_read == blk_set_p->usage);
-		new_blk_len = (int)(ins_rec_len ? (curr_blk_len + curr_rec_cmpc + sizeof(rec_hdr) + ins_rec_len
+		new_blk_len = (int)(ins_rec_len ? (curr_blk_len + curr_rec_cmpc + SIZEOF(rec_hdr) + ins_rec_len
 					      - blk_set_p->prev_match - blk_set_p->curr_match)
 			       : curr_blk_len);		/* No inserted rec, size does not change */
 		if (new_blk_len <= psa->max_blk_len)
@@ -792,15 +792,15 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			if (0 != blk_set_p->prev_blk_key->end)
 			{	/* First piece is block prior to the record + key + value */
 				BLK_SEG(bs_ptr,
-					blk_set_p->old_buff + sizeof(v15_blk_hdr),
-					(curr_rec_offset - sizeof(v15_blk_hdr)));
+					blk_set_p->old_buff + SIZEOF(v15_blk_hdr),
+					(curr_rec_offset - SIZEOF(v15_blk_hdr)));
 			}
-			BLK_ADDR(ins_rec_hdr, sizeof(rec_hdr), rec_hdr);
+			BLK_ADDR(ins_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 			/* Setup new record header */
-			new_rec_len = (int)(sizeof(rec_hdr) + ins_rec_len - blk_set_p->prev_match);
+			new_rec_len = (int)(SIZEOF(rec_hdr) + ins_rec_len - blk_set_p->prev_match);
 			ins_rec_hdr->rsiz = new_rec_len;
 			ins_rec_hdr->cmpc = blk_set_p->prev_match;
-			BLK_SEG(bs_ptr, (sm_uc_ptr_t)ins_rec_hdr, sizeof(rec_hdr));
+			BLK_SEG(bs_ptr, (sm_uc_ptr_t)ins_rec_hdr, SIZEOF(rec_hdr));
 			/* Setup key */
 			BLK_ADDR(cp1,
 				 blk_set_p->ins_rec.ins_key->end + 1 - blk_set_p->prev_match,
@@ -810,15 +810,15 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			BLK_SEG(bs_ptr, cp1, blk_set_p->ins_rec.ins_key->end + 1 - blk_set_p->prev_match);
 			/* Setup value (all index records have value of size "block_id". The proper value is
 			   either there already or will be when we go to commit these changes. */
-			BLK_SEG(bs_ptr, (sm_uc_ptr_t)&blk_set_p->ins_rec.blk_id, sizeof(block_id));
+			BLK_SEG(bs_ptr, (sm_uc_ptr_t)&blk_set_p->ins_rec.blk_id, SIZEOF(block_id));
 			/* For index blocks, we know that since a star key is the last record in the block
 			   (which is the last record that can be curr_rec) that there is a trailing portion
 			   of the block we need to output.
 			*/
-			BLK_ADDR(next_rec_hdr, sizeof(rec_hdr), rec_hdr);	/* Replacement rec header */
+			BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);	/* Replacement rec header */
 			next_rec_hdr->rsiz = curr_rec_len - curr_rec_shrink;
 			next_rec_hdr->cmpc = blk_set_p->curr_match;
-			BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, sizeof(rec_hdr));
+			BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 			remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);	/* Where rest of record plus any
 										   further records begin */
 			remain_len = curr_blk_len - curr_rec_offset;
@@ -886,7 +886,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			}
 			assert(0 < new_lh_blk_len);
 			/* Right hand side has key of curr_rec expanded since is first key of blcok */
-			new_rh_blk_len = (int)(sizeof(v15_blk_hdr) + ((rec_hdr *)blk_set_p->curr_rec)->cmpc +
+			new_rh_blk_len = (int)(SIZEOF(v15_blk_hdr) + ((rec_hdr *)blk_set_p->curr_rec)->cmpc +
 					       (curr_blk_len - curr_rec_offset));
 			assert(0 < new_rh_blk_len);
 			/* Common initialization */
@@ -915,8 +915,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				if (level_0)
 				{	/* Level 0 block, we are only splitting it -- never adding a record */
 					assert(curr_rec_offset <= psa->max_blk_len);
-					BLK_SEG(bs_ptr, blk_set_p->old_buff + sizeof(v15_blk_hdr),
-						curr_rec_offset - sizeof(v15_blk_hdr));
+					BLK_SEG(bs_ptr, blk_set_p->old_buff + SIZEOF(v15_blk_hdr),
+						curr_rec_offset - SIZEOF(v15_blk_hdr));
 					assert(0 == ins_rec_len);	/* Never insert records to lvl0 */
 					if (new_rh_blk_len > psa->max_blk_len)
 					{	/* Case of a data block that has a DBCREC2BIG error unnoticed by DBCERTIFY SCAN.
@@ -935,18 +935,18 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					   If adding a record, the inserted record becomes a star key record.
 					   If not adding a record the last record is morphed into a star key record.
 					*/
-					BLK_SEG(bs_ptr, blk_set_p->old_buff + sizeof(v15_blk_hdr),
+					BLK_SEG(bs_ptr, blk_set_p->old_buff + SIZEOF(v15_blk_hdr),
 						(ins_rec_len ? curr_rec_offset : prev_rec_offset)
-						- sizeof(v15_blk_hdr));
-					BLK_ADDR(new_star_hdr, sizeof(rec_hdr), rec_hdr);
+						- SIZEOF(v15_blk_hdr));
+					BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
 					new_star_hdr->rsiz = BSTAR_REC_SIZE;
 					new_star_hdr->cmpc = 0;
-					BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, sizeof(rec_hdr));
+					BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
 					BLK_SEG(bs_ptr, (ins_rec_len ? (uchar_ptr_t)&blk_set_p->ins_rec.blk_id
-							 : (blk_set_p->prev_rec + sizeof(rec_hdr)
+							 : (blk_set_p->prev_rec + SIZEOF(rec_hdr)
 							    + blk_set_p->prev_blk_key->end + 1
 							    - ((rec_hdr *)blk_set_p->prev_rec)->cmpc)),
-						sizeof(block_id));
+						SIZEOF(block_id));
 				}
 				/* Complete our LHS block */
 				if (0 == BLK_FINI(bs_ptr, bs1))
@@ -968,12 +968,12 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 						blk_set_prnt_p = blk_set_p - 1;
 					assert(blk_set_prnt_p != &psa->blk_set[0]);
 					assert(NULL != last_rec_key);
-					/* Note: We do not need the "+ 1" on the key length since sizeof(dbc_gv_key) contains
+					/* Note: We do not need the "+ 1" on the key length since SIZEOF(dbc_gv_key) contains
 					   the first character of the key so the "+ 1" to get the last byte of the key is
 					   already integrated into the length
 					*/
 					memcpy(blk_set_prnt_p->ins_rec.ins_key, last_rec_key,
-					       sizeof(dbc_gv_key) + last_rec_key->end);
+					       SIZEOF(dbc_gv_key) + last_rec_key->end);
 					/* Setup so that creation of the blk_set_new_p block can then set its block id into
 					   our parent block's insert rec buffer which will be made part of the inserted
 					   record at block build time
@@ -999,10 +999,10 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				/**** Now build RHS into either current or new block ****/
 				BLK_INIT(bs_ptr, bs1);
 				blk_set_rhs_p->upd_addr = bs1;		/* Block building roadmap.. */
-				BLK_ADDR(next_rec_hdr, sizeof(rec_hdr), rec_hdr);
+				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = curr_rec_len + curr_rec_cmpc;
 				next_rec_hdr->cmpc = 0;
-				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, sizeof(rec_hdr));
+				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 				/* Copy the previously compressed part of the key out of curr_rec. Note, if this
 				   key is a star rec key, nothing is written because cmpc is zero */
 				if (curr_rec_cmpc)
@@ -1013,8 +1013,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				}
 				/* Remainder of existing block */
 				BLK_SEG(bs_ptr,
-					blk_set_p->curr_rec + sizeof(rec_hdr),
-					curr_blk_len - curr_rec_offset - sizeof(rec_hdr));
+					blk_set_p->curr_rec + SIZEOF(rec_hdr),
+					curr_blk_len - curr_rec_offset - SIZEOF(rec_hdr));
 				/* Complete update array */
 				if (0 == BLK_FINI(bs_ptr, bs1))
 					GTMASSERT;
@@ -1035,7 +1035,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				new_lh_blk_len = (int)(curr_rec_offset + BSTAR_REC_SIZE -
 						       (blk_set_p->curr_rec - blk_set_p->prev_rec) );
 				assert(0 < new_lh_blk_len);
-				new_rh_blk_len = (int)(sizeof(v15_blk_hdr) + sizeof(rec_hdr) +
+				new_rh_blk_len = (int)(SIZEOF(v15_blk_hdr) + SIZEOF(rec_hdr) +
 						       ins_rec_len  + curr_blk_len - (curr_rec_offset) - curr_rec_shrink);
 				assert(0 < new_rh_blk_len);
 				if (new_lh_blk_len > psa->max_blk_len || new_rh_blk_len > psa->max_blk_len)
@@ -1085,15 +1085,15 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				   current *-key to become the new *-key.
 				*/
 				BLK_SEG(bs_ptr,
-					blk_set_p->old_buff + sizeof(v15_blk_hdr),
-					prev_rec_offset - sizeof(v15_blk_hdr));
+					blk_set_p->old_buff + SIZEOF(v15_blk_hdr),
+					prev_rec_offset - SIZEOF(v15_blk_hdr));
 				/* Replace last record with star key rec */
-				BLK_ADDR(new_star_hdr, sizeof(rec_hdr), rec_hdr);
+				BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
 				new_star_hdr->rsiz = BSTAR_REC_SIZE;
 				new_star_hdr->cmpc = 0;
-				BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, sizeof(rec_hdr));
+				BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
 				/* Output pointer from prev_rec as star key record's value */
-				BLK_SEG(bs_ptr,	blk_set_p->curr_rec - sizeof(block_id), sizeof(block_id));
+				BLK_SEG(bs_ptr,	blk_set_p->curr_rec - SIZEOF(block_id), SIZEOF(block_id));
 				/* Complete our LHS block */
 				if (0 == BLK_FINI(bs_ptr, bs1))
 					GTMASSERT;
@@ -1110,12 +1110,12 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 						blk_set_prnt_p = blk_set_p - 1;
 					assert(blk_set_prnt_p != &psa->blk_set[0]);
 					assert(NULL != blk_set_p->prev_blk_key);
-					/* Note: We do not need the "+ 1" on the key length since sizeof(dbc_gv_key) contains
+					/* Note: We do not need the "+ 1" on the key length since SIZEOF(dbc_gv_key) contains
 					   the first character of the key so the "+ 1" to get the last byte of the key is
 					   already integrated into the length
 					*/
 					memcpy(blk_set_prnt_p->ins_rec.ins_key, blk_set_p->prev_blk_key,
-					       sizeof(dbc_gv_key) + blk_set_p->prev_blk_key->end);
+					       SIZEOF(dbc_gv_key) + blk_set_p->prev_blk_key->end);
 					/* Setup so that creation of the blk_set_new_p block can then set its block id into
 					   our parent block's insert rec buffer which will be made part of the inserted
 					   record at block build time
@@ -1146,24 +1146,24 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 				/* Build record header for inserted record. Inserted record is always for index
 				   type blocks
 				*/
-				BLK_ADDR(ins_rec_hdr, sizeof(rec_hdr), rec_hdr);
-				ins_rec_hdr->rsiz = sizeof(rec_hdr) + blk_set_p->ins_rec.ins_key->end + 1
-					+ sizeof(block_id);
+				BLK_ADDR(ins_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
+				ins_rec_hdr->rsiz = SIZEOF(rec_hdr) + blk_set_p->ins_rec.ins_key->end + 1
+					+ SIZEOF(block_id);
 				ins_rec_hdr->cmpc = 0;
-				BLK_SEG(bs_ptr, (uchar_ptr_t)ins_rec_hdr, sizeof(rec_hdr));
+				BLK_SEG(bs_ptr, (uchar_ptr_t)ins_rec_hdr, SIZEOF(rec_hdr));
 				/* Now for the inserted record key */
 				BLK_SEG(bs_ptr,
 					blk_set_p->ins_rec.ins_key->base,
 					blk_set_p->ins_rec.ins_key->end + 1);
 				/* Finally the inserted record value always comes from the block_id field. It is
 				   not filled in now but will be when the block it refers to is created. */
-				BLK_SEG(bs_ptr,	(uchar_ptr_t)&blk_set_p->ins_rec.blk_id, sizeof(block_id));
+				BLK_SEG(bs_ptr,	(uchar_ptr_t)&blk_set_p->ins_rec.blk_id, SIZEOF(block_id));
 				/* Record that was first in RH side now needs its cmpc (and length) reset since
 				   it is now the second record in the new block. */
-				BLK_ADDR(next_rec_hdr, sizeof(rec_hdr), rec_hdr);
+				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 				next_rec_hdr->rsiz = curr_rec_len - curr_rec_shrink;
 				next_rec_hdr->cmpc = blk_set_p->curr_match;
-				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, sizeof(rec_hdr));
+				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 				remain_offset = curr_rec_shrink + SIZEOF(rec_hdr);	/* Where rest of record plus any
 											   further records begin */
 				remain_len = curr_blk_len - curr_rec_offset;
@@ -1189,21 +1189,21 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 					/* Tree is too high */
 					GTMASSERT;
 				/* First record will have last key in LHS block */
-				BLK_ADDR(next_rec_hdr, sizeof(rec_hdr), rec_hdr);
-				next_rec_hdr->rsiz = sizeof(rec_hdr) + last_rec_key->end + 1 + sizeof(block_id);;
+				BLK_ADDR(next_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
+				next_rec_hdr->rsiz = SIZEOF(rec_hdr) + last_rec_key->end + 1 + SIZEOF(block_id);;
 				next_rec_hdr->cmpc = 0;
-				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, sizeof(rec_hdr));
+				BLK_SEG(bs_ptr, (uchar_ptr_t)next_rec_hdr, SIZEOF(rec_hdr));
 				BLK_SEG(bs_ptr, last_rec_key->base, (last_rec_key->end + 1));
-				BLK_ADDR(lhs_block_id_p, sizeof(block_id), block_id);	/* First record's value */
-				BLK_SEG(bs_ptr, (uchar_ptr_t)lhs_block_id_p, sizeof(block_id));
+				BLK_ADDR(lhs_block_id_p, SIZEOF(block_id), block_id);	/* First record's value */
+				BLK_SEG(bs_ptr, (uchar_ptr_t)lhs_block_id_p, SIZEOF(block_id));
 				blk_set_new_p->ins_blk_id_p = lhs_block_id_p;	/* Receives block id when created */
 				/* Second record is a star key record pointing to the RHS block */
-				BLK_ADDR(new_star_hdr, sizeof(rec_hdr), rec_hdr);
+				BLK_ADDR(new_star_hdr, SIZEOF(rec_hdr), rec_hdr);
 				new_star_hdr->rsiz = BSTAR_REC_SIZE;
 				new_star_hdr->cmpc = 0;
-				BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, sizeof(rec_hdr));
-				BLK_ADDR(rhs_block_id_p, sizeof(block_id), block_id);	/* First record's value */
-				BLK_SEG(bs_ptr, (uchar_ptr_t)rhs_block_id_p, sizeof(block_id));
+				BLK_SEG(bs_ptr, (uchar_ptr_t)new_star_hdr, SIZEOF(rec_hdr));
+				BLK_ADDR(rhs_block_id_p, SIZEOF(block_id), block_id);	/* First record's value */
+				BLK_SEG(bs_ptr, (uchar_ptr_t)rhs_block_id_p, SIZEOF(block_id));
 				blk_set_rhs_p->ins_blk_id_p = rhs_block_id_p;	/* Receives block id when created */
 				/* Complete update array */
 				if (0 == BLK_FINI(bs_ptr, bs1))
@@ -1303,7 +1303,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			else
 				/* Regular bitmap (not last one) */
 				blks_this_lmap = psa->dbc_cs_data->bplmap;
-			lcl_map_p = blk_set_bm_p->old_buff + sizeof(v15_blk_hdr);
+			lcl_map_p = blk_set_bm_p->old_buff + SIZEOF(v15_blk_hdr);
 			lcl_blk = psa->hint_lcl = bm_find_blk(psa->hint_lcl, lcl_map_p, blks_this_lmap, &dummy_bool);
 			if (NO_FREE_SPACE == lcl_blk)
 			{
@@ -1359,7 +1359,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			/* VMS has an unalighed tn. All UNIX variants have an aligned TN */
 			VMS_ONLY(PUT_ULONG(&((v15_blk_hdr_ptr_t)new_blk_p)->tn, psa->dbc_cs_data->trans_hist.curr_tn));
 			UNIX_ONLY(((v15_blk_hdr_ptr_t)new_blk_p)->tn = psa->dbc_cs_data->trans_hist.curr_tn);
-			new_blk_p += sizeof(v15_blk_hdr);
+			new_blk_p += SIZEOF(v15_blk_hdr);
 			for (blk_array_top = (blk_segment *)blk_sega_p->addr, blk_sega_p++;
 			     blk_sega_p <= blk_array_top; blk_sega_p++)
 			{	/* Start with first subtantive array entry ([1]) and do the segment move thing */
@@ -1431,7 +1431,7 @@ void dbc_flush_fhead(phase_static_area *psa)
 	psa->fc->op = FC_WRITE;
 	psa->fc->op_buff = (uchar_ptr_t)psa->dbc_cs_data;
 	psa->fc->op_pos = 1;
-	psa->fc->op_len = sizeof(v15_sgmnt_data);
+	psa->fc->op_len = SIZEOF(v15_sgmnt_data);
 	dbcertify_dbfilop(psa);
 	psa->dbc_fhdr_dirty = FALSE;
 	return;

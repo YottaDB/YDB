@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	   running that close to the edge, they should be increasing their lock space or using fewer locks anyway.
 	   (see 7/97).
         */
-	n = (ptroff_t)(nshrs * (3 + sizeof(mlk_shrsub) - 1) + (p->total_length - (val - p->value)));
+	n = (ptroff_t)(nshrs * (3 + SIZEOF(mlk_shrsub) - 1) + (p->total_length - (val - p->value)));
 	if (ctl->subtop - ctl->subfree < n || ctl->blkcnt < nshrs)
 		return 0;
 
@@ -51,12 +51,12 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 		shr1 = (mlk_shrblk_ptr_t)R2A(ret->rsib);
 		A2R(ctl->blkfree, shr1);
 	}
-	memset(ret, 0, sizeof(*ret));
+	memset(ret, 0, SIZEOF(*ret));
 	if (par)
 		A2R(ret->parent, par);
 	if (ptr)
 		A2R(*ptr, ret);
-	n = (ptroff_t)ROUND_UP(sizeof(mlk_shrsub) - 1 + len, sizeof(ptroff_t));
+	n = (ptroff_t)ROUND_UP(SIZEOF(mlk_shrsub) - 1 + len, SIZEOF(ptroff_t));
 	if (ctl->subtop - ctl->subfree < n)
 		GTMASSERT;
 	subptr = (mlk_shrsub_ptr_t)R2A(ctl->subfree);

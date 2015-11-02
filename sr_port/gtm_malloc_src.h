@@ -11,7 +11,7 @@
 
 /* Storage manager for "smaller" pieces of storage. Uses power-of-two
    "buddy" system as described by Knuth. Currently manages pieces of
-   size 2K - sizeof(header).
+   size 2K - SIZEOF(header).
 
    This include file is included in both gtm_malloc.c and gtm_malloc_dbg.c.
    See the headers of those modules for explanations of how the storage
@@ -206,8 +206,8 @@ typedef struct storExtHdrStruct
    allocator ever gets this extra block, this field will be increased by the size of one element
    to compensate.
 */
-#define EXTENT_SIZE ((MAXTWO * (ELEMS_PER_EXTENT + 1)) + sizeof(storExtHdr))
-static unsigned int extent_used = (MAXTWO * ELEMS_PER_EXTENT + sizeof(storExtHdr));
+#define EXTENT_SIZE ((MAXTWO * (ELEMS_PER_EXTENT + 1)) + SIZEOF(storExtHdr))
+static unsigned int extent_used = (MAXTWO * ELEMS_PER_EXTENT + SIZEOF(storExtHdr));
 /* Following are values used in queueIndex in a storage element. Note that both
    values must be less than zero for the current code to function correctly. */
 #define QUEUE_ANCHOR		-1
@@ -485,7 +485,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	/* Check that the storage queue offset in a storage element has sufficient reach
 	   to cover an extent.
 	*/
-	assert(((extent_used - sizeof(storExtHdr)) <= ((1 << (sizeof(uStor->extHdrOffset) * 8)) - 1)));
+	assert(((extent_used - SIZEOF(storExtHdr)) <= ((1 << (SIZEOF(uStor->extHdrOffset) * 8)) - 1)));
 
 	/* Initialize size table used to get a storage queue index */
 	sizeIndex = 0;
@@ -569,7 +569,7 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 		uStor2->queueIndex = sizeIndex;
 		assert(0 == ((unsigned long)uStor2 & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
 #ifdef DEBUG
-		memcpy(uStor2->headMarker, markerChar, sizeof(markerChar));	/* Put header tag in place */
+		memcpy(uStor2->headMarker, markerChar, SIZEOF(markerChar));	/* Put header tag in place */
 		/* Backfill entire block being freed so usage of it will cause problems */
 		if (GDL_SmBackfill & gtmDebugLevel)
 			backfill((unsigned char *)uStor2 + hdrSize, TwoTable[sizeIndex] - hdrSize);
@@ -603,7 +603,7 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 			extent_used = EXTENT_SIZE; /* New max for sanity checks */
 		} else
 			i = 1;		/* The storage was not aligned. Have planned number of blocks with some waste */
-		assert(((char *)sEHdr + sizeof(*sEHdr)) <= ((char *)uStorAlloc + EXTENT_SIZE));
+		assert(((char *)sEHdr + SIZEOF(*sEHdr)) <= ((char *)uStorAlloc + EXTENT_SIZE));
 		for (uStor2 = uStor; ELEMS_PER_EXTENT > i; ++i)
 		{	/* Place all but first entry on the queue */
 			uStor2 = (storElem *)((unsigned long)uStor2 + MAXTWO);
@@ -613,7 +613,7 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 			uStor2->extHdrOffset = (char *)sEHdr - (char *)uStor2;
 			assert(extent_used > uStor2->extHdrOffset);
 #ifdef DEBUG
-			memcpy(uStor2->headMarker, markerChar, sizeof(markerChar));
+			memcpy(uStor2->headMarker, markerChar, SIZEOF(markerChar));
 			/* Backfill entire block on free queue so we can detect trouble
 			   with premature usage or overflow from something else */
 			if (GDL_SmBackfill & gtmDebugLevel)
@@ -703,7 +703,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 			hdrSize = OFFSETOF(storElem, userStorage);		/* Size of storElem header */
 			GTM64_ONLY(if (MAXUINT4 < (size + hdrSize)) GTMASSERT);	/* Only deal with < 4GB requests */
 			NON_GTM64_ONLY(if ((size + hdrSize) < size) GTMASSERT); /* Check for wrap in 32 bit platforms */
-			assert((hdrSize + sizeof(markerChar)) < MINTWO);
+			assert((hdrSize + SIZEOF(markerChar)) < MINTWO);
 
 #ifndef GTM_MALLOC_REENT
 			fast_lock_count++;
@@ -723,8 +723,8 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 			INCR_CNTR(smTn);
 
 			/* Validate null string not overwritten */
-			assert(0 == memcmp(&NullStruct.nullHMark[0], markerChar, sizeof(markerChar)));
-			assert(0 == memcmp(&NullStruct.nullTMark[0], markerChar, sizeof(markerChar)));
+			assert(0 == memcmp(&NullStruct.nullHMark[0], markerChar, SIZEOF(markerChar)));
+			assert(0 == memcmp(&NullStruct.nullTMark[0], markerChar, SIZEOF(markerChar)));
 #ifdef DEBUG
 			GMR_ONLY(if (!reentered))
 			{	/* Verify the storage chains before we play */
@@ -734,7 +734,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 
 			if (0 != size)
 			{
-				GMR_ONLY(size = MAX(sizeof(char *), size);)	/* Need room for deferred free next pointer */
+				GMR_ONLY(size = MAX(SIZEOF(char *), size);)	/* Need room for deferred free next pointer */
 				tSize = (gtm_msize_t)size + hdrSize;		/* Add in header size */
 #ifdef DEBUG
 				tSize += SIZEOF(markerChar);			/* Add in room for trailer label */
@@ -800,15 +800,15 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 				/* Fill in extra debugging fields in header */
 				uStor->allocatedBy = CALLERID;				/* Who allocated us */
 				uStor->allocLen = (gtm_msize_t)size;			/* User requested size */
-				memcpy(uStor->headMarker, markerChar, sizeof(markerChar));
+				memcpy(uStor->headMarker, markerChar, SIZEOF(markerChar));
 				trailerMarker = (unsigned char *)&uStor->userStorage.userStart + size;	/* Where to put trailer */
-				memcpy(trailerMarker, markerChar, sizeof(markerChar));	/* Small trailer */
+				memcpy(trailerMarker, markerChar, SIZEOF(markerChar));	/* Small trailer */
 				if (GDL_SmInitAlloc & gtmDebugLevel)
 					/* Initialize the space we are allocating */
 					backfill((unsigned char *)&uStor->userStorage.userStart, (gtm_msize_t)size);
 				if (GDL_SmBackfill & gtmDebugLevel)
 				{	/* Use backfill method of after-allocation metadata */
-					backfill(trailerMarker + sizeof(markerChar),
+					backfill(trailerMarker + SIZEOF(markerChar),
 					(uStor->realLen - (gtm_msize_t)size - hdrSize - SIZEOF(markerChar)));
 				}
 
@@ -940,8 +940,8 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 		INCR_CNTR(smTn);	/* Bump the transaction number */
 
 		/* Validate null string not overwritten */
-		assert(0 == memcmp(&NullStruct.nullHMark[0], markerChar, sizeof(markerChar)));
-		assert(0 == memcmp(&NullStruct.nullTMark[0], markerChar, sizeof(markerChar)));
+		assert(0 == memcmp(&NullStruct.nullHMark[0], markerChar, SIZEOF(markerChar)));
+		assert(0 == memcmp(&NullStruct.nullTMark[0], markerChar, SIZEOF(markerChar)));
 #ifdef DEBUG
 		/* verify chains before we attempt dequeue */
 		VERIFY_STORAGE_CHAINS;
@@ -964,13 +964,13 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 			   in the field to turn on these and other checks.
 			*/
 			assert(Allocated == uStor->state);
-			assert(0 == memcmp(uStor->headMarker, markerChar, sizeof(markerChar)));
+			assert(0 == memcmp(uStor->headMarker, markerChar, SIZEOF(markerChar)));
 			trailerMarker = (unsigned char *)&uStor->userStorage.userStart + uStor->allocLen;/* Where trailer was put */
-			assert(0 == memcmp(trailerMarker, markerChar, sizeof(markerChar)));
+			assert(0 == memcmp(trailerMarker, markerChar, SIZEOF(markerChar)));
 			if (GDL_SmChkAllocBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for after-allocation metadata */
-				assert(backfillChk(trailerMarker + sizeof(markerChar),
-						   (gtm_msize_t)(uStor->realLen - uStor->allocLen - hdrSize - sizeof(markerChar))));
+				assert(backfillChk(trailerMarker + SIZEOF(markerChar),
+						   (gtm_msize_t)(uStor->realLen - uStor->allocLen - hdrSize - SIZEOF(markerChar))));
 			}
 
 			/* Remove element from allocated queue unless element is from a reentered malloc call. In that case, just
@@ -1161,7 +1161,7 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
         {
 #endif
 		if (NULL != (addr = (void *)outOfMemoryMitigation)
-		    UNIX_ONLY(&& !(ht_rhash_ch == active_ch->ch || jbxm_dump_ch == active_ch->ch)))
+		    UNIX_ONLY(&& !(ht_rhash_ch == active_ch->ch || jbxm_dump_ch == active_ch->ch || stp_gcol_ch == active_ch->ch)))
 		{       /* Free our reserve only if not in certain condition handlers (on UNIX) since it is */
 			/* going to unwind this error and ignore it. On VMS the error will not be trapped   */
 			outOfMemoryMitigation = NULL;
@@ -1364,7 +1364,7 @@ void verifyFreeStorage(void)
 		{
 			assert(0 == ((unsigned long)uStor & (TwoTable[i] - 1)));			/* Verify alignment */
 			assert(Free == uStor->state);							/* Verify state */
-			assert(0 == memcmp(uStor->headMarker, markerChar, sizeof(markerChar)));		/* Verify metadata marker */
+			assert(0 == memcmp(uStor->headMarker, markerChar, SIZEOF(markerChar)));		/* Verify metadata marker */
 			assert(MAXINDEX != i || extent_used > uStor->extHdrOffset);
 			if (GDL_SmChkFreeBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for verifying freed storage is untouched */
@@ -1393,13 +1393,13 @@ void verifyAllocatedStorage(void)
 			if (i != MAXINDEX + 1)							/* If not verifying real mallocs,*/
 				assert(0 == ((unsigned long)uStor & (TwoTable[i] - 1)));	/* .. verify alignment */
 			assert(Allocated == uStor->state);					/* Verify state */
-			assert(0 == memcmp(uStor->headMarker, markerChar, sizeof(markerChar)));	/* Verify metadata markers */
+			assert(0 == memcmp(uStor->headMarker, markerChar, SIZEOF(markerChar)));	/* Verify metadata markers */
 			trailerMarker = (unsigned char *)&uStor->userStorage.userStart+uStor->allocLen;/* Where  trailer was put */
-			assert(0 == memcmp(trailerMarker, markerChar, sizeof(markerChar)));
+			assert(0 == memcmp(trailerMarker, markerChar, SIZEOF(markerChar)));
 			assert(MAXINDEX != i || extent_used > uStor->extHdrOffset);
 			if (GDL_SmChkAllocBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for after-allocation metadata */
-				assert(backfillChk(trailerMarker + sizeof(markerChar),
+				assert(backfillChk(trailerMarker + SIZEOF(markerChar),
 					(uStor->realLen - uStor->allocLen - hdrSize - SIZEOF(markerChar))));
 			}
 		}

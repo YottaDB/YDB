@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,10 @@
 		tp_var *restore_ent;										\
 		var = lv_getslot((lv)->ptrs.val_ent.parent.sym);						\
 		assert(var);											\
-		restore_ent = (tp_var *)malloc(sizeof(tp_var));							\
+		restore_ent = (tp_var *)malloc(SIZEOF(tp_var));							\
 		restore_ent->current_value = (lv);								\
 		restore_ent->save_value = var;									\
-		memcpy(&restore_ent->key, (mnamekey), sizeof(mname_entry));					\
+		memcpy(&restore_ent->key, (mnamekey), SIZEOF(mname_entry));					\
 		restore_ent->var_cloned = FALSE;								\
 		restore_ent->next = (tf)->vars;									\
 		assert(NULL == (lv)->tp_var);									\
@@ -45,7 +45,10 @@ typedef struct tp_frame_struct
 	unsigned int			old_locks : 1;
 	unsigned int			dlr_t : 1;
 	unsigned int			tp_save_all_flg : 1;
-	unsigned int			filler : 27;
+	unsigned int			implicit_tstart : 1;	/* TRUE if op_tstart was invoked by gvcst_put/gvcst_kill as part of
+								 * trigger processing. Field is inherited across nested op_tstarts
+								 */
+	unsigned int			filler : 26;
 	unsigned char 			*restart_pc;
 	struct stack_frame_struct	*fp;
 	struct mv_stent_struct		*mvc;

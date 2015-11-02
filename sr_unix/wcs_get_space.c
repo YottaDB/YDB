@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #include "performcaslatchcheck.h"
 #include "wcs_phase2_commit_wait.h"
 #include "wcs_recover.h"
+#include "gtm_c_stack_trace.h"
 
 GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
 GBLDEF	int4			*get_space_fail_array;	/* gbldefed to be accessilbe in a pro core */
@@ -71,7 +72,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	cache_que_head_ptr_t	q0, base;
 	int4			n, save_errno = 0, k, i, dummy_errno, max_count, count;
 	int			maxspins, retries, spins;
-	uint4			lcnt, size, to_wait, to_msg;
+	uint4			lcnt, size, to_wait, to_msg, stuck_cnt = 0;
 	int4			wcs_active_lvl[ACTIVE_LVL_ARRAYSIZE];
 	boolean_t		is_mm;
 	cache_rec		cr_contents;
@@ -273,6 +274,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					}
 					if (0 == cr->dirty)
 						return TRUE;
+					stuck_cnt++;
+					GET_C_STACK_FROM_SCRIPT("WCS_GET_SPACE_RETURN_FAIL", process_id, cr->epid, stuck_cnt);
 					WCS_GET_SPACE_RETURN_FAIL(&wcs_active_lvl[0]);
 				} else
 				{	/* buffer was locked */
@@ -304,5 +307,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		rts_error(VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
 	else
 		assert(FALSE);
+	stuck_cnt++;
+	GET_C_STACK_FROM_SCRIPT("WCS_GET_SPACE_RETURN_FAIL", process_id, cr->epid, stuck_cnt);
 	WCS_GET_SPACE_RETURN_FAIL(&wcs_active_lvl[0]);
 }

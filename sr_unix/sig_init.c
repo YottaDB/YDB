@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	struct sigaction 	ignore, act;
 	int			sig;
 
-	memset(&act, 0, sizeof(act));
+	memset(&act, 0, SIZEOF(act));
 	sigemptyset(&act.sa_mask);
 	ignore = act;
 	ignore.sa_handler = SIG_IGN;

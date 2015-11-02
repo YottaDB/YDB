@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ int4 lke_getcli(bool *all,
 #ifdef HEXPID
 		if (!cli_get_hex("PID", pid))
 #else
-		assert(sizeof(*pid) == sizeof(int));
+		assert(SIZEOF(*pid) == SIZEOF(int));
 		if (!cli_get_int("PID", (int4 *)pid))
 #endif
 		{

@@ -108,13 +108,13 @@ void mupip_downgrade(void)
 	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	/* Structure checks .. */
-	assert((24 * 1024) == sizeof(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
+	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 
-	UNIX_ONLY(sem_inf = (sem_info *)malloc(sizeof(sem_info) * 2);
-		  memset(sem_inf, 0, sizeof(sem_info) * 2);
+	UNIX_ONLY(sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * 2);
+		  memset(sem_inf, 0, SIZEOF(sem_info) * 2);
 		  atexit(mupip_downgrade_cleanup);
 		  );
-	db_fn_len = sizeof(db_fn) - 1;
+	db_fn_len = SIZEOF(db_fn) - 1;
 	if (!cli_get_str("FILE", db_fn, &db_fn_len))
 		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
 	db_fn[db_fn_len] = '\0';	/* Null terminate */
@@ -171,7 +171,7 @@ void mupip_downgrade(void)
 		TAG_POLICY_GTM_PUTMSG(db_fn, errno, realfiletag, TAG_BINARY);
 #endif
 #endif
-	csd_size = sizeof(sgmnt_data);
+	csd_size = SIZEOF(sgmnt_data);
 	DO_FILE_READ(channel, 0, &csd, csd_size, status, status2);
 	if (SS_NORMAL != status)
 	{

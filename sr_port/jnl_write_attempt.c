@@ -34,9 +34,10 @@
 
 #ifdef UNIX
 #include "gtmmsg.h"
-GBLREF boolean_t		gtm_environment_init;
 #endif
+#include "gtm_c_stack_trace.h"
 
+GBLREF boolean_t		gtm_environment_init;
 GBLREF	pid_t	process_id;
 GBLREF	uint4	image_count;
 
@@ -55,6 +56,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	/**** Note static/local */
 	static uint4		loop_image_count, writer;	/* assumes calls from one loop at a time */
 	uint4			new_dskaddr, new_dsk;
+	static uint4		stuck_cnt = 0;
 
 	error_def(ERR_JNLCNTRL);
 	error_def(ERR_JNLFLUSH);
@@ -162,6 +164,8 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				jnl_send_oper(jpc, ERR_JNLFLUSH);
 				send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, CURRENT_WRITER);
+				stuck_cnt++;
+				GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, CURRENT_WRITER, stuck_cnt);
 				send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Journal IO writer changed during wait"));
 				VMS_ONLY(jb->io_in_prog = 0);
 				UNIX_ONLY(COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0));
@@ -177,6 +181,8 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			jpc->status = status;
 			jnl_send_oper(jpc, ERR_JNLFLUSH);
 			send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, CURRENT_WRITER);
+			stuck_cnt++;
+			GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, CURRENT_WRITER, stuck_cnt);
 			*lcnt = 1;	/* ??? is it necessary to limit this, and if so, how ??? */
 			status = ERR_JNLPROCSTUCK;
 			break;
@@ -327,13 +333,14 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			{
 				send_msg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr), ERR_TEXT, 2,
 					LEN_AND_LIT("Progress prevented by a process stuck flushing journal data"));
-				UNIX_ONLY(
+				VMS_ONLY(
 					if (gtm_environment_init)
 					{
 						proc_stuck_cnt = 0;
 						continue;
 					}
 				)
+
 				GTMASSERT;
 			}
 		}

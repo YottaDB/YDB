@@ -138,7 +138,7 @@ void cmj_read_interrupt(struct CLB *lnk, int signo)
 		return;
 	}
 	/* setup I/O vec based on past history */
-	memset(&msg, 0, sizeof(msg));
+	memset(&msg, 0, SIZEOF(msg));
 	msg.msg_iov = vec;
 	if (CMI_TCP_PREFIX_LEN > lnk->ios.len_len)
 	{

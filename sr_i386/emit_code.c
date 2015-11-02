@@ -114,7 +114,7 @@ void trip_gen(triple *ct)
 	oct = oc_tab[ct->opcode].octype;
 	sopr = &saved_opr[0];
 	*sopr++ = &ct->destination;
-	for (ttp = ct , opr = ttp->operand ; opr < &(ttp->operand[2]) ; )
+	for (ttp = ct, opr = ttp->operand ; opr < ARRAYTOP(ttp->operand); )
 	{
 		if (opr->oprclass)
 		{
@@ -125,7 +125,7 @@ void trip_gen(triple *ct)
 				continue;
 			}
 			*sopr++ = opr;
-			if (sopr >= &saved_opr[MAX_ARGS])
+			if (sopr >= ARRAYTOP(saved_opr))
 				rts_error(VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS);
 		}
 		opr++;
@@ -290,7 +290,7 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				emit_xfer(4*xf_dt_get);
 				code_buf[code_idx++] = I386_INS_CMP_eAX_Iv;
 				*((int4 *)&code_buf[code_idx]) = 0;
-				code_idx += sizeof(int4);
+				code_idx += SIZEOF(int4);
 				if (sav_in == VXI_BLBC)
 					emit_jmp(VXI_BEQL, &inst);
 				else
@@ -347,7 +347,7 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						{
 							code_buf[code_idx++] = I386_INS_PUSH_Iv;
 							*((int4 *)&code_buf[code_idx]) = cnt;
-							code_idx += sizeof(int4);
+							code_idx += SIZEOF(int4);
 						}
 						cnt++;
 						inst++;
@@ -460,8 +460,8 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				code_buf[code_idx++] = modrm_byte.byte;
 
 				code_buf[code_idx++] = I386_INS_MOV_eCX;
-				*((int4 *)&code_buf[code_idx]) = (int4)sizeof(mval);
-				code_idx += sizeof(int4);
+				*((int4 *)&code_buf[code_idx]) = (int4)SIZEOF(mval);
+				code_idx += SIZEOF(int4);
 
 				code_buf[code_idx++] = I386_INS_REP_E_Prefix;
 				code_buf[code_idx++] = I386_INS_MOVSB_Xb_Yb;
@@ -572,7 +572,7 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					{
 						code_buf[code_idx++] = I386_INS_PUSH_Iv;
 						*((int4 *)&code_buf[code_idx]) = lit;
-						code_idx += sizeof(int4);
+						code_idx += SIZEOF(int4);
 					}
 				}
 				else if (*inst == VXT_ADDR)
@@ -601,7 +601,7 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 				    assert(I386_REG_EAX == i386_reg(*inst));	/* VAX R0 */
 				    inst++;
 				    *((int4 *)&code_buf[code_idx]) = 0;	/* 32 bit immediate 0 */
-				    code_idx += sizeof(int4);
+				    code_idx += SIZEOF(int4);
 				}
 				else
 				  GTMASSERT;
@@ -618,17 +618,17 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	if (cg_phase == CGP_MACHINE)
 	{
          	generated_code_size += code_idx;
-		emit_immed ((char *)&code_buf[0], sizeof(unsigned char) * code_idx);
+		emit_immed ((char *)&code_buf[0], SIZEOF(unsigned char) * code_idx);
 	} else if (cg_phase != CGP_ASSEMBLY)
 	{
 	        if (cg_phase == CGP_APPROX_ADDR)
 		{
 		      calculated_code_size += code_idx;
 		}
-		curr_addr += sizeof(unsigned char) * code_idx;
+		curr_addr += SIZEOF(unsigned char) * code_idx;
 	}
-	code_reference += sizeof(unsigned char) * code_idx;
-	jmp_offset -= sizeof(unsigned char) * code_idx;
+	code_reference += SIZEOF(unsigned char) * code_idx;
+	jmp_offset -= SIZEOF(unsigned char) * code_idx;
 	return inst;
 }
 
@@ -639,7 +639,7 @@ void emit_jmp(short vax_in, short **instp)
 {
 
 	assert (jmp_offset != 0);
-	jmp_offset -= code_idx * sizeof(code_buf[0]);	/* size of this particular instruction */
+	jmp_offset -= code_idx * SIZEOF(code_buf[0]);	/* size of this particular instruction */
 
 	assert (**instp == VXT_JMP);
 	*instp += 1;
@@ -690,12 +690,12 @@ void emit_jmp(short vax_in, short **instp)
 		if (vax_in == VXI_BRB  ||  vax_in == VXI_BRW  ||  vax_in == VXI_JMP)
 		{
 			assert(0 == call_4lcldo_variant || JMP_LONG_INST_SIZE == call_4lcldo_variant);
-			jmp_offset -= sizeof(int4) + 1;
+			jmp_offset -= SIZEOF(int4) + 1;
 			code_buf[code_idx++] = I386_INS_JMP_Jv;
 		}
 		else
 		{
-			jmp_offset -= sizeof(int4) + 2;
+			jmp_offset -= SIZEOF(int4) + 2;
 			code_buf[code_idx++] = I386_INS_Two_Byte_Escape_Prefix;
 			switch  (vax_in)
 			{
@@ -723,7 +723,7 @@ void emit_jmp(short vax_in, short **instp)
 			}
 		}
 		*((int4 *)&code_buf[code_idx]) = jmp_offset;
-		code_idx += sizeof(int4);
+		code_idx += SIZEOF(int4);
 	}
 }
 
@@ -732,7 +732,7 @@ void emit_pcrel(generic_op op, unsigned char use_reg)
 {
 	code_buf[code_idx++] = I386_INS_CALL_Jv;
 	*((int4 *)&code_buf[code_idx]) = 0;
-	code_idx += sizeof(int4);
+	code_idx += SIZEOF(int4);
 
 	jmp_offset -= code_idx;
 	code_buf[code_idx++] = I386_INS_POP_eAX;
@@ -794,7 +794,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 						break;
 					}
 					pc_value_idx = code_idx + 5;
-					code_idx += 1 + sizeof(int4) + 1;
+					code_idx += 1 + SIZEOF(int4) + 1;
 					emit_addr(0, (int4)ct->operand[0].oprval.mlit->rt_addr, &offset);
 					offset -= pc_value_idx;
 					force_32 = 1;
@@ -804,7 +804,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				else
 				{
 					emit_op_alit(op, use_reg);
-					code_idx += sizeof(int4);
+					code_idx += SIZEOF(int4);
 				}
 				if (cg_phase == CGP_APPROX_ADDR)
 					txtrel_cnt++;
@@ -813,23 +813,23 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				if (cg_phase == CGP_APPROX_ADDR)
 					define_symbol(GTM_LITERALS, ct->operand[0].oprval.cdlt, 0);
 				emit_op_alit(op, use_reg);
-				code_idx += sizeof(int4);
+				code_idx += SIZEOF(int4);
 				break;
 			case OC_ILIT:
 				literal = ct->operand[0].oprval.ilit;
 				switch(op)
 				{
 				case COMPARE: /* 1byte(opcode) + 1byte(ModR/M) + 4byte(literal) */
-					code_idx += 2 + sizeof(int4);
+					code_idx += 2 + SIZEOF(int4);
 					break;
 				case LOAD:
-					code_idx += 1 + sizeof(int4);
+					code_idx += 1 + SIZEOF(int4);
 					break;
 				case PUSH:
 					if (literal >= -128  &&  literal <= 127)
 						code_idx += 2;
 					else
-						code_idx += 1 + sizeof(int4);
+						code_idx += 1 + SIZEOF(int4);
 					break;
 				default:
 					rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
@@ -975,7 +975,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					}
 					code_buf[code_idx++] = I386_INS_CALL_Jv;
 					*((int4 *)&code_buf[code_idx]) = 0;
-					code_idx += sizeof(int4);
+					code_idx += SIZEOF(int4);
 
 					pc_value_idx = code_idx;
 					code_buf[code_idx++] = I386_INS_POP_eAX + temp_reg;
@@ -989,16 +989,16 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 				else
 				{
 					emit_op_alit(op, use_reg);
-					emit_addr(code_reference + (code_idx * sizeof(unsigned char)),
+					emit_addr(code_reference + (code_idx * SIZEOF(unsigned char)),
 						(int4)ct->operand[0].oprval.mlit->rt_addr, (int4 *)&code_buf[code_idx]);
-					code_idx += sizeof(int4);
+					code_idx += SIZEOF(int4);
 				}
 				break;
 			case OC_CDLIT:
 				emit_op_alit(op, use_reg);
-				emit_reference(code_reference + (code_idx * sizeof(unsigned char)),
+				emit_reference(code_reference + (code_idx * SIZEOF(unsigned char)),
 					ct->operand[0].oprval.cdlt, (uint4 *)&code_buf[code_idx]);
-				code_idx += sizeof(int4);
+				code_idx += SIZEOF(int4);
 				break;
 			case OC_ILIT:
 				literal = ct->operand[0].oprval.ilit;
@@ -1011,12 +1011,12 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					modrm_byte.modrm.r_m = use_reg;
 					code_buf[code_idx++] = modrm_byte.byte;
 					*((int4 *)&code_buf[code_idx]) = literal;
-					code_idx += sizeof(int4);
+					code_idx += SIZEOF(int4);
 					break;
 				case LOAD:
 					code_buf[code_idx++] = I386_INS_MOV_eAX + use_reg;
 					*((int4 *)&code_buf[code_idx]) = literal;
-					code_idx += sizeof(int4);
+					code_idx += SIZEOF(int4);
 					break;
 				case PUSH:
 					if (literal >= -128  &&  literal <= 127)
@@ -1028,7 +1028,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 					{
 						code_buf[code_idx++] = I386_INS_PUSH_Iv;
 						*((int4 *)&code_buf[code_idx]) = literal;
-						code_idx += sizeof(int4);
+						code_idx += SIZEOF(int4);
 					}
 					break;
 				default:
@@ -1184,7 +1184,7 @@ void emit_op_base_offset(generic_op op, short base_reg, int offset, short use_re
 		code_buf[code_idx++] = I386_INS_MOV_Ev_Iv;
 		emit_base_offset(0, base_reg, offset);
 		*((int4 *)&code_buf[code_idx]) = 0;
-		code_idx += sizeof(int4);
+		code_idx += SIZEOF(int4);
 		break;
 	case COMPARE:
 		code_buf[code_idx++] = I386_INS_CMP_Gv_Ev;
@@ -1264,7 +1264,7 @@ void emit_base_offset (short reg_opcode, short base_reg, int4 offset)
 	else
 	{
 		*((int4 *)&code_buf[code_idx]) = offset;
-		code_idx += sizeof(int4);
+		code_idx += SIZEOF(int4);
 	}
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +14,7 @@
 
 /*  requires gdsroot.h */
 
-#define VALFIRST(X) (ISALPHA(X) || (37 == X))
-#define VALKEY(X) (ISALPHA(X) || ISDIGIT(X) || (37 == X))
+#define	NO_ONLINE_ERR_MSG	"ONLINE qualifier for this region will be ignored"
 
 typedef	struct global_list_struct
 {

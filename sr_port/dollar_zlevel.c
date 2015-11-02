@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +19,24 @@ GBLREF stack_frame	*frame_pointer;
 int dollar_zlevel()
 {
 	int		count;
-       	stack_frame	*fp;
+       	stack_frame	*fp, *fpprev;
 
-	for (count = 0, fp = frame_pointer; fp->old_frame_pointer; fp = fp->old_frame_pointer)
+	for (count = 0, fp = frame_pointer; NULL != fp; fp = fpprev)
 	{
+		fpprev = fp->old_frame_pointer;
 		if (!(fp->type & SFT_COUNT))
 			continue;
+		if (NULL == fpprev)
+		{	/* Next frame is some sort of base frame */
+#			ifdef GTM_TRIGGER
+			if (fp->type & SFT_TRIGR)
+			{	/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
+				fpprev = *(stack_frame **)(fp + 1);
+				continue;
+			} else
+#			endif
+				break;			/* Some other base frame that stops us */
+		}
 		count++;
 	}
 	return (count);

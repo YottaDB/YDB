@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,6 @@ urx_labref **urx_addlab(urx_labref **lp0, urx_labref *lp);
 urx_rtnref *urx_addrtn(urx_rtnref *rp_start, urx_rtnref *rp);
 bool urx_getlab(char *lab, int lablen, urx_rtnref *rtn, urx_labref **lp0p, urx_labref **lp1p);
 bool urx_getrtn(char *rtn, int rtnlen, urx_rtnref **rp0p, urx_rtnref **rp1p, urx_rtnref *anchor);
-USHBIN_ONLY(void urx_remove(lnk_tabent *, int4 tablen);)
+void urx_remove(rhdtyp *rtn);
 
 #endif /* URX_H_INCLUDED */

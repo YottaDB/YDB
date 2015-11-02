@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,7 +119,7 @@ boolean_t	ecode_add(mstr *str)		/* add "str" to $ECODE and return whether SUCCES
 	dest = (char *)i2asc((unsigned char *)dest, ERR_ECLOSTMID);
 	*dest++ = ',';
 	eclostmid_len = dest - &eclostmid_buf[0];
-	assert(sizeof(eclostmid_buf) >= eclostmid_len);
+	assert(SIZEOF(eclostmid_buf) >= eclostmid_len);
 
 	assert(str->len < DOLLAR_ECODE_ALLOC);
 	space_left = dollar_ecode.top - dollar_ecode.end;

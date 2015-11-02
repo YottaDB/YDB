@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,8 @@ short ious_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 tim
 	iod = dev->iod;
 	if (iod->state == dev_never_opened)
 	{
-		iod->dev_sp = (void *)malloc(sizeof(d_us_struct));
-		memset(iod->dev_sp, 0, sizeof(d_us_struct));
+		iod->dev_sp = (void *)malloc(SIZEOF(d_us_struct));
+		memset(iod->dev_sp, 0, SIZEOF(d_us_struct));
 		iod->state = dev_closed;
 	}
 

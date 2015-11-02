@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,8 @@
 #include "iosp.h"
 #include "error.h"
 #include "mupip_exit.h"
+
+GBLREF	boolean_t	mupip_exit_status_displayed;
 
 void mupip_exit(int4 stat)
 {
@@ -34,5 +36,6 @@ void mupip_exit(int4 stat)
 		else
 			stat = 0;
 	}
+	mupip_exit_status_displayed = TRUE;
 	exit(stat);
 }

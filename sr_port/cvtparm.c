@@ -47,19 +47,18 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 	assert(MV_DEFINED(src));
 	strlen = -1;
 	siz = io_params_size[iocode];
-	if (stringpool.top - stringpool.free < siz + 1)
-		stp_gcol(siz + 1);
+	ENSURE_STP_FREE_SPACE(siz + 1);
 	switch(dev_param_control[iocode].source_type)
 	{
 		case IOP_SRC_INT:
-			assert(siz == sizeof(int4) || siz == sizeof(short));
+			assert(siz == SIZEOF(int4) || siz == SIZEOF(short));
 			MV_FORCE_NUM(src);
 			nl = MV_FORCE_INT(src);
-			if (siz == sizeof(int4))
+			if (siz == SIZEOF(int4))
 				cp = (unsigned char *)&nl;
 			else
 			{
-				assert (siz == sizeof(short));
+				assert (siz == SIZEOF(short));
 
 				ns = (short) nl;
 				cp = (unsigned char *) &ns;
@@ -76,7 +75,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			break;
 		case IOP_SRC_MSK:
 			MV_FORCE_STR(src);
-			assert(siz == sizeof(int4));
+			assert(siz == SIZEOF(int4));
 			nl = 0;
 			for (cp = (unsigned char *) src->str.addr, cnt = src->str.len ; cnt > 0 ; cnt--)
 				nl |= (1 << *cp++);
@@ -84,8 +83,8 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			break;
 		case IOP_SRC_LNGMSK:
 			MV_FORCE_STR(src);
-			assert(siz == sizeof(io_termmask));
-			memset(&lngmsk, 0, sizeof(io_termmask));
+			assert(siz == SIZEOF(io_termmask));
+			memset(&lngmsk, 0, SIZEOF(io_termmask));
 			for (cp = (unsigned char *) src->str.addr, cnt = src->str.len ; cnt > 0 ; cnt--)
 			{
 				msk = *cp++;
@@ -95,7 +94,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			cp = (unsigned char *) &lngmsk;
 			break;
 		case IOP_SRC_PRO:
-			assert(siz == sizeof (unsigned char));
+			assert(siz == SIZEOF(unsigned char));
 			MV_FORCE_STR(src);
 			nl = cvtprot(src->str.addr, src->str.len);
 			if (nl == -1)
@@ -107,7 +106,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 			status = cvttime(src, tim);
 			if ((status & 1) == 0)
 				return status;
-			siz = sizeof(tim) ;
+			siz = SIZEOF(tim) ;
 			cp = (unsigned char *) tim ;
 			break;
 		default:

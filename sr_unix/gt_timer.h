@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,32 +77,29 @@ typedef struct tag_ts {
 
 #define GT_WAKE
 
-#ifdef __STDC__
-int4 abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
-void add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd);
-void cancel_timer(TID tid);
-void hiber_start(uint4 hiber);
-void hiber_start_wait_any(uint4 hiber);
-void start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
-ABS_TIME sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
-void sys_get_curr_time(ABS_TIME *atp);
-void uninit_timers(void);
-void prealloc_gt_timers(void);
-void check_for_timer_pops(void);
-#else
-int4 abs_time_comp();
-void add_int_to_abs_time();
-void cancel_timer();
-void hiber_start();
-void hiber_start_wait_any();
-void start_timer();
-ABS_TIME sub_abs_time();
-void sys_get_curr_time();
-void uninit_timers();
-void prealloc_gt_timers();
-void check_for_timer_pops();
-#endif
+int4		abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
+void		add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd);
+void		cancel_timer(TID tid);
+void		hiber_start(uint4 hiber);
+void		hiber_start_wait_any(uint4 hiber);
+void		start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
+ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
+void		sys_get_curr_time(ABS_TIME *atp);
+void		uninit_timers(void);
+void		prealloc_gt_timers(void);
+void		check_for_timer_pops(void);
+GT_TIMER	*find_timer_intr_safe(TID tid, GT_TIMER **tprev);
+
+STATICFNDCL void	hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
+STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata);
+STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)());
+STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);
+STATICFNDCL void	timer_handler(int why);
+STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
+STATICFNDCL void	add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata);
+STATICFNDCL void	remove_timer(TID tid);
+STATICFNDCL void	sys_canc_timer (TID tid);
+STATICFNDCL void	cancel_all_timers(void);
+STATICFNDCL void	init_timers(void);
 
 #endif
-
-

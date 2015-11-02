@@ -45,6 +45,7 @@ void	t_busy2free(srch_blk_status *blkhist)
 	cse->blk = blkhist->blk_num;
 	cse->old_block = blkhist->buffaddr;
 	old_block = (blk_hdr_ptr_t)cse->old_block;
+	cse->was_free = FALSE; /* t_busy2free operates on BUSY blocks and hence cse->was_free is set to FALSE unconditionally */
 	csa = cs_addrs;
 	assert(NULL != old_block);
 	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;

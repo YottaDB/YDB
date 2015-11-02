@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,13 +14,14 @@
 #include <signal.h>
 #include "gtm_time.h"
 #include <sys/time.h>
+
 #include "dollarh.h"
+#include "gtmimagename.h"
 
 GBLREF	boolean_t	run_time;
 GBLREF	boolean_t	blocksig_initialized;
 GBLREF	sigset_t	block_sigsent;
 
-/* note to code consolidaters: this code seems to run fine on VMS */
 void dollarh(time_t intime, uint4 *days, time_t *seconds)
 {
 	uint4		tdays;
@@ -56,7 +57,7 @@ void dollarh(time_t intime, uint4 *days, time_t *seconds)
 	 * DSE and MUPIP use this function to potentially display times in the past (e.g. in DSE DUMP -FILE,
 	 * MUPIP JOURNAL EXTRACT) so restrict this assert to the runtime for now.
 	 */
-	assert(!run_time || ((*days == old_days) && (*seconds >= old_seconds)) || (*days > old_days)
+	assert(!IS_GTM_IMAGE || ((*days == old_days) && (*seconds >= old_seconds)) || (*days > old_days)
 		|| (0 < old_isdst) && (0 == isdst));
 	DEBUG_ONLY(old_seconds = (uint4)*seconds; old_days = *days; old_intime = intime; old_isdst = isdst;)
 	return;

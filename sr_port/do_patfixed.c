@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +81,7 @@ int do_patfixed(mval *str, mval *pat)
 		return FALSE;
 	patptr++;
 	min = (int4 *)patptr;
-	rtop = min + count; /* Note: the compiler generates: rtop = min + sizeof(int4) * count */
+	rtop = min + count; /* Note: the compiler generates: rtop = min + SIZEOF(int4) * count */
 
 	/* attempt a match */
 	strptr = (unsigned char *)str->str.addr;
@@ -139,7 +139,7 @@ int do_patfixed(mval *str, mval *pat)
 			assert(!(flags & PATM_STRLIT_BADCHAR));
 			/* ensure pattern atom length is within limits of the complete pattern stream */
 			assert((0 <= bytelen)
-					&& ((patptr + DIVIDE_ROUND_UP(bytelen, sizeof(*patptr)))
+					&& ((patptr + DIVIDE_ROUND_UP(bytelen, SIZEOF(*patptr)))
 						<= ((uint4 *)(pat->str.addr) + patstream_len + 2)));
 			pstr = (unsigned char *)patptr;
 			if (1 == bytelen)
@@ -170,7 +170,7 @@ int do_patfixed(mval *str, mval *pat)
 						for (letter = 0, pstr = (unsigned char *)patptr; letter < bytelen; letter++)
 							if (*pstr++ != *strptr++)
 								return FALSE;
-					patptr += DIVIDE_ROUND_UP(bytelen, sizeof(*patptr));
+					patptr += DIVIDE_ROUND_UP(bytelen, SIZEOF(*patptr));
 				}
 				UNICODE_ONLY(
 				else
@@ -200,7 +200,7 @@ int do_patfixed(mval *str, mval *pat)
 							}
 						}
 					}
-					patptr += DIVIDE_ROUND_UP(bytelen, sizeof(*patptr));
+					patptr += DIVIDE_ROUND_UP(bytelen, SIZEOF(*patptr));
 				}
 				)
 			}

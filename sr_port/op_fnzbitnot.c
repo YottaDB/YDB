@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,7 @@ void op_fnzbitnot(mval *dst,mval *bitstr)
 	if (7 < byte_len)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
 
-	if (stringpool.top - stringpool.free < bitstr->str.len)
-		stp_gcol(bitstr->str.len);
+	ENSURE_STP_FREE_SPACE(bitstr->str.len);
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	dist_byte = (unsigned char *)stringpool.free;
 	*dist_byte = *byte_1;

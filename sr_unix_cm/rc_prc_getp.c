@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,7 +112,7 @@ rc_prc_getp(rc_q_hdr *qhdr)
 		    return -1;
 	    }
 
-	    t_begin( ERR_DSEBLKRDFAIL, FALSE );
+	    t_begin(ERR_DSEBLKRDFAIL, 0);
 	    do
 	    {
 		    rsp->hdr.a.len.value = (short)((char*)(&rsp->page[0])
@@ -139,7 +139,7 @@ rc_prc_getp(rc_q_hdr *qhdr)
 
 
 		    /* block won't fit into response packet */
-		    if (rc_size_return+sizeof(rc_rsp_page)
+		    if (rc_size_return+SIZEOF(rc_rsp_page)
 			< size_return + rsp->hdr.a.len.value)
 		    {
 			    qhdr->a.erc.value = RC_XBLKOVERFLOW;
@@ -147,12 +147,12 @@ rc_prc_getp(rc_q_hdr *qhdr)
 		    }
 
 		    /* copy header block */
-		    memcpy(rsp->page, buffaddr, sizeof(blk_hdr));
+		    memcpy(rsp->page, buffaddr, SIZEOF(blk_hdr));
 		    /* increase size field to include RC_BLKHD_PAD */
 		    PUT_SHORT(&((blk_hdr*)rsp->page)->bsiz,bsiz);
-		    memcpy(rsp->page + sizeof(blk_hdr) + RC_BLKHD_PAD,
-			   buffaddr + sizeof(blk_hdr),
-			   size_return - (sizeof(blk_hdr) + RC_BLKHD_PAD));
+		    memcpy(rsp->page + SIZEOF(blk_hdr) + RC_BLKHD_PAD,
+			   buffaddr + SIZEOF(blk_hdr),
+			   size_return - (SIZEOF(blk_hdr) + RC_BLKHD_PAD));
 		    rsp->size_return.value = size_return;
 		    rsp->hdr.a.len.value += rsp->size_return.value;
 

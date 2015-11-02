@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ void gvcmy_close(struct CLB *c)
 	}
 	msg = CMMS_S_TERMINATE;
 	c->mbf = &msg;
-	c->cbl = sizeof(msg);
+	c->cbl = SIZEOF(msg);
 	c->ast = 0;	/* forces synchronous operation (sys$qiow) */
 	/* flushing the buffer is good, but errors are ignored as close is more important and looping on errors is not good */
 	cmi_write(c);

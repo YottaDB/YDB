@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ iomt_wtdoslab (io_desc *dv)
 	static readonly unsigned char label[] = {149, 84, 248, 102, 79, 192, 1, 1, 155, 0, 0, 0, 0, 0};
 	uint4   	status;
 	iosb            io_status_blk;
-	unsigned char	outcp[sizeof(label)];
+	unsigned char	outcp[SIZEOF(label)];
 	d_mt_struct	*mt_ptr;
 	error_def (ERR_MTIS);
 	error_def (ERR_MTRDONLY);
@@ -41,11 +41,11 @@ iomt_wtdoslab (io_desc *dv)
 			return;
 	}
 #endif
-	memcpy(&outcp[0], &label[0], sizeof(outcp));
+	memcpy(&outcp[0], &label[0], SIZEOF(outcp));
 	io_status_blk.status = 0;
 
 	status = iomt_wtlblk(mt_ptr->access_id, IO_WRITELBLK, &io_status_blk,
-			      outcp, sizeof(outcp));
+			      outcp, SIZEOF(outcp));
 	if ((status != SS_NORMAL) || ((status = io_status_blk.status) != SS_NORMAL))
 	{
 		if (status == SS_ENDOFTAPE)

@@ -104,7 +104,7 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		else
 		{
 			VAR_START(var, start);
-			end = undx(start, var, arg1, buff, sizeof(buff));
+			end = undx(start, var, arg1, buff, SIZEOF(buff));
 			va_end(var);
 			rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
 		}

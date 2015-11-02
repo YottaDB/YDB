@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,6 @@
 #include "iosp.h"
 #ifdef DEBUG
 #include "jnl_typedef.h"
-LITREF	int	jrt_update[JRT_RECTYPES];
 #endif
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
@@ -58,20 +57,17 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb)
 	assert((0 != jpc->pini_addr) || REPL_WAS_ENABLED(csa));
 	assert(jgbl.gbl_jrec_time || REPL_WAS_ENABLED(csa));
 	assert(csa->now_crit);
-	assert(IS_SET_KILL_ZKILL(jfb->rectype));
+	assert(IS_SET_KILL_ZKILL_ZTWORM(jfb->rectype));
 	assert(!IS_ZTP(jfb->rectype));
 	jrec = (struct_jrec_upd *)jfb->buff;
 	jrec->prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 	jrec->prefix.tn = csa->ti->curr_tn;
 	jrec->prefix.time = jgbl.gbl_jrec_time;
 	jrec->prefix.checksum = jfb->checksum;
-	if (jgbl.forw_phase_recovery)
-	{
-		QWASSIGN(jrec->token_seq, jgbl.mur_jrec_token_seq);
-	} else
-	{	/* t_end and tp_tend already has set token or jnl_seqno into jnl_fence_ctl.token */
-		QWASSIGN(jrec->token_seq.token, jnl_fence_ctl.token);
-	}
+	/* t_end/tp_tend/mur_output_record has already set token/jnl_seqno into jnl_fence_ctl.token */
+	assert((0 != jnl_fence_ctl.token) || (!dollar_tlevel && !jgbl.forw_phase_recovery && !REPL_ENABLED(csa))
+		|| (!dollar_tlevel && jgbl.forw_phase_recovery && (repl_open != csa->hdr->intrpt_recov_repl_state)));
+	QWASSIGN(jrec->token_seq.token, jnl_fence_ctl.token);
 #	ifdef GTM_CRYPT
 	if (REPL_ALLOWED(csa))
 	{

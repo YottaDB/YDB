@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ bool	mlk_shrblk_delete_if_empty(mlk_ctldata_ptr_t ctl,
 	PUT_ZERO(sub->backpointer);
 
 	p = (mlk_shrblk_ptr_t)R2A(ctl->blkfree);
-	memset(d, 0, sizeof(mlk_shrblk));
+	memset(d, 0, SIZEOF(mlk_shrblk));
 	A2R(d->rsib, p);
 
 	A2R(ctl->blkfree, d);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,7 @@ int one_job_param (char **parptr)
 				}
 				num = MV_FORCE_INTD(&window_mval);
 				*((int4 *) (*parptr)) = (neg ? -num : num);
-				*parptr += sizeof(int4);
+				*parptr += SIZEOF(int4);
 				break;
 			case jpdt_str:
 				if (window_token != TK_STRLIT)

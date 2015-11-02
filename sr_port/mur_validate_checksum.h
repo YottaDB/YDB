@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,6 @@
 #ifndef _VALIDATE_CHECKSUM_H_
 #define _VALIDATE_CHECKSUM_H_
 
-boolean_t mur_validate_checksum(void);
+boolean_t mur_validate_checksum(jnl_ctl_list *jctl);
 
 #endif

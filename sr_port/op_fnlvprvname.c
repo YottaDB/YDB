@@ -23,7 +23,7 @@
 GBLREF spdesc stringpool;
 GBLREF symval *curr_symval;
 
-void op_fnlvprvname(mval *src,mval *dst)
+void op_fnlvprvname(mval *src, mval *dst)
 {
 	ht_ent_mname	*p, *max, *top;
 	int 		n;
@@ -59,21 +59,17 @@ void op_fnlvprvname(mval *src,mval *dst)
 			}
 		}
 	}
-	dst->mvtype = MV_STR;
-	if (!max)
-		dst->str.len = 0;
-	else
+	dst->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
+	if (max)
 	{
 		n = max->key.var_name.len;
-		if (stringpool.top - stringpool.free < n)
-		{
-			dst->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval */
-			stp_gcol(n);
-		}
+		ENSURE_STP_FREE_SPACE(n);
 		memcpy(stringpool.free, max->key.var_name.addr, n);
 		dst->str.len = n;
 		dst->str.addr = (char *)stringpool.free;
 		stringpool.free += n;
-	}
+	} else
+		dst->str.len = 0;
+	dst->mvtype = MV_STR; /* initialize mvtype now that dst mval has been otherwise completely set up */
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,7 @@ GBLREF 	unsigned int		t_tries;
 GBLREF	cw_set_element		cw_set[];		/* create write set. */
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned char    	cw_map_depth;
-GBLREF	int4			update_trans;
+GBLREF	uint4			update_trans;
 
 /* actually want the following to be a static variable in this module, but getting the address of a
  * static variable through the debugger might be tricky on some platforms. hence use a global variable instead.
@@ -125,7 +125,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	tp_region		*rptr;
 	trans_num		curr_tn;
 	unsigned char    	save_cw_set_depth;
-	int4			lcl_update_trans;
+	uint4			lcl_update_trans;
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_DBBTUWRNG);
@@ -147,14 +147,14 @@ void	mu_reorg_upgrd_dwngrd(void)
 	reorg_command = upgrade ? "MUPIP REORG UPGRADE" : "MUPIP REORG DOWNGRADE";
 	reorg_entiredb = TRUE;	/* unless STARTBLK or STOPBLK is specified we are going to {up,down}grade the entire database */
 	startblk_specified = FALSE;
-	assert(sizeof(block_id) == sizeof(uint4));
+	assert(SIZEOF(block_id) == SIZEOF(uint4));
 	if ((CLI_PRESENT == cli_present("STARTBLK")) && (cli_get_hex("STARTBLK", (uint4 *)&startblk_input)))
 	{
 		reorg_entiredb = FALSE;
 		startblk_specified = TRUE;
 	}
 	stopblk_specified = FALSE;
-	assert(sizeof(block_id) == sizeof(uint4));
+	assert(SIZEOF(block_id) == SIZEOF(uint4));
 	if ((CLI_PRESENT == cli_present("STOPBLK")) && (cli_get_hex("STOPBLK", (uint4 *)&stopblk_input)))
 	{
 		reorg_entiredb = FALSE;
@@ -167,7 +167,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	status = SS_NORMAL;
 	error_mupip = FALSE;
 	gvinit();	/* initialize gd_header (needed by the later call to mu_getlst) */
-	mu_getlst("REG_NAME", sizeof(tp_region));	/* get the parameter corresponding to REGION qualifier */
+	mu_getlst("REG_NAME", SIZEOF(tp_region));	/* get the parameter corresponding to REGION qualifier */
 	if (error_mupip)
 	{
 		util_out_print("!/MUPIP REORG !AD cannot proceed with above errors!/", TRUE, LEN_AND_STR(command));
@@ -175,7 +175,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	}
 	gv_keysize = DBKEYSIZE(MAX_KEY_SZ);
 	gv_target = targ_alloc(gv_keysize, NULL, NULL);	/* t_begin needs this initialized */
-	memset(&alt_hist, 0, sizeof(alt_hist));	/* null-initialize history */
+	memset(&alt_hist, 0, SIZEOF(alt_hist));	/* null-initialize history */
 	blkhist = &alt_hist.h[0];
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
 	{
@@ -303,7 +303,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			free(bptr);
 			bptr = NULL;
 		}
-		memset(&reorg_stats, 0, sizeof(reorg_stats));	/* initialize statistics for this region */
+		memset(&reorg_stats, 0, SIZEOF(reorg_stats));	/* initialize statistics for this region */
 		for (curbmp = start_bmp; curbmp <= last_bmp; curbmp += BLKS_PER_LMAP)
 		{
 			if (mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -400,7 +400,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 						/* read in block from disk into private buffer. dont pollute the cache yet */
 						if (NULL == bptr)
 							bptr = (sm_uc_ptr_t)malloc(blk_size);
-						status1 = dsk_read(curblk, bptr, &ondsk_blkver);
+						status1 = dsk_read(curblk, bptr, &ondsk_blkver, FALSE);
 						/* dsk_read on curblk could return an error (DYNUPGRDFAIL) if curblk needs to be
 						 * upgraded and if its block size was too big to allow the extra block-header space
 						 * requirements for a dynamic upgrade. a MUPIP REORG DOWNGRADE should not error out
@@ -437,7 +437,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 				 * Any update to a block will trigger an automatic upgrade/downgrade of the block based on
 				 * 	the current fileheader desired_db_format setting and we use that here.
 				 */
-				t_begin(ERR_MUREORGFAIL, TRUE);
+				t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
 				for (; ;)
 				{
 					CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
@@ -464,7 +464,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 						mark_blk_free = TRUE;
 						inctn_opcode = inctn_blkmarkfree;
 					}
-					inctn_detail.blknum = curblk;
+					inctn_detail.blknum_struct.blknum = curblk;
 					/* t_end assumes that the history it is passed does not contain a bitmap block.
 					 * for bitmap block, the history validation information is passed through cse instead.
 					 * therefore we need to handle bitmap and non-bitmap cases separately.
@@ -484,7 +484,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 						 * at this point, we should not lose much.
 						 */
 						assert(!mark_blk_free);
-						BLK_ADDR(blkid_ptr, sizeof(block_id), block_id);
+						BLK_ADDR(blkid_ptr, SIZEOF(block_id), block_id);
 						*blkid_ptr = 0;
 						t_write_map(blkhist, (unsigned char *)blkid_ptr, curr_tn, 0);
 						assert(&alt_hist.h[0] == blkhist);
@@ -527,14 +527,14 @@ void	mu_reorg_upgrd_dwngrd(void)
 							if ((new_db_format != ondsk_blkver) && (BLK_FREE != bml_status))
 							{	/* block still needs to be converted. create cse */
 								BLK_INIT(bs_ptr, bs1);
-								BLK_SEG(bs_ptr, blkBase + sizeof(new_hdr),
-									new_hdr.bsiz - sizeof(new_hdr));
+								BLK_SEG(bs_ptr, blkBase + SIZEOF(new_hdr),
+									new_hdr.bsiz - SIZEOF(new_hdr));
 								BLK_FINI(bs_ptr, bs1);
 								t_write(blkhist, (unsigned char *)bs1, 0, 0,
 									((blk_hdr_ptr_t)blkBase)->levl, FALSE,
 									FALSE, GDS_WRITE_PLAIN);
-								/* reset update_trans in case previous retry had set it to FALSE */
-								update_trans = TRUE;
+								/* reset update_trans in case previous retry had set it to 0 */
+								update_trans = UPDTRNS_DB_UPDATED_MASK;
 								if (BLK_RECYCLED == bml_status)
 								{	/* If block that we are upgarding is RECYCLED, indicate to
 									 * bg_update that blks_to_upgrd counter should NOT be
@@ -550,7 +550,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 								 * 	both the non-bitmap block as well as the bitmap block.
 								 * Note down that this transaction is no longer updating any blocks.
 								 */
-								update_trans = FALSE;
+								update_trans = 0;
 							}
 							/* Need to put bit maps on the end of the cw set for concurrency checking.
 							 * We want to simulate t_write_map, except we want to update "cw_map_depth"
@@ -574,15 +574,15 @@ void	mu_reorg_upgrd_dwngrd(void)
 							assert(lcnt == (curblk - curbmp));
 							assert(update_array_ptr == update_array);
 							*((block_id *)update_array_ptr) = lcnt;
-							update_array_ptr += sizeof(block_id);
-							/* the following assumes sizeof(block_id) == sizeof(int) */
-							assert(sizeof(block_id) == sizeof(int));
+							update_array_ptr += SIZEOF(block_id);
+							/* the following assumes SIZEOF(block_id) == SIZEOF(int) */
+							assert(SIZEOF(block_id) == SIZEOF(int));
 							*(int *)update_array_ptr = 0;
 							t_write_map(&bmlhist, (unsigned char *)update_array, curr_tn, 0);
-							update_trans = TRUE;
+							update_trans = UPDTRNS_DB_UPDATED_MASK;
 						}
 					}
-					assert(sizeof(lcl_update_trans) == sizeof(update_trans));
+					assert(SIZEOF(lcl_update_trans) == SIZEOF(update_trans));
 					lcl_update_trans = update_trans;	/* take a copy before t_end modifies it */
 					if ((trans_num)0 != t_end(&alt_hist, 0))
 					{	/* In case this is MM and t_end() remapped an extended database, reset csd */

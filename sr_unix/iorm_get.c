@@ -119,9 +119,14 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 	bom_bytes2read = (int4)((CHSET_UTF8 == chset) ? UTF8_BOM_LEN : UTF16BE_BOM_LEN);
 	for (; rm_ptr->bom_buf_cnt < bom_bytes2read; )
 	{
+		/* If it is a pipe and at least one character is read, a timer with timer_id
+		   passed in from iorm_readfl.c will be started.  It is canceled in that
+		   routine if not expired. Last argument is passed as FALSE(UTF_VAR_PF) since we
+		   are not doing CHUNK_SIZE read here
+ 		 */
 		DOREADRLTO2(fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], bom_bytes2read - rm_ptr->bom_buf_cnt,
 			     out_of_time, blocked_in, ispipe, flags, status, tot_bytes_read,
-			     timer_id, msec_timeout, pipe_zero_timeout);
+			     timer_id, msec_timeout, pipe_zero_timeout, FALSE);
 		if (0 > status)
 		{
 			rm_ptr->bom_buf_cnt = 0;
@@ -136,7 +141,10 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 		}
 	}
 	if (rm_ptr->bom_buf_cnt >= bom_bytes2read)
+	{
 		rm_ptr->bom_buf_off = gtm_utf_bomcheck(io_ptr, &io_ptr->ichset, rm_ptr->bom_buf, rm_ptr->bom_buf_cnt);
+		rm_ptr->file_pos += rm_ptr->bom_buf_off;  /* If there is BOM bytes increment file position by bom_buf_off */
+	}
 	else if (CHSET_UTF16 == chset)	/* if UTF16 default to UTF16BE */
 		io_ptr->ichset = CHSET_UTF16BE;
 	if (chset != io_ptr->ichset)
@@ -200,11 +208,17 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 		bytes2read -= from_bom;		/* now in buffer */
 		rm_ptr->inbuf_pos += from_bom;
 		bytes_read = from_bom;
+		rm_ptr->file_pos += from_bom;
 		status = 0;
 	}
 	if (0 <= status && 0 < bytes2read)
+		/* If it is a pipe and at least one character is read, a timer with timer_id
+		   passed in from iorm_readfl.c will be started.  It is canceled in that
+		   routine if not expired. Last argument is passed as FALSE(UTF_VAR_PF) since we
+		   are not doing CHUNK_SIZE read here
+ 		 */
 		DOREADRLTO2(fildes, rm_ptr->inbuf_pos, (int)bytes2read, out_of_time, blocked_in, ispipe,
-			     flags, status, tot_bytes_read, timer_id, msec_timeout, pipe_zero_timeout);
+			     flags, status, tot_bytes_read, timer_id, msec_timeout, pipe_zero_timeout, FALSE);
 
 	/* if some bytes were read prior to timeout then process them as if no timeout occurred */
 	if (0 > status && *tot_bytes_read && errno == EINTR && out_of_time)
@@ -218,6 +232,7 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	} else
 	{
 		bytes_read += status;
+		rm_ptr->file_pos += status;
 		padchar = rm_ptr->padchar;
 		if ((CHSET_UTF16LE == chset) || (CHSET_UTF16BE == chset))
 		{	/* strip 2-byte PADCHAR in UTF-16LE or UTF-16BE from tail of line */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,40 +39,37 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 {
 	struct_jrec_inctn	inctn_record;
 	jnl_private_control	*jpc;
+	DEBUG_ONLY(int		inctn_detail_size;)
 
 	assert(csa->now_crit);
 	jpc = csa->jnl;
 	assert(0 != jpc->pini_addr);
 	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
 	inctn_record.prefix.jrec_type = JRT_INCTN;
-	inctn_record.prefix.forwptr = inctn_record.suffix.backptr = INCTN_RECLEN;
-	inctn_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+	inctn_record.prefix.forwptr = INCTN_RECLEN;
+	assert(&inctn_detail.blknum_struct.suffix == &inctn_detail.blks2upgrd_struct.suffix);
+	DEBUG_ONLY(inctn_detail_size = OFFSETOF(inctn_detail_blknum_t, suffix) + SIZEOF(inctn_detail.blknum_struct.suffix);)
+	assert(0 == (inctn_detail_size % JNL_REC_START_BNDRY));
+	assert(SIZEOF(inctn_detail) == inctn_detail_size);
+	inctn_detail.blknum_struct.suffix.backptr = INCTN_RECLEN;
+	inctn_detail.blknum_struct.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	inctn_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
 	inctn_record.prefix.time = jgbl.gbl_jrec_time;
 	inctn_record.prefix.tn = csa->ti->curr_tn;
 	inctn_record.prefix.checksum = INIT_CHECKSUM_SEED;
-	assert(inctn_opcode_total > inctn_opcode && inctn_invalid_op < inctn_opcode);
-	inctn_record.opcode = inctn_opcode;
-	switch(inctn_opcode)
-	{
-		case inctn_bmp_mark_free_gtm:
-		case inctn_bmp_mark_free_mu_reorg:
-		case inctn_blkupgrd:
-		case inctn_blkdwngrd:
-		case inctn_blkupgrd_fmtchng:
-		case inctn_blkdwngrd_fmtchng:
-		case inctn_blkmarkfree:
-			inctn_record.detail.blknum = inctn_detail.blknum;
-			break;
-		case inctn_gdsfilext_gtm:
-		case inctn_gdsfilext_mu_reorg:
-		case inctn_db_format_change:
-			inctn_record.detail.blks_to_upgrd_delta = inctn_detail.blks_to_upgrd_delta;
-			break;
-		default:
-			break;
-	}
+	assert((inctn_opcode_total > inctn_opcode) && (inctn_invalid_op < inctn_opcode));
+	/* Assert that the maximum inctn opcode # will fit in the "opcode" field in the inctn jnl record.
+	 * But before that, assert opcode is at same offset in all the individual inctn_detail_* structure types.
+	 */
+	assert(&inctn_detail.blknum_struct.opcode == &inctn_detail.blks2upgrd_struct.opcode);
+	assert(inctn_opcode_total < (1 << (8 * SIZEOF(inctn_detail.blknum_struct.opcode))));
+	inctn_detail.blknum_struct.opcode = inctn_opcode;	/* fill in opcode from the global variable */
+	/* Instead of having a multi-line switch statement that copies exactly those fields which are necessary, we
+	 * copy the entire structure (16 bytes at this point). Pipeline breaks are considered more costly than a few
+	 * unnecessary memory-to-memory copies.
+	 */
+	inctn_record.detail = inctn_detail;
 	jnl_write(jpc, JRT_INCTN, (jnl_record *)&inctn_record, NULL, NULL);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,8 +33,8 @@ zb_code  *find_line_call(void *addr)
 		call_addr++;
 		if (modrm_byte.modrm.mod == I386_MOD32_BASE_DISP_8)
 		{
-			if (*call_addr == xf_linestart * sizeof(int4) ||
-			    *call_addr == xf_zbstart * sizeof(int4))
+			if (*call_addr == xf_linestart * SIZEOF(int4) ||
+			    *call_addr == xf_zbstart * SIZEOF(int4))
 				return (zb_code *)call_addr;
 
 			call_addr++;
@@ -42,10 +42,10 @@ zb_code  *find_line_call(void *addr)
 		else
 		{
 			assert (modrm_byte.modrm.mod == I386_MOD32_BASE_DISP_32);
-			if (*((int4 *)call_addr) != xf_isformal * sizeof(int4))
+			if (*((int4 *)call_addr) != xf_isformal * SIZEOF(int4))
 				return (zb_code *)addr;
 
-			call_addr += sizeof(int4);
+			call_addr += SIZEOF(int4);
 		}
 	}
 
@@ -55,11 +55,11 @@ zb_code  *find_line_call(void *addr)
 		while (*call_addr == I386_INS_PUSH_Ib  ||  *call_addr == I386_INS_PUSH_Iv)
 		{
 			if (*call_addr == I386_INS_PUSH_Ib)
-				call_addr += 1 + sizeof(unsigned char);
+				call_addr += 1 + SIZEOF(unsigned char);
 			else
 			{
 				assert (*call_addr == I386_INS_PUSH_Iv);
-				call_addr += 1 + sizeof(int4);
+				call_addr += 1 + SIZEOF(int4);
 			}
 		}
 		modrm_byte.byte = *(call_addr + 1);
@@ -71,8 +71,8 @@ zb_code  *find_line_call(void *addr)
 		call_addr++;
 		if (modrm_byte.modrm.mod == I386_MOD32_BASE_DISP_8)
 		{
-			if (*call_addr != xf_linefetch * sizeof(int4) &&
-			    *call_addr != xf_zbfetch * sizeof(int4))
+			if (*call_addr != xf_linefetch * SIZEOF(int4) &&
+			    *call_addr != xf_zbfetch * SIZEOF(int4))
 				return (zb_code *)addr;
 		}
 	}
@@ -84,8 +84,8 @@ zb_code  *find_line_call(void *addr)
 		call_addr++;
 		if (modrm_byte.modrm.mod == I386_MOD32_BASE_DISP_8)
 		{
-			if (*call_addr != xf_linestart * sizeof(int4) &&
-			    *call_addr != xf_zbstart * sizeof(int4))
+			if (*call_addr != xf_linestart * SIZEOF(int4) &&
+			    *call_addr != xf_zbstart * SIZEOF(int4))
 				return (zb_code *)addr;
 		}
 	}

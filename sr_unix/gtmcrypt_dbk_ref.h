@@ -51,8 +51,8 @@ void	 			gc_dbk_get_hash(db_key_map *entry,  xc_string_t *hash);
 
 #define GC_NEW_DB_KEYMAP(X)						\
 {									\
-	GC_MALLOC(X, sizeof(db_key_map), db_key_map);			\
-	memset(X, 0, sizeof(db_key_map));				\
+	GC_MALLOC(X, SIZEOF(db_key_map), db_key_map);			\
+	memset(X, 0, SIZEOF(db_key_map));				\
 	GC_MALLOC(X->db_name.address, GTM_PATH_MAX, char);		\
 	memset((X)->db_name.address, 0, GTM_PATH_MAX);			\
 	GC_MALLOC(X->key_filename.address, GTM_PATH_MAX, char);		\

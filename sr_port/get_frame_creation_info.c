@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,10 +46,17 @@ void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 	{
 		if (NULL == fp->old_frame_pointer)
 		{
-			assert(FALSE);
-			result->str.len = 0;
-			return;
+			if (fp->type & SFT_TRIGR)
+				/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
+				fp = *(stack_frame **)(fp + 1);
+			else
+			{	/* Something wrong, just return null or assert if debug mode */
+				assert(FALSE);
+				result->str.len = 0;
+				return;
+			}
 		}
+		assert(NULL != fp);
 		if (!(fp->type & SFT_COUNT))
 			continue;
 		count--;

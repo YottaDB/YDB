@@ -23,6 +23,11 @@
 #include "io_params.h"
 #include "eintr_wrappers.h"
 #include "gtmio.h"
+#include "iosp.h"
+
+GBLREF io_pair		io_curr_device;
+GBLREF io_pair		io_std_device;
+GBLREF	boolean_t	gtm_pipe_child;
 
 LITREF unsigned char	io_params_size[];
 
@@ -40,6 +45,8 @@ void iorm_close(io_desc *iod, mval *pp)
 	int		p_offset;
 	pid_t  		done_pid;
 	int  		wait_status, rc;
+
+	error_def(ERR_CLOSEFAIL);
 
 	assert (iod->type == rm);
 	if (iod->state != dev_open)
@@ -120,11 +127,17 @@ void iorm_close(io_desc *iod, mval *pp)
 	/* Close the fildes unless this is a direct close of the stderr device */
 	if (!rm_ptr->stderr_parent)
 	{
+		int save_fd;
 		/* Before closing a pipe device file descriptor, check if the fd was already closed as part of a "write /eof".
 		 * If so, do not attempt the close now. Only need to free up the device structures.
 		 */
 		if (FD_INVALID != rm_ptr->fildes)
+		{
+			save_fd = rm_ptr->fildes;
 			CLOSEFILE_RESET(rm_ptr->fildes, rc);	/* resets "rm_ptr->fildes" to FD_INVALID */
+			if (0 != rc)
+				rts_error(VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);
+		}
 		if (rm_ptr->filstr != NULL)
 		{
 			FCLOSE(rm_ptr->filstr, fclose_res);
@@ -132,7 +145,12 @@ void iorm_close(io_desc *iod, mval *pp)
 		}
 		/* if this is a pipe and read_fildes and read_filstr are set then close them also */
 		if (0 < rm_ptr->read_fildes)
+		{
+			save_fd = rm_ptr->read_fildes;
 			CLOSEFILE_RESET(rm_ptr->read_fildes, rc);	/* resets "rm_ptr->read_fildes" to FD_INVALID */
+			if (0 != rc)
+				rts_error(VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, rc);
+		}
 		if (rm_ptr->read_filstr != NULL)
 		{
 			FCLOSE(rm_ptr->read_filstr, fclose_res);
@@ -144,13 +162,24 @@ void iorm_close(io_desc *iod, mval *pp)
 	if (rm_ptr->pipe_pid > 0)
 	{
 		/* if child process will not go away then have to kill shell in order to reap */
-		if (rm_ptr->independent)
-			kill(rm_ptr->pipe_pid,SIGKILL);
-		WAITPID(rm_ptr->pipe_pid, &wait_status, 0, done_pid);
-		assert(done_pid == rm_ptr->pipe_pid);
+		/* Don't reap if in a child process creating a new pipe */
+		if (FALSE == gtm_pipe_child)
+		{
+			if (rm_ptr->independent)
+				kill(rm_ptr->pipe_pid,SIGKILL);
+			WAITPID(rm_ptr->pipe_pid, &wait_status, 0, done_pid);
+			assert(done_pid == rm_ptr->pipe_pid);
+		}
 
 		if (rm_ptr->stderr_child)
 		{
+			/* If the stderr device is the current device then set it to the principal device.  This
+			 is handled in op_close for a direct close of the stderr device.  */
+			if (io_curr_device.in == rm_ptr->stderr_child)
+			{
+				io_curr_device.in = io_std_device.in;
+				io_curr_device.out = io_std_device.out;
+			}
 			/* have to make it look open in case it was closed directly */
 			/* reset the stderr_parent field so the fildes will be closed */
 			rm_ptr->stderr_child->state = dev_open;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,7 +69,6 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLDEF block_id			patch_curr_blk;
 GBLREF gd_region		*gv_cur_region;
 GBLREF gd_binding		*gd_map;
 GBLREF gd_binding		*gd_map_top;
@@ -88,6 +87,10 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF char			cli_err_str[];
 GBLREF boolean_t		write_after_image;
+GBLREF CLI_ENTRY		dse_cmd_ary[];
+
+GBLDEF block_id			patch_curr_blk;
+GBLDEF CLI_ENTRY		*cmd_ary = &dse_cmd_ary[0];	/* Define cmd_ary to be the DSE specific cmd table */
 
 static bool	dse_process(int argc);
 static void display_prompt(void);

@@ -26,6 +26,19 @@
  #define assert(x)
 #endif
 
+/* Any change done to the below macro should be reflected in mdef.h and vice versa */
+/* Note: sizeof returns a "unsigned long" type by default. In expressions involving 32-bit quantities,
+* using sizeof causes a compiler warning for every 64->32 bit auto cast (zOS compiler for now).
+* Hence typecasting the return to "int" on zOS (to avoid warning) in most common sizeof usages.
+* Whenever SIZEOF needs to be used in expressions involving 64-bit pointer quantities, use ((INTPTR_T)SIZEOF(...)).
+* Whenever SIZEOF needs to be used in expressions involving 64-bit integer quantities, use ((long)SIZEOF(...)).
+*/
+#if defined(__MVS__)
+# define SIZEOF(X) ((int)(sizeof(X)))
+#else
+# define SIZEOF(X) ((long)sizeof(X))
+#endif
+
 typedef enum
 {
 	ERROR_LINE_INFO = -1,
@@ -65,8 +78,8 @@ typedef gcry_cipher_hd_t	crypt_key_t;
 #define GTMCRYPT_HASH_HEX_LEN	GTMCRYPT_HASH_LEN * 2
 #define DAT_LINE_INDICATOR 	"dat "
 #define KEY_LINE_INDICATOR 	"key "
-#define DAT_LINE_INDICATOR_SIZE	(sizeof(DAT_LINE_INDICATOR) - 1)
-#define KEY_LINE_INDICATOR_SIZE	(sizeof(KEY_LINE_INDICATOR) - 1)
+#define DAT_LINE_INDICATOR_SIZE	(SIZEOF(DAT_LINE_INDICATOR) - 1)
+#define KEY_LINE_INDICATOR_SIZE	(SIZEOF(KEY_LINE_INDICATOR) - 1)
 #define INVALID_HANDLE		-1
 #define GTMCI			"GTMCI"
 #define ERR_STRLEN		2048
@@ -87,7 +100,7 @@ static int			gcry_already_inited = FALSE;
 #define ALGO			EVP_bf_cfb64()
 #define UNIQ_ENC_PARAM_STRING	"BLOWFISHCFB"
 #endif
-#define UNIQ_ENC_PARAM_LEN	sizeof(UNIQ_ENC_PARAM_STRING) - 1
+#define UNIQ_ENC_PARAM_LEN	SIZEOF(UNIQ_ENC_PARAM_STRING) - 1
 #define HASH_INPUT_BUFF_LEN	UNIQ_ENC_PARAM_LEN + GTM_KEY_MAX
 
 

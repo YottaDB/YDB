@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,13 +17,13 @@
 #include "gtm_string.h"
 
 /* the following macro checks that a 1 dimensional array reference is valid i.e. array[index] is within defined limits */
-#define check_1dim_array_bound(array, index)    assert((index) < (sizeof(array) / sizeof(array[0])))
+#define check_1dim_array_bound(array, index)    assert((index) < (SIZEOF(array) / SIZEOF(array[0])))
 
 /* the following macro checks that a 2 dimensional array reference is valid i.e. array[row][col] is within defined limits */
 #define check_2dim_array_bound(array, row, col)                         \
 {                                                                       \
-        assert((row) < (sizeof(array) / sizeof(array[0])));             \
-        assert((col) < (sizeof(array[0]) / sizeof(array[0][0])));       \
+        assert((row) < (SIZEOF(array) / SIZEOF(array[0])));             \
+        assert((col) < (SIZEOF(array[0]) / SIZEOF(array[0][0])));       \
 }
 
 /* Note: in various places, dfa_calc() makes a reference to the array 'typemask'.  dfa_calc() is executed at compile-time.
@@ -90,15 +90,15 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 		pos_offset[0] = 0;
 		for (seq = 1; seq < CHAR_CLASSES; seq++)
 			pos_offset[seq] = pos_offset[seq - 1] + expand->num_e[seq - 1];
-		memset(&nodes, 0, sizeof(nodes));
-		memset(&fpos[0][0], 0, sizeof(fpos));
-		memset(&states[0][0], 0, sizeof(states));
-		memset(&d_trans[0][0], 128, sizeof(d_trans));
-		memset(&pos_lis[0][0], 128, sizeof(pos_lis));
-		memset(&c_trans.c[0], 0, sizeof(c_trans.c));
-		memset(offset, 0, sizeof(offset));
-		memset(fst, 0, sizeof(fst));
-		memset(lst, 0, sizeof(lst));
+		memset(&nodes, 0, SIZEOF(nodes));
+		memset(&fpos[0][0], 0, SIZEOF(fpos));
+		memset(&states[0][0], 0, SIZEOF(states));
+		memset(&d_trans[0][0], 128, SIZEOF(d_trans));
+		memset(&pos_lis[0][0], 128, SIZEOF(pos_lis));
+		memset(&c_trans.c[0], 0, SIZEOF(c_trans.c));
+		memset(offset, 0, SIZEOF(offset));
+		memset(fst, 0, SIZEOF(fst));
+		memset(lst, 0, SIZEOF(lst));
 		charcls = 0;
 		clsnum = 0;
 		maxcls = 0;
@@ -113,7 +113,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 				fpos[charcls][charcls + 1] = TRUE;
 				lst[FST][FST] = charcls;
 				lst[FST][LST] = charcls;
-				assert(leaves->letter[0][maskcls] >= 0 && leaves->letter[0][maskcls] < sizeof(typemask));
+				assert(leaves->letter[0][maskcls] >= 0 && leaves->letter[0][maskcls] < SIZEOF(typemask));
 				seq = patmaskseq(typemask[leaves->letter[0][maskcls]]);
 				if (seq < 0)
 					seq = 0;
@@ -164,7 +164,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 				fpos[charcls][charcls + 1] = TRUE;
 				lst[LST][FST] = charcls;
 				lst[LST][LST] = charcls;
-				assert(leaves->letter[1][maskcls] >= 0 && leaves->letter[1][maskcls] < sizeof(typemask));
+				assert(leaves->letter[1][maskcls] >= 0 && leaves->letter[1][maskcls] < SIZEOF(typemask));
 				seq = patmaskseq(typemask[leaves->letter[1][maskcls]]);
 				if (seq < 0)
 					seq = 0;
@@ -268,7 +268,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 					lst[LST][FST] = charcls;
 					lst[LST][LST] = charcls;
 					assert(leaves->letter[node_num + 1][maskcls] >= 0 &&
-					       leaves->letter[node_num + 1][maskcls] < sizeof(typemask));
+					       leaves->letter[node_num + 1][maskcls] < SIZEOF(typemask));
 					seq = patmaskseq(typemask[leaves->letter[node_num + 1][maskcls]]);
 					if (seq < 0)
 						seq = 0;
@@ -362,7 +362,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 						}
 						check_1dim_array_bound(states, state_num);
 						for (count = 0;
-							memcmp(states[count], states[state_num], (sym_num + 1) * sizeof(boolean_t))
+							memcmp(states[count], states[state_num], (sym_num + 1) * SIZEOF(boolean_t))
 								&& (count < state_num);
 							count++)
 							;
@@ -394,7 +394,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 							if (count == state_num)
 								state_num++;
 							else
-								memset(states[state_num], 0, (sym_num + 1) * sizeof(states[0][0]));
+								memset(states[state_num], 0, (sym_num + 1) * SIZEOF(states[0][0]));
 						}
 					}
 					charcls += expand->num_e[maskcls];
@@ -450,7 +450,7 @@ int dfa_calc(struct leaf *leaves, int leaf_num, struct e_table *expand, uint4 **
 			for (maskcls = 0; leaves->letter[0][maskcls] >= 0; maskcls++)
 				;
 			check_1dim_array_bound(leaves->letter[0], maskcls);
-			*outchar_ptr += PAT_STRLIT_PADDING + ((maskcls + sizeof(uint4) - 1) / sizeof(uint4));
+			*outchar_ptr += PAT_STRLIT_PADDING + ((maskcls + SIZEOF(uint4) - 1) / SIZEOF(uint4));
 		} else
 		{
 			for (numexpand = 0; leaves->letter[0][numexpand] >= 0; numexpand++)

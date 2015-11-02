@@ -50,11 +50,11 @@ To build a production version GT.M for linux do the following steps:
    - [OPTIONAL] Ubuntu users must define 'distro'
    $ setenv distro ubuntu
 
-   - [OPTIONAL] By default the build procedure will build 32 bit version of
+   - [OPTIONAL] By default the build procedure will build 64 bit version of
    GT.M on a x86_64 bit machine.
-   If you intend to build 64 bit version of GT.M on a x86_64 bit machine you
-   have to explicitly set the environment variable 'OBJECT_MODE' to '64'
-   $ setenv OBJECT_MODE 64
+   If you intend to build 32 bit version of GT.M on a x86_64 bit machine you
+   have to explicitly set the environment variable 'OBJECT_MODE' to '32'
+   $ setenv OBJECT_MODE 32
 
    - Specify which ICU version is installed.
    $ setenv gtm_icu_version `icu-config --version`

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -115,15 +115,23 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	int			any_alt = FALSE;
 	int			altcount, altsimplify;
 	int			low_in, high_in, size_in, jump;
-
+	boolean_t		topseen = FALSE;/* If TRUE it means we found inchar to be == in_top and so did NOT scan the NEXT
+						 * byte in inchar (to be stored in curchar). Therefore from this point onwards,
+						 * "curchar" should never be used in this function. This is also asserted below.
+						 */
 	error_def(ERR_PATCODE);
 	error_def(ERR_PATUPPERLIM);
 	error_def(ERR_PATCLASS);
 	error_def(ERR_PATLIT);
 	error_def(ERR_PATMAXLEN);
 
-	memset(&leaves, 0, sizeof(leaves));
-	memset(&expand, 0, sizeof(expand));
+	if (0 == instr->len)		/* empty pattern string. Cant do much */
+	{
+		instr->addr++;	/* Return 1 byte more for compile_pattern to properly compute erroring M source column */
+		return ERR_PATCODE;
+	}
+	memset(&leaves, 0, SIZEOF(leaves));
+	memset(&expand, 0, SIZEOF(expand));
 	init_alt.next = NULL;
 	init_alt.altpat.len = 0;
 	done_free = TRUE;
@@ -131,7 +139,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	saveinstr = (char *) &instr->addr[0];
 	for (allmask = 0, chidx = 'A'; chidx <= 'X'; chidx++)
 		allmask |= mapbit[chidx - 'A'];
-	outchar = &obj->buff[0] + PAT_MASK_BEGIN_OFFSET; /* Note: + PAT_MASK_BEGIN_OFFSET * sizeof (uint4) */
+	outchar = &obj->buff[PAT_MASK_BEGIN_OFFSET]; /* Note: offset is actually PAT_MASK_BEGIN_OFFSET * SIZEOF (uint4) bytes */
 	last_leaf_mask = *outchar = 0;
 	patmaskptr = lastpatptr = outchar;
 	infinite = last_infinite = FALSE;
@@ -142,14 +150,17 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	exp_ptr = &expand;
 	inchar = (unsigned char *)instr->addr;
 	in_top = (unsigned char *)&inchar[instr->len];
+	assert(inchar < in_top);
 	curchar = *inchar++;
 	altactive = 0;
 	for (;;)
 	{
+		assert(inchar <= in_top);
 		altend = 0;
 		prev_fixed_len = fixed_len;
 		if ((NULL != relay) && !saw_delimiter)
 		{
+			assert(!topseen);
 			if ((',' == curchar) || (')' == curchar))
 			{
 				*relay = (inchar - 1);
@@ -160,21 +171,30 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 		if (!altactive || altend)
 		{
 			instr->addr = (char*)inchar;
-			switch(ctypetab[curchar])
+			if (!topseen && (TK_PERIOD == ctypetab[curchar]))
 			{
-			case TK_PERIOD:
 				lower_bound = 0;
 				fixed_len = FALSE;
-				break;
-			case TK_DIGIT:
+			} else if (!topseen && (TK_DIGIT == ctypetab[curchar]))
+			{
 				lower_bound = curchar - '0';
-				while (ctypetab[curchar = *inchar++] == TK_DIGIT)
-					if ((lower_bound = lower_bound * 10 + (curchar - '0'))
-						> PAT_MAX_REPEAT)
+				for ( ; ; )
+				{
+					if (inchar >= in_top)
+					{
+						assert(inchar == in_top);
+						topseen = TRUE;
+						break;
+					}
+					curchar = *inchar++;
+					if (TK_DIGIT != ctypetab[curchar])
+						break;
+					if (PAT_MAX_REPEAT < (lower_bound = (lower_bound * 10) + (curchar - '0')))
 						lower_bound = PAT_MAX_REPEAT;
+				}
 				infinite = FALSE;
-				break;
-			default:
+			} else
+			{
 				if (dfa)
 				{
 					patmaskptr = outchar;
@@ -209,7 +229,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				}
 				patmaskptr = &obj->buff[0];
 				*patmaskptr++ = fixed_len;
-				*patmaskptr = (uint4)(outchar - patmaskptr); /* unit is sizeof(uint4) */
+				*patmaskptr = (uint4)(outchar - patmaskptr); /* unit is SIZEOF(uint4) */
 				*outchar++ = count;
 				*outchar++ = total_min;
 				*outchar++ = total_max;
@@ -221,14 +241,23 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				for (seqcnt = 0; seqcnt < count; seqcnt++)
 					*outchar++ = size[seqcnt];
 				obj->len = (int4)(outchar - &obj->buff[0]);
-				instr->addr = (char *)inchar;
+				assert(!topseen || (inchar == in_top));
+				assert(inchar <= in_top);
+				instr->addr = (topseen ? (char *)inchar : (char *)inchar - 1);
 				return 0;
 			}
-			if (curchar != '.')
+			if (!topseen && (curchar != '.'))
 				upper_bound = lower_bound;
 			else
 			{
 				fixed_len = FALSE;
+				if (inchar >= in_top)
+				{
+					assert(inchar == in_top);
+					instr->addr = (char *)inchar + 1;
+					return ERR_PATCLASS;
+				}
+				assert(!topseen);
 				if (ctypetab[curchar = *inchar++] != TK_DIGIT)
 				{
 					if (lower_bound > 0)
@@ -249,9 +278,18 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					infinite = FALSE;
 					instr->addr = (char *)inchar;
 					upper_bound = curchar - '0';
-					while (ctypetab[curchar = *inchar++] == TK_DIGIT)
+					for ( ; ; )
 					{
-						if ((upper_bound = upper_bound * 10 + (curchar - '0')) > PAT_MAX_REPEAT)
+						if (inchar >= in_top)
+						{
+							assert(inchar == in_top);
+							topseen = TRUE;
+							break;
+						}
+						curchar = *inchar++;
+						if (TK_DIGIT != ctypetab[curchar])
+							break;
+						if (PAT_MAX_REPEAT < (upper_bound = (upper_bound * 10) + (curchar - '0')))
 							upper_bound = PAT_MAX_REPEAT;
 					}
 					if (upper_bound < lower_bound)
@@ -270,20 +308,32 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 		}
 		if (!altend)
 		{
-			if ('\"' == curchar)
+			if (!topseen && ('\"' == curchar))
 			{
 				pattern_mask = PATM_STRLIT;
 				strlit.bytelen= 0;
 				strlit.charlen= 0;
 				strlit.flags = 0;
-				alloclen = (sizeof(strlit.buff) / sizeof(strlit.buff[0]));
+				alloclen = (SIZEOF(strlit.buff) / SIZEOF(strlit.buff[0]));
 				buffptr = &strlit.buff[0];
 				for (;;)
 				{
+					if (inchar >= in_top)
+					{
+						assert(inchar == in_top);
+						instr->addr = (char *)inchar + 1;
+						return ERR_PATLIT;
+					}
 					curchar = *inchar;
 					if ('\"' == curchar)
 					{
-						if ((curchar = *++inchar) != '\"')
+						if (++inchar >= in_top)
+						{
+							assert(inchar == in_top);
+							topseen = TRUE;
+							break;
+						}
+						if ((curchar = *inchar) != '\"')
 						{
 							inchar++;
 							break;
@@ -296,7 +346,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					{
 						if (!UTF8_VALID(inchar, in_top, bytelen))
 						{
-							++inchar;
 							instr->addr = (char *)inchar;
 							return ERR_PATLIT;
 						}
@@ -314,6 +363,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					}
 					do
 					{
+						assert(inchar < in_top);
 						*buffptr++ = *inchar++;
 					} while (0 < --bytelen);
 					strlit.charlen++;
@@ -327,7 +377,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					fixed_len = prev_fixed_len;
 					split_atom = FALSE;
 				}
-			} else if ('(' == curchar)
+			} else if (!topseen && ('(' == curchar))
 			{	/* start of 'alternation' */
 				if (dfa)
 				{
@@ -340,6 +390,12 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						return ERR_PATMAXLEN;
 					}
 					dfa = FALSE;
+				}
+				if (inchar >= in_top)
+				{
+					assert(inchar == in_top);
+					instr->addr = (char *)inchar + 1;
+					return ERR_PATCODE;
 				}
 				pattern_mask = PATM_ALT;
 				cur_alt = &init_alt;
@@ -357,10 +413,11 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				altmax = cur_alt->altpat.buff[PAT_TOT_MAX_OFFSET(altlen)];
 				altcount = 1;
 				any_alt = TRUE;
+				assert(inchar < in_top);
 				curchar = *inchar++;
 				altactive = 1;
 				continue;
-			} else if (',' == curchar)
+			} else if (!topseen && (',' == curchar))
 			{	/* separator between alternate possibilities */
 				/* The malloc that is requested here will be freed below when the alternation is
 				 * added to the output data structure (just below the call to add_atom).
@@ -370,7 +427,13 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					instr->addr = (char *)inchar;
 					return ERR_PATCLASS;
 				}
-				cur_alt->next = (unsigned char *)malloc(sizeof(alternation));
+				if (inchar >= in_top)
+				{
+					assert(inchar == in_top);
+					instr->addr = (char *)inchar + 1;
+					return ERR_PATCODE;
+				}
+				cur_alt->next = (unsigned char *)malloc(SIZEOF(alternation));
 				cur_alt = (alternation *)cur_alt->next;
 				cur_alt->next = NULL;
 				done_free = FALSE;
@@ -389,9 +452,10 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (cur_alt->altpat.buff[PAT_TOT_MAX_OFFSET(altlen)] > altmax)
 					altmax = cur_alt->altpat.buff[PAT_TOT_MAX_OFFSET(altlen)];
 				altcount++;
+				assert(inchar < in_top);
 				curchar = *inchar++;
 				continue;
-			} else if (')' == curchar)
+			} else if (!topseen && (')' == curchar))
 			{	/* end of 'alternation' */
 				if (!altactive)
 				{
@@ -399,27 +463,47 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					return ERR_PATCLASS;
 				}
 				altactive = 0;
-				curchar = *inchar++;
+				if (inchar < in_top)
+					curchar = *inchar++;
+				else
+				{	/* We cannot do curchar = *inchar++ in this case since we are beyond the input bounds */
+					assert(inchar == in_top);
+					topseen = TRUE;
+					assert(!dfa);
+				}
 			} else
 			{
-				for (pattern_mask = 0; ; curchar = *inchar++)
+				if (topseen)
+				{
+					instr->addr = (char *)inchar + 1;
+					return ERR_PATCLASS;
+				}
+				pattern_mask = 0;
+				do
 				{
 					chidx = (curchar > 'Z') ? curchar - 'a' : curchar - 'A';
 					if ((0 <= chidx) && (chidx <= 'X' - 'A'))
-					{
 						pattern_mask |= mapbit[chidx];
-						continue;
-					} else if (('Y' - 'A' == chidx) || ('Z' - 'A' == chidx))
+					else if (('Y' - 'A' == chidx) || ('Z' - 'A' == chidx))
 					{	/* YxxxY and ZxxxZ codes not yet implemented */
 						instr->addr = (char *)inchar;
 						return ERR_PATCLASS;
+					} else
+					{
+						assert(TK_UPPER != ctypetab[curchar] && TK_LOWER != ctypetab[curchar]);
+						break;
 					}
-					assert(TK_UPPER != ctypetab[curchar] && TK_LOWER != ctypetab[curchar]);
-					break;
-				}
+					if (inchar >= in_top)
+					{
+						topseen = TRUE;
+						assert(inchar == in_top);
+						break;
+					}
+					curchar = *inchar++;
+				} while (TRUE);
 				if (0 == pattern_mask)
 				{
-					instr->addr = (char *)inchar;
+					instr->addr = topseen ? (char *)inchar + 1 : (char *)inchar;
 					return ERR_PATCLASS;
 				}
 			}
@@ -448,7 +532,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				sym_num = 0;
 				min_dfa = 0;
 				atom_map = count;
-				memset(expand.num_e, 0, sizeof(expand.num_e));
+				memset(expand.num_e, 0, SIZEOF(expand.num_e));
 			}
 			if (!dfa)
 			{
@@ -613,7 +697,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					curr_leaf_num = leaf_num;
 					if (pattern_mask & PATM_STRLIT)
 					{
-						memset(&exp_temp[0], 0, sizeof(exp_temp));
+						memset(&exp_temp[0], 0, SIZEOF(exp_temp));
 						min[atom_map] = lower_bound;
 						max[atom_map] = upper_bound;
 						size[atom_map] = strlit.bytelen;

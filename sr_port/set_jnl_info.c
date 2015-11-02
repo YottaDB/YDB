@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "min_max.h"		/* for JNL_MAX_RECLEN macro */
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -66,7 +67,7 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	jnl_info->jnl_state = csd->jnl_state;	/* Used in cre_jnl_file() */
 	assert(JNL_ALLOWED(jnl_info));
 	jnl_info->repl_state = csd->repl_state;
-	JNL_MAX_PHYS_LOGI_RECLEN(jnl_info, csd);
+	JNL_MAX_RECLEN(jnl_info, csd);
 	jnl_info->tn = csd->trans_hist.curr_tn;
 	jnl_info->alloc = csd->jnl_alq;
 	jnl_info->extend = csd->jnl_deq;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ void indir_lits(ihdtyp *ihead)
 	int4		long_temp;
 	mliteral	*lit;
 
-	hdr_pad_len = PADLEN(sizeof(ihdtyp), NATIVE_WSIZE);
+	hdr_pad_len = PADLEN(SIZEOF(ihdtyp), NATIVE_WSIZE);
 	if (hdr_pad_len) /* additional padding to ihdtyp so that the literal text pool begins at the aligned boundary */
 		emit_immed(PADCHARS, (uint4)hdr_pad_len);
 	size = indr_stringpool.free - indr_stringpool.base;
@@ -36,7 +36,7 @@ void indir_lits(ihdtyp *ihead)
 	lits_pad_len = PADLEN(size, NATIVE_WSIZE);	/* Length to pad to put instructions on even bdy */
 	if (lits_pad_len)
 		emit_immed(PADCHARS, (uint4)lits_pad_len);	/* Pad out with extraneous info */
-	size += (sizeof(ihdtyp) + hdr_pad_len + lits_pad_len);
+	size += (SIZEOF(ihdtyp) + hdr_pad_len + lits_pad_len);
 	ihead->fixup_vals_off = (int4)(ROUND_UP2(size, NATIVE_WSIZE));
 	ihead->fixup_vals_num = 0;
 	dqloop(&literal_chain, que, lit)
@@ -46,8 +46,8 @@ void indir_lits(ihdtyp *ihead)
 			ihead->fixup_vals_num++;
 			lit->rt_addr = (INTPTR_T)stringpool.free;
 			lit->v.str.addr =  (char *)((lit->v.str.addr - (char *)indr_stringpool.base) +
-						sizeof(ihdtyp) + hdr_pad_len);
-			emit_immed((char *)&lit->v, sizeof(mval));
+						SIZEOF(ihdtyp) + hdr_pad_len);
+			emit_immed((char *)&lit->v, SIZEOF(mval));
 		}
 	}
 }

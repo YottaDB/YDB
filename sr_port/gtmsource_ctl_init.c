@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,7 @@ repl_buff_t *repl_buff_create(uint4 buffsize)
 	int		index;
 	unsigned char	*buff_ptr;
 
-	tmp_rb = (repl_buff_t *)malloc(sizeof(repl_buff_t));
+	tmp_rb = (repl_buff_t *)malloc(SIZEOF(repl_buff_t));
 	tmp_rb->buffindex = REPL_MAINBUFF;
 	for (index = REPL_MAINBUFF; REPL_NUMBUFF > index; index++)
 	{
@@ -95,7 +95,7 @@ repl_buff_t *repl_buff_create(uint4 buffsize)
 		tmp_rb->buff[index].base = (unsigned char *)ROUND_UP2((uintszofptr_t)buff_ptr, DISK_BLOCK_SIZE);
 		tmp_rb->buff[index].recbuff = tmp_rb->buff[index].base;
 	}
-	tmp_rb->fc = (repl_file_control_t *)malloc(sizeof(repl_file_control_t));
+	tmp_rb->fc = (repl_file_control_t *)malloc(SIZEOF(repl_file_control_t));
 	return (tmp_rb);
 }
 
@@ -124,13 +124,12 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 	)
 	uint4			jnl_status;
 
-	error_def(ERR_JNLBADLABEL);
 	error_def(ERR_JNLFILOPN);
 
 	status = SS_NORMAL;
 	jnl_status = 0;
 
-	tmp_ctl = (repl_ctl_element *)malloc(sizeof(repl_ctl_element));
+	tmp_ctl = (repl_ctl_element *)malloc(SIZEOF(repl_ctl_element));
 	tmp_ctl->reg = reg;
 	csa = &FILE_INFO(reg)->s_addrs;
 
@@ -193,7 +192,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 		stat_buf      = cc$rms_nam;
 		fab.fab$l_nam = &stat_buf;
 		fab.fab$l_dna = JNL_EXT_DEF;
-		fab.fab$b_dns = sizeof(JNL_EXT_DEF) - 1;
+		fab.fab$b_dns = SIZEOF(JNL_EXT_DEF) - 1;
 		status = sys$open(&fab);
 		if (RMS$_NORMAL == status)
 		{
@@ -205,16 +204,14 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 #		endif
 		REPL_DPRINT2("CTL INIT :  Direct open of file %s\n", tmp_ctl->jnl_fn);
 	}
-
 	if (status == SS_NORMAL)
 	{
-		tmp_jfh_base = (jnl_file_header *)malloc(sizeof(jnl_file_header) + DISK_BLOCK_SIZE);
+		tmp_jfh_base = (jnl_file_header *)malloc(SIZEOF(jnl_file_header) + DISK_BLOCK_SIZE);
 		tmp_jfh = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)tmp_jfh_base, DISK_BLOCK_SIZE));
-		F_READ_BLK_ALIGNED(tmp_fd, 0, tmp_jfh, ROUND_UP2(sizeof(jnl_file_header), DISK_BLOCK_SIZE), status);
-		if (SS_NORMAL == status && 0 != memcmp(tmp_jfh->label, JNL_LABEL_TEXT, STR_LIT_LEN(JNL_LABEL_TEXT)))
-			status = (int4)ERR_JNLBADLABEL;
+		F_READ_BLK_ALIGNED(tmp_fd, 0, tmp_jfh, ROUND_UP2(SIZEOF(jnl_file_header), DISK_BLOCK_SIZE), status);
+		if (SS_NORMAL == status)
+			CHECK_JNL_FILE_IS_USABLE(tmp_jfh, status, FALSE, 0, NULL); /* FALSE => NO gtm_putmsg even if errors */
 	}
-
 	if (SS_NORMAL != status)
 	{
 		free(tmp_ctl);
@@ -225,7 +222,6 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 		tmp_jfh_base = NULL;
 		rts_error(VARLSTCNT(7) ERR_JNLFILOPN, 4, jnl_fn_len, jnl_fn, DB_LEN_STR(reg), status);
 	}
-
 	tmp_ctl->repl_buff = repl_buff_create(tmp_jfh->alignsize);
 	tmp_ctl->repl_buff->backctl = tmp_ctl;
 
@@ -282,8 +278,8 @@ int gtmsource_ctl_init(void)
 	unsigned char		jnl_file_name[JNL_NAME_SIZE];
 
 
-	repl_ctl_list = (repl_ctl_element *)malloc(sizeof(repl_ctl_element));
-	memset((char_ptr_t)repl_ctl_list, 0, sizeof(*repl_ctl_list));
+	repl_ctl_list = (repl_ctl_element *)malloc(SIZEOF(repl_ctl_element));
+	memset((char_ptr_t)repl_ctl_list, 0, SIZEOF(*repl_ctl_list));
 	prev_ctl = repl_ctl_list;
 
 	region_top = gd_header->regions + gd_header->n_regions;

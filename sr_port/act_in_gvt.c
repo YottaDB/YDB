@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,10 @@
 #include "gdsblk.h"
 #include "collseq.h"
 #include "spec_type.h"
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"
+#include "gv_trigger.h"
+#endif
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_altkey;
@@ -29,6 +33,11 @@ void act_in_gvt(void)
 	error_def(ERR_COLLTYPVERSION);
 	error_def(ERR_GVIS);
 
+#	ifdef GTM_TRIGGER
+	if ((HASHT_GBLNAME_LEN == gv_target->gvname.var_name.len) &&
+			(0 == MEMCMP_LIT(gv_target->gvname.var_name.addr, HASHT_GBLNAME)))
+		return;		/* No collation for triggers */
+#	endif
 	if (csp = ready_collseq((int)(gv_target->act)))
 	{
 		if (!do_verify(csp, gv_target->act, gv_target->ver))

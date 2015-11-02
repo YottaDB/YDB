@@ -20,6 +20,7 @@
 #include <curses.h>		/* must be before term.h */
 #include "gtm_term.h"
 #include "getcaps.h"
+#include "gtm_sizeof.h"
 #ifdef DEBUG
 #include <assert.h>
 #endif
@@ -93,7 +94,7 @@ static	char	gtm_cap_ascii[16 * 16];	/* ESC_LEN from io.h times number of tigetst
 #define CAP2ASCII(CAP)							\
 {									\
 	ebc_len = strlen(CAP) + 1;					\
-	assert(sizeof(gtm_cap_ascii) > (gtm_cap_index + ebc_len));	\
+	assert(SIZEOF(gtm_cap_ascii) > (gtm_cap_index + ebc_len));	\
 	ebc_to_asc((unsigned char *)&gtm_cap_ascii[gtm_cap_index], (unsigned char *)CAP, ebc_len);	\
 	CAP = &gtm_cap_ascii[gtm_cap_index];				\
 	gtm_cap_index += ebc_len;					\
@@ -130,8 +131,8 @@ int	getcaps(int fildes)
 
 #if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
 	ebc_len = strlen(cap);
-	if (sizeof(cap_ebcdic) < ebc_len)
-		ebc_len = sizeof(cap_ebcdic) - 1;
+	if (SIZEOF(cap_ebcdic) < ebc_len)
+		ebc_len = SIZEOF(cap_ebcdic) - 1;
 	asc_to_ebc((unsigned char *)cap_ebcdic, (unsigned char *)cap, ebc_len);
 	cap_ebcdic[ebc_len] = '\0';
 	cap = cap_ebcdic;

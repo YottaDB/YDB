@@ -100,9 +100,9 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 			dsocketptr->dollar_key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
 		}
 	}
-	len = sizeof(ONE_COMMA) - 1;
+	len = SIZEOF(ONE_COMMA) - 1;
 	memcpy(dsocketptr->dollar_device, ONE_COMMA, len);
-	memcpy(&dsocketptr->dollar_device[len], BADCHAR_DEVICE_MSG, sizeof(BADCHAR_DEVICE_MSG));
+	memcpy(&dsocketptr->dollar_device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
 }
 #endif
 
@@ -112,7 +112,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					/* timeout in seconds */
 {
 	int		ret;
-	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done, zint_restart, outofband_terminate;
+	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done;
+	boolean_t	zint_restart, outofband_terminate, one_read_done;
 	int		flags, len, real_errno, save_errno, fcntl_res, errlen, charlen, stp_need;
 	int		bytes_read, orig_bytes_read, ii, max_bufflen, bufflen, chars_read, mb_len, match_delim;
 	io_desc		*iod;
@@ -163,6 +164,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	sockintr = &dsocketptr->sock_save_state;
 	outofband_terminate = FALSE;
+	one_read_done = FALSE;
 
 	/* Check if new or resumed read */
 	if (!dsocketptr->mupintr)
@@ -205,17 +207,17 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 									  end_time.at_usec); DEBUGSOCKFLUSH);
 			SOCKET_DEBUG2(PRINTF("socrfl: .. buffer address: 0x%08lx  stringpool: 0x%08lx\n",
 					    buffer_start, stringpool.free); DEBUGSOCKFLUSH);
-			if (stringpool.free != (buffer_start + bytes_read))
+			if (stringpool.free != (buffer_start + bytes_read)) /* BYPASSOK */
 			{
 				/* End of stringpool not open for expansion, must move what we got. First
 				   see if we need to expand stringpool.
 				*/
 				SOCKET_DEBUG2(PRINTF("socrfl: .. Stuff put on string pool after our buffer\n"); DEBUGSOCKFLUSH);
-				if ((stringpool.free + max_bufflen) > stringpool.top)
+				if (!IS_STP_SPACE_AVAILABLE(max_bufflen))
 				{
 					v->str.addr = (char *)buffer_start;	/* Protect buffer from reclaim */
 					v->str.len = bytes_read;
-					stp_gcol(max_bufflen);
+					INVOKE_STP_GCOL(max_bufflen);
 					buffer_start = (unsigned char *)v->str.addr;
 					SOCKET_DEBUG2(PRINTF("socrfl: .. garbage collection done\n"); DEBUGSOCKFLUSH);
 				}
@@ -226,11 +228,11 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				*/
 				SOCKET_DEBUG2(PRINTF("socrfl: .. Our buffer did not move in the stringpool\n"); DEBUGSOCKFLUSH);
 				stp_need = max_bufflen - bytes_read;
-				if ((stringpool.free + stp_need) > stringpool.top)
+				if (!IS_STP_SPACE_AVAILABLE(stp_need))
 				{
 					v->str.addr = (char *)buffer_start;     /* Protect buffer from reclaim */
 					v->str.len = bytes_read;		/* stringpool.free already covers these bytes */
-					stp_gcol(stp_need);
+					INVOKE_STP_GCOL(stp_need);
 					SOCKET_DEBUG2(PRINTF("socrfl: .. garbage collection done in no movement case\n");
 						     DEBUGSOCKFLUSH);
 				}
@@ -269,7 +271,15 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	ret = TRUE;
 	has_delimiter = (0 < socketptr->n_delimiter);
 	time_for_read.at_sec  = 0;
-	time_for_read.at_usec = ((0 == timeout) ? 0 : (socketptr->moreread_timeout * 1000));
+	if (0 == timeout)
+		time_for_read.at_usec = 0;
+	else if (socketptr->def_moreread_timeout)
+		time_for_read.at_usec = socketptr->moreread_timeout * 1000;
+	else
+		time_for_read.at_usec = INITIAL_MOREREAD_TIMEOUT * 1000;
+	SOCKET_DEBUG(PRINTF("socrfl: moreread_timeout = %d def_moreread_timeout= %d time = %d \n",
+			    socketptr->moreread_timeout,socketptr->def_moreread_timeout,time_for_read.at_usec); DEBUGSOCKFLUSH);
+
 	timer_id = (TID)iosocket_readfl;
 	out_of_time = FALSE;
 	if (NO_M_TIMEOUT == timeout)
@@ -338,8 +348,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	if (!zint_restart)
 	{
 		max_bufflen = (vari) ? MAX_STRBUFF_INIT : ((MAX_STRLEN > (width * 4)) ? (width * 4) : MAX_STRLEN);
-		if (stringpool.free + max_bufflen > stringpool.top)
-			stp_gcol(max_bufflen);
+		ENSURE_STP_FREE_SPACE(max_bufflen);
 		bytes_read = 0;
 		chars_read = 0;
 	}
@@ -362,13 +371,13 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			max_bufflen += max_bufflen;
 			if (MAX_STRLEN < max_bufflen)
 				max_bufflen = MAX_STRLEN;
-			if (stringpool.free + bytes_read + max_bufflen > stringpool.top)
+			if (!IS_STP_SPACE_AVAILABLE(bytes_read + max_bufflen))
 			{
 				v->str.len = bytes_read; /* to keep the data read so far from being garbage collected */
 				v->str.addr = (char *)stringpool.free;
 				stringpool.free += v->str.len;
 				assert(stringpool.free <= stringpool.top);
-				stp_gcol(max_bufflen);
+				INVOKE_STP_GCOL(max_bufflen);
 				memcpy(stringpool.free, v->str.addr, v->str.len);
 				v->str.len = 0; /* If interrupted, don't hold onto old space */
 			}
@@ -416,14 +425,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						max_bufflen += max_bufflen;
 						if (MAX_STRLEN < max_bufflen)
 							max_bufflen = MAX_STRLEN;
-						if (stringpool.free + bytes_read + max_bufflen > stringpool.top)
+						if (!IS_STP_SPACE_AVAILABLE(bytes_read + max_bufflen))
 						{
 							v->str.len = bytes_read; /* to keep the data read so far from
 										    being garbage collected */
 							v->str.addr = (char *)stringpool.free;
 							stringpool.free += bytes_read;
 							assert(stringpool.free <= stringpool.top);
-							stp_gcol(max_bufflen);
+							INVOKE_STP_GCOL(max_bufflen);
 							memcpy(stringpool.free, v->str.addr, v->str.len);
 							v->str.len = 0; /* If interrupted, don't hold onto old space */
 						}
@@ -467,6 +476,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			status = 0;			/* Consistent treatment of no more data */
 		} else if (0 < status)
 		{
+			if (timeout && !socketptr->def_moreread_timeout && !one_read_done)
+			{
+				one_read_done = TRUE;
+				SOCKET_DEBUG(PRINTF("socrfl: before moreread_timeout = %d timeout = %d \n",
+						    socketptr->moreread_timeout,time_for_read.at_usec); DEBUGSOCKFLUSH);
+				time_for_read.at_usec = DEFAULT_MOREREAD_TIMEOUT * 1000;
+				SOCKET_DEBUG(PRINTF("socrfl: after timeout = %d \n",time_for_read.at_usec); DEBUGSOCKFLUSH);
+			}
 			SOCKET_DEBUG2(PRINTF("socrfl: Bytes read: %d\n", status); DEBUGSOCKFLUSH);
 			bytes_read += (int)status;
 			UNIX_ONLY(if (iod == io_std_device.out)
@@ -807,14 +824,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	{	/* no real problems */
 		iod->dollar.zeof = FALSE;
 		iod->dollar.za = 0;
-		memcpy(dsocketptr->dollar_device, "0", sizeof("0"));
+		memcpy(dsocketptr->dollar_device, "0", SIZEOF("0"));
 	} else
 	{	/* there's a significant problem */
 		SOCKET_DEBUG(PRINTF("socrfl: Error handling triggered - status: %d\n", status); DEBUGSOCKFLUSH);
 		if (0 == chars_read)
 			iod->dollar.x = 0;
 		iod->dollar.za = 9;
-		len = sizeof(ONE_COMMA) - 1;
+		len = SIZEOF(ONE_COMMA) - 1;
 		memcpy(dsocketptr->dollar_device, ONE_COMMA, len);
 		errptr = (char *)STRERROR(real_errno);
 		errlen = STRLEN(errptr);

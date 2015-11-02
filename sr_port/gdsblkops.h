@@ -32,17 +32,17 @@ typedef struct
 /* ***************************************************************************
  * The following is the splitup of the calculation of maximum-update-array-size for one non-TP action (for a PUT)
  *
- * BLK_INIT, BLK_FINI space ---> CDB_CW_SET_SIZE * (BLK_SEG_ARRAY_SIZE * sizeof(blk_segment))
+ * BLK_INIT, BLK_FINI space ---> CDB_CW_SET_SIZE * (BLK_SEG_ARRAY_SIZE * SIZEOF(blk_segment))
  * BLK_ADDR leaf-level space---> 2 * cs_data->blk_size         (for current and new sibling)
- * BLK_ADDR index-level space--> (MAX_BT_DEPTH - 1) * (2 * (MAX_KEY_SZ + sizeof(rec_hdr) + sizeof(block_id)) + sizeof(rec_hdr))
+ * BLK_ADDR index-level space--> (MAX_BT_DEPTH - 1) * (2 * (MAX_KEY_SZ + SIZEOF(rec_hdr) + SIZEOF(block_id)) + SIZEOF(rec_hdr))
  * 2 extra space            ---> cs_data->blk_size + BSTAR_REC_SIZE		(needed in case of global-variable creation)
- * Bitmap BLK_ADDR space    ---> (MAX_BT_DEPTH + 1) * (sizeof(block_id) * (BLKS_PER_LMAP + 1))
+ * Bitmap BLK_ADDR space    ---> (MAX_BT_DEPTH + 1) * (SIZEOF(block_id) * (BLKS_PER_LMAP + 1))
  *
  */
 
 #define	UPDATE_ELEMENT_ALIGN_SIZE	8
 #define	UPDATE_ARRAY_ALIGN_SIZE		(1 << 14)		/* round up the update array to a 16K boundary */
-#define	MAX_BITMAP_UPDATE_ARRAY_SIZE	((MAX_BT_DEPTH + 1) * ROUND_UP2(sizeof(block_id) * (BLKS_PER_LMAP + 1), 		\
+#define	MAX_BITMAP_UPDATE_ARRAY_SIZE	((MAX_BT_DEPTH + 1) * ROUND_UP2(SIZEOF(block_id) * (BLKS_PER_LMAP + 1), 		\
 												UPDATE_ELEMENT_ALIGN_SIZE))
 #define MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd)											\
 		(CDB_CW_SET_SIZE * ROUND_UP2(BLK_SEG_ARRAY_SIZE * SIZEOF(blk_segment), UPDATE_ELEMENT_ALIGN_SIZE)		\
@@ -71,8 +71,8 @@ typedef struct
 		 * this is because tp_clean_up() (invoked in case of error handling) relies on the integrity of this 		\
 		 * update array linked list in order to do its cleanup.								\
 		 * Not following the above rules will cause difficult-to-debug memory related problems (even corruption) */	\
-		tmpua = (ua_list *)malloc(sizeof(ua_list));									\
-		memset(tmpua, 0, sizeof(ua_list));	/* initialize tmpua->update_array and tmpua->next_ua to NULL */		\
+		tmpua = (ua_list *)malloc(SIZEOF(ua_list));									\
+		memset(tmpua, 0, SIZEOF(ua_list));	/* initialize tmpua->update_array and tmpua->next_ua to NULL */		\
 		/* it is important that all parameters in the MIN-MAX calculation below be unsigned numbers */			\
 		tmpua->update_array_size = MIN(MAX(cumul_update_array_size, (space_needed)), BIG_UA);				\
 		tmpua->update_array = (char *)malloc(tmpua->update_array_size);							\
@@ -127,10 +127,10 @@ GBLREF	unsigned char		cw_set_depth;
 													\
 	update_array_ptr = (char*)ROUND_UP2((INTPTR_T)update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE);	\
 	(ARRAY) = (blk_segment*)update_array_ptr;							\
-	update_array_ptr += (BLK_SEG_ARRAY_SIZE * sizeof(blk_segment));					\
+	update_array_ptr += (BLK_SEG_ARRAY_SIZE * SIZEOF(blk_segment));					\
 	assert((update_array + update_array_size) - update_array_ptr >= 0);				\
 	(BNUM) = (ARRAY + 1);										\
-	blk_seg_cnt = sizeof(blk_hdr);									\
+	blk_seg_cnt = SIZEOF(blk_hdr);									\
 }
 
 /* ***************************************************************************
@@ -181,7 +181,7 @@ GBLREF	unsigned char		cw_set_depth;
 #define BLK_FINI(BNUM,ARRAY) 								\
 (											\
 	(BNUM--)->addr = (uchar_ptr_t)0,						\
-	(blk_seg_cnt <= blk_size  &&  blk_seg_cnt >= sizeof(blk_hdr))			\
+	(blk_seg_cnt <= blk_size  &&  blk_seg_cnt >= SIZEOF(blk_hdr))			\
 		? (ARRAY)[0].addr = (uchar_ptr_t)(BNUM), (ARRAY)[0].len = blk_seg_cnt	\
 		: 0									\
 )

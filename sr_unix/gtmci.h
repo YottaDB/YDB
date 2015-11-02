@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,11 @@
 #include "mdef.h"
 
 #define GTM_CIMOD       "GTM$CI" /* base call-in frame at level 1 */
+/* Allow this many nested callin levels before generating an error.  Previously, the code
+ * allowed a number of condition handlers per call-in invocation, but when we implemented
+ * triggers they count as an invocation and caused varying behavior that made testing the limit
+ * problematic, so we picked an arbitrary limit (10) that seems generous. */
+#define CALLIN_MAX_LEVEL	10
 
 #define SET_CI_ENV(g)								\
 {										\

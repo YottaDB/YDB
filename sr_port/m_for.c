@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,8 +112,8 @@ int m_for(void)
 	    index_variable.oprval.tref->opcode == OC_INDLVADR)
 		for_temps[for_stack_ptr - for_stack] = TRUE;
 
-	body = (oprtype *)mcalloc(sizeof(oprtype));
-	skip_forchk = (oprtype *)mcalloc(sizeof(oprtype));
+	body = (oprtype *)mcalloc(SIZEOF(oprtype));
+	skip_forchk = (oprtype *)mcalloc(SIZEOF(oprtype));
 	body_indr = put_indr(body);
 	jump_target.oprclass = iter_temp.oprclass
 			     = term_temp.oprclass

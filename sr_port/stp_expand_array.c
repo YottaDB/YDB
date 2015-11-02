@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +26,8 @@ void stp_expand_array(void)
 	n = stp_array_size;
 	stp_array_size += STP_MAXITEMS;
 	a = stp_array;
-	stp_array = (mstr **) malloc(stp_array_size * sizeof(mstr *));
-	longcpy((uchar_ptr_t)stp_array, (uchar_ptr_t)a, n * sizeof(mstr *));
+	stp_array = (mstr **) malloc(stp_array_size * SIZEOF(mstr *));
+	longcpy((uchar_ptr_t)stp_array, (uchar_ptr_t)a, n * SIZEOF(mstr *));
 	free(a);
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,9 +77,9 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 			acc_meth = reg->dyn.addr->acc_meth;
 			if ((dba_cm == acc_meth) || (dba_usr == acc_meth))
 			{
-				targ = malloc(sizeof(gv_namehead) + gvent.var_name.len);
-				memset(targ, 0, sizeof(gv_namehead) + gvent.var_name.len);
-				targ->gvname.var_name.addr = (char *)targ + sizeof(gv_namehead);
+				targ = malloc(SIZEOF(gv_namehead) + gvent.var_name.len);
+				memset(targ, 0, SIZEOF(gv_namehead) + gvent.var_name.len);
+				targ->gvname.var_name.addr = (char *)targ + SIZEOF(gv_namehead);
 				targ->nct = 0;
 				targ->collseq = NULL;
 				targ->regcnt = 1;
@@ -88,7 +88,7 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 				targ->gvname.hash_code = gvent.hash_code;
 			} else
 				targ = (gv_namehead *)targ_alloc(reg->max_key_size, &gvent, reg);
-			gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
+			gvnh_reg = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));
 			gvnh_reg->gvt = targ;
 			gvnh_reg->gd_reg = reg;
 			if (NULL != tabent)

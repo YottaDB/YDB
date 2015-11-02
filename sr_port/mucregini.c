@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -162,11 +162,11 @@ void mucregini(int4 blk_init_size)
 	if (cs_data->jnl_file_len)
 	{
 		tmpjnlfile.addr = (char *)cs_data->jnl_file_name;
-		tmpjnlfile.len = sizeof(cs_data->jnl_file_name);
+		tmpjnlfile.len = SIZEOF(cs_data->jnl_file_name);
 		jnlfile.addr = (char *)gv_cur_region->jnl_file_name;
 		jnlfile.len = gv_cur_region->jnl_file_len;
 		jnldef.addr = JNL_EXT_DEF;
-		jnldef.len = sizeof(JNL_EXT_DEF) - 1;
+		jnldef.len = SIZEOF(JNL_EXT_DEF) - 1;
 		if (FILE_STAT_ERROR == gtm_file_stat(&jnlfile, &jnldef, &tmpjnlfile, TRUE, &ustatus))
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, JNL_LEN_STR(gv_cur_region), ustatus);
@@ -178,6 +178,7 @@ void mucregini(int4 blk_init_size)
 	cs_data->avg_blks_per_100gbl =  AVG_BLKS_PER_100_GBL;
 	cs_data->pre_read_trigger_factor = PRE_READ_TRIGGER_FACTOR;
 	cs_data->writer_trigger_factor = UPD_WRITER_TRIGGER_FACTOR;
+	cs_data->db_trigger_cycle = 0;
 	cs_addrs->hdr = cs_data;
 	cs_addrs->ti = &cs_data->trans_hist;
 	th = cs_addrs->ti;
@@ -205,7 +206,7 @@ void mucregini(int4 blk_init_size)
 	cs_data->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
 	cs_data->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	time(&ctime);
-	assert(sizeof(ctime) >= sizeof(int4));
+	assert(SIZEOF(ctime) >= SIZEOF(int4));
 	cs_data->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */
 	cs_addrs->bmm = MM_ADDR(cs_data);
 	bmm_init();

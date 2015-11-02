@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *tnd, struct sockaddr_in *inp)
 			inp->sin_addr.s_addr = INADDR_ANY;
 			ip_len = -1;
 		}
-		if (tnd_len - ip_len > sizeof(port_str))
+		if (tnd_len - ip_len > SIZEOF(port_str))
 			return CMI_BADIPADDRPORT;
 		memcpy(port_str, tnd_str + ip_len + 1, tnd_len - ip_len - 1);
 		port_str[tnd_len - ip_len - 1] = '\0';

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,26 +16,34 @@
 #include "urx.h"
 
 /* Routine to run the unresolved chain in search of entries that point into the linkage section that
-   is about to be released. The boundaries of that section are passed as the parms. Located entries are
-   removed from the unresolved chain.
+   is about to be released (for USHBIN type platforms) or for unresolves that point into the code
+   section for non-USHBIN platforms (currently only used by triggers on non-USHBIN platforms). The
+   The boundaries of the pertinent section is computed appropriately from the passed in routine header.
+   Located entries are removed from the unresolved chains (routine and label chains).
 */
 
 GBLREF urx_rtnref	urx_anchor;
 
 #define IS_IN_RANGE(start, end, item) ((char *)(item) >= (char *)(start) && (char *)(item) < (char *)(end))
 
-#ifdef USHBIN_SUPPORTED
-void urx_remove(lnk_tabent *lnktab, int4 tablen)
+void urx_remove(rhdtyp *rtnhdr)
 {
 	urx_rtnref	*rtn, *rtnprev;
 	urx_labref	*lab, *labprev;
 	urx_addr	*addr, *addrprev, *savaddr;
-	unsigned char	*regstart, *regend;
+	char		*regstart, *regend;
 	int		deletes;
 
 	DEBUG_ONLY(deletes = 0);
-	regstart = (unsigned char *)lnktab;
-	regend = regstart + (sizeof(lnk_tabent) * tablen);
+#ifdef USHBIN_SUPPORTED
+	/* All unresolved addresses will point into the linkage section */
+	regstart = (char *)rtnhdr->linkage_adr;
+	regend = regstart + (SIZEOF(lnk_tabent) * rtnhdr->linkage_len);
+#else
+	/* All unresolved addresses will point into the code section */
+	regstart = PTEXT_ADR(rtnhdr);
+	regend = PTEXT_END_ADR(rtnhdr);
+#endif
 	rtnprev = &urx_anchor;
 	rtn = rtnprev->next;
 	while (rtn)
@@ -117,8 +125,7 @@ void urx_remove(lnk_tabent *lnktab, int4 tablen)
 		rtnprev = rtn;
 		rtn = rtn->next;
 	}
-#ifdef DEBUG_SHBIN
+#ifdef DEBUG_URX
 	PRINTF("urx_remove: Deleted %d entries\n", deletes);
 #endif
 }
-#endif

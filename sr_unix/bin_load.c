@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,8 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include "rtnhdr.h"
+#include "gv_trigger.h"
 
 GBLREF bool		mupip_DB_full;
 GBLREF bool		mu_ctrly_occurred;
@@ -68,6 +70,11 @@ GBLREF bool             transform;
 	{						\
 		GC_GTM_PUTMSG(crypt_status, NULL);	\
 		mupip_error_occurred = TRUE;		\
+		if (NULL != tmp_gvkey)			\
+		{					\
+			free(tmp_gvkey);		\
+			tmp_gvkey = NULL;		\
+		}					\
 		return;					\
 	}						\
 }
@@ -99,7 +106,7 @@ void bin_load(uint4 begin, uint4 end)
 	mstr		mstr_src, mstr_dest;
 	collseq		*extr_collseq, *db_collseq, *save_gv_target_collseq;
 	coll_hdr	extr_collhdr, db_collhdr;
-	gv_key 		*tmp_gvkey;
+	gv_key 		*tmp_gvkey = NULL;	/* null-initialize at start, will be malloced later */
 	char		std_null_coll[BIN_HEADER_NUMSZ + 1];
 #	ifdef GTM_CRYPT
 	gtmcrypt_key_t			*encr_key_handles;
@@ -120,8 +127,7 @@ void bin_load(uint4 begin, uint4 end)
 	error_def(ERR_OLDBINEXTRACT);
 	error_def(ERR_LOADINVCHSET);
 
-	tmp_gvkey = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ - 1);
-	assert(4 == sizeof(coll_hdr));
+	assert(4 == SIZEOF(coll_hdr));
 	gvinit();
 	v.mvtype = MV_STR;
 	len = mu_bin_get((char **)&ptr);
@@ -132,9 +138,9 @@ void bin_load(uint4 begin, uint4 end)
 		mupip_exit(ERR_LDBINFMT);
 	}
 	/* assert the assumption that the level can be represented in a single character */
-	assert(' ' == *(ptr + sizeof(BIN_HEADER_LABEL) - 3));
+	assert(' ' == *(ptr + SIZEOF(BIN_HEADER_LABEL) - 3));
 
-	if (0 != memcmp(ptr, BIN_HEADER_LABEL, sizeof(BIN_HEADER_LABEL) - 2) || hdr_lvl < '2' || *(BIN_HEADER_VERSION) < hdr_lvl)
+	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || hdr_lvl < '2' || *(BIN_HEADER_VERSION) < hdr_lvl)
 	{				/* ignore the level check */
 		rts_error(VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
@@ -186,7 +192,7 @@ void bin_load(uint4 begin, uint4 end)
 		/* store hashes of all the files used during extract into muext_hash_hdr structure */
 		memcpy((char *)hash_array, ptr, len);
 		num_indexes = len / GTMCRYPT_HASH_LEN;
-		encr_key_handles = (gtmcrypt_key_t *) malloc (sizeof(gtmcrypt_key_t) * num_indexes);
+		encr_key_handles = (gtmcrypt_key_t *) malloc (SIZEOF(gtmcrypt_key_t) * num_indexes);
 		INIT_PROC_ENCRYPTION(crypt_status);
 		GC_BIN_LOAD_ERR(crypt_status);
 		for (index = 0; index < num_indexes; index++)
@@ -201,7 +207,7 @@ void bin_load(uint4 begin, uint4 end)
 	if (hdr_lvl  > '2')
 	{
 		len = mu_bin_get((char **)&ptr);
-		if (sizeof(coll_hdr) != len)
+		if (SIZEOF(coll_hdr) != len)
 		{
 			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupt collation header"), ERR_LDBINFMT);
 			mupip_exit(ERR_LDBINFMT);
@@ -220,7 +226,7 @@ void bin_load(uint4 begin, uint4 end)
 			util_out_print("Error reading record number: !UL\n", TRUE, iter);
 			mupip_error_occurred = TRUE;
 			return;
-		} else if (len == sizeof(coll_hdr))
+		} else if (len == SIZEOF(coll_hdr))
 		{
 			extr_collhdr = *((coll_hdr *)(ptr));
 			assert(hdr_lvl > '2');
@@ -235,7 +241,8 @@ void bin_load(uint4 begin, uint4 end)
 	rec_count = begin - 1;
 	extr_collseq = db_collseq = NULL;
 	need_xlation = FALSE;
-
+	assert(NULL == tmp_gvkey);	/* GVKEY_INIT macro relies on this */
+	GVKEY_INIT(tmp_gvkey, DBKEYSIZE(MAX_KEY_SZ));	/* tmp_gvkey will point to malloced memory after this */
 	for (; !mupip_DB_full ;)
 	{
 		if (++rec_count > end)
@@ -257,7 +264,7 @@ void bin_load(uint4 begin, uint4 end)
 		stringpool.free = stringpool.base;
 		if (!(len = mu_bin_get((char **)&ptr)) || mupip_error_occurred)
 			break;
-		else if (len == sizeof(coll_hdr))
+		else if (len == SIZEOF(coll_hdr))
 		{
 			extr_collhdr = *((coll_hdr *)(ptr));
 			assert(hdr_lvl > '2');
@@ -269,32 +276,29 @@ void bin_load(uint4 begin, uint4 end)
 		rp = (rec_hdr*)(ptr);
 #		ifdef GTM_CRYPT
 		if ('5' <= hdr_lvl)
-		{
-			/* Getting index value from the extracted file. It indicates which database file this record belongs */
+		{	/* Getting index value from the extracted file. It indicates which database file this record belongs to */
 			GET_LONG(index, ptr);
-
 			if (-1 != index) /* Indicates that the record is encrypted. */
 			{
 				req_dec_blk_size = len - SIZEOF(int4);
-				inbuf = (char *)(ptr + sizeof(int4));
-				GTMCRYPT_DECODE_FAST(encr_key_handles[index],
-						     inbuf,
-						     req_dec_blk_size,
-					       	     NULL,
-						     crypt_status);
+				inbuf = (char *)(ptr + SIZEOF(int4));
+				GTMCRYPT_DECODE_FAST(encr_key_handles[index], inbuf, req_dec_blk_size, NULL, crypt_status);
 				GC_BIN_LOAD_ERR(crypt_status);
 			}
-			rp = (rec_hdr*)(ptr + sizeof(int4));
+			rp = (rec_hdr*)(ptr + SIZEOF(int4));
 		}
 #		endif
 		btop = ptr + len;
 		cp1 = (unsigned char*)(rp + 1);
 		v.str.addr = (char*)cp1;
-		while (*cp1++) ;
+		while (*cp1++)
+			;
 		v.str.len =INTCAST((char*)cp1 - v.str.addr - 1);
 		if (hdr_lvl <= '2' || new_gvn)
 		{
-			bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&v.str);
+			if ((HASHT_GBLNAME_LEN == v.str.len) &&	(0 == memcmp(v.str.addr, HASHT_GBLNAME, HASHT_GBLNAME_LEN)))
+				continue;
+ 			bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&v.str);
 			max_key = gv_cur_region->max_key_size;
 			db_collhdr.act = gv_target->act;
 			db_collhdr.ver = gv_target->ver;
@@ -352,7 +356,6 @@ void bin_load(uint4 begin, uint4 end)
 			} else
 				need_xlation = FALSE;
 		}
-
 		new_gvn = FALSE;
 		for (; rp < (rec_hdr*)btop; rp = (rec_hdr*)((unsigned char *)rp + rec_len))
 		{
@@ -404,10 +407,11 @@ void bin_load(uint4 begin, uint4 end)
 							 * so get a copy of the original key from the extract */
 				memcpy(dup_key_str, gv_currkey->base, gv_currkey->end + 1);
 				gvkey_char_ptr = dup_key_str;
-				while (*gvkey_char_ptr++) ;
+				while (*gvkey_char_ptr++)
+					;
 				gv_currkey->prev = 0;
 				gv_currkey->end = gvkey_char_ptr - dup_key_str;
-				tmp_gvkey->top = gv_keysize;
+				assert(gv_keysize <= tmp_gvkey->top);
 				while (*gvkey_char_ptr)
 				{
 						/* get next subscript (in GT.M internal subsc format) */

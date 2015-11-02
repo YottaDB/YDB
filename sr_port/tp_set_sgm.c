@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,26 +30,36 @@ GBLDEF	sgm_info	*sgm_info_ptr;
 GBLDEF	tp_region	*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLDEF  tp_region	*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
 
-GBLREF	short		crash_count;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	sgm_info	*first_sgm_info;
+GBLREF	short			crash_count;
+GBLREF	sgm_info		*first_sgm_info;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 
 void tp_set_sgm(void)
 {
 	sgm_info	*si;
+	sgmnt_addrs	*csa;
 
-	si = ((sgmnt_addrs *)&FILE_INFO(gv_cur_region)->s_addrs)->sgm_info_ptr;
+	csa = cs_addrs;
+	assert(csa == &FILE_INFO(gv_cur_region)->s_addrs);
+	si = csa->sgm_info_ptr;
+	assert(si->tp_csa == csa);
+	assert(si->tp_csd == cs_data);
 	if (si->fresh_start)
 	{
 		si->next_sgm_info = first_sgm_info;
 		first_sgm_info = si;
-		si->start_tn = cs_addrs->ti->curr_tn;
-		if (cs_addrs->critical)
-			si->crash_count = cs_addrs->critical->crashcnt;
-		insert_region(gv_cur_region, &tp_reg_list, &tp_reg_free_list, sizeof(tp_region));
+		si->start_tn = csa->ti->curr_tn;
+		if (csa->critical)
+			si->crash_count = csa->critical->crashcnt;
+		insert_region(gv_cur_region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
+		/* In case triggers are supported, make sure we start with latest copy of file header's db_trigger_cycle
+		 * to avoid unnecessary cdb_sc_triggermod type of restarts.
+		 */
+		GTMTRIG_ONLY(csa->db_trigger_cycle = csa->hdr->db_trigger_cycle;)
 		si->fresh_start = FALSE;
-		assert(FALSE == si->update_trans);
+		assert(0 == si->update_trans);
 	}
 	sgm_info_ptr = si;
 	crash_count = si->crash_count;

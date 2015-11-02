@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@ oprtype put_cdlt(mstr *x)
 
 	ref = newtriple(OC_CDLIT);
 	ref->operand[0].oprclass = CDLT_REF;
-	ref->operand[0].oprval.cdlt = str = (mstr *) mcalloc(sizeof(mstr));
+	ref->operand[0].oprval.cdlt = str = (mstr *) mcalloc(SIZEOF(mstr));
 	str->addr = mcalloc(x->len);
 	str->len = x->len;
 	memcpy(str->addr, x->addr, x->len);

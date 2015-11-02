@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,17 +25,21 @@
 #include "hashtab.h"
 #include "muprec.h"
 
-GBLREF	jnl_ctl_list		*mur_jctl;
-
-/* this routine resets new_pini_addr to 0 for all process-vectors in the current jctl's (mur_jctl) hash-table entries.
+/* this routine resets new_pini_addr to 0 for all process-vectors in the current rctl->jctl hash-table entries.
  * this is usually invoked in case a journal auto switch occurs while backward recover/rollback is playing forward the updates
  */
-void	mur_pini_addr_reset(void)
+void	mur_pini_addr_reset(sgmnt_addrs *csa)
 {
+	reg_ctl_list		*rctl;
+	jnl_ctl_list		*jctl;
 	pini_list_struct	*plst;
 	ht_ent_int4 		*tabent, *topent;
 
-	for (tabent = mur_jctl->pini_list.base, topent = mur_jctl->pini_list.top; tabent < topent; tabent++)
+	rctl = csa->rctl;
+	assert(NULL != rctl);
+	jctl = rctl->jctl;
+	assert(NULL != jctl);
+	for (tabent = jctl->pini_list.base, topent = jctl->pini_list.top; tabent < topent; tabent++)
 	{
 		if (HTENT_VALID_INT4(tabent, pini_list_struct, plst))
 			plst->new_pini_addr = 0;

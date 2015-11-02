@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ GBLDEF enum dse_fmt	dse_dmp_format = CLOSED_FMT;
 GBLREF boolean_t	patch_is_fdmp;
 GBLREF int		patch_fdmp_recs;
 
-#define MESS_OFF sizeof("; ") - 1
+#define MESS_OFF SIZEOF("; ") - 1
 
 CONDITION_HANDLER(dse_dmp_handler)
 {

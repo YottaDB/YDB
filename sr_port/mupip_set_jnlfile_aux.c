@@ -57,7 +57,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 	error_def(ERR_JNLFNF);
 	error_def(ERR_PREVJNLLINKSET);
 
-	buf_len = sizeof(buf);
+	buf_len = SIZEOF(buf);
 	/* check for standalone */
 	need_no_standalone = cli_present("BYPASS");
 	if (!need_no_standalone)
@@ -79,12 +79,12 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 					TRUE, LEN_AND_LIT("PREVJNLFILE"));
 			return((uint4)ERR_JNLFILNOTCHG);
 		}
-		if (!get_full_path(STR_AND_LEN(buf), full_buf, &full_buf_len, sizeof(full_buf), &ustatus))
+		if (!get_full_path(STR_AND_LEN(buf), full_buf, &full_buf_len, SIZEOF(full_buf), &ustatus))
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(buf), ustatus);
 			return((uint4)ERR_JNLFILNOTCHG);
 		}
-		if (!get_full_path(STR_AND_LEN(jnl_fname), jnl_fn, &jnl_fn_len, sizeof(jnl_fn), &ustatus))
+		if (!get_full_path(STR_AND_LEN(jnl_fname), jnl_fn, &jnl_fn_len, SIZEOF(jnl_fn), &ustatus))
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, LEN_AND_STR(jnl_fname), ustatus);
 			return((uint4)ERR_JNLFILNOTCHG);
@@ -92,7 +92,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		jnlfile.addr = full_buf;
 		jnlfile.len = full_buf_len;
 		jnldef.addr = JNL_EXT_DEF;
-		jnldef.len = sizeof(JNL_EXT_DEF) - 1;
+		jnldef.len = SIZEOF(JNL_EXT_DEF) - 1;
 		if (FILE_PRESENT != gtm_file_stat(&jnlfile, &jnldef, NULL, FALSE, &ustatus))
 			gtm_putmsg(VARLSTCNT(5) ERR_JNLFNF, 2, buf_len, buf, ustatus);
 		if (jnl_fn_len == full_buf_len && (0 == memcmp(jnl_fn, full_buf, jnl_fn_len)))
@@ -105,7 +105,7 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 			memcpy(prev_buf, header->prev_jnl_file_name, prev_buf_len);
 		else
 		{
-			prev_buf_len = sizeof("NULL") - 1;
+			prev_buf_len = SIZEOF("NULL") - 1;
 			memcpy(prev_buf, "NULL", prev_buf_len);
 		}
 		header->prev_jnl_file_name_length = full_buf_len;

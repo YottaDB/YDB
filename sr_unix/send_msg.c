@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ void send_msg(int arg_count, ...)
                 --arg_count;
 
                 msg_string.addr = msg_buffer;
-                msg_string.len = sizeof(msg_buffer);
+                msg_string.len = SIZEOF(msg_buffer);
                 gtm_getmsg(msg_id, &msg_string);
 
                 if (arg_count > 0)

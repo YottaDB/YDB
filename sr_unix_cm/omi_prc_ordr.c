@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 /*  We want to make sure there is plenty of space in the string pool
  *  for all three operations ($ORDER, $GET, $DATA) */
     if (cptr->exts & OMI_XTF_NEWOP)
-	stp_gcol(0);
+	INVOKE_STP_GCOL(0);
 
 /*  $ORDER */
     op_gvorder(&vo);
@@ -111,7 +111,7 @@ omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 		    return -OMI_ER_DB_UNRECOVER;
 		}
 		memcpy(gv_currkey, gv_altkey,
-		       gv_altkey->end + sizeof(gv_key));
+		       gv_altkey->end + SIZEOF(gv_key));
 		gv_curr_subsc_null = FALSE;
 	    }
 

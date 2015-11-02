@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ int gtmsource_get_opt(void)
 	char		*connect_parms_str, tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		secondary_sys[MAX_SECONDARY_LEN], *c, inst_name[MAX_FN_LEN + 1];
 	char		statslog_val[4]; /* "ON" or "OFF" */
-	char		update_val[sizeof("DISABLE")]; /* "ENABLE" or "DISABLE" */
+	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
 	int		tries, index = 0, timeout_status, connect_parms_index, status;
 	mstr		log_nam, trans_name;
 	struct hostent	*sec_hostentry;
@@ -74,7 +74,7 @@ int gtmsource_get_opt(void)
 	error_def(ERR_REPLINSTSECLEN);
 	error_def(ERR_REPLINSTSECUNDF);
 
-	memset((char *)&gtmsource_options, 0, sizeof(gtmsource_options));
+	memset((char *)&gtmsource_options, 0, SIZEOF(gtmsource_options));
 	gtmsource_options.start = (CLI_PRESENT == cli_present("START"));
 	gtmsource_options.shut_down = (CLI_PRESENT == cli_present("SHUTDOWN"));
 	gtmsource_options.activate = (CLI_PRESENT == cli_present("ACTIVATE"));
@@ -106,7 +106,7 @@ int gtmsource_get_opt(void)
 	gtmsource_options.instsecondary = (CLI_PRESENT == cli_present("INSTSECONDARY"));
 	if (gtmsource_options.instsecondary)
 	{	/* -INSTSECONDARY is specified in the command line. */
-		inst_name_len = sizeof(inst_name);;
+		inst_name_len = SIZEOF(inst_name);;
 		if (!cli_get_str("INSTSECONDARY", &inst_name[0], &inst_name_len))
 		{
 			util_out_print("Error parsing INSTSECONDARY qualifier", TRUE);
@@ -124,9 +124,9 @@ int gtmsource_get_opt(void)
 			|| gtmsource_options.checkhealth || gtmsource_options.showbacklog || gtmsource_options.shut_down)
 		{
 			log_nam.addr = GTM_REPL_INSTSECONDARY;
-			log_nam.len = sizeof(GTM_REPL_INSTSECONDARY) - 1;
+			log_nam.len = SIZEOF(GTM_REPL_INSTSECONDARY) - 1;
 			trans_name.addr = &inst_name[0];
-			if (SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, sizeof(inst_name),
+			if (SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, SIZEOF(inst_name),
 									do_sendmsg_on_log2long)))
 			{
 				gtmsource_options.instsecondary = TRUE;
@@ -135,7 +135,7 @@ int gtmsource_get_opt(void)
 			{
 				if (SS_LOG2LONG == status)
 					gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr,
-						sizeof(inst_name) - 1);
+						SIZEOF(inst_name) - 1);
 				gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTSECUNDF);
 				return (-1);
 			}

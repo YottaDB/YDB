@@ -2137,7 +2137,7 @@ $ export env_variable
 
    }
 
-   while (fgets(buf, (int)sizeof(buf), tablefile) != (char *)NULL)
+   while (fgets(buf, (int)SIZEOF(buf), tablefile) != (char *)NULL)
 
    {
 

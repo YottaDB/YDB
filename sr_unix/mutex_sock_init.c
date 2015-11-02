@@ -58,7 +58,7 @@ void mutex_sock_init(void)
 	int		mutex_sock_len, save_errno;
 	struct stat	mutex_sock_stat_buf;
 	int		status;
-	unsigned char   pid_str[2 * sizeof(pid_t) + 1];
+	unsigned char   pid_str[2 * SIZEOF(pid_t) + 1];
 
 	error_def(ERR_MUTEXERR);
 	error_def(ERR_TEXT);
@@ -71,17 +71,17 @@ void mutex_sock_init(void)
 	if (FD_INVALID == (mutex_sock_fd = socket(AF_UNIX, SOCK_DGRAM, 0)))
 		rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Error with mutex socket create"), errno);
 
-	memset((char *)&mutex_sock_address, 0, sizeof(mutex_sock_address));
+	memset((char *)&mutex_sock_address, 0, SIZEOF(mutex_sock_address));
 
 	/* Get the socket path */
-	mutex_sock_dir_lognam.len = sizeof(MUTEX_SOCK_DIR) - 1;
+	mutex_sock_dir_lognam.len = SIZEOF(MUTEX_SOCK_DIR) - 1;
 	mutex_sock_dir_lognam.addr = MUTEX_SOCK_DIR;
 	mutex_sock_trans_status = TRANS_LOG_NAME(&mutex_sock_dir_lognam, &mutex_sock_dir_transnam,
-						 mutex_sock_path, sizeof(mutex_sock_path), do_sendmsg_on_log2long);
+						 mutex_sock_path, SIZEOF(mutex_sock_path), do_sendmsg_on_log2long);
 	if (mutex_sock_trans_status != SS_NORMAL)
 	{
 		strcpy(mutex_sock_path, DEFAULT_MUTEX_SOCK_DIR);
-		mutex_sock_path_len = sizeof(DEFAULT_MUTEX_SOCK_DIR) - 1;
+		mutex_sock_path_len = SIZEOF(DEFAULT_MUTEX_SOCK_DIR) - 1;
 	} else
 		mutex_sock_path_len = mutex_sock_dir_transnam.len;
 
@@ -92,6 +92,9 @@ void mutex_sock_init(void)
 		mutex_sock_path[mutex_sock_path_len] = '\0';
 	}
 
+	if ((mutex_sock_path_len + MAX_SOCKFILE_NAME_LEN) > SIZEOF(mutex_sock_address.sun_path))
+		rts_error(VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Mutex socket path too long"));
+
 	strcpy(mutex_sock_path + mutex_sock_path_len, MUTEX_SOCK_FILE_PREFIX);
 	mutex_sock_path_len += (SIZEOF(MUTEX_SOCK_FILE_PREFIX) - 1);
 	mutex_wake_this_proc_prefix_len = mutex_sock_path_len;
@@ -99,7 +102,7 @@ void mutex_sock_init(void)
 	strcpy(mutex_sock_path + mutex_sock_path_len, (char *)pid2ascx(pid_str, process_id));
 	mutex_sock_path_len += STRLEN((char *)pid_str);
 
-	if (mutex_sock_path_len > sizeof(mutex_sock_address.sun_path))
+	if (mutex_sock_path_len > SIZEOF(mutex_sock_address.sun_path))
 		rts_error(VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Mutex socket path too long"));
 
 	mutex_sock_address.sun_family = AF_UNIX;
@@ -150,7 +153,7 @@ void mutex_sock_init(void)
 	 * To make mutex_wake_proc faster, pre-initialize portions of
 	 * mutex_wake_this_proc which are invariant of the pid to be woken up.
 	 */
-	memset((char *)&mutex_wake_this_proc, 0, sizeof(mutex_wake_this_proc));
+	memset((char *)&mutex_wake_this_proc, 0, SIZEOF(mutex_wake_this_proc));
 	mutex_wake_this_proc.sun_family = AF_UNIX;
 	strcpy(mutex_wake_this_proc.sun_path, mutex_sock_path);
 	mutex_wake_this_proc_len = mutex_sock_len;
@@ -158,11 +161,11 @@ void mutex_sock_init(void)
 
 unsigned char *pid2ascx(unsigned char *pid_str, pid_t pid)
 {
-	/* pid_str should accommodate atleast 2*sizeof(pid_t) + 1 characters */
+	/* pid_str should accommodate atleast 2*SIZEOF(pid_t) + 1 characters */
 
 	register unsigned char *cp;
 
-	cp = &pid_str[2*sizeof(pid_t)];
+	cp = &pid_str[2*SIZEOF(pid_t)];
 	*cp = '\0'; /* Null terminate the string */
 	while(cp > pid_str)
 	{

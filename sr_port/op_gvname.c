@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,22 +53,16 @@ GBLREF gd_binding	*gd_map;
 GBLREF sgm_info		*first_sgm_info;
 GBLREF sgm_info		*sgm_info_ptr;
 GBLREF short		dollar_tlevel;
-GBLREF bool		transform;
 GBLREF mstr		extnam_str;
 
 void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
-	int		len;
 	int		count;
 	bool		was_null, is_null;
 	boolean_t	bgormm;
 	mval		*val;
 	short int	max_key;
 	va_list		var;
-	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
-
-	error_def(ERR_GVSUBOFLOW);
-	error_def(ERR_GVIS);
 
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	extnam_str.len = 0;
@@ -112,7 +106,7 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	for ( ; count > 0; count--)
 	{
 		val = va_arg(var, mval *);
-		COPY_SUBS_TO_GVCURRKEY(val, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
+		COPY_SUBS_TO_GVCURRKEY(val, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey, was_null, is_null */
 	}
 	va_end(var);
 	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */

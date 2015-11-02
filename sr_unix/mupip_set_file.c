@@ -241,10 +241,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	else
 	{
 		rptr = &single;
-		memset(&single, 0, sizeof(single));
+		memset(&single, 0, SIZEOF(single));
 	}
 
-	csd = (sgmnt_data *)malloc(ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE));
+	csd = (sgmnt_data *)malloc(ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
 	in_backup = FALSE;		/* Only want yes/no from mupfndfil, not an address */
 	for (;  rptr != NULL;  rptr = rptr->fPtr)
 	{
@@ -340,7 +340,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 				TAG_POLICY_GTM_PUTMSG(fn, realfiletag, TAG_BINARY, errno);
 #endif
-			LSEEKREAD(fd, 0, csd, sizeof(sgmnt_data), status);
+			LSEEKREAD(fd, 0, csd, SIZEOF(sgmnt_data), status);
 			if (0 != status)
 			{
 				save_errno = errno;
@@ -472,7 +472,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					continue;
 				}
 			}
-			LSEEKWRITE(fd, 0, csd, sizeof(sgmnt_data), status);
+			LSEEKWRITE(fd, 0, csd, SIZEOF(sgmnt_data), status);
 			if (0 != status)
 			{
 				save_errno = errno;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,8 +47,7 @@ void gvcmx_unlock(unsigned char rmv_locks, bool specific, char incr)
 	for (p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl); p != (struct CLB *)ntd_root; p = (struct CLB *)RELQUE2PTR(p->cqe.fl))
 	{
 		p->ast = 0;
-		if (stringpool.top < stringpool.free + p->mbl)
-			stp_gcol(p->mbl);
+		ENSURE_STP_FREE_SPACE(p->mbl);
 		p->mbf = stringpool.free;
 		if (remlkreq)
 		{

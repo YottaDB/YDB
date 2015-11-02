@@ -78,7 +78,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	error_def(ERR_NORECVPOOL);
 	error_def(ERR_TEXT);
 
-        memset(machine_name, 0, sizeof(machine_name));
+        memset(machine_name, 0, SIZEOF(machine_name));
         if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
                 rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
 	if (NULL == jnlpool.jnlpool_dummy_reg)
@@ -114,7 +114,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	 */
 	if (!ftok_sem_get(recvpool.recvpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
 		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
-	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	if (INVALID_SEMID == repl_instance.recvpool_semid)
 	{
 		if (INVALID_SHMID != repl_instance.recvpool_shmid)
@@ -279,8 +279,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		assert(0 == offsetof(recvpool_ctl_struct, recvpool_id));
 					/* ensure that the pool identifier is at the top of the pool */
 		recvpool.recvpool_ctl->recvpool_id.pool_type = RECVPOOL_SEGMENT;
-		memset(&recvpool.recvpool_ctl->last_valid_triple, 0, sizeof(repl_triple));
-		memset(&recvpool.recvpool_ctl->last_rcvd_triple, 0, sizeof(repl_triple));
+		memset(&recvpool.recvpool_ctl->last_valid_triple, 0, SIZEOF(repl_triple));
+		memset(&recvpool.recvpool_ctl->last_rcvd_triple, 0, SIZEOF(repl_triple));
 		recvpool.recvpool_ctl->max_dualsite_resync_seqno = 0;
 
 		recvpool.upd_proc_local->upd_proc_shutdown = NO_SHUTDOWN;
@@ -302,7 +302,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		recvpool.gtmrecv_local->last_valid_remote_proto_ver = REPL_PROTO_VER_UNINITIALIZED;
 		recvpool.gtmrecv_local->remote_proto_ver = REPL_PROTO_VER_UNINITIALIZED;
 			/* above two fields are fully initialized when receiver server connects to the source server */
-		memset(recvpool.upd_helper_ctl, 0, sizeof(*recvpool.upd_helper_ctl));
+		memset(recvpool.upd_helper_ctl, 0, SIZEOF(*recvpool.upd_helper_ctl));
 		SET_LATCH_GLOBAL(&recvpool.upd_helper_ctl->pre_read_lock, LOCK_AVAILABLE);
 		recvpool.recvpool_ctl->initialized = TRUE;
 		recvpool.recvpool_ctl->fresh_start = TRUE;

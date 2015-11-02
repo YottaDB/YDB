@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,8 @@
 #include "opcode.h"
 #include "mvalconv.h"
 #include "cdbg_dump.h"
-
-GBLREF char *oc_tab_graphic[];
+#include "stringpool.h"
+#include "cache.h"
 
 LITDEF char *oprtype_names[] =
 {
@@ -68,13 +68,16 @@ LITDEF char *indents[11] =
 	"                    "
 };
 
+GBLREF char	*oc_tab_graphic[];
+GBLREF bool	compile_time;
+GBLREF spdesc	indr_stringpool;
 GBLREF int4	sa_temps_offset[];
 GBLREF int4	sa_temps[];
 LITREF int4	sa_class_sizes[];
 
 #define MAX_INDENT (32 * 1024)
-static char	*indent_str;
-static int	last_indent = 0;
+STATICDEF char	*indent_str;
+STATICDEF int	last_indent = 0;
 
 void cdbg_dump_triple(triple *dtrip, int indent)
 {
@@ -114,7 +117,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 	int	offset;
         int	len;
 	char	*buff;
-	char 	mid[sizeof(mident_fixed)];
+	char 	mid[(SIZEOF(mident_fixed) * 2) + 1];	/* Sized to hold an labels name rtn.lbl */
 
 	if (opr)
 		PRINTF("%s %s  [0x%08lx]  Type: %s\n", cdbg_indent(indent), oprtype_names[opnum], opr,
@@ -194,15 +197,29 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		case OCNT_REF:
 			PRINTF("%s   offset from call to next triple: %d\n", cdbg_indent(indent), opr->oprval.offset);
 			break;
+		case MLAB_REF:
 		case MFUN_REF:
 			if (opr->oprval.lab)
 			{
 				len = opr->oprval.lab->mvname.len;
 				memcpy(mid, opr->oprval.lab->mvname.addr, len);
 				mid[len] = 0;
-				PRINTF("%s   mlabel name: %s\n", cdbg_indent(indent), mid);
+				PRINTF("%s   ref type: %s  mlabel name: %s\n", cdbg_indent(indent),
+				       oprtype_type_names[opr->oprclass], mid);
 			} else
-				PRINTF("%s   ** Warning ** oprval.lab is NULL\n", cdbg_indent(indent));
+				PRINTF("%s   ref type: %s  ** Warning ** oprval.lab is NULL\n", cdbg_indent(indent),
+				       oprtype_type_names[opr->oprclass]);
+			break;
+		case CDLT_REF:
+			if (opr->oprval.cdlt)
+			{
+				len = opr->oprval.cdlt->len;
+				memcpy(mid, opr->oprval.cdlt->addr, len);
+				mid[len] = 0;
+				PRINTF("%s   cdlt-ref mstr->%s", cdbg_indent(indent), mid);
+			} else
+				PRINTF("%s   ref type: %s  ** Warning ** oprval.cdlt is NULL\n", cdbg_indent(indent),
+				       oprtype_type_names[opr->oprclass]);
 			break;
 		default:
 			PRINTF("%s   %s bogus reference\n", cdbg_indent(indent), oprtype_type_names[opr->oprclass]);
@@ -269,12 +286,22 @@ void cdbg_dump_mval(int indent, mval *mv)
 /* Dump value of a given mstr. Assumes length is non-zero */
 void cdbg_dump_mstr(int indent, mstr *ms)
 {
-	unsigned char	*buffer;
+	unsigned char	*buffer, *strp;
 	int		len;
 
 	len = ms->len;
+	strp = (unsigned char *)ms->addr;
+#if defined(USHBIN_SUPPORTED) || defined(VMS)
+	/* In shared binary mode, shrink_trips is called after indir_lits() changes the addresses
+	 * in the mvals to offsets. De-offset them if they don't point into the (indirect)
+	 * stringpool. This *ONLY* happens during an indirect compilation.
+	 */
+	assert(compile_time || indr_stringpool.base != indr_stringpool.free);
+	if (!compile_time && strp < indr_stringpool.base)
+		strp += (UINTPTR_T)(indr_stringpool.base - SIZEOF(ihdtyp) - PADLEN(SIZEOF(ihdtyp), NATIVE_WSIZE));
+#endif
 	buffer = malloc(len + 1);
-	memcpy(buffer, ms->addr, len);
+	memcpy(buffer, strp, len);
 	buffer[len] = 0;
 	PRINTF("%s   String value: %s\n", cdbg_indent(indent), buffer);
 	fflush(stdout);

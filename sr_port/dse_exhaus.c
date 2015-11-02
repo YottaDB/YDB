@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,11 +62,11 @@ void dse_exhaus(int4 pp, int4 op)
 	rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
     if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 	b_top = bp + cs_addrs->hdr->blk_size;
-    else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-	b_top = bp + sizeof(blk_hdr);
+    else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+	b_top = bp + SIZEOF(blk_hdr);
     else
 	b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
-    for (rp = bp + sizeof(blk_hdr); rp < b_top ;rp = r_top)
+    for (rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top)
     {
 	if (util_interrupt)
 	{
@@ -86,13 +86,13 @@ void dse_exhaus(int4 pp, int4 op)
 	r_top = rp + temp_short;
 	if (r_top > b_top)
 	    r_top = b_top;
-	if (r_top - rp < sizeof(block_id))
+	if (r_top - rp < SIZEOF(block_id))
 	    break;
 	if (((blk_hdr_ptr_t)bp)->levl)
-	    GET_LONG(patch_path[pp],(r_top - sizeof(block_id)));
+	    GET_LONG(patch_path[pp],(r_top - SIZEOF(block_id)));
 	else
 	{
-	    for (ptr = rp + sizeof(rec_hdr); ; )
+	    for (ptr = rp + SIZEOF(rec_hdr); ; )
 	    {
 		if (*ptr++ == 0 && *ptr++ ==0)
 		    break;
@@ -118,13 +118,13 @@ void dse_exhaus(int4 pp, int4 op)
 		    nr_top = nrp + temp_short;
 		    if (nr_top > b_top)
 			nr_top = b_top;
-		    if (nr_top - nrp >= sizeof(block_id))
+		    if (nr_top - nrp >= SIZEOF(block_id))
 		    {
 			if (((blk_hdr_ptr_t)bp)->levl)
-			    GET_LONG(patch_right_sib,(nr_top - sizeof(block_id)));
+			    GET_LONG(patch_right_sib,(nr_top - SIZEOF(block_id)));
 			else
 			{
-			    for (ptr = rp + sizeof(rec_hdr); ;)
+			    for (ptr = rp + SIZEOF(rec_hdr); ;)
 			    {
 				if (*ptr++ == 0 && *ptr++ == 0)
 				    break;

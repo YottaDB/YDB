@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,10 +72,11 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 	buf [name->str.len] = 0;
 	status = GETENV(buf);
 	if (status)
-	{	if (item_code == VALUE || item_code == FULL)
-		{	retlen = strlen(status);
-			if (stringpool.top < stringpool.free + retlen)
-				stp_gcol(retlen);
+	{
+		if (item_code == VALUE || item_code == FULL)
+		{
+			retlen = strlen(status);
+			ENSURE_STP_FREE_SPACE(retlen);
 			ret->mvtype = MV_STR;
 			ret->str.addr = (char *)stringpool.free;
 			ret->str.len = retlen;

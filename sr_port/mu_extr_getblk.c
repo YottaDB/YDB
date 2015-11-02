@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ int mu_extr_getblk(unsigned char *ptr)
 	srch_blk_status	*bh;
 	srch_hist	*rt_history;
 
-	t_begin(ERR_GVGETFAIL, FALSE);
+	t_begin(ERR_GVGETFAIL, 0);
 	for (;;)
 	{
 		if (cdb_sc_normal != (status = gvcst_search(gv_currkey, NULL)))
@@ -78,7 +78,7 @@ int mu_extr_getblk(unsigned char *ptr)
 		if ((trans_num)0 != t_end(&gv_target->hist, two_histories ? rt_history : NULL))
 		{
 			if (two_histories)
-				memcpy(gv_target->hist.h, rt_history->h, sizeof(srch_blk_status) * (rt_history->depth + 1));
+				memcpy(gv_target->hist.h, rt_history->h, SIZEOF(srch_blk_status) * (rt_history->depth + 1));
 			return !end_of_tree;
 		}
 	}

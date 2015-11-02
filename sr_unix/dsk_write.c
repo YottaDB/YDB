@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,13 +88,13 @@ int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 		gds_blk_downgrade((v15_blk_hdr_ptr_t)reformat_buffer, (blk_hdr_ptr_t)buff);
 		buff = reformat_buffer;
 		size = ((v15_blk_hdr_ptr_t)buff)->bsiz;
-		assert(size <= csd->blk_size - sizeof(blk_hdr) + sizeof(v15_blk_hdr));
+		assert(size <= csd->blk_size - SIZEOF(blk_hdr) + SIZEOF(v15_blk_hdr));
 		size = (size + 1) & ~1;
-		assert(sizeof(v15_blk_hdr) <= size);
+		assert(SIZEOF(v15_blk_hdr) <= size);
 	} else DEBUG_ONLY(if (GDSV5 == cr->ondsk_blkver))
 	{
 		size = (((blk_hdr_ptr_t)buff)->bsiz + 1) & ~1;
-		assert(sizeof(blk_hdr) <= size);
+		assert(SIZEOF(blk_hdr) <= size);
 	}
 	DEBUG_ONLY(else GTMASSERT);
 	if (csa->do_fullblockwrites)
@@ -106,7 +106,7 @@ int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 	assert(!csa->acc_meth.bg.cache_state->cache_array || buff != (sm_uc_ptr_t)csd);
 	assert(!csa->acc_meth.bg.cache_state->cache_array
 	       || (buff >= (sm_uc_ptr_t)csa->acc_meth.bg.cache_state->cache_array
-		   + (sizeof(cache_rec) * (csd->bt_buckets + csd->n_bts))));
+		   + (SIZEOF(cache_rec) * (csd->bt_buckets + csd->n_bts))));
 	assert(buff < (sm_uc_ptr_t)csd || buff == reformat_buffer);
 		/* assumes hdr follows immediately after the buffer pool in shared memory */
 	assert(size <= csd->blk_size);

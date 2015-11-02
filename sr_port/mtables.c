@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,23 @@
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
+#include "gdsroot.h"		/* needed for tp.h & gv_trigger.h */
+#include "gdsbt.h"		/* needed for tp.h & gv_trigger.h */
+#include "gtm_facility.h"	/* needed for tp.h & gv_trigger.h */
+#include "fileinfo.h"		/* needed for tp.h & gv_trigger.h */
+#include "gdsfhead.h"		/* needed for tp.h & gv_trigger.h */
+#include "filestruct.h"		/* needed for tp.h & gv_trigger.h */
+#include "gdscc.h"		/* needed for tp.h & gv_trigger.h */
+#include "gdskill.h"		/* needed for tp.h & gv_trigger.h */
+#include "jnl.h"		/* needed for tp.h & gv_trigger.h */
+#include "buddy_list.h"		/* needed for tp.h & gv_trigger.h */
+#include "hashtab_int4.h"	/* needed for tp.h & gv_trigger.h */
+#include "tp.h"
+#include "gtmimagename.h"
+
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#endif
 
 LITDEF char ctypetab[NUM_CHARS] =
 {
@@ -133,20 +150,103 @@ LITDEF unsigned char mvs_size[] =
 	MV_SIZE(mvs_zintr),
 	MV_SIZE(mvs_zintdev),
 	MV_SIZE(mvs_stck),
-	MV_SIZE(mvs_lvval)
+	MV_SIZE(mvs_lvval),
+	MV_SIZE(mvs_trigr),
+	MV_SIZE(mvs_rstrtpc)
+};
+
+/* All mv_stent types that need to be preserved are indicated by the mvs_save[] array.
+ * MVST_STCK_SP (which is the same as the MVST_STCK type everywhere else is handled specially here.
+ * This entry is created by mdb_condition_handler to stack the "stackwarn" global variable.
+ * This one needs to be preserved since our encountering this type in flush_jmp.c indicates that we are currently
+ * in the error-handler of a STACKCRIT error which in turn has "GOTO ..." in the $ZTRAP/$ETRAP that is
+ * causing us to mutate the current frame we are executing in with the contents pointed to by the GOTO.
+ * In that case, we do not want to restore "stackwarn" to its previous value since we are still handling
+ * the STACKCRIT error. So we set MVST_STCK_SP type as needing to be preserved.
+ */
+LITDEF boolean_t mvs_save[] =
+{
+	TRUE,	/* MVST_MSAV */
+	FALSE,	/* MVST_MVAL */
+	TRUE,	/* MVST_STAB */
+	FALSE,	/* MVST_IARR */
+	TRUE,	/* MVST_NTAB */
+	TRUE,	/* MVST_PARM */
+	TRUE,	/* MVST_PVAL */
+	FALSE,	/* MVST_STCK */
+	TRUE,	/* MVST_NVAL */
+	TRUE,	/* MVST_TVAL */
+	TRUE,	/* MVST_TPHOLD */
+	TRUE,	/* MVST_ZINTR */
+	FALSE,	/* MVST_ZINTDEV */
+	TRUE,	/* MVST_STCK_SP */
+	TRUE,	/* MVST_LVAL */
+	FALSE,	/* MVST_TRIGR */
+	FALSE	/* MVST_RSTRTPC */
 };
 
 static readonly unsigned char localpool[7] = {'1', '1' , '1' , '0', '1', '0', '0'};
-LITDEF mval literal_null 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_UTF_LEN, 0, 0, 0, 0, 0, 0);
-LITDEF mval literal_zero 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[3], 0,      0 );
+LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_UTF_LEN, 0, 0, 0, 0, 0, 0);
+LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[3], 0,      0 );
 LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[0], 0,   1000 );
 LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[2], 0,  10000 );
-LITDEF mval literal_eleven 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  11000 );
-LITDEF mval literal_oneohoh 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[4], 0, 100000 );
-LITDEF mval literal_oneohone 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 101000 );
-LITDEF mval literal_oneten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 110000 );
-LITDEF mval literal_oneeleven 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[0], 0, 111000 );
-LITDEF mval SBS_MVAL_INT_ELE 	= DEFINE_MVAL_LITERAL(MV_NM | MV_INT,          0, 0, 0, 0, 0, SBS_NUM_INT_ELE * 1000);
+LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  11000 );
+LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[4], 0, 100000 );
+LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 101000 );
+LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 110000 );
+LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[0], 0, 111000 );
+LITDEF mval SBS_MVAL_INT_ELE	= DEFINE_MVAL_LITERAL(MV_NM | MV_INT         , 0, 0, 0, 0, 0, SBS_NUM_INT_ELE * 1000);
+
+/* --------------------------------------------------------------------------------------------------------------------------
+ * All string mvals defined in this module using LITDEF need to have MV_NUM_APPROX bit set. This is because these mval
+ * literals will most likely go into a read-only data segment of the executable and if ever they get passed into mval2subsc
+ * (e.g. &literal_hashlabel is passed in gvtr_get_hasht_gblsubs using COPY_SUBS_TO_GVCURRKEY macro), it would otherwise
+ * try to set the MV_NUM_APPROX bit and that could cause a SIG-11 since these mvals are in the read-only data segment.
+ * --------------------------------------------------------------------------------------------------------------------------
+ */
+
+/* Create mval to hold batch type TSTART. "BA" or "BATCH" mean the same.
+ * We define the shorter version here to try reduce the time taken for comparison.
+ */
+LITDEF mval literal_batch       = DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, TP_BATCH_SHRT, (char *)TP_BATCH_ID, 0, 0);
+
+#ifdef GTM_TRIGGER
+LITDEF mval literal_hasht	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, HASHT_GBLNAME_LEN    , (char *)HASHT_GBLNAME    , 0, 0);
+LITDEF mval literal_hashlabel	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHLABEL_LEN, (char *)LITERAL_HASHLABEL, 0, 0);
+LITDEF mval literal_hashcycle	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCYCLE_LEN, (char *)LITERAL_HASHCYCLE, 0, 0);
+LITDEF mval literal_hashcount	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_HASHCOUNT_LEN, (char *)LITERAL_HASHCOUNT, 0, 0);
+LITDEF mval literal_cmd		= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_CMD_LEN      , (char *)LITERAL_CMD      , 0, 0);
+LITDEF mval literal_gvsubs	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_GVSUBS_LEN   , (char *)LITERAL_GVSUBS   , 0, 0);
+LITDEF mval literal_options	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_OPTIONS_LEN  , (char *)LITERAL_OPTIONS  , 0, 0);
+LITDEF mval literal_delim	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_DELIM_LEN    , (char *)LITERAL_DELIM    , 0, 0);
+LITDEF mval literal_zdelim	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_ZDELIM_LEN   , (char *)LITERAL_ZDELIM   , 0, 0);
+LITDEF mval literal_pieces	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_PIECES_LEN   , (char *)LITERAL_PIECES   , 0, 0);
+LITDEF mval literal_trigname	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_TRIGNAME_LEN , (char *)LITERAL_TRIGNAME , 0, 0);
+LITDEF mval literal_xecute	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_XECUTE_LEN   , (char *)LITERAL_XECUTE   , 0, 0);
+LITDEF mval literal_chset	= DEFINE_MVAL_LITERAL(MV_STR | MV_NUM_APPROX, 0, 0, LITERAL_CHSET_LEN    , (char *)LITERAL_CHSET    , 0, 0);
+
+LITDEF mval gvtr_cmd_mval[GVTR_CMDTYPES] = {
+/* Define GVTR_CMD_SET, GVTR_CMD_KILL etc. */
+#	define	GV_TRIG_CMD_ENTRY(cmdmval, cmdlit, cmdmask)			\
+		DEFINE_MVAL_LITERAL(MV_STR, 0, 0, STR_LIT_LEN(cmdlit), (char *)cmdlit, 0, 0),
+#	include "gv_trig_cmd_table.h"
+#	undef GV_TRIG_CMD_ENTRY
+};
+
+LITDEF	int4	gvtr_cmd_mask[GVTR_CMDTYPES] = {
+/* Define GVTR_MASK_SET, GVTR_MASK_KILL etc. */
+#	define	GV_TRIG_CMD_ENTRY(cmdmval, cmdlit, cmdmask)	cmdmask,
+#	include "gv_trig_cmd_table.h"
+#	undef GV_TRIG_CMD_ENTRY
+};
+#endif
+
+LITDEF	gtmImageName	gtmImageNames[n_image_types] =
+{
+#define IMAGE_TABLE_ENTRY(A,B)	{LIT_AND_LEN(B)},
+#include "gtmimagetable.h"
+#undef IMAGE_TABLE_ENTRY
+};
 
 LITDEF mname_entry 	null_mname_entry =
 {
@@ -173,11 +273,11 @@ LITDEF mval *fnzqgblmod_table[2] =
 };
 
 LITDEF char gtm_release_name[]   = GTM_RELEASE_NAME;
-LITDEF int4 gtm_release_name_len = sizeof(GTM_RELEASE_NAME) - 1;
+LITDEF int4 gtm_release_name_len = SIZEOF(GTM_RELEASE_NAME) - 1;
 LITDEF char gtm_product[]        = GTM_PRODUCT;
-LITDEF int4 gtm_product_len      = sizeof(GTM_PRODUCT) - 1;
+LITDEF int4 gtm_product_len      = SIZEOF(GTM_PRODUCT) - 1;
 LITDEF char gtm_version[]        = GTM_VERSION;
-LITDEF int4 gtm_version_len      = sizeof(GTM_VERSION) - 1;
+LITDEF int4 gtm_version_len      = SIZEOF(GTM_VERSION) - 1;
 
 /* Indexed by enum db_ver in gdsdbver.h. Note that a db_ver value can be -1 but only in
    the internal context of incremental/stream backup so the value should never appear where
@@ -281,6 +381,14 @@ LITDEF int ht_sizes[] =
 	7222661, 8434427, 9849503, 11502019, 13431661, 15685133, 18316643, 21389671,
 	24978257, 29168903, 34062629, 39777391, 46450931, 54244103, 0
 };
+
+/* Table used in various ways (e.g. mident generation) */
+LITDEF char alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+				    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+				    'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
+				    '5', '6', '7', '8', '9', '\0'};
+LITDEF int alpha_table_len = 52;					/* Length of just the alphas in the table */
+LITDEF int alphanumeric_table_len = SIZEOF(alphanumeric_table) - 1;	/* For the apps not wanting to use strlen() */
 
 #ifdef DEBUG
 /* These instructions follow the definitions made

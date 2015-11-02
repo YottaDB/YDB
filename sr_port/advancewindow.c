@@ -61,7 +61,7 @@ void advancewindow(void)
 {
 	error_def(ERR_NUMOFLOW);
 	unsigned char	*cp1, *cp2, *cp3, x;
-	char		*tmp, source_line_buff[MAX_SRCLINE + sizeof(ARROW)];
+	char		*tmp, source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	int		y, charlen;
 #ifdef UNICODE_SUPPORTED
 	uint4		ch;
@@ -85,8 +85,7 @@ void advancewindow(void)
 	switch (y = ctypetab[x])
 	{
 		case TK_QUOTE:
-			if (stringpool.free + MAX_SRCLINE > stringpool.top )
-				stp_gcol(MAX_SRCLINE);
+			ENSURE_STP_FREE_SPACE(MAX_SRCLINE);
 			cp1 = (unsigned char *)lexical_ptr + 1;
 			cp2 = cp3 = stringpool.free;
 			for (;;)
@@ -191,8 +190,7 @@ void advancewindow(void)
 			{
 				director_token = TK_INTLIT ;
 				director_mval.str.len = INTCAST(lexical_ptr - director_mval.str.addr);
-				if (stringpool.free + director_mval.str.len > stringpool.top)
-					stp_gcol(director_mval.str.len);
+				ENSURE_STP_FREE_SPACE(director_mval.str.len);
 				memcpy(stringpool.free, director_mval.str.addr, director_mval.str.len);
 				assert (stringpool.free <= stringpool.top) ;
 			}
@@ -201,7 +199,7 @@ void advancewindow(void)
 			if (( x = *++lexical_ptr) >= 32)
 			{
 				x -= 32;
-				if (x < sizeof(apos_ok) / sizeof(unsigned char))
+				if (x < SIZEOF(apos_ok) / SIZEOF(unsigned char))
 				{
 					if (y = apos_ok[x])
 					{

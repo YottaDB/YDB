@@ -66,11 +66,11 @@ static char static_string_tbl[] = {
         /* Offset 15 */ '.', 's', 'y', 'm', 't', 'a', 'b', '\0'
 };
 
-#define SPACE_STRING_ALLOC_LEN  (sizeof(static_string_tbl) +    \
-                                 sizeof(GTM_LANG) + 1 +         \
-                                 sizeof(GTM_PRODUCT) + 1 +      \
-                                 sizeof(GTM_RELEASE_NAME) + 1 + \
-                                 sizeof(mident_fixed))
+#define SPACE_STRING_ALLOC_LEN  (SIZEOF(static_string_tbl) +    \
+                                 SIZEOF(GTM_LANG) + 1 +         \
+                                 SIZEOF(GTM_PRODUCT) + 1 +      \
+                                 SIZEOF(GTM_RELEASE_NAME) + 1 + \
+                                 SIZEOF(mident_fixed))
 
 /* Following constants has to be in sync with above static string array(static_string_tbl) */
 #define STR_SEC_TEXT_OFFSET 1
@@ -99,7 +99,7 @@ error_def(ERR_OBJFILERR);
 void create_object_file(rhdtyp *rhead)
 {
         int             status, rout_len;
-        char            obj_name[sizeof(mident_fixed) + 5];
+        char            obj_name[SIZEOF(mident_fixed) + 5];
         mstr            fstr;
         parse_blk       pblk;
 
@@ -108,7 +108,7 @@ void create_object_file(rhdtyp *rhead)
         assert(!run_time);
 
         DEBUG_ONLY(obj_bytes_written = 0);
-        memset(&pblk, 0, sizeof(pblk));
+        memset(&pblk, 0, SIZEOF(pblk));
         pblk.buffer = object_file_name;
         pblk.buff_size = MAX_FBUFF;
 
@@ -117,8 +117,8 @@ void create_object_file(rhdtyp *rhead)
         fstr.addr = cmd_qlf.object_file.str.addr;
         rout_len = (int)module_name.len;
         memcpy(&obj_name[0], module_name.addr, rout_len);
-        memcpy(&obj_name[rout_len], DOTOBJ, sizeof(DOTOBJ));    /* includes null terminator */
-        pblk.def1_size = rout_len + sizeof(DOTOBJ) - 1;         /* Length does not include null terminator */
+        memcpy(&obj_name[rout_len], DOTOBJ, SIZEOF(DOTOBJ));    /* includes null terminator */
+        pblk.def1_size = rout_len + SIZEOF(DOTOBJ) - 1;         /* Length does not include null terminator */
         pblk.def1_buf = obj_name;
         status = parse_file(&fstr, &pblk);
         if (0 == (status & 1))
@@ -136,14 +136,14 @@ void create_object_file(rhdtyp *rhead)
  * 'tiz cleaner this way rather than converting one to the other type in order to be accommodated
  * in an array
  * */
-        assert(JSB_ACTION_N_INS * sizeof(jsb_action[0]) == sizeof(jsb_action)); /* JSB_ACTION_N_INS maintained? */
-        assert(sizeof(jsb_action) <= sizeof(rhead->jsb));                       /* overflow check */
+        assert(JSB_ACTION_N_INS * SIZEOF(jsb_action[0]) == SIZEOF(jsb_action)); /* JSB_ACTION_N_INS maintained? */
+        assert(SIZEOF(jsb_action) <= SIZEOF(rhead->jsb));                       /* overflow check */
 
-  	memcpy(rhead->jsb, (char *)jsb_action, sizeof(jsb_action)); /* action instructions */
-        memcpy(&rhead->jsb[sizeof(jsb_action)], JSB_MARKER,                     /* followed by GTM_CODE marker */
-               MIN(STR_LIT_LEN(JSB_MARKER), sizeof(rhead->jsb) - sizeof(jsb_action)));
+  	memcpy(rhead->jsb, (char *)jsb_action, SIZEOF(jsb_action)); /* action instructions */
+        memcpy(&rhead->jsb[SIZEOF(jsb_action)], JSB_MARKER,                     /* followed by GTM_CODE marker */
+               MIN(STR_LIT_LEN(JSB_MARKER), SIZEOF(rhead->jsb) - SIZEOF(jsb_action)));
 
-        emit_immed((char *)rhead, sizeof(*rhead));
+        emit_immed((char *)rhead, SIZEOF(*rhead));
 }
 
 
@@ -169,19 +169,19 @@ void close_object_file(void)
         string_tbl = malloc(SPACE_STRING_ALLOC_LEN);
         symIndex = 0;
 
-        strEntrySize = sizeof(static_string_tbl);
+        strEntrySize = SIZEOF(static_string_tbl);
         memcpy((string_tbl + symIndex), static_string_tbl, strEntrySize);
         symIndex += strEntrySize;
 
-        strEntrySize = sizeof(GTM_LANG);
+        strEntrySize = SIZEOF(GTM_LANG);
         memcpy((string_tbl + symIndex), GTM_LANG, strEntrySize);
         symIndex += strEntrySize;
 
-        strEntrySize = sizeof(GTM_PRODUCT);
+        strEntrySize = SIZEOF(GTM_PRODUCT);
         memcpy((string_tbl + symIndex), GTM_PRODUCT, strEntrySize);
         symIndex += strEntrySize;
 
-        strEntrySize = sizeof(GTM_RELEASE_NAME);
+        strEntrySize = SIZEOF(GTM_RELEASE_NAME);
         memcpy((string_tbl + symIndex), GTM_RELEASE_NAME, strEntrySize);
         symIndex += strEntrySize;
 
@@ -228,7 +228,7 @@ void close_object_file(void)
         ehdr->e_machine = EM_X86_64;
         ehdr->e_type = ET_REL;
         ehdr->e_version = EV_CURRENT;
-        ehdr->e_shoff = sizeof(Elf64_Ehdr);
+        ehdr->e_shoff = SIZEOF(Elf64_Ehdr);
         ehdr->e_flags = ELF64_LINKER_FLAG;
 
         if ((text_scn = elf_newscn(elf)) == NULL)
@@ -341,7 +341,7 @@ void close_object_file(void)
         symtab_data->d_off  = 0LL;
         symtab_data->d_buf  = symEntries;
         symtab_data->d_type = ELF_T_REL;
-        symtab_data->d_size = sizeof(Elf64_Sym) * i;
+        symtab_data->d_size = SIZEOF(Elf64_Sym) * i;
         symtab_data->d_version = EV_CURRENT;
 
         if ((symtab_shdr = elf64_getshdr(symtab_scn)) == NULL)
@@ -352,7 +352,7 @@ void close_object_file(void)
 
         symtab_shdr->sh_name = STR_SEC_SYMTAB_OFFSET;
         symtab_shdr->sh_type = SHT_SYMTAB;
-        symtab_shdr->sh_entsize = sizeof(Elf64_Sym) ;
+        symtab_shdr->sh_entsize = SIZEOF(Elf64_Sym) ;
         symtab_shdr->sh_link = SEC_STRTAB_INDX;
 
         elf_flagehdr(elf, ELF_C_SET, ELF_F_DIRTY);

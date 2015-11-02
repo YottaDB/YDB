@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,7 +116,7 @@ int gtmrecv(void)
 #ifdef VMS
 	pool_user = (CLI_PRESENT == cli_present("DUMMY_START")) ? GTMRECV_CHILD : GTMRECV;
 #endif
-	memset((uchar_ptr_t)&recvpool, 0, sizeof(recvpool));
+	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool));
 	if (-1 == gtmrecv_get_opt())
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
 	if (gtmrecv_options.start || gtmrecv_options.shut_down)

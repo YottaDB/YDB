@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,12 +77,11 @@ int compile_pattern(oprtype *opr, bool is_indirect)
 		retmval.mvtype = MV_STR;
 		retmval.str.len = retstr.len * SIZEOF(uint4);
 		retmval.str.addr = (char *)stringpool.free;
-		if (stringpool.top - stringpool.free < retmval.str.len)
-			stp_gcol(retmval.str.len);
+		ENSURE_STP_FREE_SPACE(retmval.str.len);
 		memcpy(stringpool.free, &retstr.buff[0], retmval.str.len);
 		stringpool.free += retmval.str.len;
 		*opr = put_lit(&retmval);
-		lexical_ptr = (char *)&source_buffer[last_source_column - 1];
+		lexical_ptr = instr.addr;
 		advancewindow();
 		advancewindow();
 		return TRUE;

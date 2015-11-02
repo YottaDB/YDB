@@ -46,6 +46,7 @@
 #include "gtm_string.h"
 #include "cli.h"
 #include "util.h"
+#include "wbox_test_init.h"
 
 GBLREF	bool		caller_id_flag;
 GBLREF	bool		in_mupip_freeze;

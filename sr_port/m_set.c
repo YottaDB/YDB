@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -153,7 +153,7 @@ int m_set(void)
 
 	temp_subs = FALSE;
 	dqinit(&targchain, exorder);
-	result = (oprtype *)mcalloc(sizeof(oprtype));
+	result = (oprtype *)mcalloc(SIZEOF(oprtype));
 	resptr = put_indr(result);
 	delimiter = sub = last = NULL;
 
@@ -260,10 +260,10 @@ int m_set(void)
 				/* If we are doing alias processing, there are two possibilities:
 
 				   1) LHS is unsubscripted - it is an alias variable being created or replaced. Need to parse
-				      the varname as if this were a regular set.
+				   the varname as if this were a regular set.
 				   2) LHS is subscripted - it is an alias container variable being created or replaced. The
-				      processing here is to pass the base variable index to the store routine so bypass the
-				      lvn() call.
+				   processing here is to pass the base variable index to the store routine so bypass the
+				   lvn() call.
 
 				*/
 				if (!alias_processing || TK_LPAREN == director_token)
@@ -478,7 +478,7 @@ int m_set(void)
 							{
 								put_oc = sub->opcode;
 								if ((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc)
-										|| (OC_GVEXTNAM == put_oc))
+								    || (OC_GVEXTNAM == put_oc))
 									break;
 							}
 							assert((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc)
@@ -566,7 +566,7 @@ int m_set(void)
 												      + delim_mval->str.len),
 												     0, NULL);
 									}
-								);
+									     );
 								if (valid_char || 1 == delim_mval->str.len)
 								{	/* This reference to a one character literal or a single
 									 * byte invalid utf8 character that needs to be turned into
@@ -582,13 +582,13 @@ int m_set(void)
 									UNICODE_ONLY(
 								        else
 									{	/* Potentially multiple bytes in one int */
-										assert(sizeof(int) >= delim_mval->str.len);
+										assert(SIZEOF(int) >= delim_mval->str.len);
 										memcpy(unichar.unibytes_val,
 										       delim_mval->str.addr,
 										       delim_mval->str.len);
 										s->opcode = OC_SETP1;
 									}
-									);
+										     );
 									delimlit = (mint)unichar.unichar_val;
 									delimiter->operand[0] = put_ilit(delimlit);
 									delim1char = TRUE;
@@ -743,40 +743,59 @@ int m_set(void)
 	assert(FIRST_SETLEFT_NOTSEEN != first_setleft_invalid);
 	temp_subs_was_FALSE = (FALSE == temp_subs);	/* Note down if temp_subs is FALSE at this point */
 	/* If we are in alias processing mode, the RHS cannot be an expression but must be one of a subscripted or unsubscripted
-	   local variable or an indirect reference. */
+	 * local variable, or a $$func(..) function call.
+	 */
 	if (!alias_processing)
 	{	/* Normal case first - evaluate expression creating triples on the current chain */
 		if (!expr(result))
 			SYNTAX_ERROR_NOREPORT_HERE;
 	} else
-	{	/* Alias processing -- again determine which of the two types of sources we have */
+	{	/* Alias processing -- determine which of the three types of sources we have: var, subscripted var or $$func */
 		allow_dzwrtac_as_mident();	/* Allow source of $ZWRTACxxx as an mident */
 		if (TK_IDENT != window_token)
-			/* Only local variables allowed as aliases */
-			SYNTAX_ERROR(ERR_ALIASEXPECTED);
-		if ('$' == *window_ident.addr && STR_LIT_LEN(DOLLAR_ZWRTAC) >= window_ident.len)
-			/* $ZWRTAC is not allowed as a "source" value. Must be a $ZWRTACn<nnn> format */
-			SYNTAX_ERROR(ERR_DZWRNOALIAS);
-		if (TK_LPAREN == director_token)
-		{	/* Subscripted local variable - have alias container.
-			   The storing opcode set into the "put" triple at the top of this routine was
-			   set assuming the source was an alias. Now that we know the source is actually
-			   an alias container (and hence a different data type), we need to adjust the
-			   opcode accordingly.
-			*/
-			if (OC_SETALS2ALS == put->opcode)
-				put->opcode = OC_SETALSCTIN2ALS;
-			else
-			{
-				assert(OC_SETALSIN2ALSCT == put->opcode);
-				put->opcode = OC_SETALSCT2ALSCT;
+		{	/* Check if we have a $$func() call source */
+			if (TK_DOLLAR == window_token && TK_DOLLAR == director_token)
+			{	/* Parse the function only with exfunc(). We definitely do not want an expression */
+				temp_subs = TRUE;	/* RHS $$ function detected - need temporary */
+				if (!exfunc(result, TRUE))
+					SYNTAX_ERROR_NOREPORT_HERE;
+				if (OC_SETALSIN2ALSCT == put->opcode)
+					/* Change opcode to create an alias container from the returned alias */
+					put->opcode = OC_SETFNRETIN2ALSCT;
+				else
+				{	/* Change opcode to create an alias from the returned alias */
+					assert(OC_SETALS2ALS == put->opcode);
+					put->opcode = OC_SETFNRETIN2ALS;
+				}
+			} else
+				/* Else, only local variables allowed as aliases */
+				SYNTAX_ERROR(ERR_ALIASEXPECTED);
+		} else
+		{	/* Alias var source */
+			if ('$' == *window_ident.addr && STR_LIT_LEN(DOLLAR_ZWRTAC) >= window_ident.len)
+				/* $ZWRTAC is not allowed as a "source" value. Must be a $ZWRTACn<nnn> format */
+				SYNTAX_ERROR(ERR_DZWRNOALIAS);
+			if (TK_LPAREN == director_token)
+			{	/* Subscripted local variable - have alias container.
+				   The storing opcode set into the "put" triple at the top of this routine was
+				   set assuming the source was an alias. Now that we know the source is actually
+				   an alias container (and hence a different data type), we need to adjust the
+				   opcode accordingly.
+				*/
+				if (OC_SETALS2ALS == put->opcode)
+					put->opcode = OC_SETALSCTIN2ALS;
+				else
+				{
+					assert(OC_SETALSIN2ALSCT == put->opcode);
+					put->opcode = OC_SETALSCT2ALSCT;
+				}
 			}
+			/* For RHS processing, both alias var and alias container vars have their lv_val addr
+			   passed so normal var processing applies.
+			*/
+			if (!lvn(result, OC_GETINDX, 0))
+				SYNTAX_ERROR(ERR_ALIASEXPECTED);
 		}
-		/* For RHS processing, both alias var and alias container vars have their lv_val addr
-		   passed so normal var processing applies.
-		*/
-		if (!lvn(result, OC_GETINDX, 0))
-			SYNTAX_ERROR(ERR_ALIASEXPECTED);
 	}
 
 	if (first_setleft_invalid)

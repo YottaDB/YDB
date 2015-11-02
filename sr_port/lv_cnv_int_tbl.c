@@ -31,8 +31,7 @@ void lv_cnv_int_tbl(lv_sbs_tbl *tbl)
 	assert (blk->nxt == 0);
 	assert (blk->sbs_que.fl && blk->sbs_que.bl);
        	f = (sbs_flt_struct *)&tbl->num->ptr.sbs_flt[0];
-
-       	for (i = 0, p = &old->ptr.lv[0], p_top = &old->ptr.lv[SBS_NUM_INT_ELE]; p < p_top; p++, i++)
+       	for (i = 0, p = &old->ptr.lv[0], p_top = ARRAYTOP(old->ptr.lv); p < p_top; p++, i++)
        	{
 		if (*p)
        	       	{

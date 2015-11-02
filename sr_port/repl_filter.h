@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,33 +45,32 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	format	format	version
  *	------	-------	--------
  *	V11	V11	GT.M V4.2-000
- *	V12	V12	GT.M V4.3-000	<--- filter support starts here (in Unix)
- *	V12	V13	GT.M V4.3-001	<--- filter support starts here (in VMS )
+ *	V12	V12	GT.M V4.3-000
+ *	V12	V13	GT.M V4.3-001
  *	V12	V14	GT.M V4.3-001A
- *	V15	V15	GT.M V4.4-002
+ *	V15	V15	GT.M V4.4-002	<--- filter support starts here
  *	V16	V16	GT.M V5.0-FT01
  *	V17	V17	GT.M V5.0-000
  *	V17	V18	GT.M V5.3-003	(EPOCH record format changed so no filter format change)
+ *	V19	V19	GT.M V5.4-000	(SET/KILL records have nodeflags, New ZTWORMHOLE record, file header max_jrec_len changes)
  */
 
 typedef enum
 {
-	REPL_FILTER_V12,
-	REPL_FILTER_V15,
-	REPL_FILTER_V16,
-	REPL_FILTER_V17,
+	REPL_FILTER_VNONE = 0,
+	REPL_FILTER_V15,	/* filter version 1 corresponds to journal format V15 */
+	REPL_FILTER_V17,	/* filter version 2 corresponds to journal format V17 */
+	REPL_FILTER_V19,	/* filter version 3 corresponds to journal format V19 */
 	REPL_FILTER_MAX
 } repl_filter_t;
 
 typedef enum
 {
-	REPL_JNL_V12,
-	REPL_JNL_V13,
-	REPL_JNL_V14,
 	REPL_JNL_V15,
 	REPL_JNL_V16,
 	REPL_JNL_V17,
 	REPL_JNL_V18,
+	REPL_JNL_V19,
 	REPL_JNL_MAX
 } repl_jnl_t;
 
@@ -79,33 +78,22 @@ GBLREF	int	jnl2filterfmt[];	/* Add row to this array in repl_filter.c whenever n
 
 #define IF_INVALID	((intlfltr_t)0L)
 #define IF_NONE		((intlfltr_t)(-1L))
-#define IF_12TO15	(intlfltr_t)jnl_v12tov15
-#define IF_15TO12	(intlfltr_t)jnl_v15tov12
-#define IF_16TO12	(intlfltr_t)jnl_v16tov12
-#define IF_16TO15	(intlfltr_t)jnl_v16tov15
-#define IF_15TO16	(intlfltr_t)jnl_v15tov16
-#define IF_12TO16	(intlfltr_t)jnl_v12tov16
-#define IF_16TO16	(intlfltr_t)jnl_v16tov16
-#define IF_17TO12	(intlfltr_t)jnl_v17tov12
-#define IF_17TO15	(intlfltr_t)jnl_v17tov15
-#define IF_15TO17	(intlfltr_t)jnl_v15tov17
-#define IF_12TO17	(intlfltr_t)jnl_v12tov17
-#define IF_17TO17	(intlfltr_t)jnl_v17tov17
+#define IF_19TO15	(intlfltr_t)jnl_v19TOv15
+#define IF_19TO17	(intlfltr_t)jnl_v19TOv17
+#define IF_15TO19	(intlfltr_t)jnl_v15TOv19
+#define IF_17TO19	(intlfltr_t)jnl_v17TOv19
+#define IF_19TO19	(intlfltr_t)jnl_v19TOv19
 
-extern int jnl_v12tov15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v15tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v16tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v16tov15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v15tov16(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v12tov16(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v16tov16(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v17tov12(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v17tov15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v15tov17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v12tov17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v17tov17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v19TOv15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v15TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v19TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v17TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v19TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+
 extern void repl_check_jnlver_compat(void);
-GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1][JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
+
+GBLREF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
+GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 
 /*
  * Writing a filter :
@@ -129,37 +117,12 @@ GBLREF intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1]
  */
 
 
-#define V12_JNL_VER			'\014' /* V4.3-000*/
-#define V12_JRT_RECTYPES		27
-#define V12_JREC_PREFIX_SIZE		8
-#define V12_JREC_SUFFIX_SIZE		8
-#define V12_JNL_REC_START_BNDRY		8
-#define V12_JREC_TYPE_OFFSET		0
-#define V12_MUMPS_NODE_OFFSET	(2 * sizeof(uint4) + sizeof(trans_num_4byte) + sizeof(int4) + sizeof(seq_num) + 2 * sizeof(uint4))
-#define V12_TCOM_TOKEN_OFFSET		(V12_MUMPS_NODE_OFFSET)
-#define V12_TCOM_PARTICIPANTS_OFFSET	(V12_TCOM_TOKEN_OFFSET + sizeof(token_num))
-#define V12_JNL_SEQNO_OFFSET		(2 * sizeof(uint4) + sizeof(trans_num_4byte) + sizeof(int4))
-#define V12_TP_SET_KILL_TOKEN_OFFSET	(4 * sizeof(uint4) + sizeof(trans_num_4byte) + sizeof(int4) + sizeof(seq_num))
-#define V12_REC_SEQNO_OFFSET		(2 * sizeof(uint4) + sizeof(trans_num_4byte))
+#define TP_TOKEN_TID_SIZE		(SIZEOF(token_num) + 8)
+#define	TOKEN_PARTICIPANTS_TS_SHORT_TIME_SIZE (SIZEOF(token_num) + 2 * SIZEOF(uint4))
 
-#define TP_TOKEN_TID_SIZE		(sizeof(token_num) + 8)
-#define	TOKEN_PARTICIPANTS_TS_SHORT_TIME_SIZE (sizeof(token_num) + 2 * sizeof(uint4))
-
-#define V13_JNL_VER			'\015'
-
-#define V15_JNL_VER			'\017'
-#define V15_JNL_LABEL_TEXT		"GDSJNL15"
-#define V15_JNL_VER_EARLIEST_REPL	'\013' /* from GDSJNL11 (V4.2-002), octal equivalent of decimal 11 */
-#define V15_JNL_SEQNO_OFFSET 		(sizeof(jrec_prefix) - 2 * sizeof(uint4))
-#define V15_TCOM_PARTICIPANTS_OFFSET 	(V15_JNL_SEQNO_OFFSET + sizeof(token_num) + 8)
-#define V15_ZTCOM_PARTICIPANTS_OFFSET 	(V15_JNL_SEQNO_OFFSET + sizeof(token_num))
-#define PRE_V15_JNL_REC_TRAILER		0xFE
-#define V16_JNL_SEQNO_OFFSET 		V15_JNL_SEQNO_OFFSET
-#define V16_TCOM_PARTICIPANTS_OFFSET 	V15_TCOM_PARTICIPANTS_OFFSET
-#define V16_ZTCOM_PARTICIPANTS_OFFSET 	V15_ZTCOM_PARTICIPANTS_OFFSET
-#define V17_JNL_SEQNO_OFFSET 		sizeof(jrec_prefix)
-#define V17_TCOM_PARTICIPANTS_OFFSET 	(V17_JNL_SEQNO_OFFSET + sizeof(token_num) + 8)
-#define V17_ZTCOM_PARTICIPANTS_OFFSET 	(V17_JNL_SEQNO_OFFSET + sizeof(token_num))
+#define V15_JNL_VER			15
+#define V18_JNL_VER			18
+#define V19_JNL_VER			19
 
 typedef struct
 {
@@ -169,12 +132,6 @@ typedef struct
 	jnl_tm_t		time;			/* 4-byte time stamp both for UNIX and VMS */
 	trans_num_4byte		tn;
 } v15_jrec_prefix;	/* 16-byte */
-typedef struct
-{
-	int4			filler_suffix;
-	unsigned int		backptr : 24;
-	unsigned int		suffix_code : 8;
-} pre_v15_jrec_suffix;
 
 int repl_filter_init(char *filter_cmd);
 int repl_filter(seq_num tr_num, unsigned char *tr, int *tr_len, int bufsize);

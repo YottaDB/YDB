@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,7 @@ void cmj_housekeeping(void)
 	/* add to the free list up to poll size if necessary */
 	while (ntd_root->free_count < ntd_root->pool_size)
 	{
-		lnk = (struct CLB *)malloc(sizeof(*lnk) + ntd_root->usr_size);
+		lnk = (struct CLB *)malloc(SIZEOF(*lnk) + ntd_root->usr_size);
 		assert(lnk);
 		cmj_init_clb(ntd_root, lnk);
 		if (ntd_root->mbl)

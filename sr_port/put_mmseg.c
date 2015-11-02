@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,11 +29,11 @@ void put_mmseg(caddr_t begin, size_t size)
 	mmseg	*curr, *next;
 
 	/* --- caddr_t should be 64 bits --- */
-	assert(8 == sizeof(caddr_t));
+	assert(8 == SIZEOF(caddr_t));
 
 	/* --- create the new item --- */
-	curr = (mmseg *)malloc(sizeof(mmseg));
-	memset((char *)curr, 0, sizeof(mmseg));
+	curr = (mmseg *)malloc(SIZEOF(mmseg));
+	memset((char *)curr, 0, SIZEOF(mmseg));
 	curr->begin = (sm_uc_ptr_t)begin;
 	curr->end = (sm_uc_ptr_t)begin + size;
 

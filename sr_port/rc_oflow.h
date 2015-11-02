@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@ struct rc_oflow {
 typedef struct rc_oflow	 rc_oflow;
 
 /* DT block header is 24 bytes, need to leave space */
-#define RC_BLKHD_PAD (24 - sizeof(blk_hdr))
+#define RC_BLKHD_PAD (24 - SIZEOF(blk_hdr))
 /* DT has 6 byte max key at end, need to leave space */
 #define RC_MAXKEY_PAD 6
 /* DT puts in a fake first key */

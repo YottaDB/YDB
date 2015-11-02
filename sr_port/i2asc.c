@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@ uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 	unsigned char	ar[MAX_DIGITS_IN_INT], *q;
 	unsigned	m, len;
 
-	q = ar + sizeof(ar);
+	q = ar + SIZEOF(ar);
 	if (!n)
 		*--q = '0';
 	else
@@ -33,7 +33,7 @@ uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 		}
 	}
 	assert((uintszofptr_t)q >= (uintszofptr_t)ar);
-	len = (unsigned int)(ar + sizeof(ar) - q);
+	len = (unsigned int)(ar + SIZEOF(ar) - q);
 	memcpy(p, q, len);
 	return p + len;
 }
@@ -44,7 +44,7 @@ uchar_ptr_t i2ascl(uchar_ptr_t p, qw_num n)
 	uint4		len;
 	long		 r;
 
-	q = ar + sizeof(ar);
+	q = ar + SIZEOF(ar);
 	if (QWEQ(n, seq_num_zero))
 		*--q = '0';
 	else
@@ -56,7 +56,7 @@ uchar_ptr_t i2ascl(uchar_ptr_t p, qw_num n)
 		}
 	}
 	assert((uintszofptr_t)q >= (uintszofptr_t)ar);
-	len = (uint4)(ar + sizeof(ar) - q);
+	len = (uint4)(ar + SIZEOF(ar) - q);
 	memcpy(p, q, len);
 	return (unsigned char *)(p + len) ;
 }
@@ -67,7 +67,7 @@ uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 	uint4		len;
 	qw_num		m;
 
-	q = ar + sizeof(ar);
+	q = ar + SIZEOF(ar);
 	if (!n)
 		*--q = '0';
 	else
@@ -83,7 +83,7 @@ uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 		}
 	}
 	assert((uintszofptr_t)q >= (uintszofptr_t)ar);
-	len = (uint4)(ar + sizeof(ar) - q);
+	len = (uint4)(ar + SIZEOF(ar) - q);
 	memcpy(p, q, len);
 	return p + len;
 }
@@ -94,7 +94,7 @@ uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 	uint4		msb, lsb, len, nibble;
 	int		i;
 
-	q = ar + sizeof(ar);
+	q = ar + SIZEOF(ar);
 	lsb = n.value[lsb_index];
 	msb = n.value[msb_index];
 	if (msb)
@@ -125,7 +125,7 @@ uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 		}
 	}
 	assert((uintszofptr_t)q >= (uintszofptr_t)ar);
-	len = ar + sizeof(ar) - q;
+	len = ar + SIZEOF(ar) - q;
 	memcpy(p, q, len);
 	return p + len;
 }

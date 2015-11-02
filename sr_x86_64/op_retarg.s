@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,6 +29,7 @@
 # PUBLIC	op_retarg
 ENTRY op_retarg
 	movq	REG64_RET0,REG64_ARG0
+	movq	REG64_RET1,REG64_ARG1
 	call	unw_retarg
 	addq    $8, REG_SP
 	getframe

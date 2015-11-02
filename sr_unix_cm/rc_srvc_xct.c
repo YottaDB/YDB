@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,7 +85,7 @@ rc_srvc_xact(cptr, xend)
 
 	/* Reserve space for the RC header in the response buffer */
 	fxhdr = (rc_xblk_hdr *) cptr->xptr;
-	cptr->xptr += sizeof(rc_xblk_hdr);
+	cptr->xptr += SIZEOF(rc_xblk_hdr);
 
 	/* If true, this not a known RC block type */
 	if (fxhdr->method.value != RC_METHOD)
@@ -176,7 +176,7 @@ rc_srvc_xact(cptr, xend)
 			{
 				rc_size_return = (int4)((char *) fxhdr
 					+ fxhdr->end.value - RC_MIN_CPT_SIZ - (char *) qhdr
-					- sizeof(rc_rsp_page) + 1);
+					- SIZEOF(rc_rsp_page) + 1);
 			}
 			rc_overflow = cptr->of;
 			rc_errno = RC_SUCCESS;
@@ -247,7 +247,7 @@ rc_srvc_xact(cptr, xend)
 					    "RC Request returned error.");
 			dumped = 1;
 #endif
-			eptr = (rc_clnt_err *) malloc(sizeof(rc_clnt_err));
+			eptr = (rc_clnt_err *) malloc(SIZEOF(rc_clnt_err));
 			eptr->pid = (qhdr->r.pid1.value << 16) | qhdr->r.pid2.value;
 			eptr->next = elst;
 			elst = eptr;

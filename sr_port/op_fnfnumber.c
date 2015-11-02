@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,8 +38,7 @@ void op_fnfnumber(mval *src, mval *fmt, mval *dst)
 	   as a local version of the src must be operated upon in order to get
 	   a canonical number
 	*/
-	if ((stringpool.top - stringpool.free) < MAX_NUM_SIZE * 2)
-		stp_gcol(MAX_NUM_SIZE * 2);
+	ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE * 2);
 	/* operate on the src operand in a temp, so that
 	   conversions are possible without destroying the source
 	*/

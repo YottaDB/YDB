@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +14,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <signal.h>
-#include <string.h>
+#include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
 
@@ -27,7 +27,7 @@
 #include "op.h"
 
 GBLREF	io_pair		io_std_device;
-GBLREF	mstr 		dollar_zsource;
+GBLREF	mval 		dollar_zsource;
 GBLREF	mstr		editor;
 GBLREF	int4		dollar_zeditor;
 GBLREF	zro_ent		*zro_root;
@@ -65,7 +65,7 @@ void op_zedit(mval *v, mval *p)
 	src.addr = v->str.addr;
 	if (0 == src.len)
 		rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = es;
 	pblk.buff_size = MAX_FBUFF;
 	status = parse_file(&src, &pblk);
@@ -106,9 +106,9 @@ void op_zedit(mval *v, mval *p)
 		else if ((STR_LIT_LEN(DOTM) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTM))
 			typ = STR_LIT_LEN(DOTM);
 	}
-	dollar_zsource.addr = es;
-	dollar_zsource.len = path_len - typ;
-	s2pool(&dollar_zsource);
+	dollar_zsource.str.addr = es;
+	dollar_zsource.str.len = path_len - typ;
+	s2pool(&dollar_zsource.str);
 	es[path_len] = 0;
 	if (!exp_dir)
 	{
@@ -137,7 +137,7 @@ void op_zedit(mval *v, mval *p)
 		{
 			assert(ZRO_TYPE_SOURCE == srcdir->type);
 			tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1;
-			if (path_len + srcdir->str.len + tslash >= sizeof(es))
+			if (path_len + srcdir->str.len + tslash >= SIZEOF(es))
 				rts_error(VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
 			memmove(&es[ srcdir->str.len + tslash], &es[0], path_len);
 			if (tslash)

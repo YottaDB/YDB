@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,6 +86,7 @@ GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	int			gtmsource_srv_count;
 GBLREF	boolean_t		primary_side_std_null_coll;
+GBLREF	boolean_t		primary_side_trigger_support;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
@@ -112,7 +113,7 @@ int gtmsource()
 	error_def(ERR_REPLOFFJNLON);
 	error_def(ERR_NULLCOLLDIFF);
 
-	memset((uchar_ptr_t)&jnlpool, 0, sizeof(jnlpool_addrs));
+	memset((uchar_ptr_t)&jnlpool, 0, SIZEOF(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
 	ESTABLISH_RET(gtmsource_ch, SS_NORMAL);
 	if (-1 == gtmsource_get_opt())
@@ -277,6 +278,7 @@ int gtmsource()
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
 	}
+	primary_side_trigger_support = GTMTRIG_ONLY(TRUE;) NON_GTMTRIG_ONLY(FALSE;)
 	/* Initialize source server alive/dead state related fields in "gtmsource_local" before the ftok semaphore is released */
 	gtmsource_local->gtmsource_pid = process_id;
 	gtmsource_local->gtmsource_state = GTMSOURCE_START;

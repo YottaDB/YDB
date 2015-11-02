@@ -105,12 +105,11 @@ typedef struct
 	int4		dt_index_cnt;
 	int4		gvt_leaf_cnt;
 	int4		gvt_index_cnt;
-	unsigned char	regname[32]; 		/* Region name for DSE (MAX_RN_LEN + 1 on V4) */
-	                                        /* .. Note since test system runs on V50FT01, just make max 32 */
-	unsigned char	dbfn[256];		/* Database file name (MAX_FN_LEN + 1 on V4) */
+	unsigned char	regname[V4_MAX_RN_LEN + 1];	/* Region name for DSE */
+	unsigned char	dbfn[V4_MAX_FN_LEN + 1];	/* Database file name */
 	int4		uid_len;		/* Length of following unique id field (varies across platforms, used by v5cbsu) */
 	unique_file_id	unique_id;		/* Make sure this DB doesn't move  */
-	char		fillx[32 - sizeof(unique_file_id)];	/* Fill out for variable size of unique_id */
+	char		fillx[32 - SIZEOF(unique_file_id)];	/* Fill out for variable size of unique_id */
 	char		fill512[152];		/* Pad out to 512 for VMS oddities with fixed record IO and hdr rewrite */
 } p1hdr;
 
@@ -269,10 +268,10 @@ typedef struct
 {												\
 	update_array_ptr = (char_ptr_t)ROUND_UP2((INTPTR_T)update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE);	\
 	(ARRAY) = (blk_segment *)update_array_ptr; 						\
-	update_array_ptr += BLK_SEG_ARRAY_SIZE * sizeof(blk_segment); 				\
+	update_array_ptr += BLK_SEG_ARRAY_SIZE * SIZEOF(blk_segment); 				\
 	assert(((update_array + update_array_size) - update_array_ptr) >= 0); 			\
 	(BNUM) = (ARRAY + 1); 									\
-	blk_seg_cnt = sizeof(v15_blk_hdr);							\
+	blk_seg_cnt = SIZEOF(v15_blk_hdr);							\
 }
 
 /* ***************************************************************************
@@ -288,7 +287,7 @@ typedef struct
 #define BLK_FINI(BNUM,ARRAY) 								\
 (											\
 	(BNUM--)->addr = (uchar_ptr_t)0,						\
-	(blk_seg_cnt <= blk_size  &&  blk_seg_cnt >= sizeof(v15_blk_hdr))		\
+	(blk_seg_cnt <= blk_size  &&  blk_seg_cnt >= SIZEOF(v15_blk_hdr))		\
 		? (ARRAY)[0].addr = (uchar_ptr_t)(BNUM), (ARRAY)[0].len = blk_seg_cnt	\
 		: 0									\
 )

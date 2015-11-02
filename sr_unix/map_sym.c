@@ -50,7 +50,7 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 	static MSTR_CONST(version_sym, "gtm_ac_version");
 
 	coll_lib_found = FALSE;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(fspec, &fspec_trans, buffer, sizeof(buffer), do_sendmsg_on_log2long)))
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(fspec, &fspec_trans, buffer, SIZEOF(buffer), do_sendmsg_on_log2long)))
 		return FALSE;
 	if (NULL == (handle = fgn_getpak(buffer, INFO)))
 		return FALSE;

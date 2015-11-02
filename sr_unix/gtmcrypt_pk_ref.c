@@ -263,7 +263,7 @@ int gc_pk_scrub_plaintext_keys_from_c_stack()
 {
 	char lclarray[8192];
 
-	memset(lclarray, 0, sizeof(lclarray));
+	memset(lclarray, 0, SIZEOF(lclarray));
 }
 
 /* This function tries to decrypt the cipher file (the file containing the symmetric key with which the database is encrypted).
@@ -319,7 +319,7 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, char *plain_text,
 	}
 	if (NULL != plain_data)
 	{	/* scrub plaintext data before releasing it */
-		assert(GTM_KEY_MAX == sizeof(null_buffer));
+		assert(GTM_KEY_MAX == SIZEOF(null_buffer));
 		memset(null_buffer, 0, GTM_KEY_MAX);
 		gpgme_data_write(plain_data, null_buffer, GTM_KEY_MAX);
 		gpgme_data_release(plain_data);

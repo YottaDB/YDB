@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,6 @@
 #define MAX_SPGC_PER_LVGC 64
 
 #include "zwrite.h"
-
-/* Debug fprintf with pre and post requisite flushing of appropriate streams */
-#define DBGFPF(x) {flush_pio(); fprintf x; fflush(stderr);}
 
 /* Macro used intermittently in code to debug alias code in general. Note this macro must be specified
    as a compile option since it is used in macros that do not pull in this alias.h header file.

@@ -174,7 +174,7 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 {
 	assert (jmp_offset != 0);
 	force_32 = TRUE;
-	jmp_offset -= code_idx * sizeof(code_buf[0]);	/* size of this particular instruction */
+	jmp_offset -= code_idx * SIZEOF(code_buf[0]);	/* size of this particular instruction */
 
 	switch (cg_phase)
 	{
@@ -237,11 +237,11 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 				if (branch_op == GENERIC_OPCODE_BR)
 				{
 					assert(0 == call_4lcldo_variant || JMP_LONG_INST_SIZE == call_4lcldo_variant || force_32);
-					jmp_offset -= sizeof(int4) + 1;
+					jmp_offset -= SIZEOF(int4) + 1;
 					code_buf[code_idx++] = I386_INS_JMP_Jv;
 				} else
 				{
-					jmp_offset -= sizeof(int4) + 2;
+					jmp_offset -= SIZEOF(int4) + 2;
 					code_buf[code_idx++] = I386_INS_Two_Byte_Escape_Prefix;
 					switch (branch_op)
 					{
@@ -269,7 +269,7 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 					}
 				}
 				*((int4 *)&code_buf[code_idx]) = jmp_offset;
-				code_idx += sizeof(int4);
+				code_idx += SIZEOF(int4);
 			}
 	}
 	force_32 = FALSE;
@@ -279,7 +279,7 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 
 void	emit_base_offset(int base_reg, int offset)
 {
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info));
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info));
 	emit_base_info.rex = REX_OP; /* All instructions that we generate need to set the REX prefix */
 
 	emit_base_info.modrm_byte_set = 1;
@@ -429,7 +429,7 @@ void print_instruction()
 	obpt = &outbuf[0];
 	memset(obpt, SP, ASM_OUT_BUFF);
 	obpt += 10;
-	i2hex((curr_addr - sizeof(rhdtyp)), obpt, 8);
+	i2hex((curr_addr - SIZEOF(rhdtyp)), obpt, 8);
 	curr_addr += (instidx - prev_idx);
 	obpt += 10;
 	for( ;  prev_idx < instidx; prev_idx++)

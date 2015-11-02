@@ -45,13 +45,12 @@ void op_fnzahandle(lv_val *srclv, mval *dst)
 	/* Now convert handle to return value -- return ascii-ized addr if present */
 	if (NULL != handle)
 	{
-		if (stringpool.top - stringpool.free < ALIAS_HANDLE_LENGTH)
-			stp_gcol(ALIAS_HANDLE_LENGTH);
+		ENSURE_STP_FREE_SPACE(ALIAS_HANDLE_LENGTH);
 		dst->str.addr = (char *)stringpool.free;
 		/* 32 bit platforms require double conversion of "handle" to avoid spurious compilation warnings */
 		dst->str.len = i2hexl_nofill((qw_num)((UINTPTR_T)handle), (unsigned char *)dst->str.addr, ALIAS_HANDLE_LENGTH);
 		stringpool.free += dst->str.len;
 		dst->mvtype = MV_STR;
 	} else
-		memcpy(dst, &literal_null, sizeof(mval));
+		memcpy(dst, &literal_null, SIZEOF(mval));
 }

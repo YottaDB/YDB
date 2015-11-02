@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,9 @@ GBLREF mval		dollar_estack_delta;
 GBLREF mval		dollar_zyerror;
 GBLREF mval		dollar_zgbldir;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
+#ifdef GTM_TRIGGER
+GBLREF int4		gtm_trigger_depth;
+#endif
 
 /* Routine to NEW a special intrinsic variable. Note that gtm_newinstrinsic(),
    which actually does the dirty work, may shift the stack to insert the mv_stent
@@ -47,9 +50,15 @@ void op_newintrinsic(int intrtype)
 	mval		*intrinsic;
 	boolean_t	stored_explicit_null;
 
+	error_def(ERR_NOZTRAPINTRIG);
+
 	switch(intrtype)
 	{
 		case SV_ZTRAP:
+#			ifdef GTM_TRIGGER
+			if (0 < gtm_trigger_depth)
+				rts_error(VARLSTCNT(1) ERR_NOZTRAPINTRIG);
+#			endif
 			/* Due to the potential intermix of $ETRAP and $ZTRAP, we put a condition on the
 			   explicit NEWing of these two special variables. If "the other" trap handler
 			   definition is not null (meaning this handler is not in control) then we will

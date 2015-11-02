@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,13 +25,11 @@
 #include "cli.h"
 #include "iosp.h"
 #include "jnl.h"
-
+#include "gtmimagename.h"
 #include "gtm_rename.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
 #include "gtm_file_stat.h"
-
-GBLREF boolean_t	run_time;
 
 /* --------------------------------------------------------------------------------
 	This function  renames a file, if exists. Otherwise do nothing.
@@ -58,7 +56,7 @@ int rename_file_if_exists(char *org_fn, int org_fn_len, char *rename_fn, int *re
 	assert(0 == rename_fn[*rename_fn_len]);
 	if (SS_NORMAL != (status= gtm_rename(org_fn, org_fn_len, rename_fn, *rename_fn_len, ustatus)))
 	{
-		if (run_time)
+		if (IS_GTM_IMAGE)
 			send_msg(VARLSTCNT(9) ERR_RENAMEFAIL, 4, org_fn_len, org_fn, *rename_fn_len, rename_fn,
 				status, 0, *ustatus);
 		else
@@ -66,7 +64,7 @@ int rename_file_if_exists(char *org_fn, int org_fn_len, char *rename_fn, int *re
 				status, PUT_SYS_ERRNO(*ustatus));
 		return RENAME_FAILED;
 	}
-	if (run_time)
+	if (IS_GTM_IMAGE)
 		send_msg(VARLSTCNT (6) ERR_FILERENAME, 4, org_fn_len, org_fn, *rename_fn_len, rename_fn);
 	else
 		gtm_putmsg(VARLSTCNT (6) ERR_FILERENAME, 4, org_fn_len, org_fn, *rename_fn_len, rename_fn);

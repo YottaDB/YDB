@@ -108,38 +108,10 @@ int4	time();
 static struct itimerval sys_timer, old_sys_timer;
 #endif
 
-#if defined(__STDC__) || defined(_SYSTYPE_SVR4)
-static void add_timer(ABS_TIME *atp,
-		      TID tid,
-		      int4 time_to_expir,
-		      void (*handler)(),
-		      int4 hdata_len,
-		      void *hdata);
-static void remove_timer(TID tid);
-static void start_first_timer(ABS_TIME *atp);
-static void sys_canc_timer(TID tid);
-#else
-static void add_timer();
-static void remove_timer();
-static void start_first_timer();
-static void sys_canc_timer();
-#endif
-
-static void cancel_all_timers(void);
-static void init_timers (void);
-
 /* following can be used to see why timer_handler was called */
 #define DUMMY_SIG_NUM 0
-static void timer_handler(int why);
-static void start_timer_int(TID tid,
-			    int4 time_to_expir,
-			    void (*handler)(),
-			    int4 hdata_len,
-			    void *hdata);
-/*
- * Chain of pending timer requests in time order
- */
-volatile static GT_TIMER *timeroot = NULL;
+
+volatile STATICDEF GT_TIMER *timeroot = NULL;	/* Chain of pending timer requests in time order */
 static boolean_t first_timeset = TRUE;
 /*
  * Chain of unused timer request blocks
@@ -166,7 +138,6 @@ GBLDEF volatile boolean_t timer_in_handler = FALSE;     /* set to TRUE when time
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
 
-static void hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
 static void (*safe_handlers[])() = {hiber_wake, wake_alarm , NULL};
 
 /*
@@ -174,7 +145,7 @@ static void (*safe_handlers[])() = {hiber_wake, wake_alarm , NULL};
  * Uninitialize timers and signals
  * --------------------------------------
  */
-void	uninit_timers (void)
+void	uninit_timers(void)
 {
 	/* restore previous handler */
 	sigaction(SIGALRM, &prev_alrm_handler, NULL);
@@ -187,7 +158,7 @@ void	uninit_timers (void)
  *  (not go back to sleep).
  * --------------------------------------
  */
-static void hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag)
+STATICFNDEF void hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag)
 {
 	**waitover_flag = TRUE;
 }
@@ -286,7 +257,7 @@ void	hiber_start (uint4 hiber)
 	waitover = FALSE;		/* When OUR timer pops, it will set this flag */
 	waitover_addr = &waitover;
 	tid = (TID)waitover_addr;	/* Unique id of this timer */
-	start_timer_int((TID)tid, hiber, hiber_wake, sizeof(waitover_addr), &waitover_addr);
+	start_timer_int((TID)tid, hiber, hiber_wake, SIZEOF(waitover_addr), &waitover_addr);
 
 	/* We will loop here until OUR timer pops and sets OUR flag. Otherwise
 	   we will keep waiting for it. */
@@ -381,38 +352,31 @@ void start_timer(TID tid,
  * does as explained above in start_timer.
  * ------------------------------------------------------
  */
-static void start_timer_int(TID tid,
-			    int4 time_to_expir,
-			    void (*handler)(),
-			    int4 hdata_len,
-			    void *hdata)
+STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata)
 {
 	ABS_TIME at;
 
  	assert(0 != time_to_expir);
 	sys_get_curr_time(&at);
-
 	if (first_timeset)
 	{
 		init_timers();
 		first_timeset = FALSE;
 	}
-
-	if (timeroot && timeroot->tid == tid)
-	{
-		sys_canc_timer(tid);
-	}
-
-	/* Remove timer from chain */
-	remove_timer(tid);
-
+	/* We expect no timer with id=<tid> to exist in the timer queue currently. This is asserted in "add_timer" call below.
+	 * In pro though, we'll be safe and remove any tids that exist before adding a new entry with the same tid - 2009/10.
+	 * If a few years pass without the assert failing, it might be safe then to remove the PRO_ONLY code below.
+	 */
+	PRO_ONLY(
+		if (timeroot && (timeroot->tid == tid))
+			sys_canc_timer(tid);
+		remove_timer(tid); /* Remove timer from chain */
+	)
 	/* Link new timer into timer chain */
 	add_timer(&at, tid, time_to_expir, handler, hdata_len, hdata);
-
-	if (timeroot->tid == tid || FALSE == timer_active)
+	if ((timeroot->tid == tid) || !timer_active)
 		start_first_timer(&at);
 }
-
 
 /*
  * ---------------------------------------------
@@ -465,7 +429,7 @@ void cancel_timer(TID tid)
  *	handler		- address of handler routine
  * ----------------------------------------------------
  */
-static void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)())
+STATICFNDEF void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)())
 {
 #ifdef BSD_TIMER
 	if (time_to_expir->at_sec == 0 && time_to_expir->at_usec < (1000000 / HZ))
@@ -495,7 +459,7 @@ static void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)())
  * Start the first timer in the timer chain
  * ----------------------------------------
  */
-static void start_first_timer(ABS_TIME *curr_time)
+STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 {
 	ABS_TIME eltime, interval;
 
@@ -540,7 +504,7 @@ static void start_first_timer(ABS_TIME *curr_time)
  *
  * ------------------------------------------------------
  */
-static void timer_handler(int why)
+STATICFNDEF void timer_handler(int why)
 {
 	int4		cmp;
 	GT_TIMER	*tpop;
@@ -606,7 +570,7 @@ static void timer_handler(int why)
  *	tprev is set to the link previous to the tid link
  * ------------------------------------------------------
  */
-static GT_TIMER *find_timer(TID tid, GT_TIMER **tprev)
+STATICFNDEF GT_TIMER *find_timer(TID tid, GT_TIMER **tprev)
 {
 	GT_TIMER *tp, *tc;
 
@@ -642,12 +606,7 @@ static GT_TIMER *find_timer(TID tid, GT_TIMER **tprev)
  *	FALSE	- timer could not be added
  * --------------------------------------------------
  */
-static void add_timer(ABS_TIME *atp,
-		      TID tid,
-		      int4 time_to_expir,
-		      void (*handler)(),
-		      int4 hdata_len,
-		      void *hdata)
+STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata)
 {
 	GT_TIMER	*tp, *tpp, *ntp, *lastntp;
 	int4		cmp, i;
@@ -729,7 +688,7 @@ static void add_timer(ABS_TIME *atp,
  * Remove timer from the timer chain
  * ---------------------------------------------
  */
-static void remove_timer(TID tid)
+STATICFNDEF void remove_timer(TID tid)
 {
 	GT_TIMER *tprev, *tp, *tpp;
 
@@ -752,11 +711,11 @@ static void remove_timer(TID tid)
  * System call to cancel timer.
  * ---------------------------------------------
  */
-static void	sys_canc_timer (TID tid)
+STATICFNDEF void	sys_canc_timer (TID tid)
 {
 #ifdef BSD_TIMER
 	struct itimerval zero;
-	memset(&zero, 0, sizeof(struct itimerval));
+	memset(&zero, 0, SIZEOF(struct itimerval));
 	setitimer(ITIMER_REAL, &zero, &old_sys_timer);
 #else
 	alarm(0);
@@ -776,7 +735,7 @@ static void	sys_canc_timer (TID tid)
  * ---------------------------------------------
  *
  */
-static void cancel_all_timers(void)
+STATICFNDEF void cancel_all_timers(void)
 {
 	if (timeroot)
 		sys_canc_timer(timeroot->tid);
@@ -791,7 +750,7 @@ static void cancel_all_timers(void)
  * Initialize timers
  * --------------------------------------
  */
-static void	init_timers ()
+STATICFNDEF void	init_timers()
 {
 	struct sigaction	act;
 	error_def(ERR_TIMERHANDLER);
@@ -879,4 +838,21 @@ void	check_for_timer_pops()
 			LEN_AND_STR(whenstolen[stolenwhen - 1]));
 		assert(FALSE);	/* does not return here */
 	}
+}
+
+/* Externally exposed routine that does a find_timer and is SIGALRM interrupt safe. */
+GT_TIMER *find_timer_intr_safe(TID tid, GT_TIMER **tprev)
+{
+	sigset_t 	savemask;
+	GT_TIMER	*tcur;
+
+	/* Before scanning timer queues, block SIGALRM signal as otherwise that signal could cause an interrupt
+	 * timer routine to be driven which could in turn modify the timer queues while this mainline code is
+	 * examining the very same queue. This could cause all sorts of invalid returns (of tcur and tprev)
+	 * from the find_timer call below.
+	 */
+	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
+	tcur = find_timer(tid, tprev);
+	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	return tcur;
 }

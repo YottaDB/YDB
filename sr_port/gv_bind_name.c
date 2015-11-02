@@ -81,9 +81,9 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 		acc_meth = gv_cur_region->dyn.addr->acc_meth;
 		if ((dba_cm == acc_meth) || (dba_usr == acc_meth))
 		{
-			gv_target = malloc(sizeof(gv_namehead) + gvent.var_name.len);
-			memset(gv_target, 0, sizeof(gv_namehead) + gvent.var_name.len);
-			gv_target->gvname.var_name.addr = (char *)gv_target + sizeof(gv_namehead);
+			gv_target = malloc(SIZEOF(gv_namehead) + gvent.var_name.len);
+			memset(gv_target, 0, SIZEOF(gv_namehead) + gvent.var_name.len);
+			gv_target->gvname.var_name.addr = (char *)gv_target + SIZEOF(gv_namehead);
 			gv_target->nct = 0;
 			gv_target->collseq = NULL;
 			gv_target->regcnt = 1;
@@ -95,7 +95,7 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 			assert(gv_cur_region->max_key_size <= MAX_KEY_SZ);
 			gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size, &gvent, gv_cur_region);
 		}
-		gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
+		gvnh_reg = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));
 		gvnh_reg->gvt = gv_target;
 		gvnh_reg->gd_reg = gv_cur_region;
 		if (NULL != tabent)

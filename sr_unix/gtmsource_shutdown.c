@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@
 #ifdef UNIX
 #include "ftok_sems.h"
 #endif
+#include "gtm_c_stack_trace.h"
 
 #define	GTMSOURCE_WAIT_FOR_SHUTDOWN	(1000 - 1) /* ms, almost 1 s */
 
@@ -63,6 +64,7 @@ GBLREF	boolean_t		is_src_server;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	boolean_t		pool_init;
+GBLREF	gd_addr			*gd_header;
 
 int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 {
@@ -126,14 +128,23 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in source server shutdown rel_sem"),
 				REPL_SEM_ERRNO);
 		repl_inst_ftok_sem_release();
+		gvinit();	/* Get the gd header*/
 		/* Wait for ONE particular or ALL source servers to die */
-		for (lcnt = 0; GTMSOURCE_MAX_SHUTDOWN_WAITLOOP > lcnt; lcnt++)
+		repl_log(stdout, TRUE, TRUE, "Waiting for upto [%d] seconds for the source server to shutdown\n",
+			GTMSOURCE_MAX_SHUTDOWN_WAITLOOP);
+		for (lcnt = 1; GTMSOURCE_MAX_SHUTDOWN_WAITLOOP >= lcnt; lcnt++)
 		{
 			all_dead = TRUE;
 			for (index = 0; index < maxindex; index++)
 			{
 				if ((0 < savepid[index]) && is_proc_alive(savepid[index], 0))
+				{
 					all_dead = FALSE;
+#					ifdef DEBUG
+					if (!(lcnt % 60))
+						GET_C_STACK_FROM_SCRIPT("ERR_SHUTDOWN_INFO", process_id, savepid[index], lcnt);
+#					endif
+				}
 			}
 			if (!all_dead)
 			{
@@ -142,15 +153,17 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 				break;
 		}
 		if (GTMSOURCE_MAX_SHUTDOWN_WAITLOOP <= lcnt)
-		{	/* Waited too long for one or more source server processes to die. Display the list of pids that
-			 * wont die along with the secondary instances they correspond to. Users need to kill these
-			 * pids and reissue the shutdown command for the journal pool to be cleaned up.
+		{	/* Max timeout over, take stack trace of all the source server(s) which are still running.
+			 * Display the list of pids that wont die along with the secondary instances they correspond to.
+			 * Users need to kill these pids and reissue the shutdown command for the journal pool to be cleaned up.
 			 */
 			repl_log(stderr, TRUE, TRUE, "Error : Timed out waiting for following source server process(es) to die\n");
-			for (index = 0; index < maxindex; index++)
+			for (lcnt = 0, index = 0; index < maxindex; index++)
 			{
 				if ((0 < savepid[index]) && is_proc_alive(savepid[index], 0))
 				{
+					lcnt++;
+					GET_C_STACK_FROM_SCRIPT("ERR_SHUTDOWN", process_id, savepid[index], lcnt);
 					if (NULL != jnlpool.gtmsource_local)
 					{
 						assert(0 == index);
@@ -164,6 +177,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			}
 			repl_log(stderr, FALSE, TRUE, "Shutdown cannot proceed. Stop the above processes and reissue "
 					"the shutdown command.\n");
+			assert (FALSE);
 			return (ABNORMAL_SHUTDOWN);
 		}
 		/* At this point, the source server process is dead. The call to "gtmsource_ipc_cleanup" below relies on this. */

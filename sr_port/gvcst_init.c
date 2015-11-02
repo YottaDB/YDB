@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_addrs		*cs_addrs_list;
 GBLREF	boolean_t		gtcm_connection;
 GBLREF	bool			licensed;
 GBLREF	int4			lkid;
@@ -75,7 +76,6 @@ GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	buddy_list		*global_tlvl_info_list;
-GBLREF	enum gtmImageTypes	image_type;
 GBLREF	int4			tprestart_syslog_limit;
 GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
 GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
@@ -90,6 +90,7 @@ GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		new_dbinit_ipc;
 GBLREF	gvt_container		*gvt_pending_list;
 GBLREF	boolean_t		dse_running;
+GBLREF	jnl_gbls_t		jgbl;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -101,57 +102,61 @@ void	assert_jrec_member_offsets(void)
 	assert(DISK_BLOCK_SIZE >= PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN);
 	/* Following assert is for JNL_FILE_TAIL_PRESERVE macro in tp.h */
 	assert(PINI_RECLEN >= EPOCH_RECLEN && PINI_RECLEN >= PFIN_RECLEN && PINI_RECLEN >= EOF_RECLEN);
-	assert(sizeof(jnl_str_len_t) == sizeof(uint4));
+	/* jnl_string structure has a 8-bit nodeflags field and a 24-bit length field. In some cases, this is
+	 * used as a 32-bit length field (e.g. in the value part of the SET record or ZTWORMHOLE record). These
+	 * usages treat the 32-bits as a jnl_str_len_t type and access it directly. Hence the requirement that
+	 * jnl_str_len_t be the same size as 32-bits and also the same as the offset to the "text" member.
+	 * If this assert fails, all places that reference jnl_str_len_t need to be revisited.
+	 */
+	assert(SIZEOF(jnl_str_len_t) == SIZEOF(uint4));
+	assert(SIZEOF(jnl_str_len_t) == offsetof(jnl_string, text[0]));
 	/* since time in jnl record is a uint4, and since JNL_SHORT_TIME expects time_t, we better ensure they are same.
 	 * A change in the size of time_t would mean a redesign of the fields.  */
 
-	assert(sizeof(time_t) == GTM64_ONLY(sizeof(gtm_int8)) NON_GTM64_ONLY(sizeof(int4)));
+	assert(SIZEOF(time_t) == GTM64_ONLY(SIZEOF(gtm_int8)) NON_GTM64_ONLY(SIZEOF(int4)));
 
 	/* Make sure all jnl_seqno fields start at same offset. mur_output_record and others rely on this. */
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_upd, token_seq.jnl_seqno));
-	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_ztp_upd, jnl_seqno));
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_epoch, jnl_seqno));
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_eof, jnl_seqno));
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_tcom, token_seq.jnl_seqno));
-	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_ztcom, jnl_seqno));
+	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_ztworm, token_seq.jnl_seqno));
 
-	assert(offsetof(struct_jrec_ztcom, token) == offsetof(struct_jrec_ztp_upd, token));
+	assert(offsetof(struct_jrec_ztcom, token) == offsetof(struct_jrec_upd, token_seq));
 	/* Make sure all jnl_seqno and token fields start at 8-byte boundary */
 	assert(offsetof(struct_jrec_upd, token_seq.jnl_seqno) ==
-		(ROUND_UP(offsetof(struct_jrec_upd, token_seq.jnl_seqno), sizeof(seq_num))));
-	assert(offsetof(struct_jrec_ztp_upd, jnl_seqno) ==
-		(ROUND_UP(offsetof(struct_jrec_ztp_upd, jnl_seqno), sizeof(seq_num))));
+		(ROUND_UP(offsetof(struct_jrec_upd, token_seq.jnl_seqno), SIZEOF(seq_num))));
 	assert(offsetof(struct_jrec_tcom, token_seq.jnl_seqno) ==
-		(ROUND_UP(offsetof(struct_jrec_tcom, token_seq.jnl_seqno), sizeof(seq_num))));
-	assert(offsetof(struct_jrec_ztcom, jnl_seqno) ==
-		(ROUND_UP(offsetof(struct_jrec_ztcom, jnl_seqno), sizeof(seq_num))));
+		(ROUND_UP(offsetof(struct_jrec_tcom, token_seq.jnl_seqno), SIZEOF(seq_num))));
 	assert(offsetof(struct_jrec_null, jnl_seqno) ==
-		(ROUND_UP(offsetof(struct_jrec_null, jnl_seqno), sizeof(seq_num))));
+		(ROUND_UP(offsetof(struct_jrec_null, jnl_seqno), SIZEOF(seq_num))));
 	assert(offsetof(struct_jrec_epoch, jnl_seqno) ==
-		(ROUND_UP(offsetof(struct_jrec_epoch, jnl_seqno), sizeof(seq_num))));
+		(ROUND_UP(offsetof(struct_jrec_epoch, jnl_seqno), SIZEOF(seq_num))));
 	assert(offsetof(struct_jrec_eof, jnl_seqno) ==
-		(ROUND_UP(offsetof(struct_jrec_eof, jnl_seqno), sizeof(seq_num))));
+		(ROUND_UP(offsetof(struct_jrec_eof, jnl_seqno), SIZEOF(seq_num))));
 	/* All fixed size records must be multiple of 8-byte */
-	assert(TCOM_RECLEN == (ROUND_UP(sizeof(struct_jrec_tcom), JNL_REC_START_BNDRY)));
-	assert(ZTCOM_RECLEN == (ROUND_UP(sizeof(struct_jrec_ztcom), JNL_REC_START_BNDRY)));
-	assert(INCTN_RECLEN == (ROUND_UP(sizeof(struct_jrec_inctn), JNL_REC_START_BNDRY)));
-	assert(PINI_RECLEN == (ROUND_UP(sizeof(struct_jrec_pini), JNL_REC_START_BNDRY)));
-	assert(PFIN_RECLEN == (ROUND_UP(sizeof(struct_jrec_pfin), JNL_REC_START_BNDRY)));
-	assert(NULL_RECLEN == (ROUND_UP(sizeof(struct_jrec_null), JNL_REC_START_BNDRY)));
-	assert(EPOCH_RECLEN == (ROUND_UP(sizeof(struct_jrec_epoch), JNL_REC_START_BNDRY)));
-	assert(EOF_RECLEN == (ROUND_UP(sizeof(struct_jrec_eof), JNL_REC_START_BNDRY)));
+	assert(TCOM_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_tcom), JNL_REC_START_BNDRY)));
+	assert(ZTCOM_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_ztcom), JNL_REC_START_BNDRY)));
+	assert(INCTN_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_inctn), JNL_REC_START_BNDRY)));
+	assert(PINI_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_pini), JNL_REC_START_BNDRY)));
+	assert(PFIN_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_pfin), JNL_REC_START_BNDRY)));
+	assert(NULL_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_null), JNL_REC_START_BNDRY)));
+	assert(EPOCH_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_epoch), JNL_REC_START_BNDRY)));
+	assert(EOF_RECLEN == (ROUND_UP(SIZEOF(struct_jrec_eof), JNL_REC_START_BNDRY)));
 	/* Assumption about the structures in code */
 	assert(0 == MIN_ALIGN_RECLEN % JNL_REC_START_BNDRY);
-	assert(sizeof(uint4) == sizeof(jrec_suffix));
+	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
 	assert((MAX_JNL_REC_SIZE - MAX_LOGI_JNL_REC_SIZE) > MIN_PBLK_RECLEN);
 	assert((DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) >= MAX_JNL_REC_SIZE);/* default alignsize supports max jnl record length */
 	assert(MAX_DB_BLK_SIZE < MAX_JNL_REC_SIZE);	/* Ensure a PBLK record can accommodate a full GDS block */
+	assert(MAX_JNL_REC_SIZE <= (1 << 24));
+		/* Ensure that the 24-bit length field in the journal record can accommodate the maximum journal record size */
 	assert(tcom_record.prefix.forwptr == tcom_record.suffix.backptr);
 	assert(TCOM_RECLEN == tcom_record.suffix.backptr);
-	assert(sizeof(token_split_t) == sizeof(token_build));   /* Required for TOKEN_SET macro */
+	assert(SIZEOF(token_split_t) == SIZEOF(token_build));   /* Required for TOKEN_SET macro */
 }
 
-void gvcst_init (gd_region *greg)
+void gvcst_init(gd_region *greg)
 {
 	sgmnt_addrs		*csa, *prevcsa, *regcsa;
 	sgmnt_data_ptr_t	csd, temp_cs_data;
@@ -181,19 +186,19 @@ void gvcst_init (gd_region *greg)
 	hash_table_mname	*table;
 	boolean_t		added, first_wasopen;
 
-	error_def(ERR_DBFLCORRP);
-	error_def(ERR_DBCREINCOMP);
-	error_def(ERR_DBNOTGDS);
 	error_def(ERR_BADDBVER);
-	error_def(ERR_MMNODYNUPGRD);
+	error_def(ERR_DBCREINCOMP);
+	error_def(ERR_DBFLCORRP);
+	error_def(ERR_DBNOTGDS);
 	error_def(ERR_DBVERPERFWARN1);
 	error_def(ERR_DBVERPERFWARN2);
+	error_def(ERR_MMNODYNUPGRD);
 
+	assert(!jgbl.forw_phase_recovery);
 	CWS_INIT;	/* initialize the cw_stagnate hash-table */
-
 	/* check the header design assumptions */
-	assert(sizeof(th_rec) == (sizeof(bt_rec) - sizeof(bt->blkque)));
-	assert(sizeof(cache_rec) == (sizeof(cache_state_rec) + sizeof(cr->blkque)));
+	assert(SIZEOF(th_rec) == (SIZEOF(bt_rec) - SIZEOF(bt->blkque)));
+	assert(SIZEOF(cache_rec) == (SIZEOF(cache_state_rec) + SIZEOF(cr->blkque)));
 	DEBUG_ONLY(assert_jrec_member_offsets();)
         set_num_additional_processors();
 
@@ -215,7 +220,7 @@ void gvcst_init (gd_region *greg)
 	{
 		log_nam.addr = GTM_TPRESTART_LOG_LIMIT;
 		log_nam.len = STR_LIT_LEN(GTM_TPRESTART_LOG_LIMIT);
-		if (SS_NORMAL == TRANS_LOG_NAME(&log_nam, &trans_log_nam, trans_buff, sizeof(trans_buff), do_sendmsg_on_log2long))
+		if (SS_NORMAL == TRANS_LOG_NAME(&log_nam, &trans_log_nam, trans_buff, SIZEOF(trans_buff), do_sendmsg_on_log2long))
 		{
 			tprestart_syslog_limit = ATOI(trans_log_nam.addr);
 			if (0 > tprestart_syslog_limit)
@@ -223,7 +228,7 @@ void gvcst_init (gd_region *greg)
 		}
 		log_nam.addr = GTM_TPRESTART_LOG_DELTA;
 		log_nam.len = STR_LIT_LEN(GTM_TPRESTART_LOG_DELTA);
-		if (SS_NORMAL == TRANS_LOG_NAME(&log_nam, &trans_log_nam, trans_buff, sizeof(trans_buff), do_sendmsg_on_log2long))
+		if (SS_NORMAL == TRANS_LOG_NAME(&log_nam, &trans_log_nam, trans_buff, SIZEOF(trans_buff), do_sendmsg_on_log2long))
 		{
 			tprestart_syslog_delta = ATOI(trans_log_nam.addr);
 			if (0 > tprestart_syslog_delta)
@@ -247,7 +252,7 @@ void gvcst_init (gd_region *greg)
 			 * names whose gv_targets have already been allocated on behalf of the current database file.
 			 * Future targ_allocs will check this list before they allocate (to avoid duplicate allocations).
 			 */
-			csa->gvt_hashtab = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+			csa->gvt_hashtab = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 			init_hashtab_mname(csa->gvt_hashtab, 0);
 			assert(1 == csa->regcnt);
 			first_wasopen = TRUE;
@@ -316,7 +321,7 @@ void gvcst_init (gd_region *greg)
 	 * mupip_set_journal trying to switch journals across all regions. Currently, there is no fine-granular
 	 * checking for mupip_set_journal, hence a coarse MUPIP_IMAGE check for image_type
 	 */
-	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || MUPIP_IMAGE == image_type || (0 == have_crit(CRIT_HAVE_ANY_REG)));
+	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || IS_MUPIP_IMAGE || (0 == have_crit(CRIT_HAVE_ANY_REG)));
 	if ((0 < dollar_tlevel) && (0 != have_crit(CRIT_HAVE_ANY_REG)))
 	{	/* To avoid deadlocks with currently holding crits and the DLM lock request to be done in db_init(),
 		 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
@@ -324,7 +329,7 @@ void gvcst_init (gd_region *greg)
 		 * region has already been opened (i.e. greg->was_open = TRUE logic above) since in that case we dont
 		 * do any heavyweight processing (like db_init which involves crit/DLM locks) and so dont need to restart.
 		 */
-		insert_region(greg, &tp_reg_list, &tp_reg_free_list, sizeof(tp_region));
+		insert_region(greg, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		t_retry(cdb_sc_needcrit);
 		assert(FALSE);	/* we should never reach here since t_retry should have unwound the M-stack and restarted the TP */
 	}
@@ -363,7 +368,7 @@ void gvcst_init (gd_region *greg)
 	fc->file_type = greg_acc_meth;
 	fc->op = FC_READ;
 	fc->op_buff = (sm_uc_ptr_t)temp_cs_data;
-	fc->op_len = sizeof(*temp_cs_data);
+	fc->op_len = SIZEOF(*temp_cs_data);
 	fc->op_pos = 1;
 	dbfilop(fc);
 
@@ -411,7 +416,7 @@ void gvcst_init (gd_region *greg)
 	 * BG
 	 *	bt_header
 	 *	(bt_buckets * bt_rec)
-	 *	th_base (sizeof(que_ent) into an odd bt_rec)
+	 *	th_base (SIZEOF(que_ent) into an odd bt_rec)
 	 *	bt_base
 	 *	(n_bts * bt_rec)
 	 *	LOCK_BLOCK (lock_space)
@@ -450,14 +455,20 @@ void gvcst_init (gd_region *greg)
 	/* Unfortunately, GDS_LABEL_SZ can't be defined with STR_LIT_LEN because of header nesting issues.
 	 * So, let's make sure it's correct.
 	 */
-	assert(GDS_LABEL_SZ == sizeof(GDS_LABEL));
+	assert(GDS_LABEL_SZ == SIZEOF(GDS_LABEL));
 	assert(offsetof(node_local, fname[0]) == GDS_LABEL_SZ);
 	assert(offsetof(node_local, now_running[0]) == GDS_LABEL_SZ + MAX_FN_LEN + 1);
-	assert(sizeof(csa->nl->now_running) == MAX_REL_NAME);
+	assert(SIZEOF(csa->nl->now_running) == MAX_REL_NAME);
 	db_init(greg, temp_cs_data);
 	crash_count = csa->critical->crashcnt;
 	csa->regnum = ++region_open_count;
 	csd = csa->hdr;
+#	ifdef GTM_TRIGGER
+	/* Take copy of db trigger cycle into csa at db startup. Any concurrent changes to the
+	 * db trigger cycle (by MUPIP TRIGGER) will be detected at tcommit (t_end/tp_tend) time.
+	 */
+	csa->db_trigger_cycle = csd->db_trigger_cycle;
+#	endif
 	/* set csd and fill in selected fields */
 	assert(greg_acc_meth == greg->dyn.addr->acc_meth);
 	switch (greg_acc_meth)
@@ -505,8 +516,8 @@ void gvcst_init (gd_region *greg)
 		assert(update_array == NULL);
 		assert(update_array_ptr == NULL);
 		assert(update_array_size == 0);
-		tmp_ua = (ua_list *)malloc(sizeof(ua_list));
-		memset(tmp_ua, 0, sizeof(ua_list));	/* initialize tmp_ua->update_array and tmp_ua->next_ua to NULL */
+		tmp_ua = (ua_list *)malloc(SIZEOF(ua_list));
+		memset(tmp_ua, 0, SIZEOF(ua_list));	/* initialize tmp_ua->update_array and tmp_ua->next_ua to NULL */
 		tmp_ua->update_array = (char *)malloc(segment_update_array_size);
 		tmp_ua->update_array_size = segment_update_array_size;
 		/* assign global variables only after malloc() succeeds */
@@ -540,7 +551,7 @@ void gvcst_init (gd_region *greg)
 	{
 		if (NULL == non_tp_jfb_ptr)
 		{
-			non_tp_jfb_ptr = (jnl_format_buffer *)malloc(sizeof(jnl_format_buffer));
+			non_tp_jfb_ptr = (jnl_format_buffer *)malloc(SIZEOF(jnl_format_buffer));
 			non_tp_jfb_buff_ptr =  (unsigned char *)malloc(MAX_JNL_REC_SIZE);
 			non_tp_jfb_ptr->buff = (char *) non_tp_jfb_buff_ptr;
 			/* If the journal records need to be encrypted in the journal file and if replication is in use,
@@ -571,12 +582,12 @@ void gvcst_init (gd_region *greg)
 		 */
 		csa->min_total_nontpjnl_rec_size = PINI_RECLEN + MIN_ALIGN_RECLEN;
 	}
-	if (tp_in_use || GTM_IMAGE != image_type)
+	if (tp_in_use || !IS_GTM_IMAGE)
 		gvcst_tp_init(greg);	/* Initialize TP structures, else postpone till TP is used (only if GTM) */
 	if (!global_tlvl_info_list)
 	{
-		global_tlvl_info_list = (buddy_list *)malloc(sizeof(buddy_list));
-		initialize_list(global_tlvl_info_list, sizeof(global_tlvl_info), GBL_TLVL_INFO_LIST_INIT_ALLOC);
+		global_tlvl_info_list = (buddy_list *)malloc(SIZEOF(buddy_list));
+		initialize_list(global_tlvl_info_list, SIZEOF(global_tlvl_info), GBL_TLVL_INFO_LIST_INIT_ALLOC);
 	}
 	greg->open = TRUE;
 	greg->opening = FALSE;
@@ -625,32 +636,26 @@ void gvcst_init (gd_region *greg)
 		 */
 		prevcsa = NULL;
 		greg_fid = &(csa->nl->unique_id);
-		for (addr_ptr = get_next_gdr(NULL); NULL != addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		for (regcsa = cs_addrs_list; NULL != regcsa; regcsa = regcsa->next_csa)
 		{
-			for (prev_reg = addr_ptr->regions, reg_top = prev_reg + addr_ptr->n_regions; prev_reg < reg_top; prev_reg++)
+			if ((NULL != prevcsa) && (regcsa->fid_index < prevcsa->fid_index))
+				continue;
+			reg_fid = &((regcsa)->nl->unique_id);
+			VMS_ONLY(if (0 < memcmp(&(greg_fid->file_id), (char *)&(reg_fid->file_id), SIZEOF(gd_id))))
+			UNIX_ONLY(if (0 < gdid_cmp(&(greg_fid->uid), &(reg_fid->uid))))
 			{
- 				if (!prev_reg->open || prev_reg->was_open || (greg == prev_reg))
-					continue;
-				/* Only BG/MM regions can be involved in TP transactions, do not sort GT.CM or DDP regions */
-				if (!((dba_bg == prev_reg->dyn.addr->acc_meth) || (dba_mm == prev_reg->dyn.addr->acc_meth)))
-					continue;
-				regcsa = (sgmnt_addrs *)&FILE_INFO(prev_reg)->s_addrs;
-				if ((NULL != prevcsa) && (regcsa->fid_index < prevcsa->fid_index))
-					continue;
-				reg_fid = &((regcsa)->nl->unique_id);
-				VMS_ONLY(if (0 < memcmp(&(greg_fid->file_id), (char *)&(reg_fid->file_id), sizeof(gd_id))))
-				UNIX_ONLY(if (0 < gdid_cmp(&(greg_fid->uid), &(reg_fid->uid))))
-				{
-					if (NULL == prevcsa || regcsa->fid_index > prevcsa->fid_index)
-						prevcsa = regcsa;
-				} else
-					regcsa->fid_index++;
-			}
+				if ((NULL == prevcsa) || (regcsa->fid_index > prevcsa->fid_index))
+					prevcsa = regcsa;
+			} else
+				regcsa->fid_index++;
 		}
 		if (NULL == prevcsa)
 			csa->fid_index = 1;
 		else
 			csa->fid_index = prevcsa->fid_index + 1;
+		/* Add current csa into list of open csas */
+		csa->next_csa = cs_addrs_list;
+		cs_addrs_list = csa;
 		/* Also update tp_reg_list fid_index's as insert_region relies on it */
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 			tr->file.fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;

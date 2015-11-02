@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ void murgetlst(void)
 	inc_list_struct	*ptr;
 	error_def(ERR_MUNODBNAME);
 
-	len = sizeof(buff);
+	len = SIZEOF(buff);
 	if (!cli_get_str(name,buff,&len))
 		mupip_exit(ERR_MUNODBNAME);
 
@@ -40,7 +40,7 @@ void murgetlst(void)
 	for (c1 = c2 = buff; ; )
 	{	for ( ; *c2 && (*c2 != ',') ; c2++)
 			;
-		ptr->next = (inc_list_struct*)malloc(sizeof(inc_list_struct));
+		ptr->next = (inc_list_struct*)malloc(SIZEOF(inc_list_struct));
 		ptr = ptr->next;
 		ptr->next = 0;
 		ptr->input_file.len = INTCAST(c2 - c1);

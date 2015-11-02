@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "do_shmat.h"		/* for do_shmat() prototype */
+#include "mutex.h"
 #endif
 
 #include "gtm_file_stat.h"
@@ -90,6 +91,7 @@
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "add_inter.h"
 #include "gtm_logicals.h"
+#include "gtm_c_stack_trace.h"
 
 #if defined(UNIX)
 # define PATH_DELIM		'/'
@@ -136,6 +138,7 @@ GBLREF  int		process_exiting;		/* Process is on it's way out */
 #ifdef UNIX
 GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
 GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	uint4		mutex_per_process_init_pid;
 #endif
 
 LITREF char             gtm_release_name[];
@@ -179,7 +182,7 @@ void mupip_backup_call_on_signal(void)
 {															\
 	if (JNL_ENABLED(cs_data)											\
 		UNIX_ONLY( && (0 != cs_addrs->nl->jnl_file.u.inode))							\
-		VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))))	\
+		VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid)))))	\
 	{														\
 		jpc = cs_addrs->jnl;											\
 		jbp = jpc->jnl_buff;											\
@@ -237,21 +240,23 @@ void mupip_backup(void)
 	char			instfilename[MAX_FN_LEN + 1], *errptr;
 	unsigned int		full_len;
 	unix_db_info		*udi;
+	sgmnt_addrs		*csa;
 	repl_inst_hdr		repl_instance;
-	unsigned char		*cmdptr, command[MAX_FN_LEN * 2 + 5]; /* 5 == sizeof("cp") + 2 (space) + 1 (NULL) */
+	unsigned char		*cmdptr, command[MAX_FN_LEN * 2 + 5]; /* 5 == SIZEOF("cp") + 2 (space) + 1 (NULL) */
 	struct shmid_ds		shm_buf;
 	int4			shm_id;
 	replpool_identifier	replpool_id;
 	sm_uc_ptr_t		start_addr;
-	seq_num			jnl_seqno;
 	int			group_id;
 	int			perm;
 #else
 # error UNSUPPORTED PLATFORM
 #endif
+	seq_num			jnl_seqno;
 	now_t			now;						/* for GET_CUR_TIME macro */
 	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	ZOS_ONLY(int		realfiletag;)
+	uint4			*kip_pids_arr_ptr;
 
 	error_def(ERR_BACKUPCTRL);
 	error_def(ERR_DBCCERR);
@@ -313,7 +318,7 @@ void mupip_backup(void)
 		if (0 == cli_get_hex64("TRANSACTION", &temp_tn))
 		{
 			temp_tn = 0;
-			s_len = sizeof(since_buff);
+			s_len = SIZEOF(since_buff);
 			if (cli_get_str("SINCE", (char *)since_buff, &s_len))
 			{
 				lower_to_upper(since_buff, since_buff, s_len);
@@ -376,7 +381,7 @@ void mupip_backup(void)
 		jnl_options[jnl_disable] = TRUE;
 	else if (journal)
 	{
-		s_len = sizeof(jnl_str);
+		s_len = SIZEOF(jnl_str);
 		UNSUPPORTED_PLATFORM_CHECK;
 		if (!CLI_GET_STR_ALL("JOURNAL", jnl_str_ptr, &s_len))
 			mupip_exit(ERR_MUPCLIERR);
@@ -411,7 +416,7 @@ void mupip_backup(void)
 			mupip_exit(ERR_MUPCLIERR);
 		}
 	}
-	mu_getlst("REG_NAME", sizeof(backup_reg_list));
+	mu_getlst("REG_NAME", SIZEOF(backup_reg_list));
 	if (error_mupip)
 	{
 		mubclnup(NULL, need_to_free_space);
@@ -512,9 +517,9 @@ void mupip_backup(void)
 	if (TRUE == online)
 	{
 		tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME;
-		tempdir_log.len = sizeof(GTM_BAK_TEMPDIR_LOG_NAME) - 1;
+		tempdir_log.len = SIZEOF(GTM_BAK_TEMPDIR_LOG_NAME) - 1;
 		trans_log_name_status =
-			TRANS_LOG_NAME(&tempdir_log, &tempdir_trans, tempdir_trans_buffer, sizeof(tempdir_trans_buffer),
+			TRANS_LOG_NAME(&tempdir_log, &tempdir_trans, tempdir_trans_buffer, SIZEOF(tempdir_trans_buffer),
 					do_sendmsg_on_log2long);
 		/* save the length of the "base" so we can (restore it and) re-use the string in tempdir_trans.addr */
 		tempdir_trans_len = tempdir_trans.len;
@@ -559,7 +564,7 @@ void mupip_backup(void)
 		   UNIX where we are making the same restirction due to lack of testing more than anything else
 		   so the hard coded value will do for now. SE 5/2005
 		*/
-		if (incremental && ((32 * 1024) - sizeof(shmpool_blk_hdr)) < cs_data->blk_size)
+		if (incremental && ((32 * 1024) - SIZEOF(shmpool_blk_hdr)) < cs_data->blk_size)
 		{	/* Limitation: VMS RMS IO limited to 32K - 1 VMS blk so we likewise limit our IO. This can be
 			   overcome with more code to deal with the larger block sizes much like the regular
 			   backup does but this is not being done as part of this (64bittn) project. SE 2/2005
@@ -582,7 +587,7 @@ void mupip_backup(void)
 			else if (incremental && (backup_to_file != rptr->backup_to))
 			{
 				tempdir_trans.addr = tempdir_trans_buffer;
-				tempdir_trans.len = sizeof(SCRATCH_DIR) - 1;
+				tempdir_trans.len = SIZEOF(SCRATCH_DIR) - 1;
 				memcpy(tempdir_trans_buffer, SCRATCH_DIR, tempdir_trans.len);
 				tempdir_trans_buffer[tempdir_trans.len]='\0';
 			} else
@@ -687,7 +692,7 @@ void mupip_backup(void)
 							& (~((XAB$M_NODEL << XAB$V_SYS) | (XAB$M_NODEL << XAB$V_OWN)));
 			temp_nam = cc$rms_nam;
 			temp_nam.nam$l_rsa = rptr->backup_tempfile;
-			temp_nam.nam$b_rss = sizeof(rptr->backup_tempfile) - 1;	/* temp solution, note it is a byte value */
+			temp_nam.nam$b_rss = SIZEOF(rptr->backup_tempfile) - 1;	/* temp solution, note it is a byte value */
 
 			temp_fab = cc$rms_fab;
 			temp_fab.fab$l_nam = &temp_nam;
@@ -700,7 +705,7 @@ void mupip_backup(void)
 			temp_file_name_len = exp_file_name_len = strlen(tempfilename);
 			memcpy(exp_file_name, tempfilename, temp_file_name_len);
 			if (!get_full_path(tempfilename, temp_file_name_len, exp_file_name,
-						&exp_file_name_len, sizeof(exp_file_name), &ustatus))
+						&exp_file_name_len, SIZEOF(exp_file_name), &ustatus))
 			{
 				util_out_print("!/Unable to resolve concealed definition for file !AD ", TRUE,
 						temp_file_name_len, tempfilename);
@@ -782,7 +787,7 @@ void mupip_backup(void)
 			mu_gv_cur_reg_init();
 			jnlpool.jnlpool_dummy_reg = reg = gv_cur_region;
 			gv_cur_region = r_save;
-			ASSERT_IN_RANGE(MIN_RN_LEN, sizeof(JNLPOOL_DUMMY_REG_NAME) - 1, MAX_RN_LEN);
+			ASSERT_IN_RANGE(MIN_RN_LEN, SIZEOF(JNLPOOL_DUMMY_REG_NAME) - 1, MAX_RN_LEN);
 			MEMCPY_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME);
 			reg->rname_len = STR_LIT_LEN(JNLPOOL_DUMMY_REG_NAME);
 			reg->rname[reg->rname_len] = '\0';
@@ -856,6 +861,7 @@ void mupip_backup(void)
 			if (rptr->not_this_time > keep_going)
 				continue;
 			TP_CHANGE_REG(rptr->reg);
+			kip_pids_arr_ptr = cs_addrs->nl->kip_pid_array;
 			if (debug_mupip)
 			{
 				GET_CUR_TIME;
@@ -863,7 +869,10 @@ void mupip_backup(void)
 					CTIME_BEFORE_NL, time_ptr, DB_LEN_STR(gv_cur_region));
 			}
 			while (cs_data->kill_in_prog && (MAX_CRIT_TRY > crit_counter++))
+			{
+				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
 				wcs_sleep(crit_counter);
+			}
 		}
 		if (debug_mupip)
 		{
@@ -924,12 +933,13 @@ void mupip_backup(void)
 	{
 		mup_bak_pause(); /* ? save some crit time? */
 		backup_started = TRUE;
+		DEBUG_ONLY(jnl_seqno = 0;)
 #ifdef UNIX
 		if (NULL != mu_repl_inst_reg_list)
-		{	/* Backup the replication instance file. To do this there is no need to attach to the journal pool.
-			 * All that is needed is a system "cp" command of the instance file to the destination file.
-			 * After that we need to update a few fields in the file header to make it correspond to the
-			 * databases and reflect the fact that this is a cleanly shutdown instance file.
+		{	/* Backup the replication instance file. To do this all that is needed is a system "cp" command
+			 * of the instance file to the destination file. After that we need to update a few fields in the
+			 * file header to make it correspond to the databases and reflect the fact that this is a
+			 * cleanly shutdown instance file.
 			 */
 			cmdptr = &command[0];
 			memcpy(cmdptr, "cp ", 3);
@@ -952,7 +962,7 @@ void mupip_backup(void)
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done;
 			}
-			repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+			repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 			jnlpool.repl_inst_filehdr = &repl_instance;
 			shm_id = repl_instance.jnlpool_shmid;
 			/* If the journal pool does not exist, it means the instance file is not in use and hence to back it
@@ -980,7 +990,7 @@ void mupip_backup(void)
 					error_mupip = TRUE;
 					goto repl_inst_bkup_done;
 				}
-				memcpy((void *)&replpool_id, (void *)start_addr, sizeof(replpool_identifier));
+				memcpy((void *)&replpool_id, (void *)start_addr, SIZEOF(replpool_identifier));
 				if (memcmp(replpool_id.label, GDS_RPL_LABEL, GDS_LABEL_SZ - 1))
 				{
 					if (!memcmp(replpool_id.label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))
@@ -1003,7 +1013,20 @@ void mupip_backup(void)
 					error_mupip = TRUE;
 					goto repl_inst_bkup_done;
 				}
-				jnl_seqno = ((jnlpool_ctl_ptr_t)start_addr)->jnl_seqno;
+				csa = &udi->s_addrs;
+				jnlpool.jnlpool_ctl = (jnlpool_ctl_ptr_t)start_addr;
+				csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE);
+				csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE
+									+ SIZEOF(mutex_spin_parms_struct));
+				/* Do the per process initialization of mutex stuff (needed before grab_lock is done) */
+				assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
+				if (!mutex_per_process_init_pid)
+					mutex_per_process_init();
+				grab_lock(jnlpool.jnlpool_dummy_reg);
+				jnl_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+				assert(0 != jnl_seqno);
+				rel_lock(jnlpool.jnlpool_dummy_reg);
+				jnlpool.jnlpool_ctl = NULL;	/* or else exit handling will try to rel_lock this as well */
 				if (-1 == shmdt((caddr_t)start_addr))
 				{
 					save_errno = errno;
@@ -1012,7 +1035,6 @@ void mupip_backup(void)
 					error_mupip = TRUE;
 					goto repl_inst_bkup_done;
 				}
-				assert(0 != jnl_seqno);
 				/* All the cleanup we want is exactly done by the "repl_inst_triple_truncate" function. But
 				 * we dont want to clean the instance file. We want to instead clean the backed up instance file.
 				 * To that effect, temporarily change "udi->fn" to reflect the backed up file so all the changes
@@ -1023,6 +1045,7 @@ void mupip_backup(void)
 				udi->fn = (char *)seg->fname;
 			} else
 				jnl_seqno = jnlpool.repl_inst_filehdr->jnl_seqno;
+			assert(0 != jnl_seqno);
 repl_inst_bkup_done:
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 			if (!error_mupip)
@@ -1067,6 +1090,7 @@ repl_inst_bkup_done:
 					rptr->last_blk_at_last_bkup = 0;
 				}
 			}
+			assert((0 == jnl_seqno) || !REPL_ENABLED(cs_data) || (cs_data->reg_seqno <= jnl_seqno));
 			memcpy(rptr->backup_hdr, cs_data, SIZEOF_FILE_HDR(cs_data));
 			if (online) /* save a copy of the fileheader, modify current fileheader and release crit */
 			{
@@ -1099,7 +1123,7 @@ repl_inst_bkup_done:
 						cre_jnl_file_intrpt_rename(((int)cs_data->jnl_file_len), cs_data->jnl_file_name);
 					if (JNL_ALLOWED(cs_data))
 					{
-						memset(&jnl_info, 0, sizeof(jnl_info));
+						memset(&jnl_info, 0, SIZEOF(jnl_info));
 						jnl_info.prev_jnl = &prev_jnl_fn[0];
 						set_jnl_info(gv_cur_region, &jnl_info);
 						save_no_prev_link = jnl_info.no_prev_link =  (jnl_options[jnl_noprevjnlfile] ||
@@ -1113,7 +1137,7 @@ repl_inst_bkup_done:
 						if (JNL_ENABLED(cs_data) &&
 							UNIX_ONLY((0 != cs_addrs->nl->jnl_file.u.inode))
 							VMS_ONLY((0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid,
-									zero_fid, sizeof(zero_fid)))))
+									zero_fid, SIZEOF(zero_fid)))))
 						{	/* Note: following will again call wcs_flu() */
 							if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_BACKUP)))
 							{

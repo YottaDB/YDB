@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ int m_zstep(void)
 	error_def(ERR_INVZSTEP);
 	error_def(ERR_ZSTEPARG);
 
-	assert(zstep_index[26] == (sizeof(zstep_names)/sizeof(nametabent)));
+	assert(zstep_index[26] == (SIZEOF(zstep_names)/SIZEOF(nametabent)));
 	op = OC_ZSTEP;
 
 	switch(window_token)

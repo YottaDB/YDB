@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,8 +81,7 @@ void op_setzextract(mval *src, mval *expr, int schar, int echar, mval *dst)
 	strlen = pfxlen + padlen + expr->str.len + sfxlen;
 	if (strlen > MAX_STRLEN)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
-	if (strlen > (stringpool.top - stringpool.free))
-		stp_gcol(strlen);
+	ENSURE_STP_FREE_SPACE(strlen);
 
 	pfx = (unsigned char *)src->str.addr;
 	straddr = stringpool.free;

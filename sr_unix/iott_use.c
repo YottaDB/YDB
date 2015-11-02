@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -286,7 +286,7 @@ void iott_use(io_desc *iod, mval *pp)
 					mask_in &= (~TRM_READSYNC);
 					break;
 				case iop_terminator:
-					memcpy(&mask_term.mask[0], (pp->str.addr + p_offset), sizeof(io_termmask));
+					memcpy(&mask_term.mask[0], (pp->str.addr + p_offset), SIZEOF(io_termmask));
 					temp_ptr = (d_tt_struct *)d_in->dev_sp;
 					if (mask_term.mask[0] == NUL &&
 						mask_term.mask[1] == NUL &&
@@ -310,7 +310,7 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_noterminator:
 					temp_ptr = (d_tt_struct *)d_in->dev_sp;
 					temp_ptr->default_mask_term = FALSE;
-					memset(&mask_term.mask[0], 0, sizeof(io_termmask));
+					memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
 					break;
 				case iop_ttsync:
 					t.c_iflag |= IXON;
@@ -411,7 +411,7 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 			rts_error(VARLSTCNT(3) ERR_TCSETATTR, tt_ptr->fildes, errno);
 		temp_ptr->term_ctrl = mask_in;
-		memcpy(&temp_ptr->mask_term, &mask_term, sizeof(io_termmask));
+		memcpy(&temp_ptr->mask_term, &mask_term, SIZEOF(io_termmask));
 		if (flush_input)
 		{
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);

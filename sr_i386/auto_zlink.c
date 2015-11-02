@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@
 #define XFER_LONG_SZ	6
 #define INST_SZ		1
 
-rhdtyp *auto_zlink (unsigned char *pc, int4 *line)
+rhdtyp *auto_zlink (unsigned char *pc, int4 **line)
 {
 	char		*adj_pc;	/* address of PEA rtnref offset */
 	mstr		rname;
@@ -86,7 +86,7 @@ rhdtyp *auto_zlink (unsigned char *pc, int4 *line)
 		op_zlink (&rtn, 0);
 		if (0 != (rhead = find_rtn_hdr (&rname)))
 		{
-			*line = *(int4 *) (adj_pc - PEA_SZ + INST_SZ);
+			*line = *(int4 **) (adj_pc - PEA_SZ + INST_SZ);
 			if (!(*line))
 				rts_error(VARLSTCNT(1) ERR_LABELUNKNOWN);
 			return rhead;

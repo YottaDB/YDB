@@ -48,9 +48,9 @@ int gtm_event_log_init(void)
 
 	if (gtm_do_event_log) /* Already initialized */
 		return(SS_NORMAL);
-	name.len = sizeof(GTM_EVENT_LOG_LIB_ENV) - 1;
+	name.len = SIZEOF(GTM_EVENT_LOG_LIB_ENV) - 1;
 	name.addr = GTM_EVENT_LOG_LIB_ENV;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&name, &trans_name, log_name, sizeof(log_name), do_sendmsg_on_log2long))
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&name, &trans_name, log_name, SIZEOF(log_name), do_sendmsg_on_log2long))
 			|| (0 == trans_name.len))
 		return(status);
 	memcpy(shared_lib, trans_name.addr, trans_name.len);
@@ -63,12 +63,12 @@ int gtm_event_log_init(void)
 		return(-1);
 	}
 #ifdef GTM_EVENT_LOG_HARDCODE_RTN_NAME
-	trans_name.len = sizeof(GTM_EVENT_LOG_RTN) - 1;
+	trans_name.len = SIZEOF(GTM_EVENT_LOG_RTN) - 1;
 	trans_name.addr = GTM_EVENT_LOG_RTN;
 #else
-	name.len = sizeof(GTM_EVENT_LOG_RTN_ENV) - 1;
+	name.len = SIZEOF(GTM_EVENT_LOG_RTN_ENV) - 1;
 	name.addr = GTM_EVENT_LOG_RTN_ENV;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&name, &trans_name, log_name, sizeof(log_name), do_sendmsg_on_log2long))
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&name, &trans_name, log_name, SIZEOF(log_name), do_sendmsg_on_log2long))
 		|| (0 == trans_name.len))
 	{
 		SPRINTF(print_msg, "%s not set or null. No event logging done", GTM_EVENT_LOG_RTN_ENV);

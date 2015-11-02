@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,20 +18,21 @@
 #include "mmemory.h"
 #include "advancewindow.h"
 
-GBLDEF triple pos_in_chain;
+GBLDEF triple			pos_in_chain;
 
-GBLREF char window_token;
-GBLREF mident window_ident;
-GBLREF short int source_line;
-GBLREF oprtype *for_stack[],**for_stack_ptr;
-GBLREF short int last_source_column;
-GBLREF triple *curtchain;
-GBLREF int mlmax;
-GBLREF mline *mline_tail;
-GBLREF short int block_level;
-GBLREF mlabel *mlabtab;
-GBLREF bool code_generated;
-GBLREF command_qualifier  	cmd_qlf;
+GBLREF char			window_token;
+GBLREF mident			window_ident;
+GBLREF short int		source_line;
+GBLREF oprtype 			*for_stack[], **for_stack_ptr;
+GBLREF short int		last_source_column;
+GBLREF triple			*curtchain;
+GBLREF int			mlmax;
+GBLREF mline			*mline_tail;
+GBLREF short int		block_level;
+GBLREF mlabel			*mlabtab;
+GBLREF bool			code_generated;
+GBLREF command_qualifier	cmd_qlf;
+GBLREF boolean_t		trigger_compile;
 
 int line(uint4 *lnc)
 {
@@ -53,7 +54,7 @@ int line(uint4 *lnc)
 	parmbase = 0;
 	dot_count = 0;
 	success = TRUE;
-	curlin = (mline *) mcalloc(sizeof(*curlin));
+	curlin = (mline *)mcalloc(SIZEOF(*curlin));
 	curlin->line_number = 0;
 	curlin->table = FALSE;
 	last_source_column = 0;
@@ -61,7 +62,7 @@ int line(uint4 *lnc)
 		int_label();
 
 	if (window_token == TK_IDENT || (cmd_qlf.qlf & CQ_LINE_ENTRY))
-		start_fetches(OC_LINEFETCH);
+		start_fetches(GTMTRIG_ONLY(trigger_compile ? OC_FETCH : ) OC_LINEFETCH);
 	else
 		newtriple(OC_LINESTART);
 
@@ -94,14 +95,14 @@ int line(uint4 *lnc)
 		if (success && window_token == TK_LPAREN)
 		{
 			r = maketriple (OC_ISFORMAL);
-			dqins (curtchain->exorder.bl->exorder.bl, exorder, r);
+			dqins(curtchain->exorder.bl->exorder.bl, exorder, r);
 			advancewindow();
 			parmbase = parmtail = newtriple(OC_BINDPARM);
 			for (parmcount = 0 ; window_token != TK_RPAREN ; parmcount++)
 			{
 				if (window_token != TK_IDENT)
 				{
-					stx_error (ERR_NAMEEXPECTED);
+					stx_error(ERR_NAMEEXPECTED);
 					success = FALSE;
 					break;
 				} else

@@ -84,6 +84,7 @@ void mval_write(zshow_out *output, mval *v, boolean_t flush)
 		} else
 			graphic_str = &lmv;
 		graphic_str->mvtype = MV_STR;
+		graphic_str->str.len = 0; /* initialize len in case stp_gcol gets called before actual set of len occurs below */
 
 		/* Note that throughout this module, we use v->str.addr[xxx] to access the input string instead of
 		 * maintaining a pointer variable. This is because we call zshow_output at lot of places and each

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@
 
 #define S_CUTOFF 		7
 #define FREE_RTNTBL_SPACE 	17
-#define RTNTBL_EXP_MIN sizeof(rtn_tabent) * FREE_RTNTBL_SPACE /* never expand the routine name table by less than 17 entries */
+#define RTNTBL_EXP_MIN SIZEOF(rtn_tabent) * FREE_RTNTBL_SPACE /* never expand the routine name table by less than 17 entries */
 #define RTNTBL_EXP_MAX 16*1024+1 /* never expand the routine name table by more than 16KB (at one time) */
 
 GBLREF rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_end, *rtn_names_top;
@@ -36,7 +36,7 @@ bool zlput_rname (rhdtyp *hdr)
 {
 	rhdtyp		*old_rhead, *rhead;
 	rtn_tabent	*rbot, *mid, *rtop;
-	stack_frame	*fp;
+	stack_frame	*fp, *fpprev;
 	char		*src, *new, *old_table;
 	int		comp;
 	ht_ent_mname    *tabent;
@@ -72,8 +72,8 @@ bool zlput_rname (rhdtyp *hdr)
 			{
 				rbot = mid + 1;
 				continue;
-			}
-			else {
+			} else
+			{
 				rtop = mid - 1;
 				continue;
 			}
@@ -83,20 +83,20 @@ bool zlput_rname (rhdtyp *hdr)
 	{	/* Entry was not found. Add in a new one */
 		old_table = (char *)0;
 		src = (char *) mid;
-		src_len = (char *)rtn_names_end - (char *)mid + sizeof(rtn_tabent);
+		src_len = (char *)rtn_names_end - (char *)mid + SIZEOF(rtn_tabent);
 		if (rtn_names_end >= rtn_names_top)
 		{ /* Not enough room, recreate table in larger area, try to expand exponentially */
 			size = (char *)rtn_names_end - (char *)rtn_names;
 			size = ROUND_UP(size +
 				((RTNTBL_EXP_MIN > size) ? RTNTBL_EXP_MIN : ((RTNTBL_EXP_MAX < size) ? RTNTBL_EXP_MAX : size)),
-				sizeof(rtn_tabent));
+				SIZEOF(rtn_tabent));
 			new = malloc(size);
 			memcpy(new, rtn_names, (char *)mid - (char *)rtn_names);
 			mid = (rtn_tabent *)((char *)mid + (new - (char *)rtn_names));
 			old_table = (char *) rtn_names;
 			rtn_names_end = (rtn_tabent *)((char *)rtn_names_end + (new - (char *)rtn_names));
 			rtn_names = (rtn_tabent *)new;
-			rtn_names_top = (rtn_tabent *)(new + size - sizeof(rtn_tabent));
+			rtn_names_top = (rtn_tabent *)(new + size - SIZEOF(rtn_tabent));
 			memset(rtn_names_end + 1, 0, size - ((char *)(rtn_names_end + 1) - new));
 		}
 		memmove(mid + 1, src, src_len);
@@ -109,8 +109,14 @@ bool zlput_rname (rhdtyp *hdr)
 	{	/* Entry exists. Update it */
 		old_rhead = (rhdtyp *)mid->rt_adr;
 		/* Verify routine is not currently active. If it is, we cannot replace it */
-		for (fp = frame_pointer; fp ; fp = fp->old_frame_pointer)
-		{	/* Check all possible versions of each routine header */
+		for (fp = frame_pointer; fp ; fp = fpprev)
+		{
+			fpprev = fp->old_frame_pointer;
+#			ifdef GTM_TRIGGER
+			if (NULL != fpprev && SFT_TRIGR & fpprev->type)
+				fpprev = *(stack_frame **)(fpprev + 1);
+#			endif
+			/* Check all possible versions of each routine header */
 			for (rhead = CURRENT_RHEAD_ADR(old_rhead); rhead;
 			     rhead = (rhdtyp *)NON_USHBIN_ONLY(rhead->old_rhead_ptr)USHBIN_ONLY(rhead->old_rhead_adr))
 				if (fp->rvector == rhead)
@@ -151,7 +157,7 @@ bool zlput_rname (rhdtyp *hdr)
 			if (!old_rhead->old_rhead_ptr)
 			{
 			        fix_pages((unsigned char *)old_rhead, (unsigned char *)LNRTAB_ADR(old_rhead)
-					  + (sizeof(lnr_tabent) * old_rhead->lnrtab_len));
+					  + (SIZEOF(lnr_tabent) * old_rhead->lnrtab_len));
 			}
 		)
 		USHBIN_ONLY(
@@ -178,7 +184,7 @@ bool zlput_rname (rhdtyp *hdr)
 				old_rhead->ptext_adr = old_rhead->ptext_end_adr = NULL;
 				old_rhead->lnrtab_adr = NULL;
 			}
-			urx_remove(old_rhead->linkage_adr, old_rhead->linkage_len);
+			urx_remove(old_rhead);
 			free(old_rhead->literal_adr);	/* Release the read-write releasable segments */
 			old_rhead->literal_adr = NULL;
 			old_rhead->vartab_adr = NULL;

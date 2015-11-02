@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@ int dse_data(char *dst, int *len)
 	unsigned short cli_len;
 	char buf[MAX_LINE],*src,*bot,*top;
 
-	cli_len = sizeof(buf);
+	cli_len = SIZEOF(buf);
 	if (!cli_get_str("DATA",buf,&cli_len))
 		return FALSE;
 	bot = dst;

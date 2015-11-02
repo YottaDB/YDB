@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,16 +52,14 @@ void op_fnzbitor(mval *dst, mval *bitstr1, mval *bitstr2)
 		short1 = TRUE;
 		n = str_len2;
 		n0 = str_len1;
-	}
-	else
+	} else
 	{
 		short1 = FALSE;
 		n = str_len1;
 		n0 = str_len2;
 	}
 
-	if (stringpool.top - stringpool.free < n + 1)
-		stp_gcol(n + 1);
+	ENSURE_STP_FREE_SPACE(n + 1);
 	byte_1 = (unsigned char *)stringpool.free;
   	*byte_1 = short1 ? byte2_len : byte1_len;
 	byte1_1 = (unsigned char *)bitstr1->str.addr;

@@ -198,9 +198,9 @@ void dse_chng_fhead(void)
 	if (TRUE == location_present)
 	{
 		if (FALSE == size_present)
-			size = sizeof(int4);
-		if (!((sizeof(char) == size) || (sizeof(short) == size) || (sizeof(int4) == size) ||
-			(sizeof(gtm_int64_t) == size)))
+			size = SIZEOF(int4);
+		if (!((SIZEOF(char) == size) || (SIZEOF(short) == size) || (SIZEOF(int4) == size) ||
+			(SIZEOF(gtm_int64_t) == size)))
 		{
 			CLNUP_CRIT;
                         rts_error(VARLSTCNT(1) ERR_SIZENOTVALID8);
@@ -214,41 +214,41 @@ void dse_chng_fhead(void)
 		else
 		{
 			chng_ptr = (sm_uc_ptr_t)cs_addrs->hdr + location;
-			if (sizeof(char) == size)
+			if (SIZEOF(char) == size)
 			{
 				SPRINTF(temp_str, "!UB [0x!XB]");
 				old_value = *(sm_uc_ptr_t)chng_ptr;
 			}
-			else if (sizeof(short) == size)
+			else if (SIZEOF(short) == size)
 			{
 				SPRINTF(temp_str, "!UW [0x!XW]");
 				old_value = *(sm_ushort_ptr_t)chng_ptr;
 			}
-			else if (sizeof(int4) == size)
+			else if (SIZEOF(int4) == size)
 			{
 				SPRINTF(temp_str, "!UL [0x!XL]");
 				old_value = *(sm_uint_ptr_t)chng_ptr;
 			}
-			else if (sizeof(gtm_int64_t) == size)
+			else if (SIZEOF(gtm_int64_t) == size)
 			{
 				SPRINTF(temp_str, "!@UQ [0x!@XQ]");
 				old_value = *(qw_num_ptr_t)chng_ptr;
 			}
 			if (value_present)
 			{
-				if (sizeof(char) == size)
+				if (SIZEOF(char) == size)
 					*(sm_uc_ptr_t)chng_ptr = (unsigned char) value;
-				else if (sizeof(short) == size)
+				else if (SIZEOF(short) == size)
 					*(sm_ushort_ptr_t)chng_ptr = (unsigned short) value;
-				else if (sizeof(int4) == size)
+				else if (SIZEOF(int4) == size)
 					*(sm_uint_ptr_t)chng_ptr = (unsigned int) value;
-				else if (sizeof(gtm_int64_t) == size)
+				else if (SIZEOF(gtm_int64_t) == size)
 					*(qw_num_ptr_t)chng_ptr = value;
 			} else
 				value = old_value;
 			SPRINTF(temp_str1, "Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
 				temp_str, temp_str);
-			if (sizeof(int4) >= size)
+			if (SIZEOF(int4) >= size)
 				util_out_print(temp_str1, TRUE, location, location, (uint4)old_value, (uint4)old_value,
 					(uint4)value, (uint4)value, size, size);
 			else
@@ -307,7 +307,7 @@ void dse_chng_fhead(void)
 	}
 	if (CLI_PRESENT == cli_present("CERT_DB_VER"))
 	{
-		buf_len = sizeof(buf);
+		buf_len = SIZEOF(buf);
 		if (cli_get_str("CERT_DB_VER", buf, &buf_len))
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
@@ -323,7 +323,7 @@ void dse_chng_fhead(void)
 	}
 	if (CLI_PRESENT == cli_present("DB_WRITE_FMT"))
 	{
-		buf_len = sizeof(buf);
+		buf_len = SIZEOF(buf);
 		if (cli_get_str("DB_WRITE_FMT", buf, &buf_len))
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
@@ -586,7 +586,7 @@ void dse_chng_fhead(void)
 	}
 	if (CLI_PRESENT == cli_present("ONLINE_NBB"))
 	{
-		buf_len = sizeof(buf);
+		buf_len = SIZEOF(buf);
 		if (cli_get_str("ONLINE_NBB", buf, &buf_len))
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
@@ -611,7 +611,7 @@ void dse_chng_fhead(void)
 	}
 	if (CLI_PRESENT == cli_present("ABANDONED_KILLS"))
 	{
-		buf_len = sizeof(buf);
+		buf_len = SIZEOF(buf);
 		if (cli_get_str("ABANDONED_KILLS", buf, &buf_len))
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
@@ -636,7 +636,7 @@ void dse_chng_fhead(void)
 	}
         if (CLI_PRESENT == cli_present("KILL_IN_PROG"))
         {
-                buf_len = sizeof(buf);
+                buf_len = SIZEOF(buf);
                 if (cli_get_str("KILL_IN_PROG", buf, &buf_len))
                 {
                         lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
@@ -661,7 +661,7 @@ void dse_chng_fhead(void)
         }
         if (CLI_PRESENT == cli_present("MACHINE_NAME"))
 	{
-		buf_len = sizeof(buf);
+		buf_len = SIZEOF(buf);
 		if (cli_get_str("MACHINE_NAME", buf, &buf_len))
 		{
 			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);

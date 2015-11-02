@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ static readonly unsigned char home_param_list[] =
 	(unsigned char)iop_clearscreen,
 	(unsigned char)iop_eol
 };
-static readonly mval home_params = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(home_param_list) - 1, (char *)home_param_list, 0, 0);
+static readonly mval home_params = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(home_param_list) - 1, (char *)home_param_list, 0, 0);
 
 void iott_wtff(void)
 {

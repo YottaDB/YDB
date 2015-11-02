@@ -49,14 +49,14 @@ int main (int argc, char *argv[])
 
 	if (*argv[1] == '-')
 	{
-		if ((0 != STRNCMP_LIT(argv[1], ID_PREFIX)) || ('\0' == argv[1][sizeof(ID_PREFIX) - 1]))
+		if ((0 != STRNCMP_LIT(argv[1], ID_PREFIX)) || ('\0' == argv[1][SIZEOF(ID_PREFIX) - 1]))
 			PrintUsage;
 
 		errno = 0;
-		if (((id = ATOI(argv[1] + sizeof(ID_PREFIX) - 1)) == 0 && errno != 0) || id <= 0)
+		if (((id = ATOI(argv[1] + SIZEOF(ID_PREFIX) - 1)) == 0 && errno != 0) || id <= 0)
 		{
 			FPRINTF(stderr, "Invalid id %s specified, using default id %d\n", \
-					argv[1] + sizeof(ID_PREFIX) - 1, DEFAULT_ID);
+					argv[1] + SIZEOF(ID_PREFIX) - 1, DEFAULT_ID);
 			id = DEFAULT_ID;
 		}
 		i = 2;

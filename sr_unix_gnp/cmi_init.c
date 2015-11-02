@@ -67,7 +67,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 
 	/* make sure we can re-run quickly w/o reuse problems */
 	status = setsockopt(ntd_root->listen_fd, SOL_SOCKET, SO_REUSEADDR,
-		(void*)&on, sizeof(on));
+		(void*)&on, SIZEOF(on));
 	if (-1 == status)
 	{
 		save_errno = errno;
@@ -75,7 +75,7 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		return save_errno;
 	}
 
-	status = bind(ntd_root->listen_fd, (struct sockaddr*)&in, sizeof(in));
+	status = bind(ntd_root->listen_fd, (struct sockaddr*)&in, SIZEOF(in));
 	if (-1 == status)
 	{
 		save_errno = errno;

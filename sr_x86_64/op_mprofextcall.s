@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -46,14 +46,11 @@ l1:	movq    (REG64_ARG1),REG64_ACCUM
 	je	l4
 	movslq  0(REG64_ACCUM),REG64_ACCUM
         movq    mrt_ptext_adr(REG64_ARG0),REG64_ARG1
-        movq    mrt_lit_ptr(REG64_ARG0),REG_LITERAL_BASE
         addq    REG64_ARG1,REG64_ACCUM
 	movq	REG64_ACCUM,REG64_ARG2
         movq    mrt_lnk_ptr(REG64_ARG0),REG64_ARG1
 	call	new_stack_frame_sp
 	getframe
-	movq    frame_pointer(REG_IP),REG64_ARG2
-	movq    REG_LITERAL_BASE,msf_literal_ptr_off(REG64_ARG2)
 	ret
 
 l2:	cmpq	$0,REG64_ARG1

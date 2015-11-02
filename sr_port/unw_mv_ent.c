@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "rtnhdr.h"
+#include "error.h"
 #include "mv_stent.h"
 #include "sbs_blk.h"
 #include "gdsroot.h"
@@ -31,6 +32,7 @@
 #include "error_trap.h"		/* for STACK_ZTRAP_EXPLICIT_NULL macro */
 #include "op.h"
 #include "iotcpdef.h"
+#include "iotcproutine.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #ifdef UNIX
@@ -38,6 +40,10 @@
 #endif
 #include "stack_frame.h"
 #include "alias.h"
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#endif
 
 GBLREF symval			*curr_symval;
 GBLREF sbs_blk			*sbs_blk_hdr;
@@ -49,14 +55,38 @@ GBLREF gd_addr			*gd_header;
 GBLREF gd_addr			*gd_targ_addr;
 GBLREF gd_binding		*gd_map;
 GBLREF gd_binding		*gd_map_top;
+GBLREF dollar_ecode_type	dollar_ecode;
+GBLREF dollar_stack_type	dollar_stack;
+GBLREF short			dollar_tlevel;
 GBLREF mval			dollar_etrap;
 GBLREF mval			dollar_ztrap;
 GBLREF mval			dollar_zgbldir;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF mstr			extnam_str;
-GBLREF stack_frame		*frame_pointer;
+GBLREF stack_frame		*frame_pointer, *error_frame;
 GBLREF lv_xnew_var		*xnewvar_anchor;
+#ifdef GTM_TRIGGER
+GBLREF mval			*dollar_ztcode;
+GBLREF mval			*dollar_ztdata;
+GBLREF mval			*dollar_ztoldval;
+GBLREF mval			*dollar_ztriggerop;
+GBLREF mval			*dollar_ztupdate;
+GBLREF mval			*dollar_ztvalue;
+GBLREF boolean_t		*ztvalue_changed_ptr;
+GBLREF int			mumps_status;
+GBLREF boolean_t		run_time;
+GBLREF int4			gtm_trigger_depth;
+GBLREF symval			*trigr_symval_list;
+#ifdef DEBUG
+GBLREF gv_trigger_t		*gtm_trigdsc_last;		/* For debugging purposes - parms gtm_trigger called with */
+GBLREF gtm_trigger_parms	*gtm_trigprm_last;
+GBLREF ch_ret_type		(*ch_at_trigger_init)();
+#endif
+#endif
+GBLREF unsigned char		*restart_pc, *restart_ctxt;
+GBLREF mval			*alias_retarg;
+GBLREF tcp_library_struct	tcp_routines;
 
 mval	*unw_mv_ent(mv_stent *mv_st_ent)
 {
@@ -68,6 +98,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 	lv_xnew_var	*xnewvar, *xnewvarnext;
 	d_socket_struct	*dsocketptr;
 	socket_interrupt *sockintr;
+	socket_struct	*socketptr;
 	UNIX_ONLY(d_tt_struct	*tt_ptr;)
 	DBGRFCT_ONLY(mident_fixed vname;)
 
@@ -110,6 +141,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			return NULL;
 		case MVST_MVAL:
 		case MVST_IARR:
+		case MVST_TPHOLD:
 			return NULL;
 		case MVST_LVAL:
 			/* Reduce the reference count of this unanchored lv_val (current usage as callin argument
@@ -126,7 +158,24 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 				curr_symval = symval_ptr->last_tab;
 				DBGRFCT((stderr, "\n\n***** unw_mv_ent-STAB: ** Symtab pop with 0x"lvaddr" replacing 0x"
 					 lvaddr"\n\n", curr_symval, symval_ptr));
-				if (symval_ptr->alias_activity && symval_ptr->xnew_var_list)
+#				ifdef GTM_TRIGGER
+				/* If this is a trigger symval, don't fully unwind it but rather put it on the trigr_symval_list
+				 * so it can be reused without having to be fully recreated again.
+				 */
+				if (symval_ptr->trigr_symval)
+				{	/* Relist it */
+					assert(NULL == symval_ptr->xnew_var_list);
+					assert(NULL == symval_ptr->xnew_ref_list);
+					symval_ptr->last_tab = trigr_symval_list;
+					trigr_symval_list = symval_ptr;
+					/* Note we do not set SFF_UNW_SYMVAL here because this being a trigger related symbol
+					 * table, when it unwinds, so has any possible reference to what was using it.
+					 */
+					return NULL;
+				}
+#				endif
+				if (symval_ptr->alias_activity
+				    && ((NULL != symval_ptr->xnew_var_list) || (NULL != alias_retarg)))
 					/* Special cleanup for aliases and passed through vars */
 					als_check_xnew_var_aliases(symval_ptr, curr_symval);
 				else
@@ -257,7 +306,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 		case MVST_STCK_SP:
 			assert(mvs_size[MVST_STCK] == mvs_size[MVST_STCK_SP]);
 			if (0 < mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_size)
-				memcpy(*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr), (char*)mv_st_ent+mvs_size[MVST_STCK],
+				memcpy(*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr), (char*)mv_st_ent + mvs_size[MVST_STCK],
 				       mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_size);
 			else
 				*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr) =
@@ -265,20 +314,6 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			return NULL;
 		case MVST_TVAL:
 			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_tval;
-			return NULL;
-		case MVST_TPHOLD:
-			return NULL;	/* just a place holder for TP */
-		case MVST_ZINTR:
-			/* Restore environment to pre-$zinterrupt evocation */
-			dollar_zininterrupt = FALSE;
-			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_zintr.saved_dollar_truth;
-			op_gvrectarg(&mv_st_ent->mv_st_cont.mvs_zintr.savtarg);
-			extnam_str.len = mv_st_ent->mv_st_cont.mvs_zintr.savextref.len;
-			if (extnam_str.len)
-			{
-				memcpy(extnam_str.addr, mv_st_ent->mv_st_cont.mvs_zintr.savextref.addr, extnam_str.len);
-				free(mv_st_ent->mv_st_cont.mvs_zintr.savextref.addr);
-			}
 			return NULL;
 		case MVST_ZINTDEV:
 			/* Since the interrupted device frame is popping off, there is no way that the READ
@@ -289,7 +324,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 				return NULL;	/* already processed */
 			switch(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->type)
 			{
-#ifdef UNIX
+#				ifdef UNIX
 				case tt:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
@@ -300,24 +335,101 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 						mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					}
 					return NULL;
-#endif
+#				endif
 				case gtmsocket:
 					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
 					{	/* This mv_stent has not been processed yet */
 						dsocketptr = (d_socket_struct *)(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->dev_sp);
 						sockintr = &dsocketptr->sock_save_state;
 						sockintr->end_time_valid = FALSE;
-						sockintr->who_saved = sockwhich_invalid;
 						dsocketptr->mupintr = FALSE;
+						if (sockwhich_connect == sockintr->who_saved)
+						{	/* clean up socketptr structure */
+							socketptr = (socket_struct *)mv_st_ent->mv_st_cont.mvs_zintdev.socketptr;
+							if (socket_connect_inprogress == socketptr->state
+								&& FD_INVALID != socketptr->sd)
+								tcp_routines.aa_close(socketptr->sd);
+							if (NULL != socketptr->zff.addr)
+								free(socketptr->zff.addr);
+							if (NULL != socketptr->buffer)
+								free(socketptr->buffer);
+							iosocket_delimiter((unsigned char *)NULL, 0, socketptr, TRUE);
+							free(socketptr);
+						}
+						sockintr->who_saved = sockwhich_invalid;
 					}
+					mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+					mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 					return NULL;
 				default:
 					GTMASSERT;	/* No other device should be here */
 			}
 			break;
+		case MVST_ZINTR:
+			/* Restore environment to pre-$zinterrupt evocation. Note the first few elemnents of MVST_ZINTR
+			 * and MVST_TRIGR are the same so the processing of those elements is commonized.
+			 */
+			dollar_zininterrupt = FALSE;
+			/* Get rid of old values that may exist */
+			if (dollar_ecode.begin)
+				free(dollar_ecode.begin);
+ 			if (dollar_ecode.array)
+				free(dollar_ecode.array);
+			if (dollar_stack.begin)
+				free(dollar_stack.begin);
+			if (dollar_stack.array)
+				free(dollar_stack.array);
+			/* Restore the old values from dollar_ecode_ci and dollar_stack_ci */
+			error_frame = mv_st_ent->mv_st_cont.mvs_zintr.error_frame_save;
+			memcpy(&dollar_ecode, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_ecode_save, SIZEOF(dollar_ecode));
+			memcpy(&dollar_stack, &mv_st_ent->mv_st_cont.mvs_zintr.dollar_stack_save, SIZEOF(dollar_stack));
+			/* Fall into MVST_TRIGR */
+		case MVST_TRIGR:
+			dollar_truth = (boolean_t)mv_st_ent->mv_st_cont.mvs_trigr.saved_dollar_truth;
+			op_gvrectarg(&mv_st_ent->mv_st_cont.mvs_trigr.savtarg);
+			extnam_str.len = mv_st_ent->mv_st_cont.mvs_trigr.savextref.len;
+			if (extnam_str.len)
+				memcpy(extnam_str.addr, mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr, extnam_str.len);
+#			ifdef GTM_TRIGGER
+			if (MVST_TRIGR != mv_st_ent->mv_st_type)
+				/* MVST_ZINTR common handling ends here */
+				return NULL;
+			ztvalue_changed_ptr = mv_st_ent->mv_st_cont.mvs_trigr.ztvalue_changed_ptr;
+			dollar_ztvalue = mv_st_ent->mv_st_cont.mvs_trigr.ztvalue_save;
+			dollar_ztcode = mv_st_ent->mv_st_cont.mvs_trigr.ztcode_save;
+			dollar_ztdata = mv_st_ent->mv_st_cont.mvs_trigr.ztdata_save;
+			dollar_ztoldval = mv_st_ent->mv_st_cont.mvs_trigr.ztoldval_save;
+			dollar_ztriggerop = mv_st_ent->mv_st_cont.mvs_trigr.ztriggerop_save;
+			dollar_ztupdate = mv_st_ent->mv_st_cont.mvs_trigr.ztupdate_save;
+			mumps_status = mv_st_ent->mv_st_cont.mvs_trigr.mumps_status_save;
+			run_time = mv_st_ent->mv_st_cont.mvs_trigr.run_time_save;
+#			ifdef DEBUG
+			gtm_trigdsc_last = (gv_trigger_t *)mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigdsc_last_save;
+			gtm_trigprm_last = (gtm_trigger_parms *)mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigprm_last_save;
+#			endif
+			assert(gtm_trigger_depth >= mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save);
+			gtm_trigger_depth = mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save;
+			if (0 == gtm_trigger_depth)
+			{	/* Only restore error handling environment if returning out of trigger-world */
+				dollar_etrap = mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save;
+				dollar_ztrap = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
+				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
+			}
+			assert(ctxt >= mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
+			ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
+			assert(((0 == gtm_trigger_depth) && (ch_at_trigger_init == ctxt->ch))
+			       || (0 < gtm_trigger_depth) && (&mdb_condition_handler == ctxt->ch));
+			active_ch = ctxt;
+			ctxt->ch_active = FALSE;
+#			endif
+			return NULL;
+		case MVST_RSTRTPC:
+			restart_pc = mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_pc_save;
+			restart_ctxt = mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_ctxt_save;
+			return NULL;
 		default:
 			GTMASSERT;
-			return NULL;
+			break;
 	}
 
 	return NULL; /* This should never get executed, added to make compiler happy */

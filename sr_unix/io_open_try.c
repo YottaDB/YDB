@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,7 @@
 #include "stringpool.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
+#include "gtmimagename.h"
 
 #define  LOGNAME_LEN 255
 /* avoid calling getservbyname for shell and Kerberos shell */
@@ -50,7 +51,6 @@
 
 LITREF	unsigned char		io_params_size[];
 GBLREF	dev_dispatch_struct	io_dev_dispatch[];
-GBLREF	boolean_t		run_time;
 GBLREF	io_desc			*active_device;
 GBLREF	mstr			sys_input;
 GBLREF	mstr			sys_output;
@@ -128,8 +128,8 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	{
 		if (0 == tl->iod)
 		{
-			tl->iod =  (io_desc *)malloc(sizeof(io_desc));
-			memset((char*)tl->iod, 0, sizeof(io_desc));
+			tl->iod =  (io_desc *)malloc(SIZEOF(io_desc));
+			memset((char*)tl->iod, 0, SIZEOF(io_desc));
 			tl->iod->pair.in  = tl->iod;
 			tl->iod->pair.out = tl->iod;
 			tl->iod->trans_name = tl;
@@ -158,7 +158,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					if (EEXIST != errno)
 						filecreated = TRUE;
 					/*	create another one for fifo write	*/
-					tl->iod->pair.out = (io_desc *)malloc(sizeof(io_desc));
+					tl->iod->pair.out = (io_desc *)malloc(SIZEOF(io_desc));
 					(tl->iod->pair.out)->pair.in = tl->iod;
 					(tl->iod->pair.out)->pair.out = (tl->iod->pair.out);
 					(tl->iod->pair.out)->trans_name = tl;
@@ -179,13 +179,13 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		{
 			lower_to_upper(dev_type, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
 
-			if (((sizeof("SOCKET") - 1) == mspace->str.len)
+			if (((SIZEOF("SOCKET") - 1) == mspace->str.len)
 				 && (0 == MEMCMP_LIT(dev_type, "SOCKET")))
 				tl->iod->type = gtmsocket;
-			else if (((sizeof("PIPE") - 1) == mspace->str.len)
+			else if (((SIZEOF("PIPE") - 1) == mspace->str.len)
 			    && (0 == MEMCMP_LIT(dev_type, "PIPE")))
 				tl->iod->type = pi;
-			else if (((sizeof("TCP") - 1) == mspace->str.len)
+			else if (((SIZEOF("TCP") - 1) == mspace->str.len)
 			    && (0 == MEMCMP_LIT(dev_type, "TCP")))
 				tl->iod->type = tcp;
 			else
@@ -260,7 +260,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 								      (GTM_SOCKLEN_TYPE *)&sockoptlen);
 						if (!sockstat && SOCK_STREAM == sockoptval)
 						{
-							socknamelen = sizeof(sockname);
+							socknamelen = SIZEOF(sockname);
 							sockstat = getsockname(file_des,
 									       (struct sockaddr *)&sockname,
 									       (GTM_SOCKLEN_TYPE *)&socknamelen);
@@ -574,7 +574,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	active_device = 0;
 	naml->iod->newly_created = FALSE;
 
-	if ((NO_M_TIMEOUT != timeout)&& run_time)
+	if ((NO_M_TIMEOUT != timeout) && IS_MCODE_RUNNING)
 		return (status);
 	else
 		return TRUE;

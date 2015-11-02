@@ -62,25 +62,25 @@ gd_addr *create_dummy_gbldir(void)
 	int4		*int4_ptr;
 	uint4		t_offset, size;
 
-	size = sizeof(header_struct) + sizeof(gd_addr) + 3 * sizeof(gd_binding) + 1 * sizeof(gd_region) + 1 * sizeof(gd_segment);
+	size = SIZEOF(header_struct) + SIZEOF(gd_addr) + 3 * SIZEOF(gd_binding) + 1 * SIZEOF(gd_region) + 1 * SIZEOF(gd_segment);
 	header = (header_struct *)malloc(ROUND_UP(size, DISK_BLOCK_SIZE));
 	memset(header, 0, ROUND_UP(size, DISK_BLOCK_SIZE));
 	header->filesize = size;
 	size = ROUND_UP(size, DISK_BLOCK_SIZE);
-	memcpy(header->label, GDE_LABEL_LITERAL, sizeof(GDE_LABEL_LITERAL));
-	addr = (gd_addr *)((char *)header + sizeof(header_struct));
+	memcpy(header->label, GDE_LABEL_LITERAL, SIZEOF(GDE_LABEL_LITERAL));
+	addr = (gd_addr *)((char *)header + SIZEOF(header_struct));
 	addr->max_rec_size = 256;
-	addr->maps = (gd_binding*)((UINTPTR_T)addr + sizeof(gd_addr));
+	addr->maps = (gd_binding*)((UINTPTR_T)addr + SIZEOF(gd_addr));
 	addr->n_maps = 3;
-	addr->regions = (gd_region*)((INTPTR_T)(addr->maps) + 3 * sizeof(gd_binding));
+	addr->regions = (gd_region*)((INTPTR_T)(addr->maps) + 3 * SIZEOF(gd_binding));
 	addr->n_regions = 1;
-	addr->segments = (gd_segment*)((INTPTR_T)(addr->regions) + sizeof(gd_region));
+	addr->segments = (gd_segment*)((INTPTR_T)(addr->regions) + SIZEOF(gd_region));
 	addr->n_segments = 1;
 	addr->link = 0;
 	addr->tab_ptr = 0;
 	addr->id = 0;
 	addr->local_locks = 0;
-	addr->end = (UINTPTR_T)(addr->segments + 1 * sizeof(gd_segment));
+	addr->end = (UINTPTR_T)(addr->segments + 1 * SIZEOF(gd_segment));
 	int4_ptr = (int4*)(addr->maps);
 	*int4_ptr++ = 0x232FFFFF;
 	*int4_ptr++ = 0xFFFFFFFF;
@@ -125,13 +125,13 @@ gd_addr *create_dummy_gbldir(void)
 	/* Should be using gd_id_ptr_t below, but ok for now since malloc won't return > 4G
 	 * and since addr->id is a 4-byte pointer only until we change the format of the global directory.
 	 */
-	addr->id = (gd_id *)malloc(sizeof(gd_id));
-	memset(addr->id, 0, sizeof(gd_id));
+	addr->id = (gd_id *)malloc(SIZEOF(gd_id));
+	memset(addr->id, 0, SIZEOF(gd_id));
 
-	addr->tab_ptr = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+	addr->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 	init_hashtab_mname((hash_table_mname *)addr->tab_ptr,0);
 
-	name = (gdr_name *)malloc(sizeof(gdr_name));
+	name = (gdr_name *)malloc(SIZEOF(gdr_name));
 	MALLOC_CPY_LIT(name->name.addr, "DUMMY.GLD");
 	if (gdr_name_head)
 		name->link = (struct gdr_name *)gdr_name_head;

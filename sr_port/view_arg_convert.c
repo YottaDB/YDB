@@ -112,7 +112,7 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
 				gvinit();
-			memset(&parmblk->ident.c[0], 0, sizeof(parmblk->ident));
+			memset(&parmblk->ident.c[0], 0, SIZEOF(parmblk->ident));
 			if (parm->str.len >= 2 && *parm->str.addr == '^')
 			{
 				namestr.addr = parm->str.addr + 1;	/* skip initial '^' */
@@ -129,7 +129,7 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 		case VTP_RTNAME:
 			if (NULL == parm)
 				rts_error(VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
-			memset(&parmblk->ident.c[0], 0, sizeof(parmblk->ident));
+			memset(&parmblk->ident.c[0], 0, SIZEOF(parmblk->ident));
 			if (parm->str.len > 0)
 				memcpy(&parmblk->ident.c[0], parm->str.addr,
 				       (parm->str.len <= MAX_MIDENT_LEN ? parm->str.len : MAX_MIDENT_LEN));
@@ -149,13 +149,13 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 				gvinit();
 			if (first_time)
 			{
-				noisolation_buddy_list = (buddy_list *)malloc(sizeof(buddy_list));
-				initialize_list(noisolation_buddy_list, sizeof(noisolation_element), NOISOLATION_INIT_ALLOC);
-				gvt_pending_buddy_list = (buddy_list *)malloc(sizeof(buddy_list));
-				initialize_list(gvt_pending_buddy_list, sizeof(gvt_container), NOISOLATION_INIT_ALLOC);
+				noisolation_buddy_list = (buddy_list *)malloc(SIZEOF(buddy_list));
+				initialize_list(noisolation_buddy_list, SIZEOF(noisolation_element), NOISOLATION_INIT_ALLOC);
+				gvt_pending_buddy_list = (buddy_list *)malloc(SIZEOF(buddy_list));
+				initialize_list(gvt_pending_buddy_list, SIZEOF(gvt_container), NOISOLATION_INIT_ALLOC);
 				first_time = FALSE;
 			}
-			if (sizeof(global_names) <= parm->str.len)
+			if (SIZEOF(global_names) <= parm->str.len)
 				GTMASSERT;
 			tmpstr.len = parm->str.len;	/* we need to change len and should not change parm->str, so take a copy */
 			tmpstr.addr = parm->str.addr;
@@ -220,7 +220,7 @@ void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 						r_ptr = temp_gd_map->reg.addr;
 						assert(r_ptr->max_key_size <= MAX_KEY_SZ);
 						temp_gv_target = (gv_namehead *)targ_alloc(r_ptr->max_key_size, &gvent, r_ptr);
-						gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
+						gvnh_reg = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));
 						gvnh_reg->gvt = temp_gv_target;
 						gvnh_reg->gd_reg = r_ptr;
 						if (NULL != tabent)

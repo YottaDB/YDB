@@ -15,9 +15,9 @@
 #include "rtnhdr.h"
 #include <elf.h>
 
-#define NATIVE_HDR_LEN	(sizeof(Elf64_Ehdr))
+#define NATIVE_HDR_LEN	(SIZEOF(Elf64_Ehdr))
 
-#define COFFHDRLEN         (sizeof(int4) * 8)      /* Size of old masscomp-coff header before routine hdr */
+#define COFFHDRLEN         (SIZEOF(int4) * 8)      /* Size of old masscomp-coff header before routine hdr */
 
 #define GET_RTNHDR_ADDR(sym)	(unsigned char *)(sym)
 #define DOREADRC_OBJFILE(FDESC, FBUFF, FBUFF_LEN, RC) DOREADRC(FDESC, FBUFF, FBUFF_LEN, RC)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,17 +79,17 @@
 /*  Data structures */
 
 typedef union rc_byte {
-    char		 octet[sizeof(unsigned char)];
+    char		 octet[SIZEOF(unsigned char)];
     unsigned char	 value;
 } rc_byte;
 
 typedef union rc_word {
-    char		 octet[sizeof(unsigned short)];
+    char		 octet[SIZEOF(unsigned short)];
     unsigned short	 value;
 } rc_word;
 
 typedef union rc_lword {
-    char		 octet[sizeof(uint4)];
+    char		 octet[SIZEOF(uint4)];
     uint4	 value;
 } rc_lword;
 

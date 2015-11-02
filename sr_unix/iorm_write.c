@@ -317,7 +317,7 @@ void iorm_write(mstr *v)
 #else
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 #endif
-	memcpy(rm_ptr->dollar_device, "0", sizeof("0"));
+	memcpy(rm_ptr->dollar_device, "0", SIZEOF("0"));
 
 	if (rm_ptr->noread)
 		rts_error(VARLSTCNT(1) ERR_RMSRDONLY);

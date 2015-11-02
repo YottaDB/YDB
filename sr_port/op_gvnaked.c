@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,23 +48,18 @@ GBLREF gv_namehead	*gv_target;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgm_info         *first_sgm_info;
-GBLREF bool		transform;
 GBLREF mstr		extnam_str;
 
 void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
 	va_list		var;
-	int		len;
 	int		count;
 	bool		was_null, is_null, sbs_cnt;
 	mval		*val;
 	short 		max_key;
 	unsigned char	*ptr, *end_ptr;
-	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 
 	error_def(ERR_GVNAKED);
-	error_def(ERR_GVSUBOFLOW);
-	error_def(ERR_GVIS);
 	error_def(ERR_MAXNRSUBSCRIPTS);
 
 	extnam_str.len = 0;
@@ -88,7 +83,6 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	gv_currkey->end = gv_currkey->prev;
 	is_null = FALSE;
 	was_null = (gv_currkey->end ? gv_prev_subsc_null : FALSE);
-	max_key = gv_cur_region->max_key_size;
 	sbs_cnt = 0;
 	if (1 < count)
 	{
@@ -104,9 +98,10 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	/* else naked reference will not increase number of subscripts, so do not worry about exceeding the limit */
 	VAR_START(var, val_arg);
 	val = val_arg;
+	max_key = gv_cur_region->max_key_size;
 	for ( ; ; )
 	{
-		COPY_SUBS_TO_GVCURRKEY(val, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
+		COPY_SUBS_TO_GVCURRKEY(val, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey, was_null, is_null */
 		if (0 < --count)
 			val = va_arg(var, mval *);
 		else

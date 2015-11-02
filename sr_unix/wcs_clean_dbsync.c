@@ -74,12 +74,13 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 
 	csa = *csaptr;
 	assert(csa->dbsync_timer);	/* to ensure no duplicate dbsync timers */
+	CANCEL_DBSYNC_TIMER(csa, TRUE);	/* reset csa->dbsync_timer now that the dbsync timer has popped */
+	assert(!csa->dbsync_timer);
 	reg = csa->region;
-	assert(reg->open);
 	/* Don't know how this can happen, but if region is closed, just return in PRO. */
 	if (!reg->open)
 	{
-		csa->dbsync_timer = FALSE;
+		assert(FALSE);
 		return;
 	}
 	is_mm = (dba_mm == reg->dyn.addr->acc_meth);
@@ -204,10 +205,9 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	}
 	if (dbsync_defer_timer)
 	{
-		assert(sizeof(INTPTR_T) == sizeof(csa));
-		start_timer((TID)csa, TIM_DEFER_DBSYNC, &wcs_clean_dbsync, sizeof(csa), (char *)&csa);
-	} else
-		csa->dbsync_timer = FALSE;
+		assert(SIZEOF(INTPTR_T) == SIZEOF(csa));
+		START_DBSYNC_TIMER(csa, TIM_DEFER_DBSYNC);
+	}
 	/* To restore to former glory, don't use TP_CHANGE_REG, 'coz we might mistakenly set cs_addrs and cs_data to NULL
 	 * if the region we are restoring to has been closed. Don't use tp_change_reg 'coz we might be ripping out the structures
 	 * needed in tp_change_reg in gv_rundown. */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,7 +66,7 @@ void jobinterrupt_process_cleanup(void)
 	/* Now build message for operator log with the form ERRWZINTR, compiler-error */
 	util_out_print(NULL, RESET);
 	msgbuff.addr = (char *)msgbuf;
-	msgbuff.len = sizeof(msgbuf);
+	msgbuff.len = SIZEOF(msgbuf);
 	gtm_getmsg(ERR_ERRWZINTR, &msgbuff);
 	mbptr = msgbuf + strlen((char *)msgbuf);
 	/* Find the beginning of the compiler error (look for "%") */

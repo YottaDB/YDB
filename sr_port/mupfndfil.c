@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,20 +67,20 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 	if (is_raw_dev(file.addr))
 	{
 		def.addr = DEF_NODBEXT;
-		def.len = sizeof(DEF_NODBEXT) - 1;
+		def.len = SIZEOF(DEF_NODBEXT) - 1;
 	}
 	else
 	{
 		def.addr = DEF_DBEXT;	/* UNIX need to pass "*.dat" but reg->dyn.addr->defext has "DAT" */
-		def.len = sizeof(DEF_DBEXT) - 1;
+		def.len = SIZEOF(DEF_DBEXT) - 1;
 	}
 #elif defined(VMS)
 	def.addr = (char *)reg->dyn.addr->defext;
-	def.len = sizeof(reg->dyn.addr->defext);
+	def.len = SIZEOF(reg->dyn.addr->defext);
 #endif
 	if (NULL == filestr)
 	{
-		ret.len = sizeof(filename);
+		ret.len = SIZEOF(filename);
 		ret.addr = filename;
 		retptr = &ret;
 	} else

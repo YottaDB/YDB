@@ -42,6 +42,7 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include "shmpool.h"	/* Needed for the shmpool structures */
 
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
 
@@ -105,10 +106,10 @@ unsigned char mu_cre_file(void)
 	error_def(ERR_LOWSPACECRE);
 	error_def(ERR_MUNOSTRMBKUP);
 
-	assert((-(sizeof(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
+	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
 	cs_addrs = &udi_struct.s_addrs;
 	cs_data = (sgmnt_data_ptr_t)NULL;	/* for CLEANUP */
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.fop = (F_SYNTAXO | F_PARNODE);
 	pblk.buffer = path;
 	pblk.buff_size = MAX_FBUFF;
@@ -119,11 +120,11 @@ unsigned char mu_cre_file(void)
 	if (is_raw_dev(path))
 	{	/* do not use a default extension for raw device files */
 		pblk.def1_buf = DEF_NODBEXT;
-		pblk.def1_size = sizeof(DEF_NODBEXT) - 1;
+		pblk.def1_size = SIZEOF(DEF_NODBEXT) - 1;
 	} else
 	{
 		pblk.def1_buf = DEF_DBEXT;
-		pblk.def1_size = sizeof(DEF_DBEXT) - 1;
+		pblk.def1_size = SIZEOF(DEF_DBEXT) - 1;
 	}
 	if (1 != (parse_file(&file, &pblk) & 1))
 	{
@@ -138,7 +139,7 @@ unsigned char mu_cre_file(void)
 		return EXIT_WRN;
 	}
 	udi = &udi_struct;
-	memset(udi, 0, sizeof(unix_db_info));
+	memset(udi, 0, SIZEOF(unix_db_info));
 	udi->raw = is_raw_dev(pblk.l_dir);
 #	ifdef GTM_CRYPT
 	/* Check if this file is an encrypted database. If yes, do init */
@@ -162,7 +163,7 @@ unsigned char mu_cre_file(void)
 		}
 		if (-1 != (status = (ssize_t)lseek(fd, 0, SEEK_SET)))
 		{
-			DOREADRC(fd, buff, sizeof(buff), status);
+			DOREADRC(fd, buff, SIZEOF(buff), status);
 		} else
 			status = errno;
 		if (0 != status)
@@ -184,7 +185,7 @@ unsigned char mu_cre_file(void)
 				return EXIT_NRM;
 		}
 		PRINTF("Determining size of raw device...\n");
-		for(i = 1; read(fd, buff, sizeof(buff)) == sizeof(buff);)
+		for(i = 1; read(fd, buff, SIZEOF(buff)) == SIZEOF(buff);)
 		{
 			i *= 2;
 			lseek(fd, (off_t)i * BUFSIZ, SEEK_SET);
@@ -196,7 +197,7 @@ unsigned char mu_cre_file(void)
 		{
 			i = (lower + upper) / 2;
 			lseek(fd, (off_t)i * BUFSIZ, SEEK_SET);
- 			if (read(fd, buff, sizeof(buff)) == sizeof(buff))
+ 			if (read(fd, buff, SIZEOF(buff)) == SIZEOF(buff))
 				lower = i;
 			else
 				upper = i;
@@ -246,7 +247,7 @@ unsigned char mu_cre_file(void)
 		}
 	}
 	gv_cur_region->dyn.addr->file_cntl = &fc;
-	memset(&fc, 0, sizeof(file_control));
+	memset(&fc, 0, SIZEOF(file_control));
 	fc.file_info = (void*)&udi_struct;
 	udi->fd = fd;
 	cs_data = (sgmnt_data_ptr_t)malloc(SIZEOF_FILE_HDR_DFLT);
@@ -345,7 +346,7 @@ unsigned char mu_cre_file(void)
 		CLEANUP(EXIT_WRN);
 		return EXIT_WRN;
 	}
-	if ((32 * 1024 - sizeof(shmpool_blk_hdr)) < cs_data->blk_size)
+	if ((32 * 1024 - SIZEOF(shmpool_blk_hdr)) < cs_data->blk_size)
 		gtm_putmsg(VARLSTCNT(5) ERR_MUNOSTRMBKUP, 3, RTS_ERROR_STRING(path), 32 * 1024 - DISK_BLOCK_SIZE);
 	util_out_print("Created file !AD", TRUE, RTS_ERROR_STRING(path));
 	CLEANUP(EXIT_NRM);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,25 @@ void preemptive_ch(int preemptive_severe)
 	if (INVALID_GV_TARGET != reset_gv_target)
 	{
 		if (SUCCESS != preemptive_severe && INFO != preemptive_severe)
-			RESET_GV_TARGET;
+		{
+			/* We know of a few cases in Unix where gv_target and gv_currkey could be out of sync at this point.
+			 *   a) If we are inside trigger code which in turn does an update that does
+			 *	reads of ^#t global and ends up in a restart. This restart would
+			 *	in turn do a rts_error(TPRETRY) which would invoke mdb_condition_handler
+			 *	that would in turn invoke preemptive_ch which invokes this macro.
+			 *	In this tp restart case though, it is ok for gv_target and gv_currkey
+			 *	to be out of sync because they are going to be reset by tp_clean_up anyways.
+			 *	So skip the dbg-only in-sync check.
+			 *   b) If we are in gvtr_init reading the ^#t global and detect an error (e.g. TRIGINVCHSET)
+			 *	gv_target after the reset would be pointing to a regular global whereas gv_currkey
+			 *	would be pointing to ^#t. It is ok to be out-of-sync since in this case, we expect
+			 *	mdb_condition_handler to be calling us. That has code to reset gv_currkey (and
+			 *	cs_addrs/cs_data etc.) to reflect gv_target (i.e. get them back in sync).
+			 * Therefore in Unix we pass SKIP_GVT_GVKEY_CHECK to skip the gvtarget/gvcurrkey out-of-sync check
+			 * in RESET_GV_TARGET. In VMS we pass DO_GVT_GVKEY_CHECK as we dont yet know of an out-of-sync situation.
+			 */
+			RESET_GV_TARGET(UNIX_ONLY(SKIP_GVT_GVKEY_CHECK) VMS_ONLY(DO_GVT_GVKEY_CHECK));
+		}
 	}
 	if (0 < dollar_tlevel)
 	{

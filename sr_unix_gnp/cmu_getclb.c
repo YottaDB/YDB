@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ struct CLB *cmu_getclb(cmi_descriptor *node, cmi_descriptor *task)
 				qp = RELQUE2PTR(p->cqe.fl))
 		{
 			p = QUEENT2CLB(qp, cqe);
-			if (p->peer.sin_port == in.sin_port && 0 == memcmp(&p->peer.sin_addr, &in.sin_addr, sizeof(in.sin_addr)))
+			if (p->peer.sin_port == in.sin_port && 0 == memcmp(&p->peer.sin_addr, &in.sin_addr, SIZEOF(in.sin_addr)))
 			{ /* (port, address) pair is necessary and sufficient for uniqueness. There might be other fields in
 			     sockaddr_in that might be implementation dependent. So, compare only (port, address) pair. */
 				sigprocmask(SIG_SETMASK, &oset, NULL);

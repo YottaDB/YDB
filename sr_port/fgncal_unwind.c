@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,18 +12,26 @@
 #include "mdef.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
+#include "tp_frame.h"
+#include "error.h"
+#include "error_trap.h"
 #include "mv_stent.h"
 #include "op.h"
 #include "fgncal.h"
+#ifdef GTM_TRIGGER
+#include "gv_trigger.h"
+#include "gtm_trigger.h"
+#endif
 
-GBLDEF unsigned char *fgncal_stack;
-GBLREF unsigned char *stackbase, *stacktop, *stackwarn, *msp;
-GBLREF mv_stent *mv_chain;
-GBLREF stack_frame *frame_pointer;
+GBLDEF unsigned char	*fgncal_stack;
+GBLREF unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
+GBLREF mv_stent		*mv_chain;
+GBLREF stack_frame	*frame_pointer;
 
 void fgncal_unwind(void)
 {
-	mv_stent *mvc;
+	mv_stent	*mvc;
+
 	error_def(ERR_STACKUNDERFLO);
 
 	assert(msp <= stackbase && msp > stacktop);
@@ -31,8 +39,14 @@ void fgncal_unwind(void)
 	assert(frame_pointer <= (stack_frame*)stackbase && frame_pointer > (stack_frame *)stacktop);
 
 	while (frame_pointer && frame_pointer < (stack_frame *)fgncal_stack)
-		op_unwind();
-
+	{
+#		ifdef GTM_TRIGGER
+		if (SFT_TRIGR & frame_pointer->type)
+			gtm_trigger_fini(TRUE);
+		else
+#		endif
+			op_unwind();
+	}
 	for (mvc = mv_chain ; mvc < (mv_stent *) fgncal_stack ; )
 	{
 		unw_mv_ent(mvc);

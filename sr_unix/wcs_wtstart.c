@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include <signal.h>	/* for VSIG_ATOMIC_T type */
-
+#include "util.h"
 #include "gtm_stdio.h"
 
 #include "aswp.h"
@@ -52,9 +52,13 @@
 #include "gds_blk_downgrade.h"
 #include "deferred_signal_handler.h"
 #include "memcoherency.h"
+#include "wbox_test_init.h"
+#include "wcs_clean_dbsync.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include "min_max.h"
+#include "gtmimagename.h"
 
 #define	REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, trace_cntr)	\
 {									\
@@ -74,8 +78,6 @@ GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
 GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4	fast_lock_count;
-GBLREF	boolean_t	run_time;
-
 /* In case of a disk-full situation, we want to print a message every 1 minute. We maintain two global variables to that effect.
  * dskspace_msg_counter and save_dskspace_msg_counter. If we encounter a disk-full situation and both those variables are different
  * we start a timer dskspace_msg_timer() that pops after a minute and increments one of the variables dskspace_msg_counter.
@@ -106,6 +108,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	static	int4		error_message_loop_count = 0;
 	uint4			index;
 	boolean_t		is_mm;
+	uint4			curr_wbox_seq_num;
+	int			try_sleep;
 	GTMCRYPT_ONLY(
 		int		req_enc_blk_size;
 		int4		crypt_status = 0;
@@ -119,6 +123,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	error_def(ERR_JNLWRTNOWWRTR);
 	error_def(ERR_JNLWRTDEFER);
 	error_def(ERR_GBLOFLOW);
+	error_def(ERR_SYSCALL);
 
 	udi = FILE_INFO(region);
 	csa = &udi->s_addrs;
@@ -213,7 +218,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail2);
 			break;
 		}
-		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - sizeof(cr->blkque));
+		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - SIZEOF(cr->blkque));
 		if (!is_mm)
 		{
 			assert(!CR_NOT_ALIGNED(cr, cr_lo) && !CR_NOT_IN_RANGE(cr, cr_lo, cr_hi));
@@ -338,11 +343,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)bp);
 					save_bp = (blk_hdr_ptr_t) GDS_ANY_ENCRYPTGLOBUF(bp, csa);
 					DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)save_bp);
-					req_enc_blk_size = bp->bsiz - (SIZEOF(*bp));
+					assert((bp->bsiz <= csd->blk_size) && (bp->bsiz >= SIZEOF(*bp)));
+					req_enc_blk_size = MIN(csd->blk_size, bp->bsiz) - SIZEOF(*bp);
 					if (BLK_NEEDS_ENCRYPTION(bp->levl, req_enc_blk_size))
 					{
 						ASSERT_ENCRYPTION_INITIALIZED;
-						memcpy(save_bp, bp, sizeof(blk_hdr));
+						memcpy(save_bp, bp, SIZEOF(blk_hdr));
 						GTMCRYPT_ENCODE_FAST(csa->encr_key_handle,
 								     (char *)(bp + 1),
 								     req_enc_blk_size,
@@ -407,7 +413,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				{	/* first time and every minute */
 					send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
 						 ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
-					if (!run_time)
+					if (!IS_GTM_IMAGE)
 						gtm_putmsg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
 							   ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
 					save_dskspace_msg_counter = dskspace_msg_counter;
@@ -449,8 +455,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		 * no purpose to the existing timer. A new one would anyways be started whenever the last dirty cache
 		 * record in the current active queue is flushed. Cancel the previous one.
 		 */
-		cancel_timer((TID)csa);
-		csa->dbsync_timer = FALSE;
+		CANCEL_DBSYNC_TIMER(csa, FALSE);
 	}
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 	CLEAR_WTSTART_PID(cnl, index);

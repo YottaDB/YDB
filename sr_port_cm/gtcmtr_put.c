@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ bool gtcmtr_put(void)
 	assert(*ptr == CMMS_Q_PUT);
 	ptr++;
 	GET_USHORT(len, ptr);
-	ptr += sizeof(unsigned short);
+	ptr += SIZEOF(unsigned short);
 	regnum = *ptr++;
 	reg_ref = gtcm_find_region(curr_entry,regnum);
 	len--; /* subtract size of regnum */
@@ -80,7 +80,7 @@ bool gtcmtr_put(void)
 		cs_addrs->jnl->pini_addr = reg_ref->pini_addr;
 	}
 	GET_USHORT(len, ptr);
-	ptr += sizeof(unsigned short);
+	ptr += SIZEOF(unsigned short);
 	v.mvtype = MV_STR;
 	v.str.len = len;
 	v.str.addr = (char *)ptr;
@@ -91,11 +91,11 @@ bool gtcmtr_put(void)
 		rts_error(VARLSTCNT(11) ERR_KEY2BIG, 4, n, (int4)gv_cur_region->max_key_size,
 			REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 	}
-	if (n + v.str.len + sizeof(rec_hdr) > gv_cur_region->max_rec_size)
+	if (n + v.str.len + SIZEOF(rec_hdr) > gv_cur_region->max_rec_size)
 	{
 		if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
 			end = &buff[MAX_ZWR_KEY_SZ - 1];
-		rts_error(VARLSTCNT(11) ERR_REC2BIG, 4, n + v.str.len + sizeof(rec_hdr),
+		rts_error(VARLSTCNT(11) ERR_REC2BIG, 4, n + v.str.len + SIZEOF(rec_hdr),
 			(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region),
 			0, ERR_GVIS, 2, end - buff, buff);
 	}

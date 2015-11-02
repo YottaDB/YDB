@@ -141,7 +141,7 @@ void dbcertify_scan_phase(void)
 	   when we rewrite the header later. Make sure the header is in one single 512 byte
 	   block.
 	*/
-	assert(DISK_BLOCK_SIZE == sizeof(p1hdr));
+	assert(DISK_BLOCK_SIZE == SIZEOF(p1hdr));
 
 	/* Check results of option parse */
 	psa->phase_one = TRUE;
@@ -150,20 +150,20 @@ void dbcertify_scan_phase(void)
 	psa->bsu_keys = !cli_negated("BSU_KEYS");
 	if (outfile_present = (CLI_PRESENT == cli_present("OUTFILE")))
 	{
-		buff_len = sizeof(psa->outfn) - 1;
+		buff_len = SIZEOF(psa->outfn) - 1;
 		if (FALSE == cli_get_str("OUTFILE", (char_ptr_t)psa->outfn, &buff_len))
 			mupip_exit(ERR_MUPCLIERR);
 		psa->outfn[buff_len] = '\0';	/* Not null terminated if max string on UNIX, not at all on VMS */
 	}
 	if (CLI_PRESENT == cli_present("TEMPFILE_DIR"))
 	{	/* Want to put temp files in this directory */
-		buff_len = sizeof(psa->tmpfiledir) - 1;
+		buff_len = SIZEOF(psa->tmpfiledir) - 1;
 		if (FALSE == cli_get_str("TEMPFILE_DIR", (char_ptr_t)psa->tmpfiledir, &buff_len))
 			mupip_exit(ERR_MUPCLIERR);
 		psa->tmpfiledir[buff_len] = '\0';
 	}
 	psa->keep_temp_files = (CLI_PRESENT == cli_present("KEEP_TEMPS"));
-	buff_len = sizeof(psa->regname) - 1;
+	buff_len = SIZEOF(psa->regname) - 1;
 	if (FALSE == cli_get_str("REGION", (char_ptr_t)psa->regname, &buff_len))
 		mupip_exit(ERR_MUPCLIERR);
 	psa->regname[buff_len] = '\0';
@@ -201,9 +201,9 @@ void dbcertify_scan_phase(void)
 	if (!outfile_present)
 	{	/* No output file name specified -- supply a default */
 		len = strlen((char_ptr_t)dbfn);
-		if (MAX_FN_LEN < (len + sizeof(DEFAULT_OUTFILE_SUFFIX) - 1))
+		if (MAX_FN_LEN < (len + SIZEOF(DEFAULT_OUTFILE_SUFFIX) - 1))
 		{
-			badfn = malloc(len + sizeof(DEFAULT_OUTFILE_SUFFIX));
+			badfn = malloc(len + SIZEOF(DEFAULT_OUTFILE_SUFFIX));
 			memcpy(badfn, dbfn, len);
 			badfn[len] = 0;
 			strcat((char_ptr_t)badfn, DEFAULT_OUTFILE_SUFFIX);
@@ -214,8 +214,8 @@ void dbcertify_scan_phase(void)
 	}
 
 	/* Build data structures and open database */
-	MALLOC_INIT(psa->dbc_gv_cur_region, sizeof(gd_region));
-	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, sizeof(gd_segment));
+	MALLOC_INIT(psa->dbc_gv_cur_region, SIZEOF(gd_region));
+	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, SIZEOF(gd_segment));
 	psa->dbc_gv_cur_region->dyn.addr->acc_meth = dba_bg;
 	len = strlen((char_ptr_t)dbfn);
 	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
@@ -224,7 +224,7 @@ void dbcertify_scan_phase(void)
 	FILE_CNTL_INIT(psa->dbc_gv_cur_region->dyn.addr);
 	psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_type = dba_bg;
 
-	psa->dbc_cs_data = malloc(sizeof(*psa->dbc_cs_data));
+	psa->dbc_cs_data = malloc(SIZEOF(*psa->dbc_cs_data));
 
 	/* Initialize for db processing - open and read in file-header */
 	psa->fc = psa->dbc_gv_cur_region->dyn.addr->file_cntl;
@@ -267,9 +267,9 @@ void dbcertify_scan_phase(void)
 		if (-1 == gtm_zos_set_tag(psa->outfd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
 			TAG_POLICY_GTM_PUTMSG((char_ptr_t)psa->outfn, errno, realfiletag, TAG_BINARY);
 #endif
-		memset((void *)&psa->ofhdr, 0, sizeof(p1hdr));
-		memcpy(psa->ofhdr.p1hdr_tag, P1HDR_TAG, sizeof(psa->ofhdr.p1hdr_tag));
-		dbc_write_p1out(psa, &psa->ofhdr, sizeof(p1hdr));	/* Initial hdr is all zeroes */
+		memset((void *)&psa->ofhdr, 0, SIZEOF(p1hdr));
+		memcpy(psa->ofhdr.p1hdr_tag, P1HDR_TAG, SIZEOF(psa->ofhdr.p1hdr_tag));
+		dbc_write_p1out(psa, &psa->ofhdr, SIZEOF(p1hdr));	/* Initial hdr is all zeroes */
 	}
 
 	/* Initialize */
@@ -301,7 +301,7 @@ void dbcertify_scan_phase(void)
 			     && (blk_num < psa->dbc_cs_data->trans_hist.total_blks);
 		     lm_offset += BML_BITS_PER_BLK, dbptr += psa->dbc_cs_data->blk_size, blk_num++)
 		{
-			if (gvcst_blk_is_allocated(psa->curr_lbmap_buff + sizeof(v15_blk_hdr), lm_offset))
+			if (gvcst_blk_is_allocated(psa->curr_lbmap_buff + SIZEOF(v15_blk_hdr), lm_offset))
 				/* This block is in use -- process it */
 				dbc_process_block(psa, blk_num, dbptr);
 			else
@@ -345,7 +345,7 @@ void dbcertify_scan_phase(void)
 				lm_offset = (blk_num - bitmap_blk_num) * 2;
 				dbptr = ((psa->dbc_cs_data->start_vbn - 1) * DISK_BLOCK_SIZE) + psa->dbc_cs_data->free_space
 					+ ((gtm_off_t)psa->dbc_cs_data->blk_size * blk_num);
-				if (gvcst_blk_is_allocated(psa->curr_lbmap_buff + sizeof(v15_blk_hdr), lm_offset))
+				if (gvcst_blk_is_allocated(psa->curr_lbmap_buff + SIZEOF(v15_blk_hdr), lm_offset))
 					/* This block is in use -- process it */
 					dbc_process_block(psa, blk_num, dbptr);
 				else
@@ -374,14 +374,14 @@ void dbcertify_scan_phase(void)
 		psa->ofhdr.dt_index_cnt = psa->dtlvln0;
 		psa->ofhdr.gvt_leaf_cnt = psa->gvtlvl0;
 		psa->ofhdr.gvt_index_cnt = psa->gvtlvln0;
-		psa->ofhdr.uid_len = sizeof(unique_file_id);	/* Size used by v5cbsu since this field len varies by platform */
+		psa->ofhdr.uid_len = SIZEOF(unique_file_id);	/* Size used by v5cbsu since this field len varies by platform */
 		memcpy(&psa->ofhdr.unique_id, &FILE_INFO(psa->dbc_gv_cur_region)->UNIX_ONLY(fileid)VMS_ONLY(file_id),
-		       sizeof(unique_file_id));
-		assert(sizeof(psa->ofhdr.regname) > strlen((char_ptr_t)psa->regname));
+		       SIZEOF(unique_file_id));
+		assert(SIZEOF(psa->ofhdr.regname) > strlen((char_ptr_t)psa->regname));
 		strcpy((char_ptr_t)psa->ofhdr.regname, (char_ptr_t)psa->regname);
-		assert(sizeof(psa->ofhdr.dbfn) > strlen((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname));
+		assert(SIZEOF(psa->ofhdr.dbfn) > strlen((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname));
 		strcpy((char_ptr_t)psa->ofhdr.dbfn, (char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname);
-		dbc_write_p1out(psa, &psa->ofhdr, sizeof(p1hdr));	/* Rewrite populated output file header */
+		dbc_write_p1out(psa, &psa->ofhdr, SIZEOF(p1hdr));	/* Rewrite populated output file header */
 		CLOSEFILE_RESET(psa->outfd, rc);		/* Close output file; Resets "psa->outfd" to FD_INVALID */
 		if (-1 == rc)
 		{
@@ -488,13 +488,13 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 			dbc_integ_error(psa, blk_num, "Bad block level");
 
 		/* Isolate first record for length check */
-		rec1_ptr = psa->block_buff + sizeof(v15_blk_hdr);
+		rec1_ptr = psa->block_buff + SIZEOF(v15_blk_hdr);
 		rec1_cmpc = ((rec_hdr_ptr_t)rec1_ptr)->cmpc;
 		if (0 != rec1_cmpc)
 			dbc_integ_error(psa, blk_num, "Bad compression count");
 		GET_USHORT(us_rec_len, &((rec_hdr_ptr_t)rec1_ptr)->rsiz);
 		rec1_len = us_rec_len;
-		if ((rec1_len + sizeof(v15_blk_hdr)) < blk_len)
+		if ((rec1_len + SIZEOF(v15_blk_hdr)) < blk_len)
 		{	/* There is a 2nd record. It must also be checked as it is possible for a
 			   too-long record to exist as the 2nd record if it is a near clone of the
 			   first record (differing only in the last byte of the key) and the first
@@ -584,7 +584,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 				have_dt_blk = TRUE;	/* Only DT records have non-zero cmpc in 2nd record */
 			else
 			{
-				rec1_gvn_len = strlen((char_ptr_t)rec1_ptr + sizeof(rec_hdr));
+				rec1_gvn_len = strlen((char_ptr_t)rec1_ptr + SIZEOF(rec_hdr));
 				if (rec2_cmpc <= rec1_gvn_len)
 					have_dt_blk = TRUE;
 			}
@@ -685,7 +685,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 				psa->rhdr.akey_len = key_len = STRLEN((char_ptr_t)key_ptr);
 			else
 				psa->rhdr.akey_len = 0;
-			dbc_write_p1out(psa, &psa->rhdr, sizeof(p1rec));
+			dbc_write_p1out(psa, &psa->rhdr, SIZEOF(p1rec));
 			if (psa->bsu_keys && gdsblk_gvtleaf == blk_type)
 				dbc_write_p1out(psa, key_ptr, key_len);
 		}
@@ -701,7 +701,7 @@ void dbc_requeue_block(phase_static_area *psa, block_id blk_num)
 	if (NULL == psa->iebl || MAX_IEB_CNT <= (psa->iebl->blk_cnt + 1))
 	{	/* Need a new/another block to hold error blocks */
 		DBC_DEBUG(("DBC_DEBUG: Allocating new iebl struct\n"));
-		iebl = malloc(sizeof(integ_error_blk_list));
+		iebl = malloc(SIZEOF(integ_error_blk_list));
 		iebl->next = psa->iebl;
 		iebl->blk_cnt = 0;
 		psa->iebl = iebl;
@@ -783,7 +783,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	/* We have to parse the block down to the supplied key to make sure the compressed portions
 	   of the key are available.
 	*/
-	rec_p = psa->block_buff + sizeof(v15_blk_hdr);
+	rec_p = psa->block_buff + SIZEOF(v15_blk_hdr);
 	while (rec_p < trec_p)
 	{
 		dbc_find_key(psa, psa->first_rec_key, rec_p, 0);
@@ -805,7 +805,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	blk_p = blk_set_p->old_buff;
 	assert(0 == ((v15_blk_hdr_ptr_t)blk_p)->levl);
 	rec_cmpc = ((rec_hdr *)blk_set_p->curr_rec)->cmpc;
-	rec_value_p = (blk_set_p->curr_rec + sizeof(rec_hdr) + blk_set_p->curr_blk_key->end + 1 - rec_cmpc);
+	rec_value_p = (blk_set_p->curr_rec + SIZEOF(rec_hdr) + blk_set_p->curr_blk_key->end + 1 - rec_cmpc);
 	/* Verify that the dt record we found is the exact one we were looking for */
 	if ((psa->first_rec_key->gvn_len + 1) != blk_set_p->curr_blk_key->end)
 		/* Some concurrency issues no doubt.. */
@@ -815,7 +815,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	/* Create gv_target if necessary */
 	if (NULL == gv_target)
 	{
-		gv_target = malloc(sizeof(gv_namehead) + psa->dbc_cs_data->max_key_size);
+		gv_target = malloc(SIZEOF(gv_namehead) + psa->dbc_cs_data->max_key_size);
 		gv_target->clue.prev = 0;
 		gv_target->clue.top = psa->first_rec_key->top;
 	}
@@ -826,9 +826,9 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	GET_USHORT(us_rec_len, &((rec_hdr *)blk_set_p->curr_rec)->rsiz);
 	rec_len = us_rec_len;
 	rec_value_len = (int)(rec_len - (rec_value_p - blk_set_p->curr_rec));
-	if (sizeof(block_id) < rec_value_len)
+	if (SIZEOF(block_id) < rec_value_len)
 	{	/* This global potentially has collation data in its record (taken from gvcst_root_search()) */
-		subrec_p = get_spec(rec_value_p + sizeof(block_id), (int)(rec_value_len - sizeof(block_id)), COLL_SPEC);
+		subrec_p = get_spec(rec_value_p + SIZEOF(block_id), (int)(rec_value_len - SIZEOF(block_id)), COLL_SPEC);
 		if (subrec_p)
 		{
 			gv_target->nct = *(subrec_p + COLL_NCT_OFFSET);
@@ -851,7 +851,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	{	/* Need to setup gv_altkey in case of errors (contains gvn) */
 		if (NULL == gv_altkey)
 		{
-			gv_altkey = malloc(sizeof(gv_key) + psa->dbc_cs_data->max_key_size);
+			gv_altkey = malloc(SIZEOF(gv_key) + psa->dbc_cs_data->max_key_size);
 			gv_altkey->prev = 0;
 			gv_altkey->top = psa->first_rec_key->top;
 		}
@@ -861,7 +861,7 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	}
 	assert(gv_target->act || NULL == gv_target->collseq);
 	/* Format the resulting key into the result buffer which is sized appropriately for this task */
-	key_end_p = format_targ_key(psa->rslt_buff, sizeof(psa->rslt_buff), &gv_target->clue, TRUE);
+	key_end_p = format_targ_key(psa->rslt_buff, SIZEOF(psa->rslt_buff), &gv_target->clue, TRUE);
 	*key_end_p = 0;
 	return psa->rslt_buff;
 }

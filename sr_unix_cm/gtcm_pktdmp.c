@@ -41,7 +41,7 @@ char *gtcm_hname(struct sockaddr_in *sin)
 
 #ifndef SUNOS
     if ((he = gethostbyaddr((void *)&sin->sin_addr.s_addr,
-			    sizeof(struct in_addr), AF_INET)))
+			    SIZEOF(struct in_addr), AF_INET)))
 	sprintf(name,"%s (%d.%d.%d.%d)",he->h_name,
 		   sin->sin_addr.s_addr >> 24,
 		   sin->sin_addr.s_addr >> 16 & 0xFF,

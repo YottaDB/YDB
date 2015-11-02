@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,13 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "trans_log_name.h"
+#include "cli.h"
+
+/* This executable does not have any command tables so initialize command array to NULL. The reason why cmd_ary is needed is
+ * because trans_log_name (invoked by this module) in turn pulls in gtm_malloc/gtm_free and in turn a lot of the database
+ * runtime logic which in turn (due to triggers) pulls in the compiler as well (op_zcompile etc. require cmd_ary).
+ */
+GBLDEF	CLI_ENTRY	*cmd_ary = NULL;
 
 int	quiet = 0;
 
@@ -48,7 +55,7 @@ void	clean_mem(char *name)
 
 	path1.len = STRLEN(name);
 	path1.addr = name;
-	if (SS_NORMAL != TRANS_LOG_NAME(&path1, &path2, buff, sizeof(buff), do_sendmsg_on_log2long))
+	if (SS_NORMAL != TRANS_LOG_NAME(&path1, &path2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 		fprintf(stderr, "Error translating path: %s\n", name);
 	else
 	{

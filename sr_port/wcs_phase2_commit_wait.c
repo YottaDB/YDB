@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,8 +70,8 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	error_def(ERR_COMMITWAITPID);
 	error_def(ERR_COMMITWAITSTUCK);
 
-	crarray_size = sizeof(crarray) / sizeof(crarray[0]);
-	DEBUG_ONLY(waitarray_size = sizeof(waitarray) / sizeof(waitarray[0]);)
+	crarray_size = SIZEOF(crarray) / SIZEOF(crarray[0]);
+	DEBUG_ONLY(waitarray_size = SIZEOF(waitarray) / SIZEOF(waitarray[0]);)
 
 	assert(!mu_rndwn_file_dbjnl_flush);	/* caller should have avoided calling us if it was mupip rundown */
 	csd = csa->hdr;

@@ -55,9 +55,9 @@ void gtcm_open_cmerrlog(void)
 	} else
 	{
 		lfn1.addr = GTCM_GNP_CMERR_FN;
-		lfn1.len = sizeof(GTCM_GNP_CMERR_FN) - 1;
+		lfn1.len = SIZEOF(GTCM_GNP_CMERR_FN) - 1;
 	}
-	rval = TRANS_LOG_NAME(&lfn1, &lfn2, lfn_path, sizeof(lfn_path), do_sendmsg_on_log2long);
+	rval = TRANS_LOG_NAME(&lfn1, &lfn2, lfn_path, SIZEOF(lfn_path), do_sendmsg_on_log2long);
 	if (rval == SS_NORMAL || rval == SS_NOLOGNAM)
 	{
 		lfn_path[lfn2.len] = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@
 #include "mupip_exit.h"
 #include "mu_gv_cur_reg_init.h"
 #include "dbfilop.h"
-#include "mur_read_file.h"	/* for mur_fread_eof() prototype */
+#include "mur_read_file.h"	/* for "mur_fread_eof" prototype */
 #include "tp_change_reg.h"
 #include "gds_rundown.h"
 #include "is_file_identical.h"
@@ -61,14 +61,13 @@
 #include "gtmsource.h"
 #include "gtm_logicals.h"
 
-GBLREF  int		mur_regno;
-GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	boolean_t	have_standalone_access;
+GBLREF	gd_addr		*gd_header;
 
 #define            		STAR_QUOTE "\"*\""
 boolean_t mur_open_files()
@@ -79,7 +78,6 @@ boolean_t mur_open_files()
 	char				*cptr, *cptr_last, *ctop;
 	jnl_ctl_list                    *jctl, *temp_jctl;
 	reg_ctl_list			*rctl, *rctl_top, tmp_rctl;
-	mval                            mv;
 	gld_dbname_list			*gld_db_files, *curr;
 	gd_addr                 	*temp_gd_header;
 	boolean_t                       star_specified;
@@ -155,26 +153,32 @@ boolean_t mur_open_files()
 	/* We assume recovery will be done only on current global directory.
 	 * That is, journal file names specified must be from current global directory.
 	 */
+	if (star_specified || mur_options.update && !mur_options.redirect)
+	{	/* "*" is specified or it is -recover or -rollback. We require gtmgbldir to be set in all these cases.
+		 * The only exception is "-redirect" in which case the target database is obtained from -redirect
+		 * instead of from the global directory.
+		 */
+		assert(NULL == gd_header);
+		gvinit();	/* read in current global directory */
+		assert(NULL != gd_header);
+	}
 	if (star_specified)
 	{
-		mv.mvtype = MV_STR;
-		mv.str.len = 0;
-		temp_gd_header = zgbldir(&mv);
-		max_reg_total = temp_gd_header->n_regions;
-		gld_db_files = read_db_files_from_gld(temp_gd_header);
+		max_reg_total = gd_header->n_regions;
+		gld_db_files = read_db_files_from_gld(gd_header);
 	} else
 		gld_db_files = mur_db_files_from_jnllist(jnl_file_list, jnl_file_list_len, &max_reg_total);
 	if (NULL == gld_db_files)
 		return FALSE;
-	mur_ctl = (reg_ctl_list *)malloc(sizeof(reg_ctl_list) * max_reg_total);
-	memset(mur_ctl, 0, sizeof(reg_ctl_list) * max_reg_total);
+	mur_ctl = (reg_ctl_list *)malloc(SIZEOF(reg_ctl_list) * max_reg_total);
+	memset(mur_ctl, 0, SIZEOF(reg_ctl_list) * max_reg_total);
 	curr = gld_db_files;
 	murgbl.max_extr_record_length = DEFAULT_EXTR_BUFSIZE;
 	murgbl.repl_standalone = FALSE;
 	if (mur_options.rollback)
 	{	/* Rundown the Jnlpool and Recvpool */
 #if defined(UNIX)
-		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, sizeof(replpool_id.instfilename),
+		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, SIZEOF(replpool_id.instfilename),
 			issue_gtm_putmsg))
 		{	/* appropriate gtm_putmsg would have already been issued by repl_inst_get_name */
 			return FALSE;
@@ -186,7 +190,7 @@ boolean_t mur_open_files()
 		assert(NULL != jnlpool.repl_inst_filehdr);
 #elif defined(VMS)
 		gbldir_mstr.addr = GTM_GBLDIR;
-		gbldir_mstr.len = sizeof(GTM_GBLDIR) - 1;
+		gbldir_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
 		tran_name = get_name(&gbldir_mstr);
 		memcpy(replpool_id.gtmgbldir, tran_name->addr, tran_name->len);
 		full_len = tran_name->len;
@@ -242,8 +246,9 @@ boolean_t mur_open_files()
 		murgbl.reg_full_total++;	/* mur_close_files() expects rctl->csa and rctl->jctl to be initialized.
 						 * so consider this rctl only after those have been initialized. */
 		init_hashtab_mname(&rctl->gvntab, 0);	/* for mur_forward() */
-		rctl->db_ctl = (file_control *)malloc(sizeof(file_control));
-		memset(rctl->db_ctl, 0, sizeof(file_control));
+		rctl->db_ctl = (file_control *)malloc(SIZEOF(file_control));
+		memset(rctl->db_ctl, 0, SIZEOF(file_control));
+		mur_rctl_desc_alloc(rctl); /* Allocate rctl->mur_desc associated buffers */
 		/* For redirect we just need to change the name of database. recovery will redirect to new database file */
 		if (mur_options.redirect)
 		{
@@ -255,6 +260,7 @@ boolean_t mur_open_files()
 					curr->gd->dyn.addr->fname_len = rl_ptr->new_name_len;
 					memcpy(curr->gd->dyn.addr->fname, rl_ptr->new_name, curr->gd->dyn.addr->fname_len);
 					curr->gd->dyn.addr->fname[curr->gd->dyn.addr->fname_len] = 0;
+					break;
 				}
 			}
 		}
@@ -421,8 +427,8 @@ boolean_t mur_open_files()
 			{	/* User implicitly specified current generation journal files.
                 		 * Only one journal per region is specified. So open them now.
 				 */
-        			mur_jctl = jctl = (jnl_ctl_list *)malloc(sizeof(jnl_ctl_list));
-				memset(jctl, 0, sizeof(jnl_ctl_list));
+        			jctl = (jnl_ctl_list *)malloc(SIZEOF(jnl_ctl_list));
+				memset(jctl, 0, SIZEOF(jnl_ctl_list));
                         	rctl->jctl_head = rctl->jctl = jctl;
                 		jctl->jnl_fn_len = csd->jnl_file_len;
 				memcpy(jctl->jnl_fn, csd->jnl_file_name, csd->jnl_file_len);
@@ -432,9 +438,7 @@ boolean_t mur_open_files()
                 		cre_jnl_file_intrpt_rename(jctl->jnl_fn_len, jctl->jnl_fn);
                         	if (!mur_fopen(jctl))
                                 	return FALSE;
-				/* note mur_fread_eof must be done after setting mur_ctl, mur_regno and mur_jctl */
-				mur_regno = (int)(rctl - &mur_ctl[0]);
-				if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl)))
+				if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl, rctl)))
 				{
 					gtm_putmsg(VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
 						jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("mur_fread_eof failed"));
@@ -461,8 +465,8 @@ boolean_t mur_open_files()
 		ctop = &jnl_file_list[jnl_file_list_len];
 		while (cptr < ctop)
 		{
-			mur_jctl = jctl = (jnl_ctl_list *)malloc(sizeof(jnl_ctl_list));
-			memset(jctl, 0, sizeof(jnl_ctl_list));
+			jctl = (jnl_ctl_list *)malloc(SIZEOF(jnl_ctl_list));
+			memset(jctl, 0, SIZEOF(jnl_ctl_list));
 			cptr_last = cptr;
 			while (0 != *cptr && ',' != *cptr && '"' != *cptr &&  ' ' != *cptr)
 				++cptr;
@@ -474,10 +478,9 @@ boolean_t mur_open_files()
 			}
 			cptr++;	/* skip separator */
 			/* Note cre_jnl_file_intrpt_rename was already called in mur_db_files_from_jnllist */
-			if (!mur_fopen(jctl))
+			if (!mur_fopen(jctl))	/* dont know rctl yet */
 				return FALSE;
-			for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total;
-					rctl < rctl_top; rctl++, mur_regno++)
+			for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
 			{
 				if (rctl->gd->dyn.addr->fname_len == jctl->jfh->data_file_name_length &&
 						(0 == memcmp(jctl->jfh->data_file_name, rctl->gd->dyn.addr->fname,
@@ -495,8 +498,7 @@ boolean_t mur_open_files()
 				}
 				if (NULL != rl_ptr)
 				{
-					for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total;
-							rctl < rctl_top; rctl++, mur_regno++)
+					for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
 					{
 						if (rctl->gd->dyn.addr->fname_len == rl_ptr->new_name_len &&
 								(0 == memcmp(rctl->gd->dyn.addr->fname, rl_ptr->new_name,
@@ -507,8 +509,7 @@ boolean_t mur_open_files()
 				if (rctl == rctl_top)
 					GTMASSERT;/* db list was created from journal file header. So it is not possible */
 			}
-			/* note mur_fread_eof must be done after setting mur_ctl, mur_regno and mur_jctl */
-			if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl)))
+			if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl, rctl)))
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset);
 				return FALSE;
@@ -570,11 +571,15 @@ boolean_t mur_open_files()
 		{
 			for (--murgbl.reg_total; murgbl.reg_total > regno; murgbl.reg_total--)
 			{
-				if (NULL != mur_ctl[murgbl.reg_total].jctl)
+				rctl = &mur_ctl[murgbl.reg_total];
+				if (NULL != (jctl = rctl->jctl_head))
 				{
+					assert(jctl == rctl->jctl); /* rctl->jctl and rctl->jctl_head should be same now */
 					tmp_rctl = mur_ctl[regno];
-					mur_ctl[regno] = mur_ctl[murgbl.reg_total];
-					mur_ctl[murgbl.reg_total] = tmp_rctl;
+					mur_ctl[regno] = *rctl;
+					*rctl = tmp_rctl;
+					rctl = &mur_ctl[regno];
+					MUR_FIX_JCTL_BACK_POINTER_TO_RCTL(jctl, rctl, &mur_ctl[murgbl.reg_total], TRUE);
 					break;
 				}
 			}
@@ -591,7 +596,7 @@ boolean_t mur_open_files()
 	 * However mur_close_files will close all regions opened (murgbl.reg_full_total) */
 	if (mur_options.forward)
 	{
-		for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
+		for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 		{
 			jctl = rctl->jctl_head;
 			if (mur_options.update)
@@ -600,6 +605,7 @@ boolean_t mur_open_files()
 				if (mur_options.chain)
 				{	/* User might have not specified journal file starting tn matching database curr_tn.
 					 * So try to open previous generation journal files and add to linked list */
+					rctl->jctl = jctl;	/* asserted by mur_insert_prev */
 					while (jctl->jfh->bov_tn > csd->trans_hist.curr_tn)
 					{
 						if (0 == jctl->jfh->prev_jnl_file_name_length)
@@ -610,13 +616,8 @@ boolean_t mur_open_files()
 							gtm_putmsg(VARLSTCNT(4) ERR_NOPREVLINK, 2,
 									jctl->jnl_fn_len, jctl->jnl_fn);
 							return FALSE;
-						} else
-						{
-							rctl->jctl = mur_jctl = jctl; /* To satisfy a good assert */
-							if (!mur_insert_prev())
-								return FALSE;
-							jctl = mur_jctl;
-						}
+						} else if (!mur_insert_prev(&jctl))
+							return FALSE;
 					}
 				}
 				if (jctl->jfh->bov_tn != csd->trans_hist.curr_tn && !mur_options.notncheck)

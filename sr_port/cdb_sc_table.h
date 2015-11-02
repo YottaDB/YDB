@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2003, 2008 Fidelity Information Services, Inc        *
+ *      Copyright 2003, 2010 Fidelity Information Services, Inc        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -86,7 +86,9 @@ CDB_SC_LCHAR_ENTRY(cdb_sc_blksplit,         FALSE, 'f') /* 'f'  recompute_upd_ar
 CDB_SC_LCHAR_ENTRY(cdb_sc_toomanyrecompute, FALSE, 'g') /* 'g'  more than 25% of the blocks in read-set need to be recomputed */
 CDB_SC_LCHAR_ENTRY(cdb_sc_jnlstatemod,      FALSE, 'h') /* 'h'  csd->jnl_state changed or csd->jnl_before_image changed since start of the transaction */
 CDB_SC_LCHAR_ENTRY(cdb_sc_unfreeze_getcrit, FALSE, 'i') /* 'i'  gdsfilext found region frozen. Wait for unfreeze and reattempt crit */
-CDB_SC_LCHAR_ENTRY(cdb_sc_backupstatemod,   FALSE, 'j') /* 'j'  t_end/tp_tend found online-backup-in-progress state changed since start of transaction */
+CDB_SC_LCHAR_ENTRY(cdb_sc_bkupss_statemod,  FALSE, 'j') /* 'j'  t_end/tp_tend found that either online-backup-in-progress or snapshot
+								state changed since start of transaction */
 CDB_SC_LCHAR_ENTRY(cdb_sc_crbtmismatch,     TRUE,  'k') /* 'k'  cr->blk and bt->blk does not match */
 CDB_SC_LCHAR_ENTRY(cdb_sc_phase2waitfail,   TRUE,  'l') /* 'l'  wcs_phase2_commit_wait timed out when called from t_qread */
 CDB_SC_LCHAR_ENTRY(cdb_sc_inhibitkills,     FALSE, 'm') /* 'm'  t_end/tp_tend found inhibit_kills counter greater than zero */
+CDB_SC_LCHAR_ENTRY(cdb_sc_triggermod,       FALSE, 'n') /* 'n'  csd->db_trigger_cycle changed since start of of transaction */

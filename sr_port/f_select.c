@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ int f_select( oprtype *a, opctype op )
 	endtrip = put_tjmp(r);
 	for (;;)
 	{
-		cnd = (oprtype *) mcalloc(sizeof(oprtype));
+		cnd = (oprtype *) mcalloc(SIZEOF(oprtype));
 		if (!bool_expr((bool) FALSE, cnd))
 		{
 			if (temp_shift_gvrefs)

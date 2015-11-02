@@ -153,31 +153,31 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 				z_ptr->m_opcode = *addr; /* save for later restore while cancelling breakpoint */
 #endif
 				tmp_xf_code = (z_ptr->m_opcode & ZB_CODE_MASK) >> ZB_CODE_SHIFT;
-				if (xf_linefetch * sizeof(UINTPTR_T) == tmp_xf_code)
+				if (xf_linefetch * SIZEOF(UINTPTR_T) == tmp_xf_code)
 				{
 #ifdef	COMPLEX_INSTRUCTION_UPDATE
 					FIX_OFFSET_WITH_ZBREAK_OFFSET(addr, xf_zbfetch);
 #else
 					*addr = (*addr & (zb_code)(~ZB_CODE_MASK)) |
-						((xf_zbfetch * sizeof(UINTPTR_T)) << ZB_CODE_SHIFT);
+						((xf_zbfetch * SIZEOF(UINTPTR_T)) << ZB_CODE_SHIFT);
 #endif
-				} else if (xf_linestart * sizeof(UINTPTR_T) == tmp_xf_code)
+				} else if (xf_linestart * SIZEOF(UINTPTR_T) == tmp_xf_code)
 				{
 #ifdef	COMPLEX_INSTRUCTION_UPDATE
 					FIX_OFFSET_WITH_ZBREAK_OFFSET(addr, xf_zbstart);
 #else
 					*addr = (*addr & (zb_code)(~ZB_CODE_MASK)) |
-						((xf_zbstart * sizeof(UINTPTR_T)) << ZB_CODE_SHIFT);
+						((xf_zbstart * SIZEOF(UINTPTR_T)) << ZB_CODE_SHIFT);
 #endif
-				} else if (((xf_zbstart * sizeof(UINTPTR_T)) != tmp_xf_code)
-					&& ((xf_zbfetch * sizeof(UINTPTR_T)) != tmp_xf_code))
+				} else if (((xf_zbstart * SIZEOF(UINTPTR_T)) != tmp_xf_code)
+					&& ((xf_zbfetch * SIZEOF(UINTPTR_T)) != tmp_xf_code))
 					GTMASSERT;
 				z_ptr->rtn = &(CURRENT_RHEAD_ADR(routine))->routine_name;
 				assert(lab_name != NULL);
 				z_ptr->lab = lab_name;
 				z_ptr->offset = offset;
 				z_ptr->mpc = (zb_code *)((unsigned char *)addr - SIZEOF_LA);
-				inst_flush(addr, sizeof(INST_TYPE));
+				inst_flush(addr, SIZEOF(INST_TYPE));
 			}
 			if (z_ptr->action)
 			{	/* A zbreak command was already set for this line */

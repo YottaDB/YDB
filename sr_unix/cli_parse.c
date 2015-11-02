@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ static CLI_ENTRY 	*gpcmd_verb;			/* pointer to verb table */
 static CLI_PARM 	*gpcmd_parm_vals;		/* pointer to parameters for command */
 
 GBLREF char 		cli_token_buf[];
-GBLREF CLI_ENTRY 	cmd_ary[];
+GBLREF CLI_ENTRY 	*cmd_ary;
 
 GBLREF IN_PARMS *cli_lex_in_ptr;
 
@@ -496,7 +496,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 	opt_str_tmp = *opt_str_ptr;
 	if (0 == MEMCMP_LIT(*opt_str_ptr, NO_STRING))
 	{
-		*opt_str_ptr += sizeof(NO_STRING) - 1;
+		*opt_str_ptr += SIZEOF(NO_STRING) - 1;
 		neg_flg = 1;
 	} else
 		neg_flg = 0;
@@ -555,7 +555,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		return TRUE;
 	if ((VAL_STR == pparm->val_type) || (VAL_LIST == pparm->val_type))
 	{
-		strncpy(local_str, pparm->pval_str, sizeof(local_str) - 1);
+		strncpy(local_str, pparm->pval_str, SIZEOF(local_str) - 1);
 		ptr_next_val = local_str;
 		while (NULL != ptr_next_val)
 		{
@@ -802,7 +802,7 @@ CLI_ENTRY *get_parm_entry(char *parm_str)
 	char		local_str[MAX_LINE], *tmp_ptr;
 	error_def(ERR_MUPCLIERR);
 
-	strncpy(local_str, parm_str, sizeof(local_str) - 1);
+	strncpy(local_str, parm_str, SIZEOF(local_str) - 1);
 	root_match = (gpqual_root && !STRNCMP_STR(gpqual_root->name, local_str));
 
 	/* ---------------------------------------
@@ -849,7 +849,7 @@ int cli_present(char *entry)
 	CLI_ENTRY	*pparm;
 	char		local_str[MAX_LINE];
 
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	cli_strupper(local_str);
 	if (pparm = get_parm_entry(local_str))
@@ -882,7 +882,7 @@ bool cli_get_value(char *entry, char val_buf[])
 	CLI_ENTRY	*pparm;
 	char		local_str[MAX_LINE];
 
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	cli_strupper(local_str);
 	if (NULL == (pparm = get_parm_entry(local_str)))
 		return(FALSE);
@@ -908,7 +908,7 @@ boolean_t cli_negated(char *entry) 		/* entity */
 	CLI_ENTRY	*pparm;
 	char		local_str[MAX_LINE];
 
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	cli_strupper(local_str);
 	if (pparm = get_parm_entry(local_str))
 		return(pparm->negated);
@@ -928,7 +928,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 
 	ind = 0;
 	assert(0 != gpcmd_parm_vals);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	cli_strupper(local_str);
 	match_ind = -1;
 
@@ -1006,3 +1006,54 @@ bool cli_get_parm(char *entry, char val_buf[])
 	}
 	return(TRUE);
 }
+
+#ifdef GTM_TRIGGER
+int parse_triggerfile_cmd(void)
+{
+	int 		res, cmd_ind;
+	int 		opt_cnt;
+	int 		eof;
+	char		cmd[] = "TRIGGER";
+	char		*ptr;
+
+	error_def(ERR_MUNOACTION);
+
+	opt_cnt = 0;
+	gpqual_root = 0;
+	func = 0;
+	parms_cnt = 0;			/* Parameters count */
+	*cli_err_str = 0;
+	cmd_ind = find_verb(cmd);
+	assert(-1 != cmd_ind);
+	gpcmd_qual = cmd_ary[cmd_ind].qual_vals;
+	gpcmd_parm_vals = NULL;
+	gpcmd_verb = cmd_ary[cmd_ind].qual_vals;
+	if (gpcmd_qual)
+		clear_parm_vals(gpcmd_qual, TRUE);
+	func = cmd_ary[cmd_ind].func;
+	/* ----------------------
+	 * Parse command options
+	 * ----------------------
+	 */
+	do
+	{
+		res = parse_arg(gpcmd_qual, &eof);
+	} while (1 == res);
+	/* -------------------------------------
+	 * If parse error, display error string
+	 * -------------------------------------
+	 */
+	if (-1 == res)
+		func = 0;
+	else
+		return(0);
+	/* -------------------------
+	 * If gettoken returned EOF
+	 * -------------------------
+	 */
+	if (eof)
+		return(EOF);
+	else
+		return(ERR_MUNOACTION);
+}
+#endif

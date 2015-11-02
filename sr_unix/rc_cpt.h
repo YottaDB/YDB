@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 
 #define RC_MAX_CPT_SYNC	65535
 #define RC_CPT_OVERFLOW	0xFFFF
-#define RC_CPT_ENTRY_SIZE	sizeof(int4)
+#define RC_CPT_ENTRY_SIZE	SIZEOF(int4)
 #define RC_CPT_TABSIZE 512
 
 typedef struct {

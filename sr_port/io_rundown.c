@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void io_dev_close (io_log_name *d)
 	ESTABLISH(lastchance3);
 	pp.mvtype = MV_STR;
 	pp.str.addr = (char *) p;
-	pp.str.len = sizeof(p);
+	pp.str.len = SIZEOF(p);
 	if (d->iod->pair.in && d->iod->pair.in->state == dev_open)
 		(d->iod->pair.in->disp_ptr->close)(d->iod->pair.in, &pp);
 	if (d->iod->pair.out && d->iod->pair.out->state == dev_open)

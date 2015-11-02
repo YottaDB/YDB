@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,7 +91,7 @@ assert(rc_overflow->buff != 0);
     v.str.len = len;
     v.str.addr = data->str;
     v.mvtype = MV_STR;
-    if (gv_currkey->end + 1 + v.str.len + sizeof(rec_hdr) > gv_cur_region->max_rec_size)
+    if (gv_currkey->end + 1 + v.str.len + SIZEOF(rec_hdr) > gv_cur_region->max_rec_size)
     {
 	qhdr->a.erc.value = RC_KEYTOOLONG;
 	REVERT;

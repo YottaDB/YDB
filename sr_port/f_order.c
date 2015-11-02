@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,25 +28,24 @@ GBLREF	mident	window_ident;
 GBLREF	triple	*curtchain;
 
 /* The following are static triples used to pass information between functions "f_order" and "set_opcode" */
-static	triple	*gvo2_savtarg1;	/* Save gv_currkey after processing gvn1 in $ORDER(gvn1,expr) */
-static	triple	*gvo2_savtarg2;	/* Save gv_currkey after processing gvn1 and expr in $ORDER(gvn1,expr) but before executing
-				 * the runtime function for $ORDER (OC_GVO2) */
-static	triple	*gvo2_pre_srchindx_triple;	/* the end of the triple chain before OC_SRCHINDX got inserted */
+STATICDEF triple	*gvo2_savtarg1;	/* Save gv_currkey after processing gvn1 in $ORDER(gvn1,expr) */
+STATICDEF triple	*gvo2_savtarg2;	/* Save gv_currkey after processing gvn1 and expr in $ORDER(gvn1,expr) but before executing
+					 * the runtime function for $ORDER (OC_GVO2) */
+STATICDEF triple	*gvo2_pre_srchindx_triple;	/* the end of the triple chain before OC_SRCHINDX got inserted */
 
 error_def(ERR_VAREXPECTED);
 error_def(ERR_ORDER2);
 
-static	opctype order_opc[last_obj][last_dir] =
-		{
-			/* forward	backward	undecided */
-			{ OC_GVORDER,	OC_ZPREVIOUS,	OC_GVO2		},	/* global */
-			{ OC_FNLVNAME,	OC_FNLVPRVNAME, OC_FNLVNAMEO2	},	/* local_name */
-			{ OC_FNORDER,	OC_FNZPREVIOUS, OC_FNO2		},	/* local_sub */
-			{ OC_INDFUN,	OC_INDFUN,	OC_INDO2	}	/* indir */
-		};
+LITDEF	opctype order_opc[last_obj][last_dir] =
+{
+	/* forward	backward	undecided */
+	{ OC_GVORDER,	OC_ZPREVIOUS,	OC_GVO2		},	/* global */
+	{ OC_FNLVNAME,	OC_FNLVPRVNAME, OC_FNLVNAMEO2	},	/* local_name */
+	{ OC_FNORDER,	OC_FNZPREVIOUS, OC_FNO2		},	/* local_sub */
+	{ OC_INDFUN,	OC_INDFUN,	OC_INDO2	}	/* indir */
+};
 
-
-static	bool set_opcode(triple *r, oprtype *result, oprtype *result_ptr, oprtype *second_opr, enum order_obj object)
+STATICFNDEF boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr, oprtype *second_opr, enum order_obj object)
 {
 	enum order_dir	direction;
 	triple		*s;
@@ -127,81 +126,90 @@ static	bool set_opcode(triple *r, oprtype *result, oprtype *result_ptr, oprtype 
 
 	switch (object)
 	{
-	case global:
-	case local_name:
-		if (direction == undecided)
-			*second_opr = *result;
-		break;
-
-	case local_sub:
-		if (direction == undecided)
-		{	/* This is $ORDER(subscripted-local-variable, expr). The normal order of evaluation would be
-			 *
-			 * 1) Evaluate subscripts of local variable
-			 * 2) Do OC_SRCHINDX
-			 * 3) Evaluate expr
-			 * 4) Do OC_FNORDER
-			 *
-			 * But it is possible that the subscripted local-variable is defined only by an extrinsic function
-			 * that is part of "expr". In that case, we should NOT do the OC_SRCHINDX before "expr" gets evaluated
-			 * (as otherwise OC_SRCHINDX will not return the right lv_val structure). That is, the order of
-			 * evaluation should be
-			 *
-			 * 1) Evaluate subscripts of local variable
-			 * 2) Evaluate expr
-			 * 3) Do OC_SRCHINDX
-			 * 4) Do OC_FNORDER
-			 *
-			 * The triples need to be reordered accordingly to implement the above evaluation order.
-			 * This reordering of triples is implemented below by recording the end of the triple chain
-			 * just BEFORE (variable "gvo2_pre_srchindx_triple") and just AFTER (variable "gvo2_post_srchindx_triple")
-			 * parsing the subscripted-local-variable first argument to $ORDER. This is done partly in
-			 * the function "f_order" and partly in "set_opcode". Once these are recorded, the second argument "expr"
-			 * is parsed and the triples generated. After this, we start from gvo2_post_srchindx_triple and go back
-			 * the triple chain until we find the OC_SRCHINDX opcode or gvo2_pre_srchindx_triple whichever is earlier
-			 * (e.g. for unsubscripted names OC_SRCHINDX triple is not generated). This portion of the triple
-			 * chain (that does the OC_SRCHINDX computation) is deleted and added at the end of the current
-			 * triple chain. This accomplishes the desired evaluation reordering. Note that the value of the
-			 * naked indicator is not affected by this reordering (since OC_SRCHINDX does not do global references).
-			 */
-			for (tmptriple = gvo2_post_srchindx_triple; (OC_SRCHINDX != tmptriple->opcode);
-				tmptriple = tmptriple->exorder.bl)
-			{
-				if (tmptriple == gvo2_pre_srchindx_triple)
-					break;
-			}
-			if (OC_SRCHINDX == tmptriple->opcode)
-			{
-				t1 = tmptriple->exorder.bl;
-				t2 = gvo2_post_srchindx_triple->exorder.fl;
-				dqdelchain(t1,t2,exorder);
-				dqinit(&tmpchain, exorder);
-				tmpchain.exorder.fl = tmptriple;
-				tmpchain.exorder.bl = gvo2_post_srchindx_triple;
-				gvo2_post_srchindx_triple->exorder.fl = &tmpchain;
-				tmptriple->exorder.bl = &tmpchain;
-				tmptriple = curtchain->exorder.bl;
-				dqadd(tmptriple, &tmpchain, exorder);
-			}
-			s = newtriple(OC_PARAMETER);
-			s->operand[0] = *second_opr;
-			s->operand[1] = *result;
-			*second_opr = put_tref(s);
-		}
-		break;
-
-	case indir:
-		if (direction == forward)
-			*second_opr = put_ilit((mint)indir_fnorder1);
-		else
-			if (direction == backward)
-				*second_opr = put_ilit((mint)indir_fnzprevious);
-			else
+		case global:
+			if (direction == undecided)
 				*second_opr = *result;
-		break;
+			break;
+		case local_name:
+			if (direction == undecided)
+				*second_opr = *result;
+			else if (direction == forward)
+			{	/* The op_fnlvname rtn needs an extra parm - insert it now */
+				assert(OC_FNLVNAME == order_opc[object][direction]);
+				*second_opr = put_ilit(0);	/* Flag not to return aliases with no value */
+			}
+			break;
 
-	default:
-		assert(FALSE);
+		case local_sub:
+			if (direction == undecided)
+			{	/* This is $ORDER(subscripted-local-variable, expr). The normal order of evaluation would be
+				 *
+				 * 1) Evaluate subscripts of local variable
+				 * 2) Do OC_SRCHINDX
+				 * 3) Evaluate expr
+				 * 4) Do OC_FNORDER
+				 *
+				 * But it is possible that the subscripted local-variable is defined only by an extrinsic function
+				 * that is part of "expr". In that case, we should NOT do the OC_SRCHINDX before "expr" gets
+				 * evaluated (as otherwise OC_SRCHINDX will not return the right lv_val structure). That is, the
+				 * order of evaluation should be
+				 *
+				 * 1) Evaluate subscripts of local variable
+				 * 2) Evaluate expr
+				 * 3) Do OC_SRCHINDX
+				 * 4) Do OC_FNORDER
+				 *
+				 * The triples need to be reordered accordingly to implement the above evaluation order.
+				 * This reordering of triples is implemented below by recording the end of the triple chain
+				 * just BEFORE (variable "gvo2_pre_srchindx_triple") and just AFTER (variable
+				 * "gvo2_post_srchindx_triple") parsing the subscripted-local-variable first argument to
+				 * $ORDER. This is done partly in the function "f_order" and partly in "set_opcode". Once these
+				 * are recorded, the second argument "expr" is parsed and the triples generated. After this, we
+				 * start from gvo2_post_srchindx_triple and go back the triple chain until we find the OC_SRCHINDX
+				 * opcode or gvo2_pre_srchindx_triple whichever is earlier (e.g. for unsubscripted names
+				 * OC_SRCHINDX triple is not generated). This portion of the triple chain (that does the
+				 * OC_SRCHINDX computation) is deleted and added at the end of the current triple chain. This
+				 * accomplishes the desired evaluation reordering. Note that the value of the naked indicator is
+				 * not affected by this reordering (since OC_SRCHINDX does not do global references).
+				 */
+				for (tmptriple = gvo2_post_srchindx_triple; (OC_SRCHINDX != tmptriple->opcode);
+				     tmptriple = tmptriple->exorder.bl)
+				{
+					if (tmptriple == gvo2_pre_srchindx_triple)
+						break;
+				}
+				if (OC_SRCHINDX == tmptriple->opcode)
+				{
+					t1 = tmptriple->exorder.bl;
+					t2 = gvo2_post_srchindx_triple->exorder.fl;
+					dqdelchain(t1,t2,exorder);
+					dqinit(&tmpchain, exorder);
+					tmpchain.exorder.fl = tmptriple;
+					tmpchain.exorder.bl = gvo2_post_srchindx_triple;
+					gvo2_post_srchindx_triple->exorder.fl = &tmpchain;
+					tmptriple->exorder.bl = &tmpchain;
+					tmptriple = curtchain->exorder.bl;
+					dqadd(tmptriple, &tmpchain, exorder);
+				}
+				s = newtriple(OC_PARAMETER);
+				s->operand[0] = *second_opr;
+				s->operand[1] = *result;
+				*second_opr = put_tref(s);
+			}
+			break;
+
+		case indir:
+			if (direction == forward)
+				*second_opr = put_ilit((mint)indir_fnorder1);
+			else
+				if (direction == backward)
+					*second_opr = put_ilit((mint)indir_fnzprevious);
+				else
+					*second_opr = *result;
+			break;
+
+		default:
+			assert(FALSE);
 	}
 	r->opcode = order_opc[object][direction];
 	return TRUE;
@@ -213,68 +221,65 @@ int f_order(oprtype *a, opctype op)
 	oprtype		result, *result_ptr, *second_opr;
 	triple		tmpchain, *oldchain, *r, *triptr;
 
-	result_ptr = (oprtype *)mcalloc(sizeof(oprtype));
+	result_ptr = (oprtype *)mcalloc(SIZEOF(oprtype));
 	result = put_indr(result_ptr);
 
 	r = maketriple(OC_NOOP);	/* We'll fill in the opcode later, when we figure out what it is */
 	switch (window_token)
 	{
-	case TK_IDENT:
-		if (director_token == TK_LPAREN)
-		{	/* See comment in "set_opcode" for why we maintain "gvo2_pre_srchindx_triple" here */
-			gvo2_pre_srchindx_triple = curtchain->exorder.bl;
-			if (!lvn(&r->operand[0], OC_SRCHINDX, r))
-				return FALSE;
-			object = local_sub;
-		} else
-		{
-			r->operand[0] = put_str(window_ident.addr, window_ident.len);
-			advancewindow();
-			object = local_name;
-		}
-		second_opr = &r->operand[1];
-		break;
-
-	case TK_CIRCUMFLEX:
-		if (!gvn())
-			return FALSE;
-		object = global;
-		second_opr = &r->operand[0];
-		break;
-
-	case TK_ATSIGN:
-		if (shift_gvrefs)
-		{
-			dqinit(&tmpchain, exorder);
-			oldchain = setcurtchain(&tmpchain);
-			if (!indirection(&r->operand[0]))
+		case TK_IDENT:
+			if (director_token == TK_LPAREN)
+			{	/* See comment in "set_opcode" for why we maintain "gvo2_pre_srchindx_triple" here */
+				gvo2_pre_srchindx_triple = curtchain->exorder.bl;
+				if (!lvn(&r->operand[0], OC_SRCHINDX, r))
+					return FALSE;
+				object = local_sub;
+			} else
 			{
-				setcurtchain(oldchain);
-				return FALSE;
+				r->operand[0] = put_str(window_ident.addr, window_ident.len);
+				advancewindow();
+				object = local_name;
 			}
-
-			if (!set_opcode(r, &result, result_ptr, &r->operand[1], indir))
+				second_opr = &r->operand[1];
+			break;
+		case TK_CIRCUMFLEX:
+			if (!gvn())
 				return FALSE;
-			ins_triple(r);
+			object = global;
+			second_opr = &r->operand[0];
+			break;
+		case TK_ATSIGN:
+			if (shift_gvrefs)
+			{
+				dqinit(&tmpchain, exorder);
+				oldchain = setcurtchain(&tmpchain);
+				if (!indirection(&r->operand[0]))
+				{
+					setcurtchain(oldchain);
+					return FALSE;
+				}
 
-			newtriple(OC_GVSAVTARG);
-			setcurtchain(oldchain);
-			dqadd(expr_start, &tmpchain, exorder);
-			expr_start = tmpchain.exorder.bl;
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(expr_start);
-			*a = put_tref(r);
-			return TRUE;
-		}
-		if (!indirection(&r->operand[0]))
+				if (!set_opcode(r, &result, result_ptr, &r->operand[1], indir))
+					return FALSE;
+				ins_triple(r);
+
+				newtriple(OC_GVSAVTARG);
+				setcurtchain(oldchain);
+				dqadd(expr_start, &tmpchain, exorder);
+				expr_start = tmpchain.exorder.bl;
+				triptr = newtriple(OC_GVRECTARG);
+				triptr->operand[0] = put_tref(expr_start);
+				*a = put_tref(r);
+				return TRUE;
+			}
+			if (!indirection(&r->operand[0]))
+				return FALSE;
+			object = indir;
+			second_opr = &r->operand[1];
+			break;
+		default:
+			stx_error(ERR_VAREXPECTED);
 			return FALSE;
-		object = indir;
-		second_opr = &r->operand[1];
-		break;
-
-	default:
-		stx_error(ERR_VAREXPECTED);
-		return FALSE;
 	}
 	if (set_opcode(r, &result, result_ptr, second_opr, object))
 	{	/* Restore gv_currkey of the first argument (in case the second expression contained a global reference).

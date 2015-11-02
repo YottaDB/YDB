@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 
 
 	cur_level = ((blk_hdr_ptr_t)blk_base)->levl;
-	curptr = blk_base + sizeof(blk_hdr);
+	curptr = blk_base + SIZEOF(blk_hdr);
 	*rec_size = *keycmpc = *keylen = 0;
 	while (curptr < rec_top)
 	{
@@ -106,7 +106,7 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 			while (0 != cur_level)
 			{
 				tblk_size = ((blk_hdr_ptr_t)blk_base)->bsiz;
-				GET_LONG(tblk_num, blk_base + tblk_size - sizeof(block_id));
+				GET_LONG(tblk_num, blk_base + tblk_size - SIZEOF(block_id));
 				if (0 == tblk_num  || cs_data->trans_hist.total_blks - 1 < tblk_num)
 				{
 					assert(t_tries < CDB_STAGNATE);

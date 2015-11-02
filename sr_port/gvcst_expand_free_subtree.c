@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					chain.flag = 1;
 					chain.next_off = 0;
 					chain.cw_index = ksb->block;
-					assert(sizeof(chain) == sizeof(blk));
+					assert(SIZEOF(chain) == SIZEOF(blk));
 					blk = *(block_id *)&chain;
 				} else
 					blk = ksb->block;
@@ -115,21 +115,21 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 				memcpy(temp_buff, bp, bp->bsiz);
 				if (!was_crit)
 					rel_crit(gv_cur_region);
-				for (rp = (rec_hdr_ptr_t)(temp_buff + sizeof(blk_hdr)),
+				for (rp = (rec_hdr_ptr_t)(temp_buff + SIZEOF(blk_hdr)),
 					rtop = (rec_hdr_ptr_t)(temp_buff + ((blk_hdr_ptr_t)temp_buff)->bsiz);
 				     rp < rtop;
 				     rp = rp1)
 				{
 					GET_USHORT(temp_ushort, &rp->rsiz);
 					rp1 = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + temp_ushort);
-					if ((sm_uc_ptr_t)rp1 < (sm_uc_ptr_t)(rp + 1) + sizeof(block_id))
+					if ((sm_uc_ptr_t)rp1 < (sm_uc_ptr_t)(rp + 1) + SIZEOF(block_id))
 					{	/* This should have worked because a local copy was made while crit */
 						assert(FALSE);
 						kill_error = cdb_sc_rmisalign;
 						free(temp_buff);
 						rts_error(VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &kill_error);
 					}
-					GET_LONG(temp_long, (block_id_ptr_t)((sm_uc_ptr_t)rp1 - sizeof(block_id)));
+					GET_LONG(temp_long, (block_id_ptr_t)((sm_uc_ptr_t)rp1 - SIZEOF(block_id)));
 					if (dollar_tlevel)
 					{
 						chain = *(off_chain *)&temp_long;

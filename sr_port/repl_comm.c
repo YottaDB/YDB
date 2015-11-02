@@ -321,7 +321,7 @@ static int get_sock_buff_size(int sockfd, int *buffsize, int which_buf)
 	int	status;
 	GTM_SOCKLEN_TYPE optlen;
 
-	optlen = sizeof(*buffsize);
+	optlen = SIZEOF(*buffsize);
         status = getsockopt(sockfd, SOL_SOCKET, which_buf, (void *)buffsize, (GTM_SOCKLEN_TYPE *)&optlen);
 	return (0 == status) ? 0 : ERRNO;
 }
@@ -344,7 +344,7 @@ static int set_sock_buff_size(int sockfd, int buflen, int which_buf)
 #else
 	int	optlen;
 #endif
-	optlen = sizeof(buflen);
+	optlen = SIZEOF(buflen);
         status = setsockopt(sockfd, SOL_SOCKET, which_buf, (void *)&buflen, (GTM_SOCKLEN_TYPE)optlen);
 	return (0 == status) ? 0 : ERRNO;
 }

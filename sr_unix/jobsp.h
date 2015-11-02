@@ -93,5 +93,6 @@ bool ojchildioset(job_params_type *jparms);
 int ojstartchild(job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[]);
 void ojparams(char *p, job_params_type *job_params);
 void ojgetch_env(job_params_type *jparms);
+void ojchildioclean(void);
 
 #endif

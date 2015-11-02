@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void mlk_unlock(mlk_pvtblk *p)
 
 		if (0 < dollar_tlevel && !((t_tries < CDB_STAGNATE) || csa->now_crit)) /* Final retry and region not locked down */
 		{	/* make sure this region is in the list in case we end up retrying */
-			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, sizeof(tp_region));
+			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 			/* insert_region() will additionally attempt CRIT on the region and restart if not possible */
 			assert(csa->now_crit);
 		}

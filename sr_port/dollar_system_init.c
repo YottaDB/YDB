@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ void dollar_system_init(struct startup_vector *svec)
 	stringpool.free += dollar_system.str.len;
 	val.addr = SYSID;
 	val.len = STR_LIT_LEN(SYSID);
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
 	{
 		dollar_system.str.len += tn.len;
 		memcpy(stringpool.free, tn.addr, tn.len);
@@ -53,7 +53,7 @@ void dollar_system_init(struct startup_vector *svec)
 	}
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(SYSID), sizeof(buf) - 1);
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(SYSID), SIZEOF(buf) - 1);
 #	endif
 	else
 		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);

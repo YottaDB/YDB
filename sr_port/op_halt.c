@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,17 +12,41 @@
 #include "mdef.h"
 
 #include "gtm_stdlib.h"		/* for exit() */
+#include "gtm_string.h"
+
+#include "gtmimagename.h"
+#include "send_msg.h"
+#include "getzposition.h"
 
 #ifdef VMS
 #  include <ssdef.h>
 #endif
 #include "op.h"
 
+LITREF	gtmImageName	gtmImageNames[];
+
+error_def(ERR_PROCTERM);
+
 void op_halt(void)
 {
 #ifdef VMS
 	sys$exit(SS$_NORMAL);
 #else
+#	ifdef GTM_TRIGGER
+	mval	zposition;
+
+	/* If HALT is done from a non-runtime trigger, send a warning message to oplog to record the fact
+	 * of this uncommon process termination method.
+	 */
+	if (!IS_GTM_IMAGE && !IS_GTM_SVC_DAL_IMAGE)
+        {
+		zposition.mvtype = 0;   /* It's not an mval yet till getzposition fills it in */
+		getzposition(&zposition);
+		assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
+		send_msg(VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("HALT"),
+			 zposition.str.len, zposition.str.addr);
+	}
+#	endif
 	exit(0);
 #endif
 }

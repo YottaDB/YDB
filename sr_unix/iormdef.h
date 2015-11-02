@@ -16,6 +16,7 @@
 #define DEF_RM_RECORDSIZE	32767
 #define DEF_RM_LENGTH		66
 #define RM_BUFLEN		80
+#define CHUNK_SIZE		512
 
 #define	ONE_COMMA			"1,"
 #define	ONE_COMMA_UNAVAILABLE		"1,Resource temporarily unavailable"
@@ -111,7 +112,11 @@ typedef struct
 	unsigned char	*inbuf_top;	/* Last char (+1) in inbuf */
 	unsigned char	*outbuf;	/* Output buffer area */
 	FILE		*filstr;
+	uint4		file_pos;
 	long		pipe_buff_size;
+	char		utf_tmp_buffer[CHUNK_SIZE];	/* Buffer to store CHUNK bytes */
+	int		utf_tot_bytes_in_buffer;	/* Number of bytes read from device, it refers utf_tmp_buffer buffer */
+	int		utf_start_pos;			/* Current position in utf_tmp_buffer */
 }d_rm_struct;	/*  rms		*/
 
 #ifdef KEEP_zOS_EBCDIC

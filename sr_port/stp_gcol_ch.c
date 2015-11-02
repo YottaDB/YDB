@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "error.h"
 
-GBLREF boolean_t	disallow_forced_expansion, forced_expansion;
+GBLREF boolean_t	expansion_failed, retry_if_expansion_fails;
 
 CONDITION_HANDLER(stp_gcol_ch)
 {
@@ -22,9 +22,10 @@ CONDITION_HANDLER(stp_gcol_ch)
 	error_def(ERR_MEMORYRECURSIVE);
 
 	START_CH;
-	if ((ERR_MEMORY == SIGNAL || ERR_VMSMEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL) && forced_expansion)
+
+	if ((ERR_MEMORY == SIGNAL || ERR_VMSMEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL) && retry_if_expansion_fails)
 	{
-		disallow_forced_expansion = TRUE;
+		expansion_failed = TRUE;
 		UNWIND(NULL, NULL);
 	}
 	NEXTCH; /* we really need to expand, and there is no memory available, OR, non memory related error */

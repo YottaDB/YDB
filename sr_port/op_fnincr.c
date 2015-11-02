@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,12 +22,7 @@
 #include "mvalconv.h"
 #include "op.h"		/* for op_add prototype */
 
-/* this prototype is currently not added into op.h because the type "lv_val" is not recognized by op.h unless lv_val.h is
- * included within and it is not a preferred practice to recursively include header files.
- */
-void	op_fnincr(lv_val *local_var, mval *increment, mval *result);
-
-LITREF	mval		literal_null;
+LITREF	mval	literal_null;
 
 void	op_fnincr(lv_val *local_var, mval *increment, mval *result)
 {

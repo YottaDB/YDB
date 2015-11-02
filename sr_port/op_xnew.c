@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,7 @@ void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
 		{	/* This var has NOT been specified twice */
 			tabent2->value = tabent1->value;
 			lvp = (lv_val *)tabent2->value;
-			if (lvp && (1 < lvp->stats.trefcnt || 0 < lvp->stats.crefcnt || lvp->has_aliascont))
+			if (lvp && (IS_ALIASLV(lvp) || lvp->has_aliascont))
 				curr_symval->alias_activity = TRUE; 		/* Loading an alias into new symtab counts as
 										 * activity! */
 			if (NULL != xnewvar_anchor)
@@ -100,7 +100,7 @@ void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
 				xnewvar = xnewvar_anchor;
 				xnewvar_anchor = xnewvar->next;
 			} else
-				xnewvar = (lv_xnew_var *)malloc(sizeof(lv_xnew_var));
+				xnewvar = (lv_xnew_var *)malloc(SIZEOF(lv_xnew_var));
 			xnewvar->key = tabent1->key;	/* Note "value" in this key is not used since it is not sync'd */
 			xnewvar->lvval = lvtab1;
 			xnewvar->next = curr_symval->xnew_var_list;

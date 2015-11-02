@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,9 +39,9 @@ GBLREF	boolean_t	dse_running;
 	 * 2) Else, the block might or might not need an upgrade. To decide, we do some more checks.				\
 	 *    V5 onwards, the first 2 bytes of the block header is the version indicator. It is 1 in V5.			\
 	 *    In V4, the first 2 bytes of the block header was the block-size which is guaranteed to be				\
-	 *    at least sizeof(v15_blk_hdr) (the size of the V4 blk_hdr structure) which is 8 bytes in Unix			\
+	 *    at least SIZEOF(v15_blk_hdr) (the size of the V4 blk_hdr structure) which is 8 bytes in Unix			\
 	 *    and 7 bytes in VMS. We use the first 2 bytes in the block header as a first level check.				\
-	 *    If they are >= sizeof(v15_blk_hdr), we decide it is a V4 format block and try to upgrade.				\
+	 *    If they are >= SIZEOF(v15_blk_hdr), we decide it is a V4 format block and try to upgrade.				\
 	 *    This check is performed in this macro itself as it is a quick check and avoids a function call.			\
 	 * 3) It is quite possible that we might conclude the format incorrectly based on just the above checks.		\
 	 *	This can be due to any one of the following.									\
@@ -70,7 +70,7 @@ GBLREF	boolean_t	dse_running;
 	 */															\
 	if (!dse_running || (UPGRADE_IF_NEEDED == gtm_blkupgrade_flag))								\
 	{															\
-		if ((fully_upgraded) || (sizeof(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)(srcbuffptr))->bsiz))			\
+		if ((fully_upgraded) || (SIZEOF(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)(srcbuffptr))->bsiz))			\
 		{														\
 			upgrdstatus = SS_NORMAL;										\
 			if (NULL != (ondskblkver))										\
@@ -112,7 +112,7 @@ GBLREF	boolean_t	dse_running;
 	v15_blk_hdr_ptr_t	v4_blk_hdr;										\
 															\
 	v4_blk_hdr = (v15_blk_hdr_ptr_t)v5_blk_hdr;									\
-	if (!(fully_upgraded) || (sizeof(v15_blk_hdr) > v4_blk_hdr->bsiz))						\
+	if (!(fully_upgraded) || (SIZEOF(v15_blk_hdr) > v4_blk_hdr->bsiz))						\
 	{	/* V5 formatted buffer in shared memory (even though might be V4 format in disk) */			\
 		assert((unsigned)GDSVLAST > (unsigned)v5_blk_hdr->bver);						\
 		assert((LCL_MAP_LEVL == v5_blk_hdr->levl) || ((unsigned)MAX_BT_DEPTH > (unsigned)v5_blk_hdr->levl));	\

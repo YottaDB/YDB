@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,8 +16,7 @@
 #include "view.h"
 #include "gtm_caseconv.h"
 
-#define TOP_VIEWTAB_ENTRY (&viewtab[sizeof(viewtab) / sizeof(viewtab[0])])
-#define VT_KWSIZE (sizeof(viewtab[0].keyword))
+#define VT_KWSIZE (SIZEOF(viewtab[0].keyword))
 
 #define VIEWTAB(A,B,C,D) {A, B, C, D}
 const static readonly viewtab_entry viewtab[] =
@@ -43,9 +42,9 @@ viewtab_entry *viewkeys(mstr *v)
 		vt_ptr = (viewtab_entry *)NULL;
 	else
 	{
-		len = (v->len < sizeof(cmpbuf) ? v->len : sizeof(cmpbuf));
+		len = (v->len < SIZEOF(cmpbuf) ? v->len : SIZEOF(cmpbuf));
 		lower_to_upper(cmpbuf, (uchar_ptr_t)v->addr, len);
-		vt_top = TOP_VIEWTAB_ENTRY;
+		vt_top = ARRAYTOP(viewtab);
 		for (vt_ptr = viewtab ; vt_ptr < vt_top ; vt_ptr++)
 		{
 			n = memcmp(vt_ptr->keyword, cmpbuf, len);

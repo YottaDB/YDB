@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,12 +28,8 @@ unsigned char *n2s(mval *mv_ptr)
 
 	if (!MV_DEFINED(mv_ptr))
 		GTMASSERT;
+	ENSURE_STP_FREE_SPACE(MAX_NUM_SIZE);
 	start = stringpool.free;
-	if (start + MAX_NUM_SIZE > stringpool.top)
-	{
-		stp_gcol(MAX_NUM_SIZE);
-		start = stringpool.free;
-	}
 	cp = start;
 	m1 = mv_ptr->m[1];
 	if (m1 == 0)	/* SHOULD THIS BE UNDER THE MV_INT TEST? */
@@ -45,7 +41,7 @@ unsigned char *n2s(mval *mv_ptr)
 			*cp++ = '-';
 			m1 = -m1;
 		}
-		cp1 = lcl_buf + sizeof(lcl_buf);
+		cp1 = ARRAYTOP(lcl_buf);
 		/* m0 is the integer part */
 		m0 = m1 / MV_BIAS;
 		/* m1 will become the fractional part */
@@ -75,7 +71,7 @@ unsigned char *n2s(mval *mv_ptr)
 			m0 /= 10;
 			*--cp1 = tmp - (m0 * 10) + '0';
 		}
-		n0 = (int4)(&lcl_buf[sizeof(lcl_buf)] - cp1);
+		n0 = (int4)(ARRAYTOP(lcl_buf) - cp1);
 		memcpy(cp, cp1, n0);
 		cp += n0;
 	} else

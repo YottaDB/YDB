@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "min_max.h"          /* needed for init_root_gv.h */
+#include "min_max.h"		/* needed for init_root_gv.h */
 #include "init_root_gv.h"
 #include "util.h"
 #include "cli.h"
@@ -30,6 +30,13 @@
 #include "op.h"
 #include "format_targ_key.h"
 
+#ifdef GTM_TRIGGER
+#include "hashtab.h"		/* for STR_HASH (in COMPUTE_HASH_MNAME)*/
+#include "hashtab_mname.h"
+#include "rtnhdr.h"
+#include "gv_trigger.h"		/* needed for INIT_ROOT_GVT */
+#include "targ_alloc.h"
+#endif
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
 #endif
@@ -38,6 +45,9 @@ GBLREF gv_key		*gv_currkey;
 GBLREF sgmnt_addrs      *cs_addrs;
 GBLREF gd_region    	*gv_cur_region;
 GBLREF mval		curr_gbl_root;
+GBLREF	gv_namehead	*gv_target;
+
+LITREF	mval		literal_hasht;
 
 int dse_getki(char *dst, int *len, char *qual, int qual_len)
 {
@@ -47,11 +57,12 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	unsigned short 	buf_len;
 	int  		key_len, dlr_num, dlr_len;
 	mval 		key_subsc;
+	sgmnt_addrs	*csa;
 
 	error_def(ERR_GVSUBOFLOW);
 	error_def(ERR_GVIS);
 
-	buf_len = sizeof(buf);
+	buf_len = SIZEOF(buf);
 	if (!cli_get_str(qual, buf, &buf_len))
 		return FALSE;
 	bot = temp_dst = (char *)&key_buf[0];
@@ -87,6 +98,7 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 	}
 	*temp_dst = '\0';
 
+	csa = cs_addrs;
 	key_len = (int )(temp_dst - bot);
 	INIT_ROOT_GVT(bot, key_len, curr_gbl_root);
 	bot = (char *)&gv_currkey->base[0];

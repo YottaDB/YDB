@@ -64,8 +64,8 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 	error_def(ERR_TEXT);
 	error_def(ERR_GETSOCKNAMERR);
 
-	socketptr = (socket_struct *)malloc(sizeof(socket_struct));
-	memset(socketptr, 0, sizeof(socket_struct));
+	socketptr = (socket_struct *)malloc(SIZEOF(socket_struct));
+	memset(socketptr, 0, SIZEOF(socket_struct));
 	if (0 > file_des)
 	{	/* no socket descriptor yet */
 		if (SSCANF(sockaddr, "%[^:]:%hu:%3[^:]", temp_addr, &port, tcp) < 3)
@@ -122,7 +122,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 		else
 		{
 			free(socketptr);
-			rts_error(VARLSTCNT(4) ERR_PROTNOTSUP, 2, MIN(strlen(tcp), sizeof("TCP") - 1), tcp);
+			rts_error(VARLSTCNT(4) ERR_PROTNOTSUP, 2, MIN(strlen(tcp), SIZEOF("TCP") - 1), tcp);
 			return NULL;
 		}
 		socketptr->sd = FD_INVALID; /* don't mess with 0 */
@@ -130,7 +130,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 	} else
 	{	/* socket already setup by inetd */
 		socketptr->sd = file_des;
-		socknamelen = sizeof(socketptr->local.sin);
+		socknamelen = SIZEOF(socketptr->local.sin);
 		if (-1 == tcp_routines.aa_getsockname(socketptr->sd, (struct sockaddr *)&socketptr->local.sin, &socknamelen))
 		{
 			save_errno = errno;
@@ -141,7 +141,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 			return NULL;
 		}
 		socketptr->local.port = GTM_NTOHS(socketptr->local.sin.sin_port);
-		socknamelen = sizeof(socketptr->remote.sin);
+		socknamelen = SIZEOF(socketptr->remote.sin);
 		if (-1 == getpeername(socketptr->sd, (struct sockaddr *)&socketptr->remote.sin, (GTM_SOCKLEN_TYPE *)&socknamelen))
 		{
 			save_errno = errno;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008 Fidelity Information Services, Inc.	*
+ *	Copyright 2008, 2010 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,18 @@
 
 GBLREF	gvt_container	*gvt_pending_list;
 GBLREF	buddy_list	*gvt_pending_buddy_list;
+
+boolean_t	is_gvt_in_pending_list(gv_namehead *gvt)
+{
+	gvt_container	*gvtc;
+
+	for (gvtc = gvt_pending_list; NULL != gvtc; gvtc = (gvt_container *)gvtc->next_gvtc)
+	{
+		if (gvtc->gvnh_reg->gvt == gvt)
+			return TRUE;
+	}
+	return FALSE;
+}
 
 /* Now that "reg" is being opened, process list of gv_targets that were allocated BEFORE reg got opened to see if they
  * need to be re-allocated (due to differences in reg->max_key_size versus csa->hdr->max_key_size.

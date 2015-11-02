@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,10 +42,11 @@ GBLREF unsigned int	t_tries;
 mint	gvcst_data(void)
 {
 	blk_hdr_ptr_t	bp;
+	boolean_t	do_rtsib;
 	enum cdb_sc	status;
 	mint		val;
 	rec_hdr_ptr_t	rp;
-	unsigned short	rec_size;
+	unsigned short	match, rsiz;
 	srch_blk_status *bh;
 	srch_hist	*rt_history;
 	sm_uc_ptr_t	b_top;
@@ -55,9 +56,10 @@ mint	gvcst_data(void)
 	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	for (;;)
 	{
+		/* The following code is duplicated in gvcst_dataget. Any changes here might need to be reflected there as well */
 		rt_history = gv_target->alt_hist;
 		rt_history->h[0].blk_num = 0;
-		if ((status = gvcst_search(gv_currkey, NULL)) != cdb_sc_normal)
+		if (cdb_sc_normal != (status = gvcst_search(gv_currkey, NULL)))
 		{
 			t_retry(status);
 			continue;
@@ -66,37 +68,40 @@ mint	gvcst_data(void)
 		bp = (blk_hdr_ptr_t)bh->buffaddr;
 		rp = (rec_hdr_ptr_t)(bh->buffaddr + bh->curr_rec.offset);
 		b_top = bh->buffaddr + bp->bsiz;
-		val = 0;
-		if (gv_currkey->end + 1 == bh->curr_rec.match)
-			val = 1;
-		else if (bh->curr_rec.match >= gv_currkey->end)
-			val = 10;
-		if (1 == val  ||  rp == (rec_hdr_ptr_t)b_top)
+		match = bh->curr_rec.match;
+		do_rtsib = FALSE;
+		if (gv_currkey->end + 1 == match)
 		{
-			GET_USHORT(rec_size, &rp->rsiz);
-			if (rp == (rec_hdr_ptr_t)b_top  ||  (sm_uc_ptr_t)rp + rec_size == b_top)
+			val = 1;
+			GET_USHORT(rsiz, &rp->rsiz);
+			rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rsiz);
+			if ((sm_uc_ptr_t)rp > b_top)
 			{
-				if (cdb_sc_endtree != (status = gvcst_rtsib(rt_history, 0)))
-				{
-					if ((cdb_sc_normal != status)
-						|| (cdb_sc_normal != (status = gvcst_search_blk(gv_currkey, rt_history->h))))
-					{
-						t_retry(status);
-						continue;
-					}
-					if (rt_history->h[0].curr_rec.match >= gv_currkey->end)
-						val += 10;
-				}
-			} else
+				t_retry(cdb_sc_rmisalign);
+				continue;
+			} else if ((sm_uc_ptr_t)rp == b_top)
+				do_rtsib = TRUE;
+			else if (rp->cmpc >= gv_currkey->end)
+				val += 10;
+		} else if (match >= gv_currkey->end)
+			val = 10;
+		else
+		{
+			val = 0;
+			if (rp == (rec_hdr_ptr_t)b_top)
+				do_rtsib = TRUE;
+		}
+		if (do_rtsib && (cdb_sc_endtree != (status = gvcst_rtsib(rt_history, 0))))
+		{
+			if ((cdb_sc_normal != status) || (cdb_sc_normal != (status = gvcst_search_blk(gv_currkey, rt_history->h))))
 			{
-				if ((sm_uc_ptr_t)rp + rec_size > b_top)
-				{
-					t_retry(cdb_sc_rmisalign);
-					continue;
-				}
-				rp = (rec_hdr_ptr_t)((sm_uc_ptr_t)rp + rec_size);
-				if (rp->cmpc >= gv_currkey->end)
-					val += 10;
+				t_retry(status);
+				continue;
+			}
+			if (rt_history->h[0].curr_rec.match >= gv_currkey->end)
+			{
+				assert(1 >= val);
+				val += 10;
 			}
 		}
 		if (0 == dollar_tlevel)

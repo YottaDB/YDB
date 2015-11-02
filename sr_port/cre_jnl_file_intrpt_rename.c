@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "send_msg.h"
-
-GBLREF	boolean_t	run_time;
+#include "gtmimagename.h"
 
 void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 {
@@ -46,7 +45,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 	status1 = gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus);
 	if (FILE_STAT_ERROR == status1)
 	{
-		if (run_time)
+		if (IS_GTM_IMAGE)
 			send_msg(VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
 		else
 			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
@@ -57,7 +56,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 	status2 = gtm_file_stat(&filestr, NULL, NULL, FALSE, &ustatus);
 	if (FILE_STAT_ERROR == status2)
 	{
-		if (run_time)
+		if (IS_GTM_IMAGE)
 			send_msg(VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
 		else
 			gtm_putmsg(VARLSTCNT(5) ERR_FILEPARSE, 2, filestr.len, filestr.addr, ustatus);
@@ -70,7 +69,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 			status = gtm_rename(filestr.addr, (int)filestr.len, (char *)fn, fn_len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{
-				if (run_time)
+				if (IS_GTM_IMAGE)
 				{
 					VMS_ONLY(send_msg(VARLSTCNT(8) ERR_RENAMEFAIL, 4, filestr.len, filestr.addr,
 						fn_len, fn, status, ustatus);)
@@ -85,7 +84,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 				}
 			} else
 			{
-				if (run_time)
+				if (IS_GTM_IMAGE)
 					send_msg(VARLSTCNT(6) ERR_FILERENAME, 4, (int)filestr.len, filestr.addr, fn_len, fn);
 				else
 					gtm_putmsg(VARLSTCNT(6) ERR_FILERENAME, 4, filestr.len, filestr.addr, fn_len, fn);
@@ -98,7 +97,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 			status = gtm_file_remove(filestr.addr, (int)filestr.len, &ustatus);
 			if (SYSCALL_ERROR(status))
 			{
-				if (run_time)
+				if (IS_GTM_IMAGE)
 				{
 					VMS_ONLY(send_msg(VARLSTCNT(6) ERR_FILEDELFAIL, 2, filestr.len, filestr.addr,
 								status, ustatus);)
@@ -111,7 +110,7 @@ void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 				}
 			} else
 			{
-				if (run_time)
+				if (IS_GTM_IMAGE)
 					send_msg(VARLSTCNT(4) ERR_FILEDEL, 2, filestr.len, filestr.addr);
 				else
 					gtm_putmsg(VARLSTCNT(4) ERR_FILEDEL, 2, filestr.len, filestr.addr);

@@ -117,7 +117,7 @@ void	mupip_freeze(void)
 	error_mupip = FALSE;
 	/* DBG qualifier prints extra debug messages while waiting for KIP in region freeze */
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
-	mu_getlst("REG_NAME", sizeof(tp_region));
+	mu_getlst("REG_NAME", SIZEOF(tp_region));
 	if (error_mupip)
 	{
 		util_out_print("!/MUPIP cannot start freeze with above errors!/", TRUE);

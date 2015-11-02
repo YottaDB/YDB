@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2001, 2008 Fidelity Information Services, Inc  *
+ *      Copyright 2001, 2009 Fidelity Information Services, Inc  *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -34,7 +34,7 @@ void gtm_env_xlate_init(void)
 
 	val.addr = GTM_ENV_XLATE;
 	val.len =  STR_LIT_LEN(GTM_ENV_XLATE);
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
 	{
 		UNIX_ONLY(
 			env_gtm_env_xlate.len = tn.len;
@@ -52,7 +52,7 @@ void gtm_env_xlate_init(void)
 		env_gtm_env_xlate.len = 0;
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(GTM_ENV_XLATE), sizeof(buf) - 1);
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(GTM_ENV_XLATE), SIZEOF(buf) - 1);
 #	endif
 	else
 		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(GTM_ENV_XLATE), status);

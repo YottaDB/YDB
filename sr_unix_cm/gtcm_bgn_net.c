@@ -104,14 +104,14 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 		return save_errno;
 	}
 	/*  Reuse a specified address */
-	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&on, sizeof(on)) < 0)
+	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&on, SIZEOF(on)) < 0)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
 	/* the system should periodically check to see if the connections are live */
-	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&on, sizeof(on)) < 0)
+	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&on, SIZEOF(on)) < 0)
 	{
 		save_errno = errno;
 		perror("setsockopt:");
@@ -122,7 +122,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	sin.sin_family      = AF_INET;
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port        = htons(port);
-	if (bind(fd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
+	if (bind(fd, (struct sockaddr *)&sin, SIZEOF(sin)) < 0)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */

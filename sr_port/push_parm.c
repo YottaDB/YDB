@@ -56,7 +56,7 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 	assert(4 + actualcnt == totalcnt);
 	assert(MAX_ACTUALS >= actualcnt);
 	PUSH_MV_STENT(MVST_PARM);
-	parm = (parm_blk *)malloc(sizeof(parm_blk) - sizeof(lv_val *) + actualcnt * sizeof(lv_val *));
+	parm = (parm_blk *)malloc(SIZEOF(parm_blk) - SIZEOF(lv_val *) + actualcnt * SIZEOF(lv_val *));
 	parm->actualcnt = actualcnt;
 	parm->mask = mask;
 	mvp_blk = mv_chain;

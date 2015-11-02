@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,8 +86,8 @@ void	mupip_set_journal_fname(jnl_create_info *jnl_info)
 			memcpy(jnl_info->jnl + jnl_info->jnl_len, ext_name, ext_name_len);
 			jnl_info->jnl_len += ext_name_len;
 		}
-		memcpy(jnl_info->jnl + jnl_info->jnl_len, DEF_JNL_EXT_NAME, sizeof(DEF_JNL_EXT_NAME) - 1);
-		jnl_info->jnl_len = jnl_info->jnl_len + sizeof(DEF_JNL_EXT_NAME) - 1;
+		memcpy(jnl_info->jnl + jnl_info->jnl_len, DEF_JNL_EXT_NAME, SIZEOF(DEF_JNL_EXT_NAME) - 1);
+		jnl_info->jnl_len = jnl_info->jnl_len + SIZEOF(DEF_JNL_EXT_NAME) - 1;
 	} else
 	{
 		memcpy(jnl_info->jnl, csd->jnl_file_name, csd->jnl_file_len);

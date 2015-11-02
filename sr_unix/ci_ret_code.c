@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,5 +52,5 @@ void ci_ret_code_quit(void)
 	nested_level--;
 	/* restore frame_pointer stored at msp (see base_frame.c) */
 	frame_pointer = *(stack_frame**)msp;
-	msp += sizeof(frame_pointer);
+	msp += SIZEOF(frame_pointer);
 }

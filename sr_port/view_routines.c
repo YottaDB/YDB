@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ GBLREF stack_frame 	*frame_pointer;
 void view_routines(mval *dst, mident_fixed *name)
 {
 	mident		temp;
-	char		temp_buff[sizeof(mident_fixed)];
+	char		temp_buff[SIZEOF(mident_fixed)];
 	rtn_tabent	*bot, *top, *mid;
 	int4		comp;
 

@@ -42,7 +42,7 @@ GBLREF gd_binding	*gd_map_top;
 
 void gvzwr_fini(zshow_out *out, int pat)
 {
-	char 		m[sizeof(mident_fixed)];
+	char 		m[SIZEOF(mident_fixed)];
 	mval 		local, data;
 	gv_key		*old;
 
@@ -59,9 +59,9 @@ void gvzwr_fini(zshow_out *out, int pat)
 	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 	gvzwrite_block.gd_reg = gv_cur_region;
 	gvzwrite_block.old_targ = (unsigned char *)gv_target;
-	old = (gv_key *)malloc(sizeof(gv_key) + gv_currkey->end);
+	old = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end);
 	gvzwrite_block.old_key = (unsigned char *)old;
-	memcpy(gvzwrite_block.old_key, gv_currkey, sizeof(gv_key) + gv_currkey->end);
+	memcpy(gvzwrite_block.old_key, gv_currkey, SIZEOF(gv_key) + gv_currkey->end);
 	gvzwrite_block.old_map = gd_map;
 	gvzwrite_block.old_map_top = gd_map_top;
 	if (!pat)

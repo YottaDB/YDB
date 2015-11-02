@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ void tp_cw_list(cw_set_element **cs)
 	tempcs = (cw_set_element *)get_new_element(sgm_info_ptr->cw_set_list, 1);
 	/* secshr_db_clnup relies on the cw_set_element (specifically the "mode" field) being initialized to a value
 	 * that is not "gds_t_committed". This needs to be done before setting sgm_info_ptr->first_cw_set. */
-	memset(tempcs, 0, sizeof(cw_set_element));
+	memset(tempcs, 0, SIZEOF(cw_set_element));
 	assert(gds_t_committed != tempcs->mode);	/* ensure secshr_db_clnup's check will not be affected */
 	if (sgm_info_ptr->first_cw_set == NULL)
 		sgm_info_ptr->first_cw_set = tempcs;

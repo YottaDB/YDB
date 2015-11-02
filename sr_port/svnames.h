@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,14 @@ enum
 	SV_ZCHSET,		/* 54 */
 	SV_ZPATNUMERIC,		/* 55 */
 	SV_ZQUIT,		/* 56 */
+	SV_ZTCODE,		/* 57 */
+	SV_ZTDATA,		/* 58 */
+	SV_ZTOLDVAL,		/* 59 */
+	SV_ZTRIGGEROP,		/* 60 */
+	SV_ZTUPDATE,		/* 61 */
+	SV_ZTVALUE,		/* 62 */
+	SV_ZTWORMHOLE,		/* 63 */
+	SV_ZTLEVEL,		/* 64 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

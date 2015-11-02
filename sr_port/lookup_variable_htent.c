@@ -43,7 +43,7 @@ ht_ent_mname *lookup_variable_htent(unsigned int x)
 	{
 		assert(added);		/* Should never be a valid name without an lv */
 #ifdef DEBUG_REFCNT
-		memset(varname.c, '\0', sizeof(varname));
+		memset(varname.c, '\0', SIZEOF(varname));
 		memcpy(varname.c, tabent->key.var_name.addr, tabent->key.var_name.len);
 		DBGRFCT((stderr, "lookup_variable_htent: Allocating lv_val for variable '%s'\n", varname.c));
 #endif

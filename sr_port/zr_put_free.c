@@ -55,7 +55,7 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 #else
 	*z_ptr->mpc = z_ptr->m_opcode;
 #endif
-	inst_flush(z_ptr->mpc, sizeof(INST_TYPE));
+	inst_flush(z_ptr->mpc, SIZEOF(INST_TYPE));
 
 #ifdef USHBIN_SUPPORTED
 	if (((z_ptr == zrecs->beg) || !MIDENT_EQ((z_ptr - 1)->rtn, z_ptr->rtn)) &&
@@ -74,7 +74,7 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 #endif
 	zrecs->free--;
 	/* potentially overlapped memory, use memmove, not memcpy */
-	memmove((char *)z_ptr, (char *)(z_ptr + 1), (zrecs->free - z_ptr) * sizeof(zbrk_struct));
+	memmove((char *)z_ptr, (char *)(z_ptr + 1), (zrecs->free - z_ptr) * SIZEOF(zbrk_struct));
 	if (zrecs->free == zrecs->beg)
 	{ /* all breaks gone, free space allocated for breakpoints */
 		free(zrecs->beg);

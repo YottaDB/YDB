@@ -175,8 +175,7 @@ int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bu
 		src_charlen = (src->len / ucnv_getMinCharSize(from)) + 1; /* number of UChar's from ichset */
 		dstlen = UCNV_GET_MAX_BYTES_FOR_STRING(src_charlen, ucnv_getMaxCharSize(to));
 		dstlen = (dstlen > MAX_STRLEN) ? MAX_STRLEN : dstlen;
-		if (stringpool.free + dstlen > stringpool.top)
-			stp_gcol(dstlen);
+		ENSURE_STP_FREE_SPACE(dstlen);
 		dstbase = (char *)stringpool.free;
 	} else
 	{

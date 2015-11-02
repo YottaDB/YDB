@@ -1,0 +1,24 @@
+#################################################################
+#								#
+#	Copyright 2010 Fidelity Information Services, Inc	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+gtm_dist="GTMDIST"; export gtm_dist
+gtmgbldir="mumps.gld"; export gtmgbldir
+if [ "$gtm_chset" = "UTF-8" -o "$gtm_chset" = "utf-8" ] ; then
+        if [ -e $gtm_dist/utf8 ] ; then
+                gtm_dist="$gtm_dist/utf8"; export gtm_dist
+        fi
+fi
+gtmroutines=". $gtm_dist"; export gtmroutines
+gtm="$gtm_dist/mumps -direct"; export gtm
+mupip="$gtm_dist/mupip"; export mupip
+lke="$gtm_dist/lke"; export lke
+gde="$gtm_dist/mumps -r ^GDE"; export gde
+dse="$gtm_dist/dse"; export dse
+PATH=$PATH:$gtm_dist

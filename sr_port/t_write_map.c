@@ -76,6 +76,7 @@ void t_write_map (
 	if (cs->blk >= csa->ti->total_blks)
 		GTMASSERT;
 	cs->old_block = blkhist->buffaddr;
+	cs->was_free = FALSE; /* t_write_map operates on BUSY blocks and hence cs->was_free is set to FALSE unconditionally */
 	old_block = (blk_hdr_ptr_t)cs->old_block;
 	assert(NULL != old_block);
 	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;

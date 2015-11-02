@@ -1,5 +1,5 @@
 /****************************************************************
- *      Copyright 2001, 2006 Fidelity Information Services, Inc        *
+ *      Copyright 2001, 2009 Fidelity Information Services, Inc        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -38,12 +38,10 @@ void op_fnreverse(mval *src, mval *dst)
 	int		char_len, chlen;
 
 	MV_FORCE_STR(src);
-	if (stringpool.free + src->str.len > stringpool.top)
-		stp_gcol(src->str.len);
-
-        dstptr = stringpool.free + src->str.len;
-        srcptr = (unsigned char *)src->str.addr;
-        srctop = (unsigned char *)src->str.addr + src->str.len;
+	ENSURE_STP_FREE_SPACE(src->str.len);
+	dstptr = stringpool.free + src->str.len;
+	srcptr = (unsigned char *)src->str.addr;
+	srctop = (unsigned char *)src->str.addr + src->str.len;
 	for (char_len = 0; srcptr < srctop; srcptr += chlen, ++char_len)
 	{
 		if (!UTF8_VALID(srcptr, srctop, chlen) && !badchar_inhibit)
@@ -59,7 +57,7 @@ void op_fnreverse(mval *src, mval *dst)
 		}
 	}
 	assert(dstptr == stringpool.free);
-        stringpool.free += src->str.len;
+	stringpool.free += src->str.len;
 	MV_INIT_STRING(dst, src->str.len, dstptr);
 
 	/* set character length of both source and destination mvals */
@@ -78,18 +76,17 @@ void op_fnreverse(mval *src, mval *dst)
 void op_fnzreverse(mval *src, mval *dst)
 {
 	int	lcnt;
-        char    *in, *out;
+	char    *in, *out;
 
 	MV_FORCE_STR(src);
-        if (stringpool.free + src->str.len > stringpool.top)
-                stp_gcol(src->str.len);
-        out = (char *)stringpool.free;
-        stringpool.free += src->str.len;
-        in = src->str.addr + src->str.len * sizeof(char);
+	ENSURE_STP_FREE_SPACE(src->str.len);
+	out = (char *)stringpool.free;
+	stringpool.free += src->str.len;
+	in = src->str.addr + src->str.len * SIZEOF(char);
 	dst->mvtype = MV_STR;
 	dst->str.addr = out;
 	dst->str.len = src->str.len;
-        for (lcnt = src->str.len; lcnt > 0; lcnt--)
-                *out++ = *--in;
+	for (lcnt = src->str.len; lcnt > 0; lcnt--)
+		*out++ = *--in;
 	return;
 }

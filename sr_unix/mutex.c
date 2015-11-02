@@ -54,6 +54,7 @@
 #include "gt_timer.h"
 #include "heartbeat_timer.h"
 #include "gtmio.h"
+#include "wbox_test_init.h"
 
 #define QUANT_RETRY			10000
 #define QUEUE_RETRY			255
@@ -185,7 +186,7 @@ static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 	addr->freehead.que.fl = addr->freehead.que.bl = 0;
 	SET_LATCH_GLOBAL(&addr->freehead.latch, LOCK_AVAILABLE);
 	/* Clear the first free entry */
-	q_free_entry = (mutex_que_entry_ptr_t)((sm_uc_ptr_t)&addr->freehead + sizeof(mutex_que_head));
+	q_free_entry = (mutex_que_entry_ptr_t)((sm_uc_ptr_t)&addr->freehead + SIZEOF(mutex_que_head));
 	q_free_entry->que.fl = q_free_entry->que.bl = 0;
 	q_free_entry->pid = 0;
 	q_free_entry->super_crit = (void *)NULL;
@@ -239,13 +240,13 @@ static	void	crash_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 		next_entry = (mutex_que_entry_ptr_t)((sm_uc_ptr_t)next_entry + next_entry->que.fl);
 		if (next_entry <= (mutex_que_entry_ptr_t)&addr->prochead ||
 		    next_entry >= (mutex_que_entry_ptr_t)&addr->prochead + n + 1 ||
-		    (0 != ((INTPTR_T)next_entry & (sizeof(mutex_que_entry) - 1))))
+		    (0 != ((INTPTR_T)next_entry & (SIZEOF(mutex_que_entry) - 1))))
 		{
 			/*
 			 * next_entry == &addr->prochead => loop is done;
 			 * next_entry below queue head => queue is corrupt;
 			 * next_entry above queue top => queue is corrupt;
-			 * next_entry is not (sizeof queue entry)-byte
+			 * next_entry is not (SIZEOF(queue) entry)-byte
 			 * aligned => queue is corrupt ...
 			 * ... in all cases do a clean initialization
 			 */
@@ -380,11 +381,11 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 			}
 			if (1 == sel_stat) /* Somebody woke me up */
 			{
-				mutex_woke_me_proc_len = sizeof(struct sockaddr_un);
+				mutex_woke_me_proc_len = SIZEOF(struct sockaddr_un);
 				RECVFROM_SOCK(mutex_sock_fd, (void *)&mutex_wake_msg[0], SIZEOF(mutex_wake_msg), 0,
 					(struct sockaddr *)&mutex_woke_me_proc,
 					(GTM_SOCKLEN_TYPE *)&mutex_woke_me_proc_len, nbrecvd);
-				if (sizeof(mutex_wake_msg) == nbrecvd) /* Drained out both old and new wake messages */
+				if (SIZEOF(mutex_wake_msg) == nbrecvd) /* Drained out both old and new wake messages */
 				{
 					MUTEX_TRACE_CNTR(mutex_trc_slp_wkup);
 					MUTEX_TRACE_CNTR(mutex_trc_pgybckd_dlyd_wkup);
@@ -862,11 +863,11 @@ void mutex_seed_init(void)
 	time_t mutex_seed;
 
 	mutex_seed = time(NULL) * process_id;
-	next_rand[0] = (unsigned short)(mutex_seed & ((1U << (sizeof(unsigned short) * 8)) - 1));
-	mutex_seed >>= (sizeof(unsigned short) * 8);
-	next_rand[1] = (unsigned short)(mutex_seed & ((1U << (sizeof(unsigned short) * 8)) - 1));
-	mutex_seed >>= (sizeof(unsigned short) * 8);
-	next_rand[2] = (unsigned short)(mutex_seed & ((1U << (sizeof(unsigned short) * 8)) - 1));
+	next_rand[0] = (unsigned short)(mutex_seed & ((1U << (SIZEOF(unsigned short) * 8)) - 1));
+	mutex_seed >>= (SIZEOF(unsigned short) * 8);
+	next_rand[1] = (unsigned short)(mutex_seed & ((1U << (SIZEOF(unsigned short) * 8)) - 1));
+	mutex_seed >>= (SIZEOF(unsigned short) * 8);
+	next_rand[2] = (unsigned short)(mutex_seed & ((1U << (SIZEOF(unsigned short) * 8)) - 1));
 }
 
 void mutex_salvage(gd_region *reg)

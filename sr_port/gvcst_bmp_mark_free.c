@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,7 +90,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	if (!visit_blks)
 	{	/* Database has been completely upgraded. Free all blocks in one bitmap as part of one transaction. */
 		assert(cs_data->db_got_to_v5_once); /* assert all V4 fmt blocks (including RECYCLED) have space for V5 upgrade */
-		inctn_detail.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
+		inctn_detail.blknum_struct.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
 		for ( ; blk < blk_top;  blk = nextblk)
 		{
 			if (0 != blk->flag)
@@ -115,10 +115,10 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			len = (unsigned int)((char *)nextblk - (char *)blk);
 			update_array_ptr = (char *)updptr;
 			alt_hist.h[0].blk_num = 0;			/* need for calls to T_END for bitmaps */
-			/* the following assumes sizeof(blk_ident) == sizeof(int) */
-			assert(sizeof(blk_ident) == sizeof(int));
+			/* the following assumes SIZEOF(blk_ident) == SIZEOF(int) */
+			assert(SIZEOF(blk_ident) == SIZEOF(int));
 			*(int *)update_array_ptr = 0;
-			t_begin(ERR_GVKILLFAIL, TRUE);
+			t_begin(ERR_GVKILLFAIL, UPDTRNS_DB_UPDATED_MASK);
 			for (;;)
 			{
 				ctn = cs_addrs->ti->curr_tn;
@@ -178,13 +178,13 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		alt_hist.h[1].blk_num = 0;
 		CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 		assert((block_id)blk->block - bit_map);
-		assert(sizeof(block_id) == sizeof(blk_ident));
+		assert(SIZEOF(block_id) == SIZEOF(blk_ident));
 		*((block_id *)update_array_ptr) = ((block_id)blk->block - bit_map);
-		update_array_ptr += sizeof(blk_ident);
-		/* the following assumes sizeof(blk_ident) == sizeof(int) */
-		assert(sizeof(blk_ident) == sizeof(int));
+		update_array_ptr += SIZEOF(blk_ident);
+		/* the following assumes SIZEOF(blk_ident) == SIZEOF(int) */
+		assert(SIZEOF(blk_ident) == SIZEOF(int));
 		*(int *)update_array_ptr = 0;
-		t_begin(ERR_GVKILLFAIL, TRUE);
+		t_begin(ERR_GVKILLFAIL, UPDTRNS_DB_UPDATED_MASK);
 		for (;;)
 		{
 			ctn = cs_addrs->ti->curr_tn;
@@ -219,9 +219,9 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			cr = alt_hist.h[0].cr;
 			assert((GDSV5 == cr->ondsk_blkver) || (GDSV4 == cr->ondsk_blkver));
 			if (GDSVCURR != cr->ondsk_blkver)
-				inctn_detail.blknum = blk->block;
+				inctn_detail.blknum_struct.blknum = blk->block;
 			else
-				inctn_detail.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
+				inctn_detail.blknum_struct.blknum = 0; /* i.e. no adjustment to "blks_to_upgrd" necessary */
 			bmphist.blk_num = bit_map;
 			if (NULL == (bmphist.buffaddr = t_qread(bmphist.blk_num, (sm_int_ptr_t)&bmphist.cycle,
 								&bmphist.cr)))

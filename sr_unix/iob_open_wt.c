@@ -47,7 +47,7 @@ BFILE *iob_open_wt(path, blksiz, blkfactor)
     if (FD_INVALID == (fd = OPEN3(path,O_WRONLY | O_CREAT,0)))
 	return NULL;
 
-    file = malloc(sizeof(BFILE));
+    file = malloc(SIZEOF(BFILE));
     file->fd = fd;
     file->path = malloc(strlen(path) + 1);
     strcpy(file->path, path);

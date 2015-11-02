@@ -160,8 +160,8 @@ static int rc_init_ipc(void)
 		rc_cpt = NULL;
 	}
 	fpath1.addr = RC_CPT_PATH;
-	fpath1.len = sizeof(RC_CPT_PATH);
-	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
+	fpath1.len = SIZEOF(RC_CPT_PATH);
+	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 	{
 		PERROR("Error translating rc path");
 		return errno;
@@ -171,7 +171,7 @@ static int rc_init_ipc(void)
 		PERROR("Error with rc ftok");
 		return errno;
 	}
-	if ((rc_shmid = shmget(rc_key, sizeof(rc_cp_table) , RWDALL)) == -1)
+	if ((rc_shmid = shmget(rc_key, SIZEOF(rc_cp_table) , RWDALL)) == -1)
 	{
 		rc_shmid = INVALID_SHMID;
 		PERROR("Error with rc shmget");
@@ -279,8 +279,8 @@ int rc_cpt_inval(void)
 #endif
 	if (!rc_cpt)
 	{	fpath1.addr = RC_CPT_PATH;
-		fpath1.len = sizeof(RC_CPT_PATH);
-		if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
+		fpath1.len = SIZEOF(RC_CPT_PATH);
+		if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 		{
 			PERROR("Error translating rc path");
 			return errno;
@@ -290,7 +290,7 @@ int rc_cpt_inval(void)
 			PERROR("Error with rc ftok");
 			return errno;
 		}
-		if ((rc_shmid = shmget(rc_key, sizeof(rc_cp_table) , RWDALL)) == -1)
+		if ((rc_shmid = shmget(rc_key, SIZEOF(rc_cp_table) , RWDALL)) == -1)
 		{
 			rc_shmid = INVALID_SHMID;
 			PERROR("Error with rc shmget");
@@ -356,8 +356,8 @@ int mupip_rundown_cpt()
 	if (rc_cpt)
 		(void) shmdt((char *)rc_cpt);
 	fpath1.addr = RC_CPT_PATH;
-	fpath1.len = sizeof(RC_CPT_PATH);
-	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
+	fpath1.len = SIZEOF(RC_CPT_PATH);
+	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 	{	/* invalid environment variable setup....error */
 		return -1;
 	}
@@ -365,7 +365,7 @@ int mupip_rundown_cpt()
 	{	/* no GT.CM server installed on system - okay to reset RC values */
 		return 0;
 	}
-	if ((rc_shmid = shmget(rc_key, sizeof(rc_cp_table), RWDALL)) == -1)
+	if ((rc_shmid = shmget(rc_key, SIZEOF(rc_cp_table), RWDALL)) == -1)
 	{	/* no RC CPT - okay to reset RC values */
 		rc_shmid = INVALID_SHMID;
 		return 0;
@@ -467,8 +467,8 @@ int rc_create_cpt(void)
 	if (rc_cpt)
 		return 0;
 	fpath1.addr = RC_CPT_PATH;
-	fpath1.len = sizeof(RC_CPT_PATH);
-	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
+	fpath1.len = SIZEOF(RC_CPT_PATH);
+	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 	{
 		PERROR("Error translating rc path");
 		return errno;
@@ -478,7 +478,7 @@ int rc_create_cpt(void)
 		PERROR("Error with rc ftok");
 		return errno;
 	}
-	if ((rc_shmid = shmget(rc_key, sizeof(rc_cp_table) ,IPC_CREAT |  RWDALL)) == -1)
+	if ((rc_shmid = shmget(rc_key, SIZEOF(rc_cp_table) ,IPC_CREAT |  RWDALL)) == -1)
 	{
 		rc_shmid = INVALID_SHMID;
 		PERROR("Error with rc shmget");
@@ -591,8 +591,8 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 		memcpy((char *)head + head->cpt_tab.value, ptr, copy_size);
 		if (copy_size != cpt_size)
 		{
-			memcpy((char *)head + head->cpt_tab.value + copy_size, (char *)&rc_cpt->ring_buff[RC_CPT_TABSIZE] -
-				(cpt_size - copy_size), cpt_size - copy_size);
+			memcpy((char *)head + head->cpt_tab.value + copy_size,
+				(char *)ARRAYTOP(rc_cpt->ring_buff) - (cpt_size - copy_size), cpt_size - copy_size);
 		}
 	}
 	rc_cpt->cpvfy = rc_cpt->cpsync;

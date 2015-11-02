@@ -62,27 +62,27 @@ int gtmsource_comm_init(void)
 	if (FD_INVALID == (gtmsource_sock_fd = socket(AF_INET, SOCK_STREAM, 0)))
 	{
 		err_status = ERRNO;
-		SNPRINTF(error_string, sizeof(error_string), "Error with source server socket create : %s", STRERROR(err_status));
+		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket create : %s", STRERROR(err_status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 		return(-1);
 	}
 
 	/* A connection breakage should get rid of the socket */
 
-	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, sizeof(disable_linger)))
+	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 	{
 		err_status = ERRNO;
-		SNPRINTF(error_string, sizeof(error_string), "Error with source server socket disable linger : %s",
+		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable linger : %s",
 				STRERROR(err_status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 	}
 
 #ifdef REPL_DISABLE_KEEPALIVE
 	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&disable_keepalive,
-		sizeof(disable_keepalive)))
+		SIZEOF(disable_keepalive)))
 	{ /* Till SIGPIPE is handled properly */
 		err_status = ERRNO;
-		SNPRINTF(error_string, sizeof(error_string), "Error with source server socket disable keepalive : %s",
+		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable keepalive : %s",
 				STRERROR(err_status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 	}

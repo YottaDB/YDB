@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,26 +13,16 @@
  *	STP_PARMS.H - String pool parameters
  */
 
+#define INITIAL_STP_PAGES 12 /* This is in 8K pages */
 #define STP_PAGE_SIZE	8192 /* if necessary, change this under appropriate ifdefs for different platforms, or, use macros from
-			      * mdefsp.h */
-#define STP_INITSIZE	(12 * STP_PAGE_SIZE) /* initial size of string pool */
-#define STP_MAXINITSIZE	(400 * STP_PAGE_SIZE) /* maximum initial size of string pool */
-#define STP_GEOM_INCREMENT	(4 * STP_PAGE_SIZE) /* grow string pool as a multiple of this during geometric growth */
-#define STP_LINEAR_INCREMENT	(12 * STP_PAGE_SIZE) /* grow string pool as a multiple of this during linear growth */
-#define STP_MINFREE	(4 * STP_PAGE_SIZE) /* minimum amount which will cause a 'grow' next time */
-#define STP_MAXITEMS	8192	/* maximum number of mval's for garbage collection */
-#define STP_MAXGEOMGROWTH (4 * 1024 * 1024) /* let the stringpool grow geometrically till the size reaches STP_MAXGEOMGROWTH, after
-					      * which, grow linearly */
-#define STP_RECLAIMLIMIT (1 * 1024 * 1024) /* if the space reclaimed is more than this amount, don't do forced expansion */
-#define STP_LIMITFRCDEXPN  (8 * 1024 * 1024) /* no forced expansions of any kind after the stringpool size grows to this limit */
-#define STP_GEOMGROWTH_FACTOR	2
-#define STP_MINRECLAIM	((stringpool.top - stringpool.base) >> 2) /* atleast 25% of the current size */
-#define STP_ENOUGHRECLAIMED ((stringpool.top - stringpool.base) - ((stringpool.top - stringpool.base) >> 3))/* 87.5% of size */
-#define STP_MAXLOWRECLAIM_PASSES 4 /* if did not reclaim STP_MINRECLAIM bytes for STP_MAXLOWRECLAIM_PASSES, force an expansion */
-#define STP_INITMAXNOEXP_PASSES	4 /* initial value of number of consecutive garbage collection passes that do not expand the
-				   * stringpool, after which an expansion is forced */
-#define STP_NOEXP_PASSES_INCR	1 /* increase the "number of consecutive gcol passes for a forced expansion" by this amount for
-				   * every forced expansion */
-#define STP_MAXNOEXP_PASSES	10 /* no forced expansions after "number of consecutive gcol passes for a forced expansion"
-				    * reaches this limit. It takes 10 expansions for the strinpool to grow from STP_INITISIZE to
-				    * STP_MAXGEOMGROWTH */
+			 * mdefsp.h */
+#define STP_INITSIZE	(12 * STP_PAGE_SIZE) /* default initial size of string pool */
+#define STP_MAXINITSIZE	(61035 * STP_PAGE_SIZE) /* maximum initial size of string pool */
+#define STP_INITSIZE_REQUESTED  (INITIAL_STP_PAGES * STP_PAGE_SIZE) /* requested size of string pool */
+#define STP_MAXITEMS	8192	/* initial number of mval's for garbage collection; also grow by this value*/
+#define STP_NUM_INCRS	4 /* number of increments on the sliding scale used to grow string pool. Should be a power of 2 so that
+			 * so that divides can be done as shifts */
+#define STP_LOWRECLAIM_LEVEL(x) ((x >> 2) + (x >> 3) - (x >> 4)) /* level of available string pool (after reclaim) to
+			 * count as a low reclaim pass (31.25%) */
+#define STP_MAXLOWRECLAIM_PASSES 4 /* after compaction, if at least STP_LOWRECLAIM_LEVEL of string pool is not free for
+			 * STP_MAXLOWRECLAIM_PASSES, force an expansion */

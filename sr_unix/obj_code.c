@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,14 +54,14 @@ GBLREF int4		mvmax, mlmax, mlitmax, sa_temps[], sa_temps_offset[];
 GBLREF mlabel 		*mlabtab;
 GBLREF mline 		mline_root;
 GBLREF mvar 		*mvartab;
-GBLREF mident		module_name;
+GBLREF mident		module_name, int_module_name;
 GBLREF int4		gtm_object_size;
 GBLREF int4		sym_table_size;
 GBLREF int4		linkage_size;
 GBLREF uint4		lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 GBLREF spdesc		stringpool;
 
-#define PTEXT_OFFSET sizeof(rhdtyp)
+#define PTEXT_OFFSET SIZEOF(rhdtyp)
 
 /* The sections of the internal GT.M object (sans native object wrapper) are grouped
  * according to their type (R/O-retain, R/O-release, R/W-retain, R/W-release). The
@@ -108,18 +108,16 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	rhdtyp		rhead;
 	mline		*mlx, *mly;
 	var_tabent	*vptr;
-	mstr		rname_mstr;
+
 	error_def(ERR_TEXT);
 
 	assert(!run_time);
 	obj_init();
 
-	/* Define the routine name global symbol. */
-	rname_mstr.addr = module_name.addr;
-	rname_mstr.len = module_name.len;
-	define_symbol(GTM_MODULE_DEF_PSECT, &rname_mstr);
+	/* Define the routine name global symbol */
+	define_symbol(GTM_MODULE_DEF_PSECT, (mstr *)&int_module_name);
 
-	memset(&rhead, 0, sizeof(rhead));
+	memset(&rhead, 0, SIZEOF(rhead));
 	alloc_reg();
 	jmp_opto();
 	/* Note that this initial setting of curr_addr is historical in that the routine header was
@@ -251,13 +249,13 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	IA64_ONLY(assert(calculated_code_size == generated_code_size));
 	/* External entry definitions (line number table */
 	offset = (int4)(mline_root.externalentry->rtaddr - PTEXT_OFFSET);
-	emit_immed((char *)&offset, sizeof(offset));	/* line 0 */
+	emit_immed((char *)&offset, SIZEOF(offset));	/* line 0 */
 	for (mlx = mline_root.child ; mlx ; mlx = mly)
 	{
 		if (mlx->table)
 		{
 			offset = (int4)(mlx->externalentry->rtaddr - PTEXT_OFFSET);
-			emit_immed((char *)&offset, sizeof(offset));
+			emit_immed((char *)&offset, SIZEOF(offset));
 		}
 		if ((mly = mlx->child) == 0)
 		{
@@ -285,10 +283,10 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	if (lits_pad_size)
 		emit_immed(PADCHARS, lits_pad_size);
 	/* Variable table: */
-	vptr = (var_tabent *)mcalloc(mvmax * USIZEOF(var_tabent));
+	vptr = (var_tabent *)mcalloc(mvmax * SIZEOF(var_tabent));
 	if (mvartab)
 		walktree(mvartab, cg_var, (char *)&vptr);
-	emit_immed((char *)vptr, mvmax * USIZEOF(var_tabent));
+	emit_immed((char *)vptr, mvmax * SIZEOF(var_tabent));
 	/* The label table */
 	if (mlabtab)
 		walktree((mvar *)mlabtab, cg_lab, (char *)TRUE);
@@ -324,12 +322,12 @@ void	cg_lab(mlabel *mlbl, char *do_emit)
 			lent.lab_name.len = mlbl->mvname.len;
 			lent.lab_name.addr = (char *)(mlbl->mvname.addr - (char *)stringpool.base);
 											/* Offset into literal text pool */
-			lent.LABENT_LNR_OFFSET = (lnr_tabent *)(sizeof(lnr_tabent) * mlbl->ml->line_number);
+			lent.LABENT_LNR_OFFSET = (lnr_tabent *)(SIZEOF(lnr_tabent) * mlbl->ml->line_number);
 											/* Offset into lnr table */
-			emit_immed((char *)&lent, sizeof(lent));
+			emit_immed((char *)&lent, SIZEOF(lent));
 		} else
 		{	/* 1st pass, do the definition but no emissions */
-			mlabel2xtern(&glob_name, &module_name, &mlbl->mvname);
+			mlabel2xtern(&glob_name, &int_module_name, &mlbl->mvname);
 			define_symbol(GTM_CODE, &glob_name);
 		}
 	}

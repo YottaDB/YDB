@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -123,7 +123,7 @@ oprtype *addr;          address to jmp
 	default:
 		GTMASSERT;
 	}
-	for (p = t->operand ; p < &(t->operand[2]) ; p++)
+	for (p = t->operand ; p < ARRAYTOP(t->operand); p++)
 		if (p->oprclass == TRIP_REF)
 			ex_tail(p);
 	return;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,14 +85,14 @@ void repl_inst_create(void)
 	buff_8byte_aligned = (char *)ROUND_UP2((INTPTR_T)buff_8byte_aligned, 8);
 	repl_instance = (repl_inst_hdr_ptr_t)&buff_8byte_aligned[0];
 	gtmsrc_lcl_array = (gtmsrc_lcl_ptr_t)&buff_8byte_aligned[REPL_INST_HDR_SIZE];
-	memset(machine_name, 0, sizeof(machine_name));
+	memset(machine_name, 0, SIZEOF(machine_name));
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
 		rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
 	STAT_FILE(inst_fn, &stat_buf, status);
 	if (-1 != status)
 	{
 		in_repl_inst_create = TRUE;	/* used by an assert in the call to "repl_inst_read" below */
-		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)repl_instance, sizeof(repl_inst_hdr));
+		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)repl_instance, SIZEOF(repl_inst_hdr));
 		in_repl_inst_create = FALSE;
 		if ((INVALID_SEMID != repl_instance->jnlpool_semid) || (INVALID_SHMID != repl_instance->jnlpool_shmid)
 			|| (INVALID_SEMID != repl_instance->recvpool_semid) || (INVALID_SHMID != repl_instance->recvpool_shmid))
@@ -127,7 +127,7 @@ void repl_inst_create(void)
 	 * Of these the last part is not allocated at file creation time. The rest have to be initialized now.
 	 */
 	/************************** Initialize "repl_inst_hdr" section ***************************/
-	memset(repl_instance, 0, sizeof(repl_inst_hdr));
+	memset(repl_instance, 0, SIZEOF(repl_inst_hdr));
 	memcpy(&repl_instance->label[0], GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ-1);
 	repl_instance->replinst_minorver = GDS_REPL_INST_MINOR_LABEL;
 	repl_instance->is_little_endian = GTM_IS_LITTLE_ENDIAN;
@@ -148,19 +148,19 @@ void repl_inst_create(void)
 	 */
 	if (cli_present("NAME"))
 	{
-		inst_name_len = sizeof(inst_name);;
+		inst_name_len = SIZEOF(inst_name);;
 		if (!cli_get_str("NAME", &inst_name[0], &inst_name_len))
 			rts_error(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("Error parsing NAME qualifier"));
 	} else
 	{
 		log_nam.addr = GTM_REPL_INSTNAME;
-		log_nam.len = sizeof(GTM_REPL_INSTNAME) - 1;
+		log_nam.len = SIZEOF(GTM_REPL_INSTNAME) - 1;
 		trans_name.addr = &inst_name[0];
-		if (SS_NORMAL != (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, sizeof(inst_name),
+		if (SS_NORMAL != (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, SIZEOF(inst_name),
 								dont_sendmsg_on_log2long)))
 		{
 			if (SS_LOG2LONG == status)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, sizeof(inst_name) - 1);
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(inst_name) - 1);
 			else
 				rts_error(VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
 		}

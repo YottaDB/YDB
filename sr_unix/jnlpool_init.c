@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,6 @@ GBLREF	node_local_ptr_t	locknl;
 GBLREF	uint4			log_interval;
 GBLREF	boolean_t		is_updproc;
 GBLREF	uint4			mutex_per_process_init_pid;
-GBLREF	boolean_t		run_time;
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
@@ -78,7 +77,7 @@ LITREF	int4			gtm_release_name_len;
 														\
 	if (new_ipc)												\
 	{													\
-		assert(!run_time);	/* Since "gtm_putmsg" is done below ensure it is never GT.M */		\
+		assert(!IS_GTM_IMAGE);	/* Since "gtm_putmsg" is done below ensure it is never GT.M */		\
 		if (NULL != jnlpool.jnlpool_ctl)								\
 		{												\
 			if (-1 == shmdt((caddr_t)jnlpool.jnlpool_ctl))						\
@@ -183,7 +182,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	error_def(ERR_TEXT);
 
 	assert(gtmsource_startup == gtmsource_options.start);
-	memset(machine_name, 0, sizeof(machine_name));
+	memset(machine_name, 0, SIZEOF(machine_name));
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
 		rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
 	if (NULL == recvpool.recvpool_dummy_reg)
@@ -192,7 +191,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		mu_gv_cur_reg_init();
 		jnlpool.jnlpool_dummy_reg = reg = gv_cur_region;
 		gv_cur_region = r_save;
-		ASSERT_IN_RANGE(MIN_RN_LEN, sizeof(JNLPOOL_DUMMY_REG_NAME) - 1, MAX_RN_LEN);
+		ASSERT_IN_RANGE(MIN_RN_LEN, SIZEOF(JNLPOOL_DUMMY_REG_NAME) - 1, MAX_RN_LEN);
 		MEMCPY_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME);
 		reg->rname_len = STR_LIT_LEN(JNLPOOL_DUMMY_REG_NAME);
 		reg->rname[reg->rname_len] = 0;
@@ -224,7 +223,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	 */
 	if (!ftok_sem_get(jnlpool.jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE))
 		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
-	repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+	repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	is_src_srvr = (GTMSOURCE == pool_user);
 	/* If caller is source server and secondary instance name has been specified check if it is different from THIS instance */
 	if (is_src_srvr && gtmsource_options.instsecondary)
@@ -366,16 +365,16 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with journal pool access semaphore"), REPL_SEM_ERRNO);
 	}
-	assert(sizeof(jnlpool_ctl_struct) % 16 == 0);	/* enforce 16-byte alignment for this structure */
+	assert(SIZEOF(jnlpool_ctl_struct) % 16 == 0);	/* enforce 16-byte alignment for this structure */
 	/* Since seqno is an 8-byte quantity and is used in most of the sections below, we require all sections to
 	 * be at least 8-byte aligned. In addition we expect that the beginning of the journal data (JNLDATA_BASE_OFF) is
 	 * aligned at a boundary that is suitable for journal records (defined by JNL_WRT_END_MASK).
 	 */
 	assert(JNLPOOL_CTL_SIZE % 8 == 0);
 	assert(JNLPOOL_CRIT_SIZE % 8 == 0);
-	assert(sizeof(repl_inst_hdr) % 8 == 0);
-	assert(sizeof(gtmsrc_lcl) % 8 == 0);
-	assert(sizeof(gtmsource_local_struct) % 8 == 0);
+	assert(SIZEOF(repl_inst_hdr) % 8 == 0);
+	assert(SIZEOF(gtmsrc_lcl) % 8 == 0);
+	assert(SIZEOF(gtmsource_local_struct) % 8 == 0);
 	assert(REPL_INST_HDR_SIZE % 8 == 0);
 	assert(GTMSRC_LCL_SIZE % 8 == 0);
 	assert(GTMSOURCE_LOCAL_SIZE % 8 == 0);
@@ -383,9 +382,9 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE); /* secshr_db_clnup uses this
 												    * relationship */
 	jnlpool_mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + CRIT_SPACE);
-	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)jnlpool_mutex_spin_parms + sizeof(mutex_spin_parms_struct));
+	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)jnlpool_mutex_spin_parms + SIZEOF(mutex_spin_parms_struct));
 	if (new_ipc)
-		memset(csa->nl, 0, sizeof(node_local)); /* Make csa->nl->glob_sec_init FALSE */
+		memset(csa->nl, 0, SIZEOF(node_local)); /* Make csa->nl->glob_sec_init FALSE */
 	csa->now_crit = FALSE;
 	jnlpool.repl_inst_filehdr = (repl_inst_hdr_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SIZE);
 	jnlpool.gtmsrc_lcl_array = (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool.repl_inst_filehdr + REPL_INST_HDR_SIZE);

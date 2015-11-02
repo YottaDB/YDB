@@ -85,7 +85,7 @@ bool is_gdid_stat_identical(gd_id_ptr_t fid, struct stat *stat_buf)
 {
 #if defined(__osf__) || defined(_AIX)
 
-	assert(sizeof(fid->st_gen) >= sizeof(stat_buf->st_gen));
+	assert(SIZEOF(fid->st_gen) >= SIZEOF(stat_buf->st_gen));
 	if (fid->device == stat_buf->st_dev && fid->inode == stat_buf->st_ino &&  (
 #ifdef _AIX
 	     FS_REMOTE == stat_buf->st_flag ? TRUE :
@@ -101,7 +101,7 @@ bool is_gdid_stat_identical(gd_id_ptr_t fid, struct stat *stat_buf)
 
 void set_gdid_from_stat(gd_id_ptr_t fid, struct stat *stat_buf)
 {
-	assert(sizeof(gd_id) <= sizeof(gds_file_id));
+	assert(SIZEOF(gd_id) <= SIZEOF(gds_file_id));
 	fid->inode = stat_buf->st_ino;
 	fid->device = stat_buf->st_dev;
 #if defined(__osf__)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,8 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 								i = MV_FORCE_INT(key) ;
 								if (!MV_IS_INT(key)) i++;
 							}
-							for (lvpp = &num->ptr.lv[i]; 0 <= --i && !*--lvpp; );
+							for (lvpp = &num->ptr.lv[i]; 0 <= --i && !*--lvpp; )
+								;
 							if (0 <= i)
 							{
 								MV_FORCE_MVAL(dst,i) ;
@@ -144,8 +145,9 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 					found = TRUE;
 				} else
 				{
-					for (i = SBS_NUM_INT_ELE, lvpp = &num->ptr.lv[SBS_NUM_INT_ELE];
-						(--i, num->ptr.lv <= --lvpp) && !*lvpp; );
+					for (i = SBS_NUM_INT_ELE, lvpp = ARRAYTOP(num->ptr.lv);
+							(--i, num->ptr.lv <= --lvpp) && !*lvpp; )
+						;
 					if (num->ptr.lv <= lvpp)
 					{
 						MV_FORCE_MVAL(dst,i) ;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,6 +60,9 @@
 #include "gtmmsg.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "suspsigs_handler.h"
+#include "startup.h"
+#include "gtm_startup.h"
+#include "invocation_mode.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -76,6 +79,9 @@ GBLREF	global_latch_t		defer_latch;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	char			cli_err_str[];
+GBLREF	CLI_ENTRY		mupip_cmd_ary[];
+
+GBLDEF	CLI_ENTRY		*cmd_ary = &mupip_cmd_ary[0];	/* Define cmd_ary to be the MUPIP specific cmd table */
 
 void display_prompt(void);
 
@@ -84,23 +90,17 @@ int main (int argc, char **argv)
 	int		res;
 
 	image_type = MUPIP_IMAGE;
+	invocation_mode = MUMPS_UTILTRIGR;
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(util_base_ch);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, NULL, suspsigs_handler);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);
-        SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
-	licensed = transform = TRUE;
+	licensed = TRUE;
 	in_backup = FALSE;
 	op_open_ptr = mu_op_open;
 	mu_get_term_characterstics();
-	get_page_size();
-	getjobnum();
-	INVOKE_INIT_SECSHR_ADDRS;
-	getzdir();
-	initialize_pattern_table();
-	prealloc_gt_timers();
 	cli_lex_setup(argc,argv);
 	if (argc < 2)			/* Interactive mode */
 		display_prompt();
@@ -108,9 +108,7 @@ int main (int argc, char **argv)
 	/*      this call should be after cli_lex_setup() due to S390 A/E conversion    */
 	gtm_chk_dist(argv[0]);
 	INIT_GBL_ROOT(); /* Needed for GVT initialization */
-	io_init(TRUE);
-	stp_init(STP_INITSIZE);
-	rts_stringpool = stringpool;
+	init_gtm();
 	while(1)
 	{	func = 0;
 		if ((res = parse_cmd()) == EOF)

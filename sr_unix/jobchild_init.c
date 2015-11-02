@@ -118,7 +118,7 @@ void jobchild_init(void)
 		/* Set up $ZMODE to "OTHER" */
 		dollar_zmode.mvtype = MV_STR;
 		dollar_zmode.str.addr = &other_mode_buf[0];
-		dollar_zmode.str.len = sizeof(other_mode_buf) -1;
+		dollar_zmode.str.len = SIZEOF(other_mode_buf) -1;
 		/* Release storage allocated by ojchildparms() */
 		if (jparms.directory.len)
 			free(jparms.directory.addr);
@@ -164,7 +164,7 @@ void jobchild_init(void)
 		/* Set up $ZMODE to "INTERACTIVE" */
 		dollar_zmode.mvtype = MV_STR;
 		dollar_zmode.str.addr = &interactive_mode_buf[0];
-		dollar_zmode.str.len = sizeof(interactive_mode_buf) -1;
+		dollar_zmode.str.len = SIZEOF(interactive_mode_buf) -1;
 	}
 	gtm_init_env(base_addr, transfer_addr);
 	if (MUMPS_CALLIN & invocation_mode)

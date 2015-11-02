@@ -1,24 +1,231 @@
 #################################################################
-#								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
-#								#
-#	This source code contains the intellectual property	#
-#	of its copyright holder(s), and is made available	#
-#	under a license.  If you do not know the terms of	#
-#	the license, please stop and do not read further.	#
-#								#
+#                                                               #
+#       Copyright 2010 Fidelity Information Services, Inc       #
+#                                                               #
+#       This source code contains the intellectual property     #
+#       of its copyright holder(s), and is made available       #
+#       under a license.  If you do not know the terms of       #
+#       the license, please stop and do not read further.       #
+#                                                               #
 #################################################################
-gtm_dist="GTMDIST"; export gtm_dist
-gtmgbldir="mumps.gld"; export gtmgbldir
-if [ "$gtm_chset" = "UTF-8" -o "$gtm_chset" = "utf-8" ] ; then
-        if [ -e $gtm_dist/utf8 ] ; then
-                gtm_dist="$gtm_dist/utf8"; export gtm_dist
-        fi
+
+# Usage: source "GTMDIST"/gtmprofile
+# Sets up the default environment for single-user use of GT.M.
+# System administrators must review and edit as appropriate for multi-user production environments.
+
+# Expects the following environment variables to be set:
+#   $gtm_chset - set to "UTF-8" if GT.M is to run in Unicode mode
+#   $gtm_passwd and $gtm_dbkeys if database encryption is used
+# Attempts to set the following environment variables to reasonable values:
+#   $gtm_dist $gtmgbldir $gtm_icu_version $gtm_log $gtm_principal_editing $gtm_prompt $gtm_retention $gtmroutines $gtm_tmp $gtmver
+# The following shell variables are used and left unset.
+#   $old_gtm_dist $old_gtmroutines $old_gtmver $tmp_gtm_tmp $tmp_passwd
+
+# ; is used as a separator for sed as being the character most unlikely to be in file names
+
+# Save gtmroutines if it exists because we need to temporarily override it
+if [ -n "$gtmroutines" ] ; then
+    old_gtmroutines="$gtmroutines"
+else
+    unset old_gtmroutines
 fi
-gtmroutines=". $gtm_dist"; export gtmroutines
-gtm="$gtm_dist/mumps -direct"; export gtm
-mupip="$gtm_dist/mupip"; export mupip
-lke="$gtm_dist/lke"; export lke
-gde="$gtm_dist/mumps -r ^GDE"; export gde
-dse="$gtm_dist/dse"; export dse
-PATH=$PATH:$gtm_dist
+
+# Save gtm_passwd if defined because we don't want to mess with prompting for a password within this script
+# Need to distinguish between $gtm_passwd not set at all vs. set to null string
+if [ -z "${gtm_passwd+isset}" ] ; then
+    unset tmp_passwd
+else
+    tmp_passwd=$gtm_passwd ; unset gtm_passwd
+fi
+
+# If an existing GT.M is defined in $gtm_dist, capture it to change version number & directory in environment variables
+# Since %XCMD is new, cannot assume that old GT.M version has it
+if [ -n "$gtm_dist" ] ; then
+    old_gtm_dist=$gtm_dist
+    if [ -f $gtm_dist/_XCMD.o ] ; then
+        gtmroutines=$gtm_dist ; export gtmroutines
+        old_gtmver=`$gtm_dist/mumps -run %XCMD 'Write $Piece($ZVersion," ",2),"_",$Piece($ZVersion," ",4)'`
+    else
+        unset old_gtmver
+    fi
+else unset old_gtm_dist old_gtmver
+fi
+
+# Set gtm_dist - GT.M installation script sets the actual directory name
+gtm_dist="GTMDIST" ; export gtm_dist
+
+# Idempotence says change the environment only if a new GT.M directory is being pointed to
+# otherwise just restore $gtmroutines and exit
+if [ $gtm_dist != "$old_gtm_dist" ] ; then
+
+    gtmroutines=$gtm_dist ; export gtmroutines # Force $gtmroutines to guarantee access to %XCMD for now; repaired later
+    # Set $gtm_icu_version if icu-config is available - should be set before checking for UTF-8 mode
+    if [ -z "$gtm_icu_version" -a -n "`which icu-config`" ] ; then
+        gtm_icu_version=`icu-config --version | gtm_chset=M $gtm_dist/mumps -run %XCMD 'Read x Write $Piece(x,".",1,2)'`
+        export gtm_icu_version
+    fi
+
+    # If UTF-8 is selected, and UTF-8 mode works, set $gtm_dist to utf8 subdirectory; default $LC_CTYPE if not set
+    # Note that if UTF-8 mode cannot be properly set, GT.M remains configured for M mode
+    if [ "`echo $gtm_chset|tr utf UTF`" = "UTF-8" -a -d $gtm_dist/utf8 ] ; then
+        if [ -z "$LC_CTYPE" ] ; then
+            LC_CTYPE=`locale -a | tr UTF utf | grep .utf | head -1` ; export LC_CTYPE
+        fi
+	echo $LC_CTYPE | grep utf > /dev/null
+        if [ $? = 0 -a "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -1`" = 'GTM>' ] ; then
+            gtm_dist=$gtm_dist/utf8 ; gtmroutines=$gtm_dist
+        fi
+    fi
+
+    # Set $gtmver - must be set before $gtmroutines and $gtm_prompt are set
+    gtmver=`$gtm_dist/mumps -run %XCMD 'Write $Piece($ZVersion," ",2),"_",$Piece($ZVersion," ",4)'` ; export gtmver
+
+    # Set $gtm_prompt - must be set after checking for UTF-8 mode since prompt may be based on gtm_dist
+    if [ -z "$gtm_prompt" ] ; then
+        gtm_prompt="GTM>"
+    else
+        if [ -n "$old_gtm_dist" ] ; then
+            gtm_prompt=`echo $gtm_prompt | sed "s;$old_gtm_dist;$gtm_dist;"`
+        fi
+        if [ -n "$old_gtmver" ] ; then
+            gtm_prompt=`echo $gtm_prompt | sed "s;$old_gtmver;$gtmver;"`
+        fi
+    fi
+    export gtm_prompt
+
+    # Set $gtmdir and create default directories if they don't exist
+    if [ -n "$gtmdir" ] ; then
+        if [ -n "$old_gtm_dist" ] ; then
+            gtmdir=`echo $gtmdir | sed "s;$old_gtm_dist;$gtm_dist;"`
+        fi
+        if [ -n "$old_gtmver" ] ; then
+            gtmdir=`echo $gtmdir | sed "s;$old_gtmver;$gtmver;"`
+        fi
+    else
+        gtmdir=$HOME/.fis-gtm
+    fi
+    export gtmdir
+    mkdir -p $gtmdir/r $gtmdir/$gtmver/g $gtmdir/$gtmver/o $gtmdir/$gtmver/r $gtmdir/$gtmver/o/utf8
+
+    # Set $gtmroutines - edit for new GT.M if previously set, otherwise use default
+    if [ -n "$old_gtmroutines" ] ; then
+        gtmroutines="$old_gtmroutines"
+        if [ -n "$old_gtm_dist" ] ; then
+            gtmroutines=`echo $gtmroutines | sed "s;$old_gtm_dist;$gtm_dist;"`
+        fi
+        if [ -n "$old_gtmver" ] ; then
+            gtmroutines=`echo $gtmroutines | sed "s;$old_gtmver;$gtmver;"`
+        fi
+    elif [ "utf8" = `basename $gtm_dist` ] ; then
+        gtmroutines="$gtmdir/$gtmver/o/utf8($gtmdir/$gtmver/r $gtmdir/r) $gtm_dist"
+    else
+        gtmroutines="$gtmdir/$gtmver/o($gtmdir/$gtmver/r $gtmdir/r) $gtm_dist"
+    fi
+    export gtmroutines
+
+    # Set $gtmgbldir - edit for new GT.M if previously set, otherwise use default and create if needed
+    if [ -n "$gtmgbldir" ] ; then
+        if [ -n "$old_gtm_dist" ] ; then
+            gtmgbldir=`echo $gtmgbldir | sed "s;$old_gtm_dist;$gtm_dist;"`
+        fi
+        if [ -n "$old_gtmver" ] ; then
+            gtmgbldir=`echo $gtmgbldir | sed "s;$old_gtmver;$gtmver;"`
+        fi
+    else
+        gtmgbldir=$gtmdir/$gtmver/g/gtm.gld
+    fi
+    export gtmgbldir
+
+    # Set $gtm_tmp
+    tmp_gtm_tmp=`uname -s`
+    if [ "HP-UX" = $tmp_gtm_tmp -o "SunOS" = $tmp_gtm_tmp ] ; then
+        tmp_gtm_tmp=/var/tmp/fis-gtm/$gtmver
+    else
+        tmp_gtm_tmp=/tmp/fis-gtm/$gtmver
+    fi
+    if [ -d "$tmp_gtm_tmp" ] ; then
+        gtm_tmp=$tmp_gtm_tmp
+    else
+        if [ -n "$old_gtm_dist" ] ; then
+            gtm_tmp=`echo $gtm_tmp | sed "s;$old_gtm_dist;$gtm_dist;"`
+        fi
+        if [ -n "$old_gtmver" ] ; then
+            gtm_tmp=`echo $gtm_tmp | sed "s;$old_gtmver;$gtmver;"`
+        fi
+        if [ ! -d "$gtm_tmp" ] ; then
+            mkdir -p $tmp_gtm_tmp ; chmod a+rw,+t $tmp_gtm_tmp ; gtm_tmp=$tmp_gtm_tmp
+        fi
+    fi
+    export gtm_tmp
+
+    # Set $gtm_log - use recommended directory if it exists, otherwise modify old value if it exists
+    # Don't need to worry about non-existent directory because gtmsecshr will create it
+    # $gtm_tmp will be used if $gtm_log not defined
+    if [ -d /var/log/fis-gtm/$gtmver ] ; then
+        gtm_log=/var/log/fis-gtm/$gtmver
+    elif [ -n "$gtm_log" ] ; then
+        if [ -n "$old_gtm_dist" ] ; then
+            gtm_log=`echo $gtm_log | sed "s;$old_gtm_dist;$gtm_dist;"`
+        fi
+        if [ -n "$old_gtmver" ] ; then
+            gtm_log=`echo $gtm_log | sed "s;$old_gtmver;$gtmver;"`
+        fi
+    else
+        gtm_log=$gtm_tmp
+    fi
+    export gtm_log
+
+    # Set $PATH
+    if [ -n "$old_gtm_dist" ] ; then
+        PATH=`echo $PATH | sed "s;$old_gtm_dist;$gtm_dist;"`
+    fi
+    if [ -n "$old_gtmver" ] ; then
+        PATH=`echo $PATH | sed "s;$old_gtmver;$gtmver;"`
+    fi
+    if [ -z "`echo $PATH | grep -E  \(:\|\^\)$gtm_dist\(:\|$\)`" ] ; then
+        PATH=$PATH:$gtm_dist
+    fi
+
+    # Other useful environment variables
+    # System administrators - add, delete or modify GT.M environment variables here as appropriate for your installation
+    if [ -z "$gtm_principal_editing" ] ; then
+        gtm_principal_editing="EDITING" ; export gtm_principal_editing
+    fi
+    if [ -z "$gtm_repl_instance" ] ; then
+        gtm_repl_instance=$gtmdir/$gtmver/g/gtm.repl ; export gtm_repl_instance
+    fi
+    if [ -z "$gtm_retention" ] ; then
+        gtm_retention=42 ; export gtm_retention
+    fi
+
+    # Define aliases
+    alias dse="$gtm_dist/dse"
+    alias gde="$gtm_dist/mumps -run GDE"
+    alias gtm="$gtm_dist/gtm"
+    alias lke="$gtm_dist/lke"
+    alias mupip="$gtm_dist/mupip"
+
+    # Create default global directory and database if they don't exist
+    # Must handle case where database file path is relative to global directory
+    if [ ! -f $gtmgbldir ] ; then
+        if [ -f $gtm_dist/gdedefaults ] ; then
+            $gtm_dist/mumps -run %XCMD 'Write "@","'$gtm_dist'/gdedefaults",!,"exit",!' | $gtm_dist/mumps -run GDE
+        else
+            echo exit | $gtm_dist/mumps -run GDE
+        fi
+    fi
+    if [ ! -f "`dirname $gtmgbldir`/`basename $gtmgbldir gld`dat" ] ; then
+        ( cd `dirname $gtmgbldir` ; mupip create ; mupip set -journal="on,before" -region "*" )
+    fi
+
+# If $old_gtm_dist and $gtm_dist are the same, need to restore $gtmroutines
+else
+    gtmroutines="$old_gtmroutines" ; export gtmroutines
+fi
+
+# Restore gtm_passwd if it was set
+if [ ! -z "${tmp_passwd+isset}" ] ; then
+    gtm_passwd=$tmp_passwd ; export gtm_passwd
+fi
+
+unset old_gtm_dist old_gtmver old_gtmroutines tmp_gtm_tmp tmp_passwd

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,7 +82,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 			{
 				mstr_ch.len = in_length;
 				mstr_ch.addr = (char *)ptr;
-				mstr_targ.len = sizeof(buf1);
+				mstr_targ.len = SIZEOF(buf1);
 				mstr_targ.addr = (char *)buf1;
 				do_xform(gv_target->collseq, XBACK, &mstr_ch, &mstr_targ, &length);
 				memcpy(ptr, mstr_targ.addr, length); /* mstr_targ.addr is used just in case it is
@@ -130,11 +130,11 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 						*targ++ = '.';
 						expon = LARGE_EXP;
 						PUT_USHORT(targ, tbl_ptr[ch]);
-						targ += sizeof(short);
+						targ += SIZEOF(short);
 					} else
 					{	/* Insert dot between digits */
 						PUT_USHORT(targ, tbl_ptr[ch]);
-						targ += sizeof(short);
+						targ += SIZEOF(short);
 						*targ = *(targ - 1);
 						*(targ - 1) = '.';
 						targ++;
@@ -143,7 +143,7 @@ unsigned char *gvsub2str(unsigned char *sub, unsigned char *targ, bool xlat_flg)
 				} else
 				{
 					PUT_USHORT(targ, tbl_ptr[ch]);
-					targ += sizeof(short);
+					targ += SIZEOF(short);
 				}
 			}
 			if (expon > (LARGE_EXP - 100))

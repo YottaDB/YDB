@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -19,12 +19,7 @@
 ############################################
 
 #	gtm_curpro is the current production version
-if (`uname -m` == "ia64") then
-	# On Itanium (Linux or HPUX) it is V53FT00 (the first clean build on this platform)
-	setenv	gtm_curpro	"V53FT00"
-else
-	setenv	gtm_curpro	"V51000" # V52000,A,B cannot be gtm_curpro due to $gtm_inc_list issue in gtm_env.csh/gtmsrc.csh
-endif
+setenv	gtm_curpro	"V53004"
 
 #	gtm_verno is the current production version
 setenv	gtm_verno	$gtm_curpro

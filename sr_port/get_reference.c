@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,8 +33,7 @@ void get_reference(mval *var)
 
 	/* you need to return a double-quote for every single-quote. assume worst case. */
 	maxlen = MAX_ZWR_KEY_SZ + (!extnam_str.len ? 0 : ((extnam_str.len * 2) + SIZEOF(extnamdelim)));
-	if (stringpool.free + maxlen > stringpool.top)
-		stp_gcol(maxlen);
+	ENSURE_STP_FREE_SPACE(maxlen);
 	var->mvtype = MV_STR;
 	start = var->str.addr = (char *)stringpool.free;
 	var->str.len = 0;

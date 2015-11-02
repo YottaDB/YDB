@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,9 +28,9 @@ GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
 
 #if defined(UNIX)
-multi_struct *mur_token_lookup(token_num token, uint4 pid, off_jnl_t rec_time, enum rec_fence_type fence)
+multi_struct *mur_token_lookup(token_num token, off_jnl_t rec_time, enum rec_fence_type fence)
 #elif defined(VMS)
-multi_struct *mur_token_lookup(token_num token, uint4 pid, int4 image_count, off_jnl_t rec_time, enum rec_fence_type fence)
+multi_struct *mur_token_lookup(token_num token, int4 image_count, off_jnl_t rec_time, enum rec_fence_type fence)
 #endif
 {
 	ht_ent_int8	*tabent;
@@ -46,8 +46,7 @@ multi_struct *mur_token_lookup(token_num token, uint4 pid, int4 image_count, off
 		}
 		for (multi = (multi_struct *)tabent->value; NULL != multi; multi = (multi_struct *)multi->next)
 		{
-			if (multi->pid == pid && VMS_ONLY(multi->image_count == image_count &&)
-					(ZTPFENCE == fence || multi->time == rec_time))
+			if (VMS_ONLY(multi->image_count == image_count &&) ((ZTPFENCE == fence) || (multi->time == rec_time)))
 				return multi;
 		}
 	}

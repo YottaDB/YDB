@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc #
+#	Copyright 2001, 2010 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -329,7 +329,7 @@ if ( $buildaux_gtcm_server == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_server.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_server -L$gtm_obj \
-		$gtm_obj/gtcm_main.o $gtm_obj/omi_srvc_xct.o $gtm_obj/dummy_gtmci.o $gt_ld_sysrtns $gt_ld_options_all_exe \
+		$gtm_obj/gtcm_main.o $gtm_obj/omi_srvc_xct.o $gt_ld_sysrtns $gt_ld_options_all_exe \
 		-lgtcm -lmumps -lstub $gt_ld_syslibs >& $gtm_map/gtcm_server.map
 	if ( $status != 0  ||  ! -x $3/gtcm_server) then
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -350,7 +350,7 @@ if ( $buildaux_gtcm_gnp_server == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_gnp_server.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_gnp_server -L$gtm_obj \
-		$gtm_obj/gtcm_gnp_server.o $gtm_obj/gtcm_gnp_clitab.o $gtm_obj/dummy_gtmci.o $gt_ld_sysrtns $gt_ld_options_all_exe \
+		$gtm_obj/gtcm_gnp_server.o $gt_ld_sysrtns $gt_ld_options_all_exe \
 		-lgnpserver -llke -lmumps -lcmisockettcp -lstub \
 		$gt_ld_syslibs >& $gtm_map/gtcm_gnp_server.map
 	if ( $status != 0  ||  ! -x $3/gtcm_gnp_server) then
@@ -373,7 +373,7 @@ if ( $buildaux_gtcm_play == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_play.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_play -L$gtm_obj \
-		$gtm_obj/gtcm_play.o $gtm_obj/omi_sx_play.o $gtm_obj/dummy_gtmci.o $gt_ld_sysrtns $gt_ld_options_all_exe \
+		$gtm_obj/gtcm_play.o $gtm_obj/omi_sx_play.o $gt_ld_sysrtns $gt_ld_options_all_exe \
 		-lgtcm -lmumps -lstub $gt_ld_syslibs >& $gtm_map/gtcm_play.map
 	if ( $status != 0  ||  ! -x $3/gtcm_play) then
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -394,7 +394,7 @@ if ( $buildaux_gtcm_pkdisp == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_pkdisp.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_pkdisp -L$gtm_obj $gtm_obj/gtcm_pkdisp.o \
-		$gtm_obj/dummy_gtmci.o $gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_syslibs \
+		$gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_syslibs \
 			>& $gtm_map/gtcm_pkdisp.map
 	if ( $status != 0  ||  ! -x $3/gtcm_pkdisp) then
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -413,7 +413,7 @@ if ( $buildaux_gtcm_shmclean == 1 ) then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtcm_shmclean.loadmap"
 	endif
 	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtcm_shmclean -L$gtm_obj $gtm_obj/gtcm_shmclean.o	\
-		$gtm_obj/dummy_gtmci.o $gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_syslibs	\
+		$gt_ld_sysrtns -lgtcm -lmumps -lstub $gt_ld_syslibs	\
 			>& $gtm_map/gtcm_shmclean.map
 	if ( $status != 0  ||  ! -x $3/gtcm_shmclean) then
 		set buildaux_status = `expr $buildaux_status + 1`
@@ -487,10 +487,7 @@ endif
 #Do these only for the below mentioned platforms. All the remaining platforms will run GT.M without encryption
 if ($buildaux_gtmcrypt == 1) then
 	set encrypt_supported = `$gtm_tools/check_encrypt_support.sh`
-	if ("ERROR" == $encrypt_supported) then
-		set buildaux_status = `expr $buildaux_status + 1`
-		echo "buildaux-E-libgtmcrypt, Encryption libraries/header files not found" >> $gtm_log/error.`basename $gtm_exe`.log
-	else if ("TRUE" == $encrypt_supported) then
+	if ("TRUE" == $encrypt_supported) then
 		set plugin_build_type=""
 		switch ($2)
 		case "[bB]*":

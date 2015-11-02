@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +71,7 @@ int f_piece(oprtype *a, opctype op)
 		} else
 		{       /* Potentially multiple bytes in one int */
 			r->opcode = OC_FNP1;
-			assert(sizeof(int) >= delim_mval->str.len);
+			assert(SIZEOF(int) >= delim_mval->str.len);
 			memcpy(unichar.unibytes_val, delim_mval->str.addr, delim_mval->str.len);
 		}
 		delimiter->operand[0] = put_ilit(unichar.unichar_val);

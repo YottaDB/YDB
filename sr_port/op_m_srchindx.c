@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ lv_val* op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...)
 	static lvname_info_ptr	lvn_info = NULL;
 
 	if (!lvn_info)
-		lvn_info = (lvname_info_ptr) malloc(sizeof(struct lvname_info_struct));
+		lvn_info = (lvname_info_ptr) malloc(SIZEOF(struct lvname_info_struct));
 	VAR_START(var, lvarg);
 	VMS_ONLY(va_count(count);)
 	lvn_info->start_lvp = lvarg;  	/* process arg[1] */

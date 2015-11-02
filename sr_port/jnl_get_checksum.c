@@ -50,7 +50,7 @@ uint4 jnl_get_checksum(uint4 *buff, sgmnt_addrs *csa, int bufflen)
 	}
 #	endif
 	checksum = INIT_CHECKSUM_SEED;
-	for (blen = bufflen / USIZEOF(*buff), top = buff + blen, blk_top = buff + CHKSUM_SEGLEN4 / 2; buff < top ;)
+	for (blen = bufflen / SIZEOF(*buff), top = buff + blen, blk_top = buff + CHKSUM_SEGLEN4 / 2; buff < top ;)
 	{
 		if (blk_top > top)
 			blk_top = top;

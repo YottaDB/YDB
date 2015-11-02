@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,13 +43,10 @@
 #include "updproc.h"
 #include "repl_dbg.h"
 
+GBLREF	boolean_t	pool_init;
+GBLREF	boolean_t	repl_allowed;
+GBLREF	gd_addr		*gd_header;
 GBLREF	recvpool_addrs	recvpool;
-GBLREF  gd_addr         *gd_header;
-GBLREF  gd_addr		*gd_targ_addr;
-GBLREF  gd_binding	*gd_map;
-GBLREF  gd_binding	*gd_map_top;
-GBLREF  boolean_t        repl_allowed;
-GBLREF  boolean_t        pool_init;
 
 error_def(ERR_UPDATEFILEOPEN);
 
@@ -82,13 +79,10 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Receive pool semop error"), REPL_SEM_ERRNO);
 	}
-        /* get the desired global directory and update the gd_map */
-	SET_GD_HEADER(v);
-	SET_GD_MAP;
-	*gld_db_files = read_db_files_from_gld(gd_header);/* read the global directory read
-					all the database files to be opened */
-        if (!updproc_open_files(gld_db_files, start_jnl_seqno)) /* open and initialize all regions */
-                mupip_exit(ERR_UPDATEFILEOPEN);
+	gvinit();	/* get the desired global directory and update the gd_map */
+	*gld_db_files = read_db_files_from_gld(gd_header);/* read all the database files to be opened in this global directory */
+	if (!updproc_open_files(gld_db_files, start_jnl_seqno)) /* open and initialize all regions */
+		mupip_exit(ERR_UPDATEFILEOPEN);
 	if (repl_allowed)
 	{
 		jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);

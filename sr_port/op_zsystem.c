@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,23 +40,21 @@
 #include "change_reg.h"
 #include "setterm.h"
 #include "getzposition.h"
+#ifdef DEBUG
+#include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
+#endif
 
 #define	ZSYSTEMSTR	"ZSYSTEM"
 #define	MAXZSYSSTRLEN	4096	/* maximum command line length supported by most Unix shells */
 
-GBLREF int4		dollar_zsystem;			/* exit status of child */
-GBLREF short		dollar_tlevel;
-GBLREF io_pair		io_std_device;
-GBLREF unsigned int	t_tries;
-GBLREF tp_region	*tp_reg_list;
-GBLREF uint4            trust;
+GBLREF	int4		dollar_zsystem;			/* exit status of child */
+GBLREF	short		dollar_tlevel;
+GBLREF	io_pair		io_std_device;
+GBLREF	uint4           trust;
 
 void op_zsystem(mval *v)
 {
 	int		len;
-	mval		zpos;
-	sgmnt_addrs	*csa;
-	tp_region	*tr;
 #ifdef UNIX
 	char		*sh, cmd_buf[MAXZSYSSTRLEN], *cmd;
 #ifdef _BSD
@@ -71,34 +69,9 @@ void op_zsystem(mval *v)
 #error UNSUPPORTED PLATFORM
 #endif
 	error_def(ERR_INVSTRLEN);
-	error_def(ERR_TPNOTACID);
 	error_def(ERR_SYSCALL);
 
-	if (0 < dollar_tlevel)
-	{	/* Note the existence of similar code in op_dmode.c and mdb_condition_handler.c.
-		 * Any changes here should be reflected there too. We don't have a macro for this because
-		 * 	(a) This code is considered pretty much stable.
-		 * 	(b) Making it a macro makes it less readable.
-		 */
-		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
-		{	/* the mdb_condition_handler does all regions in all global directories
-			 * this should produce the same result more quickly but the difference should be noted */
-			assert(tr->reg->open);
-			if (!tr->reg->open)
-				continue;
-			csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;
-			if (csa->now_crit)
-				rel_crit(tr->reg);
-		}
-		if (CDB_STAGNATE <= t_tries)
-		{
-			assert(CDB_STAGNATE == t_tries);
-			t_tries = CDB_STAGNATE - 1;
-			getzposition(&zpos);
-			gtm_putmsg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(ZSYSTEMSTR), zpos.str.len, zpos.str.addr);
-			send_msg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(ZSYSTEMSTR), zpos.str.len, zpos.str.addr);
-		}
-	}
+	TPNOTACID_CHECK(ZSYSTEMSTR);
 	MV_FORCE_STR(v);
 #ifdef UNIX
 	if (v->str.len > (MAXZSYSSTRLEN - 32 - 1)) /* 32 char for shell name, remaining for ZSYSTEM command */
@@ -130,7 +103,7 @@ void op_zsystem(mval *v)
 	if (-1 == dollar_zsystem)
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
 #ifdef _BSD
-	assert(sizeof(wait_stat) == sizeof(int4));
+	assert(SIZEOF(wait_stat) == SIZEOF(int4));
 	wait_stat.w_status = dollar_zsystem;
 #else
 	wait_stat = dollar_zsystem;

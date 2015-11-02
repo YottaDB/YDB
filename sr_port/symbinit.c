@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,7 +106,7 @@ int4 symbinit(void)
 			{
 				fp_fix->l_symtab = (ht_ent_mname **)((char *)fp_fix->l_symtab - shift_size);
 				if ((unsigned char *)fp_fix->l_symtab < (unsigned char *)fp_fix)
-					memset((unsigned char *)fp_fix->l_symtab, 0, fp_fix->vartab_len * sizeof(ht_ent_mname *));
+					memset((unsigned char *)fp_fix->l_symtab, 0, fp_fix->vartab_len * SIZEOF(ht_ent_mname *));
 			}
 			if (fp_fix->temps_ptr < top && fp_fix->temps_ptr > stacktop)
 				fp_fix->temps_ptr -= shift_size;
@@ -141,7 +141,7 @@ int4 symbinit(void)
 
 	memset(l_syms, 0, ls_size);
 	size++;
-	ptr = (symval *)malloc(sizeof(symval));
+	ptr = (symval *)malloc(SIZEOF(symval));
 	init_hashtab_mname(&ptr->h_symtab, size);
 	ptr->last_tab = curr_symval;
 	ptr->lv_flist = NULL;
@@ -149,6 +149,7 @@ int4 symbinit(void)
 	ptr->xnew_ref_list = NULL;
 	ptr->tp_save_all = 0;
 	ptr->alias_activity = FALSE;
+	GTMTRIG_ONLY(ptr->trigr_symval = FALSE);
 
 	/* dqinit (ptr, sbs_que); */
 	ptr->sbs_que.bl = (struct sbs_blk_struct *)ptr;

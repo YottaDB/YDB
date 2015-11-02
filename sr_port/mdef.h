@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,7 @@ typedef struct
 #include <inttypes.h>
 #include "mdefsa.h"
 #include "mdefsp.h"
+#include "gtm_sizeof.h"
 
 /* Define GT.M interlude functions for open, close, pipe, creat and dup system calls. This lets GT.M trace through all file
  * descriptor activity (needed for D9I11-002714). Do this on all Unix platforms. Note that only the macro GTM_FD_TRACE is
@@ -77,13 +78,13 @@ typedef struct
 #endif
 
 /* Now that mdefsp.h is included, GBLDEF should have been #defined. Use it to define STATICDEF for variables
- * and STATICFNDEF, STATICFNREF for functions. Define STATICDEF to "GBLDEF". This way we know such usages are intended
+ * and STATICFNDEF, STATICFNDCL for functions. Define STATICDEF to "GBLDEF". This way we know such usages are intended
  * to be "static" but yet can effectively debug these variables since they are externally visible.
  * For functions, do not use the "static" keyword to make them externally visible.
  * Note that a STATICREF for variables does not make sense since statics are supposed to be used only within one module.
  */
 #define	STATICDEF	GBLDEF
-#define	STATICFNREF	extern
+#define	STATICFNDCL	extern
 #define	STATICFNDEF
 
 /* INTPTR_T is an integer that has the same length as a pointer on each platform.  Its basic use is for arithmetic
@@ -169,21 +170,21 @@ typedef UINTPTR_T uintszofptr_t;
 #if defined(__ia64) || defined(__MVS__)
 #	define INTCAST(X) ((int)(X))
 #	define UINTCAST(X) ((uint4)(X))
-#	define USIZEOF(X) ((unsigned int)(sizeof(X)))
-#	define SIZEOF(X) ((int)(sizeof(X)))
 #	define STRLEN(X) ((int)(strlen(X)))
 #	define USTRLEN(X) ((unsigned int)(strlen(X)))
 #	define OFFSETOF(X,Y) ((int)(offsetof(X,Y)))
 #else
 #	define  INTCAST(X) X
 #	define  UINTCAST(X) X
-#	define 	USIZEOF(X) ((uint4)sizeof(X))
-#	define 	SIZEOF(X) sizeof(X)
 #	define 	STRLEN(X) strlen(X)
 #	define 	USTRLEN(X) strlen(X)
 #	define	OFFSETOF(X,Y) offsetof(X,Y)
 #endif
 
+#define	ARRAYSIZE(arr)	SIZEOF(arr)/SIZEOF(arr[0])	/* # of elements defined in the array */
+#define	ARRAYTOP(arr)	(&arr[0] + ARRAYSIZE(arr))	/* address of the TOP of the array (first byte AFTER array limits).
+							 * use &arr[0] + size instead of &arr[size] to avoid compiler warning.
+							 */
 #ifdef __x86_64__
 #define X86_64_ONLY(x)		x
 #define NON_X86_64_ONLY(x)
@@ -282,17 +283,17 @@ typedef struct
 typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of type long */
 
 /* Bit definitions for mval type (mvtype) */
-#define MV_NM		 1
-#define MV_INT		 2
-#define MV_NUM_MASK	 3
-#define MV_STR		 4
-#define MV_NUM_APPROX	 8
-#define MV_SBS		16
-#define MV_SYM		32
-#define MV_SUBLIT	64
-#define MV_RETARG      128
-#define MV_UTF_LEN     256
-#define MV_ALIASCONT   512
+#define MV_NM		 1	/* 0x0001 */
+#define MV_INT		 2	/* 0x0002 */
+#define MV_NUM_MASK	 3	/* 0x0003 (MV_NM | MV_INT) */
+#define MV_STR		 4	/* 0x0004 */
+#define MV_NUM_APPROX	 8	/* 0x0008 */
+#define MV_SBS		16	/* 0x0010 */
+#define MV_SYM		32	/* 0x0020 */
+#define MV_SUBLIT	64	/* 0x0040 */
+#define MV_RETARG      128	/* 0x0080 */
+#define MV_UTF_LEN     256	/* 0x0100 */
+#define MV_ALIASCONT   512	/* 0x0200 */
 
 /* Special definition used when an xnew'd lv_val is moved from a popped symtab to an earlier
    one so it can be preserved. This flag marks the lv_val as a pointer to the new symtab so
@@ -496,8 +497,8 @@ int4 timeout2msec(int4 timeout);
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
 #define	STR_LIT_LEN(LITERAL)		(SIZEOF(LITERAL) - 1)
-#define	LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (sizeof(LITERAL) - 1)
-#define	LENGTH_AND_LITERAL(LITERAL)	(sizeof(LITERAL) - 1), (LITERAL)
+#define	LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (SIZEOF(LITERAL) - 1)
+#define	LENGTH_AND_LITERAL(LITERAL)	(SIZEOF(LITERAL) - 1), (LITERAL)
 #define	STRING_AND_LENGTH(STRING)	(STRING), (STRLEN((char *)(STRING)))
 #define	LENGTH_AND_STRING(STRING)	(strlen((char *)(STRING))), (STRING)
 
@@ -506,9 +507,9 @@ int4 timeout2msec(int4 timeout);
 #define	STR_AND_LEN(STRING)		STRING_AND_LENGTH(STRING)
 #define	LEN_AND_STR(STRING)		LENGTH_AND_STRING(STRING)
 
-#define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
-#define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, sizeof(LITERAL) - 1)
-#define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, sizeof(LITERAL) - 1)
+#define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)
+#define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, SIZEOF(LITERAL) - 1)
+#define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)
 #define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)(STRING)))
 
 #define	STRCPY(SOURCE, DEST)		strcpy((char *)(SOURCE), (char *)(DEST))
@@ -820,6 +821,8 @@ typedef que_head *	que_head_ptr_t;
 #  define	ENDIANOTHER		"LITTLE"
 #  define	ENDIANTHISJUSTIFY	"   BIG"	/* right justified */
 #  define	GTM_IS_LITTLE_ENDIAN	FALSE
+#  define	BIGENDIAN_ONLY(X)	X
+#  define	LITTLEENDIAN_ONLY(X)
 #else
 #  define	msb_index		1
 #  define	lsb_index		0
@@ -828,6 +831,8 @@ typedef que_head *	que_head_ptr_t;
 #  define	ENDIANOTHER		"BIG"
 #  define	ENDIANTHISJUSTIFY	"LITTLE"	/* right justified */
 #  define	GTM_IS_LITTLE_ENDIAN	TRUE
+#  define	BIGENDIAN_ONLY(X)
+#  define	LITTLEENDIAN_ONLY(X)	X
 #endif
 
 #ifdef INT8_SUPPORTED
@@ -1184,20 +1189,37 @@ unsigned int asc_hex2i(char *p, int len);
  * It is used by format2zwr() which is called a lot during MUPIP EXTRACT (which can be time-consuming
  * for a big database), hence the need to make it efficient.
  */
-#define I2A(des, des_len, num)										\
+#define I2A(des, des_len, num)											\
+{														\
+	if ((unsigned)(num) < 1000)										\
+	{ /* perform light-weight conversion of numbers upto 3 digits */					\
+		int 	n1, n2; /* digits at the 10th and 100th decimal positions respectively */		\
+		n2 = ((num) / 100) % 10;									\
+		if (0 != n2)											\
+			(des)[(des_len)++] = n2 + '0';								\
+		n1 = ((num) / 10) % 10;										\
+		if (0 != n1 || 0 != n2)										\
+			(des)[(des_len)++] = n1 + '0';								\
+		(des)[(des_len)++] = ((num) % 10) + '0';							\
+	} else													\
+		des_len += (int)(i2asc((uchar_ptr_t)((des) + des_len), num) - (uchar_ptr_t)((des) + des_len));	\
+}
+
+/* The following is similar to I2A except that it updates the input pointer directly (no length parameter needed) */
+#define I2A_INLINE(des, num)										\
 {													\
 	if ((unsigned)(num) < 1000)									\
 	{ /* perform light-weight conversion of numbers upto 3 digits */				\
 		int 	n1, n2; /* digits at the 10th and 100th decimal positions respectively */	\
 		n2 = ((num) / 100) % 10;								\
 		if (0 != n2)										\
-			(des)[(des_len)++] = n2 + '0';							\
+			*des++ = n2 + '0';								\
 		n1 = ((num) / 10) % 10;									\
 		if (0 != n1 || 0 != n2)									\
-			(des)[(des_len)++] = n1 + '0';							\
-		(des)[(des_len)++] = ((num) % 10) + '0';						\
+			*des++ = n1 + '0';								\
+		*des++ = ((num) % 10) + '0';								\
 	} else 												\
-		des_len += (int)(i2asc((uchar_ptr_t)((des) + des_len), num) - (uchar_ptr_t)((des) + des_len));	\
+		des = (char *)i2asc((uchar_ptr_t)des, num);						\
 }
 
 /* This macro converts a decimal string to a number (a more efficient alternative to asc2i).
@@ -1205,10 +1227,11 @@ unsigned int asc_hex2i(char *p, int len);
  */
 #define A2I(cp, end, num)											\
 {														\
-	unsigned char *cpbase = (unsigned char*)(cp);								\
+	unsigned char	*cpbase = (unsigned char*)(cp);								\
+	char		ch;											\
 														\
-	for (num = 0; (cp) < (end) && *((unsigned char*)cp) >= '0' && *((unsigned char*)cp) <= '9'; ++(cp))	\
-		num = (num) * 10 + (*((unsigned char*)cp) - '0');						\
+	for (num = 0; (cp) < (end) && ('0' <= (ch = *((unsigned char*)cp))) && ('9' >= ch); ++(cp))		\
+		num = (num) * 10 + (ch - '0');									\
 	if (cpbase == ((unsigned char*)cp))									\
 		num = -1;											\
 }
@@ -1305,6 +1328,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define EXIT_MASK 	7
 #define MIN_FN_LEN	1
 #define MAX_FN_LEN	255
+#define V4_MAX_FN_LEN	255	/* required for dbcertify.h */
 #define MAX_TRANS_NAME_LEN	257
 
 typedef uint4 		jnl_tm_t;
@@ -1338,9 +1362,9 @@ typedef gtm_uint64_t	gtm_off_t;
  */
 #define	MAX_INSTNAME_LEN	16	/* Max Length of the replication instance name including terminating null character '\0' */
 #define	NUM_GTMSRC_LCL		16	/* number of gtmsrc_lcl structures in the replication instance file */
-#define	REPL_INST_HDR_SIZE	(sizeof(repl_inst_hdr))
-#define	GTMSRC_LCL_SIZE		(sizeof(gtmsrc_lcl) * NUM_GTMSRC_LCL)			/* size of the gtmsrc_lcl array */
-#define	GTMSOURCE_LOCAL_SIZE	(sizeof(gtmsource_local_struct) * NUM_GTMSRC_LCL)	/* size of the gtmsource_local array */
+#define	REPL_INST_HDR_SIZE	(SIZEOF(repl_inst_hdr))
+#define	GTMSRC_LCL_SIZE		(SIZEOF(gtmsrc_lcl) * NUM_GTMSRC_LCL)			/* size of the gtmsrc_lcl array */
+#define	GTMSOURCE_LOCAL_SIZE	(SIZEOF(gtmsource_local_struct) * NUM_GTMSRC_LCL)	/* size of the gtmsource_local array */
 #define	REPL_INST_TRIPLE_OFFSET	(REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE)
 
 #define	MAX_NODENAME_LEN	16	/* used by repl_instance.h. A similar macro JPV_LEN_NODE is defined in jnl.h */
@@ -1392,7 +1416,7 @@ typedef enum
 #define	IS_UTF16_CHSET(chset)	((CHSET_UTF16 == (chset)) || (CHSET_UTF16LE == (chset)) || (CHSET_UTF16BE == (chset)))
 #define IS_UTF_CHSET(chset) ((CHSET_UTF_MIN <= (chset)) && (CHSET_UTF_MAX >= (chset)))
 
-#define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (sizeof(UINTPTR_T) - 1))
+#define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (SIZEOF(UINTPTR_T) - 1))
 #if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__MVS__)
 #define GTM_CRYPT
 #define GTMCRYPT_ONLY(X)		X
@@ -1410,4 +1434,39 @@ typedef enum
 	for (i = 0; i < len; i+=2)						\
 		sprintf((char *)out + i, "%02X", (unsigned char)in[i/2]);	\
 }
+
+#ifdef UNIX
+#	define	GTM_SNAPSHOT
+#	define	NON_GTM_SNAPSHOT_ONLY(X)
+#	define	GTM_SNAPSHOT_ONLY(X)		X
+#else
+#	define	NON_GTM_SNAPSHOT_ONLY(X)	X
+#	define	GTM_SNAPSHOT_ONLY(X)
+#endif
+
+/* Currently triggers are supported only on Unix */
+#if defined(UNIX) && !defined(__hppa)	/* triggers not supported on HPUX-HPPA */
+#	define	GTM_TRIGGER
+#	define	GTMTRIG_ONLY(X)			X
+#	define	NON_GTMTRIG_ONLY(X)
+#	define	GTMTRIG_DBG_ONLY(X)		DEBUG_ONLY(X)
+#	define	GTM_TRIGGER_DEPTH_MAX		127	/* Maximum depth triggers can nest */
+#else
+#	define	GTMTRIG_ONLY(X)
+#	define	NON_GTMTRIG_ONLY(X)		X
+#	define	GTMTRIG_DBG_ONLY(X)
+#endif
+
+/* A type definition to hold a range of numbers */
+typedef struct gtm_num_range_struct
+{
+	uint4   min;    /* included in range */
+	uint4   max;    /* included in range */
+} gtm_num_range_t;
+
+/* Debug fprintf with pre and post requisite flushing of appropriate streams */
+#ifndef DBGFPF
+# define DBGFPF(x) {flush_pio(); fprintf x; fflush(stderr);}
+#endif
+
 #endif /* MDEF_included */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ GBLREF jnlpool_addrs		jnlpool;
 GBLREF uint4			process_id;
 GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
 GBLREF gv_namehead		*gv_target;
-GBLREF int4			update_trans;
+GBLREF uint4			update_trans;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 
 #define	RESET_EARLY_TN_IF_NEEDED(csa)						\
@@ -112,7 +112,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 */
 		for (si = first_tp_si_by_ftok;  (NULL != si);  si = si->next_tp_si_by_ftok)
 		{
-			if (T_COMMIT_STARTED == si->update_trans)
+			if (UPDTRNS_TCOMMIT_STARTED_MASK & si->update_trans)
 			{	/* Two possibilities.
 				 *	(a) case of duplicate set not creating any cw-sets but updating db curr_tn++.
 				 *	(b) Have completed commit for this region and have released crit on this region.
@@ -135,7 +135,8 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	} else
 	{
 		trstr = "NON-TP";
-		update_underway = (cs_addrs->now_crit && (T_COMMIT_STARTED == update_trans) || T_UPDATE_UNDERWAY(cs_addrs));
+		update_underway = (cs_addrs->now_crit && (UPDTRNS_TCOMMIT_STARTED_MASK & update_trans)
+					|| T_UPDATE_UNDERWAY(cs_addrs));
 		if (NULL != gv_target)	/* gv_target can be NULL in case of DSE MAPS command etc. */
 			gv_target->clue.end = 0; /* in case t_end() had set history's tn to be "valid_thru++", undo it */
 	}

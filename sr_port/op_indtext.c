@@ -52,13 +52,15 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 	indir_src.str.len += SIZEOF("+^") - 1;
 	indir_src.str.len += MAX_NUM_SIZE;
 	indir_src.str.len += rtn->str.len;
-	if (stringpool.top - stringpool.free < indir_src.str.len)
-		stp_gcol(indir_src.str.len);
-
+	ENSURE_STP_FREE_SPACE(indir_src.str.len);
+	DBG_MARK_STRINGPOOL_UNEXPANDABLE; /* Now that we have ensured enough space in the stringpool, we dont expect any more
+					   * garbage collections or expansions until we are done with the below initialization.
+					   */
 	/* Push an mval pointing to the complete entry ref on to the stack so the string is valid even
-	 * if garbase collection occurs before cache_put() */
+	 * if garbage collection occurs before cache_put() */
 	PUSH_MV_STENT(MVST_MVAL);
-	mv_chain->mv_st_cont.mvs_mval.mvtype = MV_STR;
+	mv_chain->mv_st_cont.mvs_mval.mvtype = 0;	/* so stp_gcol (if invoked below) does not get confused by this otherwise
+							 * incompletely initialized mval in the M-stack */
 	mv_chain->mv_st_cont.mvs_mval.str.addr = (char *)stringpool.free;
 	memcpy(stringpool.free, lab->str.addr, lab->str.len);
 	stringpool.free += lab->str.len;
@@ -69,6 +71,8 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 	memcpy(stringpool.free, rtn->str.addr, rtn->str.len);
 	stringpool.free += rtn->str.len;
 	mv_chain->mv_st_cont.mvs_mval.str.len = INTCAST(stringpool.free - (unsigned char*)mv_chain->mv_st_cont.mvs_mval.str.addr);
+	mv_chain->mv_st_cont.mvs_mval.mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
+	DBG_MARK_STRINGPOOL_EXPANDABLE;	/* Now that we are done with stringpool.free initializations, mark as free for expansion */
 
 	indir_src.str = mv_chain->mv_st_cont.mvs_mval.str;
 	indir_src.code = indir_text;

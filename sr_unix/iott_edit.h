@@ -30,7 +30,7 @@ LITREF	unsigned char	e2a[];
 				 else									\
 					buffer_start[OFFSET] = (unsigned char)CHAR;}
 #define BUFF_ADDR(OFFSET)	(utf8_active ? (char *)&buffer_32_start[OFFSET] : (char *)&buffer_start[OFFSET])
-#define BUFF_CHAR_SIZE		(utf8_active ? sizeof(wint_t) : sizeof(unsigned char))
+#define BUFF_CHAR_SIZE		(utf8_active ? SIZEOF(wint_t) : SIZEOF(unsigned char))
 #define SET_BUFF(OFFSET,CHAR,LENGTH)	{if (utf8_active)						\
 					 {	int off = OFFSET;					\
 						 for ( ; off < (OFFSET + (LENGTH)); off++)		\
@@ -39,7 +39,7 @@ LITREF	unsigned char	e2a[];
 					 else								\
 						memset(&buffer_start[OFFSET], CHAR, LENGTH);}
 #define MOVE_BUFF(OFFSET,SOURCE,LENGTH)	{if (utf8_active)						\
-					   memmove(&buffer_32_start[OFFSET], SOURCE, (LENGTH) * sizeof(wint_t));	\
+					   memmove(&buffer_32_start[OFFSET], SOURCE, (LENGTH) * SIZEOF(wint_t));	\
 					 else								\
 					   memmove(&buffer_start[OFFSET], SOURCE, LENGTH);}
 

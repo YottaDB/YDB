@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,12 +23,17 @@
 #include "jnl_write.h"
 #include "gtmimagename.h"
 #include "jnl_get_checksum.h"
+#include "buddy_list.h"		/* needed for muprec.h */
+#include "hashtab_int4.h"	/* needed for muprec.h */
+#include "hashtab_int8.h"	/* needed for muprec.h */
+#include "hashtab_mname.h"	/* needed for muprec.h */
+#include "hashtab.h"
+#include "muprec.h"
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF	short			dollar_tlevel;
-GBLREF	enum gtmImageTypes 	image_type;
 GBLREF 	jnl_gbls_t		jgbl;
 
 void	jnl_put_jrt_pini(sgmnt_addrs *csa)
@@ -36,6 +41,7 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 	struct_jrec_pini	pini_record;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
+	struct pini_list	*mur_plst;
 
 	assert(csa->now_crit);
 	jpc = csa->jnl;
@@ -57,26 +63,34 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 	 * prc_vec->jpv_time is for accounting purpose only. Usually it is kind of redundant too. */
 	if (!jgbl.forw_phase_recovery)
 	{
-		if (GTCM_GNP_SERVER_IMAGE == image_type && NULL != originator_prc_vec)
+		assert(NULL == jgbl.mur_pini_addr_reset_fnptr);
+		assert(NULL == csa->rctl);
+		mur_plst = NULL;
+		if (IS_GTCM_GNP_SERVER_IMAGE && (NULL != originator_prc_vec))
 		{
 			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],
-				(unsigned char*)originator_prc_vec, sizeof(jnl_process_vector));
+				(unsigned char*)originator_prc_vec, SIZEOF(jnl_process_vector));
 		} else
-			memset((unsigned char*)&pini_record.process_vector[ORIG_JPV], 0, sizeof(jnl_process_vector));
+			memset((unsigned char*)&pini_record.process_vector[ORIG_JPV], 0, SIZEOF(jnl_process_vector));
 	} else
 	{
-		if (NULL != jgbl.mur_plst)
+		assert(NULL != csa->rctl);
+		mur_plst = csa->rctl->mur_plst;
+		if (NULL != jgbl.mur_pini_addr_reset_fnptr)
+		{
 			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],
-					(unsigned char *)&jgbl.mur_plst->origjpv, sizeof(jnl_process_vector));
-		else
+					(unsigned char *)&mur_plst->origjpv, SIZEOF(jnl_process_vector));
+		} else
 		{	/* gdsfilext done during "mur_block_count_correct" */
-			memset((unsigned char*)&pini_record.process_vector[ORIG_JPV], 0, sizeof(jnl_process_vector));
+			assert(NULL == mur_plst);
+			memset((unsigned char*)&pini_record.process_vector[ORIG_JPV], 0, SIZEOF(jnl_process_vector));
 		}
 	}
-	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
+	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, SIZEOF(jnl_process_vector));
 	jnl_write(jpc, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL);
 	/* Note : jpc->pini_addr should not be updated until PINI record is written [C9D08-002376] */
 	jpc->pini_addr = jbp->freeaddr - PINI_RECLEN;
-	if (jgbl.forw_phase_recovery && (NULL != jgbl.mur_plst))
-		jgbl.mur_plst->new_pini_addr = jpc->pini_addr;/* note down for future forward play logical record processing */
+	assert(jgbl.forw_phase_recovery || (NULL == mur_plst));
+	if (NULL != mur_plst)
+		mur_plst->new_pini_addr = jpc->pini_addr;/* note down for future forward play logical record processing */
 }

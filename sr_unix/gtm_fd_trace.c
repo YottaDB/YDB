@@ -114,7 +114,6 @@ int gtm_creat(const char *pathname, mode_t mode)
 
 	fd = creat(pathname, mode);
 	FD_TRACE(fd_ops_creat, fd, 0);
-	assert(-1 != fd);
 	return fd;
 }
 
@@ -169,8 +168,8 @@ int gtm_close(int fd)
 	error_def(ERR_CALLERID);
 
 	status = close(fd);
-	FD_TRACE(fd_ops_close, fd, status);
 	save_errno = errno;
+	FD_TRACE(fd_ops_close, fd, status);
 	if ((-1 == status) && (EINTR != save_errno))
 	{
 		send_msg(VARLSTCNT(4) ERR_CLOSEFAIL, 1, fd, save_errno);

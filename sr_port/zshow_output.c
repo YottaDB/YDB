@@ -89,6 +89,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			mv = &mv_chain->mv_st_cont.mvs_mval;
 		} else
 			mv = &lmv;
+		mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
 		if (str)
 		{
 			len = str->len;
@@ -184,11 +185,11 @@ void zshow_output(zshow_out *out, const mstr *str)
 			mv = &mv_chain->mv_st_cont.mvs_mval;
 		} else
 			mv = &lmv;
+		mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
 
 		if (out->code && out->code != out->curr_code)
 		{
-			if (stringpool.top - stringpool.free < 1)
-				stp_gcol(1);
+			ENSURE_STP_FREE_SPACE(1);
 			mv->str.addr = (char *)stringpool.free;
 			mv->str.len = 1;
 			mv->mvtype = MV_STR;
@@ -250,8 +251,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					MAX_LVSUBSCRIPTS <= out->out_var.lv.lvar->ptrs.val_ent.parent.sbs->level + 1)
 					rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 				temp = op_putindx(VARLSTCNT(2) out->out_var.lv.child, mv);
-				if (stringpool.top - stringpool.free < out->ptr - out->buff)
-					stp_gcol((int)(out->ptr - out->buff));
+				ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 				mv->mvtype = MV_STR;
 				mv->str.addr = (char *)stringpool.free;
 				mv->str.len = INTCAST(out->ptr - out->buff);
@@ -278,8 +278,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				MAX_LVSUBSCRIPTS <= out->out_var.lv.lvar->ptrs.val_ent.parent.sbs->level + 1)
 				rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 			temp = op_putindx(VARLSTCNT(2) out->out_var.lv.child, mv);
-			if (stringpool.top - stringpool.free < out->ptr - out->buff)
-				stp_gcol((int)(out->ptr - out->buff));
+			ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 			mv->str.addr = (char *)stringpool.free;
 			mv->str.len = INTCAST(out->ptr - out->buff);
 			mv->mvtype = MV_STR;
@@ -298,7 +297,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 		if (!out->len)
 		{
 			key_ovrhd = gv_currkey->end + 1 + F_SUBSC_LEN + N_SUBSC_LEN;
-			out->len = (int)(gv_cur_region->max_rec_size - key_ovrhd - sizeof(rec_hdr));
+			out->len = (int)(gv_cur_region->max_rec_size - key_ovrhd - SIZEOF(rec_hdr));
 			if (out->len < MIN_DATASIZE)
 				rts_error(VARLSTCNT(1) ERR_ZSHOWGLOSMALL);
 		}
@@ -308,6 +307,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			mv = &mv_chain->mv_st_cont.mvs_mval;
 		} else
 			mv = &lmv;
+		mv->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before value gets initialized below */
 		if (out->code && out->code != out->curr_code)
 		{
 			gv_currkey->end = out->out_var.gv.end;
@@ -366,8 +366,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, kend - kbuff, kbuff);
 					}
 				}
-				if (stringpool.top - stringpool.free < out->ptr - out->buff)
-					stp_gcol((int)(out->ptr - out->buff));
+				ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 				mv->str.addr = (char *)stringpool.free;
 				mv->str.len = INTCAST(out->ptr - out->buff);
 				mv->mvtype = MV_STR;
@@ -399,8 +398,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, kend - kbuff, kbuff);
 				}
 			}
-			if (stringpool.top - stringpool.free < out->ptr - out->buff)
-				stp_gcol((int)(out->ptr - out->buff));
+			ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 			mv->str.addr = (char *)stringpool.free;
 			mv->str.len = INTCAST(out->ptr - out->buff);
 			mv->mvtype = MV_STR;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,18 +16,23 @@
 #include "op.h"
 #include "source_file.h"
 #include "cli.h"
+#include "iosp.h"
 
 #define FILE_NAME_SIZE 255
 
 GBLDEF int4			dollar_zcstatus;
 
+#ifdef UNIX
+GBLREF CLI_ENTRY		*cmd_ary;
+GBLREF CLI_ENTRY		mumps_cmd_ary[];
+#endif
 GBLREF boolean_t		run_time;
 GBLREF bool			compile_time;
 GBLREF spdesc			stringpool, rts_stringpool, indr_stringpool;
 GBLREF command_qualifier	cmd_qlf, glb_cmd_qlf;
 GBLREF bool			transform;
 
-void op_zcompile(mval *v)
+void op_zcompile(mval *v, boolean_t mExtReqd)
 {
 	unsigned		status;
 	command_qualifier	save_qlf;
@@ -36,6 +41,9 @@ void op_zcompile(mval *v)
 				obj_file[FILE_NAME_SIZE + 1],
 				list_file[FILE_NAME_SIZE + 1],
 				ceprep_file[FILE_NAME_SIZE + 1];
+#	ifdef UNIX
+	CLI_ENTRY		*save_cmd_ary;
+#	endif
 
 	MV_FORCE_STR(v);
 	if (!v->str.len)
@@ -66,15 +74,27 @@ void op_zcompile(mval *v)
 	run_time = FALSE;
 	compile_time = TRUE;
 	transform = FALSE;
-	dollar_zcstatus = 1;
+	dollar_zcstatus = SS_NORMAL;
 	len = FILE_NAME_SIZE;
+#	ifdef UNIX
+	/* The caller of this function could be GT.M, DSE, MUPIP, GTCM GNP server, GTCM OMI server etc. Most of them have their
+	 * own command parsing tables and some dont even have one. Nevertheless, we need to parse the string as if it was a
+	 * MUMPS compilation command. So we switch temporarily to the MUMPS parsing table "mumps_cmd_ary".
+	 * TODO: What to do in case of errors in between the save and restore. Does it really matter if cmd_ary is not restored?
+	 */
+	save_cmd_ary = cmd_ary;
+	cmd_ary = &mumps_cmd_ary[0];
+#	endif
 	for (status = cli_get_str("INFILE",source_file_string, &len);
 		status;
 		status = cli_get_str("INFILE",source_file_string, &len))
 	{
-		compile_source_file(len, source_file_string);
+		compile_source_file(len, source_file_string, mExtReqd);
 		len = FILE_NAME_SIZE;
 	}
+#	ifdef UNIX
+	cmd_ary = save_cmd_ary;	/* restore cmd_ary */
+#	endif
 
 	assert (run_time == FALSE && compile_time == TRUE);
 	run_time = TRUE;

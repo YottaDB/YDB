@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,8 @@
 #include "gtm_string.h"
 #include "gvcmz.h"
 
-#define FORWARD_REC(x)	buffptr += x->len + sizeof(*x) - 1; CM_GET_USHORT(tmp_short, buffptr, usr->convert_byteorder);\
-	buffptr += tmp_short + sizeof(unsigned short); x = (bunch_rec *)buffptr;
+#define FORWARD_REC(x)	buffptr += x->len + SIZEOF(*x) - 1; CM_GET_USHORT(tmp_short, buffptr, usr->convert_byteorder);\
+	buffptr += tmp_short + SIZEOF(unsigned short); x = (bunch_rec *)buffptr;
 
 GBLDEF bool		zdefactive;
 GBLDEF unsigned short	zdefbufsiz;
@@ -64,17 +64,16 @@ void gvcmz_bunch(mval *v)
 	{
 		if (!usr->buffer)
 		{
-			if (stringpool.top < stringpool.free + lnk->mbl)
-				stp_gcol(lnk->mbl);
+			ENSURE_STP_FREE_SPACE(lnk->mbl);
 			msgptr = lnk->mbf = stringpool.free;
 		} else
 			msgptr = lnk->mbf = usr->buffer;
 
 		*msgptr++ = CMMS_B_BUFRESIZE;
 		CM_PUT_USHORT(msgptr, zdefbufsiz, usr->convert_byteorder);
-		msgptr += sizeof(unsigned short);
+		msgptr += SIZEOF(unsigned short);
 		lnk->ast = 0;
-		lnk->cbl = S_HDRSIZE + sizeof(unsigned short);
+		lnk->cbl = S_HDRSIZE + SIZEOF(unsigned short);
 		status = cmi_write(lnk);
 		if (CMI_ERROR(status))
 		{
@@ -111,7 +110,7 @@ void gvcmz_bunch(mval *v)
 	{
 		buffptr = usr->buffer;
 		*buffptr++ = CMMS_B_BUFFLUSH;
-		buffptr += sizeof (short);
+		buffptr += SIZEOF(short);
 		usr->buffer_used = (unsigned char *)buffptr - usr->buffer;
 	} else
 		buffptr = usr->buffer + 3;	/* trancode + # of transactions */
@@ -170,12 +169,12 @@ void gvcmz_bunch(mval *v)
 	nrec.len = gv_currkey->end - cc + 1;
 	nrec.prv = gv_currkey->prev;
 	nrec.cc = cc;
-	newrec_len = sizeof(nrec) - 1 + nrec.len + sizeof(unsigned short) + v->str.len;
+	newrec_len = SIZEOF(nrec) - 1 + nrec.len + SIZEOF(unsigned short) + v->str.len;
 	if (overlay)
 	{
-		oldrec_len = sizeof(*brec) - 1 + brec->len;
+		oldrec_len = SIZEOF(*brec) - 1 + brec->len;
 		CM_GET_USHORT(tmp_short, buffptr + oldrec_len, usr->convert_byteorder);
-		oldrec_len += tmp_short + sizeof(unsigned short);
+		oldrec_len += tmp_short + SIZEOF(unsigned short);
 		new_space = newrec_len - oldrec_len;
 		insert_record = buffptr;
 		FORWARD_REC(brec);
@@ -188,14 +187,14 @@ void gvcmz_bunch(mval *v)
 		UNIX_ONLY(rts_error(VARLSTCNT(4) ERR_ZDEFOFLOW, 2, lnk->nod.len, lnk->nod.addr);)
 
 	memcpy(buffptr + new_space, buffptr, bufftop - buffptr);	/* shuffle buffer to make room for new record */
-	memcpy(insert_record, &nrec, sizeof(nrec) - 1);
-	insert_record += sizeof(nrec) - 1;
+	memcpy(insert_record, &nrec, SIZEOF(nrec) - 1);
+	insert_record += SIZEOF(nrec) - 1;
 	memcpy(insert_record, &gv_currkey->base[cc], nrec.len);
 	insert_record += nrec.len;
 	tmp_short = (unsigned short)v->str.len;
 	assert((int4)tmp_short == v->str.len); /* ushort <- int4 assignment lossy? */
 	CM_PUT_USHORT(insert_record, tmp_short, usr->convert_byteorder);
-	insert_record += sizeof(unsigned short);
+	insert_record += SIZEOF(unsigned short);
 	memcpy(insert_record, v->str.addr, v->str.len);
 	usr->buffer_used += new_space;
 	if (!overlay)

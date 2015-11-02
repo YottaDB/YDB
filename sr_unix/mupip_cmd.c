@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@
 #include "mupip_rundown.h"
 #include "mupip_set.h"
 #include "mupip_stop.h"
+#include "mupip_trigger.h"
 #include "mupip_upgrade.h"
 #include "mupip_ftok.h"
 #include "mupip_endiancvt.h"
@@ -55,6 +56,9 @@
 #include "read_db_files_from_gld.h"	/* Needed for updproc.h */
 #include "updproc.h"
 #include "repl_instance.h"
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
 
 static CLI_ENTRY mup_set_journal_qual[] = {
 	{ "ALIGNSIZE",       0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
@@ -270,6 +274,7 @@ static readonly CLI_PARM mup_integ_map_parm[] = {
 
 static	CLI_ENTRY	mup_integ_qual[] = {
 	{ "ADJACENCY",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0       },
+	{ "ANALYZE",     mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 	{ "BLOCK",       mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_HEX },
 	{ "BRIEF",       mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 	{ "DBG",         mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NON_NEG, VAL_N_A, 0       },
@@ -279,6 +284,8 @@ static	CLI_ENTRY	mup_integ_qual[] = {
 	{ "KEYRANGES",   mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0       },
 	{ "MAP",         mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
 	{ "MAXKEYSIZE",  mupip_integ, 0, mup_integ_map_parm, 0, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_NUM, 0       },
+	{ "ONLINE",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 2, NEG,     VAL_N_A, 0       },
+	{ "PRESERVE",	 mupip_integ, 0, 0,		     0, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_N_A, 0	   },
 	{ "REGION",      mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 	{ "SUBSCRIPT",   mupip_integ, 0, 0,                  0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
 	{ "TN_RESET",    mupip_integ, 0, 0,                  0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
@@ -579,6 +586,25 @@ static 	CLI_ENTRY	mup_crypt_qual[] = {
 { "OFFSET",               mupip_crypt, 0, 0,                  0,                    0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { 0 }
 };
+
+#ifdef GTM_TRIGGER
+static	CLI_PARM	mup_trig_parm[] = {
+	{ "FILE", "Output File: " },
+	{ "", "" }
+};
+
+static readonly CLI_PARM mup_trig_sel_parm[] = {
+	{ "SELECT", "*"}
+};
+
+static 	CLI_ENTRY	mup_trigger_qual[] = {
+{ "NOPROMPT",		  mupip_trigger, 0, 0,                 0, 0,		        0, VAL_NOT_REQ,	0, NON_NEG, VAL_STR,  0 },
+{ "SELECT",               mupip_trigger, 0, mup_trig_sel_parm, 0, 0,			0, VAL_NOT_REQ,	1, NON_NEG, VAL_STR,  0 },
+{ "TRIGGERFILE",	  mupip_trigger, 0, 0,                 0, 0,		        0, VAL_REQ,	0, NON_NEG, VAL_STR,  0 },
+{ 0 }
+};
+#endif
+
 static	CLI_PARM	mup_stop_parm[] = {
 	{ "ID", "ID: " },
 	{ "", "" }
@@ -594,7 +620,7 @@ static	CLI_PARM	mup_downgrade_parm[] = {
 	{ "", "" }
 };
 
-GBLDEF	CLI_ENTRY	cmd_ary[] = {
+GBLDEF	CLI_ENTRY	mupip_cmd_ary[] = {
 { "BACKUP",    mupip_backup,  mup_backup_qual,    mup_backup_parm,    0, cli_disallow_mupip_backup,    0, VAL_DISALLOWED, 2, 0, 0, 0 },
 { "CONVERT",   mupip_cvtpgm,  mup_convert_qual,   mup_convert_parm,   0, 0,                            0, VAL_DISALLOWED, 2, 0, 0, 0 },
 { "CREATE",    mupip_create,  mup_create_qual,    0,                  0, 0,                            0, VAL_DISALLOWED, 0, 0, 0, 0 },
@@ -618,6 +644,9 @@ GBLDEF	CLI_ENTRY	cmd_ary[] = {
 { "RUNDOWN",   mupip_rundown, mup_rundown_qual,   mup_rundown_parm,   0, cli_disallow_mupip_rundown,   0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "SET",       mupip_set,     mup_set_qual,       mup_set_parm,       0, cli_disallow_mupip_set,       0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { "STOP",      mupip_stop,    0,                  mup_stop_parm,      0, 0,                            0, VAL_DISALLOWED, 1, 0, 0, 0 },
+#ifdef GTM_TRIGGER
+{ "TRIGGER",   mupip_trigger, mup_trigger_qual,   mup_trig_parm,      0, cli_disallow_mupip_trigger,   0, VAL_DISALLOWED, 1, 0, 0, 0 },
+#endif
 { "UPGRADE",   mupip_upgrade, 0,                  mup_upgrade_parm,   0, 0,                            0, VAL_DISALLOWED, 1, 0, 0, 0 },
 { 0 }
 };

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ void iotcp_wtff(void)
 #ifdef C9A06001531
 	iotcp_wteol(1,iod);
 #endif
-	temp.len = sizeof(FORM_FEED) - 1;
+	temp.len = SIZEOF(FORM_FEED) - 1;
 	temp.addr = FORM_FEED;
 	iotcp_write(&temp);
 #ifdef C9A06001531

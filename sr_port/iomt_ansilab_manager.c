@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,7 +110,7 @@ void iomt_wtansilab(io_desc *dv, uint4 labs)
 		*(outcp+12) = asc_buf[1];
 		*(outcp+13) = asc_buf[2];
 		*(outcp+14) = asc_buf[3];
-		memcpy(outcp+15, hdr2_lab, sizeof(hdr2_lab) - 1);
+		memcpy(outcp+15, hdr2_lab, SIZEOF(hdr2_lab) - 1);
 		mask = 0;
 		if (mt_ptr->ebcdic)
 		{	movtc(ANSI_LAB_LENGTH, outcp, LIB_AB_ASC_EBC, buff);
@@ -176,7 +176,7 @@ void iomt_wtansilab(io_desc *dv, uint4 labs)
 		*(outcp+12) = asc_buf[1];
 		*(outcp+13) = asc_buf[2];
 		*(outcp+14) = asc_buf[3];
-		memcpy(outcp+15, hdr2_lab, sizeof(hdr2_lab) - 1);
+		memcpy(outcp+15, hdr2_lab, SIZEOF(hdr2_lab) - 1);
 		if (mt_ptr->ebcdic)
 		{	movtc(ANSI_LAB_LENGTH, outcp, LIB_AB_ASC_EBC, buff);
 			status = iomt_wtlblk(mt_ptr->access_id, mask, &io_status_blk,

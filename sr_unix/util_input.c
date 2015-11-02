@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 		{
 			do
 			{	/* no u_ferror */
-				uc_fgets_ret = u_fgets(ufgets_Ubuffer, (int32_t)(sizeof(ufgets_Ubuffer) / sizeof(UChar)) - 1, u_fp);
+				uc_fgets_ret = u_fgets(ufgets_Ubuffer, (int32_t)(SIZEOF(ufgets_Ubuffer) / SIZEOF(UChar)) - 1, u_fp);
 			} while (NULL == uc_fgets_ret && !u_feof(u_fp) && ferror(fp) && EINTR == errno);
 			if (NULL == uc_fgets_ret)
 			{

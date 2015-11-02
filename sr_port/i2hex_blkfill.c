@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@ void i2hex_blkfill(int num, uchar_ptr_t addr, int len)
 	unsigned char	buff[8];
 	int		i;
 
-	assert(sizeof(buff) >= len);
+	assert(SIZEOF(buff) >= len);
 	i2hex(num, buff, len);
 	for ( i = 0; i < len - 1 ; i++)
 	{
@@ -34,7 +34,7 @@ void i2hexl_blkfill(qw_num num, uchar_ptr_t addr, int len)
 	unsigned char	buff[16];
 	int		i;
 
-	assert(sizeof(buff) >= len);
+	assert(SIZEOF(buff) >= len);
 	i2hexl(num, buff, len);
 	for ( i = 0; i < len - 1 ; i++)
 	{

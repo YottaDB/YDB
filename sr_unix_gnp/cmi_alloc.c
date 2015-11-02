@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ struct CLB *cmi_alloc_clb(void)
 	else
 	{
 		/* client path */
-		lnk = (struct CLB *)malloc(sizeof(*lnk));
+		lnk = (struct CLB *)malloc(SIZEOF(*lnk));
 		cmj_init_clb(NULL, lnk);
 	}
 	return lnk;

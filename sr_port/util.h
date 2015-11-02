@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ boolean_t util_is_log_open(void);
 /* While the maximum for OPER_LOG_SIZE is 1906 (found from experimentation), we
    set it's maximum to 1904 being the largest 4 byte aligned size we can use. This
    4 byte aligned size is necessary to make the header length calculation done as
-   sizeof(oper) - sizeof(oper.text) work correctly. If a size is used that is not
+   SIZEOF(oper) - SIZEOF(oper.text) work correctly. If a size is used that is not
    4 byte aligned, this calculation will incorrectly contain the compiler pad chars
    causing garbage at the end of operator log lines. SE 9/2001
 */
@@ -45,10 +45,12 @@ typedef struct
 void util_in_open(struct dsc$descriptor_s *file_prompt);
 void util_out_open(struct dsc$descriptor_s *file_prompt);
 void util_log_open(char *filename, uint4 len);
-#else
+void util_out_write(unsigned char *addr, unsigned int len);
+#else /* UNIX */
 #include "gtm_stdio.h"		/* for FILE * */
 void util_in_open(void *);
 char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);
+void util_out_print_gtmio(caddr_t message, int flush, ...);
 #endif
 
 #define OUT_BUFF_SIZE	2048
@@ -63,7 +65,6 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 void util_exit_handler(void);
 void util_out_close(void);
 void util_out_send_oper(char *addr, unsigned int len);
-void util_out_write(unsigned char *addr, unsigned int len);
 void util_out_print(caddr_t message, int flush, ...);
 
 #include "cmidef.h"	/* for clb_struct */

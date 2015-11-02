@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -148,14 +148,14 @@ void dse_range(void)
 	    continue;
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 	    b_top = bp + cs_addrs->hdr->blk_size;
-	else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-	    b_top = bp + sizeof(blk_hdr);
+	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+	    b_top = bp + SIZEOF(blk_hdr);
 	else
 	    b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
-	rp = bp + sizeof(blk_hdr);
+	rp = bp + SIZEOF(blk_hdr);
 	GET_SHORT(rsize, &((rec_hdr_ptr_t) rp)->rsiz);
-	if (rsize < sizeof(rec_hdr))
-	    r_top = rp + sizeof(rec_hdr);
+	if (rsize < SIZEOF(rec_hdr))
+	    r_top = rp + SIZEOF(rec_hdr);
 	else
 	    r_top = rp + rsize;
 	if (r_top >= b_top)
@@ -163,33 +163,33 @@ void dse_range(void)
 	got_lonely_star = FALSE;
 	if (((blk_hdr_ptr_t) bp)->levl)
 	{
-	    key_top = r_top - sizeof(block_id);
+	    key_top = r_top - SIZEOF(block_id);
 	    if (star && (r_top == b_top))
 		got_lonely_star = TRUE;
 	} else
 	{
 	    if (!up && !low)
 		continue;
-	    for (key_top = rp + sizeof(rec_hdr); key_top < r_top ; )
+	    for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top ; )
 		if (!*key_top++ && !*key_top++)
 		    break;
 	}
 	if (!got_lonely_star)
 	{
-		key_bot = rp + sizeof(rec_hdr);
+		key_bot = rp + SIZEOF(rec_hdr);
 		size = key_top - key_bot;
 		if (size <= 0)
 		    continue;
-		if (size > sizeof(targ_key))
-			size = sizeof(targ_key);
+		if (size > SIZEOF(targ_key))
+			size = SIZEOF(targ_key);
 		if (lost)
 		{
-			for (key_top1 = rp + sizeof(rec_hdr); key_top1 < r_top ; )
+			for (key_top1 = rp + SIZEOF(rec_hdr); key_top1 < r_top ; )
 				if (!*key_top1++)
 				    break;
-			size1 = key_top1 - rp - sizeof(rec_hdr);
-			if (size1 > sizeof(targ_key))
-				size1 = sizeof(targ_key);
+			size1 = key_top1 - rp - SIZEOF(rec_hdr);
+			if (size1 > SIZEOF(targ_key))
+				size1 = SIZEOF(targ_key);
 			patch_find_root_search = TRUE;
 			patch_path_count = 1;
 			patch_find_blk = blk;
@@ -210,28 +210,28 @@ void dse_range(void)
 			    rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 			if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 			    b_top = bp + cs_addrs->hdr->blk_size;
-			else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-			    b_top = bp + sizeof(blk_hdr);
+			else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+			    b_top = bp + SIZEOF(blk_hdr);
 			else
 			    b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
-			rp = bp + sizeof(blk_hdr);
+			rp = bp + SIZEOF(blk_hdr);
 			GET_SHORT(rsize, &((rec_hdr_ptr_t) rp)->rsiz);
-			if (rsize < sizeof(rec_hdr))
-			    r_top = rp + sizeof(rec_hdr);
+			if (rsize < SIZEOF(rec_hdr))
+			    r_top = rp + SIZEOF(rec_hdr);
 			else
 			    r_top = rp + rsize;
 			if (r_top >= b_top)
 			    r_top = b_top;
 			if (((blk_hdr_ptr_t) bp)->levl)
-			    key_top = r_top - sizeof(block_id);
-			for (key_top1 = rp + sizeof(rec_hdr); key_top1 < r_top ; )
+			    key_top = r_top - SIZEOF(block_id);
+			for (key_top1 = rp + SIZEOF(rec_hdr); key_top1 < r_top ; )
 				if (!*key_top1++)
 				    break;
-			size1 = key_top1 - rp - sizeof(rec_hdr);
+			size1 = key_top1 - rp - SIZEOF(rec_hdr);
 			if (size1 > 0)
 			{
-				if (size1 > sizeof(targ_key))
-					size1 = sizeof(targ_key);
+				if (size1 > SIZEOF(targ_key))
+					size1 = SIZEOF(targ_key);
 				patch_find_root_search = TRUE;
 				patch_path_count = 1;
 				patch_find_blk = blk;

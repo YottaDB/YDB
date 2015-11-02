@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <stddef.h>		/* for offsetof macro (used by OFFSETOF macro) */
 
 #include "gtm_string.h"
 #include "gdsroot.h"
@@ -27,7 +29,6 @@
 GBLREF	gv_namehead		*gv_target_list;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF	enum gtmImageTypes	image_type;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	int			process_exiting;
 
@@ -81,27 +82,28 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		gvt->gvname.var_name.len = 0;
 		gvt->gvname.hash_code = 0;
 	}
-	gvt->first_rec = (gv_key *)((char *)&gvt->clue + sizeof(gv_key) + keysize);
-	gvt->last_rec = (gv_key *)((char *)gvt->first_rec + sizeof(gv_key) + keysize);
-	assert((UINTPTR_T)gvt->first_rec % sizeof(gvt->first_rec->top) == 0);
-	assert((UINTPTR_T)gvt->last_rec % sizeof(gvt->last_rec->top) == 0);
-	assert((UINTPTR_T)gvt->first_rec % sizeof(gvt->first_rec->end) == 0);
-	assert((UINTPTR_T)gvt->last_rec % sizeof(gvt->last_rec->end) == 0);
-	assert((UINTPTR_T)gvt->first_rec % sizeof(gvt->first_rec->prev) == 0);
-	assert((UINTPTR_T)gvt->last_rec % sizeof(gvt->last_rec->prev) == 0);
+	assert(0 == (OFFSETOF(gv_namehead, clue) % SIZEOF(gvt->clue)));
+	gvt->first_rec = (gv_key *)((char *)&gvt->clue + SIZEOF(gv_key) + keysize);
+	gvt->last_rec = (gv_key *)((char *)gvt->first_rec + SIZEOF(gv_key) + keysize);
+	assert((UINTPTR_T)gvt->first_rec % SIZEOF(gvt->first_rec->top) == 0);
+	assert((UINTPTR_T)gvt->last_rec % SIZEOF(gvt->last_rec->top) == 0);
+	assert((UINTPTR_T)gvt->first_rec % SIZEOF(gvt->first_rec->end) == 0);
+	assert((UINTPTR_T)gvt->last_rec % SIZEOF(gvt->last_rec->end) == 0);
+	assert((UINTPTR_T)gvt->first_rec % SIZEOF(gvt->first_rec->prev) == 0);
+	assert((UINTPTR_T)gvt->last_rec % SIZEOF(gvt->last_rec->prev) == 0);
 	DEBUG_ONLY(clue_size = (char *)gvt->first_rec - (char *)&gvt->clue);
 	DEBUG_ONLY(first_rec_size = (char *)gvt->last_rec - (char *)gvt->first_rec);
 	DEBUG_ONLY(last_rec_size = (char *)gvt->gvname.var_name.addr - (char *)gvt->last_rec);
 	assert(clue_size == first_rec_size);
 	assert(clue_size == last_rec_size);
-	assert(clue_size == (sizeof(gv_key) + keysize));
+	assert(clue_size == (SIZEOF(gv_key) + keysize));
 	gvt->clue.top = gvt->last_rec->top = gvt->first_rec->top = keysize;
 	gvt->clue.prev = gvt->clue.end = 0;
 	/* If "reg" is non-NULL, but "gvent" is NULL, then it means the targ_alloc is being done for the directory tree.
 	 * In that case, set gvt->root appropriately to DIR_ROOT. Else set it to 0. Also assert that the region is
 	 * open in this case with the only exception being if called from mur_forward for non-invasive operations (e.g. EXTRACT).
 	 */
-	assert((NULL != gvent) || (NULL == reg) || reg->open || (MUPIP_IMAGE == image_type) && !mupip_jnl_recover);
+	assert((NULL != gvent) || (NULL == reg) || reg->open || (IS_MUPIP_IMAGE && !mupip_jnl_recover));
 	gvt->root = ((NULL != reg) && (NULL == gvent) ? DIR_ROOT : 0);
 	gvt->nct = 0;
 	gvt->act = 0;
@@ -110,7 +112,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	gvt->collseq = NULL;
 	gvt->read_local_tn = (trans_num)0;
 	gvt->noisolation = FALSE;
-	gvt->alt_hist = (srch_hist *)malloc(sizeof(srch_hist));
+	gvt->alt_hist = (srch_hist *)malloc(SIZEOF(srch_hist));
 	gvt->hist.h[0].blk_num = HIST_TERMINATOR;
 	gvt->alt_hist->h[0].blk_num = HIST_TERMINATOR;
 	/* Initialize the 0:MAX_BT_DEPTH. Otherwise, memove of the array in mu_reorg can cause problem */
@@ -124,6 +126,10 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	gvt->prev_gvnh = NULL;
 	gvt->next_tp_gvnh = NULL;
 	assert(gv_target_list != gvt);
+#	ifdef GTM_TRIGGER
+	gvt->gvt_trigger = NULL;
+	gvt->db_trigger_cycle = 0;
+#	endif
 	gvt->next_gvnh = gv_target_list;		/* Insert into gv_target list */
 	if (NULL != gv_target_list)
 		gv_target_list->prev_gvnh = gvt;
@@ -149,7 +155,9 @@ void	targ_free(gv_namehead *gvt)
 		 *	c) In VMS, DAL calls could rundown the database. This is tough to check using an assert.
 		 * Assert accordingly.
 		 */
-		UNIX_ONLY(assert((GTCM_GNP_SERVER_IMAGE == image_type) || (process_exiting && (gvt == cs_addrs->dir_tree)));)
+		UNIX_ONLY(assert(IS_GTCM_GNP_SERVER_IMAGE
+				 || (process_exiting && ((gvt == cs_addrs->dir_tree)
+							 GTMTRIG_ONLY(|| (gvt == cs_addrs->hasht_tree))))));
 		gv_target = NULL;	/* In that case, set gv_target to NULL to ensure freed up memory is never used */
 	}
 	/* assert we never delete a gvt that is actively used in a TP transaction */

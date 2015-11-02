@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -165,10 +165,10 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 #define A2R(X, Y) ((X) = (ptroff_t)(((sm_uc_ptr_t)(Y)) - ((sm_uc_ptr_t) &(X))))
 
 /* compute the true size of a mlk_pvtblk */
-#define MLK_PVTBLK_SIZE(DLEN, SCNT) (sizeof(mlk_pvtblk) - 1 + (DLEN) + (SCNT))
+#define MLK_PVTBLK_SIZE(DLEN, SCNT) (SIZEOF(mlk_pvtblk) - 1 + (DLEN) + (SCNT))
 
 /* compute the true size of a mlk_shrsub */
-#define MLK_SHRSUB_SIZE(X) (ROUND_UP(sizeof(mlk_shrsub) - 1 + (X)->length, sizeof(ptroff_t)))
+#define MLK_SHRSUB_SIZE(X) (ROUND_UP(SIZEOF(mlk_shrsub) - 1 + (X)->length, SIZEOF(ptroff_t)))
 
 #define DEF_LOCK_SIZE OS_PAGELET_SIZE * 200
 

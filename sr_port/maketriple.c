@@ -20,7 +20,7 @@ triple *maketriple(opctype op)
 {
 	triple *x;
 
-	x = (triple *)mcalloc(USIZEOF(triple));
+	x = (triple *)mcalloc(SIZEOF(triple));
 	x->opcode = op;
 	x->src.line = source_line;
 	x->src.column = source_column;

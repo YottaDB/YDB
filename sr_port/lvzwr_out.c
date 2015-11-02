@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ GBLREF merge_glvn_ptr	mglvnp;
 GBLREF gd_region	*gv_cur_region;
 GBLREF bool		gv_curr_subsc_null;
 GBLREF symval		*curr_symval;
-GBLREF zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
+GBLREF zwr_hash_table	*zwrhtab;			/* Used to track aliases during zwrites */
 GBLREF uint4		zwrtacindx;			/* When creating $ZWRTACxxx vars for ZWRite, this holds xxx */
 
 LITDEF MSTR_CONST(semi_star, " ;*");
@@ -200,9 +200,9 @@ void lvzwr_out(lv_val *lvp)
 				   currently dumping so push a new lvzwrite_block onto the stack, fill it in for the current var
 				   and call lvzwr_va() to handle it. When done, dismantle the temp lvzwrite_block.
 				*/
-				newzwrb = (lvzwrite_datablk *)malloc(sizeof(lvzwrite_datablk));
-				memset(newzwrb, 0, sizeof(lvzwrite_datablk));
-				newzwrb->sub = (zwr_sub_lst *)malloc(sizeof(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
+				newzwrb = (lvzwrite_datablk *)malloc(SIZEOF(lvzwrite_datablk));
+				memset(newzwrb, 0, SIZEOF(lvzwrite_datablk));
+				newzwrb->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
 				newzwrb->curr_name = &newzav->ptrs.val_ent.zwr_var;
 				newzwrb->prev = lvzwrite_block;
 				lvzwrite_block = newzwrb;
@@ -214,7 +214,7 @@ void lvzwr_out(lv_val *lvp)
 				free(newzwrb);
 			}
 			return;
-		} else if  (1 < lvp->stats.trefcnt || 0 < lvp->stats.crefcnt)
+		} else if (IS_ALIASLV(lvp))
 		{	/* Case 2 -- alias base variable (only base vars have reference counts). Note this can occur with
 			   TP save/restore vars since we increment both trefcnt and crefcnt for these hidden copied references.
 			   Because of that, we can't assert alias_activity but otherwise it shouldn't affect processing.

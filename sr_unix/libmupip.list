@@ -53,18 +53,6 @@ gtmsource_stopfilter
 gv_select
 jnl2ext
 jnl_setver
-jnl_v12tov15
-jnl_v12tov16
-jnl_v12tov17
-jnl_v15tov12
-jnl_v15tov16
-jnl_v15tov17
-jnl_v16tov12
-jnl_v16tov15
-jnl_v16tov16
-jnl_v17tov12
-jnl_v17tov15
-jnl_v17tov17
 jnlext_write
 jnlpool_hasnt_overflowed
 mu_all_version_standalone
@@ -92,7 +80,6 @@ mu_int_read
 mu_int_reg
 mu_int_reg_ch
 mu_int_write
-mu_load_input
 mu_op_open
 mu_outofband_setup
 mu_put_gvdata
@@ -109,6 +96,7 @@ mu_signal_process
 mu_split
 mu_swap_blk
 mu_term_setup
+mu_trig_trgfile
 mu_upgrd_dngrd_confirmed
 mu_upgrd_header
 mubclnup
@@ -136,7 +124,6 @@ mupip_ftok
 mupip_help
 mupip_integ
 mupip_intrpt
-mupip_load_ch
 mupip_quit
 mupip_recover
 mupip_reorg
@@ -153,6 +140,7 @@ mupip_set_journal_fname
 mupip_set_journal_newstate
 mupip_set_journal_parse
 mupip_stop
+mupip_trigger
 mupip_upgrade
 mupip_upgrade_standalone
 mur_apply_pblk
@@ -165,6 +153,8 @@ mur_cre_file_extfmt
 mur_db_files_from_jnllist
 mur_do_wildcard
 mur_forward
+mur_forward_play_cur_jrec
+mur_forward_play_multireg_tp
 mur_gbldefs
 mur_get_options
 mur_get_pini
@@ -207,6 +197,10 @@ repl_log
 repl_log_init
 repl_tr_good
 replic_gbldefs
+ss_anal_shdw_file
+ss_get_block
+ss_initiate
+ss_read_block
 upd_log_init
 updhelper_end
 updhelper_init
@@ -217,4 +211,3 @@ updproc_end
 updproc_get_gblname
 updproc_init
 updproc_open_files
-v12_jnl_record_length

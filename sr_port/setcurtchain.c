@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,9 +13,12 @@
 
 #include "compiler.h"
 
-GBLDEF	triple *curtchain;
-GBLREF	int4	pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
-GBLREF	triple	t_orig;
+GBLDEF	triple		*curtchain;
+GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
+GBLREF	triple		t_orig;
+#ifdef GTM_TRIGGER
+GBLREF	boolean_t	trigger_compile;
+#endif
 
 triple *setcurtchain(triple *x)
 {
@@ -28,7 +31,7 @@ triple *setcurtchain(triple *x)
 		 * insert a OC_RTERROR triple then. Now that curtchain is back in the same chain as pos_in_chain, reissue
 		 * the ins_errtriple call.
 		 */
-		 assert(!IS_STX_WARN(pending_errtriplecode));
+		 assert(!IS_STX_WARN(pending_errtriplecode) GTMTRIG_ONLY( || trigger_compile));
 		 ins_errtriple(pending_errtriplecode);
 		 pending_errtriplecode = 0;
 	}

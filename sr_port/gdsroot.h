@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,7 +85,7 @@ typedef struct
 # error Unsupported platform
 #endif
 
-#define UNIQUE_ID_SIZE sizeof(gd_id)
+#define UNIQUE_ID_SIZE SIZEOF(gd_id)
 
 typedef union
 {
@@ -152,6 +152,10 @@ typedef struct
 #endif
 #define is_gdid_gdid_identical(A, B) (0 == gdid_cmp(A, B) ? TRUE: FALSE)
 #endif
+
+#define	VALFIRSTCHAR(X)			(ISALPHA(X) || ('%' == X))
+#define	VALFIRSTCHAR_WITH_TRIG(X)	(ISALPHA(X) || ('%' == X) GTMTRIG_ONLY(|| (HASHT_GBL_CHAR1 == X)))
+#define	VALKEY(X)			(ISALPHA(X) || ISDIGIT(X))
 
 /* Prototypes below */
 block_id get_dir_root(void);

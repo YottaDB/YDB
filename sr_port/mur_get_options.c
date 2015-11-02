@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,7 @@ void	mur_get_options(void)
 
 	qual_buffer = (char *)malloc(MAX_LINE);
 	entry = (char *)malloc(MAX_LINE);
-	memset(&mur_options, 0, sizeof mur_options);
+	memset(&mur_options, 0, SIZEOF(mur_options));
 	/*----- 	-VERBOSE	-----*/
 	if (CLI_PRESENT == cli_present("VERBOSE"))
 		mur_options.verbose = TRUE;
@@ -293,7 +293,7 @@ void	mur_get_options(void)
 				gtm_putmsg(VARLSTCNT(4) ERR_INVREDIRQUAL, 2, LEN_AND_LIT(REDIRECT_STR));
 				mupip_exit(ERR_MUPCLIERR);
 			}
-			rl_ptr1 = (redirect_list *)malloc(sizeof(redirect_list));
+			rl_ptr1 = (redirect_list *)malloc(SIZEOF(redirect_list));
 			rl_ptr1->next = NULL;
 			if (mur_options.redirect == NULL)
 				mur_options.redirect = rl_ptr1;
@@ -485,7 +485,7 @@ void	mur_get_options(void)
 			if (',' == *qual_buffer_ptr)
 				qual_buffer_ptr++;  /* skip separator */
 			entry_ptr = entry;
-			sl_ptr1 = (select_list *)malloc(sizeof(select_list));
+			sl_ptr1 = (select_list *)malloc(SIZEOF(select_list));
 			sl_ptr1->next = NULL;
 			if (NULL == mur_options.global)
 				mur_options.global = sl_ptr1;
@@ -559,7 +559,7 @@ void	mur_get_options(void)
 			if (',' == *qual_buffer_ptr)
 				qual_buffer_ptr++;  /* skip separator */
 			entry_ptr = entry;
-			sl_ptr1 = (select_list *)malloc(sizeof(select_list));
+			sl_ptr1 = (select_list *)malloc(SIZEOF(select_list));
 			sl_ptr1->next = NULL;
 			if (NULL == mur_options.user)
 				mur_options.user = sl_ptr1;
@@ -633,7 +633,7 @@ void	mur_get_options(void)
 			if (',' == *qual_buffer_ptr)
 				qual_buffer_ptr++;  /* skip separator */
 			entry_ptr = entry;
-			ll_ptr1 = (long_list *)malloc(sizeof(long_list));
+			ll_ptr1 = (long_list *)malloc(SIZEOF(long_list));
 			ll_ptr1->next = NULL;
 			if (NULL == mur_options.id)
 				mur_options.id = ll_ptr1;
@@ -727,7 +727,7 @@ void	mur_get_options(void)
 			if (',' == *qual_buffer_ptr)
 				qual_buffer_ptr++;  /* skip separator */
 			entry_ptr = entry;
-			sl_ptr1 = (select_list *)malloc(sizeof(select_list));
+			sl_ptr1 = (select_list *)malloc(SIZEOF(select_list));
 			sl_ptr1->next = NULL;
 			if (mur_options.process == NULL)
 				mur_options.process = sl_ptr1;

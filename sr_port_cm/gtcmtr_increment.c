@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ bool	gtcmtr_increment(void)
 	assert(*ptr == CMMS_Q_INCREMENT);
 	ptr++;
 	GET_USHORT(len, ptr);
-	ptr += sizeof(unsigned short);
+	ptr += SIZEOF(unsigned short);
 	regnum = *ptr++;
 	reg_ref = gtcm_find_region(curr_entry,regnum);
 	len--; /* subtract size of regnum */
@@ -80,7 +80,7 @@ bool	gtcmtr_increment(void)
 		cs_addrs->jnl->pini_addr = reg_ref->pini_addr;
 	}
 	GET_USHORT(len, ptr);
-	ptr += sizeof(unsigned short);
+	ptr += SIZEOF(unsigned short);
 	incr_delta.mvtype = MV_STR;
 	incr_delta.str.len = len;
 	incr_delta.str.addr = (char *)ptr;
@@ -101,15 +101,15 @@ bool	gtcmtr_increment(void)
 		temp_short = (unsigned short)post_incr.str.len;
 		assert((int4)temp_short == post_incr.str.len); /* ushort <- int4 assignment lossy? */
 		if (curr_entry->clb_ptr->mbl < 1 +			/* msg header */
-					       sizeof(temp_short) +	/* size of length of $INCR return value */
+					       SIZEOF(temp_short) +	/* size of length of $INCR return value */
 					       temp_short) 		/* length of $INCR return value */
 		{	/* resize buffer */
-			cmi_realloc_mbf(curr_entry->clb_ptr, 1 + sizeof(temp_short) + temp_short);
+			cmi_realloc_mbf(curr_entry->clb_ptr, 1 + SIZEOF(temp_short) + temp_short);
 			ptr = curr_entry->clb_ptr->mbf;
 		}
 		*ptr++ = CMMS_R_INCREMENT;
 		PUT_USHORT(ptr, temp_short);
-		ptr += sizeof(unsigned short);
+		ptr += SIZEOF(unsigned short);
 		memcpy(ptr, post_incr.str.addr, temp_short);
 		ptr += temp_short;
 	} else

@@ -84,7 +84,7 @@ void	emit_link_reference(int4 refoffset, mstr *name)
 	assert(sym);
 	if ((N_TEXT | N_EXT) != sym->n.n_type)
 	{
-		newrel = (struct rel_table *)mcalloc(sizeof(struct rel_table));
+		newrel = (struct rel_table *)mcalloc(SIZEOF(struct rel_table));
 		newrel->next = (struct rel_table *)0;
 		newrel->resolve = 0;
 		newrel->r.r_address = refoffset;
@@ -122,7 +122,7 @@ void	emit_immed(char *source, uint4 size)
 		DEBUG_ONLY(obj_bytes_written += size);
 		while (size > 0)
 		{
-			write = sizeof(emit_buff) - emit_buff_used;
+			write = SIZEOF(emit_buff) - emit_buff_used;
 			write = size < write ? size : write;
 			memcpy(emit_buff + emit_buff_used, source, write);
 			size -= write;
@@ -202,7 +202,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 		*/
 		if (!compsyms_hashtab)
 		{	/* Allocate if not allocated yet */
-			compsyms_hashtab = (hash_table_str *)malloc(sizeof(hash_table_str));
+			compsyms_hashtab = (hash_table_str *)malloc(SIZEOF(hash_table_str));
 			compsyms_hashtab->base = NULL;
 		}
 		if (!compsyms_hashtab->base)
@@ -233,7 +233,7 @@ struct sym_table *define_symbol(unsigned char psect, mstr *name)
 	}
 
 	/* Didn't find it in existing symbols; create new symbol.  */
-	newsym = (struct sym_table *)mcalloc(USIZEOF(struct sym_table) + name->len);
+	newsym = (struct sym_table *)mcalloc(SIZEOF(struct sym_table) + name->len);
 	newsym->name_len = name->len + 1;
 	memcpy(&newsym->name[0], name->addr, name->len);
 	newsym->name[name->len] = 0;
@@ -284,7 +284,7 @@ void	output_relocation (void)
 	struct rel_table	*rel;
 
 	for (rel = link_rel; NULL != rel;  rel = rel->next)
-		emit_immed((char *)&rel->r, sizeof(rel->r));
+		emit_immed((char *)&rel->r, SIZEOF(rel->r));
 }
 
 
@@ -295,7 +295,7 @@ int	output_symbol_size(void)
 	uint4			string_length;
 	struct sym_table	*sym;
 
-	string_length = sizeof(int4);
+	string_length = SIZEOF(int4);
 	sym = symbols;
 	while (sym)
 	{
@@ -315,9 +315,9 @@ void	output_symbol(void)
 	uint4			string_length;
 	struct sym_table	*sym;
 
-	string_length = USIZEOF(int4) + sym_table_size;
+	string_length = SIZEOF(int4) + sym_table_size;
 	assert(string_length == output_symbol_size());
-	emit_immed((char *)&string_length, sizeof(string_length));
+	emit_immed((char *)&string_length, SIZEOF(string_length));
 	sym = symbols;
 	while (sym)
 	{
@@ -411,7 +411,7 @@ void	emit_literals(void)
 		else
 			p->v.str.addr = NULL;
 		p->v.fnpc_indx = (unsigned char)-1;
-		emit_immed((char *)&p->v, sizeof(p->v));
+		emit_immed((char *)&p->v, SIZEOF(p->v));
 		offset += SIZEOF(p->v);
 	}
 	assert (offset == lits_mval_size);
@@ -437,7 +437,7 @@ int4	find_linkage(mstr* name)
 		/* Add new linkage psect entry at end of list.  */
 		sym ->linkage_offset = linkage_size;
 
-		newlnk = (struct linkage_entry *)mcalloc(sizeof(struct linkage_entry));
+		newlnk = (struct linkage_entry *)mcalloc(SIZEOF(struct linkage_entry));
 		newlnk->symbol = sym;
 		newlnk->next = NULL;
 		if (NULL == linkage_first)

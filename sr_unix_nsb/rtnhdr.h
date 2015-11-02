@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,10 +57,6 @@ typedef struct	rhead_struct
 	int4		current_rhead_off;	/* (updated) offset to routine header of current module version */
 	int4		temp_mvals;		/* (updated) temp_mvals value of current module version */
 	int4		temp_size;		/* (updated) temp_size value of current module version */
-#ifdef HAS_LITERAL_SECT
-	int4		*linkage_ptr;		/* (updated) address of linkage Psect of current module version */
-	unsigned char	*literal_ptr;		/* (updated) address of literal Psect of current module version */
-#endif
 } rhdtyp;
 
 /* Although the names change from _ptr to _off is politically correct, (they ARE offsets, not pointers),
@@ -79,7 +75,7 @@ typedef struct	rhead_struct
 #define LABTAB_ADR(rtnhdr) ((lab_tabent *)((char *)(rtnhdr) + (rtnhdr)->labtab_off))
 #define LNRTAB_ADR(rtnhdr) ((lnr_tabent *)((char *)(rtnhdr) + (rtnhdr)->lnrtab_off))
 #define LITERAL_ADR(rtnhdr) ((unsigned char *)(rtnhdr)->literal_ptr)
-#define LINKAGE_ADR(rtnhdr) ((caddr_t)(rtnhdr)->linkage_ptr)
+#define LINKAGE_ADR(rtnhdr) ((caddr_t)NULL)
 #define PTEXT_ADR(rtnhdr) ((unsigned char *)((char *)(rtnhdr) + (rtnhdr)->ptext_off))
 #define PTEXT_END_ADR(rtnhdr) ((unsigned char *)((char *)(rtnhdr) + (rtnhdr)->vartab_off))
 #define CURRENT_RHEAD_ADR(rtnhdr) ((rhdtyp *)((char *)(rtnhdr) + (rtnhdr)->current_rhead_off))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,12 @@
 #include "repl_instance.h"
 #include "gtmio.h"
 #endif
-
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"			/* for rtn_tabent in gv_trigger.h */
+#include "gv_trigger.h"
+#include "targ_alloc.h"
+#include "hashtab.h"			/* for STR_HASH (in COMPUTE_HASH_MNAME)*/
+#endif
 #ifdef VMS
 #include <fab.h>
 #include <rms.h>
@@ -71,6 +76,7 @@
 #include <prtdef.h>
 #endif
 #include "op.h"
+#include "svnames.h"		/* for SV_ZTWORMHOLE */
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "read_db_files_from_gld.h"
 #include "updproc.h"
@@ -89,6 +95,8 @@
 #include "have_crit.h"
 #include "wbox_test_init.h"
 #include "format_targ_key.h"
+#include "op_tcommit.h"
+#include "error_trap.h"
 
 #define	MAX_IDLE_HARD_SPINS	1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
 
@@ -110,6 +118,7 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	struct_jrec_tcom	tcom_record;
+GBLREF	gv_namehead		*reset_gv_target;
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t		tp_restart_fail_sig_used;
@@ -121,26 +130,30 @@ GBLREF	boolean_t		secondary_side_std_null_coll;
 GBLREF	boolean_t		disk_blk_read;
 GBLREF	seq_num			lastlog_seqno;
 GBLREF	uint4			log_interval;
+#ifdef GTM_TRIGGER
+DEBUG_ONLY(GBLREF ch_ret_type	(*ch_at_trigger_init)();)
+GBLREF	int			tprestart_state;        /* When triggers restart, multiple states possible. See tp_restart.h */
+GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
+#endif
 
-LITREF	int			jrt_update[JRT_RECTYPES];
-LITREF	boolean_t		jrt_fixed_size[JRT_RECTYPES];
-LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
+LITREF	mval			literal_hasht;
 static	boolean_t		updproc_continue = TRUE;
 
 CONDITION_HANDLER(updproc_ch)
 {
+	int		rc;
 	unsigned char	seq_num_str[32], *seq_num_ptr;
 	unsigned char	seq_num_strx[32], *seq_num_ptrx;
 
+	error_def(ERR_REPEATERROR);
 	error_def(ERR_TPRETRY);
-	error_def(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
 
 	START_CH;
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
-#if defined(DEBUG) && defined(DEBUG_UPDPROC_TPRETRY)
+#		if defined(DEBUG) && defined(DEBUG_UPDPROC_TPRETRY)
 		assert(FALSE);
-#endif
+#		endif
 		repl_log(updproc_log_fp, TRUE, TRUE, " ----> TPRETRY for sequence number "INT8_FMT" "INT8_FMTX" \n",
 			INT8_PRINT(recvpool.upd_proc_local->read_jnl_seqno),
 			INT8_PRINTX(recvpool.upd_proc_local->read_jnl_seqno));
@@ -150,39 +163,44 @@ CONDITION_HANDLER(updproc_ch)
 		 * In the first case, we need to do a tp_restart. In the second, op_tcommit would have already done it for us.
 		 * The way we detect the second case is from the value of first_sgm_info since it is NULLified in tp_restart.
 		 */
-		if (first_sgm_info)
+		if (first_sgm_info GTMTRIG_ONLY( || (TPRESTART_STATE_NORMAL != tprestart_state)))
 		{
 			VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
-			tp_restart(1);
-#ifdef UNIX
+			rc = tp_restart(1);
+			assert(0 == rc);			/* No partials restarts can happen at this final level */
+			GTMTRIG_ONLY(assert(TPRESTART_STATE_NORMAL == tprestart_state));
+			NON_GTMTRIG_ONLY(assert(INVALID_GV_TARGET == reset_gv_target);)
+			reset_gv_target = INVALID_GV_TARGET; /* see "trigger_item_tpwrap_ch" similar code for why this is needed */
+#			ifdef UNIX
 			if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */
-#elif defined VMS
+#			elif defined VMS
 			if (!tp_restart_fail_sig_used)		/* If tp_restart ran clean */
-#else
-#error unsupported platform
-#endif
+#			else
+#			  error unsupported platform
+#			endif
 			{
 				UNWIND(NULL, NULL);
 			}
-#ifdef VMS
+#			ifdef VMS
 			else
 			{	/* Otherwise tp_restart had a signal that we must now deal with.
 				 * replace the TPRETRY information with that saved from tp_restart.
 				 * first assert that we have room for these arguments and proper setup
 				 */
 				assert(TPRESTART_ARG_CNT >= tp_restart_fail_sig->chf$is_sig_args);
-				memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * sizeof(int));
+				memcpy(sig, tp_restart_fail_sig, (tp_restart_fail_sig->chf$l_sig_args + 1) * SIZEOF(int));
 				tp_restart_fail_sig_used = FALSE;
 			}
-#endif
+#			endif
 		} else
 		{
 			UNWIND(NULL, NULL);
 		}
-	} else if ((int)(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY)) == SIGNAL)
-	{ /* Change the severity of memory-exhaust errors to fatal so we will have a process dump for debugging */
-		SIGNAL = MAKE_MSG_SEVERE(SIGNAL);
 	}
+#	ifdef GTM_TRIGGER
+	else if (ERR_REPEATERROR == SIGNAL)
+		SIGNAL = dollar_ecode.error_last_ecode;	/* Error rethrown from a trigger */
+#	endif
 	NEXTCH;
 }
 
@@ -195,11 +213,10 @@ int updproc(void)
 {
 	seq_num			jnl_seqno; /* the current jnl_seq no of the Update process */
 	seq_num			start_jnl_seqno;
-	unsigned char		*mstack_ptr;
 	uint4			status;
 	gld_dbname_list 	*gld_db_files;
 #ifdef VMS
-	char			proc_name[PROC_NAME_MAXLEN+1];
+	char			proc_name[PROC_NAME_MAXLEN + 1];
 	struct dsc$descriptor_s proc_name_desc;
 #endif
 
@@ -208,6 +225,7 @@ int updproc(void)
 	error_def(ERR_RECVPOOLSETUP);
 
 	call_on_signal = updproc_sigstop;
+	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &updproc_ch);
 
 #ifdef VMS
 	/* Get a meaningful process name */
@@ -228,11 +246,11 @@ int updproc(void)
 	 * this feature enabled, then we will not be receiving journal records for the duplicate set anyways so running with
 	 * this flag always set to FALSE does not hurt.
 	 */
-	memset((uchar_ptr_t)&recvpool, 0, sizeof(recvpool)); /* For util_base_ch and mupip_exit */
+	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool)); /* For util_base_ch and mupip_exit */
 	if (updproc_init(&gld_db_files, &start_jnl_seqno) == UPDPROC_EXISTS) /* we got the global directory header already */
 		rts_error(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Update Process already exists"));
 	/* Initialization of all the relevant global datastructures and allocation for TP */
-	mu_gv_stack_init(&mstack_ptr);
+	mu_gv_stack_init();
 	recvpool.upd_proc_local->read = 0;
 	recvpool.recvpool_ctl->std_null_coll = secondary_side_std_null_coll;
 	jnl_seqno = start_jnl_seqno;
@@ -275,7 +293,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	jnl_record		*rec;
 	uint4			temp_write, temp_read;
 	enum jnl_record_type	rectype;
-	int4			upd_rec_seqno = 0; /* the total no of journal reocrds excluding TCOM records */
+	int4			upd_rec_seqno = 0; /* the total no of journal records excluding TCOM records */
 	int4			tupd_num; /* the number of tset/tkill/tzkill records encountered */
 	int4			tcom_num; /* the number of tcom records encountered */
 	seq_num			jnl_seqno, tmpseqno; /* the current jnl_seq no of the Update process */
@@ -291,6 +309,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	char			*val_ptr;
 	jnl_string		*keystr;
 	mstr			mname;
+	char			*key;
 	enum upd_bad_trans_type	bad_trans_type;
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
@@ -310,7 +329,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	boolean_t		buffers_flushed;
 	uint4			idle_flush_count = 0;	/* Number of times buffers were flushed without an intermediate sleep */
 	uint4			write_wrap;
-
 	UNIX_ONLY(
 		repl_triple		triple;
 		repl_triple_jnl_ptr_t	triplecontent;
@@ -526,7 +544,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				 */
 				repl_log(updproc_log_fp, TRUE, TRUE, "Processing REPL_NEW_TRIPLE message\n");
 				triplecontent = (repl_triple_jnl_ptr_t)readaddrs;
-				memset(&triple, 0, sizeof(triple));
+				memset(&triple, 0, SIZEOF(triple));
 				triple.start_seqno = triplecontent->start_seqno;
 				memcpy(triple.root_primary_instname, triplecontent->instname, MAX_INSTNAME_LEN - 1);
 				triple.root_primary_cycle = triplecontent->cycle;
@@ -535,7 +553,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					"Root Primary = [%s] : Cycle = [%d] : Received from instance = [%s]\n",
 					triple.start_seqno, triple.start_seqno, triple.root_primary_instname,
 					triple.root_primary_cycle, triple.rcvd_from_instname);
-				if (sizeof(repl_triple_jnl_t) != rec_len)
+				if (SIZEOF(repl_triple_jnl_t) != rec_len)
 				{
 					bad_trans_type = upd_bad_triple_len;
 					assert(FALSE);
@@ -613,10 +631,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					tcom_num++;
 			} else if (IS_SET_KILL_ZKILL(rectype))
 			{
-				if (IS_ZTP(rectype))
-					keystr = (jnl_string *)&rec->jrec_fset.mumps_node;
-				else
-					keystr = (jnl_string *)&rec->jrec_set.mumps_node;
+				assert(!IS_ZTP(rectype));
+				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
+				GTMTRIG_ONLY(TRIG_PROCESS_JNL_STR_NODEFLAGS(keystr);)
 				key_len = keystr->length;	/* local copy of shared recvpool key */
 				if ((MAX_KEY_SZ >= key_len && 0 <= key_len && 0 == keystr->text[key_len - 1]) &&
 					(upd_good_record == updproc_get_gblname(keystr->text, key_len, gv_mname, &mname)))
@@ -626,7 +643,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						val_mv.mvtype = MV_STR;
 						val_ptr = &keystr->text[keystr->length];
 						GET_MSTR_LEN(val_mv.str.len, val_ptr); /* length of value validated later */
-						val_mv.str.addr = val_ptr + sizeof(mstr_len_t);
+						val_mv.str.addr = val_ptr + SIZEOF(mstr_len_t);
 					}
 					if (IS_FENCED(rectype))
 					{
@@ -646,8 +663,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 								assert((!dollar_tlevel && !tupd_num) || dollar_tlevel
 										&& (tupd_num || dollar_trestart));
 								if (!dollar_tlevel)
-									op_tstart(TRUE, TRUE, &ts_mv, 0); /* not equal to -1
-														==> RESTARTABLE */
+									op_tstart(TRUE, TRUE, &ts_mv, 0);
+										/* 0 ==> save no locals but RESTART OK */
 								tupd_num++;
 							}
 							upd_rec_seqno++;
@@ -659,7 +676,31 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						assert(FALSE);
 					}
 				} else
+				{
+					bad_trans_type = upd_bad_key;
 					assert(FALSE);
+				}
+			} else if (IS_ZTWORM(rectype))
+			{
+				assert(IS_FENCED(rectype));
+				assert(IS_TP(rectype));
+				assert(0 <= tupd_num);
+				assert(0 == tcom_num);
+				if (0 > tupd_num || 0 != tcom_num)
+				{
+					bad_trans_type = upd_fence_bad_ztworm_t_num;
+					assert(FALSE);
+				} else if (IS_TUPD(rectype))
+				{
+					ts_mv.mvtype = MV_STR;
+					ts_mv.str.len = 0;
+					ts_mv.str.addr = NULL;
+					assert((!dollar_tlevel && !tupd_num) || dollar_tlevel && (tupd_num || dollar_trestart));
+					if (!dollar_tlevel)
+						op_tstart(TRUE, TRUE, &ts_mv, 0); /* 0 ==> save no locals but RESTART OK */
+					tupd_num++;
+				}
+				upd_rec_seqno++;
 			}
 		}
 		if (upd_good_record == bad_trans_type)
@@ -677,7 +718,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				temp_jnlpool_ctl->write = jnlpool_ctl->write;
 				temp_jnlpool_ctl->jnl_seqno = jnlpool_ctl->jnl_seqno;
 				assert((temp_jnlpool_ctl->write_addr % temp_jnlpool_ctl->jnlpool_size) == temp_jnlpool_ctl->write);
-				jgbl.cumul_jnl_rec_len = sizeof(jnldata_hdr_struct) + NULL_RECLEN;
+				jgbl.cumul_jnl_rec_len = SIZEOF(jnldata_hdr_struct) + NULL_RECLEN;
 				temp_jnlpool_ctl->write += SIZEOF(jnldata_hdr_struct);
 				if (temp_jnlpool_ctl->write >= temp_jnlpool_ctl->jnlpool_size)
 				{
@@ -786,10 +827,11 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				assert(0 != dollar_tlevel);
 				op_ztcommit(1);
 				incr_seqno = TRUE;
-			}
-			else if (IS_SET_KILL_ZKILL(rectype))
+			} else if (IS_SET_KILL_ZKILL(rectype))
 			{
-				gv_bind_name(gd_header, &mname);	/* this sets gv_target and gv_cur_region */
+				key = keystr->text;
+				UPD_GV_BIND_NAME_APPROPRIATE(gd_header, mname, key, key_len);	/* if ^#t do special processing */
+				/* the above would have set gv_target and gv_cur_region appropriately */
 				csa = &FILE_INFO(gv_cur_region)->s_addrs;
 				if (!REPL_ALLOWED(csa))
 				{	/* Replication/Journaling is NOT enabled on the database file that the current
@@ -811,9 +853,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				{
 					bad_trans_type = upd_bad_key_size;
 					assert(gtm_white_box_test_case_enabled
-						&& (WBTEST_UPD_GVSUBOFLOW_ERROR == gtm_white_box_test_case_number));
-				}
-				else
+						&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number));
+				} else
 				{
 					if (IS_KILL(rectype))
 						op_gvkill();
@@ -822,12 +863,12 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					else
 					{
 						assert(IS_SET(rectype));
-						if (keystr->length + 1 + val_mv.str.len + sizeof(rec_hdr) >
+						if (keystr->length + 1 + val_mv.str.len + SIZEOF(rec_hdr) >
 										gv_cur_region->max_rec_size)
 						{
 							bad_trans_type = upd_bad_val_size;
 							assert(gtm_white_box_test_case_enabled
-								&& (WBTEST_UPD_REC2BIG_ERROR == gtm_white_box_test_case_number));
+								&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number));
 						} else
 						op_gvput(&val_mv);
 					}
@@ -845,6 +886,13 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						csa->n_pre_read_trigger--;
 					disk_blk_read = FALSE;
 				}
+			} else if (IS_ZTWORM(rectype))
+			{
+				assert(dollar_tlevel);	/* op_tstart should already have been done */
+				val_mv.mvtype = MV_STR;
+				val_mv.str.len = rec->jrec_ztworm.ztworm_str.length;
+				val_mv.str.addr = &rec->jrec_ztworm.ztworm_str.text[0];
+				op_svput(SV_ZTWORMHOLE, &val_mv);
 			}
 		}
 		if (upd_good_record != bad_trans_type)
@@ -896,7 +944,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						if (0 == (end = format_targ_key(buff,MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
 						rts_error(VARLSTCNT(10) ERR_REC2BIG, 4,
-							gv_currkey->end + 1 + val_mv.str.len + sizeof(rec_hdr),
+							gv_currkey->end + 1 + val_mv.str.len + SIZEOF(rec_hdr),
 							(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2,
 							end - buff, buff);
 						break;

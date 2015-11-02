@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ bool gtcmtr_query(void)
 	assert(CMMS_Q_QUERY == *ptr);
 	ptr++;
 	GET_USHORT(tmp_len, ptr);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	regnum = *ptr++;
 	reg_ref = gtcm_find_region(curr_entry, regnum);
 	tmp_len--;	/* subtract size of regnum */
@@ -106,11 +106,11 @@ bool gtcmtr_query(void)
 	{
 		if (gv_target->nct || gv_target->collseq)
 			gv_xform_key(gv_altkey, TRUE);
-		/* key_len = sizeof(gv_key) + gv_altkey->end; */
-		key_len = gv_altkey->end + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(char);
-		tot_val_len = (curr_entry->query_is_queryget ? val.str.len + sizeof(unsigned short) : 0);
+		/* key_len = SIZEOF(gv_key) + gv_altkey->end; */
+		key_len = gv_altkey->end + SIZEOF(unsigned short) + SIZEOF(unsigned short) + SIZEOF(unsigned short) + SIZEOF(char);
+		tot_val_len = (curr_entry->query_is_queryget ? val.str.len + SIZEOF(unsigned short) : 0);
 		/* ushort <- uint4 assignment lossy? */
-		assert((uint4)tot_val_len == (curr_entry->query_is_queryget ? val.str.len + sizeof(unsigned short) : 0));
+		assert((uint4)tot_val_len == (curr_entry->query_is_queryget ? val.str.len + SIZEOF(unsigned short) : 0));
 	} else
 		key_len = tot_val_len = 0;
 	msg_len = SIZEOF(unsigned char) + SIZEOF(unsigned short) + SIZEOF(unsigned char) + key_len + tot_val_len;
@@ -120,7 +120,7 @@ bool gtcmtr_query(void)
 	*ptr++ = CMMS_R_QUERY;
 	tmp_len = key_len + 1;
 	PUT_USHORT(ptr, tmp_len);
-	ptr += sizeof(unsigned short);
+	ptr += SIZEOF(unsigned short);
 	*ptr++ = regnum;
 	gv_key_top_ptr = ptr;
 	if (found)
@@ -131,18 +131,18 @@ bool gtcmtr_query(void)
 		 * vinu, 07/18/01 */
 
 		/* PUT_USHORT(ptr, gv_altkey->top); */
-		ptr += sizeof(unsigned short);
+		ptr += SIZEOF(unsigned short);
 		PUT_USHORT(ptr, gv_altkey->end);
-		ptr += sizeof(unsigned short);
+		ptr += SIZEOF(unsigned short);
 		PUT_USHORT(ptr, gv_altkey->prev);
-		ptr += sizeof(unsigned short);
-		memcpy(ptr, gv_altkey->base, key_len - sizeof(unsigned short) - sizeof(unsigned short) - sizeof(unsigned short));
-		ptr += (key_len - sizeof(unsigned short) - sizeof(unsigned short) - sizeof(unsigned short));
+		ptr += SIZEOF(unsigned short);
+		memcpy(ptr, gv_altkey->base, key_len - SIZEOF(unsigned short) - SIZEOF(unsigned short) - SIZEOF(unsigned short));
+		ptr += (key_len - SIZEOF(unsigned short) - SIZEOF(unsigned short) - SIZEOF(unsigned short));
 		if (curr_entry->query_is_queryget)
 		{
-			tmp_len = tot_val_len - sizeof(unsigned short);
+			tmp_len = tot_val_len - SIZEOF(unsigned short);
 			PUT_USHORT(ptr, tmp_len);
-			ptr += sizeof(unsigned short);
+			ptr += SIZEOF(unsigned short);
 			memcpy(ptr, val.str.addr, tmp_len);
 		}
 	}

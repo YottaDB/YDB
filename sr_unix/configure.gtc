@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2009 Fidelity Information Services, Inc #
+#	Copyright 2009, 2010 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -12,6 +12,9 @@
 
 # In order to test future configure.csh changes, copy a modified version into /usr/library/Vxxx/pro/configure
 # and /usr/library/Vxxx/dbg/configure.  Then execute $cms_tools/kitstart.csh -ti Vxxx and check output log
+# If changes are made to this file such as removing files or changing permissions in the install
+# directory there may need to be changes made to files used by kitstart.csh to execute
+# $cms_tools/gtm_compare_dist.csh. This will be detected during the kitstart.csh described above.
 
 . ./arch.gtc
 # we need a copy for gtm_test_install since the version above will be deleted.
@@ -67,6 +70,42 @@ if [ $arch = "zos" ]; then
 else
 	rootuser=root
 	binuser=bin
+	# if bin group does not exist then ask user to define a different installation group or exit
+	touch tmp_owngrp
+	chgrp $binuser tmp_owngrp 2> /dev/null
+	if [ 0 != "$?" ] ; then
+		$echo "The default \"bin\" installation group does not exist."
+		rm tmp_owngrp
+		$echo "Do you want to use a different group for installation? (y or n) \c"
+		read resp
+		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+			$echo "Enter installation group name: \c"
+			read binuser
+			if [ "$binuser" != "" ] ; then
+				touch tmp_owngrp
+				chgrp $binuser tmp_owngrp 2> /dev/null
+				if [ 0 != "$?" ] ; then
+					$echo $binuser is not a valid group name - exiting!
+					rm tmp_owngrp
+					exit 1
+				fi
+				$echo "Should execution of GT.M be restricted to \"$binuser\"? (y or n) \c"
+				read resp
+				if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+					group="$binuser"
+				else
+					group=""
+				fi
+				group_restricted_asked=1
+			else
+				$echo "No group name entered - exiting!"
+				exit
+			fi
+		else
+			$echo "Either add the \"bin\" group or use a different installation group next time. - exiting!"
+			exit
+		fi
+	fi
 	defowner=bin
 fi
 
@@ -104,11 +143,14 @@ else
 fi
 
 # Files that need to have $gtm_dist, $echo, etc. set in them.
-pathmods="gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile.gtc"
+pathmods="gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile.gtc gtm.gtc gtmprofile_preV54000.gtc gdedefaults.gtc"
 
 if [ $deliver_gtcm = "yes" ]; then
 	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
 fi
+
+# geteuid is no longer executable in distribution so change it
+chmod 755 ./geteuid
 
 if [ "`./geteuid`" != "root" ] ; then
 	$echo "You must run Configure as root."
@@ -116,7 +158,7 @@ if [ "`./geteuid`" != "root" ] ; then
 fi
 
 $echo "                     GT.M Configuration Script"
-$echo "Copyright 2009 Fidelity National Information Services, Inc. Use of this"
+$echo "Copyright 2009, 2010 Fidelity National Information Services, Inc. Use of this"
 $echo "software is restricted by the provisions of your license agreement."
 $echo ""
 
@@ -128,29 +170,32 @@ if [ "$resp" = "" ] ; then
 	owner=$defowner
 else
 	owner=$resp
-	chown $resp tmp_owngrp 2> /dev/null
-	if [ 1 = "$?" ] ; then
-		echo $resp is not a valid user name - exiting!
-		rm tmp_owngrp
-		exit
-	fi
 fi
 
-$echo "Should execution of GT.M be restricted to a group? (y or n) \c"
-read resp
-if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-	$echo "Enter group name: \c"
-	read group
-	if [ "$group" != "" ] ; then
-		chgrp $group tmp_owngrp 2> /dev/null
-		if [ 1 = "$?" ] ; then
-			echo $group is not a valid group name - exiting!
-			rm tmp_owngrp
-			exit 1
+chown $owner tmp_owngrp 2> /dev/null
+if [ 0 != "$?" ] ; then
+	$echo $owner is not a valid user name - exiting!
+	rm tmp_owngrp
+	exit
+fi
+
+# if user had to enter a group name because bin did not exist, then he may already have specified a restriction
+# if so, $group will be set already
+if [ -z "$group_restricted_asked" ] ; then
+	$echo "Should execution of GT.M be restricted to a group? (y or n) \c"
+	read resp
+	if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+		$echo "Enter group name: \c"
+		read group
+		if [ "$group" != "" ] ; then
+			chgrp $group tmp_owngrp 2> /dev/null
+			if [ 0 != "$?" ] ; then
+				$echo $group is not a valid group name - exiting!
+				rm tmp_owngrp
+				exit 1
+			fi
 		fi
 	fi
-else
-	group=""
 fi
 
 rm tmp_owngrp
@@ -160,7 +205,7 @@ read gtmdist
 
 # if gtmdist is relative then need to make it absolute
 
-if [ `echo $gtmdist | grep -c '^/'` -eq 0 ] ; then
+if [ `$echo $gtmdist | grep -c '^/'` -eq 0 ] ; then
     gtmdist=`pwd`/$gtmdist
 fi
 
@@ -232,7 +277,7 @@ if [ -d "utf8" ]; then
 		$echo "Should an ICU version other than the default be used? (y or n) \c"
 		read resp
 		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-			$echo "Enter ICU version (at least ICU version 3.6 is required. Enter as <minor-ver>.<major-ver>): \c"
+			$echo "Enter ICU version (at least ICU version 3.6 is required. Enter as <major-ver>.<minor-ver>): \c"
 			read gtm_icu_version
 			icu_ver=`$echo $gtm_icu_version | sed 's/\.//'`
 			majmin=`$echo $icu_ver | cut -f 1 -d "."`
@@ -265,12 +310,12 @@ if [ -d "utf8" ]; then
 				if [ $arch = "ibm" -o $arch = "zos" ]; then
 					# From the version'ed library(eg. libicuio36.0.a) extract out
 					# 36.0.a
-					full_icu_ver_string=`echo $icu_versioned_lib | sed 's/libicuio//g'`
+					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio//g'`
 					# Extract 36 from 36.0.a
-					majmin=`echo $full_icu_ver_string | cut -f 1 -d '.'`
+					majmin=`$echo $full_icu_ver_string | cut -f 1 -d '.'`
 				else
-					full_icu_ver_string=`echo $icu_versioned_lib | sed 's/libicuio\.//g'`
-					majmin=`echo $full_icu_ver_string | cut -f 2 -d '.'`
+					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
+					majmin=`$echo $full_icu_ver_string | cut -f 2 -d '.'`
 				fi
 			elif [ "$gtm_icu_version" != "" ] ; then
 				# If the user specified a desired version number, then check if the ICU
@@ -320,15 +365,15 @@ if [ -d "utf8" ]; then
 		done
 		if [ "$found_icu" -eq 0 ] ; then
 			if [ "$majmin" != "" ] ; then
-				echo "WARNING: ICU version $gtm_icu_version not found. Not installing Unicode support."
+				$echo "WARNING: ICU version $gtm_icu_version not found. Not installing Unicode support."
 			else
-				echo "WARNING: Default ICU version not found. Not installing Unicode support."
+				$echo "WARNING: Default ICU version not found. Not installing Unicode support."
 			fi
 		fi
 		# Look for locale
 		utflocale=`locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n1`
 		if [ "$utflocale" = "" ] ; then
-			echo "WARNING: UTF8 locale not found. Not installing Unicode support."
+			$echo "WARNING: UTF8 locale not found. Not installing Unicode support."
 		fi
 		# If both libicu and locale are on system then install UTF-8 support
 		if [ "$found_icu" -ne 0  -a "$utflocale" != "" ] ; then
@@ -386,9 +431,15 @@ if [ -f $file ]; then
 fi
 
 # Install the .cshrc and .profile files
-cp gtmprofile gtmcshrc $gtmdist
+cp gdedefaults gtmprofile gtmprofile_preV54000 gtm gtmcshrc $gtmdist
+chmod 0444 $gtmdist/gdedefaults
+chown $owner $gtmdist/gdedefaults
 chmod 0755 $gtmdist/gtmprofile
 chown $owner $gtmdist/gtmprofile
+chmod 0755 $gtmdist/gtmprofile_preV54000
+chown $owner $gtmdist/gtmprofile_preV54000
+chmod 0755 $gtmdist/gtm
+chown $owner $gtmdist/gtm
 chmod 0755 $gtmdist/gtmcshrc
 chown $owner $gtmdist/gtmcshrc
 
@@ -412,17 +463,17 @@ done
 for i in $binaries
 do
 	if [ $arch = "sun" -o $arch = "linux" ]; then
-		install -g bin -o $owner -m 755 $i $gtmdist
+		install -g $binuser -o $owner -m 644 $i $gtmdist
 	elif [ $arch = "ibm" ]; then
-		/usr/bin/install -f $gtmdist -M 755 -O $owner -G bin $i
+		/usr/bin/install -f $gtmdist -M 644 -O $owner -G $binuser $i
 	elif [ -x /usr/sbin/install ]; then
-		/usr/sbin/install -f $gtmdist -m 755 -u $owner -g bin $i $gtmdist
+		/usr/sbin/install -f $gtmdist -m 644 -u $owner -g $binuser $i $gtmdist
 	elif [ $arch = "zos" ]; then
 		cp $i $gtmdist/
-		chmod 755 $gtmdist/$i
+		chmod 644 $gtmdist/$i
 		chown $user:$binuser $gtmdist/$i
 	else
-		install -f $gtmdist -m 755 -u $owner -g bin $i $gtmdist
+		install -f $gtmdist -m 644 -u $owner -g $binuser $i $gtmdist
 	fi
 #		strip $gtmdist/$i >/dev/null 2>&1
 done
@@ -500,7 +551,7 @@ if [ -d "$plugin_gtmcrypt" ]; then
 	for i in $gtmcryptbinaries
 	do
 		if [ $arch = "sun" -o $arch = "linux" ]; then
-			install -g bin -o $owner -m 755 $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
+			install -g $binuser -o $owner -m 755 $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
 		elif [ $arch = "ibm" ]; then
 			/usr/bin/install -f $gtmdist/$plugin_gtmcrypt -M 755 -O $owner -G $binuser $plugin_gtmcrypt/$i
 		elif [ $arch = "zos" ]; then
@@ -518,7 +569,7 @@ if [ -d "$plugin_gtmcrypt" ]; then
 
 	# Install the plugin shared library
 	if [ $arch = "sun" -o $arch = "linux" ]; then
-		install -g bin -o $owner -m 755 $plugin/$gtmcryptsharedlib $gtmdist/$plugin
+		install -g $binuser -o $owner -m 755 $plugin/$gtmcryptsharedlib $gtmdist/$plugin
 	elif [ $arch = "ibm" ]; then
 		/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G $binuser $plugin/$gtmcryptsharedlib
 	elif [ $arch = "zos" ]; then
@@ -606,15 +657,18 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	$echo "Creating lowercase versions of the MUMPS routines."
 	(cd $gtmdist; ./lowerc_cp *.m)
 	if [ "$dogtmcrypt" -ne 0 ]; then
-		(cd $gtmdist/$plugin_gtmcrypt; ln -s $gtmcryptmfile `echo $gtmcryptmfile | tr '[A-Z]' '[a-z]'`)
+		(cd $gtmdist/$plugin_gtmcrypt; ln -s $gtmcryptmfile `$echo $gtmcryptmfile | tr '[A-Z]' '[a-z]'`)
 	fi
 	if [ "$doutf8" -ne 0 ]; then
 		(cd $gtmdist/utf8; ./lowerc_cp *.m)
 		if [ "$dogtmcrypt" -ne 0 ]; then
-			(cd $gtmdist/$plugin_gtmcrypt/utf8; ln -s $gtmcryptmfile `echo $gtmcryptmfile | tr '[A-Z]' '[a-z]'`)
+			(cd $gtmdist/$plugin_gtmcrypt/utf8; ln -s $gtmcryptmfile `$echo $gtmcryptmfile | tr '[A-Z]' '[a-z]'`)
 		fi
 	fi
 fi
+
+# Change mode to executable for mumps and libgtmshr to do the compiles
+chmod 755 $gtmdist/mumps $gtmdist/libgtmshr$ext
 
 gtmroutines=$gtmdist
 gtmgbldir=$gtmdist/mumps.gld
@@ -630,9 +684,9 @@ $echo ""
 # Ensure we are NOT in UTF-8 mode
 gtm_chset="M"
 export gtm_chset
-(cd $gtmdist; ./mumps -nowarning *.m)
+(cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat)
 if [ "$dogtmcrypt" -ne 0 ]; then
-	(cd $gtmdist/plugin/gtmcrypt; $gtmdist/mumps -nowarning *.m; mv *.o $gtmdist)
+	(cd $gtmdist/plugin/gtmcrypt; $gtmdist/mumps -noignore *.m; $echo $?>>$gtmdist/compstat; mv *.o $gtmdist)
 fi
 if [ "$doutf8" -ne 0 ]; then
 	# Ensure we ARE in UTF-8 mode
@@ -664,13 +718,20 @@ if [ "$doutf8" -ne 0 ]; then
 		LD_LIBRARY_PATH=$save_icu_libpath
 		export LD_LIBRARY_PATH
 	fi
-	(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -nowarning *.m)
+	(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat)
 	if [ "$dogtmcrypt" -ne 0 ]; then
-		(cd $gtmdist/plugin/gtmcrypt/utf8; $gtmdist/utf8/mumps -nowarning *.m; mv *.o $gtmdist/utf8)
+		(cd $gtmdist/plugin/gtmcrypt/utf8; $gtmdist/utf8/mumps -noignore *.m; \
+		$echo $?>>$gtmdist/compstat; mv *.o $gtmdist/utf8)
 	fi
 	gtm_chset="M"
 	export gtm_chset
 fi
+
+# Change mode to executable for the normal binaries
+for i in $binaries
+do
+	chmod 755 $gtmdist/$i
+done
 
 chmod 0644 $gtmdist/*.m
 chmod 0644 $gtmdist/*.o
@@ -747,10 +808,13 @@ if [ -d utf8 ]; then
 	cd ..
 fi
 
-# change group ownership of all files if requested
+# change group ownership of all files if group restricted
+# otherwise change to the default as some files were created with root group
 if [ "$group" != "" ] ; then
 	chgrp -R $group $gtmdist
 	chmod -R o-rwx $gtmdist
+else
+	chgrp -R $binuser $gtmdist
 fi
 
 # Install real gtmsecshr with special permissions in $gtmdist/gtmsecshrdir
@@ -761,14 +825,14 @@ chgrp $binuser $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
 if [ $arch = "sun" -o $arch = "linux" ]; then
-	install -m 4755 -o root -g bin gtmsecshr $gtmdist
-	install -m 4500 -o root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
+	install -m 4755 -o root -g $binuser gtmsecshr $gtmdist
+	install -m 4500 -o root -g $binuser gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 elif [ $arch = "ibm" ]; then
-	/usr/bin/install -f $gtmdist -M 4755 -O root -G bin gtmsecshr
-	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G bin gtmsecshrdir/gtmsecshr
+	/usr/bin/install -f $gtmdist -M 4755 -O root -G $binuser gtmsecshr
+	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G $binuser gtmsecshrdir/gtmsecshr
 elif [ -x /usr/sbin/install ]; then
-	/usr/sbin/install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
-	/usr/sbin/install -f $tgtmsecshrdir -m 4500 -u root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir
+	/usr/sbin/install -f $gtmdist -m 4755 -u root -g $binuser gtmsecshr $gtmdist
+	/usr/sbin/install -f $tgtmsecshrdir -m 4500 -u root -g $binuser gtmsecshrdir/gtmsecshr $tgtmsecshrdir
 elif [ $arch = "zos" ]; then
 	cp gtmsecshr $gtmdist/gtmsecshr
 	cp gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
@@ -776,8 +840,8 @@ elif [ $arch = "zos" ]; then
 	chmod 4755 $gtmdist/gtmsecshr
 	chmod 4500 $tgtmsecshrdir/gtmsecshr
 else
-	install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
-	install -f $tgtmsecshrdir -m 4500 -u root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir
+	install -f $gtmdist -m 4755 -u root -g $binuser gtmsecshr $gtmdist
+	install -f $tgtmsecshrdir -m 4500 -u root -g $binuser gtmsecshrdir/gtmsecshr $tgtmsecshrdir
 fi
 
 if [ -d $gtmdist/utf8 ]; then
@@ -787,11 +851,14 @@ fi
 strip $gtmdist/gtmsecshr > /dev/null 2>&1
 strip $tgtmsecshrdir/gtmsecshr > /dev/null 2>&1
 
-# change group ownership of wrapper if requested
+# change group ownership of wrapper if group restricted
 # also remove user privileges for wrapper if group changed
+# otherwise change group to the default as some files were created with root group
 if [ "$group" != "" ] ; then
 	chgrp $group $gtmdist/gtmsecshr
 	chmod 4550 $gtmdist/gtmsecshr
+else
+	chgrp $binuser $gtmdist/gtmsecshr
 fi
 
 # leave nothing writeable
@@ -814,6 +881,18 @@ if [ -d $gtmdist/plugin/gtmcrypt/utf8 ]; then
 	chmod a-w $gtmdist/plugin/gtmcrypt/utf8/*
 fi
 
+# if we had a mumps error then remove executable bit recursively and exit
+# this could include compile and/or library load errors
+if [ 0 != `grep -c '[1-9]' $gtm_dist/compstat` ]; then
+	$echo ""
+	$echo "GT.M installation FAILED – please review error messages"
+	$echo ""
+	chmod -R a-x $gtmdist
+	exit 1
+fi
+
+rm -f $gtmdist/compstat
+
 $echo ""
 $echo "Installation completed. Would you like all the temporary files"
 $echo "removed from this directory? (y or n) \c"
@@ -821,7 +900,7 @@ read resp
 
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
-		*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
+		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
 		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING
 	\rm -rf GETPASS.o plugin
 	if [ -d utf8 ]; then

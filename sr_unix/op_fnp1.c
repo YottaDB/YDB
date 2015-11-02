@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,10 +81,10 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 	assert(gtm_utf8_mode);
 	MV_FORCE_STR(src);
 	ldelim.unichar_val = delim;
-	if (!UTF8_VALID(ldelim.unibytes_val, ldelim.unibytes_val + sizeof(ldelim.unibytes_val), dlmlen) &&
+	if (!UTF8_VALID(ldelim.unibytes_val, ldelim.unibytes_val + SIZEOF(ldelim.unibytes_val), dlmlen) &&
 			!badchar_inhibit)
 	{ /* The delimiter is a bad character so error out if badchar not inhibited */
-		UTF8_BADCHAR(0, ldelim.unibytes_val, ldelim.unibytes_val + sizeof(ldelim.unibytes_val), 0, NULL);
+		UTF8_BADCHAR(0, ldelim.unibytes_val, ldelim.unibytes_val + SIZEOF(ldelim.unibytes_val), 0, NULL);
 	}
 
 	ldst.mvtype = MV_STR;

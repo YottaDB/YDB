@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ void jnl_prc_vector (jnl_process_vector *pv)
 	int		gethostname_res;
 	time_t		temp_time;
 
-	memset(pv, 0, sizeof(jnl_process_vector));
+	memset(pv, 0, SIZEOF(jnl_process_vector));
 
 	pv->jpv_pid = process_id;
 	time(&temp_time);

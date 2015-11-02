@@ -36,11 +36,11 @@ GBLDEF int4 sa_temps_offset[VALUED_REF_TYPES];
 LITDEF int4 sa_class_sizes[VALUED_REF_TYPES] =
 {
 	0		/* dummy for slot zero */
-	,sizeof(mval*)	/* TVAR_REF */
-	,sizeof(mval)	/* TVAL_REF */
-	,sizeof(mint)	/* TINT_REF */
-	,sizeof(mval*)	/* TVAD_REF */
-	,sizeof(char*)	/* TCAD_REF */
+	,SIZEOF(mval*)	/* TVAR_REF */
+	,SIZEOF(mval)	/* TVAL_REF */
+	,SIZEOF(mint)	/* TINT_REF */
+	,SIZEOF(mval*)	/* TVAD_REF */
+	,SIZEOF(char*)	/* TCAD_REF */
 };
 
 void alloc_reg(void)
@@ -55,8 +55,8 @@ void alloc_reg(void)
 	int4	size;
 	error_def(ERR_TMPSTOREMAX);
 
-	memset(&tempcont[0][0], 0, sizeof(tempcont));
-	memset(&temphigh[0], -1, sizeof(temphigh));
+	memset(&tempcont[0][0], 0, SIZEOF(tempcont));
+	memset(&temphigh[0], -1, SIZEOF(temphigh));
 	temphigh[TVAR_REF] = mvmax - 1;
 	COMPDBG(PRINTF(" \n\n\n\n************************************ Begin alloc_reg scan *****************************\n"););
 	dqloop(&t_orig, exorder, x)
@@ -128,7 +128,7 @@ void alloc_reg(void)
 			}
 			break;
 		}
-		for (j = x->operand, y = x; j < &(y->operand[2]) ;)
+		for (j = x->operand, y = x; j < ARRAYTOP(y->operand); )
 		{
 			if (j->oprclass == TRIP_REF)
 			{
@@ -206,7 +206,7 @@ void alloc_reg(void)
 
 	size = sa_temps[TVAL_REF] * sa_class_sizes[TVAL_REF];
 	sa_temps_offset[TVAL_REF] = size;
-	/* Since we need to align the temp region to the largest types, align even int temps to sizeof(char*) */
+	/* Since we need to align the temp region to the largest types, align even int temps to SIZEOF(char*) */
 	size += ROUND_UP2(sa_temps[TINT_REF] * sa_class_sizes[TINT_REF], SIZEOF(char *));
 	sa_temps_offset[TINT_REF] = size;
 	size += sa_temps[TVAD_REF] * sa_class_sizes[TVAD_REF];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include "mvalconv.h"
 #include "lv_val.h"
 #include "alias.h"
+#include "gtmimagename.h"
 
 GBLREF spdesc		stringpool;
 GBLREF int4		cache_hits, cache_fails;
@@ -64,8 +65,9 @@ GBLREF boolean_t	badchar_inhibit;
 GBLREF int		gv_fillfactor;
 GBLREF int4		gtm_max_sockets;
 
-LITREF mval literal_zero;
-LITREF mval literal_one;
+LITREF gtmImageName	gtmImageNames[];
+LITREF mval		literal_zero;
+LITREF mval		literal_one;
 
 void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 {
@@ -150,19 +152,19 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			{
 				case dba_mm:
 					tmpstr.addr = "MM";
-					tmpstr.len = sizeof("MM")-1;
+					tmpstr.len = SIZEOF("MM")-1;
 					break;
 				case dba_bg:
 					tmpstr.addr = "BG";
-					tmpstr.len = sizeof("BG")-1;
+					tmpstr.len = SIZEOF("BG")-1;
 					break;
 				case dba_cm:
 					tmpstr.addr = "CM";
-					tmpstr.len = sizeof("CM")-1;
+					tmpstr.len = SIZEOF("CM")-1;
 					break;
 				case dba_usr:
 					tmpstr.addr = "USR";
-					tmpstr.len = sizeof("USR")-1;
+					tmpstr.len = SIZEOF("USR")-1;
 					break;
 				default:
 					GTMASSERT;
@@ -268,7 +270,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		  DEBUG_ONLY(else GD_HEADER_ASSERT);
 		  map = gd_map;
 		  map++;	/* get past local locks */
-		  for (; memcmp(&parmblk.ident.c[0], &(map->name[0]), sizeof(mident_fixed)) >= 0; map++)
+		  for (; memcmp(&parmblk.ident.c[0], &(map->name[0]), SIZEOF(mident_fixed)) >= 0; map++)
 		    assert(map < gd_map_top);
 		  reg = map->reg.addr;
 		  tmpstr.addr = (char *)reg->rname;
@@ -328,8 +330,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 #				define GVSTATS_KEYWORD_SIZE	5		/* THREE PLUS TWO DELIMITERS */
 #				define GVSTATS_KEYWORD_COUNT	n_gvstats_rec_types
 #				define GVSTATS_MAX_SIZE (GVSTATS_KEYWORD_COUNT * (GVSTATS_MAX_DIGITS + GVSTATS_KEYWORD_SIZE))
-				if (stringpool.top - stringpool.free < GVSTATS_MAX_SIZE)
-					stp_gcol(GVSTATS_MAX_SIZE);
+				ENSURE_STP_FREE_SPACE(GVSTATS_MAX_SIZE);
 				dst->str.addr = (char *)stringpool.free;
 				/* initialize cnl->gvstats_rec.db_curr_tn field from file header */
 				csa->nl->gvstats_rec.db_curr_tn = csa->hdr->trans_hist.curr_tn;
@@ -382,7 +383,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			reset_gv_target = gv_target;
 			gv_target = cs_addrs->dir_tree;	/* Trick the get program into using the directory tree */
 			op_gvget(dst);
-			RESET_GV_TARGET;
+			RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 			break;
 		case VTK_YLCT:
 			if (!arg)
@@ -437,6 +438,10 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			break;
 		case VTK_LVGCOL:
 			n = als_lvval_gc();
+			break;
+		case VTK_IMAGENAME:
+			dst->str.len = gtmImageNames[image_type].imageNameLen;
+			dst->str.addr = gtmImageNames[image_type].imageName;
 			break;
 		default:
 			rts_error(VARLSTCNT(1) ERR_VIEWFN);

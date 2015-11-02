@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,17 +75,15 @@ void    op_ztcommit(int4 n)
 	if (!jgbl.forw_phase_recovery)
 	{
 		SET_GBL_JREC_TIME;
-		QWASSIGN(ztcom_record.token, jnl_fence_ctl.token); /* token was computed in the first call to
-								      jnl_write_ztp_logical after op_ztstart */
 		ztcom_record.participants = 0;
 		for (csa = jnl_fence_ctl.fence_list; JNL_FENCE_LIST_END != csa; csa = csa->next_fenced)
 			ztcom_record.participants++;
 	} else
-	{
-		QWASSIGN(ztcom_record.token, jgbl.mur_jrec_token_seq.token);
-		QWASSIGN(ztcom_record.jnl_seqno, jgbl.mur_jrec_seqno);
 		ztcom_record.participants = jgbl.mur_jrec_participants;
-	}
+	/* If GT.M, token was computed in the first call to jnl_write_ztp_logical after op_ztstart.
+	 * If journal recovery, token was set in mur_output_record.
+	 */
+	QWASSIGN(ztcom_record.token, jnl_fence_ctl.token);
 	replication = yes_jnl_no_repl = FALSE;
 	new_fence_list = JNL_FENCE_LIST_END;
 	/* Sort journaled regions based on ftok order and grab crit. Do this BEFORE grabbing jnlpool lock to avoid deadlock */
@@ -149,8 +147,6 @@ void    op_ztcommit(int4 n)
 		assert(csa->now_crit);
 		if (0 == jpc->pini_addr)
 			jnl_put_jrt_pini(csa);
-		if (!jgbl.forw_phase_recovery)
-			ztcom_record.jnl_seqno = REPL_ALLOWED(csa) ? temp_jnlpool_ctl->jnl_seqno : seq_num_zero;
 		ztcom_record.prefix.pini_addr = jpc->pini_addr;
 		ztcom_record.prefix.tn = csa->ti->curr_tn;
 		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
@@ -175,4 +171,5 @@ void    op_ztcommit(int4 n)
 		csa_next = csa->next_fenced;
 		csa->next_fenced = NULL;
 	}
+	jgbl.tp_ztp_jnl_upd_num = 0;
 }

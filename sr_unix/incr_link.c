@@ -77,6 +77,7 @@ GBLREF boolean_t	gtm_utf8_mode;
 
 ZOS_ONLY(
 GBLDEF unsigned char	*text_section;
+GBLDEF boolean_t	extended_symbols_present;
 GBLDEF int		total_length;
 GBLDEF int		text_counter = 0;
 )
@@ -113,7 +114,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	var_tabent	*curvar, *vartop;
 	char		name_buf[PATH_MAX+1];
 	int		name_buf_len;
-	char		marker[sizeof(JSB_MARKER) - 1];
+	char		marker[SIZEOF(JSB_MARKER) - 1];
 
 	error_def(ERR_DLLCHSETM);
 	error_def(ERR_DLLCHSETUTF8);
@@ -123,16 +124,16 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	error_def(ERR_TEXT);
 
 	AIX_ONLY(
-		FILHDR	  *hddr = NULL;
+		FILHDR	  hddr;
 		unsigned short  magic;
 	)
 
 	ZOS_ONLY(
 		ESD symbol;
-		boolean_t extended_symbols_present = FALSE;
 		total_length = 0;
+		extended_symbols_present = FALSE;
 		text_counter = 0;
-		memset(&symbol, 0 , sizeof(ESD));
+		memset(&symbol, 0 , SIZEOF(ESD));
 		assert(NULL == text_section);
 		ZOS_FREE_TEXT_SECTION;
 	)
@@ -157,42 +158,39 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	}
 
 	/* Get the routine header where we can make use of it */
-	hdr = (rhdtyp *)malloc(sizeof(rhdtyp));
+	hdr = (rhdtyp *)malloc(SIZEOF(rhdtyp));
 	if (shlib)
 	{	/* Make writable copy of header as header of record */
 		/* On some platforms, the address returned by dlsym() is not the actual shared code address, but normally
 		 * an address to the linkage table, eg. TOC (AIX), PLT (HP-UX). Computing the actual shared code address
 		 * is platform dependent and is handled by the macro (see incr_link_sp.h) */
 		shdr = (unsigned char *)GET_RTNHDR_ADDR(zro_entry->shrsym);
-		memcpy(hdr, shdr, sizeof(rhdtyp));
+		memcpy(hdr, shdr, SIZEOF(rhdtyp));
 		hdr->shlib_handle = zro_entry->shrlib;
 	} else
 	{	/* Seek past native object headers to get GT.M object's routine header */
 
 		/* To check if it is not an xcoff64 bit .o */
 		AIX_ONLY(
-			hddr = (FILHDR *)(malloc(sizeof(FILHDR)));
-			DOREADRC(file_desc, hddr, sizeof(FILHDR), status);
-			if (-1 != status)
+			DOREADRC(file_desc, &hddr, SIZEOF(FILHDR), status);
+			if (0 == status)
 			{
-				magic = hddr->f_magic;
-				if (-1 == (status = (ssize_t)lseek(file_desc, -(sizeof(FILHDR)), SEEK_SET)))
-				status = errno;
+				magic = hddr.f_magic;
+				if (-1 == (status = (ssize_t)lseek(file_desc, -(SIZEOF(FILHDR)), SEEK_SET)))
+					status = errno;
+				if (magic != U64_TOCMAGIC)
+					return FALSE;
 			} else
-				status = errno;
-			free(hddr);
-
-			if (magic != U64_TOCMAGIC)
-				return FALSE;
+				zl_error(file_desc, zro_entry, ERR_INVOBJ, 0, 0, 0, 0);
 		)
 		/* In the GOFF .o on zOS, if the symbol name(name of the module) exceeds ESD_NAME_MAX_LENGTH (8), *
 		 * then 2 extra extended records are emitted, which causes the start of text section to vary */
 #ifdef __MVS__
-			DOREADRC(file_desc, &symbol, sizeof(symbol), status);	/* This is HDR record */
-			if (-1 != status)
+			DOREADRC(file_desc, &symbol, SIZEOF(symbol), status);	/* This is HDR record */
+			if (0 == status)
 			{
-				DOREADRC(file_desc, &symbol, sizeof(symbol), status)	/* First symbol (ESD record) */
-				if (-1 != status)
+				DOREADRC(file_desc, &symbol, SIZEOF(symbol), status)	/* First symbol (ESD record) */
+				if (0 == status)
 				{
 					if (0x01 == symbol.ptv[1])	/* which means the extended records are there */
 						extended_symbols_present = TRUE;
@@ -201,10 +199,10 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 						assert(0x0 == symbol.ptv[1]);
 						extended_symbols_present = FALSE;
 					}
-				} else
-					status = errno;
-			} else
-				status = errno;
+				}
+			}
+			if (0 != status)
+				zl_error(file_desc, zro_entry, ERR_INVOBJ, 0, 0, 0, 0);
 #endif
 		if (-1 != (status = (ssize_t)lseek(file_desc, NATIVE_HDR_LEN, SEEK_SET)))
 		{
@@ -218,9 +216,9 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 			zl_error(file_desc, zro_entry, ERR_INVOBJ, 0, 0, 0, 0);
 		}
 	}
-	if (0 != memcmp(hdr->jsb, (char *)jsb_action, sizeof(jsb_action)) ||
-		0 != memcmp(&hdr->jsb[sizeof(jsb_action)], JSB_MARKER,
-				MIN(STR_LIT_LEN(JSB_MARKER), sizeof(hdr->jsb) - sizeof(jsb_action))))
+	if (0 != memcmp(hdr->jsb, (char *)jsb_action, SIZEOF(jsb_action)) ||
+		0 != memcmp(&hdr->jsb[SIZEOF(jsb_action)], JSB_MARKER,
+				MIN(STR_LIT_LEN(JSB_MARKER), SIZEOF(hdr->jsb) - SIZEOF(jsb_action))))
 	{
 		if (!shlib)	/* Shared library cannot recompile so this is always an error */
 		{
@@ -239,7 +237,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 				   format */
 				int len;
 				pre_v5_routine_name = (pre_v5_mident *)((char*)hdr + PRE_V5_RTNHDR_RTNOFF);
-				for (len = 0; len < sizeof(pre_v5_mident) && pre_v5_routine_name->c[len]; len++)
+				for (len = 0; len < SIZEOF(pre_v5_mident) && pre_v5_routine_name->c[len]; len++)
 					;
 				zl_error(0, zro_entry, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
 				 	zro_entry->str.len, zro_entry->str.addr);
@@ -361,10 +359,10 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	   and/or auto-zlink.
 	*/
 	/* Allocate 1 extra, to align linkage_adr */
-	hdr->linkage_adr = (lnk_tabent *)malloc((hdr->linkage_len * sizeof(lnk_tabent)) + sizeof(lnk_tabent));
-	assert(PADLEN(hdr->linkage_adr, sizeof(lnk_tabent) == 0));
-	assert(((UINTPTR_T)hdr->linkage_adr % sizeof(lnk_tabent)) == 0);
-	memset((char *)hdr->linkage_adr, 0, (hdr->linkage_len * sizeof(lnk_tabent)));
+	hdr->linkage_adr = (lnk_tabent *)malloc((hdr->linkage_len * SIZEOF(lnk_tabent)) + SIZEOF(lnk_tabent));
+	assert(PADLEN(hdr->linkage_adr, SIZEOF(lnk_tabent) == 0));
+	assert(((UINTPTR_T)hdr->linkage_adr % SIZEOF(lnk_tabent)) == 0);
+	memset((char *)hdr->linkage_adr, 0, (hdr->linkage_len * SIZEOF(lnk_tabent)));
 	/* Relocations for read-write releasable section. Perform relocation on literal mval table and
 	 * variable table entries since they both point to the offsets from the beginning of the
 	 * literal text pool. The relocations for the linkage section is done in addr_fix() */
@@ -393,7 +391,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	}
 
 	/* Read-write non-releasable section */
-	sect_rw_nonrel_size = hdr->labtab_len * sizeof(lab_tabent);
+	sect_rw_nonrel_size = hdr->labtab_len * SIZEOF(lab_tabent);
 	sect_rw_nonrel = malloc(sect_rw_nonrel_size);
 	if (shlib)
 		memcpy(sect_rw_nonrel, shdr + (INTPTR_T)hdr->labtab_adr, sect_rw_nonrel_size);
@@ -412,7 +410,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	}
 	/* Remaining initialization */
 	hdr->current_rhead_adr = hdr;
-	assert(hdr->routine_name.len < sizeof(zlink_mname.c));
+	assert(hdr->routine_name.len < SIZEOF(zlink_mname.c));
 	memcpy(&zlink_mname.c[0], hdr->routine_name.addr, hdr->routine_name.len);
 	zlink_mname.c[hdr->routine_name.len] = 0;
 	/* Do address fix up with relocation and symbol entries from the object. Note that shdr will
@@ -503,8 +501,8 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 	error_def(ERR_INVOBJ);
 	error_def(ERR_TEXT);
 	res_root = NULL;
-	numrel = (int)((hdr->sym_table_off - hdr->rel_table_off) / sizeof(struct relocation_info));
-	if ((numrel * sizeof(struct relocation_info)) != (hdr->sym_table_off - hdr->rel_table_off))
+	numrel = (int)((hdr->sym_table_off - hdr->rel_table_off) / SIZEOF(struct relocation_info));
+	if ((numrel * SIZEOF(struct relocation_info)) != (hdr->sym_table_off - hdr->rel_table_off))
 		return FALSE;	/* Size was not even multiple of relocation entries */
 
 	while (numrel > 0)
@@ -527,7 +525,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 		numrel -= rel_read;
 		for (; rel_read;  --rel_read, ++rel_ptr)
 		{
-			new_res = (res_list *)malloc(sizeof(*new_res));
+			new_res = (res_list *)malloc(SIZEOF(*new_res));
 			new_res->symnum = rel_ptr->r_symbolnum;
 			new_res->addr = rel_ptr->r_address;
 			new_res->next = new_res->list = 0;
@@ -572,8 +570,8 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 	*/
 	if (shlib)
 	{
-		memcpy(&string_size, shdr + hdr->sym_table_off, sizeof(string_size));
-		symbols = shdr + hdr->sym_table_off + sizeof(string_size);
+		memcpy(&string_size, shdr + hdr->sym_table_off, SIZEOF(string_size));
+		symbols = shdr + hdr->sym_table_off + SIZEOF(string_size);
 		string_size -= SIZEOF(string_size);
 	} else
 	{
@@ -709,7 +707,7 @@ boolean_t addr_fix (int file, unsigned char *shdr, urx_rtnref *urx_lcl)
 				urx_putlab(&labid.c[0], sym_size, urx_rp, (char *)hdr->linkage_adr + res_root->addr);
 			else
 			{
-				urx_tmpaddr = (urx_addr *)malloc(sizeof(urx_addr));
+				urx_tmpaddr = (urx_addr *)malloc(SIZEOF(urx_addr));
 				urx_tmpaddr->next = urx_rp->addr;
 				urx_tmpaddr->addr = (INTPTR_T *)((char *)hdr->linkage_adr + res_root->addr);
 				urx_rp->addr = urx_tmpaddr;

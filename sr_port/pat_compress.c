@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ int pat_compress(uint4	pattern_mask,
 		{
 			if (pattern_mask & PATM_STRLIT)
 			{	/* PATM_STRLIT pattern consists of PAT_STRLIT_PADDING int4s that contain padding information */
-				if (!memcmp(lastpatptr + 1, strlit_buff, strlit_buff->bytelen + PAT_STRLIT_PADDING * sizeof(int4)))
+				if (!memcmp(lastpatptr + 1, strlit_buff, strlit_buff->bytelen + PAT_STRLIT_PADDING * SIZEOF(int4)))
 					return TRUE;
 			} else
 				return TRUE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@ GBLREF unsigned char *msp;
 void op_oldvar(void)
 {
 	assert(msp == (unsigned char *)mv_chain);
-	unw_mv_ent(mv_chain);
+	assert(MVST_TRIGR != mv_chain->mv_st_type);	/* Should never unwind a trigger frame here */
 	POP_MV_STENT();
 	return;
 }

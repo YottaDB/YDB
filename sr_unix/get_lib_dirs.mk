@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2002, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2002, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -41,7 +41,7 @@ ifeq ($(gt_os_type), AIX)
 common_dirs_sp=unix_gnp unix_cm unix port_cm port
 else
 ifeq ($(gt_os_type), OS/390)
-common_dirs_sp=unix_gnp unix_cm unix_nsb unix port_cm port
+common_dirs_sp=unix_gnp unix_cm unix port_cm port
 else
 ifeq ($(findstring CYGWIN,$(gt_os_type)), CYGWIN)
 common_dirs_sp=unix_gnp unix_cm unix_nsb unix port_cm port

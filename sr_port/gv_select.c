@@ -74,8 +74,8 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_FREEZECTRL);
 
-	memset(gmap, 0, sizeof(gmap));
-	gmap_size = sizeof(gmap) / sizeof(gmap[0]);
+	memset(gmap, 0, SIZEOF(gmap));
+	gmap_size = SIZEOF(gmap) / SIZEOF(gmap[0]);
 	gmap_ptr_base = &gmap[0];
 	/* "estimated_entries" is a conservative estimate of the # of entries that could be used up in the gmap array */
 	estimated_entries = 1;	/* take into account the NULL gmap entry at the end of the array */
@@ -137,9 +137,9 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		else if (gmap_beg.len == 1 && '*' == *c)
 		{
 			gmap_beg.addr = (char*)&percent_lit;
-			gmap_beg.len = sizeof(percent_lit);
+			gmap_beg.len = SIZEOF(percent_lit);
 			gmap_end.addr =  (char*)&tilde_lit;
-			gmap_end.len = sizeof(tilde_lit);
+			gmap_end.len = SIZEOF(tilde_lit);
 		} else if (1 == len && '*' == *c)
 		{
 			gmap_end = gmap_beg;
@@ -176,8 +176,8 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		if (estimated_entries >= gmap_size)
 		{	/* Current gmap array does not have enough space. Double size before calling global_map */
 			new_gmap_size = gmap_size * 2;	/* double size of gmap array */
-			gmap_ptr = (mstr *)malloc(sizeof(mstr) * new_gmap_size);
-			memcpy(gmap_ptr, gmap_ptr_base, sizeof(mstr) * gmap_size);
+			gmap_ptr = (mstr *)malloc(SIZEOF(mstr) * new_gmap_size);
+			memcpy(gmap_ptr, gmap_ptr_base, SIZEOF(mstr) * gmap_size);
 			if (gmap_ptr_base != &gmap[0])
 				free(gmap_ptr_base);
 			gmap_size = new_gmap_size;
@@ -269,7 +269,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
                                 }
                         }
 			assert(curr_gbl_name.str.len > 0);
-			gl_ptr = (glist*)malloc(sizeof(glist) - 1 + curr_gbl_name.str.len);
+			gl_ptr = (glist*)malloc(SIZEOF(glist) - 1 + curr_gbl_name.str.len);
 			gl_ptr->name.mvtype = MV_STR;
 			gl_ptr->name.str.addr = (char*)gl_ptr->nbuf;
 			gl_ptr->name.str.len = curr_gbl_name.str.len;

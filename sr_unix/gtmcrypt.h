@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -209,7 +209,6 @@ void gtmcrypt_entry(void);
 
 #define INIT_DB_ENCRYPTION(fname, CSA, CSD, RC)											\
 {																\
-	GBLREF enum gtmImageTypes	image_type;										\
 	GBLREF stack_frame		*frame_pointer;										\
 	GBLREF short			dollar_tlevel;										\
 	char 				*ptr, *key_hash = CSD->encryption_hash;							\
@@ -219,11 +218,11 @@ void gtmcrypt_entry(void);
 	RC = 0;															\
 	/* If we are in a TP transaction and the environment is setup in such a way that we will be doing a gtm_ci call 	\
 	 * then let's error out as gtm_ci doesn't work inside a TP transaction */						\
-	prompt_passwd = PROMPT_PASSWD(image_type);										\
+	prompt_passwd = PROMPT_PASSWD;												\
 	if (prompt_passwd && 0 < dollar_tlevel)											\
 		rts_error(VARLSTCNT(1) ERR_CRYPTNOPSWDINTP);									\
 	/* Make sure we are not in gtm_ci already. */										\
-	assert(!IS_MUMPS(image_type) || !(frame_pointer->flags & SFF_CI));							\
+	assert(!IS_MUMPS_IMAGE || !(frame_pointer->flags & SFF_CI));								\
 	/* The below macro eventually calls gtmcrypt_getkey_by_hash to get the encryption key for the database based on 	\
 	 * the hash in the database file header. It could be possible that initially the user had a wrong password and 		\
 	 * tried accessing a global which might have landed in db_init and would have successfully done encryption 		\
@@ -233,15 +232,14 @@ void gtmcrypt_entry(void);
 	 * will call gtm_ci for prompting password. Hence before calling the encryption library, make a note if we had 		\
 	 * to do ci_ret_code_quit below. */											\
 	call_ci_ret_code_quit = (prompt_passwd && !(frame_pointer->flags & SFF_CI));						\
-	ALLOC_BUFF_GET_ENCR_KEY(CSA, key_hash, (CSD->blk_size + sizeof(int4)), RC);						\
+	ALLOC_BUFF_GET_ENCR_KEY(CSA, key_hash, (CSD->blk_size + SIZEOF(int4)), RC);						\
 	if (call_ci_ret_code_quit)												\
 		ci_ret_code_quit();												\
 }
 
-#define IS_MUMPS(img_type)		(GTM_IMAGE == img_type)
-#define PROMPT_PASSWD(img_type) 	(IS_MUMPS(img_type)									\
-				   	  && (NULL != (ptr = (char *)getenv(GTM_PASSWD)))					\
-					  && (0 == strlen(ptr)))
+#define PROMPT_PASSWD			(IS_MUMPS_IMAGE										\
+					 && (NULL != (ptr = (char *)getenv(GTM_PASSWD))) 					\
+					 && (0 == strlen(ptr)))
 
 /* =====================================================================================================*/
 /* 					Plugin Related Macros						*/
@@ -255,7 +253,6 @@ void gtmcrypt_entry(void);
  * a non zero value and error out accordingly. */
 #define INIT_PROC_ENCRYPTION(RC)												\
 {																\
-	GBLREF enum gtmImageTypes	image_type;										\
 	GBLREF int4			gbl_encryption_ecode;									\
 	GBLREF stack_frame		*frame_pointer;										\
 	GBLREF short			dollar_tlevel;										\
@@ -280,18 +277,18 @@ void gtmcrypt_entry(void);
 			assert(NULL != gtmcrypt_init_fnptr);									\
 			/* If we are in a TP transaction and the environment is setup in such a way that we will be doing a 	\
 			 * gtm_ci call then let's error out as gtm_ci doesn't work inside a TP transaction */			\
-			prompt_passwd = PROMPT_PASSWD(image_type);								\
+			prompt_passwd = PROMPT_PASSWD;										\
 			if (prompt_passwd && (0 < dollar_tlevel))								\
 				rts_error(VARLSTCNT(1) ERR_CRYPTNOPSWDINTP);							\
 			/* Make sure we are not in gtm_ci already. */								\
-			assert(!IS_MUMPS(image_type) || !(frame_pointer->flags & SFF_CI));					\
+			assert(!IS_MUMPS_IMAGE || !(frame_pointer->flags & SFF_CI));						\
 			/* The call to gtmcrypt_init below will try to call gtm_ci on finding that password is set to 		\
 			 * empty string and if the calling process is MUMPS. Make a note of the condition under which we	\
 			 * would be calling ci_ret_code_quit. */								\
 			call_ci_ret_code_quit = (prompt_passwd && !(frame_pointer->flags & SFF_CI));				\
 			/* Call the encryption library's init routine. Also, pass a boolean indicating whether 			\
 			 * the library should do the password prompting(for MUMPS) or not(for MUPIP, DSE, etc.)*/		\
-			xc_status_t init_ret_status = (*gtmcrypt_init_fnptr)(IS_MUMPS(image_type));				\
+			xc_status_t init_ret_status = (*gtmcrypt_init_fnptr)(IS_MUMPS_IMAGE);					\
 			/* Unwind the stack frames if necessary. */								\
 			if (call_ci_ret_code_quit)										\
 				ci_ret_code_quit();										\

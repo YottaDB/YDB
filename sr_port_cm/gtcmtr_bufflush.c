@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ bool gtcmtr_bufflush(void)
 	ptr++;
 	v.mvtype = MV_STR;
 	GET_USHORT(num_trans, ptr);
-	ptr += sizeof (short);
+	ptr += SIZEOF(short);
 	for (; num_trans-- > 0;)
 	{
 		regnum = *ptr++;
@@ -82,14 +82,14 @@ bool gtcmtr_bufflush(void)
 			originator_prc_vec = curr_entry->pvec;
 		}
 		GET_USHORT(data_len, ptr);
-		ptr += sizeof(short);
+		ptr += SIZEOF(short);
 		v.str.len = data_len;
 		v.str.addr = (char *)ptr;
-		if (n + v.str.len + sizeof(rec_hdr) > gv_cur_region->max_rec_size)
+		if (n + v.str.len + SIZEOF(rec_hdr) > gv_cur_region->max_rec_size)
 		{
 			if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
 				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			rts_error(VARLSTCNT(11) ERR_REC2BIG, 4, n + v.str.len + sizeof(rec_hdr), (int4)gv_cur_region->max_rec_size,
+			rts_error(VARLSTCNT(11) ERR_REC2BIG, 4, n + v.str.len + SIZEOF(rec_hdr), (int4)gv_cur_region->max_rec_size,
 				REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 		}
 		gvcst_put(&v);

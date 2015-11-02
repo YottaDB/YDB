@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,11 +24,12 @@ GBLREF bool 	shift_gvrefs;
 
 int gvn(void)
 {
-	triple *ref, *t1, *oldchain, tmpchain, *triptr, *s;
-	oprtype subscripts[MAX_GVSUBSCRIPTS], *sb1, *sb2;
-	bool shifting, vbar, parse_status;
-	opctype ox;
-	char x;
+	triple		*ref, *t1, *oldchain, tmpchain, *triptr, *s;
+	oprtype		subscripts[MAX_GVSUBSCRIPTS], *sb1, *sb2;
+	bool		shifting, vbar, parse_status;
+	opctype		ox;
+	char		x;
+
 	error_def(ERR_MAXNRSUBSCRIPTS);
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_GBLNAME);
@@ -110,7 +111,7 @@ int gvn(void)
 	if (window_token == TK_LPAREN)
 		for (;;)
 		{
-			if (sb1 >= &subscripts[MAX_GVSUBSCRIPTS])
+			if (sb1 >= ARRAYTOP(subscripts))
 			{
 				stx_error(ERR_MAXNRSUBSCRIPTS);
 				if (shifting)

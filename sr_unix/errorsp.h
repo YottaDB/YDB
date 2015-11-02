@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,20 @@
 #  define GTMCORENAME "gtmcore"
 #endif
 
+/* Define maximum condition handlers. For utilities that do not use triggers (dse, lke, and such) we
+   only need a basic number of condition handlers. But if triggers are supported, not only the GT.M
+   runtime but MUPIP and the GTCM servers too need to be able to nest which means several triggers
+   per allowed level plus extra handlers for that last level.
+*/
+#define MAX_HANDLERS 15		/* should be enough for dse/lke etc. */
+#ifdef GTM_TRIGGER
+#  define MAX_MUMPS_HANDLERS (MAX_HANDLERS + 20 + 15 + (GTM_TRIGGER_DEPTH_MAX * 2))	/* Allow for callins plus many trigr lvls */
+#else
+#  define MAX_MUMPS_HANDLERS (MAX_HANDLERS + 20)					/* to allow upto 10 nested callin lvls */
+#endif
+
 #define CONDITION_HANDLER(name)	ch_ret_type name(int arg)
-#define MAX_HANDLERS 15		/* should be enough for dse/lke/mupip etc. */
-#define MAX_MUMPS_HANDLERS (MAX_HANDLERS + 20)	/* to allow upto 10 nested levels of callins */
+
 /* Count of arguments the TPRETRY error will make available for tp_restart to use */
 #define TPRESTART_ARG_CNT 6
 
@@ -99,17 +110,41 @@ void ch_trace_point() {return;}
 
 /* MUM_TSTART unwinds the current C-stack and restarts executing generated code from the top of the current M-stack.
  * With the introduction of call-ins, there could be multiple mdb_condition_handlers stacked up in chnd stack.
- * The active context should be reset to the youngest mdb_condition_handler created by the current gtm/call-in invocation
+ * The active context should be reset to the youngest mdb_condition_handler created by the current gtm/call-in invocation. We have
+ * two flavors depending on if triggers are enabled or not.
  */
-#define MUM_TSTART		{					\
-                                        CHTRACEPOINT;			\
-					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; \
-					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active); \
-                                        ctxt->ch_active = FALSE; 	\
-					restart = mum_tstart;		\
-					active_ch = ctxt;		\
-					longjmp(ctxt->jmp, 1);		\
+#ifdef GTM_TRIGGER
+/* Note the 2nd assert makes sure we are NOT returning to a trigger-invoking frame which does not have a valid msp to
+ * support a return since a call to op_gvput or op_kill does not save a return addr in the M stackframe but only in the C
+ * stackframe. But if proc_act_type is non-zero we set an error frame flag and getframe instead detours to
+ * error_return which deals with the module appropriately.
+ */
+#define MUM_TSTART		{												\
+					GBLREF unsigned short proc_act_type;							\
+                                        CHTRACEPOINT;										\
+					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; 		\
+					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active);	\
+					assert(!(SFF_TRIGR_CALLD & frame_pointer->flags) || (0 != proc_act_type)		\
+					       || (SFF_ETRAP_ERR & frame_pointer->flags));					\
+					DBGEHND((stderr, "MUM_TSTART: Frame %016lx dispatched\n", frame_pointer));		\
+                                        ctxt->ch_active = FALSE; 								\
+					restart = mum_tstart;									\
+					active_ch = ctxt;									\
+					longjmp(ctxt->jmp, 1);									\
 				}
+#else
+#define MUM_TSTART		{												\
+                                        CHTRACEPOINT;										\
+					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; 		\
+					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active);	\
+					DBGEHND((stderr, "MUM_TSTART: Frame %016lx dispatched\n", frame_pointer));		\
+                                        ctxt->ch_active = FALSE; 								\
+					restart = mum_tstart;									\
+					active_ch = ctxt;									\
+					longjmp(ctxt->jmp, 1);									\
+				}
+#endif
+
 
 #define ESTABLISH_RET(x,ret)	{					\
                                         CHTRACEPOINT;			\
@@ -174,8 +209,6 @@ void ch_trace_point() {return;}
 				}
 
 #define DRIVECH(x)		{									\
-					GBLREF int	mumps_status;					\
-													\
 					error_def(ERR_TPRETRY);						\
 					CHTRACEPOINT;							\
 					if (ERR_TPRETRY != error_condition)				\
@@ -243,12 +276,13 @@ void stop_image_no_core(void);
 #define SUPPRESS_DUMP		(created_core || dont_want_core)
 #define DUMP_CORE               gtm_dump_core();
 
-#define MUMPS_EXIT		{					\
-					GBLREF int4 exi_condition;      \
-                                        CHTRACEPOINT;			\
-					mumps_status = SIGNAL;		\
-					exi_condition = -mumps_status;  \
-					EXIT(-exi_condition);		\
+#define MUMPS_EXIT		{							\
+					GBLREF int4 exi_condition;			\
+                                        GBLREF int  mumps_status;			\
+                                        CHTRACEPOINT;					\
+					mumps_status = SIGNAL;				\
+					exi_condition = -mumps_status;  		\
+					EXIT(-exi_condition);				\
 				}
 
 #define PROCDIE(x)		_exit(x)
@@ -256,10 +290,10 @@ void stop_image_no_core(void);
 						exit(x);		\
 				}
 
-#define DUMP			(   SIGNAL == (int)ERR_ASSERT		\
-				 || SIGNAL == (int)ERR_GTMASSERT	\
-				 || SIGNAL == (int)ERR_GTMCHECK		\
-				 || SIGNAL == (int)ERR_MEMORY		\
+#define DUMP			(SIGNAL == (int)ERR_ASSERT			\
+				 || SIGNAL == (int)ERR_GTMASSERT		\
+				 || SIGNAL == (int)ERR_GTMCHECK	/* BYPASSOK */	\
+				 || SIGNAL == (int)ERR_MEMORY			\
 				 || SIGNAL == (int)ERR_STACKOFLOW )
 
 /* true if above or SEVERE and GTM error (perhaps add some "system" errors) */
@@ -300,5 +334,12 @@ CONDITION_HANDLER(read_source_ch);
 CONDITION_HANDLER(source_ch);
 CONDITION_HANDLER(gtmci_init_ch);
 CONDITION_HANDLER(gtmci_ch);
+CONDITION_HANDLER(gvtr_tpwrap_ch);
+#ifdef GTM_TRIGGER
+CONDITION_HANDLER(trigger_trgfile_tpwrap_ch);
+CONDITION_HANDLER(trigger_item_tpwrap_ch);
+CONDITION_HANDLER(gtm_trigger_ch);
+CONDITION_HANDLER(gtm_trigger_complink_ch);
+#endif
 
 #endif

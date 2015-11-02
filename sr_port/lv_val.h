@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@
 		lv_val **savflist_ptr = (flist_ptr);								\
 		DBGRFCT((stderr, "\n<< Free list queueing of lv_val/sbs_blk at 0x"lvaddr" by %s line %d\n",	\
 			 (lv_ptr), __FILE__, __LINE__));							\
-		DEBUG_ONLY(memset((lv_ptr), 0xfd, sizeof(lv_val)));						\
+		DEBUG_ONLY(memset((lv_ptr), 0xfd, SIZEOF(lv_val)));						\
 		(lv_ptr)->ptrs.free_ent.next_free = *savflist_ptr;						\
 		*savflist_ptr = (lv_ptr);									\
 		(lv_ptr)->v.mvtype = 0;	/* clears any use as MV_ALIASCONT */ 					\
@@ -98,7 +98,6 @@
 		(lv)->ptrs.val_ent.parent.sym = symvalarg;								\
 	}
 
-
 /* Macro to call lv_var_clone and set the cloned status in the tp_var structure */
 #define TP_VAR_CLONE(lv)			\
 {						\
@@ -109,6 +108,9 @@
 	(lv)->tp_var->var_cloned = TRUE;	\
 }
 
+/* Macro to indicate if a given lv_val is an alias or not */
+#define IS_ALIASLV(lv) (((1 < (lv)->stats.trefcnt) || (0 < (lv)->stats.crefcnt)) \
+			DEBUG_ONLY(&& assert(MV_SYM == (lv)->ptrs.val_ent.parent.sym->ident)))
 
 typedef struct lv_sbs_tbl_struct
 {	/* Note this structure is allocated from lv_getslot() which also allocates lv_val structures so its size
@@ -200,21 +202,22 @@ typedef struct lv_xnewref_struct
  */
 typedef struct symval_struct
 {
-       	unsigned short		ident;
-	unsigned char		tp_save_all;
-	unsigned char		filler1;
-	boolean_t		alias_activity;
+       	unsigned short			ident;
+	unsigned char			tp_save_all;
+	unsigned char			filler1;
+	boolean_t			alias_activity;
 	struct
 	{
 		struct sbs_blk_struct	*fl, *bl;
 	} sbs_que;
-	lv_xnew_var		*xnew_var_list;
-	lv_xnew_ref		*xnew_ref_list;
-       	hash_table_mname	h_symtab;
-	lv_blk	       		first_block;
-	lv_val	       		*lv_flist;
-       	struct symval_struct	*last_tab;
-	int4			symvlvl;		/* Level of symval struct (nesting) */
+	lv_xnew_var			*xnew_var_list;
+	lv_xnew_ref			*xnew_ref_list;
+       	hash_table_mname		h_symtab;
+	lv_blk	       			first_block;
+	lv_val	       			*lv_flist;
+       	struct symval_struct		*last_tab;
+	int4				symvlvl;		/* Level of symval struct (nesting) */
+	boolean_t			trigr_symval;		/* Symval is owned by a trigger */
 } symval;
 
 /* Structure to describe the block allocated to describe a var specified on a TSTART to be restored
@@ -254,9 +257,12 @@ void op_setals2als(lv_val *src, int dstindx);
 void op_setalsin2alsct(lv_val *src, lv_val *dst);
 void op_setalsctin2als(lv_val *src, int dstindx);
 void op_setalsct2alsct(lv_val *src, lv_val *dst);
+void op_setfnretin2als(mval *srcmv, int destindx); /* no an lv_val ref but kept here with its friends so it not lonely */
+void op_setfnretin2alsct(mval *srcmv, lv_val *dstlv);
 void op_killalias(int srcindx);
 void op_clralsvars(lv_val *dst);
 void op_fnzahandle(lv_val *src, mval *dst);
+void op_fnincr(lv_val *local_var, mval *increment, mval *result);
 
 void lvzwr_var(lv_val *lv, int4 n);
 unsigned char   *format_lvname(lv_val *start, unsigned char *buff, int size);

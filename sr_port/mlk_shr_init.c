@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,10 +33,10 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	mlk_ctldata_ptr_t	ctl;
 
 	/* there are four sections with the following approximate sizes
-	 *  mlk_ctldata	--> sizeof(mlk_ctldata)
+	 *  mlk_ctldata	--> SIZEOF(mlk_ctldata)
 	 *  mlk_shrblk	--> size * 5/8 (consisting of nr_blocks number of mlk_shrblk structures)
 	 *  mlk_prcblk	--> size * 1/8 (consisting of nr_procs  number of mlk_prcblk structures)
-	 *  mlk_shrsubs	--> size * 3/8 - sizeof(mlk_ctldata) (consisting of variable number of variable length subscript strings)
+	 *  mlk_shrsubs	--> size * 3/8 - SIZEOF(mlk_ctldata) (consisting of variable number of variable length subscript strings)
 	 */
 	nr_blocks = ((size >> 1) + (size >> 3)) / SIZEOF(mlk_shrblk);	/* size/2 + size/8 = size*5/8 */
 	nr_procs = (size >> 3) / SIZEOF(mlk_prcblk);

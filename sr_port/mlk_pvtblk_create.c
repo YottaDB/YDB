@@ -115,7 +115,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	 * Each string is preceeded by 1 byte string len.
 	 */
 	r = (mlk_pvtblk *) malloc(MLK_PVTBLK_SIZE(len, subcnt));
-	memset(r, 0, sizeof(mlk_pvtblk) - 1);
+	memset(r, 0, SIZEOF(mlk_pvtblk) - 1);
 	r->translev = 1;
 	r->subscript_cnt = subcnt;
 	/* Each string is preceeded by string length byte */

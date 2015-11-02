@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,8 @@
 #include "error.h"
 #include "fao_parm.h"
 #include "min_max.h"
+#include "hashtab_mname.h"
+#include "lv_val.h"
 #include "util.h"
 #include "util_format.h"
 #include "util_out_print_vaparm.h"
@@ -37,11 +39,14 @@
 	if (faocnt > 0) {result = (type)va_arg(var, type); faocnt--;} else result = defval;
 
 GBLREF	io_pair			io_std_device;
-GBLREF	enum gtmImageTypes	image_type;
 GBLDEF	char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
 GBLDEF	va_list		last_va_list_ptr;
 GBLREF	boolean_t	blocksig_initialized;
 GBLREF  sigset_t	block_sigsent;
+GBLREF	void		(*op_write_ptr)(mval *v);
+GBLREF	void		(*op_wteol_ptr)(int4 n);
+
+
 static	boolean_t	first_syslog = TRUE;
 
 /*
@@ -262,8 +267,8 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				 * from gtmsecshr will not be treated as column widths but as character lengths.
 				 * This is a safe limitation since no message from gtmsecshr specifies width yet.
 				 */
-				assert(!gtm_utf8_mode || (GTMSECSHR_IMAGE == image_type) || (NULL != gtm_wcswidth_fnptr));
-				cwidth = (!gtm_utf8_mode || GTMSECSHR_IMAGE == image_type)
+				assert(!gtm_utf8_mode || IS_GTMSECSHR_IMAGE || (NULL != gtm_wcswidth_fnptr));
+				cwidth = (!gtm_utf8_mode || IS_GTMSECSHR_IMAGE)
 					? length : (*gtm_wcswidth_fnptr)((unsigned char *)c, length, FALSE, 1);
 				if (0 < field_width && cwidth > field_width)
 					cwidth = field_width;
@@ -289,7 +294,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					} else
 					{
 						chlen = (caddr_t)UTF8_MBTOWC(c, ctop, ch) - c;
-						if (GTMSECSHR_IMAGE != image_type)
+						if (!IS_GTMSECSHR_IMAGE)
 						{
 							chwidth = (int)UTF8_WCWIDTH(ch);
 							/* Note down chwidth (for debugging) from ICU before tampering with it */
@@ -443,16 +448,16 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 							switch (type2)
 							{ /* length is number of ascii hex chars */
 								case 'B':
-							        	length = sizeof(short);
+							        	length = SIZEOF(short);
 							         	break;
 								case 'W':
-									length = sizeof(int4);
+									length = SIZEOF(int4);
 							                break;
 								case 'L':
-									length = 2 * sizeof(int4);
+									length = 2 * SIZEOF(int4);
 							                break;
 							        case 'J':
-									length = 2 * sizeof(INTPTR_T);
+									length = 2 * SIZEOF(INTPTR_T);
 						                       	break;
 								default:
 									assert(FALSE);
@@ -511,8 +516,8 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					GTM64_ONLY(
 					/* If this is an integer to be printed using format specifier X, display the
 					   least 4 bytes */
-					if (type == 'X' && type2 == 'J' && (length == (2 * sizeof(INTPTR_T))))
-						memcpy(outptr, numa + sizeof(INTPTR_T), length/2);
+					if (type == 'X' && type2 == 'J' && (length == (2 * SIZEOF(INTPTR_T))))
+						memcpy(outptr, numa + SIZEOF(INTPTR_T), length/2);
 					else
 						memset(outptr, '*', field_width);
 					)
@@ -575,12 +580,12 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 	char	*fmt_top1, *fmt_top2; /* the top of the buffer after leaving 1 (and 2 bytes respectively) at the end */
 	int	util_avail_len;
 
-	assert(sizeof(fmt_buff) == sizeof(util_outbuff));
+	assert(SIZEOF(fmt_buff) == SIZEOF(util_outbuff));
 	if (util_outptr == NULL)
 		util_outptr = util_outbuff;
 	if (message != NULL)
 	{
-		util_avail_len = INTCAST(util_outbuff + sizeof(util_outbuff) - util_outptr - 2);
+		util_avail_len = INTCAST(util_outbuff + SIZEOF(util_outbuff) - util_outptr - 2);
 		assert(0 <= util_avail_len);
 		if (0 < util_avail_len)
 			util_outptr = util_format(message, var, util_outptr, util_avail_len, faocnt);
@@ -603,7 +608,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			 * stop copying just before the point of overflow is reached even though it means loss of the tail data.
 			 */
 			*util_outptr = '\0';
-			fmt_top1 = fmt_buff + sizeof(fmt_buff) - 1;
+			fmt_top1 = fmt_buff + SIZEOF(fmt_buff) - 1;
 			fmt_top2 = fmt_top1 - 1;
 			for (util_outptr = util_outbuff, fmtc = fmt_buff; (0 != *util_outptr) && (fmtc < fmt_top1); )
 			{
@@ -679,6 +684,37 @@ void	util_out_print(caddr_t message, int flush, ...)
 	va_start(var, flush);
 
 	util_out_print_vaparm(message, flush, var, MAXPOSINT4);
+	va_end(last_va_list_ptr);
+	va_end(var);
+}
+
+/* Used primarily by MUPIP in the MUPIP TRIGGER routines where output can either be output "normally" there or
+ * when the same trigger parsing/loading functions are called from within GTM, the output is done with GTM IO
+ * routines.
+ */
+void	util_out_print_gtmio(caddr_t message, int flush, ...)
+{
+	int		flush_it;
+	boolean_t	usestdio;
+	va_list		var;
+	mval		flushtxt;
+
+	va_start(var, flush);
+
+	usestdio = IS_MCODE_RUNNING;
+	assert((FLUSH == flush) || (NOFLUSH == flush));
+	flush_it = ((FLUSH == flush) && !usestdio) ? FLUSH : NOFLUSH;
+	util_out_print_vaparm(message, flush_it, var, MAXPOSINT4);
+	if (usestdio && (FLUSH == flush))
+	{	/* Message should be in buffer and we just need to flush it */
+		assert(NULL != op_write_ptr);
+		flushtxt.mvtype = MV_STR;
+		flushtxt.str.addr = util_outbuff;
+		flushtxt.str.len = INTCAST(util_outptr - util_outbuff);
+		(*op_write_ptr)(&flushtxt);
+		(*op_wteol_ptr)(1);
+		util_outptr = util_outbuff;	/* Signal text is flushed */
+	}
 	va_end(last_va_list_ptr);
 	va_end(var);
 }

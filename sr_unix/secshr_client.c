@@ -117,7 +117,7 @@ const static char readonly secshr_unbl_start_mesg_code[][MAX_GTMSECSHR_FAIL_MESG
 	recd = 0;										\
 	mesg_len = 0;										\
 	recv_ptr = (char *)&mesg;								\
-	recv_len = sizeof(mesg);								\
+	recv_len = SIZEOF(mesg);								\
 	client_timer_popped = 0;								\
 	msec_timeout = timeout2msec(CLIENT_ACK_TIMER);						\
 	start_timer(timer_id, msec_timeout, client_timer_handler, 0, NULL);			\
@@ -173,14 +173,14 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 		struct stat stat_buf;
 
 		gtmsecshr_logname.addr = GTMSECSHR_PATH;
-                gtmsecshr_logname.len = sizeof(GTMSECSHR_PATH) - 1;
-		status = TRANS_LOG_NAME(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path, sizeof(gtmsecshr_path),
+                gtmsecshr_logname.len = SIZEOF(GTMSECSHR_PATH) - 1;
+		status = TRANS_LOG_NAME(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path, SIZEOF(gtmsecshr_path),
 						dont_sendmsg_on_log2long);
                 if (SS_NORMAL != status)
 		{
 			if (SS_LOG2LONG == status)
 				send_msg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_logname.len, gtmsecshr_logname.addr,
-					sizeof(gtmsecshr_path) - 1);
+					SIZEOF(gtmsecshr_path) - 1);
                         send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 					ERR_TEXT, 2, RTS_ERROR_STRING(secshr_unbl_start_mesg_code[INVTRANSGTMSECSHR]));
                         rts_error(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
@@ -206,7 +206,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 			mesg.len += path_len;
 		} else if (FLUSH_DB_IPCS_INFO == code)
 		{
-			memcpy(&mesg.mesg.db_ipcs, &db_ipcs, sizeof(struct ipcs_mesg_struct));
+			memcpy(&mesg.mesg.db_ipcs, &db_ipcs, SIZEOF(struct ipcs_mesg_struct));
 			/* most of the time file length is much smaller than MAX_TRANS_NAME_LEN */
 			mesg.len += (SIZEOF(struct ipcs_mesg_struct) - MAX_TRANS_NAME_LEN);
 			mesg.len += mesg.mesg.db_ipcs.fn_len;
@@ -273,7 +273,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 			if (0 <= num_chars_recvd)
 			{
 				recd += num_chars_recvd;
-				if ((0 == mesg_len) && (sizeof(int) <= recd))
+				if ((0 == mesg_len) && (SIZEOF(int) <= recd))
 					mesg_len = mesg.len;
 				if (recd == mesg_len)
 				{

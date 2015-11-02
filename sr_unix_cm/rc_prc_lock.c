@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -136,7 +136,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 				}else
 					prior = &(*prior)->next;
 			}
-		fl = (rc_lknam*)((char *)fl + sbk->len.value - 1 + sizeof(rc_lknam));
+		fl = (rc_lknam*)((char *)fl + sbk->len.value - 1 + SIZEOF(rc_lknam));
 		sbk = &fl->sb_key;
 
 		}
@@ -186,8 +186,8 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 			return -1;
 		}
 		temp += subcnt;
-		mp = (mlk_pvtblk*)malloc(sizeof(mlk_pvtblk) + temp + pid_len + 1);
-		memset(mp, 0, sizeof(mlk_pvtblk) - 1);
+		mp = (mlk_pvtblk*)malloc(SIZEOF(mlk_pvtblk) + temp + pid_len + 1);
+		memset(mp, 0, SIZEOF(mlk_pvtblk) - 1);
 		mp->subscript_cnt = subcnt;
 		mp->total_length = temp;
 		memcpy(mp->value, key_buff, mp->total_length);
@@ -214,7 +214,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 			return -1;/* error */
 
 		}
-		fl = (rc_lknam*)((char *)fl + sbk->len.value - 1 + sizeof(rc_lknam));
+		fl = (rc_lknam*)((char *)fl + sbk->len.value - 1 + SIZEOF(rc_lknam));
 		sbk = &fl->sb_key;
 	}
 	blocked = FALSE;

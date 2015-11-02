@@ -27,7 +27,7 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
 
 	assert(tbl->sym->ident == MV_SYM);
        	lv = lv_getslot(tbl->sym);
-	memset(lv,0, sizeof(lv_val));
+	memset(lv,0, SIZEOF(lv_val));
        	lv->ptrs.val_ent.parent.sbs = tbl;
 
 	assert(stat->prev == stat->blk || stat->prev->nxt == stat->blk);
@@ -57,7 +57,7 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
        	       	       	dst = src;
        	       	       	src += 1;
        	       	       	memcpy(dst, src, (char *)stat->ptr - (char *)src);
-       	       	       	slot = (sbs_str_struct *)((char *)stat->ptr - sizeof(sbs_str_struct));
+       	       	       	slot = (sbs_str_struct *)((char *)stat->ptr - SIZEOF(sbs_str_struct));
 	 	}
  	       	prev->cnt++;
 	} else if (blk->nxt && blk->nxt->cnt < max_count)

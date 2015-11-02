@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 		return ERR_PARBUFSM;
 	assert(trans.addr == pblk->buffer);
 
-	memset(&def, 0, sizeof(def));	/* initial the defaults to zero */
+	memset(&def, 0, SIZEOF(def));	/* initial the defaults to zero */
 	if (pblk->def1_size > 0)
 	{	/* Parse default filespec if supplied */
 		def.fop = F_SYNTAXO;
@@ -134,7 +134,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 					if (NULL != (hostinfo = GETHOSTBYNAME(LOCALHOSTNAME)))
 					{
 						localhost_ip = *(struct in_addr *)hostinfo->h_addr;
-						if (0 == memcmp(&localhost_ip, &query_ip, sizeof(struct in_addr)))
+						if (0 == memcmp(&localhost_ip, &query_ip, SIZEOF(struct in_addr)))
 							local_ip = &localhost_ip;
 					}
 					if (!local_ip)
@@ -151,7 +151,7 @@ int4	parse_file(mstr *file, parse_blk *pblk)
 							local_ip = (struct in_addr *)*hostaddrlist;
 							if (!local_ip)		/* End of list -- must be remote */
 								break;
-							if (0 == memcmp(&query_ip, local_ip, sizeof(struct in_addr)))
+							if (0 == memcmp(&query_ip, local_ip, SIZEOF(struct in_addr)))
 								break;		/* Tiz truly a local node */
 						}
 					}

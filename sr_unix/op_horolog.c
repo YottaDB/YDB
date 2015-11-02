@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +24,7 @@ void op_horolog(mval *s)
 
 	assert (stringpool.free <= stringpool.top);
 	assert (stringpool.free >= stringpool.base);
-	if (stringpool.top - stringpool.free < MAXNUMLEN+1)
-		stp_gcol(MAXNUMLEN+1);
-
+	ENSURE_STP_FREE_SPACE(MAXNUMLEN + 1);
 	seconds = time(0);
 	dollarh(seconds, &days, &seconds);
 	s->str.addr = (char *) stringpool.free;

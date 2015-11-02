@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -134,7 +134,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		{	/* Reached max, need to autoswitch */
 			/* Ensure new journal file can hold the entire current transaction's journal record requirements */
 			assert(csd->autoswitchlimit >= MAX_REQD_JNL_FILE_SIZE(total_jnl_rec_size));
-			memset(&jnl_info, 0, sizeof(jnl_info));
+			memset(&jnl_info, 0, SIZEOF(jnl_info));
 			jnl_info.prev_jnl = &prev_jnl_fn[0];
 			set_jnl_info(gv_cur_region, &jnl_info);
 			assert(JNL_ENABLED(csa) && (NOJNL != jpc->channel) && !(JNL_FILE_SWITCHED(jpc)));
@@ -149,8 +149,9 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			} else
 				rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region), jpc->status);
 			assert(!jgbl.forw_phase_recovery || (NULL != jgbl.mur_pini_addr_reset_fnptr));
-			if (jgbl.forw_phase_recovery && (NULL != jgbl.mur_pini_addr_reset_fnptr))
-				(*jgbl.mur_pini_addr_reset_fnptr)();
+			assert(jgbl.forw_phase_recovery || (NULL == jgbl.mur_pini_addr_reset_fnptr));
+			if (NULL != jgbl.mur_pini_addr_reset_fnptr)
+				(*jgbl.mur_pini_addr_reset_fnptr)(csa);
 			assert(!jnl_info.no_rename);
 			assert(!jnl_info.no_prev_link);
 			if (EXIT_NRM == cre_jnl_file(&jnl_info))

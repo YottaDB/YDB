@@ -44,8 +44,7 @@ int op_readfl(mval *v, int4 length, int4 timeout)
 		rts_error(VARLSTCNT(1) ERR_RDFLTOOLONG);
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
-	if (stringpool.free + b_length + ESC_LEN > stringpool.top)
-		stp_gcol(b_length + ESC_LEN);
+	ENSURE_STP_FREE_SPACE(b_length + ESC_LEN);
 	v->mvtype = MV_STR;
 	v->str.addr = (char *)stringpool.free;
 	v->str.len = 0;
@@ -61,8 +60,7 @@ int op_readfl(mval *v, int4 length, int4 timeout)
 	{
 		cnt = insize = outsize = v->str.len;
 		assert(stringpool.free >= stringpool.base);
-		if (cnt > stringpool.top - stringpool.free)
-			stp_gcol(cnt);
+		ENSURE_STP_FREE_SPACE(cnt);
 		temp_ch = stringpool.free;
 		save_ptr = v->str.addr;
 		start_ptr = (char *)temp_ch;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,7 @@
 
 #define TIME_FORMAT	"_%Y%j%H%M%S"	/* .yearjuliendayhoursminutesseconds */
 
+GBLDEF CLI_ENTRY	*cmd_ary = NULL; /* GTMSECSHR does not have any command tables so initialize command array to NULL */
 
 GBLREF	int			gtmsecshr_log_file;
 GBLREF	int			gtmsecshr_sockfd;
@@ -202,9 +203,9 @@ int main(void)
 		recd = 0;
 		mesg_len = 0;
 		recv_ptr = (char *)&mesg;
-		recv_len = sizeof(mesg);
+		recv_len = SIZEOF(mesg);
 		recv_complete = 0;
-		client_addr_len = sizeof(struct sockaddr_un);
+		client_addr_len = SIZEOF(struct sockaddr_un);
 		msec_timeout = timeout2msec(GTMSECSHR_MESG_TIMEOUT);
 		start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
 		while (!recv_complete)
@@ -220,7 +221,7 @@ int main(void)
 			else
 			{
 				recd += num_chars_recd;
-				if ((0 == mesg_len) && (sizeof(int) <= recd))
+				if ((0 == mesg_len) && (SIZEOF(int) <= recd))
 					mesg_len = mesg.len;
 				if (recd == mesg_len)
 					recv_complete = 1;
@@ -462,8 +463,8 @@ int gtmsecshr_open_log_file (void)
 	error_def(ERR_TEXT);
 
 	gtmsecshr_lognam.addr = GTMSECSHR_LOG_DIR;
-	gtmsecshr_lognam.len = sizeof(GTMSECSHR_LOG_DIR) - 1;
-	status = TRANS_LOG_NAME(&gtmsecshr_lognam, &gtmsecshr_transnam, gtmsecshr_logpath, sizeof(gtmsecshr_logpath),
+	gtmsecshr_lognam.len = SIZEOF(GTMSECSHR_LOG_DIR) - 1;
+	status = TRANS_LOG_NAME(&gtmsecshr_lognam, &gtmsecshr_transnam, gtmsecshr_logpath, SIZEOF(gtmsecshr_logpath),
 					dont_sendmsg_on_log2long);
 	if ((SS_NORMAL != status) || !ABSOLUTE_PATH(gtmsecshr_logpath))
 	{	/* gtm_log not defined or not defined to absolute path, use default gtm_log
@@ -471,10 +472,10 @@ int gtmsecshr_open_log_file (void)
 		 */
 		if (SS_LOG2LONG == status)
 			send_msg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_lognam.len, gtmsecshr_lognam.addr,
-				sizeof(gtmsecshr_logpath) - 1);
+				SIZEOF(gtmsecshr_logpath) - 1);
 		send_msg(VARLSTCNT(4) ERR_GTMSECSHRDEFLOG, 2, RTS_ERROR_TEXT(DEFAULT_GTMSECSHR_LOG_DIR));
 		strcpy(gtmsecshr_logpath, DEFAULT_GTMSECSHR_LOG_DIR);
-		gtmsecshr_logpath_len = sizeof(DEFAULT_GTMSECSHR_LOG_DIR) - 1;
+		gtmsecshr_logpath_len = SIZEOF(DEFAULT_GTMSECSHR_LOG_DIR) - 1;
 	} else
 		gtmsecshr_logpath_len = gtmsecshr_transnam.len;
 	if (-1 == Stat(gtmsecshr_logpath, &buf))
@@ -563,12 +564,12 @@ void gtmsecshr_switch_log_file(int sig)
 	strcpy(newname, gtmsecshr_logpath);
 	if (((time_t)-1 == (now = time(NULL))) || (!(tm_struct = localtime(&now))))
 	{
-		SPRINTF(&newname[gtmsecshr_logpath_len + sizeof(GTMSECSHR_LOG_PREFIX) - 1],
+		SPRINTF(&newname[gtmsecshr_logpath_len + SIZEOF(GTMSECSHR_LOG_PREFIX) - 1],
 			".timerrno%d", errno);
 	} else
 	{
-		STRFTIME(&newname[gtmsecshr_logpath_len + sizeof(GTMSECSHR_LOG_PREFIX) - 1],
-			MAX_TRANS_NAME_LEN - gtmsecshr_logpath_len - sizeof(GTMSECSHR_LOG_PREFIX),
+		STRFTIME(&newname[gtmsecshr_logpath_len + SIZEOF(GTMSECSHR_LOG_PREFIX) - 1],
+			MAX_TRANS_NAME_LEN - gtmsecshr_logpath_len - SIZEOF(GTMSECSHR_LOG_PREFIX),
 			TIME_FORMAT, tm_struct, dummy);
 	}
 	newname_len = STRLEN(newname);
@@ -633,7 +634,7 @@ void gtmsecshr_sig_init(void)
 
 	sig_init(gtmsecshr_signal_handler, gtmsecshr_signal_handler, suspsigs_handler);
 	/* Redefine handler for SIGHUP to switch log file */
-	memset(&act, 0, sizeof(act));
+	memset(&act, 0, SIZEOF(act));
 	act.sa_handler  = gtmsecshr_switch_log_file;
 	sigaction(SIGHUP, &act, 0);
 }
@@ -726,15 +727,15 @@ int service_request(gtmsecshr_mesg *buf)
 		break;
 	   case REMOVE_FILE :
 #		ifndef MUTEX_MSEM_WAKE
-		for (index = 0; index < sizeof(buf->mesg.path); index++)
+		for (index = 0; index < SIZEOF(buf->mesg.path); index++)
 		{
 			if ('\0' == buf->mesg.path[index])
 				break;
 		}
-		if ((0 == index) || (index >= sizeof(buf->mesg.path)))
+		if ((0 == index) || (index >= SIZEOF(buf->mesg.path)))
 		{
 			gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7, RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
-				buf->code, index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index,
+				buf->code, index >= SIZEOF(buf->mesg.path) ? SIZEOF(buf->mesg.path) - 1 : index,
 				buf->mesg.path, ERR_TEXT, 2, RTS_ERROR_LITERAL("no file or length too long"));
 			buf->code = EINVAL;
 		} else
@@ -759,7 +760,7 @@ int service_request(gtmsecshr_mesg *buf)
 				buf->code = errno;
 				gtm_putmsg(VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7,
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
-					index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index, buf->mesg.path,
+					index >= SIZEOF(buf->mesg.path) ? SIZEOF(buf->mesg.path) - 1 : index, buf->mesg.path,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to get file status"), errno);
 #			ifndef __MVS__
 			} else if (!S_ISSOCK(statbuf.st_mode))
@@ -769,14 +770,14 @@ int service_request(gtmsecshr_mesg *buf)
 			{
 				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
-					index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index, buf->mesg.path,
+					index >= SIZEOF(buf->mesg.path) ? SIZEOF(buf->mesg.path) - 1 : index, buf->mesg.path,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("File is not a GTM mutex socket file"));
 				buf->code = EINVAL;
 			} else if (0 != MEMCMP_LIT(basnam, MUTEX_SOCK_FILE_PREFIX))
 			{
 				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
 			  	 RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
-				 buf->code, index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index,
+				 buf->code, index >= SIZEOF(buf->mesg.path) ? SIZEOF(buf->mesg.path) - 1 : index,
 				 buf->mesg.path, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("File name does not match the naming convention for a GT.M mutex socket file"));
 				buf->code = EINVAL;
@@ -784,7 +785,7 @@ int service_request(gtmsecshr_mesg *buf)
 			{
 				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
 				 RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
-				 buf->code, index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index,
+				 buf->code, index >= SIZEOF(buf->mesg.path) ? SIZEOF(buf->mesg.path) - 1 : index,
 				 buf->mesg.path, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("File does not reside in the normal directory for a GT.M mutex socket file"));
 				buf->code = EINVAL;
@@ -828,7 +829,7 @@ int service_request(gtmsecshr_mesg *buf)
 		fn = buf->mesg.db_ipcs.fn;
 		fn_len = buf->mesg.db_ipcs.fn_len;
 		*(fn + fn_len) = 0;	/* We assumed we have one extra byte. fn must be null terminated */
-		if (!file_head_read(fn, &header, sizeof(header)))
+		if (!file_head_read(fn, &header, SIZEOF(header)))
 		{
 			buf->code = errno;
 			send_msg(VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,
@@ -839,7 +840,7 @@ int service_request(gtmsecshr_mesg *buf)
 		header.shmid = buf->mesg.db_ipcs.shmid;
 		header.gt_sem_ctime.ctime = buf->mesg.db_ipcs.gt_sem_ctime;
 		header.gt_shm_ctime.ctime = buf->mesg.db_ipcs.gt_shm_ctime;
-		if (!file_head_write(fn, &header, sizeof(header)))
+		if (!file_head_write(fn, &header, SIZEOF(header)))
 		{
 			buf->code = errno;
 			send_msg(VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,

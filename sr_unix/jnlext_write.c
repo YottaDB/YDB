@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ void	jnlext_write(fi_type *file_info, char *buffer, int length)
 	op_val.str.addr = (char *)file_info->fn;
 	op_val.str.len = file_info->fn_len;
 	op_pars.mvtype = MV_STR;
-	op_pars.str.len = sizeof(open_params_list);
+	op_pars.str.len = SIZEOF(open_params_list);
 	op_pars.str.addr = (char *)open_params_list;
 	op_use(&op_val, &op_pars);
 	op_val.mvtype = MV_STR;

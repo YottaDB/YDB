@@ -19,7 +19,7 @@
 
 /*----- File I/O related -----*/
 #define F_CLOSE(FD, RC)				CLOSEFILE_RESET(FD, RC) /* interrupt safe close(); also resets "FD" to FD_INVALID */
-#define F_COPY_GDID(to, from)			memcpy(&(to), &(from), sizeof(to))
+#define F_COPY_GDID(to, from)			memcpy(&(to), &(from), SIZEOF(to))
 #define F_COPY_GDID_FROM_STAT(to, stat_buf) 	set_gdid_from_stat(&(to), &stat_buf);
 #define F_READ_BLK_ALIGNED			LSEEKREAD
 #define F_WRITE_BLK_ALIGNED			LSEEKWRITE

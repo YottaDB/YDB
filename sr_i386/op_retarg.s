@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,9 +28,10 @@
 
 # PUBLIC	op_retarg
 ENTRY op_retarg
-	movl	%eax,(%esp)
+	movl	%edx,(%esp)	# Reuse return point on stack (not needed)
+	pushl	%eax
 	call	unw_retarg
-	addl	$4,%esp
+	addl	$8,%esp
 	getframe
 	ret
 # op_retarg ENDP

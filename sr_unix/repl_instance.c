@@ -92,10 +92,10 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
 	error_def(ERR_TEXT);
 
 	log_nam.addr = GTM_REPL_INSTANCE;
-	log_nam.len = sizeof(GTM_REPL_INSTANCE) - 1;
+	log_nam.len = SIZEOF(GTM_REPL_INSTANCE) - 1;
 	trans_name.addr = temp_inst_fn;
 	ret = FALSE;
-	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn, sizeof(temp_inst_fn),
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn),
 							do_sendmsg_on_log2long)))
 		&& (0 != trans_name.len))
 	{
@@ -112,13 +112,13 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
 		if (issue_rts_error == error_action)
 		{
 			if (SS_LOG2LONG == status)
-				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, sizeof(temp_inst_fn) - 1);
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(temp_inst_fn) - 1);
 			else
 				rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 		} else if (issue_gtm_putmsg == error_action)
 		{
 			if (SS_LOG2LONG == status)
-				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, sizeof(temp_inst_fn) - 1);
+				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(temp_inst_fn) - 1);
 			else
 				gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTUNDEF);
 		}
@@ -387,12 +387,12 @@ void repl_inst_jnlpool_reset(void)
 		repl_inst_flush_filehdr();
 	} else
 	{	/* If journal pool does not exist, reset sem/shm ids directly in the replication instance file header on disk */
-		repl_inst_read((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+		repl_inst_read((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		repl_instance.jnlpool_semid = INVALID_SEMID;
 		repl_instance.jnlpool_shmid = INVALID_SHMID;
 		repl_instance.jnlpool_semid_ctime = 0;
 		repl_instance.jnlpool_shmid_ctime = 0;
-		repl_inst_write((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+		repl_inst_write((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	}
 }
 
@@ -419,12 +419,12 @@ void repl_inst_recvpool_reset(void)
 		repl_inst_flush_filehdr();
 	} else
 	{	/* If journal pool does not exist, reset sem/shm ids directly in the replication instance file header on disk */
-		repl_inst_read((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+		repl_inst_read((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		repl_instance.recvpool_semid = INVALID_SEMID;
 		repl_instance.recvpool_shmid = INVALID_SHMID;
 		repl_instance.recvpool_semid_ctime = 0;
 		repl_instance.recvpool_shmid_ctime = 0;
-		repl_inst_write((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+		repl_inst_write((char *)udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	}
 }
 
@@ -514,8 +514,8 @@ int4	repl_inst_triple_get(int4 index, repl_triple *triple)
 		/* assert that no caller should request a get of an unused (but allocated) triple */
 	if (index >= repl_inst_filehdr->num_alloc_triples)
 		return ERR_REPLINSTNOHIST;
-	offset = REPL_INST_TRIPLE_OFFSET + (index * sizeof(repl_triple));
-	repl_inst_read((char *)udi->fn, offset, (sm_uc_ptr_t)triple, sizeof(repl_triple));
+	offset = REPL_INST_TRIPLE_OFFSET + (index * SIZEOF(repl_triple));
+	repl_inst_read((char *)udi->fn, offset, (sm_uc_ptr_t)triple, SIZEOF(repl_triple));
 	return 0;
 }
 
@@ -654,9 +654,9 @@ void	repl_inst_triple_add(repl_triple *triple)
 		}
 	}
 	grab_lock(jnlpool.jnlpool_dummy_reg);
-	offset = REPL_INST_TRIPLE_OFFSET + (sizeof(repl_triple) * (off_t)triple_num);
+	offset = REPL_INST_TRIPLE_OFFSET + (SIZEOF(repl_triple) * (off_t)triple_num);
 	time(&triple->created_time);
-	repl_inst_write(udi->fn, offset, (sm_uc_ptr_t)triple, sizeof(repl_triple));
+	repl_inst_write(udi->fn, offset, (sm_uc_ptr_t)triple, SIZEOF(repl_triple));
 	triple_num++;
 	if (jnlpool.repl_inst_filehdr->num_alloc_triples < triple_num)
 		jnlpool.repl_inst_filehdr->num_alloc_triples = triple_num;
@@ -710,10 +710,10 @@ void	repl_inst_triple_truncate(seq_num rollback_seqno)
 		index++;
 		if (index != jnlpool.repl_inst_filehdr->num_triples)	/* no truncation necessary */
 		{	/* null initialize all those to-be-virtually-truncated triples in the instance file */
-			nullsize = (jnlpool.repl_inst_filehdr->num_triples - index) * sizeof(repl_triple);
+			nullsize = (jnlpool.repl_inst_filehdr->num_triples - index) * SIZEOF(repl_triple);
 			triple = malloc(nullsize);
 			memset(triple, 0, nullsize);
-			offset = REPL_INST_TRIPLE_OFFSET + (sizeof(repl_triple) * (off_t)index);
+			offset = REPL_INST_TRIPLE_OFFSET + (SIZEOF(repl_triple) * (off_t)index);
 			repl_inst_write(udi->fn, offset, (sm_uc_ptr_t)triple, nullsize);
 			free(triple);
 			assert(jnlpool.repl_inst_filehdr->num_triples >= 0);
@@ -794,8 +794,8 @@ void	repl_inst_flush_gtmsrc_lcl()
 	 * in "gtmsource_local" or "gtmsrc_lcl".
 	 */
 	COPY_GTMSOURCELOCAL_TO_GTMSRCLCL(jnlpool.gtmsource_local, gtmsrclcl_ptr);
-	offset = REPL_INST_HDR_SIZE + (sizeof(gtmsrc_lcl) * (off_t)index);
-	repl_inst_write(udi->fn, offset, (sm_uc_ptr_t)gtmsrclcl_ptr, sizeof(gtmsrc_lcl));
+	offset = REPL_INST_HDR_SIZE + (SIZEOF(gtmsrc_lcl) * (off_t)index);
+	repl_inst_write(udi->fn, offset, (sm_uc_ptr_t)gtmsrclcl_ptr, SIZEOF(gtmsrc_lcl));
 	jnlpool.gtmsource_local->last_flush_resync_seqno = jnlpool.gtmsource_local->read_jnl_seqno;
 }
 

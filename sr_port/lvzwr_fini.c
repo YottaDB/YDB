@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ void lvzwr_fini(zshow_out *out, int t)
 	} else
 	{	/* mval specified for character "pattern" (pattern matching) */
 		assert(zwr_patrn_mval == lvzwrite_block->zwr_intype);
-		memset(m.c, 0, sizeof(m.c));
+		memset(m.c, 0, SIZEOF(m.c));
 		local.mvtype = MV_STR;
 		local.str.addr = &m.c[0];
 		local.str.len = 1;
@@ -75,7 +75,7 @@ void lvzwr_fini(zshow_out *out, int t)
 		{
 			if (do_pattern(&local, lvzwrite_block->pat))
 			{
-				memset(&m.c[local.str.len], 0, sizeof(m.c) - local.str.len);
+				memset(&m.c[local.str.len], 0, SIZEOF(m.c) - local.str.len);
 				temp_key.var_name = local.str;
 				COMPUTE_HASH_MNAME(&temp_key);
 				if (NULL != (tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key)))
@@ -84,7 +84,7 @@ void lvzwr_fini(zshow_out *out, int t)
 					lvzwr_var(((lv_val *)tabent->value), 0);
 				}
 			}
-			op_fnlvname(&local, &local);
+			op_fnlvname(&local, TRUE, &local);
 			assert(local.str.len <= MAX_MIDENT_LEN);
 			memcpy(&m.c[0], local.str.addr, local.str.len);
 			local.str.addr = &m.c[0];

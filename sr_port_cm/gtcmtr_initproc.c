@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,14 +60,14 @@ bool gtcmtr_initproc(void)
 	curr_entry->err_compat = gtcm_err_compat((protocol_msg *)reply, &myproto);
 	curr_entry->cli_supp_allowexisting_stdnullcoll = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_STDNULLCOLL_MIN_LEVEL, 3));
 	curr_entry->client_supports_long_names = (0 <= memcmp(reply + CM_LEVEL_OFFSET, CMM_LONGNAMES_MIN_LEVEL, 3));
-	originator_prc_vec = curr_entry->pvec = (jnl_process_vector *)malloc(sizeof(jnl_process_vector));
-        jpv_size = sizeof(jnl_process_vector);
+	originator_prc_vec = curr_entry->pvec = (jnl_process_vector *)malloc(SIZEOF(jnl_process_vector));
+        jpv_size = SIZEOF(jnl_process_vector);
 	assert(jpv_size >= curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE &&
 		S_HDRSIZE + S_PROTSIZE < curr_entry->clb_ptr->cbl);
         if (jpv_size > (curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE))
 	{	/* our jpv is larger than client so limit copy and pad */
                 jpv_size = curr_entry->clb_ptr->cbl - S_HDRSIZE - S_PROTSIZE;
-                memset((char *)originator_prc_vec + jpv_size, 0, sizeof(jnl_process_vector) - jpv_size);
+                memset((char *)originator_prc_vec + jpv_size, 0, SIZEOF(jnl_process_vector) - jpv_size);
         }
 	reply = curr_entry->clb_ptr->mbf;
         memcpy((unsigned char *)originator_prc_vec, reply + S_HDRSIZE + S_PROTSIZE, jpv_size);

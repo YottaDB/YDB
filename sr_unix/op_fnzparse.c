@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ void	op_fnzparse (mval *file, mval *field, mval *def1, mval *def2, mval *type, m
 			rts_error(VARLSTCNT(4) ERR_ZPARSFLDBAD, 2, field->str.len, field->str.addr);
 	}
 
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 
 	if (type->str.len != 0)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +88,7 @@ void dse_chng_rhead(void)
 	blk_size = cs_addrs->hdr->blk_size;
 	chng_rec = FALSE;
 	b_top = bp + ((blk_hdr_ptr_t)bp)->bsiz;
-	if (((blk_hdr_ptr_t)bp)->bsiz > blk_size || ((blk_hdr_ptr_t)bp)->bsiz < sizeof(blk_hdr))
+	if (((blk_hdr_ptr_t)bp)->bsiz > blk_size || ((blk_hdr_ptr_t)bp)->bsiz < SIZEOF(blk_hdr))
 		chng_rec = TRUE;	/* force rewrite to correct size */
 	if (cli_present("RECORD") == CLI_PRESENT)
 	{
@@ -129,7 +129,7 @@ void dse_chng_rhead(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		if (x < sizeof(rec_hdr) || x > blk_size)
+		if (x < SIZEOF(rec_hdr) || x > blk_size)
 		{
 			util_out_print("Error: invalid rsiz.", TRUE);
 			t_abort(gv_cur_region, cs_addrs);
@@ -142,12 +142,12 @@ void dse_chng_rhead(void)
 	{
 		BLK_INIT(bs_ptr, bs1);
 		cp = bp;
-		cp += sizeof(blk_hdr);
+		cp += SIZEOF(blk_hdr);
 		if (chng_rec)
 		{
 			BLK_SEG(bs_ptr, cp, rp - cp);
-			BLK_SEG(bs_ptr, (uchar_ptr_t)&new_rec, sizeof(rec_hdr));
-			cp = rp + sizeof(rec_hdr);
+			BLK_SEG(bs_ptr, (uchar_ptr_t)&new_rec, SIZEOF(rec_hdr));
+			cp = rp + SIZEOF(rec_hdr);
 		}
 		if (b_top - cp)
 			BLK_SEG(bs_ptr, cp, b_top - cp);

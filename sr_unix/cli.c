@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ boolean_t cli_get_hex(char *entry, uint4 *dst)
 	char	local_str[MAX_LINE];
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
@@ -68,7 +68,7 @@ boolean_t cli_get_hex64(char *entry, gtm_uint64_t *dst)
 	char	local_str[MAX_LINE];
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
@@ -97,7 +97,7 @@ boolean_t cli_get_uint64(char *entry, gtm_uint64_t *dst)
 	char	local_str[MAX_LINE];
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
@@ -126,7 +126,7 @@ boolean_t cli_get_int(char *entry, int4 *dst)
 	char		local_str[MAX_LINE];
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	if (cli_present(local_str) == CLI_PRESENT
 		&& cli_get_value(local_str, buf))
@@ -156,7 +156,7 @@ boolean_t cli_get_int64(char *entry, gtm_int64_t *dst)
 	char		local_str[MAX_LINE];
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	if (cli_present(local_str) == CLI_PRESENT
 		&& cli_get_value(local_str, buf))
@@ -186,7 +186,7 @@ boolean_t cli_get_num(char *entry, int4 *dst)
 	char		local_str[MAX_LINE];
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	if (cli_present(local_str) == CLI_PRESENT
 		&& cli_get_value(local_str, buf))
@@ -217,7 +217,7 @@ boolean_t cli_get_num64(char *entry, gtm_int64_t *dst)
 	char		local_str[MAX_LINE];
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	if (cli_present(local_str) == CLI_PRESENT
 		&& cli_get_value(local_str, buf))
@@ -247,14 +247,14 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 	char		local_str[MAX_LINE];
 	size_t		maxdstlen, maxbuflen, copylen;
 
-	maxbuflen = sizeof(buf);
+	maxbuflen = SIZEOF(buf);
 	maxdstlen = *max_len;
 
 	assert(maxdstlen <= maxbuflen);
 	assert(maxdstlen > 0);
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	if (!(cli_present(local_str) == CLI_PRESENT
 	  && cli_get_value(local_str, buf)))
@@ -287,7 +287,7 @@ boolean_t cli_get_time(char *entry, uint4 *dst)
 	unsigned int	factor;
 
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	buf[0] = ':';
 	if ((cli_present(local_str) == CLI_PRESENT
 	  && cli_get_value(local_str, buf + 1)))
@@ -331,7 +331,7 @@ int4 cli_t_f_n (char *entry)
 	char		local_str[MAX_LINE];
 
 	assert (strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	cli_strupper(local_str);
 	if (cli_get_value(local_str, buf))
@@ -371,7 +371,7 @@ int4 cli_n_a_e (char *entry)
 	char		local_str[MAX_LINE];
 
 	assert (strlen(entry) > 0);
-	strncpy(local_str, entry, sizeof(local_str) - 1);
+	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 
 	cli_strupper(local_str);
 	if (cli_get_value(local_str, buf))

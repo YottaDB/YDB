@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -233,7 +233,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 	}
 
 /*	This is the end of the response buffer (for the *_prc_*() routines) */
-	bend  = &buff[OMI_BUFSIZ];
+	bend  = ARRAYTOP(buff);
 
 /*	Loop through the transaction(s) */
 	for (i = nxact.value;  i > 0;  i--)

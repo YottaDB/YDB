@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,6 @@ GBLREF  jnl_process_vector      *prc_vec;
 GBLREF	jnl_gbls_t		jgbl;
 
 error_def(ERR_FILEIDMATCH);
-error_def(ERR_JNLBADLABEL);
 error_def(ERR_JNLOPNERR);
 error_def(ERR_JNLRDERR);
 error_def(ERR_JNLBADRECFMT);
@@ -118,11 +117,9 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 		assert(FALSE);
 		return ERR_JNLRDERR;
 	}
-	if (0 != MEMCMP_LIT(header->label, JNL_LABEL_TEXT))
-	{
-		jpc->status = ERR_JNLBADLABEL;
+	CHECK_JNL_FILE_IS_USABLE(header, jpc->status, FALSE, 0, NULL);	/* FALSE => NO gtm_putmsg even if errors */
+	if (SS_NORMAL != jpc->status)
 		return ERR_JNLOPNERR;
-	}
 	if (header->prev_recov_end_of_data)
 	{
 		/* not possible for run time. In case it happens user must fix it */
@@ -176,8 +173,17 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 		jpc->status = ERR_JNLVSIZE;
 		return ERR_JNLOPNERR;
 	}
-	jb->buff_off = (uintszofptr_t)ROUND_UP2((uintszofptr_t)&jb->buff[0], DISK_BLOCK_SIZE) - (uintszofptr_t)&jb->buff[0];
+	/* For performance reasons (to be able to do aligned writes to the journal file), we need to ensure the journal buffer
+	 * address is 512-byte aligned in Unix. jb->buff_off is the number of bytes to go past before getting an aligned buffer.
+	 * For VMS, this performance enhancement is currently not done and can be revisited later.
+	 */
+	UNIX_ONLY(jb->buff_off = (uintszofptr_t)ROUND_UP2((uintszofptr_t)&jb->buff[0], DISK_BLOCK_SIZE)
+					- (uintszofptr_t)&jb->buff[0];)
+	VMS_ONLY(jb->buff_off = 0;)
 	jb->size = csd->jnl_buffer_size * DISK_BLOCK_SIZE;
+	/* Assert that journal buffer does NOT spill past the allocated journal buffer size in shared memory */
+	assert((sm_uc_ptr_t)&jb->buff[jb->buff_off + jb->size] < ((sm_uc_ptr_t)csa->nl + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(csd)));
+	assert((sm_uc_ptr_t)jb == ((sm_uc_ptr_t)csa->nl + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE));
 	jb->freeaddr = jb->dskaddr = UNIX_ONLY(jb->fsync_dskaddr = ) header->end_of_data;
 	/* The following is to make sure that the data in jnl_buffer is aligned with the data in the
 	 * disk file on an IO_BLOCK_SIZE boundary. Since we assert that jb->size is a multiple of IO_BLOCK_SIZE,
@@ -219,7 +225,8 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	JNL_WHOLE_TIME(prc_vec->jpv_time);
 	jb->epoch_interval = header->epoch_interval;
 	jb->next_epoch_time = (uint4)(MID_TIME(prc_vec->jpv_time) + jb->epoch_interval);
-	memcpy(&header->who_opened, prc_vec, sizeof(jnl_process_vector));
+	jb->max_jrec_len = header->max_jrec_len;
+	memcpy(&header->who_opened, prc_vec, SIZEOF(jnl_process_vector));
 	header->crash = TRUE;	/* in case this processes is crashed, this will remain TRUE */
 	VMS_ONLY(
 		if (REPL_ENABLED(csd) && pool_init)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#include "gtm_c_stack_trace.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -76,6 +77,8 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		dse_running;
 GBLREF	boolean_t		disk_blk_read;
 GBLREF	uint4			t_err;
+GBLREF	boolean_t		block_is_free;
+GBLREF	boolean_t		mupip_jnl_recover;
 
 /* There are 3 passes (of the do-while loop below) we allow now.
  * The first pass which is potentially out-of-crit and hence can end up not locating the cache-record for the input block.
@@ -112,19 +115,24 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	srch_blk_status		*blkhist;
 	trans_num		dirty, blkhdrtn;
 	sm_uc_ptr_t		buffaddr;
+	uint4			stuck_cnt = 0;
+	boolean_t		lcl_blk_free;
 
 	error_def(ERR_BUFOWNERSTUCK);
 	error_def(ERR_DBFILERR);
 	error_def(ERR_DYNUPGRDFAIL);
 	error_def(ERR_GVPUTFAIL);
 
+	lcl_blk_free = block_is_free;
+	block_is_free = FALSE;	/* Reset to FALSE so that if t_qread fails below, we don't have an incorrect state of this var */
 	first_tp_srch_status = NULL;
 	reset_first_tp_srch_status = FALSE;
 	csa = cs_addrs;
 	csd = csa->hdr;
 	INCR_DB_CSH_COUNTER(csa, n_t_qreads, 1);
 	is_mm = (dba_mm == csd->acc_meth);
-	assert((t_tries < CDB_STAGNATE) || csa->now_crit);
+	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
+	assert((t_tries < CDB_STAGNATE) || csa->now_crit || mupip_jnl_recover);
 	if (0 < dollar_tlevel)
 	{
 		assert(sgm_info_ptr);
@@ -338,7 +346,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(0 == cr->dirty);
 				assert(cr->read_in_progress >= 0);
 				CR_BUFFER_CHECK(gv_cur_region, csa, csd, cr);
-				if (SS_NORMAL != (status = dsk_read(blk, GDS_REL2ABS(cr->buffaddr), &ondsk_blkver)))
+				if (SS_NORMAL != (status = dsk_read(blk, GDS_REL2ABS(cr->buffaddr), &ondsk_blkver, lcl_blk_free)))
 				{	/* buffer does not contain valid data, so reset blk to be empty */
 					cr->cycle++;	/* increment cycle for blk number changes (for tp_hist and others) */
 					cr->blk = CR_BLKEMPTY;
@@ -373,7 +381,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				disk_blk_read = TRUE;
 				assert(0 <= cr->read_in_progress);
 				assert(0 == cr->dirty);
-				cr->ondsk_blkver = ondsk_blkver;			/* Only set in cache if read was success */
+				/* Only set in cache if read was success */
+				cr->ondsk_blkver = (lcl_blk_free ? GDSVCURR : ondsk_blkver);
 				cr->r_epid = 0;
 				RELEASE_BUFF_READ_LOCK(cr);
 				assert(-1 <= cr->read_in_progress);
@@ -544,6 +553,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							send_msg(VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id, blocking_pid,
 								cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
 								cr->read_in_progress, cr->rip_latch.u.parts.latch_pid);
+							stuck_cnt++;
+							GET_C_STACK_FROM_SCRIPT("BUFOWNERSTUCK",
+								process_id, blocking_pid, stuck_cnt);
 							if (MAX_TQREAD_WAIT <= lcnt)	/* max wait of 4 mins */
 								GTMASSERT;
 							/* Kickstart the process taking a long time in case it was suspended */

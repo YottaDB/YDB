@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "cmd.h"
 #include "indir_enum.h"
 #include "svnames.h"
+#include "advancewindow.h"
 
 GBLREF	char		window_token;
 GBLREF	boolean_t	run_time;
@@ -33,7 +34,10 @@ int m_quit(void)
 	int		rval;
 	triple		*triptr;
 	triple		*r;
-	oprtype		x,*cr;
+	oprtype		x, *cr, tmparg;
+	mvar		*mvarptr;
+
+	error_def(ERR_ALIASEXPECTED);
 	error_def(ERR_QUITARGUSE);
 	error_def(ERR_QUITARGLST);
 
@@ -46,7 +50,7 @@ int m_quit(void)
 			r->operand[0] = put_ilit(SV_QUIT);
 			x = put_tref(r);
 			coerce(&x, OCT_BOOL);
-			cr = (oprtype *)mcalloc(sizeof(oprtype));	/* for jump target */
+			cr = (oprtype *)mcalloc(SIZEOF(oprtype));	/* for jump target */
 			bx_tail(x.oprval.tref, (bool)TRUE, cr);
 			r = newtriple(OC_RET);
 			x = put_tref(r);
@@ -57,6 +61,7 @@ int m_quit(void)
 			{
 				r = newtriple(OC_RETARG);
 				r->operand[0] = put_lit((mval *)&literal_null);
+				r->operand[1] = put_ilit(FALSE);
 				x = put_tref(r);
 				return TRUE;
 			}
@@ -66,12 +71,30 @@ int m_quit(void)
 			newtriple((run_time) ? OC_HARDRET : OC_RET);
 			return TRUE;
 		}
-		if ((rval = expr(&x)) && (window_token != TK_COMMA))
+		/* We now know we have an arg. See if it is an alias indicated arg */
+		if (TK_ASTERISK == window_token)
+		{	/* We have QUIT * alias syntax */
+			advancewindow();
+			if (TK_IDENT == window_token)
+			{	/* Both alias and alias container sources go through here */
+				if (!lvn(&tmparg, OC_SRCHINDX, 0))
+					return FALSE;
+				r = newtriple(OC_RETARG);
+				r->operand[0] = tmparg;
+				r->operand[1] = put_ilit(TRUE);
+				return TRUE;
+			} else
+			{	/* Unexpected text after alias indicator */
+				stx_error(ERR_ALIASEXPECTED);
+				return FALSE;
+			}
+		} else if ((rval = expr(&x)) && (TK_COMMA != window_token))
 		{
 			if (EXPR_INDR != rval)
 			{
 				r = newtriple(OC_RETARG);
 				r->operand[0] = x;
+				r->operand[1] = put_ilit(FALSE);
 			} else	/* Indirect argument */
 				make_commarg(&x, indir_quit);
 			return TRUE;

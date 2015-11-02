@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,7 +107,7 @@ boolean_t mu_rndwn_repl_instance(replpool_identifier *replpool_id, boolean_t imm
 	/* Lock replication instance using ftok semaphore */
 	if (!ftok_sem_get(reg, TRUE, REPLPOOL_ID, immediate))
 		return FALSE;
-	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	semarg.buf = &semstat;
 	assert(rndwn_both_pools || JNLPOOL_SEGMENT == replpool_id->pool_type || RECVPOOL_SEGMENT == replpool_id->pool_type);
 	if (rndwn_both_pools || (JNLPOOL_SEGMENT == replpool_id->pool_type))

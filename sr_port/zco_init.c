@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,13 +32,13 @@ void zco_init(void)
 	if (dollar_zcompile.addr)
 		free(dollar_zcompile.addr);
 	val.addr = ZCOMPILE;
-	val.len = sizeof(ZCOMPILE) - 1;
-	status = TRANS_LOG_NAME(&val, &tn, buf1, sizeof(buf1), dont_sendmsg_on_log2long);
+	val.len = SIZEOF(ZCOMPILE) - 1;
+	status = TRANS_LOG_NAME(&val, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
 	{
 #		ifdef UNIX
 		if (SS_LOG2LONG == status)
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, sizeof(buf1) - 1);
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf1) - 1);
 		else
 #		endif
 			rts_error(VARLSTCNT(1) status);

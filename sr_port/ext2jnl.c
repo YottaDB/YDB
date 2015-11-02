@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,6 @@
 
 GBLREF	char		*ext_stop;
 GBLREF	gv_key		*gv_currkey;
-LITREF	boolean_t	jrt_fixed_size[JRT_RECTYPES];
-LITREF	int		jrt_update[JRT_RECTYPES];
 static	boolean_t	in_tp;
 static	int4		num_records;
 
@@ -74,6 +72,8 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	muextract_type	exttype;
 	enum jnl_record_type	rectype;
 	jrec_suffix	*suffix;
+	uint4		nodeflags;
+	DEBUG_ONLY(uint4	tcom_num = 0;)
 
 	ext_stop = ptr + strlen(ptr) + 1;
 	temp_rec = rec;
@@ -90,8 +90,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			{
 				num_records++;
 				rec->prefix.jrec_type = JRT_TSET;
-			}
-			else
+			} else
 				rec->prefix.jrec_type = JRT_USET;
 		} else
 			rec->prefix.jrec_type = JRT_SET;
@@ -104,8 +103,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			{
 				num_records++;
 				rec->prefix.jrec_type = JRT_TKILL;
-			}
-			else
+			} else
 				rec->prefix.jrec_type = JRT_UKILL;
 		} else
 			rec->prefix.jrec_type = JRT_KILL;
@@ -118,12 +116,26 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 			{
 				num_records++;
 				rec->prefix.jrec_type = JRT_TZKILL;
-			}
-			else
+			} else
 				rec->prefix.jrec_type = JRT_UZKILL;
 		} else
 			rec->prefix.jrec_type = JRT_ZKILL;
 		break;
+
+#	ifdef GTM_TRIGGER
+	case MUEXT_ZTWORM:
+		if (in_tp)
+		{
+			if (0 == num_records)
+			{
+				num_records++;
+				rec->prefix.jrec_type = JRT_TZTWORM;
+			} else
+				rec->prefix.jrec_type = JRT_UZTWORM;
+		} else
+			GTMASSERT;	/* ZTWORMHOLE should always been seen only inside a TP fence */
+		break;
+#	endif
 
 	case MUEXT_TSTART:
 		in_tp = TRUE;
@@ -133,6 +145,14 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 
 	case MUEXT_TCOMMIT:
 		rec->prefix.jrec_type = JRT_TCOM;
+		DEBUG_ONLY(
+			/* External filter format has only ONE TSTART..TCOM. The journal record received from the external filter
+			 * SHOULD also have only ONE TSTART..TCOM
+			 */
+			tcom_num++;
+			assert(1 == tcom_num);
+		)
+		rec->jrec_tcom.num_participants = 1; /* Only ONE TSTART..TCOM in the external filter format */
 		in_tp = FALSE;
 		break;
 
@@ -172,52 +192,70 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	assert(NULL != ptr);
 	rec->jrec_null.jnl_seqno = asc2l((uchar_ptr_t)ptr,STRLEN(ptr));
 
-	if (MUEXT_NULL == exttype)
+	switch(exttype)
 	{
-		rec->jrec_null.prefix.forwptr =  rec->jrec_null.suffix.backptr = NULL_RECLEN;
-		rec->jrec_null.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-		return ((char_ptr_t)rec) + NULL_RECLEN;
+		case MUEXT_NULL:
+			rec->jrec_null.prefix.forwptr =  rec->jrec_null.suffix.backptr = NULL_RECLEN;
+			rec->jrec_null.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+			return ((char_ptr_t)rec) + NULL_RECLEN;
+		case MUEXT_TCOMMIT:
+			ptr = strtok(NULL, "\\");		/* get the participants */
+			ptr = strtok(NULL, "\\");		/* get the jnl_tid */
+			rec->jrec_tcom.jnl_tid[0] = 0;
+			if (NULL != ptr)
+				strcpy(rec->jrec_tcom.jnl_tid, ptr);
+			num_records = 0;
+			rec->jrec_tcom.prefix.forwptr =  rec->jrec_tcom.suffix.backptr = TCOM_RECLEN;
+			rec->jrec_tcom.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
+			return ((char_ptr_t)rec) + TCOM_RECLEN;
 	}
-	else if (MUEXT_TCOMMIT == exttype)
+	assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));
+	ptr = strtok(NULL, "\\");	/* get the update_num field */
+	assert(NULL != ptr);
+	assert(OFFSETOF(struct_jrec_upd, update_num) == OFFSETOF(struct_jrec_ztworm, update_num));
+	rec->jrec_set_kill.update_num = asc2i((uchar_ptr_t)ptr, STRLEN(ptr));
+	if (MUEXT_ZTWORM != exttype)
 	{
-		ptr = strtok(NULL, "\\");		/* get the participants */
-		ptr = strtok(NULL, "\\");		/* get the jnl_tid */
-		rec->jrec_tcom.jnl_tid[0] = 0;
-		if (NULL != ptr)
-			strcpy(rec->jrec_tcom.jnl_tid, ptr);
-		num_records = 0;
-		rec->jrec_tcom.prefix.forwptr =  rec->jrec_tcom.suffix.backptr = TCOM_RECLEN;
-		rec->jrec_tcom.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-		return ((char_ptr_t)rec) + TCOM_RECLEN;
+		ptr = strtok(NULL, "\\");		/* get the nodeflags field */
+		assert(NULL != ptr);
+		rec->jrec_set_kill.mumps_node.nodeflags = asc2i((uchar_ptr_t)ptr, STRLEN(ptr));
 	}
 	ptr += (strlen(ptr) + 1); /* get the key-value and data also; can't use strtok since there might be '\\' in the subscript */
-	assert(IS_SET_KILL_ZKILL(rectype));
 	assert(NULL != ptr);
-
-	len = STRLEN(ptr);
-	keylength = zwrkeylength(ptr, len); /* determine length of key */
-
-	REPL_DPRINT2("ext2jnl source:KEY=DATA:%s\n", ptr);
-	assert(keylength <= len);
-	str2gvkey_nogvfunc(ptr, keylength, gv_currkey);
-	rec->jrec_kill.mumps_node.length = gv_currkey->end;
-	memcpy(rec->jrec_kill.mumps_node.text, gv_currkey->base, gv_currkey->end);
-	temp_reclen = (int)(FIXED_UPD_RECLEN + rec->jrec_kill.mumps_node.length + SIZEOF(jnl_str_len_t));
-	if (IS_KILL_ZKILL(rectype))
+	if (MUEXT_ZTWORM != exttype)
 	{
-		temp_reclen += JREC_SUFFIX_SIZE;
-		reclen = ROUND_UP2(temp_reclen, JNL_REC_START_BNDRY);
-		memset((char_ptr_t)rec + temp_reclen - JREC_SUFFIX_SIZE, 0, reclen - temp_reclen);
-		suffix = (jrec_suffix *)((char_ptr_t)rec + reclen - JREC_SUFFIX_SIZE);
-		rec->prefix.forwptr = suffix->backptr = reclen;
-		suffix->suffix_code = JNL_REC_SUFFIX_CODE;
-		return (char_ptr_t)rec + reclen;
+		assert(IS_SET_KILL_ZKILL(rectype));
+		len = STRLEN(ptr);
+		keylength = zwrkeylength(ptr, len); /* determine length of key */
+
+		REPL_DPRINT2("ext2jnl source:KEY=DATA:%s\n", ptr);
+		assert(keylength <= len);
+		str2gvkey_nogvfunc(ptr, keylength, gv_currkey);
+		rec->jrec_set_kill.mumps_node.length = gv_currkey->end;
+		memcpy(rec->jrec_set_kill.mumps_node.text, gv_currkey->base, gv_currkey->end);
+		temp_reclen = (int)(FIXED_UPD_RECLEN + rec->jrec_set_kill.mumps_node.length + SIZEOF(jnl_str_len_t));
+		if (IS_KILL_ZKILL(rectype))
+		{
+			temp_reclen += JREC_SUFFIX_SIZE;
+			reclen = ROUND_UP2(temp_reclen, JNL_REC_START_BNDRY);
+			memset((char_ptr_t)rec + temp_reclen - JREC_SUFFIX_SIZE, 0, reclen - temp_reclen);
+			suffix = (jrec_suffix *)((char_ptr_t)rec + reclen - JREC_SUFFIX_SIZE);
+			rec->prefix.forwptr = suffix->backptr = reclen;
+			suffix->suffix_code = JNL_REC_SUFFIX_CODE;
+			return (char_ptr_t)rec + reclen;
+		}
+		/* we have to get the data value now */
+		src.len = len - keylength - 1;
+		src.addr = ptr + (keylength + 1);
+	} else
+	{	/* ZTWORMHOLE */
+		assert(IS_ZTWORM(rectype));
+		src.addr = ptr;
+		src.len = STRLEN(ptr);
+		temp_reclen = (int)(FIXED_ZTWORM_RECLEN);
 	}
-	/* we have to get the data value now */
-	src.len = len - keylength - 1;
-	src.addr = ptr + (keylength + 1);
 	des.len = 0;
-	des.addr = (char_ptr_t)rec + temp_reclen + sizeof(jnl_str_len_t);
+	des.addr = (char_ptr_t)rec + temp_reclen + SIZEOF(jnl_str_len_t);
 	REPL_DPRINT3("ext2jnl JNL Format (before zwr2format): src : Len %d :: DATA:%s\n", src.len, src.addr);
 	REPL_DPRINT3("ext2jnl JNL Format (before zwr2format): des : Len %d :: DATA:%s\n", des.len, des.addr);
 	if (!zwr2format(&src, &des))

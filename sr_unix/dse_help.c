@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,11 +34,11 @@ void dse_version(void)
 	 *    one blank
 	 */
 	char gtm_rel_name[] = GTM_RELEASE_NAME;
-	char dse_rel_name[sizeof(GTM_RELEASE_NAME) - sizeof(GTM_PRODUCT)];
+	char dse_rel_name[SIZEOF(GTM_RELEASE_NAME) - SIZEOF(GTM_PRODUCT)];
 	int  dse_rel_name_len;
 	char *cptr;
 
-	for (cptr = gtm_rel_name + sizeof(GTM_PRODUCT), dse_rel_name_len = 0;
+	for (cptr = gtm_rel_name + SIZEOF(GTM_PRODUCT), dse_rel_name_len = 0;
 	     *cptr != ' ' && *cptr != '\0';
 	     dse_rel_name[dse_rel_name_len++] = *cptr++);
 	dse_rel_name[dse_rel_name_len] = '\0';

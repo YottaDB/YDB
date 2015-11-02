@@ -58,7 +58,7 @@ bool gtcmtr_zprevious(void)
 	assert(CMMS_Q_PREV == *ptr);
 	ptr++;
 	GET_USHORT(len, ptr);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	regnum = *ptr++;
 	reg_ref = gtcm_find_region(curr_entry, regnum);
 	len--;	/* subtract size of regnum */
@@ -151,26 +151,26 @@ bool gtcmtr_zprevious(void)
 		gv_altkey->prev = gv_currkey->prev;
 		if (gv_target->nct || gv_target->collseq)
 			gv_xform_key(gv_altkey, TRUE);
-		/* len = sizeof(gv_key) + gv_altkey->end; */
-		len = gv_altkey->end + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(char);
+		/* len = SIZEOF(gv_key) + gv_altkey->end; */
+		len = gv_altkey->end + SIZEOF(unsigned short) + SIZEOF(unsigned short) + SIZEOF(unsigned short) + SIZEOF(char);
 	}
 	ptr = curr_entry->clb_ptr->mbf;
 	*ptr++ = CMMS_R_PREV;
 	tmp_len = len + 1;
 	PUT_USHORT(ptr, tmp_len);
-	ptr += sizeof(short);
+	ptr += SIZEOF(short);
 	*ptr++ = regnum;
 	if (len)
 	{	/* memcpy(ptr, gv_altkey, len); */ /* this memcpy modified to the following PUTs and memcpy; vinu, 07/18/01 */
 		/* we are goint to restore top from old_top, why even bother setting it now? vinu, 07/18/01 */
 		/* PUT_USHORT(ptr, gv_altkey->top); */
-		PUT_USHORT(ptr + sizeof(unsigned short), gv_altkey->end);
-		PUT_USHORT(ptr + sizeof(unsigned short) + sizeof(unsigned short), gv_altkey->prev);
-		memcpy(ptr + sizeof(unsigned short) + sizeof(unsigned short) + sizeof(unsigned short), gv_altkey->base,
-		       len - sizeof(unsigned short) - sizeof(unsigned short) - sizeof(unsigned short));
+		PUT_USHORT(ptr + SIZEOF(unsigned short), gv_altkey->end);
+		PUT_USHORT(ptr + SIZEOF(unsigned short) + SIZEOF(unsigned short), gv_altkey->prev);
+		memcpy(ptr + SIZEOF(unsigned short) + SIZEOF(unsigned short) + SIZEOF(unsigned short), gv_altkey->base,
+		       len - SIZEOF(unsigned short) - SIZEOF(unsigned short) - SIZEOF(unsigned short));
 	}
 	PUT_USHORT(ptr, old_top); /* ((gv_key *)ptr)->top = old_top; */
-	curr_entry->clb_ptr->cbl = sizeof(unsigned char) + sizeof(unsigned short) + sizeof(unsigned char) + len;
+	curr_entry->clb_ptr->cbl = SIZEOF(unsigned char) + SIZEOF(unsigned short) + SIZEOF(unsigned char) + len;
 	reset_gv_target = INVALID_GV_TARGET;
 	return TRUE;
 }

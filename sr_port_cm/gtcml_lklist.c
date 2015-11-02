@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,14 +52,14 @@ void gtcml_lklist(void)
 	{
 		new = TRUE;
 		GET_USHORT(len, ptr);
-		ptr += sizeof(unsigned short);
+		ptr += SIZEOF(unsigned short);
 		regnum = *ptr++;
 		reg_ref = gtcm_find_region(curr_entry,regnum);
 		len--; /* subtract size of regnum */
 		translev = *ptr++; len--;
 		subcnt = *ptr++; len--;
-		new_entry = (mlk_pvtblk *)malloc(sizeof(mlk_pvtblk) + len - 1);
-		memset(new_entry, 0, sizeof(mlk_pvtblk));
+		new_entry = (mlk_pvtblk *)malloc(SIZEOF(mlk_pvtblk) + len - 1);
+		memset(new_entry, 0, SIZEOF(mlk_pvtblk));
 		memcpy(&new_entry->value[0], ptr, len);
 		ptr += len;
 		reg_ref->oper = PENDING;

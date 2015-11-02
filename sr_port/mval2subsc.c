@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		{
 			mstr_ch.len = tmp_len;
 			mstr_ch.addr = (char *)in_ptr;
-			mstr_buf1.len = sizeof(buf1);
+			mstr_buf1.len = SIZEOF(buf1);
 			mstr_buf1.addr = (char *)buf1;
 			do_xform(gv_target->collseq, XFORM, &mstr_ch, &mstr_buf1, &tmp_len);
 			in_ptr = (unsigned char*)mstr_buf1.addr; /* mstr_buf1.addr is used just in case it is

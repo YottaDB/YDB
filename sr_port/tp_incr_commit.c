@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,7 @@ void tp_incr_commit(void)
 							cse->new_buff = low_cse->new_buff;
 						} else if (low_cse->new_buff)
 							free_element(si->new_buff_list,
-									(char *)low_cse->new_buff - sizeof(que_ent));
+									(char *)low_cse->new_buff - SIZEOF(que_ent));
 						free_element(si->tlvl_cw_set_list, (char *)low_cse);
 						orig_cse = cse;
 					} else
@@ -117,8 +117,8 @@ void tp_incr_commit(void)
 							cse->new_buff = low_cse->new_buff;
 						} else if (low_cse->new_buff)
 							free_element(si->new_buff_list,
-									(char *)low_cse->new_buff - sizeof(que_ent));
-						memcpy(low_cse, cse, sizeof(cw_set_element));
+									(char *)low_cse->new_buff - SIZEOF(que_ent));
+						memcpy(low_cse, cse, SIZEOF(cw_set_element));
 						low_cse->next_cw_set = next_cse;
 						low_cse->prev_cw_set = prev_cse;
 						low_cse->high_tlevel = NULL;

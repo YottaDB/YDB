@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,17 +91,17 @@ void gvcmz_netopen_attempt(struct CLB *c)
 		proto_str = (unsigned char *)&myproto;
 		if (!prc_vec)
 		{
-			prc_vec = malloc(sizeof(*prc_vec));
+			prc_vec = malloc(SIZEOF(*prc_vec));
 			jnl_prc_vector(prc_vec);
 		}
-		prc_vec_size = sizeof(*prc_vec);
+		prc_vec_size = SIZEOF(*prc_vec);
 #ifdef BIGENDIAN
-		memcpy((unsigned char *)&temp_vect, (unsigned char *)prc_vec, sizeof(jnl_process_vector));
+		memcpy((unsigned char *)&temp_vect, (unsigned char *)prc_vec, SIZEOF(jnl_process_vector));
 		temp_vect.jpv_pid =  GTM_BYTESWAP_32(temp_vect.jpv_pid);
 		temp_vect.jpv_image_count =  GTM_BYTESWAP_32(temp_vect.jpv_image_count);
 		temp_vect.jpv_time =  GTM_BYTESWAP_64(temp_vect.jpv_time);
 		temp_vect.jpv_login_time =  GTM_BYTESWAP_64(temp_vect.jpv_login_time);
-		memcpy(ptr + S_PROTSIZE, (unsigned char *)&temp_vect, sizeof(jnl_process_vector));
+		memcpy(ptr + S_PROTSIZE, (unsigned char *)&temp_vect, SIZEOF(jnl_process_vector));
 #else
 		memcpy(ptr + S_PROTSIZE, (unsigned char *)prc_vec, prc_vec_size);
 #endif
@@ -111,7 +111,7 @@ void gvcmz_netopen_attempt(struct CLB *c)
 		/* We connected with V010 server; let's behave like a V010 client. */
 		proto_str = (unsigned char *)S_PROTOCOL;
 		assert(prc_vec);
-		assert(sizeof(*prc_vec) > v010_jnl_process_vector_size());
+		assert(SIZEOF(*prc_vec) > v010_jnl_process_vector_size());
 		v010_jnl_prc_vector(prc_vec);
 		prc_vec_size = v010_jnl_process_vector_size();
 		memcpy(ptr + S_PROTSIZE, (unsigned char *)prc_vec, prc_vec_size);
@@ -168,9 +168,9 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	error_def(CMERR_INVPROT);
 
 	c = UNIX_ONLY(cmi_alloc_clb())VMS_ONLY(cmu_makclb());
-	c->usr = malloc(sizeof(link_info));
+	c->usr = malloc(SIZEOF(link_info));
 	li = c->usr;
-	memset(li, 0, sizeof(*li));
+	memset(li, 0, SIZEOF(*li));
 	c->err = gvcmz_neterr_set;
 #ifdef VMS
 	c->nod.dsc$b_dtype = c->tnd.dsc$b_dtype = DSC$K_DTYPE_T;
@@ -204,7 +204,7 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 		free(c->usr);
 		free(VMS_ONLY(c->nod.dsc$a_pointer) UNIX_ONLY(c->nod.addr));
 		free(VMS_ONLY(c->tnd.dsc$a_pointer) UNIX_ONLY(c->tnd.addr));
-		VMS_ONLY(lib$free_vm(&sizeof(*c), &c, 0);)
+		VMS_ONLY(lib$free_vm(&SIZEOF(*c), &c, 0);)
 		UNIX_ONLY(cmi_free_clb(c));
 		rts_error(VARLSTCNT(3) ERR_NETDBOPNERR, 0, status);
 	}
@@ -212,8 +212,7 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 		ntd_root = cmu_ntdroot();
 	gtcm_protocol(&myproto);
 	li->lnk_active = TRUE;
-	if (stringpool.top - stringpool.free < CM_MINBUFSIZE)
-		stp_gcol(CM_MINBUFSIZE);
+	ENSURE_STP_FREE_SPACE(CM_MINBUFSIZE);
 	do
 	{
 		gvcmz_netopen_attempt(c);

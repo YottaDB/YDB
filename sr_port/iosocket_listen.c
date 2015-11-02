@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,7 +83,7 @@ boolean_t iosocket_listen(io_desc *iod, unsigned short len)
 
 	socketptr->state = socket_listening;
 
-	len = sizeof(LISTENING) - 1;
+	len = SIZEOF(LISTENING) - 1;
 	memcpy(&dsocketptr->dollar_key[0], LISTENING, len);
 	dsocketptr->dollar_key[len++] = '|';
 	memcpy(&dsocketptr->dollar_key[len], socketptr->handle, socketptr->handle_len);

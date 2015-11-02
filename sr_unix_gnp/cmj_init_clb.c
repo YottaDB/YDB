@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,13 +17,13 @@ void cmj_init_clb(struct NTD *tsk, struct CLB *lnk)
 	if (lnk)
 	{
 		if (tsk)
-			memset(lnk, 0 , sizeof(*lnk) + tsk->usr_size );
+			memset(lnk, 0 , SIZEOF(*lnk) + tsk->usr_size );
 		else
-			memset(lnk, 0 , sizeof(*lnk));
+			memset(lnk, 0 , SIZEOF(*lnk));
 		lnk->ntd = tsk;
 		lnk->sta = CM_CLB_DISCONNECT;
 		lnk->mun = -1;
 		if (tsk && tsk->usr_size)
-			lnk->usr = (void *)((char *)lnk + sizeof(*lnk));
+			lnk->usr = (void *)((char *)lnk + SIZEOF(*lnk));
 	}
 }

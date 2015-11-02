@@ -39,7 +39,7 @@
 #define NOCONCEAL_OPTION "NO_CONCEAL"
 
 static readonly mval empty_str_mval = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
-static readonly mval no_conceal_op  = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, sizeof(NOCONCEAL_OPTION) - 1,
+static readonly mval no_conceal_op  = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(NOCONCEAL_OPTION) - 1,
 							 NOCONCEAL_OPTION, 0, 0);
 static unsigned char dumpable_error_dump_file_parms[2] = {iop_newversion, iop_eol};
 static unsigned char dumpable_error_dump_file_noparms[1] = {iop_eol};
@@ -102,7 +102,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
 
 	/* Setup new signal handler to just drive condition handler which will do the right thing */
-	memset(&new_action, 0, sizeof(new_action));
+	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = SA_SIGINFO;
 #ifdef __sparc
@@ -122,7 +122,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	if (0 != (saved_util_outbuff_len = (int)(util_outptr - util_outbuff)))	/* Caution -- assignment */
 	{
 		assert(0 <= saved_util_outbuff_len);
-		assert(saved_util_outbuff_len <= sizeof(saved_util_outbuff));
+		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
 		memcpy(saved_util_outbuff, util_outbuff, saved_util_outbuff_len);
 	}
 	jobexam_dump(input_dump_file_name, dump_file_spec);
@@ -172,7 +172,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
 	++jobexam_counter;
 	/* Setup default filename/type to use for the parse. Append processid and a counter. */
 	MEMCPY_LIT(dump_file_name, DEFAULT_DUMP_FILENAME);
-	dump_file_name_ptr = dump_file_name + sizeof(DEFAULT_DUMP_FILENAME) - 1;
+	dump_file_name_ptr = dump_file_name + SIZEOF(DEFAULT_DUMP_FILENAME) - 1;
 	*dump_file_name_ptr++ = '_';
 	dump_file_name_ptr = i2asc(dump_file_name_ptr, process_id);
 	*dump_file_name_ptr++ = '_';
@@ -187,7 +187,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
 	/* Parms of file to be created (newversion) */
 	parms.mvtype = MV_STR;
 	parms.str.addr = (char *)dumpable_error_dump_file_parms;
-	parms.str.len = sizeof(dumpable_error_dump_file_parms);
+	parms.str.len = SIZEOF(dumpable_error_dump_file_parms);
 	/* Open, use, and zshow into new file, then close and reset current io device */
 	op_open(dump_file_spec, &parms, 0, 0);
 	op_use(dump_file_spec, &parms);
@@ -196,7 +196,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
 	zshowall.str.len = 1;
 	op_zshow(&zshowall, ZSHOW_DEVICE, NULL);
 	parms.str.addr = (char *)dumpable_error_dump_file_noparms;
-	parms.str.len = sizeof(dumpable_error_dump_file_noparms);
+	parms.str.len = SIZEOF(dumpable_error_dump_file_noparms);
 	op_close(dump_file_spec, &parms);
 	/* Notify operator dump was taken */
 	send_msg(VARLSTCNT(5) ERR_JOBEXAMDONE, 3, process_id, dump_file_spec->str.len, dump_file_spec->str.addr);

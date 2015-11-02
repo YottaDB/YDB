@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,6 +90,7 @@
 #include "zwrite.h"
 #include "alias.h"
 #include "cenable.h"
+#include "gtmimagename.h"
 
 #ifdef __sun
 #define PACKAGE_ENV_TYPE  "GTMXC_RPC"  /* env var to use rpc instead of xcall */
@@ -100,49 +101,55 @@
 
 GBLREF int init_xfer_table(void);
 
-GBLDEF void		(*restart)() = &mum_tstart;
+GBLDEF void			(*restart)() = &mum_tstart;
+#ifdef __MVS__
+/* In zOS we cann't access function address directly, So creating function pointer
+ * which points to mdb_condition_handler. We can use this function pointer to get
+ * the address of mdb_condition_handler in ESTABLSH assembly macro.
+ */
+GBLDEF ch_ret_type      (*mdb_condition_handler_ptr)(int arg) = &mdb_condition_handler;
+#endif
 
-GBLREF mval 		**ind_result_array, **ind_result_sp, **ind_result_top;
-GBLREF mval 		**ind_source_array, **ind_source_sp, **ind_source_top;
-GBLREF rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
-GBLREF int4		break_message_mask;
-GBLREF stack_frame 	*frame_pointer;
-GBLREF unsigned char 	*stackbase, *stacktop, *stackwarn, *msp;
-GBLREF unsigned char	*fgncal_stack;
-GBLREF mv_stent		*mv_chain;
-GBLREF xfer_entry_t	xfer_table[];
-GBLREF mval		dollar_system;
-GBLREF mval		dollar_ztrap;
-GBLREF mval		dollar_zstatus;
-GBLREF mval		dollar_zmode;
-GBLREF bool		compile_time;
-GBLREF boolean_t	run_time;
-GBLREF spdesc		stringpool;
-GBLREF spdesc		rts_stringpool;
-GBLREF command_qualifier glb_cmd_qlf, cmd_qlf;
-GBLREF bool		lv_null_subs;
-GBLREF lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
-GBLREF symval		*curr_symval;
-GBLREF collseq          *local_collseq;
-GBLREF pattern          *pattern_list;
-GBLREF pattern          *curr_pattern;
-GBLREF pattern          mumps_pattern;
-GBLREF uint4    	*pattern_typemask;
-GBLREF bool		transform;
-GBLREF fnpc_area	fnpca;
-GBLREF int4		exi_condition;
-GBLREF global_latch_t 	defer_latch;
-GBLREF boolean_t	is_replicator;
-GBLREF void		(*ctrlc_handler_ptr)();
-GBLREF boolean_t	mstr_native_align;
-GBLREF boolean_t	gtm_utf8_mode;
-GBLREF boolean_t	utf8_patnumeric;
-GBLREF mstr		dollar_zchset;
-GBLREF mstr		dollar_zpatnumeric;
-GBLREF casemap_t	casemaps[];
-GBLREF void             (*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
-GBLREF ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
-GBLREF ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
+GBLREF mval 			**ind_result_array, **ind_result_sp, **ind_result_top;
+GBLREF mval 			**ind_source_array, **ind_source_sp, **ind_source_top;
+GBLREF rtn_tabent		*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
+GBLREF int4			break_message_mask;
+GBLREF stack_frame 		*frame_pointer;
+GBLREF unsigned char 		*stackbase, *stacktop, *stackwarn, *msp;
+GBLREF unsigned char		*fgncal_stack;
+GBLREF mv_stent			*mv_chain;
+GBLREF xfer_entry_t		xfer_table[];
+GBLREF mval			dollar_system;
+GBLREF mval			dollar_ztrap;
+GBLREF mval			dollar_zstatus;
+GBLREF mval			dollar_zmode;
+GBLREF bool			compile_time;
+GBLREF spdesc			stringpool;
+GBLREF spdesc			rts_stringpool;
+GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
+GBLREF bool			lv_null_subs;
+GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
+GBLREF symval			*curr_symval;
+GBLREF collseq       	  	*local_collseq;
+GBLREF pattern         		*pattern_list;
+GBLREF pattern        		*curr_pattern;
+GBLREF pattern        		mumps_pattern;
+GBLREF uint4    		*pattern_typemask;
+GBLREF bool			transform;
+GBLREF fnpc_area		fnpca;
+GBLREF int4			exi_condition;
+GBLREF global_latch_t 		defer_latch;
+GBLREF boolean_t		is_replicator;
+GBLREF void			(*ctrlc_handler_ptr)();
+GBLREF boolean_t		mstr_native_align;
+GBLREF boolean_t		gtm_utf8_mode;
+GBLREF boolean_t		utf8_patnumeric;
+GBLREF mstr			dollar_zchset;
+GBLREF mstr			dollar_zpatnumeric;
+GBLREF casemap_t		casemaps[];
+GBLREF void             	(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
+GBLREF ch_ret_type		(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
+GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
 
 OS_PAGE_SIZE_DECLARE
 
@@ -159,7 +166,7 @@ void gtm_startup(struct startup_vector *svec)
 	static char 	other_mode_buf[] = "OTHER";
 	mstr		log_name;
 
-	assert(svec->argcnt == sizeof(*svec));
+	assert(svec->argcnt == SIZEOF(*svec));
 	IA64_ONLY(init_xfer_table();)
 	get_page_size();
 	cache_table_relobjs = &cache_table_rebuild;
@@ -172,7 +179,7 @@ void gtm_startup(struct startup_vector *svec)
 	if (svec->user_stack_size > 8388608)
 		svec->user_stack_size = 8388608;
 	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
-        msp = stackbase = mstack_ptr + svec->user_stack_size - sizeof(char *);
+        msp = stackbase = mstack_ptr + svec->user_stack_size - SIZEOF(char *);
 
 	/* mark the stack base so that if error occur during call-in gtm_init(), the unwind
 	   logic in gtmci_ch() will get rid of the stack completely */
@@ -189,25 +196,36 @@ void gtm_startup(struct startup_vector *svec)
 	stp_init(svec->user_strpl_size);
 	if (svec->user_indrcache_size > MAX_INDIRECTION_NESTING || svec->user_indrcache_size < MIN_INDIRECTION_NESTING)
 		svec->user_indrcache_size = MIN_INDIRECTION_NESTING;
-	ind_result_array = (mval **)malloc(sizeof(mval *) * svec->user_indrcache_size);
-	ind_source_array = (mval **)malloc(sizeof(mval *) * svec->user_indrcache_size);
+	ind_result_array = (mval **)malloc(SIZEOF(mval *) * svec->user_indrcache_size);
+	ind_source_array = (mval **)malloc(SIZEOF(mval *) * svec->user_indrcache_size);
 	ind_result_sp = ind_result_array;
 	ind_result_top = ind_result_sp + svec->user_indrcache_size;
 	ind_source_sp = ind_source_array;
 	ind_source_top = ind_source_sp + svec->user_indrcache_size;
 	rts_stringpool = stringpool;
 	compile_time = FALSE;
-	run_time = TRUE;
-
+	switch(image_type)
+	{
+		case GTM_IMAGE:
+		case GTM_SVC_DAL_IMAGE:
+			run_time = TRUE;
+			is_replicator = TRUE;
+			break;
+#		ifdef UNIX
+		case MUPIP_IMAGE:
+			run_time = FALSE;
+			assert(!is_replicator);
+			break;
+#		endif
+		default:
+			GTMASSERT;
+	}
 	gtm_utf8_init(); /* Initialize the runtime for Unicode */
-
 	/* Initialize alignment requirement for the runtime stringpool */
 	log_name.addr = DISABLE_ALIGN_STRINGS;
 	log_name.len = STR_LIT_LEN(DISABLE_ALIGN_STRINGS);
 	/* mstr_native_align = logical_truth_value(&log_name, FALSE, NULL) ? FALSE : TRUE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
-
-	is_replicator = TRUE;	/* as GT.M goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	getjobname();
 	INVOKE_INIT_SECSHR_ADDRS;
 	getzprocess();
@@ -220,15 +238,15 @@ void gtm_startup(struct startup_vector *svec)
         if (NULL != GETENV(PACKAGE_ENV_TYPE))	/* chose xcall (default) or rpc zcall */
             xfer_table[xf_fnfgncal] = (xfer_entry_t)op_fnfgncal_rpc;  /* using RPC */
 #endif
-	msp -= sizeof(stack_frame);
+	msp -= SIZEOF(stack_frame);
 	frame_pointer = (stack_frame *)msp;
-	memset(frame_pointer,0, sizeof(stack_frame));
+	memset(frame_pointer,0, SIZEOF(stack_frame));
 	frame_pointer->temps_ptr = (unsigned char *)frame_pointer;
 	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
 	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
 	frame_pointer->type = SFT_COUNT;
-	frame_pointer->rvector = (rhdtyp*)malloc(sizeof(rhdtyp));
-	memset(frame_pointer->rvector,0,sizeof(rhdtyp));
+	frame_pointer->rvector = (rhdtyp*)malloc(SIZEOF(rhdtyp));
+	memset(frame_pointer->rvector, 0, SIZEOF(rhdtyp));
 	symbinit();
 	/* Variables for supporting $ZSEARCH sorting and wildcard expansion */
 	zsrch_var = lv_getslot(curr_symval);
@@ -240,30 +258,33 @@ void gtm_startup(struct startup_vector *svec)
 
 	/* Initialize global pointer to control-C handler. Also used in iott_use */
 	ctrlc_handler_ptr = &ctrlc_handler;
-	sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler);
-	atexit(gtm_exit_handler);
-	io_init(FALSE);		/* starts with nocenable */
-	cenable();		/* cenable unless the environment indicates otherwise - 2 steps because this can report errors */
+	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
+	if (!IS_MUPIP_IMAGE)
+	{
+		sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler);
+		atexit(gtm_exit_handler);
+		cenable();	/* cenable unless the environment indicates otherwise - 2 steps because this can report errors */
+	}
 	jobinterrupt_init();
 	getzdir();
 	dpzgbini();
 	zco_init();
 	/* a base addr of 0 indicates a gtm_init call from an rpc server */
-	if (svec->base_addr)
+	if ((GTM_IMAGE == image_type) && (NULL != svec->base_addr))
 		jobchild_init();
 	else
-	{
+	{	/* Trigger enabled utilities will enable through here */
 		dollar_zmode.mvtype = MV_STR;
 		dollar_zmode.str.addr = &other_mode_buf[0];
-		dollar_zmode.str.len = sizeof(other_mode_buf) -1;
+		dollar_zmode.str.len = SIZEOF(other_mode_buf) -1;
 	}
 	svec->frm_ptr = (unsigned char *)frame_pointer;
 	dollar_ztrap.mvtype = MV_STR;
-	dollar_ztrap.str.len = sizeof(init_break);
+	dollar_ztrap.str.len = SIZEOF(init_break);
 	dollar_ztrap.str.addr = (char *)init_break;
 	dollar_zstatus.mvtype = MV_STR;
 	dollar_zstatus.str.len = 0;
-	dollar_zstatus.str.addr = (char *)0;
+	dollar_zstatus.str.addr = NULL;
 	ecode_init();
 	zyerror_init();
 	ztrap_form_init();

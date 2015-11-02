@@ -68,7 +68,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 	unsigned char	c;
 	short		mode, mode1;
 	int4		length, width, width_bytes, recordsize, padchar;
-	long		size;
 	int		fstat_res, save_errno;
 	d_rm_struct	*rm_ptr;
 	struct stat	statbuf;
@@ -84,6 +83,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 	error_def(ERR_SYSCALL);
 	error_def(ERR_WIDTHTOOSMALL);
 	error_def(ERR_PADCHARINVALID);
+	error_def(ERR_IOERROR);
 
 	p_offset = 0;
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
@@ -176,9 +176,15 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{
 				iorm_flush(iod);
 				if (lseek(rm_ptr->fildes, (off_t)0, SEEK_SET) == -1)
-					rts_error(VARLSTCNT(1) errno);
+				{
+					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+							RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
+				}
 				if (fseek(rm_ptr->filstr, (long)0, SEEK_SET) == -1)	/* Rewind the input stream */
-					rts_error(VARLSTCNT(1) errno);
+				{
+					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseek"),
+							RTS_ERROR_LITERAL("REWIND"), CALLFROM, errno);
+				}
 				iod->dollar.zeof = FALSE;
 				iod->dollar.y = 0;
 				iod->dollar.x = 0;
@@ -186,6 +192,14 @@ void	iorm_use(io_desc *iod, mval *pp)
 				rm_ptr->done_1st_read = rm_ptr->done_1st_write = rm_ptr->crlast = FALSE;
 				rm_ptr->out_bytes = rm_ptr->bom_buf_cnt = rm_ptr->bom_buf_off = 0;
 				rm_ptr->inbuf_pos = rm_ptr->inbuf_off = rm_ptr->inbuf;
+				rm_ptr->file_pos = 0;
+				/* Reset temporary buffer so that the next read starts afresh */
+				if (IS_UTF_CHSET(iod->ichset))
+				{
+					DEBUG_ONLY(memset(rm_ptr->utf_tmp_buffer, 0, CHUNK_SIZE));
+					rm_ptr->utf_start_pos = 0;
+					rm_ptr->utf_tot_bytes_in_buffer = 0;
+				}
 			}
 			break;
 		case iop_stream:
@@ -207,20 +221,39 @@ void	iorm_use(io_desc *iod, mval *pp)
 		case iop_truncate:
 			if (!rm_ptr->fifo && !rm_ptr->pipe)
 			{
-				/* Warning! ftell() returns a long and fseek only accepts a long
-				 * as its second argument.  this may cause problems for files longer
-				 * the 2Gb.
-				 */
-				if ((size = ftell(rm_ptr->filstr)) != -1)
+				int ftruncate_res;
+				if (fseek(rm_ptr->filstr, (long)rm_ptr->file_pos, SEEK_SET) == -1)
 				{
-					int ftruncate_res;
-
-					if (lseek(rm_ptr->fildes, (off_t)size, SEEK_SET) == -1)
-						rts_error(VARLSTCNT(1) errno);
-					FTRUNCATE(rm_ptr->fildes, (off_t)size, ftruncate_res);
-					if (fseek(rm_ptr->filstr, size, SEEK_SET) == -1)
-						rts_error(VARLSTCNT(1) errno);
-					iod->dollar.zeof = TRUE;
+					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("fseek"),
+							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
+				}
+				if (lseek(rm_ptr->fildes, (off_t)rm_ptr->file_pos, SEEK_SET) == -1)
+				{
+					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
+							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
+				}
+				FTRUNCATE(rm_ptr->fildes, (off_t)rm_ptr->file_pos, ftruncate_res);
+				if (0 != ftruncate_res)
+				{
+					rts_error(VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("ftruncate"),
+							RTS_ERROR_LITERAL("TRUNCATE"), CALLFROM, errno);
+				}
+				iod->dollar.zeof = TRUE;
+				/* Reset temporary buffer so that the next read can start afresh */
+				if (IS_UTF_CHSET(iod->ichset))
+				{
+					rm_ptr->inbuf_top = rm_ptr->inbuf_off = rm_ptr->inbuf_pos = rm_ptr->inbuf;
+					rm_ptr->out_bytes = rm_ptr->bom_buf_cnt = rm_ptr->bom_buf_off = 0;
+					DEBUG_ONLY(memset(rm_ptr->utf_tmp_buffer, 0, CHUNK_SIZE));
+					rm_ptr->utf_start_pos = 0;
+					rm_ptr->utf_tot_bytes_in_buffer = 0;
+					if (0 == rm_ptr->file_pos)
+					{
+						/* If the truncate size is zero reset done_1st_read and done_1st_write
+						 * to FALSE.
+						 */
+						rm_ptr->done_1st_read = rm_ptr->done_1st_write = FALSE;
+					}
 				}
 			}
 			break;

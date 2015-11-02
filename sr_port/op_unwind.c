@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
@@ -20,6 +22,7 @@
 #include "objlabel.h"
 #include "op.h"
 #include "error_trap.h"
+#include "error.h"
 
 GBLREF	void		(*unw_prof_frame_ptr)(void);
 GBLREF	stack_frame	*frame_pointer, *zyerr_frame;
@@ -28,16 +31,24 @@ GBLREF	mv_stent	*mv_chain;
 GBLREF	tp_frame	*tp_pointer;
 GBLREF	boolean_t	is_tracing_on;
 GBLREF	boolean_t	skip_error_ret;
-GBLREF stack_frame	*error_frame;
+GBLREF	stack_frame	*error_frame;
+GBLREF	mval		*alias_retarg;
 
 /* this has to be maintained in parallel with unw_retarg(), the unwind with a return argument (extrinisic quit) routine */
 void op_unwind(void)
 {
+	stack_frame	*prevfp;
 	mv_stent 	*mvc;
 
 	error_def(ERR_STACKUNDERFLO);
 	error_def(ERR_TPQUIT);
 
+	if (frame_pointer->type & SFT_COUNT)
+	{	/* If unwinding a counted frame, make sure we don't have an alias return argument in flight */
+		assert(NULL == alias_retarg);
+		alias_retarg = NULL;
+	}
+	DBGEHND_ONLY(prevfp = frame_pointer);
 	if (tp_pointer && tp_pointer->fp <= frame_pointer)
 		rts_error(VARLSTCNT(1) ERR_TPQUIT);
 	/* Note that error_ret() should be invoked only after the rts_error() of TPQUIT.
@@ -72,16 +83,17 @@ void op_unwind(void)
 	if (is_tracing_on)
 		(*unw_prof_frame_ptr)();
 	mv_chain = mvc;
-	msp = (unsigned char *)frame_pointer + sizeof(stack_frame);
+	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	if (msp > stackbase)
 		rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
 	frame_pointer = frame_pointer->old_frame_pointer;
+	DBGEHND((stderr, "op_unwind: Stack frame 0x%016lx unwound - frame 0x%016lx now current\n", prevfp, frame_pointer));
 	if (NULL != zyerr_frame && frame_pointer > zyerr_frame)
 		zyerr_frame = NULL;
 	if (frame_pointer)
 	{
-		if (frame_pointer < (stack_frame *)msp || frame_pointer > (stack_frame *)stackbase ||
-				frame_pointer < (stack_frame *)stacktop)
+		if (frame_pointer < (stack_frame *)msp || frame_pointer > (stack_frame *)stackbase
+		    || frame_pointer < (stack_frame *)stacktop)
 			rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
 	}
 	return;

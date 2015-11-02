@@ -26,7 +26,7 @@ void create_object_file(rhdtyp *rhead);
 void obj_init(void);
 DEBUG_ONLY(int output_symbol_size(void);)
 
-#define OUTPUT_SYMBOL_SIZE (USIZEOF(int4) + sym_table_size)
+#define OUTPUT_SYMBOL_SIZE (SIZEOF(int4) + sym_table_size)
 
 #define PADCHARS	"PADDING PADDING"
 #ifndef SECTION_ALIGN_BOUNDARY

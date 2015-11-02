@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ void bt_refresh(sgmnt_addrs *csa)
 
 	csd = csa->hdr;
 	assert(dba_bg == csd->acc_meth);
-	longset((uchar_ptr_t)csa->bt_header, (csd->bt_buckets + csd->n_bts + 1) * sizeof(bt_rec), 0);
+	longset((uchar_ptr_t)csa->bt_header, (csd->bt_buckets + csd->n_bts + 1) * SIZEOF(bt_rec), 0);
 
 	for (ptr = csa->bt_header, top = ptr + csd->bt_buckets + 1; ptr < top; ptr++)
 		ptr->blk = BT_QUEHEAD;
@@ -37,7 +37,7 @@ void bt_refresh(sgmnt_addrs *csa)
 		ptr->blk = BT_NOTVALID;
 		ptr->cache_index = CR_NOTVALID;
 		insqt((que_ent_ptr_t)ptr, (que_ent_ptr_t)bt1);
-		insqt((que_ent_ptr_t)((sm_uc_ptr_t)ptr + (2 * sizeof(int4))), (que_ent_ptr_t)csa->th_base);
+		insqt((que_ent_ptr_t)((sm_uc_ptr_t)ptr + (2 * SIZEOF(int4))), (que_ent_ptr_t)csa->th_base);
 	}
 	((th_rec *)((uchar_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn = csa->ti->curr_tn - 1;
 	csa->ti->mm_tn = 0;

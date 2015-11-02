@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,16 +113,16 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	if (0 == upd_pid)
 	{
 		/* Update Process */
-		upd_proc_log_cmd.len = sizeof(UPDPROC_CMD) - 1;
+		upd_proc_log_cmd.len = SIZEOF(UPDPROC_CMD) - 1;
 		upd_proc_log_cmd.addr = UPDPROC_CMD;
-		status = TRANS_LOG_NAME(&upd_proc_log_cmd, &upd_proc_trans_cmd, upd_proc_cmd, sizeof(upd_proc_cmd),
+		status = TRANS_LOG_NAME(&upd_proc_log_cmd, &upd_proc_trans_cmd, upd_proc_cmd, SIZEOF(upd_proc_cmd),
 						dont_sendmsg_on_log2long);
 		if (status != SS_NORMAL)
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   RTS_ERROR_LITERAL("Could not find path of Update Process. Check value of $gtm_dist"));
 			if (SS_LOG2LONG == status)
-				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDPROC_CMD), sizeof(upd_proc_cmd) - 1);
+				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDPROC_CMD), SIZEOF(upd_proc_cmd) - 1);
 			repl_errno = EREPL_UPDSTART_BADPATH;
 			return(UPDPROC_START_ERR);
 		}

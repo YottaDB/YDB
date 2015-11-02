@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -58,16 +58,8 @@ l1:	#&(code_offset) for this label (usually & of linenumber table entry
 	#linkage ptr(ctxt ptr)
 	movq	mrt_lnk_ptr(REG64_ARG0),REG64_ARG1
 
-	#literal base
-	movq	mrt_lit_ptr(REG64_ARG0),REG_LITERAL_BASE
-
 	call	flush_jmp
 	getframe
-	movq    frame_pointer(REG_IP),REG64_ARG2
-
-	#flush_jmp inits lit ptr field to zero so getframe won't load the reg. Now we can save
-	#the correct reg in the stack frame for subsquent getframes.
-        movq    REG_LITERAL_BASE,msf_literal_ptr_off(REG64_ARG2)
 	ret
 
 l2:	#point to "temp" arg auto_zlink can set with new labaddr

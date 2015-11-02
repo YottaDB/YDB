@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void op_zmess(unsigned int cnt, ...)
 
 		faocnt = eptr->parm_count;
 		faocnt = (faocnt > MAX_FAO_PARMS ? MAX_FAO_PARMS : faocnt);
-		faocnt = mval2fao(eptr->msg, var, &fao[0], cnt, faocnt, buff, buff + sizeof(buff));
+		faocnt = mval2fao(eptr->msg, var, &fao[0], cnt, faocnt, buff, buff + SIZEOF(buff));
 		va_end(var);
 		if (faocnt != -1)
 			rts_error(VARLSTCNT(faocnt+2) errnum, faocnt, fao[0], fao[1], fao[2], fao[3], fao[4], fao[5], fao[6],

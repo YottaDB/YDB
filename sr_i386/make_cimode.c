@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,26 +48,26 @@ rhdtyp *make_cimode(void)
 
 	if (NULL != base_address)
 		return base_address;
-	base_address = (rhdtyp *)GTM_TEXT_ALLOC(sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
-	memset(base_address,0,sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
+	base_address = (rhdtyp *)GTM_TEXT_ALLOC(SIZEOF(rhdtyp) + CODE_SIZE + SIZEOF(lab_tabent) + CODE_LINES * SIZEOF(int4));
+	memset(base_address,0,SIZEOF(rhdtyp) + CODE_SIZE + SIZEOF(lab_tabent) + CODE_LINES * SIZEOF(int4));
 	base_address->routine_name.len = STR_LIT_LEN(GTM_CIMOD);
 	base_address->routine_name.addr = GTM_CIMOD;
-	base_address->ptext_ptr = sizeof(rhdtyp);
+	base_address->ptext_ptr = SIZEOF(rhdtyp);
 	base_address->vartab_ptr =
-		base_address->labtab_ptr = sizeof(rhdtyp) + CODE_SIZE;	/* hdr + code */
-	base_address->lnrtab_ptr = sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent);
+		base_address->labtab_ptr = SIZEOF(rhdtyp) + CODE_SIZE;	/* hdr + code */
+	base_address->lnrtab_ptr = SIZEOF(rhdtyp) + CODE_SIZE + SIZEOF(lab_tabent);
 	base_address->labtab_len = 1;
 	base_address->lnrtab_len = CODE_LINES;
 	code = (unsigned char *) base_address + base_address->ptext_ptr;
 	*code++ = I386_INS_CALL_Jv;
-	*((int4 *)code) = (int4)((unsigned char *)ci_restart - (code + sizeof(int4)));
-	code += sizeof(int4);
+	*((int4 *)code) = (int4)((unsigned char *)ci_restart - (code + SIZEOF(int4)));
+	code += SIZEOF(int4);
 	*code++ = I386_INS_CALL_Jv; /* a CALL to return control from M to ci_ret_code() which in turn returns to gtm_ci() */
-	*((int4 *)code) = (int4)((unsigned char *)ci_ret_code - (code + sizeof(int4)));
-	code += sizeof(int4);
+	*((int4 *)code) = (int4)((unsigned char *)ci_ret_code - (code + SIZEOF(int4)));
+	code += SIZEOF(int4);
 	*code++ = I386_INS_JMP_Jv;
-	*((int4 *)code) = (int4)((unsigned char *)opp_ret - (code + sizeof(int4)));
-	code += sizeof(int4);
+	*((int4 *)code) = (int4)((unsigned char *)opp_ret - (code + SIZEOF(int4)));
+	code += SIZEOF(int4);
 	lbl = (lab_tabent *)((int) base_address + base_address->labtab_ptr);
 	lbl->lab_ln_ptr = base_address->lnrtab_ptr;
 	lnr = (int *)((int)base_address + base_address->lnrtab_ptr);
@@ -76,6 +76,6 @@ rhdtyp *make_cimode(void)
 	*lnr++ = base_address->ptext_ptr + 2 * CALL_SIZE;
 	assert(code - ((unsigned char *)base_address + base_address->ptext_ptr) == CODE_SIZE);
 	zlput_rname(base_address);
-	inst_flush(base_address, sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
+	inst_flush(base_address, SIZEOF(rhdtyp) + CODE_SIZE + SIZEOF(lab_tabent) + CODE_LINES * SIZEOF(int4));
 	return base_address;
 }

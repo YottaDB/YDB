@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,6 @@
 GBLREF	boolean_t	in_gvcst_incr;
 GBLREF	mval		increment_delta_mval;
 GBLREF	mval		*post_incr_mval;
-GBLREF	boolean_t	pre_incr_update_trans;	/* copy of "sgm_info_ptr->update_trans" before the $INCR */
 GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	short		dollar_tlevel;
 
@@ -41,8 +40,6 @@ void	gvcst_incr(mval *increment, mval *result)
 	assert(!in_gvcst_incr);
 	assert(MV_IS_NUMERIC(increment));	/* op_gvincr or gtcmtr_increment should have done the MV_FORCE_NUM before calling */
 	in_gvcst_incr = TRUE;
-	if (dollar_tlevel)
-		pre_incr_update_trans = sgm_info_ptr->update_trans;
 	post_incr_mval = result;
 	/* it is possible (due to some optimizations in the compiler) that both the input parameters "increment" and "result"
 	 * point to the same mval. if we pass "increment" and "result" as they are to gvcst_put, it is possible due to the code
@@ -55,6 +52,8 @@ void	gvcst_incr(mval *increment, mval *result)
 	 * used in gvincr_recompute_upd_array.
 	 */
 	increment_delta_mval = *increment;
+	/* Since we should be caring about just the numeric part, nullify the string part of the mval */
+	increment_delta_mval.str.len = 0;
 	gvcst_put(&increment_delta_mval);
 	assert(!in_gvcst_incr);	/* should have been reset by gvcst_put */
 	in_gvcst_incr = FALSE;	/* just in case it is not reset already by gvcst_put */

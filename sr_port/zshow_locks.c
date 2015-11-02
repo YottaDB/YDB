@@ -34,7 +34,7 @@ void zshow_locks(zshow_out *output)
 	/* Print LUS statistic */
 	output->flush = FALSE;
 	v.str.addr = &mlg[0];
-	v.str.len = sizeof(mlg) - 1;
+	v.str.len = SIZEOF(mlg) - 1;
 	zshow_output(output, &v.str);
 	ptr = i2ascl((uchar_ptr_t)valstr, mlk_stats.n_user_locks_success);
 	v.str.len = (mstr_len_t)(ptr - &valstr[0]);
@@ -44,7 +44,7 @@ void zshow_locks(zshow_out *output)
 	/* Print LUF statistic */
 	output->flush = FALSE;
 	v.str.addr = &mlt[0];
-	v.str.len = sizeof(mlt) - 1;
+	v.str.len = SIZEOF(mlt) - 1;
 	zshow_output(output, &v.str);
 	ptr = i2ascl((uchar_ptr_t)valstr, mlk_stats.n_user_locks_fail);
 	v.str.len = (mstr_len_t)(ptr - &valstr[0]);
@@ -65,7 +65,7 @@ void zshow_locks(zshow_out *output)
 		if (temp->level && temp->zalloc)
 		{
 			v.str.addr = &zal[0];
-			v.str.len = sizeof(zal) - 1;
+			v.str.len = SIZEOF(zal) - 1;
 			zshow_output(output,&v.str);
 			zshow_format_lock(output,temp);
 			output->flush = TRUE;
@@ -73,29 +73,29 @@ void zshow_locks(zshow_out *output)
 			zshow_output(output,&v.str);
 			output->flush = FALSE;
 			v.str.addr = &lck[0];
-			v.str.len = sizeof(lck) - 1;
+			v.str.len = SIZEOF(lck) - 1;
 			zshow_output(output,&v.str);
 			zshow_format_lock(output,temp);
 			v.str.addr = &lvl[0];
-			v.str.len = sizeof(lvl) - 1;
+			v.str.len = SIZEOF(lvl) - 1;
 			zshow_output(output,&v.str);
 			MV_FORCE_MVAL(&v,(int)temp->level) ;
 			mval_write(output,&v,TRUE);
 		} else if (temp->level)
 		{
 			v.str.addr = &lck[0];
-			v.str.len = sizeof(lck) - 1;
+			v.str.len = SIZEOF(lck) - 1;
 			zshow_output(output,&v.str);
 			zshow_format_lock(output,temp);
 			v.str.addr = &lvl[0];
-			v.str.len = sizeof(lvl) - 1;
+			v.str.len = SIZEOF(lvl) - 1;
 			zshow_output(output,&v.str);
 			MV_FORCE_MVAL(&v,(int)temp->level) ;
 			mval_write(output,&v,TRUE);
 		} else if (temp->zalloc)
 		{
 			v.str.addr = &zal[0];
-			v.str.len = sizeof(zal) - 1;
+			v.str.len = SIZEOF(zal) - 1;
 			zshow_output(output,&v.str);
 			zshow_format_lock(output,temp);
 			output->flush = TRUE;

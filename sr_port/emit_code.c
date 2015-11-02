@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ GBLDEF int call_4lcldo_variant;	 /* used in emit_jmp for call[sp] and forlcldo *
 
 #endif /* __x86_64__ || __ia64 */
 
-#define MVAL_INT_SIZE DIVIDE_ROUND_UP(sizeof(mval), sizeof(UINTPTR_T))
+#define MVAL_INT_SIZE DIVIDE_ROUND_UP(SIZEOF(mval), SIZEOF(UINTPTR_T))
 
 #ifdef DEBUG
 #include "vdatsize.h"
@@ -177,7 +177,7 @@ void trip_gen (triple *ct)
 	oct = oc_tab[ct->opcode].octype;
 	sopr = &saved_opr[0];
 	*sopr++ = &ct->destination;
-	for (ttp = ct, opr = ttp->operand;  opr < &(ttp->operand[2]);)
+	for (ttp = ct, opr = ttp->operand ; opr < ARRAYTOP(ttp->operand); )
 	{
 		if (opr->oprclass)
 		{
@@ -188,7 +188,7 @@ void trip_gen (triple *ct)
 				continue;
 			}
 			*sopr++ = opr;
-			if (sopr >= &saved_opr[MAX_ARGS])
+			if (sopr >= ARRAYTOP(saved_opr))
 				rts_error(VARLSTCNT(3) ERR_MAXARGCNT, 1, MAX_ARGS);
 		}
 		opr++;
@@ -384,7 +384,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 #ifdef DEBUG
 			list_chkpage();
 			obpt = &outbuf[0];
-			memset(obpt, SP, sizeof(outbuf));
+			memset(obpt, SP, SIZEOF(outbuf));
 			i2asc((uchar_ptr_t)obpt, vaxi_cnt++);
 			obpt += 7;
 			if (VXT_IREPAB != *inst && VXT_IREPL != *inst)
@@ -434,7 +434,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						must be fetched from a global variable by subroutine call. */
 					assert(*inst == 0x5a);		/* VAX r10 or $TEST register */
 					inst++;
-					emit_call_xfer(sizeof(intszofptr_t) * xf_dt_get);
+					emit_call_xfer(SIZEOF(intszofptr_t) * xf_dt_get);
 					reg = GTM_REG_R0;	/* function return value */
 #endif
 					/* Generate a cmp instruction using the return value of the previous call,
@@ -653,7 +653,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					 * logic of multiple copies can be replaced with more efficient instruction(s)
 					 * available on that particular platform.
 					 */
-					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, sizeof(mval));
+					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, SIZEOF(mval));
 #else
 					for (words_to_move = MVAL_INT_SIZE, reg_offset = 0; words_to_move;)
 					{
@@ -725,7 +725,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 									reg = get_arg_reg();
 									GEN_MOVE_REG(reg, MOVL_RETVAL_REG);
 									emit_push(reg);
-									emit_call_xfer(sizeof(intszofptr_t) * xf_dt_store);
+									emit_call_xfer(SIZEOF(intszofptr_t) * xf_dt_store);
 								} else
 								{
 									GEN_MOVE_REG(gtm_reg(*inst), MOVL_RETVAL_REG);
@@ -1126,14 +1126,15 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							break;
 						case OC_CDLIT:
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
-							if (GENERIC_OPCODE_LDA == generic_inst) {
+							if (GENERIC_OPCODE_LDA == generic_inst)
+							{
 								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
 								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(trg_reg);)
 								inst_emitted = TRUE;
 							} else
 							{
 								RISC_ONLY(code_buf[code_idx++]
-										|= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+									  |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
 								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
@@ -1799,7 +1800,7 @@ void	add_to_vax_push_list(int pushes_seen)
 		push_list_index = 0;
 		if (current_push_list_ptr->next == 0 )
 		{
-			current_push_list_ptr->next = (struct push_list *)malloc(sizeof(*current_push_list_ptr));
+			current_push_list_ptr->next = (struct push_list *)malloc(SIZEOF(*current_push_list_ptr));
 			current_push_list_ptr->next->next = 0;
 		}
 		current_push_list_ptr = current_push_list_ptr->next;
@@ -1828,7 +1829,7 @@ void	push_list_init(void)
 	push_list_index = -1;
 	if (push_list_start_ptr == 0)
 	{
-		push_list_start_ptr = (struct push_list *)malloc(sizeof(*current_push_list_ptr));
+		push_list_start_ptr = (struct push_list *)malloc(SIZEOF(*current_push_list_ptr));
 		push_list_start_ptr->next = 0;
 	}
 	current_push_list_ptr = push_list_start_ptr;
@@ -1861,7 +1862,7 @@ void	emit_call_xfer(int xfer)
 			memcpy(obpt, &vdat_wdisp[0], VDAT_WDISP_SIZE);
 			obpt += VDAT_WDISP_SIZE;
 		}
-		offset = (int)(xfer / sizeof(char *));
+		offset = (int)(xfer / SIZEOF(char *));
 		for (c = (unsigned char *)xfer_name[offset]; *c ; )
 			*obpt++ = *c++;
 		memcpy(obpt, &vdat_r11[0], VDAT_R11_SIZE);
@@ -1872,7 +1873,7 @@ void	emit_call_xfer(int xfer)
 #endif
 
 	assert(0 == (xfer & 0x3));
-	offset = (int)(xfer / sizeof(char *));
+	offset = (int)(xfer / SIZEOF(char *));
 #ifdef __x86_64__
 /* Set RAX to 0 for variable argument function calls. This is part of the ABI.
 	The RAX represents the # of floating of values being passed

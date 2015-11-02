@@ -62,7 +62,7 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 	error_def(ERR_SIGMAPERR);
 	error_def(ERR_SIGACCERR);
 
-	memset(gtmsi, 0, sizeof(*gtmsi));
+	memset(gtmsi, 0, SIZEOF(*gtmsi));
 	gtmsi->signal = sig;
 #if (!defined(Linux390))
 	if (NULL != info)

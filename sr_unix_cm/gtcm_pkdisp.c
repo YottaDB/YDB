@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,12 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"		/* for exit() */
+
+/* The use of "open" below involves pulling in gtm_open() (from gtm_fd_trace.c) which in turn pulls in caller_id and the works.
+ * To avoid all those from bloating this library, we skip the file-descriptor trace in this module.
+ */
+#undef GTM_FD_TRACE
+
 #include "gtm_unistd.h"		/* for read() */
 #include "gtm_fcntl.h"
 #include <errno.h>
@@ -78,7 +84,7 @@ int main(int argc, char_ptr_t argv[])
 	{
 		if (rdmr)
 		{
-			cc = (int)(&buff[sizeof(buff)] - &bptr[blen]);
+			cc = (int)(ARRAYTOP(buff) - &bptr[blen]);
 			if ((cc = (int)(read(fd, &bptr[blen], cc))) < 0)
 			{
 				PRINTF("%s: read(): %s", argv[0], STRERROR(errno));

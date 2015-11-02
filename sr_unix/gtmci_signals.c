@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,8 +41,8 @@ void 	sig_save_ext(struct sigaction* act)
 	int	i;
 	if (MUMPS_CALLIN & invocation_mode)
 	{  /* C  is the base */
-		gtm_sig_h = (struct sigaction*)malloc(NSIG * sizeof(struct sigaction));
-		ext_sig_h = (struct sigaction*)malloc(NSIG * sizeof(struct sigaction));
+		gtm_sig_h = (struct sigaction*)malloc(NSIG * SIZEOF(struct sigaction));
+		ext_sig_h = (struct sigaction*)malloc(NSIG * SIZEOF(struct sigaction));
 		for (i = 1; i <= NSIG; i++)
 			sigaction(i, act, &ext_sig_h[i-1]);
 	} else {  /* GT.M is the base */

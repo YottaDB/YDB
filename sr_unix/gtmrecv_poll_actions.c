@@ -182,7 +182,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		if (FD_INVALID != gtmrecv_sock_fd)
 		{	/* Send XOFF_ACK_ME */
 			xoff_msg.type = REPL_XOFF_ACK_ME;
-			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&send_seqno, sizeof(seq_num));
+			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&send_seqno, SIZEOF(seq_num));
 			xoff_msg.len = MIN_REPL_MSGLEN;
 			REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, FALSE, &gtmrecv_poll_immediate)
 				; /* Empty Body */

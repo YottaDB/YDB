@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,9 +95,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 				jpc->pini_addr = 0;
 			gds_rundown();
 			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
-			cs_addrs->dir_tree->regcnt--;	/* targ_free relies on this */
-			targ_free(cs_addrs->dir_tree);
-			cs_addrs->dir_tree = NULL;
+			FREE_CSA_DIR_TREE(cs_addrs);
 			cm_del_gdr_ptr(gv_cur_region);
 		} else if (0 < refcnt)
 		{

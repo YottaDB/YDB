@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,16 +34,16 @@ void zdate_form_init(struct startup_vector *svec)
 
 	val.addr = ZDATE_FORM;
 	val.len = STR_LIT_LEN(ZDATE_FORM);
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
 	{
-		assert(tn.len < sizeof(buf));
+		assert(tn.len < SIZEOF(buf));
 		buf[tn.len] = '\0';
 		zdate_form = (int4)(STRTOL(buf, NULL, 10));
 	} else if (SS_NOLOGNAM == status)
 		zdate_form = svec->zdate_form;
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, sizeof(buf) - 1);
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf) - 1);
 #	endif
 	else
 		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZDATE_FORM), status);

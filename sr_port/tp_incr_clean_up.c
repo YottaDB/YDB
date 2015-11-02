@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -163,7 +163,7 @@ void tp_incr_clean_up(short newlevel)
 				{
 					tmp_cse = cse->high_tlevel;
 					if (cse->new_buff)
-						free_element(si->new_buff_list, (char *)cse->new_buff - sizeof(que_ent));
+						free_element(si->new_buff_list, (char *)cse->new_buff - SIZEOF(que_ent));
 					free_element(si->tlvl_cw_set_list, (char *)cse);
 					cse = tmp_cse;
 				}
@@ -190,6 +190,7 @@ void tp_incr_clean_up(short newlevel)
 			REINITIALIZE_LIST(si->new_buff_list);	/* reinitialize the new_buff buddy_list */
 			REINITIALIZE_LIST(si->tlvl_cw_set_list);	/* reinitialize the tlvl_cw_set buddy_list */
 		}
+		DEBUG_ONLY(if (!si->update_trans) DBG_CHECK_SI_BUDDY_LIST_IS_REINITIALIZED(si);)
 	}
 	assert((NULL != first_sgm_info) || 0 == cw_stagnate.size || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
@@ -215,8 +216,8 @@ void restore_next_off(cw_set_element *cse)
 #ifdef DEBUG
 	ptr = cse->new_buff;
 	cur_blk_size = ((blk_hdr_ptr_t)ptr)->bsiz;
-	assert(2 == (sizeof(cse->undo_offset) / sizeof(cse->undo_offset[0])));
-	assert(2 == (sizeof(cse->undo_next_off) / sizeof(cse->undo_next_off[0])));
+	assert(2 == (SIZEOF(cse->undo_offset) / SIZEOF(cse->undo_offset[0])));
+	assert(2 == (SIZEOF(cse->undo_next_off) / SIZEOF(cse->undo_next_off[0])));
 	assert(cse->undo_offset[0] < cur_blk_size);
 	assert(cse->undo_offset[1] < cur_blk_size);
 #endif
@@ -250,12 +251,28 @@ void rollbk_gbl_tlvl_info(short newlevel)
 		prev_gtli = gtli;
 	}
 	assert(!global_tlvl_info_head || gtli);
-	assert(!prev_gtli || (gtli && (newlevel + 1 == gtli->t_level)));
-	if (gtli && newlevel + 1 == gtli->t_level)
+	assert(!prev_gtli || (gtli && ((newlevel + 1) == gtli->t_level)));
+	if (gtli && ((newlevel + 1) == gtli->t_level))
+	{
 		jnl_fence_ctl.fence_list = gtli->global_tlvl_fence_info;
-	else
+		GTMTRIG_ONLY(
+			/* Restore the ztwormhole pointer to the value at the start of the rollback'ed level */
+			jgbl.prev_ztworm_ptr = gtli->tlvl_prev_ztworm_ptr;
+		)
+		jgbl.cumul_jnl_rec_len = gtli->tlvl_cumul_jrec_len;
+		jgbl.tp_ztp_jnl_upd_num = gtli->tlvl_tp_ztp_jnl_upd_num;
+		DEBUG_ONLY(jgbl.cumul_index = gtli->tlvl_cumul_index;)
+	} else
+	{
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
-
+		GTMTRIG_ONLY(
+			/* Fresh start, so reset ztwormhole pointer. */
+			jgbl.prev_ztworm_ptr = NULL;
+		)
+		jgbl.cumul_jnl_rec_len = 0;
+		jgbl.tp_ztp_jnl_upd_num = 0;
+		DEBUG_ONLY(jgbl.cumul_index = 0;)
+	}
 	FREE_GBL_TLVL_INFO(gtli);
 	if (prev_gtli)
 		prev_gtli->next_global_tlvl_info = NULL;
@@ -266,6 +283,7 @@ void rollbk_gbl_tlvl_info(short newlevel)
 		tmp_next_csa = old_csa->next_fenced;
 		old_csa->next_fenced = NULL;
 	}
+	/* No need to clean up jnl_fence_ctl.inctn_fence_list. See similar comment in tp_clean_up for details on why */
 }
 
 /* Rollback the tlvl specific info (per segment) stored in tlevel_info list.
@@ -339,8 +357,6 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 				si->jnl_head = NULL;
 				si->jnl_tail = &si->jnl_head;
 			}
-			jgbl.cumul_jnl_rec_len = tli->tlvl_cumul_jrec_len;
-			DEBUG_ONLY(jgbl.cumul_index = tli->tlvl_cumul_index;)
 		}
 		DEBUG_ONLY(invalidate = FALSE;)
 		for (th = tli->tlvl_tp_hist_info; th != si->last_tp_hist; th++)
@@ -382,12 +398,10 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 			FREE_JFB_INFO(si, temp_jfb);
 			si->jnl_head = NULL;
 			si->jnl_tail = &si->jnl_head;
-			jgbl.cumul_jnl_rec_len = 0;
-			DEBUG_ONLY(jgbl.cumul_index = 0;)
 		}
 		reinitialize_hashtab_int4(si->blks_in_use);
 		si->num_of_blks = 0;
-		si->update_trans = FALSE;
+		si->update_trans = 0;
 		csa->dir_tree->clue.end = 0;
 		si->last_tp_hist = si->first_tp_hist;
 	}

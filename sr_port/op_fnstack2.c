@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,8 +58,8 @@ GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related 
 void op_fnstack2(int level, mval *info, mval *result)
 {
  	int		cur_zlevel;
-	int		mode;
- 	unsigned char	info_upper[sizeof("MCODE")];
+	stack_mode_t	mode;
+ 	unsigned char	info_upper[SIZEOF("MCODE")];
 
 	error_def(ERR_INVSTACODE);
 
@@ -69,11 +69,11 @@ void op_fnstack2(int level, mval *info, mval *result)
 	if (info->str.len == 5)
 	{
 		lower_to_upper(info_upper, (unsigned char *)info->str.addr, 5);
-		if (!memcmp("MCODE", info_upper, sizeof("MCODE")-1))
+		if (!memcmp("MCODE", info_upper, SIZEOF("MCODE")-1))
 			mode = DOLLAR_STACK_MCODE;
-		else if (!memcmp("ECODE", info_upper, sizeof("ECODE")-1))
+		else if (!memcmp("ECODE", info_upper, SIZEOF("ECODE")-1))
 			mode = DOLLAR_STACK_ECODE;
-		else if (!memcmp("PLACE", info_upper, sizeof("PLACE")-1))
+		else if (!memcmp("PLACE", info_upper, SIZEOF("PLACE")-1))
 			mode = DOLLAR_STACK_PLACE;
 	}
 	if (DOLLAR_STACK_INVALID == mode)

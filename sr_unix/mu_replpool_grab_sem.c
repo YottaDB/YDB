@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,7 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 	udi->fn = (char *)replreg->dyn.addr->fname;
 	if (!ftok_sem_get(replreg, TRUE, REPLPOOL_ID, immediate))
 		rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, full_len, instfilename);
-	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+	repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	/*
 	 * --------------------------
 	 * First semaphores of jnlpool
@@ -180,10 +180,10 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 	repl_instance.recvpool_semid_ctime = udi->gt_sem_ctime;
 	/* Initialize jnlpool.repl_inst_filehdr as it is used later by gtmrecv_fetchresync() */
 	assert(NULL == jnlpool.repl_inst_filehdr);
-	jnlpool.repl_inst_filehdr = (repl_inst_hdr_ptr_t)malloc(sizeof(repl_inst_hdr));
-	memcpy(jnlpool.repl_inst_filehdr, &repl_instance, sizeof(repl_inst_hdr));
+	jnlpool.repl_inst_filehdr = (repl_inst_hdr_ptr_t)malloc(SIZEOF(repl_inst_hdr));
+	memcpy(jnlpool.repl_inst_filehdr, &repl_instance, SIZEOF(repl_inst_hdr));
 	/* Flush changes to the replication instance file header to disk */
-	repl_inst_write(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
+	repl_inst_write(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 	/* Now release jnlpool/recvpool ftok semaphore */
 	if (!ftok_sem_release(replreg, FALSE, immediate))
 	{

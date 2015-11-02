@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,12 +58,16 @@
 #define	DEFAULT_SOCKET_BUFFER_SIZE	0x400
 #define	MAX_SOCKET_BUFFER_SIZE		0x100000
 #define	MAX_INTERNAL_SOCBUF_SIZE	0x100000
-/* Next two fields relate to the time that a variable length unterminated read will wait to see
+/* Next three fields relate to the time that a variable length unterminated read will wait to see
    if there is more input coming in before it gives up and returns what it has to the user. This
    time is specified in milliseconds. This value used to be 200ms but that was deemed too long on
    modern systems yet now the user can change it if they wish to. Tradeoffs are longer waits for
-   variable reads versus potential CPU burner if the value gets too low.
+   variable reads versus potential CPU burner if the value gets too low.  The implementation now
+   waits INITIAL_MOREREAD_TIMEOUT time for the first read to occur and then switches to the
+   DEFAULT_MOREREAD_TIMEOUT.  This keeps CPU usage low during the potentially long period prior to
+   reading some data, while being more responsive for subsequent reads.
  */
+#define INITIAL_MOREREAD_TIMEOUT	200
 #define DEFAULT_MOREREAD_TIMEOUT	10
 #define MAX_MOREREAD_TIMEOUT		999
 
@@ -74,10 +78,10 @@
 	int	errlen; \
 	char	*errptr; \
 	iod->dollar.za = 9; \
-	memcpy(dsocketptr->dollar_device, ONE_COMMA, sizeof(ONE_COMMA)); \
+	memcpy(dsocketptr->dollar_device, ONE_COMMA, SIZEOF(ONE_COMMA)); \
 	errptr = (char *)STRERROR(syserror); \
 	errlen = STRLEN(errptr); \
-	memcpy(&dsocketptr->dollar_device[sizeof(ONE_COMMA) - 1], errptr, errlen + 1); /* + 1 for null */ \
+	memcpy(&dsocketptr->dollar_device[SIZEOF(ONE_COMMA) - 1], errptr, errlen + 1); /* + 1 for null */ \
 	assert(ERR_SOCKWRITE == gtmerror);				\
 	UNIX_ONLY(if (iod == io_std_device.out)				\
 		{							\
@@ -98,7 +102,8 @@ enum socket_state
 	socket_connected,
 	socket_listening,
 	socket_bound,
-	socket_created
+	socket_created,
+	socket_connect_inprogress
 };
 
 enum socket_protocol
@@ -152,6 +157,7 @@ typedef struct socket_struct_type
 	boolean_t			nodelay;
 	boolean_t			first_read;
 	boolean_t			first_write;
+	boolean_t			def_moreread_timeout;	/* true if deviceparameter morereadtime defined in open or use */
 	mstr				zff;
 } socket_struct;
 
@@ -163,6 +169,8 @@ typedef struct socket_interrupt_type
 	int				bytes_read;
 	int				chars_read;
 	boolean_t                       end_time_valid;
+	boolean_t			ibfsize_specified;
+	struct d_socket_struct_type	*newdsocket;
 } socket_interrupt;
 
 typedef struct d_socket_struct_type

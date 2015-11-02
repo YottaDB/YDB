@@ -42,13 +42,6 @@ typedef struct shm_parms_struct
         key_t           key;
 } shm_parms;
 
-#define RESET_GV_CUR_REGION						\
-{									\
-	gv_cur_region = temp_region;					\
-	cs_addrs = temp_cs_addrs;					\
-	cs_data = temp_cs_data;						\
-}
-
 #define RNDWN_ERR(str, reg)						\
 {									\
 	save_errno = errno;						\
@@ -57,59 +50,6 @@ typedef struct shm_parms_struct
 	else								\
 		util_out_print(str, TRUE);				\
 	util_out_print(STRERROR(save_errno), TRUE);			\
-}
-
-#define SEG_SHMATTACH(addr, reg)								\
-{												\
-	if (-1 == (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)				\
-				do_shmat(udi->shmid, addr, SHM_RND)))				\
-	{											\
-		if (EINVAL != errno)								\
-			RNDWN_ERR("Error attaching to shared memory for file !AD", (reg));	\
-		/* shared memory segment no longer exists */					\
-		CLNUP_RNDWN(udi, (reg));							\
-		RESET_GV_CUR_REGION;								\
-		return FALSE;									\
-	}											\
-}
-
-#define SEG_MEMMAP(addr, reg)										\
-{													\
-	if (-1 == (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)addr,          	\
-		(size_t)stat_buf.st_size, PROT_READ | PROT_WRITE, GTM_MM_FLAGS, udi->fd, (off_t)0)))	\
-	{												\
-		RNDWN_ERR("Error mapping memory for file !AD", (reg));					\
-		CLNUP_RNDWN(udi, (reg));								\
-		RESET_GV_CUR_REGION;									\
-		return FALSE;										\
-	}												\
-}
-
-#define CLNUP_RNDWN(udi, reg)									\
-{												\
-	int	rc;										\
-												\
-	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */		\
-	if (sem_created)									\
-	{											\
-		if (-1 == semctl(udi->semid, 0, IPC_RMID))					\
-			RNDWN_ERR("Error removing the semaphore for file !AD", (reg));		\
-	} else											\
-		do_semop(udi->semid, 0, -1, IPC_NOWAIT | SEM_UNDO);				\
-	REVERT;											\
-	ftok_sem_release(reg, TRUE, TRUE);							\
-	if (restore_rndwn_gbl)									\
-		RESET_GV_CUR_REGION;								\
-}
-
-#define CLNUP_SEM(sem_id, reg)									\
-{												\
-	if (sem_created)									\
-	{											\
-		if (-1 == semctl((sem_id), 0, IPC_RMID))					\
-			RNDWN_ERR("Error removing the semaphore for file !AD", (reg));		\
-	} else											\
-		do_semop((sem_id), 0, -1, IPC_NOWAIT | SEM_UNDO);				\
 }
 
 #define CONVERT_TO_NUM(ENTRY)						\

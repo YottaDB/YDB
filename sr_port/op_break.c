@@ -58,8 +58,8 @@ void op_break(void)
 		if (c < c_top)
 		{
 			line_length = (int)(c - 1 - line_start);	/* Go back one ',' */
-			assert(sizeof(line) >= line_length);
-			memcpy(line, line_start, MIN(line_length, sizeof(line)));
+			assert(SIZEOF(line) >= line_length);
+			memcpy(line, line_start, MIN(line_length, SIZEOF(line)));
 		}
 		/* The last part of $ZSTATUS is the expanded error message text. Print that followed by the M-source line# */
 		do_msg = (c < c_top);

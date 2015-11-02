@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,8 +68,8 @@ void mu_getlst(char *name, int4 size)
 
 	mu_star_specified = FALSE;
 	assert(size > 0);
-	rlen = sizeof(rbuff);
-	flen = sizeof(fbuff);
+	rlen = SIZEOF(rbuff);
+	flen = SIZEOF(fbuff);
 
 	is_directory = FALSE;
 	if (!in_backup)
@@ -99,7 +99,7 @@ void mu_getlst(char *name, int4 size)
 			}
 			assert(NULL == mu_repl_inst_reg_list);
 			if (NULL == mu_repl_inst_reg_list)
-				mu_repl_inst_reg_list = malloc(sizeof(backup_reg_list));
+				mu_repl_inst_reg_list = malloc(SIZEOF(backup_reg_list));
 			if ((!cli_get_str("REPLINSTANCE", fbuff, &flen)) || (0 == flen))
 			{
 				util_out_print("Error parsing REPLINSTANCE qualifier", TRUE);
@@ -117,7 +117,7 @@ void mu_getlst(char *name, int4 size)
 		}
 		if (!cli_get_str(name, rbuff, &rlen))
 			mupip_exit(ERR_MUNODBNAME);
-		flen = sizeof(fbuff);	/* reset max_buflen to original before call to "cli_get_str" */
+		flen = SIZEOF(fbuff);	/* reset max_buflen to original before call to "cli_get_str" */
 		if ((!cli_get_str("SAVE_DIR", fbuff, &flen)) || (0 == flen))
 			mupip_exit(ERR_MUBCKNODIR);
 	}

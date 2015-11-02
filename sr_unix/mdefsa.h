@@ -37,10 +37,10 @@
 #define DOTOBJ			".o"
 #define GTM_DIST		"gtm_dist"
 #define GTM_IMAGE_NAME		"mumps"
-#define GTM_IMAGE_NAMELEN	(sizeof(GTM_IMAGE_NAME) - 1)
+#define GTM_IMAGE_NAMELEN	(SIZEOF(GTM_IMAGE_NAME) - 1)
 #define	DIR_SEPARATOR		'/'
 #define	GTMSECSHR_NAME		"gtmsecshr"
-#define GTMSECSHR_NAMELEN	(sizeof(GTMSECSHR_NAME) - 1)
+#define GTMSECSHR_NAMELEN	(SIZEOF(GTMSECSHR_NAME) - 1)
 
 #define	ICU_LIBFLAGS		(RTLD_NOW | RTLD_GLOBAL)
 

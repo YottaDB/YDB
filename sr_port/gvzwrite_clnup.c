@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,5 +54,5 @@ void	gvzwrite_clnup(void)
 		gvzwrite_block.old_key = gvzwrite_block.old_targ = (unsigned char *)NULL;
 		gvzwrite_block.subsc_count = 0;
 	}
-	RESET_GV_TARGET;
+	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);
 }

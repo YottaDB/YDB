@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,6 @@ GBLREF bool		gv_prev_subsc_null;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_region	*gv_cur_region;
-GBLREF bool		transform;
 GBLREF gd_addr		*gd_targ_addr;
 GBLREF mstr             extnam_str;
 GBLREF mval		dollar_zgbldir;
@@ -55,15 +54,10 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 {
 	va_list		var;
 	VMS_ONLY(int4	count;)
-	int		len;
 	bool		was_null, is_null;
 	mstr		*tmp_mstr_ptr;
 	mval		*val, *val2, val_xlated;
 	short		max_key;
-	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
-
-	error_def(ERR_GVSUBOFLOW);
-	error_def(ERR_GVIS);
 
 	VAR_START(var, val1);
 	VMS_ONLY(va_count(count);)
@@ -106,7 +100,7 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 	for (count -= 3;  count > 0;  count--)
 	{
 		val = va_arg(var, mval *);
-		COPY_SUBS_TO_GVCURRKEY(val, gv_currkey, was_null, is_null);	/* updates gv_currkey, was_null, is_null */
+		COPY_SUBS_TO_GVCURRKEY(val, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey, was_null, is_null */
 	}
 	va_end(var);
 	gv_prev_subsc_null = was_null; /* if true, it indicates there is a null subscript (except last subscript) in current key */

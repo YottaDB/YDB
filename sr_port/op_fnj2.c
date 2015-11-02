@@ -43,8 +43,7 @@ void op_fnj2(mval *src, int len, mval *dst)
 		size = src->str.len + n;
 		if (size > MAX_STRLEN)
 			rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
-		if (stringpool.top - stringpool.free < size)
-			stp_gcol(size);
+		ENSURE_STP_FREE_SPACE(size);
 		cp = stringpool.free;
 		stringpool.free += size;
 		memset(cp, SP, n);
@@ -71,8 +70,7 @@ void op_fnzj2(mval *src, int len, mval *dst)
 		dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 	} else
 	{
-		if (stringpool.top - stringpool.free < len)
-			stp_gcol(len);
+		ENSURE_STP_FREE_SPACE(len);
 		cp = stringpool.free;
 		stringpool.free += len;
 		memset(cp, SP, n);

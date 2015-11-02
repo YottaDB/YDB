@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,7 +140,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		}
 		socketptr->first_write = FALSE;
 	}
-	memcpy(dsocketptr->dollar_device, "0", sizeof("0"));
+	memcpy(dsocketptr->dollar_device, "0", SIZEOF("0"));
 	if (CHSET_M != iod->ochset)
 	{ /* For ochset == UTF-8, validate the output,
 	   * For ochset == UTF-16[B|L]E, convert the output (and validate during conversion)

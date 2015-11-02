@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,8 +94,8 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 	assert(tcp == ioptr->type);
 	if (dev_never_opened == ioptr->state)
 	{
-		ioptr->dev_sp = (void *)malloc(sizeof(d_tcp_struct));
-		memset(ioptr->dev_sp, 0, sizeof(d_tcp_struct));
+		ioptr->dev_sp = (void *)malloc(SIZEOF(d_tcp_struct));
+		memset(ioptr->dev_sp, 0, SIZEOF(d_tcp_struct));
 	}
 	tcpptr = (d_tcp_struct *)ioptr->dev_sp;
 	if (dev_never_opened == ioptr->state)
@@ -109,7 +109,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 	}
 	ioptr->dollar.zeof = FALSE;
 	newtcp = *tcpptr;
-	memcpy(newtcp.dollar_device, LITZERO, sizeof(LITZERO));
+	memcpy(newtcp.dollar_device, LITZERO, SIZEOF(LITZERO));
 	newtcp.passive = FALSE;
 	while (iop_eol != *(pp->str.addr + p_offset))
 	{
@@ -200,7 +200,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 		if (newtcp.passive)		/* passive connection */
 		{
 			/* no listening socket for this addr?  make one. */
-			memcpy(ioptr->dev_sp, &newtcp, sizeof(d_tcp_struct));
+			memcpy(ioptr->dev_sp, &newtcp, SIZEOF(d_tcp_struct));
 			if (!(lsock = iotcp_getlsock(dev)))
 				return	FALSE;	/* could not create listening socket */
 			timer_id = (TID)iotcp_open;
@@ -279,7 +279,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				rts_error(VARLSTCNT(6) ERR_SOCKWAIT, 0, ERR_TEXT, 2, errlen, errptr);
 				return FALSE;
 			}
-			size = sizeof(struct sockaddr_in);
+			size = SIZEOF(struct sockaddr_in);
 			status = tcp_routines.aa_accept(lsock, &peer, &size);
 			if (-1 == status)
 			{
@@ -363,7 +363,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 					return FALSE;
 				}
 				/*	allow multiple connections to the same IP address */
-				if	(-1 == tcp_routines.aa_setsockopt(newtcp.socket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)))
+				if	(-1 == tcp_routines.aa_setsockopt(newtcp.socket, SOL_SOCKET, SO_REUSEADDR, &on, SIZEOF(on)))
 				{
 					(void)tcp_routines.aa_close(newtcp.socket);
 					errptr = (char *)STRERROR(errno);
@@ -371,7 +371,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 					rts_error(VARLSTCNT(5) ERR_SOCKINIT, 3, errno, errlen, errptr);
 					return FALSE;
 				}
-				size=sizeof(newtcp.bufsiz);
+				size=SIZEOF(newtcp.bufsiz);
 				if (-1 == tcp_routines.aa_getsockopt(newtcp.socket, SOL_SOCKET, SO_RCVBUF, &newtcp.bufsiz, &size))
 				{
 					(void)tcp_routines.aa_close(newtcp.socket);
@@ -384,7 +384,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				 * Note: the check for EINTR from the connect need not be converted to an EINTR wrapper macro,
 				 * since the connect is not retried on EINTR.
 				 */
-				temp_1 = tcp_routines.aa_connect(newtcp.socket, (struct sockaddr *)&newtcp.sin, sizeof(newtcp.sin));
+				temp_1 = tcp_routines.aa_connect(newtcp.socket, (struct sockaddr *)&newtcp.sin, SIZEOF(newtcp.sin));
 				if ((temp_1 < 0) && (ECONNREFUSED != errno) && (EINTR != errno))
 				{
 					(void)tcp_routines.aa_close(newtcp.socket);
@@ -421,7 +421,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 				tcp_routines.aa_ntohs(newtcp.sin.sin_port));
 #endif
 		}
-		memcpy(ioptr->dev_sp, &newtcp, sizeof(d_tcp_struct));
+		memcpy(ioptr->dev_sp, &newtcp, SIZEOF(d_tcp_struct));
 		ioptr->state = dev_open;
 	}
 #ifdef	DEBUG_TCP

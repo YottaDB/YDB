@@ -27,8 +27,11 @@
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
+
 GBLDEF unsigned char		*mu_int_locals;
-GBLDEF unsigned char		*mu_int_master;
 GBLDEF int4			mu_int_ovrhd;
 
 GBLREF gd_region		*gv_cur_region;
@@ -36,6 +39,23 @@ GBLREF sgmnt_data		mu_int_data;
 GBLREF uint4			mu_int_errknt;
 GBLREF boolean_t		tn_reset_specified;
 
+#ifdef GTM_SNAPSHOT
+# define GET_NATIVE_SIZE(native_size)									\
+{													\
+	GBLREF util_snapshot_ptr_t	util_ss_ptr;							\
+	GBLREF boolean_t		ointeg_this_reg;						\
+	if (ointeg_this_reg)										\
+	{												\
+		assert(NULL != util_ss_ptr);								\
+		native_size = util_ss_ptr->native_size;							\
+		assert(0 != native_size); /* Ensure native_size is updated properly in ss_initiate */	\
+	} else												\
+		native_size = mu_file_size(gv_cur_region->dyn.addr->file_cntl);				\
+}
+#else
+# define GET_NATIVE_SIZE(native_size)	\
+	native_size = mu_file_size(gv_cur_region->dyn.addr->file_cntl);
+#endif
 boolean_t mu_int_fhead(void)
 {
 	unsigned char	*p1;
@@ -72,7 +92,7 @@ boolean_t mu_int_fhead(void)
 	mu_data = &mu_int_data;
 	if (MEMCMP_LIT(mu_data->label, GDS_LABEL))
 	{
-		if (memcmp(mu_data->label, GDS_LABEL, sizeof(GDS_LABEL) - 2))
+		if (memcmp(mu_data->label, GDS_LABEL, SIZEOF(GDS_LABEL) - 2))
 			mu_int_err(ERR_DBNOTDB, 0, 0, 0, 0, 0, 0, 0);
 		else
 			mu_int_err(ERR_DBINCRVER, 0, 0, 0, 0, 0, 0, 0);
@@ -134,7 +154,7 @@ boolean_t mu_int_fhead(void)
 		mu_int_err(ERR_DBTNNEQ, 0, 0, 0, 0, 0, 0, 0);
         if (0 != mu_data->kill_in_prog)
         {
-                gtm_putmsg(VARLSTCNT(4) ERR_MUKILLIP, 2, DB_LEN_STR(gv_cur_region));
+                gtm_putmsg(VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(gv_cur_region), LEN_AND_LIT("MUPIP INTEG"));
                 mu_int_errknt++;
         }
         if (0 != mu_data->abandoned_kills)
@@ -145,9 +165,9 @@ boolean_t mu_int_fhead(void)
         }
 	if (MAX_KEY_SZ < mu_data->max_key_size)
 		mu_int_err(ERR_DBMAXKEYEXC, 0, 0, 0, 0, 0, 0, 0);
-	if (sizeof(rec_hdr) + sizeof(block_id) >= mu_data->max_rec_size)
+	if (SIZEOF(rec_hdr) + SIZEOF(block_id) >= mu_data->max_rec_size)
 		mu_int_err(ERR_DBMXRSEXCMIN, 0, 0, 0, 0, 0, 0, 0);
-	if (mu_data->blk_size - sizeof(blk_hdr) < mu_data->max_rec_size)
+	if (mu_data->blk_size - SIZEOF(blk_hdr) < mu_data->max_rec_size)
 		mu_int_err(ERR_DBMAXRSEXBL, 0, 0, 0, 0, 0, 0, 0);
 #	ifdef GTM_CRYPT
 	if (mu_data->is_encrypted)
@@ -223,7 +243,8 @@ boolean_t mu_int_fhead(void)
 		return FALSE;
 	}
 	size = mu_int_ovrhd + block_factor * mu_data->trans_hist.total_blks;
-	native_size = mu_file_size(gv_cur_region->dyn.addr->file_cntl);
+	/* If ONLINE INTEG for this region is in progress, then native_size would have been calculated in ss_initiate. */
+	GET_NATIVE_SIZE(native_size);
 	/* In the following tests, the EOF block should always be 1 greater
 	 * than the actual size of the file.  This is due to the GDS being
 	 * allocated in even DISK_BLOCK_SIZE-byte blocks. */
@@ -238,7 +259,7 @@ boolean_t mu_int_fhead(void)
 	}
 	/* make working space for all local bitmaps */
 	maps = (mu_data->trans_hist.total_blks + mu_data->bplmap - 1) / mu_data->bplmap;
-	size = (unsigned int)(BM_SIZE(mu_data->bplmap) - sizeof(blk_hdr));
+	size = (unsigned int)(BM_SIZE(mu_data->bplmap) - SIZEOF(blk_hdr));
 	size *= maps;
 	mu_int_locals = (unsigned char *)malloc(size);
 	memset(mu_int_locals, FOUR_BLKS_FREE, size);

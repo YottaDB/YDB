@@ -20,6 +20,12 @@
 
 GBLREF	boolean_t	gtm_utf8_mode;
 
+/* --------------------------------------------------------------------
+ * NOTE: This module is a near copy of sr_port/op_fnzpiece.c differing
+ * only in that it calls "matchc" instead of "matchb" to do matching.
+ * --------------------------------------------------------------------
+ */
+
 /*
  * -----------------------------------------------
  * op_fnpiece()
@@ -39,7 +45,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
 void op_fnpiece(mval *src, mval *del, int first, int last, mval *dst)
 {
 	int		piece_cnt, del_len, src_len;
-	char		*del_str, *src_str, *tmp_str;
+	char		*del_str, *src_str;
 	char		*match_start;
 	int		match_res, int_del;
 	delimfmt	unichar;
@@ -47,52 +53,41 @@ void op_fnpiece(mval *src, mval *del, int first, int last, mval *dst)
 	assert(gtm_utf8_mode);
 	if (--first < 0)
 		first = 0;
-
 	if ((piece_cnt = last - first) < 1)
 	{
 		MV_INIT_STRING(dst, 0, NULL);
 		return;
 	}
-
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(del);
-
 	/* See if we can take a short cut to op_fnp1. If so, the delimiter value needs to be reformated. */
 	if (1 == piece_cnt && 1 == MV_FORCE_LEN(del))
         { /* Both valid chars of char_len=1 and single byte invalid chars get the fast path */
 		unichar.unichar_val = 0;
-		assert(sizeof(unichar.unibytes_val) >= del->str.len);
+		assert(SIZEOF(unichar.unibytes_val) >= del->str.len);
 		memcpy(unichar.unibytes_val, del->str.addr, del->str.len);
 		op_fnp1(src, unichar.unichar_val, last, dst); /* Use last as it is unmodified */
 		return;
 	}
-
 	src_len = src->str.len;
 	src_str = src->str.addr;
 	del_len = del->str.len;
 	del_str = del->str.addr;
-	while (first--)
+	if (first)
 	{
-		tmp_str = (char *)matchc(del_len, (uchar_ptr_t)del_str, src_len, (uchar_ptr_t)src_str, &match_res);
-		src_len -= (int)(tmp_str - src_str);
-		src_str = tmp_str;
+		match_start = (char *)matchc(del_len, (uchar_ptr_t)del_str, src_len, (uchar_ptr_t)src_str, &match_res, &first);
 		if (0 == match_res)
 		{
 			MV_INIT_STRING(dst, 0, NULL);
 			return;
 		}
-	}
-	match_start = src_str;
-	while (piece_cnt--)
-	{
-		tmp_str = (char *)matchc(del_len, (uchar_ptr_t)del_str, src_len, (uchar_ptr_t)src_str, &match_res);
-		src_len -= (int)(tmp_str - src_str);
-		src_str = tmp_str;
-		if (0 == match_res)
-			break;
-	}
+		src_len -= INTCAST(match_start - src_str);
+		src_str = match_start;
+	} else
+		match_start = src_str;
+	src_str = (char *)matchc(del_len, (uchar_ptr_t)del_str, src_len, (uchar_ptr_t)src_str, &match_res, &piece_cnt);
 	if (0 != match_res)
 		src_str -= del_len;
-	MV_INIT_STRING(dst, src_str - match_start, match_start);
+	MV_INIT_STRING(dst, INTCAST(src_str - match_start), match_start);
 	return;
 }

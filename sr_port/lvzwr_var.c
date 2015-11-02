@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -172,9 +172,10 @@ void lvzwr_var(lv_val *lv, int4 n)
 	*/
 	verify_hash_add = FALSE;	/* By default we don't need to verify add */
 	value_printed_pending = FALSE;	/* Force the "value_printed" flag on if TRUE */
-	if (!merge_args && 0 == n && (1 < lv->stats.trefcnt || 0 < lv->stats.crefcnt))
+	zav = NULL;
+	if (!merge_args && IS_ALIASLV(lv))
 	{
-		assert(MV_SYM == lv->ptrs.val_ent.parent.sym->ident);	/* Verify base var lv_val */
+		assert(0 == n);	/* Verify base var lv_val */
 		if (tabent_addr = (ht_ent_addr *)lookup_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lv))
 		{	/* We've seen it before but check if it was actually printed at that point */
 			zav = (zwr_alias_var *)tabent_addr->value;
@@ -192,10 +193,12 @@ void lvzwr_var(lv_val *lv, int4 n)
 
 	if ((0 == lvzwrite_block->subsc_count) && (0 == n))
 		zwr_sub->subsc_list[n].subsc_type = ZWRITE_ASTERISK;
-	if (MV_DEFINED(&(lv->v)) &&
-	    (!lvzwrite_block->subsc_count || (0 == n && ZWRITE_ASTERISK == zwr_sub->subsc_list[n].subsc_type) ||
-	     (n && !(lvzwrite_block->mask >> n))))
+	if (MV_DEFINED(&(lv->v))
+	    && (!lvzwrite_block->subsc_count || ((0 == n) && ZWRITE_ASTERISK == zwr_sub->subsc_list[n].subsc_type)
+		|| ((0 != n) && !(lvzwrite_block->mask >> n))))
+	{
 		lvzwr_out(lv);
+	}
 	if (verify_hash_add && !lvzwrite_block->zav_added)
 	{	/* lvzwr_out processing didn't add a zav for this var. Take care of that now so we
 		   recognize it as a "dealt with" alias when they are encountered later.
@@ -236,7 +239,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 				unsigned char buff[512], *end;
 
 				lvzwrite_block->curr_subsc++;
-				end = lvzwr_key(buff, sizeof(buff));
+				end = lvzwr_key(buff, SIZEOF(buff));
 				zwr_sub->subsc_list[n].actual = (mval *)NULL;
 				lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 				rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);

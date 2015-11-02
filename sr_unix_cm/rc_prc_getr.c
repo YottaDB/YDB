@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -176,7 +176,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		return 0;
 	}
 
-	t_begin(ERR_GVGETFAIL, FALSE);
+	t_begin(ERR_GVGETFAIL, 0);
 	for (;;)
 	{
 		rsp->hdr.a.len.value = (short)((char*)(&rsp->page[0]) - (char*)rsp);
@@ -218,7 +218,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 								goto restart;
 					}
 				}
-			if ((bsiz = ((blk_hdr *)(bh->buffaddr))->bsiz + RC_BLKHD_PAD) > sizeof(blk_hdr) + RC_BLKHD_PAD)
+			if ((bsiz = ((blk_hdr *)(bh->buffaddr))->bsiz + RC_BLKHD_PAD) > SIZEOF(blk_hdr) + RC_BLKHD_PAD)
 			{	/* Non-empty block, global exists */
 				if (bsiz > size_return)
 					rc_overflow->size = bsiz - size_return;
@@ -228,13 +228,13 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 					size_return = bsiz;
 				}
 
-				memcpy(rsp->page, bh->buffaddr, sizeof(blk_hdr));
+				memcpy(rsp->page, bh->buffaddr, SIZEOF(blk_hdr));
 				PUT_SHORT(&((blk_hdr*)rsp->page)->bsiz,bsiz);
-				memcpy(rsp->page + sizeof(blk_hdr) + RC_BLKHD_PAD, bh->buffaddr + sizeof(blk_hdr),
-					  size_return - (sizeof(blk_hdr) + RC_BLKHD_PAD));
+				memcpy(rsp->page + SIZEOF(blk_hdr) + RC_BLKHD_PAD, bh->buffaddr + SIZEOF(blk_hdr),
+					  size_return - (SIZEOF(blk_hdr) + RC_BLKHD_PAD));
 				rsp->size_return.value = size_return;
 				rsp->hdr.a.len.value += rsp->size_return.value;
-				assert(rsp->hdr.a.len.value <= rc_size_return+sizeof(rc_rsp_page));
+				assert(rsp->hdr.a.len.value <= rc_size_return+SIZEOF(rc_rsp_page));
 				rsp->zcode.value = (cs_data->blk_size / 512);	/* (2 ** zcode) == blk_size */
 				if (rc_overflow->size)
 				{
@@ -249,7 +249,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 
 			if ((rc_read_stamp = t_end(&gv_target->hist, two_histories ? &second_history : NULL)) == 0)
 				continue;
-			if (bsiz == sizeof(blk_hdr) + RC_BLKHD_PAD)	/* Empty block, global does not exist */
+			if (bsiz == SIZEOF(blk_hdr) + RC_BLKHD_PAD)	/* Empty block, global does not exist */
 			{
 				qhdr->a.erc.value = RC_MUMERRUNDEFVAR;
 		 		rsp->size_return.value = 0;

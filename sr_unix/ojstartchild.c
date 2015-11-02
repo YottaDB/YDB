@@ -39,18 +39,9 @@
 #include "compiler.h"
 #include "job_addr.h"
 #include "util.h"
-#include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
-#include "gdsbt.h"
-#include "gdsfhead.h"
-#include "filestruct.h"
-#include "dpgbldir.h"
 #include "gtmio.h"
-#include "jnl.h"
-#ifdef GTM_CRYPT
-#include "gtmcrypt.h"
-#endif
 
 #define MAX_CMD_LINE		8192	/* Maximum command line length */
 #define MAX_PATH		 128	/* Maximum file path length */
@@ -72,7 +63,6 @@ GBLREF	bool			jobpid;		/* job's output files should have the pid appended to the
 GBLREF	volatile boolean_t		ojtimeout;
 GBLREF	boolean_t			job_try_again;
 GBLREF	uint4			process_id;
-GBLREF	int			mutex_sock_fd;
 #ifndef SYS_ERRLIST_INCLUDE
 /* currently either stdio.h or errno.h both of which are included above */
 /*	needed by TIMEOUT_ERROR in jobsp.h */
@@ -165,11 +155,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	job_parm		*jp;
 	rhdtyp			*base_addr;
 	struct sigaction	act, old_act;
-	unix_db_info		*udi;
-	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
-	gd_region		*r_top, *r_local;
-	gd_addr			*addr_ptr;
 	int			pipe_status, env_len;
 
 #ifdef	__osf__
@@ -272,9 +257,9 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			{
 				job_launched = TRUE;
 
-				assert(sizeof(pid_t) == sizeof(child_pid));
+				assert(SIZEOF(pid_t) == SIZEOF(child_pid));
 				/* write child_pid into pipe to be read by parent process(P) for $ZJOB */
-				DOWRITERC(pipe_fds[1], &child_pid, sizeof(child_pid), pipe_status);
+				DOWRITERC(pipe_fds[1], &child_pid, SIZEOF(child_pid), pipe_status);
 				if (0 != pipe_status)
 				{
 					rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
@@ -298,41 +283,14 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		CLOSEFILE_RESET(pipe_fds[0], pipe_status);	/* resets "pipe_fds[0]" to FD_INVALID */
 		CLOSEFILE_RESET(pipe_fds[1], pipe_status);	/* resets "pipe_fds[1]" to FD_INVALID */
 
-		/* Close any encryption related fds that the plug-in might have opened */
-		GTMCRYPT_ONLY(GTMCRYPT_CLOSE;)
+		/* do common cleanup in child */
+		ojchildioclean();
 
-		/* Run through the list of databases to simply close them out (still open by parent) */
-		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
-		{
-			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top;
-				r_local++)
-			{
-				if (r_local->open && !r_local->was_open &&
-					(dba_bg == r_local->dyn.addr->acc_meth || dba_mm == r_local->dyn.addr->acc_meth))
-				{
-					udi = (unix_db_info *)(r_local->dyn.addr->file_cntl->file_info);
-					csa = &udi->s_addrs;
-					csd = csa->hdr;
-					/* Close journal file if open. Check for JNL_ALLOWED instead of JNL_ENABLED to ensure
-					 * we do not miss out on closing open journal file descriptors in the case where the
-					 * current jnl_state is "jnl_closed" but we had opened the file when it was "jnl_open".
-					 */
-					if (JNL_ALLOWED(csd) && (NULL != csa->jnl) && (NOJNL != csa->jnl->channel))
-						CLOSEFILE_RESET(csa->jnl->channel, rc);	/* resets "channel" to FD_INVALID */
-					CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
-				}
-			}
-		}
-#ifndef MUTEX_MSEM_WAKE
-		/* We don't need the parent's mutex socket anymore either (if we are using the socket) */
-		if (FD_INVALID != mutex_sock_fd)
-			CLOSEFILE_RESET(mutex_sock_fd, rc);	/* resets "mutex_sock_fd" to FD_INVALID */
-#endif
 		/* Count the number of environment variables.  */
 		for (environ_count = 0, c3 = environ, c2 = *c3;  c2;  c3++, c2 = *c3)
 			environ_count++;
 #ifdef	__osf__
-/* Since we're creating an array of pointers for the O/S, make sure sizeof(char *) is correct for 64-bit pointers for OSF/1.  */
+/* Since we're creating an array of pointers for the O/S, make sure SIZEOF(char *) is correct for 64-bit pointers for OSF/1.  */
 #pragma	pointer_size (save)
 #pragma pointer_size (long)
 #endif
@@ -365,7 +323,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 *	each line above is an entry in the environment array.
 		 */
 
-		env_ind = env_ary = (char **)malloc((environ_count + MAX_JOB_QUALS + argcnt + 1)*sizeof(char *));
+		env_ind = env_ary = (char **)malloc((environ_count + MAX_JOB_QUALS + argcnt + 1)*SIZEOF(char *));
 
 #ifdef	__osf__
 #pragma pointer_size (restore)
@@ -585,7 +543,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #endif
 
 #ifdef	__osf__
-/* Make sure sizeof(char *) is correct.  */
+/* Make sure SIZEOF(char *) is correct.  */
 #pragma pointer_size (save)
 #pragma pointer_size (long)
 #endif
@@ -628,13 +586,13 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 
 		c1 = GETENV("gtm_dist");
 		string_len = STRLEN(c1);
-		if ((string_len + sizeof(MUMPS_EXE_STR)) < sizeof(tbuff))
+		if ((string_len + SIZEOF(MUMPS_EXE_STR)) < SIZEOF(tbuff))
 		{
 			memcpy(tbuff, c1, string_len);
 			c2 = &tbuff[string_len];
 			strcpy(c2, MUMPS_EXE_STR);
 		} else
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, string_len, c1, sizeof(tbuff) - sizeof(MUMPS_EXE_STR));
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, string_len, c1, SIZEOF(tbuff) - SIZEOF(MUMPS_EXE_STR));
 
 #		ifdef KEEP_zOS_EBCDIC_	/* use real strcpy to preserve env in native code set */
 #		pragma convlit(suspend)

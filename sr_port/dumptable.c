@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,12 +44,12 @@ void dumptable(void)
 		c = i2asc(c,sa_temps[i]);
 
 		if (i == TVAR_REF)
-		{	memcpy(c, &start8[0], sizeof(start8) - 1);
-			c += sizeof(start8) - 1;
+		{	memcpy(c, &start8[0], SIZEOF(start8) - 1);
+			c += SIZEOF(start8) - 1;
 		}
 		else
-		{	memcpy(c, &start9[0], sizeof(start9) - 1);
-			c += sizeof(start9) - 1;
+		{	memcpy(c, &start9[0], SIZEOF(start9) - 1);
+			c += SIZEOF(start9) - 1;
 		}
 
 		c = i2asc(c,sa_temps_offset[i]);

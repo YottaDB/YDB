@@ -37,7 +37,7 @@ void set_num_additional_processors(void)
 
 #ifdef __hpux
 	struct pst_dynamic psd;
-	if (pstat_getdynamic(&psd, sizeof(psd), (size_t)1, 0) == -1)
+	if (pstat_getdynamic(&psd, SIZEOF(psd), (size_t)1, 0) == -1)
 	{
 		send_msg(VARLSTCNT(1) ERR_NUMPROCESSORS);
                 numcpus = 1;

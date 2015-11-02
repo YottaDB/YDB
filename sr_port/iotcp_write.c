@@ -44,7 +44,7 @@ void	iotcp_write(mstr *v)
 	iod = io_curr_device.out;
 	tcpptr = (d_tcp_struct *)iod->dev_sp;
 	tcpptr->lastop = TCP_WRITE;
-	memcpy(tcpptr->dollar_device, LITZERO, sizeof(LITZERO));
+	memcpy(tcpptr->dollar_device, LITZERO, SIZEOF(LITZERO));
 	inlen = v->len;
 	outlen = iod->width - iod->dollar.x;
 
@@ -59,10 +59,10 @@ void	iotcp_write(mstr *v)
 		if ((size = tcp_routines.aa_send(tcpptr->socket, out, outlen, (tcpptr->urgent ? MSG_OOB : 0))) == -1)
 		{
 			iod->dollar.za = 9;
-			memcpy(tcpptr->dollar_device, LITONE_COMMA, sizeof(LITONE_COMMA));
+			memcpy(tcpptr->dollar_device, LITONE_COMMA, SIZEOF(LITONE_COMMA));
 			errptr = (char *)STRERROR(errno);
 			errlen = STRLEN(errptr);
-			memcpy(&tcpptr->dollar_device[sizeof(LITONE_COMMA) - 1], errptr, errlen);
+			memcpy(&tcpptr->dollar_device[SIZEOF(LITONE_COMMA) - 1], errptr, errlen);
 			rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
 		}
 		assert(size == outlen);

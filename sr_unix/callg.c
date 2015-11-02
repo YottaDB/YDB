@@ -46,7 +46,7 @@
 
 INTPTR_T callg(callgfnptr fnptr, gparam_list *paramlist)
 {
-	assert(32 == (sizeof(paramlist->arg) / sizeof(void *)));
+	assert(32 == (SIZEOF(paramlist->arg) / SIZEOF(void *)));
 	switch(paramlist->n)
 	{
 		case 0:

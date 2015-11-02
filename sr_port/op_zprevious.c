@@ -88,11 +88,12 @@ void op_zprevious(mval *v)
 			found = gvcmx_zprevious();
 		else
 			found = gvusr_zprevious();
-		v->mvtype = MV_STR;
+		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied
+				* by this to-be-overwritten mval */
 		if (found)
 		{
 			gv_altkey->prev = gv_currkey->prev;
-			if (stringpool.top - stringpool.free < MAX_KEY_SZ)
+			if (!IS_STP_SPACE_AVAILABLE(MAX_KEY_SZ))
 			{
 				if ((0xFF != gv_altkey->base[gv_altkey->prev])
 						&& (SUBSCRIPT_STDCOL_NULL != gv_altkey->base[gv_altkey->prev]))
@@ -102,11 +103,9 @@ void op_zprevious(mval *v)
 					n = gv_altkey->end - gv_altkey->prev;
 					assert(n > 0);
 				}
-				if (stringpool.top - stringpool.free < n)
-				{
-                                        v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
-					stp_gcol(n);
-				}
+				v->str.len = 0; /* so stp_gcol (if invoked) can free up space currently occupied by this
+						 * to-be-overwritten mval */
+				ENSURE_STP_FREE_SPACE(n);
 			}
 			v->str.addr = (char *)stringpool.free;
 			stringpool.free = gvsub2str(&gv_altkey->base[gv_altkey->prev], stringpool.free, FALSE);
@@ -116,6 +115,7 @@ void op_zprevious(mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
+		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 		if (gv_curr_subsc_null && ok_to_change_currkey)
 		{	/* Restore gv_currkey to what it was at function entry time */
 			gv_currkey->base[gv_currkey->prev + 1] = KEY_DELIMITER;
@@ -123,7 +123,9 @@ void op_zprevious(mval *v)
 				gv_currkey->base[gv_currkey->prev] = SUBSCRIPT_STDCOL_NULL;
 			assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
 			gv_currkey->end = gv_currkey->prev + 2;
+			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
 		}
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
 	} else
 	{	/* the following section is for $ZPREVIOUS(^gname) */
 		assert(2 <= gv_currkey->end);
@@ -175,8 +177,8 @@ void op_zprevious(mval *v)
 				break;
 			else  if ((map - 1) > gd_map)
 			{
-				assert(sizeof((map - 1)->name) == sizeof(mident_fixed));
-				assert(0 == (map - 1)->name[sizeof((map - 1)->name) - 1]);
+				assert(SIZEOF((map - 1)->name) == SIZEOF(mident_fixed));
+				assert(0 == (map - 1)->name[SIZEOF((map - 1)->name) - 1]);
 				gv_currkey->end = mid_len((mident_fixed *)((map - 1)->name));
 				memcpy(gv_currkey->base, (map - 1)->name, gv_currkey->end);
 				gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
@@ -185,14 +187,13 @@ void op_zprevious(mval *v)
 		}
 		gv_currkey->end = 0;
 		gv_currkey->base[0] = KEY_DELIMITER;
-		v->mvtype = MV_STR;
+		v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied
+				* by this to-be-overwritten mval */
 		if (found)
 		{
-			if (stringpool.free + name.len + 1 > stringpool.top)
-			{
-				v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
-				stp_gcol(name.len + 1);
-			}
+			v->str.len = 0; /* so stp_gcol (if invoked) can free up space currently occupied by this
+					 * to-be-overwritten mval */
+			ENSURE_STP_FREE_SPACE(name.len + 1);
 			v->str.addr = (char *)stringpool.free;
 			*stringpool.free++ = '^';
 			memcpy(stringpool.free, name.addr, name.len);
@@ -203,6 +204,7 @@ void op_zprevious(mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
+		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 		/* No need to restore gv_currkey (to what it was at function entry) as it is already set to NULL */
 	}
 	return;

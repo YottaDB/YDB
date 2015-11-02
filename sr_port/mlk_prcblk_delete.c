@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ void mlk_prcblk_delete(mlk_ctldata_ptr_t ctl,
 					*prpt = 0;
 				else
 					A2R(*prpt, R2A(pr->next));
-				memset(pr, 0, sizeof(*pr));
+				memset(pr, 0, SIZEOF(*pr));
 				A2R(pr->next, R2A(ctl->prcfree));
 				A2R(ctl->prcfree, pr);
 				assert(ctl->prcfree >= 0);

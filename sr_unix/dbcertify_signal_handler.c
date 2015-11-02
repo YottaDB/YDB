@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,9 +62,10 @@ GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
 GBLREF	volatile boolean_t	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
-GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	phase_static_area	*psa_gbl;
+
+LITREF	gtmImageName		gtmImageNames[];
 
 void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 {
@@ -87,15 +88,15 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 	if (NULL != info)
 		exi_siginfo = *info;
 	else
-		memset(&exi_siginfo, 0, sizeof(*info));
+		memset(&exi_siginfo, 0, SIZEOF(*info));
 #if defined(__ia64) && defined(__hpux)
         context_ptr = (gtm_sigcontext_t *)context;      /* no way to make a copy of the context */
-	memset(&exi_context, 0, sizeof(exi_context));
+	memset(&exi_context, 0, SIZEOF(exi_context));
 #else
 	if (NULL != context)
 		exi_context = *(gtm_sigcontext_t *)context;
 	else
-		memset(&exi_context, 0, sizeof(exi_context));
+		memset(&exi_context, 0, SIZEOF(exi_context));
 	context_ptr = &exi_context;
 #endif
 	/* Check if we are fielding nested immediate shutdown signals */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,7 @@ void op_fnj3(mval *src,int width,int fract,mval *dst)
 		rts_error(VARLSTCNT(1) ERR_MAXSTRLEN);
 	MV_FORCE_NUM(src);
 	/* need to guarantee that the n2s call will not cause string pool overflow */
-	if (stringpool.top - stringpool.free < w)
-		stp_gcol(w);
+	ENSURE_STP_FREE_SPACE(w);
 	sign = 0;
 	cp = stringpool.free;
 	if (src->mvtype & MV_INT)

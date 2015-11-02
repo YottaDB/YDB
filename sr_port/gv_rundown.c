@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,11 +96,7 @@ void gv_rundown(void)
 				if (NULL != cs_addrs)
 				{
 					if (NULL != cs_addrs->dir_tree)
-					{
-						cs_addrs->dir_tree->regcnt--;	/* targ_free relies on this */
-						targ_free(cs_addrs->dir_tree);
-						cs_addrs->dir_tree = NULL;
-					}
+						FREE_CSA_DIR_TREE(cs_addrs);
 					if (cs_addrs->sgm_info_ptr)
 					{
 						si = cs_addrs->sgm_info_ptr;

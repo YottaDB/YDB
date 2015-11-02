@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -65,6 +65,10 @@ ENTRY gtm_ret_code
 	movq	REG64_ACCUM,frame_pointer(REG_IP)
 	#movq	REG_XFER_TABLE, frame_pointer(REG_IP)
 	addq	$8, msp(REG_IP)
+	jmp	return
+
+ENTRY gtm_levl_ret_code
+	REVERT
 	jmp	return
 
 # dm_start ENDP

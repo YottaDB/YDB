@@ -27,6 +27,6 @@ void ind_cg_var(mvar *v, var_tabent **p)
 	(*p)[v->mvidx].var_name = v->mvname;
 	COMPUTE_HASH_MNAME(&((*p)[v->mvidx]));
 	(*p)[v->mvidx].var_name.addr = (char *)((v->mvname.addr - (char *)indr_stringpool.base) +
-						ROUND_UP2(sizeof(ihdtyp), NATIVE_WSIZE));
+						ROUND_UP2(SIZEOF(ihdtyp), NATIVE_WSIZE));
 	(*p)[v->mvidx].marked = FALSE;
 }

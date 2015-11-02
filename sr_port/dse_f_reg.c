@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void dse_f_reg(void)
 
 	temp_gdaddr = gd_header;
 	gd_header = original_header;
-	rnlen = sizeof(rn);
+	rnlen = SIZEOF(rn);
 	if (!cli_get_str("REGION",rn,&rnlen))
 	{
 		gd_header = temp_gdaddr;

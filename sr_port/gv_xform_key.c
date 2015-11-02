@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,12 +48,12 @@ void	gv_xform_key(gv_key *keyp, bool xback)
 			temp.str.addr = (char *)buff;
 			temp.mvtype = MV_STR;
 		}
-		gv_sparekey = (gv_key *)malloc(sizeof(gv_key) - 1 + gv_keysize);
+		gv_sparekey = (gv_key *)malloc(SIZEOF(gv_key) - 1 + gv_keysize);
 		gv_sparekey_size = gv_keysize;
 	}
 	assert(keyp->top == gv_keysize);
 	assert(keyp->end < keyp->top);
-	memcpy(gv_sparekey, keyp, sizeof(gv_key) + keyp->end);
+	memcpy(gv_sparekey, keyp, SIZEOF(gv_key) + keyp->end);
 	c1 = keyp->base;
 	while (*c1++)
 		;

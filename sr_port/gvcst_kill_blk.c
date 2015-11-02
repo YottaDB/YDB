@@ -99,7 +99,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	old_blk_hdr = (blk_hdr_ptr_t)buffer;
 	kill_root = FALSE;
 	blk_size = cs_data->blk_size;
-	first_in_blk = (rec_hdr_ptr_t)((bytptr)old_blk_hdr + sizeof(blk_hdr));
+	first_in_blk = (rec_hdr_ptr_t)((bytptr)old_blk_hdr + SIZEOF(blk_hdr));
 	top_of_block = (rec_hdr_ptr_t)((bytptr)old_blk_hdr + old_blk_hdr->bsiz);
 	left_ptr = (rec_hdr_ptr_t)((bytptr)old_blk_hdr + low.offset);
 	right_ptr = (rec_hdr_ptr_t)((bytptr)old_blk_hdr + high.offset);
@@ -155,13 +155,13 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		{
 			GET_USHORT(temp_ushort, &rp->rsiz);
 			rp1 = (rec_hdr_ptr_t)((bytptr)rp + temp_ushort);
-			if (((bytptr)rp1 < (bytptr)(rp + 1) + sizeof(block_id)) ||
+			if (((bytptr)rp1 < (bytptr)(rp + 1) + SIZEOF(block_id)) ||
 				((bytptr)rp1 < buffer) || ((bytptr)rp1 > (buffer + blk_size)))
 			{
 				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_rmisalign;
 			}
-			GET_LONG(temp_long, ((bytptr)rp1 - sizeof(block_id)));
+			GET_LONG(temp_long, ((bytptr)rp1 - SIZEOF(block_id)));
 			if (dollar_tlevel)
 			{
 				chain1 = *(off_chain *)&temp_long;
@@ -185,18 +185,18 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		}
 		new_block_index = t_create(blk, (uchar_ptr_t)bs1, 0, 0, 0);
 		/* create index block */
-		BLK_ADDR(new_rec_hdr, sizeof(rec_hdr), rec_hdr);
-		new_rec_hdr->rsiz = sizeof(rec_hdr) + sizeof(block_id);
+		BLK_ADDR(new_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
+		new_rec_hdr->rsiz = SIZEOF(rec_hdr) + SIZEOF(block_id);
 		new_rec_hdr->cmpc = 0;
 		BLK_INIT(bs_ptr, bs1);
-		BLK_SEG(bs_ptr, (bytptr)new_rec_hdr, sizeof(rec_hdr));
-		BLK_SEG(bs_ptr, (bytptr)&zeroes, sizeof(block_id));
+		BLK_SEG(bs_ptr, (bytptr)new_rec_hdr, SIZEOF(rec_hdr));
+		BLK_SEG(bs_ptr, (bytptr)&zeroes, SIZEOF(block_id));
 		if (!BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_mkblk;
 		}
-		cse = t_write(blkhist, (unsigned char *)bs1, sizeof(blk_hdr) + sizeof(rec_hdr), new_block_index, 1,
+		cse = t_write(blkhist, (unsigned char *)bs1, SIZEOF(blk_hdr) + SIZEOF(rec_hdr), new_block_index, 1,
 			TRUE, FALSE, GDS_WRITE_KILLTN);
 		assert(!dollar_tlevel || !cse->high_tlevel);
 		*cseptr = cse;
@@ -205,7 +205,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		return cdb_sc_normal;
 	}
 	next_rec_shrink = (int)(old_blk_hdr->bsiz + ((bytptr)del_ptr - (bytptr)right_ptr));
-	if (sizeof(blk_hdr) >= next_rec_shrink)
+	if (SIZEOF(blk_hdr) >= next_rec_shrink)
 	{
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_rmisalign;
@@ -256,12 +256,12 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				BLK_SEG(bs_ptr, (bytptr)first_in_blk, blkseglen);
 				first_copy = FALSE;
 			}
-			BLK_ADDR(star_rec_hdr, sizeof(rec_hdr), rec_hdr);
+			BLK_ADDR(star_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 			star_rec_hdr->cmpc = 0;
-			star_rec_hdr->rsiz = (unsigned short)(sizeof(rec_hdr) + sizeof(block_id));
-			BLK_SEG(bs_ptr, (bytptr)star_rec_hdr, sizeof(rec_hdr));
+			star_rec_hdr->rsiz = (unsigned short)(SIZEOF(rec_hdr) + SIZEOF(block_id));
+			BLK_SEG(bs_ptr, (bytptr)star_rec_hdr, SIZEOF(rec_hdr));
 			GET_USHORT(temp_ushort, &left_ptr->rsiz);
-			BLK_SEG(bs_ptr, ((bytptr)left_ptr + temp_ushort - sizeof(block_id)), sizeof(block_id));
+			BLK_SEG(bs_ptr, ((bytptr)left_ptr + temp_ushort - SIZEOF(block_id)), SIZEOF(block_id));
 		}
 	}
 	blkseglen = (int)((bytptr)top_of_block - (bytptr)right_ptr);
@@ -274,11 +274,11 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			BLK_SEG(bs_ptr, (bytptr)right_ptr, blkseglen);
 		} else
 		{
-			BLK_ADDR(new_rec_hdr, sizeof(rec_hdr), rec_hdr);
+			BLK_ADDR(new_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 			new_rec_hdr->cmpc = right_ptr->cmpc - next_rec_shrink;
 			GET_USHORT(temp_ushort, &right_ptr->rsiz);
 			new_rec_hdr->rsiz = temp_ushort + next_rec_shrink;
-			BLK_SEG(bs_ptr, (bytptr)new_rec_hdr, sizeof(rec_hdr));
+			BLK_SEG(bs_ptr, (bytptr)new_rec_hdr, SIZEOF(rec_hdr));
 			if (targ_len)
 			{
 				BLK_ADDR(skb, targ_len, unsigned char);
@@ -311,8 +311,8 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	{
 		old_cse = cse->low_tlevel;
 		assert(old_cse && old_cse->done);
-		assert(2 == (sizeof(old_cse->undo_offset) / sizeof(old_cse->undo_offset[0])));
-		assert(2 == (sizeof(old_cse->undo_next_off) / sizeof(old_cse->undo_next_off[0])));
+		assert(2 == (SIZEOF(old_cse->undo_offset) / SIZEOF(old_cse->undo_offset[0])));
+		assert(2 == (SIZEOF(old_cse->undo_next_off) / SIZEOF(old_cse->undo_next_off[0])));
 		assert(!old_cse->undo_next_off[0] && !old_cse->undo_offset[0]);
 		assert(!old_cse->undo_next_off[1] && !old_cse->undo_offset[1]);
 	}
@@ -325,13 +325,13 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		{	/* follow chain to first deleted record */
 			if (0 == curr_chain.next_off)
 				break;
-			if (right_ptr == top_of_block  &&  (bytptr)del_ptr - curr == sizeof(off_chain))
+			if (right_ptr == top_of_block  &&  (bytptr)del_ptr - curr == SIZEOF(off_chain))
 				break;	/* special case described below: stop just before the first deleted record */
 			prev = curr;
 			curr += curr_chain.next_off;
 			GET_LONGP(&curr_chain, curr);
 		}
-		if (right_ptr == top_of_block  &&  (bytptr)del_ptr - curr == sizeof(off_chain))
+		if (right_ptr == top_of_block  &&  (bytptr)del_ptr - curr == SIZEOF(off_chain))
 		{
 			/* if the right side of the block is gone and our last chain is in the last record,
 			 * terminate the chain and adjust the previous entry to point at the new *-key
@@ -357,10 +357,10 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 					old_cse->undo_offset[1] = (block_offset)(prev - buffer);
 					assert(old_cse->undo_offset[1]);
 				}
-				prev_chain.next_off = (unsigned int)((bytptr)left_ptr - prev + (unsigned int)(sizeof(rec_hdr)));
+				prev_chain.next_off = (unsigned int)((bytptr)left_ptr - prev + (unsigned int)(SIZEOF(rec_hdr)));
 				GET_LONGP(prev, &prev_chain);
 			} else	/* it's the first (and only) one */
-				cse->first_off = (block_offset)((bytptr)left_ptr - buffer + sizeof(rec_hdr));
+				cse->first_off = (block_offset)((bytptr)left_ptr - buffer + SIZEOF(rec_hdr));
 		} else if (curr >= (bytptr)del_ptr)
 		{	/* may be more records on the right that aren't deleted */
 			while (curr < (bytptr)right_ptr)

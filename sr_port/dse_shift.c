@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,7 +120,7 @@ void dse_shift(void)
 		size = 0;
 	else if (size > cs_addrs->hdr->blk_size)
 		size = cs_addrs->hdr->blk_size;
-	if (offset < sizeof(blk_hdr) || offset > size)
+	if (offset < SIZEOF(blk_hdr) || offset > size)
 	{
 		util_out_print("Error:  offset not in range of block.", TRUE);
 		t_abort(gv_cur_region, cs_addrs);
@@ -140,7 +140,7 @@ void dse_shift(void)
 			return;
 		}
 		memset(lbp, 0, shift);
-		BLK_SEG(bs_ptr, bp + sizeof(blk_hdr), offset - sizeof(blk_hdr));
+		BLK_SEG(bs_ptr, bp + SIZEOF(blk_hdr), offset - SIZEOF(blk_hdr));
 		BLK_SEG(bs_ptr, lbp, shift);
 		if (size - offset)
 			BLK_SEG(bs_ptr, bp + offset, size - offset);
@@ -148,8 +148,8 @@ void dse_shift(void)
 	{
 		if (shift > offset)
 			shift = offset - SIZEOF(blk_hdr);
-		if (offset - shift > sizeof(blk_hdr))
-			BLK_SEG(bs_ptr, bp + sizeof(blk_hdr), offset - shift - sizeof(blk_hdr));
+		if (offset - shift > SIZEOF(blk_hdr))
+			BLK_SEG(bs_ptr, bp + SIZEOF(blk_hdr), offset - shift - SIZEOF(blk_hdr));
 		if (size - offset)
 			BLK_SEG(bs_ptr, bp + offset, size - offset);
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -122,7 +122,13 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			   so clear its restartability.
 			*/
 			io_find_mvstent(iod, TRUE);
+			dsocketptr->mupintr = FALSE;
 		}
+	} else if (dsocketptr->mupintr && !dollar_zininterrupt)
+	{	/* The interrupted read was not properly resumed so clear it now */
+		dsocketptr->mupintr = FALSE;
+		dsocketptr->sock_save_state.who_saved = sockwhich_invalid;
+		io_find_mvstent(iod, TRUE);
 	}
 
 	while (iop_eol != (ch = *(pp->str.addr + p_offset++)))
@@ -330,7 +336,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		return;
 	}
 	/* ------------------ make a local copy of device structure to play with -------------------- */
-	d_socket_struct_len = sizeof(d_socket_struct) + (sizeof(socket_struct) * (gtm_max_sockets - 1));
+	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (gtm_max_sockets - 1));
 	memcpy(newdsocket, dsocketptr, d_socket_struct_len);
 	/* --------------- handle the two special cases attach/detach first ------------------------- */
 	if (detach_specified)
@@ -491,7 +497,10 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	if (ibfsize_specified)
 		newsocket.bufsiz = ibfsize;
 	if (moreread_specified)
+	{
 		newsocket.moreread_timeout = moreread_timeout;
+		newsocket.def_moreread_timeout = TRUE;	/* need to know this was user-defined in iosocket_readfl.c */
+	}
 	if (!create_new_socket)
 	{
 		/* these changes apply to only pre-existing sockets */
@@ -501,7 +510,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		nodelay = newsocket.nodelay ? 1 : 0;
 		if ((socketptr->nodelay != newsocket.nodelay) &&
 		    (-1 == tcp_routines.aa_setsockopt(newsocket.sd, IPPROTO_TCP,
-						      TCP_NODELAY, &nodelay, sizeof(nodelay))))
+						      TCP_NODELAY, &nodelay, SIZEOF(nodelay))))
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
@@ -511,7 +520,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 #endif
 		if ((socketptr->bufsiz != newsocket.bufsiz) &&
 		    (-1 == tcp_routines.aa_setsockopt(newsocket.sd, SOL_SOCKET,
-						      SO_RCVBUF, &newsocket.bufsiz, sizeof(newsocket.bufsiz))))
+						      SO_RCVBUF, &newsocket.bufsiz, SIZEOF(newsocket.bufsiz))))
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
@@ -538,6 +547,10 @@ void	iosocket_use(io_desc *iod, mval *pp)
                 if (socketptr->sd > 0)
                         (void)tcp_routines.aa_close(socketptr->sd);
                 iosocket_delimiter((unsigned char *)NULL, 0, &newsocket, TRUE);
+		if (NULL != socketptr->zff.addr)
+			free(socketptr->zff.addr);
+		if (NULL != socketptr->buffer)
+			free(socketptr->buffer);
                 free(socketptr);
                 return;
         }

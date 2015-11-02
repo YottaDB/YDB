@@ -73,7 +73,7 @@ int gtmrecv_start_helpers(int n_readers, int n_writers)
 	}
 	if (avail_slots < n_readers + n_writers)
 	{
-		SNPRINTF(err_str, sizeof(err_str),
+		SNPRINTF(err_str, SIZEOF(err_str),
 				"%d helpers will exceed the maximum allowed (%d), limit the helpers to %d\n",
 				n_readers + n_writers, MAX_UPD_HELPERS, avail_slots);
 		gtm_putmsg(VARLSTCNT(4) ERR_REPLERR, 2, LEN_AND_STR(err_str));
@@ -90,7 +90,7 @@ int gtmrecv_start_helpers(int n_readers, int n_writers)
 	{
 		started_readers = upd_helper_ctl->start_n_readers;
 		started_writers = upd_helper_ctl->start_n_writers;
-		SNPRINTF(err_str, sizeof(err_str), "%s %d out of %d readers and %d out of %d writers started",
+		SNPRINTF(err_str, SIZEOF(err_str), "%s %d out of %d readers and %d out of %d writers started",
 				((started_readers + started_writers) == (n_readers + n_writers)) ? "All" : "Only",
 				started_readers, n_readers, started_writers, n_writers);
 		if ((started_readers + started_writers) == (n_readers + n_writers))

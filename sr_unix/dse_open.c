@@ -84,7 +84,7 @@ void	dse_open (void)
 			util_out_print("Current output file:  !AD", TRUE, strlen(patch_ofile), &patch_ofile[0]);
 			return;
 		}
-		cli_len = sizeof(patch_ofile);
+		cli_len = SIZEOF(patch_ofile);
 		if (!cli_get_str("FILE", patch_ofile, &cli_len))
 			return;
 		if (0 == cli_len)
@@ -96,7 +96,7 @@ void	dse_open (void)
 		patch_len = cli_len;
 
 		pars.mvtype = MV_STR;
-		pars.str.len = sizeof(open_params_list);
+		pars.str.len = SIZEOF(open_params_list);
 		pars.str.addr = (char *)open_params_list;
 		val.mvtype = MV_STR;
 		val.str.len = patch_len;
@@ -106,7 +106,7 @@ void	dse_open (void)
 
 		if (CLI_PRESENT == cli_present("OCHSET"))
 		{
-			cli_len = sizeof(ch_set_name);
+			cli_len = SIZEOF(ch_set_name);
 			if (cli_get_str("OCHSET", ch_set_name, &cli_len))
 			{
 				if (0 == cli_len)
@@ -186,7 +186,7 @@ void	dse_close(void)
 		val.mvtype = pars.mvtype = MV_STR;
 		val.str.addr = (char *)patch_ofile;
 		val.str.len = patch_len;
-		pars.str.len = sizeof(iop_eol);
+		pars.str.len = SIZEOF(iop_eol);
 		pars.str.addr = (char *)&no_param;
 		op_close(&val, &pars);
 		dse_dmp_format = CLOSED_FMT;

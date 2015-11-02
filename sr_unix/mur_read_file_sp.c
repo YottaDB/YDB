@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,8 +39,6 @@
 #include "gtmmsg.h"
 #include "repl_sp.h"		/* for F_CLOSE used by the JNL_FD_CLOSE macro */
 
-GBLREF	mur_read_desc_t	mur_desc;
-GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF 	mur_gbls_t	murgbl;
 
@@ -53,16 +51,17 @@ GBLREF 	mur_gbls_t	murgbl;
  *          error status on unsuccessful
  * This function starts an asynchronous read in a given buffer
  ****************************************************************************************/
-uint4 mur_fread_start(mur_buff_desc_t *buff)
+uint4 mur_fread_start(jnl_ctl_list *jctl, mur_buff_desc_t *buff)
 {
 	buff->aiocbp->aio_offset = buff->dskaddr;
 	buff->aiocbp->aio_buf = (char *)buff->base;
-	buff->blen = MIN(MUR_BUFF_SIZE, mur_jctl->eof_addr - buff->dskaddr);
+	buff->blen = MIN(MUR_BUFF_SIZE, jctl->eof_addr - buff->dskaddr);
 	buff->aiocbp->aio_nbytes = buff->blen;
-	buff->rip_channel = mur_jctl->channel;	/* store channel that issued the AIO in order to use later for aio_cancel() */
+	buff->rip_channel = jctl->channel;	/* store channel that issued the AIO in order to use later for aio_cancel() */
+	assert(!buff->read_in_progress);
 	buff->read_in_progress = TRUE;
-        AIO_READ(buff->rip_channel, buff->aiocbp, mur_jctl->status, mur_jctl->status2);
-	return mur_jctl->status;
+	AIO_READ(buff->rip_channel, buff->aiocbp, jctl->status, jctl->status2);
+	return jctl->status;
 }
 /************************************************************************************
  * Function name: mur_fread_wait
@@ -72,7 +71,7 @@ uint4 mur_fread_start(mur_buff_desc_t *buff)
  * Purpose: The purpose of this routine is to make sure that a previously issued asysnchronous read
  *          in a given buffer has completed
  **************************************************************************************/
-uint4 mur_fread_wait(mur_buff_desc_t *buff)
+uint4 mur_fread_wait(jnl_ctl_list *jctl, mur_buff_desc_t *buff)
 {
 	ssize_t	nbytes;
 
@@ -84,47 +83,53 @@ uint4 mur_fread_wait(mur_buff_desc_t *buff)
 	 * anything but EINPROGRESS, the asynchronous I/O operation has completed. Subsequently, we can fetch the status of the
 	 * operation from a call to aio_return.
 	 */
-	AIO_ERROR(buff->aiocbp, mur_jctl->status);
-	if (-1 != mur_jctl->status)
+	AIO_ERROR(buff->aiocbp, jctl->status);
+	if (-1 != jctl->status)
 	{
-		AIO_RETURN(buff->aiocbp, nbytes); /* if successful mur_jctl->status will contain number of bytes read */
+		AIO_RETURN(buff->aiocbp, nbytes); /* if successful jctl->status will contain number of bytes read */
 		if (-1 != nbytes)
 		{
 			if (buff->blen == nbytes)
-				return (mur_jctl->status = SS_NORMAL);
+				return (jctl->status = SS_NORMAL);
 			/* AIO_READ didn't fetch the requested size chunk */
 			assert(buff->blen > nbytes);
 			DO_FILE_READ(buff->rip_channel, buff->dskaddr + nbytes, buff->base + nbytes, buff->blen - nbytes,
-					mur_jctl->status, mur_jctl->status2);
-			return mur_jctl->status;
+					jctl->status, jctl->status2);
+			return jctl->status;
 		}
 	}
-	return (mur_jctl->status = errno);
+	return (jctl->status = errno);
 }
 
 /* cancel asynchronous read */
-uint4 mur_fread_cancel(void)
+uint4 mur_fread_cancel(jnl_ctl_list *jctl)
 {
-	int	status, index, save_err;
+	int			status, index, save_err;
+	reg_ctl_list		*rctl;
+	mur_read_desc_t		*mur_desc;
+	mur_buff_desc_t		*seq_buff;
 
+	rctl = jctl->reg_ctl;
+	mur_desc = rctl->mur_desc;
 	/* At most one buffer can have read_in_progress, not both */
-	assert(!(mur_desc.seq_buff[0].read_in_progress && mur_desc.seq_buff[1].read_in_progress));
-	for (index = 0, save_err = 0; index < sizeof(mur_desc.seq_buff) / sizeof(mur_desc.seq_buff[0]); index++)
+	assert(!(mur_desc->seq_buff[0].read_in_progress && mur_desc->seq_buff[1].read_in_progress));
+	for (index = 0, save_err = 0; index < ARRAYSIZE(mur_desc->seq_buff); index++)
 	{
-		if (mur_desc.seq_buff[index].read_in_progress)
+		seq_buff = &mur_desc->seq_buff[index];
+		if (seq_buff->read_in_progress)
 		{
-			AIO_CANCEL(mur_desc.seq_buff[index].rip_channel, NULL, status);
+			AIO_CANCEL(seq_buff->rip_channel, NULL, status);
 			if (-1 == status)
 				save_err = errno;
 			else if (AIO_NOTCANCELED == status)	/* the OS cannot cancel the aio once it has actually started */
-				mur_jctl->status = mur_fread_wait(&mur_desc.seq_buff[index]);	/* wait for it to finish. */
-			mur_desc.seq_buff[index].read_in_progress = FALSE;
+				jctl->status = mur_fread_wait(seq_buff);	/* wait for it to finish. */
+			seq_buff->read_in_progress = FALSE;
 		}
 	}
-	/* Note that although the cancellation errored out for rip_channel, we are storing the status in mur_jctl which need not
+	/* Note that although the cancellation errored out for rip_channel, we are storing the status in jctl which need not
 	 * actually be the jctl corresponding to rip_channel
 	 */
-	return (mur_jctl->status = ((0 == save_err) ? SS_NORMAL : save_err));
+	return (jctl->status = ((0 == save_err) ? SS_NORMAL : save_err));
 }
 
 #endif /* MUR_USE_AIO */

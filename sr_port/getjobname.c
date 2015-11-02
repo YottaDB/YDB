@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@ void getjobname(void)
 	getjobnum();
 	i2usmval(&dollar_job, process_id);
 	n2s(&dollar_job);
-	assert(dollar_job.str.len <= sizeof(djbuff));
+	assert(dollar_job.str.len <= SIZEOF(djbuff));
 	memcpy(djbuff,dollar_job.str.addr,dollar_job.str.len);
 	dollar_job.str.addr = djbuff;
 }

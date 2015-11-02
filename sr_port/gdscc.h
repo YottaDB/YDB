@@ -188,6 +188,7 @@ typedef struct cw_set_element_struct
 	block_offset	undo_next_off[2];
 	block_offset	undo_offset[2];
 	uint4		blk_checksum;
+	uint4		was_free;
 } cw_set_element;
 
 #endif

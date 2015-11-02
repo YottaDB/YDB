@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,7 @@ void dse_wcreinit (void)
 	}
 	if (cs_addrs->critical)
 		crash_count = cs_addrs->critical->crashcnt;
-	len = sizeof(confirm);
+	len = SIZEOF(confirm);
 	GET_CONFIRM(confirm,len);
 	if (confirm[0] != 'Y' && confirm[0] != 'y')
 	{

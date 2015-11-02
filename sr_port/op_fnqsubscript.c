@@ -1,5 +1,5 @@
 /****************************************************************
- *      Copyright 2001, 2004 Sanchez Computer Associates, Inc.        *
+ *      Copyright 2001, 2009 Fidelity Information Services, Inc        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -52,8 +52,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 	if (!is_canonic_name(src))
 		rts_error(VARLSTCNT(4) ERR_NOCANONICNAME, 2, src->str.len, src->str.addr);
 	/*  A subscript cannot be longer than the whole name... */
-	if (stringpool.free + src->str.len > stringpool.top)
-		stp_gcol(src->str.len);
+	ENSURE_STP_FREE_SPACE(src->str.len);
 	srcmval = *src;
 	src = &srcmval;		/* Copy of source mval in case same as dst mval */
 	dst->str.len = 0;

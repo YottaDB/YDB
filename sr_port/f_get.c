@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@ int f_get(oprtype *a, opctype op)
 
 	error_def(ERR_VAREXPECTED);
 
-	result_ptr = (oprtype *)mcalloc(sizeof(oprtype));
+	result_ptr = (oprtype *)mcalloc(SIZEOF(oprtype));
 	result = put_indr(result_ptr);
 	r = maketriple(op);
 

@@ -52,8 +52,7 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 		assert(arg->str.len  == format_out.len );			\
 		assert(arg->str.addr == format_out.addr);			\
 		TEST_FAKE_STRINGPOOL_FULL;					\
-		if (stringpool.top - stringpool.free < arg->str.len)		\
-			stp_gcol(arg->str.len);					\
+		ENSURE_STP_FREE_SPACE(arg->str.len);				\
 		memcpy(stringpool.free, arg->str.addr, arg->str.len);		\
 			/* use arg 'coz gcol doesn't preserve format_out  */	\
 	}									\
@@ -145,8 +144,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		 * subscripts specified as arguments to $NAME() in addition to those in the naked reference */
 		space_needed = (int)((STR_LIT_LEN("^()") + ZWR_EXP_RATIO(MAX_KEY_SZ) + sub_count));
 		TEST_FAKE_STRINGPOOL_FULL;
-		if (space_needed > stringpool.top - stringpool.free)
-			stp_gcol(space_needed);
+		ENSURE_STP_FREE_SPACE(space_needed);
 		sptr = stringpool.free;
 		*sptr++ = '^';
 		key_ptr = (unsigned char *)&gv_currkey->base[0];
@@ -201,8 +199,8 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		space_needed = (int)(STR_LIT_LEN("^[,]()") + MAX_MIDENT_LEN + sub_count - 1); 	/* ^[,]GLVN(max of sub_count-1 *
 											 * subscript separator commas) */
 		TEST_FAKE_STRINGPOOL_FULL;
-		if (space_needed > stringpool.top - stringpool.free) /* We don't account for subscripts here as they are        */
-			 stp_gcol(space_needed);		     /* processed by mval_lex which reserves space if necessary */
+		/* We don't account for subscripts here as they are processed by mval_lex which reserves space if necessary */
+		ENSURE_STP_FREE_SPACE(space_needed);
 		dst->str.addr = (char *)stringpool.free;
 		if (fnname_type & FNGBL)
 		{

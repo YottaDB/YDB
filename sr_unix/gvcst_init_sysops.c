@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,6 +81,24 @@
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
+#include "db_snapshot.h"
+
+#ifndef GTM_SNAPSHOT
+# error "Snapshot facility not supported in this platform"
+#endif
+
+#define SS_INFO_INIT(csa)												\
+{															\
+	shm_snapshot_ptr_t	ss_shm_ptr;										\
+															\
+	csa->nl->ss_shmid = INVALID_SHMID;										\
+	csa->nl->ss_shmcycle = 0;											\
+	csa->nl->snapshot_in_prog = FALSE;										\
+	csa->nl->num_snapshots_in_effect = 0;										\
+	assert(1 == MAX_SNAPSHOTS); /* To ensure that we revisit this whenever multiple snapshots is implemented */	\
+	ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(csa));								\
+	SS_DEFAULT_INIT_POOL(ss_shm_ptr);										\
+}
 
 #define GTM_ATTACH_CHECK_ERROR													\
 {																\
@@ -133,28 +151,28 @@
 			 *  construction before handing control to the topmost condition handler. But it does not hurt to do	\
 			 *  the copy.												\
 			 */													\
-			assert(strlen(csa->nl->now_running) < sizeof(now_running));						\
-			memcpy(now_running, csa->nl->now_running, sizeof(now_running));						\
-			now_running[sizeof(now_running) - 1] = '\0'; /* protection against bad csa->nl->now_running values */	\
+			assert(strlen(csa->nl->now_running) < SIZEOF(now_running));						\
+			memcpy(now_running, csa->nl->now_running, SIZEOF(now_running));						\
+			now_running[SIZEOF(now_running) - 1] = '\0'; /* protection against bad csa->nl->now_running values */	\
 			VERMISMATCH = TRUE;											\
 		} else														\
 			SHM_SETUP_OK = TRUE;											\
 	}															\
 }
 
-#define GTM_VERMISMATCH_ERROR													\
-{																\
-	if (!vermismatch_already_printed)											\
-	{															\
-		vermismatch_already_printed = TRUE;										\
-		/* for DSE, change VERMISMATCH to be INFO (instead of the more appropriate WARNING)				\
-		 * as we want the condition handler (dbinit_ch) to do a CONTINUE (which it does					\
-		 * only for severity levels SUCCESS or INFO) and resume processing in gvcst_init.c				\
-		 * instead of detaching from shared memory.									\
-		 */														\
-		rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_VERMISMATCH, ((DSE_IMAGE != image_type) ? ERROR : INFO)), 6,		\
-			DB_LEN_STR(reg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));			\
-	}															\
+#define GTM_VERMISMATCH_ERROR											\
+{														\
+	if (!vermismatch_already_printed)									\
+	{													\
+		vermismatch_already_printed = TRUE;								\
+		/* for DSE, change VERMISMATCH to be INFO (instead of the more appropriate WARNING)		\
+		 * as we want the condition handler (dbinit_ch) to do a CONTINUE (which it does			\
+		 * only for severity levels SUCCESS or INFO) and resume processing in gvcst_init.c		\
+		 * instead of detaching from shared memory.							\
+		 */												\
+		rts_error(VARLSTCNT(8) MAKE_MSG_TYPE(ERR_VERMISMATCH, (!IS_DSE_IMAGE ? ERROR : INFO)), 6,	\
+			DB_LEN_STR(reg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));	\
+	}													\
 }
 
 #define ATTACH_TRIES   		10
@@ -163,7 +181,6 @@
 #define EIDRM_SLEEP_INT		500
 #define EIDRM_MAX_SLEEPS	20
 
-GBLREF	enum gtmImageTypes	image_type;
 GBLREF  uint4                   process_id;
 GBLREF  gd_region               *gv_cur_region;
 GBLREF  boolean_t               sem_incremented;
@@ -217,7 +234,7 @@ gd_region *dbfilopn (gd_region *reg)
 	FILE_CNTL_INIT_IF_NULL(seg);
 	file.addr = (char *)seg->fname;
 	file.len = seg->fname_len;
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = fbuff;
 	pblk.buff_size = MAX_FBUFF;
 	pblk.fop = (F_SYNTAXO | F_PARNODE);
@@ -227,17 +244,17 @@ gd_region *dbfilopn (gd_region *reg)
 	{
 		raw = TRUE;
 		pblk.def1_buf = DEF_NODBEXT;
-		pblk.def1_size = sizeof(DEF_NODBEXT) - 1;
+		pblk.def1_size = SIZEOF(DEF_NODBEXT) - 1;
 	} else
 	{
 		raw = FALSE;
 		pblk.def1_buf = DEF_DBEXT;
-		pblk.def1_size = sizeof(DEF_DBEXT) - 1;
+		pblk.def1_size = SIZEOF(DEF_DBEXT) - 1;
 	}
 	status = parse_file(&file, &pblk);
 	if (!(status & 1))
 	{
-		if (GTCM_GNP_SERVER_IMAGE != image_type)
+		if (!IS_GTCM_GNP_SERVER_IMAGE)
 		{
 			free(seg->file_cntl->file_info);
 			free(seg->file_cntl);
@@ -245,7 +262,7 @@ gd_region *dbfilopn (gd_region *reg)
 		}
 		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	}
-	assert(((int)pblk.b_esl + 1) <= sizeof(seg->fname));
+	assert(((int)pblk.b_esl + 1) <= SIZEOF(seg->fname));
 	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
 	pblk.buffer[pblk.b_esl] = 0;
 	seg->fname[pblk.b_esl] = 0;
@@ -274,7 +291,7 @@ gd_region *dbfilopn (gd_region *reg)
 		if (FD_INVALID == udi->fd)
 		{
 			errno_save = errno;
-			if (GTCM_GNP_SERVER_IMAGE != image_type)
+			if (!IS_GTCM_GNP_SERVER_IMAGE)
 			{
 				free(seg->file_cntl->file_info);
 				free(seg->file_cntl);
@@ -304,15 +321,24 @@ gd_region *dbfilopn (gd_region *reg)
 
 void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd)
 {
+	/* Ensure that all the various sections that the shared memory contains are actually
+	 * aligned at the OS_PAGE_SIZE boundary
+	 */
+	assert(0 == NODE_LOCAL_SPACE % OS_PAGE_SIZE);
+	assert(0 == LOCK_SPACE_SIZE(csd) % OS_PAGE_SIZE);
+	assert(0 == JNL_SHARE_SIZE(csd) % OS_PAGE_SIZE);
+	assert(0 == SHMPOOL_SECTION_SIZE % OS_PAGE_SIZE);
 	switch(reg->dyn.addr->acc_meth)
 	{
 	case dba_mm:
+		assert(0 == MMBLK_CONTROL_SIZE(csd) % OS_PAGE_SIZE);
 		reg->sec_size = (uint4)ROUND_UP(NODE_LOCAL_SPACE + LOCK_SPACE_SIZE(csd) + MMBLK_CONTROL_SIZE(csd) \
-					 + JNL_SHARE_SIZE(csd) + SHMPOOL_BUFFER_SIZE, OS_PAGE_SIZE);
+					 + JNL_SHARE_SIZE(csd) + SHMPOOL_SECTION_SIZE, OS_PAGE_SIZE);
 		break;
 	case dba_bg:
+		assert(0 == CACHE_CONTROL_SIZE(csd) % OS_PAGE_SIZE);
 		reg->sec_size = (uint4)ROUND_UP(NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd) \
-					 + CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + SHMPOOL_BUFFER_SIZE, OS_PAGE_SIZE);
+					 + CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + SHMPOOL_SECTION_SIZE, OS_PAGE_SIZE);
 		break;
 	default:
 		GTMASSERT;
@@ -367,7 +393,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	read_only = reg->read_only;
 	new_dbinit_ipc = FALSE;	/* we did not create a new ipc resource */
 	udi = FILE_INFO(reg);
-	memset(machine_name, 0, sizeof(machine_name));
+	memset(machine_name, 0, SIZEOF(machine_name));
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, gethostname_res))
 		rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Unable to get the hostname"), errno);
 	assert(strlen(machine_name) < MAX_MCNAMELEN);
@@ -384,7 +410,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 #	ifdef GTM_CRYPT
 	/* Since LKE will never look at the encrypted contents of the database file, it won't need the initialize
 	 * encryption. */
-	do_crypt_init = (tsd->is_encrypted && (LKE_IMAGE != image_type));
+	do_crypt_init = (tsd->is_encrypted && !IS_LKE_IMAGE);
 	if (do_crypt_init)
 	{
 		/* Encryption initialization is a heavy operation due to the initalization of gpgme. Hence, we do
@@ -408,7 +434,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	fc->file_type = reg->dyn.addr->acc_meth;
 	fc->op = FC_READ;
 	fc->op_buff = (sm_uc_ptr_t)tsd;
-	fc->op_len = sizeof(*tsd);
+	fc->op_len = SIZEOF(*tsd);
 	fc->op_pos = 1;
 	dbfilop(fc);		/* Read file header */
 #	ifdef GTM_CRYPT
@@ -421,7 +447,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 * the below INIT_DB_ENCRYPTION if the above encryption initialization failed. */
 		if (0 == init_status)
 			INIT_DB_ENCRYPTION(reg->dyn.addr->fname, csa, tsd, init_status);
-		if (0 != init_status && (GTM_IMAGE == image_type))
+		if ((0 != init_status) && IS_GTM_IMAGE)
 			GC_RTS_ERROR(init_status, reg->dyn.addr->fname);
 		csa->encrypt_init_status = init_status;
 	}
@@ -496,7 +522,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
 						ERR_TEXT, 2, LEN_AND_LIT("semid is valid but shmid is invalid"));
 			if (-1 == shmctl(udi->shmid, IPC_STAT, &shmstat))
-				rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+				rts_error(VARLSTCNT(11) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
 					ERR_TEXT, 2, LEN_AND_LIT("Error with database control shmctl"), errno);
 			else if (shmstat.shm_ctime != tsd->gt_shm_ctime.ctime)
 			{
@@ -600,12 +626,15 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	 * The jnl_buff buffer should be initialized irrespective of read/write process */
 	JNL_INIT(csa, reg, tsd);
 	csa->shmpool_buffer = (shmpool_buff_hdr_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
-	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->shmpool_buffer + SHMPOOL_BUFFER_SIZE;
+	/* Initialize memory for snapshot context */									\
+	csa->ss_ctx = malloc(SIZEOF(snapshot_context_t));
+	DEFAULT_INIT_SS_CTX((SS_CTX_CAST(csa->ss_ctx)));
+	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->shmpool_buffer + SHMPOOL_SECTION_SIZE;
 	csa->lock_addrs[1] = csa->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
 	csa->total_blks = tsd->trans_hist.total_blks;   		/* For test to see if file has extended */
 	if (new_dbinit_ipc)
 	{
-		memset(csa->nl, 0, sizeof(*csa->nl));			/* We allocated shared storage -- we have to init it */
+		memset(csa->nl, 0, SIZEOF(*csa->nl));			/* We allocated shared storage -- we have to init it */
 		if (JNL_ALLOWED(csa))
 		{	/* initialize jb->cycle to a value different from initial value of jpc->cycle (0). although this is not
 			 * necessary right now, in the future, the plan is to change jnl_ensure_open() to only do a cycle mismatch
@@ -650,7 +679,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		assert(!vermismatch);
 		if (is_bg)
 		{
-			memcpy(csd, tsd, sizeof(sgmnt_data));
+			memcpy(csd, tsd, SIZEOF(sgmnt_data));
 			fc->file_type = dba_bg;
 			fc->op = FC_READ;
 			fc->op_buff = MM_ADDR(csd);
@@ -673,6 +702,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		}
 		db_csh_ref(csa);
 		shmpool_buff_init(reg);
+		SS_INFO_INIT(csa);
 		STRCPY(csa->nl->machine_name, machine_name);					/* machine name */
 		assert(MAX_REL_NAME > gtm_release_name_len);
 		memcpy(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
@@ -718,7 +748,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			if (is_bg)
 			{
 				assert(memcmp(csd, GDS_LABEL, GDS_LABEL_SZ - 1) == 0);
-				LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, sizeof(sgmnt_data), errno_save);
+				LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, SIZEOF(sgmnt_data), errno_save);
 				if (0 != errno_save)
 				{
 					rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
@@ -847,7 +877,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			csd->gt_sem_ctime = tsd->gt_sem_ctime;
 			csd->gt_shm_ctime = tsd->gt_shm_ctime;
 		}
-		LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, sizeof(sgmnt_data), errno_save);
+		LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, SIZEOF(sgmnt_data), errno_save);
 		if (0 != errno_save)
 		{
 			rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),

@@ -32,9 +32,9 @@
 */
 
 #define SBS_ELE_BLK_SIZE	(GTM64_ONLY(240)NON_GTM64_ONLY(184))
-#define SBS_NUM_INT_ELE		(SBS_ELE_BLK_SIZE / sizeof(lv_val *))
-#define SBS_NUM_STR_ELE		(SBS_ELE_BLK_SIZE / sizeof(sbs_str_struct))
-#define SBS_NUM_FLT_ELE		(SBS_ELE_BLK_SIZE / sizeof(sbs_flt_struct))
+#define SBS_NUM_INT_ELE		(SBS_ELE_BLK_SIZE / SIZEOF(lv_val *))
+#define SBS_NUM_STR_ELE		(SBS_ELE_BLK_SIZE / SIZEOF(sbs_str_struct))
+#define SBS_NUM_FLT_ELE		(SBS_ELE_BLK_SIZE / SIZEOF(sbs_flt_struct))
 
 typedef struct {mstr str; lv_val *lv;} sbs_str_struct;
 typedef struct {mflt flt; lv_val *lv;} sbs_flt_struct;

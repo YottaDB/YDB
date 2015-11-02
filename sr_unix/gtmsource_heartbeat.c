@@ -66,7 +66,7 @@ void gtmsource_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr)
 	UNIX_ONLY(assert(*interval_ptr == heartbeat_period);)	/* interval_len and interval_ptr are dummies on VMS */
 	gtmsource_now += heartbeat_period;			/* cannot use *interval_ptr on VMS */
 	REPL_DPRINT2("Starting heartbeat timer with %d s\n", heartbeat_period);
-	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, sizeof(heartbeat_period),
+	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
 			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
 }
 
@@ -85,11 +85,11 @@ int gtmsource_init_heartbeat(void)
 	num_q_entries = DIVIDE_ROUND_UP(heartbeat_max_wait, heartbeat_period) + 2;
 	REPL_DPRINT4("Initialized heartbeat, heartbeat_period = %d s, heartbeat_max_wait = %d s, num_q_entries = %d\n",
 			heartbeat_period, heartbeat_max_wait, num_q_entries);
-	if (!(repl_heartbeat_que_head = (repl_heartbeat_que_entry_t *)malloc(num_q_entries * sizeof(repl_heartbeat_que_entry_t))))
+	if (!(repl_heartbeat_que_head = (repl_heartbeat_que_entry_t *)malloc(num_q_entries * SIZEOF(repl_heartbeat_que_entry_t))))
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error in allocating heartbeat queue"), errno);
 
-	memset(repl_heartbeat_que_head, 0, num_q_entries * sizeof(repl_heartbeat_que_entry_t));
+	memset(repl_heartbeat_que_head, 0, num_q_entries * SIZEOF(repl_heartbeat_que_entry_t));
 	repl_heartbeat_free_head = repl_heartbeat_que_head + 1;
 	*(gtm_time4_t *)&repl_heartbeat_que_head->heartbeat.ack_time[0] = 0;
 	*(gtm_time4_t *)&repl_heartbeat_free_head->heartbeat.ack_time[0] = 0;
@@ -106,7 +106,7 @@ int gtmsource_init_heartbeat(void)
 	 * this code may have to be revisited. Also, modify the check in gtmsource_process (prev_now != (save_now = gtmsource_now))
 	 * to be something like (hearbeat_period < difftime((save_now = gtmsource_now), prev_now)). Vinaya 2003, Sep 08
 	 */
-	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, sizeof(heartbeat_period),
+	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
 			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
 	heartbeat_stalled = FALSE;
 	earliest_sent_time = 0;
@@ -147,7 +147,7 @@ boolean_t gtmsource_is_heartbeat_overdue(time_t *now, repl_heartbeat_msg_ptr_t o
 		return (FALSE);
 	}
 
-	memcpy(overdue_heartbeat, &heartbeat_element->heartbeat, sizeof(repl_heartbeat_msg_t));
+	memcpy(overdue_heartbeat, &heartbeat_element->heartbeat, SIZEOF(repl_heartbeat_msg_t));
 
 	REPL_DPRINT5("Overdue heartbeat - SEQNO : "INT8_FMT" time : %ld now : %ld difftime : %00.f\n",
 		     INT8_PRINT(*(seq_num *)&overdue_heartbeat->ack_seqno[0]), *(gtm_time4_t *)&overdue_heartbeat->ack_time[0],

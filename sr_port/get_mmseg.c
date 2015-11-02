@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ caddr_t get_mmseg(size_t size)
 
 #if defined(__osf__) && defined(__alpha)
 	/* caddr_t should be 64 bits */
-	assert(8 == sizeof(caddr_t));
+	assert(8 == SIZEOF(caddr_t));
 #endif
 
 	if (!mmseg_head)

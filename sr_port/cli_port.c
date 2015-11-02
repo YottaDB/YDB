@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -290,7 +290,7 @@ int cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_nu
 	uint4		num;
 	int		retval = 0;
 
-	two_num_qual_len = sizeof(two_num_qual_str);
+	two_num_qual_len = SIZEOF(two_num_qual_str);
 	if (!cli_get_str(qual_name, two_num_qual_str, &two_num_qual_len))
 	{
 		util_out_print("Error parsing !AZ qualifier", TRUE, qual_name);

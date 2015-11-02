@@ -53,6 +53,10 @@
 #include "mu_rndwn_repl_instance.h"
 #include "send_msg.h"
 #include "do_shmat.h"	/* for do_shmat() prototype */
+#include "shmpool.h" /* Needed for the shmpool structures */
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
 
 GBLREF gd_region        *gv_cur_region;
 
@@ -93,7 +97,7 @@ int mu_rndwn_all(void)
                 return ERR_MUNOTALLSEC;
         }
 	fname = (char *)malloc(MAX_FN_LEN + 1);
-	while (NULL != (FGETS(entry, sizeof(entry), pf, fgets_res)) && entry[0] != '\n')
+	while (NULL != (FGETS(entry, SIZEOF(entry), pf, fgets_res)) && entry[0] != '\n')
 	{
 		tmp_exit_status = SS_NORMAL;
 		if (validate_db_shm_entry(entry, fname, &tmp_exit_status))
@@ -153,7 +157,7 @@ boolean_t validate_db_shm_entry(char *entry, char *fname, int *exit_stat)
 	{
 		/* check for the bare minimum size of the shared memory segment that we expect
 		 * (with no fileheader related information at hand) */
-		if (NODE_LOCAL_SPACE + SHMPOOL_BUFFER_SIZE > parm_buff->sgmnt_siz)
+		if (NODE_LOCAL_SPACE + SHMPOOL_SECTION_SIZE > parm_buff->sgmnt_siz)
 		{
 			free(parm_buff);
 			return FALSE;
@@ -234,7 +238,7 @@ boolean_t validate_replpool_shm_entry(char *entry, replpool_id_ptr_t replpool_id
 	{
 		*shmid = parm_buff->shmid;
 		/* Check for the bare minimum size of the replic shared segment that we expect */
-		/* if (parm_buff->sgmnt_siz < (sizeof(replpool_identifier) + MIN(MIN_JNLPOOL_SIZE, MIN_RECVPOOL_SIZE))) */
+		/* if (parm_buff->sgmnt_siz < (SIZEOF(replpool_identifier) + MIN(MIN_JNLPOOL_SIZE, MIN_RECVPOOL_SIZE))) */
 		if (parm_buff->sgmnt_siz < MIN(MIN_JNLPOOL_SIZE, MIN_RECVPOOL_SIZE))
 		{
 			free(parm_buff);
@@ -254,7 +258,7 @@ boolean_t validate_replpool_shm_entry(char *entry, replpool_id_ptr_t replpool_id
 			free(parm_buff);
 			return FALSE;
 		}
-		memcpy((void *)replpool_id, (void *)start_addr, sizeof(replpool_identifier));
+		memcpy((void *)replpool_id, (void *)start_addr, SIZEOF(replpool_identifier));
 		if (memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 1))
 		{
 			if (!memcmp(replpool_id->label, GDS_RPL_LABEL, GDS_LABEL_SZ - 3))
@@ -305,7 +309,7 @@ shm_parms *get_shm_parm(char *entry)
 	shm_parms	*parm_buff;
 	struct shmid_ds	shm_buf;
 
-	parm_buff = (shm_parms *)malloc(sizeof(shm_parms));
+	parm_buff = (shm_parms *)malloc(SIZEOF(shm_parms));
 
 	parm = parse_shm_entry(entry, SHMID);
 	CONVERT_TO_NUM(shmid);
@@ -418,7 +422,7 @@ int mu_rndwn_sem_all(void)
 		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("POPEN()"), CALLFROM, save_errno);
                 return ERR_MUNOTALLSEC;
         }
-	while (NULL != (FGETS(entry, sizeof(entry), pf, fgets_res)) && entry[0] != '\n')
+	while (NULL != (FGETS(entry, SIZEOF(entry), pf, fgets_res)) && entry[0] != '\n')
 	{
 		if (-1 != (semid = parse_sem_id(entry)))
 		{

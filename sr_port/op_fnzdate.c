@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,8 +55,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 	MV_FORCE_STR(fmt);
 	MV_FORCE_STR(mo_str);
 	MV_FORCE_STR(day_str);
-	if (stringpool.top - stringpool.free < ZDATE_MAX_LEN)
-		stp_gcol(ZDATE_MAX_LEN);
+	ENSURE_STP_FREE_SPACE(ZDATE_MAX_LEN);
 	time = 0;
 	if ((src->mvtype & MV_STR) && (src->mvtype & MV_NUM_APPROX))
 	{

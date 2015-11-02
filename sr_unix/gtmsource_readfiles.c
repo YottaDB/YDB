@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,9 +75,6 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	FILE			*gtmsource_statslog_fp;
 GBLREF	gtmsource_state_t	gtmsource_state;
-
-LITREF	int			jrt_update[JRT_RECTYPES];
-LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 
 static	int4			num_tcom = -1;
 static	boolean_t		trans_read = FALSE;
@@ -246,15 +243,14 @@ static	int repl_next(repl_buff_t *rb)
 		{
 			rec = ((jnl_record *)(b->recbuff));
 			rectype = rec->prefix.jrec_type;
-			if (IS_SET_KILL_ZKILL(rectype))
+			if (IS_SET_KILL_ZKILL_ZTWORM(rectype))
 			{
-				keystr = (IS_ZTP(rectype)) ? (jnl_string *)&rec->jrec_fkill.mumps_node
-							   : (jnl_string *)&rec->jrec_kill.mumps_node;
-				DECODE_SET_KILL_ZKILL(keystr,
-						      (IS_ZTP(rectype)),
-						      rec->prefix.forwptr,
-						      rb->backctl->encr_key_handle,
-						      crypt_status);
+				assert(!IS_ZTP(rectype));
+				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
+				/* Assert that ZTWORMHOLE type record too has same layout as KILL/SET */
+				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&rec->jrec_ztworm.ztworm_str);
+				DECODE_SET_KILL_ZKILL(keystr, rec->prefix.forwptr, rb->backctl->encr_key_handle,
+							crypt_status);
 				if (0 != crypt_status)
 					GC_RTS_ERROR(crypt_status, rb->backctl->jnl_fn);
 			}
@@ -421,7 +417,7 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 			     csa->nl->jnl_file.u.device,  csa->nl->jnl_file.u.st_gen);
 		if (!ctl->fh_read_done)
 		{
-			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, ROUND_UP(sizeof(jnl_file_header), 8), status);
+			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, ROUND_UP(SIZEOF(jnl_file_header), 8), status);
 			if (SS_NORMAL != status)
 				rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn,
 						ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in reading jfh in update_eof_addr"), status);
@@ -799,7 +795,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 					/* End of transaction in this file */
 					ctl->read_complete = TRUE;
 					if (num_tcom == -1)
-						num_tcom = ((jnl_record *)b->recbuff)->jrec_tcom.participants;
+						num_tcom = ((jnl_record *)b->recbuff)->jrec_tcom.num_participants;
 					num_tcom--;
 					if (num_tcom == 0) /* Read the whole trans */
 						trans_read = TRUE;
@@ -1539,7 +1535,7 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	 */
 	assert(buff == (unsigned char *)gtmsource_msgp + REPL_MSG_HDRLEN); /* else increasing buffer space will not work */
 	assert(maxbufflen == gtmsource_msgbufsiz - REPL_MSG_HDRLEN);
-	assert(REPL_MSG_HDRLEN == sizeof(jnldata_hdr_struct));
+	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct));
 	DEBUG_ONLY(loopcnt = 0;)
 	do
 	{

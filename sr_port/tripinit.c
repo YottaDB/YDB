@@ -55,7 +55,7 @@ void tripinit(void)
 	dqinit(&t_orig,exorder);
 	dqinit(&(t_orig.backptr), que);
 	dqinit(&literal_chain, que);
-	memset(&mline_root, 0, sizeof(mline_root));
+	memset(&mline_root, 0, SIZEOF(mline_root));
 	mline_tail = & mline_root;
 	block_level = -1;
 	setcurtchain(&t_orig);

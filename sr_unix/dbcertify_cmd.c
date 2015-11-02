@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, LLC.	*
+ *	Copyright 2005, 2010 Fidelity Information Services, LLC.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,9 +55,8 @@ static	CLI_ENTRY	dbcertify_qual[] = {
 };
 
 
-GBLDEF	CLI_ENTRY	cmd_ary[] = {
+GBLDEF	CLI_ENTRY	dbcertify_cmd_ary[] = {
 	{ "CERTIFY",   dbcertify_certify_phase, dbcertify_qual,   dbcertify_parm,   0, 0,    0, VAL_DISALLOWED, 1, 0, 0, 0 },
 	{ "SCAN",      dbcertify_scan_phase,	dbscan_qual,	  dbscan_parm,      0, 0,    0, VAL_DISALLOWED, 1, 0, 0, 0 },
 	{ 0 }
 };
-

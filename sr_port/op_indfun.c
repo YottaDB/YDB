@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ void op_indfun(mval *v, mint argcode, mval *dst)
 
 	error_def(ERR_INDMAXNEST);
 
-	assert((sizeof(indir_opcode)/sizeof(indir_opcode[0])) > argcode);
+	assert((SIZEOF(indir_opcode)/SIZEOF(indir_opcode[0])) > argcode);
 	assert(indir_opcode[argcode]);
 	MV_FORCE_STR(v);
 	indir_src.str = v->str;

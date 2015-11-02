@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,6 @@
 #endif
 
 GBLREF	uint4			process_id;
-GBLREF	enum gtmImageTypes	image_type;
 
 error_def(ERR_BKUPTMPFILOPEN);
 error_def(ERR_BKUPTMPFILWRITE);
@@ -60,7 +59,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 	{
 #ifdef DEBUG
 		/* someone else is flushing it right now */
-		if (GTM_IMAGE != image_type)
+		if (!IS_GTM_IMAGE)
 			util_out_print("Process !12UL has the shmpool lock preventing backup buffer flush.",
 				TRUE, sbufh_p->shmpool_crit_latch.u.parts.latch_pid);
 #endif

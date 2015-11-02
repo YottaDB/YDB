@@ -47,7 +47,7 @@ int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 blks
 	assert(0 == ((long)gds_blk_trg & 0x7));
 	v15bp = (v15_blk_hdr_ptr_t)gds_blk_src;
 	bp = (blk_hdr_ptr_t)gds_blk_trg;
-	assert((sizeof(v15_blk_hdr) <= v15bp->bsiz) || (UPGRADE_ALWAYS == gtm_blkupgrade_flag));
+	assert((SIZEOF(v15_blk_hdr) <= v15bp->bsiz) || (UPGRADE_ALWAYS == gtm_blkupgrade_flag));
 	UNIX_ONLY(v15tn = v15bp->tn);
 	VMS_ONLY(GET_ULONG(v15tn, &v15bp->tn));
 	v15bsiz = v15bp->bsiz;

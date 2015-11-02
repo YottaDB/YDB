@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,12 +19,12 @@ void op_fnlvnameo2(mval *src,mval *dst,mval *direct)
 
 	MV_FORCE_STR(src);
 	MV_FORCE_NUM(direct);
-	if (!MV_IS_INT(direct) || (direct->m[1] != 1*MV_BIAS && direct->m[1] != -1*MV_BIAS))
+	if (!MV_IS_INT(direct) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
 		rts_error(VARLSTCNT(1) ERR_ORDER2);
 	else
-	{	if (direct->m[1] == 1*MV_BIAS)
-			op_fnlvname(src,dst);
+	{	if (direct->m[1] == (1 * MV_BIAS))
+			op_fnlvname(src, FALSE, dst);
 		else
-			op_fnlvprvname(src,dst);
+			op_fnlvprvname(src, dst);
 	}
 }

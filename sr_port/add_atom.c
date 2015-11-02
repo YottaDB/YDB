@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,11 +93,11 @@ boolean_t add_atom(int	*count,
 		} else
 		{
 			bytelen = strlit_buff->bytelen;
-			*outchar_ptr += DIVIDE_ROUND_UP(bytelen, sizeof(uint4)) + PAT_STRLIT_PADDING;
+			*outchar_ptr += DIVIDE_ROUND_UP(bytelen, SIZEOF(uint4)) + PAT_STRLIT_PADDING;
 			if (*outchar_ptr - *fstchar_ptr > MAX_PATTERN_LENGTH)
 				return FALSE;
 			*patmaskptr++ = pattern_mask;
-			memcpy(patmaskptr, strlit_buff, bytelen + PAT_STRLIT_PADDING * sizeof(uint4));
+			memcpy(patmaskptr, strlit_buff, bytelen + PAT_STRLIT_PADDING * SIZEOF(uint4));
 			*size = strlit_buff->charlen;
 		}
 		(*count)++;

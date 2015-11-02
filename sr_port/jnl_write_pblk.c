@@ -60,7 +60,7 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
 	pblk_record.bsiz = MIN(csa->hdr->blk_size, buffer->bsiz);
 	assert((pblk_record.bsiz == buffer->bsiz) ||
 	       (cse->blk_checksum == jnl_get_checksum((uint4 *)buffer, NULL, pblk_record.bsiz)));
-	assert(pblk_record.bsiz >= sizeof(blk_hdr) || dse_running);
+	assert(pblk_record.bsiz >= SIZEOF(blk_hdr) || dse_running);
 	pblk_record.ondsk_blkver = cse->ondsk_blkver;
 	tmp_jrec_size = (int)FIXED_PBLK_RECLEN + pblk_record.bsiz + JREC_SUFFIX_SIZE;
 	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
@@ -71,6 +71,6 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
 	suffix = (jrec_suffix *)&local_buff[JNL_REC_START_BNDRY];
 	pblk_record.prefix.forwptr = suffix->backptr = jrec_size;
 	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
-	assert(sizeof(uint4) == sizeof(jrec_suffix));
+	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
 	jnl_write(jpc, JRT_PBLK, (jnl_record *)&pblk_record, buffer, &blk_trailer);
 }

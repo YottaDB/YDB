@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,31 +101,31 @@ void dse_f_blk(void)
 	rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
     if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 	b_top = bp + cs_addrs->hdr->blk_size;
-    else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-	b_top = bp + sizeof(blk_hdr);
+    else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+	b_top = bp + SIZEOF(blk_hdr);
     else
 	b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
-    rp = bp + sizeof(blk_hdr);
+    rp = bp + SIZEOF(blk_hdr);
     GET_SHORT(rsize, &((rec_hdr_ptr_t) rp)->rsiz);
-    if (rsize < sizeof(rec_hdr))
-	r_top = rp + sizeof(rec_hdr);
+    if (rsize < SIZEOF(rec_hdr))
+	r_top = rp + SIZEOF(rec_hdr);
     else
 	r_top = rp + rsize;
     if (r_top > b_top)
 	r_top = b_top;
-    for (key_top = rp + sizeof(rec_hdr); key_top < r_top ; )
+    for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top ; )
     {
 	if (!*key_top++)
 	    break;
     }
-    if (((blk_hdr_ptr_t)bp)->levl && key_top > (blk_id = r_top - sizeof(block_id)))
+    if (((blk_hdr_ptr_t)bp)->levl && key_top > (blk_id = r_top - SIZEOF(block_id)))
     	key_top = blk_id;
     patch_path_count = 1;
     patch_path[0] = get_dir_root();
     patch_left_sib = patch_right_sib = 0;
-    size = key_top - rp - sizeof(rec_hdr);
-    if (size > sizeof(targ_key))
-	size = sizeof(targ_key);
+    size = key_top - rp - SIZEOF(rec_hdr);
+    if (size > SIZEOF(targ_key))
+	size = SIZEOF(targ_key);
     patch_find_root_search = TRUE;
     if ((exhaust = (cli_present("EXHAUSTIVE") == CLI_PRESENT)) || size <= 0)
     {
@@ -159,7 +159,7 @@ void dse_f_blk(void)
 	}
 	else
 	{
-	    global_roots_head = (global_root_list *)malloc(sizeof(global_root_list));
+	    global_roots_head = (global_root_list *)malloc(SIZEOF(global_root_list));
 	    global_roots_tail = global_roots_head;
 	    global_roots_head->link = (global_root_list *)0;
 	    global_roots_head->dir_path = (global_dir_path *)0;

@@ -50,11 +50,11 @@ void op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...)
 	VMS_ONLY(va_count(count));
 	MAXSTR_BUFF_INIT;
 
-	memset(&output, 0, sizeof(output));
+	memset(&output, 0, SIZEOF(output));
 	output.code = 'V';
 	output.type = ZSHOW_DEVICE;
 	output.buff = &buff[0];
-	output.size = sizeof(buff);
+	output.size = SIZEOF(buff);
 	output.ptr = output.buff;
 	out = &output;
 	count--;

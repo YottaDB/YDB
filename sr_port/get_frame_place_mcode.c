@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "stringpool.h"
@@ -18,6 +20,8 @@
 #include "objlabel.h"
 #include "cache.h"
 #include "cache_cleanup.h"
+#include "mu_gv_stack_init.h"
+#include "gtmimagename.h"
 
 #include "op.h"			/* for op_fntext() prototype */
 
@@ -25,8 +29,9 @@ GBLREF	stack_frame		*frame_pointer;
 GBLREF	stack_frame		*error_frame;
 GBLREF	spdesc			stringpool;
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
+GBLREF	enum gtmImageTypes	image_type;
 
-void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
+void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *result)
 {
 	int		count;
 	stack_frame	*fp;
@@ -50,10 +55,17 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 	{
 		if (NULL == fp->old_frame_pointer)
 		{
-			assert(FALSE);
-			result->str.len = 0;
-			return;
+			if (fp->type & SFT_TRIGR)
+				/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
+				fp = *(stack_frame **)(fp + 1);
+			else
+			{	/* Something wrong, just return null or assert if debug mode */
+				assert(FALSE);
+				result->str.len = 0;
+				return;
+			}
 		}
+		assert(NULL != fp);
 		if (!(fp->type & SFT_COUNT))
 			continue;
 		count--;
@@ -85,41 +97,48 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 	{
 		if (!indirect_frame)
 		{
-			label.mvtype = MV_STR;
-			routine.mvtype = MV_STR;
-			result->mvtype = MV_STR;
-			label.str.len = result->str.len;
-			label.str.addr = (char *)&pos_str[0];
-			routine.str.len = 0;
-			for (ips = 0, s1 = s2 = -1; ips < result->str.len; ips++)
+			if (IS_GTM_IMAGE || (0 < level))
 			{
-				if ('+' == pos_str[ips])
+				label.mvtype = MV_STR;
+				routine.mvtype = MV_STR;
+				result->mvtype = MV_STR;
+				label.str.len = result->str.len;
+				label.str.addr = (char *)&pos_str[0];
+				routine.str.len = 0;
+				for (ips = 0, s1 = s2 = -1; ips < result->str.len; ips++)
 				{
-					assert((-1 == s1) && (-1 == s2));
-					s1 = ips;
+					if ('+' == pos_str[ips])
+					{
+						assert((-1 == s1) && (-1 == s2));
+						s1 = ips;
+					}
+					if ('^' == pos_str[ips])
+					{
+						s2 = ips;
+						break;
+					}
 				}
-				if ('^' == pos_str[ips])
+				if (s2 >= 0)
 				{
-					s2 = ips;
-					break;
+					routine.str.addr = (char *)&pos_str[s2 + 1];
+					routine.str.len = result->str.len - s2 - 1;
+					label.str.len = s2;
 				}
+				offset = 0;
+				if (s1 >= 0)
+				{
+					label.str.len = s1;
+					if (s2 < 0)
+						s2 = result->str.len;
+					for (ips = s1 + 1; ips < s2; ips++)
+						offset = offset * 10 + pos_str[ips] - '0';
+				}
+				op_fntext(&label, offset, &routine, result);
+			} else
+			{	/* Utility base frame does not have source code */
+				result->str.addr = UTIL_BASE_FRAME_CODE;
+				result->str.len = STRLEN(UTIL_BASE_FRAME_CODE);
 			}
-			if (s2 >= 0)
-			{
-				routine.str.addr = (char *)&pos_str[s2 + 1];
-				routine.str.len = result->str.len - s2 - 1;
-				label.str.len = s2;
-			}
-			offset = 0;
-			if (s1 >= 0)
-			{
-				label.str.len = s1;
-				if (s2 < 0)
-					s2 = result->str.len;
-				for (ips = s1 + 1; ips < s2; ips++)
-					offset = offset * 10 + pos_str[ips] - '0';
-			}
-			op_fntext(&label, offset, &routine, result);
 		} else
 		{	/* code picked up from cache_cleanup(). any changes here might need to be reflected there */
 			vp = (INTPTR_T *)fp->ctxt;

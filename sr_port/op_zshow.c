@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +86,7 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 		ptr = func->str.addr;
 		i = func->str.len;
 	}
-	memset(&output, 0, sizeof(output));
+	memset(&output, 0, SIZEOF(output));
 	if (type == ZSHOW_LOCAL)
 		output.out_var.lv.lvar = lvn;
 	else if (type == ZSHOW_GLOBAL)
@@ -97,7 +97,7 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 	MAXSTR_BUFF_INIT;
 	output.type = type;
 	output.buff = &buff[0];
-	output.size = sizeof(buff);
+	output.size = SIZEOF(buff);
 	output.ptr = output.buff;
 	for ( ; i ; i--, ptr++)
 	{

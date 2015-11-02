@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +114,7 @@ static char *encode_cpu()
 	}
 	if (count == 3)
 	{
-		for (cpuidx = 0; cpuidx < sizeof(gtcm_proto_cpu_info)/sizeof(gtcm_proto_cpu_info_t) - 1; cpuidx++)
+		for (cpuidx = 0; cpuidx < SIZEOF(gtcm_proto_cpu_info)/SIZEOF(gtcm_proto_cpu_info_t) - 1; cpuidx++)
 		{
 			if (0 == memcmp(p, gtcm_proto_cpu_info[cpuidx].cpu_in_rel_str,
 						gtcm_proto_cpu_info[cpuidx].size_of_cpu_in_rel_str))
@@ -141,7 +141,7 @@ static char *encode_os()
 	}
 	if (count == 2)
 	{
-		for (osidx = 0; osidx < sizeof(gtcm_proto_os_info)/sizeof(gtcm_proto_os_info_t) - 1; osidx++)
+		for (osidx = 0; osidx < SIZEOF(gtcm_proto_os_info)/SIZEOF(gtcm_proto_os_info_t) - 1; osidx++)
 		{
 			if (0 == memcmp(p, gtcm_proto_os_info[osidx].os_in_rel_str,
 						gtcm_proto_os_info[osidx].size_of_os_in_rel_str))

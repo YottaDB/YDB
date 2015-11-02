@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,9 +44,7 @@ void op_fnchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 	cnt -= 1;
 
 	size = cnt * GTM_MB_LEN_MAX;
-	if (stringpool.free + size > stringpool.top)
-		stp_gcol(size);
-
+	ENSURE_STP_FREE_SPACE(size);
 	base = stringpool.free;
 	for (outptr = base, char_len = 0; cnt > 0; --cnt)
 	{
@@ -82,8 +80,7 @@ void op_fnzchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 	VMS_ONLY(va_count(cnt);)
 	cnt -= 1;
 
-	if (stringpool.free + cnt > stringpool.top)
-		stp_gcol(cnt);
+	ENSURE_STP_FREE_SPACE(cnt);
 
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *)stringpool.free;
@@ -117,8 +114,7 @@ void op_fnzechar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 	VMS_ONLY(va_count(cnt);)
 	cnt -= 1;
 
-	if (stringpool.free + cnt > stringpool.top)
-		stp_gcol(cnt);
+	ENSURE_STP_FREE_SPACE(cnt);
 
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *)stringpool.free;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 	if (NULL == (tabent = lookup_hashtab_mname(rh->reg_hash, &gvent)) || NULL == (gvnh_reg = (gvnh_reg_t *)tabent->value))
 	{
 		gv_target = targ_alloc(cs_data->max_key_size, &gvent, rh->reg);
-		gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
+		gvnh_reg = (gvnh_reg_t *)malloc(SIZEOF(gvnh_reg_t));
 		gvnh_reg->gvt = gv_target;
 		gvnh_reg->gd_reg = rh->reg;
 		if (NULL != tabent)

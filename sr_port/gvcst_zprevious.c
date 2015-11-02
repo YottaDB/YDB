@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,8 +45,8 @@ GBLREF unsigned int	t_tries;
 
 bool gvcst_zprevious(void)
 {
-	static gv_key	*temp_key;
-	static int4	temp_keysize = 0;
+	static gv_key	*zprev_temp_key;
+	static int4	zprev_temp_keysize = 0;
 	blk_hdr_ptr_t	bp;
 	bool		found, two_histories;
 	enum cdb_sc	status;
@@ -97,28 +97,25 @@ bool gvcst_zprevious(void)
 				c1 = gv_altkey->base;
 				memcpy(c1, gv_currkey->base, bh->prev_rec.match);
 				c1 += bh->prev_rec.match;
-				assert(temp_keysize <= gv_keysize);
-				if (temp_keysize < gv_keysize)
+				assert(zprev_temp_keysize <= gv_keysize);
+				if (zprev_temp_keysize < gv_keysize)
 				{
-					if (NULL != temp_key)
-						free(temp_key);
-					temp_key = (gv_key *)malloc(sizeof(gv_key) + gv_keysize);
-					temp_key->top = gv_keysize;
-					temp_keysize = gv_keysize;
+					zprev_temp_keysize = gv_keysize;
+					GVKEY_INIT(zprev_temp_key, zprev_temp_keysize);
 				}
-				assert(temp_key->top >= gv_currkey->top);
+				assert(zprev_temp_key->top >= gv_currkey->top);
 				if (cdb_sc_normal != (status = gvcst_expand_key((blk_hdr_ptr_t)bh->buffaddr, bh->prev_rec.offset,
-									temp_key)))
+									zprev_temp_key)))
 				{
 					t_retry(status);
 					continue;
 				}
-				if ((temp_key->end < gv_currkey->end) && (temp_key->end <= gv_currkey->prev))
+				if ((zprev_temp_key->end < gv_currkey->end) && (zprev_temp_key->end <= gv_currkey->prev))
 					found = FALSE;
 				else
 				{
-					c2 = temp_key->base + bh->prev_rec.match;
-					ctop = temp_key->base + temp_key->end;
+					c2 = zprev_temp_key->base + bh->prev_rec.match;
+					ctop = zprev_temp_key->base + zprev_temp_key->end;
 					for (;;)
 					{
 						if (c2 >= ctop)

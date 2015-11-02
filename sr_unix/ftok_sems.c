@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,6 @@
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			process_id;
-GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		sem_incremented;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	volatile boolean_t	semwt2long;
@@ -137,8 +136,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
 			return FALSE;
 		}
-		/*
-		 * Following will set semaphore number 2 ( = FTOK_SEM_PER_ID - 1)  value as GTM_ID.
+		/* Following will set semaphore number 2 ( = FTOK_SEM_PER_ID - 1)  value as GTM_ID.
 		 * In case we have orphaned semaphore for some reason, mupip rundown will be
 		 * able to identify GTM semaphores from the value GTM_ID and will remove.
 		 */
@@ -162,62 +160,59 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 			ftok_sopcnt = 3;
 		} else
 			ftok_sopcnt = 2;
-		assert(DSE_IMAGE != image_type || incr_cnt);
+		assert(!IS_DSE_IMAGE || incr_cnt);
 		/* First try is always non-blocking */
 		ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO | IPC_NOWAIT;
 		status = semop(udi->ftok_semid, ftok_sop, ftok_sopcnt);
-		if (-1 == status)
-		{
-			save_errno = errno;
-			if (immediate)
-			{
-				gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
-				gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
-					RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
-				return FALSE;
-			}
-			if (EAGAIN == save_errno)	/* Someone else is holding it */
-			{	/* see note on Linux specific difference in behaviour of semctl() with GETPID in gds_rundown_ch() */
-				sem_pid = semctl(udi->ftok_semid, 0, GETPID);
-				if (-1 == sem_pid)
-				{
-					/*EIDRM seen only on Linux*/
-					if ((EINVAL == errno) || (EIDRM == errno))	/* the sem might have been deleted */
-						continue;
-					else
-					{
-						gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
-						gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
-							RTS_ERROR_LITERAL("semop() and semctl()"), CALLFROM, errno);
-						return FALSE;
-					}
-				}
-				if (DSE_IMAGE != image_type)
-				{
-					if (!gtm_environment_init)
-						sem_wait_time = MAX_SEM_WT;
-					else
-						sem_wait_time = 604800; /* one week, that is, infinite wait */
-				}
-				else {
-					sem_wait_time = MAX_SEM_DSE_WT;
-					util_out_print("FTOK semaphore for region !AD is held by pid, !UL. "
-						       "An attempt will be made in the next !SL seconds to grab it.",
-						       TRUE, DB_LEN_STR(reg), sem_pid, sem_wait_time/1000);
-				}
-				semwt2long = FALSE;
-				start_timer((TID)semwt2long_handler, sem_wait_time, semwt2long_handler, 0, NULL);
-				/*** drop thru ***/
-			} else if (((EINVAL != save_errno) && (EIDRM != save_errno) && (EINTR != save_errno)) ||
-				(MAX_RES_TRIES < lcnt))
-			{
-				gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
-				gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
-				return FALSE;
-			} else
-				continue;
-		} else
+		if (-1 != status)
 			break;
+		save_errno = errno;
+		if (immediate)
+		{
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+			return FALSE;
+		}
+		if (EAGAIN == save_errno)	/* Someone else is holding it */
+		{	/* see note on Linux specific difference in behaviour of semctl() with GETPID in gds_rundown_ch() */
+			sem_pid = semctl(udi->ftok_semid, 0, GETPID);
+			if (-1 == sem_pid)
+			{
+				/*EIDRM seen only on Linux*/
+				if ((EINVAL == errno) || (EIDRM == errno))	/* the sem might have been deleted */
+					continue;
+				else
+				{
+					gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+					gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("semop() and semctl()"), CALLFROM, errno);
+					return FALSE;
+				}
+			}
+			if (!IS_DSE_IMAGE)
+			{
+				if (!gtm_environment_init)
+					sem_wait_time = MAX_SEM_WT;
+				else
+					sem_wait_time = 604800; /* one week, that is, infinite wait */
+			} else
+			{
+				sem_wait_time = MAX_SEM_DSE_WT;
+				util_out_print("FTOK semaphore for region !AD is held by pid, !UL. "
+					       "An attempt will be made in the next !SL seconds to grab it.",
+					       TRUE, DB_LEN_STR(reg), sem_pid, sem_wait_time/1000);
+			}
+			semwt2long = FALSE;
+			start_timer((TID)semwt2long_handler, sem_wait_time, semwt2long_handler, 0, NULL);
+			/*** drop thru ***/
+		} else if (((EINVAL != save_errno) && (EIDRM != save_errno) && (EINTR != save_errno)) || (MAX_RES_TRIES < lcnt))
+		{
+			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+			return FALSE;
+		} else
+			continue;
 		/* We already started a timer. Now try semop not using IPC_NOWAIT (that is, blocking semop)*/
 		ftok_sop[0].sem_flg = ftok_sop[1].sem_flg = ftok_sop[2].sem_flg = SEM_UNDO;
 		status = semop(udi->ftok_semid, ftok_sop, ftok_sopcnt);
@@ -239,8 +234,8 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 						RTS_ERROR_LITERAL("semop() and semctl()"), CALLFROM, save_errno);
 					return FALSE;
 				}
-			} else if (((EINVAL != save_errno) && (EIDRM != save_errno) && (EINTR != save_errno)) ||
-				(MAX_RES_TRIES < lcnt))
+			} else if (((EINVAL != save_errno) && (EIDRM != save_errno) && (EINTR != save_errno))
+				|| (MAX_RES_TRIES < lcnt))
 			{
 				cancel_timer((TID)semwt2long_handler);
 				gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
@@ -248,6 +243,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 				return FALSE;
 			}
 			/* else continue */
+			cancel_timer((TID)semwt2long_handler);
 		} else
 		{
 			cancel_timer((TID)semwt2long_handler);

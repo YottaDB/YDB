@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ int rc_prc_setf(rc_q_hdr *qhdr)
     ptr++;
     GET_SHORT(str_remain ,ptr);
     ptr++;
-    if (gv_currkey->end + 1 + v.str.len + sizeof(rec_hdr) > gv_cur_region->max_rec_size)
+    if (gv_currkey->end + 1 + v.str.len + SIZEOF(rec_hdr) > gv_cur_region->max_rec_size)
     {
 	qhdr->a.erc.value = RC_KEYTOOLONG;
 #ifdef DEBUG

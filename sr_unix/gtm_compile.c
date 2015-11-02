@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,19 +71,19 @@ int	gtm_compile (void)
 	run_time = FALSE;
 	compile_time = TRUE;
         mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
-        msp = stackbase = mstack_ptr + (USER_STACK_SIZE - sizeof(char *));
-	mv_chain = (mv_stent *) msp;
+        msp = stackbase = mstack_ptr + (USER_STACK_SIZE - SIZEOF(char *));
+	mv_chain = (mv_stent *)msp;
         stackwarn = stacktop + (USER_STACK_SIZE / 4);
 
-	msp -= sizeof(stack_frame);
-	frame_pointer = (stack_frame *) msp;
-	memset(frame_pointer,0, sizeof(stack_frame));
-	frame_pointer->temps_ptr = (unsigned char *) frame_pointer;
+	msp -= SIZEOF(stack_frame);
+	frame_pointer = (stack_frame *)msp;
+	memset(frame_pointer, 0, SIZEOF(stack_frame));
+	frame_pointer->temps_ptr = (unsigned char *)frame_pointer;
 	frame_pointer->mpc = CODE_ADDRESS(gtm_ret_code);
 	frame_pointer->ctxt = GTM_CONTEXT(gtm_ret_code);
 	frame_pointer->type = SFT_COUNT;
-	frame_pointer->rvector = (rhdtyp*)malloc(sizeof(rhdtyp));
-	memset(frame_pointer->rvector,0,sizeof(rhdtyp));
+	frame_pointer->rvector = (rhdtyp *)malloc(SIZEOF(rhdtyp));
+	memset(frame_pointer->rvector, 0, SIZEOF(rhdtyp));
 	symbinit();
 
 	/* Variables for supporting $ZSEARCH sorting and wildcard expansion */
@@ -104,19 +104,18 @@ int	gtm_compile (void)
 	initialize_pattern_table();
 	ce_init();	/* initialize compiler escape processing */
 
-	dollar_zcstatus = 1;
+	dollar_zcstatus = SS_NORMAL;
 	len = MAX_FBUFF;
-	for (status = cli_get_str("INFILE",source_file_string,&len);
+	for (status = cli_get_str("INFILE", source_file_string, &len);
 		status;
-		status = cli_get_str("INFILE",source_file_string, &len))
+		status = cli_get_str("INFILE", source_file_string, &len))
 	{
-		compile_source_file(len, source_file_string);
+		compile_source_file(len, source_file_string, TRUE);
 		len = MAX_FBUFF;
 	}
 	print_exit_stats();
 	io_rundown(NORMAL_RUNDOWN);
-	if (!(dollar_zcstatus & 1))
+	if (SS_NORMAL != dollar_zcstatus)
 		return -1;
-	else
-		return SS_NORMAL;
+	return SS_NORMAL;
 }

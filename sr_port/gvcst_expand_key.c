@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,15 +30,15 @@ enum cdb_sc	gvcst_expand_key(blk_hdr_ptr_t bp, int4 rec_top, gv_key *key)
 	sm_uc_ptr_t	p;
 	unsigned char	*kbase, *kend, *kprv, *ktop, last, current;
 
-	assert(sizeof(rec_hdr) <= sizeof(blk_hdr));
+	assert(SIZEOF(rec_hdr) <= SIZEOF(blk_hdr));
 	kbase = kend = key->base;
 	ktop = &key->base[key->top];
 	rp = (rec_hdr_ptr_t)bp;
 	rtop = (rec_hdr_ptr_t)((sm_uc_ptr_t)bp + rec_top);
-	for (r_offset = sizeof(blk_hdr);  ;  GET_USHORT(temp_ushort, &rp->rsiz), r_offset = temp_ushort)
+	for (r_offset = SIZEOF(blk_hdr);  ;  GET_USHORT(temp_ushort, &rp->rsiz), r_offset = temp_ushort)
 	{
-		/* WARNING:  Assumes that sizeof(rec_hdr) <= sizeof(blk_hdr)	*/
-		if (r_offset < sizeof(rec_hdr))
+		/* WARNING:  Assumes that SIZEOF(rec_hdr) <= SIZEOF(blk_hdr)	*/
+		if (r_offset < SIZEOF(rec_hdr))
 		{
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_r2small;

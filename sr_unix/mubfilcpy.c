@@ -168,7 +168,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	tmplen = gv_cur_region->dyn.addr->fname_len;
 	tempfilelen = STRLEN(tempfilename);
 	cmdlen = STR_LIT_LEN(CP_CMD) + tmplen + 1 /* space */ + tempfilelen + 1 /* terminating NULL byte */;
-	if (cmdlen > sizeof(cmdarray))
+	if (cmdlen > SIZEOF(cmdarray))
 		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
 	MEMCPY_LIT(command, CP_CMD);
 	cmdlen = STR_LIT_LEN(CP_CMD);
@@ -348,7 +348,7 @@ bool	mubfilcpy (backup_reg_list *list)
 
 		if (0 < (filesize = stat_buf.st_size))
 		{
-			rsize = (int4)(sizeof(shmpool_blk_hdr) + header_cpy->blk_size);
+			rsize = (int4)(SIZEOF(shmpool_blk_hdr) + header_cpy->blk_size);
 			sblkh_p = (shmpool_blk_hdr_ptr_t)malloc(rsize);
 			/* Do not use LSEEKREAD macro here because of dependence on setting filepointer for
 			   subsequent reads.
@@ -453,7 +453,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	assert(command == &cmdarray[0]);
 	tmplen = file->len;
 	cmdlen = STR_LIT_LEN(MV_CMD) + tempfilelen + 1 /* space */ + tmplen + 1 /* terminating NULL byte */;
-	if (cmdlen > sizeof(cmdarray))
+	if (cmdlen > SIZEOF(cmdarray))
 		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
 	MEMCPY_LIT(command, MV_CMD);
 	cmdlen = STR_LIT_LEN(MV_CMD);

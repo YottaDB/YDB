@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -189,7 +189,7 @@ int cmd(void)
 	error_def(ERR_EXPR);
 	error_def(ERR_CNOTONSYS);
 
-	assert(cmd_index[26] == (sizeof(cmd_names)/sizeof(nametabent)));
+	assert(cmd_index[26] == (SIZEOF(cmd_names)/SIZEOF(nametabent)));
 
 	CHKTCHAIN(curtchain);
 	pos_in_chain = *curtchain;
@@ -221,7 +221,7 @@ int cmd(void)
 	else
 	{
 		advancewindow();
-		cr = (oprtype *) mcalloc(sizeof(oprtype));
+		cr = (oprtype *) mcalloc(SIZEOF(oprtype));
 		if (!bool_expr((bool) FALSE,cr))
 		{
 			stx_error(ERR_PCONDEXPECTED);

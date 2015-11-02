@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,21 +46,22 @@
 #include "repl_sp.h"
 #include "is_file_identical.h"
 #include "jnl_get_checksum.h"
+#include "gtmimagename.h"
 
 /* Note : Now all system error messages are issued here. So callers do not need to issue them again */
 #define STATUS_MSG(info)										\
 {													\
 	if (SS_NORMAL != info->status2)									\
 	{												\
-		if (run_time)										\
-			send_msg(VARLSTCNT(12) ERR_JNLCRESTATUS, 7, CALLFROM, info->jnl_len, info->jnl,\
+		if (IS_GTM_IMAGE)									\
+			send_msg(VARLSTCNT(12) ERR_JNLCRESTATUS, 7, CALLFROM, info->jnl_len, info->jnl,	\
 				info->fn_len, info->fn, info->status, 0, info->status2);		\
 		else											\
 			gtm_putmsg(VARLSTCNT1(11) ERR_JNLCRESTATUS, 7, CALLFROM, info->jnl_len, info->jnl,\
 				info->fn_len, info->fn, info->status, PUT_SYS_ERRNO(info->status2));	\
 	} else if (SS_NORMAL != info->status)								\
 	{												\
-		if (run_time)										\
+		if (IS_GTM_IMAGE)									\
 			send_msg(VARLSTCNT(10) ERR_JNLCRESTATUS, 7, CALLFROM, info->jnl_len, 		\
 				info->jnl, info->fn_len, info->fn, info->status);			\
 		else											\
@@ -83,13 +84,8 @@ if (SYSCALL_ERROR(info->status) || SYSCALL_ERROR(info->status2))	\
 #define ZERO_SIZE		(ZERO_SIZE_IN_BLOCKS * DISK_BLOCK_SIZE)
 #endif
 
-#ifdef DEBUG
-#include "gtmimagename.h"
-GBLREF	enum gtmImageTypes	image_type;
-#endif
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF	boolean_t		run_time;
 GBLREF	jnl_process_vector	*prc_vec;
 
 /* Create a journal file from info.
@@ -125,7 +121,7 @@ uint4	cre_jnl_file(jnl_create_info *info)
 				STATUS_MSG(info);
 				return EXIT_ERR;
 			}
-			if (run_time)
+			if (IS_GTM_IMAGE)
 				send_msg(VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
 			else
 				gtm_putmsg(VARLSTCNT(4) ERR_JNLFNF, 2, filestr.len, filestr.addr);
@@ -147,9 +143,7 @@ uint4	cre_jnl_file(jnl_create_info *info)
 	return (cre_jnl_file_common(info, rename_fn, rename_fn_len));
 }
 
-
-/* This creates info->jnl and
- * if (!info->no_rename) then it renames existing info->jnl to be rename_fn */
+/* This creates info->jnl and if (!info->no_rename) then it renames existing info->jnl to be rename_fn */
 uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len)
 {
 	jnl_file_header		*header;
@@ -197,7 +191,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		 *	But in this case we cut the link and hence info->no_prev_link should be TRUE.
 		 * The assert below tries to capture this as much as possible without introducing any new global variables.
 		 */
-		assert((MUPIP_IMAGE == image_type && !jgbl.forw_phase_recovery) || (GTM_IMAGE == image_type && info->no_prev_link));
+		assert((IS_MUPIP_IMAGE && !jgbl.forw_phase_recovery) || (IS_GTM_IMAGE && info->no_prev_link));
 		create_fn_len = info->jnl_len;
 		create_fn = info->jnl;
 		assert(0 == create_fn[create_fn_len]);
@@ -266,9 +260,9 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 #elif defined(VMS)
 	nam = cc$rms_nam;
 	nam.nam$l_rsa = name_buffer;
-	nam.nam$b_rss = sizeof(name_buffer);
+	nam.nam$b_rss = SIZEOF(name_buffer);
 	nam.nam$l_esa = es_buffer;
-	nam.nam$b_ess = sizeof(es_buffer);
+	nam.nam$b_ess = SIZEOF(es_buffer);
 	nam.nam$b_nop = NAM$M_NOCONCEAL;
 	fab = cc$rms_fab;
 	fab.fab$l_nam = &nam;
@@ -302,11 +296,11 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		STATUS_MSG(info);
 		RETURN_ON_ERROR(info);
 	}
-	memcpy(jnlfile_id.dvi, &nam.nam$t_dvi, sizeof(jnlfile_id.dvi));
-	memcpy(jnlfile_id.did, &nam.nam$w_did, sizeof(jnlfile_id.did));
-	memcpy(jnlfile_id.fid, &nam.nam$w_fid, sizeof(jnlfile_id.fid));
+	memcpy(jnlfile_id.dvi, &nam.nam$t_dvi, SIZEOF(jnlfile_id.dvi));
+	memcpy(jnlfile_id.did, &nam.nam$w_did, SIZEOF(jnlfile_id.did));
+	memcpy(jnlfile_id.fid, &nam.nam$w_fid, SIZEOF(jnlfile_id.fid));
 #endif
-	info->checksum = jnl_get_checksum_entire((uint4 *)&jnlfile_id, sizeof(gd_id));
+	info->checksum = jnl_get_checksum_entire((uint4 *)&jnlfile_id, SIZEOF(gd_id));
 	/* Journal file header size relies on this assert */
 	assert(256 == GTMCRYPT_RESERVED_HASH_LEN);
 	/* We have already saved previous journal file name in info */
@@ -328,7 +322,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	pini_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);
 	pini_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	assert(prc_vec);
-	memcpy((unsigned char*)&pini_record->process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
+	memcpy((unsigned char*)&pini_record->process_vector[CURR_JPV], (unsigned char*)prc_vec, SIZEOF(jnl_process_vector));
 	/* Already process_vector[ORIG_JPV] is memset 0 */
 	pini_record->prefix.pini_addr = JNL_HDR_LEN;
 	/* EPOCHs are written unconditionally in Unix while they are written only for BEFORE_IMAGE in VMS */
@@ -398,7 +392,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	if (SS_NORMAL != (info->status = gtm_rename((char *)info->jnl, (int)info->jnl_len,
 						    (char *)rename_fn, rename_fn_len, &info->status2)))
 	{
-		if (run_time)
+		if (IS_GTM_IMAGE)
 			send_msg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 		else
 			gtm_putmsg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
@@ -411,14 +405,14 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	if (SS_NORMAL !=  (info->status = gtm_rename((char *)create_fn, create_fn_len,
 						     (char *)info->jnl, (int)info->jnl_len, &info->status2)))
 	{
-		if (run_time)
+		if (IS_GTM_IMAGE)
 			send_msg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 		else
 			gtm_putmsg(VARLSTCNT(6) ERR_RENAMEFAIL, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 		STATUS_MSG(info);
 		return EXIT_ERR;
 	}
-	if (run_time)
+	if (IS_GTM_IMAGE)
 		send_msg(VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 	else
 		gtm_putmsg(VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,16 +32,12 @@
 #include "gtmmsg.h"
 
 GBLREF 	mur_gbls_t	murgbl;
-GBLREF 	mur_rab_t	mur_rab;
-GBLREF	jnl_ctl_list	*mur_jctl;
-GBLREF	reg_ctl_list	*mur_ctl;
-GBLREF	mur_read_desc_t	mur_desc;
 GBLREF	mur_opt_struct  mur_options;
 GBLREF 	jnl_gbls_t	jgbl;
 
-#define	PROCEED_IF_EXTRACT_SHOW_VERIFY(pini_addr, plst, pplst)								\
+#define	PROCEED_IF_EXTRACT_SHOW_VERIFY(JCTL, PINI_ADDR, PLST, PPLST)							\
 {	/* allow EXTRACT/SHOW/VERIFY to proceed after printing BAD PINI error if error_limit permits.			\
-	 * the way we proceed is by returning as if pini_addr was the first journal record in the file.			\
+	 * the way we proceed is by returning as if PINI_ADDR was the first journal record in the file.			\
 	 * this is guaranteed to be a PINI record because of the way GT.M create journal files.				\
 	 */														\
 	GBLREF 	mur_gbls_t	murgbl;											\
@@ -51,14 +47,14 @@ GBLREF 	jnl_gbls_t	jgbl;
 	if (mur_options.update || !(MUR_WITHIN_ERROR_LIMIT(murgbl.err_cnt, mur_options.error_limit)))			\
 						/* RECOVER/ROLLBACK should not proceed even if error_limit permits */	\
 		return ERR_JNLBADRECFMT;										\
-	pini_addr = JNL_FILE_FIRST_RECORD;										\
-	if (NULL != (tabent = lookup_hashtab_int4(&mur_jctl->pini_list, (uint4 *)&pini_addr)))				\
-		plst = tabent->value;											\
+	PINI_ADDR = JNL_FILE_FIRST_RECORD;										\
+	if (NULL != (tabent = lookup_hashtab_int4(&JCTL->pini_list, (uint4 *)&PINI_ADDR)))				\
+		PLST = tabent->value;											\
 	else														\
-		plst = NULL;												\
-	if (NULL != plst)												\
+		PLST = NULL;												\
+	if (NULL != PLST)												\
 	{														\
-		*pplst = plst;												\
+		*PPLST = PLST;												\
 		return SS_NORMAL;											\
 	}														\
 	/* at this point we have a bad PINI record in the beginning of the journal file, we probably should GTMASSERT */\
@@ -70,18 +66,21 @@ GBLREF 	jnl_gbls_t	jgbl;
  * For success pplst = (pointer to the pini_list_struct structure) is updated.
  * For success it returns SS_NORMAL. Else error code is returned.
  */
-uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
+uint4	mur_get_pini(jnl_ctl_list *jctl, off_jnl_t pini_addr, pini_list_struct **pplst)
 {
 	pini_list_struct	*plst;
 	struct_jrec_pini	*pini_rec;
 	uint4			status;
 	ht_ent_int4		*tabent;
+	struct_jrec_pini	*pinirec;
+	reg_ctl_list		*rctl;
+	mur_read_desc_t		*mur_desc;
 
 	error_def(ERR_JNLREAD);
 	error_def(ERR_JNLBADRECFMT);
 	error_def(ERR_NOPINI);
 
-	if (NULL != (tabent = lookup_hashtab_int4(&mur_jctl->pini_list, (uint4 *)&pini_addr)))
+	if (NULL != (tabent = lookup_hashtab_int4(&jctl->pini_list, (uint4 *)&pini_addr)))
 		plst = tabent->value;
 	else
 		plst = NULL;
@@ -90,44 +89,44 @@ uint4	mur_get_pini(off_jnl_t pini_addr, pini_list_struct **pplst)
 		*pplst = plst;
 		return SS_NORMAL;
 	}
-	mur_desc.random_buff.dskaddr = ROUND_DOWN2(pini_addr, DISK_BLOCK_SIZE);
-	mur_desc.random_buff.blen = pini_addr - mur_desc.random_buff.dskaddr + PINI_RECLEN;
-	if (mur_desc.random_buff.dskaddr > mur_jctl->eof_addr - mur_desc.random_buff.blen ||
-		(SS_NORMAL != (status = mur_read(mur_jctl))))
+	rctl = jctl->reg_ctl;
+	mur_desc = rctl->mur_desc;
+	mur_desc->random_buff.dskaddr = ROUND_DOWN2(pini_addr, DISK_BLOCK_SIZE);
+	mur_desc->random_buff.blen = pini_addr - mur_desc->random_buff.dskaddr + PINI_RECLEN;
+	if (mur_desc->random_buff.dskaddr > jctl->eof_addr - mur_desc->random_buff.blen
+		|| (SS_NORMAL != (status = mur_read(jctl))))
 	{
-		if (mur_options.update && mur_jctl->after_end_of_data && !jgbl.forw_phase_recovery)
+		if (mur_options.update && jctl->after_end_of_data && !jgbl.forw_phase_recovery)
 			return ERR_JNLBADRECFMT;
-		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset);
-		gtm_putmsg(VARLSTCNT(5) ERR_JNLREAD, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, pini_addr);
+		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset);
+		gtm_putmsg(VARLSTCNT(5) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, pini_addr);
 		assert(FALSE);
 		murgbl.wrn_count++;
-		PROCEED_IF_EXTRACT_SHOW_VERIFY(pini_addr, plst, pplst);
+		PROCEED_IF_EXTRACT_SHOW_VERIFY(jctl, pini_addr, plst, pplst);
 	}
-	mur_rab.pinirec = (struct_jrec_pini *)(mur_desc.random_buff.base + (pini_addr - mur_desc.random_buff.dskaddr));
+	pinirec = (struct_jrec_pini *)(mur_desc->random_buff.base + (pini_addr - mur_desc->random_buff.dskaddr));
 	/* Verify that it's actually a PINI record */
-	if (JRT_PINI != mur_rab.pinirec->prefix.jrec_type || PINI_RECLEN != mur_rab.pinirec->prefix.forwptr ||
-       		!IS_VALID_JNLREC((jnl_record *)mur_rab.pinirec, mur_jctl->jfh))
+	if (JRT_PINI != pinirec->prefix.jrec_type || PINI_RECLEN != pinirec->prefix.forwptr ||
+       		!IS_VALID_JNLREC((jnl_record *)pinirec, jctl->jfh))
 	{
-		if (mur_options.update && mur_jctl->after_end_of_data && !jgbl.forw_phase_recovery)
+		if (mur_options.update && jctl->after_end_of_data && !jgbl.forw_phase_recovery)
 			return ERR_JNLBADRECFMT;
-		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, mur_jctl->rec_offset);
-		if (JRT_PINI != mur_rab.pinirec->prefix.jrec_type)
-			gtm_putmsg(VARLSTCNT(5) ERR_NOPINI, 3, mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, pini_addr);
+		gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset);
+		if (JRT_PINI != pinirec->prefix.jrec_type)
+			gtm_putmsg(VARLSTCNT(5) ERR_NOPINI, 3, jctl->jnl_fn_len, jctl->jnl_fn, pini_addr);
 		assert(FALSE);
 		murgbl.wrn_count++;
-		PROCEED_IF_EXTRACT_SHOW_VERIFY(pini_addr, plst, pplst);
+		PROCEED_IF_EXTRACT_SHOW_VERIFY(jctl, pini_addr, plst, pplst);
 	}
 	/* Insert it into the list */
 	plst = (pini_list_struct *)get_new_element(murgbl.pini_buddy_list, 1);
 	plst->pini_addr = pini_addr;
 	plst->new_pini_addr = 0;
 	plst->state = IGNORE_PROC;
-	memcpy(&plst->jpv,     &mur_rab.pinirec->process_vector[CURR_JPV], sizeof(jnl_process_vector));
-	memcpy(&plst->origjpv, &mur_rab.pinirec->process_vector[ORIG_JPV], sizeof(jnl_process_vector));
-#ifndef GTM64
-	assert(sizeof(void *) == sizeof(pini_addr));
-#endif /* GTM64 */
-	add_hashtab_int4(&mur_jctl->pini_list, (uint4 *)&pini_addr, (void *)plst, &tabent);
+	memcpy(&plst->jpv,     &pinirec->process_vector[CURR_JPV], SIZEOF(jnl_process_vector));
+	memcpy(&plst->origjpv, &pinirec->process_vector[ORIG_JPV], SIZEOF(jnl_process_vector));
+	NON_GTM64_ONLY(assert(SIZEOF(void *) == SIZEOF(pini_addr));)
+	add_hashtab_int4(&jctl->pini_list, (uint4 *)&pini_addr, (void *)plst, &tabent);
 	*pplst = plst;
 	return SS_NORMAL;
 }

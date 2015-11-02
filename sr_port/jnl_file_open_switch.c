@@ -48,7 +48,7 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 		JNL_FD_CLOSE(jpc->channel, status);	/* sets jpc->channel to NOJNL */
 	jnl_send_oper(jpc, sts);
 	/* attempt to create a new journal file */
-	memset(&create, 0, sizeof(create));
+	memset(&create, 0, SIZEOF(create));
 	create.status = create.status2 = SS_NORMAL;
 	create.prev_jnl = &prev_jnl_fn[0];
 	set_jnl_info(reg, &create);

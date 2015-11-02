@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -232,6 +232,7 @@ static readonly CLI_ENTRY dse_fdmp_qual[] = {
 { "JOURNAL",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { "MIXEDMODE",   0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { "RETRIES",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
+{ "SNAPSHOT",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { "TPBLKMOD",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { "TPRETRIES",   0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
 { "UPDPROC",     0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG, 0, 0 },
@@ -349,7 +350,7 @@ static readonly CLI_ENTRY dse_shift_qual[] = {
 { 0 }
 };
 
-GBLDEF CLI_ENTRY cmd_ary[] = {
+GBLDEF CLI_ENTRY dse_cmd_ary[] = {
 { "ADD",          dse_adrec,      dse_add_qual,      0, 0, cli_disallow_dse_add,    0, VAL_DISALLOWED, 0, 0, 0, 0 },
 { "ALL",          dse_all,        dse_all_qual,      0, 0, cli_disallow_dse_all,    0, VAL_DISALLOWED, 0, 0, 0, 0 },
 { "BUFFER_FLUSH", dse_flush,      0,                 0, 0, 0,                       0, VAL_DISALLOWED, 0, 0, 0, 0 },

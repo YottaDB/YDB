@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2009 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2010 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -91,7 +91,9 @@ OC_EXFUN:	irepab	val.5
 		pushab	val.0
 		jsb	xfer.xf_exfun
 OC_EXFUNRET:	pushab	val.1
-		jsb	xfer.xf_exfunret
+		calls	#1,xfer.xf_exfunret
+OC_EXFUNRETALS:	pushab	val.1
+		calls	#1,xfer.xf_exfunretals
 OC_EXTCALL:	pushab	val.2
 		pushab	val.1
 		jsb	xfer.xf_extcall
@@ -189,8 +191,9 @@ OC_FNLENGTH:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnlength
 OC_FNLVNAME:	pushab	val.0
+		pushl	val.2
 		pushab	val.1
-		calls	#2,xfer.xf_fnlvname
+		calls	#3,xfer.xf_fnlvname
 OC_FNLVNAMEO2:	pushab	val.2
 		pushab	val.0
 		pushab	val.1
@@ -442,6 +445,11 @@ OC_FNZTRANSLATE: pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#4,xfer.xf_fnztranslate
+OC_FNZTRIGGER:	pushab	val.0
+		pushab	val.3
+		pushab	val.2
+		pushab	val.1
+		calls	#4,xfer.xf_fnztrigger
 OC_FNZTRNLNM:	pushab	val.0
 		pushab	val.6
 		pushab	val.5
@@ -758,6 +766,7 @@ OC_READFL:	jsb 	xfer.xf_restartpc
 OC_RESTARTPC:	jsb	xfer.xf_restartpc
 OC_RET:		jsb	xfer.xf_ret
 OC_RETARG:	movab	val.1,r0
+		movl	val.2,r1
 		jsb	xfer.xf_retarg
 OC_RHDADDR:	pushab	val.2
 		pushab	val.1
@@ -784,6 +793,12 @@ OC_SETALSCTIN2ALS:	pushl	val.1
 OC_SETALSCT2ALSCT:	pushab	val.1
 			pushab	val.2
 			calls	#2,xfer.xf_setalsct2alsct
+OC_SETFNRETIN2ALS:	pushl	val.1
+			pushab	val.2
+			calls	#2,xfer.xf_setfnretin2als
+OC_SETFNRETIN2ALSCT:	pushab	val.1
+			pushab	val.2
+			calls	#2,xfer.xf_setfnretin2alsct
 OC_SETEXTRACT:	pushab	val.0
 		pushl	val.3
 		pushl	val.2
@@ -893,8 +908,9 @@ OC_ZALLOCATE:	pushl	val.1
 OC_ZATTACH:	jsb 	xfer.xf_restartpc
 		pushab	val.1
 		calls	#1,xfer.xf_zattach
-OC_ZCOMPILE:	pushab	val.1
-		calls	#1,xfer.xf_zcompile
+OC_ZCOMPILE:	pushl	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_zcompile
 OC_ZCONT:	jsb	xfer.xf_zcont
 OC_ZDEALLOCATE:	pushl	val.1
 		calls	#1,xfer.xf_zdeallocate
@@ -904,9 +920,9 @@ OC_ZEDIT:	jsb 	xfer.xf_restartpc
 		calls	#2,xfer.xf_zedit
 OC_ZG1:		pushl	val.1
 		jsb	xfer.xf_zg1
-OC_ZGOTO:	pushab	val.3
+OC_ZGOTO:	pushl	val.1
+		pushab	val.3
 		pushab	val.2
-		pushl	val.1
 		jsb	xfer.xf_zgoto
 OC_ZHELP:	pushab	val.2
 		pushab	val.1

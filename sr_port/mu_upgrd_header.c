@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 
 	error_def(ERR_MUINFOUINT8);
 
-	memset(csd, 0, sizeof(sgmnt_data));
+	memset(csd, 0, SIZEOF(sgmnt_data));
 	MEMCPY_LIT(csd->label, GDS_LABEL);
 	csd->blk_size = v15_csd->blk_size;
 	csd->bplmap = v15_csd->bplmap;
@@ -77,7 +77,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;	/* New from V5.3-002 */
 	csd->createinprogress = v15_csd->createinprogress;
 	time(&ctime);
-	assert(sizeof(ctime) >= sizeof(int4));
+	assert(SIZEOF(ctime) >= SIZEOF(int4));
 	csd->creation_time4 = (int4)ctime;/* No need to propagate previous value. Take only lower order 4-bytes of current time */
 	csd->last_inc_backup = v15_csd->last_inc_backup;
 	csd->last_com_backup = v15_csd->last_com_backup;
@@ -215,7 +215,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 						&csd->resync_seqno, &csd->resync_seqno);
 		)
 	}
-	memcpy(csd->reorg_restart_key, v15_csd->reorg_restart_key, sizeof(csd->reorg_restart_key));	/* New from V4.2 */
+	memcpy(csd->reorg_restart_key, v15_csd->reorg_restart_key, SIZEOF(csd->reorg_restart_key));	/* New from V4.2 */
 	memcpy(csd->machine_name, v15_csd->machine_name, MAX_MCNAMELEN);
 	csd->reserved_for_upd = UPD_RESERVED_AREA;
 	csd->avg_blks_per_100gbl =  AVG_BLKS_PER_100_GBL;

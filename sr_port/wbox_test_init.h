@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,9 +44,11 @@ typedef enum {
 	WBTEST_TP_HIST_CDB_SC_BLKMOD,		/* 20 */
 	WBTEST_ABANDONEDKILL,			/* 21 MUPIP STOP a kill in progress in 2nd stage*/
 	WBTEST_ENCRYPT_INIT_ERROR,		/* 22 : Prevent encryption initialized assert from happening */
-	WBTEST_UPD_GVSUBOFLOW_ERROR,		/* 23 : Update process should issue GVSUBOFLOW error */
-	WBTEST_UPD_REC2BIG_ERROR,		/* 24 : Update process should issue REC2BIG error*/
-	WBTEST_FILE_EXTEND_ERROR		/* 25 : Prevent assert form mupip extend if # blocks is > 224M */
+	WBTEST_UPD_PROCESS_ERROR,		/* 23 : Update process should issue GVSUBOFLOW error, REC2BIG error */
+	WBTEST_FILE_EXTEND_ERROR,		/* 24 : Prevent assert form mupip extend if # blocks is > 224M */
+	WBTEST_BUFOWNERSTUCK_STACK,		/* 25 : Get stack trace of the blocking pid for stuck messages*/
+	WBTEST_OINTEG_WAIT_ON_START,		/* 26 : Have online integ wait 60 after initiating the snapshot */
+	WBTEST_MUR_ABNORMAL_EXIT_EXPECTED	/* 27 : We expect MUPIP JOURNAL RECOVER/ROLLBACK to exit with non-zero status */
 } wbtest_code_t;
 
 #ifdef DEBUG
@@ -71,6 +73,9 @@ typedef enum {
 
 #ifdef DEBUG
 #define ENABLE_WBTEST_ABANDONEDKILL									\
+{													\
+	int	sleep_counter;										\
+													\
 	sleep_counter = 0;										\
 	GTM_WHITE_BOX_TEST(WBTEST_ABANDONEDKILL, sleep_counter, SLEEP_ONE_MIN);				\
 	if (SLEEP_ONE_MIN == sleep_counter)								\
@@ -79,7 +84,8 @@ typedef enum {
 		util_out_print("!/INFO : WBTEST_ABANDONEDKILL waiting in Phase II of Kill",TRUE);	\
 		while (1 <= sleep_counter)								\
 			wcs_sleep(sleep_counter--);							\
-	}
+	}												\
+}
 #else
 #define ENABLE_WBTEST_ABANDONEDKILL
 #endif

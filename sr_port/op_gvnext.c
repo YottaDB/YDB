@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,14 +83,10 @@ void op_gvnext(mval *v)
 	else
 		found = gvusr_order();
 
-	v->mvtype = MV_STR;
+	v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
 	if (!found)
 	{
-		if (stringpool.top - stringpool.free < 2)
-		{
-			v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval */
-			stp_gcol(2);
-		}
+		ENSURE_STP_FREE_SPACE(2);
 		c = v->str.addr = (char *) stringpool.free;
 		*c++ = '-';
 		*c = '1';
@@ -99,7 +95,6 @@ void op_gvnext(mval *v)
 	} else
 	{
 		gv_altkey->prev = gv_currkey->prev;
-
  		if (stringpool.top - stringpool.free < MAX_SUBSC_LEN)
 		{
 			if (*(&gv_altkey->base[0] + gv_altkey->prev) != 0xFF)
@@ -109,8 +104,7 @@ void op_gvnext(mval *v)
 				n = gv_altkey->top - gv_altkey->prev;
 				assert (n > 0);
 			}
-			if (stringpool.top - stringpool.free < n)
-				stp_gcol (n);
+			ENSURE_STP_FREE_SPACE(n);
 		}
 		v->str.addr = (char *) stringpool.free;
 		c = (char *)(&gv_altkey->base[0] + gv_altkey->prev);
@@ -120,5 +114,6 @@ void op_gvnext(mval *v)
 		assert (v->str.addr + v->str.len <= (char *) stringpool.top &&
 			v->str.addr + v->str.len >= (char *) stringpool.base);
 	}
+	v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 	return;
 }

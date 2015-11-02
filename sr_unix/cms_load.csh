@@ -284,10 +284,8 @@ if ($mods_only == 0) then
 	endif
 ######################## Edit release_name.h ####################################
 
-	if ($cms_ver != $dst_ver) then
-		echo "Modifying release_name.h"
-		$cms_tools/edrelnam.csh $dst_ver # Do we care if this fails?
-	endif
+	echo "Modifying release_name.h"
+	$cms_tools/edrelnam.csh $dst_ver # Do we care if this fails?
 endif
 
 ############## Set appropriate permissions on the files. For comments see $gtm_tools/comlist.csh ##############

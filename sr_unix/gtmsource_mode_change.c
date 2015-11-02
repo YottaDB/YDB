@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ int gtmsource_mode_change(int to_mode)
 		jnlpool.gtmsource_local->secondary_inet_addr = gtmsource_options.sec_inet_addr;
 		STRCPY(jnlpool.gtmsource_local->secondary_host, gtmsource_options.secondary_host);
 		memcpy(&jnlpool.gtmsource_local->connect_parms[0], &gtmsource_options.connect_parms[0],
-				sizeof(gtmsource_options.connect_parms));
+				SIZEOF(gtmsource_options.connect_parms));
 	}
 	if ('\0' != gtmsource_options.log_file[0] && 0 != STRCMP(jnlpool.gtmsource_local->log_file, gtmsource_options.log_file))
 	{

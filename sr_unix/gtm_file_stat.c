@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ int gtm_file_stat(mstr *file, mstr *def, mstr *ret, boolean_t check_prv, uint4 *
 	tmpfile = &tmp_str;
 	if (NULL != def)
 	{
-		memset(&pblk, 0, sizeof(pblk));
+		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buffer = fbuff;
 		pblk.buff_size = MAX_FBUFF;
 		pblk.fop = (F_SYNTAXO | F_PARNODE);

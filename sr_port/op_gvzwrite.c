@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,11 +40,11 @@ void op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...)
 	MAXSTR_BUFF_DECL(buff);
 
 	MAXSTR_BUFF_INIT;
-	memset(&output, 0, sizeof(output));
+	memset(&output, 0, SIZEOF(output));
 	output.code = 'V';
 	output.type = ZSHOW_DEVICE;
 	output.buff = &buff[0];
-	output.size = sizeof(buff);
+	output.size = SIZEOF(buff);
 	output.ptr = output.buff;
 
 	VAR_START(var, pat);

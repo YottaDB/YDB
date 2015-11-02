@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,13 +98,13 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 					horiz_growth = TRUE;
 					old_cse = cse;
 					cse = (cw_set_element *)get_new_free_element(sgm_info_ptr->tlvl_cw_set_list);
-					memcpy(cse, old_cse, sizeof(cw_set_element));
+					memcpy(cse, old_cse, SIZEOF(cw_set_element));
 					cse->low_tlevel = old_cse;
 					cse->high_tlevel = NULL;
 					old_cse->high_tlevel = cse;
 					cse->t_level = dollar_tlevel;
-					assert(2 == (sizeof(cse->undo_offset) / sizeof(cse->undo_offset[0])));
-					assert(2 == (sizeof(cse->undo_next_off) / sizeof(cse->undo_next_off[0])));
+					assert(2 == (SIZEOF(cse->undo_offset) / SIZEOF(cse->undo_offset[0])));
+					assert(2 == (SIZEOF(cse->undo_next_off) / SIZEOF(cse->undo_next_off[0])));
 					for (iter = 0; iter < 2; iter++)
 						cse->undo_next_off[iter] = cse->undo_offset[iter] = 0;
 					if (old_cse->done)
@@ -160,7 +160,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 		ks = sgm_info_ptr->kill_set_tail;
 		if (NULL == ks)		/* Allocate first kill set to sgm_info_ptr block */
 		{
-			ks = sgm_info_ptr->kill_set_tail = sgm_info_ptr->kill_set_head = (kill_set *)malloc(sizeof(kill_set));
+			ks = sgm_info_ptr->kill_set_tail = sgm_info_ptr->kill_set_head = (kill_set *)malloc(SIZEOF(kill_set));
 			ks->used = 0;
 			ks->next_kill_set = NULL;
 		}
@@ -169,7 +169,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 	{
 		if (ks->next_kill_set == NULL)
 		{
-			ks->next_kill_set = (kill_set *)malloc(sizeof(kill_set));
+			ks->next_kill_set = (kill_set *)malloc(SIZEOF(kill_set));
 			ks->next_kill_set->used = 0;
 			ks->next_kill_set->next_kill_set = NULL;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,10 +67,9 @@ void op_setalsin2alsct(lv_val *srclv, lv_val *dstlv)
 	/* Decrement alias container refs (if any) and cleanup if necessary */
 	DECR_AC_REF(dstlv, TRUE);
 	/* Reset value of lv_val to now be a container ref to the supplied base var */
-	memcpy(&dstlv->v, &literal_null, sizeof(mval));
+	memcpy(&dstlv->v, &literal_null, SIZEOF(mval));
 	dstlv->v.mvtype |= MV_ALIASCONT;				/* Set the magic container flag */
 	dstlv->v.str.addr = (char *)srclv;				/* And save our reference */
-	dstlv->v.str.len = 0;
 	assert(0 < srclv->stats.trefcnt);
 	assert(0 <= srclv->stats.crefcnt);
 	INCR_TREFCNT(srclv);						/* Total reference counts */

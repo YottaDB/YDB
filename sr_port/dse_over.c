@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ void dse_over(void)
 		blk = patch_curr_blk;
 	if (CLI_PRESENT == cli_present("OCHSET"))
 	{
-		name_len = sizeof(chset_name);
+		name_len = SIZEOF(chset_name);
 		if (cli_get_str("OCHSET", chset_name, &name_len) && 0 != name_len)
 		{
 			chset_name[name_len] = 0;
@@ -142,7 +142,7 @@ void dse_over(void)
 	}
 	if (!cli_get_hex("OFFSET", &offset))
 		return;
-	if (offset < sizeof(blk_hdr))
+	if (offset < SIZEOF(blk_hdr))
 	{
 		util_out_print("Error:  offset too small.", TRUE);
 		return;
@@ -158,8 +158,8 @@ void dse_over(void)
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 
 	size = ((blk_hdr_ptr_t)blkhist.buffaddr)->bsiz;
-	if (size < sizeof(blk_hdr))
-		size = sizeof(blk_hdr);
+	if (size < SIZEOF(blk_hdr))
+		size = SIZEOF(blk_hdr);
 	else if (size >= blk_size)
 		size = blk_size;
 
@@ -211,7 +211,7 @@ void dse_over(void)
 	memcpy(lbp + offset, &data[0], data_len);
 
 	BLK_INIT(bs_ptr, bs1);
-	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + sizeof(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - sizeof(blk_hdr));
+	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		util_out_print("Error: bad blk build.", TRUE);

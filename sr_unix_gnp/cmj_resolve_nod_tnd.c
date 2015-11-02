@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ cmi_status_t cmj_resolve_nod_tnd(cmi_descriptor *nod, cmi_descriptor *tnd, struc
 	if (inp->sin_addr.s_addr == INADDR_ANY)
 	{
 		/* use nod as a host name if tnd was just a port */
-		assert(CMI_DESC_LENGTH(nod) < (sizeof(hn)-1));
+		assert(CMI_DESC_LENGTH(nod) < (SIZEOF(hn)-1));
 		memcpy(hn, CMI_DESC_POINTER(nod), CMI_DESC_LENGTH(nod));
 		hn[CMI_DESC_LENGTH(nod)] = '\0';
 

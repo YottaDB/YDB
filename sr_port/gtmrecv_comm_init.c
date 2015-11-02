@@ -59,13 +59,13 @@ int gtmrecv_comm_init(in_port_t port)
 		return (-1);
 	}
 
-	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, sizeof(disable_linger)))
+	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), ERRNO);
 
 #ifdef REPL_DISABLE_KEEPALIVE
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&disable_keepalive,
-			sizeof(disable_keepalive)))
+			SIZEOF(disable_keepalive)))
 	{
 		/* Till SIGPIPE is handled properly */
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -74,19 +74,19 @@ int gtmrecv_comm_init(in_port_t port)
 #endif
 
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&enable_reuseaddr,
-			sizeof(enable_reuseaddr)))
+			SIZEOF(enable_reuseaddr)))
 	{
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), ERRNO);
 	}
 
 	/* Make it known to the world that you are ready for a Source Server */
-	memset((char *)&secondary_addr, 0, sizeof(secondary_addr));
+	memset((char *)&secondary_addr, 0, SIZEOF(secondary_addr));
 	secondary_addr.sin_family = AF_INET;
 	secondary_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	secondary_addr.sin_port = htons(port);
 
-	if (0 > BIND(gtmrecv_listen_sock_fd, (struct sockaddr *)&secondary_addr, sizeof(secondary_addr)))
+	if (0 > BIND(gtmrecv_listen_sock_fd, (struct sockaddr *)&secondary_addr, SIZEOF(secondary_addr)))
 	{
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not bind local address"), ERRNO);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */

@@ -34,15 +34,15 @@ typedef struct hash_table_objcode_struct
 {									\
 	char *sptr;							\
 	sptr = (hkey)->str.addr;					\
-	if ((hkey)->str.len < sizeof(mident_fixed))			\
+	if ((hkey)->str.len < SIZEOF(mident_fixed))			\
 	{								\
 		STR_HASH((sptr), (hkey)->str.len, hash, 0);		\
 	}								\
 	else 								\
 	{								\
-		STR_HASH((sptr), sizeof(mident_fixed)/2, hash, 0);		\
-		STR_HASH((sptr) +  (hkey)->str.len - sizeof(mident_fixed)/2, 	\
-			sizeof(mident_fixed)/2, hash, hash);			\
+		STR_HASH((sptr), SIZEOF(mident_fixed)/2, hash, 0);		\
+		STR_HASH((sptr) +  (hkey)->str.len - SIZEOF(mident_fixed)/2, 	\
+			SIZEOF(mident_fixed)/2, hash, hash);			\
 	}								\
 }
 

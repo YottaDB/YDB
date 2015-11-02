@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,16 @@ typedef struct err_ctl_struct
 
 /* to change default severity of msg to type */
 #define MAKE_MSG_TYPE(msg, type)  ((msg) & ~SEV_MSK | (type))
+
+/* Macro used intermittently to trace various error handling invocations */
+/* #define DEBUG_ERRHND */
+#ifdef DEBUG_ERRHND
+# define DBGEHND(x) DBGFPF(x)
+# define DBGEHND_ONLY(x) x
+#else
+# define DBGEHND(x)
+# define DBGEHND_ONLY(x)
+#endif
 
 const err_ctl *err_check(int err);
 

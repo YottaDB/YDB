@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2008 Fidelity Information Services, Inc.*
+ *	Copyright 2002, 2010 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,6 +71,12 @@ boolean_t cli_disallow_mupip_integ(void)
 								|| d_c_cli_present("BLOCK")
 								|| d_c_cli_present("SUBSCRIPT")
 								|| d_c_cli_present("REGION"));
+	CLI_DIS_CHECK_N_RESET;
+	/* -ONLINE and -FILE/-TN_RESET is incompatible as the former requires shared memory and the latter requires
+	 * standalone access
+	 */
+	disallow_return_value = d_c_cli_present("ONLINE") && (d_c_cli_present("TN_RESET")
+								|| d_c_cli_present("FILE"));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -442,3 +448,14 @@ boolean_t cli_disallow_mupip_set(void)
 	return FALSE;
 }
 
+boolean_t cli_disallow_mupip_trigger(void)
+{
+	int disallow_return_value = 0;
+
+	*cli_err_str_ptr = 0;
+
+	/* any MUPIP TRIGGER command has to have either SELECT or TRIGGERFILE */
+	disallow_return_value = !(d_c_cli_present("SELECT") || d_c_cli_present("TRIGGERFILE"));
+	CLI_DIS_CHECK_N_RESET;
+	return FALSE;
+}

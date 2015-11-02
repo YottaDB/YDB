@@ -46,7 +46,7 @@ gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
 		assert (map_region < map_region_top);
 		seg = (gd_segment *)map_region->dyn.addr;
 		FILE_CNTL_INIT_IF_NULL(seg);
-		ret.len = sizeof(filename);
+		ret.len = SIZEOF(filename);
 		ret.addr = filename;
 		retptr = &ret;
 		file.addr = (char *)seg->fname;
@@ -56,16 +56,16 @@ gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
 		if (is_raw_dev(file.addr))
 		{
 			def.addr = DEF_NODBEXT;
-			def.len = sizeof(DEF_NODBEXT) - 1;
+			def.len = SIZEOF(DEF_NODBEXT) - 1;
 		}
 		else
 		{
 			def.addr = DEF_DBEXT;	/* UNIX need to pass "*.dat" but reg->dyn.addr->defext has "DAT" */
-			def.len = sizeof(DEF_DBEXT) - 1;
+			def.len = SIZEOF(DEF_DBEXT) - 1;
 		}
 #elif defined(VMS)
 		def.addr = DEFDBEXT;
-		def.len = sizeof(DEFDBEXT) - 1;
+		def.len = SIZEOF(DEFDBEXT) - 1;
 #endif
 		if (FILE_PRESENT != gtm_file_stat(&file, &def, retptr, FALSE, &ustatus))
 		{
@@ -76,8 +76,8 @@ gld_dbname_list *read_db_files_from_gld(gd_addr *addr)
 		seg->fname_len = retptr->len;
 		memcpy(seg->fname, filename, retptr->len + 1);
 		dblist = dblist->next
-		    = (gld_dbname_list *)malloc(sizeof(gld_dbname_list));
-	        memset(dblist, 0, sizeof(gld_dbname_list));
+		    = (gld_dbname_list *)malloc(SIZEOF(gld_dbname_list));
+	        memset(dblist, 0, SIZEOF(gld_dbname_list));
 		map_region->stat.addr = (void *)dblist;
 		dblist->gd = map_region;
 	}

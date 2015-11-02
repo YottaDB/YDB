@@ -109,7 +109,7 @@ void	gvcmz_neterr(INTPTR_T *err)
 		if (NULL != err)
 		{
 			count = (uint4)(*err + 1);
-			memcpy(err_buff, err, count * sizeof(INTPTR_T));
+			memcpy(err_buff, err, count * SIZEOF(INTPTR_T));
 			err_buff[count] = 0;
 			err_buff[count + 1] = ERR_LCKSCANCELLED;
 			err_buff[count + 2] = 0;

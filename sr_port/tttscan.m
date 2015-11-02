@@ -90,7 +90,7 @@ arglit	s ttt(ttt)="VXT_LIT",ttt=ttt+1 d scan s ttt(ttt)=tok,ttt=ttt+1
 	s z=0
 	q
 argxfer	d scan i tok'="." s em="period (.) expected" d err s z=1 q
-	s ttt(ttt)="VXT_XFER",ttt=ttt+1 d scan s ttt(ttt)="sizeof(char *) * (short int)"_tok,ttt=ttt+1
+	s ttt(ttt)="VXT_XFER",ttt=ttt+1 d scan s ttt(ttt)="SIZEOF(char *) * (short int)"_tok,ttt=ttt+1
 	d scan
 	s z=0
 	q

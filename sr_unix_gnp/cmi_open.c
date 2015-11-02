@@ -60,9 +60,9 @@ cmi_status_t cmi_open(struct CLB *lnk)
 		return CMI_NETFAIL;
 
 	lnk->mun = -1;
-	memset((void *)&lnk->cqe, 0, sizeof(lnk->cqe));
-	memset((void *)&lnk->ios, 0, sizeof(lnk->ios));
-	memset((void *)&lnk->stt, 0, sizeof(lnk->stt));
+	memset((void *)&lnk->cqe, 0, SIZEOF(lnk->cqe));
+	memset((void *)&lnk->ios, 0, SIZEOF(lnk->ios));
+	memset((void *)&lnk->stt, 0, SIZEOF(lnk->stt));
 	lnk->cbl = 0;
 	lnk->urgdata = 0;
 	lnk->deferred_event = lnk->deferred_reason = lnk->deferred_status = 0;
@@ -73,7 +73,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	if (FD_INVALID == new_fd)
 		return errno;
 
-	while ((-1 == (rval = connect(new_fd, (struct sockaddr *)&in, sizeof(in)))) && EINTR ==errno && 0 == outofband)
+	while ((-1 == (rval = connect(new_fd, (struct sockaddr *)&in, SIZEOF(in)))) && EINTR ==errno && 0 == outofband)
 		;
 	if (-1 == rval)
 	{

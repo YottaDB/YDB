@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,14 +42,14 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
-	else if (((blk_hdr_ptr_t) bp)->bsiz < sizeof(blk_hdr))
-		b_top = bp + sizeof(blk_hdr);
+	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
+		b_top = bp + SIZEOF(blk_hdr);
 	else
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
 
 	if (!cli_get_hex("OFFSET", &offset))
 		return 0;
-	if (offset < sizeof(blk_hdr))
+	if (offset < SIZEOF(blk_hdr))
 	{
 		util_out_print("Error: offset less than blk header",TRUE);
 		return 0;
@@ -65,11 +65,11 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 
 	patch_rec_counter = 1;
 	patch_comp_key[0] = patch_comp_key[1] = 0;
-	for (rp = bp + sizeof(blk_hdr); rp < rp_targ ; )
+	for (rp = bp + SIZEOF(blk_hdr); rp < rp_targ ; )
 	{
 		GET_SHORT(rec_size, &((rec_hdr_ptr_t)rp)->rsiz);
-		if (rec_size < sizeof(rec_hdr))
-			r_top = rp + sizeof(rec_hdr);
+		if (rec_size < SIZEOF(rec_hdr))
+			r_top = rp + SIZEOF(rec_hdr);
 		else
 			r_top = rp + rec_size;
 		if (r_top >= b_top)
@@ -83,10 +83,10 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 
 		patch_rec_counter++;
 		if (((blk_hdr_ptr_t) bp)->levl)
-			key_top = r_top - sizeof(block_id);
+			key_top = r_top - SIZEOF(block_id);
 		else
 		{
-			for (key_top = rp + sizeof(rec_hdr); key_top < r_top ; )
+			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top ; )
 				if (!*key_top++ && !*key_top++)
 					break;
 		}
@@ -94,12 +94,12 @@ sm_uc_ptr_t skan_offset (sm_uc_ptr_t bp, bool over_run)
 			cc = patch_comp_count;
 		else
 			cc = ((rec_hdr_ptr_t) rp)->cmpc;
-		size = key_top - rp - sizeof(rec_hdr);
-		if (size > sizeof(patch_comp_key) - 2 - cc)
-			size = sizeof(patch_comp_key) - 2 - cc;
+		size = key_top - rp - SIZEOF(rec_hdr);
+		if (size > SIZEOF(patch_comp_key) - 2 - cc)
+			size = SIZEOF(patch_comp_key) - 2 - cc;
 		if (size < 0)
 			size = 0;
-		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
+		memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
 		patch_comp_count = cc + size;
 		rp = r_top;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ void op_fnzdata(lv_val *srclv, mval *dst)
 		assert(srclv->ptrs.val_ent.parent.sym);
 		if (MV_SYM == srclv->ptrs.val_ent.parent.sym->ident)
 			/* This is an unsubscripted var -- check reference count */
-			isalias = (1 < srclv->stats.trefcnt) || (0 < srclv->stats.crefcnt);
+			isalias = IS_ALIASLV(srclv);
 		else
 		{	/* Must be a subscript lv - check if a container */
 			assert(MV_SBS == srclv->ptrs.val_ent.parent.sbs->ident);

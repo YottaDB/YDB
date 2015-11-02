@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,8 +39,7 @@ void op_fnzbitset(mval *dst, mval *bitstr, int pos, int truthval)
 		rts_error(VARLSTCNT(1) ERR_INVBITSTR);
 	if ((1> pos) || (pos > str_len - byte_len))
 		rts_error(VARLSTCNT(1) ERR_INVBITPOS);
-	if (stringpool.top - stringpool.free < bitstr->str.len)
-		stp_gcol(bitstr->str.len);
+	ENSURE_STP_FREE_SPACE(bitstr->str.len);
 	dist_byte = (unsigned char *)stringpool.free;
 	byte_1 = (unsigned char *)bitstr->str.addr;
 	memcpy(dist_byte, byte_1, bitstr->str.len);

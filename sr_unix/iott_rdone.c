@@ -119,7 +119,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 			{
 				utf8_more = tt_state->utf8_more;
 				more_ptr = tt_state->more_ptr;
-				memcpy(more_buf, tt_state->more_buf, sizeof(more_buf));
+				memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
 			}
 			zb_ptr = tt_state->zb_ptr;
 			zb_top = tt_state->zb_top;
@@ -138,7 +138,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		 * ---------------------------------------------------------
 		 */
 		zb_ptr = io_ptr->dollar.zb;
-		zb_top = zb_ptr + sizeof(io_ptr->dollar.zb) - 1;
+		zb_top = zb_ptr + SIZEOF(io_ptr->dollar.zb) - 1;
 		*zb_ptr = 0;
 		io_ptr->esc_state = START;
 		io_ptr->dollar.za = 0;
@@ -193,7 +193,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 				{
 					tt_state->utf8_more = utf8_more;
 					tt_state->more_ptr = more_ptr;
-					memcpy(tt_state->more_buf, more_buf, sizeof(more_buf));
+					memcpy(tt_state->more_buf, more_buf, SIZEOF(more_buf));
 				}
 				tt_state->zb_ptr = zb_ptr;
 				tt_state->zb_top = zb_top;
@@ -517,8 +517,8 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 #ifdef UNICODE_SUPPORTED
 			else
 			{
-				memcpy(tt_ptr->recall_buff.addr, &INPUT_CHAR, sizeof(INPUT_CHAR));
-				tt_ptr->recall_buff.len = sizeof(INPUT_CHAR);
+				memcpy(tt_ptr->recall_buff.addr, &INPUT_CHAR, SIZEOF(INPUT_CHAR));
+				tt_ptr->recall_buff.len = SIZEOF(INPUT_CHAR);
 			}
 #endif
 			tt_ptr->recall_width = inchar_width;

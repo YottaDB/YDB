@@ -117,13 +117,13 @@ void mupip_upgrade(void)
 
 	/* Structure checks .. */
 #ifndef __ia64
-	assert((24 * 1024) == sizeof(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
+	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 #endif
 
-	UNIX_ONLY(sem_inf = (sem_info *)malloc(sizeof(sem_info) * 2);
-		  memset(sem_inf, 0, sizeof(sem_info) * 2);
+	UNIX_ONLY(sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * 2);
+		  memset(sem_inf, 0, SIZEOF(sem_info) * 2);
 		  atexit(mupip_upgrade_cleanup));
-	db_fn_len = sizeof(db_fn);
+	db_fn_len = SIZEOF(db_fn);
 	if (!cli_get_str("FILE", db_fn, &db_fn_len))
 		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
 	db_fn[db_fn_len] = '\0';	/* Null terminate */
@@ -182,7 +182,7 @@ void mupip_upgrade(void)
 #endif
 	v15_file_size = stat_buf.st_size;
 #endif
-	v15_csd_size = sizeof(v15_sgmnt_data);
+	v15_csd_size = SIZEOF(v15_sgmnt_data);
 	DO_FILE_READ(channel, 0, &v15_csd, v15_csd_size, status, status2);
 	if (SS_NORMAL != status)
 	{
@@ -196,7 +196,7 @@ void mupip_upgrade(void)
 	 * to 224M blocks.
 	 */
 #ifdef UNIX
-		DO_FILE_READ(channel, 0, &csd, sizeof(sgmnt_data), status, status2);
+		DO_FILE_READ(channel, 0, &csd, SIZEOF(sgmnt_data), status, status2);
 		if (SS_NORMAL != status)
 		{
 			F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
@@ -214,7 +214,7 @@ void mupip_upgrade(void)
 				assert(START_VBN_CURRENT == norm_vbn);
 			)
 			csd.free_space = 0;
-			DO_FILE_WRITE(channel, 0, &csd, sizeof(csd), status, status2);
+			DO_FILE_WRITE(channel, 0, &csd, SIZEOF(csd), status, status2);
 			if (SS_NORMAL != status)
 			{
 				F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
@@ -222,7 +222,7 @@ void mupip_upgrade(void)
 				mupip_exit(ERR_MUNOUPGRD);
 			}
 			memset(new_v5_master_map, BMP_EIGHT_BLKS_FREE, (MASTER_MAP_SIZE_DFLT - MASTER_MAP_SIZE_V5_OLD));
-			DO_FILE_WRITE(channel, sizeof(csd) + MASTER_MAP_SIZE_V5_OLD, new_v5_master_map,
+			DO_FILE_WRITE(channel, SIZEOF(csd) + MASTER_MAP_SIZE_V5_OLD, new_v5_master_map,
 							(MASTER_MAP_SIZE_DFLT - MASTER_MAP_SIZE_V5_OLD), status, status2);
 			if (SS_NORMAL != status)
 			{
@@ -316,14 +316,14 @@ void mupip_upgrade(void)
         mu_upgrd_header(&v15_csd, &csd);
 	csd.master_map_len = MASTER_MAP_SIZE_V4;	/* V5 master map is not part of file header */
 	memcpy(new_master_map, v15_csd.master_map, MASTER_MAP_SIZE_V4);
-	DO_FILE_WRITE(channel, 0, &csd, sizeof(csd), status, status2);
+	DO_FILE_WRITE(channel, 0, &csd, SIZEOF(csd), status, status2);
 	if (SS_NORMAL != status)
 	{
 		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILOPERR, 2, db_fn_len, db_fn, status);
 		mupip_exit(ERR_MUNOUPGRD);
 	}
-	DO_FILE_WRITE(channel, sizeof(csd), new_master_map, MASTER_MAP_SIZE_V4, status, status2);
+	DO_FILE_WRITE(channel, SIZEOF(csd), new_master_map, MASTER_MAP_SIZE_V4, status, status2);
 	if (SS_NORMAL != status)
 	{
 		F_CLOSE(channel, rc); /* resets "channel" to FD_INVALID */

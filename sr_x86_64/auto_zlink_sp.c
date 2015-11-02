@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2008 Fidelity Information Services, Inc *
+ *      Copyright 2008, 2010 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -13,11 +13,11 @@
 
 #include "opcode.h"
 #include "mdefsp.h"
-
 #include "x86_64.h"
-
 #include "auto_zlink_sp.h"
 #include "i386.h"
+
+GBLREF int4	rtnhdr_off, labaddr_off;
 
 union
 {
@@ -40,8 +40,7 @@ short opcode_correct(unsigned char *curr_pc, short opcode, short reg_opcode, sho
 			else
 				return FALSE;
 		}
-	}
-	else if (*(curr_pc - MOD_LONG_SZ) == opcode)
+	} else if (*(curr_pc - MOD_LONG_SZ) == opcode)
 	{
 		modrm_byte_actual.byte = *(curr_pc - MOD_LONG_SZ + 1);
 		if ((modrm_byte_actual.modrm.reg_opcode == reg_opcode) && (modrm_byte_actual.modrm.mod == I386_MOD32_BASE_DISP_32))
@@ -53,8 +52,7 @@ short opcode_correct(unsigned char *curr_pc, short opcode, short reg_opcode, sho
 			else
 				return FALSE;
 		}
-	}
-	else if (*(curr_pc - MOD_NONE_SZ) == opcode)
+	} else if (*(curr_pc - MOD_NONE_SZ) == opcode)
 	{
 		modrm_byte_actual.byte = *(curr_pc - MOD_NONE_SZ + 1);
 		if ((modrm_byte_actual.modrm.reg_opcode == reg_opcode) && (modrm_byte_actual.modrm.mod == I386_MOD32_BASE))
@@ -67,8 +65,7 @@ short opcode_correct(unsigned char *curr_pc, short opcode, short reg_opcode, sho
 				return FALSE;
 		}
 	}
-	else
-		return FALSE;
+	return FALSE;
 }
 
 
@@ -85,7 +82,7 @@ short valid_calling_sequence(unsigned char *pc)
 	modrm_byte_long.modrm.r_m = GTM_REG_XFER_TABLE;
 
 			/*	 inst = call off(%reg_xfer) 	*/
-	if(curr_offset += opcode_correct(pc, I386_INS_Grp5_Prefix, I386_INS_CALL_Ev, TRUE, GTM_REG_XFER_TABLE))
+	if (curr_offset += opcode_correct(pc, I386_INS_Grp5_Prefix, I386_INS_CALL_Ev, TRUE, GTM_REG_XFER_TABLE))
 	{
 			/* 	inst is :: mov R0 = MEM 	*/
 		inst_sz = 1 + opcode_correct((pc - curr_offset),I386_INS_MOV_Gv_Ev,I386_REG_RDI,TRUE,GTM_REG_PV & 0x7);
@@ -127,6 +124,5 @@ short valid_calling_sequence(unsigned char *pc)
 		}
 		return TRUE;
 	}
-	else
-		return FALSE;
+	return FALSE;
 }

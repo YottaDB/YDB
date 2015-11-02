@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@ GBLREF	cw_set_element		cw_set[];
 GBLREF	unsigned char		cw_set_depth, cw_map_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err;
-GBLREF	int4			update_trans;
+GBLREF	uint4			update_trans;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	short			dollar_tlevel;
@@ -45,14 +45,14 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
 #endif
 
-void t_begin (uint4 err, boolean_t update_transaction) 	/* err --> error code for current gvcst_routine */
+void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcst_routine */
 {
 	srch_blk_status	*s;
 	trans_num	histtn;
 
 	assert(0 == dollar_tlevel); /* if in TP, the T_BEGIN_xxx_NONTP_OR_TP macro should have been used and we will not be here */
 	/* any changes to the initialization in the two lines below might need a similar change in T_BEGIN_xxx_NONTP_OR_TP macros */
-	update_trans = (int4)update_transaction;
+	update_trans = upd_trans;
 	t_err = err;
 
 	/* If we use a clue then we must consider the oldest tn in the search history to be the start tn for this transaction */

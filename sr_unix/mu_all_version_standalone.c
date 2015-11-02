@@ -75,7 +75,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	sop[2].sem_num = 0; sop[2].sem_op = 1; 		/* Increment all semaphores */
 	sop[3].sem_num = 1; sop[3].sem_op = 1;
 	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = sop[3].sem_flg = SEM_UNDO | IPC_NOWAIT;
-	memset(sem_inf, 0, (sizeof(sem_inf) * FTOK_ID_CNT));	/* Zero all fields so we know what to clean up */
+	memset(sem_inf, 0, (SIZEOF(sem_inf) * FTOK_ID_CNT));	/* Zero all fields so we know what to clean up */
 
 	for (i = 0; FTOK_ID_CNT > i; ++i)
 	{	/* Once through for both ftok key'd semaphores */
@@ -140,7 +140,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 			TAG_POLICY_GTM_PUTMSG(db_fn, errno, realfiletag, TAG_BINARY);
 #endif
-		LSEEKREAD(fd, 0, &v15_csd, sizeof(v15_csd), rc);
+		LSEEKREAD(fd, 0, &v15_csd, SIZEOF(v15_csd), rc);
 		if (0 != rc)
 		{
 			mu_all_version_release_standalone(sem_inf);

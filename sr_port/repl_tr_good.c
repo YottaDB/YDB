@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,9 +24,6 @@
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "repl_tr_good.h"
-
-LITREF	int			jrt_update[JRT_RECTYPES];
-LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 
 boolean_t repl_tr_good(uchar_ptr_t tr, int tr_len, seq_num seqno)
 { /* verify that the transaction corresponds to seqno and is well formed */

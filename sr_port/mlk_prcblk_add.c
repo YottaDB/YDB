@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@ void mlk_prcblk_add(gd_region *reg,
         ptroff_t		*prpt;
 	int			lcnt;
 
+	error_def(ERR_LOCKSPACEFULL);
 	for (prpt = (ptroff_t *)&d->pending, lcnt = FILE_INFO(reg)->s_addrs.hdr->lock_space_size / PRC_FACTOR;
 			*prpt && lcnt; prpt = (ptroff_t *) &pr->next, lcnt--)
 	{
@@ -41,7 +42,10 @@ void mlk_prcblk_add(gd_region *reg,
 		}
 	}
 	if (!lcnt)
-		GTMASSERT;
+	{
+		send_msg(VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, REG_LEN_STR(reg));
+		rts_error(VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, REG_LEN_STR(reg));
+	}
 	if (ctl->prccnt < 1)
 	{
 		mlk_shrclean(reg, ctl, (mlk_shrblk_ptr_t)R2A(ctl->blkroot));

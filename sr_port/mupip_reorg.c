@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,7 @@ void mupip_reorg(void)
 
 	resume = (CLI_PRESENT == cli_present("RESUME"));
 	reorg_op = DEFAULT;
-	n_len = sizeof(cli_buff);
+	n_len = SIZEOF(cli_buff);
 	memset(cli_buff, 0, n_len);
 	if (CLI_PRESENT == cli_present("USER_DEFINED_REORG") && (CLI_GET_STR_ALL("USER_DEFINED_REORG", cli_buff, &n_len)))
 	{
@@ -109,7 +109,7 @@ void mupip_reorg(void)
 	}
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
 	{
-		assert(sizeof(data_fill_factor) == sizeof(int4));
+		assert(SIZEOF(data_fill_factor) == SIZEOF(int4));
 		if (!cli_get_int("FILL_FACTOR", (int4 *)&data_fill_factor) || MAX_FILLFACTOR < data_fill_factor)
 			data_fill_factor = MAX_FILLFACTOR;
 		else if (MIN_FILLFACTOR > data_fill_factor)
@@ -119,7 +119,7 @@ void mupip_reorg(void)
 		data_fill_factor = MAX_FILLFACTOR;
 	if ((cli_status = cli_present("INDEX_FILL_FACTOR")) == CLI_PRESENT)
 	{
-		assert(sizeof(index_fill_factor) == sizeof(int4));
+		assert(SIZEOF(index_fill_factor) == SIZEOF(int4));
 		if (!cli_get_int("INDEX_FILL_FACTOR", (int4 *)&index_fill_factor))
 			index_fill_factor = data_fill_factor;
 		else if (MIN_FILLFACTOR > index_fill_factor)
@@ -130,7 +130,7 @@ void mupip_reorg(void)
 	else
 		index_fill_factor = data_fill_factor;
 	util_out_print("Fill Factor:: Index blocks !UL%: Data blocks !UL%", FLUSH, index_fill_factor, data_fill_factor);
-	n_len = sizeof(cli_buff);
+	n_len = SIZEOF(cli_buff);
 	memset(cli_buff, 0, n_len);
 	if (CLI_PRESENT != cli_present("EXCLUDE"))
 		exclude_gl_head.next = NULL;
@@ -144,7 +144,7 @@ void mupip_reorg(void)
 			gtm_putmsg(VARLSTCNT(1) ERR_NOEXCLUDE);
 	}
 
-	n_len = sizeof(cli_buff);
+	n_len = SIZEOF(cli_buff);
 	memset(cli_buff, 0, n_len);
 	if (CLI_PRESENT != cli_present("SELECT"))
 	{
@@ -165,8 +165,8 @@ void mupip_reorg(void)
 	}
 
 	mu_reorg_process = TRUE;
-	gv_currkey_next_reorg = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ);
-	gv_currkey_next_reorg->top = MAX_KEY_SZ;
+	assert(NULL == gv_currkey_next_reorg);
+	GVKEY_INIT(gv_currkey_next_reorg, DBKEYSIZE(MAX_KEY_SZ));
 	reorg_gv_target = targ_alloc(MAX_KEY_SZ, NULL, NULL);
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2008 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,6 +78,13 @@
 #include "util.h"
 #endif
 
+#ifdef GTM_TRIGGER
+#include "rtnhdr.h"			/* for rtn_tabent in gv_trigger.h */
+#include "gv_trigger.h"
+#include "hashtab.h"			/* for STR_HASH (in COMPUTE_HASH_MNAME)*/
+#include "tp_set_sgm.h"
+#endif
+
 #define MAX_LCNT 100
 
 GBLREF	void			(*call_on_signal)();
@@ -93,11 +100,13 @@ GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	int			updhelper_log_fd;
 GBLREF	FILE			*updhelper_log_fp;
 GBLREF	int			num_additional_processors;
+GBLREF  sgmnt_addrs             *cs_addrs;
+GBLREF 	sgmnt_data_ptr_t 	cs_data;
 #ifdef VMS
 GBLREF  uint4                   image_count;
 #endif
 GBLREF boolean_t		disk_blk_read;
-LITREF	int			jrt_update[JRT_RECTYPES];
+LITREF	mval			literal_hasht;
 static	uint4			last_pre_read_offset;
 
 int updhelper_reader(void)
@@ -109,11 +118,8 @@ int updhelper_reader(void)
 	call_on_signal = updhelper_reader_sigstop;
 	updhelper_init(UPD_HELPER_READER);
 	repl_log(updhelper_log_fp, TRUE, TRUE, "Helper reader started. PID %d [0x%X]\n", process_id, process_id);
-	gv_currkey = (gv_key *)malloc(sizeof(gv_key) - 1 + gv_keysize);
-	gv_altkey = (gv_key *)malloc(sizeof(gv_key) - 1 + gv_keysize);
-	gv_currkey->top = gv_altkey->top = gv_keysize;
-	gv_currkey->end = gv_currkey->prev = gv_altkey->end = gv_altkey->prev = 0;
-	gv_altkey->base[0] = gv_currkey->base[0] = '\0';
+	GVKEY_INIT(gv_currkey, gv_keysize);
+	GVKEY_INIT(gv_altkey, gv_keysize);
 	last_pre_read_offset = 0;
 	continue_reading = TRUE;
 	do
@@ -150,6 +156,11 @@ boolean_t updproc_preread(void)
 	enum cdb_sc		status;
 	gd_region               *reg, *r_top;
 	char           		gv_mname[MAX_KEY_SZ];
+	char			lcl_key[MAX_KEY_SZ];
+	DEBUG_ONLY(
+		uint4		num_scanned;
+		uint4		num_helped;
+	)
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
@@ -158,6 +169,7 @@ boolean_t updproc_preread(void)
 	unsigned char 		buff[MAX_ZWR_KEY_SZ], *end;
 	uint4			write, write_wrap;
 #endif
+
 	error_def(ERR_DBCCERR);
 	error_def(ERR_ERRCALL);
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
@@ -167,6 +179,7 @@ boolean_t updproc_preread(void)
 	upd_helper_ctl = recvpool.upd_helper_ctl;
 	csa = NULL;
 	pre_read_offset = last_pre_read_offset;
+	DEBUG_ONLY(num_scanned = num_helped = 0;)
 	while (last_pre_read_offset == upd_helper_ctl->pre_read_offset)
 	{
 		if (NO_SHUTDOWN != helper_entry->helper_shutdown)
@@ -301,74 +314,88 @@ boolean_t updproc_preread(void)
 		} else
 			good_record = FALSE;
 		RELEASE_SWAPLOCK(&upd_helper_ctl->pre_read_lock);
+		DEBUG_ONLY(num_scanned++;)
 		if (good_record)
 		{
 			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 			if (IS_SET_KILL_ZKILL(rectype))
 			{
 				was_wrapped = recvpool_ctl->wrapped;
-				if (IS_ZTP(rectype))
-					keystr = (jnl_string *)&rec->jrec_fset.mumps_node;
-				else
-					keystr = (jnl_string *)&rec->jrec_set.mumps_node;
+				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 				key_len = keystr->length;	/* local copy of shared recvpool key */
-				if ((MAX_KEY_SZ >= key_len && 0 < key_len && 0 == keystr->text[key_len - 1]) &&
-					(upd_good_record == updproc_get_gblname(keystr->text, key_len, gv_mname, &mname)))
-				{
-					gv_bind_name(gd_header, &mname);	/* this sets gv_target and gv_cur_region */
-					if (!gv_target->root)
-						continue;
-					csa = &FILE_INFO(gv_cur_region)->s_addrs;/* we modify n_pre_read for the region we read
-										    on our last try. This is done for
-										    performance reasons so that n_pre_read
-										    doesn't have to be an atomic counter */
-					memcpy(gv_currkey->base, keystr->text, key_len);
-					if ((readaddrs + rec_len > recvpool.recvdata_base + upd_proc_local->read
-						&& !(was_wrapped && !recvpool_ctl->wrapped))
-						&& (0 != gv_currkey->base[0]
-						&&  0 == gv_currkey->base[key_len - 1]
-						&&  0 == gv_currkey->base[mname.len]))
+				if (MAX_KEY_SZ >= key_len)
+				{	/* The receive pool is shared memory and the contents can be overwritten concurrently by the
+					 * receiver server.  The update process reader helper doesn't enforce any access control,
+					 * so we take a local copy of the key and use that.  Because the contents could have
+					 * changed during the copy, a further validation on the key length (key_len) is done below
+					 * in the if.
+					 */
+					memcpy(lcl_key, keystr->text, key_len);
+					if ((0 < key_len) && (0 == lcl_key[key_len - 1])
+						&& (upd_good_record == updproc_get_gblname(lcl_key, key_len, gv_mname, &mname))
+						&& (key_len == keystr->length))	/* If the shared copy changed underneath us, what
+										   we copied over is potentially a bad record */
 					{
-						gv_currkey->base[key_len] = 0; 	/* second null of a key terminator */
-						gv_currkey->end = key_len;
-						disk_blk_read = FALSE;
-						status = gvcst_search(gv_currkey, NULL);
-						if (cdb_sc_normal != status)
-						{	/* If gvcst_search returns abnormal status, no need to retry since
-							 * we are a pre-reader but we need to reset clue to avoid fast-path
-							 * in the next call to gvcst_search for this same global. This is
-							 * necessary because gvcst_search fast path (non-zero clue) assumes that
-							 * srch_status->buffaddr is non-NULL if srch_status->cr is non-NULL. But
-							 * this is not necessarily guaranteed for example if gvcst_search returns
-							 * abnormal status due to t_qread returning NULL (due in turn to the
-							 * function "wcs_phase2_commit_wait" detecting csd->wc_blocked is TRUE
-							 * and deciding to restart). In this case buffaddr will be set to NULL
-							 * while cr will be non-NULL causing srch_status to be inconsistent.
-							 * Resetting the clue would cause this to be freshly initialized next
-							 * time gvcst_search for this gv_target is called.
-							 */
-							gv_target->clue.end = 0;
-						}
-						if (disk_blk_read)
-							csa->nl->n_pre_read--;
+						UPD_GV_BIND_NAME_APPROPRIATE(gd_header, mname, lcl_key, key_len); /* if ^#t do
+													       special processing */
+						/* the above would have set gv_target and gv_cur_region appropriately */
+						if (!gv_target->root)
+							continue;
+						csa = &FILE_INFO(gv_cur_region)->s_addrs;/* we modify n_pre_read for the region we
+											    read on our last try. This is done for
+											    performance reasons so that n_pre_read
+											    doesn't have to be an atomic counter */
+						memcpy(gv_currkey->base, lcl_key, key_len);
+						if ((readaddrs + rec_len > recvpool.recvdata_base + upd_proc_local->read
+						     && !(was_wrapped && !recvpool_ctl->wrapped))
+						    && (0 != gv_currkey->base[0]
+							&&  0 == gv_currkey->base[key_len - 1]
+							&&  0 == gv_currkey->base[mname.len]))
+						{
+							gv_currkey->base[key_len] = 0; 	/* second null of a key terminator */
+							gv_currkey->end = key_len;
+							disk_blk_read = FALSE;
+							DEBUG_ONLY(num_helped++);
+							status = gvcst_search(gv_currkey, NULL);
+							if (cdb_sc_normal != status)
+							{	/* If gvcst_search returns abnormal status, no need to retry since
+								 * we are a pre-reader but we need to reset clue to avoid fast-path
+								 * in the next call to gvcst_search for this same global. This is
+								 * necessary because gvcst_search fast path (non-zero clue) assumes
+								 * that srch_status->buffaddr is non-NULL if srch_status->cr is
+								 * non-NULL. But this is not necessarily guaranteed for example if
+								 * gvcst_search returns abnormal status due to t_qread returning
+								 * NULL (due in turn to the function "wcs_phase2_commit_wait"
+								 * detecting csd->wc_blocked is TRUE and deciding to restart). In
+								 * this case buffaddr will be set to NULL while cr will be non-NULL
+								 * causing srch_status to be inconsistent. Resetting the clue would
+								 * cause this to be freshly initialized next time gvcst_search for
+								 * this gv_target is called.
+								 */
+								gv_target->clue.end = 0;
+							}
+							if (disk_blk_read)
+								csa->nl->n_pre_read--;
 #ifdef REPL_DEBUG
-						if (NULL == (end = format_targ_key(buff,
-									MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-							end = &buff[MAX_ZWR_KEY_SZ - 1];
-						util_out_print(
-							"readaddrs = !XJ pre_read_offset = !XL write_wrap = !XL write = !XL",
-							FALSE, readaddrs, pre_read_offset,
-							recvpool_ctl->write_wrap, recvpool_ctl->write);
-						util_out_print(
-							" Seqno = 0x!16@XQ Rectype = !SL gv_currkey = !AD status = !SL",
-							TRUE, &recvpool.recvpool_ctl->jnl_seqno,
-							rectype, end - buff, buff, status);
+							if (NULL == (end = format_targ_key(buff,
+											   MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+								end = &buff[MAX_ZWR_KEY_SZ - 1];
+							util_out_print(
+							       "readaddrs = !XJ pre_read_offset = !XL write_wrap = !XL write = !XL",
+								FALSE, readaddrs, pre_read_offset,
+								recvpool_ctl->write_wrap, recvpool_ctl->write);
+							util_out_print(
+								" Seqno = 0x!16@XQ Rectype = !SL gv_currkey = !AD status = !SL",
+								TRUE, &recvpool.recvpool_ctl->jnl_seqno,
+								rectype, end - buff, buff, status);
 #endif
+						} else
+						{
+							REPL_DPRINT1("Unexpected bad record\n");
+							good_record = FALSE;
+						}
 					} else
-					{
-						REPL_DPRINT1("Unexpected bad record\n");
 						good_record = FALSE;
-					}
 				} else
 					good_record = FALSE;
 			}

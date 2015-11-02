@@ -94,7 +94,7 @@ int op_fnzsearch (mval *file, mint indx, mval *ret)
 		}
 	} else
 	{
-		memset(&pblk, 0, sizeof(pblk));
+		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buffer = buf1;
 		pblk.buff_size = MAX_FBUFF;
 		if (!(parse_file(&file->str, &pblk) & 1))
@@ -155,7 +155,7 @@ void dir_srch (parse_blk *pfil)
 	lv_val		*dir1, *dir2, *tmp;
 	mstr		tn;
 	short		p2_len;
-	char		filb[MAX_FBUFF + 1], patb[sizeof(ptstr)], *c, *lastd, *top, *p2, *c1, ch;
+	char		filb[MAX_FBUFF + 1], patb[SIZEOF(ptstr)], *c, *lastd, *top, *p2, *c1, ch;
 	mval		pat_mval, sub, compare;
 	bool		wildname, seen_wd;
 	struct dirent 	*dent;
@@ -171,7 +171,7 @@ void dir_srch (parse_blk *pfil)
 
 	ESTABLISH(dir_ch);
 	pat_mval.mvtype = MV_STR;
-	pat_mval.str.addr = patb;	/* patb should be sizeof(ptstr.buff) but instead is sizeof(ptstr) since the C compiler
+	pat_mval.str.addr = patb;	/* patb should be SIZEOF(ptstr.buff) but instead is SIZEOF(ptstr) since the C compiler
 					 * complains about the former and the latter is just 4 bytes more */
 	pat_mval.str.len = 0;
 	sub.mvtype = MV_STR;
@@ -256,9 +256,7 @@ void dir_srch (parse_blk *pfil)
 
 					if (do_pattern(&compare, &pat_mval))
 					{	/* got a hit */
-						if (stringpool.free + compare.str.len + sub.str.len + p2_len + 1 > stringpool.top)
-							stp_gcol(compare.str.len + sub.str.len + p2_len + 1);
-
+						ENSURE_STP_FREE_SPACE(compare.str.len + sub.str.len + p2_len + 1);
 						/* concatenate directory and name */
 						c1 = (char *)stringpool.free;
 						tn = sub.str;
@@ -335,8 +333,7 @@ void dir_srch (parse_blk *pfil)
 
 				if (do_pattern(&compare, &pat_mval))
 				{	/* got a hit */
-					if (stringpool.free + compare.str.len + sub.str.len > stringpool.top)
-						stp_gcol(compare.str.len + sub.str.len);
+					ENSURE_STP_FREE_SPACE(compare.str.len + sub.str.len);
 
 					/* concatenate directory and name */
 					c = (char *)stringpool.free;
@@ -384,8 +381,7 @@ void dir_srch (parse_blk *pfil)
 			filb[sub.str.len] = 0;
 			sub.str.addr = filb;
 
-			if (stringpool.free + compare.str.len + sub.str.len > stringpool.top)
-				stp_gcol(compare.str.len + sub.str.len);
+			ENSURE_STP_FREE_SPACE(compare.str.len + sub.str.len);
 
 			/* concatenate directory and name */
 			c1 = (char *)stringpool.free;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,11 +50,13 @@ GBLREF	boolean_t	ready2signal_gvundef;		/* TRUE if GET operation is about to sig
 
 bool	gvcst_get(mval *v)
 {
-	srch_blk_status	*s;
+	blk_hdr_ptr_t	bp;
 	enum cdb_sc	status;
 	int		key_size, data_len;
-	unsigned short	rsiz;
 	rec_hdr_ptr_t	rp;
+	sm_uc_ptr_t	b_top;
+	srch_blk_status *bh;
+	unsigned short	rsiz;
 #	ifdef DEBUG
 	boolean_t	in_op_gvget_lcl;
 #	endif
@@ -72,20 +74,24 @@ bool	gvcst_get(mval *v)
 	{
 		if (cdb_sc_normal == (status = gvcst_search(gv_currkey, NULL)))
 		{
-			if ((key_size = gv_currkey->end + 1) == gv_target->hist.h[0].curr_rec.match)
+			bh = gv_target->hist.h;
+			if ((key_size = gv_currkey->end + 1) == bh->curr_rec.match)
 			{
-				rp = (rec_hdr_ptr_t)(gv_target->hist.h[0].buffaddr + gv_target->hist.h[0].curr_rec.offset);
+				/* The following code is duplicated in gvcst_dataget. Any changes here might need
+				 * to be reflected there as well.
+				 */
+				bp = (blk_hdr_ptr_t)bh->buffaddr;
+				b_top = bh->buffaddr + bp->bsiz;
+				rp = (rec_hdr_ptr_t)(bh->buffaddr + bh->curr_rec.offset);
 				GET_USHORT(rsiz, &rp->rsiz);
 				data_len = rsiz + rp->cmpc - SIZEOF(rec_hdr) - key_size;
-				if (data_len < 0  || (sm_uc_ptr_t)rp + rsiz >
-					gv_target->hist.h[0].buffaddr + ((blk_hdr_ptr_t)gv_target->hist.h[0].buffaddr)->bsiz)
+				if ((0 > data_len) || ((sm_uc_ptr_t)rp + rsiz > b_top))
 				{
 					assert(CDB_STAGNATE > t_tries);
 					status = cdb_sc_rmisalign1;
 				} else
 				{
-					if (stringpool.top - stringpool.free < data_len)
-						stp_gcol(data_len);
+					ENSURE_STP_FREE_SPACE(data_len);
 					assert(stringpool.top - stringpool.free >= data_len);
 					memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
 					if (0 == dollar_tlevel)

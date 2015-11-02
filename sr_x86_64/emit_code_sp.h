@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007, 2008 Fidelity Information Services, Inc *
+ *      Copyright 2007, 2009 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -183,22 +183,22 @@ GBLREF struct emit_base_info emit_base_info;
 	} \
 	if (emit_base_info.offset32_set) { \
 		*((int4 *)&code_buf[code_idx]) = emit_base_info.offset32; \
-		code_idx += sizeof(int4) ;			\
+		code_idx += SIZEOF(int4) ;			\
 	} \
 	if (emit_base_info.offset64_set) { \
 		*((int64_t *)&code_buf[code_idx]) = emit_base_info.offset64; \
-		code_idx += sizeof(int64_t) ;			\
+		code_idx += SIZEOF(int64_t) ;			\
 	} \
 	if (emit_base_info.imm8_set) { \
 		code_buf[code_idx++] = emit_base_info.imm8; \
 	} \
 	if (emit_base_info.imm32_set) { \
 		*((int4 *)&code_buf[code_idx]) = emit_base_info.imm32; \
-		code_idx += sizeof(int4) ;			\
+		code_idx += SIZEOF(int4) ;			\
 	} \
 	if (emit_base_info.imm64_set) { \
 		*((int64_t *)&code_buf[code_idx]) = emit_base_info.imm64; \
-		code_idx += sizeof(int64_t) ;			\
+		code_idx += SIZEOF(int64_t) ;			\
 	} \
 }
 
@@ -336,7 +336,7 @@ GBLREF struct emit_base_info emit_base_info;
 #define GEN_LOAD_IMMED(reg, imval)	\
 { \
 	int op_code = I386_INS_MOV_eAX + (reg & 0x7); \
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info));	\
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info));	\
 	SET_REX_PREFIX(0, REX_B, reg) \
 	emit_base_info.imm32 = (int) imval & 0xffffffff;	\
 	emit_base_info.imm32_set = 1; \
@@ -361,7 +361,7 @@ GBLREF struct emit_base_info emit_base_info;
 #define GEN_CMP_EAX_IMM32(imm)	\
 { \
 	int op_code = I386_INS_CMP_eAX_Iv ; \
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info));	\
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info));	\
 	emit_base_info.imm32 = (int4) imm & 0xffffffff;	\
 	emit_base_info.imm32_set = 1; \
 	CODE_BUF_GEN(op_code)	\
@@ -411,7 +411,7 @@ GBLREF struct emit_base_info emit_base_info;
 #define GEN_CMP_REGS(reg1, reg2) \
 { \
 	int op_code = I386_INS_CMP_Gv_Ev; \
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info));	\
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info));	\
 	SET_REX_PREFIX(REX_W, REX_R, reg1)					\
 	SET_REX_PREFIX(0, REX_B, reg2)					\
 	emit_base_info.modrm_byte.modrm.reg_opcode = reg1 & 0x7;	\
@@ -425,7 +425,7 @@ GBLREF struct emit_base_info emit_base_info;
 #define GEN_CMP_IMM32(reg, imm)			\
 { \
 	int op_code = I386_INS_Grp1_Ev_Iv_Prefix; \
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info));	\
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info));	\
 	emit_base_info.modrm_byte.modrm.reg_opcode = I386_INS_CMP__; \
 	emit_base_info.modrm_byte.modrm.mod = I386_MOD32_REGISTER; \
 	emit_base_info.modrm_byte.modrm.r_m = reg & 0x7; \
@@ -442,7 +442,7 @@ GBLREF struct emit_base_info emit_base_info;
 #define GEN_ADD_IMMED(reg, imval)		\
 { \
 	int op_code = I386_INS_Grp1_Ev_Iv_Prefix; \
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info)); \
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info)); \
 	SET_REX_PREFIX(REX_W, REX_B, reg) \
 	emit_base_info.modrm_byte_set = 1;	\
 	emit_base_info.modrm_byte.modrm.mod = I386_MOD32_REGISTER;	\
@@ -456,7 +456,7 @@ GBLREF struct emit_base_info emit_base_info;
 #define GEN_MOVE_REG(trg, src)	\
 { \
 	int op_code = I386_INS_MOV_Ev_Gv; \
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info)); \
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info)); \
 	SET_REX_PREFIX(REX_W, REX_B, trg) \
 	SET_REX_PREFIX(0, REX_R, src) \
 	emit_base_info.modrm_byte_set = 1;	\
@@ -469,7 +469,7 @@ GBLREF struct emit_base_info emit_base_info;
 #define GEN_JUMP_REG(reg)	\
 { \
 	int op_code = I386_INS_Grp5_Prefix; \
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info)); \
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info)); \
 	SET_REX_PREFIX(REX_OP | REX_W, REX_B, reg) \
 	emit_base_info.modrm_byte_set = 1;	\
 	emit_base_info.modrm_byte.modrm.mod = I386_MOD32_REGISTER;	\
@@ -481,11 +481,11 @@ GBLREF struct emit_base_info emit_base_info;
 #define GEN_PCREL		\
 { \
 	int op_code = I386_INS_CALL_Jv; \
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info)); \
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info)); \
 	emit_base_info.imm32 = 0; \
 	emit_base_info.imm32_set = 1; \
 	CODE_BUF_GEN(op_code)	\
-	memset((void *)&emit_base_info, 0, sizeof(emit_base_info)); \
+	memset((void *)&emit_base_info, 0, SIZEOF(emit_base_info)); \
 	op_code = I386_INS_POP_eAX + (GTM_REG_CODEGEN_TEMP & 0x7);	\
 	SET_REX_PREFIX(0, REX_B, GTM_REG_CODEGEN_TEMP) \
 	assert(GTM_REG_CODEGEN_TEMP > 7); \

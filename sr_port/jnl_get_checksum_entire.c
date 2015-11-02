@@ -31,7 +31,7 @@ uint4 jnl_get_checksum_entire(uint4 *buff, int bufflen)
 	uint4		*blk_top, blen, checksum;
 
 	checksum = INIT_CHECKSUM_SEED;
-	for (blen = bufflen / USIZEOF(*buff), blk_top = buff + blen ; buff < blk_top; buff++)
+	for (blen = bufflen / SIZEOF(*buff), blk_top = buff + blen ; buff < blk_top; buff++)
 		checksum = ADJUST_CHECKSUM(checksum, *buff);
 	assert(checksum);
 	/* It is theoretically possible that the computed checksum turns out to be 0. In order to differentiate this

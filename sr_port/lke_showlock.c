@@ -179,15 +179,15 @@ bool	lke_showlock(
 					gtcmbufidx = 0;
 					memcpy(&gtcmbuf[gtcmbufidx], CLNTNODE_LIT, STR_LIT_LEN(CLNTNODE_LIT));
 					gtcmbufidx += STR_LIT_LEN(CLNTNODE_LIT);
-					memcpy(&gtcmbuf[gtcmbufidx], tree->auxnode, sizeof(tree->auxnode));
-					gtcmbufidx += real_len(sizeof(tree->auxnode), (uchar_ptr_t)tree->auxnode);
+					memcpy(&gtcmbuf[gtcmbufidx], tree->auxnode, SIZEOF(tree->auxnode));
+					gtcmbufidx += real_len(SIZEOF(tree->auxnode), (uchar_ptr_t)tree->auxnode);
 					memcpy(&gtcmbuf[gtcmbufidx], CLNTPID_LIT, STR_LIT_LEN(CLNTPID_LIT));
 					gtcmbufidx += STR_LIT_LEN(CLNTPID_LIT);
 					SPRINTF(&gtcmbuf[gtcmbufidx], PIDPRINT_LIT, tree->auxpid);
 					f[5] = strlen(gtcmbuf);
 					f[6] = (UINTPTR_T)&gtcmbuf[0];
 					assert(f[5] > gtcmbufidx);
-					assert(gtcmbufidx < sizeof(gtcmbuf));
+					assert(gtcmbufidx < SIZEOF(gtcmbuf));
 				} else
 					f[5] = f[6] = 0;
 				if (interactive)
@@ -214,7 +214,7 @@ bool	lke_showlock(
 					}
 					memcpy(format + len1, msg, len2);
 					format[len1 + len2] = '\0';
-					assert((len1 + len2) < sizeof(format));
+					assert((len1 + len2) < SIZEOF(format));
 					if (NULL == lnk)
 					{
 						if ((NULL == one_lock.addr) ||

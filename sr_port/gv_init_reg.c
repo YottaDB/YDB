@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,17 +27,14 @@
 
 GBLREF int4		lkid;
 GBLREF bool		licensed ;
-GBLREF int4		gv_keysize;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region	*gv_cur_region;
 
 void gv_init_reg (gd_region *reg)
 {
-	gv_key		*temp_key;
 	gv_namehead	*g;
 	sgmnt_addrs	*csa;
-	int		keysize;
 #ifdef	NOLICENSE
 	licensed= TRUE ;
 #else
@@ -53,38 +50,14 @@ void gv_init_reg (gd_region *reg)
 	case dba_cm:
 	case dba_mm:
 	case dba_bg:
-		if( FALSE == reg->open)
-		  gvcst_init (reg);
+		if (!reg->open)
+			gvcst_init(reg);
 		break;
 	default:
 		GTMASSERT;
 	}
 	assert(reg->open);
-
-	keysize = DBKEYSIZE(reg->max_key_size);
-
-	if (keysize > gv_keysize)
-	{
-		gv_keysize = keysize;
-		temp_key = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
-		if (gv_currkey)
-		{
-			memcpy(temp_key, gv_currkey, sizeof(gv_key) + gv_currkey->end);
-			free(gv_currkey);
-		} else
-			temp_key->base[0] = '\0';
-		gv_currkey = temp_key;
-		gv_currkey->top = gv_keysize;
-		temp_key = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
-		if (gv_altkey)
-		{
-			memcpy(temp_key, gv_altkey, sizeof(gv_key) + gv_altkey->end);
-			free(gv_altkey);
-		} else
-			temp_key->base[0] = '\0';
-		gv_altkey = temp_key;
-		gv_altkey->top = gv_keysize;
-	}
+	GVKEYSIZE_INCREASE_IF_NEEDED(DBKEYSIZE(reg->max_key_size));
 	if (reg->dyn.addr->acc_meth == dba_bg || reg->dyn.addr->acc_meth == dba_mm)
 	{
 		if (!reg->was_open)

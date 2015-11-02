@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,9 @@ GBLREF io_pair			io_curr_device, io_std_device;
 #ifdef UNIX
 GBLREF va_list			last_va_list_ptr;	/* set by util_format */
 #endif
+#ifdef GTM_TRIGGER
+GBLREF boolean_t		trigger_compile;
+#endif
 
 void stx_error(int in_error, ...)
 {
@@ -43,7 +46,7 @@ void stx_error(int in_error, ...)
 	VA_ARG_TYPE	cnt, arg1, arg2, arg3, arg4;
 	bool		list, warn;
 	char		msgbuf[MAX_SRCLINE];
-	char		buf[MAX_SRCLINE + LISTTAB + sizeof(ARROW)];
+	char		buf[MAX_SRCLINE + LISTTAB + SIZEOF(ARROW)];
 	char		*c;
 	mstr		msg;
 	boolean_t	is_stx_warn;	/* current error is actually of type warning and we are in CGP_PARSE phase */
@@ -71,7 +74,7 @@ void stx_error(int in_error, ...)
 	 * 	a) shift_gvrefs
 	 *	b) source_error_found
 	 */
-	is_stx_warn = ((CGP_PARSE == cg_phase) && IS_STX_WARN(in_error));
+	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !trigger_compile);
 	if (!is_stx_warn)
 		shift_gvrefs = FALSE;
 	if (run_time)
@@ -80,7 +83,7 @@ void stx_error(int in_error, ...)
 		 * could have a postconditional that bypasses this code) issue the rts_error.
 		 * See IS_STX_WARN macro definition for details.
 		 */
-		if ((cg_phase == CGP_PARSE) && IS_STX_WARN(in_error))
+		if (is_stx_warn)
 		{
 			ins_errtriple(in_error);
 			return;
@@ -206,7 +209,7 @@ void stx_error(int in_error, ...)
 	{
 		va_start(args, in_error);
 		msg.addr = msgbuf;
-		msg.len = sizeof(msgbuf);
+		msg.len = SIZEOF(msgbuf);
 		gtm_getmsg(in_error, &msg);
 		assert(msg.len);
 #ifdef UNIX

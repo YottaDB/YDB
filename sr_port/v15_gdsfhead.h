@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -260,8 +260,8 @@ typedef struct v15_sgmnt_data_struct
 	 * fields), the character array common_filler below will become a negative sized array
 	 * which will signal a compiler error (rather than an undecipherable runtime error).
 	 */
-	char		common_filler[584 - sizeof(v15_bg_trc_rec) * v15_n_bg_trc_rec_variable_types
-				      - sizeof(v15_db_csh_acct_rec) * v15_n_db_csh_acct_rec_types];
+	char		common_filler[584 - SIZEOF(v15_bg_trc_rec) * v15_n_bg_trc_rec_variable_types
+				      - SIZEOF(v15_db_csh_acct_rec) * v15_n_db_csh_acct_rec_types];
 	/* Include all the db cache accounting fields below */
 #define	TAB_DB_CSH_ACCT_REC(A,B,C)	v15_db_csh_acct_rec	acct_##A;
 #include "v15_tab_db_csh_acct_rec.h"

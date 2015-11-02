@@ -31,6 +31,7 @@
 #include "mu_file_size.h"
 #include "mu_gv_cur_reg_init.h"
 #include "gtmmsg.h"
+#include "wbox_test_init.h"
 
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
@@ -58,7 +59,7 @@ boolean_t mu_int_init(void)
 
 	mu_gv_cur_reg_init();
 	/* get filename */
-	gv_cur_region->dyn.addr->fname_len = sizeof(gv_cur_region->dyn.addr->fname);
+	gv_cur_region->dyn.addr->fname_len = SIZEOF(gv_cur_region->dyn.addr->fname);
 	if (!cli_get_str("WHAT", (char *)gv_cur_region->dyn.addr->fname, &gv_cur_region->dyn.addr->fname_len))
 		mupip_exit(ERR_MUNODBNAME);
 	if (!STANDALONE(gv_cur_region))
@@ -81,7 +82,7 @@ boolean_t mu_int_init(void)
 		mu_int_err(ERR_DBFSTHEAD, 0, 0, 0, 0, 0, 0, 0);
 		return FALSE;
 	}
-	assert(SGMNT_HDR_LEN == sizeof(sgmnt_data));
+	assert(SGMNT_HDR_LEN == SIZEOF(sgmnt_data));
 	fc->op = FC_READ;
 	fc->op_buff = (uchar_ptr_t)&mu_int_data;
 	fc->op_len = SGMNT_HDR_LEN;

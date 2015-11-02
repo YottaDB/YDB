@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,22 +72,22 @@ void io_init(bool term_ctrl)
 
 	io_init_name();
 	/* default logical names */
-	io_root_log_name = (io_log_name *)malloc(sizeof(*io_root_log_name));
-	memset(io_root_log_name, 0, sizeof(*io_root_log_name));
+	io_root_log_name = (io_log_name *)malloc(SIZEOF(*io_root_log_name));
+	memset(io_root_log_name, 0, SIZEOF(*io_root_log_name));
 	val.mvtype = MV_STR;
 	val.str.addr = "0";
 	val.str.len = 1;
 	ln = get_log_name(&val.str, INSERT);
 	assert(ln != 0);
 	val.str = gtm_principal;
-	status = TRANS_LOG_NAME(&val.str, &tn, buf1, sizeof(buf1), dont_sendmsg_on_log2long);
+	status = TRANS_LOG_NAME(&val.str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 	if (SS_NOLOGNAM == status)
 		dollar_principal = 0;
 	else if (SS_NORMAL == status)
 		dollar_principal = get_log_name(&tn, INSERT);
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, sizeof(buf1) - 1);
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
 #	endif
 	else
 		rts_error(VARLSTCNT(1) status);
@@ -96,30 +96,30 @@ void io_init(bool term_ctrl)
 	val.str = sys_input;
 	inp = get_log_name(&val.str, INSERT);
 	pars.mvtype = MV_STR;
-	status = TRANS_LOG_NAME(&val.str, &tn, buf1, sizeof(buf1), dont_sendmsg_on_log2long);
+	status = TRANS_LOG_NAME(&val.str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 	if (SS_NOLOGNAM == status)
 	{
-		pars.str.len = sizeof(null_params_list);
+		pars.str.len = SIZEOF(null_params_list);
 		pars.str.addr = (char *)null_params_list;
 	} else if (SS_NORMAL == status)
 	{
 		if (!io_is_rm(&val.str))
 		{
-			pars.str.len = sizeof(no_params);
+			pars.str.len = SIZEOF(no_params);
 			pars.str.addr = (char *)&no_params;
 		} else  if (io_is_sn(&val.str))
 		{
-			pars.str.len = sizeof(open_params_list);
+			pars.str.len = SIZEOF(open_params_list);
 			pars.str.addr = (char *)open_params_list;
 		} else
 		{
-			pars.str.len = sizeof(shr_params);
+			pars.str.len = SIZEOF(shr_params);
 			pars.str.addr = (char *)shr_params;
 		}
 	}
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, sizeof(buf1) - 1);
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
 #	endif
 	else
 		rts_error(VARLSTCNT(1) status);
@@ -127,17 +127,17 @@ void io_init(bool term_ctrl)
 	(*op_open_ptr)(&val, &pars, 0, 0);
 	io_curr_device.in  = io_std_device.in  = inp->iod;
 	val.str = sys_output;
-	if ((SS_NORMAL == TRANS_LOG_NAME(&gtm_netout, &tn, buf1, sizeof(buf1), do_sendmsg_on_log2long))
-			&& (SS_NORMAL == TRANS_LOG_NAME(&sys_net, &tn, buf1, sizeof(buf1), do_sendmsg_on_log2long))
+	if ((SS_NORMAL == TRANS_LOG_NAME(&gtm_netout, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long))
+			&& (SS_NORMAL == TRANS_LOG_NAME(&sys_net, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long))
 			&& io_is_sn(&sys_net))
 		val.str = sys_net;
 	outp = get_log_name(&val.str, INSERT);
-	status = TRANS_LOG_NAME(&val.str, &tn, buf1, sizeof(buf1), dont_sendmsg_on_log2long);
+	status = TRANS_LOG_NAME(&val.str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
 	{
 #		ifdef UNIX
 		if (SS_LOG2LONG == status)
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, sizeof(buf1) - 1);
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, SIZEOF(buf1) - 1);
 		else
 #		endif
 			rts_error(VARLSTCNT(1) status);
@@ -157,11 +157,11 @@ void io_init(bool term_ctrl)
 	{
 		if (status == SS_NOLOGNAM)
 		{
-			pars.str.len = sizeof(null_params_list);
+			pars.str.len = SIZEOF(null_params_list);
 			pars.str.addr = (char *)null_params_list;
 		} else  if (status == SS_NORMAL)
 		{
-			pars.str.len = sizeof(open_params_list);
+			pars.str.len = SIZEOF(open_params_list);
 			pars.str.addr = (char *)open_params_list;
 		}
 		(*op_open_ptr)(&val, &pars, 0, 0);
@@ -176,7 +176,7 @@ void io_init(bool term_ctrl)
 
 	if (dollar_principal)
 		dollar_principal->iod = io_std_device.in;
-	pars.str.len = sizeof(no_params);
+	pars.str.len = SIZEOF(no_params);
 	pars.str.addr = (char *)&no_params;
 	val.str.len = io_curr_device.in->trans_name->len;
 	val.str.addr = io_std_device.in->trans_name->dollar_io;

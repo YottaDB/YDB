@@ -52,24 +52,24 @@ const int parm_space_needed[] =
 {
 	0,
 	0,
-	sizeof(void *),
-	sizeof(xc_int_t),
-	sizeof(xc_uint_t),
-	sizeof(xc_long_t),
-	sizeof(xc_ulong_t),
-	sizeof(xc_float_t),
-	sizeof(xc_double_t),
-	sizeof(xc_int_t *) + sizeof(xc_int_t),
-	sizeof(xc_uint_t *) + sizeof(xc_uint_t),
-	sizeof(xc_long_t *) + sizeof(xc_long_t),
-	sizeof(xc_ulong_t *) + sizeof(xc_ulong_t),
-	sizeof(xc_string_t *) + sizeof(xc_string_t),
-	sizeof(xc_float_t *) + sizeof(xc_float_t),
-	sizeof(xc_char_t *),
-	sizeof(xc_char_t **) + sizeof(xc_char_t *),
-	sizeof(xc_double_t *) + sizeof(xc_double_t),
-	sizeof(xc_pointertofunc_t),
-	sizeof(xc_pointertofunc_t *) + sizeof(xc_pointertofunc_t)
+	SIZEOF(void *),
+	SIZEOF(xc_int_t),
+	SIZEOF(xc_uint_t),
+	SIZEOF(xc_long_t),
+	SIZEOF(xc_ulong_t),
+	SIZEOF(xc_float_t),
+	SIZEOF(xc_double_t),
+	SIZEOF(xc_int_t *) + SIZEOF(xc_int_t),
+	SIZEOF(xc_uint_t *) + SIZEOF(xc_uint_t),
+	SIZEOF(xc_long_t *) + SIZEOF(xc_long_t),
+	SIZEOF(xc_ulong_t *) + SIZEOF(xc_ulong_t),
+	SIZEOF(xc_string_t *) + SIZEOF(xc_string_t),
+	SIZEOF(xc_float_t *) + SIZEOF(xc_float_t),
+	SIZEOF(xc_char_t *),
+	SIZEOF(xc_char_t **) + SIZEOF(xc_char_t *),
+	SIZEOF(xc_double_t *) + SIZEOF(xc_double_t),
+	SIZEOF(xc_pointertofunc_t),
+	SIZEOF(xc_pointertofunc_t *) + SIZEOF(xc_pointertofunc_t)
 };
 
 /* manage local get_memory'ed space (the space is never returned) */
@@ -190,7 +190,7 @@ static enum xc_types	scan_keyword(char **c)
 	if (!d)
 		return xc_notfound;
 	len = (int)(d - b);
-	for (i = 0 ;  i < sizeof(xctab) / sizeof(xctab[0]) ;  i++)
+	for (i = 0 ;  i < SIZEOF(xctab) / SIZEOF(xctab[0]) ;  i++)
 	{
 		if ((0 == memcmp(xctab[i].nam, b, len)) && ('\0' ==  xctab[i].nam[len]))
 		{
@@ -364,12 +364,12 @@ struct extcall_package_list	*exttab_parse(mval *package)
 	error_def(ERR_TEXT);
 
 	/* First, construct package name environment variable */
-	memcpy(str_buffer, PACKAGE_ENV_PREFIX, sizeof(PACKAGE_ENV_PREFIX));
-	tbp = &str_buffer[sizeof(PACKAGE_ENV_PREFIX) - 1];
+	memcpy(str_buffer, PACKAGE_ENV_PREFIX, SIZEOF(PACKAGE_ENV_PREFIX));
+	tbp = &str_buffer[SIZEOF(PACKAGE_ENV_PREFIX) - 1];
 	if (package->str.len)
 	{
 		/* guaranteed by compiler */
-		assert(package->str.len < MAX_NAME_LENGTH - sizeof(PACKAGE_ENV_PREFIX) - 1);
+		assert(package->str.len < MAX_NAME_LENGTH - SIZEOF(PACKAGE_ENV_PREFIX) - 1);
 		*tbp++ = '_';
 		memcpy(tbp, package->str.addr, package->str.len);
 		tbp += package->str.len;
@@ -402,7 +402,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		/* Unable to obtain handle to the shared library */
 		rts_error(VARLSTCNT(4) ERR_ZCUNAVAIL, 2, package->str.len, package->str.addr);
 	}
-	pak = get_memory(sizeof(*pak));
+	pak = get_memory(SIZEOF(*pak));
 	pak->first_entry = 0;
 	put_mstr(&package->str, &pak->package_name);
 	pak->package_handle = pakhandle;
@@ -535,7 +535,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 				parameter_alloc_values[parameter_count] = -1;
 			tbp = scan_space(tbp);
 		}
-		entry_ptr = get_memory(sizeof(*entry_ptr));
+		entry_ptr = get_memory(SIZEOF(*entry_ptr));
 		entry_ptr->next_entry = pak->first_entry;
 		pak->first_entry = entry_ptr;
 		entry_ptr->return_type = ret_tok;
@@ -543,8 +543,8 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		entry_ptr->argcnt = parameter_count;
 		entry_ptr->input_mask = array_to_mask(is_input, parameter_count);
 		entry_ptr->output_mask = array_to_mask(is_output, parameter_count);
-		entry_ptr->parms = get_memory(parameter_count * sizeof(entry_ptr->parms[0]));
-		entry_ptr->param_pre_alloc_size = get_memory(parameter_count * sizeof(intszofptr_t));
+		entry_ptr->parms = get_memory(parameter_count * SIZEOF(entry_ptr->parms[0]));
+		entry_ptr->param_pre_alloc_size = get_memory(parameter_count * SIZEOF(intszofptr_t));
 		entry_ptr->parmblk_size = (SIZEOF(void *) * parameter_count) + SIZEOF(intszofptr_t);
 		for (i = 0 ;  i < parameter_count ;  i++)
 		{
@@ -681,14 +681,14 @@ callin_entry_list*	citab_parse (void)
 		}
 		if (!*tbp)
 			ext_stx_error(ERR_CIRPARMNAME, ext_table_file_name);
-		entry_ptr = get_memory(sizeof(callin_entry_list));
+		entry_ptr = get_memory(SIZEOF(callin_entry_list));
 		entry_ptr->next_entry = save_entry_ptr;
 		save_entry_ptr = entry_ptr;
 		entry_ptr->return_type = ret_tok;
 		entry_ptr->argcnt = parameter_count;
 		entry_ptr->input_mask = inp_mask;
 		entry_ptr->output_mask = out_mask;
-		entry_ptr->parms = get_memory(parameter_count * sizeof(entry_ptr->parms[0]));
+		entry_ptr->parms = get_memory(parameter_count * SIZEOF(entry_ptr->parms[0]));
 		for (i = 0 ;  i < parameter_count ;  i++)
 			entry_ptr->parms[i] = parameter_types[i];
 		put_mstr(&labref, &entry_ptr->label_ref);

@@ -70,7 +70,7 @@ void mupip_extend(void)
 	error_def(ERR_TEXT);
 #endif
 
-	r_len = sizeof(regionname);
+	r_len = SIZEOF(regionname);
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
 		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
 	if (cli_get_int("BLOCKS",&tblocks))

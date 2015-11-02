@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
 #include "copy.h"
 #endif
 
-#define SPACE_NEEDED (sizeof(blk_hdr) - sizeof(v15_blk_hdr))
+#define SPACE_NEEDED (SIZEOF(blk_hdr) - SIZEOF(v15_blk_hdr))
 
 GBLREF	boolean_t	dse_running;
 
@@ -48,18 +48,18 @@ void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 	*/
 	assert(gds_blk_trg);
 	assert(gds_blk_src);
-	assert(sizeof(v15_blk_hdr) > gds_blk_src->bver);	/* Check it is a GDSVCURR blk to begin with */
+	assert(SIZEOF(v15_blk_hdr) > gds_blk_src->bver);	/* Check it is a GDSVCURR blk to begin with */
 	assert(0 == ((long)gds_blk_trg & 0x7));			/* Buffer alignment checks (8 byte) */
 	assert(0 == ((long)gds_blk_src & 0x7));
-	trg_p = (sm_uc_ptr_t)gds_blk_trg + sizeof(v15_blk_hdr);
-	src_p = (sm_uc_ptr_t)gds_blk_src + sizeof(blk_hdr);
+	trg_p = (sm_uc_ptr_t)gds_blk_trg + SIZEOF(v15_blk_hdr);
+	src_p = (sm_uc_ptr_t)gds_blk_src + SIZEOF(blk_hdr);
 	bsiz = gds_blk_src->bsiz;
 	assert(MAX_BLK_SZ >= bsiz);
-	assert(sizeof(blk_hdr) <= bsiz);
+	assert(SIZEOF(blk_hdr) <= bsiz);
 	tn = gds_blk_src->tn;
 	assert((MAX_TN_V4 >= tn) || dse_running);
 	levl = gds_blk_src->levl;
-	movesize = bsiz - USIZEOF(blk_hdr);
+	movesize = bsiz - SIZEOF(blk_hdr);
 	if ((sm_uc_ptr_t)gds_blk_trg != (sm_uc_ptr_t)gds_blk_src)
 	{	/* Normal case, downgrade is to a new buffer. Our simple check is quicker
 		   than just always doing memmove() would be. But assert they are at least

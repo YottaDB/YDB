@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,12 +66,13 @@ enum
 #define	START_FLAG_HASINFO			0x00000004
 #define	START_FLAG_COLL_M			0x00000008
 #define	START_FLAG_VERSION_INFO			0x00000010
+#define	START_FLAG_TRIGGER_SUPPORT		0x00000020
 
 #define	MIN_REPL_MSGLEN		32 /* To keep compiler happy with
 				    * the definition of repl_msg_t as well
 				    * as to accommodate a seq_num */
 
-#define	REPL_MSG_CMPINFOLEN	(sizeof(repl_cmpinfo_msg_t))
+#define	REPL_MSG_CMPINFOLEN	(SIZEOF(repl_cmpinfo_msg_t))
 #define	REPL_MSG_CMPDATALEN	256	/* length of data part of message exchanged between source/receiver to test compression */
 #define	REPL_MSG_CMPDATAMASK	0xff
 #define	MAX_CMP_EXPAND_FACTOR	2	/* the worst case factor by which compression could actually expand input data */
@@ -82,8 +83,8 @@ enum
 
 #define	REPL_MSG_ALIGN	8	/* every message sent across the pipe is expected to be at least 8-byte aligned */
 
-#define	REPL_MSG_TYPE	(uint4)(sizeof(int4))
-#define	REPL_MSG_LEN	(uint4)(sizeof(int4))
+#define	REPL_MSG_TYPE	(uint4)(SIZEOF(int4))
+#define	REPL_MSG_LEN	(uint4)(SIZEOF(int4))
 #define	REPL_MSG_HDRLEN	(uint4)(REPL_MSG_TYPE + REPL_MSG_LEN) /* For type and len fields */
 
 typedef struct	/* Used also to send a message of type REPL_INST_NOHIST */
@@ -133,7 +134,7 @@ typedef struct
 {
 	int4		type;
 	int4		len;
-	unsigned char	start_seqno[sizeof(seq_num)];
+	unsigned char	start_seqno[SIZEOF(seq_num)];
 	uint4		start_flags;
 	unsigned char	jnl_ver;
 	char		proto_ver;	/* Needs to be "signed char" in order to be able to do signed comparisons of this with
@@ -146,7 +147,7 @@ typedef struct
 {
 	int4		type;
 	int4		len;
-	unsigned char	start_seqno[sizeof(seq_num)];
+	unsigned char	start_seqno[SIZEOF(seq_num)];
 	unsigned char	jnl_ver;
 	char		start_flags[4];
 	char		proto_ver;	/* Needs to be "signed char" in order to be able to do signed comparisons of this with
@@ -252,8 +253,8 @@ typedef struct
 {
 	int4		type;
 	int4		len;
-	unsigned char	ack_seqno[sizeof(seq_num)];
-	unsigned char	ack_time[sizeof(gtm_time4_t)];
+	unsigned char	ack_seqno[SIZEOF(seq_num)];
+	unsigned char	ack_time[SIZEOF(gtm_time4_t)];
 	unsigned char	filler_32[12];
 } repl_heartbeat_msg_t; /* The first two fields should be as in repl_msg_t */
 

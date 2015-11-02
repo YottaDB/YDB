@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 		MV_FORCE_LEN(out_str);
 	}
 	/* Initialize both translation tables & other stuff */
-	memset(xlate, 0, sizeof(xlate));
+	memset(xlate, 0, SIZEOF(xlate));
 	if (!MV_IS_SINGLEBYTE(in_str))
 	{ /* hash table not needed if input is entirely single byte */
 		init_hashtab_int4(&xlate_hash, 0);
@@ -152,9 +152,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	 */
 	size = src->str.len + src->str.char_len * max_len_incr;
 	size = (size > MAX_STRLEN) ? MAX_STRLEN : size;
-	if (stringpool.top - stringpool.free < size)
-		stp_gcol(size);
-
+	ENSURE_STP_FREE_SPACE(size);
 	outbase = (unsigned char *)out_str->str.addr; /* recompute in case stp_gcol() changes out_str->str.addr */
 	outtop = outbase + out_str->str.len;
 	dstbase = stringpool.free;
@@ -215,9 +213,8 @@ void op_fnztranslate(mval *src,mval *in_str,mval *out_str,mval *dst)
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(in_str);
 	MV_FORCE_STR(out_str);
-	if (stringpool.top - stringpool.free < src->str.len)
-		stp_gcol(src->str.len);
-	memset(xlate,0xFF,sizeof(xlate));
+	ENSURE_STP_FREE_SPACE(src->str.len);
+	memset(xlate,0xFF,SIZEOF(xlate));
 	n = in_str->str.len < out_str->str.len ? in_str->str.len : out_str->str.len;
 	for (inpt = (unsigned char *)in_str->str.addr,
 		outpt = (unsigned char *)out_str->str.addr,

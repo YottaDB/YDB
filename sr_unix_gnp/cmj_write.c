@@ -40,7 +40,7 @@ cmi_status_t cmj_write_start(struct CLB *lnk)
 		return (lnk->sta == CM_CLB_DISCONNECT) ? CMI_DCNINPROG : CMI_LNKNOTIDLE;
 	lnk->sta = CM_CLB_WRITE;
 	CMI_CLB_IOSTATUS(lnk) = SS_NORMAL;
-	memset(&msg, 0, sizeof(msg));
+	memset(&msg, 0, SIZEOF(msg));
 	msg.msg_iovlen = NUM_IOVECS; /* two vectors */
 	msg.msg_iov = vec;
 	vec[IOVEC_LEN].iov_len = CMI_TCP_PREFIX_LEN;

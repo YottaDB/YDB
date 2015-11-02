@@ -43,7 +43,7 @@ int m_if(void)
 	error_def(ERR_INDEXTRACHARS);
 
 	ifpos_in_chain = pos_in_chain;
-	jmpchain = (jmpchn*)mcalloc(sizeof(jmpchn));
+	jmpchain = (jmpchn*)mcalloc(SIZEOF(jmpchn));
 	dqinit(jmpchain,link);
 	if (TK_EOL == window_token)
 		return TRUE;
@@ -54,7 +54,7 @@ int m_if(void)
 	{
 		jmpref = newtriple(OC_JMPTCLR);
 		jmpref->operand[0] = x;
-		nxtjmp = (jmpchn *)mcalloc(sizeof(jmpchn));
+		nxtjmp = (jmpchn *)mcalloc(SIZEOF(jmpchn));
 		nxtjmp->jmptrip = jmpref;
 		dqins(jmpchain,link,nxtjmp);
 	} else
@@ -62,7 +62,7 @@ int m_if(void)
 		first_time = TRUE;
 		for (;;)
 		{
-			ta_opr = (oprtype *)mcalloc(sizeof(oprtype));
+			ta_opr = (oprtype *)mcalloc(SIZEOF(oprtype));
 			if (!bool_expr((bool)TRUE, ta_opr))
 				return FALSE;
 			if ((ref0 = curtchain->exorder.bl)->opcode == OC_JMPNEQ
@@ -85,7 +85,7 @@ int m_if(void)
 			}
 			jmpref = newtriple(OC_JMP);
 			jmpref->operand[0] = x;
-			nxtjmp = (jmpchn *)mcalloc(sizeof(jmpchn));
+			nxtjmp = (jmpchn *)mcalloc(SIZEOF(jmpchn));
 			nxtjmp->jmptrip = jmpref;
 			dqins(jmpchain,link,nxtjmp);
 			tnxtarg(ta_opr);

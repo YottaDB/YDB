@@ -22,11 +22,14 @@
 #include "mu_gv_cur_reg_init.h"
 
 GBLREF gd_region	*gv_cur_region;
+#ifdef UNIX
+GBLREF	gd_region	*ftok_sem_reg;
+#endif
 
 void mu_gv_cur_reg_init(void)
 {
-	MALLOC_INIT(gv_cur_region, sizeof(gd_region));
-	MALLOC_INIT(gv_cur_region->dyn.addr, sizeof(gd_segment));
+	MALLOC_INIT(gv_cur_region, SIZEOF(gd_region));
+	MALLOC_INIT(gv_cur_region->dyn.addr, SIZEOF(gd_segment));
 	gv_cur_region->dyn.addr->acc_meth = dba_bg;
 
 	FILE_CNTL_INIT(gv_cur_region->dyn.addr);
@@ -39,5 +42,14 @@ void mu_gv_cur_reg_free(void)
 	free(gv_cur_region->dyn.addr->file_cntl);
 	free(gv_cur_region->dyn.addr);
 	free(gv_cur_region);
+#	ifdef UNIX
+	assert(gv_cur_region != ftok_sem_reg);	/* ftok_sem_release should have been done BEFORE mu_gv_cur_reg_free */
+	if (gv_cur_region == ftok_sem_reg)	/* Handle case nevertheless in pro */
+	{	/* Before resetting gv_cur_region to NULL, also reset ftok_sem_reg to NULL. Not doing so would
+		 * otherwise cause SIG-11 in "ftok_sem_release" (usually invoked as part of exit handling).
+		 */
+		ftok_sem_reg = NULL;
+	}
+#	endif
 	gv_cur_region = NULL; /* If you free it, you must not access it */
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,11 +67,11 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 	v.str.len   = li.value;
 	v.str.addr  = ptr;
 	cptr->ga    = zgbldir(&v);
-	memset(&pblk, 0, sizeof(pblk));
+	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = c;
 	pblk.buff_size = MAX_FBUFF;
 	pblk.def1_buf = DEF_GDR_EXT;
-	pblk.def1_size = sizeof(DEF_GDR_EXT) - 1;
+	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(&v.str, &pblk);
 
 	/* for all segments insert the full path in the segment fname */

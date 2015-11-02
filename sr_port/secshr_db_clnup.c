@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,6 +67,9 @@
 #include "memcoherency.h"
 #include "shmpool.h"
 #include "wbox_test_init.h"
+#ifdef GTM_SNAPSHOT
+#include "db_snapshot.h"
+#endif
 
 /* This section documents DOs and DONTs about code used by GTMSECSHR on Alpha VMS. Any module linked into GTMSECSHR (see
  * secshrlink.axp for the current list) must follow certain rules as GTMSECSHR provides user-defined system services
@@ -97,20 +100,20 @@
 
 /* IMPORTANT : SECSHR_PROBE_REGION sets csa */
 #define	SECSHR_PROBE_REGION(reg)									\
-	if (!GTM_PROBE(sizeof(gd_region), (reg), READ))							\
+	if (!GTM_PROBE(SIZEOF(gd_region), (reg), READ))							\
 		continue; /* would be nice to notify the world of a problem but where and how?? */	\
 	if (!reg->open || reg->was_open)								\
 		continue;										\
-	if (!GTM_PROBE(sizeof(gd_segment), (reg)->dyn.addr, READ))					\
+	if (!GTM_PROBE(SIZEOF(gd_segment), (reg)->dyn.addr, READ))					\
 		continue; /* would be nice to notify the world of a problem but where and how? */	\
 	if ((dba_bg != (reg)->dyn.addr->acc_meth) && (dba_mm != (reg)->dyn.addr->acc_meth))		\
 		continue;										\
-	if (!GTM_PROBE(sizeof(file_control), (reg)->dyn.addr->file_cntl, READ))				\
+	if (!GTM_PROBE(SIZEOF(file_control), (reg)->dyn.addr->file_cntl, READ))				\
 		continue; /* would be nice to notify the world of a problem but where and how? */	\
-	if (!GTM_PROBE(sizeof(GDS_INFO), (reg)->dyn.addr->file_cntl->file_info, READ))			\
+	if (!GTM_PROBE(SIZEOF(GDS_INFO), (reg)->dyn.addr->file_cntl->file_info, READ))			\
 		continue; /* would be nice to notify the world of a problem but where and how? */	\
 	csa = &(FILE_INFO((reg)))->s_addrs;								\
-	if (!GTM_PROBE(sizeof(sgmnt_addrs), csa, WRITE))						\
+	if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, WRITE))						\
 		continue; /* would be nice to notify the world of a problem but where and how? */	\
 	assert(reg->read_only && !csa->read_write || !reg->read_only && csa->read_write);
 
@@ -160,7 +163,7 @@
 	SALVAGE_UNIX_LATCH_DBCRIT(X, is_exiting, dummy);							\
 }
 
-GBLREF pid_t	process_id;	/* Used in xxx_SWAPLOCK macros .. has same value as rundown_process_id on UNIX */
+GBLREF uint4	process_id;	/* Used in xxx_SWAPLOCK macros .. has same value as rundown_process_id on UNIX */
 #endif
 
 GBLDEF gd_addr_fn_ptr	get_next_gdr_addrs;
@@ -175,7 +178,7 @@ GBLDEF gd_region	**jnlpool_reg_addrs;
 GBLDEF inctn_opcode_t	*inctn_opcode_addrs;
 GBLDEF inctn_detail_t	*inctn_detail_addrs;
 GBLDEF short		*dollar_tlevel_addrs;
-GBLDEF int4		*update_trans_addrs;
+GBLDEF uint4		*update_trans_addrs;
 GBLDEF sgmnt_addrs	**cs_addrs_addrs;
 GBLDEF sgmnt_addrs 	**kip_csa_addrs;
 GBLDEF boolean_t	*need_kip_incr_addrs;
@@ -211,7 +214,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	char			*wcblocked_ptr;
 	boolean_t		is_bg, jnlpool_reg, do_accounting, first_time = TRUE, is_exiting;
 	boolean_t		dlr_tlevel, kip_csa_usable, needkipincr;
-	int4			upd_trans; /* a copy of the global variable "update_trans" which is needed for VMS STOP/ID case */
+	uint4			upd_trans; /* a copy of the global variable "update_trans" which is needed for VMS STOP/ID case */
 	boolean_t		tp_update_underway = FALSE;	/* set to TRUE if TP commit was in progress or complete */
 	boolean_t		non_tp_update_underway = FALSE;	/* set to TRUE if non-TP commit was in progress or complete */
 	boolean_t		update_underway = FALSE;	/* set to TRUE if either TP or non-TP commit was underway */
@@ -246,6 +249,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 #	ifdef VMS
 	uint4			process_id;	/* needed for the UNPIN_CACHE_RECORD macro */
 #	endif
+	GTM_SNAPSHOT_ONLY(
+		snapshot_context_ptr_t	lcl_ss_ctx;
+	)
 
 	error_def(ERR_WCBLOCKED);
 
@@ -328,24 +334,24 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	VMS_ONLY(assert(rundown_process_id);)
 	VMS_ONLY(process_id = rundown_process_id;)	/* used by the UNPIN_CACHE_RECORD macro */
 	is_exiting = (ABNORMAL_TERMINATION == secshr_state) || (NORMAL_TERMINATION == secshr_state);
-	if (GTM_PROBE(sizeof(*dollar_tlevel_addrs), dollar_tlevel_addrs, READ))
+	if (GTM_PROBE(SIZEOF(*dollar_tlevel_addrs), dollar_tlevel_addrs, READ))
 		dlr_tlevel = *dollar_tlevel_addrs;
 	else
 	{
 		assert(FALSE);
 		dlr_tlevel = FALSE;
 	}
-	if (dlr_tlevel && GTM_PROBE(sizeof(*first_tp_si_by_ftok_addrs), first_tp_si_by_ftok_addrs, READ))
+	if (dlr_tlevel && GTM_PROBE(SIZEOF(*first_tp_si_by_ftok_addrs), first_tp_si_by_ftok_addrs, READ))
 	{	/* Determine update_underway for TP transaction. A similar check is done in t_commit_cleanup as well.
 		 * Regions are committed in the ftok order using "first_tp_si_by_ftok". Also crit is released on each region
 		 * as the commit completes. Take that into account while determining if update is underway.
 		 */
 		for (si = *first_tp_si_by_ftok_addrs; NULL != si; si = si->next_tp_si_by_ftok)
 		{
-			if (GTM_PROBE(sizeof(sgm_info), si, READ))
+			if (GTM_PROBE(SIZEOF(sgm_info), si, READ))
 			{
-				assert(GTM_PROBE(sizeof(cw_set_element), si->first_cw_set, READ) || (NULL == si->first_cw_set));
-				if (T_COMMIT_STARTED == si->update_trans)
+				assert(GTM_PROBE(SIZEOF(cw_set_element), si->first_cw_set, READ) || (NULL == si->first_cw_set));
+				if (UPDTRNS_TCOMMIT_STARTED_MASK & si->update_trans)
 				{	/* Two possibilities.
 					 *	(a) case of duplicate set not creating any cw-sets but updating db curr_tn++.
 					 *	(b) Have completed commit for this region and have released crit on this region.
@@ -356,10 +362,10 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					update_underway = TRUE;
 					break;
 				}
-				if (GTM_PROBE(sizeof(cw_set_element), si->first_cw_set, READ))
+				if (GTM_PROBE(SIZEOF(cw_set_element), si->first_cw_set, READ))
 				{	/* Note that SECSHR_PROBE_REGION does a "continue" if any probes fail. */
 					csa = si->tp_csa;
-					if (!GTM_PROBE(sizeof(sgmnt_addrs), csa, READ))
+					if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, READ))
 						continue;
 					if (T_UPDATE_UNDERWAY(csa))
 					{
@@ -378,14 +384,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	if (!dlr_tlevel)
 	{	/* determine update_underway for non-TP transaction */
 		upd_trans = FALSE;
-		if (GTM_PROBE(sizeof(*update_trans_addrs), update_trans_addrs, READ))
+		if (GTM_PROBE(SIZEOF(*update_trans_addrs), update_trans_addrs, READ))
 			upd_trans = *update_trans_addrs;
 		csaddrs = NULL;
-		if (GTM_PROBE(sizeof(*cs_addrs_addrs), cs_addrs_addrs, READ))
+		if (GTM_PROBE(SIZEOF(*cs_addrs_addrs), cs_addrs_addrs, READ))
 			csaddrs = *cs_addrs_addrs;
-		if (GTM_PROBE(sizeof(sgmnt_addrs), csaddrs, READ))
+		if (GTM_PROBE(SIZEOF(sgmnt_addrs), csaddrs, READ))
 		{
-			if (csaddrs->now_crit && (T_COMMIT_STARTED == upd_trans) || T_UPDATE_UNDERWAY(csaddrs))
+			if (csaddrs->now_crit && (UPDTRNS_TCOMMIT_STARTED_MASK & upd_trans) || T_UPDATE_UNDERWAY(csaddrs))
 			{
 				non_tp_update_underway = TRUE;	/* non-tp update was underway */
 				update_underway = TRUE;
@@ -398,13 +404,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	assert((COMMIT_INCOMPLETE != secshr_state) || update_underway);
 	for (gd_header = (*get_next_gdr_addrs)(NULL);  NULL != gd_header;  gd_header = (*get_next_gdr_addrs)(gd_header))
 	{
-		if (!GTM_PROBE(sizeof(gd_addr), gd_header, READ))
+		if (!GTM_PROBE(SIZEOF(gd_addr), gd_header, READ))
 			break;	/* if gd_header is accessible */
 		for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions;  reg < reg_top;  reg++)
 		{
 			SECSHR_PROBE_REGION(reg);	/* SECSHR_PROBE_REGION sets csa */
 			csd = csa->hdr;
-			if (!GTM_PROBE(sizeof(sgmnt_data), csd, WRITE))
+			if (!GTM_PROBE(SIZEOF(sgmnt_data), csd, WRITE))
 			{
 				assert(FALSE);
 				continue; /* would be nice to notify the world of a problem but where and how? */
@@ -488,7 +494,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					continue;
 				}
 				cache_state = csa->acc_meth.bg.cache_state;
-				if (!GTM_PROBE(sizeof(cache_que_heads), cache_state, WRITE))
+				if (!GTM_PROBE(SIZEOF(cache_que_heads), cache_state, WRITE))
 				{
 					SECSHR_ACCOUNTING(3);
 					SECSHR_ACCOUNTING(__LINE__);
@@ -499,7 +505,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				SALVAGE_UNIX_LATCH(&cache_state->cacheq_active.latch, is_exiting);
 				start_cr = cache_state->cache_array + csd->bt_buckets;
 				max_bts = csd->n_bts;
-				if (!GTM_PROBE((uint4)(max_bts * sizeof(cache_rec)), start_cr, WRITE))
+				if (!GTM_PROBE((uint4)(max_bts * SIZEOF(cache_rec)), start_cr, WRITE))
 				{
 					SECSHR_ACCOUNTING(3);
 					SECSHR_ACCOUNTING(__LINE__);
@@ -545,21 +551,21 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				 * that it gets processed at least once */
 				for (si = *first_tp_si_by_ftok_addrs; NULL != si; si = si->next_tp_si_by_ftok)
 				{
-					if (!GTM_PROBE(sizeof(sgm_info), si, READ))
+					if (!GTM_PROBE(SIZEOF(sgm_info), si, READ))
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
 						SECSHR_ACCOUNTING(si);
 						assert(FALSE);
 						break;
-					} else if (!GTM_PROBE(sizeof(gd_region), si->gv_cur_region, READ))
+					} else if (!GTM_PROBE(SIZEOF(gd_region), si->gv_cur_region, READ))
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
 						SECSHR_ACCOUNTING(si->gv_cur_region);
 						assert(FALSE);
 						continue;
-					} else if (!GTM_PROBE(sizeof(gd_segment), si->gv_cur_region->dyn.addr, READ))
+					} else if (!GTM_PROBE(SIZEOF(gd_segment), si->gv_cur_region->dyn.addr, READ))
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
@@ -569,11 +575,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					} else if (si->gv_cur_region->dyn.addr->file_cntl == reg->dyn.addr->file_cntl)
 					{
 						cs = si->first_cw_set;
-						if (cs && GTM_PROBE(sizeof(cw_set_element), cs, READ))
+						if (cs && GTM_PROBE(SIZEOF(cw_set_element), cs, READ))
 						{
 							while (cs->high_tlevel)
 							{
-								if (GTM_PROBE(sizeof(cw_set_element),
+								if (GTM_PROBE(SIZEOF(cw_set_element),
 											cs->high_tlevel, READ))
 									cs = cs->high_tlevel;
 								else
@@ -593,7 +599,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				}
 			} else if (!dlr_tlevel && csa->t_commit_crit)
 			{
-				if (!GTM_PROBE(sizeof(unsigned char), cw_depth_addrs, READ))
+				if (!GTM_PROBE(SIZEOF(unsigned char), cw_depth_addrs, READ))
 				{
 					SECSHR_ACCOUNTING(3);
 					SECSHR_ACCOUNTING(__LINE__);
@@ -683,7 +689,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					if (!tp_update_underway)
 					{
-						if (GTM_PROBE(sizeof(*start_tn_addrs), start_tn_addrs, READ))
+						if (GTM_PROBE(SIZEOF(*start_tn_addrs), start_tn_addrs, READ))
 							currtn = *start_tn_addrs;
 						else
 						{
@@ -702,11 +708,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					if (tp_update_underway)
 					{
 						orig_cs = cs;
-						if (cs && GTM_PROBE(sizeof(cw_set_element), cs, READ))
+						if (cs && GTM_PROBE(SIZEOF(cw_set_element), cs, READ))
 						{
 							while (cs->high_tlevel)
 							{
-								if (GTM_PROBE(sizeof(cw_set_element),
+								if (GTM_PROBE(SIZEOF(cw_set_element),
 											cs->high_tlevel, READ))
 									cs = cs->high_tlevel;
 								else
@@ -721,7 +727,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							}
 						}
 					}
-					if (!GTM_PROBE(sizeof(cw_set_element), cs, WRITE))
+					if (!GTM_PROBE(SIZEOF(cw_set_element), cs, WRITE))
 					{
 						SECSHR_ACCOUNTING(3);
 						SECSHR_ACCOUNTING(__LINE__);
@@ -787,9 +793,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								} else if (cs->ins_off != 0)
 								{
 									if ((cs->ins_off
-										> ((blk_hdr *)blk_ptr)->bsiz - sizeof(block_id))
+										> ((blk_hdr *)blk_ptr)->bsiz - SIZEOF(block_id))
 										|| (cs->ins_off
-										 < (sizeof(blk_hdr) + sizeof(rec_hdr))))
+										 < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr))))
 									{
 										SECSHR_ACCOUNTING(7);
 										SECSHR_ACCOUNTING(__LINE__);
@@ -812,7 +818,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 										|| (&first_cw_set[cs->index] < cs));
 									chain.cw_index = cs->index;
 									chain.next_off = cs->next_off;
-									if (!(GTM_PROBE(sizeof(int4), chain_ptr, WRITE)))
+									if (!(GTM_PROBE(SIZEOF(int4), chain_ptr, WRITE)))
 									{
 										SECSHR_ACCOUNTING(5);
 										SECSHR_ACCOUNTING(__LINE__);
@@ -866,7 +872,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						assert(gds_t_committed != cs->old_mode);
 						if (gds_t_committed > cs->old_mode)
 						{
-							if (!GTM_PROBE(sizeof(cache_rec), cr, WRITE))
+							if (!GTM_PROBE(SIZEOF(cache_rec), cr, WRITE))
 							{
 								SECSHR_ACCOUNTING(4);
 								SECSHR_ACCOUNTING(__LINE__);
@@ -949,10 +955,10 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								assert((0 <= cs->level) && (MAX_BT_DEPTH > cs->level));
 								gvtarget = cs->blk_target;
 								assert((MAX_BT_DEPTH + 1)
-									== (sizeof(gvtarget->hist.h)
-										/ sizeof(gvtarget->hist.h[0])));
+									== (SIZEOF(gvtarget->hist.h)
+										/ SIZEOF(gvtarget->hist.h[0])));
 								if ((0 <= cs->level) && (MAX_BT_DEPTH > cs->level)
-									&& GTM_PROBE(sizeof(gv_namehead), gvtarget, WRITE)
+									&& GTM_PROBE(SIZEOF(gv_namehead), gvtarget, WRITE)
 									&& (0 != gvtarget->clue.end))
 								{
 									t1 = &gvtarget->hist.h[cs->level];
@@ -970,7 +976,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							 * We have already picked out a cr for the commit. Use that.
 							 */
 							cr = cs->cr;
-							if (!GTM_PROBE(sizeof(cache_rec), cr, WRITE))
+							if (!GTM_PROBE(SIZEOF(cache_rec), cr, WRITE))
 							{
 								SECSHR_ACCOUNTING(4);
 								SECSHR_ACCOUNTING(__LINE__);
@@ -1016,8 +1022,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						 * If so need to store link to it so wcs_recover can back it up later. Cannot
 						 * rely on precomputed value csa->backup_in_prog since it is not initialized
 						 * if (cw_depth == 0) (see t_end.c). Hence using cnl->nbb explicitly in check.
+						 * However, for snapshots we can rely on csa as it is computed under
+						 * if (update_trans).
 						 */
-						if ((BACKUP_NOT_IN_PROGRESS != cnl->nbb) && (NULL != cs->old_block))
+						if ((SNAPSHOTS_IN_PROG(csa) ||
+							(BACKUP_NOT_IN_PROGRESS != cnl->nbb)) && (NULL != cs->old_block))
 						{
 							if (T_COMMIT_CRIT_PHASE2 != csa->t_commit_crit)
 							{	/* Set "cr->twin" to point to "cs->old_block". This is not normal
@@ -1073,6 +1082,17 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									 */
 								}
 #								endif
+								GTM_SNAPSHOT_ONLY(
+									if (csa->snapshot_in_prog)
+									{
+										lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
+										WRITE_SNAPSHOT_BLOCK(csa,
+													cr,
+													NULL,
+													cr->blk,
+													lcl_ss_ctx);
+									}
+								)
 							}
 						}
 						if (T_COMMIT_CRIT_PHASE2 != csa->t_commit_crit)
@@ -1212,9 +1232,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							} else if (cs->ins_off)
 							{
 								if ((cs->ins_off >
-									((blk_hdr *)blk_ptr)->bsiz - sizeof(block_id))
-									|| (cs->ins_off < (sizeof(blk_hdr)
-										+ sizeof(rec_hdr)))
+									((blk_hdr *)blk_ptr)->bsiz - SIZEOF(block_id))
+									|| (cs->ins_off < (SIZEOF(blk_hdr)
+										+ SIZEOF(rec_hdr)))
 									|| (0 > (short)cs->index)
 									|| ((cs - cw_set_addrs) <= cs->index))
 								{
@@ -1234,9 +1254,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									&& (gds_t_write_root == nxt->mode))
 								{
 									if ((nxt->ins_off >
-									     ((blk_hdr *)blk_ptr)->bsiz - sizeof(block_id))
-										|| (nxt->ins_off < (sizeof(blk_hdr)
-											 + sizeof(rec_hdr)))
+									     ((blk_hdr *)blk_ptr)->bsiz - SIZEOF(block_id))
+										|| (nxt->ins_off < (SIZEOF(blk_hdr)
+											 + SIZEOF(rec_hdr)))
 										|| (0 > (short)nxt->index)
 										|| ((cs - cw_set_addrs) <= nxt->index))
 									{
@@ -1280,9 +1300,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									if ((cs->ins_off
 										> ((blk_hdr *)blk_ptr)->bsiz
-											- sizeof(block_id))
+											- SIZEOF(block_id))
 										|| (cs->ins_off
-										 < (sizeof(blk_hdr) + sizeof(rec_hdr))))
+										 < (SIZEOF(blk_hdr) + SIZEOF(rec_hdr))))
 									{
 										SECSHR_ACCOUNTING(7);
 										SECSHR_ACCOUNTING(__LINE__);
@@ -1318,7 +1338,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								{
 									GET_LONGP(&chain, chain_ptr);
 									if ((1 == chain.flag)
-									   && ((chain_ptr - blk_ptr + sizeof(block_id))
+									   && ((chain_ptr - blk_ptr + SIZEOF(block_id))
 										  <= ((blk_hdr *)blk_ptr)->bsiz)
 									   && (chain.cw_index < si->cw_set_depth)
 									   && (FALSE != secshr_tp_get_cw(
@@ -1364,12 +1384,12 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						 * is marking a recycled block as free (inctn_opcode is inctn_blkmarkfree).
 						 */
 						if ((NULL != inctn_opcode_addrs)
-							&& (GTM_PROBE(sizeof(*inctn_opcode_addrs), inctn_opcode_addrs, READ))
+							&& (GTM_PROBE(SIZEOF(*inctn_opcode_addrs), inctn_opcode_addrs, READ))
 							&& ((inctn_bmp_mark_free_gtm == *inctn_opcode_addrs)
 								|| (inctn_bmp_mark_free_mu_reorg == *inctn_opcode_addrs))
 							&& (NULL != inctn_detail_addrs)
-							&& (GTM_PROBE(sizeof(*inctn_detail_addrs), inctn_detail_addrs, READ))
-							&& (0 != inctn_detail_addrs->blknum))
+							&& (GTM_PROBE(SIZEOF(*inctn_detail_addrs), inctn_detail_addrs, READ))
+							&& (0 != inctn_detail_addrs->blknum_struct.blknum))
 						{
 							DECR_BLKS_TO_UPGRD(csa, csd, 1);
 						}
@@ -1507,7 +1527,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					/* We have already checked that "si" is READABLE. Check that it is WRITABLE since
 					 * we might need to set "si->kip_csa" in the CAREFUL_INCR_KIP macro.
 					 */
-					if (GTM_PROBE(sizeof(sgm_info), si, WRITE))
+					if (GTM_PROBE(SIZEOF(sgm_info), si, WRITE))
 					{
 						kip_csa_usable = TRUE;
 						/* Take this opportunity to reset si->cr_array_index */
@@ -1532,10 +1552,10 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					 * Only if it is NULL, should we increment the kill_in_prog flag.
 					 */
 					kip_csa_usable =
-						(GTM_PROBE(sizeof(*kip_csa_addrs), kip_csa_addrs, WRITE))
+						(GTM_PROBE(SIZEOF(*kip_csa_addrs), kip_csa_addrs, WRITE))
 							? TRUE : FALSE;
 					assert(kip_csa_usable);
-					if (GTM_PROBE(sizeof(*need_kip_incr_addrs), need_kip_incr_addrs, WRITE))
+					if (GTM_PROBE(SIZEOF(*need_kip_incr_addrs), need_kip_incr_addrs, WRITE))
 						needkipincr = *need_kip_incr_addrs;
 					else
 					{
@@ -1565,7 +1585,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			 */
 			if (is_exiting)
 			{
-				if (GTM_PROBE(sizeof(*first_sgm_info_addrs), first_sgm_info_addrs, READ))
+				if (GTM_PROBE(SIZEOF(*first_sgm_info_addrs), first_sgm_info_addrs, READ))
 					firstsgminfo = *first_sgm_info_addrs;
 				else
 				{
@@ -1575,7 +1595,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				if (dlr_tlevel || (NULL != firstsgminfo))
 				{
 					si = csa->sgm_info_ptr;
-					kip_csa_usable = (GTM_PROBE(sizeof(sgm_info), si, WRITE)) ? TRUE : FALSE;
+					kip_csa_usable = (GTM_PROBE(SIZEOF(sgm_info), si, WRITE)) ? TRUE : FALSE;
 					assert(kip_csa_usable);
 					/* Since the kill process cannot be completed, we need to decerement KIP count
 					 * and increment the abandoned_kills count.
@@ -1589,7 +1609,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				} else if (!dlr_tlevel)
 				{
 					kip_csa_usable =
-						(GTM_PROBE(sizeof(*kip_csa_addrs), kip_csa_addrs, WRITE))
+						(GTM_PROBE(SIZEOF(*kip_csa_addrs), kip_csa_addrs, WRITE))
 						? TRUE : FALSE;
 					assert(kip_csa_usable);
 					if (kip_csa_usable && (NULL != *kip_csa_addrs))
@@ -1601,10 +1621,10 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			}
 			if (JNL_ENABLED(csd))
 			{
-				if (GTM_PROBE(sizeof(jnl_private_control), csa->jnl, WRITE))
+				if (GTM_PROBE(SIZEOF(jnl_private_control), csa->jnl, WRITE))
 				{
 					jbp = csa->jnl->jnl_buff;
-					if (GTM_PROBE(sizeof(jnl_buffer), jbp, WRITE) && is_exiting)
+					if (GTM_PROBE(SIZEOF(jnl_buffer), jbp, WRITE) && is_exiting)
 					{
 						SALVAGE_UNIX_LATCH(&jbp->fsync_in_prog_latch, is_exiting);
 						if (VMS_ONLY(csa->jnl->qio_active)
@@ -1644,7 +1664,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					SECSHR_ACCOUNTING(4);
 					SECSHR_ACCOUNTING(__LINE__);
 					SECSHR_ACCOUNTING(csa->jnl);
-					SECSHR_ACCOUNTING(sizeof(jnl_private_control));
+					SECSHR_ACCOUNTING(SIZEOF(jnl_private_control));
 					assert(FALSE);
 				}
 			}
@@ -1783,7 +1803,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 #endif
 		}	/* For all regions */
 	}	/* For all glds */
-	if (jnlpool_reg_addrs && (GTM_PROBE(sizeof(*jnlpool_reg_addrs), jnlpool_reg_addrs, READ)))
+	if (jnlpool_reg_addrs && (GTM_PROBE(SIZEOF(*jnlpool_reg_addrs), jnlpool_reg_addrs, READ)))
 	{	/* although there is only one jnlpool reg, SECSHR_PROBE_REGION macro might do a "continue" and hence the for loop */
 		for (reg = *jnlpool_reg_addrs, jnlpool_reg = TRUE; jnlpool_reg && reg; jnlpool_reg = FALSE) /* only jnlpool reg */
 		{
@@ -1795,13 +1815,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				jpl = (jnlpool_ctl_ptr_t)((sm_uc_ptr_t)csa->critical - JNLPOOL_CTL_SIZE); /* see jnlpool_init() for
 													   * relationship between
 													   * critical and jpl */
-				if (GTM_PROBE(sizeof(jnlpool_ctl_struct), jpl, WRITE))
+				if (GTM_PROBE(SIZEOF(jnlpool_ctl_struct), jpl, WRITE))
 				{
 					if ((jpl->early_write_addr > jpl->write_addr) && (update_underway))
 					{	/* we need to update journal pool to reflect the increase in jnl-seqno */
 						cumul_jnl_rec_len = (uint4)(jpl->early_write_addr - jpl->write_addr);
 						jh = (jnldata_hdr_ptr_t)((sm_uc_ptr_t)jpl + JNLDATA_BASE_OFF + jpl->write);
-						if (GTM_PROBE(sizeof(*jh), jh, WRITE) && 0 != (jsize = jpl->jnlpool_size))
+						if (GTM_PROBE(SIZEOF(*jh), jh, WRITE) && 0 != (jsize = jpl->jnlpool_size))
 						{	/* Below chunk of code mirrors  what is done in t_end/tp_tend */
 							/* Begin atomic stmnts */
 							jh->jnldata_len = cumul_jnl_rec_len;
@@ -1855,18 +1875,18 @@ boolean_t	secshr_tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1)
 	*cs1 = cs;
 	for (iter = 0; iter < depth; iter++)
 	{
-		if (!(GTM_PROBE(sizeof(cw_set_element), *cs1, READ)))
+		if (!(GTM_PROBE(SIZEOF(cw_set_element), *cs1, READ)))
 		{
 			*cs1 = NULL;
 			return FALSE;
 		}
 		*cs1 = (*cs1)->next_cw_set;
 	}
-	if (*cs1 && GTM_PROBE(sizeof(cw_set_element), *cs1, READ))
+	if (*cs1 && GTM_PROBE(SIZEOF(cw_set_element), *cs1, READ))
 	{
 		while ((*cs1)->high_tlevel)
 		{
-			if (GTM_PROBE(sizeof(cw_set_element), (*cs1)->high_tlevel, READ))
+			if (GTM_PROBE(SIZEOF(cw_set_element), (*cs1)->high_tlevel, READ))
 				*cs1 = (*cs1)->high_tlevel;
 			else
 			{

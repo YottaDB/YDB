@@ -104,8 +104,8 @@ void dse_adrec(void)
 
 	if (((blk_hdr_ptr_t)lbp)->bsiz > blk_size)
 		((blk_hdr_ptr_t)lbp)->bsiz = blk_size;
-	else if (((blk_hdr_ptr_t)lbp)->bsiz < sizeof(blk_hdr))
-		((blk_hdr_ptr_t)lbp)->bsiz = sizeof(blk_hdr);
+	else if (((blk_hdr_ptr_t)lbp)->bsiz < SIZEOF(blk_hdr))
+		((blk_hdr_ptr_t)lbp)->bsiz = SIZEOF(blk_hdr);
 
 	b_top = lbp + ((blk_hdr_ptr_t)lbp)->bsiz;
 	if (((blk_hdr_ptr_t)lbp)->levl)
@@ -130,8 +130,8 @@ void dse_adrec(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		MEMCP(&data[0], (char *)&blk, 0, sizeof(block_id), sizeof(block_id));
-		data_len = sizeof(block_id);
+		MEMCP(&data[0], (char *)&blk, 0, SIZEOF(block_id), SIZEOF(block_id));
+		data_len = SIZEOF(block_id);
 	} else
 	{
 		if (cli_present("DATA") != CLI_PRESENT)
@@ -183,24 +183,24 @@ void dse_adrec(void)
 	for (cc = 0; cc < size && patch_comp_key[cc] == key[cc]; cc++)
 		;
 	((rec_hdr_ptr_t)new_bp)->cmpc = cc;
-	new_len = key_len - cc + data_len + sizeof(rec_hdr);
+	new_len = key_len - cc + data_len + SIZEOF(rec_hdr);
 	PUT_SHORT(&((rec_hdr_ptr_t)new_bp)->rsiz, new_len);
-	MEMCP(new_bp, &key[cc], sizeof(rec_hdr), key_len - cc, blk_size);
-	MEMCP(new_bp, &data[0], sizeof(rec_hdr) + key_len - cc, data_len, blk_size);
+	MEMCP(new_bp, &key[cc], SIZEOF(rec_hdr), key_len - cc, blk_size);
+	MEMCP(new_bp, &data[0], SIZEOF(rec_hdr) + key_len - cc, data_len, blk_size);
 	if (rp < b_top)
 	{
 		GET_SHORT(rsize, &((rec_hdr_ptr_t)rp)->rsiz);
-		if (rsize < sizeof(rec_hdr))
-			r_top = rp + sizeof(rec_hdr);
+		if (rsize < SIZEOF(rec_hdr))
+			r_top = rp + SIZEOF(rec_hdr);
 		else
 			r_top = rp + rsize;
 		if (r_top >= b_top)
 			r_top = b_top;
 		if (((blk_hdr_ptr_t)lbp)->levl)
-			key_top = r_top - sizeof(block_id);
+			key_top = r_top - SIZEOF(block_id);
 		else
 		{
-			for (key_top = rp + sizeof(rec_hdr); key_top < r_top; )
+			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
 				if (!*key_top++ && !*key_top++)
 					break;
 		}
@@ -208,22 +208,22 @@ void dse_adrec(void)
 			cc = patch_comp_count;
 		else
 			cc = ((rec_hdr_ptr_t)rp)->cmpc;
-		size = key_top - rp - sizeof(rec_hdr);
-		if (size > sizeof(patch_comp_key) - 2 - cc)
-			size = sizeof(patch_comp_key) - 2 - cc;
+		size = key_top - rp - SIZEOF(rec_hdr);
+		if (size > SIZEOF(patch_comp_key) - 2 - cc)
+			size = SIZEOF(patch_comp_key) - 2 - cc;
 		if (size < 0)
 			size = 0;
-		memcpy(&patch_comp_key[cc], rp + sizeof(rec_hdr), size);
+		memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
 		patch_comp_count = cc + size;
 		size = (key_len < patch_comp_count) ? key_len : patch_comp_count;
 		for (cc = 0; cc < size && patch_comp_key[cc] ==  key[cc]; cc++)
 			;
 		((rec_hdr_ptr_t)(new_bp + new_len))->cmpc = cc;
-		rsize = patch_comp_count - cc + r_top - key_top + sizeof(rec_hdr);
+		rsize = patch_comp_count - cc + r_top - key_top + SIZEOF(rec_hdr);
 		PUT_SHORT(&((rec_hdr_ptr_t)(new_bp + new_len))->rsiz, rsize);
-		MEMCP(new_bp, &patch_comp_key[cc], new_len + sizeof(rec_hdr), patch_comp_count - cc, blk_size);
-		MEMCP(new_bp, key_top, new_len + sizeof(rec_hdr) + patch_comp_count - cc, b_top - key_top, blk_size);
-		new_len += patch_comp_count - cc + sizeof(rec_hdr) + b_top - key_top;
+		MEMCP(new_bp, &patch_comp_key[cc], new_len + SIZEOF(rec_hdr), patch_comp_count - cc, blk_size);
+		MEMCP(new_bp, key_top, new_len + SIZEOF(rec_hdr) + patch_comp_count - cc, b_top - key_top, blk_size);
+		new_len += patch_comp_count - cc + SIZEOF(rec_hdr) + b_top - key_top;
 	}
 	if (rp - lbp + new_len > blk_size)
 	{
@@ -238,7 +238,7 @@ void dse_adrec(void)
 	((blk_hdr_ptr_t)lbp)->bsiz += new_len + (unsigned int)(rp - b_top);
 
 	BLK_INIT(bs_ptr, bs1);
-	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + sizeof(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - sizeof(blk_hdr));
+	BLK_SEG(bs_ptr, (uchar_ptr_t)lbp + SIZEOF(blk_hdr), (int)((blk_hdr_ptr_t)lbp)->bsiz - SIZEOF(blk_hdr));
 	if (!BLK_FINI(bs_ptr, bs1))
 	{
 		util_out_print("Error: bad blk build.", TRUE);
