@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -9,14 +9,26 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 tttgen	;scan the ttt input file and produce c source code
-	Break
-	Set infile="ttt.txt",outfile="ttt.c"
-	Do ^LOADOP
-	Do ^LOADVX
+	;zcmdline processing for use in make files
+	Set outfile="ttt.c"
+	Set zcmdline=$ZCMDLINE
+	If $Length(zcmdline) Do
+	. Set infile=$Piece(zcmdline," ",1)
+	. For i=2,3 Do
+	. . Set fullfile=$Piece(zcmdline," ",i)
+	. . Set ndirs=$Length(fullfile,"/")
+	. . Set filename=$Piece(fullfile,"/",ndirs)
+	. . Set loadh(filename)=fullfile
+	Else  Do
+	. Break
+	. Set infile="ttt.txt"
+	. Set loadh("opcode_def.h")="opcode_def.h",loadh("vxi.h")="vxi.h"
+	Do ^loadop
+	Do ^loadvx
 	Open infile:read
-	Do ^TTTSCAN
-	Do ^CHKOP
-	Do ^CHK2LEV
-	Do ^GENDASH
-	Do ^GENOUT
+	Do ^tttscan
+	Do ^chkop
+	Do ^chk2lev
+	Do ^gendash
+	Do ^genout
 	Quit

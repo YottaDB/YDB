@@ -50,7 +50,7 @@
 
 LITREF	unsigned char		io_params_size[];
 GBLREF	dev_dispatch_struct	io_dev_dispatch[];
-GBLREF	bool			run_time;
+GBLREF	boolean_t		run_time;
 GBLREF	io_desc			*active_device;
 GBLREF	mstr			sys_input;
 GBLREF	mstr			sys_output;

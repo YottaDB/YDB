@@ -37,7 +37,6 @@
 #include "copy.h"
 
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
-DEBUG_ONLY( GBLREF bool		run_time;)
 
 GBLREF	uint4			process_id;
 GBLREF	sm_uc_ptr_t		jnldata_base;

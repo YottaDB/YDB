@@ -391,7 +391,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				return NULL;
 			}
 			in_len = u_strlen(cli_fgets_Ubuffer);
-			in_len = trim_U16_line_term(cli_fgets_Ubuffer,(int)(in_len));
+			in_len = trim_U16_line_term(cli_fgets_Ubuffer, in_len);
 			for (u16_off = 0, mbc_len = 0; u16_off < in_len; )
 			{
 				U16_NEXT(cli_fgets_Ubuffer, u16_off, in_len, uc32_cp);
@@ -420,7 +420,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				destbuffer = buffer;
 			}
 			errorcode = U_ZERO_ERROR;
-			u_strToUTF8(destbuffer, destsize, &mbc_dest_len, cli_fgets_Ubuffer, (int32_t)(in_len + 1), &errorcode);
+			u_strToUTF8(destbuffer, destsize, &mbc_dest_len, cli_fgets_Ubuffer, in_len + 1, &errorcode);
 			if (U_FAILURE(errorcode))
 				if (U_BUFFER_OVERFLOW_ERROR == errorcode)
 				{	/* truncate so null terminated */
@@ -446,7 +446,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			if (cli_lex_str)
 			{
 				if (cli_lex_in_ptr->buflen < in_len)
-				  cli_lex_in_expand((int)(in_len));
+					cli_lex_in_expand(in_len);
 				destbuffer = cli_lex_in_ptr->in_str;
 			} else
 			{
@@ -500,21 +500,7 @@ int	cli_gettoken (int *eof)
 			if (strlen(cli_lex_in_ptr->in_str)
 			    + strlen(cli_lex_in_ptr->argv[arg_no]) > MAX_LINE)
 				break;
-			if (cli_has_space(cli_lex_in_ptr->argv[arg_no]))
-			{
-				from = cli_lex_in_ptr->argv[arg_no++];
-				to = cli_lex_in_ptr->in_str + strlen(cli_lex_in_ptr->in_str);
-				*to++ = '\"';
-				while(*from != '\0')
-				{
-					if ('\"' == *from)
-						*to++ = *from;
-					*to++ = *from++;
-				}
-				*to++ = '\"';
-				*to = '\0';
-			} else
-				strcat(cli_lex_in_ptr->in_str, cli_lex_in_ptr->argv[arg_no++]);
+			strcat(cli_lex_in_ptr->in_str, cli_lex_in_ptr->argv[arg_no++]);
 		}
 	}
 

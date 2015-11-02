@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -227,7 +227,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			jnlfile_lost = FALSE;
 			if (jb->free_update_pid)
 			{
-				FIX_NONZERO_FREE_UPDATE_PID(jb);
+				FIX_NONZERO_FREE_UPDATE_PID(csa, jb);
 			} else if (jb->dskaddr > jb->freeaddr || threshold > jb->freeaddr || jb->free != (jb->freeaddr % jb->size))
 			{ /* if it's possible to recover from JNLCNTRL, or JNLMEMDSK errors, do it here.
 			   * jnl_file_lost is disruptive - Vinaya, June 05, 2001 */

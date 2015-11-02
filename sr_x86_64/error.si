@@ -1,0 +1,58 @@
+#################################################################
+#								#
+#	Copyright 2007 Fidelity Information Services, Inc	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+	.sbttl	error.si
+#	PAGE	+
+#-----------------------------------------------
+# Mumps error condition handler macros
+#-----------------------------------------------
+chnd_size	=	224
+chnd_save_active =	0
+chnd_ch_active	=	8
+chnd_ch		=	16
+chnd_jmp	=	24
+
+	.data
+.extern	ctxt
+.extern	active_ch
+
+#	.text
+#	setjmp is really __sigsetjmp(env,0)
+#.extern	__sigsetjmp
+
+	.sbttl	error.si    ESTABLISH
+.macro ESTABLISH label
+	addq	$chnd_size,ctxt(REG_IP)			# ctxt++
+	movq	ctxt(REG_IP),%rax
+	movq	active_ch(REG_IP),%rdx
+	movq	%rdx,chnd_save_active(%rax)	# ctxt->save_active_ch = active_ch
+	movl	$0,chnd_ch_active(%rax)		# ctxt->ch_active = FALSE
+	movq	%rax,active_ch(REG_IP)			# active_ch = ctxt
+	leaq	mdb_condition_handler(REG_IP), REG64_SCRATCH1
+	movq    REG64_SCRATCH1, chnd_ch(%rax)		# ctxt->ch = x
+	addq	$chnd_jmp,%rax			# setjmp(ctxt->jnp)
+	movq	$0,%rsi
+	movq	%rax,%rdi
+	call 	__sigsetjmp@PLT
+	incl  	%eax
+	jne  	\label
+	REVERT
+	jmp  	return
+\label:
+.endm
+
+	.sbttl	error.si    REVERT
+.macro REVERT
+	movq	ctxt(REG_IP),%rax			# active_ch = ctxt->save_active_c
+	movq	chnd_save_active(%rax),%rax
+	movq	%rax,active_ch(REG_IP)
+	subq  	$chnd_size,ctxt(REG_IP)			# ctxt--
+.endm

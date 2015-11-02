@@ -36,7 +36,7 @@
 #include "cert_blk.h"
 #include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_search_tail,gvcst_search prototype */
 
-GBLREF bool             certify_all_blocks;
+GBLREF boolean_t	certify_all_blocks;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_namehead	*gv_target;

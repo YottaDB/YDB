@@ -41,7 +41,8 @@ GBLREF unsigned char 		*stackbase,*stacktop,*stackwarn,*msp;
 GBLREF mv_stent			*mv_chain;
 GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval			*curr_symval;
-GBLREF bool			run_time, compile_time;
+GBLREF boolean_t		run_time;
+GBLREF bool			compile_time;
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF int4			dollar_zcstatus;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,6 +98,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 	sgmnt_addrs 		*csa;
 	repl_ctl_element	*tmp_ctl = NULL;
 	jnl_file_header		*tmp_jfh = NULL;
+	jnl_file_header		*tmp_jfh_base = NULL;
 	int			tmp_fd = -1;
 	int			status;
 #ifdef UNIX
@@ -191,8 +192,9 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 
 	if (status == SS_NORMAL)
 	{
-		tmp_jfh = (jnl_file_header *)malloc(ROUND_UP(sizeof(jnl_file_header), 8));
-		F_READ_BLK_ALIGNED(tmp_fd, 0, tmp_jfh, ROUND_UP(sizeof(jnl_file_header), 8), status);
+		tmp_jfh_base = (jnl_file_header *)malloc(sizeof(jnl_file_header) + DISK_BLOCK_SIZE);
+		tmp_jfh = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)tmp_jfh_base, DISK_BLOCK_SIZE));
+		F_READ_BLK_ALIGNED(tmp_fd, 0, tmp_jfh, ROUND_UP2(sizeof(jnl_file_header), DISK_BLOCK_SIZE), status);
 		if (SS_NORMAL == status && 0 != memcmp(tmp_jfh->label, JNL_LABEL_TEXT, STR_LIT_LEN(JNL_LABEL_TEXT)))
 			status = (int4)ERR_JNLBADLABEL;
 	}
@@ -201,9 +203,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 	{
 		free(tmp_ctl);
 		tmp_ctl = NULL;
-		if (NULL != tmp_jfh)
-			free(tmp_jfh);
+		if (NULL != tmp_jfh_base)
+			free(tmp_jfh_base);
 		tmp_jfh = NULL;
+		tmp_jfh_base = NULL;
 		rts_error(VARLSTCNT(7) ERR_JNLFILOPN, 4, jnl_fn_len, jnl_fn, DB_LEN_STR(reg), status);
 	}
 
@@ -211,6 +214,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg,
 	tmp_ctl->repl_buff->backctl = tmp_ctl;
 
 	tmp_ctl->repl_buff->fc->eof_addr = JNL_FILE_FIRST_RECORD;
+	tmp_ctl->repl_buff->fc->jfh_base = tmp_jfh_base;
 	tmp_ctl->repl_buff->fc->jfh = tmp_jfh;
 	tmp_ctl->repl_buff->fc->fd = tmp_fd;
 
@@ -300,8 +304,8 @@ int repl_ctl_close(repl_ctl_element *ctl)
 					free(ctl->repl_buff->buff[index].base);
 			if (ctl->repl_buff->fc)
 			{
-				if (ctl->repl_buff->fc->jfh)
-					free(ctl->repl_buff->fc->jfh);
+				if (ctl->repl_buff->fc->jfh_base)
+					free(ctl->repl_buff->fc->jfh_base);
 				if (NOJNL != ctl->repl_buff->fc->fd)
 				{
 					F_CLOSE(ctl->repl_buff->fc->fd, status);

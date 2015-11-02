@@ -31,17 +31,18 @@
 #include "min_max.h"
 #include "jnl_get_checksum.h"
 
-GBLREF cw_set_element	cw_set[];
-GBLREF unsigned char	cw_set_depth;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF short		dollar_tlevel;
-GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
-GBLREF gv_namehead	*gv_target;
-GBLREF uint4		t_err;
-GBLREF unsigned int	t_tries;
-GBLREF boolean_t	horiz_growth;
-GBLREF int4		prev_first_off, prev_next_off;
+GBLREF	cw_set_element	cw_set[];
+GBLREF	unsigned char	cw_set_depth;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	sgm_info	*sgm_info_ptr;
+GBLREF	short		dollar_tlevel;
+GBLREF	trans_num	local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	gv_namehead	*gv_target;
+GBLREF	uint4		t_err;
+GBLREF	unsigned int	t_tries;
+GBLREF	boolean_t	horiz_growth;
+GBLREF	int4		prev_first_off, prev_next_off;
+GBLREF	boolean_t	mu_reorg_process;
 
 cw_set_element *t_write (
 			srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
@@ -228,6 +229,8 @@ cw_set_element *t_write (
 	cse->forward_process = forward;
 	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->t_level = dollar_tlevel;
+	/* All REORG operations should disable the "indexmod" optimization (C9B11-001813/C9H12-002934). Assert that. */
+	assert(!mu_reorg_process || (GDS_WRITE_KILLTN == write_type));
 	if (dollar_tlevel)
 		cse->write_type |= write_type;
 	else

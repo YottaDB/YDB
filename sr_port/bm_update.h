@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef __BM_UPDATE_H__
 #define __BM_UPDATE_H__
 
-void bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, bool is_mm);
+void bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm);
 
 #endif

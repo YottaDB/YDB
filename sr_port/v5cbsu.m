@@ -44,7 +44,7 @@ v5cbsu
 	. . Set outrecs=outrecs+1
 	. . If gvtleaf=blktype Set releaf=releaf+1	; This is a leaf block we cannot process (no key)
 	. . Quit
-	. TStart ()
+	. TStart ():T="BATCH"
 	. Set exist=$DATA(@reckey)
 	. If (1=exist)!(11=exist) Set value=$Get(@reckey) Set @reckey=value TCommit  Set prorecs=prorecs+1
 	. Else  TRollback  Set byprecs=byprecs+1
@@ -188,6 +188,7 @@ init
 	Set writeflg=0
 	Set endian("AXP")=FALSE
 	Set endian("x86")=FALSE
+	Set endian("x86_64")=FALSE
 	Set endian("HP-PA")=TRUE
 	Set endian("IA64/B")=TRUE
 	Set endian("IA64/L")=FALSE

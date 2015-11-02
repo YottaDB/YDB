@@ -23,3 +23,5 @@
 #define PART_DEAD 1
 #define NOT_DEAD 0
 #define NOT_THERE -1
+
+#define LOCK_SELF_WAKE 100

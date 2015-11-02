@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,9 +53,7 @@ bool gtcmtr_data(void)
 	gtcm_bind_name(reg_ref->reghead, TRUE);
 	x = 0;
  	if (gv_target->root)
-	{
 		x = gvcst_data();
-	}
 	v = *fndata_table[x / 10][x & 1];
 
 	ptr = curr_entry->clb_ptr->mbf;
@@ -63,7 +61,7 @@ bool gtcmtr_data(void)
 	len = sizeof(unsigned char);
 	PUT_USHORT(ptr, len);
 	ptr += sizeof(unsigned short);
-	*ptr++ = MV_FORCE_INT(&v);
+	*ptr++ = MV_FORCE_INTD(&v);
 	curr_entry->clb_ptr->cbl = ptr - curr_entry->clb_ptr->mbf;
 	return TRUE;
 }

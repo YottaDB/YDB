@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -11,23 +11,52 @@
 
 # Commands to build GT.M downloaded from SourceForge
 # 1. 'cd' to the GT.M directory where sr_* directories are copied to.
-# 2. Define an environment variable gtm_curpro to point to the full path of the prior GT.M installation.
-#    (download and install GT.M binary distribution from SourceForge if you do not have
-#    GT.M installed already).
+# 2. Define an environment variable gtm_curpro to point to the full
+#    path of the prior GT.M installation.
+#    (download and install GT.M binary distribution from SourceForge
+#    if you do not have GT.M installed already).
 # 3. To build debug version with no compiler optimzations -
-# 		gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=<the current directory>
+# 	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=<the current directory>
 #    To build a version enabling optimizations -
-#    		gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=<the current directory>
+#    	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=<the current directory>
 #
+#    By default the build procedure will build 32 bit version of GT.M
+#    on a x86_64 bit machine.
+#    If you intend to build 64 bit version of GT.M on a x86_64 bit machine you
+#    have to explicitly set the environment variable 'OBJECT_MODE' to '64'
+#    Example:
+#        OBJECT_MODE=64; export OBJECT_MODE #bourne shell
+#        export OBJECT_MODE=64              #bash shell
+#        setenv OBJECT_MODE 64              #tcsh shell
+#
+#   This procedure requires the tcsh shell to be installed.
 
 # get_lib_dirs.mk must be in the same directory as this makefile
+gt_machine_type=$(shell uname -m)
+gt_os_type=$(shell uname -s)
+
+linux_build_type=32
+
+ifeq ($(gt_machine_type),ia64)
+linux_build_type=64
+endif
+
+ifeq ($(gt_machine_type),x86_64)
+ifeq ($(OBJECT_MODE),64)
+linux_build_type=64
+else
+linux_build_type=32
+endif
+endif
+
 verbose ?= 0
 include get_lib_dirs.mk
 
 CURDIR=$(shell pwd)
 
 ifeq ($(MAKELEVEL),0)
-#the first-level make invocation - rules to create & clean directories and build utilities selectively.
+# the first-level make invocation - rules to create & clean directories
+# and build utilities selectively.
 
 ifndef buildtypes
 buildtypes=pro
@@ -36,7 +65,6 @@ endif
 ifndef gtm_ver
 gtm_ver=$(CURDIR)
 endif
-
 gt_ar_archiver=ar
 gt_ar_options=rv
 
@@ -49,8 +77,21 @@ make_i_flags=$(addprefix -I$(gtm_ver)/, $(gt_src_list))
 
 export #export all variables defined here to sub-make
 
-# Build the complete suit for packaging - all executables, % utilities, help files etc.
-all: dirs $(addsuffix _all, $(buildtypes)) ;
+# Build the complete suit for packaging - all executables, % utilities,
+# help files etc.
+all: dirs xfer_build $(addsuffix _all, $(buildtypes)) ;
+
+#Build xfer_desc.i for ia64 and linux x86_64
+xfer_build:
+ifeq ($(gt_machine_type),ia64)
+	tcsh -f $(gtm_ver)/sr_ia64/gen_xfer_desc.csh $(gt_src_list)
+else
+ifeq ($(gt_machine_type),x86_64)
+ifeq ($(linux_build_type),64)
+	tcsh -f $(gtm_ver)/sr_x86_64/gen_xfer_desc.csh $(gt_src_list)
+endif
+endif
+endif
 
 dirs: 	$(addprefix $(gtm_ver)/, $(addsuffix /obj, $(buildtypes))) \
 	$(addprefix $(gtm_ver)/, $(addsuffix /map, $(buildtypes))) ;
@@ -73,9 +114,32 @@ package: $(addsuffix _tar, $(buildtypes))
 %_tar: release_name.h
 	@echo "packaging GT.M..."
 	grep RELEASE_NAME $< | awk '{print $$4}' | sed 's/[\.]//' | sed 's/-//' > idtemp
-	grep RELEASE_NAME $< | awk '{print $$5}' | tr '[:upper:]' '[:lower:]' > ostemp
-	@tar -zcvf gtm_`cat idtemp`_`cat ostemp`_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
-	rm -f idtemp ostemp
+ifeq ($(MACHTYPE),x86_64)
+# On a 64 bit machine switch between 64 bit and 32 bit depending upon
+# the OBJECT_MODE environment variable
+ifeq ($(linux_build_type),64)
+	@tar -zcvf gtm_`head -1 idtemp`_$(OSTYPE)_$(MACHTYPE)_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+else
+	@tar -zcvf gtm_`head -1 idtemp`_$(OSTYPE)_i686_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+endif
+else
+
+ifeq ($(OSTYPE),hpux)
+# IA64 HP-UX has MACHTYPE set to unknown; so use uname -m
+# tar doesnt support "z" (to zip) option; so needs a separate gzip command
+ifeq ($(gt_machine_type), ia64)
+	@tar -cvf gtm_`head -1 idtemp`_$(OSTYPE)_$(gt_machine_type)_$*.tar -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+	@gzip gtm_`head -1 idtemp`_$(OSTYPE)_$(gt_machine_type)_$*.tar
+else
+	@tar -cvf gtm_`head -1 idtemp`_$(OSTYPE)_`echo $(MACHTYPE) | sed 's/_//1'`_$*.tar -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+	@gzip gtm_`head -1 idtemp`_$(OSTYPE)_`echo $(MACHTYPE) | sed 's/_//1'`_$*.tar
+endif
+
+else
+	@tar -zcvf gtm_`head -1 idtemp`_$(OSTYPE)_$(MACHTYPE)_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+endif
+endif
+	rm -f idtemp
 
 %_clean:
 	rm -rf $(gtm_ver)/$*
@@ -93,24 +157,27 @@ bta_%:comlist.mk
 	$(MAKE) -C $(gtm_ver)/bta/obj -I$(gtm_ver)/bta/obj $(make_i_flags) -f $< CURRENT_BUILDTYPE=bta $*
 
 else
-# Second-level make invocation: compute dependencies, compile, archive, link and test.
+# Second-level make invocation: compute dependencies, compile, archive,
+# link and test.
 
-# gt_src_list is the list of all source (sr_*) directories. allfiles_list is the superset of all
-# GT.M files (.c, .s, .m, .list, etc. etc.) present in all sr_* directories.
-allfiles_list:=$(sort $(notdir $(foreach d,$(gt_src_list),$(wildcard $(gtm_ver)/$(d)/*))))
+# gt_src_list is the list of all source (sr_*) directories. allfiles_list
+# is the superset of all GT.M files (.c, .s, .m, .list, etc. etc.) present
+# in all sr_* directories.  ttt.c is generated from ttt.txt
+allfiles_list:=$(sort $(notdir $(foreach d,$(gt_src_list),$(wildcard $(gtm_ver)/$(d)/*))) ttt.c)
 
-# allfiles_list computation should precede this include, since os390:gtm_env_sp.mk requires $(allfiles_list)
+# allfiles_list computation should precede this include, since
+# os390:gtm_env_sp.mk requires $(allfiles_list)
 include gtm_env_sp.mk
 
 # the list of all GT.M executables
 exe_list:=libgtmshr$(gt_ld_shl_suffix) $(exe_list) $(gt_svc_exe)
 
 
-# In the following code, various categories of source files are filtered from allfiles_list into
-# separate variables based on the file extention.
+# In the following code, various categories of source files are filtered
+# from allfiles_list into separate variables based on the file extention.
 
-# m file stuff.  These list builds go to great pain to insure that either post cms_load
-# forms and pre-cms load forms work.
+# m file stuff.  These list builds go to great pain to insure that either
+# post cms_load forms and pre-cms load forms work.
 mfile_list:=$(filter-out _%.m, $(filter %.m, $(allfiles_list)))
 mptfile_list:=$(sort $(basename $(filter %.mpt, $(allfiles_list))) $(basename $(patsubst _%.m, %, $(filter _%.m, $(allfiles_list)))))
 mfile_targets:=$(addsuffix .m,$(foreach f,$(basename $(mfile_list)), $(shell echo $(f) | tr '[:lower:]' '[:upper:]')))
@@ -170,8 +237,8 @@ gtcm_pkdisp_obj=gtcm_pkdisp.o
 gtcm_shmclean_obj=gtcm_shmclean.o
 dtgbldir_obj=dtgbldir.o
 
-# exclude .o's in .list files, .o's used in ld's below, plus dtgblkdir.o (which doesn't appear to be
-# used anywhere!
+# exclude .o's in .list files, .o's used in ld's below, plus dtgbldir.o
+# (which doesn't appear to be used anywhere!
 non_mumps_objs:=$(addsuffix .o,$(shell cat $(foreach d,$(gt_src_list),$(wildcard $(gtm_ver)/$(d)/*.list))))
 exclude_list:= \
 	$(non_mumps_objs) \
@@ -223,7 +290,8 @@ endif
 gt_cc_options += $(gt_cc_option_I)
 gt_as_options += $(gt_cc_option_I)
 
-# gt_ld_options should be set with '=' to allow lazy evaluation of gt_ld_options_loadmap
+# gt_ld_options should be set with '=' to allow lazy evaluation of
+# gt_ld_options_loadmap
 gt_ld_options=$(gt_ld_options_common) $(gt_ld_options_buildsp) $(gt_ld_options_loadmap) -L$(CURDIR)
 
 gt_cpus ?= 2
@@ -274,7 +342,7 @@ endef
 	$(compile-help)
 
 mcompiles:
-	cd ..;gtm_dist=$(dir $(CURDIR));export gtm_dist;gtmgbldir=$(notdir $@);export gtmgbldir; ./mumps *.m ; tcsh ../sr_unix/mkutf8dir.csh
+	cd ..;gtm_dist=$(dir $(CURDIR));export gtm_dist;gtmgbldir=$(notdir $@);export gtmgbldir; ./mumps *.m ; tcsh -f ../sr_unix/mkutf8dir.csh
 
 dotcsh: $(csh_files)
 	cp -f $^ ..
@@ -307,8 +375,9 @@ rm -f $@
 endef
 
 ifdef gt_svc_exe
-# Note: gtm_svc should link with gtm_dal_svc.o before gtm_mumps_call_clnt.o(libgtmrpc.a) to
-#       resolve conflicting symbols (gtm_init_1, gtm_halt_1 etc..) appropriately.
+# Note: gtm_svc should link with gtm_dal_svc.o before
+# gtm_mumps_call_clnt.o(libgtmrpc.a) to resolve conflicting symbols
+# (gtm_init_1, gtm_halt_1 etc..) appropriately.
 ../$(gt_svc_exe): $(gtm_svc_obj) $(gtmshr_obj) libmumps.a libgnpclient.a libcmisockettcp.a $(gt_ld_gtmrpc_library_option)
 	$(gt-ld)
 endif
@@ -321,7 +390,6 @@ endif
 
 ../geteuid: $(geteuid_obj) libmumps.a
 	$(gt-ld)
-
 
 ../gtmsecshr: $(gtmsecshr_obj) libmumps.a
 	$(gt-ld)
@@ -357,11 +425,15 @@ endif
 	$(gt-ld)
 
 # build GT.M shared library(libgtmshr) from PIC-compiled .o files
+# chcon is for SELinux - see comment in buildshr.csh
 ../libgtmshr$(gt_ld_shl_suffix): gtmshr_symbols.export $(gtmshr_obj) libmumps.a libgnpclient.a libcmisockettcp.a
 	rm -f $@
 	@echo "linking $(notdir $@)..."
 	@echo $(gt_ld_linker) $(gt_ld_options) $(gt_ld_shl_options) $(gt_ld_options_gtmshr) -o $@ $(gtmshr_obj) -lmumps -lgnpclient -lcmisockettcp $(gt_ld_syslibs) > ../map/$(notdir $@).map 2>&1
 	@$(gt_ld_linker) $(gt_ld_options) $(gt_ld_shl_options) $(gt_ld_options_gtmshr) -o $@ $(gtmshr_obj) -lmumps -lgnpclient -lcmisockettcp $(gt_ld_syslibs) >> ../map/$(notdir $@).map 2>&1
+ifeq ($(gt_os_type),Linux)
+	@-[ -x /usr/bin/chcon ] && chcon -t texrel_shlib_t $@
+endif
 
 gtcmconfig: $(gtc_list)
 	cp -f $^ ..
@@ -393,12 +465,13 @@ endif
 #
 -include $(list_files:.list=.ldep)
 
-# Overriding the implicit archive rule a(m):m to accumulate all changed .o files
-# in a temporary dependency (.ardep) file that will be used by ar to archive
-# all files in a single command.
-# This enhancement [of accumulating in a temporary .ardep file instead of updating
-# the library righaway] improves the full building time. However for incremental
-# builds the object file is updated into the archive immediately.
+# Overriding the implicit archive rule a(m):m to accumulate all changed .o
+# files in a temporary dependency (.ardep) file that will be used by ar to
+# archive all files in a single command.
+# This enhancement [of accumulating in a temporary .ardep file instead of
+# updating the library rightaway] improves the full building time. However
+# for incremental builds the object file is updated into the archive
+# immediately.
 (%):%
 ifeq ($(incremental),1)
 	@$(gt_ar_archiver) $(gt_ar_options) $@ $<
@@ -437,22 +510,30 @@ endif
 	@echo ../_$(shell echo $* | tr '[:lower:]' '[:upper:]').m: $< > $@
 	@$(gt_echoe) "\t"cp -f $$\< $$\@ >> $@
 
-# By setting gtm_curpro to point to a prior installed GT.M directory (if available), the following
-# rule automatically generates *_ctl.c from *.msg.
+# By setting gtm_curpro to point to a prior installed GT.M directory (if
+# available), the following rules automatically generates *_ctl.c from *.msg
+# and ttt.c from ttt.txt.
 ifdef gtm_curpro
 %_ctl.c:%.msg msg.m
 	gtm_dist=$(gtm_curpro);export gtm_dist;\
 		$(gtm_curpro)/mumps $(filter-out $<, $^);\
 		$(gtm_curpro)/mumps -run msg $< unix
 	@rm -f msg.o
+
+ttt.c:ttt.txt opcode_def.h vxi.h tttgen.m tttscan.m chk2lev.m chkop.m gendash.m genout.m loadop.m loadvx.m
+	gtm_dist=$(gtm_curpro);export gtm_dist;\
+		$(gtm_curpro)/mumps $(filter-out %.h, $(filter-out $<, $^));\
+		$(gtm_curpro)/mumps -run tttgen $< $(filter %.h, $^)
+	@rm -f tttgen.o tttscan.o chk2lev.o chkop.o gendash.o genout.o loadop.o loadvx.o
 endif
 
-# By default [since the rule %.o:%.s precedes %.o:%.c], the .s files take precedence over
-# .c files if both versions exist for a module. The following rule allows us to reverse
-# this behavior for a special set of modules (eg. compswap for sparcv8 etc.) by assigning
-# them to a variable gt_cc_before_as [in gtm_env_sp.mk].
-# gt_cc_before_as should be defined to the list of .o files for which both .c and .s exist
-# but need to be compiled from .c instead of from .s files.
+# By default [since the rule %.o:%.s precedes %.o:%.c], the .s files take
+# precedence over .c files if both versions exist for a module. The
+# following rule allows us to reverse this behavior for a special set of
+# modules (eg. compswap for sparcv8 etc.) by assigning them to a variable
+# gt_cc_before_as [in gtm_env_sp.mk].
+# gt_cc_before_as should be defined to the list of .o files for which both
+# .c and .s exist but need to be compiled from .c instead of from .s files.
 ifdef gt_cc_before_as
 $(gt_cc_before_as):%.o:%.c	#override rules for gt_cc_before_as modules ONLY
 ifeq ($(verbose),1)
@@ -472,12 +553,23 @@ else
 	@$(gt-as-convert)
 endif
 endif
+
 %.o:%$(gt_as_src_suffix)
 ifeq ($(verbose),1)
 	$(gt-as)
 else
 	@echo "$< ----> $(CURDIR)/$@"
+ifeq ($(gt_os_type), Linux)
+ifeq ($(gt_machine_type), ia64)
+	@$(gt_cpp)
+	@$(gt-as_cpp)
+	@rm $<_cpp.s
+else
 	@$(gt-as)
+endif
+else
+	@$(gt-as)
+endif
 endif
 
 %.o:%.c

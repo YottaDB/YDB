@@ -28,8 +28,15 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #include "stringpool.h"
+#include "send_msg.h"
+#include "error.h"
 
 GBLREF io_pair			io_curr_device;
+#ifdef UNIX
+GBLREF io_pair			io_std_device;
+GBLREF bool			prin_out_dev_failure;
+#endif
+
 GBLREF tcp_library_struct	tcp_routines;
 GBLREF mstr			chset_names[];
 GBLREF UConverter		*chset_desc[];
@@ -46,6 +53,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	mstr		tempv;
 	char		*out, *c_ptr, *c_top;
 	int		in_b_len, b_len, status, new_len, c_len, mb_len;
+	int		flags;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr;
 
@@ -55,6 +63,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	error_def(ERR_ZFF2MANY);
 	error_def(ERR_DELIMSIZNA);
 	error_def(ERR_ZINTRECURSEIO);
+	UNIX_ONLY(error_def(ERR_NOPRINCIO);)
 
 	SOCKET_DEBUG2(PRINTF("socwrite: ************************** Top of iosocket_write\n"); DEBUGSOCKFLUSH);
 	iod = io_curr_device.out;
@@ -68,6 +77,11 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	}
 	if (dsocketptr->mupintr)
 		rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+#ifdef MSG_NOSIGNAL
+	flags = MSG_NOSIGNAL;		/* return EPIPE instead of SIGPIPE */
+#else
+	flags = 0;
+#endif
 	socketptr->lastop = TCP_WRITE;
 	if (socketptr->first_write)
 	{ /* First WRITE, do following
@@ -81,13 +95,17 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			iod->ochset = CHSET_UTF16BE; /* per Unicode standard, assume big endian when endian
 							format is unspecified */
 			get_chset_desc(&chset_names[iod->ochset]);
-			DOTCPSEND(socketptr->sd, UTF16BE_BOM, UTF16BE_BOM_LEN, 0, status);
+			DOTCPSEND(socketptr->sd, UTF16BE_BOM, UTF16BE_BOM_LEN, flags, status);
 			SOCKET_DEBUG2(PRINTF("socwrite: TCP send of BOM-BE with rc %d\n", status); DEBUGSOCKFLUSH);
 			if (0 != status)
 			{
 				SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
 				return;
 			}
+#ifdef UNIX
+			else if (iod == io_std_device.out)
+				prin_out_dev_failure = FALSE;
+#endif
 		}
 		if (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset) /* need conversion of ZFF and DELIM0 */
 		{
@@ -171,7 +189,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 					if (0 < socketptr->n_delimiter)
 					{
 						DOTCPSEND(socketptr->sd, socketptr->odelimiter0.addr, socketptr->odelimiter0.len,
-								(socketptr->urgent ? MSG_OOB : 0), status);
+								(socketptr->urgent ? MSG_OOB : 0) | flags, status);
 						SOCKET_DEBUG2(PRINTF("socwrite: TCP send of %d byte delimiter with rc %d\n",
 								     socketptr->odelimiter0.len, status); DEBUGSOCKFLUSH);
 						if (0 != status)
@@ -179,6 +197,10 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 							SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
 							return;
 						}
+#ifdef UNIX
+						else if (iod == io_std_device.out)
+							prin_out_dev_failure = FALSE;
+#endif
 					}
 					iod->dollar.y++;
 					iod->dollar.x = 0;
@@ -209,13 +231,17 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				}
 			}
 			assert(0 != b_len);
-			DOTCPSEND(socketptr->sd, out, b_len, (socketptr->urgent ? MSG_OOB : 0), status);
+			DOTCPSEND(socketptr->sd, out, b_len, (socketptr->urgent ? MSG_OOB : 0) | flags, status);
 			SOCKET_DEBUG2(PRINTF("socwrite: TCP data send of %d bytes with rc %d\n", b_len, status); DEBUGSOCKFLUSH);
 			if (0 != status)
 			{
 				SOCKERROR(iod, dsocketptr, socketptr, ERR_SOCKWRITE, status);
 				return;
 			}
+#ifdef UNIX
+			else if (iod == io_std_device.out)
+				prin_out_dev_failure = FALSE;
+#endif
 			dollarx(iod, (uchar_ptr_t)out, (uchar_ptr_t)out + b_len);
 			SOCKET_DEBUG2(PRINTF("socwrite: $x/$y updated by dollarx():  $x: %d  $y: %d  filter: %d  escape:  %d\n",
 					     iod->dollar.x, iod->dollar.y, iod->write_filter, iod->esc_state);

@@ -21,12 +21,32 @@
 set found_icu = ""
 set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
 if (`uname` == "AIX") then
-	setenv LIBPATH /usr/local/lib
-	set library_path = "$LIBPATH"
+	setenv LIBPATH /usr/local/lib64:/usr/local/lib
+	set library_path = `echo $LIBPATH | sed 's/:/ /g'`
 else
-	setenv LD_LIBRARY_PATH "/usr/local/lib:/usr/lib:/usr/lib32"
+# Optional parameter added. This script can be executed from remote system using ssh
+# The environment $gtm_* variable's will not defined.
+# Test system can pass an optional paramter of include path($gtm_inc) to check_unicode_support.csh
+# to verify the presence of x86_64.h.
+	if ( $# == 1 ) then
+		set incdir = "$1"
+	else
+		if ( $?gtm_inc ) then
+			set incdir = "$gtm_inc"
+		else
+			set incdir = ""
+		endif
+	endif
+
+	if ( -e $incdir/x86_64.h ) then
+		setenv LD_LIBRARY_PATH "/usr/local/lib64:/usr/local/lib:/usr/lib:/usr/lib32"
+	else
+		setenv LD_LIBRARY_PATH "/usr/local/lib:/usr/lib:/usr/lib32"
+        endif
+
 	set library_path = `echo $LD_LIBRARY_PATH | sed 's/:/ /g'`
 endif
+
 foreach libpath ($library_path)
 	# 36 is the version GT.M supports for ICU
 	if (-e $libpath) set found_icu = `ls -1 $libpath | grep "libicu.*36.*" | wc -l`

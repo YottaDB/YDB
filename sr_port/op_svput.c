@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,8 +10,10 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
+
 #include "svnames.h"
 #include "io.h"
 #include "gdsroot.h"
@@ -27,7 +29,6 @@
 #include "zroutines.h"
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
-#include "underr.h"
 #include "gtmmsg.h"
 #include "ztrap_save_ctxt.h"
 #include "dollar_zlevel.h"
@@ -49,6 +50,9 @@ GBLDEF MSTR_DEF(gtmprompt, STR_LIT_LEN(DEFAULT_PROMPT), &prombuf[0]);
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
+GBLREF gd_addr		*gd_targ_addr;
+GBLREF gd_binding	*gd_map;
+GBLREF gd_binding	*gd_map_top;
 GBLREF io_pair		io_curr_device;
 GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_zstatus;
@@ -121,6 +125,8 @@ void op_svput(int varnum, mval *v)
 	       		} else
 			{
 	   			gd_header = zgbldir(v);
+				/* update the gd_map */
+				SET_GD_MAP;
 	   			dollar_zgbldir.str.len = v->str.len;
 	   			dollar_zgbldir.str.addr = v->str.addr;
 	  			s2pool(&dollar_zgbldir.str);

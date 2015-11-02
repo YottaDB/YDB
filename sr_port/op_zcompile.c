@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,8 @@
 
 GBLDEF int4			dollar_zcstatus;
 
-GBLREF bool			run_time, compile_time;
+GBLREF boolean_t		run_time;
+GBLREF bool			compile_time;
 GBLREF spdesc			stringpool, rts_stringpool, indr_stringpool;
 GBLREF command_qualifier	cmd_qlf, glb_cmd_qlf;
 GBLREF bool			transform;
@@ -52,7 +53,7 @@ void op_zcompile(mval *v)
 	zl_cmd_qlf(&v->str, &glb_cmd_qlf);
 	cmd_qlf = glb_cmd_qlf;
 
-	assert (run_time == TRUE);
+	assert(run_time);
 	assert(rts_stringpool.base == stringpool.base);
 	rts_stringpool = stringpool;
 	if (!indr_stringpool.base)

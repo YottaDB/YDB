@@ -80,7 +80,7 @@ GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but no
 
 void	op_tcommit(void)
 {
-	bool			blk_used, is_mm;
+	boolean_t		blk_used, is_mm;
 	sm_uc_ptr_t		bmp;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned int		ctn;

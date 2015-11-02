@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,7 @@
 #include "indir_enum.h"
 
 GBLREF	char		window_token;
-GBLREF	bool		run_time;
+GBLREF	boolean_t	run_time;
 GBLREF	oprtype		*for_stack[], **for_stack_ptr;
 
 int m_quit(void)

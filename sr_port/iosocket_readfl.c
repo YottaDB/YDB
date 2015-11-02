@@ -39,11 +39,17 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
+#include "send_msg.h"
+#include "error.h"
 
 GBLREF	stack_frame      	*frame_pointer;
 GBLREF	unsigned char    	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	mv_stent         	*mv_chain;
 GBLREF	io_pair 		io_curr_device;
+#ifdef UNIX
+GBLREF	io_pair			io_std_device;
+GBLREF	bool			prin_in_dev_failure;
+#endif
 GBLREF	bool			out_of_time;
 GBLREF	spdesc 			stringpool;
 GBLREF	volatile int4		outofband;
@@ -133,6 +139,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	error_def(ERR_ZINTRECURSEIO);
 	error_def(ERR_STACKCRIT);
 	error_def(ERR_STACKOFLOW);
+	UNIX_ONLY(error_def(ERR_NOPRINCIO);)
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
@@ -462,6 +469,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		{
 			SOCKET_DEBUG2(PRINTF("socrfl: Bytes read: %d\n", status); DEBUGSOCKFLUSH);
 			bytes_read += status;
+			UNIX_ONLY(if (iod == io_std_device.out)
+				prin_in_dev_failure = FALSE;)
 			if (socketptr->first_read && CHSET_M != ichset) /* May have a BOM to defuse */
 			{
 				if (CHSET_UTF8 != ichset)
@@ -808,8 +817,20 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		len = sizeof(ONE_COMMA) - 1;
 		memcpy(dsocketptr->dollar_device, ONE_COMMA, len);
 		errptr = (char *)STRERROR(real_errno);
-		errlen = STRLEN(errptr) + 1;
-		memcpy(&dsocketptr->dollar_device[len], errptr, errlen);
+		errlen = STRLEN(errptr);
+		memcpy(&dsocketptr->dollar_device[len], errptr, errlen + 1);	/* + 1 for null */
+#ifdef UNIX
+		if (io_curr_device.in == io_std_device.in)
+		{
+			if (!prin_in_dev_failure)
+				prin_in_dev_failure = TRUE;
+			else
+			{
+				send_msg(VARLSTCNT(1) ERR_NOPRINCIO);
+					stop_image_no_core();
+			}
+		}
+#endif
 		if (iod->dollar.zeof || -1 == status || 0 < iod->error_handler.len)
 		{
 			iod->dollar.zeof = TRUE;

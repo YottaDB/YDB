@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,9 @@
 void op_cvtparm(int iocode, mval *src, mval *dst)
 {
 	int status;
-	if ((status = cvtparm(iocode, src, dst)) == 0)
+
+	MV_FORCE_DEFINED(src);
+	if (0 == (status = cvtparm(iocode, src, dst)))
 		return;
 	rts_error(VARLSTCNT(1) status);
 }

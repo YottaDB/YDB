@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,8 +52,8 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <time.h>
-#include <string.h>
+#include "gtm_time.h"
+#include "gtm_string.h"
 #include <stddef.h>
 
 #if defined(__ia64) && defined(__linux__)
@@ -218,11 +218,12 @@ void	prealloc_gt_timers(void)
 	sigaddset(&blockalrm, SIGALRM);
 
 	sigemptyset(&block_sigsent);
-	sigaddset (&block_sigsent, SIGINT);
-	sigaddset (&block_sigsent, SIGQUIT);
-	sigaddset (&block_sigsent, SIGTERM);
-	sigaddset (&block_sigsent, SIGTSTP);
-	sigaddset (&block_sigsent, SIGCONT);
+	sigaddset(&block_sigsent, SIGINT);
+	sigaddset(&block_sigsent, SIGQUIT);
+	sigaddset(&block_sigsent, SIGTERM);
+	sigaddset(&block_sigsent, SIGTSTP);
+	sigaddset(&block_sigsent, SIGCONT);
+	sigaddset(&block_sigsent, SIGALRM);
 }
 
 /*

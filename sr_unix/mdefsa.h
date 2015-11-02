@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,11 @@
 #define	ICU_LIBFLAGS		(RTLD_NOW | RTLD_GLOBAL)
 
 #ifdef __hpux
+#  ifdef __ia64
+#	define GTMSHR_IMAGE_NAME	"libgtmshr.so"
+#  else
 #	define GTMSHR_IMAGE_NAME	"libgtmshr.sl"
+#  endif
 #	define	ICU_LIBNAME		"libicuio.sl"
 #elif defined(__MVS__)
 #	define GTMSHR_IMAGE_NAME	"libgtmshr.dll"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,8 @@ GBLREF unsigned char 		*source_buffer;
 GBLREF short int 		source_name_len, last_source_column, source_line;
 GBLREF int4 			source_error_found;
 GBLREF command_qualifier	cmd_qlf;
-GBLREF bool 			shift_gvrefs, run_time, dec_nofac;
+GBLREF bool 			shift_gvrefs, dec_nofac;
+GBLREF boolean_t		run_time;
 GBLREF char			cg_phase;
 GBLREF io_pair			io_curr_device, io_std_device;
 #ifdef UNIX
@@ -64,7 +65,6 @@ void stx_error(int in_error, ...)
 	error_def(ERR_CENOINDIR);
 	error_def(ERR_BADCHAR);
 
-	flush_pio();
 	va_start(args, in_error);
 	/* In case of a IS_STX_WARN type of parsing error, we resume parsing so it is important NOT to reset
 	 * the following global variables
@@ -123,6 +123,7 @@ void stx_error(int in_error, ...)
 	} else if (cg_phase == CGP_PARSE)
 		ins_errtriple(in_error);
 	assert(!run_time);	/* From here on down, should never go ahead with printing compile-error while in run_time */
+	flush_pio();
 	if (source_error_found)
 	{
 		va_end(args);

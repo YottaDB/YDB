@@ -90,6 +90,9 @@ GBLREF mval		dollar_ztexit;
 GBLREF int		totalAlloc;
 GBLREF int		totalRmalloc;
 GBLREF int		totalUsed;
+GBLREF int		totalAllocGta;
+GBLREF int		totalRallocGta;
+GBLREF int		totalUsedGta;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 
@@ -349,15 +352,15 @@ void op_svget(int varnum, mval *v)
 			*v = dollar_ztexit;
 			break;
 		case SV_ZALLOCSTOR:
-			count = totalAlloc;
+			count = totalAlloc + totalAllocGta;
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_ZREALSTOR:
-			count = totalRmalloc;
+			count = totalRmalloc + totalRallocGta;
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_ZUSEDSTOR:
-			count = totalUsed;
+			count = totalUsed + totalUsedGta;
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_ZCHSET:

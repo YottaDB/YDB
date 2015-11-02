@@ -21,17 +21,18 @@
 #include "min_max.h"
 #include "hashtab.h"
 #include "stringpool.h"
+#include "gtm_text_alloc.h"
 
 #define S_CUTOFF 		7
 #define FREE_RTNTBL_SPACE 	17
 
-GBLREF rtn_tabent	*rtn_fst_table,*rtn_names,*rtn_names_end,*rtn_names_top;
+GBLREF rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_end, *rtn_names_top;
 GBLREF stack_frame	*frame_pointer;
 GBLREF hash_table_mname rt_name_tbl;	/* globally defined routine table name */
 
 bool zlput_rname (rhdtyp *hdr)
 {
-	rhdtyp		*old_rhead;
+	rhdtyp		*old_rhead, *rhead;
 	rtn_tabent	*rbot, *mid, *rtop;
 	stack_frame	*fp;
 	char		*src, *new, *old_table;
@@ -104,9 +105,43 @@ bool zlput_rname (rhdtyp *hdr)
 		old_rhead = (rhdtyp *)mid->rt_adr;
 		/* Verify routine is not currently active. If it is, we cannot replace it */
 		for (fp = frame_pointer; fp ; fp = fp->old_frame_pointer)
-			if (fp->rvector == old_rhead)
-				return FALSE;
+		{	/* Check all possible versions of each routine header */
+			for (rhead = CURRENT_RHEAD_ADR(old_rhead); rhead;
+			     rhead = (rhdtyp *)NON_USHBIN_ONLY(rhead->old_rhead_ptr)USHBIN_ONLY(rhead->old_rhead_adr))
+				if (fp->rvector == rhead)
+					return FALSE;
+		}
 		zr_remove(old_rhead); /* get rid of the now inactive breakpoints and release any private code section */
+
+		/* If source has been read in for old routine, free space. Since routine name is the key, do this before
+		   (in USHBIN builds) we release the literal text section as part of the releasable read-only section.
+		*/
+		tabent = NULL;
+		if (rt_name_tbl.base)
+		{
+			key.var_name = mid->rt_name;
+			COMPUTE_HASH_MNAME(&key);
+			if (NULL != (tabent = lookup_hashtab_mname(&rt_name_tbl, &key)) && tabent->value)
+			{
+				src_tbl = (uint4 *)tabent->value;
+				entries = *(src_tbl + 1);
+				if (0 != entries)
+					/* Don't count line 0 which we bypass */
+					entries--;
+				/* curline start is 2 uint4s into src_tbl and then space past line 0 or
+				   we end up freeing the storage for line 0/1 twice since they have the
+				   same pointers.
+				*/
+				for (curline = RECAST(mstr *)(src_tbl + 2) + 1; 0 != entries; --entries, ++curline)
+				{
+					assert(curline->len);
+					free(curline->addr);
+				}
+				free(tabent->value);
+				tabent->value = 0;
+			} else
+				tabent = NULL;
+		}
 		NON_USHBIN_ONLY(
 			hdr->old_rhead_ptr = (int4)old_rhead;
 			if (!old_rhead->old_rhead_ptr)
@@ -117,12 +152,21 @@ bool zlput_rname (rhdtyp *hdr)
 		)
 		USHBIN_ONLY(
 			if (!old_rhead->shlib_handle)
-		        { /* Migrate text literals pointing into text area we are about to throw away into the stringpool.
-			     We also can release the read-only releasable segment as it is no longer needed. */
+		        { 	/* Migrate text literals pointing into text area we are about to throw away into the stringpool.
+				   We also can release the read-only releasable segment as it is no longer needed.
+				*/
 				stp_move((char *)old_rhead->literal_text_adr,
 					 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
+				if (tabent)
+				{	/* There was $TEXT info released thus an hash entry with a program name probably
+					   pointing into the readonly storage we are about to release. Replace the mident
+					   key in the hashtable with the routine name mident from the new header.
+					*/
+					assert(MSTR_EQ(&tabent->key.var_name, rtn_name));
+					tabent->key.var_name = *rtn_name;	/* Update key with newly saved mident */
+				}
 				zlmov_lnames(old_rhead); /* copy the label names from literal pool to malloc'd area */
-				free(old_rhead->ptext_adr);
+				GTM_TEXT_FREE(old_rhead->ptext_adr);
 				/* Reset the routine header pointers to the sections we just freed up.
 				 * NOTE: literal_text_adr shouldn't be reset as it points to the label area malloc'd
 				 * in zlmov_lnames() */
@@ -139,29 +183,6 @@ bool zlput_rname (rhdtyp *hdr)
 			hdr->old_rhead_adr = old_rhead;
 		)
 		mid->rt_name = *rtn_name;
-		if (rt_name_tbl.base)		 /* if source has been read in for old module, free space */
-		{
-			key.var_name = mid->rt_name;
-			COMPUTE_HASH_MNAME(&key);
-			if ((tabent = lookup_hashtab_mname(&rt_name_tbl, &key)) != NULL && tabent->value)
-			{
-				src_tbl = (uint4 *)tabent->value;
-				entries = *(src_tbl + 1);
-				if (0 != entries)	/* Don't count line 0 which we bypass */
-					entries--;
-				/* curline start is 2 uint4s into src_tbl and then space past line 0 or
-				   we end up freeing the storage for line 0/1 twice since they have the
-				   same pointers.
-				*/
-				for (curline = RECAST(mstr *)(src_tbl + 2) + 1; 0 != entries; --entries, ++curline)
-				{
-					assert(curline->len);
-					free(curline->addr);
-				}
-				free(tabent->value);
-				tabent->value = 0;
-			}
-		}
 	}
 	mid->rt_adr= hdr;
 	return TRUE;

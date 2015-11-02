@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@ LITREF mval literal_zero;
 
 void op_exp(mval *u, mval* v, mval *p)
 {
-	mval 	u1;
+	mval 	u1, *u1_p;
 	double 	accuracy;
 	double 	x, x1, y, z, z2, z3, z4, z5, id, il;
 #ifndef UNIX
@@ -48,9 +48,10 @@ void op_exp(mval *u, mval* v, mval *p)
 	error_def(ERR_NUMOFLOW);
 	error_def(ERR_NEGFRACPWR);
 
-	memcpy(&u1, u, sizeof(mval));
+	u1_p = &u1;
+	memcpy(u1_p, u, sizeof(mval));
 
-        MV_FORCE_NUM(&u1);
+        MV_FORCE_NUM(u1_p);
         MV_FORCE_NUM(v);
 
         if (v->m[1] == 0 && v->m[0] == 0)
@@ -67,14 +68,14 @@ void op_exp(mval *u, mval* v, mval *p)
 			*p = literal_one;
 			return;
 		}
-	        if ((u1.mvtype & MV_INT) != 0)
+	        if ((u1_p->mvtype & MV_INT) != 0)
         	{
-			if (u1.m[1] == 0)
+			if (u1_p->m[1] == 0)
 			{
                 		*p = literal_zero;
 		                return;
 			}
-        	} else if (u1.m[1] == 0 && u1.m[0] == 0)
+        	} else if (u1_p->m[1] == 0 && u1_p->m[0] == 0)
 		{
 			*p = literal_zero;
 			return;
@@ -89,10 +90,10 @@ void op_exp(mval *u, mval* v, mval *p)
                         }
                         if (n1 < 0)
                         {
-                                op_div((mval *)&literal_one, &u1, &w);
+                                op_div((mval *)&literal_one, u1_p, &w);
                                 n1 = -n1;
                         } else
-				w = u1;
+				w = *u1_p;
                         zmv = literal_one;
                         for ( ; ; )
                         {
@@ -107,16 +108,16 @@ void op_exp(mval *u, mval* v, mval *p)
                         return;
                 } else
                 {
-			if ((u1.mvtype & MV_INT) != 0)
+			if ((u1_p->mvtype & MV_INT) != 0)
 			{
-                        	if (u1.m[1] < 0)
+                        	if (u1_p->m[1] < 0)
                         	{
                                 	rts_error(VARLSTCNT(1) ERR_NEGFRACPWR);
                                 	return;
                         	}
 			} else
 			{
-				if (u1.sgn)
+				if (u1_p->sgn)
 				{
 					rts_error(VARLSTCNT(1) ERR_NEGFRACPWR);
 					return;
@@ -125,23 +126,23 @@ void op_exp(mval *u, mval* v, mval *p)
                 }
         } else
 	{
-	        if ((u1.mvtype & MV_INT) != 0)
+	        if ((u1_p->mvtype & MV_INT) != 0)
         	{
-                	if (u1.m[1] < 0)
+                	if (u1_p->m[1] < 0)
                 	{
-                        	u1.m[1] = - u1.m[1];
+                        	u1_p->m[1] = - u1_p->m[1];
 	                        neg = TRUE;
         	        }
-			if (u1.m[1] == 0)
+			if (u1_p->m[1] == 0)
 			{
 				*p = literal_zero;
 				return;
 			}
-        	} else if (u1.sgn)
+        	} else if (u1_p->sgn)
         	{
-                	u1.sgn = 0;
+                	u1_p->sgn = 0;
 	                neg = TRUE;
-			if (u1.m[1] == 0 && u1.m[0] == 0)
+			if (u1_p->m[1] == 0 && u1_p->m[0] == 0)
 			{
 				*p = literal_zero;
 				return;
@@ -212,7 +213,7 @@ void op_exp(mval *u, mval* v, mval *p)
 		}
 	}
 
-	x = mval2double(&u1);
+	x = mval2double(u1_p);
 	y = mval2double(v);
 
 	z = pow(x, y);

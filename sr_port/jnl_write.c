@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@
 #include "is_proc_alive.h"
 
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
-DEBUG_ONLY( GBLREF bool		run_time;)
+DEBUG_ONLY( GBLREF boolean_t	run_time;)
 
 GBLREF	uint4			process_id;
 GBLREF	sm_uc_ptr_t		jnldata_base;
@@ -119,14 +119,13 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	/* Before taking a copy of jb->freeaddr, determine if both free and freeaddr are in sync. If not fix that first. */
 	if (jb->free_update_pid)
 	{
-		FIX_NONZERO_FREE_UPDATE_PID(jb);
+		FIX_NONZERO_FREE_UPDATE_PID(csa, jb);
 	}
 	lcl_freeaddr = jb->freeaddr;
 	lcl_free = jb->free;
 	lcl_size = jb->size;
-	lcl_buff = &jb->buff[0];
-	assert(lcl_freeaddr % lcl_size == lcl_free);
-	assert(lcl_freeaddr >= jb->dskaddr);
+	lcl_buff = &jb->buff[jb->buff_off];
+	DBG_CHECK_JNL_BUFF_FREEADDR(jb);
 	++jb->reccnt[rectype];
 	assert(NULL != jnl_rec);
 	rlen = jnl_rec->prefix.forwptr;
@@ -149,8 +148,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	{	/* the calls below to jnl_write_attempt() and jnl_file_extend() are duplicated for the ALIGN record and the
 		 * non-ALIGN journal record instead of making it a function. this is purely for performance reasons.
 		 */
- 		assert((!jb->blocked) || (FALSE == is_proc_alive(jb->blocked, 0))
- 			VMS_ONLY(|| ((jb->blocked == process_id) && lib$ast_in_prog())));
+		assert((!jb->blocked) || (FALSE == is_proc_alive(jb->blocked, 0))
+			VMS_ONLY(|| ((jb->blocked == process_id) && lib$ast_in_prog())));
 		jb->blocked = process_id;
 		/* We should differentiate between a full and an empty journal buffer, hence the pessimism reflected in the <=
 		 * check below. Hence also the -1 in lcl_freeaddr - (lcl_size - align_rec_len - 1).
@@ -247,6 +246,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		SHM_WRITE_MEMORY_BARRIER;
 		jb->free = lcl_free;
 		jb->free_update_pid = 0;
+		DBG_CHECK_JNL_BUFF_FREEADDR(jb);
 		if (JRT_PINI == rectype)
 			jnl_rec->prefix.pini_addr = lcl_freeaddr;
 	}
@@ -411,6 +411,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	SHM_WRITE_MEMORY_BARRIER;
 	jb->free = lcl_free;
 	jb->free_update_pid = 0;
+	DBG_CHECK_JNL_BUFF_FREEADDR(jb);
 	VMS_ONLY(
 		if (((lcl_freeaddr - jb->dskaddr) > jb->min_write_size)
 		    && (SS_NORMAL != (status = jnl_qio_start(jpc))) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))

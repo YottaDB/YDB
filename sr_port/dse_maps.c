@@ -81,7 +81,7 @@ void dse_maps(void)
 	int4			bml_size, bml_list_size, blk_index, bml_index;
 	int4			total_blks;
 	int4			bplmap, dummy_int;
-	bool			dummy_bool;
+	boolean_t		dummy_bool;
 	unsigned char		*bml_list;
 	cache_rec_ptr_t		cr, dummy_cr;
 	bt_rec_ptr_t		btr;
@@ -256,9 +256,9 @@ void dse_maps(void)
 					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 			}
                         if (dba_bg == cs_addrs->hdr->acc_meth)
-                                bg_update(cw_set, cw_set + cw_set_depth, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
+                                bg_update(cw_set, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
                         else
-                                mm_update(cw_set, cw_set + cw_set_depth, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
+                                mm_update(cw_set, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
                         INCREMENT_CURR_TN(cs_data);
 			while (cr_array_index)	/* could have been incremented by bg_update/mm_update */
 				cr_array[--cr_array_index]->in_cw_set = FALSE;

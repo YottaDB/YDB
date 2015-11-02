@@ -65,8 +65,8 @@ typedef struct repl_inst_hdr_struct
 						 * this instance is brought up as a propagating primary and the receiver server
 						 * connects to the new primary source server successfully.
 						 */
-	NON_IA64_ONLY(unsigned char   filler_512[404];)
-	IA64_ONLY(unsigned char   filler_512[380];) 	/*On IA64 the size of time_t is 8 which will account for 20 extra bytes.
+	NON_GTM64_ONLY(unsigned char   filler_512[404];)
+	GTM64_ONLY(unsigned char   filler_512[380];) 	/*On GTM64 the size of time_t is 8 which will account for 20 extra bytes.
 						  	 *And 4 additional byes as the member 'jnlpool_semid_ctime' starts starts on
 							 *8 byte-boundary, so totally we need to reduce filler by 24(20 + 4) */
 } repl_inst_hdr;

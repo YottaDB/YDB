@@ -181,6 +181,4 @@ typedef struct cw_set_element_struct
 	uint4		blk_checksum;
 } cw_set_element;
 
-block_id	bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr);
-
 #endif

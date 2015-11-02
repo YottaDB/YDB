@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "toktyp.h"
@@ -21,7 +22,6 @@
 #include "cache.h"
 #include "hashtab_objcode.h"
 #include "op.h"
-#include "underr.h"
 
 GBLREF char 			window_token, director_token;
 GBLREF mident 			window_ident;

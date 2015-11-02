@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,7 @@ typedef struct {
 
 typedef struct {
 	uint4		eof_addr;	/* On-disk last byte offset */
+	jnl_file_header	*jfh_base;
 	jnl_file_header	*jfh;
 	int		fd;
 	gd_id		id;

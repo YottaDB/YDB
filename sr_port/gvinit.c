@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,15 +33,13 @@ void gvinit(void)
 	int4	keysize;
 	gv_key	*tmp_currkey, *tmp_altkey;
 
+	/* if gd_header is null then get the current one, and update the gd_map */
 	if (!gd_header)
 	{
-		v.mvtype = MV_STR;
-		v.str.len = 0;
-		gd_header = zgbldir(&v);
-		gd_map = gd_header->maps;
-		gd_map_top = gd_map + gd_header->n_maps;
-		gd_targ_addr = gd_header;
+		SET_GD_HEADER(v);
+		SET_GD_MAP;
 	}
+	DEBUG_ONLY(else GD_HEADER_ASSERT);
 
 	/* May get in here after an extended ref call, so you don't want to
 		lose any preexisting keys */

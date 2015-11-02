@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@ TAB_DB_CSH_ACCT_REC(n_clue_used_same,   "  count_clue_used_same  ", "  cumul_clu
 TAB_DB_CSH_ACCT_REC(n_clue_used_tail,   "  count_clue_used_tail  ", "  cumul_clue_used_tail  ") /* number of times the search-key was between the clue and last_rec */
 TAB_DB_CSH_ACCT_REC(n_t_qreads,         "  count_t_qreads        ", "  cumul_t_qreads        ") /* number of calls to t_qread */
 TAB_DB_CSH_ACCT_REC(n_dsk_reads,        "  count_dsk_reads       ", "  cumul_dsk_reads       ") /* number of calls to dsk_read through t_qread() */
-TAB_DB_CSH_ACCT_REC(n_bg_updates,       "  count_bg_updates      ", "  cumul_bg_updates      ") /* number of calls to bg_update (for MM no. of calls to mm_update) */
+TAB_DB_CSH_ACCT_REC(n_bgmm_updates,     "  count_bgmm_updates    ", "  cumul_bgmm_updates    ") /* number of calls to bg_update (for MM no. of calls to mm_update) */
 TAB_DB_CSH_ACCT_REC(n_dsk_writes,       "  count_dsk_writes      ", "  cumul_dsk_writes      ") /* number of calls to dsk_write through wcs_wtstart() */
 TAB_DB_CSH_ACCT_REC(n_bg_update_creates,"  count_bg_update_create", "  cumul_bg_update_create") /* number of calls to db_csh_getn() from bg_update() (no meaning in MM) */
 TAB_DB_CSH_ACCT_REC(n_db_csh_getns,     "  count_db_csh_getns    ", "  cumul_db_csh_getns    ") /* number of calls to db_csh_getn */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,8 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	struct_jrec_epoch	epoch_record;
 	jnl_buffer_ptr_t	jb;
 	jnl_private_control	*jpc;
-	jnl_file_header		header;
+	jnl_file_header		*header;
+	unsigned char		hdr_base[JNL_HDR_LEN + ALIGNMENT_SIZE];
 	sgmnt_data_ptr_t	csd;
 #if defined(VMS)
 	io_status_block_disk	iosb;
@@ -61,6 +62,7 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	jpc = csa->jnl;
 	assert(0 != jpc->pini_addr);
 	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
+	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, DISK_BLOCK_SIZE));
 	csd = csa->hdr;
 	epoch_record.prefix.jrec_type = JRT_EPOCH;
 	epoch_record.prefix.forwptr = epoch_record.suffix.backptr = EPOCH_RECLEN;
@@ -89,15 +91,15 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 		QWASSIGN(epoch_record.jnl_seqno, seq_num_zero);
 	if (jb->end_of_data)
 	{
-		DO_FILE_READ(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
+		DO_FILE_READ(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 		assert(SS_NORMAL != jpc->status || SS_NORMAL == jpc->status2);
 		if (SS_NORMAL == jpc->status)
 		{
-			header.end_of_data = jb->end_of_data;
-			header.eov_tn = jb->eov_tn;
-			header.eov_timestamp = jb->eov_timestamp;
-			header.end_seqno = jb->end_seqno;
-			DO_FILE_WRITE(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
+			header->end_of_data = jb->end_of_data;
+			header->eov_tn = jb->eov_tn;
+			header->eov_timestamp = jb->eov_timestamp;
+			header->end_seqno = jb->end_seqno;
+			DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			/* for abnormal status do not do anything. journal file header will have previous end_of_data */
 		}
 	}

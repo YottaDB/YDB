@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,73 +44,74 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 	unsigned char 	*cp, msk;
 	io_termmask 	lngmsk;
 
+	assert(MV_DEFINED(src));
 	strlen = -1;
 	siz = io_params_size[iocode];
 	if (stringpool.top - stringpool.free < siz + 1)
 		stp_gcol(siz + 1);
 	switch(dev_param_control[iocode].source_type)
 	{
-	case IOP_SRC_INT:
-		assert(siz == sizeof(int4) || siz == sizeof(short));
-		MV_FORCE_NUM(src);
-		nl = MV_FORCE_INT(src);
-		if (siz == sizeof(int4))
-			cp = (unsigned char *)&nl;
-		else
-		{
-			assert (siz == sizeof(short));
+		case IOP_SRC_INT:
+			assert(siz == sizeof(int4) || siz == sizeof(short));
+			MV_FORCE_NUM(src);
+			nl = MV_FORCE_INT(src);
+			if (siz == sizeof(int4))
+				cp = (unsigned char *)&nl;
+			else
+			{
+				assert (siz == sizeof(short));
 
-			ns = (short) nl;
-			cp = (unsigned char *) &ns;
-		}
-		break;
-	case IOP_SRC_STR:
-		assert(siz == IOP_VAR_SIZE);
-		MV_FORCE_STR(src);
-		if (src->str.len > 255)	/*one byte string lengths within a parameter string*/
-			return (int4) ERR_DEVPARTOOBIG;
-		strlen = src->str.len;
-		siz = strlen + SIZEOF(unsigned char);
-		cp = (unsigned char *) src->str.addr;
-		break;
-	case IOP_SRC_MSK:
-		MV_FORCE_STR(src);
-		assert(siz == sizeof(int4));
-		nl = 0;
-		for (cp = (unsigned char *) src->str.addr, cnt = src->str.len ; cnt > 0 ; cnt--)
-			nl |= (1 << *cp++);
-		cp = (unsigned char *) &nl;
-		break;
-	case IOP_SRC_LNGMSK:
-		MV_FORCE_STR(src);
-		assert(siz == sizeof(io_termmask));
-		memset(&lngmsk, 0, sizeof(io_termmask));
-		for (cp = (unsigned char *) src->str.addr, cnt = src->str.len ; cnt > 0 ; cnt--)
-		{
-			msk = *cp++;
-			nl = msk / 32;
-			lngmsk.mask[nl] |= (1 << (msk - (nl * 32)));
-		}
-		cp = (unsigned char *) &lngmsk;
-		break;
-	case IOP_SRC_PRO:
-		assert(siz == sizeof (unsigned char));
-		MV_FORCE_STR(src);
-		nl = cvtprot(src->str.addr, src->str.len);
-		if (nl == -1)
-			return  (int4) ERR_DEVPARPROT;
-		msk = nl;
-		cp = &msk;
-		break;
-	case IOP_SRC_TIME:
-		status = cvttime(src, tim);
-		if ((status & 1) == 0)
-		    return status;
-		siz = sizeof(tim) ;
-		cp = (unsigned char *) tim ;
-		break;
-	default:
-		assert(FALSE);
+				ns = (short) nl;
+				cp = (unsigned char *) &ns;
+			}
+			break;
+		case IOP_SRC_STR:
+			assert(siz == IOP_VAR_SIZE);
+			MV_FORCE_STR(src);
+			if (src->str.len > 255)	/*one byte string lengths within a parameter string*/
+				return (int4) ERR_DEVPARTOOBIG;
+			strlen = src->str.len;
+			siz = strlen + SIZEOF(unsigned char);
+			cp = (unsigned char *) src->str.addr;
+			break;
+		case IOP_SRC_MSK:
+			MV_FORCE_STR(src);
+			assert(siz == sizeof(int4));
+			nl = 0;
+			for (cp = (unsigned char *) src->str.addr, cnt = src->str.len ; cnt > 0 ; cnt--)
+				nl |= (1 << *cp++);
+			cp = (unsigned char *) &nl;
+			break;
+		case IOP_SRC_LNGMSK:
+			MV_FORCE_STR(src);
+			assert(siz == sizeof(io_termmask));
+			memset(&lngmsk, 0, sizeof(io_termmask));
+			for (cp = (unsigned char *) src->str.addr, cnt = src->str.len ; cnt > 0 ; cnt--)
+			{
+				msk = *cp++;
+				nl = msk / 32;
+				lngmsk.mask[nl] |= (1 << (msk - (nl * 32)));
+			}
+			cp = (unsigned char *) &lngmsk;
+			break;
+		case IOP_SRC_PRO:
+			assert(siz == sizeof (unsigned char));
+			MV_FORCE_STR(src);
+			nl = cvtprot(src->str.addr, src->str.len);
+			if (nl == -1)
+				return  (int4) ERR_DEVPARPROT;
+			msk = nl;
+			cp = &msk;
+			break;
+		case IOP_SRC_TIME:
+			status = cvttime(src, tim);
+			if ((status & 1) == 0)
+				return status;
+			siz = sizeof(tim) ;
+			cp = (unsigned char *) tim ;
+			break;
+		default:
+			assert(FALSE);
 	}
 	dst->mvtype = MV_STR;
 	dst->str.addr = (char *) stringpool.free;

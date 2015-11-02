@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,9 +17,7 @@ GBLREF unsigned char *source_buffer;
 GBLREF short int source_column;
 GBLREF short int last_source_column;
 GBLREF char *lexical_ptr;
-GBLREF bool run_time, compile_time;
 GBLREF struct ce_sentinel_desc	*ce_def_list;
-
 
 void ce_substitute(struct ce_sentinel_desc *shp, int4 source_col, int4 *skip_ct)
 {

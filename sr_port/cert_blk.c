@@ -61,7 +61,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 {
 	block_id		child, prev_child;
 	rec_hdr_ptr_t		rp, r_top;
-	bool			dummy_bool;
+	boolean_t		dummy_bool;
 	int			num_subscripts;
 	uint4			bplmap, mask1, offset;
 	sm_uint_ptr_t		chunk_p;			/* Value is unaligned so will be assigned to chunk */

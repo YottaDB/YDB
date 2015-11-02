@@ -30,17 +30,18 @@ GBLREF	boolean_t	dse_running;
 void gvcst_map_build(uint4 *array, sm_uc_ptr_t base_addr, cw_set_element *cs, trans_num ctn)
 {
 	boolean_t	busy, status;
+	block_id	blkid, bmpblkid;
 	uint4		ret, (*bml_func)();
 
-	VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);
-	if (!status)
-		GTMASSERT;	/* it is not a valid bitmap block */
+	bmpblkid = cs->blk;
+	DEBUG_ONLY(VALIDATE_BM_BLK(bmpblkid, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);)
+	assert(status); /* assert it is a valid bitmap block */
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	base_addr += sizeof(blk_hdr);
 	bml_func = (busy = (cs->reference_cnt > 0)) ? bml_busy : (cs_addrs->hdr->db_got_to_v5_once ? bml_recycled : bml_free);
-	while (*array)
+	while (blkid = *array)
 	{
-		if (0 == (ret = (* bml_func)((*array - cs->blk), base_addr)))
+		if (0 == (ret = (* bml_func)((blkid - bmpblkid), base_addr)))
 			cs->reference_cnt--;
 		array++;
 	}

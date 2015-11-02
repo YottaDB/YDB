@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,10 +64,12 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 	}
 	for(i = 0; ;)
 	{
+		MV_FORCE_DEFINED(in);
 		if (MV_IS_STRING(in))
 			memcpy(cp, in->str.addr, in->str.len);
 		else
-		{	stringpool.free = cp;
+		{
+			stringpool.free = cp;
 			n2s(in);
 			/* Convert to string, rely on the fact that it will be converted exactly at the
 				end of the stringpool.

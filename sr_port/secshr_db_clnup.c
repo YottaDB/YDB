@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1107,11 +1107,15 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 							UNIX_ONLY(RELEASE_SWAPLOCK(&jbp->io_in_prog_latch));
 						}
 						if (jbp->free_update_pid == rundown_process_id)
-						{
+						{	/* Got shot in the midst of updating freeaddr/free in jnl_write.c
+							 * Fix the values (possible only in VMS where we have kernel extension).
+							 */
+							UNIX_ONLY(assert(FALSE);)
 							assert(csa->now_crit);
 							jbp->free = csa->jnl->temp_free;
 							jbp->freeaddr = csa->jnl->new_freeaddr;
 							jbp->free_update_pid = 0;
+							DBG_CHECK_JNL_BUFF_FREEADDR(jbp);
 						}
 						if (jbp->blocked == rundown_process_id)
 						{

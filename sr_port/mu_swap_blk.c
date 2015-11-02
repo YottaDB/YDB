@@ -114,7 +114,6 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	unsigned char    	save_cw_set_depth;
 	cw_set_element		*tmpcse;
 	jnl_buffer_ptr_t	jbbp; /* jbp is non-NULL only if before-image journaling */
-	uint4			write_type;
 	unsigned int		bsiz;
 
 	dest_blk_id = *pdest_blk_id;
@@ -346,10 +345,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			assert(t_tries < CDB_STAGNATE);
 			return cdb_sc_blkmod;
 		}
-		write_type = (dest_blk_level || level) ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN;
 		assert(gv_target->hist.h[level].blk_num == work_blk_id);
 		assert(gv_target->hist.h[level].buffaddr == work_blk_ptr);
-		t_write(&gv_target->hist.h[level], (unsigned char *)bs1, 0, 0, dest_blk_level, TRUE, TRUE, write_type);
+		t_write(&gv_target->hist.h[level], (unsigned char *)bs1, 0, 0, dest_blk_level, TRUE, TRUE, GDS_WRITE_KILLTN);
 	}
 	/* 2: work_blk_id into dest_blk_id */
 	if (!blk_was_free && work_blk_id == dest_hist_ptr->h[dest_blk_level+1].blk_num)
@@ -383,10 +381,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			assert(t_tries < CDB_STAGNATE);
 			return cdb_sc_blkmod;
 		}
-		write_type = (dest_blk_level || level) ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN;
 		assert(dest_blk_id == dest_hist_ptr->h[dest_blk_level].blk_num);
 		assert(dest_blk_ptr == dest_hist_ptr->h[dest_blk_level].buffaddr);
-		t_write(&dest_hist_ptr->h[dest_blk_level], (unsigned char *)bs1, 0, 0, level, TRUE, TRUE, write_type);
+		t_write(&dest_hist_ptr->h[dest_blk_level], (unsigned char *)bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
 	} else /* free block or, when working block does not move vertically (swap with parent/child) */
 	{
 		BLK_INIT(bs_ptr, bs1);
@@ -398,7 +395,6 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			assert(t_tries < CDB_STAGNATE);
 			return cdb_sc_blkmod;
 		}
-		write_type = (blk_was_free || dest_blk_level || level) ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN;
 		if (blk_was_free)
 		{
 			tmpcse = &cw_set[cw_set_depth];
@@ -442,7 +438,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			hist_ptr = &dest_hist_ptr->h[dest_blk_level];
 			assert(dest_blk_id == hist_ptr->blk_num);
 			assert(dest_blk_ptr == hist_ptr->buffaddr);
-			t_write(hist_ptr, (unsigned char *)bs1, 0, 0, level, TRUE, TRUE, write_type);
+			t_write(hist_ptr, (unsigned char *)bs1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
 		}
 	}
 	if (!blk_was_free)
@@ -496,9 +492,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				return cdb_sc_blkmod;
 			}
 			assert(level == dest_blk_level);
-			write_type = (level ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN);
 			assert(dest_parent_ptr == dest_hist_ptr->h[level+1].buffaddr);
-			t_write(&dest_hist_ptr->h[level+1], (unsigned char *)bs1, 0, 0, level+1, FALSE, TRUE, write_type);
+			t_write(&dest_hist_ptr->h[level+1], (unsigned char *)bs1, 0, 0, level+1, FALSE, TRUE, GDS_WRITE_KILLTN);
 		} else if (work_blk_id != dest_hist_ptr->h[dest_blk_level+1].blk_num)
 		{	/* Destination block moved in the position of working block.
 			 * So destination block's parent's pointer should be changed to work_blk_id
@@ -523,10 +518,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 				assert(t_tries < CDB_STAGNATE);
 				return cdb_sc_blkmod;
 			}
-			write_type = (dest_blk_level || level) ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN;
 			assert(dest_parent_ptr == dest_hist_ptr->h[dest_blk_level+1].buffaddr);
 			t_write(&dest_hist_ptr->h[dest_blk_level+1], (unsigned char *)bs1, 0, 0, dest_blk_level+1,
-				FALSE, TRUE, write_type);
+				FALSE, TRUE, GDS_WRITE_KILLTN);
 		}
 	}
 	/* 4: Parent of working block, if different than destination's parent or, destination was a free block */
@@ -551,9 +545,8 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			assert(t_tries < CDB_STAGNATE);
 			return cdb_sc_blkmod;
 		}
-		write_type = (blk_was_free || dest_blk_level || level) ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN;
 		assert(gv_target->hist.h[level+1].buffaddr == work_parent_ptr);
-		t_write(&gv_target->hist.h[level+1], (unsigned char *)bs1, 0, 0, level+1, FALSE, TRUE, write_type);
+		t_write(&gv_target->hist.h[level+1], (unsigned char *)bs1, 0, 0, level+1, FALSE, TRUE, GDS_WRITE_KILLTN);
 	}
 	/* else already taken care of, when dest_blk_id moved */
 	if (blk_was_free)

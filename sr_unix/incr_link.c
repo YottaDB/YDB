@@ -30,7 +30,7 @@
 #include "min_max.h"
 #include "gtmdbglvl.h"
 #include "cmd_qlf.h"	/* needed for CQ_UTF8 */
-#include "gtm_malloc.h"
+#include "gtm_text_alloc.h"
 
 #define RELOCATE(field, type, base) field = (type)((unsigned char *)(field) + (UINTPTR_T)(base))
 #define RELREAD 50			/* number of relocation entries to buffer */
@@ -109,6 +109,11 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	int		name_buf_len;
 	char		marker[sizeof(JSB_MARKER) - 1];
 
+	AIX_ONLY(
+	FILHDR          *hddr = NULL;
+        unsigned short  magic;
+	)
+
 	error_def(ERR_DLLCHSETM);
 	error_def(ERR_DLLCHSETUTF8);
 	error_def(ERR_DLLVERSION);
@@ -147,6 +152,23 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		hdr->shlib_handle = zro_entry->shrlib;
 	} else
 	{	/* Seek past native object headers to get GT.M object's routine header */
+
+		/* To check if it is not an xcoff64 bit .o */
+		AIX_ONLY(
+			hddr = (FILHDR *)(malloc(sizeof(FILHDR)));
+			if (-1 != (status = read(file_desc, hddr, sizeof(FILHDR))))
+			{
+				magic = hddr->f_magic;
+				if (-1 == (status = (ssize_t)lseek(file_desc, -(sizeof(FILHDR)), SEEK_SET)))
+				status = errno;
+			} else
+				status = errno;
+			free(hddr);
+
+			if (magic != U64_TOCMAGIC)
+				return FALSE;
+		)
+
 		if (-1 != (status = (ssize_t)lseek(file_desc, NATIVE_HDR_LEN, SEEK_SET)))
 		{
 			DOREADRC(file_desc, hdr, sizeof(rhdtyp), status);
@@ -230,8 +252,8 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		rel_base = shdr;
 	else
 	{
-		sect_ro_rel_size = (unsigned int)((INTPTR_T) hdr->literal_adr - (INTPTR_T) hdr->ptext_adr);
-		sect_ro_rel = GTM_TEXT_MALLOC(sect_ro_rel_size);
+		sect_ro_rel_size = (unsigned int)((INTPTR_T)hdr->literal_adr - (INTPTR_T)hdr->ptext_adr);
+		sect_ro_rel = GTM_TEXT_ALLOC(sect_ro_rel_size);
 		/* It should be aligned well at this point but make a debug level check to verify */
 		assert((INTPTR_T)sect_ro_rel == ((INTPTR_T)sect_ro_rel & ~(LINKAGE_PSECT_BOUNDARY - 1)));
 		DOREADRC(file_desc, sect_ro_rel, sect_ro_rel_size, status);
@@ -695,7 +717,7 @@ void	zl_error_hskpng(int4 file)
 		if (hdr)
 			free(hdr);
 		if (sect_ro_rel)
-			free(sect_ro_rel);
+			GTM_TEXT_FREE(sect_ro_rel);
 		if (sect_rw_rel)
 			free(sect_rw_rel);
 		if (sect_rw_nonrel)

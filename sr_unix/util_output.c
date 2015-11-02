@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -342,13 +342,13 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						}
 					else
 					{
-						IA64_ONLY(
+						GTM64_ONLY(
                                                 if ('X' == type)
                                                 	{GETFAOVALDEF(faocnt, fao, UINTPTR_T, addr_val, 0);}
                                                 else
                                                 	{GETFAOVALDEF(faocnt, fao, int4, int_val, 0);}
                                                 )
-					  	NON_IA64_ONLY(GETFAOVALDEF(faocnt, fao, int4, int_val, 0);)
+					  	NON_GTM64_ONLY(GETFAOVALDEF(faocnt, fao, int4, int_val, 0);)
 						switch(type2)
 						{
 							case 'B':
@@ -358,8 +358,8 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 								int_val = int_val & 0xFFFF;
 								break;
 							case 'L':
-								NON_IA64_ONLY(int_val = int_val & 0xFFFFFFFF;)
-								IA64_ONLY(
+								NON_GTM64_ONLY(int_val = int_val & 0xFFFFFFFF;)
+								GTM64_ONLY(
 		                                                if ('X' == type)
 									{addr_val = addr_val & 0xFFFFFFFFFFFFFFFF;}
 								else
@@ -392,14 +392,14 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 									length = sizeof(int4);
 							                break;
 							        case 'L':
-						               		NON_IA64_ONLY(length = sizeof(int4) + sizeof(int4);)
-									IA64_ONLY(length = sizeof(INTPTR_T) + sizeof(INTPTR_T);)
+						               		NON_GTM64_ONLY(length = sizeof(int4) + sizeof(int4);)
+									GTM64_ONLY(length = sizeof(INTPTR_T) + sizeof(INTPTR_T);)
 						                       	break;
 								default:
 									assert(FALSE);
 							}
-							NON_IA64_ONLY(i2hex(int_val, numptr, length);)
-							IA64_ONLY(i2hex(addr_val, numptr, length);)
+							NON_GTM64_ONLY(i2hex(int_val, numptr, length);)
+							GTM64_ONLY(i2hex(addr_val, numptr, length);)
 							numptr += length;
 							break;
 						default:
@@ -448,7 +448,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 				}
 				if ((field_width > 0) && (field_width < length))
 				{
-					IA64_ONLY(
+					GTM64_ONLY(
 					/* If this is an integer to be printed using format specifier X, display the
 					   least 4 bytes */
 					if (type == 'X' && type2 == 'L' && (length == (2 * sizeof(INTPTR_T))))
@@ -456,7 +456,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					else
 						memset(outptr, '*', field_width);
 					)
-					NON_IA64_ONLY(memset(outptr, '*', field_width);)
+					NON_GTM64_ONLY(memset(outptr, '*', field_width);)
 					outptr += field_width;
 				} else
 				{
@@ -492,7 +492,8 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	 * When syslog is processing and a signal occurs, the signal processing might eventually lead to another syslog
 	 * call.  But in libc the first syslog has grabbed a lock (syslog_lock), and now the other syslog call will
 	 * block waiting for that lock which can't be released since the first syslog was interrupted by the signal.
-	 * A work around is to temporarily block external signals and then restore them after the syslog returns.
+	 * A work around is to temporarily block signals (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT, SIGALRM) and then
+	 * restore them after the syslog call returns.
 	 */
 	sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
 	(void)SYSLOG(LOG_USER | LOG_INFO, addr);

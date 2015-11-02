@@ -21,17 +21,17 @@
 #include "obj_file.h"
 #include "cg_var.h"
 
-GBLREF bool	run_time;
-GBLREF int4	mvmax, mlitmax;
-GBLREF mvar 	*mvartab;
-GBLREF int4	curr_addr, code_size;
-GBLREF int4	sa_temps[];
-GBLREF int4	sa_temps_offset[];
-GBLREF char	cg_phase;	/* code generation phase */
-GBLREF char	cg_phase_last; 	/* previous code generation phase */
-GBLREF spdesc	stringpool, indr_stringpool;
+GBLREF boolean_t	run_time;
+GBLREF int4		mvmax, mlitmax;
+GBLREF mvar		*mvartab;
+GBLREF int4		curr_addr, code_size;
+GBLREF int4		sa_temps[];
+GBLREF int4		sa_temps_offset[];
+GBLREF char		cg_phase;	/* code generation phase */
+GBLREF char		cg_phase_last; 	/* previous code generation phase */
+GBLREF spdesc		stringpool, indr_stringpool;
 #ifdef __ia64
-GBLREF int4	generated_code_size, calculated_code_size;
+GBLREF int4		generated_code_size, calculated_code_size;
 #endif
 
 GBLDEF unsigned char	*runtime_base;
@@ -105,7 +105,7 @@ void	ind_code(mstr *obj)
         GTM64_ONLY(runtime_base = (unsigned char *)ROUND_UP2((UINTPTR_T)runtime_base, SECTION_ALIGN_BOUNDARY);)
 
 	IA64_ONLY(old_code_size = code_size;)
-#if (defined(USHBIN_SUPPORTED) || defined(VMS))
+#if defined(USHBIN_SUPPORTED) || defined(VMS)
 	shrink_trips();
 #endif
 	IA64_ONLY(

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,11 +79,13 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 		result->str.addr = (char *)&pos_str[0];
 		result->str.len = 1;
 	}
-	assert((0 != result->str.len) || (DOLLAR_STACK_MAXINDEX <= level));
 	if (DOLLAR_STACK_PLACE == mode)
 	{
-		s2pool(&result->str);
-		assert(((unsigned char *)result->str.addr + result->str.len) == stringpool.free);
+		if (result->str.len)
+		{
+			s2pool(&result->str);
+			assert(((unsigned char *)result->str.addr + result->str.len) == stringpool.free);
+		}
 	}
 	if (DOLLAR_STACK_MCODE == mode)
 	{

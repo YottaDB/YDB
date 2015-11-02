@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,8 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	boolean_t		need_extend;
 	jnl_buffer_ptr_t     	jb;
 	jnl_create_info 	jnl_info;
-	jnl_file_header		header;
+	jnl_file_header		*header;
+	unsigned char		hdr_buff[JNL_HDR_LEN + ALIGNMENT_SIZE];
 	uint4			new_alq;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -197,13 +198,14 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		{
 			assert(!need_extend);	/* ensure we won't go through the for loop again */
 			/* Virtually extend currently used journal file */
+			header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_buff, DISK_BLOCK_SIZE));
 			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
-			DO_FILE_READ(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
+			DO_FILE_READ(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			if (SS_NORMAL != jpc->status)
 				rts_error(VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
-			assert((header.virtual_size + new_blocks) == new_alq);
-			header.virtual_size = new_alq;
-			DO_FILE_WRITE(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
+			assert((header->virtual_size + new_blocks) == new_alq);
+			header->virtual_size = new_alq;
+			DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			if (SS_NORMAL != jpc->status)
 				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 		}

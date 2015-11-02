@@ -20,7 +20,7 @@
 typedef struct mcalloc_hdr_struct {
 	struct mcalloc_hdr_struct *link;	/* pointer to the next block */
 	int4		size;			/* size of the usable area in this block */
-	IA64_ONLY(int filler;)			/* The data(data[0]) on IA64 should begin on 8-byte boundary */
+	GTM64_ONLY(int filler;)			/* The data(data[0]) on 64-bit platforms should begin on 8-byte boundary */
 	char		data[1];		/* beginning of the allocatable area (NOTE: should be last member) */
 } mcalloc_hdr;
 

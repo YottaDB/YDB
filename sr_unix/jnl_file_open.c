@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ error_def(ERR_JNLMOVED);
 error_def(ERR_JNLOPNERR);
 error_def(ERR_JNLRDERR);
 
-uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy)	/* third argument for compatibility with VMS version */
+uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument for compatibility with VMS version */
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;

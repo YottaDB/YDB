@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@
 #define GTM_ICU_MINOR_ENV		"$gtm_icu_minorver"
 
 #define	GTM_GVDUPSETNOOP		"$gtm_gvdupsetnoop"
+#define	GTM_NOUNDEF			"$gtm_noundef"
 #define	GTM_GDSCERT			"$gtm_gdscert"
 #define	GTM_BLKUPGRADE_FLAG		"$gtm_blkupgrade_flag"
 

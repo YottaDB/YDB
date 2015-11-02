@@ -128,7 +128,6 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			blk2_ances_hdr, new_levelp_cur_hdr, new_levelp_cur_next_hdr;
 	blk_segment	*bs_ptr1, *bs_ptr2;
 	srch_hist	*blk1ptr, *blk2ptr; /* blk2ptr is for right sibling's hist from a minimum sub-tree containing both blocks */
-	uint4		write_type;
 
 	blk_size = cs_data->blk_size;
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
@@ -612,8 +611,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
-	write_type = (complete_merge ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN);
-	t_write(&blk1ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, write_type);
+	t_write(&blk1ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, GDS_WRITE_KILLTN);
 	/* -----------------
 	 * The right sibling
 	 * -----------------
@@ -637,7 +635,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			assert(t_tries < CDB_STAGNATE);
 			return cdb_sc_blkmod;
 		}
-		t_write(&blk2ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, TRUE, TRUE, GDS_WRITE_PLAIN);
+		t_write(&blk2ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, TRUE, TRUE, GDS_WRITE_KILLTN);
 	} else
 	{
 		kill_set_ptr->blk[kill_set_ptr->used].flag = 0;
@@ -720,8 +718,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
-	assert(write_type == (complete_merge ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN));
-	t_write(&blk1ptr->h[levelp], (unsigned char *)bs_ptr1, 0, 0, levelp, FALSE, forward_process, write_type);
+	t_write(&blk1ptr->h[levelp], (unsigned char *)bs_ptr1, 0, 0, levelp, FALSE, forward_process, GDS_WRITE_KILLTN);
 	/* ---------------------------------------------------------------------------
 	 * if delete_all_blk2_ances and level+1 <= level2 < levelp,
 	 * 	if blk2ptr->h[level2].blk_num are *-record blocks
@@ -749,7 +746,6 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			assert(t_tries < CDB_STAGNATE);
 			return cdb_sc_blkmod;
 		}
-		assert(GDS_WRITE_KILLTN == write_type);	/* since "complete_merge" should be TRUE */
 		t_write(&blk2ptr->h[level2], (unsigned char *)bs_ptr1, 0, 0, level2, TRUE, TRUE, GDS_WRITE_KILLTN);
 	}
 	/* else do not need to change blk2ptr->h[level2].blk_num.

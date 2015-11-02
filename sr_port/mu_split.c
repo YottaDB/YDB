@@ -175,7 +175,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
-	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, GDS_WRITE_PLAIN);
+	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, GDS_WRITE_KILLTN);
 
 	/* Create new split piece, we already know that this will not be *-rec only */
 	BLK_INIT(bs_ptr2, bs_ptr1);
@@ -424,7 +424,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				return cdb_sc_blkmod;
 			}
 			t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, right_index,
-				level, first_copy, FALSE, GDS_WRITE_PLAIN);
+				level, first_copy, FALSE, GDS_WRITE_KILLTN);
 			break;
 		}
 		/* if SPLIT REQUIRED */
@@ -480,7 +480,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, ins_off, right_index, level);
 			else
 				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, right_index,
-					level, first_copy, FALSE, GDS_WRITE_PLAIN);
+					level, first_copy, FALSE, GDS_WRITE_KILLTN);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (new_rtblk_star_only)
@@ -537,7 +537,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
 			else
 				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0,
-					level, TRUE, TRUE, GDS_WRITE_PLAIN);
+					level, TRUE, TRUE, GDS_WRITE_KILLTN);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (new_leftblk_top_off < gv_target->hist.h[level].curr_rec.offset)
@@ -604,9 +604,6 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				assert(t_tries < CDB_STAGNATE);
 				return cdb_sc_blkmod;
 			}
-			/* Since a new root block is not created but two new children are created, this update to the
-			 * root block should disable the "indexmod" optimization (C9B11-001813).
-			 */
 			cse = t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, left_index,
 				level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
 			t_write_root(ins_off2, right_index);	/* create a sibling cw-set-element to store ins_off2/right_index */

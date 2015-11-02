@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef __MM_UPDATE_H__
 #define __MM_UPDATE_H__
 
-enum cdb_sc mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn, trans_num effective_tn, sgm_info *si);
+enum cdb_sc mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn, sgm_info *si);
 
 #endif

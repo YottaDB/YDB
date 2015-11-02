@@ -36,7 +36,7 @@
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	bool			run_time;
+GBLREF	boolean_t		run_time;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		dse_running;
 

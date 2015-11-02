@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,6 @@ mint gvcmx_data(void)
 	mint ret;
 
 	gvcmz_doop(CMMS_Q_DATA, CMMS_R_DATA, &v);
-	ret = MV_FORCE_INT(&v);
+	ret = MV_FORCE_INTD(&v);
 	return ret;
 }

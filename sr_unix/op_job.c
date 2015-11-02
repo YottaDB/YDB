@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,6 +105,11 @@ int	op_job(int4 argcnt, ...)
 
 	/* initialize $zjob = 0, in case JOB fails */
 	dollar_zjob = 0;
+
+	MV_FORCE_DEFINED(label);
+	MV_FORCE_DEFINED(routine);
+	MV_FORCE_DEFINED(param_buf);
+
 	/* create a pipe to channel the PID of the jobbed off process(J) from middle level
 	 * process(M) to the current process (P) */
 	OPEN_PIPE(pipe_fds, pipe_status);

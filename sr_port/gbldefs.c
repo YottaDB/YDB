@@ -148,7 +148,6 @@ GBLDEF	bool		error_mupip = FALSE,
 			jobpid = FALSE,
 			online = FALSE,
 			record = FALSE,
-			run_time = FALSE,
 			is_standalone = FALSE,
 			std_dev_outbnd = FALSE,
 			in_mupip_freeze = FALSE,
@@ -163,6 +162,7 @@ GBLDEF	boolean_t	is_updproc = FALSE,
 			is_updhelper = FALSE,
 			mupip_jnl_recover = FALSE,
 			repl_allowed = FALSE,
+			run_time = FALSE,
 			unhandled_stale_timer_pop = FALSE,
 			gtcm_connection = FALSE,
 			is_replicator = FALSE,	/* TRUE => this process can write jnl records to the jnlpool for replicated db */
@@ -245,11 +245,11 @@ GBLDEF	mval		**ind_result_array, **ind_result_sp, **ind_result_top;
 GBLDEF	mval		**ind_source_array, **ind_source_sp, **ind_source_top;
 GBLDEF	rtn_tabent	*rtn_fst_table, *rtn_names, *rtn_names_top, *rtn_names_end;
 GBLDEF	int4		break_message_mask;
-GBLDEF	bool		rc_locked = FALSE,
-			certify_all_blocks = FALSE;	/* If flag is set all blocks are checked after they are
+GBLDEF	bool		rc_locked = FALSE;
+GBLDEF	boolean_t	certify_all_blocks = FALSE;	/* If flag is set all blocks are checked after they are
 							 * written to the database.  Upon error we stay critical
 							 * and report.  This flag can be set via the MUMPS command
-							 * VIEW 1. */
+							 * VIEW "GDSCERT":1. */
 GBLDEF	mval		curr_gbl_root;
 GBLDEF	gd_addr		*original_header;
 GBLDEF	mem_list	*mem_list_head;
@@ -909,3 +909,10 @@ GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to i
 GBLDEF	uint4	process_id;
 GBLDEF	uint4	image_count;	/* not used in UNIX but defined to preserve VMS compatibility */
 
+GBLDEF  int     totalRmalloc;                           /* Total storage currently (real) malloc'd (includes extent blocks) */
+GBLDEF  int     totalAlloc;                             /* Total allocated (includes allocation overhead but not free space */
+GBLDEF  int     totalUsed;                              /* Sum of user allocated portions (totalAlloc - overhead) */
+
+GBLDEF	int	totalRallocGta;				/* Total storage currently (real) mmap alloc'd */
+GBLDEF	int     totalAllocGta;                          /* Total mmap allocated (includes allocation overhead but not free space */
+GBLDEF	int     totalUsedGta;                           /* Sum of "in-use" portions (totalAllocGta - overhead) */

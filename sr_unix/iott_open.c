@@ -28,7 +28,7 @@
 #include "gtm_isanlp.h"
 #include "gtm_conv.h"
 
-GBLREF bool		run_time;
+GBLREF boolean_t	run_time;
 GBLREF int		COLUMNS, GTM_LINES, AUTO_RIGHT_MARGIN;
 GBLREF uint4		gtm_principal_editing_defaults;
 GBLREF io_pair		io_std_device;

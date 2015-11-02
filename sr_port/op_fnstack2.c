@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ GBLREF	dollar_stack_type	dollar_stack;			/* structure containing $STACK related 
 	switch(mode)									\
 	{										\
 		case DOLLAR_STACK_ECODE:						\
-			result->str.len = 0;						\
+			assert(0 == result->str.len);					\
 			break;								\
 		case DOLLAR_STACK_PLACE:						\
 		case DOLLAR_STACK_MCODE:						\
@@ -63,9 +63,9 @@ void op_fnstack2(int level, mval *info, mval *result)
 
 	error_def(ERR_INVSTACODE);
 
-	result->mvtype = MV_STR;
 	mode = DOLLAR_STACK_INVALID;
 	/* make sure that info is one of the three valid strings */
+	MV_FORCE_STR(info);	/* force input string to null string in case it is undefined */
 	if (info->str.len == 5)
 	{
 		lower_to_upper(info_upper, (unsigned char *)info->str.addr, 5);
@@ -78,23 +78,24 @@ void op_fnstack2(int level, mval *info, mval *result)
 	}
 	if (DOLLAR_STACK_INVALID == mode)
 		rts_error(VARLSTCNT(4) ERR_INVSTACODE, 2, info->str.len, info->str.addr);
+	result->mvtype = MV_STR;
+	result->str.len = 0;	/* set result to null string before any processing */
 	cur_zlevel = dollar_zlevel();
-	if (0 > level)
-		result->str.len = 0;
-	else if (!dollar_stack.index)
+	if (0 <= level)
 	{
-		if (level < cur_zlevel)
+		if (!dollar_stack.index)
+		{
+			if (level < cur_zlevel)
+			{
+				GET_FRAME_INFO(level, mode, cur_zlevel, result);
+			}
+		} else if (level < dollar_stack.index)
+			get_dollar_stack_info(level, mode, result);
+		else if (!dollar_stack.incomplete && (1 == dollar_ecode.index)
+				&& (error_frame == dollar_ecode.first_ecode_error_frame) && (level < cur_zlevel))
 		{
 			GET_FRAME_INFO(level, mode, cur_zlevel, result);
-		} else
-			result->str.len = 0;
-	} else if (level < dollar_stack.index)
-		get_dollar_stack_info(level, mode, result);
-	else if (!dollar_stack.incomplete && (1 == dollar_ecode.index)
-			&& (error_frame == dollar_ecode.first_ecode_error_frame) && (level < cur_zlevel))
-	{
-		GET_FRAME_INFO(level, mode, cur_zlevel, result);
-	} else
-		result->str.len = 0;
+		}
+	}
 	return;
 }

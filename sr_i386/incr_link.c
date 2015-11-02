@@ -25,7 +25,7 @@
 #include "incr_link.h"
 #include "min_max.h"	/* MIDENT_CMP needs MIN */
 #include "cmd_qlf.h"	/* needed for CQ_UTF8 */
-#include "gtm_malloc.h"
+#include "gtm_text_alloc.h"
 
 /* INCR_LINK - read and process a mumps object module.  Link said module to
  	currently executing image */
@@ -91,7 +91,7 @@ bool incr_link(int file_desc)
 
 	assert (file_hdr.a_bss == 0);
 	code_size = file_hdr.a_text + file_hdr.a_data;
-	code = GTM_TEXT_MALLOC(code_size);
+	code = GTM_TEXT_ALLOC(code_size);
 	DOREADRL(file_desc, code, code_size, read_size);
 	if (read_size != code_size)
 	{
@@ -423,7 +423,7 @@ void zl_error(int4 file, int4 err, int4 err2, int4 len, char *addr)
 {
 	if (code)
 	{
-		free(code);
+		GTM_TEXT_FREE(code);
 		code = NULL;
 	}
 	close(file);
@@ -432,7 +432,8 @@ void zl_error(int4 file, int4 err, int4 err2, int4 len, char *addr)
 		rts_error(VARLSTCNT(6) err, 0, err2, 2, len, addr);
 	else if (0 != err)
 		rts_error(VARLSTCNT(1) err);
-	else {
+	else
+	{
 		assert(0 != err2);
 		rts_error(VARLSTCNT(4) err2, 2, len, addr);
 	}

@@ -1,6 +1,7 @@
+#! tcsh -f
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -10,16 +11,22 @@
 #################################################################
 
 #
-###########################################################################################
+#######################################################################
 #
-#	mkutf8dir.csh - If ICU is installed, create utf8 subdirectory.
+#	mkutf8dir.csh - Used by makefile build procedure
+#		Should be kept in sync with similar code in comlist.csh
+#			If ICU is installed, create utf8 subdirectory.
 #                   Mirror parent directory except for .o's.
 #	                Build .o's in UTF-8 mode.
 #
-###########################################################################################
+#######################################################################
 
-source $gtm_tools/check_unicode_support.csh
-if ("TRUE" == "$is_unicode_support") then
+set checkunicode = "../sr_unix/check_unicode_support.csh"
+if ( -e $checkunicode ) then
+    set x8664inc = ""
+    if ( "Linux" == `uname` && "x86_64" == `uname -m` && "64" == "$linux_build_type" ) set x8664inc = "../sr_x86_64"
+    source $checkunicode $x8664inc
+    if ("TRUE" == "$is_unicode_support") then
 	if (! -e utf8) mkdir utf8
 	setenv LC_CTYPE $utflocale
 	unsetenv LC_ALL
@@ -45,12 +52,10 @@ if ("TRUE" == "$is_unicode_support") then
 	cd utf8
 	../mumps *.m
 	if ($status != 0) then
-		set buildaux_status = `expr $buildaux_status + 1`
-		echo "buildaux-E-compile_UTF8, Failed to compile .m programs in UTF-8 mode"
+		echo "mkutf8dir-E-compile_UTF8, Failed to compile .m programs in UTF-8 mode"
 	endif
 	cd ..
 	setenv LC_CTYPE C
 	unsetenv gtm_chset	# switch back to "M" mode
+    endif
 endif
-
-

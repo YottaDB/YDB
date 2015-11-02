@@ -17,7 +17,6 @@
 #include "compiler.h"
 #include "mdq.h"
 
-GBLREF bool			run_time;
 GBLREF bool			shift_gvrefs;
 GBLREF mcalloc_hdr		*mcavailptr, *mcavailbase;
 GBLREF int			mcavail;

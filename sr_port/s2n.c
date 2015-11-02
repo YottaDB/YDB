@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,9 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "arit.h"
 #include "stringpool.h"
-#include "underr.h"
 
 #define DIGIT(x)	( x >='0' && x <= '9' )
 #define NUM_MASK	( MV_NM | MV_INT | MV_NUM_APPROX )
@@ -23,13 +23,16 @@ LITREF mval literal_null ;
 LITREF int4 ten_pwr[] ;
 
 char *s2n (mval *u)
-{	error_def (ERR_NUMOFLOW) ;
+{
 	char	*c, *d, *w, *eos ;
 	int	i, j, k, x, y, z, sign, zero, expdigits ;
 	bool	digit, dot, exp, exneg, tail ;
 
+	error_def (ERR_NUMOFLOW);
+
 	i = 0;
-	MV_FORCE_DEFINED(u);
+	if (!MV_DEFINED(u))
+		GTMASSERT;
 	c = u->str.addr;
 	if ( u->str.len==0 )
 	{

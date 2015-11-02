@@ -14,7 +14,7 @@
 
 #include <sys/types.h>
 
-#if defined(__ia64)
+#if defined(__ia64) || defined(__x86_64__)
 #define GTM64
 #endif /* __ia64 */
 
@@ -23,6 +23,8 @@ typedef          int    int4;           /* 4-byte signed integer */
 typedef unsigned int    uint4;          /* 4-byte unsigned integer */
 typedef          long   int8;           /* 8-byte signed integer */
 typedef unsigned long   uint8;          /* 8-byte unsigned integer */
+typedef unsigned long 	gtm_uint8;     /*these two datatypes are defined because */
+typedef		 long   gtm_int8;	/*int8 and uint8 are system defined in AIX_64*/
 #define INT8_NATIVE
 #else
 typedef          long   int4;
@@ -125,6 +127,8 @@ typedef unsigned short	in_port_t;
 
 #ifdef __linux__
 #define SYS_ERRLIST_INCLUDE   "gtm_stdio.h"
+#define MUTEX_MSEM_WAKE
+#define POSIX_MSEM
 #endif
 
 #ifdef __CYGWIN__
@@ -173,6 +177,20 @@ void dyncall();
 #undef BIGENDIAN
 #endif /* __i386 */
 
+#ifdef __x86_64__
+#define CACHELINE_SIZE        64
+#define MSYNC_ADDR_INCS        OS_PAGE_SIZE
+#define USHBIN_SUPPORTED
+#define INO_T_LONG
+/*
+#define MUTEX_MSEM_WAKE
+#define POSIX_MSEM
+> */
+#    define LINKAGE_PSECT_BOUNDARY  8
+#undef BIGENDIAN
+typedef char  mach_inst;        /* machine instruction */
+#endif
+
 #define INTERLOCK_ADD(X,Y,Z)    (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
 
 
@@ -182,6 +200,8 @@ void dyncall();
  * in the rest of the available bytes */
 #if __ia64
 #define RHEAD_JSB_SIZE 24 /* We need 16 bytes for putting the 'return -1' instruction + the GTM_CODE string */
+#elif __x86_64__
+#define RHEAD_JSB_SIZE 16 /* We need 8 bytes for putting the 'return -1' instruction + the GTM_CODE string */
 #else
 #define RHEAD_JSB_SIZE	NON_USHBIN_ONLY(8) USHBIN_ONLY(16)
 #endif /* __ia64 */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "hashtab_mname.h"	/* needed for lv_val.h */
 #include "lv_val.h"
 #include "sbs_blk.h"
@@ -18,7 +19,6 @@
 #include "do_xform.h"
 #include "numcmp.h"
 #include "mvalconv.h"
-#include "underr.h"
 
 LITREF	mval	SBS_MVAL_INT_ELE;
 

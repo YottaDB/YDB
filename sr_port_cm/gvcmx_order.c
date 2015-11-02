@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,7 @@ bool gvcmx_order(void)
 	mval v;
 
 	gvcmz_doop(CMMS_Q_ORDER, CMMS_R_ORDER, &v);
-	if (MV_FORCE_INT(&v))
+	if (MV_FORCE_INTD(&v))
 		return TRUE;
 	else
 		return FALSE;

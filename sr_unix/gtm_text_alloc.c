@@ -1,0 +1,497 @@
+/****************************************************************
+ *								*
+ *	Copyright 2007 Fidelity Information Services, Inc	*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+
+/* Storage manager for mmap() allocated storage used for executable code.
+   Uses power-of-two "buddy" system as described by Knuth. Allocations up to
+   size <pagesize> - sizeof(header) are managed by the buddy system. Larger
+   sizes are only "tracked" and then released via munmap() when they are freed.
+
+   The algorithms used in this module are very similar to those used in
+   gtm_malloc.c with some changes and fewer of the generation options
+   since this is a more special purpose type allocation mechanism.
+*/
+
+#include "mdef.h"
+
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <signal.h>
+#include <stddef.h>
+#include <errno.h>
+#include "gtm_stdio.h"
+#include "gtm_string.h"
+#include "gtm_stdlib.h"
+#include "gtm_unistd.h"
+
+#include "eintr_wrappers.h"
+#include "mdq.h"
+#include "min_max.h"
+#include "error.h"
+#include "gtmmsg.h"
+#include "caller_id.h"
+#include "gtm_text_alloc.h"
+
+/* These routines for Unix are NOT thread or interrupt safe */
+#  define TEXT_ALLOC(rsize, addr)										\
+{														\
+	int	save_errno;											\
+ 	addr = mmap(NULL, rsize, (PROT_READ + PROT_WRITE + PROT_EXEC), (MAP_PRIVATE + MAP_ANONYMOUS), -1, 0);	\
+	if (MAP_FAILED == addr)											\
+	{													\
+		--gtaSmDepth;											\
+                --fast_lock_count;										\
+		save_errno = errno;										\
+	        if (ENOMEM == save_errno)									\
+		{												\
+			assert(FALSE);										\
+			rts_error(VARLSTCNT(5) ERR_MEMORY, 2, rsize, CALLERID, save_errno);  			\
+		}												\
+		/* On non-allocate related error, give more general error and GTMASSERT */			\
+		gtm_putmsg(VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("mmap()"), CALLFROM,			\
+			   save_errno, 0,									\
+			   ERR_TEXT, 3, LEN_AND_LIT("Storage call made from"), CALLERID);			\
+		GTMASSERT;											\
+	}													\
+}
+#define TEXT_FREE(addr, rsize) 											\
+{														\
+	int	rc, save_errno;											\
+	rc = munmap(addr, rsize);										\
+	if (-1 == rc)												\
+	{													\
+		--gtaSmDepth;											\
+                --fast_lock_count;										\
+		save_errno = errno;										\
+		gtm_putmsg(VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("munmap"), CALLFROM,			\
+			   save_errno, 0,									\
+			   ERR_TEXT, 3, LEN_AND_LIT("Storage call made from"), CALLERID);			\
+		GTMASSERT;											\
+	}													\
+}
+
+/* States a storage element may be in (which need to be different from malloc states). */
+enum ElemState {Allocated = 0x43, Free = 0x34};
+
+/* The MAXTWO is set to pagesize and MINTWO to 5 sizes below that. Our systems have page
+   sizes of 16K, 8K, and 4K.
+*/
+#define MAXTWO gtm_os_page_size
+#define MINTWO TwoTable[0]		/* Computed by gtaSmInit() */
+#define MAXINDEX 5
+
+#define STE_FP(p) p->userStorage.links.fPtr
+#define STE_BP(p) p->userStorage.links.bPtr
+
+/* Following are values used in queueIndex in a storage element. Note that both
+   values must be less than zero for the current code to function correctly. */
+#define QUEUE_ANCHOR		-1
+#define REAL_ALLOC		-2
+
+#ifdef DEBUG_SM
+#  define DEBUGSM(x) (PRINTF x, fflush(stdout))
+# else
+#  define DEBUGSM(x)
+#endif
+
+#define INCR_CNTR(x) ++x
+#define INCR_SUM(x, y) x += y
+#define DECR_CNTR(x) --x
+#define DECR_SUM(x, y) x -= y
+#define SET_MAX(max, tst) max = MAX(max, tst)
+#define SET_ELEM_MAX(idx) SET_MAX(freeElemMax[idx], freeElemCnt[idx])
+#define CALLERID ((unsigned char *)caller_id())
+
+/* Define "routines" to enqueue and dequeue storage elements. Use define so we don't
+   have to depend on each implementation's compiler inlining to get efficient code here */
+#define ENQUEUE_STOR_ELEM(idx, elem)			\
+{							\
+	  storElem *qHdr, *fElem;			\
+	  qHdr = &freeStorElemQs[idx];			\
+	  STE_FP(elem) = fElem = STE_FP(qHdr);		\
+	  STE_BP(elem) = qHdr;				\
+	  STE_FP(qHdr) = STE_BP(fElem) = elem;		\
+          INCR_CNTR(freeElemCnt[idx]);			\
+          SET_ELEM_MAX(idx);				\
+}
+
+#define DEQUEUE_STOR_ELEM(elem)				\
+{ 							\
+	  STE_FP(STE_BP(elem)) = STE_FP(elem);		\
+	  STE_BP(STE_FP(elem)) = STE_BP(elem);		\
+          DECR_CNTR(freeElemCnt[elem->queueIndex]);	\
+}
+
+#define GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr)      \
+{							\
+	qHdr = &freeStorElemQs[sizeIndex];		\
+	uStor = STE_FP(qHdr);	      			/* First element on queue */ \
+	if (QUEUE_ANCHOR != uStor->queueIndex)		/* Does element exist? (Does queue point to itself?) */ \
+        {						\
+		DEQUEUE_STOR_ELEM(uStor);		/* It exists, dequeue it for use */ \
+	} else						\
+		uStor = gtaFindStorElem(sizeIndex);	\
+	assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */ \
+}
+
+GBLREF  int		process_exiting;		/* Process is on it's way out */
+GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
+
+/* Each allocated block has the following structure. The actual address
+   returned to the user for allocation and supplied by the user for release
+   is actually the storage beginning at the 'userStorage.userStart' area.
+   This holds true even for storage that is truely mmap'd.
+*/
+typedef struct storElemStruct
+{	/* This flavor of header is 16 bytes. This is required on IA64 and we have just adopted it for
+	   the other platforms as well as it is a minor expense given the sizes of chunks we are using
+	*/
+	int		queueIndex;			/* Index into TwoTable for this size of element */
+	enum ElemState	state;				/* State of this block */
+	unsigned int	realLen;			/* Real (total) length of allocation */
+	int		filler;
+	union						/* The links are used only when element is free */
+	{
+		struct					/* Free block information */
+		{
+			struct	storElemStruct	*fPtr;	/* Next storage element on free queue */
+			struct	storElemStruct	*bPtr;	/* Previous storage element on free queue */
+		} links;
+		unsigned char	userStart;		/* First byte of user useable storage */
+	} userStorage;
+} storElem;
+
+GBLREF readonly struct
+{
+	unsigned char nullHMark[4];
+	unsigned char nullStr[1];
+	unsigned char nullTMark[4];
+} NullStruct;
+
+static  uint4  		TwoTable[MAXINDEX + 2];
+static  storElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anchor for dbl-linked
+							   list since ptrs not at top of element */
+static	volatile int4	gtaSmDepth;			/* If we get nested... */
+static	boolean_t	gtaSmInitialized;		/* Initialized indicator */
+
+/* Fields to help instrument our algorithm */
+GBLREF  int     	totalRallocGta;                 /* Total storage currently (real) mmap alloc'd */
+GBLREF  int     	totalAllocGta;                  /* Total mmap allocated (includes allocation overhead but not free space */
+GBLREF  int     	totalUsedGta;                   /* Sum of "in-use" portions (totalAllocGta - overhead) */
+static	int		totalAllocs;                    /* Total alloc requests */
+static	int		totalFrees;                     /* Total free requests */
+static	int		rAllocMax;                      /* Maximum value of totalRalloc */
+static	int		allocCnt[MAXINDEX + 2];         /* Alloc count satisfied by each queue size */
+static	int		freeCnt[MAXINDEX + 2];          /* Free count for element in each queue size */
+static	int		elemSplits[MAXINDEX + 2];       /* Times a given queue size block was split */
+static	int		elemCombines[MAXINDEX + 2];     /* Times a given queue block was formed by buddies being recombined */
+static	int		freeElemCnt[MAXINDEX + 2];      /* Current count of elements on the free queue */
+static	int		freeElemMax[MAXINDEX + 2];      /* Maximum number of blocks on the free queue */
+
+OS_PAGE_SIZE_DECLARE
+
+#ifdef COMP_GTA		/* Only build this routine if it is going to be called */
+/* Internal prototypes */
+void gtaSmInit(void);
+storElem *gtaFindStorElem(int sizeIndex);
+int getSizeIndex(size_t size);
+
+error_def(ERR_TRNLOGFAIL);
+error_def(ERR_INVDBGLVL);
+error_def(ERR_MEMORY);
+error_def(ERR_SYSCALL);
+error_def(ERR_MEMORYRECURSIVE);
+error_def(ERR_TEXT);
+
+/* Initialize the storage manangement system. Things to initialize:
+
+   - Initialize size2Index table. This table is used to convert a malloc request size
+     to a storage queue index.
+   - Initialize queue anchor fwd/bkwd pointers to point to queue anchors so we
+     build a circular queue. This allows elements to be added and removed without
+     end-of-queue special casing. The queue anchor element is easily recognized because
+     it's queue index size will be set to a special value.
+   - Initialize debug mode. See if gtm_debug_level environment variable is set and
+     retrieve it's value if yes. */
+void gtaSmInit(void)
+{
+	char		*ascNum;
+	storElem	*uStor;
+	int		i, sizeIndex, twoSize;
+
+	/* WARNING!! Since this is early initialization, the assert(s) below are not well behaved if they do
+	   indeed trip. The best that can be hoped for is they give a condition handler exhausted error on
+	   GTM startup. Unfortunately, more intelligent responses are somewhat elusive since no output devices
+	   are setup nor (potentially) most of the GTM runtime.
+	*/
+
+	/* Initialize the TwoTable fields for our given page size */
+	TwoTable[MAXINDEX + 1] = 0xFFFFFFFF;
+	for (sizeIndex = MAXINDEX, twoSize = gtm_os_page_size; 0 <= sizeIndex; --sizeIndex, twoSize >>= 1)
+	{
+		assert(0 < twoSize);
+		TwoTable[sizeIndex] = twoSize;
+		assert(TwoTable[sizeIndex] < TwoTable[sizeIndex + 1]);
+	}
+
+	/* Need to initialize the fwd/bck ptrs in the anchors to point to themselves */
+	for (uStor = &freeStorElemQs[0], i = 0; i <= MAXINDEX; ++i, ++uStor)
+	{
+		STE_FP(uStor) = STE_BP(uStor) = uStor;
+		uStor->queueIndex = QUEUE_ANCHOR;
+	}
+	gtaSmInitialized = TRUE;
+}
+
+/* Recursive routine used to obtain an element on a given size queue. If no
+   elements of that size are available, we recursively call ourselves to get
+   an element of the next larger queue which we will then split in half to
+   get the one we need and place the remainder back on the free queue of its
+   new smaller size. If we run out of queues, we obtain a fresh new 'hunk' of
+   storage, carve it up into the largest block size we handle and process as
+   before. */
+storElem *gtaFindStorElem(int sizeIndex)
+{
+	unsigned char	*uStorAlloc;
+	storElem	*uStor, *uStor2, *qHdr;
+	int		hdrSize;
+
+	++sizeIndex;
+	if (MAXINDEX >= sizeIndex)
+	{	/* We have more queues to search */
+	        GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr);
+
+		/* We have a larger than necessary element now so break it in half and put
+		   the second half on the queue one size smaller than us */
+                INCR_CNTR(elemSplits[sizeIndex]);
+		--sizeIndex;					/* Dealing now with smaller element queue */
+		assert(0 <= sizeIndex && MAXINDEX >= sizeIndex);
+		uStor2 = (storElem *)((unsigned long)uStor + TwoTable[sizeIndex]);
+		uStor2->state = Free;
+		uStor2->queueIndex = sizeIndex;
+		assert(0 == ((unsigned long)uStor2 & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
+		ENQUEUE_STOR_ELEM(sizeIndex, uStor2);		/* Place on free queue */
+	} else
+	{	/* Nothing left to search, [real] allocation must occur */
+		TEXT_ALLOC((size_t)MAXTWO, uStorAlloc);
+		uStor2 = (storElem *)uStorAlloc;
+		/* Make addr "MAXTWO" byte aligned */
+		uStor = (storElem *)(((unsigned long)(uStor2) + MAXTWO - 1) & (unsigned long) -MAXTWO);
+                totalRallocGta += MAXTWO;
+                SET_MAX(rAllocMax, totalRallocGta);
+		DEBUGSM(("debuggta: Allocating block at 0x%08lx\n", uStor));
+		uStor->state = Free;
+		sizeIndex = MAXINDEX;
+	}
+
+	assert(sizeIndex >= 0 && sizeIndex <= MAXINDEX);
+
+	uStor->queueIndex = sizeIndex;		/* This is now a smaller block */
+	return uStor;
+}
+
+/* Routine to return an index into the TwoTable for a given size (round up to next power of two) */
+int getSizeIndex(size_t size)
+{
+	size_t	testSize;
+	int	sizeIndex;
+
+	testSize = MAXTWO;
+	sizeIndex = MAXINDEX;
+
+	/* Theory here is to hunt for first significant bit. Then if there is more to the word, bump back
+	   to previous queue size. Note that in the following loop, the sizeIndex can go negative if the
+	   value of size is less than MINTWO (which is queue index 0) but since we guarantee there will be a
+	   remainder, we will increment back to 0. */
+
+	while (0 == (testSize & size))
+	{
+		--sizeIndex;				/* Try next smaller queue */
+		if (0 <= sizeIndex)			/* .. if there is a queue */
+			testSize >>= 1;
+		else					/* Else leave loop with last valid testSize */
+			break;
+	}
+
+	if (0 != (size & (testSize - 1)))		/* Is there a remainder? */
+		++sizeIndex;				/* .. if yes, round up a size */
+
+	return sizeIndex;
+}
+
+/* Obtain free storage of the given size */
+void *gtm_text_alloc(size_t size)
+{
+	unsigned char	*retVal;
+	storElem 	*uStor, *qHdr;
+	size_t		tSize;
+	int		sizeIndex, hdrSize;
+	boolean_t	reentered;
+
+	/* Note that this if is also structured for maximum fallthru. The else will
+	   be near the end of this entry point */
+	if (gtaSmInitialized)
+	{
+		assert(MAXPOSINT4 >= size);			/* Since unsigned, no negative check needed */
+		hdrSize = OFFSETOF(storElem, userStorage);	/* Size of storElem header */
+		assert(hdrSize < MINTWO);
+
+		fast_lock_count++;
+		++gtaSmDepth;					/* Nesting depth of memory calls */
+		reentered = (1 < gtaSmDepth);
+		if (reentered)
+		{
+			--gtaSmDepth;
+			assert(FALSE);
+			rts_error(VARLSTCNT(1) ERR_MEMORYRECURSIVE);
+		}
+		INCR_CNTR(totalAllocs);
+		if (0 != size)
+		{
+			tSize = size + hdrSize;				/* Add in header size */
+			if (MAXTWO >= tSize)
+			{	/* Use our memory manager for smaller pieces */
+				sizeIndex = getSizeIndex(tSize);		/* Get index to size we need */
+				assert(0 <= sizeIndex && MAXINDEX >= sizeIndex);
+				GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr);
+				tSize = TwoTable[sizeIndex];
+				uStor->realLen = (int)tSize;
+			} else
+			{	/* Use regular mmap to obtain the piece */
+				TEXT_ALLOC(tSize, uStor);
+				uStor->queueIndex = REAL_ALLOC;
+				uStor->realLen = (unsigned int)tSize;
+				sizeIndex = MAXINDEX + 1;
+			}
+			totalUsedGta += tSize;
+			totalAllocGta += tSize;
+			INCR_CNTR(allocCnt[sizeIndex]);
+			uStor->state = Allocated;
+			retVal = &uStor->userStorage.userStart;
+			/* Assert we have an appropriate boundary */
+			assert(((long)retVal & (long)IA64_ONLY(-16)NON_IA64_ONLY(-8)) == (long)retVal);
+		} else	/* size was 0 */
+			retVal = &NullStruct.nullStr[0];
+		--gtaSmDepth;
+		--fast_lock_count;
+		return retVal;
+	} else  /* Storage mgmt has not been initialized */
+	{
+		gtaSmInit();
+		/* Reinvoke gtm_text_alloc now that we are initialized	*/
+		return (void *)gtm_text_alloc(size);
+	}
+}
+
+/* Release the free storage at the given address */
+void gtm_text_free(void *addr)
+{
+	storElem 	*uStor, *buddyElem;
+	int 		sizeIndex, hdrSize, saveIndex;
+	size_t		allocSize;
+
+	if (process_exiting)	/* If we are exiting, don't bother with frees. Process destruction can do it */
+		return;
+	if (!gtaSmInitialized)	/* Storage must be init'd before can free anything */
+		GTMASSERT;
+
+	++fast_lock_count;
+	++gtaSmDepth;	/* Recursion indicator */
+
+	if (1 < gtaSmDepth)
+	{
+		--gtaSmDepth;
+		assert(FALSE);
+		rts_error(VARLSTCNT(1) ERR_MEMORYRECURSIVE);
+	}
+
+	INCR_CNTR(totalFrees);
+	if ((unsigned char *)addr != &NullStruct.nullStr[0])
+	{
+		hdrSize = OFFSETOF(storElem, userStorage);
+		uStor = (storElem *)((unsigned long)addr - hdrSize);		/* Backup ptr to element header */
+		sizeIndex = uStor->queueIndex;
+		totalUsedGta -= uStor->realLen;
+		if (sizeIndex >= 0)
+		{	/* We can put the storage back on one of our simple queues */
+			assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
+			assert(0 <= sizeIndex && MAXINDEX >= sizeIndex);
+			assert(uStor->realLen == TwoTable[sizeIndex]);
+			uStor->state = Free;
+			INCR_CNTR(freeCnt[sizeIndex]);
+			totalAllocGta -= TwoTable[sizeIndex];
+			/* First, if there are larger queues than this one, see if it has a buddy that it can
+			   combine with */
+			while (sizeIndex < MAXINDEX)
+			{
+				buddyElem = (storElem *)((unsigned long)uStor ^ TwoTable[sizeIndex]);/* Address of buddy */
+				assert(0 == ((unsigned long)buddyElem & (TwoTable[sizeIndex] - 1)));/* Verify alignment */
+				assert(Allocated == buddyElem->state || Free == buddyElem->state);
+				assert(0 <= buddyElem->queueIndex && buddyElem->queueIndex <= sizeIndex);
+				if (Allocated == buddyElem->state || buddyElem->queueIndex != sizeIndex)
+					/* All possible combines done */
+					break;
+
+				/* Remove buddy from its queue and make a larger element for a larger queue */
+				DEQUEUE_STOR_ELEM(buddyElem);
+				if (buddyElem < uStor)		/* Pick lower address buddy for top of new bigger block */
+					uStor = buddyElem;
+				++sizeIndex;
+				assert(0 <= sizeIndex && MAXINDEX >= sizeIndex);
+				INCR_CNTR(elemCombines[sizeIndex]);
+				uStor->queueIndex = sizeIndex;
+			}
+			ENQUEUE_STOR_ELEM(sizeIndex, uStor);
+		} else
+		{
+			assert(REAL_ALLOC == sizeIndex);		/* Better be a real alloc type block */
+			INCR_CNTR(freeCnt[MAXINDEX + 1]);               /* Count free of malloc */
+ 			allocSize = uStor->realLen;
+			TEXT_FREE(uStor, allocSize);
+			totalRallocGta -= allocSize;
+			totalAllocGta -= allocSize;
+ 		}
+	}
+	--gtaSmDepth;
+	--fast_lock_count;
+}
+
+/* Routine to print the end-of-process info -- either allocation statistics or malloc trace dump.
+   Note that the use of FPRINTF here instead of util_out_print is historical. The output was at one
+   time going to stdout and util_out_print goes to stderr. If necessary or desired, these could easily
+   be changed to use util_out_print instead of FPRINTF
+*/
+void printAllocInfo(void)
+{
+        storElem        *eHdr, *uStor;
+        int             i;
+
+	if (0 == totalAllocs)
+		return;		/* Nothing to report -- likely a utility that doesn't use mmap */
+	FPRINTF(stderr,"\nMmap small storage performance:\n");
+	FPRINTF(stderr,
+		"Total allocs: %d, total frees: %d, total ralloc bytes: %d, max ralloc bytes: %d\n",
+		totalAllocs, totalFrees, totalRallocGta, rAllocMax);
+	FPRINTF(stderr,
+		"Total (currently) allocated (includes overhead): %d, Total (currently) used (no overhead): %d\n",
+		totalAllocGta, totalUsedGta);
+	FPRINTF(stderr,"\nQueueSize   Allocs      Frees    Splits  Combines    CurCnt    MaxCnt\n");
+	FPRINTF(stderr,  "                                                      Free       Free\n");
+	FPRINTF(stderr,  "---------------------------------------------------------------------\n");
+	{
+		for (i = 0; i <= MAXINDEX + 1; ++i)
+		{
+			FPRINTF(stderr,
+				"%9d %9d %9d %9d %9d %9d %9d\n", TwoTable[i], allocCnt[i], freeCnt[i],
+				elemSplits[i], elemCombines[i], freeElemCnt[i], freeElemMax[i]);
+		}
+	}
+}
+#endif /* COMP_GTA */

@@ -94,7 +94,7 @@ void	assert_jrec_member_offsets(void)
 	/* since time in jnl record is a uint4, and since JNL_SHORT_TIME expects time_t, we better ensure they are same.
 	 * A change in the size of time_t would mean a redesign of the fields.  */
 
-	assert(sizeof(time_t) == GTM64_ONLY(sizeof(int8)) NON_GTM64_ONLY(sizeof(int4)));
+	assert(sizeof(time_t) == GTM64_ONLY(sizeof(gtm_int8)) NON_GTM64_ONLY(sizeof(int4)));
 
 	/* Make sure all jnl_seqno fields start at same offset. mur_output_record and others rely on this. */
 	assert(offsetof(struct_jrec_null, jnl_seqno) == offsetof(struct_jrec_upd, token_seq.jnl_seqno));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ GBLREF spdesc stringpool;
 
 void op_fnfnumber(mval *src, mval *fmt, mval *dst)
 {
-	mval		temp;
+	mval		temp, *temp_p;
 	unsigned char	fncode, sign, *ch, *cp, *ff, *ff_top, *t;
 	int 		ct, x, y, z, xx;
 	boolean_t	comma, paren;
@@ -43,19 +43,20 @@ void op_fnfnumber(mval *src, mval *fmt, mval *dst)
 	/* operate on the src operand in a temp, so that
 	   conversions are possible without destroying the source
 	*/
-	temp = *src;
+	temp_p = &temp;
+	*temp_p = *src;
 	/* if the source operand is not a canonical number, force conversion
 	*/
-	MV_FORCE_STR(&temp);
+	MV_FORCE_STR(temp_p);
 	MV_FORCE_STR(fmt);
 	if (fmt->str.len == 0)
 	{
-		*dst = temp;
+		*dst = *temp_p;
 		return;
 	}
-	temp.mvtype = MV_STR;
-	ch = (unsigned char *)temp.str.addr;
-	ct = temp.str.len;
+	temp_p->mvtype = MV_STR;
+	ch = (unsigned char *)temp_p->str.addr;
+	ct = temp_p->str.len;
 	cp = stringpool.free;
 	fncode = 0;
 	for (ff = (unsigned char *)fmt->str.addr , ff_top = ff + fmt->str.len ; ff < ff_top ; )
@@ -109,8 +110,8 @@ void op_fnfnumber(mval *src, mval *fmt, mval *dst)
 		/* Only add '+' if > 0 */
 		if (0 != (fncode & PLUS) && 0 == sign)
 		{	/* Need to make into num and check for int 0 in case was preprocessed by op_fnj3() */
-			MV_FORCE_NUM(&temp);
-			if (0 == (temp.mvtype & MV_INT) || 0 != temp.m[1])
+			MV_FORCE_NUM(temp_p);
+			if (0 == (temp_p->mvtype & MV_INT) || 0 != temp_p->m[1])
 				sign = '+';
 		}
 		if (0 != (fncode & MINUS) && '-' == sign)

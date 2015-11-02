@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,5 +13,6 @@
 #define V15_GDSROOT_H
 
 typedef uint4	v15_trans_num;
+typedef uint4   v15_time_t;
 
 #endif

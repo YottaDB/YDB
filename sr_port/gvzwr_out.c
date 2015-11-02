@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -37,7 +38,7 @@ void gvzwr_out(void)
 	op_gvget(&val);
 	if (!MV_DEFINED(&val))
 		return;
-	MV_FORCE_STR(&val);
+	MV_FORCE_STRD(&val);
 	outdesc.mvtype = MV_STR;
 	outdesc.str.addr = &buff[0];
 	outdesc.str.len = INTCAST(end - outdesc.str.addr);

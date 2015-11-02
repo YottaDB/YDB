@@ -69,7 +69,6 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 	unsigned short	locks_bckout, locks_done;
 	int4		msec_timeout;	/* timeout in milliseconds */
 	mlk_pvtblk	*pvt_ptr1, *pvt_ptr2, **prior;
-	uint4		hiber;			/* hiber time in msecs */
 
 	gotit = -1;
 	cm_action = CM_ZALLOCATES;
@@ -136,10 +135,7 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 			mlk_unpend(pvt_ptr1);		/* Eliminated the dangling request block */
 			t_retry(cdb_sc_needcrit);		/* release crit to prevent a deadlock */
 		}
-		/* Start with 0.5 second timer interval, double that interval each
-		 * iteration until a maximum timer limit is achieved.
-		 */
-		hiber = 500;	/* 1/2 sec */
+
 		for (;;)
 		{
 			if (out_of_time || outofband)
@@ -174,15 +170,8 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 				break;
 			}
 			if (pvt_ptr1->nodptr)
-			{
-				if (hiber < 16000)
-					hiber *= 2;
-				if (lk_check_own(pvt_ptr1))		/* Process that owned lock is gone */
-					hiber = 250;
-			} else
-				hiber = 500;
-			/* Start hibernating using the hiber time */
-			hiber_start_wait_any(hiber);
+				lk_check_own(pvt_ptr1);		/* clear an abandoned owner */
+			hiber_start_wait_any(LOCK_SELF_WAKE);
 		}
 		if (blocked  &&  out_of_time)
 			break;

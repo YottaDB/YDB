@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -76,13 +76,6 @@ if ($platform_name == "hpux") then
 	endif
 endif
 
-set machine_name = `hostname`
-if ($machine_name == "hanuman" || $machine_name == "saktiman" || $machine_name == "spiderman" || $machine_name == "batman") then
-	set s7_env = true
-else
-	set s7_env = false
-endif
-
 cd $dst_top_dir
 if (-e $dst_ver) then
 	foreach image (pro bta dbg)
@@ -103,26 +96,21 @@ if (-e $dst_ver) then
 		# But, this is better than not checking at all.
 		echo "Following processes are still using $dst_ver; not deleting $dst_top_dir/$dst_ver"
 		/bin/ps $psopt | grep "$dst_top_dir/$dst_ver/" | grep -vE "grep|$0"
-		if ($s7_env == "false") then
-			exit 1
-		endif
+		exit 1
 	endif
 	if ($dst_ver =~ V3* || $dst_ver =~ V4* || $dst_ver =~ V5* || $dst_ver == "V990") then
-		if ($s7_env == "false") then
-			set move_args = "compulsory"
-		endif
+		set move_args = "compulsory"
 	endif
 	if ($?move_args)  then
-		set save_ver = `ls -ld ${gtm_root}/$dst_ver | awk '{if (length($7)==1) $7="0"_$7; time=$6"_"$7"_"$8; print toupper(time)}' | sed 's/://g'`
+		set save_ver = `ls -ld ${gtm_root}/$dst_ver | \
+			awk '{if (length($7)==1) $7="0"_$7; time=$6"_"$7"_"$8; print toupper(time)}' | sed 's/://g'`
 		echo "Renaming ${gtm_root}/${dst_ver} to ${gtm_root}/${dst_ver}_${save_ver}"
 		mv ${gtm_root}/$dst_ver ${gtm_root}/${dst_ver}_${save_ver}
 	else if (! $mods_only) then
-		if ($s7_env == "false") then
-			echo "Deleting existing $dst_dir directory structure"
-			rm -rf $dst_ver
-			if ($status != 0) then
-				exit $status
-			endif
+		echo "Deleting existing $dst_dir directory structure"
+		rm -rf $dst_ver
+		if ($status != 0) then
+			exit $status
 		endif
 	else
 		echo "Updating $dst_dir directory structure"
@@ -131,7 +119,7 @@ endif
 
 ############## Create $dst_dir and subdirectories ##################
 
-if ($s7_env == "true" || ! -e $dst_ver) then
+if (! -e $dst_ver) then
 	echo "Creating -------> $dst_dir Directory Structure ..."
 	mkdir -p $dst_ver
 	if ($status != 0) then
@@ -141,9 +129,6 @@ if ($s7_env == "true" || ! -e $dst_ver) then
 	set gtm_ver = `pwd`
 	if ($status != 0) then
 		exit $status
-	endif
-	if ($s7_env == "true") then
-        	rm -rf $dir_structure
 	endif
 	mkdir $dir_structure {`echo $build_types | sed 's/ /,/g'`}/{`echo $build_dirs | sed 's/ /,/g'`}
 	if ($status != 0) then
@@ -156,11 +141,19 @@ cd $gtm_ver
 cp $preserve_time $cms_dir/*/gtmsrc.csh .
 
 ############### Define platform-specific libraries ##################################
+# if you add a directory below you must modify cms_chsrc.csh in at least two places
+# assume you have added sr_x86_64 to gtm_s_linux64 below
+# in cms_chsrc.cms add:
+# setenv sr_x86_64	$cms_ver/sr_x86_64
+# and modify s_linux64:
+# setenv s_linux64	"{$sr_linux,$sr_x86_64,$sr_x86_regs,$sr_unix,$sr_port,$sr_unix_cm,$sr_unix_gnp,$sr_port_cm}"
+# if this directory is added to more than one gtm_s... then modify the additional s_... in cms_cshrc.csh
 
-set gtm_s_aix     = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_rs6000 sr_aix  "
-set gtm_s_osf1    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_alpha  sr_dux  "
-set gtm_s_hpux    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hppa   sr_hpux "
-set gtm_s_linux   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_i386   sr_linux"
+set gtm_s_aix     = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_rs6000   sr_aix  "
+set gtm_s_osf1    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_alpha    sr_dux  "
+set gtm_s_hpux    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hppa     sr_hpux "
+set gtm_s_linux   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux"
+set gtm_s_linux64 = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_x86_regs sr_x86_64  sr_linux"
 set gtm_s_sunos   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_sparc  sr_sun  "
 set gtm_s_os390   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_s390   sr_os390"
 set gtm_s_l390    = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_l390   sr_linux"
@@ -182,7 +175,15 @@ endif
 if ( "ia64" == $mach_type && "linux" == $platform_library ) then
 	set platform_library = "linuxia"
 endif
-
+if ( "x86_64" == $mach_type && "linux" == $platform_library ) then
+	if ( $?OBJECT_MODE ) then
+		if (  $OBJECT_MODE != "32" ) then
+			set platform_library = "linux64"
+		endif
+	else
+		set platform_library = "linux64"
+	endif
+endif
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############
 
 cd $cms_dir
@@ -198,11 +199,7 @@ foreach ref_library ( $ref_libs )
 			if ($nfiles != 0) then
 				if ($mods_only == 0) then
 					echo "Copying $nfiles files of type .$ftype from $ref_library to ${gtm_ver}/${dir}"
-					if ($s7_env == "false") then
-						\ls -1 | grep "\.$ftype"'$' | xargs -i cp -f $preserve_time {} $gtm_ver/${dir}
-					else
-						\ls -1 | grep "\.$ftype"'$' | xargs -i ln -f -s "$PWD/{}" $gtm_ver/${dir}
-					endif
+					\ls -1 | grep "\.$ftype"'$' | xargs -i cp -f $preserve_time {} $gtm_ver/${dir}
 				else
 					# @ n_modfiles=0
 					foreach srcfile (*.$ftype)
@@ -231,11 +228,7 @@ foreach ref_library ( $ref_libs )
 						endif
 						if (! { cmp -s ${srcfile} ${gtm_ver}/${dir}/${dstfile} } ) then
 							echo "Copying differing $srcfile from $ref_library to $gtm_ver/${dir}"
-							if ($s7_env == "false") then
-								cp -f $preserve_time $srcfile $gtm_ver/${dir}
-							else
-								ln -s -f ${PWD}/$srcfile $gtm_ver/${dir}
-							endif
+							cp -f $preserve_time $srcfile $gtm_ver/${dir}
 							# @ n_modfiles++
 						endif
 					end
@@ -247,15 +240,9 @@ foreach ref_library ( $ref_libs )
 			set nfiles=`ls -1 *.${ftype}nix | wc -l | sed 's/^[ ]*//g'`
 			if ($nfiles != 0) then
 				echo "Restoring $nfiles NIXed files of type .$ftype in directory ${gtm_ver}/${dir}"
-				if ($s7_env == "false") then
-				    ls -1 *.${ftype}nix |\
-						awk '{printf "cp -f $preserve_time %s %s/%s\n", $1, '\"${gtm_ver}/${dir}\"', $1}' |\
-						sed 's/nix$//g' | sh
-				else
-				    ls -1 *.${ftype}nix |\
-						awk '{printf "ln -s -f ${PWD}/%s %s/%s\n", $1, '\"${gtm_ver}/${dir}\"', $1}' |\
-						sed 's/nix$//g' | sh
-				endif
+				ls -1 *.${ftype}nix |\
+				awk '{printf "cp -f $preserve_time %s %s/%s\n", $1, '\"${gtm_ver}/${dir}\"', $1}' |\
+				sed 's/nix$//g' | sh
 			endif
 		end
 	end

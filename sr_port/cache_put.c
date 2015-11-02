@@ -16,7 +16,7 @@
 #include "cachectl.h"
 #include "cacheflush.h"
 #include "rtnhdr.h"
-#include "gtm_malloc.h"
+#include "gtm_text_alloc.h"
 
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
@@ -33,7 +33,7 @@ void cache_put(icode_str *src, mstr *object)
 	indir_cache_mem_size += (ICACHE_SIZE + object->len);
 	if (indir_cache_mem_size > MAX_CACHE_MEMSIZE || cache_table.size > MAX_CACHE_ENTRIES)
 		cache_table_rebuild();
-	csp = (cache_entry *)GTM_TEXT_MALLOC(ICACHE_SIZE + object->len);
+	csp = (cache_entry *)GTM_TEXT_ALLOC(ICACHE_SIZE + object->len);
 	csp->obj.addr = (char *)csp + ICACHE_SIZE;
 	csp->refcnt = csp->zb_refcnt = 0;
 	csp->src = *src;

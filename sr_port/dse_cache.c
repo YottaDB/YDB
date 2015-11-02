@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -164,8 +164,8 @@ void dse_cache(void)
 			{
 				util_out_print("Region !AD :  jnl_buffer_struct  = 0x!XL",
 						TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->jnl->jnl_buff));
-				util_out_print("Region !AD :  jnl_buffer_data    = 0x!XL",
-						TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->jnl->jnl_buff->buff));
+				util_out_print("Region !AD :  jnl_buffer_data    = 0x!XL", TRUE, REG_LEN_STR(reg),
+					       DB_ABS2REL(&csa->jnl->jnl_buff->buff[csa->jnl->jnl_buff->buff_off]));
 			}
 			util_out_print("Region !AD :  shmpool_buffer     = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->shmpool_buffer));

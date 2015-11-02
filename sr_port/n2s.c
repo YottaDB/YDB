@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,6 @@
 
 #include "arit.h"
 #include "stringpool.h"
-#include "underr.h"
 
 #define PACKED_DIGITS	(MAX_DIGITS_IN_INT - 1)	/* maximum packed decimal representation is 999999999 (nine nines) */
 
@@ -28,10 +27,7 @@ unsigned char *n2s(mval *mv_ptr)
 	unsigned char	lcl_buf[MAX_DIGITS_IN_INT];
 
 	if (!MV_DEFINED(mv_ptr))
-	{
-		underr(mv_ptr);
-		return NULL;
-	}
+		GTMASSERT;
 	start = stringpool.free;
 	if (start + MAX_NUM_SIZE > stringpool.top)
 	{

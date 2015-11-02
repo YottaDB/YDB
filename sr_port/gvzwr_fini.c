@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,12 +71,12 @@ void gvzwr_fini(zshow_out *out, int pat)
 			gv_currkey->base[0] = '\0';
 			op_gvname(VARLSTCNT(1) &local);
  			op_gvdata(&data);
-			if (!(MV_FORCE_INT(&data)))
+			if (!(MV_FORCE_INTD(&data)))
 				sgnl_gvundef();
 			else
 			{
 				gvzwrite_block.fixed = (gvzwrite_block.fixed ? TRUE : FALSE);
-				gvzwr_var(MV_FORCE_INT(&data), 0);
+				gvzwr_var(MV_FORCE_INTD(&data), 0);
 			}
 		} else               /* Old (naked) reference. Keep previous gv_target reference */
 		{
@@ -87,12 +87,12 @@ void gvzwr_fini(zshow_out *out, int pat)
 			gv_currkey->base[ gv_currkey->end ] = 0;
 			gv_currkey->prev = 0;
 			op_gvdata(&data);
-			if (!(MV_FORCE_INT(&data)))
+			if (!(MV_FORCE_INTD(&data)))
 				sgnl_gvundef();
 			else
 			{
 				gvzwrite_block.fixed = (gvzwrite_block.fixed ? TRUE : FALSE);
-				gvzwr_var((int4)MV_FORCE_INT(&data), 0);
+				gvzwr_var((int4)MV_FORCE_INTD(&data), 0);
 			}
 		}
 	} else
@@ -111,9 +111,9 @@ void gvzwr_fini(zshow_out *out, int pat)
 			if (do_pattern(&local, gvzwrite_block.pat))
 			{
 				op_gvdata(&data);
-				if ((MV_FORCE_INT(&data)))
+				if ((MV_FORCE_INTD(&data)))
 				{
-					gvzwr_var((int4)MV_FORCE_INT(&data), 0);
+					gvzwr_var((int4)MV_FORCE_INTD(&data), 0);
 				}
 			}
 			op_gvorder(&local);

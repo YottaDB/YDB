@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2006 Fidelity Information Services, Inc	#
+#	Copyright 2006, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -42,7 +42,9 @@ src	=	16
 dest	=	20
 
 	.text
+
 .extern	n2s
+.extern underr
 
 # PUBLIC	op_fnzextract
 ENTRY op_fnzextract
@@ -52,6 +54,8 @@ ENTRY op_fnzextract
 	pushl	%ebx
 
 	movl	src(%ebp),%esi		# esi - src. mval
+	mv_force_defined %esi, l00
+	movl	%esi, src(%ebp)		# save possibly modified src ptr
 	mv_force_str %esi, l01
 	movl	src(%ebp),%esi		# esi - src.mval
 	movl	first(%ebp),%eax	# eax - first

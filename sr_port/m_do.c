@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,8 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF	bool		for_temps[MAX_FOR_STACK],
-			run_time;
+GBLREF	bool		for_temps[MAX_FOR_STACK];
+GBLREF	boolean_t	run_time;
 GBLREF	char		window_token;
 GBLREF	oprtype		*for_stack[MAX_FOR_STACK],
 			**for_stack_ptr;

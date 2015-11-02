@@ -16,6 +16,7 @@
 #include "gtmsecshr.h"
 #include "crit_wake.h"
 #include "send_msg.h"
+#include "have_crit.h"
 
 int crit_wake (sm_uint_ptr_t pid)
 {
@@ -29,5 +30,8 @@ int crit_wake (sm_uint_ptr_t pid)
 		return(ESRCH);
 	} else
 		assert(EINVAL != errno);
+	/* if you are in crit don't send, the other process's timer will wake it up any way */
+	if (0 != have_crit(CRIT_HAVE_ANY_REG))
+		return 0;
 	return send_mesg2gtmsecshr(WAKE_MESSAGE, *pid, (char *)NULL, 0);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,7 +85,7 @@ int m_merge(void)
 		}
 		type = MARG1_LCL | MARG1_GBL;
 		MV_FORCE_MVAL(&mv, type);
-		MV_FORCE_STR(&mv);
+		MV_FORCE_STRD(&mv);
                 ref = maketriple(OC_INDMERGE);
                 ref->operand[0] = put_lit(&mv);
                 ref->operand[1] = mopr;
@@ -128,7 +128,7 @@ int m_merge(void)
 		}
 		type = MARG2_LCL | MARG2_GBL;
 		MV_FORCE_MVAL(&mv, type);
-		MV_FORCE_STR(&mv);
+		MV_FORCE_STRD(&mv);
                 ref = maketriple(OC_INDMERGE);
                 ref->operand[0] =  put_lit(&mv);
                 ref->operand[1] = mopr;

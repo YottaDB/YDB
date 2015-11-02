@@ -241,9 +241,9 @@ void dse_chng_bhead(void)
 		}
 		/* Pass the desired tn as argument to bg_update or mm_update */
 		if (dba_bg == cs_addrs->hdr->acc_meth)
-			bg_update(cw_set, cw_set + cw_set_depth, cs_addrs->ti->curr_tn, tn, dummysi);
+			bg_update(cw_set, cs_addrs->ti->curr_tn, tn, dummysi);
 		else
-			mm_update(cw_set, cw_set + cw_set_depth, cs_addrs->ti->curr_tn, tn, dummysi);
+			mm_update(cw_set, cs_addrs->ti->curr_tn, tn, dummysi);
 		INCREMENT_CURR_TN(cs_data);
 		/* the following code is analogous to that in t_end and should be maintained in a similar fashion */
 		while (cr_array_index)

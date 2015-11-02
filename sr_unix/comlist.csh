@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Infromation Services, Inc #
+#	Copyright 2001, 2008 Fidelity Infromation Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -336,7 +336,7 @@ unsetenv gtm_chset
 
 #############################################################
 #
-#  Generate the error message definition files.
+#  Generate the error message definition files and also ttt.c
 #
 #############################################################
 if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
@@ -365,6 +365,29 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
 		mv -f ${j}_ansi.h $gtm_inc
 	endif
     end
+
+    # Generate ttt.c from $gtm_tools/ttt.txt, $gtm_inc/opcode_def.h, and $gtm_inc/vxi.h, if needed
+    if (-e ttt.c && $gtm_verno !~ V9*) then
+        echo "comlist-I-tttexist : ttt.c already exists for production version $gtm_verno. Not recreating."
+    else
+	if (-e ttt.c) then
+	    echo "comlist-I-tttexist : ttt.c already exists for development version $gtm_verno. Recreating."
+            chmod +w ttt.c	# in case previous build had reset permissions to be read-only
+            rm -f ttt.c
+	endif
+	cd $p3/obj
+	cp $gtm_inc/opcode_def.h $gtm_inc/vxi.h $gtm_tools/ttt.txt .
+	$gtm_root/$gtm_curpro/pro/mumps -direct <<GTM_in_tttgen
+Set \$ZROUTINES=". $gtmroutines"
+Do ^tttgen
+ZContinue
+Halt
+GTM_in_tttgen
+	chmod $comlist_chmod_src ttt.c
+	cp -p ttt.c $gtm_src
+        # remove the .o-s we just created so they're not put into libraries
+        rm -f chk2lev.o chkop.o gendash.o genout.o loadop.o loadvx.o tttgen.o tttscan.o
+    endif
     setenv gtmroutines "$old_gtmroutines"
     unset old_gtmroutines
     setenv gtm_dist "$real_gtm_dist"
@@ -372,7 +395,7 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
 
     popd
 else
-    echo "comlist-E-NoMUMPS, unable to regenerate merrors.c due to missing $gtm_curpro/pro/mumps" \
+    echo "comlist-E-NoMUMPS, unable to regenerate merrors.c and ttt.c due to missing $gtm_curpro/pro/mumps" \
 		    >> $gtm_log/error.`basename $gtm_exe`.log
 endif
 
@@ -406,8 +429,8 @@ end
 
 # C compilations first:
 
-# For ia64, the file - xfer_desc.i - needs to be generated.
-if ( "ia64" == $mach_type ) then
+# For ia64 & x86_64, the file - xfer_desc.i - needs to be generated.
+if ( "ia64" == $mach_type || "x86_64" == $mach_type ) then
         pushd $gtm_src
         tcsh $gtm_tools/gen_xfer_desc.csh
         popd
@@ -492,7 +515,7 @@ foreach i ( $comlist_liblist )
 		# Note: libgtmrpc.a must be built in $gtm_exe because it must also be shipped with the release.
 		gt_ar $gt_ar_option_create $gtm_exe/lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
 		if ( $status != 0 ) then
-			@ comlist_status = $comlist_status + 1
+			@ comlist_status = $status
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_tools/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
@@ -522,7 +545,7 @@ foreach i ( $comlist_liblist )
 		/bin/ls | egrep '\.o$' | egrep -v "$exclude" | \
 			xargs -n50 $shell $gtm_tools/gt_ar.csh $gt_ar_option_create lib$i.a >>& ar$i.log
 		if ( $status != 0 ) then
-			@ comlist_status = $comlist_status + 1
+			@ comlist_status = $status
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_tools/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
@@ -531,7 +554,7 @@ foreach i ( $comlist_liblist )
 	default:
 		gt_ar $gt_ar_option_create lib$i.a `sed -f $gtm_tools/lib_list_ar.sed $gtm_tools/lib$i.list` >>& ar$i.log
 		if ( $status != 0 ) then
-			@ comlist_status = $comlist_status + 1
+			@ comlist_status = $status
 			echo "comlist-E-ar${i}error, Error creating lib$i.a archive (see ${dollar_sign}gtm_obj/ar$i.log)" \
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
@@ -570,17 +593,17 @@ endif
 switch ( $3 )
 case "gtm_bta":
 	$shell $gtm_tools/buildbta.csh $p4
-	@ comlist_status = $comlist_status + $status	# done before each breaksw instead of after endsw
+	if ($status != 0) @ comlist_status = $status	# done before each breaksw instead of after endsw
 	breaksw						# as $status seems to be get reset in between
 
 case "gtm_dbg":
 	$shell $gtm_tools/builddbg.csh $p4
-	@ comlist_status = $comlist_status + $status
+	if ($status != 0) @ comlist_status = $status
 	breaksw
 
 case "gtm_pro":
 	$shell $gtm_tools/buildpro.csh $p4
-	@ comlist_status = $comlist_status + $status
+	if ($status != 0) @ comlist_status = $status
 	breaksw
 endsw
 
@@ -589,29 +612,6 @@ if ( ! -x $gtm_dist/mumps ) then
 	echo "comlist-W-nomsgverify, unable to verify error message definition files" >> $gtm_log/error.`basename $gtm_exe`.log
 	echo "comlist-W-noonlinehelp, unable to generate on-line help files" >> $gtm_log/error.`basename $gtm_exe`.log
 	goto comlist.END
-endif
-
-cd $p3
-cd ./obj
-
-# Verify that $gtm_src/ttt.c has been generated from $gtm_tools/ttt.txt, $gtm_inc/opcode_def.h, and $gtm_inc/vxi.h
-cp $gtm_inc/opcode_def.h $gtm_inc/vxi.h $gtm_tools/ttt.txt .
-gtm <<GTM_in_tttgen
-Set \$ZROUTINES=". $gtm_dist"
-Do ^TTTGEN
-ZContinue
-Halt
-GTM_in_tttgen
-
-diff {$gtm_src/,}ttt.c >& ttt.dif
-if ( $status != 0 ) then
-	echo "comlist-W-tttoutofdate, ${dollar_sign}gtm_src/ttt.c was not generated from ${dollar_sign}gtm_tools/ttt.txt, " \
-		"${dollar_sign}gtm_inc/opcode_def.h, and ${dollar_sign}gtm_inc/vxi.h" \
-		>> $gtm_log/error.`basename $gtm_exe`.log
-	echo "comlist-I-tttdiff, See differences in ${dollar_sign}gtm_obj/ttt.dif" \
-		>> $gtm_log/error.`basename $gtm_exe`.log
-	echo "comlist-I-tttgen, See ${dollar_sign}gtm_obj/ttt.c for C source file generated from ${dollar_sign}gtm_tools/ttt.txt" \
-		>> $gtm_log/error.`basename $gtm_exe`.log
 endif
 
 set mupip_size = `ls -l $gtm_exe/mupip |awk '{print $5}'`
@@ -631,6 +631,7 @@ setenv gtmgbldir ./mumps.gld
 gde <<GDE_in1
 exit
 GDE_in1
+if ($status != 0) @ comlist_status = $status
 
 # Create the GT.M help database file.
 setenv gtmgbldir $gtm_dist/gtmhelp.gld
@@ -638,15 +639,17 @@ gde <<GDE_in_gtmhelp
 Change -segment DEFAULT	-block=2048	-file=$gtm_dist/gtmhelp.dat
 Change -region DEFAULT	-record=1020	-key=255
 GDE_in_gtmhelp
+if ($status != 0) @ comlist_status = $status
 
 mupip create
+if ($status != 0) @ comlist_status = $status
 
 gtm <<GTM_in_gtmhelp
 Do ^GTMHLPLD
 $gtm_dist/mumps.hlp
 Halt
 GTM_in_gtmhelp
-
+if ($status != 0) @ comlist_status = $status
 
 # Create the GDE help database file.
 setenv gtmgbldir $gtm_dist/gdehelp.gld
@@ -654,19 +657,24 @@ gde <<GDE_in_gdehelp
 Change -segment DEFAULT	-block=2048	-file=$gtm_dist/gdehelp.dat
 Change -region DEFAULT	-record=1020	-key=255
 GDE_in_gdehelp
+if ($status != 0) @ comlist_status = $status
 
 mupip create
+if ($status != 0) @ comlist_status = $status
 
 gtm <<GTM_in_gdehelp
 Do ^GTMHLPLD
 $gtm_dist/gde.hlp
 GTM_in_gdehelp
+if ($status != 0) @ comlist_status = $status
 
-chmod 775 *
+chmod 775 *	# do not check $status here because we know it will be 1 since "gtmsecshr" permissions cannot be changed.
 
 # Create the dump file for ZHELP.
 touch $gtm_dist/gtmhelp.dmp
+if ($status != 0) @ comlist_status = $status
 chmod a+rw $gtm_dist/gtmhelp.dmp
+if ($status != 0) @ comlist_status = $status
 
 # Create a mirror image (using soft links) of $gtm_dist under $gtm_dist/utf8 if it exists.
 if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while building GDE
@@ -684,8 +692,10 @@ if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while build
 		# Soft link everything else
 		if (-e utf8/$file) then
 			rm -f utf8/$file
+			if ($status != 0) @ comlist_status = $status
 		endif
 		ln -s ../$file utf8/$file
+		if ($status != 0) @ comlist_status = $status
 	end
 	popd
 endif
@@ -722,6 +732,8 @@ unset p2
 unset p3
 unset p4
 
+echo ""
+echo "Exit status (should be 0) is : $comlist_status"
 echo ""
 echo "End of $0 `date`"
 

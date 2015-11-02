@@ -39,11 +39,11 @@ GBLREF char 		source_file_name[];
 GBLREF unsigned short 	source_name_len;
 
 GBLREF command_qualifier cmd_qlf;
-GBLREF mident	routine_name;
-GBLREF mident	module_name;
-GBLREF bool	run_time;
-GBLREF int4	mlmax, mvmax;
-GBLREF int4	code_size, lit_addrs, lits_size;
+GBLREF mident		routine_name;
+GBLREF mident		module_name;
+GBLREF boolean_t	run_time;
+GBLREF int4		mlmax, mvmax;
+GBLREF int4		code_size, lit_addrs, lits_size;
 
 GBLDEF int4	psect_use_tab[GTM_LASTPSECT];	/* bytes of each psect in this module */
 GBLDEF char	object_file_name[MAX_FBUFF + 1];
@@ -149,7 +149,6 @@ void drop_object_file(void)
         }
 }
 
-GBLREF bool run_time;
 GBLREF spdesc stringpool;
 
 void emit_addr(int4 refaddr, int4 offset, int4 *result)
@@ -472,7 +471,7 @@ void emit_literals(void)
 	dqloop(&literal_chain, que, p)
 	{
 		assert (p->rt_addr == offset);
-		MV_FORCE_NUM(&p->v);
+		MV_FORCE_NUMD(&p->v);
 		if (p->v.str.len)
 			emit_pidr(p->rt_addr + ((char *) &p->v.str.addr - (char *)&p->v),
 				 p->v.str.addr - (char *) stringpool.base, (int4 *)&p->v.str.addr);

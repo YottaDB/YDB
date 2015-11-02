@@ -36,7 +36,7 @@ GBLREF	mval		director_mval;
 GBLREF	char		*lexical_ptr;
 GBLREF	spdesc		stringpool;
 GBLREF	boolean_t	gtm_utf8_mode;
-GBLREF	bool		run_time;
+GBLREF	boolean_t	run_time;
 
 GBLREF	mident		window_ident;	/* the current identifier */
 GBLREF	mident		director_ident;	/* the look-ahead identifier */

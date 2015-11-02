@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -145,6 +145,8 @@
 }
 #elif defined(__MVS__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_SYNC, FDESC);
+#elif defined(__linux__)
+#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
 #else
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DSYNC, FDESC);
 #endif
@@ -173,7 +175,7 @@
 #define LOCK_IS_ALLOWED(FDESC, STATUS)								\
 {												\
 	struct statfs buf;									\
-	STATUS = ((-1 != fstatfs(FDESC, &buf)) && (NFS_SUPER_MAGIC != buf.f_type)) ? 0 : -1;	\
+	STATUS = ((-1 != fstatfs(FDESC, &buf)) && (NFS_SUPER_MAGIC != buf.f_type)) ? 0 : -2;	\
 }
 #else
 #define LOCK_IS_ALLOWED(FDESC, STATUS)	STATUS = 0
@@ -201,7 +203,7 @@
 		if (-1 != FDESC)										\
 		{												\
 			LOCK_IS_ALLOWED(FDESC, status);								\
-			if (-1 != status)									\
+			if (-2 != status)									\
 			{											\
 				do {										\
 					lock.l_type = (((FFLAG) & O_WRONLY) || ((FFLAG) & O_RDWR))		\
@@ -210,21 +212,21 @@
 					lock.l_start = lock.l_len = 0;	/* lock the whole file */ 		\
 					lock.l_pid = l_pid;							\
 				} while (-1 == (status = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno); 	\
-				if (-1 != status)								\
+			}											\
+			if (-1 != status)									\
+			{											\
+				if ((FFLAG) & O_CREAT)								\
 				{										\
-					if ((FFLAG) & O_CREAT)							\
+					FTRUNCATE(FDESC, 0, status);						\
+				} else										\
+				{										\
+					FSTAT_FILE(FDESC, &stat_buf, status); 					\
+					if (status || (0 == stat_buf.st_size))					\
 					{									\
-						FTRUNCATE(FDESC, 0, status);					\
-					} else									\
-					{									\
-						FSTAT_FILE(FDESC, &stat_buf, status);				\
-						if (status || (0 == stat_buf.st_size))				\
-						{								\
-							CLOSE_OBJECT_FILE(FDESC, status); 			\
-							FDESC = -1;						\
-							SHORT_SLEEP(WAIT_FOR_FILE_TIME); 			\
-							continue;						\
-						}								\
+						CLOSE_OBJECT_FILE(FDESC, status);				\
+						FDESC = -1;							\
+						SHORT_SLEEP(WAIT_FOR_FILE_TIME);				\
+						continue;							\
 					}									\
 				}										\
 			}											\
@@ -692,6 +694,7 @@
 	if (-1 == STATUS1)							\
 		STATUS1 = ERR_PREMATEOF;					\
 }
+
 #define DO_FILE_WRITE(CHANNEL, OFFSET, WRITEBUFF, LEN, STATUS1, STATUS2)	\
 {										\
 	STATUS2 = SS_NORMAL;							\

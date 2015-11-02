@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "error.h"
 #include "indir_enum.h"
 #include "rtnhdr.h"
@@ -25,7 +26,7 @@
 #include "jobinterrupt_process.h"
 #include "dollar_zlevel.h"		/* for SET_ERROR_FRAME macro to use dollar_zlevel() function */
 
-#define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INT(&ztrap_pop2level))) /* note: assignment */
+#define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
 
 GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame;
 GBLREF unsigned short	proc_act_type;

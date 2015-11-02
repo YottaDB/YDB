@@ -17,7 +17,7 @@ GDEINIT
 	s ZERO=$c(0),ONE=$c(1),TRUE=ONE,FALSE=ZERO,TAB=$c(9)
 	s endian("VAX","VMS")=FALSE,glo("VMS")=1024
 	s endian("AXP","VMS")=FALSE,endian("AXP","OSF1")=FALSE,glo("VMS")=1024,glo("OSF1")=1024
-	s endian("x86","SCO")=FALSE,endian("x86","UWIN")=FALSE,endian("x86","Linux")=FALSE,endian("x86","CYGWIN")=FALSE
+	s endian("x86","SCO")=FALSE,endian("x86","UWIN")=FALSE,endian("x86","Linux")=FALSE,endian("x86_64","Linux")=FALSE,endian("x86","CYGWIN")=FALSE
 	s glo("SCO")=384,glo("UWIN")=1024,glo("Linux")=1024,glo("CYGWIN")=1024
 	s endian("SEQUOIA_SERIES_400","VAX")=TRUE,glo("VAX")=1024
 	s endian("HP-PA","HP-UX")=TRUE,glo("HP-UX")=1024
@@ -38,6 +38,8 @@ GDEINIT
 	s HEX(0)=1
 	s gtm64="false"
 	i ($p($zver," ",4)="IA64") s gtm64="true"
+	i ($p($zver," ",4)="RS6000") s gtm64="true"
+	i ($p($zver," ",4)="x86_64") s gtm64="true"
 	i (gtm64="true") f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
 	e  f x=1:1:8 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
 	s TWO(26)=TWO(24)*4
@@ -328,7 +330,8 @@ VMS
 	q
 
 UNIX:
-	s hdrlab="GTCGBDUNX005"		; must be concurrently maintained in gbldirnam.h!!!
+	s hdrlab="GTCGBDUNX005"         ; must be concurrently maintained in gbldirnam.h!!!
+        i (gtm64="true") s hdrlab="GTCGBDUNX105"
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

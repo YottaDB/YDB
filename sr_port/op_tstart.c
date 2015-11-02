@@ -70,7 +70,6 @@ GBLREF	mlk_pvtblk		*mlk_pvt_root;
 GBLREF	symval			*curr_symval;
 GBLREF	unsigned char		*msp, *stacktop, *stackwarn, *tpstackbase, *tpstacktop, *tpstackwarn,
 				*tp_sp, t_fail_hist[CDB_MAX_TRIES];
-GBLREF	volatile bool		run_time;
 GBLREF  unsigned int		t_tries;
 GBLREF	tp_region		*tp_reg_list, *tp_reg_free_list;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */

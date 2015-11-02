@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -9,10 +9,10 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 loadvx	;load op codes
-	n (vxi,vxx)
+	n (vxi,vxx,loadh)
 	k vxi,vxx
 	s lnr=0
-	s file="vxi.h" o file:read u file
+	s file=loadh("vxi.h") o file:read u file
 loop	r x i $zeof g fini
 	s rec=x,lnr=lnr+1
 	d proc

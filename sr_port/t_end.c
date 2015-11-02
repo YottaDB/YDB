@@ -90,7 +90,7 @@
 	}												\
 }
 
-GBLREF	bool			certify_all_blocks, rc_locked;
+GBLREF	bool			rc_locked;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
@@ -155,7 +155,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 {
 	srch_hist		*hist;
 	bt_rec_ptr_t		bt;
-	bool			blk_used;
+	boolean_t		blk_used;
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cs, *cs_top, *cs1;
 	enum cdb_sc		status;
@@ -312,7 +312,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		}
 	}
 	if (update_trans && JNL_ENABLED(csa))
-	{	/* compute the total journal record size requirements before grab_crit().
+	{	/* compute the total journal record size requirements before grab_crit.
 		 * there is code later that will check for state changes from now to then and if so do a recomputation
 		 */
 		assert(!cw_map_depth || cw_set_depth < cw_map_depth);
@@ -348,7 +348,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			 * The available space must be double-checked inside crit. */
 			if (!is_mm && (csa->nl->wc_in_free < (int4)(cw_set_depth + 1))
 				   && !wcs_get_space(gv_cur_region, cw_set_depth + 1, NULL))
-				assert(FALSE);	/* wcs_get_space() should have returned TRUE unconditionally in this case */
+				assert(FALSE);	/* wcs_get_space should have returned TRUE unconditionally in this case */
 			for (;;)
 			{
 				grab_crit(gv_cur_region);
@@ -382,7 +382,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				 * 	csa->jnl_before_image and csa->jnl_state got set */
 				csa->jnl_before_image = csd->jnl_before_image;
 				csa->jnl_state = csd->jnl_state;
-				/* jnl_file_lost() causes a jnl_state transition from jnl_open to jnl_closed
+				/* jnl_file_lost causes a jnl_state transition from jnl_open to jnl_closed
 				 * and additionally causes a repl_state transition from repl_open to repl_closed
 				 * all without standalone access. This means that csa->repl_state might be repl_open
 				 * while csd->repl_state might be repl_closed. update csa->repl_state in this case
@@ -751,7 +751,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		}
 		/* if we are not writing an INCTN record, we better have a non-zero cw_depth.
 		 * the only two exceptions are that
-		 * 	a) if we were being called from gvcst_put() for a duplicate SET
+		 * 	a) if we were being called from gvcst_put for a duplicate SET
 		 * 	b) if we were called from DSE MAPS
 		 * in case (a), we want to write logical SET journal records and replicate them.
 		 * in case (b), we do not want to replicate them. we want to assert that is_replicator is FALSE in this case.
@@ -809,10 +809,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			 * (if it decides to switch to a new journal file)
 			 */
 			ADJUST_GBL_JREC_TIME(jgbl, jbp);
-			/* Note that jnl_ensure_open() can call cre_jnl_file() which
-			 * in turn assumes jgbl.gbl_jrec_time is set. Also jnl_file_extend() can call
-			 * jnl_write_epoch_rec() which in turn assumes jgbl.gbl_jrec_time is set.
-			 * In case of forw-phase-recovery, mur_output_record() would have already set this.
+			/* Note that jnl_ensure_open can call cre_jnl_file which
+			 * in turn assumes jgbl.gbl_jrec_time is set. Also jnl_file_extend can call
+			 * jnl_write_epoch_rec which in turn assumes jgbl.gbl_jrec_time is set.
+			 * In case of forw-phase-recovery, mur_output_record would have already set this.
 			 */
 			assert(jgbl.gbl_jrec_time);
 			jnl_status = jnl_ensure_open();
@@ -905,17 +905,16 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 							bsiz = old_block->bsiz;
 							assert((bsiz <= csd->blk_size) || dse_running);
 							assert(bsiz >= sizeof(blk_hdr) || dse_running);
-							/* For acquired blocks, we should have computed checksum already.
-							 * The only exception is if we found no need to compute checksum
-							 * outside of crit but before we got crit, an EPOCH got written
-							 * concurrently so we have to write a PBLK (and hence compute the
-							 * checksum as well) when earlier we thought none was necessary.
-							 * An easy way to check this is that an EPOCH was written AFTER
-							 * we started this transaction.
+							/* For acquired or gds_t_busy2free blocks, we should have computed
+							 * checksum already. The only exception is if we found no need to
+							 * compute checksum outside of crit but before we got crit, an
+							 * EPOCH got written concurrently so we have to write a PBLK (and
+							 * hence compute the checksum as well) when earlier we thought none
+							 * was necessary. An easy way to check this is that an EPOCH was
+							 * written AFTER we started this transaction.
 							 */
-							assert((gds_t_acquired != cs->mode) || cs->blk_checksum
-								|| (epoch_tn >= start_tn));
-							assert(gds_t_busy2free != cs->mode || cs->blk_checksum);
+							assert((gds_t_acquired != cs->mode) || (gds_t_busy2free != cs->mode)
+								|| cs->blk_checksum || (epoch_tn >= start_tn));
 							/* It is possible that the block has a bad block-size.
 							 * Before computing checksum ensure bsiz passed is safe.
 							 * The checks done here for "bsiz" assignment are
@@ -1038,7 +1037,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 							bml_status_check(cs);
 					)
 					if (is_mm)
-						status = mm_update(cs, cs_top, dbtn, blktn, dummysi);
+						status = mm_update(cs, dbtn, blktn, dummysi);
 					else
 					{
 						if (csd->dsid)
@@ -1056,13 +1055,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 							} else	if (0 == cs->level)
 								rc_cpt_entry(cs->blk);
 						}
-						status = bg_update(cs, cs_top, dbtn, blktn, dummysi);
+						status = bg_update(cs, dbtn, blktn, dummysi);
 					}
 					if (cdb_sc_normal != status)
 					{	/* the database is probably in trouble */
 						assert(gtm_white_box_test_case_enabled);
 						retvalue = t_commit_cleanup(status, 0);	/* return value of TRUE implies	that */
-						assert(retvalue); 	/* secshr_db_clnup() should have completed the commit */
+						assert(retvalue); 	/* secshr_db_clnup should have completed the commit */
 						status = cdb_sc_normal;	/* reset status to normal as transaction is complete */
 						assert(!csa->now_crit);	/* assert that we do not hold crit any more */
 						/* At this time "cr_array_index" could be non-zero and a few cache-records might
@@ -1129,7 +1128,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		 */
 		SHM_WRITE_MEMORY_BARRIER;
 		jpl->write = tjpl->write;
-		/* jpl->write_addr should be updated before updating jpl->jnl_seqno as secshr_db_clnup() relies on this */
+		/* jpl->write_addr should be updated before updating jpl->jnl_seqno as secshr_db_clnup relies on this */
 		QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
 		assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
 		jpl->jnl_seqno = tjpl->jnl_seqno;
@@ -1174,7 +1173,7 @@ failed_skip_revert:
 		rel_crit(gv_cur_region);
 	t_retry(status);
 	/* in the retry case, we do not do a CWS_RESET as cw_stagnate is used only in the
-	 * final retry in which case t_end() will succeed and do a CWS_RESET
+	 * final retry in which case t_end will succeed and do a CWS_RESET
 	 */
 	cw_map_depth = 0;
 	return 0;

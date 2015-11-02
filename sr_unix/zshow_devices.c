@@ -423,9 +423,8 @@ void zshow_devices(zshow_out *output)
 					ZS_STR_OUT(&v, current_text);
 					MV_FORCE_MVAL(&m, (int)dsocketptr->current_socket);
 					mval_write(output, &m, FALSE);
-/* smw need new iosocketdef.h					if (dsocketptr->mupintr)
+					if (dsocketptr->mupintr)
 						ZS_STR_OUT(&v, interrupt_text);
-*/
 					output->flush = TRUE;
 					zshow_output(output, 0);
 					for(ii = 0; ii < dsocketptr->n_socket; ii++)

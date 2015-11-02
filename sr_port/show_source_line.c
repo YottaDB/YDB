@@ -20,7 +20,8 @@
 GBLREF short int 	source_name_len, last_source_column, source_line;
 GBLREF char 		source_file_name[];
 GBLREF unsigned char	*source_buffer;
-GBLREF bool		dec_nofac, run_time;
+GBLREF bool		dec_nofac;
+GBLREF boolean_t	run_time;
 
 void show_source_line(char* buf, boolean_t warn)
 {

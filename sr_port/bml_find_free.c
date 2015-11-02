@@ -19,7 +19,7 @@
 /* Returns the location of the first set bit in the field.	*/
 /* The search starts at the hint and wraps if necessary.	*/
 
-int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits, bool *used)
+int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits, boolean_t *used)
 {
 	uchar_ptr_t	ptr, top;
 	unsigned char 	valid;

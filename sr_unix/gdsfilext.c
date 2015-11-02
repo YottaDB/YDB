@@ -66,7 +66,7 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	boolean_t	mu_reorg_process;
 GBLREF	uint4		process_id;
-GBLREF	bool		run_time;
+GBLREF	boolean_t	run_time;
 GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	unsigned int	t_tries;
 GBLREF	jnl_gbls_t	jgbl;

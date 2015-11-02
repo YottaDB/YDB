@@ -18,8 +18,8 @@
 #include "gtm_socket.h"
 #include <sys/un.h>
 #include <signal.h>
-#if (!defined(_AIX) && !defined(__MVS__))
-#if !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__)
+#if !defined(__MVS__)
+#if !defined(_AIX) && !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__)
 #include <siginfo.h>
 #endif
 #include "gtm_stdlib.h"
@@ -285,6 +285,7 @@ void gtmsecshr_init(void)
 	struct sembuf	sop[4];
 	gtmsecshr_mesg	mesg;
 	struct stat	stat_buf;
+	char		*gtm_tmp_ptr;
 
 	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_GTMSECSHRSRVF);
@@ -295,6 +296,7 @@ void gtmsecshr_init(void)
 	error_def(ERR_GTMSECSHROPCMP);
 	error_def(ERR_GTMSECSHRSOCKET);
 	error_def(ERR_TEXT);
+	error_def(ERR_GTMSECSHRTMPPATH);
 
 	process_id = getpid();
 	if (-1 == setuid(ROOTUID))
@@ -359,6 +361,12 @@ void gtmsecshr_init(void)
 	{
 		send_msg(VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("server already running"), errno);
+		/* if gtm_tmp is not defined, show default path */
+		if (gtm_tmp_ptr = GETENV("gtm_tmp"))
+			send_msg(VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT(gtm_tmp_ptr),
+				ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
+		else
+			send_msg(VARLSTCNT(4) ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));
 		util_out_print("A gtmsecshr server is already running - exiting", TRUE);
 		gtmsecshr_exit(SEMAPHORETAKEN, FALSE);
 	}

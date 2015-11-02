@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,11 +20,11 @@
 #define CANCEL_ONE -1
 #define CANCEL_ALL -2
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
-GBLREF bool 	run_time;
-GBLREF mident	routine_name;
-LITREF mident 	zero_ident;
+GBLREF char		window_token;
+GBLREF mident		window_ident;
+GBLREF boolean_t	run_time;
+GBLREF mident		routine_name;
+LITREF mident		zero_ident;
 
 int m_zbreak(void)
 {

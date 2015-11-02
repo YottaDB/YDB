@@ -19,6 +19,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "dpgbldir.h"
 #include "filestruct.h"
 #include "jnl.h"
 #include "view.h"
@@ -38,9 +39,10 @@ GBLREF spdesc		stringpool;
 GBLREF int4		cache_hits, cache_fails;
 GBLREF unsigned char	*stackbase, *stacktop;
 GBLREF gd_addr		*gd_header;
+GBLREF gd_addr		*gd_targ_addr;
 GBLREF gd_binding	*gd_map;
 GBLREF gd_binding	*gd_map_top;
-GBLREF bool		certify_all_blocks;
+GBLREF boolean_t	certify_all_blocks;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
@@ -71,6 +73,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	mval		*arg;
 	mstr		tmpstr;
 	int		n;
+	mval	        v;
 	viewparm	parmblk;
 	gd_binding	*map;
 	gd_region	*reg;
@@ -255,17 +258,23 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			dst->str = tmpstr;
 			break;
 		case VTK_REGION:
-			assert(gd_header);
-			map = gd_map;
-			map++;	/* get past local locks */
-			for (; memcmp(&parmblk.ident.c[0], &(map->name[0]), sizeof(mident_fixed)) >= 0; map++)
-				assert(map < gd_map_top);
-			reg = map->reg.addr;
-			tmpstr.addr = (char *)reg->rname;
-			tmpstr.len = reg->rname_len;
-			s2pool(&tmpstr);
-			dst->str = tmpstr;
-			break;
+		  /* if gd_header is null then get the current one, and update the gd_map */
+		  if (!gd_header)
+		  {
+			  SET_GD_HEADER(v);
+			  SET_GD_MAP;
+		  }
+		  DEBUG_ONLY(else GD_HEADER_ASSERT);
+		  map = gd_map;
+		  map++;	/* get past local locks */
+		  for (; memcmp(&parmblk.ident.c[0], &(map->name[0]), sizeof(mident_fixed)) >= 0; map++)
+		    assert(map < gd_map_top);
+		  reg = map->reg.addr;
+		  tmpstr.addr = (char *)reg->rname;
+		  tmpstr.len = reg->rname_len;
+		  s2pool(&tmpstr);
+		  dst->str = tmpstr;
+		  break;
 		case VTK_RTNEXT:
 			view_routines(dst, &parmblk.ident);
 			break;

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -78,6 +78,20 @@ free			=	4
 top			=	8
 
 # mvals passed to these macros must be registers
+
+	.sbttl	mval_def.si    mv_force_defined
+# ---------------------------------------
+#       mv_force_defined(mval, label)
+# ---------------------------------------
+.macro  mv_force_defined mval, label
+        testw   $(mval_m_str+mval_m_nm),mval_w_mvtype(\mval)
+        jne     \label
+	pushl   \mval
+        call    underr
+        addl    $4,%esp
+	movl	%eax, \mval
+\label:
+.endm
 
 	.sbttl	mval_def.si    mv_force_str
 # ---------------------------------------

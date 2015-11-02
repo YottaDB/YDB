@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,8 @@
 #define JNL_REC_START_BNDRY	8
 #define MAX_LOGI_JNL_REC_SIZE	(MAX_DB_BLK_SIZE)			  /* maximum logical journal record size */
 #define	MAX_JNL_REC_SIZE	(MAX_LOGI_JNL_REC_SIZE + DISK_BLOCK_SIZE) /* one more disk-block for PBLK record header/footer */
+
+#define ALIGNMENT_SIZE		DISK_BLOCK_SIZE	/* For direct I/O, buffers need to be aligned on DISK_BLOCK_SIZE boundaries */
 
 #define MIN_YIELD_LIMIT		0
 #define MAX_YIELD_LIMIT		2048
@@ -243,6 +245,7 @@ typedef struct
 	int4			epoch_interval;	/* Time between successive epochs in epoch-seconds */
 	boolean_t		before_images;	/* If TRUE, before-image processing is enabled */
 						/* end not volatile QUAD */
+	uintszofptr_t		buff_off;	/* relative offset to DISK_BLOCK_SIZE aligned buffer start */
 	volatile int4		free;		/* relative index of first byte to write in buffer */
 	volatile uint4		freeaddr,	/* virtual on-disk address which will correspond to free, when it is written */
 				end_of_data,	/* Synched offset updated by jnl_write_epoch. Used by recover/rollback */
@@ -297,8 +300,9 @@ typedef struct
 	unsigned char		buff[1];		/* Actually buff[size] */
 } jnl_buffer;
 
-#define	FIX_NONZERO_FREE_UPDATE_PID(jbp)										\
+#define	FIX_NONZERO_FREE_UPDATE_PID(csa, jbp)										\
 {															\
+	assert(csa->now_crit);	/* hold crit before manipulating freeaddr/free */					\
 	assert(jbp->free_update_pid);											\
 	UNIX_ONLY(assert(!is_proc_alive(jbp->free_update_pid, 0));)							\
 	VMS_ONLY(assert(FALSE);) /* secshr_db_clnup should have cleaned up this field even in case of STOP/ID */	\
@@ -308,6 +312,13 @@ typedef struct
 		jbp->free = jbp->freeaddr % jbp->size;									\
 		jbp->free_update_pid = 0;										\
 	}														\
+	DBG_CHECK_JNL_BUFF_FREEADDR(jbp);										\
+}
+
+#define	DBG_CHECK_JNL_BUFF_FREEADDR(jbp)			\
+{								\
+	assert((jbp->freeaddr % jbp->size) == jbp->free);	\
+	assert(jbp->freeaddr >= jbp->dskaddr);			\
 }
 
 #ifdef DB64
@@ -788,7 +799,7 @@ DEBUG_ONLY(
 #define JNL_SHARE_SIZE(X)	(JNL_ALLOWED(X) ? 							\
 				(ROUND_UP(JNL_NAME_EXP_SIZE + sizeof(jnl_buffer), OS_PAGE_SIZE)		\
                                 + ROUND_UP(((sgmnt_data_ptr_t)X)->jnl_buffer_size * DISK_BLOCK_SIZE, 	\
-					OS_PAGE_SIZE)) : 0)
+					OS_PAGE_SIZE) + OS_PAGE_SIZE) : 0)
 
 /* pass address of jnl_buffer to get address of expanded jnl file name */
 #define JNL_GDID_PVT(CSA)        ((CSA)->jnl->fileid)

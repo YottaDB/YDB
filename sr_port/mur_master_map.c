@@ -42,9 +42,9 @@ GBLREF	int			mur_regno;
 
 void	mur_master_map()
 {
-	uchar_ptr_t		bml_buffer;
-	uint4			bplmap, blk_index, bml_size;
-	bool			dummy;
+	uchar_ptr_t		bml_buffer, bmp_buffer;
+	uint4			bplmap, blk_index, bml_size, total_blks, blks_in_last_bitmap;
+	boolean_t		dummy_bool;
 	int			status;
 	file_control		*db_ctl;
 	enum db_ver		dummy_ondskblkver;
@@ -59,7 +59,9 @@ void	mur_master_map()
 	bplmap = cs_data->bplmap;
 	bml_size = ROUND_UP(BML_BITS_PER_BLK * bplmap + USIZEOF(blk_hdr), 8);
 	bml_buffer = (uchar_ptr_t)malloc(bml_size);
-	for (blk_index = 0;  blk_index < cs_data->trans_hist.total_blks;  blk_index += bplmap)
+	bmp_buffer = bml_buffer + sizeof(blk_hdr);
+	total_blks = cs_data->trans_hist.total_blks;
+	for (blk_index = 0;  blk_index < total_blks;  blk_index += bplmap)
 	{	/* Read local bit map into buffer */
 		db_ctl->op = FC_READ;
 		db_ctl->op_buff = bml_buffer;
@@ -69,24 +71,26 @@ void	mur_master_map()
 		GDS_BLK_UPGRADE_IF_NEEDED(blk_index, db_ctl->op_buff, db_ctl->op_buff,
 			cs_data, &dummy_ondskblkver, status, cs_data->fully_upgraded);
 		if (SS_NORMAL != status)
+		{
 			if (ERR_DYNUPGRDFAIL == status)
 				rts_error(VARLSTCNT(5) status, 3, blk_index, DB_LEN_STR(gv_cur_region));
 			else
 				rts_error(VARLSTCNT(1) status);
-		if (bml_find_free(0, bml_buffer + sizeof(blk_hdr), bplmap, &dummy) == NO_FREE_SPACE)
+		}
+		if (bml_find_free(0, bmp_buffer, bplmap, &dummy_bool) == NO_FREE_SPACE)
 			bit_clear(blk_index / bplmap, cs_addrs->bmm);
 		else
 			bit_set(blk_index / bplmap, cs_addrs->bmm);
 	}
-
-	/* Last local map may be smaller than bplmap so redo with correct bit count */
-	if (bml_find_free(0, bml_buffer + sizeof(blk_hdr), cs_addrs->ti->total_blks - cs_addrs->ti->total_blks / bplmap * bplmap,
-			  &dummy)
-	    == NO_FREE_SPACE)
-		bit_clear(blk_index / bplmap - 1, cs_addrs->bmm);
-	else
-		bit_set(blk_index / bplmap - 1, cs_addrs->bmm);
-
+	blks_in_last_bitmap = total_blks - ROUND_DOWN(total_blks, bplmap);
+	if (blks_in_last_bitmap)
+	{	/* Last local map may be smaller than bplmap so redo with correct bit count */
+		assert(blks_in_last_bitmap > 1);	/* the last valid block in the database should never be a bitmap block */
+		if (NO_FREE_SPACE == bml_find_free(0, bmp_buffer, blks_in_last_bitmap, &dummy_bool))
+			bit_clear(blk_index / bplmap - 1, cs_addrs->bmm);
+		else
+			bit_set(blk_index / bplmap - 1, cs_addrs->bmm);
+	}
 	free(bml_buffer);
-	cs_addrs->nl->highest_lbm_blk_changed = cs_data->trans_hist.total_blks;
+	cs_addrs->nl->highest_lbm_blk_changed = total_blks;
 }

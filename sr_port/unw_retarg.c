@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,12 +10,12 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "tp_frame.h"
 #include "unw_retarg.h"
-#include "underr.h"
 #include "unwind_nocounts.h"
 #include "error_trap.h"
 

@@ -106,7 +106,7 @@ typedef rec_hdr *rec_hdr_ptr_t;
         GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)(REC_BASE))->rsiz));  \
         REC_SIZE = temp_ushort
 
-int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used);
+int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, boolean_t *used);
 void bm_setmap(block_id bml, block_id blk, int4 busy);
 void bml_newmap(blk_hdr_ptr_t ptr, uint4 size, trans_num curr_tn);
 

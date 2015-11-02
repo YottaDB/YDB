@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,9 +28,11 @@
 
 	.text
 .extern	s2n
+.extern underr
 
 # PUBLIC	mval2bool
 ENTRY mval2bool
+	mv_force_defined %edx, l1
 	pushl	%edx
 	mv_force_num %edx, skip_conv
 	popl	%edx

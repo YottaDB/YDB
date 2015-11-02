@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,24 +20,24 @@ TAB_BG_TRC_REC("  Blocked by qio        ", blocked)
 TAB_BG_TRC_REC("  Blkd qio fnshd 2 late ", blkd_made_empty)
 TAB_BG_TRC_REC("  Obsolete to empty     ", obsolete_to_empty)
 TAB_BG_TRC_REC("  Qio to clean          ", qio_to_clean)
-TAB_BG_TRC_REC("  Active level tripped  ", active_lvl_trigger)
-TAB_BG_TRC_REC("  T_end new got buff    ", new_buff)
+TAB_BG_TRC_REC("  Former Activelvltriggr", active_lvl_trigger_obsolete)
+TAB_BG_TRC_REC("  Former T_end new got b", new_buff_obsolete)
 TAB_BG_TRC_REC("  Getnew buff           ", get_new_buff)
 TAB_BG_TRC_REC("  Reused modified       ", mod_to_mod)
 TAB_BG_TRC_REC("  Wcs_wtfini invoked    ", wcs_wtfini_invoked)
 #elif defined(UNIX)
-TAB_BG_TRC_REC("  Total buffer flushes  ", total_buffer_flush)		/* Count of wcs_flu calls */
-TAB_BG_TRC_REC("  Flsh for buff cnt     ", bufct_buffer_flush)		/* Count of flushing-till-buffers-free-cnt (wcs_get_space) */
-TAB_BG_TRC_REC("  Flsh for buff cnt lps ", bufct_buffer_flush_loop)	/* Count of flushing-till-buffers-free-cnt looping back (wcs_get_space) */
-TAB_BG_TRC_REC("  Calls to wcs_wtstart  ", wrt_calls)			/* Calls to wcs_wtstart */
-TAB_BG_TRC_REC("  Writes by wcs_wtstart ", wrt_count)			/* Count of writes done in wcs_wtstart */
-TAB_BG_TRC_REC("  Writes were blocked   ", wrt_blocked)			/* wc_blocked was on in wcs_wtstart */
+TAB_BG_TRC_REC("  Total buffer flushes  ", total_buffer_flush)		/* # of wcs_flu calls */
+TAB_BG_TRC_REC("  Flsh for buff cnt     ", bufct_buffer_flush)		/* # of flushing-till-buffers-free-cnt (wcs_get_space) */
+TAB_BG_TRC_REC("  Flsh for buff cnt lps ", bufct_buffer_flush_loop)	/* # of flushing-till-buffers-free-cnt looping back */
+TAB_BG_TRC_REC("  Calls to wcs_wtstart  ", wrt_calls)			/* # of calls to wcs_wtstart */
+TAB_BG_TRC_REC("  Writes by wcs_wtstart ", wrt_count)			/* # of writes done in wcs_wtstart */
+TAB_BG_TRC_REC("  Writes were blocked   ", wrt_blocked)			/* # of times wc_blocked was on in wcs_wtstart */
 TAB_BG_TRC_REC("  Writer was busy       ", wrt_busy)			/* Encountered wcs_wtstart lock */
 TAB_BG_TRC_REC("  Writer fnd no writes  ", wrt_noblks_wrtn)		/* Times wcs_wtstart ran queues but nothing written */
 TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec1)		/* Reserved filler to match length of VMS section */
 TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec2)		/* Reserved filler to match length of VMS section */
 TAB_BG_TRC_REC("  Reserved filler bg_trc", reserved_bgtrcrec3)		/* Reserved filler to match length of VMS section */
-TAB_BG_TRC_REC("  Lost block recovery   ", lost_block_recovery)		/* Performing lost block recovery in gds_rundown (traced PRO also) */
+TAB_BG_TRC_REC("  Lost block recovery   ", lost_block_recovery)		/* Performing lost block recovery in gds_rundown  */
 TAB_BG_TRC_REC("  <unused unix unique   ", unused_unix_unique)          /* Available for use as unique unix counter */
 #else
 # error Unsupported platform
@@ -49,18 +49,18 @@ TAB_BG_TRC_REC("  Stale timer pop       ", stale_timer_pop)		/* Stale timer has 
 TAB_BG_TRC_REC("  Stale process defer   ", stale_process_defer)		/* Deferring processing due to conditions */
 TAB_BG_TRC_REC("  Stale deferd procsd   ", stale_defer_processed)	/* Stale processing done outside crit */
 TAB_BG_TRC_REC("  Spcfc buff flshs      ", spcfc_buffer_flush)		/* Count of flushing specific buffer (wcs_get_space) */
-TAB_BG_TRC_REC("  Spcfc buff flsh lps   ", spcfc_buffer_flush_loop)	/* Passes through the active queue made to flush a specific buffer (wcs_get_space) */
+TAB_BG_TRC_REC("  Spcfc buff flsh lps   ", spcfc_buffer_flush_loop)	/* # of passes to flush a specific buffer (wcs_get_space) */
 TAB_BG_TRC_REC("  Spcfc buff flsh rtries", spcfc_buffer_flush_retries)	/* Times we re-flushed when 1st flush didn't flush buffer */
 TAB_BG_TRC_REC("  Spcfc buff lkwait flsh", spcfc_buffer_flushed_during_lockwait)
-TAB_BG_TRC_REC("  TP crit retries       ", tp_crit_retries)		/* Number of times we re-tried getting crit (common Unix & VMS) */
-TAB_BG_TRC_REC("  DbCshGetn_FlushDirty  ", db_csh_getn_flush_dirty)	/* all the fields from now on use the BG_TRACE_PRO macro   */
-TAB_BG_TRC_REC("  DbCshGetn_RipWait     ", db_csh_getn_rip_wait)	/* since they are incremented rarely, they will go in	   */
-TAB_BG_TRC_REC("  DbCshGetn_BfOwnerStuck", db_csh_getn_buf_owner_stuck)	/* production code too. The BG_TRACE_PRO macro does a      */
-TAB_BG_TRC_REC("  DbCshGetn_OutOfDesign ", db_csh_getn_out_of_design)	/* NON-INTERLOCKED increment.				   */
+TAB_BG_TRC_REC("  TP crit retries       ", tp_crit_retries)		/* # of times re-tried getting crit (common Unix & VMS) */
+TAB_BG_TRC_REC("  DbCshGetn_FlushDirty  ", db_csh_getn_flush_dirty)	/* all the fields from now on use the BG_TRACE_PRO macro  */
+TAB_BG_TRC_REC("  DbCshGetn_RipWait     ", db_csh_getn_rip_wait)	/* since they are incremented rarely, they will go in	  */
+TAB_BG_TRC_REC("  DbCshGetn_BfOwnerStuck", db_csh_getn_buf_owner_stuck)	/* production code too. The BG_TRACE_PRO macro does a     */
+TAB_BG_TRC_REC("  DbCshGetn_OutOfDesign ", db_csh_getn_out_of_design)	/* NON-INTERLOCKED increment.				  */
 TAB_BG_TRC_REC("  TQread_BfOwnerStuck   ", t_qread_buf_owner_stuck)
 TAB_BG_TRC_REC("  TQread_OutOfDesign    ", t_qread_out_of_design)
 TAB_BG_TRC_REC("  BtPut_FlushDirty      ", bt_put_flush_dirty)
-TAB_BG_TRC_REC("  M-lock wakeups        ", mlock_wakeups)		/* Times a process has slept on a lock in this region and been awakened */
+TAB_BG_TRC_REC("  M-lock wakeups        ", mlock_wakeups)		/* # of times a process has been awakened after lock wait */
 TAB_BG_TRC_REC("  WcBlocked WcsReoverInv", wc_blocked_wcs_recover_invoked)
 TAB_BG_TRC_REC("  WcBlocked WcsVerifyPas", wc_blocked_wcs_verify_passed)
 TAB_BG_TRC_REC("  WcBlocked TQread Getn ", wc_blocked_t_qread_db_csh_getn_invalid_blk)
@@ -146,3 +146,5 @@ TAB_BG_TRC_REC("  RefmtHvst blk kept    ", refmt_hvst_blk_kept)
 TAB_BG_TRC_REC("  RefmtHvst blk ignrd   ", refmt_hvst_blk_ignored)
 TAB_BG_TRC_REC("  RefmtBchk blk freed   ", refmt_blk_chk_blk_freed)
 TAB_BG_TRC_REC("  RefmtBchk blk kept    ", refmt_blk_chk_blk_kept)
+TAB_BG_TRC_REC("  Active level tripped  ", active_lvl_trigger)
+TAB_BG_TRC_REC("  T_end new got buff    ", new_buff)

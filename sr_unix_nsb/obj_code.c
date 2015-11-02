@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@
 #include "gtm_string.h"
 #include "stringpool.h"
 
-GBLREF bool		run_time;
+GBLREF boolean_t	run_time;
 GBLREF command_qualifier cmd_qlf;
 GBLREF int4		mvmax, mlmax, mlitmax, psect_use_tab[], sa_temps[], sa_temps_offset[];
 GBLREF mlabel 		*mlabtab;

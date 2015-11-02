@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,14 +28,14 @@
 
 # PUBLIC	op_forcenum
 ENTRY op_forcenum
-	testw	$mval_m_nm,mval_w_mvtype(%edx)
-	jne	l10
 	pushl	%eax
+	mv_force_defined %edx, l00
 	pushl	%edx
-	call	s2n
+	mv_force_num %edx, l10
 	popl	%edx
 	popl	%eax
-l10:	testw	$mval_m_str,mval_w_mvtype(%edx)
+
+	testw	$mval_m_str,mval_w_mvtype(%edx)
 	je	l20
 	testw	$mval_m_num_approx,mval_w_mvtype(%edx)
 	je	l40

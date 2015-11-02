@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +62,18 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 	       (char *)pid2ascx(mutex_wake_this_proc_str, *pid));
 	msg.pid = process_id;
 	msg.mutex_wake_instance = mutex_wake_instance;
+	/* We have seen an issue where the sendto() call done below blocked for at least more than a minute. The only reason
+	 * we know of this can happen is if the TCPIP buffer on the receiving end of the pipe is already full. But as long as
+	 * the receiving side is waiting for this wakeup message, it should be in a loop clearing the incoming messages thereby
+	 * avoiding this situation. But in reality, we have seen the receiving side not waiting for the wakeup signal at all
+	 * but instead doing something totally different effectively causing a deadlock. One approach to fix this issue is to
+	 * open the mutex socket with the O_NONBLOCK parameter that way the sendto() done below would be a non-blocking send
+	 * but that introduces issues in the mutex logic as it then needs to handle partial messages (this is because a
+	 * non-blocking sendto would send as much bytes as possible before things would block). For now, the only platform
+	 * that use this wakeup scheme is Linux and that is almost transitioning to using memory-semaphores. The blocking
+	 * sendto() issue is therefore not considered critical at this moment. This might need to be revisited in case this
+	 * code starts to get used again. -- nars - 2008/01/15.
+	 */
 	SENDTO_SOCK(mutex_sock_fd, (char *)&msg, sizeof(msg), 0, (struct sockaddr *)&mutex_wake_this_proc,
 		mutex_wake_this_proc_len, sendto_res);
 	if (0 > sendto_res)

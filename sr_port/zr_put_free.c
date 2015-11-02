@@ -19,11 +19,11 @@
 #include "zbreak.h"
 #include "inst_flush.h"
 #include "private_code_copy.h"
+#include "gtm_text_alloc.h"
 
 #ifdef __ia64
 #include "ia64.h"
 #endif /*__ia64__*/
-
 
 GBLREF hash_table_objcode	cache_table;
 
@@ -31,9 +31,9 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 {
 	mstr		rtn_str;
 	rhdtyp		*routine;
-#ifdef DEBUG
 	boolean_t	deleted;
-#endif /* DEBUG */
+	IA64_ONLY(ia64_fmt_A4	inst;)
+	IA64_ONLY(zb_code	imm14;)
 
 	assert(zrecs->beg  <= zrecs->free);
 	assert(zrecs->free < zrecs->end);
@@ -47,13 +47,9 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 		{
 			if (0 == z_ptr->action->refcnt)
 			{
-#ifdef DEBUG
 				deleted = delete_hashtab_objcode(&cache_table, &z_ptr->action->src);
-#else
-				delete_hashtab_objcode(&cache_table, &z_ptr->action->src);
-#endif /* DEBUG */
 				assert(deleted);
-				free(z_ptr->action);
+				GTM_TEXT_FREE(z_ptr->action);
 			}
 			z_ptr->action = NULL;
 		}
@@ -62,17 +58,14 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 	*z_ptr->mpc = z_ptr->m_opcode;
 	inst_flush(z_ptr->mpc, sizeof(*z_ptr->mpc));
 #else
-	{
-	  	ia64_fmt_A4 inst;
-		EXTRACT_INST(z_ptr->mpc, inst, 3);
-		zb_code imm14 = z_ptr->m_opcode;
-		inst.format.imm7b=imm14;
-		inst.format.imm6d=imm14 >> 7;
-		inst.format.sb=imm14 >> 13;
-		/*Revist when instruction bundling implemented.*/
-		UPDATE_INST(z_ptr->mpc, inst, 3);
-		inst_flush(z_ptr->mpc, sizeof(ia64_bundle));
-	}
+	EXTRACT_INST(z_ptr->mpc, inst, 3);
+	imm14 = z_ptr->m_opcode;
+	inst.format.imm7b = imm14;
+	inst.format.imm6d = imm14 >> 7;
+	inst.format.sb = imm14 >> 13;
+	/* Revist when instruction bundling implemented */
+	UPDATE_INST(z_ptr->mpc, inst, 3);
+	inst_flush(z_ptr->mpc, sizeof(ia64_bundle));
 #endif
 
 #ifdef USHBIN_SUPPORTED

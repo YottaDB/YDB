@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,9 @@
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
+GBLREF gd_addr		*gd_targ_addr;
+GBLREF gd_binding	*gd_map;
+GBLREF gd_binding	*gd_map_top;
 GBLREF mval		dollar_ztrap;
 GBLREF mval		dollar_etrap;
 GBLREF mval		dollar_estack_delta;
@@ -103,7 +106,11 @@ void op_newintrinsic(int intrtype)
 	} else if (SV_ZGBLDIR == intrtype)
 	{
 		if (dollar_zgbldir.str.len != 0)
+		{
 			gd_header = zgbldir(&dollar_zgbldir);
+			/* update the gd_map */
+			SET_GD_MAP;
+		}
 		else
 		{
 			dpzgbini();

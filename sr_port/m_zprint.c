@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,11 +17,11 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
-GBLREF bool 	run_time;
-GBLREF mident	routine_name;
-LITREF mident 	zero_ident;
+GBLREF char		window_token;
+GBLREF mident		window_ident;
+GBLREF boolean_t	run_time;
+GBLREF mident		routine_name;
+LITREF mident		zero_ident;
 
 int m_zprint(void)
 {
@@ -44,8 +44,7 @@ int m_zprint(void)
 			rtn = put_str(routine_name.addr, routine_name.len);
 		else
 			rtn = put_tref(newtriple(OC_CURRTN));
-	}
-	else
+	} else
 	{
 		got_some = TRUE;
 		advancewindow();

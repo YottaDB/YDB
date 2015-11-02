@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,6 +75,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	boolean_t	is_mm, store_history;
 	sgm_info	*si;
 	ht_ent_int4	*tabent, *lookup_tabent;
+	cw_set_element	*cse;
 
 	error_def(ERR_TRANS2BIG);
 	error_def(ERR_GVKILLFAIL);
@@ -147,19 +148,34 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				 */
 				if (t2->tn <= ((blk_hdr_ptr_t)t2->buffaddr)->tn)
 				{
-					assert(CDB_STAGNATE > t_tries);
-					if (tprestart_syslog_delta)
+					cse = t1->ptr;
+					/* Check if the cse already has a recompute list (i.e. NOISOLATION turned ON)
+					 * If so no need to restart the transaction even though the block changed.
+					 * We will detect this change in tp_tend and recompute the update array anyways.
+					 */
+					if ((NULL == cse) || !cse->recompute_list_head || cse->write_type)
 					{
-						n_blkmods++;
-						if (t2->ptr || t1->ptr)
-							n_pvtmods++;
-						if (1 != n_blkmods)
-							continue;
+						assert(CDB_STAGNATE > t_tries);
+						if (tprestart_syslog_delta)
+						{
+							n_blkmods++;
+							if (t2->ptr || t1->ptr)
+								n_pvtmods++;
+							if (1 != n_blkmods)
+								continue;
+						}
+						TP_TRACE_HIST_MOD(t2->blk_num, t2->blk_target, tp_blkmod_tp_hist,
+							cs_addrs->hdr, t2->tn, ((blk_hdr_ptr_t)t2->buffaddr)->tn, t2->level);
+						status = cdb_sc_blkmod;
+						BREAK_IN_PRO__CONTINUE_IN_DBG;
 					}
-					TP_TRACE_HIST_MOD(t2->blk_num, t2->blk_target, tp_blkmod_tp_hist,
-						cs_addrs->hdr, t2->tn, ((blk_hdr_ptr_t)t2->buffaddr)->tn, t2->level);
-					status = cdb_sc_blkmod;
-					BREAK_IN_PRO__CONTINUE_IN_DBG;
+					DEBUG_ONLY(
+					else
+						/* Assert that this is a leaf level block of a global with NOISOLATION
+						 * and that this is a SET operation (not a GET or KILL).
+						 */
+						assert((ERR_GVPUTFAIL == t_err) && t1->blk_target->noisolation && (0 == t1->level));
+					)
 				}
 				/* Although t1->first_tp_srch_status (i.e. t2) is used for doing blkmod check,
 				 * we need to use BOTH t1 and t1->first_tp_srch_status to do the cdb_sc_lostcr check.

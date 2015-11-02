@@ -1,0 +1,216 @@
+#################################################################
+#								#
+#	Copyright 2007 Fidelity Information Services, Inc	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+	.sbttl	g_msf.si
+#	PAGE	+
+#-----------------------------------------------
+# Mumps stack frame manipulation macros
+#  for the GNU gas i386 assembler version
+#-----------------------------------------------
+
+/* Register definitions */
+
+/* Registers which we expect value to be preserved! Callee saves */
+REG_IP			=	%rip
+REG_SP			=	%rsp
+
+REG_RET0		=	%rax
+REG_RET1		=	%r10
+REG64_RET0		=	%rax
+REG64_RET1		=	%r10
+REG32_RET0		=	%eax
+REG32_RET1		=	%r10d
+
+REG64_ACCUM		=	%rax
+REG32_ACCUM		=	%eax
+REG16_ACCUM		=	%ax
+REG8_ACCUM		=	%al
+REG_XFER_TABLE		=	%rbx
+
+REG_FRAME_POINTER	=	%rbp
+C_FRAME_POINTER		=	%rbp
+
+REG_PV			=	%r15
+REG_FRAME_TMP_PTR	=	%r14
+REG_FRAME_VAR_PTR	=	%r13
+REG_LITERAL_BASE	=	%r12
+
+REG64_ARG0		=	%rdi
+REG64_ARG1		=	%rsi
+REG64_ARG2		=	%rdx
+REG64_ARG3		=	%rcx
+REG64_ARG4		=	%r8
+REG64_ARG5		=	%r9
+#REG64_SCRATCH0		=	%r10     # Note asme as REG64_RET1
+REG64_SCRATCH1		=	%r11
+
+REG64_OUT_ARG0		=	%rdi
+REG64_OUT_ARG1		=	%rsi
+REG64_OUT_ARG2		=	%rdx
+REG64_OUT_ARG3		=	%rcx
+REG64_OUT_ARG4		=	%r8
+REG64_OUT_ARG5		=	%r9
+
+REG32_ARG0		=	%edi
+REG32_ARG1		=	%esi
+REG32_ARG2		=	%edx
+REG32_ARG3		=	%ecx
+REG32_ARG4		=	%r8d
+REG32_ARG5		=	%r9d
+#REG32_SCRATCH0		=	%r10d
+REG32_SCRATCH1		=	%r11d
+
+REG16_ARG0		=	%di
+REG16_ARG1		=	%si
+REG16_ARG2		=	%dx
+REG16_ARG3		=	%cx
+REG16_ARG4		=	%r8w
+REG16_ARG5		=	%r9w
+#REG16_SCRATCH0		=	%r10w
+REG16_SCRATCH1		=	%r11w
+
+REG8_ARG0		=	%dil
+REG8_ARG1		=	%sil
+REG8_ARG2		=	%dl
+REG8_ARG3		=	%cl
+REG8_ARG4		=	%r8b
+REG8_ARG5		=	%r9b
+#REG8_SCRATCH0		=	%r10b
+REG8_SCRATCH1		=	%r11b
+
+
+REG32_OUT_ARG0		=	%edi
+REG32_OUT_ARG1		=	%esi
+REG32_OUT_ARG2		=	%edx
+REG32_OUT_ARG3		=	%ecx
+REG32_OUT_ARG4		=	%r8d
+REG32_OUT_ARG5		=	%r9d
+
+msf_rvector_off		=	0
+msf_l_symtab_off	=	8
+msf_mpc_off		=	16
+msf_ctxt_off		=	24
+msf_literal_ptr_off	=	32
+msf_temps_ptr_off	=	40
+msf_vartab_ptr_off	=	48
+
+msf_old_frame_off	=	56
+msf_vartab_len_off	=	64
+msf_temp_mvals_off	=	66
+msf_typ_off		=	68
+msf_flags_off		=	70
+
+SFT_COUNT		=	0x01
+SFT_DM			=	0x02
+SFT_REP_OP		=	0x04
+SFT_ZBRK_ACT		=	0x08
+SFT_DEV_ACT		=	0x10
+SFT_ZTRAP		=	0x20
+SFT_EXTFUN		=	0x40
+SFT_ZSTEP_ACT		=	0x80
+SFT_ZINTR		=	0x100
+
+/* Opcode defination needed by assembly files
+ * These are defined in i386*.h for using in "c" files
+ */
+JMP_Jb			=       0x0eb
+JMP_Jv			=       0x0e9
+
+SUPER_STACK_SIZE           =   2048
+REG_FRAME_POINTER_SAVE_OFF =   2032
+REG_XFER_TABLE_SAVE_OFF    =   2024
+ARG_SAVE_OFFSET		   =   2016
+
+NO_REG_SAVED		   =   7
+REG_FRAME_POINTER_SAVE_OFF =   SUPER_STACK_SIZE - 16
+REG_XFER_TABLE_SAVE_OFF    =   REG_FRAME_POINTER_SAVE_OFF - 8
+ARG_SAVE_OFFSET            =   REG_XFER_TABLE_SAVE_OFF - 8
+ARG_COUNT_OFFSET	   =   ARG_SAVE_OFFSET - (8*NO_REG_SAVED)
+
+
+        .sbttl  g_msf.si        save_callee_saved
+.macro save_callee_saved
+        movq    %r12,ARG_SAVE_OFFSET(REG_SP)
+        movq    %r13,ARG_SAVE_OFFSET-8(REG_SP)
+        movq    %r14,ARG_SAVE_OFFSET-16(REG_SP)
+        movq    %r15,ARG_SAVE_OFFSET-24(REG_SP)
+        movq    %rbx,ARG_SAVE_OFFSET-32(REG_SP)
+.endm
+
+        .sbttl  g_msf.si        restore_callee_saved
+.macro restore_callee_saved
+        movq    ARG_SAVE_OFFSET-32(REG_SP),%rbx
+        movq    ARG_SAVE_OFFSET-24(REG_SP),%r15
+        movq    ARG_SAVE_OFFSET-16(REG_SP),%r14
+        movq    ARG_SAVE_OFFSET-8(REG_SP),%r13
+        movq    ARG_SAVE_OFFSET(REG_SP),%r12
+.endm
+
+
+	.sbttl	g_msf.si	putframe
+.macro putframe
+	movq	frame_pointer(%rip),REG_FRAME_POINTER
+	movq	REG_FRAME_TMP_PTR,msf_temps_ptr_off(REG_FRAME_POINTER)
+	movq	REG_FRAME_VAR_PTR,msf_l_symtab_off(REG_FRAME_POINTER)
+	movq	REG_LITERAL_BASE,msf_literal_ptr_off(REG_FRAME_POINTER)
+	movq	REG_PV,msf_ctxt_off(REG_FRAME_POINTER)
+	movq	(%rsp),REG64_SCRATCH1
+	movq	REG64_SCRATCH1,msf_mpc_off(REG_FRAME_POINTER)
+.endm
+
+	.sbttl	g_msf.si	getframe
+
+.macro getframe
+	movq	frame_pointer(%rip),REG_FRAME_POINTER
+	movq	msf_temps_ptr_off(REG_FRAME_POINTER),REG_FRAME_TMP_PTR
+	movq	msf_l_symtab_off(REG_FRAME_POINTER),REG_FRAME_VAR_PTR
+	cmpq	$0,msf_literal_ptr_off(REG_FRAME_POINTER)
+	je	lab\@
+	movq	msf_literal_ptr_off(REG_FRAME_POINTER),REG_LITERAL_BASE
+lab\@:	movq	msf_ctxt_off(REG_FRAME_POINTER),REG_PV
+	pushq	msf_mpc_off(REG_FRAME_POINTER)
+.endm
+
+	.sbttl	g_msf.si	pullstack
+
+.macro	pullstack size=8
+	addq	$\size,REG_SP
+.endm
+
+.macro	resetstack size=8
+	subq	$\size,REG_SP
+.endm
+
+	.sbttl	g_msf.si
+mrt_jsb			=	0
+mrt_shlib_handle	=	16
+mrt_src_len		=	28
+mrt_src_addr		=	32
+mrt_compiler_qlf	=	40
+mrt_obj_label		=	44
+mrt_rtn_len		=	52
+mrt_rtn_addr		=	56
+mrt_var_ptr		=	64
+mrt_var_len		=	72
+mrt_lab_ptr		=	80
+mrt_lab_len		=	88
+mrt_lnr_ptr		=	96
+mrt_lnr_len		=	104
+mrt_lit_ptr		=	128
+mrt_lnk_ptr		=	144
+mrt_ptext_adr		=	176
+mrt_checksum		=	192
+mrt_tmp_mv		=	196
+mrt_tmp_sz		=	200
+mrt_curr_ptr		=	208
+mrt_oldr_ptr		=	216
+mrt_hdr_size		=	224
+

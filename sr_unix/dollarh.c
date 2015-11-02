@@ -15,7 +15,7 @@
 #include <sys/time.h>
 #include "dollarh.h"
 
-GBLREF bool	run_time;
+GBLREF boolean_t	run_time;
 
 /* note to code consolidaters: this code seems to run fine on VMS */
 void dollarh(time_t intime, uint4 *days, time_t *seconds)

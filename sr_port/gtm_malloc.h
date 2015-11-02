@@ -24,7 +24,7 @@ typedef struct storElemStruct
 	   allocation size is 16 bytes leaving 8 bytes for data. Also I have not researched what
 	   they are, there are a bunch of 8 byte allocates in GT.M that if we were to go to a 16
 	   byte header would make the minimum block size 32 bytes thus doubling the storage
-	   requirements for these small blocks. SE 03/2002
+	   requirements for these small blocks. SE 03/2002 [Note 16 byte header is the norm in 64 bit]
 	*/
 	signed char	queueIndex;			/* Index into TwoTable for this size of element */
 	unsigned char	state;				/* State of this block */
@@ -35,8 +35,9 @@ typedef struct storElemStruct
 	struct	storElemStruct	*fPtr;			/* Next storage element on free/allocated queue */
 	struct	storElemStruct	*bPtr;			/* Previous storage element on free/allocated queue */
 	unsigned char	*allocatedBy;			/* Who allocated storage */
+	NON_GTM64_ONLY(unsigned int smTn;)		/* Storage management transaction number allocated at */
+        GTM64_ONLY(gtm_uint64_t smTn;)			/* Avoid padding in GTM64 by using large int */
 	int		allocLen;			/* Requested length of allocation */
-	unsigned int	smTn;				/* Storage management transaction number allocated at */
 	unsigned char	headMarker[4];			/* Header that should not be modified during usage */
 	union
 	{
@@ -44,9 +45,7 @@ typedef struct storElemStruct
 		unsigned char	userStart;		/* First byte of user useable storage */
 	} userStorage;
 #else
-#ifdef GTM64
-	char             filler[8];                      /* For 64 bit systems, the user area needs to be 16 byte aligned */
-#endif /* GTM64 */
+	GTM64_ONLY(char filler[8];)                     /* For 64 bit systems, the user area needs to be 16 byte aligned */
 	union						/* In production mode, the links are used only when element is free */
 	{
 		struct storElemStruct *deferFreeNext;	/* Pointer to next deferred free block */
@@ -59,16 +58,6 @@ typedef struct storElemStruct
 	} userStorage;
 #endif
 } storElem;
-
-/* Malloc of areas containing executable code need to be handled differently on some platforms
-   (currently only Linux but likely others in the future)
-*/
-#if defined(__linux__) && defined(__ia64)
-#  define GTM_TEXT_MALLOC(x) gtm_text_malloc(x)
-void *gtm_text_malloc(size_t size);
-# else
-#  define GTM_TEXT_MALLOC(x) gtm_malloc(x)
-#endif
 
 void verifyFreeStorage(void);
 void verifyAllocatedStorage(void);

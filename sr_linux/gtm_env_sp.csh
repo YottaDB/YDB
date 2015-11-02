@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,6 +25,13 @@ set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
 set mach_type = `uname -m`
 # Cygwin adds the Windows version e.g. uname = CYGWIN_NT-5.1
 set platform_only = `echo $platform_name | sed 's/_.*//'`
+
+#### To determine whether the build type is 64 or 32. On x86_64 linux box, use the header file "x86_64.h" in the inc directory.
+if ( "ia64" == $mach_type || ( "x86_64" == $mach_type && -e $gtm_inc/x86_64.h) ) then
+	setenv linux_build_type 64
+else
+	setenv linux_build_type 32
+endif
 
 if ( $?gtm_version_change == "1" ) then
 
@@ -126,12 +133,11 @@ if ( $?gtm_version_change == "1" ) then
 		setenv gt_cc_options_common "$gt_cc_options_common -DNO_SEM_TIME -DNO_SEM_GETPID"
 	endif
 
-
-	# Allow builds on 64 bit machines -- coerce to 32 bit
-	# 32 bit ICU headers of 64 bit linux are in /emul/ia32-linux/usr/include/
+	# 64 bit ICU headers of 64 bit linux are in /emul/ia64-linux/usr/include/
 	if ( "x86_64" == $mach_type ) then
-		setenv gt_cc_options_common "$gt_cc_options_common -m32"
-		if (-d /emul/ia32-linux/usr/include/) setenv gt_cc_option_I  "-I/emul/ia32-linux/usr/include/"
+		if ( "32" == $linux_build_type ) then
+			if (-d /emul/ia32-linux/usr/include/) setenv gt_cc_option_I  "-I/emul/ia32-linux/usr/include/"
+		endif
 	endif
 
 	if ( "linux" == $platform_name ) then
@@ -146,7 +152,10 @@ if ( $?gtm_version_change == "1" ) then
 	# -fno-strict-aliasing since we don't comply with the rules
 	# -ffloat-store for consistent results avoiding rounding differences
         if ( "ia64" != $mach_type ) then
-		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store -march=i686"
+		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store"
+		if ( 64 != $linux_build_type ) then
+			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -march=i686"
+		endif
 	endif
 	# -g	generate debugging information for dbx (no longer overrides -O)
 	setenv	gt_cc_option_debug	"-g"
@@ -160,26 +169,18 @@ if ( $?gtm_version_change == "1" ) then
 	# -M		generate link map onto standard output
 	setenv	gt_ld_options_common	"-Wl,-M"
 	setenv 	gt_ld_options_gtmshr	"-Wl,--version-script,gtmshr_symbols.export"
-	if ( "x86_64" == $mach_type ) then
-		setenv gt_ld_options_common "$gt_ld_options_common -m32"
-		setenv gt_ld_options_gtmshr "$gt_ld_options_gtmshr -m32"
-	endif
-
-	# need to re-define these in terms of new gt_ld_options_common:
-	setenv	gt_ld_options_bta	"$gt_ld_options_common"
-	setenv	gt_ld_options_dbg	"$gt_ld_options_common"
-	setenv	gt_ld_options_pro	"$gt_ld_options_common"
-
-
-#	setenv	gt_ld_syslibs		"-lcurses -lm -lsocket -lnsl -ldl -lposix4"
 
         if ( "ia64" == $mach_type ) then
-# Added -lelf
-        	setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl"
+		# Added -lelf
+        	setenv	gt_ld_syslibs		" -lrt -lelf -lncurses -lm -ldl"
         endif
 
         if ( "ia64" != $mach_type && "linux" == $platform_name ) then
-        	setenv  gt_ld_syslibs           "-lncurses -lm -ldl"
+		if ( "x86_64" == $mach_type && 64 == $linux_build_type ) then
+	        	setenv  gt_ld_syslibs           " -lrt -lelf -lncurses -lm -ldl"
+		else
+			setenv  gt_ld_syslibs           " -lrt -lncurses -lm -ldl"
+		endif
         endif
 
 	if ( "cygwin" == $platform_only ) then
@@ -195,19 +196,26 @@ if ( $?gtm_version_change == "1" ) then
 
 	# Shared library definition overrides:
 	setenv	gt_cc_shl_options	"-c $gt_cc_shl_fpic"
-        if ( "x86_64" == $mach_type && "linux" == $platform_name ) then
-                setenv gt_cc_shl_options "$gt_cc_shl_options -m32"
-        endif
-
 
 	setenv	gt_ld_shl_linker	"cc"
 	setenv	gt_ld_shl_options	"-shared"
-        if ( "x86_64" == $mach_type && "linux" == $platform_name ) then
-                setenv gt_ld_shl_options "$gt_ld_shl_options -m32"
+
+	# If we are trying to force a 32 bit build on a 64 bit x86 machine, then we need to explicitly specify a 32 bit
+	# over-ride option.
+        if ( "x86_64" == $mach_type && "32" == $linux_build_type ) then
+		setenv  gt_cc_options_common 	"$gt_cc_options_common -m32"
+		setenv  gt_ld_options_gtmshr	"$gt_ld_options_gtmshr -m32"
+                setenv  gt_cc_shl_options	"$gt_cc_shl_options -m32"
+                setenv  gt_ld_shl_options	"$gt_ld_shl_options -m32"
+                setenv  gt_ld_options_common	"$gt_ld_options_common -m32"
         endif
 
-	setenv	gt_ld_shl_suffix	".so"
+	# need to re-define these in terms of new gt_ld_options_common:
+	setenv	gt_ld_options_bta	"$gt_ld_options_common"
+	setenv	gt_ld_options_dbg	"$gt_ld_options_common"
+	setenv	gt_ld_options_pro	"$gt_ld_options_common"
 
+	setenv	gt_ld_shl_suffix	".so"
 
 	# lint definition overrides
 	# setenv	gt_lint_linter		""
@@ -249,10 +257,19 @@ endif
 if ( "ia64" == $mach_type ) then
 	alias	gt_as_bta	'gt_as $gt_as_option_debug $gt_as_option_nooptimize'
 	alias	gt_as_dbg	'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize'
-	alias	gt_as_pro	'gt_as $gt_as_option_optimize'
+	alias	gt_as_pro	'gt_as $gt_as_option_optimize '
 endif
 if ( "ia64" != $mach_type ) then
-	alias   gt_as_bta   'gt_as $gt_as_option_debug $gt_as_option_nooptimize --32 -o `basename \!:1 .s`.o \!:1'
-	alias gt_as_dbg 'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize --32 -o `basename \!:1 .s`.o \!:1'
-	alias   gt_as_pro   'gt_as $gt_as_option_optimize --32 -o `basename \!:1 .s`.o \!:1'
+	if ( "64" == $linux_build_type) then
+		setenv assembler_op_arch_size "--64"
+	else
+		setenv assembler_op_arch_size "--32"
+	endif
+	alias	gt_as_bta \
+		'gt_as $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
+		# Do not split alias definitions across multiple lines as tcsh will then use the last partial line
+		# as the definition. So it is ok even if the definition goes more than 132 columns (coding standard).
+	alias	gt_as_dbg	\
+		'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
+	alias   gt_as_pro	'gt_as $gt_as_option_optimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
 endif

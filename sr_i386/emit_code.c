@@ -738,7 +738,7 @@ void emit_pcrel(generic_op op, unsigned char use_reg)
 }
 
 
-GBLREF bool		run_time;
+GBLREF boolean_t	run_time;
 GBLREF int4		sa_temps_offset[];
 GBLREF int4		sa_temps[];
 LITREF int4		sa_class_sizes[];

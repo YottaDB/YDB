@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,6 @@
 #include "q_rtsib.h"
 #include "q_nxt_val_node.h"
 #include "mvalconv.h"
-#include "underr.h"
 #include "numcmp.h"
 
 GBLREF spdesc		stringpool;

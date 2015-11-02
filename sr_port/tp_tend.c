@@ -104,7 +104,7 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int4			tprestart_syslog_delta;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
-GBLREF	bool			certify_all_blocks;
+GBLREF	boolean_t		certify_all_blocks;
 GBLREF	gv_namehead		*gv_target;
 
 #ifdef UNIX
@@ -308,9 +308,9 @@ boolean_t	tp_tend()
 			 */
 			if (!csa->now_crit && !is_mm && (csa->nl->wc_in_free < si->cw_set_depth + 1)
 					&& !wcs_get_space(gv_cur_region, si->cw_set_depth + 1, NULL))
-				assert(FALSE);	/* wcs_get_space() should have returned TRUE unconditionally in this case */
+				assert(FALSE);	/* wcs_get_space should have returned TRUE unconditionally in this case */
 			if (JNL_ENABLED(csa))
-			{	/* compute the total journal record size requirements before grab_crit().
+			{	/* compute the total journal record size requirements before grab_crit.
 				 * there is code later that will check for state changes from now to then
 				 */
 				TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa);
@@ -466,7 +466,7 @@ boolean_t	tp_tend()
 							TP_TEND_CHANGE_REG(tmpsi);
 							cs_addrs->jnl_state = cs_data->jnl_state;
 							cs_addrs->jnl_before_image = cs_data->jnl_before_image;
-							/* jnl_file_lost() causes a jnl_state transition from jnl_open to jnl_closed
+							/* jnl_file_lost causes a jnl_state transition from jnl_open to jnl_closed
 							 * and additionally causes a repl_state transition from repl_open to
 							 * repl_closed all without standalone access. This means that
 							 * csa->repl_state might be repl_open while csd->repl_state might be
@@ -484,7 +484,7 @@ boolean_t	tp_tend()
 					}
 				}
 				/* Caution : since csa->backup_in_prog was initialized in op_tcommit only if si->first_cw_set was
-				 * non-NULL, it should be used in tp_tend() only within an if (NULL != si->first_cw_set)
+				 * non-NULL, it should be used in tp_tend only within an if (NULL != si->first_cw_set)
 				 */
 				if ((NULL != first_cw_set) && (csa->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb)))
 				{
@@ -547,10 +547,10 @@ boolean_t	tp_tend()
 					 * journal records (if it decides to switch to a new journal file).
 					 */
 					ADJUST_GBL_JREC_TIME(jgbl, jbp);
-					/* Note that jnl_ensure_open() can call cre_jnl_file() which in turn assumes
-					 * jgbl.gbl_jrec_time is set. Also jnl_file_extend() can call jnl_write_epoch_rec()
+					/* Note that jnl_ensure_open can call cre_jnl_file which in turn assumes
+					 * jgbl.gbl_jrec_time is set. Also jnl_file_extend can call jnl_write_epoch_rec
 					 * which in turn assumes jgbl.gbl_jrec_time is set. In case of forw-phase-recovery,
-					 * mur_output_record() would have already set this.
+					 * mur_output_record would have already set this.
 					 */
 					assert(jgbl.gbl_jrec_time);
 					jnl_status = jnl_ensure_open();
@@ -627,7 +627,7 @@ boolean_t	tp_tend()
 						if (t1->tn <= bt->tn)
 						{
 							cse = t1->ptr;
-							assert(!cse || !cse->high_tlevel && cse->blk_target == t1->blk_target);
+							assert(!cse || !cse->high_tlevel);
 							assert(CDB_STAGNATE > t_tries);
 							/* "indexmods" and "leafmods" are to monitor number of blocks that used
 							 * indexmod and noisolation optimizations respectively. Note that once
@@ -662,7 +662,8 @@ boolean_t	tp_tend()
 									assert(cse->write_type || cse->recompute_list_head);
 									leafmods++;
 									if (indexmods || cse->write_type
-										   || cdb_sc_normal != recompute_upd_array(t1, cse))
+											|| (cdb_sc_normal !=
+												recompute_upd_array(t1, cse)))
 										status = cdb_sc_blkmod;
 								}
 							}
@@ -762,7 +763,7 @@ boolean_t	tp_tend()
 						 *	b) AND the block is not in cache
 						 *	c) AND we don't have before-image-journaling
 						 *	d) AND online backup is not running.
-						 * In this case bg_update will do a db_csh_getn() and appropriately set in_cw_set
+						 * In this case bg_update will do a db_csh_getn and appropriately set in_cw_set
 						 * field to be TRUE so we shouldn't be manipulating those fields in that case.
 						 */
 						if (cr)
@@ -780,6 +781,17 @@ boolean_t	tp_tend()
 			DEBUG_ONLY(
 				if (cdb_sc_normal != status)
 					goto failed;
+				else
+				{	/* Now that we have successfully validated all histories, check that there is no
+					 * gv_target mismatch between history and corresponding cse.
+					 */
+					for (t1 = si->first_tp_hist;  t1 != si->last_tp_hist; t1++)
+					{
+						cse = t1->ptr;
+						if (NULL != cse)
+							assert(t1->blk_target == cse->blk_target);
+					}
+				}
 			)
 			if (DIVIDE_ROUND_UP(si->num_of_blks, 4) < leafmods)	/* if status == cdb_sc_normal, then leafmods  */
 			{
@@ -884,7 +896,7 @@ boolean_t	tp_tend()
 			si->backup_block_saved = FALSE;
 			jbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 			/* Caution : since csa->backup_in_prog was initialized in op_tcommit only if si->first_cw_set was
-			 * non-NULL, it should be used in tp_tend() only within an if (NULL != si->first_cw_set)
+			 * non-NULL, it should be used in tp_tend only within an if (NULL != si->first_cw_set)
 			 */
 			if (!is_mm && ((NULL != jbp) || csa->backup_in_prog))
 			{
@@ -1019,8 +1031,8 @@ boolean_t	tp_tend()
 	 *
 	 * If journal and database updates are done together region by region, there is a problem in that if an error
 	 * occurs after one region's updates are committed (to jnl and db) or if the process gets STOP/IDed in VMS,
-	 * secshr_db_clnup() should then commit BOTH the journal and database updates of the remaining regions.
-	 * committing journal updates is not trivial in secshr_db_clnup() since it can also be invoked as a user termination
+	 * secshr_db_clnup should then commit BOTH the journal and database updates of the remaining regions.
+	 * committing journal updates is not trivial in secshr_db_clnup since it can also be invoked as a user termination
 	 * handler in VMS in which case it cannot do any I/O.
 	 *
 	 * We therefore take approach (b) below. Write journal records for all regions in one loop. Write database updates
@@ -1029,7 +1041,7 @@ boolean_t	tp_tend()
 	 * that currently the journal buffers are not rolled back to undo the write of journal records but currently
 	 * MUPIP RECOVER knows to handle such records and TR C9905-001072 exists to make the source-server handle such records).
 	 * If any error occurs (or if the process gets STOP/IDed in VMS) while we are committing database updates,
-	 * secshr_db_clnup() will be invoked and will complete the updates for this TP transaction.
+	 * secshr_db_clnup will be invoked and will complete the updates for this TP transaction.
 	 */
 	/* the following section writes journal records in all regions */
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
@@ -1171,7 +1183,7 @@ boolean_t	tp_tend()
 		gv_cur_region = jpc->region;
 		cs_addrs = csa;
 		cs_data = csa->hdr;
-		/* Note tcom_record.jnl_tid was set in op_tstart() or updproc() */
+		/* Note tcom_record.jnl_tid was set in op_tstart or updproc */
 		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_TCOM, (jnl_record *)&tcom_record, NULL, NULL);
 	}
 	/* Ensure jgbl.gbl_jrec_time did not get reset by any of the jnl writing functions */
@@ -1217,9 +1229,7 @@ boolean_t	tp_tend()
 							assert(!is_mm);
 							rc_cpt_entry(cse->blk);
 						}
-						status = is_mm
-							? mm_update(cse, NULL, ctn, ctn, si)
-							: bg_update(cse, NULL, ctn, ctn, si);
+						status = is_mm ? mm_update(cse, ctn, ctn, si) : bg_update(cse, ctn, ctn, si);
 						if (cdb_sc_normal != status)
 						{	/* the database is probably in trouble */
 							assert(gtm_white_box_test_case_enabled);
@@ -1303,7 +1313,7 @@ boolean_t	tp_tend()
 		 */
 		SHM_WRITE_MEMORY_BARRIER;
 		jpl->write = tjpl->write;
-		/* jpl->write_addr should be updated before updating jpl->jnl_seqno as secshr_db_clnup() relies on this */
+		/* jpl->write_addr should be updated before updating jpl->jnl_seqno as secshr_db_clnup relies on this */
 		QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
 		QWASSIGN(jpl->jnl_seqno, tjpl->jnl_seqno);			/* End atomic stmnts */
 		assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
@@ -1584,7 +1594,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse)
  */
 boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 {
-	bool			blk_used;
+	boolean_t		blk_used;
 	block_id_ptr_t		b_ptr;
 	block_id		bml, free_bit;
 	cache_rec_ptr_t		cr;
@@ -1663,7 +1673,7 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 			assert(gds_t_acquired == cse->mode);
  			assert(GDSVCURR == cse->ondsk_blkver);
 		} else
-		{	/* in MM, although mm_update() does not use cse->old_block, tp_tend uses it to write before-images.
+		{	/* in MM, although mm_update does not use cse->old_block, tp_tend uses it to write before-images.
 			 * therefore, fix it to point to the reallocated block's buffer address
 			 */
 			cse->old_block = t_qread(cse->blk, (sm_int_ptr_t)&cse->cycle, &cse->cr);

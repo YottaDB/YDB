@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@ void iosocket_flush(io_desc *iod)
                 errlen = strlen(errptr);
                 iod->dollar.za = 9;
                 memcpy(dsocketptr->dollar_device, "1,", sizeof("1,") - 1);
-                memcpy(&dsocketptr->dollar_device[sizeof("1,") - 1], errptr, errlen);
+                memcpy(&dsocketptr->dollar_device[sizeof("1,") - 1], errptr, errlen + 1);	/* we want the null */
 		if (socketptr->ioerror)
 			rts_error(VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
 		return;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,10 +64,10 @@ void gvzwr_var(uint4 data, int4 n)
 	{
 		mval2subsc(zwr_sub->subsc_list[n].first, gv_currkey);
 		op_gvdata(&subdata);
-		if (MV_FORCE_INT(&subdata) && ((10 != (int4)MV_FORCE_INT(&subdata)) || n < gvzwrite_block.subsc_count - 1))
+		if (MV_FORCE_INTD(&subdata) && ((10 != (int4)MV_FORCE_INTD(&subdata)) || n < gvzwrite_block.subsc_count - 1))
 		{
 			save_gv_curr_subsc_null = gv_curr_subsc_null;
-			gvzwr_var((int4)MV_FORCE_INT(&subdata), n + 1);
+			gvzwr_var((int4)MV_FORCE_INTD(&subdata), n + 1);
 			gv_curr_subsc_null = save_gv_curr_subsc_null;
 		} else if (gvzwrite_block.fixed)
 			sgnl_gvundef();
@@ -99,7 +99,7 @@ void gvzwr_var(uint4 data, int4 n)
 						seen_null = 1;			/* set flag to indicate processing null sub */
 						op_gvnaked(VARLSTCNT(1) &mv);
 						op_gvdata(&subdata);
-						if (!MV_FORCE_INT(&subdata))
+						if (!MV_FORCE_INTD(&subdata))
 							loop_condition = 0;
 					}
 				} else
@@ -122,14 +122,14 @@ void gvzwr_var(uint4 data, int4 n)
 				} else
 				{
 					op_gvdata(&subdata);
-					if (MV_FORCE_INT(&subdata))
+					if (MV_FORCE_INTD(&subdata))
 						seen_null = 1;
 				}
 			}
 		}
 		while (loop_condition)
 		{
-			do_lev = (MV_FORCE_INT(&subdata) ? TRUE : FALSE);
+			do_lev = (MV_FORCE_INTD(&subdata) ? TRUE : FALSE);
 			if (n < gvzwrite_block.subsc_count)
 			{
 				if (ZWRITE_PATTERN == zwr_sub->subsc_list[n].subsc_type)
@@ -184,7 +184,7 @@ void gvzwr_var(uint4 data, int4 n)
 				end1 = gv_currkey->end;
 				prev1 = gv_currkey->prev;
                                 save_gv_curr_subsc_null = gv_curr_subsc_null;
-				gvzwr_var((int4)MV_FORCE_INT(&subdata), n + 1);
+				gvzwr_var((int4)MV_FORCE_INTD(&subdata), n + 1);
                                 gv_curr_subsc_null = save_gv_curr_subsc_null;
 				gv_currkey->end = end1;
 				gv_currkey->prev = prev1;
@@ -209,7 +209,7 @@ void gvzwr_var(uint4 data, int4 n)
 					seen_null = 1;			/* set flag to indicate processing null sub */
 					op_gvnaked(VARLSTCNT(1) &mv);
 					op_gvdata(&subdata);
-					if (!MV_FORCE_INT(&subdata))
+					if (!MV_FORCE_INTD(&subdata))
 						break;
 				}
 			} else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ void op_indtext(mval *lab, mint offset, mval *rtn, mval *dst)
 	stringpool.free += lab->str.len;
 	*stringpool.free++ = '+';
 	MV_FORCE_MVAL(&mv_off, offset);
-	MV_FORCE_STR(&mv_off); /* goes at stringpool.free. we already made enough space in the stp_gcol() call */
+	MV_FORCE_STRD(&mv_off); /* goes at stringpool.free. we already made enough space in the stp_gcol() call */
 	*stringpool.free++ = '^';
 	memcpy(stringpool.free, rtn->str.addr, rtn->str.len);
 	stringpool.free += rtn->str.len;

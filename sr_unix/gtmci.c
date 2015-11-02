@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -351,15 +351,13 @@ int gtm_ci (const char *c_rtn_name, ...)
 					*va_arg(var, gtm_double_t *) = mval2double(arg_ptr); break;
 				case xc_char_star:
 					xc_char_ptr = va_arg(var, gtm_char_t *);
-					if (!MV_IS_STRING(arg_ptr))
-						MV_FORCE_STR(arg_ptr);
+					MV_FORCE_STR(arg_ptr);
 					memcpy(xc_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
 					xc_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
 					break;
 				case xc_string_star:
 					mstr_parm = va_arg(var, gtm_string_t *);
-					if (!MV_IS_STRING(arg_ptr));
-						MV_FORCE_STR(arg_ptr);
+					MV_FORCE_STR(arg_ptr);
 					mstr_parm->length = arg_ptr->str.len;
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
 					break;

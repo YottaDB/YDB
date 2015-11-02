@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,7 +131,7 @@ LITDEF unsigned char mvs_size[] =
 	};
 
 static readonly unsigned char localpool[3] = {'1' , '1' , '0'};
-LITDEF mval literal_null 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX , 0 , 0 , 0 ,  0  , 0 , 0 );
+LITDEF mval literal_null 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_UTF_LEN, 0, 0, 0,  0, 0, 0);
 LITDEF mval literal_zero 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0 , 0 , 1 , (char *) &localpool[2] , 0 , 0 );
 LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0 , 0 , 1 , (char *) &localpool[1] , 0 ,  1000 );
 LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0 , 0 , 2 , (char *) &localpool[1] , 0 , 10000 );

@@ -27,6 +27,7 @@
 #include "inst_flush.h"
 #include "private_code_copy.h"
 #include "iosp.h"
+#include "gtm_text_alloc.h"
 
 #ifdef __ia64
 #include "ia64.h"
@@ -152,34 +153,36 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 				tmp_xf_code = (z_ptr->m_opcode & ZB_CODE_MASK) >> ZB_CODE_SHIFT;
 #else
 				ia64_fmt_A4 inst;
-				/*Revist when instruction bundling implemented.*/
+				/* Revist when instruction bundling implemented. */
 				EXTRACT_INST(addr, inst, 3);
 				z_ptr->m_opcode = ASSEMBLE_14(inst);
 				tmp_xf_code = (z_ptr->m_opcode & ZB_CODE_MASK) >> ZB_CODE_SHIFT;
 #endif /* __ia64*/
 				if (xf_linefetch * sizeof(UINTPTR_T) == tmp_xf_code)
 #ifndef __ia64
-					*addr = (*addr & (~ZB_CODE_MASK)) | ((xf_zbfetch * sizeof(int4)) << ZB_CODE_SHIFT);
+					*addr = (*addr & (zb_code)(~ZB_CODE_MASK)) |
+						((xf_zbfetch * sizeof(UINTPTR_T)) << ZB_CODE_SHIFT);
 #else
 				{
 					zb_code imm14 = xf_zbfetch * sizeof(UINTPTR_T);
 					inst.format.imm7b=imm14;
 					inst.format.imm6d=imm14 >> 7;
 					inst.format.sb=imm14 >> 13;
-					/*Revist when instruction bundling implemented.*/
+					/* Revist when instruction bundling implemented. */
 					UPDATE_INST(addr, inst, 3);
 				}
 #endif
 				else if (xf_linestart * sizeof(UINTPTR_T) == tmp_xf_code)
 #ifndef __ia64
-					*addr = (*addr & (~ZB_CODE_MASK)) | ((xf_zbstart * sizeof(int4)) << ZB_CODE_SHIFT);
+					*addr = (*addr & (zb_code)(~ZB_CODE_MASK)) |
+						((xf_zbstart * sizeof(UINTPTR_T)) << ZB_CODE_SHIFT);
 #else
 				{
 					zb_code imm14 = xf_zbstart * sizeof(UINTPTR_T);
 					inst.format.imm7b=imm14;
 					inst.format.imm6d=imm14 >> 7;
 					inst.format.sb=imm14 >> 13;
-					/*Revist when instruction bundling implemented.*/
+					/* Revist when instruction bundling implemented. */
 					UPDATE_INST(addr, inst, 3);
 				}
 #endif
@@ -207,7 +210,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 				{	/* new action is different one, this is not in stack and no zbreak points to this */
 					deleted = delete_hashtab_objcode(&cache_table, &z_ptr->action->src);
 					assert(deleted);
-					free(z_ptr->action);
+					GTM_TEXT_FREE(z_ptr->action);
 				}
 			}
 			z_ptr->action = csp;

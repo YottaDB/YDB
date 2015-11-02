@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 
 GBLREF	sgmnt_addrs 	*cs_addrs;
 GBLREF	unsigned char	rdfail_detail;
-GBLREF	bool		run_time;
+GBLREF	boolean_t	run_time;
 
 sm_uc_ptr_t mm_read(block_id blk)
 {

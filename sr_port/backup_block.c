@@ -39,17 +39,19 @@ boolean_t backup_block(block_id blk, cache_rec_ptr_t backup_cr, sm_uc_ptr_t back
 	int4			required;
 	shmpool_buff_hdr_ptr_t	sbufh_p;
 	shmpool_blk_hdr_ptr_t	sblkh_p;
-	boolean_t		ret = TRUE;
-
+	boolean_t		ret = TRUE, is_bg;
 
 	/* assuring crit, so only one instance of this module could be running at any time */
 	assert(cs_addrs->now_crit);
+	is_bg = (dba_bg == cs_data->acc_meth);
+	assert(is_bg || (dba_mm == cs_data->acc_meth));
 	/* Should have EITHER backup cr (BG mode) or buffer pointer (MM mode) */
-	assert((dba_bg == cs_data->acc_meth && NULL != backup_cr && NULL == backup_blk_p) ||
-	       (dba_mm == cs_data->acc_meth && NULL == backup_cr && NULL != backup_blk_p));
-	if (dba_bg == cs_data->acc_meth)
+	assert((is_bg && (NULL != backup_cr) && (NULL == backup_blk_p)) ||
+	       (!is_bg && (NULL == backup_cr) && (NULL != backup_blk_p)));
+	if (is_bg)
 	{	/* Get buffer address from the cache record */
 		VMS_ONLY(assert(0 == backup_cr->shmpool_blk_off));
+		assert(backup_cr->in_cw_set);	/* ensure the buffer has been pinned (from preemption in db_csh_getn) */
 		backup_blk_p = GDS_REL2ABS(backup_cr->buffaddr);
 	}
 	bsiz = ((blk_hdr_ptr_t)(backup_blk_p))->bsiz;
@@ -63,19 +65,17 @@ boolean_t backup_block(block_id blk, cache_rec_ptr_t backup_cr, sm_uc_ptr_t back
 
 	/* Fill the block we have been assigned in before marking it valid */
 	sblkh_p->blkid = blk;
-	if (dba_bg == cs_data->acc_meth)
+	if (is_bg)
 	{
 		assert(NULL != backup_cr);
 		sblkh_p->use.bkup.ondsk_blkver = backup_cr->ondsk_blkver;
-	} else DEBUG_ONLY(if (dba_mm == cs_data->acc_meth))
-	        /* For MM version, no dynamic conversions take place so just record block as we know it is */
+	} else /* For MM version, no dynamic conversions take place so just record block as we know it is */
 		sblkh_p->use.bkup.ondsk_blkver = cs_data->desired_db_format;
-	DEBUG_ONLY(else assert(FALSE));
 	/* Copy blokc information to data portion of shmpool block just following header */
 	memcpy((sblkh_p + 1), backup_blk_p, bsiz);
 	/* Need a write coherency fence here as we want to make sure the above info is stored and
-	   reflected to other processors before we mark the block valid.
-	*/
+	 * reflected to other processors before we mark the block valid.
+	 */
 	SHM_WRITE_MEMORY_BARRIER;
 	sblkh_p->valid_data = TRUE;
 	/* And another write barrier to advertise its cleanliness to other processors */

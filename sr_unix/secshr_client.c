@@ -151,6 +151,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	gtmsecshr_mesg		mesg;
 	TID			timer_id;
 	int4			msec_timeout;
+	char			*gtm_tmp_ptr;
 
 	error_def(ERR_GTMSECSHR);
 	error_def(ERR_GTMSECSHRSTART);
@@ -161,6 +162,8 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	error_def(ERR_GTMSECSHRPERM);
 	error_def(ERR_TEXT);
 	error_def(ERR_SYSCALL);
+	error_def(ERR_GTMSECSHRTMPPATH);
+
 	timer_id = (TID)send_mesg2gtmsecshr;
 
 	if (!gtmsecshr_file_check_done)
@@ -241,6 +244,12 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 #endif
 					send_msg(VARLSTCNT(10) ERR_GTMSECSHRSRVF, 3, RTS_ERROR_TEXT("Client"), process_id,
 							ERR_TEXT, 2, RTS_ERROR_TEXT("sendto to gtmsecshr failed"), save_errno);
+					/* if gtm_tmp is not defined, show default path */
+					if (gtm_tmp_ptr = GETENV("gtm_tmp"))
+						send_msg(VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT(gtm_tmp_ptr),
+							ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
+					else
+						send_msg(VARLSTCNT(4) ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));
 					START_SERVER;
 				}
 				loop_count++;

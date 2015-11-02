@@ -19,7 +19,7 @@
 /* Returns the location of the first set bit in the field.	*/
 /* The search starts at the hint and does not wrap 		*/
 
-int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, bool *used)
+int4 bm_find_blk(int4 hint, sm_uc_ptr_t base_addr, int4 total_bits, boolean_t *used)
 {
 	int4		bits;
 	sm_uc_ptr_t 	ptr, top;

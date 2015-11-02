@@ -34,13 +34,23 @@ void	emit_call_xfer(int xfer);
 int	get_arg_reg(void);
 int	gtm_reg(int vax_reg);
 
+#ifdef __x86_64__
+#define NUM_BUFFERRED_INSTRUCTIONS 100
+#define CODE_TYPE char
+#else /* ! __x86_64__ */
 #define NUM_BUFFERRED_INSTRUCTIONS 25
+#ifdef __ia64
+#define CODE_TYPE ia64_bundle
+#else
+#define CODE_TYPE uint4
+#endif /* __ia64 */
+#endif /* __x86_64__ */
 #define ASM_OUT_BUFF 	256
 #define PUSH_LIST_SIZE	500
 
 #if defined(__vms) || defined(_AIX) || defined(__hpux) || (defined(__linux__) && defined(__ia64))
 #  define TRUTH_IN_REG
-#elif defined(__osf__)
+#elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__))
 #  undef TRUTH_IN_REG
 #else
 # error UNSUPPORTED PLATFORM

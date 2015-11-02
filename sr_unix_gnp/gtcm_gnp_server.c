@@ -112,9 +112,9 @@ GBLDEF char			gtcm_gnp_server_log[MAX_FN_LEN + 1];
 GBLDEF int			gtcm_gnp_log_path_len;
 
 GBLREF FILE			*gtcm_errfs;
-GBLREF bool			certify_all_blocks;
+GBLREF boolean_t		certify_all_blocks;
 GBLREF bool			licensed;
-GBLREF bool			run_time;
+GBLREF boolean_t		run_time;
 GBLREF boolean_t		gtcm_connection;
 GBLREF uint4			process_id;
 GBLREF cm_lckblkreg		*blkdlist;

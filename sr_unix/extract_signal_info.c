@@ -64,7 +64,7 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 
 	memset(gtmsi, 0, sizeof(*gtmsi));
 	gtmsi->signal = sig;
-#if !(defined(_AIX) || defined(Linux390))
+#if (!defined(Linux390))
 	if (NULL != info)
 	{
 		switch(info->si_code)
@@ -119,8 +119,13 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 #    elif defined(__i386)
 #      ifndef REG_EIP
 #        define REG_EIP EIP
-#      endif
 					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_EIP];
+#      endif
+#    elif defined(__x86_64__)
+#      ifndef REG_RIP
+#        define REG_RIP EIP
+                                        gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_RIP];
+#      endif
 #    else
 #      error "Unsupported Linux Platform"
 #    endif
@@ -145,6 +150,16 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 #  elif defined(__MVS__)	/* not much info available */
 				gtmsi->int_iadr = info->si_addr;
 				gtmsi->infotype |= GTMSIGINFO_ILOC;
+				break;
+#  elif defined(_AIX)
+				gtmsi->subcode = info->si_code;
+				gtmsi->bad_vadr = info->si_addr;
+				gtmsi->infotype |= GTMSIGINFO_BADR;
+				if (context != NULL)
+				{
+					gtmsi->int_iadr = (caddr_t)context->sc_context.iar;
+					gtmsi->infotype |= GTMSIGINFO_ILOC;
+				}
 				break;
 #  else
 #  error "Unsupported Platform"
@@ -220,17 +235,6 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 			}
 		}
 #  endif /* Attempt to glean more info from subcode */
-	}
-#elif defined(_AIX)
-	/* Aix only returns context information through Aix 4.3.3. Will need to look at
-	   slightly different structures if running in 64 bit. */
-	if (NULL != context)
-	{
-		gtmsi->bad_vadr = (caddr_t)context->sc_jmpbuf.jmp_context.o_vaddr;
-		gtmsi->int_iadr = (caddr_t)context->sc_jmpbuf.jmp_context.iar;
-		gtmsi->infotype |= GTMSIGINFO_ILOC;
-		if (NULL != gtmsi->bad_vadr)
-			gtmsi->infotype |= GTMSIGINFO_BADR;
 	}
 #elif defined(Linux390)
 	/* Linux as of when the Linux390 port was done did not yet support returning signal information properly

@@ -70,7 +70,7 @@ LITREF	boolean_t		jrt_is_replicated[JRT_RECTYPES];
 /* This routine is called only for recover and rollback (that is, mur_options.update).
  * It applies the set/kill/zkill, tcom, inctn, and aimg records during forward processing.
  * Some fields like jnl_seqno, rec_seqno and prefix.time are saved here from original journal files.
- * Later jnl_write routines copies them to journal records instead of generating them like run_time system */
+ * Later jnl_write routines copies them to journal records instead of generating them like the runtime system */
 uint4	mur_output_record()
 {
 	mval			mv;

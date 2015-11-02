@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,12 +22,12 @@
 #include "cdbg_dump.h"
 #include "gtmdbglvl.h"
 
-GBLREF int4	source_error_found;
-GBLREF bool	run_time;
-GBLREF triple	t_orig;
-GBLREF mlabel	*mlabtab;
+GBLREF int4		source_error_found;
+GBLREF boolean_t	run_time;
+GBLREF triple		t_orig;
+GBLREF mlabel		*mlabtab;
 GBLREF command_qualifier cmd_qlf;
-GBLREF uint4	gtmDebugLevel;
+GBLREF uint4		gtmDebugLevel;
 
 int resolve_ref(int errknt)
 {

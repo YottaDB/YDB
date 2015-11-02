@@ -21,14 +21,21 @@ LOAD
 	i debug u @useio
 ; header
 	s label=$ze(rec,1,12)
+	set v532=0
+	i (gtm64="true"),(label="GTCGBLDIR008")!(label="GTCGBDUNX005") s label=hdrlab,v532=1,update=1	;autoconvert
+	i (v532=1),($p($zver," ",4)'="IA64") n gtm64 s gtm64="false"
+	i (v532=1),($p($zver," ",4)'="IA64") n SIZEOF d v532init
 	set v5ft1=0
 	i (label="GTCGBLDIR008")!(label="GTCGBDUNX004") s label=hdrlab,v5ft1=1,update=1			;autoconvert
+	i v5ft1=1 n gtm64 s gtm64="false"
 	i v5ft1=1 n SIZEOF d v5ft1init
 	set v44=0
 	i (label="GTCGBLDIR007")!(label="GTCGBDUNX003") s label=hdrlab,v44=1,update=1			;autoconvert
+	i v44=1 n gtm64 s gtm64="false"
 	i v44=1 n MAXNAMLN,MAXSEGLN,MAXREGLN,SIZEOF d v44init
 	s v30=0
 	i (label="GTCGBLDIR006")!(label="GTCGBDUNX002") s label=hdrlab,v30=4,update=1			;autoconvert
+	i v30=4 n gtm64 s gtm64="false"
 	i label'=hdrlab d cretmps,CONVERT^GDEOGET,verify s update=1 q					;autoconvert
 	s filesize=$$bin2num($ze(rec,13,16))
 	s abs=abs+SIZEOF("gd_header")
@@ -361,5 +368,22 @@ v5ft1init:
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767
 	i ver'="VMS" s SIZEOF("blk_hdr")=8
+	e  s SIZEOF("blk_hdr")=7
+	q
+v532init:
+	s SIZEOF("am_offset")=324
+	s SIZEOF("file_spec")=256
+	s SIZEOF("gd_header")=16
+	s SIZEOF("gd_contents")=44
+	s SIZEOF("gd_map")=36
+	s SIZEOF("gd_region")=332
+	s SIZEOF("gd_segment")=336
+	s SIZEOF("mident")=32
+	s SIZEOF("rec_hdr")=3
+	s SIZEOF("dsk_blk")=512
+	s SIZEOF("max_str")=32767
+	;s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32
+	;s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+	i ver'="VMS" s SIZEOF("blk_hdr")=16
 	e  s SIZEOF("blk_hdr")=7
 	q

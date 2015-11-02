@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "hashtab.h"
 #include "hashtab_objcode.h"
 #include "cachectl.h"
+#include "gtm_text_alloc.h"
 
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
@@ -32,7 +33,7 @@ void cache_table_rebuild()
 			{
 				((ihdtyp *)(csp->obj.addr))->indce = NULL;
 				indir_cache_mem_size -= (ICACHE_SIZE + csp->obj.len);
-				free(csp);
+				GTM_TEXT_FREE(csp);
 				DELETE_HTENT((&cache_table), tabent);
 			}
 		}

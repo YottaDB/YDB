@@ -23,9 +23,9 @@
  * Note: dummy parameter is for calling compatibility.
  * ------------------------------------------------------------------
  */
-GBLREF xfer_entry_t     xfer_table[];
-GBLREF volatile int4	outofband,ctrap_action_is;
-GBLREF volatile bool	run_time;
+GBLREF xfer_entry_t		xfer_table[];
+GBLREF volatile int4		outofband,ctrap_action_is;
+GBLREF volatile boolean_t	run_time;
 
 void ctrly_set(int4 dummy_param)
 {
@@ -33,8 +33,7 @@ void ctrly_set(int4 dummy_param)
 	if (!run_time)
 	{	outofband = ctrly;
 		outofband_clear();
-	}
-	else
+	} else
 	{
 		ctrap_action_is = 0;
 		outofband = ctrly;

@@ -1285,6 +1285,7 @@ RLBKNOBIMG	<ROLLBACK cannot proceed as database !AD has NOBEFORE_IMAGE journalin
 RLBKJNLNOBIMG	<Journal file !AD has NOBEFORE_IMAGE journaling>/info/fao=2!/ansi=0
 RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and journal files will not be modified)>/info/fao=0!/ansi=0
 KILLBYSIGSINFO3	<!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XL>/fatal/fao=5!/ansi=0
+GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

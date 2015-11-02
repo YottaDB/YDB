@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc #
+#	Copyright 2001, 2008 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -8,7 +8,8 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-# This script must be run with shell, not Cshell
+# This script must be run with shell, not Cshell, and it must be a standard compliant sh.
+# On Solaris this is in /usr/xpg4/bin/sh.
 
 . ./arch.gtc
 
@@ -20,6 +21,10 @@ elif [ $arch = "linux" ]; then
 else
 	echo=/bin/echo
 fi
+
+# add path to strip for solaris
+PATH="$PATH:/usr/ccs/bin"
+export PATH
 
 # Options to ps
 psopts="-ea"
@@ -38,7 +43,7 @@ else
 fi
 
 # Native shared library extension.
-if [ $arch = "hp" ]; then
+if [ $arch = "hp" -a `uname -m` != "ia64" ]; then
 	ext=".sl"
 else
 	ext=".so"
@@ -154,21 +159,38 @@ $echo ""
 
 # Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
 
-if [ -e "utf8" ]; then
+if [ -d "utf8" ]; then
 	# If package has utf8 directory, see if system has libicu and locale
 	# Setup library path (in prep for looking for libicu)
-	if [ $arch = "ibm" ] ; then
-		library_path="/usr/local/lib"
+	is64bit_gtm=`file mumps | grep 64-bit | wc -l`
+	if [ $is64bit_gtm -eq 1 ] ; then
+		library_path="/usr/local/lib64 /usr/local/lib /usr/lib /usr/lib32"
 	else
 		library_path="/usr/local/lib /usr/lib /usr/lib32"
 	fi
 	# Look for libicu
 	for libpath in $library_path
 	do
-		if [ -e $libpath ]; then
-			found_icu=`\ls -1 $libpath |grep "libicu.*36.*" | wc -l`
+		if [ -d $libpath ]; then
+			found_icu=`\ls -1 $libpath/libicu*36* | wc -l`
 			if [ "$found_icu" -ne 0 ] ; then
-				break
+				# Determine if they are the right 64/32 bit libraries
+				if [ $arch = "ibm" ] ; then
+					is64bit_icu=`nm -X64 $libpath/libicu*36* | head -1 | wc -l`
+				elif [ $arch = "linux" ] ; then
+					is64bit_icu=`file $libpath/libicu*36* | grep 64-bit | wc -l`
+				fi
+
+				if [ \( "$is64bit_gtm" -eq 1 \) -a \( "$is64bit_icu" -ne 0 \) ] ; then
+					save_icu_libpath=$libpath
+					break
+				elif [ \( "$is64bit_gtm" -ne 1 \) -a \( "$is64bit_icu" -eq 0 \) ] ; then
+					save_icu_libpath=$libpath
+					break
+				else
+					found_icu=0
+				fi
+
 			fi
 		fi
 	done
@@ -205,14 +227,14 @@ done
 rm sedin$$
 
 if [ "$doutf8" -ne 0 ]; then
-	if [ ! -e $gtmdist/utf8 ]; then
+	if [ ! -d $gtmdist/utf8 ]; then
 		mkdir $gtmdist/utf8
 	fi
 fi
 
 # Install COPYING if it is applicable
 file=COPYING
-if [ -e $file ]; then
+if [ -f $file ]; then
 	cp $file $gtmdist
 	if [ "$doutf8" -ne 0 ]; then
 		ln -s ../$file $gtmdist/utf8/$file
@@ -267,6 +289,7 @@ elif [ -x /usr/sbin/install ]; then
 else
 	install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
 fi
+
 strip $gtmdist/gtmsecshr > /dev/null 2>&1
 
 # Install other individual files
@@ -282,7 +305,7 @@ fi
 # For linux systems, attempt to execute the chcon command to allow use of the libgtmshr shared library. This
 # command is required on many modern SELinux based systems but depends on the filesystem in use (requires context
 # support). For that reason, we attempt the command and if it works, great. If it doesn't, oh well we tried.
-if [ -e /usr/bin/chcon ]; then
+if [ -f /usr/bin/chcon ]; then
 	chcon -t texrel_shlib_t $gtmdist/libgtmshr$ext > /dev/null 2>&1
 fi
 
@@ -304,10 +327,10 @@ if [ "$doutf8" -ne 0 ]; then
 			cp $file $gtmdist/utf8
 		else
 			# Soft link everything else
-			if [ -e $gtmdist/utf8/$file ]; then
+			if [ -f $gtmdist/utf8/$file ]; then
 				rm -f $gtmdist/utf8/$file
 			fi
-			if [ -e $gtmdist/$file ]; then
+			if [ -f $gtmdist/$file ]; then
 				ln -s ../$file $gtmdist/utf8/$file
 			fi
 		fi
@@ -359,9 +382,9 @@ if [ "$doutf8" -ne 0 ]; then
 	gtm_chset="UTF-8"
 	export gtm_chset
 	if [ $arch = "ibm" ]; then
-		export LIBPATH=/usr/local/lib/
+		export LIBPATH=$save_icu_libpath
 	else
-		export LD_LIBRARY_PATH=/usr/local/lib/:/usr/lib
+		export LD_LIBRARY_PATH=$save_icu_libpath
 	fi
 	(export gtm_dist=$gtmdist/utf8; cd $gtm_dist; ./mumps -nowarning *.m)
 	gtm_chset="M"
@@ -412,11 +435,6 @@ Change -region DEFAULT	-record=1020	-key=255
 Exit
 GDE.in2
 
-# Create the dump file for ZHELP
-
-touch $gtmdist/gtmhelp.dmp
-chmod a+rw $gtmdist/gtmhelp.dmp
-
 other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHELP.o GTMHLPLD.o LOAD.o LOADOP.o"
 other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o"
 csh_script_files="lowerc.csh lowerc_cp.csh upperc.csh upperc_cp.csh"
@@ -428,7 +446,7 @@ chmod 0444 $gtmdist/*.gld
 # $other_object_files, $csh_script_files should be removed unconditionally
 \rm -rf $other_object_files $csh_script_files
 
-if [ -e utf8 ]; then
+if [ -d utf8 ]; then
 	cd utf8
 	\rm -rf $other_object_files $csh_script_files
 	cd ..
@@ -439,11 +457,18 @@ $echo "Installation completed. Would you like all the temporary files"
 $echo "removed from this directory? (y or n) \c"
 read resp
 
+# leave nothing writeable
+chmod a-w $gtmdist
+chmod a-w $gtmdist/*
+if [ -d $gtmdist/utf8 ]; then
+	chmod a-w $gtmdist/utf8/*
+fi
+
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
 		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING
-	if [ -e utf8 ]; then
+	if [ -d utf8 ]; then
 		cd utf8
 		\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 			*.gtc gtm* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \

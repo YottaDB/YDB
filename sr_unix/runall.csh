@@ -302,8 +302,8 @@ if (!(-z ${TMP_DIR}_inc_files)) then
 	popd >& /dev/null
 endif
 
-# For ia64, the file - xfer_desc.i - needs to be generated.
-if ( "ia64" == $mach_type ) then
+# For ia64 & x86_64, the file - xfer_desc.i - needs to be generated.
+if ( "ia64" == $mach_type || "x86_64" == $mach_type ) then
         pushd $gtm_src
         tcsh $gtm_tools/gen_xfer_desc.csh
         popd

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,15 +70,15 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				temp_mval.str.addr = (char *)outptr;
 				temp_mval.str.len = INTCAST(outtop - outptr);
 				s2n(&temp_mval);
-				time = MV_FORCE_INT(&temp_mval);
+				time = MV_FORCE_INTD(&temp_mval);
 				if (time < 0) time = 0;
 				break;
 			}
 		}
 	}
-	date = (int)MV_FORCE_INT(src);
+	date = (int)MV_FORCE_INTD(src);
 	date += 365;
-	if ((date < 0) || ((src->mvtype &MV_STR) && (0 == MV_FORCE_INT(src))))
+	if ((date < 0) || ((src->mvtype &MV_STR) && (0 == MV_FORCE_INTD(src))))
 		date = 0;
 	dow = ((date + 3) % 7) +1;
 	for (cent = 21608 + 365, n = 3; cent < date; cent += (1461 * 25), n++)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void dse_f_free(void)
 	sm_uc_ptr_t	lmap_base;
 	int4		bplmap, total_blks;
 	int4		util_len, master_bit, lmap_bit, hint_over_bplmap, hint_mod_bplmap;
-	bool		dummy_bool, was_crit;
+	boolean_t	dummy_bool, was_crit;
 	int4		dummy_int, nocrit_present;
 	cache_rec_ptr_t	dummy_cr;
 	error_def(ERR_DSEBLKRDFAIL);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ GBLREF	int			trans_errors;
 
 void mu_int_maps(void)
 {
-	bool		dummy;
+	boolean_t	dummy_bool;
 	unsigned char	*local;
 	uchar_ptr_t	disk;
 	boolean_t	agree, disk_full, local_full, master_full;
@@ -135,7 +135,7 @@ void mu_int_maps(void)
 		master_full = !bit_set(mcnt, mu_int_master);
 		if (last_bmp == blkno)
 			mapsize = (mu_int_data.trans_hist.total_blks - blkno);
-		disk_full = (-1 == bml_find_free(0, disk + sizeof(blk_hdr), mapsize, &dummy));
+		disk_full = (-1 == bml_find_free(0, disk + sizeof(blk_hdr), mapsize, &dummy_bool));
 		agree = TRUE;
 		for (lcnt = 0, dskmap_p = (uint_ptr_t)(disk + sizeof(blk_hdr)), lmap = (uint4 *)local;
 			lcnt < mapsize;
@@ -219,7 +219,7 @@ void mu_int_maps(void)
 		}
 		if (!agree)
 		{
-			local_full = (-1 == bml_find_free(0, local, mapsize, &dummy));
+			local_full = (-1 == bml_find_free(0, local, mapsize, &dummy_bool));
 			if (local_full || disk_full)
 			{
 				mu_int_path[0] = blkno;

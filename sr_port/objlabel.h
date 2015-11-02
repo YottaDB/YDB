@@ -33,7 +33,7 @@
  * Note that OBJ_UNIX_LABEL and OBJ_PLATFORM_LABEL should not exceed 255.
  */
 
-#define OBJ_UNIX_LABEL	12
+#define OBJ_UNIX_LABEL	13
 
 #if defined(__osf__)
 #	define	OBJ_PLATFORM_LABEL	0
@@ -45,6 +45,8 @@
 #	define	OBJ_PLATFORM_LABEL	0		/* Itanium Linux */
 #elif defined(__linux__) && defined(__i386__)
 #	define	OBJ_PLATFORM_LABEL	0		/* i386 Linux */
+#elif defined(__linux__) && defined(__x86_64)
+#       define  OBJ_PLATFORM_LABEL      0               /* x86_64 Linux */
 #elif defined(__MVS__)
 #	define	OBJ_PLATFORM_LABEL	0		/* os390 */
 #elif defined(__hpux) && defined(__ia64)

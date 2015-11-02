@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,12 @@ bool	tp_grab_crit(gd_region *reg)
 		}
 		crit_count = 0;
 	}
+	/* Ideally we do not want to do wcs_recover if we are in interrupt code (as opposed to mainline code).
+	 * This is easily accomplished in VMS with a library function lib$ast_in_prog but in Unix there is no way
+	 * to tell mainline code from interrupt code without the caller providing that information. Hence we
+	 * currently do the cache recovery even in case of interrupt code even though it is a heavyweight operation.
+	 * If it is found to cause issues, this logic has to be re-examined.
+	 */
 	if (csa->hdr->wc_blocked)
 		wcs_recover(reg);
 	return(TRUE);

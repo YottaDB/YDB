@@ -22,7 +22,7 @@
 #include "gtmci.h"
 #include "inst_flush.h"
 #include "obj_file.h"
-#include "gtm_malloc.h"
+#include "gtm_text_alloc.h"
 
 #ifdef USHBIN_SUPPORTED
 /* From here down is only defined in a shared binary environment */
@@ -111,8 +111,12 @@ rhdtyp *make_mode (int mode_index)
 	rhdtyp		*base_address;
 	lab_tabent	*lbl;
 	lnr_tabent	*lnr;
-	IA64_ONLY(uint8		*code;)
-	NON_IA64_ONLY(unsigned int	*code;)
+#ifdef __ia64
+	uint8		*code;
+#else
+	NON_X86_64_ONLY(unsigned int	*code;)
+	X86_64_ONLY(char 	*code;)
+#endif /* __ia64 */
 	dyn_modes	*dmode;
 	int algnd_rtnhdr_size = (int)ROUND_UP2(sizeof(rhdtyp), SECTION_ALIGN_BOUNDARY);
 	int algnd_code_size   = (int)ROUND_UP2(CODE_SIZE, NATIVE_WSIZE);
@@ -120,7 +124,7 @@ rhdtyp *make_mode (int mode_index)
 	int algnd_lnrtab_size = (int)ROUND_UP2(CODE_LINES * sizeof(lnr_tabent), NATIVE_WSIZE);
 
 	assert(DM_MODE == mode_index || CI_MODE == mode_index);
-        base_address = (rhdtyp *)GTM_TEXT_MALLOC(algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
+        base_address = (rhdtyp *)GTM_TEXT_ALLOC(algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
 	memset(base_address, 0, algnd_rtnhdr_size + algnd_code_size + algnd_lbltab_size + algnd_lnrtab_size);
 	dmode = &our_modes[mode_index];
 	base_address->routine_name.len = dmode->rtn_name_len;
@@ -137,8 +141,12 @@ rhdtyp *make_mode (int mode_index)
 	base_address->lnrtab_len = CODE_LINES;
 	base_address->labtab_len = 1;
 
-	IA64_ONLY(code = (uint8 *)base_address->ptext_adr;)	/* start of executable code */
-	NON_IA64_ONLY(code = (unsigned int *)base_address->ptext_adr;)	/* start of executable code */
+#ifdef __ia64
+	code = (uint8 *)base_address->ptext_adr;	/* start of executable code */
+#else
+	NON_X86_64_ONLY(code = (unsigned int *)base_address->ptext_adr;)	/* start of executable code */
+	X86_64_ONLY(code = (char *)base_address->ptext_adr;)	/* start of executable code */
+#endif /* __ia64 */
 	GEN_CALL(dmode->func_ptr1);			/* line 0,1 */
 
 #ifdef _AIX

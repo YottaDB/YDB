@@ -91,7 +91,7 @@ bool	gtcmtr_increment(void)
 		rts_error(VARLSTCNT(11) ERR_KEY2BIG, 4, n, (int4)gv_cur_region->max_key_size,
 			REG_LEN_STR(gv_cur_region), 0, ERR_GVIS, 2, end - buff, buff);
 	}
-	MV_FORCE_NUM(&incr_delta);
+	MV_FORCE_NUMD(&incr_delta);
 	gvcst_incr(&incr_delta, &post_incr);
 	if (JNL_ALLOWED(cs_addrs))
 		reg_ref->pini_addr = cs_addrs->jnl->pini_addr; /* In case journal switch occurred */

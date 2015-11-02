@@ -65,16 +65,14 @@
 #include "gtm_malloc.h"		/* for verifyAllocatedStorage() prototype */
 #include "cert_blk.h"
 #include "shmpool.h"
-#include "bm_getfree.h"
 
-GBLREF	bool             	certify_all_blocks;
+GBLREF	boolean_t		certify_all_blocks;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF 	sgmnt_data_ptr_t 	cs_data;
 GBLREF	gd_addr			*gd_header;		/* needed in UNIX for MM file extension */
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;		/* needed in VMS for error logging in MM */
 GBLREF	uint4			process_id;
-GBLREF	bool			run_time;
 GBLREF	testpt_struct		testpoint;
 GBLREF  inctn_opcode_t          inctn_opcode;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -101,7 +99,7 @@ void wcs_recover(gd_region *reg)
 	que_ent_ptr_t		back_link; /* should be crit & not need interlocked ops. */
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
-	bool			blk_used;
+	boolean_t		blk_used;
 	int4			bml_full, dummy_errno, blk_size;
 	uint4			jnl_status, epid;
 	int4			bt_buckets, bufindx;	/* should be the same type as "csd->bt_buckets" */

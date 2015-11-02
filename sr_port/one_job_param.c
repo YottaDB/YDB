@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@ int one_job_param (char **parptr)
 	boolean_t	neg;
 	int		x, num;
         int		len;
+
 	error_def	(ERR_JOBPARUNK);
 	error_def	(ERR_JOBPARNOVAL);
 	error_def	(ERR_JOBPARVALREQ);
@@ -66,7 +67,7 @@ int one_job_param (char **parptr)
 	error_def	(ERR_JOBPARSTR);
 
 	if ((window_token != TK_IDENT) ||
-	   ((x = namelook (job_param_index, job_param_names, window_ident.addr, window_ident.len)) < 0))
+	    ((x = namelook (job_param_index, job_param_names, window_ident.addr, window_ident.len)) < 0))
 	{
 		stx_error (ERR_JOBPARUNK);
 		return FALSE;
@@ -83,35 +84,35 @@ int one_job_param (char **parptr)
 		advancewindow ();
 		switch (job_param_datatypes[job_param_data[x]])
 		{
-		case jpdt_num:
-			neg = FALSE;
-			if (window_token == TK_MINUS && director_token == TK_INTLIT)
-			{
-				advancewindow();
-				neg = TRUE;
-			}
-			if (window_token != TK_INTLIT)
-			{
-				stx_error (ERR_JOBPARNUM);
-				return FALSE;
-			}
-			num = MV_FORCE_INT(&window_mval);
-			*((int4 *) (*parptr)) = (neg ? -num : num);
-			*parptr += sizeof(int4);
-			break;
-		case jpdt_str:
-			if (window_token != TK_STRLIT)
-			{
-				stx_error (ERR_JOBPARSTR);
-				return FALSE;
-			}
-			len = window_mval.str.len;
-			*(*parptr)++ = len;
-			memcpy (*parptr, window_mval.str.addr, len);
-			*parptr += len;
-			break;
-		default:
-			GTMASSERT;
+			case jpdt_num:
+				neg = FALSE;
+				if (window_token == TK_MINUS && director_token == TK_INTLIT)
+				{
+					advancewindow();
+					neg = TRUE;
+				}
+				if (window_token != TK_INTLIT)
+				{
+					stx_error (ERR_JOBPARNUM);
+					return FALSE;
+				}
+				num = MV_FORCE_INTD(&window_mval);
+				*((int4 *) (*parptr)) = (neg ? -num : num);
+				*parptr += sizeof(int4);
+				break;
+			case jpdt_str:
+				if (window_token != TK_STRLIT)
+				{
+					stx_error (ERR_JOBPARSTR);
+					return FALSE;
+				}
+				len = window_mval.str.len;
+				*(*parptr)++ = len;
+				memcpy (*parptr, window_mval.str.addr, len);
+				*parptr += len;
+				break;
+			default:
+				GTMASSERT;
 		}
 		advancewindow ();
 	} else if (window_token == TK_EQUAL)

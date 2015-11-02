@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -9,10 +9,10 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 loadop	;load op codes
-	n (opc,opx,opcdcnt)
+	n (opc,opx,opcdcnt,loadh)
 	k opc,opx,opcdcnt
 	s opcdcnt=0
-	s file="opcode_def.h" o file:read u file
+	s file=loadh("opcode_def.h") o file:read u file
 loop	r x i $zeof g fini
 	i x?1"OPCODE_DEF"1.E s rec=x,opcdcnt=opcdcnt+1
 	i  d proc

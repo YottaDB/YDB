@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,8 @@
 #include "cgp.h"
 #include "compiler.h"
 
-GBLREF bool			run_time, compile_time;
+GBLREF boolean_t		run_time;
+GBLREF bool			compile_time;
 GBLREF spdesc			stringpool, rts_stringpool, indr_stringpool;
 GBLREF char			source_file_name[];
 GBLREF unsigned short		source_name_len;
@@ -38,7 +39,7 @@ int zlcompile (unsigned char len, unsigned char *addr)
 	source_file_name[len] = 0;
 	source_name_len = len;
 
-	assert (run_time == TRUE);
+	assert(run_time);
 	obj_exp = (cmd_qlf.qlf & CQ_OBJECT) != 0;
 	assert(rts_stringpool.base == stringpool.base);
 	rts_stringpool = stringpool;

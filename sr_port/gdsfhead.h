@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,10 +101,8 @@ typedef struct cache_rec_struct
 	enum db_ver	ondsk_blkver;	/* Actual block version from block header as it exists on disk
 					   (prior to any dynamic conversion that may have occurred when read in).
 					*/
-
         /* Keep our 64 bit fields up front */
 	/* this point should be quad-word aligned */
-
 	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
 					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
 	trans_num	flushed_dirty_tn;	/* value of dirty at the time of flushing */
@@ -115,7 +113,7 @@ typedef struct cache_rec_struct
 					 * (Unix & VMS) offset to cache_rec holding before-image for wcs_recover to backup */
 #ifdef VMS
 	sm_off_t	shmpool_blk_off; /* Offset to shmpool block containing the reformat buffer for this CR */
-	int4		filler;		/* Alignment */
+	int4		backup_cr_off;   /* Offset to backup_cr (set/used by bg_update_phase1/2 routines) */
 #endif
 	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
 	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA. Usage note: this
@@ -123,9 +121,7 @@ typedef struct cache_rec_struct
 					   by atomic routines/instructions. As such there needs be no cache line padding between
 					   this field and read_in_progress.
 					 */
-
 	/* and now the rest */
-
 	int4		image_count;	/* maintained with r_epid in vms to ensure that the process has stayed in gt.m */
 	int4		epid;		/* set by wcs_wtstart to id the write initiator; cleared by wcs_wtfini
    					 * used by t_commit_cleanup, secshr_db_clnup and wcs_recover */
@@ -143,7 +139,7 @@ typedef struct cache_rec_struct
 	boolean_t	data_invalid;	/* TRUE from bg_update indicates t_commit_cleanup and wcs_recover should invalidate */
 	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
 	boolean_t	wip_stopped;	/* TRUE indicates to wcs_recover, wcs_wtfini, wcs_get_blk and gds_rundown
-  					 * that secshr_db_clnup cancelled the qio*/
+  					 * that secshr_db_clnup cancelled the qio */
 } cache_rec;
 
 /* A note about cache line separation of the latches contained in these blocks. Because this block is duplicated
@@ -175,10 +171,8 @@ typedef struct
 	enum db_ver	ondsk_blkver;	/* Actual block version from block header as it exists on disk
 					   (prior to any dynamic conversion that may have occurred when read in).
 					*/
-
         /* Keep our 64 bit fields up front */
 	/* this point should be quad-word aligned */
-
 	trans_num	dirty;		/* block has been modified since last written to disk; used by bt_put, db_csh_getn
  					 * mu_rndwn_file wcs_recover, secshr_db_clnup, wr_wrtfin_all and extensively by the ccp */
 	trans_num	flushed_dirty_tn;	/* value of dirty at the time of flushing */
@@ -189,13 +183,15 @@ typedef struct
 					 * (Unix & VMS) offset to cache_rec holding before-image for wcs_recover to backup */
 #ifdef VMS
 	sm_off_t	shmpool_blk_off; /* Offset to shmpool block containing the reformat buffer for this CR */
-	int4		filler;		/* Alignment */
+	int4		backup_cr_off;   /* Offset to backup_cr (set/used by bg_update_phase1/2 routines) */
 #endif
 	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
-	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA */
-
+	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA. Usage note: this
+					   latch is used on those platforms where read_in_progress is not directly updated
+					   by atomic routines/instructions. As such there needs be no cache line padding between
+					   this field and read_in_progress.
+					 */
 	/* and now the rest */
-
 	int4		image_count;	/* maintained with r_epid in vms to ensure that the process has stayed in gt.m */
 	int4		epid;		/* set by wcs_start to id the write initiator; cleared by wcs_wtfini
    					 * used by t_commit_cleanup, secshr_db_clnup and wcs_recover */
@@ -213,12 +209,44 @@ typedef struct
 	boolean_t	data_invalid;	/* TRUE from bg_update indicates t_commit_cleanup and wcs_recover should invalidate */
 	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
 	boolean_t	wip_stopped;	/* TRUE indicates to wcs_recover, wcs_wtfini, wcs_get_blk and gds_rundown
-  					 * that secshr_db_clnup cancelled the qio*/
+  					 * that secshr_db_clnup cancelled the qio */
 } cache_state_rec;
 
 #define		CR_BLKEMPTY             -1
 #define		FROZEN_BY_ROOT          (uint4)(0xFFFFFFFF)
 #define		BACKUP_NOT_IN_PROGRESS  0x7FFFFFFF
+
+/* The following 3 macros were introduced while solving a problem with $view where a call to $view in */
+/* mumps right after a change to $zgbldir gave the old global directory - not the new one.  On VMS it */
+/* caused a core dump.  If one were to access a global variable via $data right after the change, however, */
+/* the $view worked correctly.  The solution was to make sure the gd_map information matched the current */
+/* gd_header in op_fnview.c.  The code used as a template for this change was in gvinit.c.  The first */
+/* macro gets the gd_header using an mval.  The second macro establishes the gd_map from the gd_header. */
+/* The third macro is an assert (when DEBUG_ONLY is defined) for those cases where the gd_header is already */
+/* set to make sure the mapping is correct. The first 2 macros are executed when the gd_header is null, */
+/* and the 3rd macro is associated with an else clause if it is not.  Therefore, they should be maintained */
+/* as a group. */
+
+#define SET_GD_HEADER(inmval) \
+{\
+	inmval.mvtype = MV_STR;\
+	inmval.str.len = 0;\
+	gd_header = zgbldir(&inmval);\
+}
+
+#define SET_GD_MAP \
+{\
+	gd_map = gd_header->maps;\
+	gd_map_top = gd_map + gd_header->n_maps;\
+	gd_targ_addr = gd_header;\
+}
+
+#define GD_HEADER_ASSERT \
+{\
+	assert(gd_map == gd_header->maps);\
+	assert(gd_map_top == gd_map + gd_header->n_maps);\
+	assert(gd_targ_addr == gd_header);\
+}
 
 typedef struct
 {
@@ -1357,6 +1385,7 @@ typedef struct	gv_namehead_struct
 		}														\
 	} else															\
 	{															\
+		MV_FORCE_DEFINED(mvarg);											\
 		mval2subsc(mvarg, gv_currkey);											\
 		if (gv_currkey->end >= max_key)											\
 		{														\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,11 +42,12 @@ GBLREF	boolean_t	gvdupsetnoop; 		/* if TRUE, duplicate SETs update journal but n
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
 GBLREF	boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
-GBLREF	bool		certify_all_blocks;
+GBLREF	boolean_t	certify_all_blocks;
 GBLREF	boolean_t	local_collseq_stdnull;  /* If true, standard null subscript collation will be used for local variables */
 GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
 GBLREF	uint4		gtm_max_sockets;	/* Maximum sockets in a socket device that can be created by this process */
+GBLREF	bool		undef_inhibit;
 
 void	gtm_env_init(void)
 {
@@ -81,6 +82,14 @@ void	gtm_env_init(void)
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			gvdupsetnoop = ret; /* if the logical is not defined, we want gvdupsetnoop to take its default value */
+
+		/* NOUNDEF environgment/logical */
+		val.addr = GTM_NOUNDEF;
+		val.len = sizeof(GTM_NOUNDEF) - 1;
+		assert(FALSE == undef_inhibit);	/* should have been set to FALSE in gbldefs.c */
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			undef_inhibit = ret; /* if the logical is not defined, we want undef_inhibit to take its default value */
 
 		/* Full Database-block Write mode */
 		val.addr = GTM_FULLBLOCKWRITES;

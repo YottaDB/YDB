@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,6 @@
 #include "stringpool.h"
 #include "do_xform.h"
 #include "mvalconv.h"
-#include "underr.h"
 
 GBLREF	boolean_t	in_op_fnnext;
 

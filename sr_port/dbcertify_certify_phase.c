@@ -417,7 +417,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	int		local_map_max, lbm_blk_index, lcl_blk, curr_rec_cmpc, cmpc;
 	int4		lclmap_not_full;
 	uint4		total_blks;
-	bool		dummy_bool;
+	boolean_t	dummy_bool;
 	boolean_t	got_root, level_0, completed, insert_point, restart_transaction;
 	blk_segment	*bs_ptr, *bs1, *blk_sega_p, *blk_array_top;
 	rec_hdr_ptr_t	ins_rec_hdr, next_rec_hdr, new_star_hdr;

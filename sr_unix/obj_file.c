@@ -33,7 +33,7 @@ GBLDEF short		object_name_len;
 GBLDEF int		object_file_des;
 DEBUG_ONLY(GBLDEF int	obj_bytes_written;)
 
-GBLREF bool		run_time;
+GBLREF boolean_t	run_time;
 GBLREF int4		lits_text_size, lits_mval_size;
 GBLREF unsigned char	*runtime_base;
 GBLREF mliteral		literal_chain;
@@ -352,7 +352,7 @@ void	emit_literals(void)
  	dqloop(&literal_chain, que, p)
 	{
 		assert(p->rt_addr == offset);
-		MV_FORCE_NUM(&p->v);
+		MV_FORCE_NUMD(&p->v);
 		if (p->v.str.len)
 			p->v.str.addr = (char *)(p->v.str.addr - (char *)stringpool.base); /* Initial offset */
 		else

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -38,6 +38,7 @@ ten_dd:
 .extern	add_mvals
 .extern	numcmp
 .extern	s2n
+.extern underr
 
 term	=	12
 step	=	8
@@ -52,6 +53,8 @@ ENTRY op_forloop
 	pushl	%esi
 	pushl	%ebx
 	movl	indx(%ebp),%esi
+	mv_force_defined %esi, l0
+	movl	%esi, indx(%ebp)
 	mv_force_num %esi, l1
 	movl	indx(%ebp),%esi
 	movl	step(%ebp),%edi

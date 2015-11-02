@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,12 +28,15 @@
 	.text
 .extern	numcmp
 .extern	s2n
+.extern underr
 
 # PUBLIC	op_forinit
 ENTRY op_forinit
 	movl	frame_pointer,%edx
 	popl	msf_mpc_off(%edx)
 	movl	4(%esp),%eax
+	mv_force_defined %eax, l0
+	movl	%eax, 4(%esp)
 	mv_force_num %eax, t2
 	movl	4(%esp),%eax
 	cmpl	$0,mval_l_m1(%eax)

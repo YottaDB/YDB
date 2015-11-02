@@ -35,6 +35,8 @@ void buff_flush(void);
 #  define JSB_ACTION_N_INS	4
 #elif defined(__hpux)
 #  define JSB_ACTION_N_INS	3
+#elif defined(__x86_64__)
+#  define JSB_ACTION_N_INS	8
 #else
 #  define JSB_ACTION_N_INS	2
 #endif

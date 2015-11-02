@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,8 +69,8 @@ if (SYSCALL_ERROR(info->status) || SYSCALL_ERROR(info->status2))	\
 {									\
 	int	status;							\
 	F_CLOSE(channel, status);					\
-	if (NULL != jrecbuf)						\
-		free(jrecbuf);						\
+	if (NULL != jrecbuf_base)					\
+		free(jrecbuf_base);					\
 	return EXIT_ERR;						\
 }
 
@@ -85,7 +85,7 @@ GBLREF	enum gtmImageTypes	image_type;
 #endif
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		mupip_jnl_recover;
-GBLREF	bool run_time;
+GBLREF	boolean_t		run_time;
 GBLREF	jnl_process_vector	*prc_vec;
 
 /* Create a journal file from info.
@@ -148,7 +148,8 @@ uint4	cre_jnl_file(jnl_create_info *info)
  * if (!info->no_rename) then it renames existing info->jnl to be rename_fn */
 uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len)
 {
-	jnl_file_header		header;
+	jnl_file_header		*header;
+	unsigned char		hdr_base[JNL_HDR_LEN + ALIGNMENT_SIZE];
 	struct_jrec_pfin	*pfin_record;
 	struct_jrec_pini	*pini_record;
 	struct_jrec_epoch	*epoch_record;
@@ -157,6 +158,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	int			create_fn_len, cre_jnl_rec_size, status;
 	fd_type			channel;
 	char            	*jrecbuf;
+	char			*jrecbuf_base;
 	gd_id			jnlfile_id;
 #if defined(VMS)
 	struct FAB      	fab;
@@ -212,7 +214,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		STATUS_MSG(info);
 		return EXIT_ERR;
 	}
-	jrecbuf = malloc(DISK_BLOCK_SIZE);
+	jrecbuf_base = malloc(DISK_BLOCK_SIZE + ALIGNMENT_SIZE);
+	jrecbuf = (char *)ROUND_UP2((uintszofptr_t)jrecbuf_base, DISK_BLOCK_SIZE);
 	memset(jrecbuf, 0, DISK_BLOCK_SIZE);
 	FSTAT_FILE(channel, &stat_buf, fstat_res);
 	if (-1 == fstat_res)
@@ -250,7 +253,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		return EXIT_ERR;
 	}
 	channel = fab.fab$l_stv;
-	jrecbuf = malloc(ZERO_SIZE);
+	jrecbuf_base = jrecbuf = malloc(ZERO_SIZE);
 	memset(jrecbuf, 0, ZERO_SIZE);
 	block = (JNL_HDR_LEN >> LOG2_DISK_BLOCK_SIZE);
 	assert(block * DISK_BLOCK_SIZE == JNL_HDR_LEN);
@@ -268,9 +271,10 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 #endif
 	info->checksum = jnl_get_checksum_entire((uint4 *)&jnlfile_id, sizeof(gd_id));
 	/* We have already saved previous journal file name in info */
-	jfh_from_jnl_info(info, &header);
-	header.recover_interrupted = mupip_jnl_recover;
-	DO_FILE_WRITE(channel, 0, &header, JNL_HDR_LEN, info->status, info->status2);
+	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, DISK_BLOCK_SIZE));
+	jfh_from_jnl_info(info, header);
+	header->recover_interrupted = mupip_jnl_recover;
+	DO_FILE_WRITE(channel, 0, header, JNL_HDR_LEN, info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
 	assert(DISK_BLOCK_SIZE >= EPOCH_RECLEN + EOF_RECLEN + PFIN_RECLEN + PINI_RECLEN);
@@ -337,12 +341,12 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	eof_record->prefix.time = jgbl.gbl_jrec_time;
 	QWASSIGN(eof_record->jnl_seqno, info->reg_seqno);
 	eof_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-	DO_FILE_WRITE(channel, JNL_HDR_LEN, jrecbuf, cre_jnl_rec_size, info->status, info->status2);
+	DO_FILE_WRITE(channel, JNL_HDR_LEN, jrecbuf, ROUND_UP2(cre_jnl_rec_size, DISK_BLOCK_SIZE), info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
 	F_CLOSE(channel, status);
-	free(jrecbuf);
-	jrecbuf = NULL;
+	free(jrecbuf_base);
+	jrecbuf_base = NULL;
 	if (info->no_rename)
 		return EXIT_NRM;
 	/* Say, info->jnl = a.mjl

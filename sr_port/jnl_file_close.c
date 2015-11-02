@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,8 @@ static	const	unsigned short	zero_fid[3];
 
 void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 {
-	jnl_file_header		header;
+	jnl_file_header		*header;
+	unsigned char		hdr_base[JNL_HDR_LEN + ALIGNMENT_SIZE];
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	jnl_private_control	*jpc;
@@ -96,6 +97,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 #endif
 	if ((NULL == jpc) || (NOJNL == jpc->channel))
 		return;
+	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, DISK_BLOCK_SIZE));
 	if (clean)
 	{
 		jb = jpc->jnl_buff;
@@ -105,18 +107,18 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 		UNIX_ONLY(jnl_fsync(reg, jb->dskaddr);)
 		UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr);)
 		eof_addr = jb->freeaddr - EOF_RECLEN;
-		DO_FILE_READ(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
+		DO_FILE_READ(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 		if (SYSCALL_SUCCESS(jpc->status))
 		{
-			assert(header.end_of_data <= eof_addr);
-			header.end_of_data = eof_addr;
-			header.eov_timestamp = eof_record.prefix.time;
-			assert(header.eov_timestamp >= header.bov_timestamp);
-			header.eov_tn = eof_record.prefix.tn;
-			assert(header.eov_tn >= header.bov_tn);
-			header.end_seqno = eof_record.jnl_seqno;
-			header.crash = FALSE;
-			DO_FILE_WRITE(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
+			assert(header->end_of_data <= eof_addr);
+			header->end_of_data = eof_addr;
+			header->eov_timestamp = eof_record.prefix.time;
+			assert(header->eov_timestamp >= header->bov_timestamp);
+			header->eov_tn = eof_record.prefix.tn;
+			assert(header->eov_tn >= header->bov_tn);
+			header->end_seqno = eof_record.jnl_seqno;
+			header->crash = FALSE;
+			DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			if (SYSCALL_ERROR(jpc->status))
 				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			UNIX_ONLY(

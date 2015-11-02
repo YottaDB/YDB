@@ -48,7 +48,7 @@ GBLREF char		cg_phase;	/* code generation phase */
 GBLREF char		cg_phase_last;	/* previous code generation phase */
 GBLDEF uint4 		lits_text_size, lits_mval_size;
 
-GBLREF bool		run_time;
+GBLREF boolean_t	run_time;
 GBLREF command_qualifier cmd_qlf;
 GBLREF int4		mvmax, mlmax, mlitmax, sa_temps[], sa_temps_offset[];
 GBLREF mlabel 		*mlabtab;

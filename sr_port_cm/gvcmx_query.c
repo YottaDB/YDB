@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,5 +36,5 @@ bool gvcmx_query(mval *val)
 		*val = temp;
 	return (((link_info *)lnk->usr)->query_is_queryget ?
 			(MV_DEFINED(&temp) ? TRUE : FALSE) : /* we return TRUE (1) to avoid int -> bool (char) lossy assignment */
-			MV_FORCE_INT(&temp));
+			MV_FORCE_INTD(&temp));
 }

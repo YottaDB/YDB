@@ -100,7 +100,7 @@
 
 #define MASTER_MAP_BITS_PER_LMAP	1
 
-int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits, bool *used);
+int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits, boolean_t *used);
 int4 bml_init(block_id bml);
 uint4 bml_busy(uint4 setbusy, sm_uc_ptr_t map);
 uint4 bml_free(uint4 setfree, sm_uc_ptr_t map);

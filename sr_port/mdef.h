@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,8 +99,10 @@ typedef UINTPTR_T uintszofptr_t;
 
 #ifdef __linux__
 #	define LINUX_ONLY(X) X
+#	define NON_LINUX_ONLY(X)
 #else
 #	define LINUX_ONLY(X)
+#	define NON_LINUX_ONLY(X) X
 #endif
 
 #if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips) && !defined(__ia64)
@@ -134,6 +136,28 @@ typedef UINTPTR_T uintszofptr_t;
 #	define  UINTCAST(X) X
 #	define	IA64_DEBUG_ONLY(X)
 #endif/* __ia64 */
+
+#ifdef __x86_64__
+#define X86_64_ONLY(x)                x
+#define NON_X86_64_ONLY(x)
+#else
+#define X86_64_ONLY(x)
+#define NON_X86_64_ONLY(x)    x
+#endif /* __x86_64__ */
+
+#if defined(__x86_64__) || defined(__ia64)
+#define RISC_ONLY(x)
+#define NON_RISC_ONLY(x)        x
+#else
+#define RISC_ONLY(x)            x
+#define NON_RISC_ONLY(x)
+#endif /* __x86_64__ && __ia64 */
+
+#ifdef _AIX
+#       define  AIX_ONLY(X) X
+#else
+#       define  AIX_ONLY(X)
+#endif
 
 #define BITS_PER_UCHAR  8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
@@ -194,7 +218,7 @@ typedef struct
  * Note removed "defined(__MVS__) || defined(__s390__) ||" from this ifdef to shorten the line. These can
  * be reinserted in the even these platforms are reactivated.
  */
-#if defined(__alpha) || defined(_AIX) || defined(__hpux) || (defined(__linux__) && defined(__ia64))
+#if defined(__alpha) || defined(_AIX) || defined(__hpux) || (defined(__linux__) && (defined(__ia64) || defined(__x86_64__)))
 #	define HAS_LITERAL_SECT
 #endif
 
@@ -278,11 +302,22 @@ GBLREF	boolean_t		gtm_utf8_mode;
 
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);
+mval *underr (mval *start, ...);
 
-#define MV_FORCE_STR(X)		((0 == ((X)->mvtype & MV_STR)) ? n2s(X) : NULL)
-#define MV_FORCE_NUM(X)		((0 == ((X)->mvtype & MV_NM )) ? s2n(X) : NULL)
+#ifdef DEBUG
+#	define	DBG_ASSERT(X)	assert(X),
+#else
+#	define	DBG_ASSERT(X)
+#endif
+
+/* Use the "D" format of these MV_FORCE macros only in those places where there is no possibility of M being undefined */
+#define MV_FORCE_STR(X)		(MV_FORCE_DEFINED(X), MV_FORCE_STRD(X))
+#define MV_FORCE_STRD(X)	(DBG_ASSERT(MV_DEFINED(X)) (0 == ((X)->mvtype & MV_STR)) ? n2s(X) : NULL)
+#define MV_FORCE_NUM(X)		(MV_FORCE_DEFINED(X), MV_FORCE_NUMD(X))
+#define MV_FORCE_NUMD(X)	(DBG_ASSERT(MV_DEFINED(X)) (0 == ((X)->mvtype & MV_NM )) ? s2n(X) : NULL)
 #define MV_FORCE_BOOL(X)	(MV_FORCE_NUM(X), (X)->m[1] ? TRUE : FALSE)
-#define MV_FORCE_INT(M)		((M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M))
+#define MV_FORCE_INT(M)		(MV_FORCE_DEFINED(M), MV_FORCE_INTD(M))
+#define MV_FORCE_INTD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M))
 #define MV_FORCE_UMVAL(M,I)     (((I) >= 1000000) ? i2usmval((M),(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (I)*MV_BIAS ))
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(I)) : \
@@ -294,7 +329,10 @@ char *s2n(mval *u);
 #define MV_ASGN_MVAL2FLT(F,M)	( (M).mvtype & MV_INT ? ( (F).e = 0 , (F).m[1] = (M).m[1] )\
 						      : ( (F).m[0] = (M).m[0] , (F).m[1] = (M).m[1]\
 							, (F).sgn = (M).sgn , (F).e = (M).e ))
-#define MV_FORCE_DEFINED(X)	if (!MV_DEFINED(X)) underr(X);
+#define MV_FORCE_DEFINED(X)	((!MV_DEFINED(X)) ? (X) = underr(X) : (X))
+/* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
+   macro has been added. If uses are added, this needs to be revisited. 01/2008 se
+*/
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0   ? s2n(X) : 0 )\
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
@@ -444,9 +482,37 @@ int m_usleep(int useconds);
 #ifdef UNIX
 #	define UNIX_ONLY(X)		X
 #	define UNIX_ONLY_COMMA(X)	X,
+#	ifdef UNTARGETED_MSYNC
+#		define UNTARGETED_MSYNC_ONLY(X)		X
+#		define NON_UNTARGETED_MSYNC_ONLY(X)
+#		define TARGETED_MSYNC_ONLY(X)
+#		define NON_TARGETED_MSYNC_ONLY(X)	X
+#		define REGULAR_MSYNC_ONLY(X)
+#		define NON_REGULAR_MSYNC_ONLY(X)	X
+#	else
+#		define UNTARGETED_MSYNC_ONLY(X)
+#		define NON_UNTARGETED_MSYNC_ONLY(X)	X
+#		if defined(TARGETED_MSYNC)
+#			define TARGETED_MSYNC_ONLY(X)		X
+#			define NON_TARGETED_MSYNC_ONLY(X)
+#			define REGULAR_MSYNC_ONLY(X)
+#			define NON_REGULAR_MSYNC_ONLY(X)	X
+#		else
+#			define TARGETED_MSYNC_ONLY(X)
+#			define NON_TARGETED_MSYNC_ONLY(X)	X
+#			define REGULAR_MSYNC_ONLY(X)		X
+#			define NON_REGULAR_MSYNC_ONLY(X)
+#		endif
+#	endif
 #else
 #	define UNIX_ONLY(X)
 #	define UNIX_ONLY_COMMA(X)
+#	define UNTARGETED_MSYNC_ONLY(X)
+#	define TARGETED_MSYNC_ONLY(X)
+#	define REGULAR_MSYNC_ONLY(X)
+#	define NON_UNTARGETED_MSYNC_ONLY(X)
+#	define NON_TARGETED_MSYNC_ONLY(X)
+#	define NON_REGULAR_MSYNC_ONLY(X)
 #endif
 
 #ifdef VMS

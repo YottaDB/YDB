@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,35 +14,16 @@
 #include "gtm_string.h"
 
 #include <stddef.h>	/* for offsetof macro */
-#ifdef UNIX
 #include "gtm_ipc.h"
-#endif
 #include "gtm_socket.h"
 #include "gtm_inet.h"
-#ifdef UNIX
 #include <sys/un.h>
-#endif
 #include <sys/time.h>
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
-#ifdef UNIX
 #include "gtm_stat.h"
 #include "gtmio.h"
-#endif
-#ifdef VMS
-#include <ssdef.h>
-#include <rms.h>
-#include <devdef.h>
-#include <fab.h>
-#include <iodef.h>
-#include <nam.h>
-#include <rmsdef.h>
-#include <descrip.h> /* Required for gtmsource.h */
-#include <efndef.h>
-#include <secdef.h>
-#include "iosb_disk.h"
-#endif
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -102,6 +83,7 @@ static	int			tot_tcom_len = 0;
 static	int			total_wait_for_jnl_recs = 0;
 static	int			total_wait_for_jnlopen = 0;
 static	unsigned char		*tcombuffp = NULL;
+static	unsigned char		tmp_buff_base[JNL_MAX_WRITE + 2 * DISK_BLOCK_SIZE];
 
 static	int			adjust_buff_leaving_hdr(repl_buff_t *rb);
 static	tr_search_state_t	position_read(repl_ctl_element*, seq_num);
@@ -127,13 +109,8 @@ static	int repl_read_file(repl_buff_t *rb)
 	uint4			dskaddr;
 	uint4			read_less, status;
 	int			eof_change;
-	VMS_ONLY(
-		io_status_block_disk	iosb;
-		uint4		read_off;
-		uint4		extra_bytes;
-		sm_uc_ptr_t 	read_buff;
-		DEBUG_ONLY(unsigned char	verify_buff[DISK_BLOCK_SIZE];)
-	)
+	unsigned char		*tmp_buff;
+	uint4			readaddr_adj;
 
 	error_def(ERR_TEXT);
 
@@ -172,40 +149,30 @@ static	int repl_read_file(repl_buff_t *rb)
 		REPL_DPRINT5("READ FILE : Racing with jnl file %s avoided. Read size reduced from %u to %u at offset %u\n",
 				rb->backctl->jnl_fn, b->buffremaining, b->buffremaining - read_less, b->readaddr);
 	}
-#ifdef UNIX
-	if (lseek(fc->fd, (off_t)b->readaddr, SEEK_SET) == (off_t)-1)
+	if (csa->jnl->sync_io)
 	{
-		repl_errno = EREPL_JNLFILESEEK;
-		return (ERRNO);
-	}
-	READ_FILE(fc->fd, b->base + REPL_BLKSIZE(rb) - b->buffremaining, b->buffremaining - read_less, nb);
-	status = ERRNO;
-#elif defined(VMS)
-	nb = b->buffremaining - read_less; /* to be read */
-	read_off = ROUND_DOWN2(b->readaddr, DISK_BLOCK_SIZE); /* since read has to start at a disk block boundary */
-	extra_bytes = b->readaddr - read_off;
-	read_buff = b->base + REPL_BLKSIZE(rb) - b->buffremaining - extra_bytes;
-	DEBUG_ONLY(
-		if (0 != extra_bytes)
-			memcpy(verify_buff, read_buff, extra_bytes);
-		else;
-	)
-	assert(read_buff >= b->base);
-	status = sys$qiow(EFN$C_ENF, fc->fd, IO$_READVBLK, &iosb, 0, 0, read_buff, nb + extra_bytes,
-			  DIVIDE_ROUND_DOWN(read_off, DISK_BLOCK_SIZE) + 1, 0, 0, 0);
-	if (SYSCALL_SUCCESS(status) && ((SYSCALL_SUCCESS(status = iosb.cond)) || SS$_ENDOFFILE == status))
-	{
-		nb = iosb.length;	/* num bytes actually read */
-		nb -= extra_bytes;	/* that we are interested in */
-		if ((SS$_NORMAL == status && nb < b->buffremaining - read_less) || (0 >= nb))
-			GTMASSERT; /* we thought VMS wouldn't return less than what we requested for */
-		DEBUG_ONLY((0 != extra_bytes) ? assert(0 == memcmp(verify_buff, read_buff, extra_bytes)) : 0;)
-		status = SS$_NORMAL;
+		if (lseek(fc->fd, (off_t)ROUND_DOWN2(b->readaddr, DISK_BLOCK_SIZE), SEEK_SET) == (off_t)-1)
+		{
+			repl_errno = EREPL_JNLFILESEEK;
+			return (ERRNO);
+		}
+		readaddr_adj = b->readaddr - ROUND_DOWN2(b->readaddr, DISK_BLOCK_SIZE);
+		tmp_buff = (unsigned char *)(ROUND_UP2((uintszofptr_t)tmp_buff_base, DISK_BLOCK_SIZE));
+		READ_FILE(fc->fd, tmp_buff, ROUND_UP2(b->buffremaining - read_less + readaddr_adj, DISK_BLOCK_SIZE), nb);
+		status = ERRNO;
+		if (nb > b->buffremaining - read_less)
+			nb = b->buffremaining - read_less;
+		memcpy(b->base + REPL_BLKSIZE(rb) - b->buffremaining, tmp_buff + readaddr_adj, b->buffremaining - read_less);
 	} else
-		nb = -1;
-#else
-#error Unsupported platform
-#endif
+	{
+		if (lseek(fc->fd, (off_t)b->readaddr, SEEK_SET) == (off_t)-1)
+		{
+			repl_errno = EREPL_JNLFILESEEK;
+			return (ERRNO);
+		}
+		READ_FILE(fc->fd, b->base + REPL_BLKSIZE(rb) - b->buffremaining, b->buffremaining - read_less, nb);
+		status = ERRNO;
+	}
 	if (nb >= 0)
 	{
 		b->buffremaining -= (uint4)nb;
@@ -403,9 +370,6 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	uint4			prev_eof_addr, new_eof_addr;
 	int			status;
 	sgmnt_addrs		*csa;
-#ifdef VMS
-	short           	iosb[4];
-#endif
 	repl_buff_t		*rb;
 
 	error_def(ERR_REPLFILIOERR);
@@ -423,11 +387,9 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 	} else
 	{
 		REPL_DPRINT2("Update EOF : New EOF addr will be found from jnl file hdr for %s\n", ctl->jnl_fn);
-		UNIX_ONLY(
-			REPL_DPRINT4("Update EOF : FC ID IS %u %d %u\n", fc->id.inode, fc->id.device, fc->id.st_gen);
-			REPL_DPRINT4("Update EOF : csa->nl->jnl_file.u (unreliable) is %u %d %u\n", csa->nl->jnl_file.u.inode,
-					csa->nl->jnl_file.u.device,  csa->nl->jnl_file.u.st_gen);
-		)
+		REPL_DPRINT4("Update EOF : FC ID IS %u %d %u\n", fc->id.inode, fc->id.device, fc->id.st_gen);
+		REPL_DPRINT4("Update EOF : csa->nl->jnl_file.u (unreliable) is %u %d %u\n", csa->nl->jnl_file.u.inode,
+			     csa->nl->jnl_file.u.device,  csa->nl->jnl_file.u.st_gen);
 		if (!ctl->fh_read_done)
 		{
 			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, ROUND_UP(sizeof(jnl_file_header), 8), status);

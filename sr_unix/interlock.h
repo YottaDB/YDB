@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,9 @@
 #ifndef __ia64
 #define GET_SWAPLOCK(X)			(COMPSWAP((X), LOCK_AVAILABLE, 0, process_id, 0))
 #else
-#define GET_SWAPLOCK(X)			(COMPSWAP_LOCK((X), LOCK_AVAILABLE, 0, process_id, 0))
+/* Doing the simple test before COMPSWAP_LOCK can help performance when a lock is highly contended
+ */
+#define GET_SWAPLOCK(X)		(((X)->u.parts.latch_pid == LOCK_AVAILABLE) && COMPSWAP_LOCK((X), LOCK_AVAILABLE, 0, process_id, 0))
 #endif /* __ia64 */
 /* Use COMPSWAP to release the lock because of the memory barrier and other-processor notification it implies. Also
    the usage of COMPSWAP allows us to check (with low cost) that we have/had the lock we are trying to release. If we

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a fai
 					status of the read is returned using a global reference, as the status detail
 					should typically not be needed and optimizing the call is important */
 
-GBLREF	bool			certify_all_blocks;
+GBLREF	boolean_t		certify_all_blocks;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;

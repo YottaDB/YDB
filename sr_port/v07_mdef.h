@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -147,20 +147,20 @@ typedef union
 } global_latch_t;
 
 #ifdef INT8_SUPPORTED
-   typedef	uint8			qw_num;
-   typedef	uint8			seq_num;	/* Define 8-byte sequence number */
-   typedef	uint8			qw_off_t;	/* quad-word offset */
+   typedef	gtm_uint8			qw_num;
+   typedef	gtm_uint8			seq_num;	/* Define 8-byte sequence number */
+   typedef	gtm_uint8			qw_off_t;	/* quad-word offset */
 #  define	DWASSIGNQW(A,B)		(A)=(uint4)(B)
 #  define	QWASSIGN(A,B)		(A)=(B)
-#  define	QWASSIGNDW(A,B)		QWASSIGN((A),(uint8)(B))
+#  define	QWASSIGNDW(A,B)		QWASSIGN((A),(gtm_uint8)(B))
 #  define 	QWADD(A,B,C)		(A)=(B)+(C)
 #  define 	QWSUB(A,B,C)		(A)=(B)-(C)
-#  define 	QWADDDW(A,B,C)		(A)=(B)+(uint8)(C)
-#  define 	QWSUBDW(A,B,C)		(A)=(B)-(uint8)(C)
+#  define 	QWADDDW(A,B,C)		(A)=(B)+(gtm_uint8)(C)
+#  define 	QWSUBDW(A,B,C)		(A)=(B)-(gtm_uint8)(C)
 #  define 	QWINCRBY(A,B)		(A)+=(B)
 #  define 	QWDECRBY(A,B)		(A)-=(B)
-#  define 	QWINCRBYDW(A,B)		(A)+=(uint8)(B)
-#  define 	QWDECRBYDW(A,B)		(A)-=(uint8)(B)
+#  define 	QWINCRBYDW(A,B)		(A)+=(gtm_uint8)(B)
+#  define 	QWDECRBYDW(A,B)		(A)-=(gtm_uint8)(B)
 #  define	QWMULBYDW(A,B,C)	(A)=(B)*(C)
 #  define	QWDIVIDEBYDW(A,B,Q,R)	{(R)=(A)%(B); (Q)=(A)/(B);}
 #  define	QWMODDW(A,B)		((A)%(B))
@@ -305,9 +305,9 @@ typedef union
   typedef int4 *sm_int_ptr_t;           /* Define 64 bit pointer to int */
   typedef uint4 *sm_uint_ptr_t;         /* Define 64 bit pointer to uint */
   typedef short *sm_short_ptr_t;        /* Define 64 bit pointer to short */
-  typedef int8 sm_off_t;                /* Define 64 bit offset type */
-  typedef int8 sm_long_t;               /* Define 64 bit integer type */
-  typedef uint8 sm_ulong_t;             /* Define 64 bit unsigned integer type */
+  typedef gtm_int8 sm_off_t;                /* Define 64 bit offset type */
+  typedef gtm_int8 sm_long_t;               /* Define 64 bit integer type */
+  typedef gtm_uint8 sm_ulong_t;             /* Define 64 bit unsigned integer type */
   typedef global_latch_t *sm_global_latch_ptr_t; /* Define 64 bit pointer to hp_latch */
 #  ifdef __osf__
 #    pragma pointer_size(restore)

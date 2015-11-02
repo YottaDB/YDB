@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +18,6 @@
 #include "rtnhdr.h"
 #include "mv_stent.h"
 #include "compiler.h"
-#include "underr.h"
 
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp, *stackbase, *stackwarn, *stacktop;
@@ -35,6 +34,7 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 	mv_stent	*mvp_blk;
 	int		i;
 	lv_val		*actp;
+	mval		*actpmv;
 	error_def	(ERR_STACKOFLOW);
 	error_def	(ERR_STACKCRIT);
 
@@ -59,11 +59,12 @@ void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 		actp = va_arg(var, lv_val *);
 		if (!(mask & 1 << i))
 		{
-			if ((!MV_DEFINED(&actp->v)) && (actp->v.str.addr != (char *)&actp->v))
-				underr(&actp->v);
+			actpmv = &actp->v;
+			if ((!MV_DEFINED(actpmv)) && (actpmv->str.addr != (char *)&actp->v))
+				actpmv = underr(actpmv);
 			PUSH_MV_STENT(MVST_PVAL);
 			mv_chain->mv_st_cont.mvs_pval.mvs_val = lv_getslot(curr_symval);
-			mv_chain->mv_st_cont.mvs_pval.mvs_val->v = actp->v;		/* Copy mval input */
+			mv_chain->mv_st_cont.mvs_pval.mvs_val->v = *actpmv;		/* Copy mval input */
 			mv_chain->mv_st_cont.mvs_pval.mvs_val->tp_var = NULL;		/* Fill out rest of new lv_val */
 			mv_chain->mv_st_cont.mvs_pval.mvs_val->ptrs.val_ent.children = 0;
 			mv_chain->mv_st_cont.mvs_pval.mvs_val->ptrs.val_ent.parent.sym = curr_symval;

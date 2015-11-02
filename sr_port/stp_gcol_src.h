@@ -61,7 +61,7 @@ GBLREF int 		mvmax;
 GBLREF int		mlmax;
 GBLREF int 		mvar_index;
 GBLREF hash_table_objcode cache_table;
-GBLREF bool		compile_time, run_time;
+GBLREF bool		compile_time;
 GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF int		stp_array_size;
 GBLREF gvzwrite_struct	gvzwrite_block;

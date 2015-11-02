@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@
 #include "wcs_recover.h"
 #include "tp_unwind.h"
 #include "wcs_backoff.h"
+#include "rel_quant.h"
 #include "wcs_mm_recover.h"
 #include "tp_restart.h"
 #include "repl_msg.h"		/* for gtmsource.h */
@@ -93,7 +94,7 @@ GBLREF	unsigned int	t_tries;
 GBLREF	int		process_id;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	bool		run_time;
+GBLREF	boolean_t	run_time;
 GBLREF	bool		caller_id_flag;
 GBLREF	trans_num	local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	sgmnt_addrs	*cs_addrs;
@@ -287,16 +288,19 @@ void	tp_restart(int newlevel)
 				rts_error(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
 				return; /* for the compiler only -- never executed */
 			} else
-			{	/* as of this writing, this operates only between the 2nd and 3rd tries;
-				 * the 2nd is fast with the assumption of coincidental conflict in an attempt
-				 * to take advantage of the buffer state created by the 1st try
-				 * the next to last try is not followed by a backoff as it may leave the buffers locked,
-				 * to reduce live lock and deadlock issues
-				 * with only 4 tries that leaves only the "middle" for backoff.
+			{
+				/* Yield the CPU so that the restarting process does not block the crit holder and/or other
+				 *	processes (referencing potentially non-intersecting database regions) in case
+				 *	they are waiting for the CPU. This is done using the rel_quant function.
+				 * As of this writing, this operates only between the 2nd and 3rd tries;
+				 * The 2nd is fast with the assumption of coincidental conflict in an attempt
+				 * 	to take advantage of the buffer state created by the 1st try.
+				 * The next to last try is not followed by a rel_quant as it may leave the buffers locked,
+				 * 	to reduce live lock and deadlock issues.
+				 * With only 4 tries that leaves only the "middle" for rel_quant.
 				 */
-				if ((0 < dollar_trestart) && ((CDB_STAGNATE - 1) > dollar_trestart));
-						/* +1 to adjust for "lagging" dollar_trestart, +1 for windage */
-					wcs_backoff(dollar_trestart + 2);
+				if ((0 < dollar_trestart) && ((CDB_STAGNATE - 1) > dollar_trestart))
+					rel_quant();
 			}
 		}
 		if ((CDB_STAGNATE <= t_tries))

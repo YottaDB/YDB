@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,19 +25,18 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include <stdarg.h>
 
 #include "fao_parm.h"
-#include <stdarg.h>
-#include "underr.h"
 #include "mvalconv.h"
 #include "mval2fao.h"
 
-int mval2fao (
-char		*message,		/* text of message in fao format */
-va_list		pfao,			/* argument list of caller */
-UINTPTR_T	*outparm,		/* array of resulting fao parameters */
-int		mcount, int fcount,	/* mvalcount and faocount */
-char		*bufbase, char *buftop)	/* buffer space for !AC and !AS */
+int mval2fao(
+	char		*message,		/* text of message in fao format */
+	va_list		pfao,			/* argument list of caller */
+	UINTPTR_T	*outparm,		/* array of resulting fao parameters */
+	int		mcount, int fcount,	/* mvalcount and faocount */
+	char		*bufbase, char *buftop)	/* buffer space for !AC and !AS */
 {
 	char		*buf;
 	int		i, parmcnt, num;

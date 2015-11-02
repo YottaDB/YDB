@@ -88,7 +88,7 @@ typedef struct	rhead_struct
 	int4			temp_size;		/* (#) temp_size value of current module version */
 	struct rhead_struct	*current_rhead_adr;	/* (#) address of routine header of current module version */
 	struct rhead_struct	*old_rhead_adr;		/* (#) chain of replaced routine headers */
-        IA64_ONLY(char  filler[8];) /* Need to make this structure 16 byte aligned */
+        GTM64_ONLY(char  filler[8];) /* Need to make this structure 16 byte aligned */
 } rhdtyp;
 
 /* Routine table entry */

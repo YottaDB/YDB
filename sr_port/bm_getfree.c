@@ -67,7 +67,7 @@ GBLREF short		dollar_tlevel;
 GBLREF uint4		update_array_size, cumul_update_array_size;
 GBLREF unsigned int	t_tries;
 
-block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
+block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
 {
 	cw_set_element	*cs1;
 	sm_uc_ptr_t	bmp;
@@ -248,7 +248,7 @@ block_id bm_getfree(block_id orig_hint, bool *blk_used, unsigned int cw_work, cw
  */
 boolean_t	is_free_blks_ctr_ok(void)
 {
-	bool		blk_used;
+	boolean_t	blk_used;
 	block_id	bml, free_bit, free_bml, maxbitsthismap;
 	cache_rec_ptr_t	cr;
 	int		cycle;

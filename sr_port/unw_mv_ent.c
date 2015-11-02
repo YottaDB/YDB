@@ -44,6 +44,9 @@ GBLREF lv_val			*active_lv;
 GBLREF gv_key			*gv_currkey;
 GBLREF gv_namehead		*gv_target;
 GBLREF gd_addr			*gd_header;
+GBLREF gd_addr			*gd_targ_addr;
+GBLREF gd_binding		*gd_map;
+GBLREF gd_binding		*gd_map_top;
 GBLREF mval			dollar_etrap;
 GBLREF mval			dollar_ztrap;
 GBLREF mval			dollar_zgbldir;
@@ -84,8 +87,11 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 			{
 				if (dollar_zgbldir.str.len != 0)
+				{
 					gd_header = zgbldir(&dollar_zgbldir);
-				else
+					/* update the gd_map */
+					SET_GD_MAP;
+				} else
 				{
 					dpzgbini();
 					gd_header = NULL;

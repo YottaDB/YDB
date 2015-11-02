@@ -78,7 +78,7 @@ void	comp_indr (mstr *obj)
 	sf->temp_mvals = rtnhdr->temp_mvals;
 	/* Code starts just past the literals that were fixed up and past the validation and hdr offset fields */
 	sf->mpc = (unsigned char *)rtnhdr + rtnhdr->fixup_vals_off + (rtnhdr->fixup_vals_num * sizeof(mval));
-        IA64_ONLY(sf->mpc  = (unsigned char *)ROUND_UP2((UINTPTR_T)sf->mpc, SECTION_ALIGN_BOUNDARY));
+        GTM64_ONLY(sf->mpc  = (unsigned char *)ROUND_UP2((UINTPTR_T)sf->mpc, SECTION_ALIGN_BOUNDARY));
 	sf->mpc = sf->mpc + (2 * sizeof(INTPTR_T)); /*Account for hdroffset and MAGIC_VALUE*/
 	sf->flags = SFF_INDCE;		/* We will be needing cleanup for this frame */
 	DEBUG_ONLY(

@@ -53,7 +53,6 @@
 #include "deferred_signal_handler.h"
 
 GBLREF	boolean_t	*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
-GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	uint4		process_id;
 GBLREF	VSIG_ATOMIC_T	forced_exit;
 GBLREF	int		process_exiting;
@@ -129,7 +128,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	if (0 == (max_writes = writes))			/* If specified writes to do, use that.. */
 		max_writes = csd->n_wrt_per_flu;	/* else, max writes is how many blocks there are */
 	jpc = csa->jnl;
-	assert(csa == cs_addrs);
 	assert(!JNL_ALLOWED(csd) || NULL != jpc);	/* if journaling is allowed, we better have non-null csa->jnl */
 
 	if (dba_bg == csd->acc_meth)

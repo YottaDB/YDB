@@ -25,7 +25,7 @@
 #include "jnl.h"
 #include "send_msg.h"
 
-GBLREF	bool run_time;
+GBLREF	boolean_t	run_time;
 
 void cre_jnl_file_intrpt_rename(int fn_len, sm_uc_ptr_t fn)
 {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -156,7 +156,7 @@ void op_zlink (mval *v, mval *quals)
 						ERR_FILENOTFND, 2, srcnamelen, &srcnamebuf[0]);
 			} else
 			{
-				zro_search(&objstr, &objdir, &srcstr, &srcdir, TRUE);
+				zro_search(&objstr, &objdir, &srcstr, &srcdir, NON_USHBIN_ONLY(TRUE) USHBIN_ONLY(FALSE));
 				if (!objdir && !srcdir)
 					rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr,
 						ERR_FILENOTFND, 2, dollar_zsource.len, dollar_zsource.addr);

@@ -84,7 +84,8 @@ if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 	set aix_loadmap_option = ''
 	set aix_binitfini_option = ''
 	if ( $HOSTOS == "AIX") then
-		set aix_loadmap_option = "-bcalls:$gtm_map/libgtmshr.loadmap -bmap:$gtm_map/libgtmshr.loadmap -bxref:$gtm_map/libgtmshr.loadmap"
+		set aix_loadmap_option = \
+		"-bcalls:$gtm_map/libgtmshr.loadmap -bmap:$gtm_map/libgtmshr.loadmap -bxref:$gtm_map/libgtmshr.loadmap"
 		# Delete old gtmshr since AIX linker fails to overwrite an already loaded shared library.
 		rm -f $3/libgtmshr$gt_ld_shl_suffix
 		# Define gtmci_cleanup as a termination routine for libgtmshr on AIX.
@@ -127,11 +128,6 @@ else if ( "dbg" == $gt_image && "ia64" == $mach_type && "hpux" == $platform_name
 		chatr +dbg enable $3/mumps
 endif
 
-#  Temporary workaround SELinux issues on RH5 and other newer distros. 9/2007 SE
-if ( ($HOSTOS == "Linux") && (-e /usr/local/bin/execstack) ) then
-    /usr/local/bin/execstack -s $3/mumps
-endif
-
 # Note: gtm_svc should link with gtm_dal_svc.o before gtm_mumps_call_clnt.o(libgtmrpc.a) to
 #       resolve conflicting symbols (gtm_init_1, gtm_halt_1 etc..) appropriately.
 if ( $gt_ar_gtmrpc_name != "" ) then
@@ -139,7 +135,8 @@ if ( $gt_ar_gtmrpc_name != "" ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtmsvc.loadmap"
 	endif
-	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtm_svc -L$gtm_obj $gtm_obj/{gtm_svc,mumps_clitab,gtm_rpc_init,gtm_dal_svc}.o $gt_ld_sysrtns \
+	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtm_svc \
+		-L$gtm_obj $gtm_obj/{gtm_svc,mumps_clitab,gtm_rpc_init,gtm_dal_svc}.o $gt_ld_sysrtns \
 		-lmumps -lgnpclient -lcmisockettcp -L$gtm_exe -l$gt_ar_gtmrpc_name $gt_ld_syslibs >& $gtm_map/gtm_svc.map
 	if ( $status != 0  ||  ! -x $3/gtm_svc ) then
 		set buildshr_status = `expr $buildshr_status + 1`

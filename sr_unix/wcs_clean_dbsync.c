@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -131,7 +131,10 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			&& (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid))
 			&& (NULL == check_csaddrs || FALSE == check_csaddrs->now_crit) && (FALSE == csa->now_crit)
 			&& (FALSE != tp_grab_crit(reg)))
-		{
+		{	/* Note that tp_grab_crit invokes wcs_recover in case csd->wc_blocked is non-zero.
+			 * This means we could be doing cache recovery even though we are in interrupt code.
+			 * If this is found undesirable, the logic in tp_grab_crit that invokes wcs_recover has to be re-examined.
+			 */
 			/* Note that if we are here, we have obtained crit using tp_grab_crit. */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
 			/* Do not invoke wcs_flu if the database has a newer journal file than what this process had open when the

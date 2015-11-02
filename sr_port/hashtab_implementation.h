@@ -34,8 +34,8 @@ c) hashtab_objcode.c
 *		GT.M cannot have 0 length mname. So "key" for mname cannot be 0 length.
 */
 
-GBLREF	bool	run_time;
-GBLREF	int4	expand_hashtab_depth;
+GBLREF	boolean_t	run_time;
+GBLREF	int4		expand_hashtab_depth;
 
 #if defined(INT4_HASH)
 

@@ -67,7 +67,7 @@ GBLREF	node_local_ptr_t	locknl;
 GBLREF	uint4			log_interval;
 GBLREF	boolean_t		is_updproc;
 GBLREF	uint4			mutex_per_process_init_pid;
-GBLREF	bool			run_time;
+GBLREF	boolean_t		run_time;
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;

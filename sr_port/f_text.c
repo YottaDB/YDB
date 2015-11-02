@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,10 @@
 
 static readonly mstr zero_mstr;
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
-GBLREF bool 	run_time;
-GBLREF mident	routine_name;
+GBLREF char		window_token;
+GBLREF mident		window_ident;
+GBLREF boolean_t	run_time;
+GBLREF mident		routine_name;
 GBLREF command_qualifier cmd_qlf;
 
 int f_text(oprtype *a, opctype op)

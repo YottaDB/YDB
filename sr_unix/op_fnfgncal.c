@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,11 +12,8 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
 #include <stdarg.h>
-
 #include <errno.h>
-
 #include "gtm_stdlib.h"
 
 #include "stringpool.h"
@@ -31,7 +28,6 @@
 #include "mstrcmp.h"
 #include "gt_timer.h"
 #include "callg.h"
-#include "underr.h"
 #include "callintogtmxfer.h"
 
 /******************************************************************************

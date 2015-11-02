@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,6 @@
 
 #include <stdarg.h>
 
-#include "underr.h"
 #include "hashtab_mname.h"    /* needed for lv_val.h */
 #include "lv_val.h"
 #include "undx.h"
@@ -21,7 +20,7 @@
 GBLDEF bool	undef_inhibit = 0;
 LITREF mval	literal_null;
 
-void	underr (mval *start, ...)
+mval *underr (mval *start, ...)
 {
 	mident_fixed	name;
 	unsigned char	*end;
@@ -30,13 +29,14 @@ void	underr (mval *start, ...)
 
 	va_start (var, start);
 	if (start && undef_inhibit)
-		*start = literal_null;
-	else
+	{
+		va_end(var);
+		return (mval *)&literal_null;
+	} else
 	{
 		end = format_lvname((lv_val *)start, (uchar_ptr_t)name.c, sizeof(name));
 		va_end(var);
 		rts_error(VARLSTCNT(4) ERR_UNDEF, 2, ((char *)end - name.c), name.c);
 	}
-	va_end(var);
-	return;
+	return (mval *)NULL; /* To keep compiler happy */
 }

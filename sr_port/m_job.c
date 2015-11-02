@@ -19,11 +19,11 @@
 #include "advancewindow.h"
 #include "cmd.h"
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
-GBLREF bool 	run_time;
-GBLREF mident	routine_name;
-LITREF mident 	zero_ident;
+GBLREF char		window_token;
+GBLREF mident		window_ident;
+GBLREF boolean_t	run_time;
+GBLREF mident		routine_name;
+LITREF mident		zero_ident;
 
 int m_job(void)
 {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2004, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,6 @@
 #include "cache.h"
 #include "hashtab_objcode.h"
 #include "op.h"
-#include "underr.h"
 #include "mvalconv.h"	/* for i2mval prototype for the MV_FORCE_MVAL macro */
 
 GBLREF	char			window_token;
@@ -52,53 +51,54 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 		src = newtriple(OC_IGETSRC);
 		switch (window_token)
 		{
-		case TK_IDENT:
-			if (rval = lvn(&v, OC_PUTINDX, 0))
-			{
-				s = newtriple(OC_FNINCR);
-				s->operand[0] = v;
-				s->operand[1] = put_tref(src);
-			}
-			break;
-		case TK_CIRCUMFLEX:
-			if (rval = gvn())
-			{
-				s = newtriple(OC_GVINCR);
-				s->operand[0] = put_ilit(0);	/* dummy fill since emit_code does not like empty operand[0] */
-				s->operand[1] = put_tref(src);
-			}
-			break;
-		case TK_ATSIGN:
-			if (shift_gvrefs)
-			{
-				dqinit(&tmpchain, exorder);
-				oldchain = setcurtchain(&tmpchain);
-				if (rval = indirection(&v))
+			case TK_IDENT:
+				if (rval = lvn(&v, OC_PUTINDX, 0))
 				{
-					s = newtriple(OC_INDINCR);
-					s->operand[0] = v;
-					s->operand[1] = put_tref(src);
-					newtriple(OC_GVSAVTARG);
-					setcurtchain(oldchain);
-					dqadd(expr_start, &tmpchain, exorder);
-					expr_start = tmpchain.exorder.bl;
-					triptr = newtriple(OC_GVRECTARG);
-					triptr->operand[0] = put_tref(expr_start);
-				} else
-					setcurtchain(oldchain);
-			} else
-			{
-				if (rval = indirection(&v))
-				{
-					s = newtriple(OC_INDINCR);
+					s = newtriple(OC_FNINCR);
 					s->operand[0] = v;
 					s->operand[1] = put_tref(src);
 				}
-			}
-			break;
-		default:
-			stx_error(ERR_VAREXPECTED);
-			break;
+				break;
+			case TK_CIRCUMFLEX:
+				if (rval = gvn())
+				{
+					s = newtriple(OC_GVINCR);
+					/* dummy fill since emit_code does not like empty operand[0] */
+					s->operand[0] = put_ilit(0);
+					s->operand[1] = put_tref(src);
+				}
+				break;
+			case TK_ATSIGN:
+				if (shift_gvrefs)
+				{
+					dqinit(&tmpchain, exorder);
+					oldchain = setcurtchain(&tmpchain);
+					if (rval = indirection(&v))
+					{
+						s = newtriple(OC_INDINCR);
+						s->operand[0] = v;
+						s->operand[1] = put_tref(src);
+						newtriple(OC_GVSAVTARG);
+						setcurtchain(oldchain);
+						dqadd(expr_start, &tmpchain, exorder);
+						expr_start = tmpchain.exorder.bl;
+						triptr = newtriple(OC_GVRECTARG);
+						triptr->operand[0] = put_tref(expr_start);
+					} else
+						setcurtchain(oldchain);
+				} else
+				{
+					if (rval = indirection(&v))
+					{
+						s = newtriple(OC_INDINCR);
+						s->operand[0] = v;
+						s->operand[1] = put_tref(src);
+					}
+				}
+				break;
+			default:
+				stx_error(ERR_VAREXPECTED);
+				break;
 		}
 		v = put_tref(s);
 		if (comp_fini(rval, &object, OC_IRETMVAL, &v, target->str.len))

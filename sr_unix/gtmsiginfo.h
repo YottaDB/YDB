@@ -40,10 +40,12 @@ typedef struct
 #define GTMSIGINFO_BADR		0x2	/* Bad virtual address information is available */
 #define GTMSIGINFO_USER		0x4	/* User information is available */
 
-#if defined(__osf__) || defined(_AIX) || defined(Linux390)
+#if defined(__osf__) || defined(Linux390)
 typedef	struct sigcontext	gtm_sigcontext_t;
 #elif defined(__CYGWIN__)
 typedef	struct ucontext		gtm_sigcontext_t;
+#elif defined(_AIX)
+typedef struct sigcontext64	gtm_sigcontext_t;
 #else
 typedef	ucontext_t		gtm_sigcontext_t;
 #endif

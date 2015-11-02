@@ -74,7 +74,7 @@ GBLREF pattern			mumps_pattern;
 GBLREF uint4			*pattern_typemask;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF spdesc			rts_stringpool, stringpool;
-GBLREF bool			certify_all_blocks;
+GBLREF boolean_t		certify_all_blocks;
 GBLREF boolean_t		is_replicator;
 
 void	gtcm_fail(int sig);

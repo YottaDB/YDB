@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,8 @@
 			gvnh->gvname.var_name.addr, gvnh->noisolation, status);				\
 }
 
-GBLREF bool		certify_all_blocks, lv_null_subs, undef_inhibit, jobpid;
+GBLREF boolean_t	certify_all_blocks;
+GBLREF bool		lv_null_subs, undef_inhibit, jobpid;
 GBLREF bool		view_debug1, view_debug2, view_debug3, view_debug4;
 GBLREF bool		zdefactive;
 GBLREF unsigned short	zdefbufsiz;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,6 @@
 #include "cache.h"
 #include "hashtab_objcode.h"
 #include "op.h"
-#include "underr.h"
 #include "rtnhdr.h"
 #include "valid_mname.h"
 #include "hashtab.h"

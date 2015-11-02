@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,7 @@
 #include "gtmmsg.h"
 #include "gtm_file_stat.h"
 
-GBLREF bool run_time;
-
+GBLREF boolean_t	run_time;
 
 /* --------------------------------------------------------------------------------
 	This function  renames a file, if exists. Otherwise do nothing.

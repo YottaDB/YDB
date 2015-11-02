@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,11 +82,11 @@ unsigned char	*format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size)
 		{
 		case SBS_BLK_TYPE_INT:
 			MV_FORCE_MVAL(&tempmv, index[cnt]);
-			MV_FORCE_STR(&tempmv);
+			MV_FORCE_STRD(&tempmv);
 			break;
 		case SBS_BLK_TYPE_FLT:
 			MV_ASGN_FLT2MVAL(tempmv, key_tbl[cnt]->num->ptr.sbs_flt[index[cnt]].flt);
-			MV_FORCE_STR(&tempmv);
+			MV_FORCE_STRD(&tempmv);
 			break;
 		case SBS_BLK_TYPE_STR:
 			tempmv.str = key_tbl[cnt]->str->ptr.sbs_str[index[cnt]].str;

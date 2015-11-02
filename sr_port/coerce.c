@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ void coerce(oprtype *a,unsigned short new_type)
 			dqdel(lit, que);
 		ref->opcode = OC_ILIT;
 		ref->operand[0].oprclass = ILIT_REF;
-		ref->operand[0].oprval.ilit = MV_FORCE_INT(&(lit->v));
+		ref->operand[0].oprval.ilit = MV_FORCE_INTD(&(lit->v));
 		return;
 	}
 	if (new_type == OCT_BOOL)

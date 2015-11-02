@@ -13,6 +13,7 @@
 
 #include "rtnhdr.h"
 #include "private_code_copy.h"
+#include "gtm_text_alloc.h"
 
 void adjust_frames(unsigned char *old_ptext_beg, unsigned char *old_ptext_end, unsigned char *new_ptext_beg);
 
@@ -23,7 +24,7 @@ void release_private_code_copy(rhdtyp *rtn)
 		assert(NULL != rtn->shared_ptext_adr);
 
 		adjust_frames(rtn->ptext_adr, rtn->ptext_end_adr, rtn->shared_ptext_adr);
-		free(rtn->ptext_adr);
+		GTM_TEXT_FREE(rtn->ptext_adr);
 		rtn->ptext_end_adr = rtn->shared_ptext_adr + (rtn->ptext_end_adr - rtn->ptext_adr);
 		rtn->ptext_adr = rtn->shared_ptext_adr;
 		rtn->shared_ptext_adr = NULL;

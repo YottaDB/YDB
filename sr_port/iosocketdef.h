@@ -77,7 +77,18 @@
 	memcpy(dsocketptr->dollar_device, ONE_COMMA, sizeof(ONE_COMMA)); \
 	errptr = (char *)STRERROR(syserror); \
 	errlen = STRLEN(errptr); \
-	memcpy(&dsocketptr->dollar_device[sizeof(ONE_COMMA) - 1], errptr, errlen); \
+	memcpy(&dsocketptr->dollar_device[sizeof(ONE_COMMA) - 1], errptr, errlen + 1); /* + 1 for null */ \
+	assert(ERR_SOCKWRITE == gtmerror);				\
+	UNIX_ONLY(if (iod == io_std_device.out)				\
+		{							\
+			if (!prin_out_dev_failure)			\
+				prin_out_dev_failure = TRUE;		\
+			else						\
+			{						\
+				send_msg(VARLSTCNT(1) ERR_NOPRINCIO);	\
+				stop_image_no_core();			\
+			}						\
+		})							\
 	if (socketptr->ioerror) \
 		rts_error(VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, errlen, errptr); \
 }

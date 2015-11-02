@@ -24,7 +24,8 @@
  * ------------------------------------------------------------------
  */
 GBLREF xfer_entry_t			xfer_table[];
-GBLREF volatile bool 			run_time, ctrlc_on;
+GBLREF volatile boolean_t		run_time;
+GBLREF volatile bool			ctrlc_on;
 GBLREF volatile int4			ctrap_action_is,outofband;
 
 void ctrlc_set(int4 dummy_param)
@@ -32,7 +33,8 @@ void ctrlc_set(int4 dummy_param)
 	int 		op_fetchintrrpt(), op_startintrrpt(), op_forintrrpt();
 
 	if (!outofband && run_time)
-	{	if (ctrlc_on)
+	{
+		if (ctrlc_on)
 		{
 			ctrap_action_is = 0;
 			outofband = ctrlc;

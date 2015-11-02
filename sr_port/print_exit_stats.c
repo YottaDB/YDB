@@ -17,13 +17,19 @@
 #include "fnpc.h"
 #include "cache.h"
 #include "sockint_stats.h"
+#include "gtm_text_alloc.h"
 
 GBLREF	uint4		gtmDebugLevel;		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
 void print_exit_stats(void)
 {
 	if ((GDL_SmStats | GDL_SmDumpTrace | GDL_SmDump) & gtmDebugLevel)
+	{
 		printMallocInfo();
+#ifdef COMP_GTA
+		printAllocInfo();	/* Print mmap stats if gtm_text_alloc.c was built */
+#endif
+	}
 #ifdef DEBUG
 	if (GDL_PrintPieceStats & gtmDebugLevel)
 		fnpc_stats();

@@ -185,7 +185,7 @@ typedef struct v15_sgmnt_data_struct
 	   same file -- only an extremely similar one whose use of old shared memory created integrity errors. */
 	union
 	{
-		time_t	date_time;	/* When file was created */
+		v15_time_t	date_time;	/* When file was created */
 		int	filler[2];	/* Filler to make sure above is okay even if takes 2 words on some platform */
 	} creation;
 	CNTR4DCL(filler_wcs_active_lvl,14);	/* (n_wcrs / 2) - entries in wcq_active  (trips wcs_wtstart) */

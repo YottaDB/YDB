@@ -89,6 +89,7 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_cc_option_DDEBUG	"-DDEBUG"	# define DEBUG compilation-time macro
 
 	setenv	gt_cc_option_I		"-I/usr/local/include"	# specify ICU header (include) file directory
+	setenv	gt_cc_option_I		" $gt_cc_option_I -I/usr/include/libelf" # Libelf is under different directory in SUSE
 								#   (set by gtmsrc.csh during version command)
 	setenv	gt_cc_option_debug	"-g"		# generate debugger information
 	setenv	gt_cc_option_nooptimize	""		# don't optimize generated code
@@ -214,7 +215,6 @@ alias	mupip	'$gtm_exe/mupip'
 alias	version	'set setactive_parms=(\!*); source $gtm_tools/setactive.csh'
 
 if ( $?prompt == "1" ) then
-
 	# On Unix, we have to define all of the shorter forms as individual symbols, although
 	# it's unlikely any forms other than "ver" or "version" are ever used.  Note we only
 	# do this for login (interactive) processes; shell scripts should not need to abbreviate.
@@ -224,8 +224,6 @@ if ( $?prompt == "1" ) then
 	alias	versio	version
 endif
 
-
-
 # Platform-specific overrides, if any:
 
 if ( -f $gtm_tools/gtm_env_sp.csh ) then
@@ -234,4 +232,4 @@ endif
 
 # Allow platform specific gt_ld_ci related symbol changes
 # force the linker to retain gtmci.o & dependent modules even if not referenced.
-	setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_gtmshr"
+setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_gtmshr"

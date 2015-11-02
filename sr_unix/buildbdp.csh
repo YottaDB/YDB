@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -37,9 +37,9 @@ if ( $buildbdp_status != 0 ) then
 endif
 
 $shell $gtm_tools/buildshr.csh $1 $2 $3
-@ buildbdp_status = $buildbdp_status + $status
+if ($status != 0) @ buildbdp_status = $status
 
 $shell $gtm_tools/buildaux.csh $1 $2 $3
-@ buildbdp_status = $buildbdp_status + $status
+if ($status != 0) @ buildbdp_status = $status
 
 exit $buildbdp_status

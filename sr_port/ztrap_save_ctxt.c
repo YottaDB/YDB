@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "rtnhdr.h"
 #include "mv_stent.h"
 #include "mvalconv.h"
@@ -27,7 +28,7 @@ void ztrap_save_ctxt(void)
 	error_def(ERR_STACKCRIT);
 
 	level = dollar_zlevel();
-	if (level == MV_FORCE_INT(&ztrap_pop2level))
+	if (level == MV_FORCE_INTD(&ztrap_pop2level))
 		return;
 
 	PUSH_MV_STENT(MVST_MSAV);

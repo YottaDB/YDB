@@ -113,37 +113,9 @@
 #  define GTM_MALLOC_REENT
 #else
 /* These routines for Unix are NOT thread-safe */
-
-#  if defined(__linux__) && defined(__ia64)
-#    define ACTUAL_MALLOC(size, addr) 											\
-	if (force_text_alloc) 												\
-	{ 														\
-                void   *alignaddr;	/* posix_memalign writes to *alignaddr so use temp to keep 'addr' in reg */     \
-	        size_t rsize;												\
-		int    rc;												\
-	        rsize = ROUND_UP2(size, gtm_os_page_size);								\
-		rc = posix_memalign(&alignaddr, gtm_os_page_size, rsize);						\
-		if (0 == rc)												\
-                        rc = (-1 == mprotect(alignaddr, rsize, PROT_READ | PROT_WRITE | PROT_EXEC)) ? errno : 0;	\
-                if (0 != rc)												\
-                {													\
-			--gtmMallocDepth;                                               				\
-			--fast_lock_count;                                              				\
-			assert(FALSE);                                                  				\
-		        rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("posix_memalign/memprotect"), CALLFROM, rc);	\
-                }													\
-                addr = alignaddr;											\
-	} else 														\
-		addr = (void *)malloc(size);
-
-#  else /* !(ia64 && linux) */
-#    define ACTUAL_MALLOC(size, addr)						\
- 	addr = (void *)malloc(size);
-#  endif  /* linux && ia64 */
-
 #  define MALLOC(size, addr) 							\
 {										\
-	ACTUAL_MALLOC(size, addr)						\
+	addr = (void *)malloc(size);						\
 	if (NULL == (void *)addr)						\
 	{									\
 		--gtmMallocDepth;						\
@@ -192,14 +164,14 @@ typedef struct storExtHdrStruct
 #define MAXDEFERQUEUES 10
 #ifdef DEBUG
 #  define STOR_EXTENTS_KEEP 1 /* Keep only one extent in debug for maximum testing */
-#  define MINTWO 64
-#  define MAXINDEX 5
+#  define MINTWO NON_GTM64_ONLY(64) GTM64_ONLY(128)
+#  define MAXINDEX NON_GTM64_ONLY(5) GTM64_ONLY(4)
 #  define STE_FP(p) p->fPtr
 #  define STE_BP(p) p->bPtr
 #else
 #  define STOR_EXTENTS_KEEP 5
-#  define MINTWO 16
-#  define MAXINDEX 7
+#  define MINTWO NON_GTM64_ONLY(16) GTM64_ONLY(32)
+#  define MAXINDEX NON_GTM64_ONLY(7) GTM64_ONLY(6)
 #  define STE_FP(p) p->userStorage.links.fPtr
 #  define STE_BP(p) p->userStorage.links.bPtr
 #endif
@@ -336,28 +308,39 @@ OS_PAGE_SIZE_DECLARE
 
 STATICD	boolean_t	gtmSmInitialized;		/* Initialized indicator */
 
-#if defined(__linux__) && defined(__ia64)
-GBLREF boolean_t 	force_text_alloc;		/* Explicitly turn on PROT_EXEC permission for allocated blocks */
-#endif /* __linux__ && __ia64 */
-
 #define SIZETABLEDIM MAXTWO/MINTWO
 STATICD int size2Index[SIZETABLEDIM];
 
-STATICD readonly struct
+GBLRDEF readonly struct
 {
 	unsigned char nullHMark[4];
 	unsigned char nullStr[1];
 	unsigned char nullTMark[4];
-} NullStruct = {0xde, 0xad, 0xbe, 0xef, 0x00, 0xde, 0xad, 0xbe, 0xef};
+} NullStruct
+#ifdef DEBUG
+        = {0xde, 0xad, 0xbe, 0xef, 0x00, 0xde, 0xad, 0xbe, 0xef}
+#endif
+        ;
 
 #ifdef DEBUG
 /* Arrays allocated with size of MAXINDEX + 2 are sized to hold an extra
-   entry for "real malloc" type allocations. */
+   entry for "real malloc" type allocations. Note that the arrays start with
+   the next larger element with GTM64 due to increased overhead from the
+   8 byte pointers.
+*/
 
-STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};	/* Powers of two element sizes */
+STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {
+#ifndef GTM64
+	64,
+#endif
+	128, 256, 512, 1024, 2048, 0xFFFFFFFF};	/* Powers of two element sizes */
 STATICD readonly unsigned char markerChar[4] = {0xde, 0xad, 0xbe, 0xef};
 #else
-STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {16, 32, 64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};
+STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {
+#ifndef GTM64
+	16,
+#endif
+	32, 64, 128, 256, 512, 1024, 2048, 0xFFFFFFFF};
 #endif
 
 STATICD storElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anchor for dbl-linked
@@ -379,9 +362,9 @@ STATICD readonly unsigned char backfillMarkC[4] = {0xde, 0xad, 0xbe, 0xef};
 #  endif
 #endif
 
-GBLRDEF	int	totalRmalloc;				/* Total storage currently (real) malloc'd (includes extent blocks) */
-GBLRDEF int	totalAlloc;				/* Total allocated (includes allocation overhead but not free space */
-GBLRDEF int	totalUsed;				/* Sum of user allocated portions (totalAlloc - overhead) */
+GBLREF	int	totalRmalloc;				/* Total storage currently (real) malloc'd (includes extent blocks) */
+GBLREF  int	totalAlloc;				/* Total allocated (includes allocation overhead but not free space */
+GBLREF  int	totalUsed;				/* Sum of user allocated portions (totalAlloc - overhead) */
 
 #ifdef DEBUG
 /* Define variables used to instrument how our algorithm works */
@@ -452,7 +435,7 @@ STATICR void gtmSmInit(void)
 	/* For a pro build, this var wasn't set so the assert makes no sense so bypass it */
 	assert(gtmdbglvl_inited);
 #endif
-#if defined(__linux__) && defined(__ia64)
+#if defined(__linux__) && (defined(__ia64) || defined(__x86_64__))
         /* This will make sure that all the memory allocated using 'malloc' will be in heap and no 'mmap' is used.
          * This is needed to make sure that the offset calculation that we do at places(que_ent, chache_que, etc..)
          * using 2 'malloc'ed memory can be hold in an integer. Though this will work without any problem as the
@@ -513,6 +496,7 @@ storElem *findStorElem(int sizeIndex)
 	UNIX_ONLY(error_def(ERR_SYSCALL);)
 
 	++sizeIndex;
+	DEBUG_ONLY(hdrSize = OFFSETOF(storElem, userStorage));	/* Size of storElem header */
 	if (MAXINDEX >= sizeIndex)
 	{	/* We have more queues to search */
 	        GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr);
@@ -529,7 +513,6 @@ storElem *findStorElem(int sizeIndex)
 #ifdef DEBUG
 		memcpy(uStor2->headMarker, markerChar, sizeof(markerChar));	/* Put header tag in place */
 		/* Backfill entire block being freed so usage of it will cause problems */
-		hdrSize = OFFSETOF(storElem, userStorage);			/* Size of storElem header */
 		if (GDL_SmBackfill & gtmDebugLevel)
 			backfill((unsigned char *)uStor2 + hdrSize, TwoTable[sizeIndex] - hdrSize);
 #endif
@@ -575,7 +558,6 @@ storElem *findStorElem(int sizeIndex)
 			memcpy(uStor2->headMarker, markerChar, sizeof(markerChar));
 			/* Backfill entire block on free queue so we can detect trouble
 			   with premature usage or overflow from something else */
-			hdrSize = OFFSETOF(storElem, userStorage);			/* Size of storElem header */
 			if (GDL_SmBackfill & gtmDebugLevel)
 				backfill((unsigned char *)uStor2 + hdrSize, TwoTable[MAXINDEX] - hdrSize);
 #endif
@@ -723,7 +705,7 @@ void *gtm_malloc(size_t size)
 				 * DEBUG) but that is better than maintaining an incorrect value (possible if it is incremented
 				 * by one amount during MALLOC and decremented by another amount during FREE).
 				 */
-				if (LINUX_ONLY(IA64_ONLY(!force_text_alloc &&)) MAXTWO >= tSize GMR_ONLY(&& !reentered))
+				if (MAXTWO >= tSize GMR_ONLY(&& !reentered))
 				{	/* Use our memory manager for smaller pieces */
 					sizeIndex = GetSizeIndex(tSize);		/* Get index to size we need */
 					assert(sizeIndex >= 0 && sizeIndex <= MAXINDEX);
@@ -829,19 +811,6 @@ void *gtm_malloc(size_t size)
 #endif
 }
 
-#if defined(__linux__) && defined(__ia64)
-/* Forces use of posix_memalign to allocate storage instead of malloc so we can set execute permissions for the storage */
-void *gtm_text_malloc(size_t size)
-{
-  	void *addr;
-
-	force_text_alloc = 1;
-	addr = gtm_malloc(size);
-	force_text_alloc = 0;
-	return addr;
-}
-#endif /* __linux__ && __ia64 */
-
 /* Release the free storage at the given address */
 void gtm_free(void *addr)
 {
@@ -932,7 +901,7 @@ void gtm_free(void *addr)
 			if (GDL_SmChkAllocBackfill & gtmDebugLevel)
 			{	/* Use backfill check method for after-allocation metadata */
 				assert(backfillChk(trailerMarker + sizeof(markerChar),
-				(int)(uStor->realLen - uStor->allocLen - hdrSize - sizeof(markerChar))));
+						   (int)(uStor->realLen - uStor->allocLen - hdrSize - sizeof(markerChar))));
 			}
 
 			/* Remove element from allocated queue unless element is from a reentered malloc call. In that case, just
@@ -1031,6 +1000,11 @@ void gtm_free(void *addr)
 				assert(REAL_MALLOC == sizeIndex);		/* Better be a real malloc type block */
 				INCR_CNTR(freeCnt[MAXINDEX + 1]);		/* Count free of malloc */
 				allocSize = uStor->realLen;
+#ifdef DEBUG
+                                /* Backfill entire block being freed so usage of it will cause problems */
+                                if (GDL_SmBackfill & gtmDebugLevel)
+                                        backfill((unsigned char *)uStor, allocSize);
+#endif
 				FREE(allocSize, uStor);
 				totalRmalloc -= allocSize;
 				totalAlloc -= allocSize;

@@ -61,6 +61,6 @@ typedef unix_file_info		fi_type;
 #define DEF_DB_EXT_NAME			"dat"
 #define DEF_JNL_EXT_NAME		".mjl"
 
-uint4 jnl_file_open(gd_region *reg, bool init, int4 dummy);
+uint4 jnl_file_open(gd_region *reg, bool init, void *dummy);
 
 #endif /* JNLSP_H_INCLUDED */

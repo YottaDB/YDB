@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ int exttime (uint4 time, char *buffer, int extract_len)
 	 * seems to do a call to syslog() which in turn invokes a system time routine (__tz_convert() in linux) which seems to
 	 * get suspended presumably waiting for the same interlock that __tzset() has already obtained. a fix for rollback to
 	 * work around this is to block any signals that can be sent externally while it is doing time system calls.
-	 * hence the blocking of SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT (through the use of block_sigsent) before doing
+	 * hence the blocking of SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT, SIGALRM (through the use of block_sigsent) before doing
 	 * the call to dollarh() [C9D06-002271].
 	 */
 	sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);

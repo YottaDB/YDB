@@ -49,7 +49,7 @@ GBLREF int4			lkid,lid;
 LITREF mstr			chset_names[];
 
 LITREF	unsigned char		io_params_size[];
-GBLREF	bool			run_time;
+GBLREF	boolean_t		run_time;
 GBLDEF	io_desc			*active_device;
 GBLREF	mstr			sys_input;
 GBLREF	mstr			sys_output;
@@ -421,6 +421,5 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 
 	if (run_time)
 		return (status);
-
 	return TRUE;
 }

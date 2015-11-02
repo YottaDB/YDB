@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,10 +20,10 @@
 #include "mlabel2xtern.h"
 #include "mrout2xtern.h"
 
-GBLREF bool 	run_time;
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
-GBLREF mident	routine_name;
+GBLREF boolean_t	run_time;
+GBLREF char		window_token;
+GBLREF mident		window_ident;
+GBLREF mident		routine_name;
 
 triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_commarg, boolean_t labref)
 {
