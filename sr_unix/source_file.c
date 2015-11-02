@@ -103,7 +103,7 @@ void	compile_source_file(unsigned short flen, char *faddr)
 			}
 			if (compiler_startup())
 				dollar_zcstatus = ERR_ERRORSUMMARY;
-			else if (FD_INVALID != object_file_des)
+			if (FD_INVALID != object_file_des)
 			{
 				CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
 				if (-1 == rc)

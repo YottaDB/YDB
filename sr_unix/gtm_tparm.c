@@ -33,15 +33,17 @@ char *gtm_tparm(char *c, int p1, int p2)
 	char	ebcdicbuf[32];	/* ESC_LEN in io.h is 16, allow extra */
 	char	*retptr;
 
-	len = strlen(c);
-	if (sizeof(ebcdicbuf) < len)
+	len = strlen(c) + 1;
+	if (sizeof(ebcdicbuf) <= len)
 		len = sizeof(ebcdicbuf) - 1;
 	asc_to_ebc((unsigned char *)ebcdicbuf, (unsigned char *)c, len);
+	ebcdicbuf[len] = '\0';	/* ensure null terminated */
 	retptr = tparm(ebcdicbuf, p1, p2, 0, 0, 0, 0, 0, 0, 0);
-	len = strlen(retptr);
-	if (sizeof(gtm_tparm_buf) < len)
+	len = strlen(retptr) + 1;
+	if (sizeof(gtm_tparm_buf) <= len)
 		len = sizeof(gtm_tparm_buf) - 1;
 	ebc_to_asc((unsigned char *)gtm_tparm_buf, (unsigned char *)retptr, len);
+	gtm_tparm_buf[len] = '\0';	/* ensure null terminated */
 	return gtm_tparm_buf;
 #endif
 }

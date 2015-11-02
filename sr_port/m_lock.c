@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -105,8 +105,7 @@ int m_lock(void)
 		if (!intexpr(&(ref->operand[0])))
 			return FALSE;
 		ins_triple(ref);
-		if (ox != OC_LCKDECR)
-			newtriple(OC_TIMTRU);
+		newtriple(OC_TIMTRU);
 	}
 	return TRUE;
 }

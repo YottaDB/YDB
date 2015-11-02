@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -34,7 +34,7 @@ endif
 
 alias	gt_as_local	"$comlist_gt_as"
 
-set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
+set platform_name = `uname | sed 's/-//g' | sed 's,/,,' | tr '[A-Z]' '[a-z]'`
 set mach_type = `uname -m`
 
 if ( "ia64" == $mach_type && "linux" == $platform_name ) then
@@ -44,6 +44,12 @@ if ( "ia64" == $mach_type && "linux" == $platform_name ) then
     gt_cpp -E $1 > ${gtm_obj}/${file}_cpp.s
     gt_as_local ${gtm_obj}/${file}_cpp.s -o ${gtm_obj}/${file}.o
     \rm ${gtm_obj}/${file}_cpp.s
+else if ( "os390" == $platform_name ) then
+    set file = `basename $1`
+    set file = $file:r
+
+    gt_as_local $1
+    if ( -e $gtm_obj/${file}.dbg )  chmod ugo+r $gtm_obj/${file}.dbg
 else
     gt_as_local $1
 endif

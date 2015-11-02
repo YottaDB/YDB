@@ -113,7 +113,6 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspace)
 {
 	int4		status;
-	int4		size;
 	mstr		tn;		/* translated name */
 	mstr		chset_mstr;
 	int		oflag;
@@ -243,7 +242,6 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 	if ((-2 == file_des) && (dev_open != naml->iod->state) && (us != naml->iod->type) && (tcp != naml->iod->type))
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
-		size = 0;
 		p_offset = 0;
 		ichset_specified = ochset_specified = FALSE;
 		while(iop_eol != *(pp->str.addr + p_offset))
@@ -251,13 +249,6 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 			assert((params) *(pp->str.addr + p_offset) < (params)n_iops);
 			switch ((ch = *(pp->str.addr + p_offset++)))
 			{
-				case iop_allocation:
-					if (rm == naml->iod->type)
-					{
-						GET_LONG(size, pp->str.addr + p_offset);
-						size *= 512;
-					}
-					break;
 				case iop_append:
 					if (rm == naml->iod->type)
 						oflag |= O_APPEND;
@@ -358,7 +349,7 @@ static bool mu_open_try(io_log_name *naml, io_log_name *tl, mval *pp, mval *mspa
 		 * the check for EINTR below is valid and should not be converte d to an EINTR
 		 * wrapper macro, due to the other errno values being checked.
 		 */
-		while ((-1 == (file_des = OPEN4(buf, oflag, umask_creat, size))))
+		while ((-1 == (file_des = OPEN3(buf, oflag, umask_creat))))
 		{
 			if (   EINTR == errno
 			       || ETXTBSY == errno

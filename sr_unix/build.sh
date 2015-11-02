@@ -16,8 +16,8 @@ if [ $# -lt 1 ]; then
 	echo "gcrypt: Build the plugin with libgcrypt"
 	echo "openssl: Build the plugin with OpenSSL"
 	echo "build_type:"
-	echo "p|P: Build the plugin with debug information"
-	echo "d|D: Build the plugin without debug information"
+	echo "d|D: Build the plugin with debug information"
+	echo "p|P: Build the plugin without debug information"
 	exit 1
 fi
 
@@ -152,19 +152,20 @@ echo $compile_verbose
 $compile_verbose
 build_status=`expr $build_status + $?`
 $NL
-file $gtm_dist/mumps | grep "64" > /dev/null
-if [ $? -eq 0 ]; then
-	libpath="/usr/local/lib64:/usr/lib64:/usr/local/lib:/usr/lib"
-else
-	libpath="/usr/lib32:/emul/ia32-linux/usr/lib:/usr/local/lib:/usr/lib"
-fi
-
-rm -rf $build_path/*.o
 
 if [ "" = "$gtm_dist" ]; then
 	echo "Environment variable gtm_dist undefined. Cannot compile GETPASS.m"
 	exit 1
 fi
+
+file $gtm_dist/mumps | grep "64" > /dev/null
+if [ $? -eq 0 ]; then
+	libpath="/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/lib64:/lib"
+else
+	libpath="/usr/local/lib32:/usr/local/lib:/usr/lib32:/usr/lib:/lib32:/lib"
+fi
+
+rm -rf $build_path/*.o
 
 #compile GETPASS in non-UTF8 mode
 LC_CTYPE=C
@@ -187,9 +188,9 @@ if [ -d $gtm_dist/utf8 ]; then
 		export gtm_chset_locale
 	else
 		utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
+		LC_CTYPE=$utflocale
+		export LC_CTYPE
 	fi
-	LC_CTYPE=$utflocale
-	export LC_CTYPE
 	gtm_chset=UTF-8
 	export gtm_chset
 	unset LC_ALL

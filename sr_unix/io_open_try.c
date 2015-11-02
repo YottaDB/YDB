@@ -62,7 +62,6 @@ LITREF	mstr			chset_names[];
 bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mval *mspace)	/* timeout in seconds */
 {
 	uint4		status;
-	int4		size;
 	int4		msec_timeout;	/* timeout in milliseconds */
 	mstr		tn;		/* translated name */
 	int		oflag;
@@ -293,7 +292,6 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	    && (tcp != naml->iod->type) && (gtmsocket != naml->iod->type) && (pi != naml->iod->type))
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
-		size = 0;
 		p_offset = 0;
 		ichset_specified = ochset_specified = FALSE;
 		while(iop_eol != *(pp->str.addr + p_offset))
@@ -308,13 +306,6 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					s2pool(&naml->iod->error_handler);
 					break;
 				}
-				case iop_allocation:
-					if (rm == naml->iod->type)
-					{
-						GET_LONG(size, pp->str.addr);
-						size *= 512;
-					}
-					break;
 				case iop_append:
 					if (rm == naml->iod->type)
 						oflag |= O_APPEND;
@@ -388,9 +379,9 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 
 		/*
 		 * no OPEN EINTR macros in the following while loop  due to complex error checks and processing between
-		 * top of while and calls to OPEN4
+		 * top of while and calls to OPEN3
 		 */
-		while ((-1 == (file_des = OPEN4(buf, oflag, umask_creat, size))) && !out_of_time)
+		while ((-1 == (file_des = OPEN3(buf, oflag, umask_creat))) && !out_of_time)
 		{
 			if (timed && (0 == msec_timeout))
 				out_of_time = TRUE;
@@ -412,7 +403,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					/* oflag must be O_RDWR, set it to be O_RDONLY 	*/
 					oflag &= ~O_WRONLY;
 					oflag |= O_NONBLOCK;
-					while ((-1 == (file_des = OPEN4(buf, oflag, umask_creat, size))) && !out_of_time)
+					while ((-1 == (file_des = OPEN3(buf, oflag, umask_creat))) && !out_of_time)
 					{
 						if (0 == msec_timeout)
 							out_of_time = TRUE;
@@ -433,7 +424,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					/* oflag was just made O_RDONLY, now set it to be O_WRONLY */
 					oflag |= O_WRONLY;
 					oflag &= ~O_RDONLY;
-					while ((-1 == (file_des_w = OPEN4(buf, oflag, umask_creat, size))) && !out_of_time)
+					while ((-1 == (file_des_w = OPEN3(buf, oflag, umask_creat))) && !out_of_time)
 					{
 						if (0 == msec_timeout)
 							out_of_time = TRUE;

@@ -162,7 +162,7 @@ rm -f ${TMP_DIR}_* >& /dev/null
 
 onintr cleanup
 
-set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
+set platform_name = `uname | sed 's/-//g' | sed 's,/,,' | tr '[A-Z]' '[a-z]'`
 set mach_type = `uname -m`
 
 if ($?RUNALL_BYPASS_VERSION_CHECK == 0) then
@@ -210,12 +210,13 @@ dbcertify dbcertify
 dbcertify_cmd dbcertify
 gtmcrypt_dbk_ref gtmcrypt
 gtmcrypt_pk_ref gtmcrypt
+gtmcrypt_sym_ref gtmcrypt
 gtmcrypt_ref gtmcrypt
 ascii2hex gtmcrypt
 maskpass gtmcrypt
 LABEL
 
-set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_pk_ref gtmcrypt_ref ascii2hex maskpass"
+set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_pk_ref gtmcrypt_ref ascii2hex maskpass"
 # find all libnames other than mumps
 pushd $gtm_tools >& /dev/null
 set comlist_liblist = `ls *.list | sed 's/.list//' | sed 's/^lib//'`
@@ -232,7 +233,7 @@ rm -f $gtm_inc/__temp_runall_* >& /dev/null
 rm -f $gtm_src/__temp_runall_* >& /dev/null
 rm -f ${TMP_DIR}_inc_files >& /dev/null
 rm -f ${TMP_DIR}_src_files >& /dev/null
-
+rm -f ${TMP_DIR}_latest_exe
 touch ${TMP_DIR}_inc_files
 touch ${TMP_DIR}_src_files
 
@@ -249,24 +250,30 @@ if ($#argv) then
 else
 	echo "...... Searching for --------> Last Built Executable in $gtm_exe ...... "
 	pushd $gtm_exe >& /dev/null
-	set latest_exe = `ls -lart | grep "\-..x..x..x" | tail -1 | awk '{print $NF}'`
+	# Look down the $gtm_exe recursively so that the search for recent build executable is inclusive of $gtm_exe/plugin/ and
+	# $gtm_exe/plugin/gtmcrypt. Also the new shell invocation is needed to redirect the stderr that will arise due to the
+	# gtmsecshr privileges for which (find .) will issue 'permission denied'.
+	(ls -lart `find . -type f`| grep "\-..x..x..x" | tail -1 | awk '{print $NF}' > ${TMP_DIR}_latest_exe) >&! /dev/null
+	set latest_exe_with_rel_path = `cat ${TMP_DIR}_latest_exe`
+	set latest_exe = `basename $latest_exe_with_rel_path`
+	rm -f ${TMP_DIR}_latest_exe
 	popd >& /dev/null
 	if ("$latest_exe" != "") then
 		echo "...... Searching for --------> out-of-date INCLUDEs ...... "
 		pushd $gtm_inc >& /dev/null
-		ln -s $gtm_exe/${latest_exe} __temp_runall_${latest_exe}
+		ln -s $gtm_exe/${latest_exe_with_rel_path} __temp_runall_${latest_exe}
 		ls -1Lat | sed -n '1,/__temp_runall_'${latest_exe}'/p' | grep -E '(\.h$|\.si$)' >>&! ${TMP_DIR}_inc_files
 		rm -f __temp_runall_${latest_exe} >& /dev/null
 		popd >& /dev/null
 		echo "...... Searching for --------> out-of-date SOURCEs ...... "
 		pushd $gtm_src >& /dev/null
-		ln -s $gtm_exe/${latest_exe} __temp_runall_${latest_exe}
+		ln -s $gtm_exe/${latest_exe_with_rel_path} __temp_runall_${latest_exe}
 		ls -1Lat | sed -n '1,/__temp_runall_'${latest_exe}'/p' | grep -E '(\.c$|\.msg$|\.s$)' >>&! ${TMP_DIR}_src_files
 		rm -f __temp_runall_${latest_exe} >& /dev/null
 		popd >& /dev/null
 		echo "...... Searching for --------> out-of-date PCT ROUTINEs ...... "
 		pushd $gtm_pct >& /dev/null
-		ln -s $gtm_exe/${latest_exe} __temp_runall_${latest_exe}
+		ln -s $gtm_exe/${latest_exe_with_rel_path} __temp_runall_${latest_exe}
 		ls -1Lat | sed -n '1,/__temp_runall_'${latest_exe}'/p' | grep -E '\.m$' >>&! ${TMP_DIR}_pct_files
 		rm -f __temp_runall_${latest_exe} >& /dev/null
 		popd >& /dev/null
@@ -392,6 +399,7 @@ echo ""
 echo "****************************** COMPILING *********************************"
 echo ""
 
+set exclude_compile_list_modified = "FALSE"
 if (! -z ${TMP_DIR}_src_files) then
 	foreach file (`cat ${TMP_DIR}_src_files`)
 		set file = $file:t
@@ -404,7 +412,6 @@ if (! -z ${TMP_DIR}_src_files) then
 
 		# Do not compile plugin files if they are modified. Compilation and subsequent build will happen in
 		# buildaux.csh
-		set exclude_compile_list_modified = "FALSE"
 		foreach exclude_file ($exclude_compile_list)
 			if ($exclude_file == $file) then
 				set exclude_compile_list_modified = "TRUE"
@@ -432,6 +439,9 @@ if (! -z ${TMP_DIR}_src_files) then
 				    gt_cpp -E ${gtm_src}/${file}.s > ${gtm_src}/${lfile}_cpp.s
 				    runall_as ${gtm_src}/${lfile}_cpp.s  -o ${lfile}.o
 				    \rm ${gtm_src}/${lfile}_cpp.s
+				else if ( "os390" == $platform_name ) then
+					runall_as $gtm_src/${file}.s
+					if ( -e $gtm_obj/${file}.dbg )  chmod ugo+r $gtm_obj/${file}.dbg
 				else
 				    runall_as $gtm_src/${file}.s
 				endif
@@ -553,11 +563,18 @@ endif # if (! -z ${TMP_DIR}_src_files) then
 if ("$mumps_changed" != "" || "$gtmplatformlib_changed" != "") then
 	$shell $gtm_tools/build${RUNALL_IMAGE}.csh $RUNALL_VERSION
 else
-	if (-e ${TMP_DIR}_main_.final) then
-		set build_routine = `cat ${TMP_DIR}_main_.final`
-	else # it means that there were no other changes than the PCT/GDE changes
-		set build_routine = "gde"
+	# If the plugin files are modified, include them in the final list of build routines.
+	if ("TRUE" == "$exclude_compile_list_modified") then
+		echo "gtmcrypt" >>! ${TMP_DIR}_build_routine.final
 	endif
+	if (-e ${TMP_DIR}_main_.final) then
+		cat ${TMP_DIR}_main_.final >>! ${TMP_DIR}_build_routine.final
+	endif
+	# If we have a non-zero pct file list then include gde as one of the final build routines
+	if (! -z ${TMP_DIR}_pct_files) then
+		echo "gde" >>! ${TMP_DIR}_build_routine.final
+	endif
+	set build_routine = `cat ${TMP_DIR}_build_routine.final`
 	$shell $gtm_tools/buildaux.csh $RUNALL_VERSION $RUNALL_IMAGE $gtm_root/$RUNALL_VERSION/$RUNALL_IMAGE $build_routine
 endif
 
@@ -575,7 +592,7 @@ endif
 
 # Generate Special Debug Files (z/OS specific at the moment)
 if ( -e $gtm_tools/gtm_dbgld.csh ) then
-	$gtm_tools/gtm_dbgld.csh
+	$gtm_tools/gtm_dbgld.csh $RUNALL_IMAGE
 endif
 
 cleanup:

@@ -44,6 +44,7 @@ GBLREF	unsigned char		cw_set_depth;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			update_array_size;
+GBLREF	gv_namehead		*gv_target;
 
 /* --------------------------------------------------------------------------------------------
  * This code is very similar to the code in gvcst_put for the non-block-split case as well as
@@ -201,5 +202,11 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 				cse->blk_checksum = 0;
 		}
 	}
+	assert(NULL != gv_target);
+	/* If clue is known to be non-zero, we have the potential for the first_rec part of it to be unreliable.
+	 * Reset it to be safe. See comment in similar section in tp_hist for details on why.
+	 */
+	if (gv_target->clue.end)
+		GVT_CLUE_INVALIDATE_FIRST_REC(gv_target);
 	return cdb_sc_normal;
 }

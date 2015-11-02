@@ -54,6 +54,7 @@
 #include "hashtab.h"
 #include "min_max.h"
 #include "alias.h"
+#include "gtmimagename.h"
 
 #ifndef STP_MOVE
 GBLDEF symval		*first_symval;
@@ -92,7 +93,7 @@ GBLREF int4		SPGC_since_LVGC;				/* stringpool GCs since the last dead-data GC *
 GBLREF int4		LVGC_interval;					/* dead data GC done every LVGC_interval stringpool GCs */
 GBLREF boolean_t	suspend_lvgcol;
 GBLREF hash_table_str	*complits_hashtab;
-
+GBLREF mval		director_mval, window_mval;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -199,9 +200,12 @@ static mstr		**topstr, **array, **arraytop;
 	} \
 }
 
+GBLREF	enum gtmImageTypes	image_type;
+
 static void expand_stp(unsigned int new_size)
 {
 	ESTABLISH(stp_gcol_ch);
+	assert((GTM_IMAGE == image_type) || (MUPIP_IMAGE == image_type));
 	stp_init(new_size);
 	REVERT;
 	return;
@@ -448,6 +452,12 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 			mv_parse_tree_collect(mvartab);
 		if (NULL != mlabtab)
 			mv_parse_tree_collect((mvar *)mlabtab);
+		x = MV_STPG_GET(&director_mval);
+		if (x)
+			MV_STPG_PUT(x);
+		x = MV_STPG_GET(&window_mval);
+		if (x)
+			MV_STPG_PUT(x);
 #endif
 	} else
 	{
@@ -733,6 +743,8 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 		}
 	}
 	space_before_compact = stringpool.top - stringpool.free; /* Available space before compaction */
+	DEBUG_ONLY(blklen = stringpool.free - stringpool.base;)
+	stringpool.free = stringpool.base;
 	if (topstr != array)
 	{
 		stpg_sort(array, topstr - 1);
@@ -800,7 +812,6 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 		 *       if the stringpool is expanded, we create more room, resulting in fewer calls to stp_gcol.
 		 */
 		strpool_base = stringpool.base;
-		blklen = stringpool.free - stringpool.base;
 		if ((stringpool.top - stringpool.base) < STP_MAXGEOMGROWTH)
 		{
 			stp_incr = STP_GEOM_INCREMENT * (*incr_factor);
@@ -835,7 +846,7 @@ void stp_move(char *from, char *to) /* garbage collect and move range (from,to] 
 		*low_reclaim_passes = 0;
 	} else
 	{
-		stringpool.free = stringpool.base;
+		assert(stringpool.free == stringpool.base);
 		if (topstr != array)
 		{
 #ifdef STP_MOVE

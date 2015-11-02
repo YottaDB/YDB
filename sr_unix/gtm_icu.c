@@ -78,6 +78,12 @@ typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
  */
 typedef uint8_t UVersionInfo[MAX_ICU_VERSION_LENGTH];
 
+/* The first parameter to ICUVERLT36 can be either ICU_LIBNAME or $gtm_icu_version. Depending on the choice
+ * of the first parameter, different suffix is chosen.
+ */
+#define ICU_LIBNAME_SUFFIX		" has version"
+#define GTM_ICU_VERSION_SUFFIX		" is"
+
 /* Declare enumerators for all functions */
 #define ICU_DEF(x) x##_,
 enum {
@@ -114,13 +120,15 @@ void gtm_conv_init(void);
 
 
 error_def(ERR_DLLNOOPEN);
-error_def(ERR_INVICUVER);
+error_def(ERR_ICUSYMNOTFOUND);
 error_def(ERR_TEXT);
 error_def(ERR_NONUTF8LOCALE);
+error_def(ERR_ICUVERLT36);
 
 static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char **major_verptr, char **minor_verptr)
 {
 	char		*ptr, *top, ch;
+	char		tmp_errstr[sizeof(GTM_ICU_VERSION) + STR_LIT_LEN(GTM_ICU_VERSION_SUFFIX)]; /* "$gtm_icu_version is" */
 	int4		major_ver, minor_ver;
 
 	if (NULL == icu_ver_buf)
@@ -145,7 +153,13 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char **major_
 		}
 	}
 	/* Check if the formatted version is greater than or equal to 3.6 */
-	return IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver);
+	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver)))
+	{
+		/* Construct the first part of the ICUVERLT36 error message. */
+		sprintf(tmp_errstr, "%s%s", GTM_ICU_VERSION, GTM_ICU_VERSION_SUFFIX);
+		rts_error(VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
+	}
+	return TRUE;
 }
 
 void gtm_icu_init(void)
@@ -153,6 +167,7 @@ void gtm_icu_init(void)
 	char		*locale, *chset, *libname, err_msg[MAX_ERRSTR_LEN];
 	char		icu_final_fname[MAX_ICU_FNAME_LEN + 1 + MAX_ICU_VERSION_STRLEN];	/* 1 for '_' in between */
 	char		icu_ver_buf[MAX_ICU_VERSION_STRLEN];
+	char		tmp_errstr[sizeof(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX)]; /* "libicuio.so has version" */
 	char		*major_ver_ptr, *minor_ver_ptr;
 	char		icu_libname[sizeof(ICU_LIBNAME) + MAX_ICU_VERSION_STRLEN];
 	const char	*cur_icu_fname;
@@ -343,7 +358,7 @@ void gtm_icu_init(void)
 			if (NULL == fptr)
 			{
 				COPY_DLLERR_MSG(err_str, err_msg);
-				rts_error(VARLSTCNT(8) ERR_INVICUVER, 2, LEN_AND_STR(cur_icu_fname),
+				rts_error(VARLSTCNT(8) ERR_ICUSYMNOTFOUND, 2, LEN_AND_STR(cur_icu_fname),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
 			}
 			if (0 == findx)	/* record the fact that the symbols ARE renamed */
@@ -366,8 +381,11 @@ void gtm_icu_init(void)
 			memset(icu_version, 0, MAX_ICU_VERSION_LENGTH);
 			fptr(icu_version);
 			if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
-				rts_error(VARLSTCNT(4) ERR_TEXT, 2,
-					  LEN_AND_LIT("ICU version greater than or equal to 3.6 should be used."));
+			{
+				/* Construct the first part of the ICUVERLT36 error message. */
+				sprintf(tmp_errstr, "%s%s", ICU_LIBNAME, ICU_LIBNAME_SUFFIX);
+				rts_error(VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), icu_version[0], icu_version[1]);
+			}
 		}
 	}
 	gtm_utf8_mode = TRUE;

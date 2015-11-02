@@ -29,17 +29,10 @@
 #  define DUMPRSLTFILE	"TYPE "
 #  define RMS_OPEN_BIN        ,"rfm=fix","mrs=512","ctx=bin"
 #else
-#ifdef __MVS__
-#  define SHELL_START	"#!/usr/local/bin/tcsh"
-#  define SETDISTLOGENV	"setenv "GTM_DIST" "
-#  define DSE_START_PIPE_RSLT1	"$"GTM_DIST"/dse << EOF >& "
-#  define DSE_START_PIPE_RSLT2	""
-#else
 #  define SHELL_START	"#!/bin/sh"
 #  define SETDISTLOGENV	GTM_DIST"="
 #  define DSE_START_PIPE_RSLT1	"$"GTM_DIST"/dse << EOF > "
 #  define DSE_START_PIPE_RSLT2	" 2>&1"
-#endif
 #  define OPTDELIM	"-"
 #  define DEFAULT_OUTFILE_SUFFIX ".dbcertscan"
 #  define TMPCMDFILSFX	".sh"

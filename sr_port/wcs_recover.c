@@ -481,7 +481,7 @@ void wcs_recover(gd_region *reg)
 			{	/* the bt already identifies another cache entry with this block */
 				cr_alt = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
 				assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
-					> ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
+					>= ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
 				assert((bt_rec_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->bt_index) == bt);
 				cr_alt->bt_index = 0;				/* cr is more recent */
 				assert(LATCH_CLEAR <= WRITE_LATCH_VAL(cr_alt) && LATCH_CONFLICT >= WRITE_LATCH_VAL(cr_alt));

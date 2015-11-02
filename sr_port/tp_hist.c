@@ -219,10 +219,33 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 							cs_addrs->hdr, t2->tn, ((blk_hdr_ptr_t)t2->buffaddr)->tn, t2->level);
 						status = cdb_sc_blkmod;
 						BREAK_IN_PRO__CONTINUE_IN_DBG;
-					}
-#					ifdef DEBUG
-					else
-					{	/* Assert that this is a leaf level block of a global with NOISOLATION
+					} else
+					{	/* In case of VMS, it is possible we (gvcst_search) could have been looking at
+						 * a newly formed twin buffer while setting the first_rec portion of the clue.
+						 * It is possible that the twin buffer was obtained by a db_csh_getn and that
+						 * it does not yet contain the records of the block we were interested in. This
+						 * means we could have been looking at a completely different block (the one that
+						 * was previously sitting in that global buffer) while constructing the first_rec
+						 * portion of the gv_target's clue which means first_rec is no longer reliable.
+						 * Hence reset it in this case to be safe. Note that tp_hist need not detect
+						 * all cases of blkmods accurately since this check is done outside of crit. Any
+						 * cases that are not detected here will get caught by tp_tend (which will invoke
+						 * "recompute_upd_array" function) so a similar reset of the first_rec needs to
+						 * happen there too.
+						 *
+						 * In Unix, there is no twinning so we dont have that issue. But it is possible
+						 * that if gvcst_search is reading from a buffer that is being modified
+						 * concurrently, it could pick up the first half of first_rec from the pre-update
+						 * copy of the block and the second half of first_rec from the post-update copy of
+						 * the block. Depending on the actual byte sequences, it is possible that this
+						 * mixed first_rec is LESSER than the correct value. This could therefore cause
+						 * DBKEYORD integ errors in case this is used for the next transaction. It is
+						 * therefore necessary to invalidate the first_rec in this case (C9J07-003162).
+						 */
+						if (gvt->clue.end)
+							GVT_CLUE_INVALIDATE_FIRST_REC(gvt);
+#						ifdef DEBUG
+						/* Assert that this is a leaf level block of a global with NOISOLATION
 						 * and that this is a SET operation (not a GET or KILL). The only exception
 						 * we know of to this is that the global corresponding to the incoming history
 						 * (t1) could have NOISOLATION turned OFF but yet contain a block which is
@@ -239,8 +262,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 							&& (t1->blk_target->noisolation || t2->blk_target->noisolation));
 						if (t1->blk_target != t2->blk_target)
 							donot_commit |= DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH;
+#						endif
 					}
-#					endif
 				}
 				/* Although t1->first_tp_srch_status (i.e. t2) is used for doing blkmod check,
 				 * we need to use BOTH t1 and t1->first_tp_srch_status to do the cdb_sc_lostcr check.

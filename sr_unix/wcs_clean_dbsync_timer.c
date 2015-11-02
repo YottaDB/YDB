@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,7 @@
 #include "wcs_clean_dbsync.h"
 
 GBLREF	uint4			process_id;
+GBLREF	volatile int4		fast_lock_count;
 
 void	wcs_clean_dbsync_timer(sgmnt_addrs *csa)
 {
@@ -41,9 +42,17 @@ void	wcs_clean_dbsync_timer(sgmnt_addrs *csa)
 	 */
 	if (process_id != csa->nl->wcsflu_pid && FALSE == csa->dbsync_timer)
 	{
+		/* Do not allow wcs_wtstart interrupts for the same region in this two-line window (C9J06-003139).
+		 * or else we could end up in a situation where the timer is started but dbsync_timer is set to FALSE.
+		 */
+		assert(0 <= fast_lock_count);
+		++fast_lock_count;
 		csa->dbsync_timer = TRUE;
-		/* start_timer copies over the data addressed by &csa ensuring wcs_sync_epoch gets a valid pointer */
+		/* start_timer copies over the data addressed by &csa ensuring wcs_clean_dbsync gets a valid pointer */
 		start_timer((TID)csa, TIM_DEFER_DBSYNC, &wcs_clean_dbsync, sizeof(csa), (char *)&csa);
+		assert(csa->dbsync_timer); /* assert that dbsync_timer did not get reset by an interrupt in the previous line */
+		--fast_lock_count;
+		assert(0 <= fast_lock_count);
 	}
 	return;
 }

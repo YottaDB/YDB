@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,7 @@ void advancewindow(void)
 	source_column = (unsigned char *)lexical_ptr - source_buffer + 1;
 	window_token = director_token;
 	window_mval = director_mval;
+	director_mval.mvtype = 0;	/* keeps mval from being GC'd since it is not useful until re-used */
 
 	/* It is more efficient to swich buffers between window_ident and director_ident
 	 * instead of copying the text from director_ident to window_ident. This can be

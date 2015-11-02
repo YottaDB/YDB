@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -210,7 +210,8 @@ void stx_error(int in_error, ...)
 		gtm_getmsg(in_error, &msg);
 		assert(msg.len);
 #ifdef UNIX
-		c = util_format(msgbuf, args, LIT_AND_LEN(buf), MAXPOSINT4);
+		cnt = va_arg(args, VA_ARG_TYPE);
+		c = util_format(msgbuf, args, LIT_AND_LEN(buf), (int)cnt);
 		va_end(last_va_list_ptr);	/* set by util_format */
 #else
 		c = util_format(msgbuf, args, LIT_AND_LEN(buf));

@@ -274,7 +274,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		}
 		gv_target = reorg_gv_target;
 		gv_target->root = cs_addrs->dir_tree->root;
-		reorg_gv_target->clue.end = gv_target->clue.end = 0;
+		gv_target->clue.end = 0;
 		/* assign Directory tree path to find dest_blk_id in dest_hist_ptr */
 		status = gvcst_search(dest_gv_currkey, dest_hist_ptr);
 		if (cdb_sc_normal != status)
@@ -311,7 +311,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			return cdb_sc_blkmod;
 		}
 		/* Assign Global Variable Tree path to find dest_blk_id in dest_hist_ptr */
-		reorg_gv_target->clue.end = gv_target->clue.end = 0;
+		gv_target->clue.end = 0;
 		status = gvcst_search(dest_gv_currkey, dest_hist_ptr);
 		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 		if (dest_blk_level >= dest_hist_ptr->depth || /* do not swap in root level */

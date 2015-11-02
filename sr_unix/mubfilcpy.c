@@ -45,13 +45,25 @@
 #include "wcs_phase2_commit_wait.h"
 
 #define TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
+#define	COMMAND_ARRAY_SIZE	1024
+#define	MV_CMD			"mv "
+#define	CP_CMD			"cp "
+
+#define	FREE_COMMAND_STR_IF_NEEDED		\
+{						\
+	if (command != &cmdarray[0])		\
+	{					\
+		free(command);			\
+		command = &cmdarray[0];		\
+	}					\
+}
 
 #define	CLEANUP_AND_RETURN_FALSE								\
 {												\
 	int	rc;										\
 												\
 	if (FD_INVALID != backup_fd)								\
-		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */	\
+		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
 	if (!debug_mupip)									\
 		UNLINK(tempfilename);								\
 	return FALSE;										\
@@ -69,11 +81,11 @@ GBLREF	boolean_t		debug_mupip;
 bool	mubfilcpy (backup_reg_list *list)
 {
 	mstr			*file, tempfile;
-	unsigned char		command[MAX_FN_LEN * 2 + 5]; /* 5 == max(sizeof("cp"),sizeof("mv")) + 2 (space) + 1 (NULL) */
+	unsigned char		cmdarray[COMMAND_ARRAY_SIZE], *command = &cmdarray[0];
 	sgmnt_data_ptr_t	header_cpy;
 	int4			backup_fd = FD_INVALID, size, vbn, counter, hdrsize, rsize, ntries;
 	ssize_t                 status;
-	int4			save_errno, adjust, blk_num, temp, rv, tempfilelen;
+	int4			adjust, blk_num, cmdlen, rv, save_errno, temp, tempfilelen, tmplen;
 	struct stat		stat_buf;
 	off_t			filesize, handled, offset;
 	char 			*inbuf, *zero_blk, *ptr, *errptr;
@@ -152,16 +164,22 @@ bool	mubfilcpy (backup_reg_list *list)
 		}
 		ntries++;
 	}
+	/* Calculate total line length for "cp" command. If cannot fit in local variable array, malloc space */
+	tmplen = gv_cur_region->dyn.addr->fname_len;
 	tempfilelen = STRLEN(tempfilename);
-	memcpy(command, "cp ", 3);
-	memcpy(command + 3, gv_cur_region->dyn.addr->fname, gv_cur_region->dyn.addr->fname_len);
-	command[3 + gv_cur_region->dyn.addr->fname_len] = ' ';
-	memcpy(command + 4 + gv_cur_region->dyn.addr->fname_len, tempfilename, tempfilelen);
-	command[4 + gv_cur_region->dyn.addr->fname_len + tempfilelen] = 0;
-
+	cmdlen = STR_LIT_LEN(CP_CMD) + tmplen + 1 /* space */ + tempfilelen + 1 /* terminating NULL byte */;
+	if (cmdlen > sizeof(cmdarray))
+		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
+	MEMCPY_LIT(command, CP_CMD);
+	cmdlen = STR_LIT_LEN(CP_CMD);
+	memcpy(&command[cmdlen], gv_cur_region->dyn.addr->fname, tmplen);
+	cmdlen += tmplen;
+	command[cmdlen++] = ' ';
+	memcpy(&command[cmdlen], tempfilename, tempfilelen);
+	cmdlen += tempfilelen;
+	command[cmdlen] = 0;
 	if (debug_mupip)
-		util_out_print("!/MUPIP INFO:   !AD", TRUE,
-			       sizeof("cp  ") - 1 + gv_cur_region->dyn.addr->fname_len + tempfilelen, command);
+		util_out_print("!/MUPIP INFO:   !AD", TRUE, cmdlen, command);
 	if (0 != (rv = SYSTEM((char *)command)))
 	{
 		if (-1 == rv)
@@ -172,9 +190,12 @@ bool	mubfilcpy (backup_reg_list *list)
 		}
 		if (online)
 			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
-		util_out_print("Error doing !AD", TRUE, 4 + gv_cur_region->dyn.addr->fname_len + tempfilelen, command);
+		util_out_print("Error doing !AD", TRUE, cmdlen, command);
+		FREE_COMMAND_STR_IF_NEEDED;
 		CLEANUP_AND_RETURN_FALSE;
 	}
+	FREE_COMMAND_STR_IF_NEEDED;
+	assert(command == &cmdarray[0]);
 
 	/* give temporary files the group and permissions as other shared resources - like journal files */
 	OPENFILE(tempfilename, O_RDWR, backup_fd);
@@ -428,17 +449,22 @@ bool	mubfilcpy (backup_reg_list *list)
 	CLOSEFILE_RESET(backup_fd, status);	/* resets "backup_fd" to FD_INVALID */
 
 	/* mv it to destination */
-
-	memcpy(command, "mv ", 3);
-	memcpy(command + 3, tempfilename, tempfilelen);
-	command[3 + tempfilelen] = ' ';
-	memcpy(command + 4 + tempfilelen, file->addr, file->len);
-	command[4 + tempfilelen + file->len] = 0;
+	/* Calculate total line length for "mv" command. If cannot fit in local variable array, malloc space */
+	assert(command == &cmdarray[0]);
+	tmplen = file->len;
+	cmdlen = STR_LIT_LEN(MV_CMD) + tempfilelen + 1 /* space */ + tmplen + 1 /* terminating NULL byte */;
+	if (cmdlen > sizeof(cmdarray))
+		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
+	MEMCPY_LIT(command, MV_CMD);
+	cmdlen = STR_LIT_LEN(MV_CMD);
+	memcpy(&command[cmdlen], tempfilename, tempfilelen);
+	cmdlen += tempfilelen;
+	command[cmdlen++] = ' ';
+	memcpy(&command[cmdlen], file->addr, tmplen);
+	cmdlen += tmplen;
+	command[cmdlen] = 0;
 	if (debug_mupip)
-	{
-		util_out_print("MUPIP INFO:   !AD", TRUE,
-			       sizeof("mv  ") - 1 + tempfilelen + file->len, command);
-	}
+		util_out_print("MUPIP INFO:   !AD", TRUE, cmdlen, command);
 	if (0 != (rv = SYSTEM((char *)command)))
 	{
 		if (-1 == rv)
@@ -447,11 +473,12 @@ bool	mubfilcpy (backup_reg_list *list)
 			errptr = (char *)STRERROR(save_errno);
 			util_out_print("system : !AZ", TRUE, errptr);
 		}
-		util_out_print("Error doing !AD", TRUE, 4 + gv_cur_region->dyn.addr->fname_len + tempfilelen, command);
+		util_out_print("Error executing command : !AD", TRUE, cmdlen, command);
+		FREE_COMMAND_STR_IF_NEEDED;
 		CLEANUP_AND_RETURN_FALSE;
 	}
-
-
+	FREE_COMMAND_STR_IF_NEEDED;
+	assert(command == &cmdarray[0]);
 	util_out_print("DB file !AD backed up in file !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
 		       gv_cur_region->dyn.addr->fname, file->len, file->addr);
 	util_out_print("Transactions up to 0x!16@XQ are backed up.", TRUE, &header_cpy->trans_hist.curr_tn);
@@ -463,6 +490,5 @@ bool	mubfilcpy (backup_reg_list *list)
 		cs_addrs->hdr->last_rec_bkup_last_blk = header_cpy->trans_hist.total_blks;
 	}
 	file_backed_up = TRUE;
-
 	return TRUE;
 }

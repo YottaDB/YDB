@@ -92,7 +92,7 @@ static	int	gtm_lines = 24;
 static	char	gtm_cap_ascii[16 * 16];	/* ESC_LEN from io.h times number of tigetstr values */
 #define CAP2ASCII(CAP)							\
 {									\
-	ebc_len = sizeof(CAP);						\
+	ebc_len = strlen(CAP) + 1;					\
 	assert(sizeof(gtm_cap_ascii) > (gtm_cap_index + ebc_len));	\
 	ebc_to_asc((unsigned char *)&gtm_cap_ascii[gtm_cap_index], (unsigned char *)CAP, ebc_len);	\
 	CAP = &gtm_cap_ascii[gtm_cap_index];				\

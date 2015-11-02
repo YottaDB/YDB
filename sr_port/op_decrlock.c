@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +28,7 @@ GBLREF bool		remlkreq;
 GBLREF unsigned char	cm_action;
 GBLREF tp_frame		*tp_pointer;
 
-void op_decrlock(int4 timeout)
+int	op_decrlock(int timeout)
 {
 	int		count;
 	mlk_pvtblk	**prior;
@@ -79,5 +79,5 @@ void op_decrlock(int4 timeout)
 		gvcmx_unlock(0, TRUE, INCREMENTAL);
 		remlkreq = FALSE;
 	}
-	return;
+	return TRUE;	/* return TRUE unconditionally (since this is a timed unlock) so $TEST gets set to 1 as per M-standard */
 }

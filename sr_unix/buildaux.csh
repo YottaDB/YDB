@@ -525,24 +525,26 @@ if ($buildaux_gtmcrypt == 1) then
 		set bstat = 0
 		if ( $HOSTOS == "AIX") then
 			#For AIX we will be building the encryption library with openssl support.
-			$gtm_dist_plugin/build.sh openssl $plugin_build_type >&! $gtm_map/gtmcrypt.map
+			$gtm_dist_plugin/build.sh openssl $plugin_build_type >&! $gtm_map/gtmcryptbuild.map
 			set bstat = $status;
 		else
-			$gtm_dist_plugin/build.sh gcrypt $plugin_build_type >&! $gtm_map/gtmcrypt.map
+			$gtm_dist_plugin/build.sh gcrypt $plugin_build_type >&! $gtm_map/gtmcryptbuild.map
 			set bstat = $status;
 		endif
+		cat $gtm_map/gtmcryptbuild.map
 		if (0 != $bstat || ! -x $gtm_dist_plugin/libgtmcrypt$gt_ld_shl_suffix || ! -x $gtm_dist_plugin/ascii2hex \
 			|| ! -x $gtm_dist_plugin/maskpass ) then
 			set buildaux_status = `expr $buildaux_status + 1`
 			echo "buildaux-E-libgtmcrypt, failed to build gtmcrypt and/or helper scripts \
-			(see ${dollar_sign}gtm_map/gtmcrypt.map)" >> $gtm_log/error.`basename $gtm_exe`.log
+			(see ${dollar_sign}gtm_map/gtmcryptbuild.map)" >> $gtm_log/error.`basename $gtm_exe`.log
 		else
-			$gtm_dist_plugin/install.sh >&! $gtm_map/gtmcrypt.map
+			$gtm_dist_plugin/install.sh >&! $gtm_map/gtmcryptinstall.map
 			if (0 != $status) then
 				set buildaux_status = `expr $buildaux_status + 1`
 				echo "buildaux-E-libgtmcrypt, failed to install gtmcrypt and/or helper scripts \
-				(see ${dollar_sign}gtm_map/gtmcrypt.map)" >> $gtm_log/error.`basename $gtm_exe`.log
+				(see ${dollar_sign}gtm_map/gtmcryptinstall.map)" >> $gtm_log/error.`basename $gtm_exe`.log
 			endif
+			cat $gtm_map/gtmcryptinstall.map
 		endif
 		popd >&! /dev/null
 	endif

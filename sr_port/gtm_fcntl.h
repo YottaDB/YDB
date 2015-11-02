@@ -19,12 +19,10 @@
 #	define	CREAT			creat
 #	define	OPEN			open
 #	define	OPEN3			open
-#	define	OPEN4			open
 #else
 #	define	CREAT			gtm_creat
 #	define	OPEN			gtm_open
 #	define	OPEN3			gtm_open3
-#	define	OPEN4			gtm_open4
 #	undef	open		/* in case this is already defined by <fcntl.h> (at least AIX and HPUX seem to do this) */
 #	undef	creat		/* in case this is already defined by <fcntl.h> (at least AIX and HPUX seem to do this) */
 #	define	open	gtm_open
@@ -33,7 +31,6 @@
 
 int gtm_open(const char *pathname, int flags);
 int gtm_open3(const char *pathname, int flags, mode_t mode);
-int gtm_open4(const char *pathname, int flags, mode_t mode, int4 size);
 int gtm_creat(const char *pathname, mode_t mode);
 
 #endif

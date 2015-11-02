@@ -278,8 +278,10 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	/* If database is encrypted, check if encryption initialization went fine for this database. If not,
 	 * do not let process proceed as it could now potentially get a peek at the desired data from the
 	 * decrypted shared memory global buffers (read in from disk by other processes) without having to go to disk.
+	 * If DSE, allow for a special case where it is trying to dump a local bitmap block. In this case, DSE
+	 * can continue to run fine (even if encryption initialization failed) since bitmap blocks are unencrypted.
 	 */
-	if (csa->encrypt_init_status)
+	if (csa->encrypt_init_status && (!dse_running || !IS_BITMAP_BLK(blk)))
 		GC_RTS_ERROR(csa->encrypt_init_status, gv_cur_region->dyn.addr->fname);
 #	endif
 	assert(dba_bg == csd->acc_meth);

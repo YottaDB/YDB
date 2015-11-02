@@ -290,12 +290,12 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 	assert(!csa->now_crit);
 	/* The following two asserts are to ensure we never hold more than one FTOK semaphore at any point in time.
 	 * The only exception is if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we
-	 * 	came to rundown code that invoked ftok_sem_lock() on a different region. Hence the SIGTERM/SIGQUIT check below.
+	 * 	came to rundown code that invoked ftok_sem_lock() on a different region. Hence the process_exiting check below.
 	 * In the pro version, we will do the right thing by returning TRUE right away if udi->grabbed_ftok_sem is TRUE.
 	 * 	This is because incr_cnt is FALSE always (asserted below too).
 	 */
-	assert(!udi->grabbed_ftok_sem || SIGTERM == exi_condition || SIGQUIT == exi_condition);
-	assert((NULL == ftok_sem_reg) || SIGTERM == exi_condition || SIGQUIT == exi_condition);
+	assert(!udi->grabbed_ftok_sem || (FALSE != process_exiting));
+	assert((NULL == ftok_sem_reg) || (FALSE != process_exiting));
 	assert(!incr_cnt);
 	assert(INVALID_SEMID != udi->ftok_semid);
 	ftok_sopcnt = 0;
@@ -414,9 +414,9 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 	assert(NULL != reg);
 	/* The following assert is to ensure we never hold more than one FTOK semaphore at any point in time.
 	 * The only exception is if we were MUPIP STOPped (or kill -3ed) while having ftok_sem lock on one region and we
-	 * 	came to rundown code that invoked ftok_sem_lock() on a different region. Hence the SIGTERM/SIGQUIT check below.
+	 * 	came to rundown code that invoked ftok_sem_lock() on a different region. Hence the process_exiting check below.
 	 */
-	assert(reg == ftok_sem_reg || SIGTERM == exi_condition || SIGQUIT == exi_condition);
+	assert(reg == ftok_sem_reg || (FALSE != process_exiting));
 	udi = FILE_INFO(reg);
 	assert(udi->grabbed_ftok_sem);
 	assert(udi && INVALID_SEMID != udi->ftok_semid);

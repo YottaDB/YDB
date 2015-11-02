@@ -84,8 +84,6 @@ GBLREF	boolean_t	run_time;
 static 	volatile uint4 		save_dskspace_msg_counter = 0;
 GBLDEF	volatile uint4		dskspace_msg_counter = 1;	/* not static since used in dskspace_msg_timer.c */
 
-void	wcs_sync_epoch(TID tid, int4 hd_len, jnl_private_control **jpcptr);
-
 int4	wcs_wtstart(gd_region *region, int4 writes)
 {
 	blk_hdr_ptr_t		bp, save_bp;
@@ -420,7 +418,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			}
 			++n2;
 			BG_TRACE_ANY(csa, wrt_count);
-			/* Detect whether queue has become empty. Defer action (calling wcs_sync_epoch)
+			/* Detect whether queue has become empty. Defer action (calling wcs_clean_dbsync)
 			 * to end of routine, since we still hold the lock on the cache-record */
 			queue_empty = !SUB_ENT_FROM_ACTIVE_QUE_CNT(&cnl->wcs_active_lvl, &cnl->wc_var_lock);
 			INCR_CNT(&cnl->wc_in_free, &cnl->wc_var_lock);

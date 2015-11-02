@@ -608,7 +608,7 @@ cd $p3
 
 # Generate Special Debug Files (z/OS specific at the moment)
 if ( -e $gtm_tools/gtm_dbgld.csh ) then
-	$gtm_tools/gtm_dbgld.csh
+	$gtm_tools/gtm_dbgld.csh `echo $3 | sed 's/gtm_//'`
 endif
 
 # Create a default global directory.

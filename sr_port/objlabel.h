@@ -33,7 +33,7 @@
  * Note that OBJ_UNIX_LABEL and OBJ_PLATFORM_LABEL should not exceed 255.
  */
 
-#define OBJ_UNIX_LABEL	15
+#define OBJ_UNIX_LABEL	16
 
 #if defined(__osf__)
 #	define	OBJ_PLATFORM_LABEL	0

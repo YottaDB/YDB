@@ -1267,7 +1267,7 @@ BADCHAR		<$ZCHAR(!AD) is not a valid character in the !AD encoding form>/error/f
 DLRCILLEGAL	<!_!AD!/!_!_!_Illegal $CHAR() value !UL>/error/fao=3!/ansi=0
 NONUTF8LOCALE	<Locale has character encoding (!AD) which is not compatible with UTF-8 character set>/error/fao=2!/ansi=0
 INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
-INVICUVER	<Symbol !AD not found in the ICU libraries. ICU version greater than or equal to 3.6 should be used>/error/fao=2!/ansi=0
+UNUSEDMSG1270	<INVICUVER last used in V5.3-004 (release-date 2009/06/25)>/error/fao=0!/ansi=0
 LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with gtm_chset>/error/fao=2!/ansi=0
 DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
 DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
@@ -1318,6 +1318,8 @@ CRYPTKEYFETCHFAILEDNF 	<Cannot obtain encryption key. !AD>/error/fao=2!/ansi=0
 CRYPTHASHGENFAILED	<Error generating encryption hash. !AD>/error/fao=2!/ansi=0
 CRYPTNOPSWDINTP	<Cannot prompt for password inside a TP transaction.>/error/fao=0!/ansi=0
 BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
+ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used>/error/fao=4!/ansi=0
+ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be specified>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

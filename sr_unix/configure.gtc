@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc #
+#	Copyright 2009 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -27,8 +27,10 @@ else
 fi
 
 # add path to strip for solaris
-PATH="$PATH:/usr/ccs/bin"
-export PATH
+if [ $arch = "sun"  -o  $arch = "solaris" ]; then
+	PATH="$PATH:/usr/ccs/bin"
+	export PATH
+fi
 
 # Options to ps
 psopts="-ea"
@@ -57,11 +59,15 @@ fi
 
 # Native super user and group
 if [ $arch = "zos" ]; then
-	rootuser=OMVSKERN
-	binuser=OMVSGRP
+	# because z/OS has no predefined notion of root or bin
+	# use uid 0 for super user and group
+	defowner=0
+	rootuser=0
+	binuser=0
 else
 	rootuser=root
 	binuser=bin
+	defowner=bin
 fi
 
 # Binaries
@@ -69,6 +75,11 @@ binaries="mupip mumps libgtmshr$ext lke dse  geteuid ftok semstat2"
 
 # Normal scripts - executed by anyone
 nscripts="gtmbase upperc upperc_cp lowerc lowerc_cp"
+
+# z/OS needs to copy the exports file
+if [ $arch = "zos" ]; then
+	nscripts="$nscripts gtmshr_symbols.x"
+fi
 
 # Root scripts - only executed by root
 rscripts="gtmstart gtmstop"
@@ -105,16 +116,16 @@ if [ "`./geteuid`" != "root" ] ; then
 fi
 
 $echo "                     GT.M Configuration Script"
-$echo "Copyright "`date '+%Y'`" Fidelity National Information Services, Inc. Use of this"
+$echo "Copyright 2009 Fidelity National Information Services, Inc. Use of this"
 $echo "software is restricted by the provisions of your license agreement."
 $echo ""
 
 # create temporary file to test for valid user and group names
 touch tmp_owngrp
-$echo "What account should own the files? (bin) \c"
+$echo "What account should own the files? ($defowner) \c"
 read resp
 if [ "$resp" = "" ] ; then
-	owner="bin"
+	owner=$defowner
 else
 	owner=$resp
 	chown $resp tmp_owngrp 2> /dev/null
@@ -125,10 +136,10 @@ else
 	fi
 fi
 
-$echo "Should execution of GT.M to be restricted to a group? (y or n) \c"
+$echo "Should execution of GT.M be restricted to a group? (y or n) \c"
 read resp
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
-	$echo "Enter group name? \c"
+	$echo "Enter group name: \c"
 	read group
 	if [ "$group" != "" ] ; then
 		chgrp $group tmp_owngrp 2> /dev/null
@@ -204,13 +215,15 @@ if [ -d "utf8" ]; then
 	# Setup library path (in prep for looking for libicu and crypto libs)
 	if [ "$arch" = "hp" ] ; then
 		is64bit_gtm=`file mumps | grep "IA64" | wc -l`
+	elif [ "$arch" = "zos" ] ; then
+		is64bit_gtm=1
 	else
 		is64bit_gtm=`file mumps | grep "64-bit" | wc -l`
 	fi
 	if [ $is64bit_gtm -eq 1 ] ; then
-		library_path="/usr/local/lib64 /usr/local/lib /usr/lib /usr/lib32"
+		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib"
 	else
-		library_path="/usr/local/lib /usr/lib /usr/lib32"
+		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /lib32 /lib"
 	fi
 	$echo "Should unicode support be installed? (y or n) \c"
 	read resp
@@ -249,7 +262,7 @@ if [ -d "utf8" ]; then
 				# Find the actual version'ed library to which libicuio.{so,sl,a} points to
 				icu_versioned_lib=`ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
 				# Find out vital parameters
-				if [ "$arch" = "ibm" ]; then
+				if [ $arch = "ibm" -o $arch = "zos" ]; then
 					# From the version'ed library(eg. libicuio36.0.a) extract out
 					# 36.0.a
 					full_icu_ver_string=`echo $icu_versioned_lib | sed 's/libicuio//g'`
@@ -262,9 +275,9 @@ if [ -d "utf8" ]; then
 			elif [ "$gtm_icu_version" != "" ] ; then
 				# If the user specified a desired version number, then check if the ICU
 				# library with that version number exists.
-				if [ "$arch" = "ibm" -a -f "$libpath/libicuio$majmin$icu_ext" ] ; then
-					icu_lib_found=1
-				elif [ -f "$libpath/libicuio$icu_ext.$majmin" ] ; then
+				# AIX and z/OS reference ICU as libicuioVERSION.{so,a}
+				# The other platforms reference the libraries as libicuio.{sl,so}.VERSION
+				if [ -f "$libpath/libicuio$majmin$icu_ext" -o -f "$libpath/libicuio$icu_ext.$majmin" ] ; then
 					icu_lib_found=1
 				else
 					icu_lib_found=0
@@ -281,6 +294,9 @@ if [ -d "utf8" ]; then
 				elif [ $arch = "ibm" ] ; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
 					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -1 | wc -l`
+				elif [ $arch = "zos" ] ; then
+					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
+					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "amode=64" |head -n1 |wc -l`
 				fi
 				# Make sure both GTM and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit )
 				if [ "$is64bit_gtm" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
@@ -303,14 +319,14 @@ if [ -d "utf8" ]; then
 			fi
 		done
 		if [ "$found_icu" -eq 0 ] ; then
-			if [ $majmin != "" ] ; then
+			if [ "$majmin" != "" ] ; then
 				echo "WARNING: ICU version $gtm_icu_version not found. Not installing Unicode support."
 			else
 				echo "WARNING: Default ICU version not found. Not installing Unicode support."
 			fi
 		fi
 		# Look for locale
-		utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
+		utflocale=`locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n1`
 		if [ "$utflocale" = "" ] ; then
 			echo "WARNING: UTF8 locale not found. Not installing Unicode support."
 		fi
@@ -339,6 +355,7 @@ do
 	sed -f sedin$$ $i > $dest
 	if [ "$doutf8" -ne 0 ]; then
 		cd utf8
+		if ( test -f "$dest" ) then rm $dest; fi
 		ln -s ../$dest $dest
 		cd ..
 	fi
@@ -349,6 +366,14 @@ if [ "$doutf8" -ne 0 ]; then
 	if [ ! -d $gtmdist/utf8 ]; then
 		mkdir $gtmdist/utf8
 	fi
+fi
+
+# copy debug files if necessary
+if [ $arch = "zos" ] ; then
+	for i in `ls *.mdbg 2> /dev/null` ; do
+		cp $i $gtmdist
+		rm -f $i
+	done
 fi
 
 # Install COPYING if it is applicable
@@ -477,12 +502,16 @@ if [ -d "$plugin_gtmcrypt" ]; then
 		if [ $arch = "sun" -o $arch = "linux" ]; then
 			install -g bin -o $owner -m 755 $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
 		elif [ $arch = "ibm" ]; then
-			/usr/bin/install -f $gtmdist/$plugin_gtmcrypt -M 755 -O $owner -G bin $plugin_gtmcrypt/$i
+			/usr/bin/install -f $gtmdist/$plugin_gtmcrypt -M 755 -O $owner -G $binuser $plugin_gtmcrypt/$i
+		elif [ $arch = "zos" ]; then
+			cp $plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
+			chmod 755 $gtmdist/$plugin_gtmcrypt/$i
+			chown $user:$binuser $gtmdist/$plugin_gtmcrypt/$i
 		elif [ -x /usr/sbin/install ]; then
-			/usr/sbin/install -f $gtmdist/$plugin_gtmcrypt -m 755 -u $owner -g bin \
+			/usr/sbin/install -f $gtmdist/$plugin_gtmcrypt -m 755 -u $owner -g $binuser \
 				$plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
 		else
-			install -f $gtmdist/$plugin_gtmcrypt -m 755 -u $owner -g bin \
+			install -f $gtmdist/$plugin_gtmcrypt -m 755 -u $owner -g $binuser \
 				$plugin_gtmcrypt/$i $gtmdist/$plugin_gtmcrypt
 		fi
 	done
@@ -491,11 +520,15 @@ if [ -d "$plugin_gtmcrypt" ]; then
 	if [ $arch = "sun" -o $arch = "linux" ]; then
 		install -g bin -o $owner -m 755 $plugin/$gtmcryptsharedlib $gtmdist/$plugin
 	elif [ $arch = "ibm" ]; then
-		/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G bin $plugin/$gtmcryptsharedlib
+		/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G $binuser $plugin/$gtmcryptsharedlib
+	elif [ $arch = "zos" ]; then
+		cp $plugin/$gtmcryptsharedlib $gtmdist/$plugin
+		chmod 755 $gtmdist/$plugin/$gtmcryptsharedlib
+		chown $user:$binuser $gtmdist/$plugin/$gtmcryptsharedlib
 	elif [ -x /usr/sbin/install ]; then
-		/usr/sbin/install -f $gtmdist/$plugin -m 755 -u $owner -g bin $plugin/$gtmcryptsharedlib $gtmdist/$plugin
+		/usr/sbin/install -f $gtmdist/$plugin -m 755 -u $owner -g $binuser $plugin/$gtmcryptsharedlib $gtmdist/$plugin
 	else
-		install -f $gtmdist/$plugin -m 755 -u $owner -g bin $plugin/$gtmcryptsharedlib $gtmdist/$plugin
+		install -f $gtmdist/$plugin -m 755 -u $owner -g $binuser $plugin/$gtmcryptsharedlib $gtmdist/$plugin
 	fi
 
 	# Install the plugin related M file
@@ -604,16 +637,29 @@ fi
 if [ "$doutf8" -ne 0 ]; then
 	# Ensure we ARE in UTF-8 mode
 	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
+	if [ $arch = "zos" ]; then
+		utflocale=`locale -a | grep -i en_us | grep -i utf | sed 's/.lp64$//' | grep '8$' | head -n1`
+	fi
+
 	if [ $utflocale = "" ]; then
 		utflocale="C"
 	fi
-	LC_CTYPE=$utflocale
-	export LC_CTYPE
+	if [ $arch != "zos" ]; then
+		# don't set LC_CTYPE to avoid random error messages from EBCDIC utilities
+		LC_CTYPE=$utflocale
+		export LC_CTYPE
+	else
+		gtm_chset_locale=$utflocale
+		export gtm_chset_locale
+	fi
 	unset LC_ALL
 	gtm_chset="UTF-8"
 	export gtm_chset
 	if [ $arch = "ibm" ]; then
 		export LIBPATH=$save_icu_libpath
+	elif [ $arch = "zos" ]; then
+		# on z/OS LIBPATH is the only library search path so we should preserve it
+		export LIBPATH=${save_icu_libpath}:${LIBPATH}
 	else
 		LD_LIBRARY_PATH=$save_icu_libpath
 		export LD_LIBRARY_PATH
@@ -684,6 +730,9 @@ GDE.in2
 other_object_files="CHK2LEV.o CHKOP.o GENDASH.o GENOUT.o GETNEAR.o GTMHELP.o GTMHLPLD.o LOAD.o LOADOP.o"
 other_object_files="$other_object_files LOADVX.o MSG.o TTTGEN.o TTTSCAN.o UNLOAD.o"
 csh_script_files="lowerc.csh lowerc_cp.csh upperc.csh upperc_cp.csh"
+if [ $arch = "zos" ]; then
+	other_object_files="$other_object_files GENEXPORT.o"
+fi
 
 # make database files read only
 chmod 0444 $gtmdist/*.dat
@@ -723,9 +772,9 @@ elif [ -x /usr/sbin/install ]; then
 elif [ $arch = "zos" ]; then
 	cp gtmsecshr $gtmdist/gtmsecshr
 	cp gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
+	chown $rootuser:$binuser $gtmdist/gtmsecshr $tgtmsecshrdir/gtmsecshr
 	chmod 4755 $gtmdist/gtmsecshr
 	chmod 4500 $tgtmsecshrdir/gtmsecshr
-	chown $rootuser:$binuser $gtmdist/gtmsecshr $tgtmsecshrdir/gtmsecshr
 else
 	install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
 	install -f $tgtmsecshrdir -m 4500 -u root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir

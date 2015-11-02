@@ -31,6 +31,7 @@
 #include "gdsblkops.h"		/* for RESET_UPDATE_ARRAY macro */
 #include "error.h"
 #include "have_crit.h"
+#include "min_max.h"
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
@@ -359,6 +360,10 @@ void	tp_clean_up(boolean_t rollback_flag)
 						assert(is_mm || (NULL != t1->cr));
 						assert(NULL == t1->cse);
 					}
+					/* Now that we know the clue is non-zero, validate first_rec, clue & last_rec fields
+					 * (BEFORE this clue could be used in a future transaction).
+					 */
+					DEBUG_GVT_CLUE_VALIDATE(gvnh);
 				}
 			}
 		}

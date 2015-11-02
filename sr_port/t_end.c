@@ -663,6 +663,16 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		}
 		assert((hist != hist2) || (t1 != hist->h));
 	}
+#	ifdef DEBUG
+	/* If clue is non-zero, validate it (BEFORE this could be used in a future transaction). The only exception is reorg
+	 * where we could have an invalid clue (e.g. last_rec < first_rec etc.). This is because reorg shuffles records around
+	 * heavily and therefore it is hard to maintain an uptodate clue. reorg therefore handles this situation by actually
+	 * resetting the clue just before doing the next gvcst_search. The mu_reorg* routines already take care of this reset
+	 * (in fact, this is asserted in gvcst_search too). So we can allow invalid clues here in that special case.
+	 */
+	if (!mu_reorg_process && (NULL != gv_target) && gv_target->clue.end) /* gv_target can be NULL in case of DSE MAPS etc. */
+		DEBUG_GVT_CLUE_VALIDATE(gv_target);	/* Validate that gvt has valid first_rec, clue & last_rec fields */
+#	endif
 	/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
 	assert(!gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
 	/* check bit maps for usage */

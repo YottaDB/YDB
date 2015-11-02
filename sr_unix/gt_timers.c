@@ -270,7 +270,7 @@ void	sys_get_curr_time (ABS_TIME *atp)
 
 void	hiber_start (uint4 hiber)
 {
-/* timer_start has char * as hdata type */
+	/* start_timer_int has char * as hdata type */
 	int4		waitover;
 	int4		*waitover_addr;
 	TID		tid;
@@ -652,6 +652,8 @@ static void add_timer(ABS_TIME *atp,
 	GT_TIMER	*tp, *tpp, *ntp, *lastntp;
 	int4		cmp, i;
 
+	/* Assert that no timer entry with the same "tid" exists in the timer chain */
+	assert((NULL == find_timer(tid, &tpp)));
 	/* Obtain a new timer block */
 	ntp = (GT_TIMER *)timefree;			/* Start at first free block */
 	lastntp = NULL;
@@ -703,7 +705,7 @@ static void add_timer(ABS_TIME *atp,
 	add_int_to_abs_time(atp, time_to_expir, &ntp->expir_time);
 
 	tp = (GT_TIMER *)timeroot;
-	tpp = 0;
+	tpp = NULL;
 	while (tp)
 	{
 		cmp = abs_time_comp(&tp->expir_time, &ntp->expir_time);
@@ -714,7 +716,7 @@ static void add_timer(ABS_TIME *atp,
 		tp = tp->next;
 	}
 	ntp->next = tp;
-	if (tpp == NULL)
+	if (NULL == tpp)
 		timeroot = ntp;
 	else
 		tpp->next = ntp;
@@ -729,7 +731,7 @@ static void add_timer(ABS_TIME *atp,
  */
 static void remove_timer(TID tid)
 {
-	GT_TIMER *tprev, *tp;
+	GT_TIMER *tprev, *tp, *tpp;
 
 	if ((tp = find_timer(tid, &tprev)))
 	{
@@ -740,6 +742,8 @@ static void remove_timer(TID tid)
 		/* Place element on free queue */
 		tp->next = (GT_TIMER *)timefree;
 		timefree = tp;
+		/* Assert that no duplicate timer entry with the same "tid" exists in the timer chain */
+		assert((NULL == find_timer(tid, &tpp)));
 	}
 }
 

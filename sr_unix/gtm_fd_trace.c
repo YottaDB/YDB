@@ -42,7 +42,6 @@ enum fd_ops
 {
 	fd_ops_open = 1,	/* open   */
 	fd_ops_open3,		/* open   */
-	fd_ops_open4,		/* open   */
 	fd_ops_creat,		/* creat  */
 	fd_ops_dup,		/* dup    */
 	fd_ops_dup2,		/* dup2   */
@@ -106,15 +105,6 @@ int gtm_open3(const char *pathname, int flags, mode_t mode)
 
 	fd = open(pathname, flags, mode);
 	FD_TRACE(fd_ops_open3, fd, 0);
-	return fd;
-}
-
-int gtm_open4(const char *pathname, int flags, mode_t mode, int4 size)
-{
-	int	fd;
-
-	fd = open(pathname, flags, mode, size);
-	FD_TRACE(fd_ops_open4, fd, 0);
 	return fd;
 }
 

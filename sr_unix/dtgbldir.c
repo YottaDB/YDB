@@ -14,7 +14,7 @@
 
 #undef malloc
 #undef free
-#undef GTM_FD_TRACE	/* do not use gtm_open4 with FD tracing */
+#undef GTM_FD_TRACE	/* this is a standalone executable so do not convert OPEN3 to gtm_open3 for FD tracing */
 
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
 		PRINTF("Global value %d is invalid, must be between 64 and 4096\n", global);
 		return 0;
 	}
-	if (FD_INVALID == (fd = OPEN4("./mumps.gld", O_CREAT | O_EXCL | O_RDWR, 0600, 0 )))
+	if (FD_INVALID == (fd = OPEN3("./mumps.gld", O_CREAT | O_EXCL | O_RDWR, 0600)))
 	{
 		PERROR("Error opening file");
 		return 0;

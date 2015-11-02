@@ -34,22 +34,23 @@
 #include "hashtab.h"
 #include "cws_insert.h"
 #include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_search_tail,gvcst_search prototype */
+#include "min_max.h"
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gv_namehead	*gv_target;
-GBLREF short		dollar_tlevel;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF unsigned char	rdfail_detail;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF unsigned int	t_tries;
-GBLREF boolean_t        mu_reorg_process;
-GBLREF srch_blk_status	*first_tp_srch_status;	/* overriding value of srch_blk_status given by t_qread in case of TP */
-GBLREF trans_num	local_tn;		/* transaction number for THIS PROCESS */
-GBLREF boolean_t	tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	short			dollar_tlevel;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	unsigned char		rdfail_detail;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	unsigned int		t_tries;
+GBLREF	srch_blk_status		*first_tp_srch_status;	/* overriding value of srch_blk_status given by t_qread in case of TP */
+GBLREF	trans_num		local_tn;		/* transaction number for THIS PROCESS */
+GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
 
 #ifdef DEBUG
-GBLDEF char gvcst_search_clue;
+GBLDEF	char			gvcst_search_clue;
+GBLREF	boolean_t		mu_reorg_process;
 #define	SET_GVCST_SEARCH_CLUE(X)	gvcst_search_clue = X;
 #else
 #define SET_GVCST_SEARCH_CLUE(X)
@@ -103,6 +104,10 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	if ((0 != pTarg->clue.end)
 		&& !((CDB_STAGNATE <= t_tries) && dollar_tlevel && (pTarg->read_local_tn != local_tn)))
 	{	/* have valid clue that is also safe to use */
+		/* In t_end, we skipped validating the clue in case of reorg due to the assumption that reorg never
+		 * uses the clue i.e. it nullifies the clue before calling gvcst_search. Assert that here.
+		 */
+		assert(!mu_reorg_process);
 		INCR_DB_CSH_COUNTER(cs_addrs, n_gvcst_srch_clues, 1);
 		assert(!dollar_tlevel || sgm_info_ptr);
 		status = cdb_sc_normal;	/* clue is usable unless proved otherwise */
@@ -392,9 +397,12 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		}
 		assert(c2 < &pTarg->first_rec->base[pTarg->first_rec->top]);	/* make sure we don't exceed allocated bounds */
 		*c2 = *c1;
+		DEBUG_ONLY(pTarg->first_rec->end = c2 - pTarg->first_rec->base;)
 		if (NULL == pNonStar)
-			*((short *)pTarg->last_rec->base) = 0xffff;
-		else
+		{
+			*((short *)pTarg->last_rec->base) = GVT_CLUE_LAST_REC_MAXKEY;
+			DEBUG_ONLY(pTarg->last_rec->end = sizeof(short);)
+		} else
 		{
 			pRec = pNonStar->buffaddr + pNonStar->curr_rec.offset;
 			GET_USHORT(n0, &((rec_hdr_ptr_t)pRec)->rsiz);
@@ -404,13 +412,11 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				assert(CDB_STAGNATE > t_tries);
 				return cdb_sc_rmisalign;
 			}
-
 			if (pNonStar->curr_rec.match < ((rec_hdr_ptr_t)pRec)->cmpc)
 			{
 				assert(CDB_STAGNATE > t_tries);
 			 	return cdb_sc_rmisalign;
 			}
-
 			if ((n1 = ((rec_hdr_ptr_t)pRec)->cmpc) > (int)(pTarg->last_rec->top))
 			{
 				assert(CDB_STAGNATE > t_tries);
@@ -444,6 +450,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			}
 			assert(c2 < &pTarg->last_rec->base[pTarg->last_rec->top]); /* make sure we don't exceed allocated bounds */
 			*c2 = *c1;
+			DEBUG_ONLY(pTarg->last_rec->end = c2 - pTarg->last_rec->base;)
 		}
 		COPY_CURRKEY_TO_GVTARGET_CLUE(pTarg, pKey);
 	}

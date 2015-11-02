@@ -2048,6 +2048,63 @@ GBLREF	int		process_exiting;
 	DBG_CHECK_GVTARGET_INTEGRITY(GVT);					\
 }
 
+/* Macro to denote special value of first_rec when it is no longer reliable */
+#define	GVT_CLUE_FIRST_REC_UNRELIABLE	(short)0xffff
+
+/* Macro to denote special value of last_rec when it is the absolute maximum (in case of *-keys all the way down) */
+#define	GVT_CLUE_LAST_REC_MAXKEY	(short)0xffff
+
+/* Macro to reset first_rec to a special value to indicate it is no longer reliable
+ * (i.e. the keyrange [first_rec, clue] should not be used by gvcst_search.
+ * Note that [clue, last_rec] is still a valid keyrange and can be used by gvcst_search.
+ */
+#define	GVT_CLUE_INVALIDATE_FIRST_REC(GVT)						\
+{											\
+	assert(GVT->clue.end);								\
+	*((short *)GVT->first_rec->base) = GVT_CLUE_FIRST_REC_UNRELIABLE;		\
+}
+
+#ifdef DEBUG
+/* Macro to check that the clue is valid. Basically check that first_rec <= clue <= last_rec. Also check that
+ * all of them start with the same global name in case of a GVT. A clue that does not satisfy these validity
+ * checks implies the possibility of DBKEYORD errors (e.g. C9905-001119 in VMS).
+ */
+#define	DEBUG_GVT_CLUE_VALIDATE(GVT)											\
+{															\
+	mname_entry		*gvent;											\
+	unsigned short		klen;											\
+	gv_namehead		*gvt;											\
+															\
+	/* Verify that clue->first_rec <= clue.base <= clue->last_rec.							\
+	 * The only exception is if first_rec has been reset to an unreliable value.					\
+	 */														\
+	gvt = GVT; /* copy into local variable to avoid evaluating input multiple times */				\
+	klen = MIN(gvt->clue.end, gvt->first_rec->end);									\
+	assert(klen);													\
+	assert((0 <= memcmp(gvt->clue.base, gvt->first_rec->base, klen))						\
+		|| (GVT_CLUE_FIRST_REC_UNRELIABLE == *((short *)gvt->first_rec->base)));				\
+	klen = MIN(gvt->clue.end, gvt->last_rec->end);									\
+	assert(klen);													\
+	assert(0 <= memcmp(gvt->last_rec->base, gvt->clue.base, klen));							\
+	if (DIR_ROOT != gvt->root)											\
+	{	/* Not a directory tree => a GVT tree, check that first_rec/last_rec have at least gvname in it */	\
+		gvent = &gvt->gvname;											\
+		if (GVT_CLUE_FIRST_REC_UNRELIABLE != *((short *)gvt->first_rec->base))					\
+		{													\
+			assert((0 == memcmp(gvent->var_name.addr, gvt->first_rec->base, gvent->var_name.len))		\
+				&& (KEY_DELIMITER == gvt->first_rec->base[gvent->var_name.len]));			\
+		}													\
+		if (GVT_CLUE_LAST_REC_MAXKEY != *((short *)gvt->last_rec->base))					\
+		{													\
+			assert((0 == memcmp(gvent->var_name.addr, gvt->last_rec->base, gvent->var_name.len))		\
+				&& (KEY_DELIMITER == gvt->last_rec->base[gvent->var_name.len]));			\
+		}													\
+	}														\
+}
+#else
+#define	DEBUG_GVT_CLUE_VALIDATE(GVT)
+#endif
+
 /* Macro used by $ZPREVIOUS to replace a NULL subscript at the end with the maximum possible subscript
  * that could exist in the database for this global name.
  */

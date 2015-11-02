@@ -311,7 +311,7 @@ else
         set chmod_conf = 775
         set chmod_src = 664
 endif
-chmod 775 $gtm_ver
+chmod 755 $gtm_ver
 cd $gtm_ver
 chmod $chmod_conf bta dbg pro inc pct src tools gtmsrc.csh
 chmod 775 log
