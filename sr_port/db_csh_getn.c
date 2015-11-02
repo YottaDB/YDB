@@ -65,6 +65,9 @@ GBLREF boolean_t        mu_reorg_process;
 	wcs_sleep(ocnt);				\
 }
 
+error_def(ERR_BUFRDTIMEOUT);
+error_def(ERR_INVALIDRIP);
+
 cache_rec_ptr_t	db_csh_getn(block_id block)
 {
 	cache_rec_ptr_t		hdr, q0, start_cr, cr;
@@ -72,14 +75,11 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	unsigned int		lcnt, ocnt;
 	int			rip, max_ent, pass1, pass2, pass3;
 	int4			flsh_trigger;
-	uint4			first_r_epid, latest_r_epid, dummy;
+	uint4			first_r_epid, latest_r_epid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
 	ht_ent_int4		*tabent;
-
-	error_def(ERR_BUFRDTIMEOUT);
-	error_def(ERR_INVALIDRIP);
 
 	csa = cs_addrs;
 	csd = csa->hdr;
@@ -255,23 +255,22 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				{
 					BG_TRACE_PRO(db_csh_getn_out_of_design);  /* outside of design; clear to known state */
 					send_msg(VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(gv_cur_region));
-					INTERLOCK_INIT(cr);
 					assert(cr->r_epid == 0);
 					cr->r_epid = 0;
+					INTERLOCK_INIT(cr);
 				} else  if (0 != latest_r_epid)
 				{
-					if (TRUE == is_proc_alive(latest_r_epid, cr->image_count))
+					if (is_proc_alive(latest_r_epid, cr->image_count))
 					{
-						DEBUG_ONLY(
-								if ( (BUF_OWNER_STUCK / 2)== ocnt)
-									GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, \
-										latest_r_epid, ONCE);
-							  )
+#						ifdef DEBUG
+						if ((BUF_OWNER_STUCK / 2) == ocnt)
+							GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, latest_r_epid, ONCE);
+#						endif
 						TRACE_AND_SLEEP(ocnt);
 					} else
 					{
-						INTERLOCK_INIT(cr);	/* Process gone, release that process's lock */
 						cr->r_epid = 0;
+						INTERLOCK_INIT(cr);	/* Process gone, release that process's lock */
 					}
 				} else
 				{
@@ -286,17 +285,20 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 				{
 					if (first_r_epid != latest_r_epid)
 						GTMASSERT;
-#ifdef DEBUG
-					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, latest_r_epid, TWICE);
-#else
-					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, latest_r_epid, ONCE);
-#endif
+					GET_C_STACK_FROM_SCRIPT("BUFRDTIMEOUT", process_id, latest_r_epid,
+								DEBUG_ONLY(TWICE) PRO_ONLY(ONCE));
 					RELEASE_BUFF_READ_LOCK(cr);
 					send_msg(VARLSTCNT(8) ERR_BUFRDTIMEOUT, 6, process_id,
-								cr->blk, cr, first_r_epid, DB_LEN_STR(gv_cur_region));
+						 cr->blk, cr, first_r_epid, DB_LEN_STR(gv_cur_region));
 					continue;
-				} else
-					INTERLOCK_INIT(cr);
+				}
+				cr->r_epid = 0;
+				INTERLOCK_INIT(cr);
+				LOCK_BUFF_FOR_READ(cr, rip);
+				assert(0 == rip); 	/* Since holding crit, we expect to get lock */
+				if (0 != rip)
+					continue;
+				/* We successfully obtained the lock so can fall out of this block */
 			}
 		}
 		assert(0 == rip);
@@ -317,7 +319,9 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		 * seen by another process even though it sees the unlocked state of cr->read_in_progress. This could cause
 		 * t_qread to incorrectly return with an uptodate cr->cycle even though the buffer is still being read in
 		 * from disk and this could cause db integ errors as validation (in t_end/tp_tend which relies on cr->cycle)
-		 * will detect no problems even though there is one.
+		 * will detect no problems even though there is one. Note this memory barrier is still needed even though
+		 * there is a memory barrier connotation in the LOCK_BUFF_FOR_READ() macro above. LOCK_BUFF_FOR_READ() does
+		 * a read type memory barrier whereas here, we need a write barrier.
 		 */
 		SHM_WRITE_MEMORY_BARRIER;
 		cr->cycle++;

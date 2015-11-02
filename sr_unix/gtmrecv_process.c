@@ -202,6 +202,7 @@ static	double		time_elapsed;
 static	int		recvpool_size;
 static	int		heartbeat_period;
 static	char		assumed_remote_proto_ver;
+static	boolean_t	repl_cmp_solve_timer_set;
 
 #define	GTMRECV_EXPAND_CMPBUFF_IF_NEEDED(cmpmsglen)			\
 {									\
@@ -354,7 +355,7 @@ static int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_
 	 * case when the primary is a GT.M version running V5.3-003 to V5.4-001. The lower limit is chosen to be V5.3-003 since that
 	 * was the first version where cross-endian conversion was supported.
 	 */
-	assert(REPLGBL.srcsrv_vms || (remote_jnl_ver >= jnl_ver) ||
+	assert((TREF(replgbl)).srcsrv_vms || (remote_jnl_ver >= jnl_ver) ||
 			((V18_JNL_VER <= remote_jnl_ver) && (V20_JNL_VER >= remote_jnl_ver)));
 	jb = jnl_buff;
 	status = SS_NORMAL;
@@ -481,7 +482,7 @@ static void do_flow_control(uint4 write_pos)
 		space_used = write_pos - (read_pos = upd_proc_local->read);
 	if (space_used >= recvpool_high_watermark && !xoff_sent)
 	{	/* Send XOFF message */
-		if (REPLGBL.src_node_same_endianness)
+		if ((TREF(replgbl)).src_node_same_endianness)
 		{
 			xoff_msg.type = REPL_XOFF;
 			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, SIZEOF(seq_num));
@@ -511,7 +512,7 @@ static void do_flow_control(uint4 write_pos)
 		gtmrecv_poll_interval.tv_usec = GTMRECV_WAIT_FOR_UPD_PROGRESS_US;
 	} else if (space_used < recvpool_low_watermark && xoff_sent)
 	{
-		if (REPLGBL.src_node_same_endianness)
+		if ((TREF(replgbl)).src_node_same_endianness)
 		{
 			xon_msg.type = REPL_XON;
 			memcpy((uchar_ptr_t)&xon_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, SIZEOF(seq_num));
@@ -753,7 +754,7 @@ static int gtmrecv_est_conn(void)
 			repl_max_send_buffsize, repl_max_recv_buffsize);
 	repl_log_conn_info(gtmrecv_sock_fd, gtmrecv_log_fp);
 	/* re-determine endianness of other side */
-	REPLGBL.src_node_endianness_known = FALSE;
+	(TREF(replgbl)).src_node_endianness_known = FALSE;
 	/* re-determine journal format of other side */
 	remote_jnl_ver = 0;
 	/* re-determine compression level on the replication pipe after every connection establishment */
@@ -848,7 +849,7 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, int4 type, int4 len, char *msgtypest
 			optional_seqno, optional_seqno);
 	} else
 		repl_log(log_fp, TRUE, TRUE, "Sending %s message\n", msgtypestr);
-	if (REPLGBL.src_node_same_endianness)
+	if ((TREF(replgbl)).src_node_same_endianness)
 	{
 		msgp->type = type;
 		msgp->len = len;
@@ -877,14 +878,15 @@ void gtmrecv_send_triple_info(repl_triple *triple, int4 triple_num)
 
 	SETUP_THREADGBL_ACCESS;
 	/*************** Send REPL_TRIPLE_INFO1 message ***************/
-	tripinfo1_msg.start_seqno = REPLGBL.src_node_same_endianness ? triple->start_seqno : GTM_BYTESWAP_64(triple->start_seqno);
+	tripinfo1_msg.start_seqno = (TREF(replgbl)).src_node_same_endianness ?
+		triple->start_seqno : GTM_BYTESWAP_64(triple->start_seqno);
 	memcpy(tripinfo1_msg.instname, triple->root_primary_instname, MAX_INSTNAME_LEN - 1);
 	gtmrecv_repl_send((repl_msg_ptr_t)&tripinfo1_msg, REPL_TRIPLE_INFO1, MIN_REPL_MSGLEN,
 				"REPL_TRIPLE_INFO1", triple->start_seqno);
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 		return;
 	/*************** Send REPL_TRIPLE_INFO2 message ***************/
-	if (REPLGBL.src_node_same_endianness)
+	if ((TREF(replgbl)).src_node_same_endianness)
 	{
 		tripinfo2_msg.start_seqno = triple->start_seqno;
 		tripinfo2_msg.cycle = triple->root_primary_cycle;
@@ -1127,7 +1129,7 @@ static void process_tr_buff(int msg_type)
 			 * before using the type and len fields (the compressed message header was already endian
 			 * converted as part of receiving the message in do_main_loop())
 			 */
-			if (!REPLGBL.src_node_same_endianness)
+			if (!(TREF(replgbl)).src_node_same_endianness)
 			{
 				msgp->type = GTM_BYTESWAP_32(msgp->type);
 				msgp->len = GTM_BYTESWAP_32(msgp->len);
@@ -1144,8 +1146,8 @@ static void process_tr_buff(int msg_type)
 		write_len = (write_loc - write_off);
 		assert((write_off != write_wrap) || (0 == write_off));
 		assert(remote_jnl_ver);
-		assert(REPLGBL.src_node_same_endianness || (V18_JNL_VER <= remote_jnl_ver));
-		if (!REPLGBL.src_node_same_endianness && (REPLGBL.srcsrv_vms ||
+		assert((TREF(replgbl)).src_node_same_endianness || (V18_JNL_VER <= remote_jnl_ver));
+		if (!(TREF(replgbl)).src_node_same_endianness && ((TREF(replgbl)).srcsrv_vms ||
 							(remote_jnl_ver >= jnl_ver) || (V21_JNL_VER > remote_jnl_ver)))
 		{
 			if (SS_NORMAL != (status = repl_tr_endian_convert(remote_jnl_ver,
@@ -1541,6 +1543,12 @@ static void do_main_loop(boolean_t crash_restart)
 		}
 		if (repl_connection_reset)
 			return;
+		/* Received communication from the source server, so we can cancel the timer */
+		if (TREF(gtm_environment_init) && repl_cmp_solve_timer_set)
+		{
+			cancel_timer((TID)repl_cmp_solve_rcv_timeout);
+			repl_cmp_solve_timer_set = FALSE;
+		}
 		/* Something on the replication pipe - read it */
 		REPL_DPRINT3("Pending data len : %d  Prev buff unprocessed : %d\n", data_len, buff_unprocessed);
 		buff_unprocessed += recvd_len;
@@ -1552,16 +1560,16 @@ static void do_main_loop(boolean_t crash_restart)
 			if (0 == data_len)
 			{
 				assert(0 == ((unsigned long)buffp % REPL_MSG_ALIGN));
-				if (!REPLGBL.src_node_endianness_known)
+				if (!(TREF(replgbl)).src_node_endianness_known)
 				{
-					REPLGBL.src_node_endianness_known = TRUE;
+					(TREF(replgbl)).src_node_endianness_known = TRUE;
 					if ((REPL_MSGTYPE_LAST < ((repl_msg_ptr_t)buffp)->type)
 							&& (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type)))
-						REPLGBL.src_node_same_endianness = FALSE;
+						(TREF(replgbl)).src_node_same_endianness = FALSE;
 					else
-						REPLGBL.src_node_same_endianness = TRUE;
+						(TREF(replgbl)).src_node_same_endianness = TRUE;
 				}
-				if (!REPLGBL.src_node_same_endianness)
+				if (!(TREF(replgbl)).src_node_same_endianness)
 				{
 					((repl_msg_ptr_t)buffp)->type = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type);
 					((repl_msg_ptr_t)buffp)->len = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->len);
@@ -1592,7 +1600,7 @@ static void do_main_loop(boolean_t crash_restart)
 						break;				/* Break out of here and read more data first. */
 					msghdrlen = REPL_MSG_HDRLEN; /* reset to regular msg hdr length for future messages */
 					cmpmsgp = (repl_cmpmsg_ptr_t)buffp;
-					if (!REPLGBL.src_node_same_endianness)
+					if (!(TREF(replgbl)).src_node_same_endianness)
 					{
 						cmpmsgp->cmplen = GTM_BYTESWAP_32(cmpmsgp->cmplen);
 						cmpmsgp->uncmplen = GTM_BYTESWAP_32(cmpmsgp->uncmplen);
@@ -1676,7 +1684,7 @@ static void do_main_loop(boolean_t crash_restart)
 							break;
 						}
 						memcpy(heartbeat.ack_seqno, buffp - msg_len, msg_len);
-						if (REPLGBL.src_node_same_endianness)
+						if ((TREF(replgbl)).src_node_same_endianness)
 						{
 							 ack_time = *(gtm_time4_t *)&heartbeat.ack_time[0];
 							 memcpy((uchar_ptr_t)&ack_seqno,
@@ -1691,7 +1699,7 @@ static void do_main_loop(boolean_t crash_restart)
 						REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO %llu at %ld\n",
 							     ack_time, ack_seqno, time(NULL));
 						ack_seqno = upd_proc_local->read_jnl_seqno;
-						if (REPLGBL.src_node_same_endianness)
+						if ((TREF(replgbl)).src_node_same_endianness)
 						{
 							heartbeat.type = REPL_HEARTBEAT;
 							heartbeat.len = MIN_REPL_MSGLEN;
@@ -1773,7 +1781,7 @@ static void do_main_loop(boolean_t crash_restart)
 						{
 							assert(msg_len == REPL_MSG_CMPINFOLEN - REPL_MSG_HDRLEN);
 							cmptest_msg = (repl_cmpinfo_msg_ptr_t)(buffp - msg_len - REPL_MSG_HDRLEN);
-							if (REPLGBL.src_node_same_endianness)
+							if ((TREF(replgbl)).src_node_same_endianness)
 								cmplen = cmptest_msg->datalen;
 							else
 								cmplen = GTM_BYTESWAP_32(cmptest_msg->datalen);
@@ -1840,9 +1848,32 @@ static void do_main_loop(boolean_t crash_restart)
 							cmpsolve_msg.datalen = REPL_RCVR_CMP_TEST_FAIL;
 							repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_UNCMPTRANSITION_STR);
 						}
-						if (!REPLGBL.src_node_same_endianness)
+						if (!(TREF(replgbl)).src_node_same_endianness)
 							cmpsolve_msg.datalen = GTM_BYTESWAP_32(cmpsolve_msg.datalen);
 						cmpsolve_msg.proto_ver = REPL_PROTO_VER_THIS;
+#ifdef DEBUG
+						/* make the source server wait in this white-box scenario */
+						if (gtm_white_box_test_case_enabled
+							&& (WBTEST_CMP_SOLVE_TIMEOUT == gtm_white_box_test_case_number)
+							&& (2 == gtm_white_box_test_case_count))
+						{
+							LONG_SLEEP(75);
+						}
+#endif
+						if (TREF(gtm_environment_init))
+						{
+#ifdef DEBUG
+							if (gtm_white_box_test_case_enabled &&
+								(WBTEST_CMP_SOLVE_TIMEOUT == gtm_white_box_test_case_number) &&
+								(2 == gtm_white_box_test_case_count))
+								start_timer((TID)repl_cmp_solve_rcv_timeout, 1 * 60 * 1000,
+									repl_cmp_solve_rcv_timeout, 0, NULL);
+							else
+#endif
+								start_timer((TID)repl_cmp_solve_rcv_timeout, 15 * 60 * 1000,
+									repl_cmp_solve_rcv_timeout, 0, NULL);
+							repl_cmp_solve_timer_set = TRUE;
+						}
 						gtmrecv_repl_send((repl_msg_ptr_t)&cmpsolve_msg, REPL_CMP_SOLVE,
 									REPL_MSG_CMPINFOLEN, "REPL_CMP_SOLVE", MAX_SEQNO);
 						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
@@ -1861,7 +1892,7 @@ static void do_main_loop(boolean_t crash_restart)
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 						need_tripleinfo_msg = (repl_needtriple_msg_ptr_t)(buffp - msg_len
 													- REPL_MSG_HDRLEN);
-						if (REPLGBL.src_node_same_endianness)
+						if ((TREF(replgbl)).src_node_same_endianness)
 							input_triple_seqno = need_tripleinfo_msg->seqno;
 						else
 							input_triple_seqno = GTM_BYTESWAP_64(need_tripleinfo_msg->seqno);
@@ -2036,7 +2067,7 @@ static void do_main_loop(boolean_t crash_restart)
 						assert((unsigned long)start_msg % SIZEOF(seq_num) == 0); /* alignment check */
 						memcpy((uchar_ptr_t)&recvd_jnl_seqno,
 							(uchar_ptr_t)start_msg->start_seqno, SIZEOF(seq_num));
-						if (!REPLGBL.src_node_same_endianness)
+						if (!(TREF(replgbl)).src_node_same_endianness)
 						{
 							recvd_jnl_seqno = GTM_BYTESWAP_64(recvd_jnl_seqno);
 						}
@@ -2049,12 +2080,12 @@ static void do_main_loop(boolean_t crash_restart)
 							remote_jnl_ver = start_msg->jnl_ver;
 							REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
 								     jnl_ver, remote_jnl_ver);
-							repl_check_jnlver_compat(REPLGBL.src_node_same_endianness);
+							repl_check_jnlver_compat((TREF(replgbl)).src_node_same_endianness);
 							/* older versions zero filler that was in place of start_msg->start_flags,
 							 * so we are okay fetching start_msg->start_flags unconditionally.
 							 */
 							GET_ULONG(recvd_start_flags, start_msg->start_flags);
-							if (!REPLGBL.src_node_same_endianness)
+							if (!(TREF(replgbl)).src_node_same_endianness)
 							{
 								recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
 							}
@@ -2063,13 +2094,14 @@ static void do_main_loop(boolean_t crash_restart)
 								recvd_start_flags = 0;
 							primary_side_std_null_coll = (recvd_start_flags & START_FLAG_COLL_M) ?
 								TRUE : FALSE;
-							REPLGBL.srcsrv_vms = (recvd_start_flags & START_FLAG_SRCSRV_IS_VMS) ?
-													TRUE : FALSE;
-							if (FALSE != (REPLGBL.null_subs_xform = ((primary_side_std_null_coll &&
+							(TREF(replgbl)).srcsrv_vms =
+								(recvd_start_flags & START_FLAG_SRCSRV_IS_VMS) ? TRUE : FALSE;
+							if (FALSE != ((TREF(replgbl)).null_subs_xform =
+									((primary_side_std_null_coll &&
 										!secondary_side_std_null_coll)
 									|| (secondary_side_std_null_coll &&
 										!primary_side_std_null_coll))))
-								REPLGBL.null_subs_xform = (primary_side_std_null_coll ?
+								(TREF(replgbl)).null_subs_xform = (primary_side_std_null_coll ?
 									STDNULL_TO_GTMNULL_COLL : GTMNULL_TO_STDNULL_COLL);
 								/* this sets null_subs_xform regardless of remote_jnl_ver */
 							primary_side_trigger_support
@@ -2145,6 +2177,11 @@ static void do_main_loop(boolean_t crash_restart)
 		buffp = buff_start;
 		GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 	}
+}
+
+void repl_cmp_solve_rcv_timeout(void)
+{
+	GTMASSERT;
 }
 
 static void gtmrecv_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr)

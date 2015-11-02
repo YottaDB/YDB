@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -26,16 +26,12 @@
 	.text
 .extern	pcurrpos
 
-MPR_LINESTART	=	0x8
-
 # PUBLIC	op_mproflinestart
 ENTRY op_mproflinestart
 	movl	frame_pointer,%edx
 	movl	(%esp),%eax
 	movl	%eax,msf_mpc_off(%edx)
-	pushl	$MPR_LINESTART
 	call	pcurrpos
-	addl 	$4,%esp
 	ret
 # op_mproflinestart ENDP
 

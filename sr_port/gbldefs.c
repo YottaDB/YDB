@@ -79,7 +79,7 @@
 #include "gtmimagename.h"
 #include "iotcpdef.h"
 #include "gt_timer.h"
-#include "iosocketdef.h"	/* needed for socket_pool and MAX_N_SOCKETS*/
+#include "iosocketdef.h"	/* needed for socket_pool and MAX_N_SOCKETS */
 #include "ctrlc_handler_dummy.h"
 #include "unw_prof_frame_dummy.h"
 #include "op.h"
@@ -352,10 +352,7 @@ GBLDEF	volatile	int4		fast_lock_count = 0;	/* Used in wcs_stale */
 GBLDEF	gtmsource_options_t	gtmsource_options;
 GBLDEF	gtmrecv_options_t	gtmrecv_options;
 
-GBLDEF	unsigned char		*profstack_base, *profstack_top, *prof_msp, *profstack_warn;
-GBLDEF	unsigned char		*prof_stackptr;
 GBLDEF	boolean_t		is_tracing_on;
-GBLDEF	stack_frame_prof	*prof_fp;
 GBLDEF	void			(*tp_timeout_start_timer_ptr)(int4 tmout_sec) = tp_start_timer_dummy;
 GBLDEF	void			(*tp_timeout_clear_ptr)(void) = tp_clear_timeout_dummy;
 GBLDEF	void			(*tp_timeout_action_ptr)(void) = tp_timeout_action_dummy;
@@ -523,7 +520,6 @@ GBLDEF	int4	zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including D
 GBLDEF	mval	dollar_zdir = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 
 GBLDEF	int * volatile		var_on_cstack_ptr = NULL; /* volatile pointer to int; volatile so that nothing gets optimized out */
-GBLDEF	boolean_t		gtm_environment_init = FALSE;
 GBLDEF	hash_table_int4		cw_stagnate;
 GBLDEF	boolean_t		cw_stagnate_reinitialized = FALSE;
 
@@ -758,11 +754,6 @@ GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_
 
 GBLDEF	volatile boolean_t	in_wcs_recover = FALSE;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
 
-/* Following definitions are related to white_box testing */
-GBLDEF	boolean_t	gtm_white_box_test_case_enabled = FALSE;
-GBLDEF	int		gtm_white_box_test_case_number = 0;
-GBLDEF	int		gtm_white_box_test_case_count = 0;
-GBLDEF	int 		gtm_wbox_input_test_case_count = 0; /* VMS allows maximum 31 characters for external identifer */
 
 GBLDEF	boolean_t	in_gvcst_incr = FALSE;	/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
 						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */
@@ -1016,6 +1007,11 @@ GBLDEF	gtmcrypt_strerror_t		gtmcrypt_strerror_fnptr;
 #endif /* GTM_CRYPT */
 
 #ifdef DEBUG
+/* Following definitions are related to white_box testing */
+GBLDEF	boolean_t	gtm_white_box_test_case_enabled = FALSE;
+GBLDEF	int		gtm_white_box_test_case_number = 0;
+GBLDEF	int		gtm_white_box_test_case_count = 0;
+GBLDEF	int 		gtm_wbox_input_test_case_count = 0; /* VMS allows maximum 31 characters for external identifer */
 GBLDEF	boolean_t	stringpool_unusable = FALSE;	/* Set to TRUE by any function that does not expect any of its function
 							 * callgraph to use/expand the stringpool. */
 GBLDEF	boolean_t	stringpool_unexpandable = FALSE;/* Set to TRUE by any function for a small period when it has ensured

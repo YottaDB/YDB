@@ -170,6 +170,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				assert(csd->jnl_deq == jnl_info.extend);
 				assert(csd->jnl_before_image == jnl_info.before_images);
 				csd->jnl_checksum = jnl_info.checksum;
+				csd->jnl_eovtn = csd->trans_hist.curr_tn;
 				send_msg(VARLSTCNT(4) ERR_NEWJNLFILECREAT, 2, JNL_LEN_STR(csd));
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;

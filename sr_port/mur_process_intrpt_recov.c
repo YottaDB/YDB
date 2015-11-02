@@ -52,6 +52,12 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 
+error_def(ERR_PREMATEOF); /* for DO_FILE_WRITE */
+error_def(ERR_JNLNOCREATE);
+error_def(ERR_JNLWRERR);
+error_def(ERR_JNLFSYNCERR);
+error_def(ERR_TEXT);
+
 uint4 mur_process_intrpt_recov()
 {
 	jnl_ctl_list		*jctl, *last_jctl;
@@ -66,12 +72,6 @@ uint4 mur_process_intrpt_recov()
 	io_status_block_disk	iosb;
 #endif
 	boolean_t		jfh_changed;
-
-	error_def(ERR_PREMATEOF); /* for DO_FILE_WRITE */
-	error_def(ERR_JNLNOCREATE);
-	error_def(ERR_JNLWRERR);
-	error_def(ERR_JNLFSYNCERR);
-	error_def(ERR_TEXT);
 
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
@@ -120,6 +120,8 @@ uint4 mur_process_intrpt_recov()
 		csd->trans_hist.early_tn = jctl->turn_around_tn;
 		csd->trans_hist.curr_tn = csd->trans_hist.early_tn;	/* INCREMENT_CURR_TN macro not used but noted in comment
 									 * to identify all places that set curr_tn */
+		csd->jnl_eovtn = csd->trans_hist.curr_tn;
+		csd->turn_around_point = TRUE;
 		/* MUPIP REORG UPGRADE/DOWNGRADE stores its partially processed state in the database file header.
 		 * It is difficult for recovery to restore those fields to a correct partial value.
 		 * Hence reset the related fields as if the desired_db_format got set just ONE tn BEFORE the EPOCH record
@@ -150,6 +152,7 @@ uint4 mur_process_intrpt_recov()
 			/* This is taken from bt_refresh() */
 			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = jctl->turn_around_tn - 1;
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
+		csd->turn_around_point = FALSE;
 		/* In case this is MM and wcs_flu() remapped an extended database, reset rctl->csd */
 		assert((dba_mm == cs_data->acc_meth) || (rctl->csd == cs_data));
 		rctl->csd = cs_data;

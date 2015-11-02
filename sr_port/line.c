@@ -192,16 +192,16 @@ boolean_t line(uint4 *lnc)
 	if (success)
 	{
 		assert(TREF(for_stack_ptr) == TADR(for_stack));
-		*TREF(for_stack_ptr) = NULL;
+		*(TREF(for_stack_ptr)) = NULL;
 		success = linetail();
 		if (success)
 		{
 			assert(TREF(for_stack_ptr) == TADR(for_stack));
-			if (*TREF(for_stack_ptr))
-				tnxtarg(*TREF(for_stack_ptr));
+			if (*(TREF(for_stack_ptr)))
+				tnxtarg(*(TREF(for_stack_ptr)));
 		}
 	}
-	TREF(for_stack_ptr) = TADR(for_stack);
+	assert(TREF(for_stack_ptr) == TADR(for_stack));
 	if (first_triple->exorder.fl == curtchain)
 		newtriple(OC_NOOP);			/* empty line (comment, blank, etc) */
 	curlin->externalentry = first_triple->exorder.fl;

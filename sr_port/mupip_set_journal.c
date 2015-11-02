@@ -65,6 +65,33 @@ GBLREF	char			*before_image_lit[];
 GBLREF	char			*jnl_state_lit[];
 GBLREF	char			*repl_state_lit[];
 GBLREF	jnl_gbls_t		jgbl;
+
+error_def(ERR_DBPRIVERR);
+error_def(ERR_DBOPNERR);
+error_def(ERR_DBRDERR);
+error_def(ERR_DBFILERR);
+error_def(ERR_JNLBUFFTOOSM);
+error_def(ERR_JNLRDONLY);
+error_def(ERR_MUSTANDALONE);
+error_def(ERR_FILEEXISTS);
+error_def(ERR_PREVJNLLINKCUT);
+error_def(ERR_JNLFNF);
+error_def(ERR_JNLSTATE);
+error_def(ERR_REPLSTATE);
+error_def(ERR_JNLNOCREATE);
+error_def(ERR_JNLCREATE);
+error_def(ERR_BEFOREIMG);
+error_def(ERR_UNIMPLOP);
+error_def(ERR_TEXT);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_FILEPARSE);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_FILENAMETOOLONG);
+error_def(ERR_JNLSWITCHTOOSM);
+error_def(ERR_JNLSWITCHSZCHG);
+error_def(ERR_JNLINVSWITCHLMT);
+error_def(ERR_JNLALIGNTOOSM);
+
 VMS_ONLY(static  const   unsigned short  zero_fid[3];)
 
 uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
@@ -97,32 +124,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	jnl_tm_t		save_gbl_jrec_time;
-
-	error_def(ERR_DBPRIVERR);
-	error_def(ERR_DBOPNERR);
-	error_def(ERR_DBRDERR);
-	error_def(ERR_DBFILERR);
-	error_def(ERR_JNLBUFFTOOSM);
-	error_def(ERR_JNLRDONLY);
-	error_def(ERR_MUSTANDALONE);
-	error_def(ERR_FILEEXISTS);
-	error_def(ERR_PREVJNLLINKCUT);
-	error_def(ERR_JNLFNF);
-	error_def(ERR_JNLSTATE);
-	error_def(ERR_REPLSTATE);
-	error_def(ERR_JNLNOCREATE);
-	error_def(ERR_JNLCREATE);
-	error_def(ERR_BEFOREIMG);
-	error_def(ERR_UNIMPLOP);
-	error_def(ERR_TEXT);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_FILEPARSE);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_FILENAMETOOLONG);
-	error_def(ERR_JNLSWITCHTOOSM);
-	error_def(ERR_JNLSWITCHSZCHG);
-	error_def(ERR_JNLINVSWITCHLMT);
-	error_def(ERR_JNLALIGNTOOSM);
 
 	assert(SGMNT_HDR_LEN == ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
 	memset(&jnl_info, 0, SIZEOF(jnl_info));
@@ -628,6 +629,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					continue;
 				}
 				csd->jnl_checksum = jnl_info.checksum;
+				csd->jnl_eovtn = csd->trans_hist.curr_tn;
 				gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
 					db_or_reg_len, db_or_reg, db_reg_name_len, db_reg_name,
 					LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));

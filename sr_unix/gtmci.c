@@ -59,8 +59,6 @@
 #include "compiler.h"
 #include "gt_timer.h"
 
-GBLDEF 	unsigned int		nested_level;		/* current nested depth of callin environments */
-
 GBLREF	parmblk_struct 		*param_list;
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;

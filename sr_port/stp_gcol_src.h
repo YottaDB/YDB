@@ -192,44 +192,44 @@ error_def(ERR_STPEXPFAIL);
 
 #ifdef STP_MOVE
 
-#define	MSTR_STPG_ADD(MSTR1)								\
-{											\
-	mstr		*lcl_mstr;							\
-	char		*lcl_addr;							\
-											\
-	GBLREF	spdesc	stringpool;							\
-											\
-	lcl_mstr = MSTR1;								\
-	if (lcl_mstr->len)								\
-	{										\
-		lcl_addr = lcl_mstr->addr;						\
-		if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	\
-		{									\
-			MSTR_STPG_PUT(lcl_mstr);					\
-		} else if (IS_PTR_IN_RANGE(lcl_addr, stp_move_from, stp_move_to))	\
-		{									\
-			MSTR_STPG_PUT(lcl_mstr);					\
-			stp_move_count++;						\
-		}									\
-	}										\
+#define	MSTR_STPG_ADD(MSTR1)										\
+{													\
+	mstr		*lcl_mstr;									\
+	char		*lcl_addr;									\
+													\
+	GBLREF	spdesc	stringpool;									\
+													\
+	lcl_mstr = MSTR1;										\
+	if (lcl_mstr->len)										\
+	{												\
+		lcl_addr = lcl_mstr->addr;								\
+		if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	/* BYPASSOK */	\
+		{											\
+			MSTR_STPG_PUT(lcl_mstr);							\
+		} else if (IS_PTR_IN_RANGE(lcl_addr, stp_move_from, stp_move_to))			\
+		{											\
+			MSTR_STPG_PUT(lcl_mstr);							\
+			stp_move_count++;								\
+		}											\
+	}												\
 }
 
 #else
 
-#define	MSTR_STPG_ADD(MSTR1)								\
-{											\
-	mstr		*lcl_mstr;							\
-	char		*lcl_addr;							\
-											\
-	GBLREF spdesc	stringpool;							\
-											\
-	lcl_mstr = MSTR1;								\
-	if (lcl_mstr->len)								\
-	{										\
-		lcl_addr = lcl_mstr->addr;						\
-		if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	\
-			MSTR_STPG_PUT(lcl_mstr);					\
-	}										\
+#define	MSTR_STPG_ADD(MSTR1)										\
+{													\
+	mstr		*lcl_mstr;									\
+	char		*lcl_addr;									\
+													\
+	GBLREF spdesc	stringpool;									\
+													\
+	lcl_mstr = MSTR1;										\
+	if (lcl_mstr->len)										\
+	{												\
+		lcl_addr = lcl_mstr->addr;								\
+		if (IS_PTR_IN_RANGE(lcl_addr, stringpool.base, stringpool.free))	/* BYPASSOK */	\
+			MSTR_STPG_PUT(lcl_mstr);							\
+	}												\
 }
 
 #endif
@@ -395,7 +395,7 @@ void stp_vfy_mval(void)
 					if (x->len)
 					{
 						addr = x->addr;
-						if (IS_PTR_IN_RANGE(addr, stringpool.base, stringpool.free))
+						if (IS_PTR_IN_RANGE(addr, stringpool.base, stringpool.free))	/* BYPASSOK */
 							assert(0 < (x)->len);
 					}
 				}
@@ -434,7 +434,8 @@ void mv_parse_tree_collect(mvar *node)
 /* garbage collect and move range [from,to) to stringpool adjusting all mvals/mstrs pointing in this range */
 void stp_move(char *stp_move_from, char *stp_move_to)
 #else
-void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough space for space_asked bytes */
+/* garbage collect and create enough space for space_asked bytes */
+void stp_gcol(int space_asked)	/* BYPASSOK */
 #endif
 {
 #	ifdef STP_MOVE
@@ -449,7 +450,8 @@ void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough spa
 	lvTreeNode		*node, *node_limit;
 	mstr			**cstr, *x;
 	mv_stent		*mvs;
-	mval			*m, *mtop;
+	mval			*m, **mm, **mmtop, *mtop;
+	intszofptr_t		lv_subs;
 	stack_frame		*sf;
 	tp_frame		*tf;
 	zwr_sub_lst		*zwr_sub;
@@ -800,6 +802,25 @@ void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough spa
 #				endif
 					break;
 			}
+			if (NULL != sf->for_ctrl_stack)
+			{
+				mm = (mval **)sf->for_ctrl_stack->saved_for_indx;
+				for (mmtop = (mval **)((char *)mm + (MAX_FOR_STACK * SIZEOF(mval *))); ++mm < mmtop;)
+				{
+					if (NULL != *mm)
+					{
+						m = (mval *)((char *)mm + SIZEOF(mval) + SIZEOF(mname_entry)
+							+ SIZEOF(mident_fixed));
+						lv_subs = *(intszofptr_t *)m;
+						for (m = (mval *)((char *)m + SIZEOF(intszofptr_t) + SIZEOF(lv_val));
+							0 < --lv_subs; m++)
+						{
+							assert(MV_DEFINED(m));
+							MVAL_STPG_ADD(m);
+						}
+					}
+				}
+			}
 			assert(sf->temps_ptr);
 			if (sf->temps_ptr >= (unsigned char *)sf)
 				continue;
@@ -962,7 +983,7 @@ void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough spa
 				 * the range of stringpool.base and stringpool.top. In the 'array' of (mstr *) they
 				 * must be either at the beginning, or at the end. */
 				tmpaddr = (unsigned char *)(*array)->addr;
-				if (IS_PTR_IN_RANGE(tmpaddr, stringpool.base, stringpool.top))
+				if (IS_PTR_IN_RANGE(tmpaddr, stringpool.base, stringpool.top))	/* BYPASSOK */
 					topstr -= stp_move_count;/* stringpool elements before move elements in stp_array */
 				else
 					array += stp_move_count;/* stringpool elements after move elements or no stringpool

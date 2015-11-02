@@ -38,9 +38,8 @@ THREADGBLDEF(expr_depth,			unsigned int)			/* expression nesting level */
 THREADGBLDEF(expr_start,			triple *)			/* chain anchor for side effect early evaluation */
 THREADGBLDEF(expr_start_orig,			triple *)			/* anchor used to test if there's anything hung on
 										 * expr_start */
-THREADGBLDEF(for_ctrl_indr_subs,		boolean_t)			/* part of kludge 2get 2nd arg from op_indlvadr */
-THREADGBLDEF(for_run_stack_lvl,			uint4)				/* time tracking of FOR stack nesting */
-THREADGBLDEF(for_stack_ptr,			oprtype **)			/* part of for nesting mechanism */
+THREADGBLDEF(for_nest_level,			uint4)				/* kludge feeds extra (non-lvn) arg to FOR rt ops */
+THREADGBLDEF(for_stack_ptr,			oprtype **)			/* part of FOR compilation nesting mechanism */
 THREADGBLDEF(gtm_fullbool,			unsigned int)			/* controls boolean side-effect behavior defaults
 										 * to 0 (GTM_BOOL) */
 THREADGBLDEF(last_source_column,		short int)			/* parser tracker */
@@ -128,10 +127,19 @@ THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* UNIX op_fnzsearch temp for null
 #endif
 THREADGBLDEF(gtm_env_init_done,			boolean_t)			/* gtm_env_init flag for completion */
 THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() function pointer */
+THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates that this is GT.M rather than
+										 * production environment */
+THREADGBLFPTR(gtm_sigusr1_handler,		void, 		())		/* SIGUSR1 signal handler function ptr */
+THREADGBLDEF(gtm_waitstuck_script,		mstr)				/* Path to the script to be executed during waits*/
 THREADGBLDEF(gtmprompt,				mstr)				/* mstr pointing to prombuf containing the GTM
 										 * prompt */
-THREADGBLFPTR(gtm_sigusr1_handler,		void, 		())		/* SIGUSR1 signal handler function ptr */
 THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
+THREADGBLDEF(mprof_chunk_avail_size,		int)				/* Number of mprof stack frames that can fit in
+										 * the current chunk */
+THREADGBLDEF(mprof_ptr,				mprof_wrapper *)		/* Object containing key mprof references */
+THREADGBLDEF(mprof_stack_curr_frame, 		mprof_stack_frame *)		/* Pointer to the last frame on the mprof stack */
+THREADGBLDEF(mprof_stack_next_frame, 		mprof_stack_frame *)		/* Pointer to the next frame to be put on the
+										 * mprof stack */
 #ifdef UNIX
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 #endif
@@ -140,6 +148,7 @@ THREADGBLDEF(parms_cnt,                         unsigned int)                   
 THREADGBLDEF(pipefifo_interrupt,		int)				/* count of number of times a pipe or fifo device is
 										 * interrupted */
 #endif
+THREADGBLDEF(prof_fp,				mprof_stack_frame *)		/* Stack frame that mprof currently operates on */
 THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
 THREADGBLDEF(view_ydirt_str_len,		int4)				/* part of op_view working storage for ydir* ops */
@@ -153,14 +162,14 @@ THREADGBLDEF(zsearch_dir2,			lv_val *)			/* UNIX $zsearch() directory 2 */
 
 /* Larger structures and char strings */
 THREADGBLDEF(fnpca,				fnpc_area)			/* $Piece cache structure area */
+THREADGBLAR1DEF(for_stack,			oprtype *,	MAX_FOR_STACK)	/* stacks FOR scope complete (compilation) addrs */
+THREADGBLAR1DEF(for_temps,			boolean_t,	MAX_FOR_STACK)	/* stacked flags of FOR control value temps */
+THREADGBLAR1DEF(last_fnquery_return_sub,	mval,		MAX_LVSUBSCRIPTS)/* Returned subscripts of last $QUERY() */
 THREADGBLDEF(lcl_coll_xform_buff,		char *)				/* This buffer is for local collation
 										 * transformations, which must not nest - i.e.
 										 * a transformation routine must not call another,
 										 * or itself. This kind of nesting would cause
 										 * overwriting of the buffer */
-THREADGBLAR1DEF(for_stack,			oprtype *,	MAX_FOR_STACK)	/* stacks FOR scope complete (compilation) addrs */
-THREADGBLAR1DEF(for_temps,			boolean_t,	MAX_FOR_STACK)	/* stacked flags of FOR control value temps */
-THREADGBLAR1DEF(last_fnquery_return_sub,	mval,		MAX_LVSUBSCRIPTS)/* Returned subscripts of last $QUERY() */
 #ifdef UNIX
 THREADGBLAR1DEF(parm_ary,                       char *,         MAX_PARMS)      /* parameter strings buffer */
 THREADGBLAR1DEF(parm_ary_len,                   int,            MAX_PARMS)      /* array element allocation length */
@@ -172,11 +181,15 @@ THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size
 										 * to 3 bytes, the buffer would at least
 										 * accommodate 10 Unicode characters in a prompt */
 THREADGBLDEF(rt_name_tbl,			hash_table_mname)		/* Routine hash table for finding $TEXT() info */
-#ifdef UNIX
+THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
+
 /* GTM Call-in related globals */
+#ifdef UNIX
 THREADGBLDEF(callin_hashtab, 			hash_table_str *)		/* Callin hash table */
 THREADGBLDEF(ci_table, 				callin_entry_list *)		/* Callin table in the form of a linked list */
-THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* current nested depth of callin environments */
 #endif
-THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
-THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)		/* External call table package list */
+THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)	/* External call table package list */
+#ifdef UNIX
+THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of callin environments */
+#endif
+

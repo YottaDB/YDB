@@ -88,6 +88,7 @@ typedef struct st_timer_alloc
 int4		abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
 void		add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd);
 void		cancel_timer(TID tid);
+void		clear_timers(void);
 void		hiber_start(uint4 hiber);
 void		hiber_start_wait_any(uint4 hiber);
 void		start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);

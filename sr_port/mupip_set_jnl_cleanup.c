@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,7 @@ void mupip_set_jnl_cleanup(boolean_t clean_exit)
 				gds_info->file_cntl_lsb.lockid = 0;
 				sys$dassgn(gds_info->fab->fab$l_stv);
 			)
-			UNIX_ONLY(db_ipcs_reset(gv_cur_region, !clean_exit);)
+			UNIX_ONLY(db_ipcs_reset(gv_cur_region);)
 		} else
 		{
  			tp_change_reg();

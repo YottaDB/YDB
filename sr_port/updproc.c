@@ -146,18 +146,17 @@ GBLREF	gv_namehead		*gv_target;
 LITREF	mval			literal_hasht;
 static	boolean_t		updproc_continue = TRUE;
 
-error_def(ERR_REPEATERROR);
-error_def(ERR_TPRETRY);
-error_def(ERR_TEXT);
-error_def(ERR_SECONDAHEAD);
-error_def(ERR_RECVPOOLSETUP);
-error_def(ERR_UPDREPLSTATEOFF);
-error_def(ERR_TPRETRY);
 error_def(ERR_GBLOFLOW);
-error_def(ERR_GVSUBOFLOW);
 error_def(ERR_GVIS);
 error_def(ERR_REC2BIG);
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_REPEATERROR);
+error_def(ERR_SECONDAHEAD);
+error_def(ERR_TEXT);
+error_def(ERR_TPRETRY);
+error_def(ERR_TPRETRY);
 error_def(ERR_TRIGDEFNOSYNC);
+error_def(ERR_UPDREPLSTATEOFF);
 
 CONDITION_HANDLER(updproc_ch)
 {
@@ -1077,27 +1076,25 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			temp_read = 0;
 			temp_write = 0;
 			upd_rec_seqno = tupd_num = tcom_num = 0;
-			/*Throw an error if bad_trans comes for the same sequence number*/
+			/* Throw an error if bad_trans comes for the same sequence number */
 			if (last_errored_seqno == jnl_seqno)
 			{
 				last_errored_seqno = 0;
 				switch(bad_trans_type)
 				{
 					case upd_bad_key_size:
-						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-							end = &buff[MAX_ZWR_KEY_SZ - 1];
-						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS,2, end - buff, buff);
+						ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
 						break;
 					case upd_bad_val_size:
-						if (0 == (end = format_targ_key(buff,MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
 						rts_error(VARLSTCNT(10) ERR_REC2BIG, 4,
 							gv_currkey->end + 1 + val_mv.str.len + SIZEOF(rec_hdr),
-							(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region), ERR_GVIS, 2,
-							end - buff, buff);
+							(int4)gv_cur_region->max_rec_size, REG_LEN_STR(gv_cur_region),
+							ERR_GVIS, 2, end - buff, buff);
 						break;
 				}
-			}else
+			} else
 				last_errored_seqno = jnl_seqno;
 			continue;
 		}

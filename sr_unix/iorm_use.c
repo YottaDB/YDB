@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +61,14 @@ GBLREF	boolean_t	gtm_utf8_mode;
 GBLREF	UConverter	*chset_desc[];
 LITREF	mstr		chset_names[];
 #endif
+error_def(ERR_DEVPARMNEG);
+error_def(ERR_RMWIDTHPOS);
+error_def(ERR_RMWIDTHTOOBIG);
+error_def(ERR_RECSIZENOTEVEN);
+error_def(ERR_SYSCALL);
+error_def(ERR_WIDTHTOOSMALL);
+error_def(ERR_PADCHARINVALID);
+error_def(ERR_IOERROR);
 
 void	iorm_use(io_desc *iod, mval *pp)
 {
@@ -75,15 +83,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 	mstr		chset_mstr;
 	boolean_t	ichset_specified, ochset_specified, chset_allowed;
 	gtm_chset_t	width_chset, temp_chset;
-
-	error_def(ERR_DEVPARMNEG);
-	error_def(ERR_RMWIDTHPOS);
-	error_def(ERR_RMWIDTHTOOBIG);
-	error_def(ERR_RECSIZENOTEVEN);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_WIDTHTOOSMALL);
-	error_def(ERR_PADCHARINVALID);
-	error_def(ERR_IOERROR);
 
 	p_offset = 0;
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
@@ -157,6 +156,12 @@ void	iorm_use(io_desc *iod, mval *pp)
 			break;
 		case iop_noreadonly:
 			rm_ptr->noread = FALSE;
+			break;
+		case iop_writeonly:
+			rm_ptr->write_only = TRUE;
+			break;
+		case iop_nowriteonly:
+			rm_ptr->write_only = FALSE;
 			break;
 		case iop_recordsize:
 			if (dev_open != iod->state || (!IS_UTF_CHSET(iod->ichset) && !IS_UTF_CHSET(iod->ochset)) ||

@@ -45,6 +45,7 @@
 #include "testpt.h"
 #include "sleep_cnt.h"
 #include "mupipbckup.h"
+#include "wbox_test_init.h"
 
 #ifdef UNIX
 #  include "eintr_wrappers.h"
@@ -92,12 +93,6 @@ GBLREF volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
 #ifdef DEBUG
 GBLREF	unsigned int		t_tries;
 GBLREF	int			process_exiting;
-#endif
-#ifdef DEBUG_DB64
-  /* if debugging large address stuff, make all memory segments allocate above 4G line */
-  GBLREF sm_uc_ptr_t		next_smseg;
-#else
-#  define next_smseg	NULL
 #endif
 
 error_def(ERR_BUFRDTIMEOUT);
@@ -372,7 +367,7 @@ void wcs_recover(gd_region *reg)
 					 * all following cr's.  If r_epid is 0 and also read in progress, we identify
 					 * this as corruption and fixup up this cr and proceed to the next cr.
 					 */
-					assert(FALSE);
+					assert(FALSE || (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
 					if ((0 != r_epid) && (epid != r_epid))
 						GTMASSERT;
 					/* process still active but not playing fair or cache is corrupted */
@@ -834,18 +829,8 @@ void	wcs_mm_recover(gd_region *reg)
 	{
 		udi = FILE_INFO(gv_cur_region);
 		FSTAT_FILE(udi->fd, &stat_buf, status);
-#	ifdef DEBUG_DB64
-		rel_mmseg((caddr_t)old_base[0]);
-		status = (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)get_mmseg((size_t)stat_buf.st_size),
-										(size_t)stat_buf.st_size,
-										mm_prot,
-										GTM_MM_FLAGS, udi->fd, (off_t)0));
-#	else
-		status = (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL,
-										(size_t)stat_buf.st_size,
-										mm_prot,
-										GTM_MM_FLAGS, udi->fd, (off_t)0));
-#	endif
+		status = (sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL, (size_t)stat_buf.st_size,
+										mm_prot, GTM_MM_FLAGS, udi->fd, (off_t)0));
 	}
 	if (-1 == status)
 	{
@@ -854,9 +839,6 @@ void	wcs_mm_recover(gd_region *reg)
 			rel_crit(gv_cur_region);
 		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 	}
-#	ifdef DEBUG_DB64
-	put_mmseg((caddr_t)(cs_addrs->db_addrs[0]), (size_t)stat_buf.st_size);
-#	endif
 	/* In addition to updating the internal map values, gds_map_moved also updates cs_data to point to the remapped file */
 	gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], (off_t)stat_buf.st_size);
         cs_addrs->total_blks = cs_addrs->ti->total_blks;

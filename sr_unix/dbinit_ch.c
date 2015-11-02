@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,12 +66,7 @@ CONDITION_HANDLER(dbinit_ch)
 		if (NULL != csa->hdr)
 		{
 			if (dba_mm == db_init_region->dyn.addr->acc_meth)
-			{
 				munmap((caddr_t)csa->db_addrs[0], (size_t)(csa->db_addrs[1] - csa->db_addrs[0]));
-#ifdef DEBUG_DB64
-				rel_mmseg((caddr_t)csa->db_addrs[0]);
-#endif
-			}
 			csa->hdr = (sgmnt_data_ptr_t)NULL;
 		}
 		if (NULL != csa->jnl)

@@ -14,6 +14,8 @@
 
 #include <sys/types.h>
 
+error_def(ERR_TPNOTACID);
+															\
 /* HEADER-FILE-DEPENDENCIES : hashtab_int4.h */
 
 #define JNL_LIST_INIT_ALLOC		16		/* initial allocation for si->jnl_list */
@@ -244,8 +246,27 @@ typedef struct tp_region_struct
 	assert(0 == si->update_trans);							\
 }
 
+#define	DBG_CHECK_IN_FIRST_SGM_INFO_LIST(SI)						\
+{											\
+	sgm_info		*tmpsi;							\
+											\
+	GBLREF sgm_info		*first_sgm_info;					\
+	GBLREF  uint4           dollar_tlevel;						\
+											\
+	assert(dollar_tlevel);								\
+	assert(NULL != first_sgm_info);							\
+	assert(NULL != SI);								\
+	for (tmpsi = first_sgm_info; NULL != tmpsi; tmpsi = tmpsi->next_sgm_info)	\
+	{										\
+		if (tmpsi == SI)							\
+			break;								\
+	}										\
+	assert(NULL != tmpsi);								\
+}
+
 #else
 #define	DBG_CHECK_TP_REG_LIST_SORTING(REGLIST)
+#define	DBG_CHECK_IN_FIRST_SGM_INFO_LIST(SI)
 #endif
 
 /* The below macro is used to check if any block split info (heuristic used by gvcst_put) is no longer relevant
@@ -757,8 +778,6 @@ GBLREF	unsigned int	t_tries;
 #define	TPNOTACID_CHECK(CALLER_STR)											\
 {															\
 	mval		zpos;												\
-															\
-	error_def(ERR_TPNOTACID);											\
 															\
 	if (IS_TP_AND_FINAL_RETRY)											\
 	{														\

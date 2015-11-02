@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,6 +73,17 @@ GBLREF	gd_region		*gv_cur_region;
 
 LITREF	char			*gtm_dbversion_table[];
 
+error_def(ERR_BADTAG);
+error_def(ERR_DBRDONLY);
+error_def(ERR_ENDIANCVT);
+error_def(ERR_IOEOF);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUSTANDALONE);
+error_def(ERR_NOENDIANCVT);
+error_def(ERR_TEXT);
+
 #define NOTCURRDBFORMAT		"database format is not the current version"
 #define NOTCURRMDBFORMAT	"minor database format is not the current version"
 #define NOTFULLYUPGRADED	"some blocks are not upgraded to the current version"
@@ -128,6 +139,24 @@ void	endian_find_key(endian_info *info, end_gv_key *gv_key, char *rec_p, int rec
 boolean_t	endian_match_key(end_gv_key *gv_key1, int blk_levl, end_gv_key *key2);
 block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key);
 
+/* If we acquired standalone access, we need to release it before we exit. Ideally, mupip_exit_handler should take care of doing
+ * it. But, since we free up memory allocated to gv_cur_region before exiting out of this module, db_ipcs_reset done in mupip_exit
+ * will cause invalid memory references since standalone_reg (used by db_ipcs_reset) is a pointer to gv_cur_region. One solution
+ * would be to do gv_cur_region free up AFTER db_ipcs_reset in mupip_exit_handler but since various code path sets gv_cur_region,
+ * the implication of such a change is not clear at this point.
+ */
+#define DO_STANDALONE_CLNUP_IF_NEEDED(ENDIAN_NATIVE)			\
+{									\
+	DEBUG_ONLY(GBLREF	gd_region	*standalone_reg;)	\
+									\
+	if (ENDIAN_NATIVE)						\
+	{	/* release standalone access */				\
+		assert(gv_cur_region == standalone_reg);		\
+		db_ipcs_reset(gv_cur_region);				\
+		mu_gv_cur_reg_free();					\
+	}								\
+}
+
 void mupip_endiancvt(void)
 {
 	char			db_name[MAX_FN_LEN + 1], *t_name;
@@ -152,21 +181,7 @@ void mupip_endiancvt(void)
 	GTMCRYPT_ONLY(
 		int		crypt_status;
 	)
-#ifdef __MVS__
-	int realfiletag;
-	/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
-	error_def(ERR_TEXT);
-	error_def(ERR_BADTAG);
-#endif
-
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_IOEOF);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_MUSTANDALONE);
-	error_def(ERR_NOENDIANCVT);
-	error_def(ERR_ENDIANCVT);
-	error_def(ERR_DBRDONLY);
+	ZOS_ONLY(int 		realfiletag;)
 
 	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
 	{
@@ -294,7 +309,7 @@ void mupip_endiancvt(void)
 		mu_gv_cur_reg_init();
 		strcpy((char *)gv_cur_region->dyn.addr->fname, db_name);
 		gv_cur_region->dyn.addr->fname_len = n_len;
-		got_standalone = mu_rndwn_file(gv_cur_region, TRUE);
+		got_standalone = STANDALONE(gv_cur_region);
 		if (FALSE == got_standalone)
 		{
 			mu_gv_cur_reg_free();
@@ -305,7 +320,7 @@ void mupip_endiancvt(void)
 		}
 		if (gv_cur_region->read_only && !outdb_specified)
 		{
-			mu_gv_cur_reg_free();
+			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 			free(old_data);
 			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
 			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, n_len, db_name);
@@ -377,11 +392,7 @@ void mupip_endiancvt(void)
 	}
 	if (check_error)
 	{
-		if (endian_native)
-		{	/* release standalone */
-			db_ipcs_reset(gv_cur_region, FALSE);
-			mu_gv_cur_reg_free();
-		}
+		DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 		free(old_data);
 		CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
 		mupip_exit(ERR_MUNOACTION);
@@ -419,11 +430,7 @@ void mupip_endiancvt(void)
 	response = util_input(conf_buff, MAX_CONF_RESPONSE, stdin, TRUE);
 	if (NULL == response || ('Y' != conf_buff[0] && 'y' != conf_buff[0]))
 	{
-		if (endian_native)
-		{	/* release standalone */
-			db_ipcs_reset(gv_cur_region, FALSE);
-			mu_gv_cur_reg_free();
-		}
+		DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 		free(old_data);
 		CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
 		mupip_exit(ERR_MUNOACTION);
@@ -448,11 +455,7 @@ void mupip_endiancvt(void)
 			util_out_print("Error creating converted databasae file !AD.  Aborting endiancvt.", TRUE, outdb_len, outdb);
 			errptr = (char *)STRERROR(save_errno);
 			util_out_print("open : !AZ", TRUE, errptr);
-			if (endian_native)
-			{	/* release standalone */
-				db_ipcs_reset(gv_cur_region, FALSE);
-				mu_gv_cur_reg_free();
-			}
+			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 			free(new_data);
 			free(old_data);
 			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
@@ -470,11 +473,7 @@ void mupip_endiancvt(void)
 			free(old_data);
 			CLOSEFILE_RESET(outdb_fd, rc);	/* resets "outdb_fd" to FD_INVALID */
 			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
-			if (endian_native)
-			{
-				db_ipcs_reset(gv_cur_region, FALSE);
-				mu_gv_cur_reg_free();
-			}
+			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 			util_out_print("Error writing converted database file !AD header.  Aborting endiancvt.", TRUE,
 				outdb_len, outdb);
 			if (-1 != save_errno)
@@ -498,11 +497,7 @@ void mupip_endiancvt(void)
 			free(old_data);
 			CLOSEFILE_RESET(outdb_fd, rc);	/* resets "outdb_fd" to FD_INVALID */
 			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
-			if (endian_native)
-			{
-				db_ipcs_reset(gv_cur_region, FALSE);
-				mu_gv_cur_reg_free();
-			}
+			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 			util_out_print("Error reading database file !AD master map.  Aborting endiancvt.", TRUE,
 				n_len, db_name);
 			if (-1 != save_errno)
@@ -521,11 +516,7 @@ void mupip_endiancvt(void)
 			free(old_data);
 			CLOSEFILE_RESET(outdb_fd, rc);	/* resets "outdb_fd" to FD_INVALID */
 			CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
-			if (endian_native)
-			{
-				db_ipcs_reset(gv_cur_region, FALSE);
-				mu_gv_cur_reg_free();
-			}
+			DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 			util_out_print("Error writing converted database file !AD master map.  Aborting endiancvt.", TRUE,
 				outdb_len, outdb);
 			if (-1 != save_errno)
@@ -545,12 +536,10 @@ void mupip_endiancvt(void)
 	status = endian_process(&info, new_data, old_data);
 	if (0 != status)
 	{
-		if (endian_native)
-		{	/* db_ipcs_reset works even with the now wrong endian header since it just */
-			/* sets csd->s[eh]mid to INVALID_S[EH]ID which is -1 and zeroes s[eh]_ctime */
-			db_ipcs_reset(gv_cur_region, FALSE);
-			mu_gv_cur_reg_free();
-		}
+		/* db_ipcs_reset in the macro below works even with the now converted opposite endian header since it just sets
+		 * csd->s{e|h}mid to INVALIDS{E|H}MID and zeroes s{e|h}m_ctime.
+		 */
+		DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 		free(new_data);
 		free(old_data);
 		CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
@@ -567,11 +556,7 @@ void mupip_endiancvt(void)
 		if (outdb_specified)
 			CLOSEFILE_RESET(outdb_fd, rc);	/* resets "outdb_fd" to FD_INVALID */
 		CLOSEFILE_RESET(db_fd, rc);	/* resets "db_fd" to FD_INVALID */
-		if (endian_native)
-		{
-			db_ipcs_reset(gv_cur_region, FALSE);
-			mu_gv_cur_reg_free();
-		}
+		DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 		util_out_print("Error writing!AZ database file !AD header.  Aborting endiancvt.", TRUE,
 			outdb_specified ? "new" : "", outdb_specified ? outdb_len : n_len, outdb_specified ? outdb : db_name);
 		if (-1 != save_errno)
@@ -585,11 +570,7 @@ void mupip_endiancvt(void)
 			mupip_exit(ERR_MUNOFINISH);
 		}
 	}
-	if (endian_native)
-	{	/* release standalone */
-		db_ipcs_reset(gv_cur_region, FALSE);
-		mu_gv_cur_reg_free();
-	}
+	DO_STANDALONE_CLNUP_IF_NEEDED(endian_native);
 	free(new_data);
 	free(old_data);
 	GTM_FSYNC((outdb_specified ? outdb_fd : db_fd), rc);

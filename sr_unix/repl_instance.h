@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -146,6 +146,8 @@ boolean_t	repl_inst_was_rootprimary(void);
 void		repl_inst_reset_zqgblmod_seqno_and_tn(void);
 
 boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr);
+void            repl_cmp_solve_src_timeout(void);
+void            repl_cmp_solve_rcv_timeout(void);
 boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary);
 boolean_t	gtmsource_get_triple_info(seq_num seqno, repl_triple *triple, int4 *triple_num);
 void		gtmsource_triple_get(int4 index, repl_triple *triple);

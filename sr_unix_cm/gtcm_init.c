@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@
 #include "tp.h"
 #include "init_secshr_addrs.h"
 #include "gtm_imagetype_init.h"
+#include "fork_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -76,6 +77,7 @@ GBLREF pattern			*curr_pattern;
 GBLREF pattern			mumps_pattern;
 GBLREF uint4			*pattern_typemask;
 GBLREF spdesc			rts_stringpool, stringpool;
+GBLREF int			process_exiting;
 
 void	gtcm_fail(int sig);
 
@@ -100,14 +102,15 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 
 #ifndef GTCM_DEBUG_NOBACKGROUND
-	if ((pid = fork()) < 0)
+	DO_FORK(pid);
+	if (0 > pid)
 	{
 		save_errno = errno;
 		SPRINTF(msg, "Unable to detach %s from controlling tty", SRVR_NAME);
 		gtcm_rep_err(msg, save_errno);
 		exit(-1);
 	}
-	else if (pid > 0)
+	else if (0 < pid)
 		exit(0);
 	(void) setpgrp();
 #endif

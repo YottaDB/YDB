@@ -28,6 +28,13 @@
 GBLREF io_pair		io_curr_device;
 GBLREF	boolean_t	gtm_utf8_mode;
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
+#ifdef __MVS__
+error_def(ERR_BADTAG);
+#endif
+error_def(ERR_DEVOPENFAIL);
+error_def(ERR_TEXT);
+
+
 
 LITREF	mstr		chset_names[];
 LITREF unsigned char	io_params_size[];
@@ -51,11 +58,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 #ifdef __MVS__
 	int		file_tag, obtained_tag, realfiletag;
 	char		*errmsg;
-	error_def(ERR_BADTAG);
 #endif
-
-	error_def(ERR_DEVOPENFAIL);
-	error_def(ERR_TEXT);
 
 	iod = dev_name->iod;
 	size = 0;
@@ -156,7 +159,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		if (!d_rm->pipe && 2 < fd)
 		{	/* not for stdin, stdout, stderr or pipes */
 			if (iod->newly_created || newversion)
-			{	/* tag the file */
+			{	/* tag the file.  The macros also modify text_tag and file_tag. */
 				if (d_rm->fifo && (iod->is_ochset_default || d_rm->noread))
 				{	/* If FIFO, set tag per ichset if no ochset or READONLY */
 					SET_TAG_FROM_CHSET(iod->ichset, iod->file_chset, TRUE);
@@ -165,6 +168,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					SET_TAG_FROM_CHSET(iod->ochset, iod->file_chset, TRUE);
 				}
 				iod->file_tag = (unsigned int)file_tag;
+				iod->text_flag = text_tag;
 				if (-1 == gtm_zos_set_tag(fd, file_tag, text_tag, TAG_FORCE, &realfiletag))
 				{
 					errmsg = STRERROR(errno);

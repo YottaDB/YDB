@@ -1,7 +1,6 @@
-
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2011 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,15 +9,14 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-#include "semop_timedout_handler.h"
+#ifndef _FORK_INIT_H
+#define _FORK_INIT_H
 
-void semop_timedout_handler(void)
-{
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	TREF(semop2long) = TRUE;
-	return;
+#define DO_FORK(pid)			\
+{					\
+	pid = fork();			\
+	if (0 == pid)			\
+		clear_timers();		\
 }
 
+#endif

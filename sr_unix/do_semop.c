@@ -18,18 +18,28 @@
 
 #include "do_semop.h"
 #include "gtm_c_stack_trace.h"
+#include "gtm_c_stack_trace_semop.h"
 
 /* perform one semop, returning errno if it was unsuccessful */
 int do_semop(int sems, int num, int op, int flg)
 {
 	static struct sembuf    sop[1];
 	int			rv = -1;
-	boolean_t		wait_option = !(flg & IPC_NOWAIT);
+	boolean_t		wait_option;
+
+	wait_option = ((!(flg & IPC_NOWAIT)) && (0 == op));
 	sop[0].sem_num = num;
 	sop[0].sem_op = op;
 	sop[0].sem_flg = flg;
-	TRY_SEMOP_GET_C_STACK(wait_option, sems, sop, 1, rv);
-	if (-1 == rv)
-		return errno;
-	return 0;
+	CHECK_SEMVAL_GRT_SEMOP(sems, num, op);
+	if (wait_option)
+	{
+		rv = try_semop_get_c_stack(sems, sop, 1);
+		return rv;
+	} else
+	{
+		while (-1 == (rv = semop(sems, sop, 1)) && EINTR == errno)
+			;
+		return (-1 == rv) ? errno : 0;
+	}
 }

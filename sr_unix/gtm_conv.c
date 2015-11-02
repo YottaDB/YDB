@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,29 +35,33 @@ LITDEF mstr chset_names[CHSET_MAX_IDX_ALL] =
 #define MAX_CHSET_LEN	8	/* maximum length of CHSET names */
 
 /* This array holds the ICU converter handles corresponding to the respective
- * CHSET name in the table chset_names[] */
+ * CHSET name in the table chset_names[]
+ */
 GBLDEF	UConverter	*chset_desc[CHSET_MAX_IDX];
-
 GBLDEF casemap_t casemaps[MAX_CASE_IDX] =
 { /* Supported case mappings and their disposal conversion routines for both $ZCHSET modes.
-     Note: since UTF-8 disposal functions for "U" and "L" are ICU "function pointers" rather
-     rather than their direct addresses, they are initialized in gtm_utf8_init() instead */
+   * Note: since UTF-8 disposal functions for "U" and "L" are ICU "function pointers" rather
+   * rather than their direct addresses, they are initialized in gtm_utf8_init() instead
+   */
 	{"U", &lower_to_upper, NULL           },
 	{"L", &upper_to_lower, NULL           },
 	{"T", NULL,            &gtm_strToTitle}
 };
 
-LITREF unsigned char 	lower_to_upper_table[];
 GBLREF	spdesc 		stringpool;
+
+LITREF unsigned char 	lower_to_upper_table[];
+
+error_def(ERR_ICUERROR);
 error_def(ERR_MAXSTRLEN);
 
 /* Routine to verify given parameter against supported CHSETs.
  * Valid arguments (case-insensitive):
- * 	"M", "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE"
+ *	"M", "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE"
  * Returns
- * 	-1 (if invalid argument) or
+ *	-1 (if invalid argument) or
  *	0  (if "M") or
- * 	non-zero index to an entry of chset_names[] (if valid)
+ *	non-zero index to an entry of chset_names[] (if valid)
  */
 int verify_chset(const mstr *parm)
 {
@@ -66,10 +70,8 @@ int verify_chset(const mstr *parm)
 
 	if ((MIN_CHSET_LEN > parm->len) || (MAX_CHSET_LEN < parm->len))
 		return -1; /* Parameter is smaller or larger than any possible CHSET */
-
 	/* Make a translated copy of the parm */
 	lower_to_upper((unsigned char *)mode, (unsigned char *)parm->addr, parm->len);
-
 	/* See if any of our possibilities match */
 	for (vptr = chset_names, vptr_top = vptr + CHSET_MAX_IDX_ALL; vptr < vptr_top; ++vptr)
 	{
@@ -91,6 +93,7 @@ int verify_case(const mstr *parm)
 {
 	unsigned char	c;
 	int		index;
+
 	if (1 == parm->len)
 	{
 		c = lower_to_upper_table[*(uchar_ptr_t)parm->addr];
@@ -132,13 +135,13 @@ UConverter* get_chset_desc(const mstr* chset)
 		status = U_ZERO_ERROR;
 		chset_desc[chset_indx] = ucnv_open(chset_names[chset_indx].addr, &status);
 		if (U_FAILURE(status))
-			GTMASSERT;
+			rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
 		/* Initialize the callback for illegal/invalid characters, so that conversion
 		 * stops at the first illegal character rather than continuing with replacement */
 		status = U_ZERO_ERROR;
 		ucnv_setToUCallBack(chset_desc[chset_indx], &callback_stop, NULL, NULL, NULL, &status);
 		if (U_FAILURE(status))
-			GTMASSERT;
+			rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* strange and unexpected ICU unhappiness */
 	}
 	return chset_desc[chset_indx];
 }
@@ -147,11 +150,9 @@ UConverter* get_chset_desc(const mstr* chset)
 void gtm_conv_init(void)
 {
 	assert(gtm_utf8_mode);
-
 	/* Implicitly created CHSET descriptor for UTF-8 */
 	get_chset_desc(&chset_names[CHSET_UTF8]);
 	assert(NULL != chset_desc[CHSET_UTF8]);
-
 	/* initialize the case conversion disposal functions */
 	casemaps[0].u = u_strToUpper;
 	casemaps[1].u = u_strToLower;
@@ -171,7 +172,8 @@ int gtm_conv(UConverter* from, UConverter* to, mstr *src, char* dstbuff, int* bu
 		/* Compute the stringpool buffer space needed for conversion given that source
 		 * is encoded in the ichset representation.  The ICU functions ucnv_getMinCharSize()
 		 * and ucnv_getMaxCharSize() are used to compute the minimum and maximum number of
-		 * bytes required per UChar if converted from/to ichset/ochset respectively */
+		 * bytes required per UChar if converted from/to ichset/ochset respectively
+		 */
 		src_charlen = (src->len / ucnv_getMinCharSize(from)) + 1; /* number of UChar's from ichset */
 		dstlen = UCNV_GET_MAX_BYTES_FOR_STRING(src_charlen, ucnv_getMaxCharSize(to));
 		dstlen = (dstlen > MAX_STRLEN) ? MAX_STRLEN : dstlen;

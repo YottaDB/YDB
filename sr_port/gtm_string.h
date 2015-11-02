@@ -23,10 +23,10 @@
 
 #define	STRCPY(SOURCE, DEST)		strcpy((char *)(SOURCE), (char *)(DEST))
 #define STRNCPY_LIT(SOURCE, LITERAL)	strncpy((char *)(SOURCE), (char *)(LITERAL), SIZEOF(LITERAL) - 1)	/* BYPASSOK */
-#define	STRNCPY_STR(SOURCE, STRING)	strncpy((char *)(SOURCE), (char *)(STRING), strlen((char *)(STRING)))	/* BYPASSOK */
+#define	STRNCPY_STR(SOURCE, STRING, LEN) strncpy((char *)(SOURCE), (char *)(STRING), LEN)
 
 #define	STRCMP(SOURCE, DEST)		strcmp((char *)(SOURCE), (char *)(DEST))
 #define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)		/* BYPASSOK */
-#define	STRNCMP_STR(SOURCE, STRING)	strncmp(SOURCE, STRING, strlen((char *)(STRING)))	/* BYPASSOK */
+#define	STRNCMP_STR(SOURCE, STRING, LEN) strncmp(SOURCE, STRING, LEN)
 
 #endif

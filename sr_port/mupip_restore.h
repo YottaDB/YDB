@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,5 +13,10 @@
 #define MUPIP_RESTORE_INCLUDED
 
 void mupip_restore(void);
+
+#ifdef UNIX
+STATICFNDCL	void	exec_read(BFILE *bf, char *buf, int nbytes);
+STATICFNDCL	void	tcp_read(BFILE *bf, char *buf, int nbytes);
+#endif
 
 #endif /* MUPIP_RESTORE_INCLUDED */

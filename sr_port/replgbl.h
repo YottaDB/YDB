@@ -11,6 +11,8 @@
 #ifndef REPLGBL_H
 #define REPLGBL_H
 
+#define DEFAULT_JNL_RELEASE_TIMEOUT	300	    /* Default value for jnl_release_timeout is 5 minutes */
+
 typedef struct
 {
 	boolean_t	trig_replic_warning_issued; /* TRUE if a warning to the source server log indicating a replicated triggered
@@ -22,8 +24,7 @@ typedef struct
 	boolean_t	src_node_same_endianness;   /* TRUE if the source server has the same endianness as the receiver server */
 	boolean_t	src_node_endianness_known;  /* TRUE if the endianness is already found out by the receiver server */
 	boolean_t	srcsrv_vms;		    /* TRUE if the source server is VMS */
+	int4		jnl_release_timeout;	    /* Timeout value for the jnl_release timer, in seconds */
 } replgbl_t;
-
-#define REPLGBL	(TREF(replgbl))
 
 #endif

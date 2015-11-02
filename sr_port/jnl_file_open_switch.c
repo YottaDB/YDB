@@ -68,6 +68,7 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	{
 		jpc->status = SS_NORMAL;
 		csa->hdr->jnl_checksum = create.checksum;
+		csa->hdr->jnl_eovtn = csa->hdr->trans_hist.curr_tn;
 	}
 	send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
 	assert(csa->hdr->jnl_file_len == create.jnl_len);

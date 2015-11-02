@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,8 +68,28 @@ GBLREF	bool			in_backup;
 
 LITREF char			*gtm_dbversion_table[];
 
+error_def(ERR_BADTAG);
+error_def(ERR_CRYPTNOMM);
+error_def(ERR_DBPREMATEOF);
+error_def(ERR_DBRDERR);
+error_def(ERR_DBRDONLY);
+error_def(ERR_INVACCMETHOD);
+error_def(ERR_MMNODYNDWNGRD);
+error_def(ERR_MUNOACTION);
+error_def(ERR_RBWRNNOTCHG);
+error_def(ERR_TEXT);
+error_def(ERR_WCERRNOTCHG);
+error_def(ERR_WCWRNNOTCHG);
+
 #define MAX_ACC_METH_LEN	2
 #define MAX_DB_VER_LEN		2
+
+#define DO_CLNUP_AND_SET_EXIT_STAT(EXIT_STAT, EXIT_WRN_ERR_MASK)		\
+{										\
+	exit_stat |= EXIT_WRN_ERR_MASK;						\
+	db_ipcs_reset(gv_cur_region);						\
+	mu_gv_cur_reg_free();							\
+}
 
 int4 mupip_set_file(int db_fn_len, char *db_fn)
 {
@@ -91,23 +111,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	char			*errptr, *command = "MUPIP SET VERSION";
 	int			save_errno;
 	int			rc;
-#ifdef __MVS__
-	int realfiletag;
-	/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
-	error_def(ERR_TEXT);
-	error_def(ERR_BADTAG);
-#endif
-
-	error_def(ERR_DBPREMATEOF);
-	error_def(ERR_DBRDERR);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_INVACCMETHOD);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_RBWRNNOTCHG);
-	error_def(ERR_WCERRNOTCHG);
-	error_def(ERR_WCWRNNOTCHG);
-	error_def(ERR_MMNODYNDWNGRD);
-	error_def(ERR_CRYPTNOMM);
+	ZOS_ONLY(int 		realfiletag;)
 
 	exit_stat = EXIT_NRM;
 	defer_status = cli_present("DEFER_TIME");
@@ -324,7 +328,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		} else
 		{	/* Following part needs standalone access */
 			assert(GDSVLAST == desired_dbver);
-			got_standalone = mu_rndwn_file(gv_cur_region, TRUE);
+			got_standalone = STANDALONE(gv_cur_region);
 			if (FALSE == got_standalone)
 				return (int4)ERR_WCERRNOTCHG;
 			/* we should open it (for changing) after mu_rndwn_file, since mu_rndwn_file changes the file header too */
@@ -333,9 +337,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
 				util_out_print("open : !AZ", TRUE, errptr);
-				exit_stat |= EXIT_ERR;
-				db_ipcs_reset(gv_cur_region, FALSE);
-				mu_gv_cur_reg_free();
+				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_ERR);
 				continue;
 			}
 #ifdef __MVS__
@@ -363,7 +365,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("!UL too large, maximum reserved bytes allowed is !UL for database file !AD",
 							TRUE, reserved_bytes, MAX_RESERVE_B(csd), fn_len, fn);
 					CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
-					db_ipcs_reset(gv_cur_region, FALSE);
+					db_ipcs_reset(gv_cur_region);
 					return (int4)ERR_RBWRNNOTCHG;
 				}
 				csd->reserved_bytes = reserved_bytes;
@@ -419,16 +421,14 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					if (!cli_get_num("DEFER_TIME", &defer_time))
 					{
 						util_out_print("Error getting DEFER_TIME qualifier value", TRUE);
-						db_ipcs_reset(gv_cur_region, FALSE);
+						db_ipcs_reset(gv_cur_region);
 						return (int4)ERR_RBWRNNOTCHG;
 					}
 					if (-1 > defer_time)
 					{
 						util_out_print("DEFER_TIME cannot take negative values less than -1", TRUE);
 						util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-						exit_stat |= EXIT_WRN;
-						db_ipcs_reset(gv_cur_region, FALSE);
-						mu_gv_cur_reg_free();
+						DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
 						continue;
 					}
 					csd->defer_time = defer_time;
@@ -437,9 +437,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				{
 					util_out_print("MM access method cannot be set if there are blocks to upgrade",	TRUE);
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					exit_stat |= EXIT_WRN;
-					db_ipcs_reset(gv_cur_region, FALSE);
-					mu_gv_cur_reg_free();
+					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
 					continue;
 				}
 				if (GDSVCURR != csd->desired_db_format)
@@ -447,18 +445,14 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("MM access method cannot be set in DB compatibility mode",
 						TRUE);
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					exit_stat |= EXIT_WRN;
-					db_ipcs_reset(gv_cur_region, FALSE);
-					mu_gv_cur_reg_free();
+					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
 					continue;
 				}
 				if (JNL_ENABLED(csd) && csd->jnl_before_image)
 				{
 					util_out_print("MM access method cannot be set with BEFORE image journaling", TRUE);
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					exit_stat |= EXIT_WRN;
-					db_ipcs_reset(gv_cur_region, FALSE);
-					mu_gv_cur_reg_free();
+					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
 					continue;
 				}
 				csd->jnl_before_image = FALSE;
@@ -468,9 +462,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				{
 					util_out_print("DEFER cannot be specified with BG access method.", TRUE);
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					exit_stat |= EXIT_WRN;
-					db_ipcs_reset(gv_cur_region, FALSE);
-					mu_gv_cur_reg_free();
+					DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, EXIT_WRN);
 					continue;
 				}
 			}
@@ -504,7 +496,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (disk_wait_status)
 				util_out_print("Database file !AD now has wait disk set to !UL seconds",
 						TRUE, fn_len, fn, csd->wait_disk_space);
-			db_ipcs_reset(gv_cur_region, FALSE);
+			db_ipcs_reset(gv_cur_region);
 		} /* end of else part if (!need_standalone) */
 		mu_gv_cur_reg_free();
 	}

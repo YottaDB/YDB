@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,9 +46,9 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 	{
 		if (-1 > cr->read_in_progress)
 		{	/* outside of design; clear to known state */
-			INTERLOCK_INIT(cr);
 			assert(0 == cr->r_epid);
 			cr->r_epid = 0;
+			INTERLOCK_INIT(cr);
 			break;
 		}
 		wcs_sleep(lcnt);
@@ -63,6 +63,7 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 			{
 				if (FALSE == is_proc_alive(r_epid, cr->image_count))
 				{	/* process gone; release its lock */
+					cr->r_epid = 0;
 					RELEASE_BUFF_READ_LOCK(cr);
 				} else
 				{
@@ -71,7 +72,7 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 				}
 			} else
 			{	/* process stopped before could set r_epid */
-				RELEASE_BUFF_READ_LOCK(cr);
+				RELEASE_BUFF_READ_LOCK(cr);	/* cr->r_epid already 0 no need to reset */
 				if (-1 > cr->read_in_progress)
 				{	/* process released since if (cr->r_epid); rectify semaphore  */
 					LOCK_BUFF_FOR_READ(cr, n);

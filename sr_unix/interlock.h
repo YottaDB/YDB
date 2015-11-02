@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,20 @@
 #include "lockconst.h"
 #include "compswap.h"
 #include "aswp.h"
+#include "memcoherency.h"
+
+/* Define memory barrier macro to use in LOCK_BUFF_FOR_READ/RELEASE_BUFF_READ_LOCK macros below. On AIX
+ * and Tru64, the locking macros have no memory barrier connotation because they use load/store_locked instructions.
+ * The macros defined below give us that connotation on the platforms that need it and avoid adding additional
+ * memory barriers on platforms that already have them.
+ */
+#if defined(_AIX) || defined(__osf__)
+#  define READ_LOCK_READ_MEMBARRIER SHM_READ_MEMORY_BARRIER
+#  define READ_LOCK_WRITE_MEMBARRIER SHM_WRITE_MEMORY_BARRIER
+#else
+#  define READ_LOCK_READ_MEMBARRIER
+#  define READ_LOCK_WRITE_MEMBARRIER
+#endif
 
 /* LATCH_{CLEAR,SET,CONFLICT} need to be in ascending order. wcs_verify relies on this ordering for detecting out-of-range values */
 #define LATCH_CLEAR	0
@@ -21,10 +35,14 @@
 #define LATCH_CONFLICT	2
 #define	WRITE_LATCH_VAL(cr)		(cr)->interlock.latch	/* this can take either of the above 3 LATCH_* values */
 
-#define INTERLOCK_INIT(X)		{SET_LATCH((sm_int_ptr_t)&((X)->interlock.latch), LATCH_CLEAR); \
-					 (X)->read_in_progress = -1;	\
-					 SET_LATCH_GLOBAL(&((X)->rip_latch), LOCK_AVAILABLE);}
-	/* On HPPA, SET_LATCH_GLOBAL forces its available value, for others it is the same as SET_LATCH */
+#define INTERLOCK_INIT(X)											\
+{														\
+	(X)->read_in_progress = -1;										\
+	SHM_WRITE_MEMORY_BARRIER;										\
+	SET_LATCH((sm_int_ptr_t)&((X)->interlock.latch), LATCH_CLEAR);						\
+	SET_LATCH_GLOBAL(&((X)->rip_latch), LOCK_AVAILABLE);							\
+}
+/* On HPPA, SET_LATCH_GLOBAL forces its available value, for others it is the same as SET_LATCH */
 
 #define INTERLOCK_INIT_MM(X)		(SET_LATCH((sm_int_ptr_t)&((X)->interlock.latch), LATCH_CLEAR))
 					  /* similar to INTERLOCK_INIT except this is for a mmblk_rec */
@@ -32,19 +50,29 @@
 /* New buffer doesn't need interlocked operation.  */
 #define LOCK_NEW_BUFF_FOR_UPDATE(X)	(SET_LATCH((sm_int_ptr_t)&((X)->interlock.latch), LATCH_SET))
 
-#define LOCK_BUFF_FOR_UPDATE(X,Y,Z)     {Y = ASWP((sm_int_ptr_t)&(X)->interlock.latch, LATCH_SET, Z); \
+#define LOCK_BUFF_FOR_UPDATE(X,Y,Z)     {Y = ASWP((sm_int_ptr_t)&(X)->interlock.latch, LATCH_SET, Z);		\
 						 LOCK_HIST("OBTN", &(X)->interlock.latch, process_id, -1);}
-#define RELEASE_BUFF_UPDATE_LOCK(X,Y,Z) {LOCK_HIST("RLSE", &(X)->interlock.latch, process_id, -1); \
+#define RELEASE_BUFF_UPDATE_LOCK(X,Y,Z) {LOCK_HIST("RLSE", &(X)->interlock.latch, process_id, -1); 		\
 					         Y = ASWP((sm_int_ptr_t)&(X)->interlock.latch, LATCH_CLEAR, Z);}
 #define CLEAR_BUFF_UPDATE_LOCK(X,Z)     (ASWP((sm_int_ptr_t)&(X)->interlock.latch, LATCH_CLEAR, Z))
 
-#define LOCK_BUFF_FOR_READ(X,Y)		(Y = INCR_CNT((sm_int_ptr_t)&(X)->read_in_progress, \
-						      (sm_global_latch_ptr_t)&(X)->rip_latch))
-#define RELEASE_BUFF_READ_LOCK(X)	(DECR_CNT((sm_int_ptr_t)&(X)->read_in_progress, \
-						  (sm_global_latch_ptr_t)&(X)->rip_latch))
-
 /* Only the writer uses the LATCH_CONFLICT value.  */
 #define LOCK_BUFF_FOR_WRITE(X,Y,Z)      (Y = ASWP((sm_int_ptr_t)&(X)->interlock.latch, LATCH_CONFLICT, Z))
+
+/* The macros below currently use an interlocked increment/decrement type of locking unlike the above macros which
+ * use an atomic swap method.
+ */
+#define LOCK_BUFF_FOR_READ(X,Y)											\
+{														\
+	Y = INCR_CNT((sm_int_ptr_t)&(X)->read_in_progress, (sm_global_latch_ptr_t)&(X)->rip_latch);		\
+	READ_LOCK_READ_MEMBARRIER;										\
+}
+
+#define RELEASE_BUFF_READ_LOCK(X)										\
+{														\
+	READ_LOCK_WRITE_MEMBARRIER;										\
+	DECR_CNT((sm_int_ptr_t)&(X)->read_in_progress, (sm_global_latch_ptr_t)&(X)->rip_latch);			\
+}
 
 /* Used after an aswp; if the return value (second argument to one of these macros) was
  * LATCH_CONFLICT, then the writer owned the buffer when this process performed the aswp.

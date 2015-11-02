@@ -87,8 +87,6 @@ GBLREF gv_namehead      *gv_target;
 GBLREF lvzwrite_datablk *lvzwrite_block;
 GBLREF lv_val		*active_lv;
 
-error_def(ERR_GVIS);
-error_def(ERR_GVSUBOFLOW);
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_MERGEINCOMPL);
 error_def(ERR_NCTCOLLDIFF);
@@ -102,7 +100,7 @@ void op_merge(void)
 	mval 			*mkey, *value, *subsc;
 	int			org_glvn1_keysz, org_glvn2_keysz, delta2, dollardata_src, dollardata_dst, sbs_depth;
 	unsigned char		*ptr, *ptr2;
-	unsigned char  		buff[MAX_ZWR_KEY_SZ], *endbuff;
+	unsigned char  		buff[MAX_ZWR_KEY_SZ];
 	unsigned char		nullcoll_src, nullcoll_dst;
 	zshow_out		output;
 	DCL_THREADGBL_ACCESS;
@@ -204,11 +202,7 @@ void op_merge(void)
 				/* Create the destination key for this iteration (under ^glvn1) */
 				gvname_env_restore(mglvnp->gblp[IND1]);
 				if (gv_cur_region->max_key_size < org_glvn1_keysz + delta2)
-				{
-					if (0 == (endbuff = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-						endbuff = &buff[MAX_ZWR_KEY_SZ - 1];
-					rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, endbuff - buff, buff);
-				}
+					ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
 				assert(gv_currkey->end == org_glvn1_keysz - 1);
 				memcpy(gv_currkey->base + org_glvn1_keysz - 2,
 					mkey->str.addr + org_glvn2_keysz - 2, delta2 + 2);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,6 @@
 #define ERRNO           	(errno)
 #define FORMAT_STR      	"PID %d %s is%s alive\n"
 #define FORMAT_STR1      	"PID %d %s is%s alive in %s mode\n"
-#define repl_fork_rcvr_server(pid, d1) (((*(pid) = fork()) >= 0) ? SS_NORMAL : *(pid))
 
 /*----- File I/O related -----*/
 #define F_CLOSE(FD, RC)				CLOSEFILE_RESET(FD, RC) /* interrupt safe close(); also resets "FD" to FD_INVALID */

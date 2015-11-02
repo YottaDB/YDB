@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,20 +81,33 @@ DEBUG_ONLY(GBLREF ch_ret_type	(*ch_at_trigger_init)();)
 GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
 #endif
 
+error_def(ERR_ASSERT);
+error_def(ERR_BLKCNTEDITFAIL);
+error_def(ERR_GTMCHECK);
+error_def(ERR_GTMASSERT);
+error_def(ERR_JNLACTINCMPLT);
+error_def(ERR_MUINFOUINT4);
+error_def(ERR_MUINFOUINT8);
+error_def(ERR_MUJNLNOTCOMPL);
+error_def(ERR_MUJNLSTAT);
+error_def(ERR_MEMORY);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUPJNLINTERRUPT);
+#ifdef UNIX
+error_def(ERR_REPLINSTDBMATCH);
+#endif
+error_def(ERR_RLBKJNSEQ);
+error_def(ERR_RLBKLOSTTNONLY);
+error_def(ERR_REPEATERROR);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_TPRETRY);
+error_def(ERR_VMSMEMORY);
+
 void		gtm_ret_code();
 
 CONDITION_HANDLER(mupip_recover_ch)
 {
 	int	rc;
-
-	error_def(ERR_TPRETRY);
-	error_def(ERR_ASSERT);
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_GTMASSERT);
-        error_def(ERR_MEMORY);
-        error_def(ERR_VMSMEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_REPEATERROR);
 
 	START_CH;
 	if ((int)ERR_TPRETRY == SIGNAL)
@@ -156,20 +169,7 @@ void	mupip_recover(void)
 #ifdef UNIX
 	seq_num			max_reg_seqno, replinst_seqno;
 	unix_db_info		*udi;
-
-	error_def(ERR_REPLINSTDBMATCH);
 #endif
-
-	error_def(ERR_BLKCNTEDITFAIL);
-	error_def(ERR_JNLACTINCMPLT);
-	error_def(ERR_MUINFOUINT4);
-	error_def(ERR_MUINFOUINT8);
-	error_def(ERR_MUJNLNOTCOMPL);
-	error_def(ERR_MUJNLSTAT);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_MUPJNLINTERRUPT);
-	error_def(ERR_RLBKJNSEQ);
-	error_def(ERR_RLBKLOSTTNONLY);
 
 	ESTABLISH(mupip_recover_ch);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mupip_recover_ch);
@@ -213,7 +213,10 @@ void	mupip_recover(void)
 			rctl->jfh_recov_interrupted = TRUE;
 			intrrupted_recov_processing = murgbl.intrpt_recovery = TRUE;
 		} else if (rctl->recov_interrupted) /* it is not necessary to do interrupted recover processing */
+		{
 			murgbl.intrpt_recovery = TRUE; /* Recovery was interrupted at some point */
+			rctl->csa->hdr->turn_around_point = FALSE; /*Reset turn around point field*/
+		}
 	}
 	UNIX_ONLY(
 		max_reg_seqno = 0;

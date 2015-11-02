@@ -321,8 +321,13 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					oflag  |=  O_RDONLY;
 					break;
 				case iop_writeonly:
-					oflag  &= ~(O_RDWR | O_RDONLY);
-					oflag  |= O_WRONLY | O_CREAT;
+#					ifdef __MVS__
+					if (ff != naml->iod->type)
+#					endif
+					{
+						oflag  &= ~(O_RDWR | O_RDONLY);
+						oflag  |= O_WRONLY | O_CREAT;
+					}
 					break;
 				case iop_ipchset:
 #ifdef KEEP_zOS_EBCDIC

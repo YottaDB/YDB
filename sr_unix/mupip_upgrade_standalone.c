@@ -23,6 +23,7 @@
 #include "iosp.h"
 #include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
+#include "eintr_wrapper_semop.h"
 #include "ipcrmid.h"
 #include "util.h"
 #include "mupip_upgrade_standalone.h"
@@ -73,7 +74,7 @@ boolean_t mupip_upgrade_standalone(char *fn, int *semid)
 	sop[2].sem_num = 0; sop[2].sem_op = 1; 	/* Increment all semaphores */
 	sop[3].sem_num = 1; sop[3].sem_op = 1;
 	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = sop[3].sem_flg = SEM_UNDO | IPC_NOWAIT;
-	SEMOP(sems, sop, 4, semop_res);
+	SEMOP(sems, sop, 4, semop_res, NO_WAIT);
 	if (-1 == semop_res)
 	{
 		if (errno == EAGAIN)

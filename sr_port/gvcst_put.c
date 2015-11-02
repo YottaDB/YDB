@@ -127,8 +127,24 @@ GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 
-#define	ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value)									\
+error_def(ERR_GVINCRISOLATION);
+error_def(ERR_GVIS);
+error_def(ERR_GVPUTFAIL);
+error_def(ERR_REC2BIG);
+error_def(ERR_RSVDBYTE2HIGH);
+error_def(ERR_TPRETRY);
+
+/* Before issuing an error, add GVT to the list of known gvts in this TP transaction in case it is not already done.
+ * This GVT addition is usually done by "tp_hist" but that function has most likely not yet been invoked in gvcst_put.
+ * Doing this addition will ensure we remember to reset any non-zero clue in dir_tree as part of tp_clean_up when a TROLLBACK
+ * or TRESTART (implicit or explicit) occurs. Not doing so could cause transfer of control from the current gvcst_put action
+ * to a user-defined error trap which if it does further database references, it could end up using invalid clues from GVT
+ * and potentially incorrectly commit the transaction causing db integ errors as well.
+ */
+#define	ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, GVT)								\
 {														\
+	if (dollar_tlevel)											\
+		ADD_TO_GVT_TP_LIST(GVT);	/* note: macro also updates read_local_tn if necessary */	\
 	if (gv_currkey->end + 1 + value.len + SIZEOF(rec_hdr) > gv_cur_region->max_rec_size)			\
 	{                                                                                                       \
 		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))			\
@@ -139,30 +155,44 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 	}                                                                                                       \
 }
 
-#define	ISSUE_RSVDBYTE2HIGH_ERROR								\
-{												\
-	/* The record that is newly inserted/updated does not fit by itself in a separate block	\
-	 * if the current reserved-bytes for this database is taken into account. Cannot go on.	\
-	 */											\
-	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))		\
-		end = &buff[MAX_ZWR_KEY_SZ - 1];						\
-	rts_error(VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,			\
-		REG_LEN_STR(gv_cur_region), blk_size, blk_reserved_bytes,			\
-		ERR_GVIS, 2, end - buff, buff);							\
+/* See comment before ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro definition for why the ADD_TO_GVT_TP_LIST call below is necessary */
+#define	ISSUE_RSVDBYTE2HIGH_ERROR(GVT)										\
+{														\
+	if (dollar_tlevel)											\
+		ADD_TO_GVT_TP_LIST(GVT);	/* note: macro also updates read_local_tn if necessary */	\
+	/* The record that is newly inserted/updated does not fit by itself in a separate block			\
+	 * if the current reserved-bytes for this database is taken into account. Cannot go on.			\
+	 */													\
+	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))				\
+		end = &buff[MAX_ZWR_KEY_SZ - 1];								\
+	rts_error(VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,					\
+		REG_LEN_STR(gv_cur_region), blk_size, blk_reserved_bytes,					\
+		ERR_GVIS, 2, end - buff, buff);									\
 }
 
-#define	RESTORE_ZERO_GVT_ROOT_ON_RETRY(LCL_ROOT, GV_TARGET, TP_ROOT)					\
-{													\
-	if (!LCL_ROOT && (LCL_ROOT != GV_TARGET->root))							\
-	{	/* We had reset the root block from zero to a non-zero value within			\
-		 * this function, but since we are restarting, we can no longer be			\
-		 * sure of the validity of the root block. Reset it to 0 so it will			\
-		 * be re-determined in the next global reference.					\
-		 */											\
-		assert((TP_ROOT == GV_TARGET->root)							\
-			|| ((0 == TP_ROOT) GTMTRIG_ONLY(&& (0 < gvtr_parms.num_triggers_invoked))));	\
-		GV_TARGET->root = 0;									\
-	}												\
+#define	RESTORE_ZERO_GVT_ROOT_ON_RETRY(LCL_ROOT, GV_TARGET, TP_ROOT, DIR_HIST, DIR_TREE)			\
+{														\
+	if (!LCL_ROOT)												\
+	{													\
+		assert(NULL != DIR_HIST);									\
+		assert(DIR_TREE == GV_TARGET->gd_csa->dir_tree);						\
+		/* t_retry only resets gv_target->clue and not the clue of the directory tree.			\
+		 * But DIR_HIST non-null implies the directory tree was used in a gvcst_search and hence	\
+		 * was validated (in t_end/tp_hist),so we need to reset its clue before the next try.		\
+		 */												\
+		DIR_TREE->clue.end = 0;										\
+		/* Check if LCL_ROOT & GV_TARGET->root are in sync. If not make them so. */			\
+		if (GV_TARGET->root)										\
+		{	/* We had reset the root block from zero to a non-zero value within			\
+			 * this function, but since we are restarting, we can no longer be			\
+			 * sure of the validity of the root block. Reset it to 0 so it will			\
+			 * be re-determined in the next global reference.					\
+			 */											\
+			assert((TP_ROOT == GV_TARGET->root)							\
+				|| ((0 == TP_ROOT) GTMTRIG_ONLY(&& (0 < gvtr_parms.num_triggers_invoked))));	\
+			GV_TARGET->root = 0;									\
+		}												\
+	}													\
 }
 
 #ifdef DEBUG
@@ -204,7 +234,7 @@ void	gvcst_put(mval *val)
 	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
 	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
 	cw_set_element		*cse, *cse_new, *old_cse;
-	gv_namehead		*save_targ, *split_targ;
+	gv_namehead		*save_targ, *split_targ, *dir_tree;
 	enum cdb_sc		status;
 	gv_key			*temp_key;
 	mstr			value;
@@ -295,13 +325,6 @@ void	gvcst_put(mval *val)
 	boolean_t		is_mm;
 #	endif
 
-	error_def(ERR_GVINCRISOLATION);
-	error_def(ERR_GVIS);
-	error_def(ERR_REC2BIG);
-	error_def(ERR_RSVDBYTE2HIGH);
-	error_def(ERR_TPRETRY);
-	error_def(ERR_GVPUTFAIL);
-
 	is_dollar_incr = in_gvcst_incr;
 	in_gvcst_incr = FALSE;
 	csa = cs_addrs;
@@ -362,6 +385,7 @@ tn_restart:
 	 * typically do a normal increment and then, for certain conditions, do a complementary decrement, we assert that
 	 * the net effect is never a decrease.
 	 */
+	assert(csa == cs_addrs);	/* no amount of retries should change cs_addrs from what it was at entry into gvcst_put */
 	assert((((int)t_tries) > lcl_t_tries) || (CDB_STAGNATE == t_tries));
 	DEBUG_ONLY(lcl_t_tries = t_tries;) /* update lcl_t_tries */
 	DEBUG_ONLY(
@@ -375,6 +399,7 @@ tn_restart:
 		dbg_trace_array[dbg_num_iters].val = val;
 		GTMTRIG_ONLY(dbg_trace_array[dbg_num_iters].lcl_implicit_tstart = lcl_implicit_tstart;)
 		dbg_trace_array[dbg_num_iters].is_extra_block_split = FALSE;
+		dbg_trace_array[dbg_num_iters].retry_line = 0;
 		split_targ = NULL;
 	)
 	/* If MM and file extension occurred, reset csd to cs_data to avoid out-of-date value. If BG we dont need the reset
@@ -458,7 +483,7 @@ tn_restart:
 		 * led us to this conclusion. So scan the directory tree here and validate its history at the end of this function.
 		 * If we decide to restart due to a concurrency conflict, remember to reset gv_target->root to 0 before restarting.
 		 */
-		gv_target = csa->dir_tree;
+		gv_target = dir_tree = csa->dir_tree;
 		for (cp1 = temp_key->base, cp2 = gv_altkey->base;  0 != *cp1;)
 			*cp2++ = *cp1++;
 		*cp2++ = 0;
@@ -467,7 +492,6 @@ tn_restart:
 		assert(gv_altkey->end <= gv_altkey->top);
 		dir_hist = &gv_target->hist;
 		status = gvcst_search(gv_altkey, NULL);
-		gv_target->clue.end = 0;
 		RESET_GV_TARGET_LCL(save_targ);
 		if (cdb_sc_normal != status)
 			GOTO_RETRY;
@@ -510,11 +534,12 @@ tn_restart:
 			MV_FORCE_NUM(post_incr_mval);
 			post_incr_mval->mvtype &= ~MV_STR;	/* needed to force any alphanumeric string to numeric */
 			MV_FORCE_STR(post_incr_mval);
+			assert(post_incr_mval->str.len);
 			value = post_incr_mval->str;
-			/* the MAX_REC_SIZE check could not be done in op_gvincr (like is done in op_gvput) because
+			/* The MAX_REC_SIZE check could not be done in op_gvincr (like is done in op_gvput) because
 			 * the post-increment value is not known until here. so do the check here.
 			 */
-			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value);
+			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, dir_tree);
 		} else
 			value = val->str;
 		/* Potential size of a GVT leaf block containing just the new/updated record */
@@ -523,7 +548,7 @@ tn_restart:
 		{	/* The record that is newly inserted/updated does not fit by itself in a separate block
 			 * if the current reserved-bytes for this database is taken into account. Cannot go on.
 			 */
-			ISSUE_RSVDBYTE2HIGH_ERROR;
+			ISSUE_RSVDBYTE2HIGH_ERROR(dir_tree);
 		}
 		BLK_ADDR(curr_rec_hdr, SIZEOF(rec_hdr), rec_hdr);
 		curr_rec_hdr->rsiz = SIZEOF(rec_hdr) + temp_key->end + 1 + value.len;
@@ -567,7 +592,7 @@ tn_restart:
 		root_blk_cw_index = ins_chain_index;
 		temp_key = gv_altkey;
 		gv_target->hist.h[0].blk_num = HIST_TERMINATOR;
-		gv_target = csa->dir_tree;
+		gv_target = dir_tree;
 		bh = &gv_target->hist.h[0];
 		value.len = SIZEOF(block_id);
 		value.addr = (char *)&zeroes;
@@ -598,14 +623,15 @@ tn_restart:
 				MV_FORCE_NUM(post_incr_mval);
 				post_incr_mval->mvtype &= ~MV_STR;	/* needed to force any alphanumeric string to numeric */
 				MV_FORCE_STR(post_incr_mval);
+				assert(post_incr_mval->str.len);
 			}
 			assert(MV_IS_STRING(post_incr_mval));
 			assert(dollar_tlevel ? si->update_trans : update_trans);
 			value = post_incr_mval->str;
-			/* the MAX_REC_SIZE check could not be done in op_gvincr (like is done in op_gvput) because
+			/* The MAX_REC_SIZE check could not be done in op_gvincr (like is done in op_gvput) because
 			 * the post-increment value is not known until here. so do the check here.
 			 */
-			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value);
+			ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, gv_target);
 
 		} else
 			value = val->str;
@@ -636,7 +662,7 @@ tn_restart:
 			 */
 			if (no_pointers || (CDB_STAGNATE <= t_tries))
 			{
-				ISSUE_RSVDBYTE2HIGH_ERROR;
+				ISSUE_RSVDBYTE2HIGH_ERROR(gv_target);
 			} else
 			{
 				status = cdb_sc_mkblk;
@@ -934,8 +960,12 @@ tn_restart:
 				{
 					assert(dollar_tlevel);
 					if (is_dollar_incr)
+					{
+						ADD_TO_GVT_TP_LIST(gv_target); /* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE
+									  * macro definition for why this macro call is necessary */
 						rts_error(VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
 							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
+					}
 					if (NULL == cse->recompute_list_tail ||
 						0 != memcmp(gv_currkey->base, cse->recompute_list_tail->key.base,
 							gv_currkey->top))
@@ -1882,6 +1912,10 @@ tn_restart:
 	horiz_growth = FALSE;
 	assert((csa->dir_tree == gv_target) || tp_root);
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
+	/* The only case where gv_target is still csa->dir_tree after the above RESET macro is if op_gvput was invoked
+	 * with gv_target being set to cs_addrs->dir_tree. In that case gbl_target_was_set would have been set to TRUE. Assert.
+	 */
+	assert((csa->dir_tree != gv_target) || gbl_target_was_set);
 	/* Format the journal records only once for non-TP (irrespective of number of restarts).
 	 * We remember this through the variable "jnl_format_done". If TRUE, we do not redo the jnl_format.
 	 * The only exception is if we are in $INCREMENT in which case we need to reformat since the
@@ -1907,18 +1941,34 @@ tn_restart:
 		if (succeeded)
 		{
 			if (NULL != dir_hist)
+			{	/* The Global Variable Tree was created in this transaction. So clear its gv_target to be safe.
+				 * The directory tree though will have a non-zero value and that can stay as it is since it
+				 * was validated in this transaction and was found good enough for us to commit.
+				 */
+				assert(dir_tree != gv_target);
 				gv_target->clue.end = 0;
+			}
 		} else
 		{	/* "t_retry" would have already been invoked by "t_end".
 			 * So instead of going to "retry:", do only whatever steps from there are necessary here.
 			 */
-			RESTORE_ZERO_GVT_ROOT_ON_RETRY(lcl_root, gv_target, tp_root);
+			RESTORE_ZERO_GVT_ROOT_ON_RETRY(lcl_root, gv_target, tp_root, dir_hist, dir_tree);
 			jnl_format_done = FALSE;	/* need to reformat jnl records for $INCR even in case of non-TP */
+			GTMTRIG_DBG_ONLY(dbg_trace_array[dbg_num_iters].retry_line = __LINE__);
 			goto tn_restart;
 		}
 	} else
 	{
 		status = tp_hist(dir_hist);
+		if (NULL != dir_hist)
+		{	/* Note that although "tp_hist" processes the "dir_hist" history, it only adds "gv_target" to gvt_tp_list.
+			 * But csa->dir_tree might have had clue, blk-split related info etc. modified as part of this
+			 * gvcst_put invocation that might also need cleanup (just like any other gv_target) so add
+			 * csa->dir_tree to gvt_tp_list (if not already done).
+			 */
+			assert(dir_tree == csa->dir_tree);
+			ADD_TO_GVT_TP_LIST(dir_tree);	/* note: macro also updates read_local_tn if necessary */
+		}
 		if (cdb_sc_normal != status)
 			GOTO_RETRY;
 		jnl_format_done = FALSE;
@@ -2107,8 +2157,15 @@ tn_restart:
 		return;
 	}
 retry:
+	/* Note that it is possible cs_addrs is not equal to csa at this point in case we restarted due to trigger
+	 * invocations and in case those triggers referenced globals in different regions. But this should be fixed
+	 * by a call to t_retry/tp_restart below (it does a TP_CHANGE_REG(tp_pointer->gd_reg)).
+	 */
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
-	RESTORE_ZERO_GVT_ROOT_ON_RETRY(lcl_root, gv_target, tp_root);
+	/* Need to restart. If directory tree was used in this transaction, nullify its clue as well (not normally
+	 * done by t_retry). The RESTORE_ZERO_GVT_ROOT_ON_RETRY macro call below takes care of that for us.
+	 */
+	RESTORE_ZERO_GVT_ROOT_ON_RETRY(lcl_root, gv_target, tp_root, dir_hist, dir_tree);
 #	ifdef GTM_TRIGGER
 	if (!skip_dbtriggers)
 	{

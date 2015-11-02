@@ -127,14 +127,15 @@
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
-	if (!REPLGBL.trig_replic_warning_issued && REPLGBL.trig_replic_suspect_seqno && !secondary_side_trigger_support)	\
+	if (!(TREF(replgbl)).trig_replic_warning_issued && (TREF(replgbl)).trig_replic_suspect_seqno &&				\
+		!secondary_side_trigger_support)										\
 	{ 	/* Note: The below repl_log text is copied from TRIG2NOTRIG error message content from merrors.msg. Change 	\
 		 * to one should be reflected in another									\
 		 */														\
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Warning: Sending transaction sequence number %d which used "		\
-			"triggers to a replicator that does not support triggers\n", REPLGBL.trig_replic_suspect_seqno);	\
-		REPLGBL.trig_replic_warning_issued = TRUE; /* No more warnings till restart */					\
-		REPLGBL.trig_replic_suspect_seqno = seq_num_zero;								\
+			"triggers to a replicator that does not support triggers\n", (TREF(replgbl)).trig_replic_suspect_seqno);\
+		(TREF(replgbl)).trig_replic_warning_issued = TRUE; /* No more warnings till restart */				\
+		(TREF(replgbl)).trig_replic_suspect_seqno = seq_num_zero;							\
 	}															\
 }
 #endif
@@ -426,7 +427,9 @@ int gtmsource_process(void)
 		gtmsource_stop_heartbeat();
 		if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
 		{
+			gtmsource_start_jnl_release_timer();
 			gtmsource_est_conn(&secondary_addr);
+			gtmsource_stop_jnl_release_timer();
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
 			repl_source_data_sent = repl_source_msg_sent = repl_source_cmp_sent = 0;
@@ -904,9 +907,10 @@ int gtmsource_process(void)
 			assert(IF_INVALID != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 			/* reverse transformation should exist */
 			assert(IF_NONE != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
-			if (FALSE != (REPLGBL.null_subs_xform = (primary_side_std_null_coll   && !secondary_side_std_null_coll ||
-					secondary_side_std_null_coll && !primary_side_std_null_coll)))
-				REPLGBL.null_subs_xform = (primary_side_std_null_coll ?
+			if (FALSE != ((TREF(replgbl)).null_subs_xform = (primary_side_std_null_coll &&
+					!secondary_side_std_null_coll || secondary_side_std_null_coll &&
+					!primary_side_std_null_coll)))
+				(TREF(replgbl)).null_subs_xform = (primary_side_std_null_coll ?
 							STDNULL_TO_GTMNULL_COLL : GTMNULL_TO_STDNULL_COLL);
 			gtmsource_filter |= INTERNAL_FILTER;
 			gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);

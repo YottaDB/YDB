@@ -35,6 +35,7 @@
 #include "gdsblk.h"
 #include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
+#include "eintr_wrapper_semop.h"
 #include "mu_all_version_standalone.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
@@ -104,7 +105,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 			else
 				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
 		}
-		SEMOP(sem_inf[i].sem_id, sop, 4, rc);
+		SEMOP(sem_inf[i].sem_id, sop, 4, rc, NO_WAIT);
 		if (-1 == rc)
 		{
 			save_errno = errno;
@@ -137,10 +138,10 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 			mu_all_version_release_standalone(sem_inf);
 			rts_error(VARLSTCNT(5) ERR_DBOPNERR, 2, RTS_ERROR_TEXT(db_fn), save_errno);
 		}
-#ifdef __MVS__
+#		ifdef __MVS__
 		if (-1 == gtm_zos_tag_to_policy(fd, TAG_BINARY, &realfiletag))
 			TAG_POLICY_GTM_PUTMSG(db_fn, errno, realfiletag, TAG_BINARY);
-#endif
+#		endif
 		LSEEKREAD(fd, 0, &v15_csd, SIZEOF(v15_csd), rc);
 		if (0 != rc)
 		{

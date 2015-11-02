@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,14 @@ GBLREF	volatile int4	db_fsync_in_prog;
 GBLREF	volatile int4	jnl_qio_in_prog;
 GBLREF	uint4		process_id;
 
+error_def(ERR_DBFSYNCERR);
+error_def(ERR_JNLACCESS);
+error_def(ERR_JNLCNTRL);
+error_def(ERR_JNLRDERR);
+error_def(ERR_JNLWRTDEFER);
+error_def(ERR_JNLWRTNOWWRTR);
+error_def(ERR_PREMATEOF);
+
 uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write);
 void jnl_mm_timer_write(void);
 
@@ -64,14 +72,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	int			aligned_tsz;
 	sm_uc_ptr_t		aligned_base;
 	uint4			jnl_fs_block_size;
-
-	error_def(ERR_DBFSYNCERR);
-	error_def(ERR_JNLACCESS);
-	error_def(ERR_JNLCNTRL);
-	error_def(ERR_JNLRDERR);
-	error_def(ERR_JNLWRTDEFER);
-	error_def(ERR_JNLWRTNOWWRTR);
-	error_def(ERR_PREMATEOF);
 
 	assert(NULL != jpc);
 	udi = FILE_INFO(jpc->region);
@@ -103,7 +103,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		assert(0 <= jnl_qio_in_prog);
 		return SS_NORMAL;
 	}
-
 	/* Currently we overload io_in_prog_latch to perform the db fsync too. Anyone trying to do a
 	 *   jnl_qio_start will first check if a db_fsync is needed and if so sync that before doing any jnl qio.
 	 * Note that since an epoch record is written when need_db_fsync is set to TRUE, we are guaranteed that
@@ -126,12 +125,12 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	}
 	free_ptr = jb->free;
         /* The following barrier is to make sure that for the value of "free" that we extract (which may be
-           slightly stale but that is not a correctness issue) we make sure we dont write out a stale version of
-           the journal buffer contents. While it is possible that we see journal buffer contents that are more
-           uptodate than "free", this would only mean writing out a less than optimal number of bytes but again,
-           not a correctness issue. Secondary effect is that it also enforces a corresponding non-stale value of
-           freeaddr is read and this is relied upon by asserts below.
-	*/
+         * slightly stale but that is not a correctness issue) we make sure we dont write out a stale version of
+         * the journal buffer contents. While it is possible that we see journal buffer contents that are more
+         * uptodate than "free", this would only mean writing out a less than optimal number of bytes but again,
+         * not a correctness issue. Secondary effect is that it also enforces a corresponding non-stale value of
+         * freeaddr is read and this is relied upon by asserts below.
+	 */
 	SHM_READ_MEMORY_BARRIER;
 	dsk = jb->dsk;
 	dskaddr = jb->dskaddr;
@@ -198,7 +197,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 			jpc->new_dskaddr = dskaddr + tsz;
 			assert(jpc->new_dsk == jpc->new_dskaddr % jb->size);
 			assert(jb->freeaddr >= jpc->new_dskaddr);
-
 			jpc->dsk_update_inprog = TRUE;	/* for secshr_db_clnup to clean it up (when it becomes feasible in Unix) */
 			jb->dsk = jpc->new_dsk;
 			jb->dskaddr = jpc->new_dskaddr;
@@ -245,8 +243,8 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
  * It calls jnl_sub_qio_start() with appropriate arguments in two stages, the first one with
  * optimal "jnl_fs_block_size" boundary and the other suboptimal tail end of the write. The latter
  * call is made only if no other process has finished the jnl write upto the required point
- * during the time this process yields */
-
+ * during the time this process yields
+ */
 uint4 jnl_qio_start(jnl_private_control *jpc)
 {
 	unsigned int		yield_cnt, status;
@@ -260,15 +258,13 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	udi = FILE_INFO(jpc->region);
 	csa = &udi->s_addrs;
 	jb = jpc->jnl_buff;
-
 	/* this block of code (till yield()) processes the buffer upto an "jnl_fs_block_size" alignment boundary
-	 * and the next block of code (after the yield()) processes the tail end of the data (if necessary) */
-
+	 * and the next block of code (after the yield()) processes the tail end of the data (if necessary)
+	 */
 	lcl_dskaddr = jb->dskaddr;
 	target_freeaddr = jb->freeaddr;
 	if (lcl_dskaddr >= target_freeaddr)
 		return SS_NORMAL;
-
 	/* ROUND_DOWN2 macro is used under the assumption that "jnl_fs_block_size" would be a power of 2 */
 	jnl_fs_block_size = jb->fs_block_size;
 	if (ROUND_DOWN2(lcl_dskaddr, jnl_fs_block_size) != ROUND_DOWN2(target_freeaddr, jnl_fs_block_size))
@@ -276,25 +272,26 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 		if (SS_NORMAL != (status = jnl_sub_qio_start(jpc, TRUE)))
 			return status;
 	} /* else, data does not cross/touch an alignment boundary, yield and see if someone else
-	   * does the dirty job more efficiently */
-
+	   * does the dirty job more efficiently
+	   */
 	for (yield_cnt = 0; yield_cnt < csa->hdr->yield_lmt; yield_cnt++)
 	{	/* yield() until someone has finished your job or no one else is active on the jnl file */
 		old_freeaddr = jb->freeaddr;
 		rel_quant();
 		/* Purpose of this memory barrier is to get a current view of asyncrhonously changed fields
-		   like whether the jnl file was switched, the write position in the journal file and the
-		   write address in the journal buffer for all the remaining statements in this loop because
-		   the rel_quant call above allows any and all of them to change and we aren't under any
-		   locks while in this loop. This is not a correctness issue as we would either eventually
-		   see the updates or it means we are writing what has already been written. It is a performance
-		   issue keeping more current with state changes done by other processes on other processors.
-		*/
+		 * like whether the jnl file was switched, the write position in the journal file and the
+		 * write address in the journal buffer for all the remaining statements in this loop because
+		 * the rel_quant call above allows any and all of them to change and we aren't under any
+		 * locks while in this loop. This is not a correctness issue as we would either eventually
+		 * see the updates or it means we are writing what has already been written. It is a performance
+		 * issue keeping more current with state changes done by other processes on other processors.
+		 */
 		SHM_READ_MEMORY_BARRIER;
 		if (JNL_FILE_SWITCHED(jpc))
 			return SS_NORMAL;
 		/* assert(old_freeaddr <= jb->freeaddr) ** Potential race condition with jnl file switch could
-		   make this assert fail so it is removed */
+		 * make this assert fail so it is removed
+		 */
 		if (old_freeaddr == jb->freeaddr || target_freeaddr <= jb->dskaddr)
 			break;
 	}

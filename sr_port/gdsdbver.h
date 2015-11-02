@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,8 @@ enum db_ver
 
 /* Database minor version as an enum quantity. This is an ever increasing number that may skip actual
    releases as it is only added to when a file-header field is added or changed or if there is a
-   significant API difference in the version. Note these entries need corresponding updates in
+   significant API difference in the version. This number can be incremented only by adding an entry
+   at the end, just before GDSMVLAST. Note these entries need corresponding updates in
    db_auto_upgrade.c.
 */
 enum mdb_ver
@@ -58,6 +59,7 @@ enum mdb_ver
 	GDSMV53004,	/* New fields(is_encrypted, encryption_hash) for encryption */
 	GDSMV54000,	/* New fields(db_trigger_cycle) for triggers */
 	GDSMV54002,	/* New statistical counter field for ZTRIGGER command */
+	GDSMV54003,	/* New fields(turn_around_point, jnl_eovtn) for backward recovery */
 	GDSMVLAST
 };
 #define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))

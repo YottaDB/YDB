@@ -34,7 +34,7 @@ GBLREF	gd_binding	*gd_map;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
-GBLREF	sgm_info	*sgm_info_ptr;
+GBLREF	sgm_info	*first_sgm_info, *sgm_info_ptr;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgmnt_data	*cs_data;
 GBLREF	uint4		dollar_tlevel;
@@ -44,6 +44,7 @@ void op_gvrectarg(mval *v)
 	int			len;
 	unsigned char		*c;
 	short			end;
+	sgm_info		*si;
 	gd_region		*reg;
 	gvsavtarg_t		*gvsavtarg, gvst_tmp;
 	DEBUG_ONLY(
@@ -96,9 +97,37 @@ void op_gvrectarg(mval *v)
 	reg = gvsavtarg->gv_cur_region;
 	TP_CHANGE_REG(reg);	/* sets gv_cur_region, cs_addrs, cs_data */
 	gv_target = gvsavtarg->gv_target;
+	assert(dollar_tlevel || ((NULL == first_sgm_info) && (NULL == sgm_info_ptr)));
 	if (dollar_tlevel)
-		sgm_info_ptr = gvsavtarg->sgm_info_ptr;
-	assert(dollar_tlevel || (NULL == sgm_info_ptr));
+	{	/* Restore sgm_info_ptr if needed.
+		 * a) If first_sgm_info is NULL (possible if op_gvrectarg is called as part of tp restart handling),
+		 *	then no region is included in this TP so set sgm_info_ptr to NULL.
+		 * b) If the region has not yet been opened in this TP transaction (si->fresh_start is TRUE), then
+		 *	again set sgm_info_ptr to NULL.
+		 * c) If the region corresponding to the restored $reference has already been opened as part
+		 * 	of this TP transaction, then set sgm_info_ptr to point to the corresponding tp structure.
+		 */
+		assert(cs_addrs == gv_target->gd_csa);
+		si = cs_addrs->sgm_info_ptr;
+		if ((NULL != first_sgm_info) && !si->fresh_start)
+		{	/* Case (c) */
+			sgm_info_ptr = si;
+			DBG_CHECK_IN_FIRST_SGM_INFO_LIST(si);
+		} else
+		{	/* Case (a) OR (b).
+			 * In case of (b), note that first_sgm_info could be non-NULL while sgm_info_ptr is NULL.
+			 * We can fix the latter to be a non-NULL value by invoking "tp_set_sgm". But we dont want
+			 * to do that here because it can cause restarts (due to the "insert_region" call) and this
+			 * function can be invoked by "gtm_trigger_fini" which cannot handle tp restarts within.
+			 * We therefore keep first_sgm_info and sgm_info_ptr temporarily out-of-sync until the NEXT
+			 * global reference (op_gvname, op_gvnaked or op_gvextnam) which would invoke "tp_set_sgm".
+			 * The two need to be in sync BEFORE any database functions (gvcst_search.c, gvcst_get.c etc.)
+			 * are invoked as they assume sgm_info_ptr is non-NULL if dollar_tlevel is non-zero.
+			 */
+			sgm_info_ptr = NULL;
+		}
+		assert((NULL != first_sgm_info) || (NULL == sgm_info_ptr));
+	}
 	TREF(gv_last_subsc_null) = gvsavtarg->gv_last_subsc_null;
 	TREF(gv_some_subsc_null) = gvsavtarg->gv_some_subsc_null;
 	gv_currkey->prev = gvsavtarg->prev;

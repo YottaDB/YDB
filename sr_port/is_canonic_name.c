@@ -101,7 +101,7 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 				}
 				if (('|' == letter) || ('[' == letter))
 				{
-					term = letter;
+					term = (letter == '[') ? ']' : letter;
 					envpart = 0;
 					if (subs_count == seq)
 						start = isrc + 1;
@@ -143,6 +143,8 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 						state = (')' == term) ? 8 : 5;		/* end or name */
 					else if (',' != letter)
 						return FALSE;	/* Not a single char number */
+					if ((subs_count == seq) && (0 == stop))
+						stop = isrc;
 					break;
 				}
 				if (('-' == letter) || ('.' == letter) || ISDIGIT_ASCII(letter))

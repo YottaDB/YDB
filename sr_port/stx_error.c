@@ -14,6 +14,7 @@
 #include "gtm_string.h"
 #include "cmd_qlf.h"
 #include "compiler.h"
+#include "opcode.h"
 #include "cgp.h"
 #include "io.h"
 #include "list_file.h"
@@ -42,6 +43,7 @@ error_def(ERR_SRCNAM);
 error_def(ERR_LABELMISSING);
 error_def(ERR_FMLLSTPRESENT);
 error_def(ERR_FMLLSTMISSING);
+error_def(ERR_FOROFLOW);
 error_def(ERR_ACTLSTTOOLONG);
 error_def(ERR_BADCHSET);
 error_def(ERR_BADCASECODE);
@@ -81,12 +83,13 @@ void stx_error(int in_error, ...)
 		 * could have a postconditional that bypasses this code) issue the rts_error.
 		 * See IS_STX_WARN macro definition for details.
 		 */
-		TREF(for_stack_ptr) = TADR(for_stack);
 		if (is_stx_warn)
 		{
 			ins_errtriple(in_error);
 			return;
 		}
+		if (TREF(for_stack_ptr) > (oprtype **)TADR(for_stack))
+			FOR_POP(BLOWN_FOR);
 		if (ERR_BADCHAR == in_error)
 		{
 			cnt = va_arg(args, VA_ARG_TYPE);
@@ -110,7 +113,7 @@ void stx_error(int in_error, ...)
 			arg2 = va_arg(args, VA_ARG_TYPE);
 			va_end(args);
 			rts_error(VARLSTCNT(4) in_error, cnt, arg1, arg2);
-		} else if ((ERR_CEUSRERROR == in_error) || (ERR_INVDLRCVAL == in_error))
+		} else if ((ERR_CEUSRERROR == in_error) || (ERR_INVDLRCVAL == in_error) || (ERR_FOROFLOW == in_error))
 		{
 			cnt = va_arg(args, VA_ARG_TYPE);
 			assert(cnt == 1);
@@ -189,7 +192,7 @@ void stx_error(int in_error, ...)
 		show_source_line(&buf[LISTTAB], SIZEOF(buf), warn);
 		if (warn)
 		{
-			if ((ERR_CEUSRERROR != in_error) && (ERR_INVDLRCVAL != in_error))
+			if ((ERR_CEUSRERROR != in_error) && (ERR_INVDLRCVAL != in_error) && (ERR_FOROFLOW != in_error))
 				dec_err(VARLSTCNT(1) in_error);
 			else
 			{

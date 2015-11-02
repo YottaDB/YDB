@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -26,15 +26,12 @@
 	.text
 .extern	pcurrpos
 
-MPR_LINESTART	=	0x8
-
 # PUBLIC	op_mproflinestart
 ENTRY op_mproflinestart
 	movq	frame_pointer(REG_IP),REG64_RET1
 	movq    (REG_SP),REG64_ACCUM
 	movq	REG64_ACCUM,msf_mpc_off(REG64_RET1)
 	movq    REG_PV, msf_ctxt_off(REG64_RET1)      # Save ctxt into frame_pointer
-	movl	$MPR_LINESTART,REG32_ARG0
 	call	pcurrpos
 	ret
 # op_mproflinestart ENDP

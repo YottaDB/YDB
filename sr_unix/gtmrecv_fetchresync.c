@@ -252,8 +252,8 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		assert(resync_msg.resync_seqno);
 		resync_msg.proto_ver = REPL_PROTO_VER_THIS;
 		resync_msg.node_endianness = NODE_ENDIANNESS;
-		REPLGBL.src_node_same_endianness = TRUE;
-		REPLGBL.src_node_endianness_known = FALSE;
+		(TREF(replgbl)).src_node_same_endianness = TRUE;
+		(TREF(replgbl)).src_node_endianness_known = FALSE;
 		gtmrecv_repl_send((repl_msg_ptr_t)&resync_msg, REPL_FETCH_RESYNC, MIN_REPL_MSGLEN,
 					"REPL_FETCH_RESYNC", resync_msg.resync_seqno);
 		if (repl_connection_reset)
@@ -285,15 +285,15 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			if (wait_count <= 0)
 				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Waited too long to get message from primary. Check if primary is alive."));
-			if (!REPLGBL.src_node_endianness_known)
+			if (!(TREF(replgbl)).src_node_endianness_known)
 			{
-				REPLGBL.src_node_endianness_known = TRUE;
+				(TREF(replgbl)).src_node_endianness_known = TRUE;
 				if ((REPL_MSGTYPE_LAST < msg.type) && (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg.type)))
-					REPLGBL.src_node_same_endianness = FALSE;
+					(TREF(replgbl)).src_node_same_endianness = FALSE;
 				else
-					REPLGBL.src_node_same_endianness = TRUE;
+					(TREF(replgbl)).src_node_same_endianness = TRUE;
 			}
-			if (!REPLGBL.src_node_same_endianness)
+			if (!(TREF(replgbl)).src_node_same_endianness)
 			{
 				msg.type = GTM_BYTESWAP_32(msg.type);
 				msg.len = GTM_BYTESWAP_32(msg.len);
@@ -323,7 +323,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 
 				case REPL_NEED_TRIPLE_INFO:
 					need_tripleinfo_msg = RECAST(repl_needtriple_msg_ptr_t)&msg;
-					if (REPLGBL.src_node_same_endianness)
+					if ((TREF(replgbl)).src_node_same_endianness)
 						triple_seqnum = need_tripleinfo_msg->seqno;
 					else
 						triple_seqnum = GTM_BYTESWAP_64(need_tripleinfo_msg->seqno);
@@ -375,7 +375,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			rts_error(VARLSTCNT(1) ERR_REPLCOMM);
 			return ERR_REPLCOMM;
 		}
-		if (REPLGBL.src_node_same_endianness)
+		if ((TREF(replgbl)).src_node_same_endianness)
 			QWASSIGN(*resync_seqno, *(seq_num *)&msg.msg[0]);
 		else
 			QWASSIGN(*resync_seqno, GTM_BYTESWAP_64(*(seq_num *)&msg.msg[0]));

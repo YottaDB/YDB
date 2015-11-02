@@ -22,11 +22,30 @@
 #define EXP_IDX_BIAQ		 (18+MV_XBIAS)		/* Max. biased exponent index within two longs 	*/
 #define EXPLO			(-42+MV_XBIAS)		/* Min. biased exponent  			*/
 #define EXPHI			 (48+MV_XBIAS)		/* Max. biased exponent  			*/
-/* Note: The above values for EXPLO and EXPHI seem to set up a range of 20 thru 110 which still leaves room for expansion
- * in the 7-bit exponent whose full range is 0 thru 127. Not clear what the reason for leaving some gap on either side is.
- * One thought is maybe the gap of 19 in the lower side & 17 in the upper side has got something to do with the max
- * precision we suport (18 decimal digits). But it is still not clear to me why. --- nars -- 2011/01/14.
+/* Note: The above values for EXPLO and EXPHI set up a range of 20 thru 109 which still leaves room for expansion
+ * in the 7-bit exponent whose full range is 0 thru 127. One might be tempted to increase EXPLO/EXPHI to accommodate
+ * the available range but should not because these values also affect how numeric subscripts are stored in the database.
+ *
+ * The entire numeric range currently supported by GT.M along with how it represents them internally as well as
+ * inside the database (the first byte of the numeric subscript) is captured in the table below.
+ *
+ * -------------------------|----------------------------------------------------------------------------------------
+ *            Numeric value |     ...     [-1E46, -1E-43]   ...       [0]      ...     [1E-43, 1E46]     ...
+ *  mval.e   representation |     ...      [ 109,   20]     ...       [0]      ...       [ 20, 109]      ...
+ *  mval.sgn representation |     ...      [   1,    1]     ...       [0]      ...       [  0,   0]      ...
+ *                          |      |            |            |         |        |            |            |
+ *                          |      |            |            |         |        |            |            |
+ *                          |      |            |            |         |        |            |            |
+ *                          |      v            v            v         v        v            v            v
+ * subscript representation | [0x00, 0x11] [0x12, 0x6b] [0x6c,0x7F] [0x80] [0x81, 0x93] [0x94, 0xED] [0xEE, 0xFF]
+ *       in database        |
+ * -------------------------|----------------------------------------------------------------------------------------
+ *
+ * Any increase in EXPHI will encroach the currently unused interval [0x00,0x11] and has to be done with caution
+ * as a few of those are used for different purposes (0x01 to represent a null subscript in standard null collation,
+ * 0x02 to be used for spanning node subscripts etc.)
  */
+
 #define EXP_INT_OVERF		  (7+MV_XBIAS)		/* Upper bound on MV_INT numbers 		*/
 #define EXP_INT_UNDERF		 (-3+MV_XBIAS)		/* Lower bound on MV_INT numbers (includes
 							 *   integers & fractions upto 3 decimal places */

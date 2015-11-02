@@ -255,7 +255,8 @@ typedef struct lv_val_struct
 		} free_ent;
 		struct
 		{	/* When xnew'd lv's are copied to previous symtab, their new root is
-			   set here so multiple references can be resolved properly (mvtype == MV_LVCOPIED */
+			 * set here so multiple references can be resolved properly (mvtype == MV_LVCOPIED)
+			 */
 			struct lv_val_struct *newtablv;
 		} copy_loc;
 	} ptrs;
@@ -394,55 +395,48 @@ typedef lvname_info	*lvname_info_ptr;
 	sym->lvtreenode_flist = LV;							\
 }
 
+unsigned char   *format_lvname(lv_val *start, unsigned char *buff, int size);
 lv_val		*lv_getslot(symval *sym);
 lvTree		*lvtree_getslot(symval *sym);
 lvTreeNode	*lvtreenode_getslot(symval *sym);
 
-void		lv_newblock(symval *sym, int numElems);
-void		lvtree_newblock(symval *sym, int numElems);
-void		lvtreenode_newblock(symval *sym, int numElems);
+void	lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree);
+void	lv_killarray(lvTree *lvt, boolean_t dotpsave);
+void	lv_newblock(symval *sym, int numElems);
+void	lv_newname(ht_ent_mname *hte, symval *sym);
+void	lvtree_newblock(symval *sym, int numElems);
+void	lvtreenode_newblock(symval *sym, int numElems);
+void	lv_var_clone(lv_val *clone_var, lv_val *base_lv);
+void	lvzwr_var(lv_val *lv, int4 n);
 
-#define NOARG 3				/* used by the FOR slight of hand because the compiler doesn't pass NULL pointers */
+void	op_clralsvars(lv_val *dst);
+void	op_forfreeindx(void);
+void	op_fornestlvl(uint4 level);
+void	op_fndata(lv_val *x, mval *y);
+void	op_fnzdata(lv_val *x, mval *y);
+void	op_fnincr(lv_val *local_var, mval *increment, mval *result);
+void	op_fnnext(lv_val *src,mval *key,mval *dst);
+void	op_fno2(lv_val *src,mval *key,mval *dst,mval *direct);
+void	op_fnorder(lv_val *src, mval *key, mval *dst);
+void	op_fnzahandle(lv_val *src, mval *dst);
+void	op_fnzprevious(lv_val *src, mval *key, mval *dst);
+void	op_kill(lv_val *lv);
+void	op_killalias(int srcindx);
+void	op_lvzwithdraw(lv_val *lv);
+void	op_setals2als(lv_val *src, int dstindx);
+void	op_setalsin2alsct(lv_val *src, lv_val *dst);
+void	op_setalsctin2als(lv_val *src, int dstindx);
+void	op_setalsct2alsct(lv_val *src, lv_val *dst);
+void	op_setfnretin2als(mval *srcmv, int destindx); /* no an lv_val ref but kept here with its friends so it not lonely */
+void	op_setfnretin2alsct(mval *srcmv, lv_val *dstlv);
+void	op_zshow(mval *func, int type, lv_val *lvn);
 
-lv_val *lv_getslot(symval *sym);
-void lv_killarray(lvTree *lvt, boolean_t dotpsave);
-void lv_newname(ht_ent_mname *hte, symval *sym);
-void lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree);
-void lv_var_clone(lv_val *clone_var, lv_val *base_lv);
-
-void op_zshow(mval *func, int type, lv_val *lvn);
-void op_fndata(lv_val *x, mval *y);
-void op_fnzdata(lv_val *x, mval *y);
-void op_fno2(lv_val *src,mval *key,mval *dst,mval *direct);
-void op_fnnext(lv_val *src,mval *key,mval *dst);
-void op_fnorder(lv_val *src, mval *key, mval *dst);
-void op_fnzprevious(lv_val *src, mval *key, mval *dst);
-void op_kill(lv_val *lv);
-void op_lvzwithdraw(lv_val *lv);
-void op_setals2als(lv_val *src, int dstindx);
-void op_setalsin2alsct(lv_val *src, lv_val *dst);
-void op_setalsctin2als(lv_val *src, int dstindx);
-void op_setalsct2alsct(lv_val *src, lv_val *dst);
-void op_setfnretin2als(mval *srcmv, int destindx); /* no an lv_val ref but kept here with its friends so it not lonely */
-void op_setfnretin2alsct(mval *srcmv, lv_val *dstlv);
-void op_killalias(int srcindx);
-void op_clralsvars(lv_val *dst);
-void op_fnzahandle(lv_val *src, mval *dst);
-void op_fnincr(lv_val *local_var, mval *increment, mval *result);
-
-void lvzwr_var(lv_val *lv, int4 n);
-unsigned char   *format_lvname(lv_val *start, unsigned char *buff, int size);
-
-lv_val *op_srchindx(UNIX_ONLY_COMMA(int argcnt_arg) lv_val *lv, ...);
-lv_val *op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...);
-lv_val *op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
-lv_val *op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
-lv_val *op_savputindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
-lv_val *op_rfrshindx(boolean_t put, uint4 for_lvl);
-void	op_forctrlindr1(uint4 for_lvl);
-boolean_t	op_forctrlindr2(uint4 jeopardy);
-
-boolean_t lcl_arg1_is_desc_of_arg2(lv_val *cur, lv_val *ref);
+lv_val   *op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
+lv_val   *op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
+lv_val   *op_rfrshindx(uint4 level, boolean_t put);
+lv_val   *op_savputindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
+lv_val   *op_srchindx(UNIX_ONLY_COMMA(int argcnt_arg) lv_val *lv, ...);
+lv_val   *op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...);
 
 /* Function Prototypes for local variables functions of merge */
 boolean_t 	lcl_arg1_is_desc_of_arg2(lv_val *cur, lv_val *ref);

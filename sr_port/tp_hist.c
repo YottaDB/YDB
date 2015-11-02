@@ -333,6 +333,9 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					if (++si->num_of_blks > si->tp_hist_size)
 					{	/* catch the case where MUPIP recover or update process gets into this situation */
 						assert(!mupip_jnl_recover && !is_updproc);
+						delete_hashtab_int4(si->blks_in_use,(uint4 *)&blk);
+						si->num_of_blks--;
+						assert(si->num_of_blks == si->tp_hist_size);
 						rts_error(VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
 					}
 					/* Either history has a clue or not.
@@ -435,15 +438,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	}
 	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
 	assert((cdb_sc_normal != status) || !TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
-	if (gvt->read_local_tn != local_tn)
-	{	/* Set read_local_tn to local_tn; Also add gvt to list of gvtargets referenced in this TP transaction. */
-		gvt->read_local_tn = local_tn;
-		gvt->next_tp_gvnh = gvt_tp_list;
-		gvt_tp_list = gvt;
-	} else
-	{	/* Check that gvt is already part of the list of gvtargets referenced in this TP transaction */
-		DBG_CHECK_IN_GVT_TP_LIST(gvt, TRUE);	/* TRUE => we check that gvt IS present in the gvt_tp_list */
-	}
+	ADD_TO_GVT_TP_LIST(gvt);	/* updates gvt->read_local_tn & adds gvt to gvt_tp_list : both only if needed */
 	CWS_RESET;
 	return status;
 }

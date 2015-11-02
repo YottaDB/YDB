@@ -64,7 +64,6 @@ GBLREF	uint4		outOfMemoryMitigateSize;	/* Reserve that we will freed to help cle
 GBLREF	uint4		max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
 GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilations */
 GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
-GBLREF	boolean_t	gtm_environment_init;
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 
 void	gtm_env_init(void)
@@ -209,7 +208,7 @@ void	gtm_env_init(void)
 		}
 		if (GETENV("gtm_environment_init"))
 		{
-			gtm_environment_init = TRUE;
+			TREF(gtm_environment_init) = TRUE;
 		}
 		/* Platform specific initializations */
 		gtm_env_init_sp();

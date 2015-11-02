@@ -378,7 +378,7 @@ static uint4	array_to_mask(boolean_t ar[MAXIMUM_PARAMETERS], int n)
 struct extcall_package_list	*exttab_parse(mval *package)
 {
 	int		parameter_alloc_values[MAXIMUM_PARAMETERS], parameter_count, ret_pre_alloc_val, i, fclose_res;
-	int		path_len, len, keywordlen;
+	int		len, keywordlen;
 	boolean_t	is_input[MAXIMUM_PARAMETERS], is_output[MAXIMUM_PARAMETERS], got_status;
 	mstr		callnam, rtnnam, clnuprtn;
 	mstr 		val, trans;
@@ -422,12 +422,9 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		/* External call table is a null file */
 		rts_error(VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
 	}
-	path_len = STRLEN(str_buffer);
-	/* STRNCPY_STR(str_temp_buffer, str_buffer, path_len); */
-	STRNCPY_STR(str_temp_buffer, str_buffer);
-	str_temp_buffer[path_len] = 0;
+	STRNCPY_STR(str_temp_buffer, str_buffer, MAX_TABLINE_LEN);
 	val.addr = str_temp_buffer;
-	val.len = path_len;
+	val.len = STRLEN(str_temp_buffer);
 	/* Need to copy the str_buffer into another temp variable since
 	 * TRANS_LOG_NAME requires input and output buffers to be different.
 	 * If there is an env variable present in the pathname, TRANS_LOG_NAME

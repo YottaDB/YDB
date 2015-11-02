@@ -53,6 +53,18 @@ GBLREF 	jnl_gbls_t	jgbl;
 GBLREF 	bool		in_backup;
 GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 
+error_def(ERR_DBFILERR);
+error_def(ERR_DBFSYNCERR);
+error_def(ERR_GBLOFLOW);
+error_def(ERR_JNLFILOPN);
+error_def(ERR_JNLFLUSH);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+error_def(ERR_WAITDSKSPACE);
+error_def(ERR_WCBLOCKED);
+error_def(ERR_WRITERSTUCK);
+
 #define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(FIX_IN_WTSTART, WAS_CRIT)							\
 {															\
 	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (cnl->in_wtstart), 1);						\
@@ -60,7 +72,6 @@ GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 	{														\
 		DEBUG_ONLY(int4	in_wtstart;) 		/* temporary for debugging purposes */				\
 		DEBUG_ONLY(int4	intent_wtstart;) 	/* temporary for debugging purposes */				\
-		error_def(ERR_WRITERSTUCK);										\
 															\
 		assert(csa->now_crit);											\
 		SIGNAL_WRITERS_TO_STOP(csd);		/* to stop all active writers */				\
@@ -134,17 +145,6 @@ boolean_t wcs_flu(uint4 options)
 	cache_que_head_ptr_t	crq;
         struct shmid_ds         shm_buf;
 	uint4			fsync_dskaddr;
-
-	error_def(ERR_DBFILERR);
-	error_def(ERR_DBFSYNCERR);
-	error_def(ERR_GBLOFLOW);
-	error_def(ERR_JNLFILOPN);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_OUTOFSPACE);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_TEXT);
-	error_def(ERR_WAITDSKSPACE);
-	error_def(ERR_WCBLOCKED);
 
 	jnl_status = 0;
 	flush_hdr = options & WCSFLU_FLUSH_HDR;
@@ -446,7 +446,11 @@ boolean_t wcs_flu(uint4 options)
 			if ((MAXJNLQIOLOCKWAIT / 2 == lcnt) || (MAXJNLQIOLOCKWAIT == lcnt))
 				performCASLatchCheck(&jb->io_in_prog_latch, TRUE);
 		}
-		jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
+		if (csd->jnl_before_image)
+			jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
+		/* else the journal files do not support before images and hence can only be used for forward recovery. So skip
+		 * fsync of the database (jb->need_db_fsync = FALSE) because we don't care if the on-disk db is up-to-date or not.
+		 */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		assert(!(JNL_FILE_SWITCHED(jpc)));
 		assert(jgbl.gbl_jrec_time);

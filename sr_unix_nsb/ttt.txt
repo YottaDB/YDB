@@ -965,19 +965,13 @@ OC_FNZWIDTH:    pushab  val.0                   ; destination mval
 OC_ZTRIGGER:	calls	#0,xfer.xf_ztrigger
 OC_ZWRITESVN:	pushl	val.1
  		calls	#1,xfer.xf_zwritesvn
+OC_RFRSHINDX:	pushl	val.2
+		pushl	val.1
+		calls	#2,xfer.xf_rfrshindx
+		movl	r0,addr.0
 OC_SAVPUTINDX:	irepab	val.2
 		calls	val.1,xfer.xf_savputindx
 		movl	r0,addr.0
-OC_RFRSHINDX:	pushl	val.1
-		pushl	val.2
-		calls	#1,xfer.xf_rfrshindx
-		movl	r0,addr.0
-OC_RFRSHINDX:	pushl	val.1
-		pushl	val.2
-		calls	#2,xfer.xf_rfrshindx
-		movl	r0,addr.0
-OC_FORCTRLINDR1:	pushl	val.1
-			calls	#1,xfer.xf_forctrlindr1
-OC_FORCTRLINDR2:	pushl	val.1
-			calls	#1,xfer.xf_forctrlindr2
-			movl	r0,val.0
+OC_FORFREEINDX:	calls	#0,xfer.xf_forfreeindx
+OC_FORNESTLVL:	pushl	val.1
+		calls	#1,xfer.xf_fornestlvl

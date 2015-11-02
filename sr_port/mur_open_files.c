@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,8 +64,6 @@
 #include "gtmsource.h"
 #include "gtm_logicals.h"
 
-
-
 GBLREF	boolean_t	blocksig_initialized;
 GBLREF	sigset_t	block_sigsent;
 GBLREF	reg_ctl_list	*mur_ctl;
@@ -75,6 +73,41 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	jnlpool_addrs	jnlpool;
 GBLREF	boolean_t	have_standalone_access;
 GBLREF	gd_addr		*gd_header;
+
+#if defined(VMS)
+error_def (ERR_MUJPOOLRNDWNFL);
+error_def (ERR_MUJPOOLRNDWNSUC);
+error_def (ERR_MURPOOLRNDWNFL);
+error_def (ERR_MURPOOLRNDWNSUC);
+#elif defined(UNIX)
+error_def (ERR_JNLFILEOPNERR);
+error_def (ERR_SYSCALL);
+#endif
+error_def (ERR_DBFILOPERR);
+error_def (ERR_DBFRZRESETFL);
+error_def (ERR_DBFRZRESETSUC);
+error_def (ERR_DBJNLNOTMATCH);
+error_def (ERR_DBRDONLY);
+error_def (ERR_FILENOTFND);
+error_def (ERR_FILEPARSE);
+error_def (ERR_JNLBADRECFMT);
+error_def (ERR_JNLDBTNNOMATCH);
+error_def (ERR_JNLFILEDUP);
+error_def (ERR_JNLNMBKNOTPRCD);
+error_def (ERR_JNLSTATEOFF);
+error_def (ERR_JNLTNOUTOFSEQ);
+error_def (ERR_MUPCLIERR);
+error_def (ERR_MUPJNLINTERRUPT);
+error_def (ERR_MUSTANDALONE);
+error_def (ERR_NOPREVLINK);
+error_def (ERR_NOSTARFILE);
+error_def (ERR_NOTALLJNLEN);
+error_def (ERR_NOTALLREPLON);
+error_def (ERR_REPLSTATEOFF);
+error_def (ERR_RLBKNOBIMG);
+error_def (ERR_ROLLBKINTERRUPT);
+error_def (ERR_STARFILE);
+error_def (ERR_TEXT);
 
 #define            		STAR_QUOTE "\"*\""
 boolean_t mur_open_files()
@@ -87,16 +120,15 @@ boolean_t mur_open_files()
 	reg_ctl_list			*rctl, *rctl_top, tmp_rctl;
 	gld_dbname_list			*gld_db_files, *curr;
 	gd_addr                 	*temp_gd_header;
-	boolean_t                       star_specified;
+	boolean_t                       star_specified, outofsync;
 	redirect_list			*rl_ptr;
 	unsigned int			full_len;
 	replpool_identifier		replpool_id;
 	sgmnt_data_ptr_t		csd;
 	sgmnt_addrs			*csa;
 	file_control			*fc;
-	bool				reg_frz_status;
-
-#ifdef VMS
+	freeze_status			reg_frz_status;
+#if defined(VMS)
 	uint4				status;
 	boolean_t			sgmnt_found;
 	mstr				gbldir_mstr, *tran_name;
@@ -104,37 +136,7 @@ boolean_t mur_open_files()
 	struct dsc$descriptor_s 	name_dsc;
 	char            		res_name[MAX_NAME_LEN + 2];/* +1 for the terminating null and
 						another +1 for the length stored in [0] by global_name() */
-	error_def (ERR_MURPOOLRNDWNSUC);
-	error_def (ERR_MURPOOLRNDWNFL);
-	error_def (ERR_MUJPOOLRNDWNSUC);
-	error_def (ERR_MUJPOOLRNDWNFL);
 #endif
-
-	error_def (ERR_MUPCLIERR);
-	error_def (ERR_FILENOTFND);
-	error_def (ERR_MUSTANDALONE);
-	error_def (ERR_DBJNLNOTMATCH);
-	error_def (ERR_JNLNMBKNOTPRCD);
-	error_def (ERR_NOTALLJNLEN);
-	error_def (ERR_NOTALLREPLON);
-	error_def (ERR_JNLDBTNNOMATCH);
-	error_def (ERR_NOPREVLINK);
-	error_def (ERR_JNLTNOUTOFSEQ);
-	error_def (ERR_STARFILE);
-	error_def (ERR_NOSTARFILE);
-	error_def (ERR_MUPCLIERR);
-	error_def (ERR_DBFRZRESETSUC);
-	error_def (ERR_FILEPARSE);
-	error_def (ERR_JNLBADRECFMT);
-	error_def (ERR_JNLSTATEOFF);
-	error_def (ERR_REPLSTATEOFF);
-	error_def (ERR_RLBKNOBIMG);
-	error_def (ERR_MUPJNLINTERRUPT);
-	error_def (ERR_ROLLBKINTERRUPT);
-	error_def (ERR_DBRDONLY);
-	error_def (ERR_DBFRZRESETFL);
-	error_def (ERR_DBFILOPERR);
-	error_def (ERR_TEXT);
 
 	jnl_file_list_len = MAX_LINE;
 	if (FALSE == CLI_GET_STR_ALL("FILE", jnl_file_list, &jnl_file_list_len))
@@ -535,6 +537,34 @@ boolean_t mur_open_files()
 				if (rctl == rctl_top)
 					GTMASSERT;/* db list was created from journal file header. So it is not possible */
 			}
+			/* Detect and report 1st case of any duplicated files in mupip forward recovery command. */
+			if (mur_options.forward)
+			{
+				VMS_ONLY(set_gdid_from_file(&jctl->fid, (char *)jctl->jnl_fn, jctl->jnl_fn_len);)
+#				if defined(UNIX)
+				if (filename_to_id(&jctl->fid, (char *)jctl->jnl_fn))
+				{
+#				endif
+					for (temp_jctl = rctl->jctl_head; temp_jctl; temp_jctl = temp_jctl->next_gen)
+					{
+						if (UNIX_ONLY(is_gdid_identical(&jctl->fid, &temp_jctl->fid))
+							VMS_ONLY(is_gdid_gdid_identical(&jctl->fid, &temp_jctl->fid)))
+						{
+							gtm_putmsg(VARLSTCNT(6) ERR_JNLFILEDUP, 4, jctl->jnl_fn_len,
+								jctl->jnl_fn, temp_jctl->jnl_fn_len, temp_jctl->jnl_fn);
+							return FALSE;
+						}
+					}
+#				if defined(UNIX)
+				}
+				else
+				{
+					gtm_putmsg(VARLSTCNT(11) ERR_JNLFILEOPNERR, 2, jctl->jnl_fn_len, jctl->jnl_fn,
+						ERR_SYSCALL, 5, LEN_AND_LIT("fstat"), CALLFROM, errno);
+					return FALSE;
+				}
+#				endif
+			}
 			if (SS_NORMAL != (jctl->status = mur_fread_eof(jctl, rctl)))
 			{
 				gtm_putmsg(VARLSTCNT(5) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn, jctl->rec_offset);
@@ -621,53 +651,83 @@ boolean_t mur_open_files()
 		return FALSE;
 	/* From this point consider only regions with journals to be processed (murgbl.reg_total)
 	 * However mur_close_files will close all regions opened (murgbl.reg_full_total) */
-	if (mur_options.forward)
+	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 	{
-		for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
+		jctl = rctl->jctl_head;
+		if (mur_options.update)
 		{
-			jctl = rctl->jctl_head;
-			if (mur_options.update)
-			{
-				csd = rctl->csd;
-				if (mur_options.chain)
-				{	/* User might have not specified journal file starting tn matching database curr_tn.
-					 * So try to open previous generation journal files and add to linked list */
-					rctl->jctl = jctl;	/* asserted by mur_insert_prev */
-					while (jctl->jfh->bov_tn > csd->trans_hist.curr_tn)
+			csd = rctl->csd;
+			if (mur_options.chain && mur_options.forward)
+			{	/* User might have not specified journal file starting tn matching database curr_tn.
+				 * So try to open previous generation journal files and add to linked list */
+				rctl->jctl = jctl;	/* asserted by mur_insert_prev */
+				while (jctl->jfh->bov_tn > csd->trans_hist.curr_tn)
+				{
+					if (0 == jctl->jfh->prev_jnl_file_name_length)
 					{
-						if (0 == jctl->jfh->prev_jnl_file_name_length)
-						{
-							gtm_putmsg(VARLSTCNT(8) ERR_JNLDBTNNOMATCH, 6,
-								jctl->jnl_fn_len, jctl->jnl_fn, &jctl->jfh->bov_tn,
-								DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn);
-							gtm_putmsg(VARLSTCNT(4) ERR_NOPREVLINK, 2,
-									jctl->jnl_fn_len, jctl->jnl_fn);
-							return FALSE;
-						} else if (!mur_insert_prev(&jctl))
-							return FALSE;
+						gtm_putmsg(VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,jctl->jnl_fn_len, jctl->jnl_fn,
+							LEN_AND_LIT("beginning"), &jctl->jfh->bov_tn,
+							DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn, &csd->jnl_eovtn);
+						gtm_putmsg(VARLSTCNT(4) ERR_NOPREVLINK, 2,
+								jctl->jnl_fn_len, jctl->jnl_fn);
+						return FALSE;
+					} else if (!mur_insert_prev(&jctl))
+						return FALSE;
+				}
+			}
+			if (mur_options.forward)
+			{
+				if (!mur_options.notncheck && (jctl->jfh->bov_tn != csd->trans_hist.curr_tn))
+				{
+					gtm_putmsg(VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9, jctl->jnl_fn_len, jctl->jnl_fn,
+						LEN_AND_LIT("beginning"), &jctl->jfh->bov_tn,
+						DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn, &csd->jnl_eovtn);
+					return FALSE;
+				}
+			} else /*Backward Recovery*/
+			{
+				if (jctl->jfh->eov_tn != csd->trans_hist.curr_tn)
+				{	/* 'outofsync' variable identifies situations in which backward recovery
+					 * proceeds if inequality (csd->jnl_eovtn <= jfh->eov_tn <= csd->curr_tn) is TRUE.
+					 * So if,
+					 * i)   backward recovery is interrupted at any time except at turn around point just after
+					 *      database header is synched OR
+					 *ii)   database is crashed but journaling is behind database i.e.
+					 *	jfh->eov_tn < csd->trans_hist.curr_tn
+					 *	outofsync is set to TRUE.
+                                         * backward recovery does not proceed if,
+					 *  i)  database is crashed and journaling is ahead of database
+					 * ii)  database is cleanly terminated and outofsync is FALSE
+					 *iii)  outofsync is TRUE but above mentioned inequality is FALSE and
+					 *      interruption or crash did not occur while processing turn around point
+					 */
+					outofsync = (rctl->recov_interrupted ||
+					  	     (jctl->jfh->crash && (jctl->jfh->eov_tn < csd->trans_hist.curr_tn)));
+					if ((jctl->jfh->crash && (jctl->jfh->eov_tn > csd->trans_hist.curr_tn) &&
+						!rctl->recov_interrupted) || (!jctl->jfh->crash && !outofsync) ||
+						(outofsync && !csd->turn_around_point && (csd->jnl_eovtn != csd->trans_hist.curr_tn)
+						  && (csd->jnl_eovtn > jctl->jfh->eov_tn)))
+					{
+						gtm_putmsg(VARLSTCNT(11) ERR_JNLDBTNNOMATCH, 9,	jctl->jnl_fn_len, jctl->jnl_fn,
+						LEN_AND_LIT("end"), &jctl->jfh->eov_tn, DB_LEN_STR(rctl->gd),
+						&csd->trans_hist.curr_tn, &csd->jnl_eovtn);
+						return FALSE;
 					}
 				}
-				if (jctl->jfh->bov_tn != csd->trans_hist.curr_tn && !mur_options.notncheck)
-				{
-					gtm_putmsg(VARLSTCNT(8) ERR_JNLDBTNNOMATCH, 6, jctl->jnl_fn_len, jctl->jnl_fn,
-						&jctl->jfh->bov_tn, DB_LEN_STR(rctl->gd), &csd->trans_hist.curr_tn);
-					return FALSE;
-				}
-			} /* if mur_options.update */
-			while (NULL != jctl->next_gen) /* Check for continuity */
-			{
-				if (!mur_options.notncheck && (jctl->next_gen->jfh->bov_tn != jctl->jfh->eov_tn))
-				{
-					gtm_putmsg(VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
-						&jctl->jfh->eov_tn, jctl->jnl_fn_len, jctl->jnl_fn,
-						&jctl->next_gen->jfh->bov_tn, jctl->next_gen->jnl_fn_len, jctl->next_gen->jnl_fn);
-					return FALSE;
-				}
-				jctl = jctl->next_gen;
 			}
-			rctl->jctl = jctl;      /* latest in linked list */
-		} /* end for */
-	}
+		} /* if mur_options.update */
+		while (NULL != jctl->next_gen) /* Check for continuity */
+		{
+			if (!mur_options.notncheck && (jctl->next_gen->jfh->bov_tn != jctl->jfh->eov_tn))
+			{
+				gtm_putmsg(VARLSTCNT(8) ERR_JNLTNOUTOFSEQ, 6,
+					&jctl->jfh->eov_tn, jctl->jnl_fn_len, jctl->jnl_fn,
+					&jctl->next_gen->jfh->bov_tn, jctl->next_gen->jnl_fn_len, jctl->next_gen->jnl_fn);
+				return FALSE;
+			}
+			jctl = jctl->next_gen;
+		}
+		rctl->jctl = jctl;      /* latest in linked list */
+	} /* end for */
 	return TRUE;
 }
-

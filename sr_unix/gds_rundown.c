@@ -42,6 +42,7 @@
 #include "aswp.h"
 #include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
+#include "eintr_wrapper_semop.h"
 #include "util.h"
 #include "send_msg.h"
 #include "change_reg.h"
@@ -108,18 +109,21 @@ GBLREF	jnl_process_vector	*originator_prc_vec;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		dse_running;
 
+error_def(ERR_ASSERT);
 error_def(ERR_CRITSEMFAIL);
-error_def(ERR_DBCCERR);
 error_def(ERR_DBFILERR);
+error_def(ERR_DBRNDWN);
 error_def(ERR_DBRNDWNWRN);
-error_def(ERR_ERRCALL);
-error_def(ERR_GBLOFLOW);
 error_def(ERR_GTMASSERT);
+error_def(ERR_GTMCHECK);
 error_def(ERR_IPCNOTDEL);
 error_def(ERR_JNLFLUSH);
+error_def(ERR_MEMORY);
+error_def(ERR_OUTOFSPACE);
 error_def(ERR_RNDWNSEMFAIL);
 error_def(ERR_TEXT);
 error_def(ERR_WCBLOCKED);
+error_def(ERR_STACKOFLOW);
 
 LITREF  char                    gtm_release_name[];
 LITREF  int4                    gtm_release_name_len;
@@ -242,7 +246,7 @@ void gds_rundown(void)
 		sop[1].sem_num = 0; sop[1].sem_op = 1;	/* Lock */
 		sopcnt = 2;
 		sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO | IPC_NOWAIT; /* Don't wait the first time thru */
-		SEMOP(udi->semid, sop, sopcnt, status);
+		SEMOP(udi->semid, sop, sopcnt, status, NO_WAIT);
 		if (-1 == status)			/* We couldn't get it in one shot -- see if we already have it */
 		{
 			save_errno = errno;
@@ -262,7 +266,7 @@ void gds_rundown(void)
 					ERR_TEXT, 2, RTS_ERROR_TEXT("gds_rundown first semop/semctl"), save_errno);
 			}
 			sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;	/* Try again - blocking this time */
-			SEMOP(udi->semid, sop, 2, status);
+			SEMOP(udi->semid, sop, 2, status, FORCED_WAIT);
 			if (-1 == status)			/* We couldn't get it at all.. */
 				rts_error(VARLSTCNT(5) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), errno);
 		}
@@ -533,9 +537,9 @@ void gds_rundown(void)
 		{
 			munmap((caddr_t)(csa->db_addrs[0] + ROUND_UP(SIZEOF_FILE_HDR(csa->hdr), MSYNC_ADDR_INCS)),
 			       (size_t)(munmap_len));
-#ifdef DEBUG_DB64
+#			ifdef DEBUG_DB64
 			rel_mmseg((caddr_t)csa->db_addrs[0]);
-#endif
+#			endif
 		}
 	}
 	/* Detach our shared memory while still under lock so reference counts will be
@@ -627,16 +631,6 @@ CONDITION_HANDLER(gds_rundown_ch)
 	unix_db_info	*udi;
 	sgmnt_addrs	*csa;
 	boolean_t	cancelled_timer, cancelled_dbsync_timer;
-
-	error_def(ERR_ASSERT);
-	error_def(ERR_CRITSEMFAIL);
-	error_def(ERR_DBRNDWN);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_OUTOFSPACE);
-        error_def(ERR_MEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_GTMCHECK);
-	error_def(ERR_TEXT);
 
 	START_CH;
 	/* To get as virgin a state as possible in the core, take the core now if we

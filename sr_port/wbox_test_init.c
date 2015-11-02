@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 
 void wbox_test_init(void)
 {
+#	ifdef DEBUG
 	mstr	envvar_logical, trans_name;
 	char	trans_bufr[MAX_TRANS_NAME_LEN];
 
@@ -40,4 +41,5 @@ void wbox_test_init(void)
 				gtm_white_box_test_case_count = ATOI(trans_name.addr);
 		}
 	}
+#	endif
 }

@@ -66,6 +66,7 @@ void tp_set_sgm(void)
 		si->fresh_start = FALSE;
 		assert(0 == si->update_trans);
 	}
+	DBG_CHECK_IN_FIRST_SGM_INFO_LIST(si);
 	sgm_info_ptr = si;
 	crash_count = si->crash_count;
 }

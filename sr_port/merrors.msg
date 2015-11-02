@@ -236,7 +236,7 @@ FNARGINC	<Format specifiers to $FNUMBER are incompatible: "!AD">/error/fao=2!/an
 JNLACCESS	<Error accessing journal file !AD>/error/fao=2!/ansi=0
 TRANSNOSTART	<ZTCOMMIT(s) issued without corresponding ZTSTART(s)>/error/fao=0!/ansi=44
 FNUMARG		<$FNUMBER format specifier "!AD" contains an illegal character: "!AD">/error/fao=4!/ansi=0
-FOROFLOW	<FOR commands nested too deeply>/error/fao=0!/ansi=0
+FOROFLOW	<FOR commands nested more than !UL deep on a line>/error/fao=1!/ansi=0
 YDIRTSZ		<Size of YDIRT data too large>/error/fao=0!/ansi=0
 JNLSUCCESS	<!AD successful>/success/fao=2!/ansi=0
 GBLNAME		<Either an identifier or a left parenthesis is expected after a ^ in this context>/error/fao=0!/ansi=29
@@ -332,7 +332,7 @@ RANDARGNEG	<Random number generator argument must be greater than or equal to on
 DBPRIVERR	<No privilege for attempted update operation for file: !AD>/error/fao=2!/ansi=0
 REC2BIG		<Record size (!UL) is greater than maximum (!UL) for region: !AD>/error/fao=4!/ansi=75
 RHMISSING	<Right-hand side of expression expected>/error/fao=0!/ansi=0
-RMSRDONLY	<Cannot write to read-only sequential file>/error/fao=0!/ansi=62
+DEVICEREADONLY	<Cannot write to read-only device>/error/fao=0!/ansi=62
 COLLDATAEXISTS	<Collation type cannot be changed while data exists>/error/fao=0!/ansi=0
 ROUTINEUNKNOWN	<Routine could not be found>/error/fao=0!/ansi=88
 RPARENMISSING	<Right parenthesis expected>/error/fao=0!/ansi=0
@@ -406,7 +406,7 @@ UNSDDTYPE	<Unsupported descriptor data type>/error/fao=0!/ansi=0
 ZCUNKTYPE	<External call: Unknown argument type>/error/fao=0!/ansi=0
 ZCUNKMECH	<External call: Unknown parameter-passing mechanism>/error/fao=0!/ansi=0
 ZCUNKQUAL	<External call: Unknown input qualifier>/error/fao=0!/ansi=0
-JNLDBTNNOMATCH	<Journal file !AD has beginning transaction number [0x!16@XQ], but database !AD has current transaction number [0x!16@XQ]>/error/fao=6!/ansi=0
+JNLDBTNNOMATCH	<Journal file !AD has !AD transaction number [0x!16@XQ], but database !AD has current transaction number [0x!16@XQ] and journal end transaction number [0x!16@XQ]>/error/fao=9!/ansi=0
 ZCALLTABLE	<External call Table format error>/error/fao=0!/ansi=0
 ZCARGMSMTCH	<External call: Actual argument count, !UL, is greater than formal argument count, !UL>/error/fao=2!/ansi=58
 ZCCONMSMTCH	<External call: Too many input arguments>/error/fao=0!/ansi=58
@@ -757,7 +757,7 @@ INVCTLMNE	<Invalid control mnemonics>/error/fao=0!/ansi=0
 SOCKLISTEN	<Error listening on a socket>/error/fao=0!/ansi=0
 LQLENGTHNA	<Listening queue length !UL not appropriate.  Must be between 1 and 5.>/error/fao=1!/ansi=0
 ADDRTOOLONG	<Socket address !AD of length !UL is longer than the maximum permissible length !UL>/error/fao=4!/ansi=0
-LSNCONNOTCMP	<Listen and connect are not compatible>/error/fao=0!/ansi=76
+UNUSEDMSG760	<Listen and connect are not compatible>/error/fao=0!/ansi=76
 CPBEYALLOC	<Attempt to copy beyond the allocated buffer>/error/fao=0!/ansi=0
 DBRDONLY	<Database file !AD read only>/error/fao=2!/ansi=0
 DUPTN		<Duplicate transaction found [TN = 0x!16@XQ] at offset 0x!XL in journal file !AD>/warning/fao=4!/ansi=0
@@ -1047,8 +1047,8 @@ GVQUERYGETFAIL	<Global variable QUERY and GET failed.  Failure code: !AD.>/error
 DBCREC2BIGINBLK	<A Record in block 0x!XL has a length greater than the maximum (!UL) in database !AD>/error/fao=4!/ansi=0
 MERGEDESC	<Merge operation not possible.  !AD is descendent of !AD.>/error/fao=4!/ansi=19
 MERGEINCOMPL	<Error encountered during MERGE; operation may be incomplete>/warning/fao=0!/ansi=0
-DBNAMEMISMATCH	<Database file !AZ (region !AD) referenced by shared memory (id = !SL) is not accessible>/error/fao=4!/ansi=0
-DBIDMISMATCH	<Database file !AZ id (region !AD) does not match file id in shared memory (id = !SL).  !/Ensure region is properly rundown.>/error/fao=4!/ansi=0
+DBNAMEMISMATCH	<Database file !AD points to shared memory (id = !UL) which in turn points to an inaccessible database file !AZ>/error/fao=4!/ansi=0
+DBIDMISMATCH	<Database file !AZ (region !AD) id does not match file id in shared memory (id = !UL).>/error/fao=4!/ansi=0
 DEVOPENFAIL	<Error opening !AD>/error/fao=2!/ansi=0
 IPCNOTDEL	<!AD : !AD did not delete IPC resources for region !AD>/info/fao=6!/ansi=0
 XCVOIDRET	<Attempt to return a value from function !AD, which is declared void in external call table !AD>/error/fao=4!/ansi=0
@@ -1060,7 +1060,7 @@ NORECVPOOL	<No receiver pool info found in the replication instance of !AD>/erro
 FTOKERR		<Error getting ftok of the file !AD>/error/fao=2!/ansi=0
 REPLREQRUNDOWN	<Error accessing replication instance !AD.  Must be rundown on cluster node !AD.>/error/fao=4!/ansi=0
 BLKCNTEDITFAIL	<Mupip recover or rollback failed to correct the block count field in the file header for file !AD>/info/fao=2!/ansi=0
-SEMREMOVED	<Semaphore id !SL removed from the system>/info/fao=1!/ansi=0
+SEMREMOVED	<Semaphore id !UL removed from the system>/info/fao=1!/ansi=0
 REPLINSTFMT	<Format error encountered while reading replication instance file !AD. Expected !AD. Found !AD.>/error/fao=6!/ansi=0
 SEMKEYINUSE	<Semaphore key 0x!XL is already in use (possibly by an older version)>/error/fao=1!/ansi=0
 XTRNTRANSERR	<Error attempting to generate an environment using an external algorithm>/error/fao=0!/ansi=0
@@ -1314,7 +1314,7 @@ CRYPTNOV4		<!AD is an encrypted database. Cannot downgrade(to V4) with Encryptio
 CRYPTNOMM		<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2!/ansi=0
 CRYPTJNLWRONGHASH	<Encryption key hash mismatch between journal file !AD and corresponding database file !AD>/error/fao=4!/ansi=0
 CRYPTKEYFETCHFAILED	<Cannot obtain encryption key for !AD. !AD>/error/fao=4!/ansi=0
-CRYPTKEYFETCHFAILEDNF 	<Cannot obtain encryption key. !AD>/error/fao=2!/ansi=0
+CRYPTKEYFETCHFAILEDNF	<Cannot obtain encryption key. !AD>/error/fao=2!/ansi=0
 CRYPTHASHGENFAILED	<Error generating encryption hash. !AD>/error/fao=2!/ansi=0
 CRYPTNOPSWDINTP	<Cannot prompt for password inside a TP transaction.>/error/fao=0!/ansi=0
 BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
@@ -1324,12 +1324,12 @@ STUCKACT	<Process stuck script invoked: !AD : !AD>/info/fao=4!/ansi=0
 CALLINAFTERXIT	<After a gtm_exit, a process can never create a valid GT.M context>/error/fao=0!/ansi=0
 LOCKSPACEFULL	<No room for LOCK. Use MUPIP SET to increase lock space for region !AD>/error/fao=2!/ansi=0
 IOERROR		<Error occured while doing !AD in !AD operation -- called from module !AD at line !UL>/error/fao=7!/ansi=0
-MAXSSREACHED 	<Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.>/error/fao=3!/ansi=0
+MAXSSREACHED	<Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.>/error/fao=3!/ansi=0
 SNAPSHOTNOV4	<Cannot downgrade (to V4) while snapshots are in progress. Currently !UL snapshots are in progress for region !AD.>/error/fao=3!/ansi=0
 SSV4NOALLOW	<Database snapshots are supported only on fully upgraded V5 databases. !AD has V4 format blocks.>/error/fao=2!/ansi=0
 SSTMPDIRSTAT	<Cannot access temporary directory !AD>/error/fao=2!/ansi=0
 SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested snapshot>/error/fao=2!/ansi=0
-UNUSEDMSG1332	<SSTMPFILOPEN Last used in V5.4-000A>/error/fao=0!/ansi=0
+JNLFILEDUP	<Journal files !AD and !AD are the same>/error/fao=4!/ansi=0
 SSPREMATEOF	<Premature end of file while reading block !UL of size: !UL bytes at offset: !UL from !AD>/error/fao=5!/ansi=0
 SSFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
 REGSSFAIL	<Process !UL encountered error contributing to the snapshot for region !AD - the snapshot is no longer valid>/error/fao=3!/ansi=0
@@ -1368,21 +1368,25 @@ TPLOCKRESTMAX	<Transaction restarts due to unavailability of locks not allowed i
 GBLEXPECTED	<Global variable reference expected in this context>/error/fao=0!/ansi=0
 GVZTRIGFAIL	<ZTRIGGER of a global variable failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 UNUSEDMSG1370	<ONLYLDTRIG: Last used in V5.4-001>/error/fao=0!/ansi=0
-SETINSETTRIGONLY      <ISV !AD can only be modified in a 'SET' type trigger>/error/fao=2!/ansi=0
+SETINSETTRIGONLY	<ISV !AD can only be modified in a 'SET' type trigger>/error/fao=2!/ansi=0
 DZTRIGINTRIG	<$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD>/error/fao=2!/ansi=0
-SECNODZTRIGINTP	<Sequence number 0x!16@XQ contains $ZTRIGGER() updates made inside a trasanction which the current replicating instance does not support. The replicating instance must be upgraded to at least V5.4-002 to support this type of transaction. Cannot continue>/error/fao=1!/ansi=0
+SECNODZTRIGINTP	<Sequence number 0x!16@XQ contains $ZTRIGGER() updates made inside a transaction which the current replicating instance does not support. The replicating instance must be upgraded to at least V5.4-002 to support this type of transaction. Cannot continue>/error/fao=1!/ansi=0
 BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression>/warning/fao=0!/ansi=0
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
-WRITEWAITPID   <PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
+WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
 REPLNOXENDIAN	<!AD side is running on a GT.M version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
 ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
-FORCTRLINDX	<Using a FOR with an indexed control variable that's assigned values calculated in extrinsics is not currently safe>/error/fao=0!/ansi=0
+UNUSEDMSG1382	<FORCTRLINDX: Only used in V5.4-002>/error/fao=0!/ansi=0
 ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/error/fao=0!/ansi=0
-ZCINVALIDKEYWORD  <External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
+ZCINVALIDKEYWORD	<External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
 REPLNOMULTILINETRG	<Sequence number 0x!16@XQ contains a trigger definition too large for transmission to the current replicating instance, which does not support multi-line triggers - stopping replication>/error/fao=1!/ansi=0
+DBSHMNAMEDIFF	<Database file !AD points to shared memory (id = !UL) which points to a different database file !AZ>/error/fao=4!/ansi=0
+SHMREMOVED	<Shared Memory id !UL removed from the system>/info/fao=1!/ansi=0
+DEVICEWRITEONLY	<Cannot read from a write-only device>/error/fao=0!/ansi=0
+ICUERROR	<ICU returned status !UL which is either unrecognized or inconsistent with the operating context>/error/fao=1!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

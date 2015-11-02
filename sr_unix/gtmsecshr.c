@@ -52,6 +52,7 @@
 #include "gt_timer.h"
 #include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
+#include "eintr_wrapper_semop.h"
 #include "gtmimagename.h"
 #include "util.h"
 #include "send_msg.h"
@@ -67,6 +68,7 @@
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
+#include "fork_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -97,6 +99,38 @@ void gtmsecshr_timer_handler(void);
 void gtmsecshr_signal_handler(int sig, siginfo_t *info, void *context);
 ZOS_ONLY(boolean_t gtm_tag_error(char *filename, int realtag, int desiredtag);)
 
+error_def(ERR_ASSERT);
+error_def(ERR_BADTAG);
+error_def(ERR_DBFILOPERR);
+error_def(ERR_DBNOTGDS);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMCHECK);
+error_def(ERR_GTMSECSHR);
+error_def(ERR_GTMSECSHRCHDIRF);
+error_def(ERR_GTMSECSHRDEFLOG);
+error_def(ERR_GTMSECSHRFORKF);
+error_def(ERR_GTMSECSHRLOGF);
+error_def(ERR_GTMSECSHRLOGSWH);
+error_def(ERR_GTMSECSHROPCMP);
+error_def(ERR_GTMSECSHRRECVF);
+error_def(ERR_GTMSECSHRSCKSEL);
+error_def(ERR_GTMSECSHRSENDF);
+error_def(ERR_GTMSECSHRSGIDF);
+error_def(ERR_GTMSECSHRSOCKET);
+error_def(ERR_GTMSECSHRSRVF);
+error_def(ERR_GTMSECSHRSRVFID);
+error_def(ERR_GTMSECSHRSRVFIL);
+error_def(ERR_GTMSECSHRSSIDF);
+error_def(ERR_GTMSECSHRSTART);
+error_def(ERR_GTMSECSHRSUIDF);
+error_def(ERR_GTMSECSHRTMOUT);
+error_def(ERR_GTMSECSHRTMPPATH);
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_MEMORY);
+error_def(ERR_OUTOFSPACE);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_TEXT);
+
 /* Note that this condition handler is not really properly setup as a condition handler
    in that it has none of the required condition handler macros in it. It's job is just
    to perform shutdown logic when it is called. No further handlers are called hence
@@ -104,13 +138,6 @@ ZOS_ONLY(boolean_t gtm_tag_error(char *filename, int realtag, int desiredtag);)
 */
 CONDITION_HANDLER(gtmsecshr_cond_hndlr)
 {
-	error_def(ERR_ASSERT);
-	error_def(ERR_GTMASSERT);
-	error_def(ERR_GTMCHECK);
-        error_def(ERR_MEMORY);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_OUTOFSPACE);
-
 	gtmsecshr_exit(arg, DUMPABLE ? TRUE : FALSE);
 }
 
@@ -164,14 +191,6 @@ int main(void)
 	struct timeval		input_timeval;
 	gtmsecshr_mesg		mesg;
 	DCL_THREADGBL_ACCESS;
-
-	error_def(ERR_GTMSECSHR);
-	error_def(ERR_GTMSECSHRSCKSEL);
-	error_def(ERR_GTMSECSHRTMOUT);
-	error_def(ERR_GTMSECSHRRECVF);
-	error_def(ERR_GTMSECSHRSENDF);
-	error_def(ERR_GTMSECSHRSTART);
-	error_def(ERR_TEXT);
 
 	GTM_THREADGBL_INIT;
 	gtm_imagetype_init(GTMSECSHR_IMAGE); /* Side-effect : Sets skip_dbtriggers to TRUE for trigger non-supporting platforms */
@@ -297,18 +316,6 @@ void gtmsecshr_init(void)
 	int		lib_gid;
 	struct stat	dist_stat_buff;
 
-	error_def(ERR_GTMSECSHRSTART);
-	error_def(ERR_GTMSECSHRSRVF);
-	error_def(ERR_GTMSECSHRSUIDF);
-	error_def(ERR_GTMSECSHRSGIDF);
-	error_def(ERR_GTMSECSHRSSIDF);
-	error_def(ERR_GTMSECSHRFORKF);
-	error_def(ERR_GTMSECSHROPCMP);
-	error_def(ERR_GTMSECSHRSOCKET);
-	error_def(ERR_TEXT);
-	error_def(ERR_GTMSECSHRTMPPATH);
-	error_def(ERR_GTMSECSHRCHDIRF);
-
 	process_id = getpid();
 	set_blocksig();
 	if (-1 == setuid(ROOTUID))
@@ -325,7 +332,8 @@ void gtmsecshr_init(void)
 				ERR_GTMSECSHRSSIDF, 0, save_errno);
 	}
 	gtmsecshr_open_log_file();
-	if (0 > (pid = fork()))
+	DO_FORK(pid);
+	if (0 > pid)
 	{
 		save_errno = errno;
 		send_msg(VARLSTCNT(8) ERR_GTMSECSHRSTART, 3, RTS_ERROR_LITERAL("Server"), process_id,
@@ -333,7 +341,7 @@ void gtmsecshr_init(void)
 		gtm_putmsg(VARLSTCNT(8) ERR_GTMSECSHRSTART, 3, RTS_ERROR_LITERAL("Server"), process_id,
 			ERR_GTMSECSHRFORKF, 0, save_errno);
 		exit (GNDCHLDFORKFLD);
-	} else if (0 != pid)
+	} else if (0 < pid)
 		exit(0);
 	process_id = getpid();
 	GET_CUR_TIME;
@@ -378,7 +386,7 @@ void gtmsecshr_init(void)
 	sop[1].sem_num = 0;
 	sop[1].sem_op = 1;
 	sop[1].sem_flg  = IPC_NOWAIT | SEM_UNDO;
-	SEMOP(secshr_sem, sop, 2, semop_res);
+	SEMOP(secshr_sem, sop, 2, semop_res, NO_WAIT);
 	if (0 > semop_res)
 	{
 		send_msg(VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
@@ -464,14 +472,9 @@ int gtmsecshr_open_log_file (void)
 	int     	save_errno = 0, status;
 	char    	gtmsecshr_path[MAX_TRANS_NAME_LEN], *error_mesg;
 	mstr    	gtmsecshr_lognam, gtmsecshr_transnam;
-#ifdef __MVS__
+#	ifdef __MVS__
 	int		create_logfile = 0, realfiletag;
-#endif
-
-	error_def(ERR_GTMSECSHRDEFLOG);
-	error_def(ERR_GTMSECSHRLOGF);
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_TEXT);
+#	endif
 
 	gtmsecshr_lognam.addr = GTMSECSHR_LOG_DIR;
 	gtmsecshr_lognam.len = SIZEOF(GTMSECSHR_LOG_DIR) - 1;
@@ -506,7 +509,7 @@ int gtmsecshr_open_log_file (void)
 	if (gtmsecshr_logpath[gtmsecshr_logpath_len - 1] != '/')
 		gtmsecshr_logpath[gtmsecshr_logpath_len++] = '/';
 	strcpy(gtmsecshr_logpath + gtmsecshr_logpath_len , GTMSECSHR_LOG_PREFIX);
-#if defined(__MVS__)
+#	if defined(__MVS__)
 	if (-1 == Stat(gtmsecshr_logpath, &buf))
 		create_logfile = 1;
 #endif
@@ -517,7 +520,7 @@ int gtmsecshr_open_log_file (void)
 				ERR_TEXT, 2, RTS_ERROR_STRING(gtmsecshr_logpath), errno);
 		exit(UNABLETOOPNLOGFILEFTL);
 	}
-#if defined(__MVS__)
+#	if defined(__MVS__)
 	if ((1 == create_logfile) && (-1 == gtm_zos_set_tag(gtmsecshr_log_file, TAG_EBCDIC, TAG_TEXT, TAG_FORCE, &realfiletag)))
 			gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_EBCDIC);
 	else if (!gtm_zos_autocvt_enabled())
@@ -556,9 +559,6 @@ void gtmsecshr_switch_log_file(int sig)
 	int		newname_len, suffix, save_errno, temp_fd, rc;
 	ZOS_ONLY(int	realfiletag;)
 
-	error_def(ERR_TEXT);
-	error_def(ERR_GTMSECSHRLOGSWH);
-
 	assert((SIGHUP == sig) || (0 == sig)); 	/* sig could be either SIGHUP or 0 */
 	assert((SIGHUP == sig) || (!ready_to_switch_log_file));
 
@@ -594,7 +594,7 @@ void gtmsecshr_switch_log_file(int sig)
 	if ((-1 == RENAME(gtmsecshr_logpath, &newname[0]))
 		|| (FD_INVALID == (temp_fd = OPEN3(gtmsecshr_logpath, O_RDWR | O_CREAT | O_APPEND, GTMSECSHR_PERMS)))
 		|| (-1 == dup2(temp_fd, gtmsecshr_log_file))
-#if defined(__MVS__)
+#	if defined(__MVS__)
 		|| (-1 == gtm_zos_set_tag(temp_fd, TAG_EBCDIC, TAG_TEXT, TAG_FORCE, &realfiletag)
 		    && gtm_tag_error(gtmsecshr_logpath, realfiletag, TAG_EBCDIC))
 		|| ((!gtm_zos_autocvt_enabled()) && ((-1 == gtm_zos_tag_to_policy(gtmsecshr_log_file, TAG_UNTAGGED, &realfiletag))
@@ -660,13 +660,6 @@ int service_request(gtmsecshr_mesg *buf)
 	struct shmid_ds		temp_shmctl_buf;
 	struct stat		statbuf;
 	sgmnt_data		header;
-
-	error_def(ERR_DBFILOPERR);
-	error_def(ERR_DBNOTGDS);
-	error_def(ERR_GTMSECSHRSRVF);
-	error_def(ERR_GTMSECSHRSRVFID);
-	error_def(ERR_GTMSECSHRSRVFIL);
-	error_def(ERR_TEXT);
 
 	GET_CUR_TIME;
 	save_code = buf->code;
@@ -874,8 +867,6 @@ int service_request(gtmsecshr_mesg *buf)
 #ifdef __MVS__
 boolean_t gtm_tag_error(char *filename, int realtag, int desiredtag)
 {
-	error_def(ERR_TEXT);
-	error_def(ERR_BADTAG);
 	char *errmsg = STRERROR(errno);
 	send_msg(VARLSTCNT(10) ERR_BADTAG, 4, LEN_AND_STR(filename), realtag,
 			desiredtag, ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +42,10 @@
 GBLREF gd_region        *gv_cur_region;
 GBLREF boolean_t	need_no_standalone;
 
+error_def(ERR_BADTAG);	/* Need for TAG_POLICY macro */
+error_def(ERR_JNLFILNOTCHG);
+error_def(ERR_TEXT);	/* Need for TAG_POLICY macro */
+
 int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 {
 	int 		jnl_fd, status;
@@ -50,14 +54,7 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 	char		*errptr;
 	int		save_no;
 	int		rc;
-#ifdef __MVS__
-	int realfiletag;
-	/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
-	error_def(ERR_TEXT);
-	error_def(ERR_BADTAG);
-#endif
-
-	error_def(ERR_JNLFILNOTCHG);
+	ZOS_ONLY(int 	realfiletag;)
 
 	OPENFILE(jnl_fname, O_RDWR, jnl_fd);
 	if (FD_INVALID == jnl_fd)
@@ -109,6 +106,6 @@ int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 		return((int4)ERR_JNLFILNOTCHG);
 	}
 	if (!need_no_standalone)
-		db_ipcs_reset(gv_cur_region, FALSE);
+		db_ipcs_reset(gv_cur_region);
 	return SS_NORMAL;
 }

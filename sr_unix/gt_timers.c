@@ -141,6 +141,8 @@ GBLREF	int		process_exiting;
 
 static void (*safe_handlers[])() = {hiber_wake, wake_alarm , NULL};
 
+error_def(ERR_TIMERHANDLER);
+
 /*
  * --------------------------------------
  * Uninitialize timers and signals
@@ -474,6 +476,24 @@ void cancel_timer(TID tid)
 	sigprocmask(SIG_SETMASK, &savemask, NULL);
 }
 
+/*
+ * ---------------------------------------------
+ * Clear the timers' state for the forked-off process.
+ * ---------------------------------------------
+ */
+void clear_timers(void)
+{
+	sigset_t savemask;
+
+	/* block SIGALRM signal */
+	sigprocmask(SIG_BLOCK, &blockalrm, &savemask);
+	while (timeroot)
+		remove_timer(timeroot->tid);
+	timer_in_handler = FALSE;
+	timer_active = FALSE;
+	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	return;
+}
 
 /*
  * ----------------------------------------------------
@@ -818,7 +838,6 @@ STATICFNDEF void cancel_all_timers(void)
 STATICFNDEF void	init_timers()
 {
 	struct sigaction	act;
-	error_def(ERR_TIMERHANDLER);
 
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
@@ -858,8 +877,6 @@ void	check_for_timer_pops()
 	struct sigaction current_sa;
 	static char *whenstolen[] = {"check_for_timer_pops",
 				     "check_for_timer_pops first time"};
-
-	error_def(ERR_TIMERHANDLER);
 
 	sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
 	if (!first_timeset)

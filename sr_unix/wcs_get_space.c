@@ -44,10 +44,13 @@ GBLDEF	int4			get_space_fail_arridx;	/* gbldefed to be accessilbe in a pro core 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;	/* needed for the JNL_ENSURE_OPEN_WCS_WTSTART macro */
-GBLREF	boolean_t		gtm_environment_init;
 GBLREF	int			num_additional_processors;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		fast_lock_count;
+
+error_def(ERR_DBFILERR);
+error_def(ERR_WAITDSKSPACE);
+error_def(ERR_GBLOFLOW);
 
 #define	WCS_CONFLICT_TRACE_ARRAYSIZE	64
 #define	LCNT_INTERVAL			DIVIDE_ROUND_UP(UNIX_GETSPACEWAIT, WCS_CONFLICT_TRACE_ARRAYSIZE)
@@ -57,7 +60,7 @@ GBLREF	volatile int4		fast_lock_count;
 	assert(FALSE);			/* We have failed */				\
 	get_space_fail_cr = CR;								\
 	get_space_fail_array = TRACEARRAY;						\
-	if (gtm_environment_init)							\
+	if (TREF(gtm_environment_init))							\
 		gtm_fork_n_core();	/* take a snapshot in case running in-house */	\
 	return FALSE;									\
 }
@@ -97,11 +100,9 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
 	boolean_t		is_mm;
 	cache_rec		cr_contents;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_DBFILERR);
-	error_def(ERR_WAITDSKSPACE);
-	error_def(ERR_GBLOFLOW);
-
+	SETUP_THREADGBL_ACCESS;
 	assert((0 != needed) || (NULL != cr));
 	get_space_fail_arridx = 0;
 	csa = &FILE_INFO(reg)->s_addrs;

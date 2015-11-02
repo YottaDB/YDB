@@ -146,6 +146,36 @@ GBLREF	uint4		mutex_per_process_init_pid;
 LITREF char             gtm_release_name[];
 LITREF int4             gtm_release_name_len;
 
+error_def(ERR_BACKUPCTRL);
+error_def(ERR_DBCCERR);
+error_def(ERR_DBFILERR);
+error_def(ERR_DBRDONLY);
+error_def(ERR_ERRCALL);
+error_def(ERR_FILEEXISTS);
+error_def(ERR_FILEPARSE);
+error_def(ERR_FREEZECTRL);
+error_def(ERR_JNLDISABLE);
+error_def(ERR_JNLFNF);
+error_def(ERR_JNLPOOLSETUP);
+error_def(ERR_JNLSTATE);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUNOSTRMBKUP);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_NOTRNDMACC);
+error_def(ERR_PREVJNLLINKCUT);
+error_def(ERR_REPLJNLCNFLCT);
+error_def(ERR_REPLPOOLINST);
+error_def(ERR_REPLSTATE);
+error_def(ERR_REPLSTATEERR);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+error_def(ERR_JNLCREATE);
+error_def(ERR_JNLNOCREATE);
+error_def(ERR_MUSELFBKUP);
+error_def(ERR_KILLABANDONED);
+error_def(ERR_BACKUPKILLIP);
+
 static char	* const jnl_parms[] =
 {
 	"DISABLE",
@@ -259,35 +289,6 @@ void mupip_backup(void)
 	ZOS_ONLY(int		realfiletag;)
 	uint4			*kip_pids_arr_ptr;
 
-	error_def(ERR_BACKUPCTRL);
-	error_def(ERR_DBCCERR);
-	error_def(ERR_DBFILERR);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_ERRCALL);
-	error_def(ERR_FILEEXISTS);
-	error_def(ERR_FILEPARSE);
-	error_def(ERR_FREEZECTRL);
-	error_def(ERR_JNLDISABLE);
-	error_def(ERR_JNLFNF);
-	error_def(ERR_JNLPOOLSETUP);
-	error_def(ERR_JNLSTATE);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_MUNOSTRMBKUP);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_NOTRNDMACC);
-	error_def(ERR_PREVJNLLINKCUT);
-	error_def(ERR_REPLJNLCNFLCT);
-	error_def(ERR_REPLPOOLINST);
-	error_def(ERR_REPLSTATE);
-	error_def(ERR_REPLSTATEERR);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_TEXT);
-	error_def(ERR_JNLCREATE);
-	error_def(ERR_JNLNOCREATE);
-	error_def(ERR_MUSELFBKUP);
-	error_def(ERR_KILLABANDONED);
-	error_def(ERR_BACKUPKILLIP);
 	ZOS_ONLY(error_def(ERR_BADTAG);)
 
 	/* ==================================== STEP 1. Initialization ======================================= */
@@ -1253,6 +1254,7 @@ repl_inst_bkup_done:
 							if (newjnlfiles_specified && sync_io_specified)
 								cs_data->jnl_sync_io = sync_io;
 							cs_data->jnl_checksum = jnl_info.checksum;
+							cs_data->jnl_eovtn = cs_data->trans_hist.curr_tn;
 							gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
 								LEN_AND_LIT("region"), REG_LEN_STR(gv_cur_region),
 								LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));

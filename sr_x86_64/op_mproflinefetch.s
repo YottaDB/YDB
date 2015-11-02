@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,8 +28,6 @@
 .extern	stack_leak_check
 .extern pcurrpos
 
-MPR_LINEFETCH	=	0x4
-
 # PUBLIC	op_mproflinefetch
 ENTRY op_mproflinefetch
 	movq	frame_pointer(REG_IP),REG64_ACCUM
@@ -37,7 +35,6 @@ ENTRY op_mproflinefetch
 	movq    REG_PV, msf_ctxt_off(REG64_ACCUM)
 	movb    $0,REG8_ACCUM             # variable length argument
 	call	gtm_fetch
-	movl 	$MPR_LINEFETCH,REG32_ARG0
 	call	pcurrpos
 	call	stack_leak_check
 	movq	frame_pointer(REG_IP),REG64_ACCUM

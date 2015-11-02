@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,9 +40,14 @@
 #include "gtm_startup_chk.h"
 #include "gtmimagename.h"
 
-GBLREF	boolean_t		gtm_environment_init;
-
 LITREF	gtmImageName		gtmImageNames[];
+
+error_def(ERR_DISTPATHMAX);
+error_def(ERR_SYSCALL);
+error_def(ERR_GTMDISTUNDEF);
+error_def(ERR_FILEPARSE);
+error_def(ERR_MAXGTMPATH);
+error_def(ERR_IMAGENAME);
 
 int gtm_chk_dist(char *image)
 {
@@ -54,13 +59,6 @@ int gtm_chk_dist(char *image)
 	int		status;
 	char 		mbuff[MAX_FBUFF + 1];
 	parse_blk	pblk;
-
-	error_def(ERR_DISTPATHMAX);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_GTMDISTUNDEF);
-	error_def(ERR_FILEPARSE);
-	error_def(ERR_MAXGTMPATH);
-	error_def(ERR_IMAGENAME);
 
 	if (NULL != (ptr1 = (char *)GETENV(GTM_DIST)))
 	{

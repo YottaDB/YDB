@@ -1611,5 +1611,6 @@ enum
 #define MAX_GVSUBSCRIPTS 32
 #define MAX_LVSUBSCRIPTS 32
 #define MAX_INDSUBSCRIPTS 32
+#define MAX_FOR_STACK 32
 
 #endif /* MDEF_included */

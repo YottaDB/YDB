@@ -109,6 +109,7 @@ typedef struct
 {
 	boolean_t	fixed;		/* Fixed format file */
 	boolean_t	noread;
+	boolean_t	write_only;	/* WRITEONLY specified */
 	boolean_t	stream;
 	boolean_t	fifo;
 	boolean_t	pipe;		/* True if pipe device */

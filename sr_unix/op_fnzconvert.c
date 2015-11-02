@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@ GBLREF	casemap_t	casemaps[];
 
 error_def(ERR_BADCASECODE);
 error_def(ERR_BADCHSET);
+error_def(ERR_ICUERROR);
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_INVFCN);
 error_def(ERR_TEXT);
@@ -79,11 +80,17 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		{ /* Fake the conversion from UTF-8 to UTF-16 to compute the required number of UChars */
 			status = U_ZERO_ERROR;
 			u_strFromUTF8(NULL, 0, &src_ustr_len, src->str.addr, src->str.len, &status);
-			if (U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status)
-			{ /* Since there is no ustring.h API to return the actual illegal sequence,
-			     we need to search the UTF-8 source to identify the BADCHAR sequence */
-				utf8_len_strict((unsigned char *)src->str.addr, src->str.len);
-				GTMASSERT; /* should never reach here */
+			if (U_FAILURE(status))
+			{	/* Since there is no ustring.h API to return the actual illegal sequence,
+				 * we need to search the UTF-8 source to identify the BADCHAR sequence
+				 * might get buffer overflow on the way to ensuring enough space
+				 */
+				if (U_FAILURE(status) && (U_BUFFER_OVERFLOW_ERROR != status))
+				{
+					if (U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status)
+						utf8_len_strict((unsigned char *)src->str.addr, src->str.len);
+					rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status);	/* ICU said bad, we say good */
+				}
 			}
 			src_ustr_ptr = (UChar*)malloc(src_ustr_len * SIZEOF(UChar));
 		}
@@ -95,7 +102,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			RELEASE_IF_NOT_LOCAL(src_ustr_ptr, src_ustr);
 			if (U_ILLEGAL_CHAR_FOUND == status || U_INVALID_CHAR_FOUND == status)
 				utf8_len_strict((unsigned char *)src->str.addr, src->str.len);	/* to report BADCHAR error */
-			GTMASSERT;
+			rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status); /* ICU said bad, we say good or don't recognize error*/
 		}
 		/* Next, fake conversion to compute the required buffer size (aka preflighting in ICU) */
 		status = U_ZERO_ERROR;
@@ -125,7 +132,9 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		dstbase = (char *)stringpool.free;
 		status = U_ZERO_ERROR;
 		u_strToUTF8(dstbase, dstlen, &ulen, dst_ustr_ptr, dst_chlen, &status);
-		if (U_FAILURE(status) || ulen != dstlen)
+		if (U_FAILURE(status))
+			rts_error(VARLSTCNT(3) ERR_ICUERROR, 1, status); /* ICU said bad, but same call above just returned OK */
+		if (ulen != dstlen)
 			GTMASSERT;
 		RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
 	}

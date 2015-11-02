@@ -33,8 +33,9 @@ GBLREF	gd_binding	*gd_map;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
-GBLREF	sgm_info	*sgm_info_ptr;
 GBLREF	spdesc		stringpool;
+GBLREF  uint4           dollar_tlevel;
+GBLREF	sgm_info	*first_sgm_info, *sgm_info_ptr;
 
 void op_gvsavtarg(mval *v)
 {
@@ -80,11 +81,15 @@ void op_gvsavtarg(mval *v)
 	/* Now we are going to fill in the structure fields most of which are pointer fields (size upto 8-byte).
 	 * This is why we ensure 8-byte alignment of c before typecasting it into gvsavtarg.
 	 */
+	DEBUG_ONLY(
+		assert(!dollar_tlevel || (NULL != first_sgm_info) || (NULL == sgm_info_ptr));
+		if (dollar_tlevel && (NULL != sgm_info_ptr))
+			DBG_CHECK_IN_FIRST_SGM_INFO_LIST(sgm_info_ptr);
+	)
 	gvsavtarg->gd_targ_addr = TREF(gd_targ_addr);
 	gvsavtarg->gd_map = gd_map;
 	gvsavtarg->gv_cur_region = gv_cur_region;
 	gvsavtarg->gv_target = gv_target;
-	gvsavtarg->sgm_info_ptr = sgm_info_ptr;
 	gvsavtarg->gv_last_subsc_null = TREF(gv_last_subsc_null);
 	gvsavtarg->gv_some_subsc_null = TREF(gv_some_subsc_null);
 	gvsavtarg->prev = gv_currkey->prev;

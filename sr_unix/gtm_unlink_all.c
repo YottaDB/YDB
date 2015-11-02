@@ -91,8 +91,11 @@ void gtm_unlink_all(void)
 	/* Step 4: Unlink all routines (including triggers) , remove $TEXT cache and remove breakpoints.
 	 * Note that for the purposes of this section, there is no difference between normal routines and trigger routines.
 	 * Both are being removed completely so the code below is a hodgepodge of code from zlput_rname and gtm_triger_cleanup().
+	 * Note process in reverse order so we can move rtn_names_end up leaving processed entries (whose keys no longer work)
+	 * off the end of the table without moving anything. This is necessary because removing ZBREAK points can call
+	 * find_rtn_hdr so this table needs to remain in a usable state while we are doing this.
 	 */
-	for (rtab = rtn_names + 1; rtab <= rtn_names_end; rtab++)
+	for (rtab = rtn_names_end; rtab > rtn_names; rtab--, rtn_names_end = rtab)
 	{	/* [0] is not used (for some reason) */
 		rtnhdr = rtab->rt_adr;
 		zr_remove(rtnhdr, FALSE);		/* Remove all breakpoints in this routine */
@@ -107,8 +110,7 @@ void gtm_unlink_all(void)
 			key.var_name = rtab->rt_name;
 			COMPUTE_HASH_MNAME(&key);
 			if (NULL != (tabent_mname = lookup_hashtab_mname(TADR(rt_name_tbl), &key)) && tabent_mname->value)
-			{
-				/* Entries and source are malloc'd in two blocks on UNIX */
+			{	/* Entries and source are malloc'd in two blocks on UNIX */
 				src_tbl = (routine_source *)tabent_mname->value;
 				if (NULL != src_tbl->srcbuff)
 					free(src_tbl->srcbuff);
@@ -140,8 +142,8 @@ void gtm_unlink_all(void)
 			free(rtnhdr->literal_adr);				/* R/W releasable section part 1 */
 			free(rtnhdr->linkage_adr);				/* R/W releasable section part 2 */
 			free(rtnhdr->labtab_adr);				/* Usually non-releasable but triggers don't have
-										 *labels so this is just cleaning up a dangling
-										 *null malloc */
+										 * labels so this is just cleaning up a dangling
+										 * null malloc */
 			/* Run the chain of old (replaced) versions freeing them also */
 			for (rhdr = OLD_RHEAD_ADR(rtnhdr); NULL != rhdr; rhdr = next_rhdr)
 			{
@@ -159,11 +161,11 @@ void gtm_unlink_all(void)
 			 * going away which will cause problems with any local variables or environment varspointing to these
 			 * literals.
 			 *
-			 * In this format, the only platform we support currently is Linux-x86 (i386) which uses GTM_TEXT_ALLOC
+			 * In this format, the only platform we support currently is Linux-x86 (i386) which uses GTM_TEXT_ALLOC()
 			 * to allocate special storage for it to put executable code in. We can access the storage header for
 			 * this storage and find out how big it is and use that information to give stp_move a good range since
 			 * the literal segment occurs right at the end of allocated storage (for which there is no pointer
-			 * in the fileheader).
+			 * in the fileheader). (Note we allow CYGWIN in here too but it has not been tested at this time)
 			 */
 			telem = (textElem *)((char *)rtnhdr - offsetof(textElem, userStorage));
 			assert(TextAllocated == telem->state);

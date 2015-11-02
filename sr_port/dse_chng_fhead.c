@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,12 @@ GBLREF	uint4		process_id;
 GBLREF	uint4		image_count;
 LITREF	char		*gtm_dbversion_table[];
 
+error_def(ERR_FREEZE);
+error_def(ERR_BLKSIZ512);
+error_def(ERR_DBRDONLY);
+error_def(ERR_SIZENOTVALID8);
+error_def(ERR_FREEZECTRL);
+
 #define	CLNUP_CRIT					\
 {							\
 	if (!was_crit)					\
@@ -88,12 +94,6 @@ void dse_chng_fhead(void)
 		char	hash_buff[GTMCRYPT_HASH_LEN];
 		int	crypt_status;
 	)
-
-	error_def(ERR_FREEZE);
-	error_def(ERR_BLKSIZ512);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_SIZENOTVALID8);
-	error_def(ERR_FREEZECTRL);
 
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -457,6 +457,8 @@ void dse_chng_fhead(void)
 		cs_addrs->hdr->n_wrt_per_flu = x;
 	if ((CLI_PRESENT == cli_present("TRIGGER_FLUSH")) && (cli_get_int("TRIGGER_FLUSH", &x)))
 		cs_addrs->hdr->flush_trigger = x;
+	if ((CLI_PRESENT == cli_present("GOT2V5ONCE")) && (cli_get_int("GOT2V5ONCE", &x)))
+                cs_addrs->hdr->db_got_to_v5_once = (boolean_t)x;
 	change_fhead_timer("STALENESS_TIMER", cs_addrs->hdr->staleness, 5000, TRUE);
 	change_fhead_timer("TICK_INTERVAL", cs_addrs->hdr->ccp_tick_interval, 100, TRUE);
 	change_fhead_timer("QUANTUM_INTERVAL", cs_addrs->hdr->ccp_quantum_interval, 1000, FALSE);

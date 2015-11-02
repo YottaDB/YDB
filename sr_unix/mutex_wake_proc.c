@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,13 +27,16 @@
 #include "eintr_wrappers.h"
 #include "is_proc_alive.h"
 #include "send_msg.h"
+#include "gtmsecshr.h"
+#ifdef DEBUG
+#include "wbox_test_init.h"
+#endif
 
 error_def(ERR_MUTEXERR);
 error_def(ERR_TEXT);
 error_def(ERR_SYSCALL);
 
 #ifndef MUTEX_MSEM_WAKE
-
 GBLREF int			mutex_sock_fd;
 GBLREF struct sockaddr_un	mutex_wake_this_proc;
 GBLREF int 			mutex_wake_this_proc_len;
@@ -63,6 +66,14 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 	       (char *)pid2ascx(mutex_wake_this_proc_str, *pid));
 	msg.pid = process_id;
 	msg.mutex_wake_instance = mutex_wake_instance;
+#	ifdef DEBUG
+	if (gtm_white_box_test_case_enabled
+		&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number))
+	{
+		FPRINTF(stderr, "PATH TO SOCKET IS\n%s\n", mutex_wake_this_proc.sun_path);
+		LONG_SLEEP(20);
+	}
+#	endif
 	/* We have seen an issue where the sendto() call done below blocked for at least more than a minute. The only reason
 	 * we know of this can happen is if the TCPIP buffer on the receiving end of the pipe is already full. But as long as
 	 * the receiving side is waiting for this wakeup message, it should be in a loop clearing the incoming messages thereby
@@ -73,8 +84,7 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 	 * non-blocking sendto would send as much bytes as possible before things would block). For now, the only platform
 	 * that use this wakeup scheme is Linux and that is almost transitioning to using memory-semaphores. The blocking
 	 * sendto() issue is therefore not considered critical at this moment. This might need to be revisited in case this
-	 * code starts to get used again. -- nars - 2008/01/15.
-	 */
+	 * code starts to get used again. -- nars - 2008/01/15. */
 	SENDTO_SOCK(mutex_sock_fd, (char *)&msg, SIZEOF(msg), 0, (struct sockaddr *)&mutex_wake_this_proc,
 		mutex_wake_this_proc_len, sendto_res);
 	if (0 > sendto_res)
@@ -83,9 +93,22 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 		 */
 		status = errno;
 		assert(0 != *pid);
+		/* if the other process could not be woken up with SENDTO_SOCK due to permissions issue,
+		 * try continue_proc() before erroring out */
+		if (EACCES == status)
+			continue_proc(*pid);
+#		ifdef DEBUG
+		if (gtm_white_box_test_case_enabled
+			&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number))
+		{
+			FPRINTF(stderr, "CALLED CONTINUE_PROC() ON THE OTHER PROCESS\n");
+			LONG_SLEEP(20);
+		}
+#		endif
+		/* check if the process is still hung; if so, signal an error */
 		if ((sendto_fail_pid == *pid) && is_proc_alive(*pid, 0))
 		{
-			SPRINTF(sendtomsg, "sendto() to pid [%d]", *pid);
+			SNPRINTF(sendtomsg, ARRAYSIZE(sendtomsg), "sendto() to pid [%d]", *pid);
 			send_msg(VARLSTCNT(10) ERR_MUTEXERR, 0, ERR_SYSCALL, 5, LEN_AND_STR(sendtomsg), CALLFROM, status);
 			assert(FALSE);
 		}
@@ -105,7 +128,6 @@ mutex_wake_proc(msemaphore *mutex_wake_msem_ptr)
 {
 	/* Unlock the memsem to wake the proc waiting on it */
 	int	rc;
-
 	/*
 	 * CAUTION : man pages on beowulf and hrothgar do not
 	 * mention anything about msem_unlock being interrupted.
@@ -118,7 +140,6 @@ mutex_wake_proc(msemaphore *mutex_wake_msem_ptr)
 	/*
 	 * Additonal note: this was converted to an EINTR wrapper macro.
 	 */
-
 	do
 	{
 		rc = MSEM_UNLOCK(mutex_wake_msem_ptr);

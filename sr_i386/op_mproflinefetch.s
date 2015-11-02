@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,17 +28,13 @@
 .extern	stack_leak_check
 .extern pcurrpos
 
-MPR_LINEFETCH	=	0x4
-
 # PUBLIC	op_mproflinefetch
 ENTRY op_mproflinefetch
 	movl	frame_pointer,%eax
 	popl	msf_mpc_off(%eax)
 	call	gtm_fetch
-	pushl	$MPR_LINEFETCH
 	call	pcurrpos
-	addl 	$4,%esp
-	popl	%eax
+	popl	%eax		# popping generated code args off stack before leak check
 	leal	(%esp,%eax,4),%esp
 	call	stack_leak_check
 	movl	frame_pointer,%eax

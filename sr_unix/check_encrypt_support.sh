@@ -25,7 +25,7 @@ if [ "OSF1" = "$hostos" -o \( "HP-UX" = "$hostos" -a "ia64" != `uname -m` \) ]; 
 	exit 0
 fi
 
-lib_search_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib"
+lib_search_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib /usr/lib/x86_64-linux-gnu"
 include_search_path="/usr/include /usr/local/include /usr/local/include/gpgme"
 bin_search_path="/usr/bin /usr/local/bin /bin"
 
@@ -101,10 +101,19 @@ do
 	fi
 done
 
+hostname=`uname -n | awk -F. '{print $1}'`
 if [ $found_headers = "TRUE" -a $found_libs = "TRUE" -a $found_bins = "TRUE" ];then
+#	We want to keep at least one server without support for encryption.  So if it send a warning if it is not the case.
+	non_encrypt_other_servers="dincern"
+	echo $non_encrypt_other_servers | grep -w $hostname > /dev/null
+	if [ $? -eq 0 ]; then
+		errmsg="This system should not supports encryption, but it does.\n"
+		echo $errmsg | mailx -s \
+			"ENCRYPTSUPPORTED-W-WARNING : Server $hostname will build encryption plugin (but should not)" \
+		 	gglogs
+	fi
 	echo "TRUE"
 else
-	hostname=`uname -n | awk -F. '{print $1}'`
 # 	These are distribution servers that support encryption. If can't build encryption plugin send error.
 	encrypt_dist_servers="charybdis jackal pfloyd snail atllita1 atlhxit1 sagaloo"
 	echo $encrypt_dist_servers | grep -w $hostname > /dev/null
@@ -117,7 +126,8 @@ else
 	fi
 #	There are servers that can support encryption. If can't build encryption plugin send warning.
 	encrypt_other_servers="scylla mlnlit1 lespaul atlst2000 turtle atllita2 atlhxit2 sagapaneer"
-	encrypt_other_servers="$encrypt_other_servers rajamanin kishoreh johnsons shaha maimoneb"
+	encrypt_other_servers="$encrypt_other_servers rajamanin kishoreh johnsons shaha maimoneb estess sopini karthikk bahirs"
+	encrypt_other_servers="$encrypt_other_servers parenteaul"
 	echo $encrypt_other_servers | grep -w $hostname > /dev/null
 	if [ $? -eq 0 ]; then
 		errmsg="This system supports encryption but does not have the required dependencies setup:\n"

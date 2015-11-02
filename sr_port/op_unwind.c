@@ -37,14 +37,14 @@ GBLREF	boolean_t	skip_error_ret;
 GBLREF	stack_frame	*error_frame;
 GBLREF	mval		*alias_retarg;
 
+error_def(ERR_STACKUNDERFLO);
+error_def(ERR_TPQUIT);
+
 /* this has to be maintained in parallel with unw_retarg(), the unwind with a return argument (extrinisic quit) routine */
 void op_unwind(void)
 {
-	stack_frame	*prevfp;
 	mv_stent 	*mvc;
-
-	error_def(ERR_STACKUNDERFLO);
-	error_def(ERR_TPQUIT);
+	stack_frame	*rfp;
 
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	if (frame_pointer->type & SFT_COUNT)
@@ -75,10 +75,23 @@ void op_unwind(void)
 	assert(msp <= stackbase && msp > stacktop);
 	assert(mv_chain <= (mv_stent *)stackbase && mv_chain > (mv_stent *)stacktop);
 	assert(frame_pointer <= (stack_frame*)stackbase && frame_pointer > (stack_frame *)stacktop);
-
+	if (NULL != frame_pointer->for_ctrl_stack)
+	{	/* someone used an ugly FOR control variable */
+		if (frame_pointer->flags & SFF_INDCE)
+		{	/* FOR control variable indx in an indirect frame belongs in the underlying real frame */
+			for (rfp = frame_pointer->old_frame_pointer; rfp && (rfp->flags & SFF_INDCE); rfp = rfp->old_frame_pointer)
+				;
+			assert(rfp);
+			if (NULL == rfp->for_ctrl_stack)
+				rfp->for_ctrl_stack = frame_pointer->for_ctrl_stack;
+			else	/* indirect compilation already cloned the pointer */
+				assert(rfp->for_ctrl_stack == frame_pointer->for_ctrl_stack);
+		} else	/* otherwise, done with this level - clean it up */
+			FREE_SAVED_FOR_INDX(frame_pointer);
+		frame_pointer->for_ctrl_stack = NULL;
+	}
 	/* See if unwinding an indirect frame */
 	IF_INDR_FRAME_CLEANUP_CACHE_ENTRY(frame_pointer);
-
 	for (mvc = mv_chain; mvc < (mv_stent *)frame_pointer; )
 	{
 		unw_mv_ent(mvc);
@@ -103,8 +116,8 @@ void op_unwind(void)
 	if (frame_pointer)
 	{
 		if (frame_pointer < (stack_frame *)msp || frame_pointer > (stack_frame *)stackbase
-		    || frame_pointer < (stack_frame *)stacktop)
-			rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
+			|| frame_pointer < (stack_frame *)stacktop)
+				rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
 		assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	}
 	return;

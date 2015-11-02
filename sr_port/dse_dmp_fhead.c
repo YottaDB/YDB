@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -393,7 +393,9 @@ void dse_dmp_fhead (void)
 		util_out_print("  fsync addrs             0x!XL", FALSE, jb->fsync_dskaddr);
 		util_out_print("      ", FALSE);
 		util_out_print("  Need_db_fsync                !AD", TRUE, 5, (jb->need_db_fsync ? " TRUE" : "FALSE"));
-		util_out_print("  Filesystem block size   0x!XL", TRUE, jb->fs_block_size);
+		util_out_print("  Filesystem block size   0x!XL", FALSE, jb->fs_block_size);
+		util_out_print("      ", FALSE);
+		util_out_print("  jnl solid tn    0x!16@XQ", TRUE, &csd->jnl_eovtn);
 		for (rectype = JRT_BAD + 1; rectype < JRT_RECTYPES - 1; rectype++)
 		{
 			util_out_print("  Jnl Rec Type    !5AZ      !7UL      ", FALSE, jrt_label[rectype],

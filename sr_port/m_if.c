@@ -49,7 +49,7 @@ int m_if(void)
 	if (TK_EOL == window_token)
 		return TRUE;
 	is_commarg = (1 == TREF(last_source_column));
-	x = for_end_of_scope(0);
+	FOR_END_OF_SCOPE(0, x);
 	assert(INDR_REF == x.oprclass);
 	if (TK_SPACE == window_token)
 	{
@@ -81,7 +81,7 @@ int m_if(void)
 				newtriple(OC_CLRTEST);
 			if (TREF(expr_start) != TREF(expr_start_orig))
 			{
-                		triptr = newtriple(OC_GVRECTARG);
+				triptr = newtriple(OC_GVRECTARG);
 				triptr->operand[0] = put_tref(TREF(expr_start));
 			}
 			jmpref = newtriple(OC_JMP);

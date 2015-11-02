@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@
 #include "init_secshr_addrs.h"
 #include "mutex.h"
 #include "gtm_zlib.h"
+#include "fork_init.h"
 
 GBLDEF	boolean_t		gtmsource_logstats = FALSE, gtmsource_pool2file_transition = FALSE;
 GBLDEF	int			gtmsource_filter = NO_FILTER;
@@ -92,6 +93,15 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
 
+error_def(ERR_JNLPOOLSETUP);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_NOTALLDBOPN);
+error_def(ERR_NULLCOLLDIFF);
+error_def(ERR_REPLCOMM);
+error_def(ERR_REPLINFO);
+error_def(ERR_REPLOFFJNLON);
+error_def(ERR_TEXT);
+
 int gtmsource()
 {
 	gd_region		*reg, *region_top;
@@ -103,15 +113,6 @@ int gtmsource()
 	char			print_msg[1024], tmpmsg[1024];
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsource_local;
-
-	error_def(ERR_NOTALLDBOPN);
-	error_def(ERR_JNLPOOLSETUP);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
-	error_def(ERR_REPLINFO);
-	error_def(ERR_REPLOFFJNLON);
-	error_def(ERR_NULLCOLLDIFF);
 
 	memset((uchar_ptr_t)&jnlpool, 0, SIZEOF(jnlpool_addrs));
 	call_on_signal = gtmsource_sigstop;
@@ -170,12 +171,13 @@ int gtmsource()
 	/* Set "child_server_running" to FALSE before forking off child. Wait for it to be set to TRUE by the child. */
 	gtmsource_local = jnlpool.gtmsource_local;
 	gtmsource_local->child_server_running = FALSE;
-	if (0 > (pid = fork()))
+	DO_FORK(pid);
+	if (0 > pid)
 	{
 		save_errno = REPL_SEM_ERRNO;
 		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not fork source server"), save_errno);
-	} else if (0 != pid)
+	} else if (0 < pid)
 	{	/* Parent. Wait until child sets "child_server_running" to FALSE. That is an indication that the child
 		 * source server has completed its initialization phase and is all set so the parent command can return.
 		 */

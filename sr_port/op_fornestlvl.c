@@ -13,20 +13,15 @@
 #include "op.h"
 #include "lv_val.h"
 
-LITREF	mval literal_one;
-LITREF	mval literal_zero;
-
-/* This provides a second return from op_indlvadr
- * it's built to provide communication at both ends but currently only used in m_for
+/* This feeds compile time context (level) passed from m_for to op_saveputindx at run-time through a TREF
+ * because  op_saveputindx function shares an argument format with others parsed by lvn
  */
-boolean_t op_forctrlindr2(uint4 jeopardy)
+void op_fornestlvl(uint4 level)
 {
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (NOARG != jeopardy)
-		TREF(for_ctrl_indr_subs) = jeopardy;
-	jeopardy = TREF(for_ctrl_indr_subs) ? TRUE : FALSE;
-	TREF(for_ctrl_indr_subs) = FALSE;
-	return jeopardy;
+	assert((0 < level) && (MAX_FOR_STACK >= level));
+	TREF(for_nest_level) = level;
+	return;
 }

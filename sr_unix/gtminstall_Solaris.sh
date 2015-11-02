@@ -30,6 +30,7 @@
 # 2011-03-05  0.05 K.S. Bhaskar - Through V5.4-001 group only needed if execution restricted to a group
 # 2011-03-08  0.06 K.S. Bhaskar - Make it work when bundled with GT.M V5.4-002
 # 2011-03-10  0.10 K.S. Bhaskar - Incorporate review comments to bundle with V5.4-002 distribution
+# 2011-05-03  0.11 K.S. Bhaskar - Allow for letter suffix releases
 
 # Turn on debugging if set
 if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
@@ -234,7 +235,7 @@ gtm_arch=`uname -m | tr -d _`
 case $gtm_arch in
     sun*) gtm_arch="sparc" ;;
 esac
-gtm_hostos=`uname -s | tr ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz`
+gtm_hostos=`uname -s | tr A-Z a-z`
 case $gtm_hostos in
     gnu/linux) gtm_hostos="linux" ;;
     hp-ux) gtm_hostos="hpux" ;;
@@ -365,7 +366,7 @@ if [ "Y" = "$gtm_verbose" ] ; then echo Finished checking options and assigning 
 # Prepare input to GT.M configure script
 gtm_configure_in=${gtm_tmp}/configure_${timestamp}.in
 if { ! $gtm_id -gn bin 2>/dev/null 1>/dev/null ; } then
-    if [ "N" = "$gtm_prompt_for_group" -o 54002 -gt `echo $gtm_version | cut -s -d V -f 2- | tr -d .-` ] ; then
+    if [ "N" = "$gtm_prompt_for_group" -o 54002 -gt `echo $gtm_version | cut -s -d V -f 2- | tr -d A-Za-z.-` ] ; then
 	echo y >>$gtm_configure_in
 	echo root >>$gtm_configure_in
 	echo $gtm_group_restriction >>$gtm_configure_in
@@ -373,7 +374,7 @@ if { ! $gtm_id -gn bin 2>/dev/null 1>/dev/null ; } then
     fi
 fi
 echo $gtm_user >>$gtm_configure_in
-if [ "Y" = "$gtm_prompt_for_group" -o 54002 -le `echo $gtm_version | cut -s -d V -f 2- | tr -d .-` ] ; then
+if [ "Y" = "$gtm_prompt_for_group" -o 54002 -le `echo $gtm_version | cut -s -d V -f 2- | tr -d A-Za-z.-` ] ; then
     echo $gtm_group >>$gtm_configure_in
 fi
 if [ "N" = "$gtm_group_already" ] ; then

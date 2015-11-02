@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,7 +127,7 @@ void mupip_exit_handler(void)
 		OP_TROLLBACK(0);
 	gv_rundown();
 	if (standalone_reg)
-		db_ipcs_reset(standalone_reg, TRUE);
+		db_ipcs_reset(standalone_reg);
 	/* have_standalone_access needs to be reset to FALSE in case we came through mupip extend and
 	 * this is one of the platforms that requires standalone access to do a file extension.  In that case
 	 * gv_rundown above requires have_standalone_access to be TRUE for proper operation.  Additionally,

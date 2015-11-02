@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,14 +45,9 @@ error_def (ERR_TEXT);
 error_def (ERR_CRITSEMFAIL);
 error_def (ERR_DBFILERR);
 error_def (ERR_FILEPARSE);
-/*
- * This routine is the counterpart of mu_rndwn_file() for standalone access.
- * In mu_rndwn_file() we got database access control semaphore.
- * We release it here.
- * As mu_rndwn_file it works for one region only.
- * 'immediate' flag is to control of IPC_WAIT flag to use or, not for system calls.
- */
-boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
+
+/* mu_rndwn_file gets a database access control semaphore - this counterpart releases it for one region */
+boolean_t db_ipcs_reset(gd_region *reg)
 {
 	int			status;
 	uint4			ustatus;
@@ -88,7 +83,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
                 return FALSE;
 	}
-	if (!ftok_sem_lock(reg, FALSE, immediate))
+	if (!ftok_sem_lock(reg, FALSE, TRUE)) /* immediate=TRUE because we don't want to wait while holding access semaphore */
 		return FALSE;
 	FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_lock, process_id);
 	/* Now we have locked the database using ftok_sem. Any other ftok conflicted database will
@@ -151,7 +146,7 @@ boolean_t db_ipcs_reset(gd_region *reg, boolean_t immediate)
 			ERR_TEXT, 2, RTS_ERROR_TEXT("sem_rmid of semid failed"));
 		return FALSE;
 	}
-	if (!ftok_sem_release(reg, TRUE, immediate))
+	if (!ftok_sem_release(reg, TRUE, TRUE)) /* immediate=TRUE because we don't want to wait while holding access semaphore */
 		return FALSE;
 	FTOK_TRACE(csa, csa->ti->curr_tn, ftok_ops_release, process_id);
 	udi->semid = INVALID_SEMID;

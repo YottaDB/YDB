@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,8 @@ GBLREF 	jnl_gbls_t		jgbl;
 GBLREF  jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	seq_num			seq_num_zero;
 
+error_def	(ERR_PREMATEOF);
+
 void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 {
 	struct_jrec_epoch	epoch_record;
@@ -56,8 +58,6 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	io_status_block_disk	iosb;
 #endif
 	uint4			jnl_fs_block_size, read_write_size;
-
-	error_def		(ERR_PREMATEOF);
 
 	assert(csa->now_crit);
 	jpc = csa->jnl;
@@ -102,6 +102,7 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 		if (SS_NORMAL == jpc->status)
 		{
 			header->end_of_data = jb->end_of_data;
+			csa->hdr->jnl_eovtn = header->eov_tn;
 			header->eov_tn = jb->eov_tn;
 			header->eov_timestamp = jb->eov_timestamp;
 			header->end_seqno = jb->end_seqno;

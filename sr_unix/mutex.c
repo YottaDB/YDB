@@ -54,8 +54,8 @@
 #include "gt_timer.h"
 #include "heartbeat_timer.h"
 #include "gtmio.h"
-#include "wbox_test_init.h"
 #ifdef DEBUG
+#include "wbox_test_init.h"
 #include "repl_msg.h"			/* needed by gtmsource.h */
 #include "gtmsource.h"			/* required for jnlpool GBLREF */
 #endif
@@ -127,6 +127,12 @@ static	int		mutex_expected_wake_instance = 0;
 
 static	enum cdb_sc	mutex_wakeup(mutex_struct_ptr_t addr);
 void			mutex_salvage(gd_region *reg);
+
+error_def(ERR_MUTEXERR);
+error_def(ERR_MUTEXFRCDTERM);
+error_def(ERR_MUTEXLCKALERT);
+error_def(ERR_TEXT);
+error_def(ERR_WCBLOCKED);
 
 /*
  *	General:
@@ -202,12 +208,9 @@ void			mutex_salvage(gd_region *reg);
 static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 {
 	mutex_que_entry_ptr_t	q_free_entry;
-#if defined(MUTEX_MSEM_WAKE) && !defined(POSIX_MSEM)
+#	if defined(MUTEX_MSEM_WAKE) && !defined(POSIX_MSEM)
 	msemaphore		*status;
-#endif
-
-	error_def(ERR_TEXT);
-	error_def(ERR_MUTEXERR);
+#	endif
 
 	assert(n > 0);
 	addr->queslots = n;
@@ -225,15 +228,15 @@ static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 	q_free_entry->mutex_wake_instance = 0;
 	while (n--)
 	{
-#ifdef MUTEX_MSEM_WAKE
-#ifdef POSIX_MSEM
+#		ifdef MUTEX_MSEM_WAKE
+#		  ifdef POSIX_MSEM
 		if (-1 == sem_init(&q_free_entry->mutex_wake_msem, TRUE, 0))  /* Shared lock with no initial resources (locked) */
-#else
+#		  else
 		if ((NULL == (status = msem_init(&q_free_entry->mutex_wake_msem, MSEM_LOCKED))) || ((msemaphore *)-1 == status))
-#endif
+#		  endif
 			rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Error with mutex wait memory semaphore initialization"), errno);
-#endif
+#		endif
 		/* Initialize fl,bl links to 0 before INSQTI as it (gtm_insqti in relqueopi.c) asserts this */
 		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->fl = 0;)
 		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->bl = 0;)
@@ -287,11 +290,11 @@ static	void	crash_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 		}
 		/* Wake up process */
 		if (next_entry->pid != process_id)
-#ifdef MUTEX_MSEM_WAKE
+#			ifdef MUTEX_MSEM_WAKE
 			mutex_wake_proc(&next_entry->mutex_wake_msem);
-#else
+#			else
 			mutex_wake_proc((sm_int_ptr_t)&next_entry->pid, next_entry->mutex_wake_instance);
-#endif
+#			endif
 	} while (TRUE);
 }
 
@@ -299,9 +302,9 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 {
 	enum cdb_sc		status;
 	boolean_t		wakeup_status;
-#ifdef MUTEX_MSEM_WAKE
+#	ifdef MUTEX_MSEM_WAKE
 	uint4                   bad_heartbeat;
-#else
+#	else
 	struct timeval		timeout;
 	int			timeout_threshold;
 	struct sockaddr_un	mutex_woke_me_proc;
@@ -311,11 +314,14 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 	ssize_t			nbrecvd;
 	int			timeout_intr_slpcnt;
 	long			timeout_val;
-#endif
-
-	error_def(ERR_MUTEXERR);
-	error_def(ERR_TEXT);
-
+#	endif
+#	ifdef DEBUG
+	if (gtm_white_box_test_case_enabled
+		&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number))
+	{
+		FPRINTF(stderr, "MUPIP BACKUP is about to start long sleep\n");
+	}
+#	endif
 	if (LOCK_AVAILABLE == addr->semaphore.u.parts.latch_pid && ++optimistic_attempts <= MUTEX_MAX_OPTIMISTIC_ATTEMPTS)
 	{
 		MUTEX_DPRINT2("%d: Nobody in crit (II) wake procs\n", process_id);
@@ -329,7 +335,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 	optimistic_attempts = 0;
 	do
 	{
-#ifdef MUTEX_MSEM_WAKE
+#		ifdef MUTEX_MSEM_WAKE
 		/* My msemaphore is already used by another process.
 		 * In other words, I was woken up, but missed my wakeup call.
 		 * I should return immediately.
@@ -369,7 +375,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 			 * wakeup_status is set to false, if I timed out and should go to recovery.
 			 */
 		}
-#else
+#		else
 		do
 		{
 			timeout.tv_sec = MUTEX_CONST_TIMEOUT_VAL;
@@ -443,7 +449,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 				break;
 			}
 		} while (TRUE);
-#endif
+#		endif
 		/*
 		 * If I was woken up and am a writer, others are blocking on
 		 * me. So, I shall try to get the lock NOW
@@ -481,9 +487,9 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 			        quant_retry_counter_remq,
 				queue_retry_counter_insq,
 				quant_retry_counter_insq;
-#ifdef MUTEX_MSEM_WAKE
+#	ifdef MUTEX_MSEM_WAKE
 	int			rc;
-#endif
+#	endif
 
 	addr = csa->critical;
 	MUTEX_TRACE_CNTR(mutex_trc_mutex_slp_fn);
@@ -517,15 +523,15 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 		do
 		{
 			free_slot = (mutex_que_entry_ptr_t)REMQHI((que_head_ptr_t)&addr->freehead);
-#ifdef MUTEX_MSEM_WAKE
+#			ifdef MUTEX_MSEM_WAKE
                         msem_slot = free_slot;
-#endif
+#			endif
 			if ((mutex_que_entry_ptr_t)NULL != free_slot &&
 			    (mutex_que_entry_ptr_t)INTERLOCK_FAIL != free_slot)
 			{
 				free_slot->pid = process_id;
 				free_slot->mutex_wake_instance = mutex_expected_wake_instance;
-#ifdef MUTEX_MSEM_WAKE
+#				ifdef MUTEX_MSEM_WAKE
 				mutex_wake_msem_ptr = &free_slot->mutex_wake_msem;
 				/* this loop makes sure that the msemaphore is locked initially
 				 * before the process goes to long sleep
@@ -534,7 +540,7 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 				{
 					rc = MSEM_LOCKNW(mutex_wake_msem_ptr);
 				} while (-1 == rc && EINTR == errno);
-#endif
+#				endif
 				/*
 				 * Significance of mutex_wake_instance field :
 				 * -----------------------------------------
@@ -638,7 +644,7 @@ static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr)
 				quant_retry_counter_insq = QUANT_RETRY;
 				wake_this_pid = free_entry->pid;
 				wake_instance = free_entry->mutex_wake_instance;
-#ifdef MUTEX_MSEM_WAKE
+#				ifdef MUTEX_MSEM_WAKE
 				/*
 				 * In case of msem wakeup, the msem has to be
 				 * unlocked before returning free_entry to
@@ -654,7 +660,7 @@ static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr)
 				 * inserting it into the free queue.
 				 */
 				 free_entry->pid = 0;
-#endif
+#				endif
 				do
 				{
 					queue_retry_counter_insq = QUEUE_RETRY;
@@ -668,9 +674,9 @@ static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr)
 							if (wake_this_pid != process_id)
 							{
 								MUTEX_TRACE_CNTR(mutex_trc_crit_wk);
-#ifndef MUTEX_MSEM_WAKE
+#								ifndef MUTEX_MSEM_WAKE
 								mutex_wake_proc((sm_int_ptr_t)&wake_this_pid, wake_instance);
-#endif
+#								endif
 							} else
 							{
 								/* With
@@ -685,10 +691,10 @@ static	enum cdb_sc mutex_wakeup(mutex_struct_ptr_t addr)
 					} while (--queue_retry_counter_insq);
 					if (!(--quant_retry_counter_insq))
 					{
-#ifndef MUTEX_MSEM_WAKE
+#						ifndef MUTEX_MSEM_WAKE
 						if (wake_this_pid != process_id)
 							mutex_wake_proc((sm_int_ptr_t)&wake_this_pid, wake_instance);
-#endif
+#						endif
 						/* Too many failures */
 						return (cdb_sc_dbccerr);
 					} else
@@ -730,9 +736,9 @@ static enum cdb_sc write_lock_spin(gd_region *reg,
 	int			write_sleep_spin_count, write_hard_spin_count;
 	sgmnt_addrs		*csa;
 	mutex_struct_ptr_t	addr;
-#ifdef MUTEX_REAL_SLEEP
+#	ifdef MUTEX_REAL_SLEEP
 	int			micro_sleep_time;
-#endif
+#	endif
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	assert(!csa->now_crit);
@@ -762,20 +768,20 @@ static enum cdb_sc write_lock_spin(gd_region *reg,
 				write_hard_spin_count = num_additional_processors ? mutex_spin_parms->mutex_hard_spin_count : 1;
 		} while (--write_hard_spin_count);
 		/* Sleep for a very short duration */
-#ifdef MUTEX_TRACE
+#		ifdef MUTEX_TRACE
 		if (MUTEX_LOCK_WRITE == mutex_lock_type)
 			MUTEX_TRACE_CNTR(mutex_trc_wt_short_slp);
 		else
 			MUTEX_TRACE_CNTR(mutex_trc_wtim_short_slp);
-#endif
-#ifdef MUTEX_REAL_SLEEP
+#		endif
+#		ifdef MUTEX_REAL_SLEEP
 		micro_sleep_time = (nrand48(next_rand) & mutex_spin_parms->mutex_spin_sleep_mask) + 1;
 		assert(micro_sleep_time < ONE_MILLION);
 		assert(FALSE == csa->now_crit);
 		MICROSEC_SLEEP(micro_sleep_time);
-#else
+#		else
 		rel_quant();
-#endif
+#		endif
 		if (!write_sleep_spin_count)	/* save memory reference on fast path */
 			write_sleep_spin_count = mutex_spin_parms->mutex_sleep_spin_count;
 	} while (--write_sleep_spin_count);
@@ -794,12 +800,10 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 	sgmnt_addrs		*csa;
 	enum cdb_sc		status;
 	boolean_t		alert;
-#ifdef MUTEX_MSEM_WAKE
+#	ifdef MUTEX_MSEM_WAKE
 	uint4			alert_heartbeat_counter = 0;
-#endif
+#	endif
 	uint4			in_crit_pid;
-
-	error_def(ERR_MUTEXLCKALERT);
 
 	/* Check that "mutex_per_process_init" has happened before we try to grab crit and that it was done with our current
 	 * pid (i.e. ensure that even in the case where parent did the mutex init with its pid and did a fork, the child process
@@ -824,13 +828,13 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 		if (cdb_sc_normal == status || cdb_sc_critreset == status)
 			return (status);
 		assert(cdb_sc_nolock == status);
-#ifdef MUTEX_MSEM_WAKE
+#		ifdef MUTEX_MSEM_WAKE
 		if (0 == alert_heartbeat_counter)
 			alert_heartbeat_counter = heartbeat_counter + MUTEX_LCKALERT_PERIOD;
 		alert = (heartbeat_counter >= alert_heartbeat_counter);
-#else
+#		else
 		alert = (lock_attempts >= max_lock_attempts);
-#endif
+#		endif
 		csa = &FILE_INFO(reg)->s_addrs;
 		++lock_attempts;
 		if (alert)
@@ -839,9 +843,9 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 			if (in_crit_pid)
 				send_msg(VARLSTCNT(5) ERR_MUTEXLCKALERT, 3, DB_LEN_STR(reg), in_crit_pid); /* Alert the admin */
 			lock_attempts = 0;
-#ifdef MUTEX_MSEM_WAKE
+#			ifdef MUTEX_MSEM_WAKE
 			alert_heartbeat_counter = 0;
-#endif
+#			endif
 		}
 		if (cdb_sc_dbccerr == mutex_sleep(csa, mutex_lock_type))
 			return (cdb_sc_dbccerr);
@@ -915,8 +919,6 @@ void mutex_salvage(gd_region *reg)
 	VMS_ONLY(uint4	holder_imgcnt;)
         DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_MUTEXFRCDTERM);
-	error_def(ERR_WCBLOCKED);
         SETUP_THREADGBL_ACCESS;
 
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -956,9 +958,11 @@ void mutex_salvage(gd_region *reg)
 			MUTEX_DPRINT3("%d : mutex salvaged, culprit was %d\n", process_id, holder_pid);
 		} else if (FALSE == TREF(disable_sigcont))
 		{
-			/* The process might have been STOPPED (kill -SIGSTOP). Send SIGCONT and nudge the stopped
-			 * process forward */
-			continue_proc(holder_pid);
+			/* The process might have been STOPPED (kill -SIGSTOP). Send SIGCONT and nudge the stopped process forward.
+			 * However, skip this call in case of SENDTO_EPERM white-box test, because we do not want the intentionally
+			 * stuck process to be awakened prematurely. */
+			DEBUG_ONLY(if (!gtm_white_box_test_case_enabled || WBTEST_SENDTO_EPERM != gtm_white_box_test_case_number))
+				continue_proc(holder_pid);
 		}
 		/* Record salvage event in db file header if applicable.
 		 * Take care not to do it for jnlpool which has no concept of a db cache.
@@ -995,7 +999,7 @@ void	mutex_per_process_init(void)
 	 */
 	if (0 == mutex_per_process_init_pid)
 		start_timer((TID)&heartbeat_timer, HEARTBEAT_INTERVAL, heartbeat_timer, 0, NULL);
-#ifndef MUTEX_MSEM_WAKE
+#	ifndef MUTEX_MSEM_WAKE
 	else
 	{	/* Close socket opened by the first call. But dont delete the socket file as the parent process will do that. */
 		assert(FD_INVALID != mutex_sock_fd);
@@ -1005,6 +1009,6 @@ void	mutex_per_process_init(void)
 	assert(FD_INVALID == mutex_sock_fd);
 	mutex_sock_init();
 	assert(FD_INVALID != mutex_sock_fd);
-#endif
+#	endif
 	mutex_per_process_init_pid = process_id;
 }

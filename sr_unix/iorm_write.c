@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,9 @@ GBLREF io_pair		io_curr_device;
 #ifdef UNICODE_SUPPORTED
 LITREF	mstr		chset_names[];
 #endif
+error_def(ERR_NOTTOEOFONPUT);
+error_def(ERR_DEVICEREADONLY);
+error_def(ERR_SYSCALL);
 
 /* write ASCII characters converting to UTF16 if needed
  * 	returns bytes written
@@ -304,9 +307,6 @@ void iorm_write(mstr *v)
 	d_rm_struct	*rm_ptr;
 	int		flags;
 	int		fcntl_res;
-	error_def(ERR_NOTTOEOFONPUT);
-	error_def(ERR_RMSRDONLY);
-	error_def(ERR_SYSCALL);
 
 	iod = io_curr_device.out;
 #ifdef __MVS__
@@ -320,7 +320,7 @@ void iorm_write(mstr *v)
 	memcpy(rm_ptr->dollar_device, "0", SIZEOF("0"));
 
 	if (rm_ptr->noread)
-		rts_error(VARLSTCNT(1) ERR_RMSRDONLY);
+		rts_error(VARLSTCNT(1) ERR_DEVICEREADONLY);
 	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
 	{
 	 	iod->dollar.za = 9;

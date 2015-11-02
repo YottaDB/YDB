@@ -58,6 +58,7 @@
 #include "mlk_shr_init.h"
 #include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
+#include "eintr_wrapper_semop.h"
 #include "is_file_identical.h"
 #include "repl_instance.h"
 
@@ -108,31 +109,21 @@
 	SS_DEFAULT_INIT_POOL(ss_shm_ptr);										\
 }
 
-#define GTM_ATTACH_CHECK_ERROR													\
-{																\
-	if (-1 == status_l)													\
-	{															\
-		rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),							\
-			  ERR_TEXT, 2, LEN_AND_LIT("Error attaching to database shared memory"), errno);			\
-	}															\
+#define GTM_ATTACH_CHECK_ERROR												\
+{															\
+	if (-1 == status_l)												\
+	{														\
+		rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),						\
+			  ERR_TEXT, 2, LEN_AND_LIT("Error attaching to database shared memory"), errno);		\
+	}														\
 }
 
-#ifdef DEBUG_DB64
-#define GTM_ATTACH_SHM														\
-{																\
-	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, next_smseg, SHM_RND));			\
-	next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + sec_size), SHMAT_ADDR_INCS);				\
-	GTM_ATTACH_CHECK_ERROR;													\
-	csa->nl = (node_local_ptr_t)csa->db_addrs[0];										\
+#define GTM_ATTACH_SHM													\
+{															\
+	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, 0, SHM_RND));			\
+	GTM_ATTACH_CHECK_ERROR;												\
+	csa->nl = (node_local_ptr_t)csa->db_addrs[0];									\
 }
-#else
-#define GTM_ATTACH_SHM														\
-{																\
-	status_l = (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)do_shmat(udi->shmid, 0, SHM_RND));				\
-	GTM_ATTACH_CHECK_ERROR;													\
-	csa->nl = (node_local_ptr_t)csa->db_addrs[0];										\
-}
-#endif
 
 #define GTM_ATTACH_SHM_AND_CHECK_VERS(VERMISMATCH, SHM_SETUP_OK)								\
 {																\
@@ -199,7 +190,6 @@ GBLREF	node_local_ptr_t	locknl;
 GBLREF	boolean_t		new_dbinit_ipc;
 GBLREF	boolean_t		gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
 GBLREF	uint4			mutex_per_process_init_pid;
-GBLREF	boolean_t		dse_running;
 
 GTMCRYPT_ONLY(
 GBLREF	gtmcrypt_key_t		mu_int_encrypt_key_handle;
@@ -211,16 +201,21 @@ GBLREF	int 	mutex_sock_fd;
 LITREF  char                    gtm_release_name[];
 LITREF  int4                    gtm_release_name_len;
 
-#ifdef DEBUG_DB64
-/* if debugging large address stuff, make all memory segments allocate above 1G line */
-GBLDEF  sm_uc_ptr_t     next_smseg = (sm_uc_ptr_t)(1L * 1024 * 1024 * 1024);
-#endif
-
 OS_PAGE_SIZE_DECLARE
 
 static  int             errno_save;
+error_def(ERR_CLSTCONFLICT);
+error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBFILERR);
+error_def(ERR_DBIDMISMATCH);
+error_def(ERR_DBNAMEMISMATCH);
+error_def(ERR_NLMISMATCHCALC);
+error_def(ERR_REQRUNDOWN);
+error_def(ERR_SYSCALL);
+error_def(ERR_DBSHMNAMEDIFF);
 error_def(ERR_TEXT);
+error_def(ERR_VERMISMATCH);
+
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
 gd_region *dbfilopn (gd_region *reg)
@@ -310,11 +305,16 @@ gd_region *dbfilopn (gd_region *reg)
 		reg->read_only = TRUE;			/* maintain csa->read_write simultaneously */
 		udi->s_addrs.read_write = FALSE;	/* maintain reg->read_only simultaneously */
 	}
-#ifdef __MVS__
+#	ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(udi->fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_SEND_MSG(fnptr, errno, realfiletag, TAG_BINARY);
-#endif
+#	endif
 	STAT_FILE(fnptr, &buf, stat_res);
+        if (-1 == stat_res)
+        {
+        	errno_save = errno;
+        	rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno_save);
+        }
 	set_gdid_from_stat(&udi->fileid, &buf);
 	if (prev_reg = gv_match(reg))
 	{
@@ -386,15 +386,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	struct stat		sb;
 	int			perm;
 	gtm_uint64_t 		sec_size;
-
-	error_def(ERR_CLSTCONFLICT);
-	error_def(ERR_CRITSEMFAIL);
-	error_def(ERR_DBNAMEMISMATCH);
-	error_def(ERR_DBIDMISMATCH);
-	error_def(ERR_NLMISMATCHCALC);
-	error_def(ERR_REQRUNDOWN);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_VERMISMATCH);
 
 	assert(INTRPT_IN_GVCST_INIT == intrpt_ok_state); /* we better be called from gvcst_init */
 	assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
@@ -483,9 +474,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
 					ERR_TEXT, 2, LEN_AND_LIT(REQRUNDOWN_TEXT));
 			}
-			/*
-			 * Create new semaphore using IPC_PRIVATE. System guarantees a unique id.
-			 */
+			/* Create new semaphore using IPC_PRIVATE. System guarantees a unique id. */
 			if (-1 == (udi->semid = semget(IPC_PRIVATE, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
 			{
 				udi->semid = INVALID_SEMID;
@@ -571,18 +560,18 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			sopcnt = 3;
 		}
 		sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = SEM_UNDO | IPC_NOWAIT;
-		SEMOP(udi->semid, sop, sopcnt, status);
+		SEMOP(udi->semid, sop, sopcnt, status, NO_WAIT);
 		if (-1 == status)
 		{
 			errno_save = errno;
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, errno_save);
 		}
-	} else /* for have_standalone_access we were already in mupip_exit_handler and got "semid" semaphore  */
-	{	/* Make sure mupip_exit_handler() has created semaphore for standalone access */
+	} else /* for have_standalone_access we were already in "mu_rndwn_file" and got "semid" semaphore  */
+	{	/* Make sure "mu_rndwn_file" has created semaphore for standalone access */
 		if (INVALID_SEMID == udi->semid || 0 == udi->gt_sem_ctime)
 			GTMASSERT;
-		/* Make sure mu_rndwn_file() has reset shared memory. In pro, just clear it and proceed. */
+		/* Make sure "mu_rndwn_file" has reset shared memory. In pro, just clear it and proceed. */
 		assert((INVALID_SHMID == udi->shmid) && (0 == udi->gt_shm_ctime));
 		udi->shmid = INVALID_SHMID;	/* reset shmid so dbinit_ch does not get confused in case we go there */
 		new_dbinit_ipc = TRUE;
@@ -631,9 +620,9 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	}
 	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 	assert(((INTPTR_T)csa->critical & 0xf) == 0); 			/* critical should be 16-byte aligned */
-#ifdef CACHELINE_SIZE
+#	ifdef CACHELINE_SIZE
 	assert(0 == ((INTPTR_T)csa->critical & (CACHELINE_SIZE - 1)));
-#endif
+#	endif
 	/* Note: Here we check jnl_sate from database file and its value cannot change without standalone access.
 	 * The jnl_buff buffer should be initialized irrespective of read/write process */
 	JNL_INIT(csa, reg, tsd);
@@ -665,20 +654,11 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (-1 == stat_res)
 			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 		mm_prot = read_only ? PROT_READ : (PROT_READ | PROT_WRITE);
-#ifdef DEBUG_DB64
-		if (-1 == (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)get_mmseg((size_t)stat_buf.st_size),
-									   (size_t)stat_buf.st_size,
-									   mm_prot,
-									   GTM_MM_FLAGS, udi->fd, (off_t)0)))
-			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
-		put_mmseg((caddr_t)(csa->db_addrs[0]), (size_t)stat_buf.st_size);
-#else
 		if (-1 == (sm_long_t)(csa->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL,
 									   (size_t)stat_buf.st_size,
 									   mm_prot,
 									   GTM_MM_FLAGS, udi->fd, (off_t)0)))
 			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
-#endif
 		csa->db_addrs[1] = csa->db_addrs[0] + stat_buf.st_size - 1;
 		csd = csa->hdr = (sgmnt_data_ptr_t)csa->db_addrs[0];
 	}
@@ -702,7 +682,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		}
 		if (csd->machine_name[0])                  /* crash occured */
 		{
-			if (0 != memcmp(csd->machine_name, machine_name, MAX_MCNAMELEN))  /* crashed on some other node */
+			if (0 != STRNCMP_STR(csd->machine_name, machine_name, MAX_MCNAMELEN))  /* crashed on some other node */
 				rts_error(VARLSTCNT(6) ERR_CLSTCONFLICT, 4, DB_LEN_STR(reg), LEN_AND_STR(csd->machine_name));
 			else
 				rts_error(VARLSTCNT(6) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csd->machine_name));
@@ -716,7 +696,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		db_csh_ref(csa);
 		shmpool_buff_init(reg);
 		SS_INFO_INIT(csa);
-		STRCPY(csa->nl->machine_name, machine_name);					/* machine name */
+		STRNCPY_STR(csa->nl->machine_name, machine_name, MAX_MCNAMELEN);			/* machine name */
 		assert(MAX_REL_NAME > gtm_release_name_len);
 		memcpy(csa->nl->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 		memcpy(csa->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1);				/* GDS label */
@@ -793,9 +773,9 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		csa->nl->glob_sec_init = TRUE;
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
 		if (-1 == stat_res)
-			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
+			rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno_save);
 		set_gdid_from_stat(&csa->nl->unique_id.uid, &stat_buf);
-#ifdef RELEASE_LATCH_GLOBAL
+#	ifdef RELEASE_LATCH_GLOBAL
 		/* On HP-UX, it is possible that mucregini/cs_data is not aligned at the same address
 		 * boundary as csd would be in shared memory. This may lead to the initialization and
 		 * usage of different elements of hp_latch_space. This may lead to the latch being
@@ -805,10 +785,10 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 * a corrupt latch (say in case of abnormal process termination).
 		 */
 		RELEASE_LATCH_GLOBAL(&csd->next_upgrd_warn.time_latch);
-#endif
+#	endif
 	} else
 	{
-		if (STRCMP(csa->nl->machine_name, machine_name))       /* machine names do not match */
+		if (STRNCMP_STR(csa->nl->machine_name, machine_name, MAX_MCNAMELEN))       /* machine names do not match */
 		{
 			if (csa->nl->machine_name[0])
 				rts_error(VARLSTCNT(6) ERR_CLSTCONFLICT, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name));
@@ -819,31 +799,37 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 * guaranteed to not exceed MAX_FN_LEN, we should have a terminating '\0' atleast at csa->nl->fname[MAX_FN_LEN]
 		 */
 		assert(csa->nl->fname[MAX_FN_LEN] == '\0');	/* Note: the first '\0' in csa->nl->fname can be much earlier */
-		if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->unique_id.uid) ||
-						csa->nl->creation_date_time4 != csd->creation_time4)
-		{
-			assert(dse_running);
-			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
-				ERR_TEXT, 2, LEN_AND_LIT("Fileid of database file doesn't match fileid in shared memory"));
-			rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
-				ERR_TEXT, 2, LEN_AND_LIT("Fileid of database file doesn't match fileid in shared memory"));
-		}
 		/* Check whether csa->nl->fname exists. If not, then it is a serious condition. Error out. */
 		STAT_FILE((char *)csa->nl->fname, &stat_buf, stat_res);
 		if (-1 == stat_res)
 		{
-			send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
-			rts_error(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid, errno);
+			errno_save = errno;
+			send_msg(VARLSTCNT(13) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
+				ERR_DBNAMEMISMATCH, 4, DB_LEN_STR(reg), udi->shmid, csa->nl->fname, errno_save);
+			rts_error(VARLSTCNT(13) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
+				ERR_DBNAMEMISMATCH, 4, DB_LEN_STR(reg), udi->shmid, csa->nl->fname, errno_save);
 		}
-		/* Check whether csa->nl->fname and csa->nl->unique_id.uid are in sync.
-		 * If not its a serious condition. Error out. */
+		/* Check whether csa->nl->fname and csa->nl->unique_id.uid are in sync. If not error out. */
 		if (FALSE == is_gdid_stat_identical(&csa->nl->unique_id.uid, &stat_buf))
 		{
-			assert(dse_running);
-			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
-				ERR_TEXT, 2, LEN_AND_LIT("Database filename and fileid in shared memory are not in sync"));
-			rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
-				ERR_TEXT, 2, LEN_AND_LIT("Database filename and fileid in shared memory are not in sync"));
+			send_msg(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
+				ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid);
+			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
+				ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid);
+		}
+		/* Previously, we used to check for csa->nl->creation_date_time4 vs csd->creation_time4 and treat it as
+		 * an id mismatch situation as well. But later it was determined that as long as the filename and the fileid
+		 * match between the database file header and the copy in shared memory, there is no more matching that needs
+		 * to be done. It is not possible for the user to create a situation where the filename/fileid matches but
+		 * the creation time does not. The only way for this to happen is shared memory corruption in which case we
+		 * have a much bigger problem to deal with -- 2011/03/30 --- nars.
+		 */
+		if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->unique_id.uid))
+		{
+			send_msg(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
+				ERR_DBSHMNAMEDIFF, 4, DB_LEN_STR(reg), udi->shmid, csa->nl->fname);
+			rts_error(VARLSTCNT(12) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(csa->nl->machine_name),
+				ERR_DBSHMNAMEDIFF, 4, DB_LEN_STR(reg), udi->shmid, csa->nl->fname);
 		}
 		if (csa->nl->donotflush_dbjnl)
 		{
@@ -887,7 +873,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 * semaphore, shared memory id and semaphore creation time to disk.
 		 */
 		csa->nl->remove_shm = FALSE;
-		STRCPY(csd->machine_name, machine_name);
+		STRNCPY_STR(csd->machine_name, machine_name, MAX_MCNAMELEN);
 		if (!is_bg)
 		{
 			csd->shmid = tsd->shmid;
@@ -962,6 +948,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		}
 		sem_incremented = FALSE;
 	}
+#	ifdef DEBUG
 	if (gtm_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == gtm_white_box_test_case_number) \
 										&& (1 == csa->nl->wbox_test_seq_num))
 	{
@@ -970,6 +957,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		while (csa->nl->wbox_test_seq_num  != 3)
 			LONG_SLEEP(10);
 	}
+#	endif
 	/* Release ftok semaphore lock so that any other ftok conflicted database can continue now */
 	if (!ftok_sem_release(reg, FALSE, FALSE))
 		rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));

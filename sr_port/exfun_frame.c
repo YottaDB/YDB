@@ -33,7 +33,7 @@ void exfun_frame (void)
 	msp_save = msp;
 	sf = (stack_frame *)(msp -= SIZEOF(stack_frame));	/* Note imbedded assignment */
 	assert(sf < frame_pointer);
-   	if (msp <= stackwarn)
+	if (msp <= stackwarn)
 	{
 		if (msp <= stacktop)
 		{
@@ -46,7 +46,7 @@ void exfun_frame (void)
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	*sf = *frame_pointer;
 	msp -= sf->rvector->temp_size;
-   	if (msp <= stackwarn)
+	if (msp <= stackwarn)
 	{
 		if (msp <= stacktop)
 		{
@@ -58,6 +58,7 @@ void exfun_frame (void)
 	sf->temps_ptr = msp;
 	assert (msp < stackbase);
 	memset (msp, 0, sf->rvector->temp_size);
+	sf->for_ctrl_stack = NULL;
 	sf->old_frame_pointer = frame_pointer;
 	frame_pointer = sf;
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));

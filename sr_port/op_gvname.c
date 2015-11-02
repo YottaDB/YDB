@@ -80,7 +80,7 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 		bgormm = ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth));
 		if (bgormm)
 		{
-			if (dollar_tlevel && !first_sgm_info)
+			if (dollar_tlevel)
 				tp_set_sgm();
 			assert(INVALID_GV_TARGET != gv_target);
 			if ((!gv_target->root) || (DIR_ROOT == gv_target->root))

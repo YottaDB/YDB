@@ -32,6 +32,19 @@
 
 #define CACHE_STATE_OFF SIZEOF(que_ent)
 
+error_def(ERR_DBCRERR);
+error_def(ERR_DBENDIAN);
+error_def(ERR_GVIS);
+error_def(ERR_GVSUBOFLOW);
+error_def(ERR_REPLINSTMISMTCH);
+error_def(ERR_SCNDDBNOUPD);
+error_def(ERR_SSATTACHSHM);
+error_def(ERR_SSFILOPERR);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_TNTOOLARGE);
+error_def(ERR_TNWARN);
+																\
 /* all this record's fields should exactly be the first members of the cache_rec in the same order */
 typedef struct mmblk_rec_struct
 {
@@ -856,9 +869,6 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 	unsigned char		instfilename_copy[MAX_FN_LEN + 1];								\
 	sm_uc_ptr_t		jnlpool_instfilename;										\
 																\
-	error_def(ERR_SCNDDBNOUPD);												\
-	error_def(ERR_REPLINSTMISMTCH);												\
-																\
 	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;										\
 	GBLREF	boolean_t		is_replicator;										\
 	GBLREF	boolean_t		pool_init;										\
@@ -1282,7 +1292,6 @@ typedef union
 
 #define CHECK_DB_ENDIAN(CSD,FNLEN,FNNAME)								\
 {													\
-	error_def(ERR_DBENDIAN);									\
 	endian32_struct	check_endian;									\
 	check_endian.word32 = (CSD)->minor_dbver;							\
 	if (!check_endian.shorts.ENDIANCHECKTHIS)							\
@@ -1499,7 +1508,9 @@ typedef struct sgmnt_data_struct
 	int4		jnl_sync_io;		/* drives sync I/O ('direct' if applicable) for journals, if set (UNIX) */
 						/* writers open NOCACHING to bypass XFC cache, if set (VMS) */
 	int4		yield_lmt;		/* maximum number of times a process yields to get optimal jnl writes */
-	char		filler_jnl[20];		/* to ensure this section has 64-byte multiple size */
+	boolean_t	turn_around_point;
+	trans_num	jnl_eovtn;		/* last tn for a closed jnl; otherwise epoch tn from the epoch before last */
+	char		filler_jnl[8];		/* to ensure this section has 64-byte multiple size */
 	/************* INTERRUPTED RECOVERY RELATED FIELDS ****************/
 	seq_num		intrpt_recov_resync_seqno;/* resync/fetchresync jnl_seqno of interrupted rollback */
 	jnl_tm_t	intrpt_recov_tp_resolve_time;/* since-time for the interrupted recover */
@@ -1969,7 +1980,6 @@ typedef struct gvsavtarg_struct
 	gd_binding		*gd_map;
 	gd_region		*gv_cur_region;
 	gv_namehead		*gv_target;
-	struct sgm_info_struct	*sgm_info_ptr;
 	bool			gv_last_subsc_null;
 	bool			gv_some_subsc_null;
 	short			prev;
@@ -2031,6 +2041,21 @@ typedef struct gvsavtarg_struct
  * There is no way op_gvname (which is where these design assumptions get actually used) is going to be called from now onwards.
  */
 GBLREF	int		process_exiting;
+GBLREF	trans_num	local_tn;
+GBLREF	gv_namehead	*gvt_tp_list;
+
+#define	ADD_TO_GVT_TP_LIST(GVT)													\
+{																\
+	if (GVT->read_local_tn != local_tn)											\
+	{	/* Set read_local_tn to local_tn; Also add GVT to list of gvtargets referenced in this TP transaction. */	\
+		GVT->read_local_tn = local_tn;											\
+		GVT->next_tp_gvnh = gvt_tp_list;										\
+		gvt_tp_list = GVT;												\
+	} else															\
+	{	/* Check that GVT is already part of the list of gvtargets referenced in this TP transaction */			\
+		DBG_CHECK_IN_GVT_TP_LIST(GVT, TRUE);	/* TRUE => we check that GVT IS present in the gvt_tp_list */		\
+	}															\
+}
 
 #ifdef DEBUG
 #define	DBG_CHECK_IN_GVT_TP_LIST(gvt, present)						\
@@ -2144,61 +2169,86 @@ GBLREF	gv_namehead	*gv_target;
 GBLREF	sgmnt_addrs	*cs_addrs;
 #define	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC	assert(process_exiting || (NULL == gv_target) || (gv_target->gd_csa == cs_addrs))
 
-#define COPY_SUBS_TO_GVCURRKEY(mvarg, max_key, gv_currkey, was_null, is_null)							\
-{																\
-	GBLREF mv_stent		*mv_chain;											\
-	GBLREF unsigned char	*msp, *stackwarn, *stacktop;									\
-	mval			temp;												\
-	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;									\
-	int			len;												\
-																\
-	error_def(ERR_GVIS);													\
-	error_def(ERR_GVSUBOFLOW);												\
-	error_def(ERR_STACKCRIT);												\
-	error_def(ERR_STACKOFLOW);												\
-																\
-	was_null |= is_null;													\
-	if (mvarg->mvtype & MV_SUBLIT)												\
-	{															\
-		is_null = ((STR_SUB_PREFIX == *(unsigned char *)mvarg->str.addr) && (KEY_DELIMITER == *(mvarg->str.addr + 1))); \
-		if (gv_target->collseq || gv_target->nct)									\
-		{														\
-			assert(dba_cm != gv_cur_region->dyn.addr->acc_meth); /* collation transformation should be done at the	\
-										server's end for CM regions */			\
-			TREF(transform) = FALSE;										\
-			end = gvsub2str((uchar_ptr_t)mvarg->str.addr, buff, FALSE);						\
-			TREF(transform) = TRUE;											\
-			temp.mvtype = MV_STR;											\
-			temp.str.addr = (char *)buff;										\
-			temp.str.len = (mstr_len_t)(end - buff);								\
-			mval2subsc(&temp, gv_currkey);										\
-		} else														\
-		{														\
-			len = mvarg->str.len;											\
-			if (gv_currkey->end + len - 1 >= max_key)								\
-			{													\
-				if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))			\
-					end = &buff[MAX_ZWR_KEY_SZ - 1];							\
-				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);			\
-			}													\
-			memcpy((gv_currkey->base + gv_currkey->end), mvarg->str.addr, len);					\
-			if (is_null && 0 != gv_cur_region->std_null_coll)							\
-				gv_currkey->base[gv_currkey->end] = SUBSCRIPT_STDCOL_NULL;					\
-			gv_currkey->prev = gv_currkey->end;									\
-			gv_currkey->end += len - 1;										\
-		}														\
-	} else															\
-	{															\
-		MV_FORCE_DEFINED(mvarg);											\
-		mval2subsc(mvarg, gv_currkey);											\
-		if (gv_currkey->end >= max_key)											\
-		{														\
-			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))				\
-				end = &buff[MAX_ZWR_KEY_SZ - 1 ];								\
-			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);				\
-		}														\
-		is_null = (MV_IS_STRING(mvarg) && (0 == mvarg->str.len));							\
-	}															\
+/* Indicate incompleteness of (potentially subscripted) global name by adding a "*" (without closing ")") at the end */
+#define	GV_SET_LAST_SUBSCRIPT_INCOMPLETE(BUFF, END)			\
+{									\
+	if (NULL == (char *)(END))					\
+	{	/* The buffer passed to format_targ_key was not enough	\
+		 * for the transformation. We don't expect this. Handle	\
+		 * it nevertheless by adding ",*" at end.		\
+		 */							\
+		assert(FALSE);						\
+		END = ((unsigned char *)ARRAYTOP(BUFF)) - 1;		\
+		assert((char *)(END) > (char *)(BUFF));			\
+		*(END)++ = '*';						\
+	} else								\
+	{	/* Overflow occurred while adding the global name OR	\
+		 * after adding the last subscript OR in the middle of	\
+		 * adding a subscript (not necessarily last). In all	\
+		 * cases, add a '*' at end to indicate incompleteness.	\
+		 */							\
+		if (')' == END[-1])					\
+			(END)--;					\
+		/* ensure we have space to write 1 byte */		\
+		assert((char *)(END) + 1 <= ((char *)ARRAYTOP(BUFF)));	\
+		*(END)++ = '*';						\
+	}								\
+}
+
+#define	ISSUE_GVSUBOFLOW_ERROR(GVKEY)								\
+{												\
+	unsigned char *endBuff, fmtBuff[MAX_ZWR_KEY_SZ];					\
+												\
+	/* Assert that input key to format_targ_key is double null terminated */		\
+	assert(KEY_DELIMITER == GVKEY->base[GVKEY->end]);					\
+	endBuff = format_targ_key(fmtBuff, ARRAYSIZE(fmtBuff), GVKEY, TRUE);			\
+	GV_SET_LAST_SUBSCRIPT_INCOMPLETE(fmtBuff, endBuff); /* Note: might update "endBuff" */	\
+	rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, endBuff - fmtBuff, fmtBuff);	\
+}
+
+#define COPY_SUBS_TO_GVCURRKEY(mvarg, max_key, gv_currkey, was_null, is_null)					\
+{														\
+	GBLREF mv_stent		*mv_chain;									\
+	GBLREF unsigned char	*msp, *stackwarn, *stacktop;							\
+	mval			temp;										\
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;							\
+	int			len;										\
+														\
+	was_null |= is_null;											\
+	if (mvarg->mvtype & MV_SUBLIT)										\
+	{													\
+		is_null = ((STR_SUB_PREFIX == *(unsigned char *)mvarg->str.addr)				\
+					&& (KEY_DELIMITER == *(mvarg->str.addr + 1))); 				\
+		if (gv_target->collseq || gv_target->nct)							\
+		{												\
+			/* collation transformation should be done at the server's end for CM regions */	\
+			assert(dba_cm != gv_cur_region->dyn.addr->acc_meth);					\
+			TREF(transform) = FALSE;								\
+			end = gvsub2str((uchar_ptr_t)mvarg->str.addr, buff, FALSE);				\
+			TREF(transform) = TRUE;									\
+			temp.mvtype = MV_STR;									\
+			temp.str.addr = (char *)buff;								\
+			temp.str.len = (mstr_len_t)(end - buff);						\
+			mval2subsc(&temp, gv_currkey);								\
+		} else												\
+		{												\
+			len = mvarg->str.len;									\
+			if (gv_currkey->end + len - 1 >= max_key)						\
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey);						\
+			memcpy((gv_currkey->base + gv_currkey->end), mvarg->str.addr, len);			\
+			if (is_null && 0 != gv_cur_region->std_null_coll)					\
+				gv_currkey->base[gv_currkey->end] = SUBSCRIPT_STDCOL_NULL;			\
+			gv_currkey->prev = gv_currkey->end;							\
+			gv_currkey->end += len - 1;								\
+		}												\
+	} else													\
+	{													\
+		MV_FORCE_DEFINED(mvarg);									\
+		mval2subsc(mvarg, gv_currkey);									\
+		if (gv_currkey->end >= max_key)									\
+			ISSUE_GVSUBOFLOW_ERROR(gv_currkey);							\
+		is_null = (MV_IS_STRING(mvarg) && (0 == mvarg->str.len));					\
+	}													\
 }
 
 /* Copy GVKEY to GVT->CLUE. Take care NOT to copy cluekey->top to GVKEY->top as they correspond
@@ -2387,9 +2437,6 @@ typedef enum
 	if ((TN) >= (CSD)->max_tn_warn)											\
 	{														\
 		trans_num trans_left;											\
-															\
-		error_def(ERR_TNTOOLARGE);										\
-		error_def(ERR_TNWARN);											\
 															\
 		if ((CSA)->hdr->max_tn <= (TN))										\
 		{													\
@@ -2779,7 +2826,6 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #define CR_BUFFER_CHECK1(reg, csa, csd, cr, cr_lo, cr_hi)					\
 {												\
 	INTPTR_T bp, bp_lo, bp_top, cr_top;							\
-	error_def(ERR_DBCRERR);									\
 												\
 	cr_top = GDS_ANY_ABS2REL(csa, cr_hi);							\
 	bp_lo = ROUND_UP(cr_top, OS_PAGE_SIZE);							\
@@ -2940,9 +2986,6 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 	shm_snapshot_ptr_t	ss_shm_ptr;											\
 	snapshot_context_ptr_t	lcl_ss_ctx;											\
 	boolean_t		csa_snapshot_in_prog, cnl_snapshot_in_prog;							\
-																\
-	error_def(ERR_SSFILOPERR);												\
-	error_def(ERR_SSATTACHSHM);												\
 																\
 	assert(CSA->now_crit);													\
 	csa_snapshot_in_prog = SNAPSHOTS_IN_PROG(CSA);										\

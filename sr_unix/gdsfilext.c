@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,12 +73,15 @@ GBLREF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl re
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
 GBLREF  boolean_t	have_standalone_access;
 
-OS_PAGE_SIZE_DECLARE
+error_def(ERR_DBFILERR);
+error_def(ERR_DBFILEXT);
+error_def(ERR_DSKSPACEFLOW);
+error_def(ERR_JNLFLUSH);
+error_def(ERR_TEXT);
+error_def(ERR_TOTALBLKMAX);
+error_def(ERR_WAITDSKSPACE);
 
-#ifdef DEBUG_DB64
-/* if debugging large address stuff, make all memory segments allocate above 4G line */
-GBLREF	sm_uc_ptr_t	next_smseg;
-#endif
+OS_PAGE_SIZE_DECLARE
 
 uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 {
@@ -98,14 +101,6 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	int4			prev_extend_blks_to_upgrd;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
-
-	error_def(ERR_DBFILERR);
-	error_def(ERR_DBFILEXT);
-	error_def(ERR_DSKSPACEFLOW);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_TEXT);
-	error_def(ERR_TOTALBLKMAX);
-	error_def(ERR_WAITDSKSPACE);
 
 #if !defined(MM_FILE_EXT_OK)
 	if (!have_standalone_access && (dba_mm == cs_addrs->hdr->acc_meth))
@@ -252,12 +247,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			tmp_csd = cs_data;
 			cs_data = (sgmnt_data_ptr_t)malloc(SIZEOF(*cs_data));
 			memcpy((sm_uc_ptr_t)cs_data, (uchar_ptr_t)tmp_csd, SIZEOF(*cs_data));
-			status = munmap((caddr_t)cs_addrs->db_addrs[0],
-					     (size_t)(cs_addrs->db_addrs[1] - cs_addrs->db_addrs[0]));
-#ifdef DEBUG_DB64
-			if (-1 != status)
-				rel_mmseg((caddr_t)cs_addrs->db_addrs[0]);
-#endif
+			status = munmap((caddr_t)cs_addrs->db_addrs[0], (size_t)(cs_addrs->db_addrs[1] - cs_addrs->db_addrs[0]));
 		} else
 			tmp_csd = NULL;
 		if (0 != status)
@@ -429,17 +419,6 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		mm_prot = cs_addrs->read_write ? (PROT_READ | PROT_WRITE) : PROT_READ;
 		old_base[0] = cs_addrs->db_addrs[0];
 		old_base[1] = cs_addrs->db_addrs[1];
-#ifdef DEBUG_DB64
-		if (-1 == ((sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)get_mmseg((size_t)new_eof),
-										(size_t)new_eof, mm_prot,
-										GTM_MM_FLAGS, udi->fd, (off_t)0))))
-		{
-			GDSFILEXT_CLNUP;
-			send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), errno);
-			return (uint4)(NO_FREE_SPACE);
-		}
-		put_mmseg((caddr_t)(cs_addrs->db_addrs[0]), (size_t)new_eof);
-#else
 		if (-1 == ((sm_long_t)(cs_addrs->db_addrs[0] = (sm_uc_ptr_t)mmap((caddr_t)NULL, (size_t)new_eof, mm_prot,
 										GTM_MM_FLAGS, udi->fd, (off_t)0))))
 		{
@@ -447,7 +426,6 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			send_msg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), errno);
 			return (uint4)(NO_FREE_SPACE);
 		}
-#endif
 		free(cs_data);			/* note current assumption that cs_data has not changed since memcpy above */
 		/* In addition to updating the internal map values, gds_map_moved sets cs_data to point to the remapped file */
 		gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], new_eof);

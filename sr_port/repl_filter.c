@@ -59,27 +59,27 @@
 
 #define V15_NULL_RECLEN		SIZEOF(v15_jrec_prefix) + SIZEOF(seq_num) + SIZEOF(uint4) + SIZEOF(jrec_suffix)
 
-#define NULLSUBSC_TRANSFORM_IF_NEEDED(PTR)				\
-{									\
-	int			keylen;					\
-	uchar_ptr_t		lclptr;					\
-	DCL_THREADGBL_ACCESS;						\
-									\
-	SETUP_THREADGBL_ACCESS;						\
-	if (REPLGBL.null_subs_xform)					\
-	{								\
-		assert(SIZEOF(jnl_str_len_t) == SIZEOF(uint4));		\
-		keylen = *((jnl_str_len_t *)(PTR));			\
-		lclptr = PTR + SIZEOF(jnl_str_len_t);			\
-		if (STDNULL_TO_GTMNULL_COLL == REPLGBL.null_subs_xform)	\
-		{							\
-			STD2GTMNULLCOLL(lclptr, keylen);		\
-		} else							\
-		{							\
-			GTM2STDNULLCOLL(lclptr, keylen);		\
-		}							\
-	}								\
-}									\
+#define NULLSUBSC_TRANSFORM_IF_NEEDED(PTR)					\
+{										\
+	int			keylen;						\
+	uchar_ptr_t		lclptr;						\
+	DCL_THREADGBL_ACCESS;							\
+										\
+	SETUP_THREADGBL_ACCESS;							\
+	if ((TREF(replgbl)).null_subs_xform)					\
+	{									\
+		assert(SIZEOF(jnl_str_len_t) == SIZEOF(uint4));			\
+		keylen = *((jnl_str_len_t *)(PTR));				\
+		lclptr = PTR + SIZEOF(jnl_str_len_t);				\
+		if (STDNULL_TO_GTMNULL_COLL == (TREF(replgbl)).null_subs_xform)	\
+		{								\
+			STD2GTMNULLCOLL(lclptr, keylen);			\
+		} else								\
+		{								\
+			GTM2STDNULLCOLL(lclptr, keylen);			\
+		}								\
+	}									\
+}										\
 
 #define BREAK_IF_BADREC(RECLEN, STATUS)				\
 {								\
@@ -1273,8 +1273,8 @@ int jnl_v21TOv15(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		 */
 		assert((HASHT_JREC == trigupd_type) || (FALSE == non_ztrig_rec_found));
 		GTMTRIG_ONLY(
-			if (!REPLGBL.trig_replic_suspect_seqno)
-				REPLGBL.trig_replic_suspect_seqno = this_upd_seqno;
+			if (!(TREF(replgbl)).trig_replic_suspect_seqno)
+				(TREF(replgbl)).trig_replic_suspect_seqno = this_upd_seqno;
 		)
 		v15_prefix = (v15_jrec_prefix *)(cb);
 		if (V15_NULL_RECLEN > conv_bufsiz)
@@ -1446,8 +1446,8 @@ int jnl_v21TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		 */
 		assert((HASHT_JREC == trigupd_type) || (FALSE == non_ztrig_rec_found));
 		GTMTRIG_ONLY(
-			if (!REPLGBL.trig_replic_suspect_seqno)
-				REPLGBL.trig_replic_suspect_seqno = this_upd_seqno;
+			if (!(TREF(replgbl)).trig_replic_suspect_seqno)
+				(TREF(replgbl)).trig_replic_suspect_seqno = this_upd_seqno;
 		)
 		prefix = (jrec_prefix *)(cb);
 		if (NULL_RECLEN > conv_bufsiz)
@@ -1610,8 +1610,8 @@ int jnl_v19TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		 */
 		assert(!secondary_side_trigger_support && (HASHT_JREC == trigupd_type));
 		GTMTRIG_ONLY(
-			if (!REPLGBL.trig_replic_suspect_seqno)
-				REPLGBL.trig_replic_suspect_seqno = this_upd_seqno;
+			if (!(TREF(replgbl)).trig_replic_suspect_seqno)
+				(TREF(replgbl)).trig_replic_suspect_seqno = this_upd_seqno;
 		)
 		prefix = (jrec_prefix *)(cb);
 		if (NULL_RECLEN > conv_bufsiz)
@@ -1819,8 +1819,8 @@ int jnl_v21TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		 */
 		assert((HASHT_JREC == trigupd_type) || (FALSE == non_ztrig_rec_found));
 		GTMTRIG_ONLY(
-			if (!REPLGBL.trig_replic_suspect_seqno)
-				REPLGBL.trig_replic_suspect_seqno = this_upd_seqno;
+			if (!(TREF(replgbl)).trig_replic_suspect_seqno)
+				(TREF(replgbl)).trig_replic_suspect_seqno = this_upd_seqno;
 		)
 		prefix = (jrec_prefix *)(cb);
 		if (NULL_RECLEN > conv_bufsiz)
@@ -1977,8 +1977,8 @@ int jnl_v21TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		assert(!secondary_side_trigger_support
 			&& ((HASHT_JREC == trigupd_type) || (FALSE == non_ztrig_rec_found)));
 		GTMTRIG_ONLY(
-			if (!REPLGBL.trig_replic_suspect_seqno)
-				REPLGBL.trig_replic_suspect_seqno = this_upd_seqno;
+			if (!(TREF(replgbl)).trig_replic_suspect_seqno)
+				(TREF(replgbl)).trig_replic_suspect_seqno = this_upd_seqno;
 		)
 		prefix = (jrec_prefix *)(cb);
 		if (NULL_RECLEN > conv_bufsiz)

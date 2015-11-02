@@ -26,9 +26,6 @@
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_region       *gv_cur_region;
 
-error_def(ERR_GVSUBOFLOW);
-error_def(ERR_GVIS);
-
 static readonly unsigned char pos_code[100] =
 {
 	0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
@@ -60,13 +57,13 @@ static readonly unsigned char neg_code[100] =
 unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 {
 	boolean_t	is_negative;
-	unsigned char	buf1[MAX_KEY_SZ + 1], buff[MAX_ZWR_KEY_SZ], ch, *cvt_table, *end, *in_ptr, *out_ptr;
+	unsigned char	buf1[MAX_KEY_SZ + 1], ch, *cvt_table, *in_ptr, *out_ptr;
 	unsigned char	*tm, temp_mantissa[NUM_DEC_DG_2L / 2 + 3];	/* Need 1 byte for each two digits.  Add 3 bytes slop */
 	mstr		mstr_ch, mstr_buf1;
 	int4		mt, mw, mx;
 	uint4		mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
 	unsigned int	digs, exp_val;
-	int		tmp_len;
+	int		tmp_len, avail_bytes;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -113,12 +110,17 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 			in_ptr = (unsigned char*)mstr_buf1.addr; /* mstr_buf1.addr is used just in case it is
 								    reallocated by the XFORM routine */
 		}
-		if ((out_key->end + tmp_len + 3) > (out_key->top - MAX_NUM_SUBSC_LEN))
-		{
-			if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, out_key, TRUE)))
-				end = &buff[MAX_ZWR_KEY_SZ - 1];
-			rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
-		}
+		/* Find out how much space is needed at a minimum to store the subscript representation of this string.
+		 * That would be STR_SUB_PREFIX + input string + at most TWO KEY_DELIMITER.
+		 * Assuming this, compute how much space would still be available in the out_key before reaching the top.
+		 * If this is negative, we have to signal a GVSUBOFLOW error.
+		 * If this is positive and the input string contains 0x00 or 0x01, we would need additional bytes to
+		 * 	store the STR_SUB_ESCAPE byte. Decrement the available space until it becomes zero
+		 *	at which point issue a GVSUBOFLOW error as well.
+		 */
+		avail_bytes = (out_key->top - MAX_NUM_SUBSC_LEN) - (out_key->end + tmp_len + 3);
+		if (0 > avail_bytes)
+			ISSUE_GVSUBOFLOW_ERROR(out_key);
 		if (0 < tmp_len)
 		{
 			*out_ptr++ = STR_SUB_PREFIX;
@@ -128,12 +130,12 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 				if (ch <= 1)
 				{
 					*out_ptr++ = STR_SUB_ESCAPE;
-					if (((int) (out_ptr - out_key->base + tmp_len + 3))
-						> (out_key->top - MAX_NUM_SUBSC_LEN))
+					if (0 > --avail_bytes)
 					{
-						if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, out_key, TRUE)))
-							end = &buff[MAX_ZWR_KEY_SZ - 1];
-						rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+						/* Ensure input key to format_targ_key is double null terminated */
+						assert(STR_SUB_PREFIX == out_key->base[out_key->end]);
+						out_key->base[out_key->end] = KEY_DELIMITER;
+						ISSUE_GVSUBOFLOW_ERROR(out_key);
 					}
 					ch++;	/* promote character */
 				}
@@ -146,7 +148,9 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		}
 		goto FINI;
 	}
-	/* Its a number, is it an integer? */
+	/* Its a number, is it an integer? But before this assert that we have enough allocated space in the key
+	 * to store the maximum possible numeric subscript and two terminating 0s at the end of the key */
+	assert((MAX_NUM_SUBSC_LEN + 2) <= (int)(out_key->top - out_key->end));
 	if (mvt & MV_INT)
 	{	/* Yes, its an integer, convert it */
 		is_negative = FALSE;
@@ -291,11 +295,11 @@ FINI:
 	*out_ptr = KEY_DELIMITER;
 	out_key->prev = out_key->end;
 	out_key->end = out_ptr - out_key->base;
-	if (0 >= (int)(out_key->top - out_key->end) - MAX_NUM_SUBSC_LEN)
-	{	/* take care of extra space plus <NUL> terminator */
-		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, out_key, TRUE)))
-			end = &buff[MAX_ZWR_KEY_SZ - 1];
-		rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
-	}
+	/* Check if after adding the current subscript and the second terminating NULL byte, there is still
+	 * MAX_NUM_SUBSC_LEN bytes (allocated additionally as part of the DBKEYSIZE macro) left at the end.
+	 * If not, we have overflown the original max-key-size length. Issue error.
+	 */
+	if ((MAX_NUM_SUBSC_LEN + 1) >= (int)(out_key->top - out_key->end))
+		ISSUE_GVSUBOFLOW_ERROR(out_key);
 	return out_ptr;
 }

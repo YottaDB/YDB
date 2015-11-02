@@ -29,7 +29,7 @@ error_def(ERR_ALIASEXPECTED);
 error_def(ERR_QUITARGUSE);
 error_def(ERR_QUITARGLST);
 
-	LITREF	mval		literal_null;
+LITREF	mval		literal_null;
 
 int m_quit(void)
 {
@@ -106,7 +106,7 @@ int m_quit(void)
 	} else if (!arg)						/* FOR */
 	{
 		triptr = newtriple(OC_JMP);
-		triptr->operand[0] = for_end_of_scope(1);
+		FOR_END_OF_SCOPE(1, triptr->operand[0]);
 		return TRUE;
 	}
 	stx_error(ERR_QUITARGUSE);

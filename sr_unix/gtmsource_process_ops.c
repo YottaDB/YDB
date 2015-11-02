@@ -61,6 +61,7 @@
 #include "repl_instance.h"
 #include "ftok_sems.h"
 #include "gtmmsg.h"
+#include "wbox_test_init.h"
 #include "have_crit.h"			/* needed for ZLIB_COMPRESS */
 #include "deferred_signal_handler.h"	/* needed for ZLIB_COMPRESS */
 #include "gtm_zlib.h"
@@ -466,7 +467,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 					repl_log(gtmsource_log_fp, TRUE, TRUE, "Warning : Secondary does not support GT.M "
 						"database triggers. #t updates on primary will not be replicated\n");
 #				endif
-				REPLGBL.trig_replic_warning_issued = FALSE;
+				(TREF(replgbl)).trig_replic_warning_issued = FALSE;
 				return (SS_NORMAL);
 			} else if (REPL_FETCH_RESYNC == msg.type)
 			{	/* Determine the protocol version of the receiver side.
@@ -997,7 +998,9 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 	int			index, cmpret, start;
 	boolean_t		cmpfail;
 	uLongf			cmplen;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(gtm_zlib_cmp_level);
 	/*************** Send REPL_CMP_TEST message ***************/
 	memset(&test_msg, 0, SIZEOF(test_msg));
@@ -1050,10 +1053,24 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 	gtmsource_repl_send((repl_msg_ptr_t)&test_msg, "REPL_CMP_TEST", MAX_SEQNO);
 	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
 		return FALSE; /* send did not succeed */
-
+	/* for in-house testing, set up a timer that would cause assert failure if REPL_CMP_SOLVE is not received
+	 * within 1 or 15 minutes, depending on whether this is a white-box test or not */
+	if (TREF(gtm_environment_init))
+#ifdef DEBUG
+		if (gtm_white_box_test_case_enabled && (WBTEST_CMP_SOLVE_TIMEOUT == gtm_white_box_test_case_number))
+			start_timer((TID)repl_cmp_solve_src_timeout, 1 * 60 * 1000, repl_cmp_solve_src_timeout, 0, NULL);
+		else
+#endif
+			start_timer((TID)repl_cmp_solve_src_timeout, 15 * 60 * 1000, repl_cmp_solve_src_timeout, 0, NULL);
 	/*************** Receive REPL_CMP_SOLVE message ***************/
 	if (!gtmsource_repl_recv((repl_msg_ptr_t)&solve_msg, REPL_MSG_CMPINFOLEN, REPL_CMP_SOLVE, "REPL_CMP_SOLVE"))
+	{
+		if (TREF(gtm_environment_init))
+			cancel_timer((TID)repl_cmp_solve_src_timeout);
 		return FALSE; /* recv did not succeed */
+	}
+	if (TREF(gtm_environment_init))
+		cancel_timer((TID)repl_cmp_solve_src_timeout);
 	assert(REPL_CMP_SOLVE == solve_msg.type);
 	cmpfail = FALSE;
 	if (REPL_MSG_CMPDATALEN != solve_msg.datalen)
@@ -1085,6 +1102,11 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 		*repl_zlib_cmp_level_ptr = ZLIB_CMPLVL_NONE;
 	}
 	return TRUE;
+}
+
+void 		repl_cmp_solve_src_timeout(void)
+{
+	GTMASSERT;
 }
 
 boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary)

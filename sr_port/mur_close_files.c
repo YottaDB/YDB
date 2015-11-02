@@ -85,6 +85,23 @@ GBLREF	boolean_t	mur_close_files_done;
 GBLREF	jnlpool_addrs	jnlpool;
 #endif
 
+error_def(ERR_FILERENAME);
+error_def(ERR_JNLACTINCMPLT);
+error_def(ERR_JNLBADLABEL);
+error_def(ERR_JNLREAD);
+error_def(ERR_JNLSTATE);
+error_def(ERR_JNLSTRESTFL);
+error_def(ERR_JNLSUCCESS);
+error_def(ERR_JNLWRERR);
+error_def(ERR_MUJNLSTAT);
+error_def(ERR_MUNOACTION);
+error_def(ERR_PREMATEOF);
+error_def(ERR_RENAMEFAIL);
+error_def(ERR_REPLSTATE);
+UNIX_ONLY(error_def(ERR_REPLFTOKSEM);)
+VMS_ONLY(error_def(ERR_SETREG2RESYNC);)
+
+
 void	mur_close_files(void)
 {
 	reg_ctl_list		*rctl, *rctl_top;
@@ -111,26 +128,6 @@ void	mur_close_files(void)
 	gtmsrc_lcl		gtmsrc_lcl_array[NUM_GTMSRC_LCL];
 #endif
 
-	error_def(ERR_FILERENAME);
-	error_def(ERR_JNLACTINCMPLT);
-	error_def(ERR_JNLBADLABEL);
-	error_def(ERR_JNLREAD);
-	error_def(ERR_JNLSTATE);
-	error_def(ERR_JNLSTRESTFL);
-	error_def(ERR_JNLSUCCESS);
-	error_def(ERR_JNLWRERR);
-	error_def(ERR_MUJNLSTAT);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_PREMATEOF);
-	error_def(ERR_RENAMEFAIL);
-	error_def(ERR_REPLSTATE);
-
-	UNIX_ONLY(
-		error_def(ERR_REPLFTOKSEM);
-	)
-	VMS_ONLY(
-		error_def(ERR_SETREG2RESYNC);
-	)
 
 	if (mur_close_files_done)
 	{
@@ -391,7 +388,7 @@ void	mur_close_files(void)
 		}
 		rctl->jctl_head = NULL;	/* So that we do not come to above loop again */
 		UNIX_ONLY(
-			if (rctl->standalone && !db_ipcs_reset(reg, !murgbl.clean_exit))
+			if (rctl->standalone && !db_ipcs_reset(reg))
 				wrn_count++;
 			rctl->standalone = FALSE;
 		)

@@ -10,9 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-
 #include "gtm_string.h"
-
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -26,8 +24,9 @@
 #include "jnl.h"
 #include "mutex.h"
 #include "wcs_phase2_commit_wait.h"
-
 #include "gvcst_protos.h"	/* for gvcst_init_sysops prototype */
+
+GBLREF  boolean_t       dse_running;
 
 error_def(ERR_DBBADUPGRDSTATE);
 
@@ -95,24 +94,24 @@ void db_auto_upgrade(gd_region *reg)
 			} else
 				csd->db_got_to_v5_once = TRUE;	/* db was created by V5 so safe to set this */
 		}
+		/* When adding a new minor version, the following template should be maintained
+		 * a) Remove the penultimate 'break'
+		 * b) Remove the assert(FALSE) in the last case (most recent minor version)
+		 * c) If there are any file header fields added in the new minor version, initialize the fields to default values
+		 *    in the last case
+		 * d) Add a new case with the new minor version
+		 * e) Add assert(FALSE) and break (like it was before)
+		 */
 		switch(csd->minor_dbver)
 		{
 			case GDSMV51000:		/* Multi-site replication available */
 			case GDSMV52000:		/* Unicode */
 			case GDSMV53000:		/* M-Itanium release */
 				gvstats_rec_upgrade(csa); /* Move GVSTATS information to new place in file header */
-			case GDSMV53003:		/* ZSHOW "G" release */
-				csd->is_encrypted = FALSE;
-				memset(csd->encryption_hash, 0, GTMCRYPT_HASH_LEN);
+			case GDSMV54002: 		/* Backward recovery related fields */
+				csd->jnl_eovtn = csd->trans_hist.curr_tn;
 				break;
-			case GDSMV53004:		/* New encryption fields */
-				csd->db_trigger_cycle = 0;
-				break;
-			case GDSMV54000:		/* New ztrigger count field */
-				csa->gvstats_rec.n_ztrigger = 0;
-				csd->gvstats_rec.n_ztrigger = 0;
-				break;
-			case GDSMV54002:
+			case GDSMV54003:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
@@ -123,8 +122,10 @@ void db_auto_upgrade(gd_region *reg)
 	}
 	csd->last_mdb_ver = GDSMVCURR;
 	if (csd->fully_upgraded && !csd->db_got_to_v5_once)
-	{	/* Database is fully upgraded but the db_got_to_v5_once field says different. Don't know how that could happen */
-		assert(FALSE);
+	{	/* Database is fully upgraded but the db_got_to_v5_once field says different.
+                 * Don't know how that could happen, except with DSE which can change both the database file header fields
+                 */
+		assert(!dse_running);
 		csd->db_got_to_v5_once = TRUE; /* fix it in PRO */
 		send_msg(VARLSTCNT(6) ERR_DBBADUPGRDSTATE, 4, REG_LEN_STR(reg), DB_LEN_STR(reg));
 	}

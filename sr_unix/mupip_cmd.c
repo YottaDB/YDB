@@ -19,6 +19,7 @@
 #include "repl_msg.h"
 #include "cli.h"
 #include "mupip_cmd_disallow.h"
+#include "iob.h"	/* needed for mupip_restore.h */
 
 /*********************************************************************
  * Parameters must be defined in the order they are to be specified

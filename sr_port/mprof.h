@@ -11,6 +11,8 @@
 
 #ifndef MPROF_H_INCLUDED
 #define MPROF_H_INCLUDED
+#include "mdef.h"
+#include "str2gvargs.h"
 #include "xfer_enum.h"
 #include "fix_xfer_entry.h"
 #ifdef UNIX
@@ -18,15 +20,11 @@
 #include <sys/resource.h>
 #endif
 #define OFFSET_LEN 			8
-#define TOTAL_SIZE_OF_PROFILING_STACKS 	8388608
-#define	GUARD_RING_FOR_PROFILING_STACK	1024
 #ifdef GTM64
 #define PROFCALLOC_DSBLKSIZE 		8192
 #else
 #define PROFCALLOC_DSBLKSIZE            8180
 #endif
-
-#define MAX_MPROF_TREE_HEIGHT		32
 
 #define POPULATE_PROFILING_TABLE() { \
 	/* xfer_table[xf_linefetch] = op_mproflinefetch; */	\
@@ -69,14 +67,16 @@
 }
 
 #if defined(VMS) && !defined(__TIME_LOADED)
-struct tms {
+struct tms
+{
 	int4	tms_utime;		/* user time */
 	int4	tms_stime;		/* system time */
 };
 #endif
 
 /* holds information identifying a line of/label in the code */
-typedef struct {
+typedef struct
+{
 	mident		*rout_name;	/* routine name */
 	mident  	*label_name;	/* label name */
 	signed int  	line_num;	/* line number; -1 used for generic label nodes, and -2 for overflow node */
@@ -88,29 +88,47 @@ typedef struct {
 } trace_entry;
 
 /* defines an mprof stack frame */
-typedef struct stack_frame_prof_struct
+typedef struct mprof_stack_frame_struct
 {
-	struct stack_frame_prof_struct	*prev;			/* reference to the previous frame */
+	struct mprof_stack_frame_struct	*prev;			/* reference to the previous frame */
 	mident				*rout_name;		/* routine name */
 	mident				*label_name;		/* label name */
+	struct mprof_tree_struct	*curr_node;		/* reference to the current tree node in this frame */
 	struct tms			start;			/* user and system time at the beginning of current measurement */
+	struct tms			carryover;		/* user and system time to be subtracted from parent frames */
 	int				dummy_stack_count;	/* number of non-label stack frames (IFs and FORs with DO) */
-} stack_frame_prof;
+} mprof_stack_frame;
 
 /* defines a node of mprof tree which is an AVL tree */
-typedef struct mprof_tree {
-	trace_entry		e;		/* holds identifying information about this node */
-	struct mprof_tree 	*link[2]; 	/* references to left and right children */
-	struct mprof_tree	*loop_link; 	/* FORs attached to the node as a linked list */
-	int 			desc_dir;	/* descending direction that indicates which subtree is unbalanced */
+typedef struct mprof_tree_struct
+{
+	trace_entry			e;		/* holds identifying information about this node */
+	struct mprof_tree_struct 	*link[2]; 	/* references to left and right children */
+	struct mprof_tree_struct	*loop_link; 	/* FORs attached to the node as a linked list */
+	int 				desc_dir;	/* descending direction that indicates which subtree is unbalanced */
+	int				ins_path_hint;	/* indicates whether node was (1) or was not (-1) in the path of last
+							 * insert, or was the node inserted (0) */
 } mprof_tree;
+
+typedef struct mprof_wrapper_struct
+{
+	struct tms		tprev, tcurr;
+	mprof_tree		*head_tblnd, *curr_tblnd;
+	int			curr_num_subscripts;
+	char			**pcavailptr, **pcavailbase;
+	int			pcavail;
+	boolean_t		is_tracing_ini;
+	mval			subsc[MAX_GVSUBSCRIPTS];
+	gvargs_t		gvargs;
+	mval			gbl_to_fill;
+} mprof_wrapper;
 
 char 	*pcalloc(unsigned int);
 void	turn_tracing_on(mval *glvn);
 void	turn_tracing_off(mval *);
 void	new_prof_frame(int);
 void 	mprof_tree_walk(mprof_tree *);
-void	pcurrpos(int inside_for_loop);
+void	pcurrpos(void);
 void	forchkhandler(char *return_address);
 void	unw_prof_frame(void);
 mprof_tree *new_node(trace_entry *);
@@ -119,6 +137,10 @@ void	mprof_tree_print(mprof_tree *tree,int tabs,int longl);
 mprof_tree *mprof_tree_insert(mprof_tree **, trace_entry *);
 void	crt_gbl(mprof_tree *p, boolean_t is_for);
 void	stack_leak_check(void);
+void	mprof_stack_init(void);
+mprof_stack_frame *mprof_stack_push(void);
+mprof_stack_frame *mprof_stack_pop(void);
+void	mprof_stack_free(void);
 
 /* functions required for the transfer table manipulations*/
 int op_mproflinefetch(), op_mproflinestart();

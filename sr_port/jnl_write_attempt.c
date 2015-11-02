@@ -37,9 +37,18 @@
 #endif
 #include "gtm_c_stack_trace.h"
 
-GBLREF boolean_t		gtm_environment_init;
 GBLREF	pid_t	process_id;
 GBLREF	uint4	image_count;
+
+error_def(ERR_JNLCNTRL);
+error_def(ERR_JNLFLUSH);
+error_def(ERR_JNLFLUSHNOPROG);
+error_def(ERR_JNLPROCSTUCK);
+error_def(ERR_JNLWRTDEFER);
+error_def(ERR_JNLWRTNOWWRTR);
+error_def(ERR_TEXT);
+error_def(ERR_JNLWRTDEFER);
+error_def(ERR_JNLWRTNOWWRTR);
 
 #ifdef VMS
 #  define CURRENT_WRITER jb->now_writer
@@ -57,13 +66,6 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	static uint4		loop_image_count, writer;	/* assumes calls from one loop at a time */
 	uint4			new_dskaddr, new_dsk;
 	static uint4		stuck_cnt = 0;
-
-	error_def(ERR_JNLCNTRL);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_JNLPROCSTUCK);
-	error_def(ERR_TEXT);
-	error_def(ERR_JNLWRTDEFER);
-	error_def(ERR_JNLWRTNOWWRTR);
 
 	/* Some callers of jnl_sub_write_attempt (jnl_flush->jnl_write_attempt, jnl_write->jnl_write_attempt) are in
 	 * crit, and some other (jnl_wait->jnl_write_attempt) are not. Callers in crit do not need worry about journal
@@ -207,15 +209,9 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	sgmnt_addrs		*csa;
 	unsigned int		status;
 	boolean_t		was_crit, jnlfile_lost, exact_check;
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_JNLCNTRL);
-	error_def(ERR_JNLFLUSH);
-	error_def(ERR_JNLFLUSHNOPROG);
-	error_def(ERR_JNLPROCSTUCK);
-	error_def(ERR_JNLWRTDEFER);
-	error_def(ERR_JNLWRTNOWWRTR);
-	error_def(ERR_TEXT);
-
+	SETUP_THREADGBL_ACCESS;
 	jb = jpc->jnl_buff;
 	csa = &FILE_INFO(jpc->region)->s_addrs;
 	was_crit = csa->now_crit;
@@ -338,7 +334,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				send_msg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr), ERR_TEXT, 2,
 					LEN_AND_LIT("Progress prevented by a process stuck flushing journal data"));
 				VMS_ONLY(
-					if (gtm_environment_init)
+					if (TREF(gtm_environment_init))
 					{
 						proc_stuck_cnt = 0;
 						continue;

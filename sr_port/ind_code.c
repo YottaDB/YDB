@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,7 +60,7 @@ void	ind_code(mstr *obj)
 {
 	var_tabent	*vptr;
 	ihdtyp		*itext;
-	int		indir_code_size;
+	uint4		indir_code_size;
 	IA64_ONLY(int	old_code_size;)
 	INTPTR_T	validation, hdr_offset, long_temp;
 	unsigned char	*indr_base_addr;
@@ -73,20 +73,21 @@ void	ind_code(mstr *obj)
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;
-#if (!defined(USHBIN_SUPPORTED) && !defined(VMS))  /* non-shared binary UNIX platforms */
+#	if (!defined(USHBIN_SUPPORTED) && !defined(VMS))  /* non-shared binary UNIX platforms */
 	shrink_jmps();
-#endif
+#	endif
 	/* GTM64: assuming indir_code_size wont exceed MAX_INT */
-	indir_code_size = (int)
-		((SECTION_ALIGN_BOUNDARY - 1) +	/* extra padding to align the beginning of the entire indirect object */
-		SIZEOF(ihdtyp) + PADLEN(SIZEOF(ihdtyp), NATIVE_WSIZE) + /* extra padding to align the beginning of lit text pool */
-		ROUND_UP2(indr_stringpool.free - indr_stringpool.base, NATIVE_WSIZE) +	/* literal strings */
-		mlitmax * SIZEOF(mval) +	/* literal mval table aligned at NATIVE_WSIZE boundary */
-	  	(SIZEOF(INTPTR_T) * 2) +		/* validation word and (neg) offset to ihdtyp */
-	                                                /* SIZEOF(INTPTR_T) is used for alignment reasons */
-	  	GTM64_ONLY((SECTION_ALIGN_BOUNDARY - 1) +)	/* extra padding to align the beginning of the code address */
-		code_size +			/* code already aligned at SECTION_ALIGN_BOUNDARY boundary */
-		mvmax * SIZEOF(var_tabent));	/* variable table ents */
+	indir_code_size =
+		(uint4)((SECTION_ALIGN_BOUNDARY - 1)	/* extra padding to align the beginning of the entire indirect object */
+		+ SIZEOF(ihdtyp) + PADLEN(SIZEOF(ihdtyp), NATIVE_WSIZE) /* extra padding to align the beginning of lit text pool */
+		+ ROUND_UP2(indr_stringpool.free - indr_stringpool.base, NATIVE_WSIZE)	/*  base literal strings */
+		+ mlitmax * SIZEOF(mval)		/* literal mval table aligned at NATIVE_WSIZE boundary */
+		+ (SIZEOF(INTPTR_T) * 2)		/* validation word and (neg) offset to ihdtyp */
+							/* SIZEOF(INTPTR_T) is used for alignment reasons */
+		+ GTM64_ONLY((SECTION_ALIGN_BOUNDARY - 1))	/* extra padding to align the beginning of the code address */
+		+ code_size				/* code already aligned at SECTION_ALIGN_BOUNDARY boundary */
+		+ mvmax * SIZEOF(var_tabent))		/* variable table ents */
+		+ SIZEOF(mval) + SIZEOF(mname_entry) + SIZEOF(mident_fixed) + (SIZEOF(uint4) * 2); /* in case of/see op_indlvadr */
 	ENSURE_STP_FREE_SPACE(indir_code_size);
 	/* Align the beginning of the indirect object so that ihdtyp fields can be accessed normally */
 	stringpool.free = (unsigned char *)ROUND_UP2((UINTPTR_T)stringpool.free, SECTION_ALIGN_BOUNDARY);
@@ -97,26 +98,23 @@ void	ind_code(mstr *obj)
 	/* Runtime base (fp->ctxt) needs to be set to the beginning of the Executable code so that
 	 * the literal references are generated with appropriate (-ve) offsets from the base
 	 * register (fp->ctxt). On USHBIN_SUPPORTED platforms, runtime_base should be computed
-	 * before shrink_trips since it could be used in codegen of literals */
+	 * before shrink_trips since it could be used in codegen of literals
+	 */
 	runtime_base = stringpool.free + SIZEOF(hdr_offset) + SIZEOF(validation);
-
 	/* Align the begining of the code so that it can be access properly. */
-        GTM64_ONLY(runtime_base = (unsigned char *)ROUND_UP2((UINTPTR_T)runtime_base, SECTION_ALIGN_BOUNDARY);)
-
+	GTM64_ONLY(runtime_base = (unsigned char *)ROUND_UP2((UINTPTR_T)runtime_base, SECTION_ALIGN_BOUNDARY);)
 	IA64_ONLY(old_code_size = code_size;)
-#if defined(USHBIN_SUPPORTED) || defined(VMS)
+#	if defined(USHBIN_SUPPORTED) || defined(VMS)
 	shrink_trips();
-#endif
+#	endif
 	IA64_ONLY(
 		if (old_code_size != code_size)
 		  calculated_code_size -= ((old_code_size - code_size)/16);
 	)
-	/* Allignment for the starting of code address before code_gen.*/
-        GTM64_ONLY(stringpool.free = (unsigned char *)ROUND_UP2((UINTPTR_T)stringpool.free, SECTION_ALIGN_BOUNDARY);)
-
+	/* Alignment for the starting of code address before code_gen.*/
+	GTM64_ONLY(stringpool.free = (unsigned char *)ROUND_UP2((UINTPTR_T)stringpool.free, SECTION_ALIGN_BOUNDARY);)
 	assert(0 == GTM64_ONLY(PADLEN((UINTPTR_T)stringpool.free, SECTION_ALIGN_BOUNDARY))
-	       NON_GTM64_ONLY(PADLEN((UINTPTR_T)stringpool.free, SIZEOF(int4))));
-
+		NON_GTM64_ONLY(PADLEN((UINTPTR_T)stringpool.free, SIZEOF(int4))));
 	/* Since we know stringpool is aligned atleast at 4-byte boundary, copy both offset and validation
 	 * words with integer assignments instead of copying them by emit_immed(). */
 	hdr_offset = indr_base_addr - stringpool.free;		/* -ve offset to ihdtyp */
@@ -125,14 +123,12 @@ void	ind_code(mstr *obj)
 	validation = MAGIC_COOKIE;			/* Word to validate we are in right place */
 	*(UINTPTR_T *)stringpool.free = validation;
 	stringpool.free += SIZEOF(validation);
-
 	cg_phase = CGP_MACHINE;
 	IA64_ONLY(generated_code_size = 0);
 	code_gen();
 	IA64_ONLY(assert(calculated_code_size == generated_code_size));
 	long_temp = stringpool.free - indr_base_addr;
 	assert(0 == PADLEN(long_temp, SIZEOF(INTPTR_T))); /* Just to make sure things are aligned for the vartab that follows */
-
 	/* variable table */
 	itext->vartab_off = (int4)long_temp;
 	itext->vartab_len = mvmax;
@@ -142,17 +138,15 @@ void	ind_code(mstr *obj)
 	else
 		assert(0 == mvmax);
 	emit_immed((char *) vptr, mvmax * SIZEOF(var_tabent));
-
 	itext->temp_mvals = sa_temps[TVAL_REF];
 	itext->temp_size = sa_temps_offset[TCAD_REF];
-	/* indir_code_size may be greater than the actual resultant code size
-	   because expression coersion may cause some literals to be optimized
-	   away, leaving mlitmax greater than actual.
-	*/
+	/* indir_code_size may be greater than the actual resultant code size because expression coersion may cause some literals
+	 * to be optimized away, leaving mlitmax greater than actual.
+	 */
 	assert(indir_code_size >= stringpool.free - indr_base_addr);
 	/* Return object code pointers on stack. A later cache_put will move
-	   the code to its new home and do the necessary cleanup on it.
-	*/
+	 * the code to its new home and do the necessary cleanup on it.
+	 */
 	obj->addr = (char *)indr_base_addr;
 	obj->len = INTCAST(stringpool.free - indr_base_addr);
 }

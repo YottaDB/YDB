@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,33 +50,40 @@ boolean_t mur_interactive(void)
 	UNIX_ONLY(char *fgets_res;)
 	VMS_ONLY($DESCRIPTOR (dres, res);)
 	VMS_ONLY($DESCRIPTOR (dprm, PROCEED_PROMPT);)
-
+	UNIX_ONLY(util_out_print(PROCEED_PROMPT, TRUE);)
 	while (FALSE == done)
 	{
 		VMS_ONLY(lib$get_input(&dres, &dprm, &len);)
-		UNIX_ONLY(util_out_print(PROCEED_PROMPT, TRUE);
-			FGETS(res, 8, stdin, fgets_res);
-			fgets_res = util_input(res, SIZEOF(res), stdin, FALSE);
-			if (NULL != fgets_res) {
-			len = strlen(res);)
-		for (index = 0; index < len; index++)
-			res[index] = TOUPPER(res[index]);
-		if (0 == memcmp(res, YES_STRING, len))
+#		if defined(UNIX)
+		fgets_res = util_input(res, SIZEOF(res), stdin, FALSE);
+		if (NULL != fgets_res)
 		{
-			done = TRUE;
-			mur_error_allowed = TRUE;
-			break;
-		} else if (0 == memcmp(res, NO_STRING, len))
-		{
-			done = TRUE;
-			mur_error_allowed = FALSE;
-			break;
+			len = strlen(res);
+#		endif
+			if (0 < len)
+			{
+				for (index = 0; index < len; index++)
+					res[index] = TOUPPER(res[index]);
+				if (0 == memcmp(res, YES_STRING, len))
+				{
+					done = TRUE;
+					mur_error_allowed = TRUE;
+					break;
+				} else if (0 == memcmp(res, NO_STRING, len))
+				{
+					done = TRUE;
+					mur_error_allowed = FALSE;
+					break;
+				}
+			}
+			util_out_print(CORRECT_PROMPT, TRUE);
+#		if defined(UNIX)
 		} else
 		{
-			util_out_print(CORRECT_PROMPT, TRUE);
-			continue;
+			mur_error_allowed = FALSE;
+			break;
 		}
-		UNIX_ONLY(} else util_out_print(CORRECT_PROMPT, TRUE);)
+#		endif
 	}
 	if (FALSE == mur_error_allowed)
 		util_out_print("Recovery terminated by operator", TRUE);

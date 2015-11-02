@@ -989,6 +989,23 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (clean_mum_tstart())
 		{
 #			ifdef UNIX
+		/* on zos, if opening a fifo which is not read only we need to fix the type for
+		   the err_dev to rm */
+#			ifdef __MVS__
+			if (err_dev && dev_open != err_dev->state && (ff == err_dev->type))
+			{
+				assert(NULL != err_dev->pair.out);
+				if (rm == err_dev->pair.out->type)
+				{
+					/* have to massage the device so remove_rms will cleanup the partially
+					   created fifo.  Refer to io_open_try.c for creation of split fifo device. */
+					err_dev->newly_created = 1;
+					err_dev->type = rm;
+					err_dev->dev_sp = err_dev->pair.out->dev_sp;
+					err_dev->pair.out->dev_sp = NULL;
+				}
+			}
+#			endif
 			if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
 			{
 				gtm_err_dev = err_dev;
@@ -1005,6 +1022,23 @@ CONDITION_HANDLER(mdb_condition_handler)
 		DBGEHND((stderr, "mdb_condition_handler: Transient or direct mode frame -- bypassing handler dispatch\n"));
 #		ifdef UNIX
 		/* executed from the direct mode so do the rms check and cleanup if necessary */
+		/* on zos, if opening a fifo which is not read only we need to fix the type for
+		   the err_dev to rm */
+#		ifdef __MVS__
+		if (err_dev && dev_open != err_dev->state && (ff == err_dev->type))
+		{
+			assert(NULL != err_dev->pair.out);
+			if (rm == err_dev->pair.out->type)
+			{
+				/* have to massage the device so remove_rms will cleanup the partially
+				   created fifo */
+				err_dev->newly_created = 1;
+				err_dev->type = rm;
+				err_dev->dev_sp = err_dev->pair.out->dev_sp;
+				err_dev->pair.out->dev_sp = NULL;
+			}
+		}
+#		endif
 		if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
 		{
 			remove_rms(err_dev);

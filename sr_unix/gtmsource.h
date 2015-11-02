@@ -20,6 +20,8 @@
 GBLREF gd_addr	*gd_header;
 #endif
 #include "min_max.h"
+#include "mdef.h"
+#include "gt_timer.h"
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
@@ -517,5 +519,8 @@ void		gtmsource_reinit_logseqno(void);
 void		gtmsource_rootprimary_init(seq_num start_seqno);
 int		gtmsource_needrestart(void);
 int		gtmsource_losttncomplete(void);
+void		gtmsource_jnl_release_timer(TID tid, int4 interval_len, int *interval_ptr);
+int		gtmsource_start_jnl_release_timer(void);
+int		gtmsource_stop_jnl_release_timer(void);
 
 #endif /* GTMSOURCE_H */

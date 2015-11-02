@@ -13,6 +13,7 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
+#include "mmemory.h"
 #include "cmd.h"
 
 GBLREF char window_token;
@@ -34,7 +35,7 @@ int m_else(void)
 		return FALSE;
 	}
 	jmpref = newtriple(OC_JMPTSET);
-	jmpref->operand[0] = for_end_of_scope(0);
+	FOR_END_OF_SCOPE(0, jmpref->operand[0]);
 	if (!linetail())
 	{	tnxtarg(&jmpref->operand[0]);
 		TREF(pos_in_chain) = elsepos_in_chain;

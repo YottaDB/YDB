@@ -81,6 +81,7 @@
 #include "suspsigs_handler.h"
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
+#include "fork_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -147,6 +148,11 @@ static void gtcm_gnp_trace_off(int sig);
 static VSIG_ATOMIC_T switch_log = FALSE;
 static VSIG_ATOMIC_T trace_on = FALSE;
 
+error_def(CMERR_CMINTQUE);
+error_def(ERR_BADGTMNETMSG);
+error_def(ERR_NETFAIL);
+error_def(ERR_TEXT);
+
 static void gtcm_gnp_server_actions(void)
 {
 	int4			status;
@@ -154,9 +160,6 @@ static void gtcm_gnp_server_actions(void)
 	char			reply;
 	connection_struct	*prev_curr_entry;
 	CMI_MUTEX_DECL;
-
-	error_def(CMERR_CMINTQUE);
-	error_def(ERR_BADGTMNETMSG);
 
 	ESTABLISH(gtcm_ch);
 	while (!cm_shutdown)
@@ -370,9 +373,6 @@ int main(int argc, char **argv, char **envp)
 
         static boolean_t no_fork = FALSE;
 
-	error_def(ERR_NETFAIL);
-	error_def(ERR_TEXT);
-
 	GTM_THREADGBL_INIT;
 	set_blocksig();
 	gtm_imagetype_init(GTCM_GNP_SERVER_IMAGE);
@@ -443,12 +443,13 @@ int main(int argc, char **argv, char **envp)
 	gtcm_connection = FALSE;
         if (!no_fork)
         {
-                if ((pid = fork()) < 0)
+		DO_FORK(pid);
+                if (0 > pid)
                 {
 			rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Error forking gnp server into the background"), errno);
                         exit(-1);
                 }
-                else if (pid > 0)
+                else if (0 < pid)
                         exit(0);
 		getjobnum();
                 (void) setpgrp();

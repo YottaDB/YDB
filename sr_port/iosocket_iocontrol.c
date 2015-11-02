@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,12 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "gtm_caseconv.h"
+#include "stringpool.h"
 
+GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
+
+error_def(ERR_INVCTLMNE);
 
 void	iosocket_iocontrol(mstr *d)
 {
@@ -33,33 +37,36 @@ void	iosocket_iocontrol(mstr *d)
 	unsigned short 	depth; /* serve as depth for LISTEN and timeout for WAIT */
 	int		length, n, timeout;
 
-	error_def(ERR_INVCTLMNE);
-
 	if (0 == d->len)
 		return;
-	memset(&action[0], 0, SIZEOF(action));
-	if (2 != (n = SSCANF(d->addr, "%[^(](%hu)", &action[0], &depth)))
+	/* The contents of d->addr are passed to us from op_iocontrol. That routine sets up these parms
+	 * but does not zero terminate the string we are passing to SSCANF. If this is not a complex parm
+	 * with parens (as is the case with WRITE /WAIT type statements), SSCANF() will get into trouble
+	 * if the stringpool contains extra junk. For that reason, we now add a null terminator and make
+	 * sure the argument is not too big to parse into our buffer above.
+	 */
+	assert(d->addr == (char *)stringpool.free); 	/* Verify string is where we think it is so we don't corrupt something */
+	assert(MAX_DEVCTL_LENGTH > d->len);
+	assert(IS_IN_STRINGPOOL(d->addr, d->len));
+	*(d->addr + d->len) = '\0';
+	if (0 == (n = SSCANF(d->addr, "%[^(](%hu)", &action[0], &depth)))
 		memcpy(&action[0], d->addr, d->len);
 	if (0 == (length = STRLEN(&action[0])))
 		return;
 	lower_to_upper((uchar_ptr_t)&action[0], (uchar_ptr_t)&action[0], length);
 	if (0 == memcmp(&action[0], "LISTEN", length))
 	{
-		if (2 != n)
+		if (2 > n)
 			depth = DEFAULT_LISTEN_DEPTH;
 		iosocket_listen(io_curr_device.out, depth);
-	}
-	else if (0 == memcmp(&action[0], "WAIT", length))
+	} else if (0 == memcmp(&action[0], "WAIT", length))
 	{
 		timeout = depth;
-		if (2 != n)
+		if (2 > n)
 			timeout = NO_M_TIMEOUT;
 		iosocket_wait(io_curr_device.out, timeout); /* depth really means timeout here. */
-	}
-	else
-	{
+	} else
 		rts_error(VARLSTCNT(1) ERR_INVCTLMNE);
-	}
 
 	return;
 }

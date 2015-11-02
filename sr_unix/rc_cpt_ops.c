@@ -33,6 +33,7 @@
 #include "rc.h"
 #include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
+#include "eintr_wrapper_semop.h"
 #include "rc_cpt_ops.h"
 #include "do_shmat.h"
 #include "trans_log_name.h"
@@ -69,9 +70,9 @@ int rc_cpt_entry(int blk)
 	struct sembuf	sop[2];
 	bool		found;
 
-#ifdef DEBUG_CPT
+#	ifdef DEBUG_CPT
 	FPRINTF(stderr,"\trc_cpt_entry(%d)",blk);
-#endif
+#	endif
 	/* test any existing RC semaphore first */
 	if (rc_sem)
 	{
@@ -124,12 +125,12 @@ int rc_cpt_entry(int blk)
 			}
 		}
 	}
-#ifdef DEBUG_CPT
+#	ifdef DEBUG_CPT
 	if (found)
 	    FPRINTF(stderr," exists");
 	else
 	    FPRINTF(stderr," add");
-#endif
+#	endif
 	if (!found)
 	{
 		rc_cpt->ring_buff[rc_cpt->index++] = entry;
@@ -138,9 +139,9 @@ int rc_cpt_entry(int blk)
 	if (rc_cpt->index == RC_CPT_TABSIZE)
 		rc_cpt->index = 0;
 	rc_cpt_unlock();
-#ifdef DEBUG_CPT
+#	ifdef DEBUG_CPT
 	FPRINTF(stderr,"\n");
-#endif
+#	endif
 	return 0;
 }
 
@@ -204,14 +205,14 @@ static void rc_cpt_unlock(void)
 	sop[0].sem_op = -1;
 	sop[0].sem_flg = SEM_UNDO;
 	rc_locked = FALSE;
-	SEMOP(rc_sem, sop, 1, semop_rv);
+	SEMOP(rc_sem, sop, 1, semop_rv, NO_WAIT);
 	if (-1 == semop_rv)
 	{
 		if (errno == EINVAL)
 		{	/* try reinitializing semaphore... */
 			if (!(rv=rc_init_ipc()))
 			{
-				SEMOP(rc_sem, sop, 1, semop_rv);
+				SEMOP(rc_sem, sop, 1, semop_rv, NO_WAIT);
 				if (-1 != semop_rv)
 				{
 					rc_locked = FALSE;
@@ -240,14 +241,14 @@ static void rc_cpt_lock(void)
 	sop[0].sem_op = 0;
 	sop[1].sem_op = 1;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;
-	SEMOP(rc_sem, sop, 2, semop_rv)
+	SEMOP(rc_sem, sop, 2, semop_rv, FORCED_WAIT)
 	if (-1 == semop_rv)
 	{
 		if (errno == EINVAL)
 		{	/* try reinitializing semaphore... */
 			if (!(rv=rc_init_ipc()))
 			{
-				SEMOP(rc_sem, sop, 2, semop_rv);
+				SEMOP(rc_sem, sop, 2, semop_rv, FORCED_WAIT);
 				if (-1 != semop_rv)
 				{
 					rc_locked = TRUE;
@@ -275,9 +276,9 @@ int rc_cpt_inval(void)
 	char		buff[1024];
 	bool		found;
 
-#ifdef DEBUG_CPT
+#	ifdef DEBUG_CPT
 	FPRINTF(stderr,"\trc_cpt_inval()\n");
-#endif
+#	endif
 	if (!rc_cpt)
 	{	fpath1.addr = RC_CPT_PATH;
 		fpath1.len = SIZEOF(RC_CPT_PATH);
@@ -324,12 +325,12 @@ int rc_cpt_inval(void)
 
 void rc_close_section(void)
 {
-#ifndef GTCM_RC
+#	ifndef GTCM_RC
 	if (rc_cpt)
 	{	(void) shmdt((char *)rc_cpt);
 		rc_cpt = 0;
 	}
-#endif
+#	endif
 	return;
 }
 
@@ -412,7 +413,7 @@ void rc_delete_cpt(void)
 	sop[0].sem_op = 0;
 	sop[1].sem_op = 1;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;
-	SEMOP(rc_sem, sop, 2, semop_rv);
+	SEMOP(rc_sem, sop, 2, semop_rv, FORCED_WAIT);
 	if (-1 == semop_rv)
 	{
 		PERROR("Error with RC semaphore lock");
@@ -437,7 +438,7 @@ void rc_delete_cpt(void)
 		sop[0].sem_num = 0;
 		sop[0].sem_op = -1;
 		sop[0].sem_flg = SEM_UNDO;
-		SEMOP(rc_sem, sop, 1, semop_rv);
+		SEMOP(rc_sem, sop, 1, semop_rv, NO_WAIT);
 		if (-1 == semop_rv)
 		{
 			PERROR("Error with RC semaphore unlock");
@@ -503,7 +504,7 @@ int rc_create_cpt(void)
 	sop[0].sem_op = 0;
 	sop[1].sem_op = 1;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;
-	SEMOP(rc_sem, sop, 2, semop_rv);
+	SEMOP(rc_sem, sop, 2, semop_rv, FORCED_WAIT);
 	if (-1 == semop_rv)
 	{
 		old_errno = errno;
@@ -517,7 +518,7 @@ int rc_create_cpt(void)
 	sop[0].sem_num = 0;
 	sop[0].sem_op = -1;
 	sop[0].sem_flg = SEM_UNDO;
-	SEMOP(rc_sem, sop, 1, semop_rv);
+	SEMOP(rc_sem, sop, 1, semop_rv, NO_WAIT);
 	if (-1 == semop_rv)
 	{
 		old_errno = errno;

@@ -132,6 +132,7 @@ int main(int argc, char *argv[])
 	cli_lex_setup(argc, argv);
 	CREATE_DUMMY_GBLDIR(gd_header, original_header, gv_cur_region, gd_map, gd_map_top);
 	gtm_chk_dist(argv[0]);
+#	ifdef DEBUG
 	if ((gtm_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == gtm_white_box_test_case_number) ))
 	{
 		sgmnt_addrs     * csa;
@@ -142,6 +143,7 @@ int main(int argc, char *argv[])
 		while (2 != cnl->wbox_test_seq_num) /*Wait for another process to get hold of the semaphore and signal next step*/
 			LONG_SLEEP(10);
 	}
+#	endif
 	if (argc < 2)
                 display_prompt();
 	io_init(TRUE);

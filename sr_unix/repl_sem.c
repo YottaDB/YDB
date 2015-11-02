@@ -38,6 +38,7 @@
 #include "gtm_logicals.h"
 #include "gtm_c_stack_trace.h"
 #include "eintr_wrappers.h"
+#include "eintr_wrapper_semop.h"
 #include "do_semop.h"
 #include "ipcrmid.h"
 #include "ftok_sems.h"
@@ -108,7 +109,7 @@ int grab_sem(int set_index, int sem_num)
 	sop[1].sem_op  = 1; /* Increment it */
 	sop[1].sem_num = sem_num;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;
-	SEMOP(sem_set_id[set_index], sop, 2, rc);
+	SEMOP(sem_set_id[set_index], sop, 2, rc, FORCED_WAIT);
 	if (0 == rc)
 		holds_sem[set_index][sem_num] = TRUE;
 	return rc;
@@ -122,7 +123,7 @@ int incr_sem(int set_index, int sem_num)
 	sop[0].sem_op  = 1; /* Increment it */
 	sop[0].sem_num = sem_num;
 	sop[0].sem_flg = SEM_UNDO;
-	SEMOP(sem_set_id[set_index], sop, 1, rc);
+	SEMOP(sem_set_id[set_index], sop, 1, rc, NO_WAIT);
 	return rc;
 }
 
@@ -138,7 +139,7 @@ int grab_sem_all_source()
 	sop[2].sem_op  = 1; /* Increment it */
 	sop[2].sem_num = SRC_SERV_COUNT_SEM;
 	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = SEM_UNDO;
-	SEMOP(sem_set_id[SOURCE], sop, 3, rc);
+	SEMOP(sem_set_id[SOURCE], sop, 3, rc, FORCED_WAIT);
 	if (0 == rc)
 	{
 		holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] = TRUE;
@@ -163,7 +164,7 @@ int grab_sem_all_receive()
 	sop[4].sem_op  = 1; /* Increment it */
 	sop[4].sem_num = RECV_SERV_OPTIONS_SEM;
 	sop[0].sem_flg = sop[1].sem_flg = sop[2].sem_flg = sop[3].sem_flg = sop[4].sem_flg = SEM_UNDO;
-	SEMOP(sem_set_id[RECV], sop, 5, rc);
+	SEMOP(sem_set_id[RECV], sop, 5, rc, FORCED_WAIT);
 	if (0 == rc)
 	{
 		holds_sem[RECV][RECV_POOL_ACCESS_SEM] = TRUE;
@@ -185,7 +186,7 @@ int grab_sem_immediate(int set_index, int sem_num)
 	sop[1].sem_op  = 1; /* Increment it */
 	sop[1].sem_num = sem_num;
 	sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO | IPC_NOWAIT;
-	SEMOP(sem_set_id[set_index], sop, 2, rc);
+	SEMOP(sem_set_id[set_index], sop, 2, rc, NO_WAIT);
 	if (0 == rc)
 		holds_sem[set_index][sem_num] = TRUE;
 	return rc;

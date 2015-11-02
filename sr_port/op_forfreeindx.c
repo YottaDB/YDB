@@ -1,4 +1,3 @@
-
 /****************************************************************
  *								*
  *	Copyright 2011 Fidelity Information Services, Inc	*
@@ -10,9 +9,19 @@
  *								*
  ****************************************************************/
 
-#ifndef SEMOP_TIMEDOUT_HANDLER_INCLUDED
-#define SEMOP_TIMEDOUT__HANDLER_INCLUDED
+#include "mdef.h"
+#include "gtm_string.h"
+#include "op.h"
+#include "lv_val.h"
+#include "stack_frame.h"
 
-void semop_timedout_handler(void);
+GBLREF	stack_frame		*frame_pointer;
 
-#endif /* SEMOP_TIMEDOUT_HANDLER_INCLUDED */
+/* free FOR saved indx pointers at the current M stack level */
+void op_forfreeindx(void)
+{
+	assert(NULL != frame_pointer->for_ctrl_stack);
+	FREE_SAVED_FOR_INDX(frame_pointer)
+	frame_pointer->for_ctrl_stack = NULL;
+	return;
+}

@@ -204,7 +204,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		if (FD_INVALID != gtmrecv_sock_fd)
 		{	/* Send XOFF_ACK_ME */
 			send_seqno = upd_proc_local->read_jnl_seqno;
-			if (REPLGBL.src_node_same_endianness)
+			if ((TREF(replgbl)).src_node_same_endianness)
 			{
 				xoff_msg.type = REPL_XOFF_ACK_ME;
 				xoff_msg.len = MIN_REPL_MSGLEN;
@@ -381,7 +381,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 
 	if ((STOP_POLL == return_status) && (send_badtrans || send_cmp2uncmp) && (FD_INVALID != gtmrecv_sock_fd))
 	{	/* Send REPL_BADTRANS or REPL_CMP2UNCMP message */
-		if (REPLGBL.src_node_same_endianness)
+		if ((TREF(replgbl)).src_node_same_endianness)
 		{
 			bad_trans_msg.type = send_cmp2uncmp ? REPL_CMP2UNCMP : REPL_BADTRANS;
 			bad_trans_msg.len  = MIN_REPL_MSGLEN;

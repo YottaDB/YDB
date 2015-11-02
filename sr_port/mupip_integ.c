@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,6 +47,7 @@
 #include "db_snapshot.h"
 #endif
 #include "mupint.h"
+#include "mu_gv_cur_reg_init.h"
 
 #define DUMMY_GLOBAL_VARIABLE   "%D%DUMMY_VARIABLE"
 #define DUMMY_GLOBAL_VARIABLE_LEN SIZEOF(DUMMY_GLOBAL_VARIABLE)
@@ -146,6 +147,23 @@ GTM_SNAPSHOT_ONLY(
 	GBLDEF boolean_t		online_specified;
 )
 
+error_def(ERR_CTRLC);
+error_def(ERR_CTRLY);
+error_def(ERR_DBBTUFIXED);
+error_def(ERR_DBBTUWRNG);
+error_def(ERR_DBNOREGION);
+error_def(ERR_DBRBNLBMN);
+error_def(ERR_DBRBNNEG);
+error_def(ERR_DBRBNTOOLRG);
+error_def(ERR_DBRDONLY);
+error_def(ERR_DBTNLTCTN);
+error_def(ERR_DBTNRESETINC);
+error_def(ERR_DBTNRESET);
+error_def(ERR_INTEGERRS);
+error_def(ERR_MUNOACTION);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUPCLIERR);
+
 void mupip_integ(void)
 {
 	boolean_t		full, muint_all_index_blocks;
@@ -169,23 +187,6 @@ void mupip_integ(void)
 		unsigned short	ss_file_len = GTM_PATH_MAX;
 	)
 	sgmnt_data_ptr_t	csd;
-
-	error_def(ERR_CTRLY);
-	error_def(ERR_CTRLC);
-	error_def(ERR_DBRDONLY);
-	error_def(ERR_INTEGERRS);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_MUNOACTION);
-	error_def(ERR_MUNOFINISH);
-	error_def(ERR_DBRBNNEG);
-	error_def(ERR_DBRBNTOOLRG);
-	error_def(ERR_DBRBNLBMN);
-	error_def(ERR_DBNOREGION);
-	error_def(ERR_DBTNRESETINC);
-	error_def(ERR_DBTNRESET);
-	error_def(ERR_DBTNLTCTN);
-	error_def(ERR_DBBTUWRNG);
-	error_def(ERR_DBBTUFIXED);
 
 	error_mupip = FALSE;
 	if (NULL == gv_target)
@@ -299,9 +300,7 @@ void mupip_integ(void)
 	}
 #	endif
 	mu_outofband_setup();
-#ifdef UNIX
-	ESTABLISH(mu_int_ch);
-#endif
+	UNIX_ONLY(ESTABLISH(mu_int_ch);)
 	if (region)
 	{
 		if (online_integ)
@@ -762,14 +761,14 @@ void mupip_integ(void)
 		} else
 			break;
 	}
+#	ifdef UNIX
 	if (!region)
 	{
+		db_ipcs_reset(gv_cur_region);
+		mu_gv_cur_reg_free(); /* mu_gv_cur_reg_init done in mu_int_init() */
 		REVERT;
-#ifdef UNIX
-		db_ipcs_reset(gv_cur_region, FALSE);
-		REVERT;
-#endif
 	}
+#	endif
 	total_errors += mu_int_errknt;
 	if (error_mupip)
 		total_errors++;

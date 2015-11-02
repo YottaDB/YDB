@@ -70,7 +70,9 @@ typedef enum {
 	WBTEST_JNL_CREATE_FAIL,			/* 42 : Journal file creation always return EXIT_ERR */
 	WBTEST_JNL_FILE_OPEN_FAIL,		/* 43 : Unix only.  Journal file open always return ERR_JNLFILOPN */
 	WBTEST_FAIL_ON_SHMGET,			/* 44 : Unix only.  Cause db_init() to fail on shmget */
-	WBTEST_EXTEND_JNL_FSYNC			/* 45 : Will enter a long loop upon trying to do jnl_fsync */
+	WBTEST_EXTEND_JNL_FSYNC,		/* 45 : Will enter a long loop upon trying to do jnl_fsync */
+	WBTEST_CMP_SOLVE_TIMEOUT,		/* 46 : Receiver will do a long sleep before sending REPL_CMP_SOLVE message */
+	WBTEST_SENDTO_EPERM			/* 47 : Will sleep in grab_crit depending on gtm_white_box_test_case_number */
 } wbtest_code_t;
 
 #ifdef DEBUG

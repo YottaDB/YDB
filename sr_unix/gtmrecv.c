@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,14 +14,9 @@
 #include "gtm_unistd.h"
 #include "gtm_fcntl.h"
 #include "gtm_inet.h"
-#ifdef UNIX
 #include "gtm_ipc.h"
 #include <sys/wait.h>
 #include "repl_instance.h"
-#elif defined(VMS)
-#include <ssdef.h>
-#include <descrip.h> /* Required for gtmrecv.h */
-#endif
 #include <errno.h>
 
 #include "gdsroot.h"
@@ -59,11 +54,10 @@
 #include "gtmmsg.h"
 #include "sgtm_putmsg.h"
 #include "gt_timer.h"
-#ifdef UNIX
 #include "ftok_sems.h"
-#endif
 #include "init_secshr_addrs.h"
 #include "mutex.h"
+#include "fork_init.h"
 
 GBLDEF	boolean_t		gtmrecv_fetchreysnc;
 GBLDEF	boolean_t		gtmrecv_logstats = FALSE;
@@ -84,38 +78,28 @@ GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
 
+error_def(ERR_MUPCLIERR);
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_REPLERR);
+error_def(ERR_REPLINFO);
+error_def(ERR_TEXT);
+
 int gtmrecv(void)
 {
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
-	uint4			gtmrecv_pid, channel;
+	uint4			gtmrecv_pid;
 	int			semval, status, save_upd_status, upd_start_status, upd_start_attempts;
 	char			print_msg[1024], tmpmsg[1024];
 	recvpool_user		pool_user = GTMRECV;
-#ifdef UNIX
 	pid_t			pid, procgp;
 	int			exit_status, waitpid_res;
 	int			log_init_status;
-#elif defined(VMS)
-	uint4			pid;
-	char			proc_name[PROC_NAME_MAXLEN + 1];
-	$DESCRIPTOR(proc_name_desc, proc_name);
-#endif
-
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_REPLERR);
-	error_def(ERR_REPLINFO);
-	error_def(ERR_TEXT);
 
 	call_on_signal = gtmrecv_sigstop;
 	ESTABLISH_RET(gtmrecv_ch, SS_NORMAL);
-
-#ifdef VMS
-	pool_user = (CLI_PRESENT == cli_present("DUMMY_START")) ? GTMRECV_CHILD : GTMRECV;
-#endif
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool));
 	if (-1 == gtmrecv_get_opt())
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
@@ -183,7 +167,8 @@ int gtmrecv(void)
 				}
 			}
 #ifndef REPL_DEBUG_NOBACKGROUND
-			if (SS_NORMAL == (status = repl_fork_rcvr_server(&pid, &channel)) && pid)
+			DO_FORK(pid);
+			if (0 < pid)
 			{
 				REPL_DPRINT2("Waiting for receiver child process %d to startup\n", pid);
 				while (0 == (semval = get_sem_info(RECV, RECV_SERV_COUNT_SEM, SEM_INFO_VAL)) &&
@@ -194,27 +179,14 @@ int gtmrecv(void)
 					 */
 					REPL_DPRINT2("Waiting for receiver child process %d to startup\n", pid);
 					SHORT_SLEEP(GTMRECV_WAIT_FOR_SRV_START);
-#ifdef UNIX
 					WAITPID(pid, &exit_status, WNOHANG, waitpid_res); /* Release defunct child if dead */
-#endif
 				}
-#ifdef VMS
-				/* Deassign the cmd mailbox channel */
-				if (SS_NORMAL != (status = sys$dassgn(channel)))
-				{
-					gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-							RTS_ERROR_LITERAL("Unable to close send-cmd mbox channel"), status);
-					gtmrecv_exit(ABNORMAL_SHUTDOWN);
-				}
-#endif
 				if (0 <= semval)
 					rel_sem(RECV, RECV_SERV_OPTIONS_SEM);
 				gtmrecv_exit(1 == semval ? SRV_ALIVE : SRV_DEAD);
-			} else if (SS_NORMAL != status)
+			} else if (0 > pid)
 			{
-#ifdef UNIX
 				status = errno;
-#endif
 				rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 					  RTS_ERROR_LITERAL("Unable to fork"), status);
 			}
@@ -257,26 +229,12 @@ int gtmrecv(void)
 	upd_proc_local->log_interval = gtmrecv_options.upd_log_interval;
 	upd_helper_ctl->start_helpers = FALSE;
 	upd_helper_ctl->start_n_readers = upd_helper_ctl->start_n_writers = 0;
-#ifdef UNIX
 	log_init_status = repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, NULL, gtmrecv_options.log_file, NULL);
 	assert(SS_NORMAL == log_init_status);
 	repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
 	if (-1 == (procgp = setsid()))
 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
-#elif defined(VMS)
-	util_log_open(STR_AND_LEN(gtmrecv_options.log_file));
-	/* Get a meaningful process name */
-	proc_name_desc.dsc$w_length = get_proc_name(LIT_AND_LEN("GTMRCV"), process_id, proc_name);
-	if (SS$_NORMAL != (status = sys$setprn(&proc_name_desc)))
-	{
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Unable to change receiver server process name"), status);
-		gtmrecv_exit(ABNORMAL_SHUTDOWN);
-	}
-#else
-#error Unsupported platform
-#endif
 	gtm_event_log_init();
 	gtmrecv_local->recv_serv_pid = process_id;
 	assert(NULL != jnlpool.jnlpool_ctl);
@@ -347,7 +305,6 @@ int gtmrecv(void)
 	}
 	if (gtmrecv_options.helpers)
 		gtmrecv_helpers_init(gtmrecv_options.n_readers, gtmrecv_options.n_writers);
-#ifdef UNIX
 	/* It is necessary for every process that is using the ftok semaphore to increment the counter by 1. This is used
 	 * by the last process that shuts down to delete the ftok semaphore when it notices the counter to be 0.
 	 * Note that the parent receiver server startup command would have done an increment of the ftok counter semaphore
@@ -356,7 +313,6 @@ int gtmrecv(void)
 	 */
 	if (!ftok_sem_incrcnt(recvpool.recvpool_dummy_reg))
 		rts_error(VARLSTCNT(1) ERR_RECVPOOLSETUP);
-#endif
 	/* Lock the receiver server count semaphore. Its value should be atmost 1. */
 	if (0 > grab_sem_immediate(RECV, RECV_SERV_COUNT_SEM))
 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Receive pool semop failure"),

@@ -213,4 +213,5 @@ void gtm_threadgbl_init(void)
 							 * in case alternative invocation methods bypass gtm_startup()
 							 */
 	TREF(for_stack_ptr) = TADR(for_stack);
+	(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
 }

@@ -31,6 +31,16 @@ unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_ke
 	out_top = out_char_ptr + max_size - 2;	/* - 2, as could add comma left-paren or TWO double quotes between checks */
 	gvkey_char_ptr = key->base;
 	DEBUG_ONLY(gvkey_top_ptr = gvkey_char_ptr + key->end;)
+	/* Ensure input key is well-formed (i.e. double null terminated) */
+	assert(KEY_DELIMITER == *(gvkey_top_ptr - 1));
+	assert(KEY_DELIMITER == *gvkey_top_ptr);
+	/* The following assert (in the for loop) assumes that a global name will be able to fit in completely into any key.
+	 * But that is not true. For exmaple I can have a maxkeysize of 10 and try to set a global variable name of length 20.
+	 * That will have issues below. Until C9J10-003204 is fixed to handle long global names and small maxkeysizes, we
+	 * let the below code stay as it is (asserts only) to avoid overheads (of if checks for whether end is reached) in pro.
+	 * When that is fixed, it is possible, we see the key terminate before even the global name is finished. In that case,
+	 * we should return without '(' or ')' in the formatted buffer. The caller will know this is a case of too long global name.
+	 */
 	for (*out_char_ptr++ = '^'; (*out_char_ptr = *gvkey_char_ptr++); out_char_ptr++)
 		assert(gvkey_char_ptr <= gvkey_top_ptr);
 	assert(gvkey_char_ptr <= gvkey_top_ptr);
@@ -56,14 +66,20 @@ unsigned char *format_targ_key(unsigned char *out_char_ptr, int4 max_size, gv_ke
 			for (work_char_ptr = work_buff;  work_char_ptr < work_top;)
 			{
 				if (out_char_ptr >= out_top)
+				{
+					assert(FALSE);
 					return (NULL);
+				}
 				*out_char_ptr++ = *work_char_ptr++;
 			}
 			if (is_string)
 				*out_char_ptr++ = '"';
 		}
 		if (out_char_ptr >= out_top)
+		{
+			assert(FALSE);
 			return (NULL);
+		}
 		for ( ; *gvkey_char_ptr++; )
 			assert(gvkey_char_ptr <= gvkey_top_ptr);
 		assert(gvkey_char_ptr <= gvkey_top_ptr);

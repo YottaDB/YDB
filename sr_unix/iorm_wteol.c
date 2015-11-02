@@ -31,6 +31,8 @@
 LITREF	mstr		chset_names[];
 GBLREF	UConverter	*chset_desc[];
 #endif
+error_def(ERR_NOTTOEOFONPUT);
+error_def(ERR_DEVICEREADONLY);
 
 void iorm_wteol(int4 x,io_desc *iod)
 {
@@ -40,8 +42,6 @@ void iorm_wteol(int4 x,io_desc *iod)
 	d_rm_struct	*rm_ptr;
 	unsigned int	*dollarx_ptr;
 	unsigned int	*dollary_ptr;
-	error_def(ERR_NOTTOEOFONPUT);
-	error_def(ERR_RMSRDONLY);
 
 #ifdef __MVS__
 	/* on zos if it is a fifo device then point to the pair.out for $X and $Y */
@@ -50,6 +50,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 		dollarx_ptr = &(iod->pair.out->dollar.x);
 		dollary_ptr = &(iod->pair.out->dollar.y);
 		rm_ptr = (d_rm_struct *) (iod->pair.out)->dev_sp;
+		iod = iod->pair.out;
 	} else
 #endif
 	{
@@ -58,7 +59,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 		rm_ptr = (d_rm_struct *)iod->dev_sp;
 	}
 	if (rm_ptr->noread)
-		rts_error(VARLSTCNT(1) ERR_RMSRDONLY);
+		rts_error(VARLSTCNT(1) ERR_DEVICEREADONLY);
 	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
 	{
 		iod->dollar.za = 9;

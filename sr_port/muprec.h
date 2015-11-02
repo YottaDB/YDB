@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,11 @@
 
 #define JNL_EXTR_LABEL		"GDSJEX05"	/* format of the simple journal extract */
 #define JNL_DET_EXTR_LABEL	"GDSJDX05"	/* format of the detailed journal extract */
+
+error_def(ERR_MUINFOSTR);
+error_def(ERR_MUINFOUINT4);
+error_def(ERR_MUINFOUINT8);
+error_def(ERR_MUJNLSTAT);
 
 #define EXTQW(I)							\
 {									\
@@ -86,8 +91,6 @@
 {												\
 	now_t	now;	/* for GET_CUR_TIME macro */						\
 	char	*time_ptr, time_str[CTIME_BEFORE_NL + 2];					\
-												\
-	error_def(ERR_MUJNLSTAT);								\
 												\
 	GET_CUR_TIME;										\
 	gtm_putmsg(VARLSTCNT(6) ERR_MUJNLSTAT, 4, LEN_AND_LIT(LIT), CTIME_BEFORE_NL, time_ptr);	\
@@ -423,6 +426,7 @@ typedef struct jnl_ctl_list_struct
 #if defined(VMS)
 	struct FAB			*fab;
 #endif
+	gd_id				fid;
 	hash_table_int4			pini_list;		/* hash table of pini_addr to pid list */
 	struct reg_ctl_list_struct	*reg_ctl;		/* Back pointer to this region's reg_ctl_list */
 	struct jnl_ctl_list_struct 	*next_gen;		/* next generation journal file */
@@ -883,10 +887,6 @@ typedef struct
 #define PRINT_VERBOSE_STAT(JCTL, MODULE)									\
 {														\
 	GBLREF 	jnl_gbls_t	jgbl;										\
-														\
-	error_def(ERR_MUINFOSTR);										\
-	error_def(ERR_MUINFOUINT4);										\
-	error_def(ERR_MUINFOUINT8);										\
 														\
 	if (mur_options.verbose)										\
 	{													\

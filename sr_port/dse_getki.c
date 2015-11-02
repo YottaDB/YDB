@@ -52,15 +52,11 @@ LITREF	mval		literal_hasht;
 int dse_getki(char *dst, int *len, char *qual, int qual_len)
 {
 	char 		buf[MAX_ZWR_KEY_SZ], *src, *temp_dst, *bot, *top, *tmp, slit[MAX_KEY_SZ + 1], key_buf[MAX_KEY_SZ + 1];
-	char		*end;
 	short int	max_key;
 	unsigned short 	buf_len;
 	int  		key_len, dlr_num, dlr_len;
 	mval 		key_subsc;
 	sgmnt_addrs	*csa;
-
-	error_def(ERR_GVSUBOFLOW);
-	error_def(ERR_GVIS);
 
 	buf_len = SIZEOF(buf);
 	if (!cli_get_str(qual, buf, &buf_len))
@@ -126,11 +122,13 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 			} else if (*src != '\"')		/* numerical subscript */
 			{
 				for (key_subsc.str.addr = src ; *src != ')' && *src != ','; src++)
+				{
 					if (src == top || (*src < '0' || *src > '9') && *src != '-' && *src != '.')
 					{
 						util_out_print("Error:  invalid key.", TRUE);
 						return FALSE;
 					}
+				}
 				key_subsc.str.len = INTCAST(src - key_subsc.str.addr);
 				s2n(&key_subsc);
 				key_subsc.mvtype &= MV_NUM_MASK;
@@ -153,20 +151,14 @@ int dse_getki(char *dst, int *len, char *qual, int qual_len)
 				key_subsc.str.addr = slit;
 				key_subsc.str.len = INTCAST(tmp - slit);
 			}
-
 			if ( 0 == key_subsc.str.len && NEVER == cs_addrs->hdr->null_subs)
 			{
 				util_out_print("Error:  Null subscripts not allowed", TRUE);
 				return FALSE;
 		        }
-
 			mval2subsc(&key_subsc, gv_currkey);
 			if (gv_currkey->end >= max_key)
-			{
-				if (0 == (end = (char *)format_targ_key((uchar_ptr_t)buf, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-					end = &buf[MAX_ZWR_KEY_SZ - 1];
-				rts_error(VARLSTCNT(6) ERR_GVSUBOFLOW, 0, ERR_GVIS, 2, end - buf, buf);
-			}
+				ISSUE_GVSUBOFLOW_ERROR(gv_currkey);
 			if (*src != ',')
 				break;
 			src++;

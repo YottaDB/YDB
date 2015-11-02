@@ -21,7 +21,6 @@
 
 #include <sys/types.h>
 #include <errno.h>
-/*#include "gtm_c_stack_trace.h"*/
 
 #define ACCEPT_SOCKET(SOCKET, ADDR, LEN, RC)	\
 {						\
@@ -182,21 +181,6 @@
 	} while(-1 == RC && EINTR == errno);	\
 }
 
-#define SEMOP(SEMID, SOPS, NSOPS, RC)					\
-{									\
-	boolean_t	wait_option = FALSE;				\
-	int             numsems; 					\
-	RC = -1;							\
-	for (numsems = NSOPS - 1; numsems >= 0; --numsems)		\
-	{								\
-		if (!(SOPS[numsems].sem_flg & IPC_NOWAIT))		\
-		{							\
-			wait_option = TRUE;				\
-			break;						\
-		}							\
-	}								\
-	TRY_SEMOP_GET_C_STACK(wait_option, SEMID, SOPS, NSOPS, RC);	\
-}
 
 #define SEND(SOCKET, BUF, LEN, FLAGS, RC)	\
 {						\
@@ -260,9 +244,10 @@
 {															\
 	/* Ensure that the incoming PID is non-zero. We currently don't know of any places where we want to invoke	\
 	 * waitpid with child PID being 0 as that would block us till any of the child spawned by this parent process	\
-	 * changes its state unless invoked with WNOHANG bit set. 							\
+	 * changes its state unless invoked with WNOHANG bit set. Make sure not waiting on current pid			\
 	 */														\
 	assert(0 != PID);												\
+	assert(getpid() != PID);					\
 	do														\
 	{														\
 	   RC = waitpid(PID, STATUS, OPTS);										\

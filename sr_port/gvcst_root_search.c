@@ -115,7 +115,7 @@ void gvcst_root_search(void)
 				if (FALSE == (CHKRECLEN(rp, h0->buffaddr, rlen)) || (rlen < hdr_len + SIZEOF(block_id)))
 				{
 					gv_target->clue.end = 0;
-					RESET_GV_TARGET_LCL(save_targ);
+					RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 					t_retry(cdb_sc_rmisalign);
 					continue;
 				}
@@ -142,7 +142,7 @@ void gvcst_root_search(void)
 					if (cdb_sc_normal != status)
 					{
 						gv_target->clue.end = 0;
-						RESET_GV_TARGET_LCL(save_targ);
+						RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 						t_retry(status);
 						continue;
 					}
@@ -159,14 +159,14 @@ void gvcst_root_search(void)
 				if (cdb_sc_normal == status)
 					break;
 				gv_target->clue.end = 0;
-				RESET_GV_TARGET_LCL(save_targ);
+				RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 				t_retry(status);
 				continue;
 			}
 		} else
 		{
 			gv_target->clue.end = 0;
-			RESET_GV_TARGET_LCL(save_targ);
+			RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 			t_retry(status);
 			continue;
 		}

@@ -41,6 +41,10 @@
 	}													\
 }
 
+#if MAX_OPT_LEN > MAX_LINE
+#	error MAX_OPT_LEN is greater than MAX_LINE. Fix STRNCMP_STR and STRNCPY_STR usages below.
+#endif
+
 GBLDEF void 		(*func)(void);			/* Function to be dispatched
 							   to for this command */
 
@@ -131,7 +135,7 @@ void	clear_parm_vals(CLI_ENTRY *cmd_parms, boolean_t follow) 		/* pointer to opt
  */
 int 	find_entry(char *str, CLI_ENTRY *pparm)
 {
-	int 		match_ind, res;
+	int 		match_ind, res, str_len;
 	boolean_t 	len_match;
 	int 		ind;
 	char 		*sp;
@@ -141,19 +145,20 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 	len_match = FALSE;
 	cli_strupper(str);
 
+	str_len = strlen(str);
 	while (0 < strlen(sp = (pparm + ind)->name))
 	{
 		/* As the table is parsed as long as the string in question is lexically smaller
 		   than the entry in the table, we go on checking the next entry.
 		   If a match is found, the lengths of the two strings (the table entry and the
 		   string in question) are compared.
-		  When the next entry is checked,
+		   When the next entry is checked,
 		   if it is not a match, the previous entry is the correct match;
 		   if it is a match again (a longer entry), if the first match was a length-match
 		   as well, the first entry is the match returned. otherwise an error is returned
 		   since we cannot make a decision (does SE match SET or SEP). */
 
-		if (0 == (res = STRNCMP_STR(sp, str)))
+		if (0 == (res = STRNCMP_STR(sp, str, str_len)))
 		{
 			if (-1 != match_ind)
 			{
@@ -162,7 +167,7 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 				break;
 			} else
 			{
-				if (strlen(str) == strlen(sp))
+				if (str_len == strlen(sp))
 					len_match = TRUE;
 				match_ind = ind;
 			}
@@ -173,7 +178,7 @@ int 	find_entry(char *str, CLI_ENTRY *pparm)
 		}
 		ind++;
 	}
-	if (-1 != match_ind && gpqual_root && 0 == STRNCMP_STR(gpqual_root->name, str))
+	if (-1 != match_ind && gpqual_root && 0 == STRNCMP_STR(gpqual_root->name, str, MAX_OPT_LEN))
 		return (-1);
 	return (match_ind);
 }
@@ -194,7 +199,6 @@ int 	find_verb(char *str)
 {
 	return (find_entry(str, cmd_ary));
 }
-
 
 /*
  * ---------------------------------------------------------
@@ -824,8 +828,8 @@ CLI_ENTRY *get_parm_entry(char *parm_str)
 	bool		root_match;
 	char		local_str[MAX_LINE], *tmp_ptr;
 
-	strncpy(local_str, parm_str, SIZEOF(local_str) - 1);
-	root_match = (gpqual_root && !STRNCMP_STR(gpqual_root->name, local_str));
+	STRNCPY_STR(local_str, parm_str, SIZEOF(local_str) - 1);
+	root_match = (gpqual_root && !STRNCMP_STR(gpqual_root->name, local_str, MAX_OPT_LEN));
 
 	/* ---------------------------------------
 	 * search qualifier table for this option
@@ -952,12 +956,12 @@ bool cli_get_parm(char *entry, char val_buf[])
 	SETUP_THREADGBL_ACCESS;
 	ind = 0;
 	assert(0 != gpcmd_parm_vals);
-	strncpy(local_str, entry, SIZEOF(local_str) - 1);
+	STRNCPY_STR(local_str, entry, SIZEOF(local_str) - 1);
 	cli_strupper(local_str);
 	match_ind = -1;
 	while (0 < strlen(sp = (gpcmd_parm_vals + ind)->name)) /* implicit assignment intended */
 	{
-		if (0 == (res = STRNCMP_STR(sp, local_str))) /* implicit assignment intended */
+		if (0 == (res = STRNCMP_STR(sp, local_str, MAX_OPT_LEN))) /* implicit assignment intended */
 		{
 			if (-1 != match_ind)
 				return (FALSE);
@@ -981,7 +985,7 @@ bool cli_get_parm(char *entry, char val_buf[])
 			{
 				parm_len = STRLEN(gets_res);
 				/* chop off newline */
-				if (local_str[parm_len - 1] == '\n')
+				if (parm_len && (local_str[parm_len - 1] == '\n'))
 				{
 					local_str[parm_len - 1] = '\0';
 					--parm_len;

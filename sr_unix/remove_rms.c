@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,13 +50,13 @@ void remove_rms (io_desc *ciod)
 	}
 	for (lpp = &io_root_log_name, lp = *lpp; lp; lp = *lpp)
 	{
-		if ((lp->iod->pair.in == ciod) ZOS_ONLY(|| (rm_ptr->fifo && (lp->iod->pair.out == ciod))))
+		if ((lp->iod->pair.in == ciod) ZOS_ONLY(|| (rm_ptr && rm_ptr->fifo && (lp->iod->pair.out == ciod))))
 		{
 			assert (lp->iod == ciod);
 #ifndef __MVS__
 			assert (lp->iod->pair.out == ciod);
 #else
-			if (rm_ptr->fifo)
+			if (rm_ptr && rm_ptr->fifo)
 			{
 				if (ciod == lp->iod->pair.out)
 					free(lp->iod->pair.in);

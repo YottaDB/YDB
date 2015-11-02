@@ -65,17 +65,15 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	extnam_str.len = 0;
 	if (!gv_currkey || (0 == gv_currkey->prev) || (0 == gv_currkey->end))
 		rts_error(VARLSTCNT(1) ERR_GVNAKED);
-
 	if ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))
 	{
 		assert(INVALID_GV_TARGET != gv_target);
-                if (dollar_tlevel && !first_sgm_info)
+                if (dollar_tlevel)
 			tp_set_sgm();
 		if (!gv_target->root || (DIR_ROOT == gv_target->root))
 			gvcst_root_search();
 		assert(gv_target->gd_csa == cs_addrs);
 	}
-
 	VMS_ONLY(va_count(count));
 	UNIX_ONLY(count = count_arg;)	/* i386 assembler modules may depend on unchanged count */
 	if (0 >= count)

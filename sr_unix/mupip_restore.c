@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,13 +68,6 @@
 #include "gtmxc_types.h"
 #include "gtmcrypt.h"
 
-#define COMMON_READ(S, BUFF, LEN)				\
-	{							\
-		assert(BACKUP_TEMPFILE_BUFF_SIZE >= LEN);	\
-		(*common_read)(S, BUFF, LEN);			\
-		if (0 != restore_read_errno)			\
-			mupip_exit(ERR_MUPRESTERR);		\
-	}
 GBLDEF	inc_list_struct		in_files;
 GBLREF	uint4			pipe_child;
 GBLREF	tcp_library_struct	tcp_routines;
@@ -83,15 +76,37 @@ GBLREF	uint4			restore_read_errno;
 
 LITREF	char			*gtm_dbversion_table[];
 
-static void exec_read(BFILE *bf, char *buf, int nbytes);
-static void tcp_read(BFILE *bf, char *buf, int nbytes);
+error_def(ERR_BADTAG);
+error_def(ERR_IOEOF);
+error_def(ERR_MUPCLIERR);
+error_def(ERR_MUPRESTERR);
+error_def(ERR_TEXT);
+
+#define COMMON_READ(S, BUFF, LEN, INBUF)		\
+{							\
+	assert(BACKUP_TEMPFILE_BUFF_SIZE >= LEN);	\
+	(*common_read)(S, BUFF, LEN);			\
+	if (0 != restore_read_errno)			\
+		CLNUP_AND_EXIT(ERR_MUPRESTERR, INBUF);	\
+}
+
+#define CLNUP_AND_EXIT(EXIT_STATUS, INBUF)				\
+{									\
+	DEBUG_ONLY(GBLREF	gd_region	*standalone_reg;)	\
+									\
+	if (INBUF)							\
+		free(INBUF);						\
+	assert(standalone_reg == gv_cur_region);			\
+	db_ipcs_reset(gv_cur_region);					\
+	mu_gv_cur_reg_free();						\
+	mupip_exit(EXIT_STATUS);					\
+}
 
 CONDITION_HANDLER(iob_io_error)
 {
 	int	dummy1, dummy2;
 	char 	s[80];
 	char 	*fgets_res;
-	error_def(ERR_IOEOF);
 
 	START_CH;
 	if (SIGNAL == ERR_IOEOF)
@@ -109,10 +124,10 @@ CONDITION_HANDLER(iob_io_error)
 void mupip_restore(void)
 {
 	static readonly char	label[] =   GDS_LABEL;
-	char			db_name[MAX_FN_LEN + 1], *inbuf, *p, *blk_ptr;
+	char			db_name[MAX_FN_LEN + 1], *inbuf = NULL, *p, *blk_ptr;
 	inc_list_struct 	*ptr;
-	inc_header		*inhead;
-	sgmnt_data		*old_data;
+	inc_header		inhead;
+	sgmnt_data		old_data;
 	short			iosb[4];
 	unsigned short		n_len;
 	int4			status, rsize, size, temp, save_errno, old_start_vbn;
@@ -141,23 +156,12 @@ void mupip_restore(void)
 	muinc_blk_hdr_ptr_t	sblkh_p;
 	int			rc;
 #	ifdef GTM_CRYPT
-	char			bkup_hash[GTMCRYPT_HASH_LEN], target_hash[GTMCRYPT_HASH_LEN];
-	char			*enc_inbuf;
-	int			blk_size, req_dec_blk_size, init_status, crypt_status;
+	char			bkup_hash[GTMCRYPT_HASH_LEN];
+	int			req_dec_blk_size, crypt_status;
 	gtmcrypt_key_t		bkup_key_handle, target_key_handle;
-	boolean_t		is_bkup_file_encrypted, is_target_file_encrypted;
-	boolean_t		is_same_hash = FALSE;
+	boolean_t		is_bkup_file_encrypted, is_same_hash = FALSE;
 #	endif
-#ifdef __MVS__
-	int realfiletag;
-	/* Need the ERR_BADTAG and ERR_TEXT  error_defs for the TAG_POLICY macro warning */
-	error_def(ERR_TEXT);
-	error_def(ERR_BADTAG);
-#endif
-
-	error_def(ERR_MUPRESTERR);
-	error_def(ERR_MUPCLIERR);
-	error_def(ERR_IOEOF);
+	ZOS_ONLY(int 		realfiletag;)
 
 	extend = TRUE;
 	if (CLI_NEGATED == (cli_status = cli_present("EXTEND")))
@@ -169,7 +173,7 @@ void mupip_restore(void)
 		mupip_exit(ERR_MUPCLIERR);
 	strcpy((char *)gv_cur_region->dyn.addr->fname, db_name);
 	gv_cur_region->dyn.addr->fname_len = n_len;
-	if (!mu_rndwn_file(gv_cur_region, TRUE))
+	if (!STANDALONE(gv_cur_region))
 	{
 		util_out_print("Error securing stand alone access to output file !AD. Aborting restore.", TRUE, n_len, db_name);
 		mupip_exit(ERR_MUPRESTERR);
@@ -181,15 +185,14 @@ void mupip_restore(void)
 		util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
 		errptr = (char *)STRERROR(save_errno);
 		util_out_print("open : !AZ", TRUE, errptr);
-		mupip_exit(save_errno);
+		CLNUP_AND_EXIT(save_errno, NULL);
 	}
 #ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(db_fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(db_name, realfiletag, TAG_BINARY, errno);
 #endif
 	murgetlst();
-	old_data = (sgmnt_data *)malloc(SIZEOF(sgmnt_data));
-	LSEEKREAD(db_fd, 0, old_data, SIZEOF(sgmnt_data), save_errno);
+	LSEEKREAD(db_fd, 0, &old_data, SIZEOF(sgmnt_data), save_errno);
 	if (0 != save_errno)
 	{
 		util_out_print("Error accessing output file !AD. Aborting restore.", TRUE, n_len, db_name);
@@ -197,46 +200,30 @@ void mupip_restore(void)
 		{
 			errptr = (char *)STRERROR(save_errno);
 			util_out_print("read : !AZ", TRUE, errptr);
-			db_ipcs_reset(gv_cur_region, TRUE);
-			mu_gv_cur_reg_free();
-			mupip_exit(save_errno);
+			CLNUP_AND_EXIT(save_errno, NULL);
 		} else
-		{
-			db_ipcs_reset(gv_cur_region, TRUE);
-			mu_gv_cur_reg_free();
-			mupip_exit(ERR_IOEOF);
-		}
+			CLNUP_AND_EXIT(ERR_IOEOF, NULL);
 	}
-	if (memcmp(&old_data->label[0], &label[0], GDS_LABEL_SZ))
+	if (memcmp(old_data.label, label, GDS_LABEL_SZ))
 	{
 		util_out_print("Output file !AD has an unrecognizable format", TRUE, n_len, db_name);
-		free(old_data);
-		db_ipcs_reset(gv_cur_region, TRUE);
-		mu_gv_cur_reg_free();
-		mupip_exit(ERR_MUPRESTERR);
+		CLNUP_AND_EXIT(ERR_MUPRESTERR, NULL);
 	}
-	CHECK_DB_ENDIAN(old_data, n_len, db_name);
+	CHECK_DB_ENDIAN(&old_data, n_len, db_name);
 
-	curr_tn = old_data->trans_hist.curr_tn;
-	old_blk_size = old_data->blk_size;
-	old_tot_blks = old_data->trans_hist.total_blks;
-	old_start_vbn = old_data->start_vbn;
-	bplmap = old_data->bplmap;
-	GTMCRYPT_ONLY(
-		/* Before the old_data is free'ed, we copy the hash from the header for future encryption */
-		memcpy(target_hash,  old_data->encryption_hash, GTMCRYPT_HASH_LEN);
-		is_target_file_encrypted = old_data->is_encrypted;
-	)
+	curr_tn = old_data.trans_hist.curr_tn;
+	old_blk_size = old_data.blk_size;
+	old_tot_blks = old_data.trans_hist.total_blks;
+	old_start_vbn = old_data.start_vbn;
+	bplmap = old_data.bplmap;
 	old_bit_maps = DIVIDE_ROUND_DOWN(old_tot_blks, bplmap);
 	inbuf = (char *)malloc(BACKUP_TEMPFILE_BUFF_SIZE);
 	sblkh_p = (muinc_blk_hdr_ptr_t)inbuf;
-	free(old_data);
 
 	msg_string.addr = msg_buffer;
 	msg_string.len = SIZEOF(msg_buffer);
 
-	inhead = (inc_header *)malloc(SIZEOF(inc_header) + 8);
-	inhead = (inc_header *)((((INTPTR_T)inhead) + 7) & -8);
+	memset(&inhead, 0, SIZEOF(inc_header));
 	rest_blks = 0;
 
 	for (ptr = in_files.next;  ptr;  ptr = ptr->next)
@@ -281,10 +268,7 @@ void mupip_restore(void)
 						ptr->input_file.len, ptr->input_file.addr);
 					errptr = (char *)STRERROR(save_errno);
 					util_out_print("open : !AZ", TRUE, errptr);
-					free(inbuf);
-					db_ipcs_reset(gv_cur_region, TRUE);
-					mu_gv_cur_reg_free();
-					mupip_exit(save_errno);
+					CLNUP_AND_EXIT(save_errno, inbuf);
 				}
 				ESTABLISH(iob_io_error);
 				break;
@@ -296,10 +280,7 @@ void mupip_restore(void)
 				{
 					util_out_print("Error creating input pipe from !AD.",
 						TRUE, ptr->input_file.len, ptr->input_file.addr);
-					free(inbuf);
-					db_ipcs_reset(gv_cur_region, TRUE);
-					mu_gv_cur_reg_free();
-					mupip_exit(ERR_MUPRESTERR);
+					CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 				}
 #ifdef DEBUG_ONLINE
 				PRINTF("file descriptor for the openned pipe is %d.\n", in->fd);
@@ -317,10 +298,7 @@ void mupip_restore(void)
 						break;
 					default :
 						util_out_print("Error : A hostname has to be specified.", TRUE);
-						free(inbuf);
-						db_ipcs_reset(gv_cur_region, TRUE);
-						mu_gv_cur_reg_free();
-						mupip_exit(ERR_MUPRESTERR);
+						CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 				}
 				assert(SIZEOF(timeout) == SIZEOF(int));
 				if ((0 == cli_get_int("NETTIMEOUT", (int4 *)&timeout)) || (0 > timeout))
@@ -331,76 +309,58 @@ void mupip_restore(void)
 				{
 					util_out_print("Error establishing TCP connection to !AD.",
 						TRUE, ptr->input_file.len, ptr->input_file.addr);
-					free(inbuf);
-					db_ipcs_reset(gv_cur_region, TRUE);
-					mu_gv_cur_reg_free();
-					mupip_exit(ERR_MUPRESTERR);
+					CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 				}
 				break;
 			default:
 				util_out_print("Aborting restore!/", TRUE);
 				util_out_print("Unrecognized input format !AD", TRUE, ptr->input_file.len, ptr->input_file.addr);
-				free(inbuf);
-				db_ipcs_reset(gv_cur_region, TRUE);
-				mu_gv_cur_reg_free();
-				mupip_exit(ERR_MUPRESTERR);
+				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 		}
-		COMMON_READ(in, inhead, SIZEOF(inc_header));
-		if (memcmp(&inhead->label[0], V5_INC_HEADER_LABEL, INC_HDR_LABEL_SZ) &&
-		    (memcmp(&inhead->label[0], INC_HEADER_LABEL, INC_HDR_LABEL_SZ)))
+		COMMON_READ(in, &inhead, SIZEOF(inc_header), inbuf);
+		if (memcmp(inhead.label, V5_INC_HEADER_LABEL, INC_HDR_LABEL_SZ) &&
+		    (memcmp(inhead.label, INC_HEADER_LABEL, INC_HDR_LABEL_SZ)))
 		{
 			util_out_print("Input file !AD has an unrecognizable format", TRUE, ptr->input_file.len,
 				ptr->input_file.addr);
-			free(inbuf);
-			db_ipcs_reset(gv_cur_region, TRUE);
-			mu_gv_cur_reg_free();
-			mupip_exit(ERR_MUPRESTERR);
+			CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 		}
 #		ifdef GTM_CRYPT
 		is_bkup_file_encrypted = FALSE;
-		if (inhead->is_encrypted)
+		if (inhead.is_encrypted)
 		{
-			COMMON_READ(in, bkup_hash, GTMCRYPT_HASH_LEN);
-			is_bkup_file_encrypted = inhead->is_encrypted;
+			COMMON_READ(in, bkup_hash, GTMCRYPT_HASH_LEN, inbuf);
+			is_bkup_file_encrypted = inhead.is_encrypted;
 		}
 #		endif
 
-		if (curr_tn != inhead->start_tn)
+		if (curr_tn != inhead.start_tn)
 		{
 			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !16@XQ!_"
 				       "Input file: !16@XQ", TRUE, ptr->input_file.len, ptr->input_file.addr,
-				       &curr_tn, &inhead->start_tn);
-			free(inbuf);
-			db_ipcs_reset(gv_cur_region, TRUE);
-			mu_gv_cur_reg_free();
-			mupip_exit(ERR_MUPRESTERR);
+				       &curr_tn, &inhead.start_tn);
+			CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 		}
-		if (old_blk_size != inhead->blk_size)
+		if (old_blk_size != inhead.blk_size)
 		{
 			util_out_print("Incompatable block size.  Output file !AD has block size !XL,", TRUE, n_len, db_name,
 				       old_blk_size);
 			util_out_print("while input file !AD is from a database with block size !XL,", TRUE, ptr->input_file.len,
-				ptr->input_file.addr, inhead->blk_size);
-			free(inbuf);
-			db_ipcs_reset(gv_cur_region, TRUE);
-			mu_gv_cur_reg_free();
-			mupip_exit(ERR_MUPRESTERR);
+				ptr->input_file.addr, inhead.blk_size);
+			CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 		}
-		new_bit_maps = DIVIDE_ROUND_DOWN(inhead->db_total_blks, bplmap);
-		if (old_tot_blks != inhead->db_total_blks)
+		new_bit_maps = DIVIDE_ROUND_DOWN(inhead.db_total_blks, bplmap);
+		if (old_tot_blks != inhead.db_total_blks)
 		{
-			if (old_tot_blks > inhead->db_total_blks || !extend)
+			if (old_tot_blks > inhead.db_total_blks || !extend)
 			{
 				totblks = old_tot_blks - DIVIDE_ROUND_UP(old_tot_blks, DISK_BLOCK_SIZE);
 				util_out_print("Incompatable database sizes.  Output file !AD has!/  !UL (!XL hex) total blocks,",
 						TRUE, n_len, db_name, totblks, totblks);
-				totblks = inhead->db_total_blks - DIVIDE_ROUND_UP(inhead->db_total_blks, DISK_BLOCK_SIZE);
+				totblks = inhead.db_total_blks - DIVIDE_ROUND_UP(inhead.db_total_blks, DISK_BLOCK_SIZE);
 				util_out_print("while input file !AD is from a database with!/  !UL (!XL hex) total blocks",
 						TRUE, ptr->input_file.len, ptr->input_file.addr, totblks, totblks);
-				free(inbuf);
-				db_ipcs_reset(gv_cur_region, TRUE);
-				mu_gv_cur_reg_free();
-				mupip_exit(ERR_MUPRESTERR);
+				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 			} else
 			{	/* The db must be exteneded which we will do ourselves (to avoid jnl and other interferences
 				   in gdsfilext). These local bit map blocks will be created in GDSVCURR format (always). The
@@ -411,7 +371,7 @@ void mupip_restore(void)
 				   the blks_to_upgrd counter.
 				 */
 				new_eof = ((off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE)
-						+ ((off_t)inhead->db_total_blks * old_blk_size);
+						+ ((off_t)inhead.db_total_blks * old_blk_size);
 				memset(buff, 0, DISK_BLOCK_SIZE);
 				LSEEKWRITE(db_fd, new_eof, buff, DISK_BLOCK_SIZE, status);
 				if (0 != status)
@@ -420,15 +380,12 @@ void mupip_restore(void)
 					util_out_print("lseek or write error : Unable to extend output file !AD!/",
 												TRUE, n_len, db_name);
 					util_out_print("  from !UL (!XL hex) total blocks to !UL (!XL hex) total blocks.!/",
-						TRUE, old_tot_blks, old_tot_blks, inhead->db_total_blks, inhead->db_total_blks);
+						TRUE, old_tot_blks, old_tot_blks, inhead.db_total_blks, inhead.db_total_blks);
 					util_out_print("  Current input file is !AD with !UL (!XL hex) total blocks!/",
 						TRUE, ptr->input_file.len, ptr->input_file.addr,
-						inhead->db_total_blks, inhead->db_total_blks);
+						inhead.db_total_blks, inhead.db_total_blks);
 					gtm_putmsg(VARLSTCNT(1) status);
-					free(inbuf);
-					db_ipcs_reset(gv_cur_region, TRUE);
-					mu_gv_cur_reg_free();
-					mupip_exit(ERR_MUPRESTERR);
+					CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 				}
 				/* --- initialize all new bitmaps, just in case they are not touched later --- */
 				if (new_bit_maps > old_bit_maps)
@@ -441,7 +398,7 @@ void mupip_restore(void)
 					newmap_bptr = newmap + SIZEOF(blk_hdr);
 					*newmap_bptr++ = THREE_BLKS_FREE;
 					memset(newmap_bptr, FOUR_BLKS_FREE, BM_SIZE(bplmap) - SIZEOF(blk_hdr) - 1);
-					for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead->db_total_blks; ii += bplmap)
+					for (ii = ROUND_UP(old_tot_blks, bplmap); ii < inhead.db_total_blks; ii += bplmap)
 					{
 						new_eof = (off_t)(old_start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)ii * old_blk_size;
 						LSEEKWRITE(db_fd, new_eof, newmap, old_blk_size, status);
@@ -450,47 +407,44 @@ void mupip_restore(void)
 							util_out_print("Aborting restore!/", TRUE);
 							util_out_print("Bitmap 0x!XL initialization error!", TRUE, ii);
 							gtm_putmsg(VARLSTCNT(1) status);
-							free(inbuf);
 							free(newmap);
-							db_ipcs_reset(gv_cur_region, TRUE);
-							mu_gv_cur_reg_free();
-							mupip_exit(ERR_MUPRESTERR);
+							CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 						}
 					}
 					free(newmap);
 				}
-				old_tot_blks = inhead->db_total_blks;
+				old_tot_blks = inhead.db_total_blks;
 			}
 		}
-		rsize = SIZEOF(muinc_blk_hdr) + inhead->blk_size;
+		rsize = SIZEOF(muinc_blk_hdr) + inhead.blk_size;
 #		ifdef GTM_CRYPT
-		if (is_bkup_file_encrypted || is_target_file_encrypted)
+		if (is_bkup_file_encrypted || old_data.is_encrypted)
 		{
 			/* See if the backup file and the target file are going to have
 			 * the same hash thereby speeding up the most common case. */
-			if (!memcmp(bkup_hash, target_hash, GTMCRYPT_HASH_LEN))
+			if (!memcmp(bkup_hash, old_data.encryption_hash, GTMCRYPT_HASH_LEN))
 				is_same_hash = TRUE;
 			if (!is_same_hash)
 			{
-				INIT_PROC_ENCRYPTION(init_status);
-				if (0 != init_status)
-					mupip_exit(init_status);
+				INIT_PROC_ENCRYPTION(crypt_status);
+				if (0 != crypt_status)
+					CLNUP_AND_EXIT(crypt_status, inbuf);
 				if (is_bkup_file_encrypted)
 				{
 					GTMCRYPT_GETKEY(bkup_hash, bkup_key_handle, crypt_status);
 					if (0 != crypt_status)
 					{
 						GC_GTM_PUTMSG(crypt_status, ptr->input_file.addr);
-						mupip_exit(init_status);
+						CLNUP_AND_EXIT(crypt_status, inbuf);
 					}
 				}
-				if (is_target_file_encrypted)
+				if (old_data.is_encrypted)
 				{
-					GTMCRYPT_GETKEY(target_hash, target_key_handle, crypt_status);
+					GTMCRYPT_GETKEY(old_data.encryption_hash, target_key_handle, crypt_status);
 					if (0 != crypt_status)
 					{
 						GC_GTM_PUTMSG(crypt_status, db_name);
-						mupip_exit(init_status);
+						CLNUP_AND_EXIT(crypt_status, inbuf);
 					}
 				}
 			}
@@ -498,13 +452,13 @@ void mupip_restore(void)
 #		endif
 		for ( ; ;)
 		{        /* All records are of fixed size so process until we get to a zeroed record marking the end */
-			COMMON_READ(in, inbuf, rsize);	/* Note rsize == sblkh_p */
+			COMMON_READ(in, inbuf, rsize, inbuf);	/* Note rsize == sblkh_p */
 			if (0 == sblkh_p->blkid && FALSE == sblkh_p->valid_data)
 			{	/* This is supposed to be the end of list marker (null entry */
-				COMMON_READ(in, &rsize, SIZEOF(rsize));
+				COMMON_READ(in, &rsize, SIZEOF(rsize), inbuf);
 				if (SIZEOF(END_MSG) + SIZEOF(int4) == rsize)
 				{	/* the length of our secondary check is correct .. now check substance */
-					COMMON_READ(in, inbuf, rsize - SIZEOF(int4));
+					COMMON_READ(in, inbuf, rsize - SIZEOF(int4), inbuf);
 					if (0 == MEMCMP_LIT(inbuf, END_MSG))
 						break;	/* We are done */
 				}
@@ -514,10 +468,7 @@ void mupip_restore(void)
 				assert(FALSE);
 				if (backup_to_file == type)
 					iob_close(in);
-				free(inbuf);
-				db_ipcs_reset(gv_cur_region, TRUE);
-				mu_gv_cur_reg_free();
-				mupip_exit(ERR_MUPRESTERR);
+				CLNUP_AND_EXIT(ERR_MUPRESTERR, inbuf);
 			}
 			rest_blks++;
 			blk_num = sblkh_p->blkid;
@@ -556,13 +507,13 @@ void mupip_restore(void)
 				if (0 != crypt_status)
 				{
 					GC_GTM_PUTMSG(crypt_status, ptr->input_file.addr);
-					mupip_exit(crypt_status);
+					CLNUP_AND_EXIT(crypt_status, inbuf);
 				}
 			}
 #			endif
 			offset = (old_start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)old_blk_size * blk_num);
 #			ifdef GTM_CRYPT
-			if (!is_same_hash && (BLOCK_REQUIRE_ENCRYPTION(is_target_file_encrypted,
+			if (!is_same_hash && (BLOCK_REQUIRE_ENCRYPTION(old_data.is_encrypted,
 							(((blk_hdr_ptr_t)blk_ptr)->levl), req_dec_blk_size)))
 			{
 				GTMCRYPT_ENCODE_FAST(target_key_handle,
@@ -573,7 +524,7 @@ void mupip_restore(void)
 				if (0 != crypt_status)
 				{
 					GC_GTM_PUTMSG(crypt_status, db_name);
-					mupip_exit(crypt_status);
+					CLNUP_AND_EXIT(crypt_status, inbuf);
 				}
 			}
 #			endif
@@ -584,21 +535,18 @@ void mupip_restore(void)
 					TRUE, n_len, db_name);
 				errptr = (char *)STRERROR(save_errno);
 				util_out_print("write : !AZ", TRUE, errptr);
-				free(inbuf);
-				db_ipcs_reset(gv_cur_region, TRUE);
-				mu_gv_cur_reg_free();
-				mupip_exit(save_errno);
+				CLNUP_AND_EXIT(save_errno, inbuf);
 			}
 		}
 		/* Next section is the file header which we need to restore */
-		COMMON_READ(in, &rsize, SIZEOF(rsize));
+		COMMON_READ(in, &rsize, SIZEOF(rsize), inbuf);
 		assert((SIZEOF(sgmnt_data) + SIZEOF(int4)) == rsize);
-		COMMON_READ(in, inbuf, rsize);
+		COMMON_READ(in, inbuf, rsize, inbuf);
 		((sgmnt_data_ptr_t)inbuf)->start_vbn = old_start_vbn;
 		((sgmnt_data_ptr_t)inbuf)->free_space = (uint4)(((old_start_vbn - 1) * DISK_BLOCK_SIZE) - SIZEOF_FILE_HDR(inbuf));
 		GTMCRYPT_ONLY(
-			memcpy(((sgmnt_data_ptr_t)inbuf)->encryption_hash, target_hash, GTMCRYPT_HASH_LEN);
-			((sgmnt_data_ptr_t)inbuf)->is_encrypted = is_target_file_encrypted;
+			memcpy(((sgmnt_data_ptr_t)inbuf)->encryption_hash, old_data.encryption_hash, GTMCRYPT_HASH_LEN);
+			((sgmnt_data_ptr_t)inbuf)->is_encrypted = old_data.is_encrypted;
 		)
 		LSEEKWRITE(db_fd, 0, inbuf, rsize - SIZEOF(int4), save_errno);
 		if (0 != save_errno)
@@ -607,22 +555,18 @@ void mupip_restore(void)
 				       TRUE, n_len, db_name);
 			errptr = (char *)STRERROR(save_errno);
 			util_out_print("write : !AZ", TRUE, errptr);
-			db_ipcs_reset(gv_cur_region, TRUE);
-			mu_gv_cur_reg_free();
-			mupip_exit(save_errno);
+			CLNUP_AND_EXIT(save_errno, inbuf);
 		}
 		GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
 		rsize = temp;
-		COMMON_READ(in, inbuf, rsize);
+		COMMON_READ(in, inbuf, rsize, inbuf);
 		if (0 != MEMCMP_LIT(inbuf, HDR_MSG))
 		{
 			util_out_print("Unexpected backup format error restoring !AD. Aborting restore.",
 				       TRUE, n_len, db_name);
 			errptr = (char *)STRERROR(save_errno);
 			util_out_print("write : !AZ", TRUE, errptr);
-			db_ipcs_reset(gv_cur_region, TRUE);
-			mu_gv_cur_reg_free();
-			mupip_exit(save_errno);
+			CLNUP_AND_EXIT(save_errno, inbuf);
 		}
 
 		GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
@@ -631,7 +575,7 @@ void mupip_restore(void)
 		assert(SGMNT_HDR_LEN == offset);	/* Still have contiguou master map for now */
 		for (i = 0;  ;  i++)			/* Restore master map */
 		{
-			COMMON_READ(in, inbuf, rsize);
+			COMMON_READ(in, inbuf, rsize, inbuf);
 			if (!MEMCMP_LIT(inbuf, MAP_MSG))
 				break;
 			LSEEKWRITE(db_fd,
@@ -645,15 +589,13 @@ void mupip_restore(void)
 					TRUE, n_len, db_name);
 				errptr = (char *)STRERROR(save_errno);
 				util_out_print("write : !AZ", TRUE, errptr);
-				db_ipcs_reset(gv_cur_region, TRUE);
-				mu_gv_cur_reg_free();
-				mupip_exit(save_errno);
+				CLNUP_AND_EXIT(save_errno, inbuf);
 			}
 			offset += rsize - SIZEOF(int4);
 			GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
 			rsize = temp;
 		}
-		curr_tn = inhead->end_tn;
+		curr_tn = inhead.end_tn;
 		switch (type)
 		{
 			case backup_to_file:
@@ -671,13 +613,10 @@ void mupip_restore(void)
 	}
 	util_out_print("!/RESTORE COMPLETED", TRUE);
 	util_out_print("!UL blocks restored", TRUE, rest_blks);
-	free(inbuf);
-	db_ipcs_reset(gv_cur_region, FALSE);
-	mu_gv_cur_reg_free();
-	mupip_exit(SS_NORMAL);
+	CLNUP_AND_EXIT(SS_NORMAL, inbuf);
 }
 
-static void exec_read(BFILE *bf, char *buf, int nbytes)
+STATICFNDEF void exec_read(BFILE *bf, char *buf, int nbytes)
 {
 	int	needed, got;
 	int4	status;
@@ -719,7 +658,7 @@ static void exec_read(BFILE *bf, char *buf, int nbytes)
 }
 
 /* the logic here can be reused in iotcp_readfl.c and iosocket_readfl.c */
-static void tcp_read(BFILE *bf, char *buf, int nbytes)
+STATICFNDEF void tcp_read(BFILE *bf, char *buf, int nbytes)
 {
 	int     	needed, status;
 	char		*curr;

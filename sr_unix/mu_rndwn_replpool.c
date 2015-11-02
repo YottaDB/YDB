@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,39 +54,37 @@
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 
-#define	RELEASE_SEM(sem_grabbed)								\
-{												\
-	if (sem_grabbed)									\
-	{											\
-		if (JNLPOOL_SEGMENT == pool_type)						\
-			status = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM);	/* journal pool */	\
-		else										\
-			status = rel_sem(RECV, RECV_POOL_ACCESS_SEM);	/* receive pool */	\
-		sem_grabbed = FALSE;								\
-	}											\
-}
-
-#define CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, grabbed)							\
+#define	RELEASE_SEM(SEM_GRABBED, POOL_TYPE, STATUS, SEM_ID, INSTFILENAME)					\
 {														\
-	RELEASE_SEM(sem_grabbed);										\
-	if (sem_created)											\
+	if (SEM_GRABBED)											\
 	{													\
-		if (-1 == semctl(sem_id, 0, IPC_RMID))								\
-			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(instfilename),	\
-				ERR_TEXT, 2, LEN_AND_LIT("Error removing semaphore"), errno);			\
-	} else													\
-	{													\
-		if (-1 == do_semop(sem_id, 0, -1, IPC_NOWAIT | SEM_UNDO))					\
-			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(instfilename),	\
-			ERR_TEXT, 2, LEN_AND_LIT("Error releasing semaphore"), errno);				\
+		if (JNLPOOL_SEGMENT == POOL_TYPE)								\
+			STATUS = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM);	/* journal pool */			\
+		else												\
+			STATUS = rel_sem(RECV, RECV_POOL_ACCESS_SEM);	/* receive pool */			\
+		SEM_GRABBED = FALSE;										\
+		if (STATUS)											\
+			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, SEM_ID, RTS_ERROR_STRING(INSTFILENAME),     \
+			ERR_TEXT, 2, LEN_AND_LIT("Error releasing semaphore"), errno);                          \
 	}													\
 }
 
-#define MU_RNDWN_REPLPOOL_RETURN(RETVAL)				\
-{									\
-	shmdt((void *)start_addr);					\
-	CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, sem_grabbed);	\
-	return RETVAL;							\
+#define CLNUP_REPLPOOL_ACC_SEM(SEM_ID, INSTFILENAME, SEM_GRABBED, SEM_CREATED, POOL_TYPE, STATUS)		\
+{														\
+	RELEASE_SEM(SEM_GRABBED ,POOL_TYPE, STATUS, SEM_ID, INSTFILENAME);					\
+	if (SEM_CREATED)											\
+	{													\
+		if (-1 == semctl(sem_id, 0, IPC_RMID))								\
+			gtm_putmsg(VARLSTCNT(10) ERR_REPLACCSEM, 3, SEM_ID, RTS_ERROR_STRING(INSTFILENAME),	\
+				ERR_TEXT, 2, LEN_AND_LIT("Error removing semaphore"), errno);			\
+	}													\
+}
+
+#define MU_RNDWN_REPLPOOL_RETURN(RETVAL, SEM_ID, INSTFILENAME, SEM_GRABBED, SEM_CREATED, POOL_TYPE, STATUS)	\
+{														\
+	shmdt((void *)start_addr);										\
+	CLNUP_REPLPOOL_ACC_SEM(SEM_ID, INSTFILENAME, SEM_GRABBED, SEM_CREATED, POOL_TYPE, STATUS);		\
+	return RETVAL;												\
 }
 
 LITREF char             gtm_release_name[];
@@ -142,7 +140,7 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(instfilename));
 		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
-		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, grabbed);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 		return FALSE;
 	}
 	sem_grabbed = TRUE;
@@ -155,14 +153,14 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLACCSEM, 3, sem_id, RTS_ERROR_STRING(instfilename));
 		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semget()"), CALLFROM, save_errno);
-		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, grabbed);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 		return FALSE;
 	}
 	if (0 < semval)
 	{
 		util_out_print("Replpool semaphore (id = !UL) for replication instance !AD is in use by another process.",
 				TRUE, sem_id, LEN_AND_STR(instfilename));
-		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, grabbed);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 		return FALSE;
 	}
 	if (-1 == shmctl(shm_id, IPC_STAT, &shm_buf))
@@ -170,14 +168,14 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(instfilename));
 		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);
-		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, grabbed);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 		return FALSE;
 	}
 	if (0 != shm_buf.shm_nattch) /* It must be zero before I attach to it */
 	{
 		util_out_print("Replpool segment (id = !UL) for replication instance !AD is in use by another process.",
 				TRUE, shm_id, LEN_AND_STR(instfilename));
-		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, grabbed);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 		return FALSE;
 	}
 	if (-1 == (sm_long_t)(start_addr = (sm_uc_ptr_t) do_shmat(shm_id, 0, 0)))
@@ -185,7 +183,7 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(instfilename));
 		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmat()"), CALLFROM, save_errno);
-		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, grabbed);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 		return FALSE;
 	}
 	/* assert that the identifiers are at the top of replpool control structure */
@@ -201,14 +199,14 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 		else
 			util_out_print("Incorrect replpool format for the segment (id = !UL) belonging to replication instance !AD",
 					TRUE, shm_id, LEN_AND_STR(instfilename));
-		MU_RNDWN_REPLPOOL_RETURN(FALSE);
+		MU_RNDWN_REPLPOOL_RETURN(FALSE, sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 	}
 	if (memcmp(replpool_id->now_running, gtm_release_name, gtm_release_name_len + 1))
 	{
 		util_out_print("Attempt to access with version !AD, while already using !AD for replpool segment (id = !UL)"
 				" belonging to replication instance !AD.", TRUE, gtm_release_name_len, gtm_release_name,
 				LEN_AND_STR(replpool_id->now_running), shm_id, LEN_AND_STR(instfilename));
-		MU_RNDWN_REPLPOOL_RETURN(FALSE);
+		MU_RNDWN_REPLPOOL_RETURN(FALSE, sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 	}
 	if (JNLPOOL_SEGMENT == pool_type)
 	{	/* Initialize variables to simulate a "jnlpool_init". This is required by "repl_inst_flush_jnlpool" called below */
@@ -244,7 +242,7 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(instfilename));
 		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmdt()"), CALLFROM, save_errno);
-		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, grabbed);
+		CLNUP_REPLPOOL_ACC_SEM(sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 		return FALSE;
 	}
 	if (0 != shm_rmid(shm_id))
@@ -252,9 +250,9 @@ boolean_t mu_rndwn_replpool(replpool_identifier *replpool_id, int sem_id, int sh
 		save_errno = errno;
 		gtm_putmsg(VARLSTCNT(5) ERR_REPLPOOLINST, 3, shm_id, RTS_ERROR_STRING(instfilename));
 		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shm_ctl()"), CALLFROM, save_errno);
-		MU_RNDWN_REPLPOOL_RETURN(FALSE);
+		MU_RNDWN_REPLPOOL_RETURN(FALSE, sem_id, instfilename, sem_grabbed, sem_created, pool_type, status);
 	}
-	RELEASE_SEM(sem_grabbed);
+	RELEASE_SEM(sem_grabbed, pool_type, status, sem_id, instfilename);
 	if (0 != sem_rmid(sem_id))
 	{
 		save_errno = errno;

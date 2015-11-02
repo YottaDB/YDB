@@ -96,6 +96,11 @@ GBLREF	boolean_t		mupip_jnl_recover;
 	(first_tp_srch_status)->cycle = (newcycle);							\
 	(first_tp_srch_status)->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS((newcr)->buffaddr);
 
+error_def(ERR_BUFOWNERSTUCK);
+error_def(ERR_DBFILERR);
+error_def(ERR_DYNUPGRDFAIL);
+error_def(ERR_GVPUTFAIL);
+
 sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out)
 	/* cycle is used in t_end to detect if the buffer has been refreshed since the t_qread */
 {
@@ -117,11 +122,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	sm_uc_ptr_t		buffaddr;
 	uint4			stuck_cnt = 0;
 	boolean_t		lcl_blk_free;
-
-	error_def(ERR_BUFOWNERSTUCK);
-	error_def(ERR_DBFILERR);
-	error_def(ERR_DYNUPGRDFAIL);
-	error_def(ERR_GVPUTFAIL);
 
 	lcl_blk_free = block_is_free;
 	block_is_free = FALSE;	/* Reset to FALSE so that if t_qread fails below, we don't have an incorrect state of this var */
@@ -546,9 +546,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if (cr->read_in_progress < -1)
 				{	/* outside of design; clear to known state */
 					BG_TRACE_PRO(t_qread_out_of_design);
-					INTERLOCK_INIT(cr);
 					assert(0 == cr->r_epid);
 					cr->r_epid = 0;
+					INTERLOCK_INIT(cr);
 				} else if (cr->read_in_progress >= 0)
 				{
 					BG_TRACE_PRO(t_qread_buf_owner_stuck);
@@ -566,6 +566,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							}
 							cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 							cr->blk = CR_BLKEMPTY;
+							cr->r_epid = 0;
 							RELEASE_BUFF_READ_LOCK(cr);
 						} else
 						{
@@ -573,11 +574,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 								rel_crit(gv_cur_region);
 							send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));
 							send_msg(VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id, blocking_pid,
-								cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
-								cr->read_in_progress, cr->rip_latch.u.parts.latch_pid);
+								 cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
+								 cr->read_in_progress, cr->rip_latch.u.parts.latch_pid);
 							stuck_cnt++;
-							GET_C_STACK_FROM_SCRIPT("BUFOWNERSTUCK",
-								process_id, blocking_pid, stuck_cnt);
+							GET_C_STACK_FROM_SCRIPT("BUFOWNERSTUCK", process_id, blocking_pid,
+										stuck_cnt);
 							if (MAX_TQREAD_WAIT <= lcnt)	/* max wait of 4 mins */
 								GTMASSERT;
 							/* Kickstart the process taking a long time in case it was suspended */
@@ -595,7 +596,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						}
 						cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 						cr->blk = CR_BLKEMPTY;
-						RELEASE_BUFF_READ_LOCK(cr);
+						RELEASE_BUFF_READ_LOCK(cr);	/* cr->r_epid already zero - no need to set */
 						if (cr->read_in_progress < -1)	/* race: process released since if r_epid */
 							LOCK_BUFF_FOR_READ(cr, dummy);
 					}

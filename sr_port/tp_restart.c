@@ -413,8 +413,10 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 #						ifdef UNIX
 					send_msg(VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist, ERR_GVFAILCORE);
 					/* Generate core only if not triggering this codepath using white-box tests */
+#					ifdef DEBUG
 					if (!gtm_white_box_test_case_enabled
 					    || (WBTEST_TP_HIST_CDB_SC_BLKMOD != gtm_white_box_test_case_number))
+#					endif
 						gtm_fork_n_core();
 #						endif
 					VMS_ONLY(send_msg(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist));

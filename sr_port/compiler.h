@@ -88,6 +88,7 @@ typedef struct	oprtypestruct
 } oprtype;
 
 /* Values for oprclass */
+#define NOCLASS		0
 #define TVAR_REF	1
 #define TVAL_REF	2
 #define TINT_REF	3
@@ -196,7 +197,6 @@ typedef struct
 
 #define CHARMAXARGS	256
 #define	MAX_ACTUALS	32
-#define MAX_FOR_STACK	32
 #define MAX_FORARGS	127
 #define MAX_SRCLINE	8192	/* maximum length of a program source or indirection line */
 #define	NO_FORMALLIST	(-1)
@@ -212,7 +212,6 @@ typedef struct
 error_def(ERR_DEVPARINAP);
 error_def(ERR_DEVPARUNK);
 error_def(ERR_DEVPARVALREQ);
-error_def(ERR_FORCTRLINDX);	/* until we fix the problem this guards against */
 error_def(ERR_FNOTONSYS);
 error_def(ERR_INVFCN);
 error_def(ERR_INVSVN);
@@ -221,8 +220,8 @@ error_def(ERR_SVNOSET);
 
 #define	IS_STX_WARN(errcode)											\
 	((ERR_INVFCN == errcode) || (ERR_FNOTONSYS == errcode) || (ERR_INVSVN == errcode)			\
-		|| (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode) || (ERR_FORCTRLINDX == errcode )	\
-		|| (ERR_DEVPARUNK == errcode) || (ERR_DEVPARINAP == errcode) || (ERR_DEVPARVALREQ == errcode))
+		|| (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode) || (ERR_DEVPARUNK == errcode) 		\
+		|| (ERR_DEVPARINAP == errcode) || (ERR_DEVPARVALREQ == errcode))
 
 /* This macro does an "stx_error" of the input errcode but before that it asserts that the input errcode is one
  * of the known error codes that are to be handled as a compile-time warning (instead of an error). It also set
@@ -303,6 +302,60 @@ error_def(ERR_SVNOSET);
 	}												\
 }
 
+/* the macro below tucks a code reference into the for_stack so a FOR that's done can move on correctly when done */
+#define FOR_END_OF_SCOPE(DEPTH, RESULT)										\
+{														\
+	oprtype	**Ptr;												\
+														\
+	assert(0 <= DEPTH);											\
+	assert(TREF(for_stack_ptr) < (oprtype **)TADR(for_stack) + MAX_FOR_STACK);				\
+	Ptr = (oprtype **)TREF(for_stack_ptr) - DEPTH;								\
+	assert(Ptr >= (oprtype **)TADR(for_stack));								\
+	if (NULL == *Ptr)											\
+		*Ptr = (oprtype *)mcalloc(SIZEOF(oprtype));							\
+	RESULT = put_indr(*Ptr);										\
+}
+
+#define GOOD_FOR  FALSE	/* single level */
+#define BLOWN_FOR TRUE	/* all levels */
+
+/* Marco to decrement or clear the for_stack, clear the for_temp array
+ * and generate code to release run-time malloc'd mvals anchored in the for_saved_indx array
+ * The corresponding FOR_PUSH macro is in m_for.c but this one is used in stx_error.c for error cases
+ */
+#define	FOR_POP(ALL)												\
+{														\
+	unsigned int	For_stack_level;									\
+	boolean_t	Seen_indx;										\
+														\
+	assert(TREF(for_stack_ptr) >= (oprtype **)TADR(for_stack));						\
+	assert(TREF(for_stack_ptr) <= (oprtype **)TADR(for_stack) + MAX_FOR_STACK);				\
+	if (TREF(for_stack_ptr) > (oprtype **)TADR(for_stack))							\
+		--(TREF(for_stack_ptr));										\
+	if (ALL)												\
+	{													\
+		while (TREF(for_stack_ptr) > (oprtype **)TADR(for_stack))					\
+			(TREF(for_stack_ptr))--;								\
+		*(TREF(for_stack_ptr)) = NULL;									\
+	}													\
+	if (TREF(for_stack_ptr) == (oprtype **)TADR(for_stack))							\
+	{													\
+		for (Seen_indx = FALSE, For_stack_level = MAX_FOR_STACK; --For_stack_level; )			\
+		{												\
+			if (!Seen_indx && (TRUE_WITH_INDX == TAREF1(for_temps, For_stack_level)))		\
+			{											\
+				(void)newtriple(OC_FORFREEINDX);						\
+				Seen_indx = TRUE;								\
+			}											\
+			TAREF1(for_temps, For_stack_level) = FALSE;						\
+		}												\
+	} else													\
+		assert(TREF(for_stack_ptr) > (oprtype **)TADR(for_stack));					\
+}
+
+/* value used to make for_temps entries a little more than boolean */
+#define TRUE_WITH_INDX 2
+
 int		actuallist(oprtype *opr);
 int		bool_expr(bool op, oprtype *addr);
 void		bx_boolop(triple *t, bool jmp_type_one, bool jmp_to_next, bool sense, oprtype *addr);
@@ -377,7 +430,6 @@ int		f_zsubstr(oprtype *a, opctype op);
 int		f_ztrigger(oprtype *a, opctype op);
 int		f_ztrnlnm(oprtype *a, opctype op);
 int		f_zwidth(oprtype *a, opctype op);
-oprtype		for_end_of_scope(int depth);
 mlabel		*get_mladdr(mident *c);
 mvar		*get_mvaddr(mident *c);
 int		glvn(oprtype *a);

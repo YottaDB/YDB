@@ -21,12 +21,13 @@
 GBLREF stack_frame *frame_pointer;
 GBLREF unsigned char *stackbase ,*stacktop, *msp, *stackwarn;
 
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
+
 void copy_stack_frame(void)
 {
 	register stack_frame *sf;
 	unsigned char	*msp_save;
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
 
 	msp_save = msp;
 	sf = (stack_frame *) (msp -= SIZEOF(stack_frame));
@@ -44,6 +45,7 @@ void copy_stack_frame(void)
 	*sf = *frame_pointer;
 	sf->old_frame_pointer = frame_pointer;
 	sf->flags = 0;		/* Don't propagate special flags */
+	sf->for_ctrl_stack = NULL;
 	frame_pointer = sf;
 	DBGEHND((stderr, "copy_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr"\n",
 		 sf, msp_save, msp));

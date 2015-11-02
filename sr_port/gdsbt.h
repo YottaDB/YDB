@@ -23,8 +23,15 @@
 #endif
 
 #ifdef VMS
-#include <ssdef.h>	/* for SS$_WASSET */
-#include "ast.h"	/* for ENABLE/DISABLE */
+#	include <ssdef.h>	/* for SS$_WASSET */
+#	include "ast.h"	/* for ENABLE/DISABLE */
+#elif defined(UNIX)
+#	include <gtm_limits.h>	/* for _POSIX_HOST_NAME_MAX */
+#	if defined(__osf__)
+#		include <sys/param.h>	/* for _POSIX_HOST_NAME_MAX */
+#	elif defined(SUNOS) && !defined(_POSIX_HOST_NAME_MAX)
+#		include <netdb.h>	/* for MAXHOSTNAMELEN (Solaris 9) */
+#	endif
 #endif
 
 #include "gvstats_rec.h"
@@ -41,7 +48,20 @@
 #define MIN_LOCK_SPACE 10
 
 #define MAX_REL_NAME	36
-#define MAX_MCNAMELEN   256
+#define MAX_MCNAMELEN   256 /* We do not support hostname truncation */
+#if defined(UNIX)
+#	if defined(_POSIX_HOST_NAME_MAX)
+#		if MAX_MCNAMELEN <= _POSIX_HOST_NAME_MAX /* _POSIX_HOST_NAME_MAX excludes terminating NULL */
+#			error MAX_MCNAMELEN is not greater than _POSIX_HOST_NAME_MAX.
+#		endif
+#	elif defined(MAXHOSTNAMELEN)
+#		if MAX_MCNAMELEN < MAXHOSTNAMELEN /* MAXHOSTNAMELEN includes terminating NULL */
+#			error MAX_MCNAMELEN is less than MAXHOSTNAMELEN.
+#		endif
+#	else
+#		error _POSIX_HOST_NAME_MAX or MAXHOSTNAMELEN not defined.
+#	endif
+#endif
 
 #define GDS_LABEL_SZ 	12
 
@@ -94,7 +114,6 @@ typedef struct
 /* This structure is used to access the transaction queue.  It points at all but the
    first two longwords of a bt_rec.  CAUTION:  there is no such thing as a queue of
    th_recs, they are always bt_recs, and the extra two longwords are always there */
-
 typedef struct
 {
 	struct
@@ -114,13 +133,11 @@ typedef struct
 /* This structure is used to maintain all cache records.  The BT queue contains
    a history of those blocks that have been updated.	*/
 
-
 /*
  *	Definitions for GT.M Mutex Control
  *
  *	See MUTEX.MAR for VMS functional implementation
  */
-
 typedef struct
 {
 	struct

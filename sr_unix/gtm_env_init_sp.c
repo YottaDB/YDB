@@ -43,6 +43,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "replgbl.h"
 
 #define	DEFAULT_NON_BLOCKED_WRITE_RETRIES	10	/* default number of retries */
 #ifdef __MVS__
@@ -238,4 +239,14 @@ void	gtm_env_init_sp(void)
 	TREF(error_on_jnl_file_lost) = trans_numeric(&val, &is_defined, FALSE);
 	if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
 		TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_TURN_OFF; /* default behavior */
+	/* Initialize variable that controls jnl release timeout */
+	val.addr = GTM_JNL_RELEASE_TIMEOUT;
+	val.len = SIZEOF(GTM_JNL_RELEASE_TIMEOUT) - 1;
+	(TREF(replgbl)).jnl_release_timeout = trans_numeric(&val, &is_defined, TRUE);
+	if (!is_defined)
+		(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
+	else if (0 > (TREF(replgbl)).jnl_release_timeout) /* consider negative timeout value as zero */
+		(TREF(replgbl)).jnl_release_timeout = 0;
+	else if (MAXPOSINT4 / MILLISECS_IN_SEC < (TREF(replgbl)).jnl_release_timeout) /* max value supported for timers */
+		(TREF(replgbl)).jnl_release_timeout = MAXPOSINT4 / MILLISECS_IN_SEC;
 }

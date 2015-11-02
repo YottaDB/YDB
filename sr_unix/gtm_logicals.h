@@ -73,6 +73,7 @@
 #define	GTM_NOUNDEF			"$gtm_noundef"
 #define	GTM_PROMPT			"$gtm_prompt"
 #define GTM_BOOLEAN			"$gtm_boolean"
+#define GTM_PROCSTUCKEXEC		"$gtm_procstuckexec"
 
 /* -------------------------- Unix only --------------------------  */
 
@@ -89,6 +90,7 @@
 #define	GTM_ZLIB_CMP_LEVEL		"$gtm_zlib_cmp_level"
 #define	GTM_EVENT_LOG_LIB_ENV		"$gtm_event_log_libpath"
 #define	GTM_EVENT_LOG_RTN_ENV		"$gtm_event_log_rtn"
+#define GTM_JNL_RELEASE_TIMEOUT		"$gtm_jnl_release_timeout"
 
 /* Unicode */
 #define	GTM_CHSET_ENV			"$gtm_chset"

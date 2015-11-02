@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,8 +40,9 @@ GBLREF	boolean_t	gtm_utf8_mode;
  * otherwise it is the start of the line.
  * If remove_leading_spaces, the return value
  * will point at the first non space, according
- * to isspace().  Note that this may not be the
- * beginning of buffer.				*/
+ * to isspace_asscii.  Note that this may not be
+ * the beginning of buffer.
+ */
 
 char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces)
 {
@@ -71,6 +72,8 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 			} while (NULL == uc_fgets_ret && !u_feof(u_fp) && ferror(fp) && EINTR == errno);
 			if (NULL == uc_fgets_ret)
 			{
+				if (!u_feof(u_fp))
+					util_out_print("Error reading from STDIN", TRUE);
 				u_fclose(u_fp);
 				return NULL;
 			}
@@ -114,7 +117,10 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 	{
 #endif
 		buffer[0] = '\0';
-		FGETS(buffer, buffersize, fp, retptr);
+		do
+		{
+			FGETS(buffer, buffersize, fp, retptr);
+		} while (NULL == retptr && !feof(fp) && ferror(fp) && EINTR == errno);
 		if (NULL != retptr)
 		{
 			if (remove_leading_spaces)
@@ -123,6 +129,10 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 			in_len = strlen(buffer);
 			if ('\n' == buffer[in_len - 1])
 				buffer[in_len - 1] = '\0';
+		} else
+		{
+			if (!feof(fp))
+				util_out_print("Error reading from STDIN", TRUE);
 		}
 #ifdef UNICODE_SUPPORTED
 	}

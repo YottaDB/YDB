@@ -45,6 +45,10 @@ LITREF	UChar32		u32_line_term[];
 LITREF	mstr		chset_names[];
 GBLREF	UConverter	*chset_desc[];
 #endif
+error_def(ERR_IOEOF);
+error_def(ERR_SYSCALL);
+error_def(ERR_ZINTRECURSEIO);
+error_def(ERR_DEVICEWRITEONLY);
 
 #define fl_copy(a, b) (a > b ? b : a)
 
@@ -131,10 +135,6 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	unsigned int	*dollarx_ptr;
 	unsigned int	*dollary_ptr;
 
-	error_def(ERR_IOEOF);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_ZINTRECURSEIO);
-
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -146,6 +146,9 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	assert(stringpool.free <= stringpool.top);
 
 	io_ptr = io_curr_device.in;
+	/* don't allow a read from a writeonly fifo */
+	if (((d_rm_struct *)io_ptr->dev_sp)->write_only)
+		rts_error(VARLSTCNT(1) ERR_DEVICEWRITEONLY);
 #ifdef __MVS__
 	/* on zos if it is a fifo device then point to the pair.out for $X and $Y */
 	if (((d_rm_struct *)io_ptr->dev_sp)->fifo)

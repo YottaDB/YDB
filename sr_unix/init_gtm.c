@@ -100,7 +100,7 @@ void init_gtm(void)
 	svec.argcnt = SIZEOF(svec);
 	svec.rtn_start = svec.rtn_end = malloc(SIZEOF(rtn_tabent));
 	memset(svec.rtn_start, 0, SIZEOF(rtn_tabent));
-	svec.user_stack_size = (256 ZOS_ONLY(+ 64))* 1024;	/* ZOS stack frame 2x other platforms so give more stack */
+	svec.user_stack_size = (272 ZOS_ONLY(+ 64))* 1024;	/* ZOS stack frame 2x other platforms so give more stack */
 	svec.user_indrcache_size = 32;
 	svec.user_strpl_size = STP_INITSIZE_REQUESTED;
 	svec.ctrlc_enable = 1;

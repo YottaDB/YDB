@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2010 Fidelity Information Services, Inc #
+#	Copyright 2009, 2011 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -112,7 +112,8 @@ elif [ "OS/390" = "$hostos" ] ; then
 	ld="xlc"
 	cc_common="-c -q64 -qWARN64 -qchars=signed -qenum=int -qascii -D_ENHANCED_ASCII_EXT=0xFFFFFFFF -D_VARARG_EXT_"
 	cc_common="$cc_common -D_XOPEN_SOURCE_EXTENDED=1 -D_ALL_SOURCE_NO_THREADS -D_ISOC99_SOURCE -D_UNIX03_SOURCE"
-	cc_common="$cc_common -D_IEEEV1_COMPATIBILITY -W c,DLL,XPLINK,EXPORTALL,RENT,NOANSIALIAS,LANGLVL(EXTENDED),ARCH(7)"
+	cc_common="$cc_common -D_IEEEV1_COMPATIBILITY -D_POSIX_C_SOURCE=200112L"
+	cc_common="$cc_common -W c,DLL,XPLINK,EXPORTALL,RENT,NOANSIALIAS,LANGLVL(EXTENDED),ARCH(7)"
 	cc_common="$cc_common -W l,DLL,XPLINK"
 	ld_common="-q64 -W l,DLL,XPLINK,MAP,XREF,REUS=RENT"
 	ld_shl_options="-q64 -W l,DLL,XPLINK"

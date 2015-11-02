@@ -63,6 +63,7 @@ GBLREF	bool			jobpid;		/* job's output files should have the pid appended to the
 GBLREF	volatile boolean_t		ojtimeout;
 GBLREF	boolean_t			job_try_again;
 GBLREF	uint4			process_id;
+GBLREF	boolean_t	gtm_pipe_child;
 #ifndef SYS_ERRLIST_INCLUDE
 /* currently either stdio.h or errno.h both of which are included above */
 /*	needed by TIMEOUT_ERROR in jobsp.h */
@@ -194,6 +195,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 * the waiting parent can diagnose.
 		 */
 
+		/* set to TRUE so any child process associated with a pipe device will know it is not the parent in iorm_close() */
+		gtm_pipe_child = TRUE;
 		joberr = joberr_gen;
 		ESTABLISH_RET(bad_child, 0);
 
