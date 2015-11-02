@@ -91,18 +91,10 @@
 #endif
 #include "util.h"
 #include "trans_log_name.h"
+#include "gtm_logicals.h"
 
 #define	MAXPATNAM	256
 #define	MAX_FILE	256
-
-#ifdef VMS
-#define	PAT_FILE	"GTM_PATTERN_FILE"
-#define	PAT_TABLE	"GTM_PATTERN_TABLE"
-#else
-#define	PAT_FILE	"$gtm_pattern_file"
-#define	PAT_TABLE	"$gtm_pattern_table"
-
-#endif
 
 enum {T_EOF = 256, T_NL, T_SYNTAX, T_NUMBER, T_IDENT, K_PATSTART, K_PATEND, K_PATTABLE, K_PATCODE};
 
@@ -217,23 +209,19 @@ int initialize_pattern_table(void)
 	 * user defined patcodes for the entire ASCII charset (0 - 127) in UTF-8 mode.
 	 */
 	max_patents = (gtm_utf8_mode ? PATENTS_UTF8 : PATENTS);
-
 	/* Initialize pattern/typemask structures and pat_allmaskbits for default typemask */
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask = (uint4 *)&(typemask[0]);
 	for (pat_allmaskbits = 0, letter = 0; letter < max_patents; letter++)
 		pat_allmaskbits |= pattern_typemask[letter];	/* used in do_patfixed/do_pattern */
-
 	/* Locate default pattern file and load it. */
-        status = trans_log_name(&pat_file,&transnam,buffer);
+        status = TRANS_LOG_NAME(&pat_file, &transnam, buffer, sizeof(buffer), do_sendmsg_on_log2long);
 	if (SS_NORMAL != status)
 		return 0;
 	if (!load_pattern_table(transnam.len, transnam.addr))
 		return 0;
-
 	/* Establish default pattern table. */
-	status = trans_log_name(&pat_table,&transnam,buffer);
-
+	status = TRANS_LOG_NAME(&pat_table,&transnam,buffer, sizeof(buffer), do_sendmsg_on_log2long);
 	if (SS_NORMAL != status)
 		return 0;
 	patname.len = transnam.len;

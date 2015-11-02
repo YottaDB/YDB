@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -161,7 +161,7 @@ static int rc_init_ipc(void)
 	}
 	fpath1.addr = RC_CPT_PATH;
 	fpath1.len = sizeof(RC_CPT_PATH);
-	if (trans_log_name(&fpath1, &fpath2, buff) != SS_NORMAL)
+	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
 	{
 		PERROR("Error translating rc path");
 		return errno;
@@ -280,7 +280,7 @@ int rc_cpt_inval(void)
 	if (!rc_cpt)
 	{	fpath1.addr = RC_CPT_PATH;
 		fpath1.len = sizeof(RC_CPT_PATH);
-		if (trans_log_name(&fpath1, &fpath2, buff) != SS_NORMAL)
+		if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
 		{
 			PERROR("Error translating rc path");
 			return errno;
@@ -357,7 +357,7 @@ int mupip_rundown_cpt()
 		(void) shmdt((char *)rc_cpt);
 	fpath1.addr = RC_CPT_PATH;
 	fpath1.len = sizeof(RC_CPT_PATH);
-	if (trans_log_name(&fpath1, &fpath2, buff) != SS_NORMAL)
+	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
 	{	/* invalid environment variable setup....error */
 		return -1;
 	}
@@ -468,7 +468,7 @@ int rc_create_cpt(void)
 		return 0;
 	fpath1.addr = RC_CPT_PATH;
 	fpath1.len = sizeof(RC_CPT_PATH);
-	if (trans_log_name(&fpath1, &fpath2, buff) != SS_NORMAL)
+	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
 	{
 		PERROR("Error translating rc path");
 		return errno;

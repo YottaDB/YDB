@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,12 +21,15 @@
 #include "iormdef.h"
 #include "io_params.h"
 #include "eintr_wrappers.h"
+#include <sys/wait.h>
 
 LITREF unsigned char	io_params_size[];
 
 void iorm_close(io_desc *iod, mval *pp)
 {
 	d_rm_struct	*rm_ptr;
+	d_rm_struct	*in_rm_ptr;
+	d_rm_struct	*stderr_rm_ptr;
 	unsigned char	c;
 	char		*path, *path2;
 	int		fclose_res;
@@ -34,6 +37,8 @@ void iorm_close(io_desc *iod, mval *pp)
 	int		fstat_res;
 	struct stat	statbuf, fstatbuf;
 	int		p_offset;
+	pid_t  		done_pid;
+	int  		wait_status;
 
 	assert (iod->type == rm);
 	if (iod->state != dev_open)
@@ -88,6 +93,7 @@ void iorm_close(io_desc *iod, mval *pp)
 		assert (iod->pair.out == iod);
 	if (iod->pair.out != iod)
 		assert (iod->pair.in == iod);
+
 	iod->state = dev_closed;
 	iod->dollar.zeof = FALSE;
 	iod->dollar.x = 0;
@@ -110,9 +116,39 @@ void iorm_close(io_desc *iod, mval *pp)
 	   processes prior to an execv() call. The fclose (for stream files) will fail but it will clean up structures orphaned
 	   by the close().
 	*/
-	close(rm_ptr->fildes);
-	if (rm_ptr->filstr != NULL)
-		FCLOSE(rm_ptr->filstr, fclose_res);
+	/* Close the fildes unless this is a direct close of the stderr device */
+	if (!rm_ptr->stderr_parent)
+	{
+		close(rm_ptr->fildes);
+		if (rm_ptr->filstr != NULL)
+			FCLOSE(rm_ptr->filstr, fclose_res);
+		/* if this is a pipe and read_fildes and read_filstr are set then close them also */
+		if (rm_ptr->read_fildes)
+			close(rm_ptr->read_fildes);
+		if (rm_ptr->read_filstr != NULL)
+			FCLOSE(rm_ptr->read_filstr, fclose_res);
+	}
+
+	/* reap the forked shell process if a pipe - it will be a zombie, otherwise*/
+	if (rm_ptr->pipe_pid > 0)
+	{
+		/* if child process will not go away then have to kill shell in order to reap */
+		if (rm_ptr->independent)
+			kill(rm_ptr->pipe_pid,SIGKILL);
+		WAITPID(rm_ptr->pipe_pid, &wait_status, 0, done_pid);
+		assert(done_pid == rm_ptr->pipe_pid);
+
+		if (rm_ptr->stderr_child)
+		{
+			/* have to make it look open in case it was closed directly */
+			/* reset the stderr_parent field so the fildes will be closed */
+			rm_ptr->stderr_child->state = dev_open;
+			stderr_rm_ptr = (d_rm_struct *)rm_ptr->stderr_child->dev_sp;
+			stderr_rm_ptr->stderr_parent = 0;
+			iorm_close(rm_ptr->stderr_child,pp);
+			remove_rms(rm_ptr->stderr_child);
+		}
+	}
 #ifdef __MVS__
 	if (rm_ptr->fifo)
 	{

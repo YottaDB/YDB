@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,14 +12,7 @@
 #ifndef _GTMSECSHR
 #define _GTMSECSHR
 
-#define MAX_SERVER_START_TRIES  25
-#define MAX_SERVER_WAIT		256
-#define CREATEFAILED		1000
-#define CLIENT_ERROR_SLEEP_TIME 1000 /* 1 sec is the max time that a cleint will sleep
-					before attempting to re-send a request */
-#define GTMSECSHR_PING_TIMEOUT  60
 #define GTMSECSHR_MESG_TIMEOUT  30
-
 #define GTMSECSHR_PERMS		0666
 
 /* Exit codes from gtmsecshr */
@@ -55,12 +48,11 @@
 #define GTMSECSHR_SOCK_DIR		GTM_TMP_ENV
 #define DEFAULT_GTMSECSHR_SOCK_DIR	DEFAULT_GTM_TMP
 #define GTMSECSHR_SOCK_PREFIX		"gtm_secshr"
-#define GTMSECSHR_PATH			"$gtm_dist/gtmsecshr"
+#define GTMSECSHR_PATH			GTM_DIST_LOG "/gtmsecshr"
 
 #define	ROOTUID				0
 #define ROOTGID				0
 
-#define NOTIFICATION_REQUIRED(X) 	(X)
 #define ABSOLUTE_PATH(X)		(X[0] == '/')
 
 #ifdef SHORT_GTMSECSHR_TIMEOUT
@@ -70,9 +62,7 @@
 #endif
 
 #define	MAX_ID_LEN			8
-
 #define	MAX_MESG			2048
-
 #define MAX_GTMSECSHR_FAIL_MESG_LEN	70
 
 typedef struct ipcs_mesg_struct {
@@ -101,19 +91,23 @@ typedef struct gtmsecshr_mesg_struct {
 /* include <stddef.h> for offsetof() */
 #define GTM_MESG_HDR_SIZE		offsetof(gtmsecshr_mesg, mesg.id)
 
+/* There should be NO deletions of messages types. Only replacements with the UNUSED_ prefix to signal disuse.
+ * This is because we want to maintain a static mapping between a given command and its corresponding message
+ * type number across all versions of GT.M (old and new). This way there is no chance of misinterpreting a command
+ * in case there is a version mismatch between the GT.M client and GTMSECSHR server processes.
+ */
 enum gtmsecshr_mesg_type{
         WAKE_MESSAGE = 1,
-        CHECK_PROCESS_ALIVE,
+        UNUSED_CHECK_PROCESS_ALIVE,
         REMOVE_SEM,
         REMOVE_SHMMEM,
-        PING_MESSAGE,
+        UNUSED_PING_MESSAGE,
 	REMOVE_FILE,
 	CONTINUE_PROCESS,
-	PING_MESG_RECVD,
+	UNUSED_PING_MESG_RECVD,
 	FLUSH_DB_IPCS_INFO,
 	GTMSECSHR_MESG_COUNT
 };
-
 
 enum gtmsecshr_ack_type{
         ACK_NOT_REQUIRED,

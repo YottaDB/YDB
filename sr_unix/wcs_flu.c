@@ -42,6 +42,7 @@
 #include "wcs_phase2_commit_wait.h"
 #include "wbox_test_init.h"
 #include "wcs_mm_recover.h"
+#include "memcoherency.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		process_id;
@@ -51,50 +52,56 @@ GBLREF 	jnl_gbls_t	jgbl;
 GBLREF 	bool		in_backup;
 GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 
-#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)							\
-if (cnl->in_wtstart)												\
-{														\
-	DEBUG_ONLY(int4	in_wtstart;) 	/* temporary for debugging purposes */					\
-	error_def(ERR_WRITERSTUCK);										\
-														\
-	assert(csa->now_crit);											\
-	SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);								\
-	lcnt = 0;												\
-	do													\
-	{													\
-		DEBUG_ONLY(in_wtstart = cnl->in_wtstart;)							\
-		if (MAXGETSPACEWAIT DEBUG_ONLY( * 2) == ++lcnt)							\
-		{	/* We have noticed the below assert to fail occasionally on some platforms (mostly	\
-			 * AIX and Linux). We suspect it is because of waiting for another writer that is 	\
-			 * in jnl_fsync (as part of flushing a global buffer) which takes more than a minute	\
-			 * to finish. To avoid false failures (where the other writer finishes its job in	\
-			 * a little over a minute) we wait for twice the time in the debug version.		\
-			 */											\
-			assert(FALSE);										\
-			cnl->wcsflu_pid = 0;									\
-			SET_TRACEABLE_VAR(csd->wc_blocked, FALSE);						\
-			if (!was_crit)										\
-				rel_crit(gv_cur_region);							\
-			send_msg(VARLSTCNT(5) ERR_WRITERSTUCK, 3, cnl->in_wtstart, DB_LEN_STR(gv_cur_region));	\
-			return FALSE;										\
-		}												\
-		if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\
-		{												\
-			save_errno = errno;									\
-			if (1 == lcnt)										\
-			{											\
-                		send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));		\
-				send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmctl()"), CALLFROM, save_errno);\
-			} 											\
-		} else if (1 == shm_buf.shm_nattch)								\
-		{												\
-			assert(FALSE == csa->in_wtstart  &&  0 <= cnl->in_wtstart);				\
-			cnl->in_wtstart = 0;	/* fix improper value of in_wtstart if you are standalone */	\
-			fix_in_wtstart = TRUE;									\
-		} else												\
-			wcs_sleep(lcnt);		/* wait for any in wcs_wtstart to finish */		\
-	} while (0 < cnl->in_wtstart);										\
-	SET_TRACEABLE_VAR(csd->wc_blocked, FALSE);								\
+#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)								\
+{															\
+	if (WRITERS_ACTIVE(cnl))											\
+	{														\
+		DEBUG_ONLY(int4	in_wtstart;) 		/* temporary for debugging purposes */				\
+		DEBUG_ONLY(int4	intent_wtstart;) 	/* temporary for debugging purposes */				\
+		error_def(ERR_WRITERSTUCK);										\
+															\
+		assert(csa->now_crit);											\
+		SIGNAL_WRITERS_TO_STOP(csd);		/* to stop all active writers */				\
+		lcnt = 0;												\
+		do													\
+		{													\
+			DEBUG_ONLY(in_wtstart = cnl->in_wtstart;)							\
+			DEBUG_ONLY(intent_wtstart = cnl->intent_wtstart;)						\
+			if (MAXGETSPACEWAIT DEBUG_ONLY( * 2) == ++lcnt)							\
+			{	/* We have noticed the below assert to fail occasionally on some platforms (mostly	\
+				 * AIX and Linux). We suspect it is because of waiting for another writer that is 	\
+				 * in jnl_fsync (as part of flushing a global buffer) which takes more than a minute	\
+				 * to finish. To avoid false failures (where the other writer finishes its job in	\
+				 * a little over a minute) we wait for twice the time in the debug version.		\
+				 */											\
+				assert(FALSE);										\
+				cnl->wcsflu_pid = 0;									\
+				SIGNAL_WRITERS_TO_RESUME(csd);								\
+				if (!was_crit)										\
+					rel_crit(gv_cur_region);							\
+				send_msg(VARLSTCNT(5) ERR_WRITERSTUCK, 3, cnl->in_wtstart, DB_LEN_STR(gv_cur_region));	\
+				return FALSE;										\
+			}												\
+			if (-1 == shmctl(udi->shmid, IPC_STAT, &shm_buf))						\
+			{												\
+				save_errno = errno;									\
+				if (1 == lcnt)										\
+				{											\
+					send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));		\
+					send_msg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmctl()"),		\
+							CALLFROM, save_errno);						\
+				} 											\
+			} else if (1 == shm_buf.shm_nattch)								\
+			{												\
+				assert((FALSE == csa->in_wtstart) && (0 <= cnl->in_wtstart));				\
+				cnl->in_wtstart = 0;	/* fix improper value of in_wtstart if you are standalone */	\
+				fix_in_wtstart = TRUE;									\
+				cnl->intent_wtstart = 0;/* fix improper value of intent_wtstart if standalone */	\
+			} else												\
+				wcs_sleep(lcnt);		/* wait for any in wcs_wtstart to finish */		\
+		} while (WRITERS_ACTIVE(cnl));										\
+		SIGNAL_WRITERS_TO_RESUME(csd);										\
+	}														\
 }
 
 bool wcs_flu(bool options)
@@ -151,6 +158,7 @@ bool wcs_flu(bool options)
 	cnl->wcsflu_pid = process_id;
 	if (dba_mm == csd->acc_meth)
 	{
+#ifndef NO_MSYNC
 #if defined(UNTARGETED_MSYNC)
 		if (csa->ti->last_mm_sync != csa->ti->curr_tn)
 		{
@@ -165,9 +173,8 @@ bool wcs_flu(bool options)
 			}
 		}
 #else
-		SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);	/* to stop all active writers */
-		for (lcnt = 1; (0 < cnl->in_wtstart  &&  MAXGETSPACEWAIT > lcnt); lcnt++)
-			wcs_sleep(lcnt);		/* wait for any in wcs_wtstart to finish */
+		SIGNAL_WRITERS_TO_STOP(csd);	/* to stop all active writers */
+		WAIT_FOR_WRITERS_TO_STOP(cnl, lcnt, MAXGETSPACEWAIT);
 		if (MAXGETSPACEWAIT == lcnt)
 		{
 			DEBUG_ONLY(GET_C_STACK_WTSTART_WRITERS(cnl->wtstart_pid));
@@ -177,17 +184,23 @@ bool wcs_flu(bool options)
 				rel_crit(gv_cur_region);
 			return FALSE;
 		}
-		SET_TRACEABLE_VAR(csd->wc_blocked, FALSE);
-		if (csa->total_blks != csd->trans_hist.total_blks)
-		{
-			wcs_mm_recover(gv_cur_region);
-			csd = csa->hdr;
-		}
+		SIGNAL_WRITERS_TO_RESUME(csd);
+		/* wcs_flu() is currently also called from wcs_clean_dbsync() which is interrupt driven code. We are about to
+		 * remap the database in interrupt code. Depending on where the interrupt occurred, all sorts of strange failures
+		 * can occur in the mainline code after the remap in interrupt code. Thankfully, this code is currently not
+		 * enabled by default (NO_MSYNC is the default) so we are fine. If ever this gets re-enabled, we need to
+		 * solve this problem by changing wcs_clean_dbsync not to call wcs_flu. The assert below is a note for this.
+		 */
+		assert(FALSE);
+		MM_DBFILEXT_REMAP_IF_NEEDED(csa, gv_cur_region);
+		/* MM MM_DBFILEXT_REMAP_IF_NEEDED can remap the file so reset csd which might no long point to the file */
+		csd = csa->hdr;
 		while (0 != csa->acc_meth.mm.mmblk_state->mmblkq_active.fl)
 		{
 			wtstart_errno = wcs_wtstart(gv_cur_region, csd->n_bts);
 			assert(ERR_GBLOFLOW != wtstart_errno);
 		}
+#endif
 #endif
 	}
 	/* jnl_enabled is an overloaded variable. It is TRUE only if JNL_ENABLED(csd) is TRUE
@@ -327,35 +340,38 @@ bool wcs_flu(bool options)
 					}
 					assert(!jnl_enabled || jb->fsync_dskaddr == jb->freeaddr);
 					wcs_recover(gv_cur_region);
-				if (jnl_enabled)
-				{
-					fsync_dskaddr = jb->fsync_dskaddr; /* take a local copy as it could change concurrently */
-					if (fsync_dskaddr != jb->freeaddr)
-					{	/* an INCTN record should have been written above */
-						assert(fsync_dskaddr <= jb->dskaddr);
-						assert((jb->freeaddr - fsync_dskaddr) >= INCTN_RECLEN);
-						/* above assert has a >= instead of == due to possible ALIGN record in between */
-						if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
-						{
-							assert(NOJNL == jpc->channel); /* jnl file lost */
-							if (!was_crit)
-								rel_crit(gv_cur_region);
-							send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
-								ERR_TEXT, 2,
+					if (jnl_enabled)
+					{
+						fsync_dskaddr = jb->fsync_dskaddr;
+							/* take a local copy as it could change concurrently */
+						if (fsync_dskaddr != jb->freeaddr)
+						{	/* an INCTN record should have been written above */
+							assert(fsync_dskaddr <= jb->dskaddr);
+							assert((jb->freeaddr - fsync_dskaddr) >= INCTN_RECLEN);
+							/* above assert has a >= instead of == due to possible
+							 * ALIGN record in between */
+							if (SS_NORMAL != (jnl_status = jnl_flush(gv_cur_region)))
+							{
+								assert(NOJNL == jpc->channel); /* jnl file lost */
+								if (!was_crit)
+									rel_crit(gv_cur_region);
+								send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+									ERR_TEXT, 2,
 									RTS_ERROR_TEXT("Error with journal flush during wcs_flu2"),
-								jnl_status);
-							return FALSE;
+									jnl_status);
+								return FALSE;
+							}
+							assert(jb->freeaddr == jb->dskaddr);
+							jnl_fsync(gv_cur_region, jb->dskaddr);
+							/* Use jb->fsync_dskaddr (instead of "fsync_dskaddr") below as the
+							 * shared memory copy is more uptodate (could have been updated by
+							 * "jnl_fsync" call above).
+							 */
+							assert(jb->fsync_dskaddr == jb->dskaddr);
 						}
-						assert(jb->freeaddr == jb->dskaddr);
-						jnl_fsync(gv_cur_region, jb->dskaddr);
-						/* Use jb->fsync_dskaddr (instead of "fsync_dskaddr") below as the shared memory
-						 * copy is more uptodate (could have been updated by "jnl_fsync" call above).
-						 */
-						assert(jb->fsync_dskaddr == jb->dskaddr);
 					}
-				}
-				wcs_wtstart(gv_cur_region, csd->n_bts);		/* Flush it all */
-				WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart);
+					wcs_wtstart(gv_cur_region, csd->n_bts);		/* Flush it all */
+					WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart);
 					if (cnl->wcs_active_lvl || crq->fl)
 					{
 						cnl->wcsflu_pid = 0;

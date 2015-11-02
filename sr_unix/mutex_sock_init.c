@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,9 +76,8 @@ void mutex_sock_init(void)
 	/* Get the socket path */
 	mutex_sock_dir_lognam.len = sizeof(MUTEX_SOCK_DIR) - 1;
 	mutex_sock_dir_lognam.addr = MUTEX_SOCK_DIR;
-	mutex_sock_trans_status = trans_log_name(&mutex_sock_dir_lognam,
-						 &mutex_sock_dir_transnam,
-						 mutex_sock_path);
+	mutex_sock_trans_status = TRANS_LOG_NAME(&mutex_sock_dir_lognam, &mutex_sock_dir_transnam,
+						 mutex_sock_path, sizeof(mutex_sock_path), do_sendmsg_on_log2long);
 	if (mutex_sock_trans_status != SS_NORMAL)
 	{
 		strcpy(mutex_sock_path, DEFAULT_MUTEX_SOCK_DIR);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,8 @@
 #include "gtmmsg.h"
 #include "memcoherency.h"
 #include "shmpool.h"
+#include "interlock.h"
+#include "add_inter.h"
 
 #ifdef UNIX
 #include "ftok_sems.h"
@@ -78,7 +80,11 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 		for (ptr = (backup_reg_list *)grlist; ptr != NULL && ptr != curr_ptr && ptr != (backup_reg_list *)halt_ptr;)
 		{
 			if (keep_going == ptr->not_this_time)
+			{
+				csa = &FILE_INFO(ptr->reg)->s_addrs;
+				DECR_INHIBIT_KILLS(csa->nl);
 				rel_crit(ptr->reg);
+			}
 			ptr = ptr->fPtr;
 		}
 		curr_ptr = (backup_reg_list *)halt_ptr;
@@ -149,7 +155,7 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 #error UNSUPPORTED PLATFORM
 #endif
 				} else	/* defreeze the databases */
-					region_freeze(ptr->reg, FALSE, FALSE);
+					region_freeze(ptr->reg, FALSE, FALSE, FALSE);
 			}
 			ptr = ptr->fPtr;
 		}

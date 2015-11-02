@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,12 +37,13 @@ boolean_t logical_truth_value(mstr *log, boolean_t negate, boolean_t *is_defined
 	boolean_t	zero, is_num;
 	int		index;
 
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TRNLOGFAIL);
 
 	tn.addr = buf;
 	if (NULL != is_defined)
 		*is_defined = FALSE;
-	if (SS_NORMAL == (status = trans_log_name(log, &tn, buf)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(log, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
 	{
 		if (NULL != is_defined)
 			*is_defined = TRUE;
@@ -70,6 +71,16 @@ boolean_t logical_truth_value(mstr *log, boolean_t negate, boolean_t *is_defined
 		}
 	} else if (SS_NOLOGNAM == status)
 		return (FALSE);
-	rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, log->len, log->addr, status);
-	return (FALSE);
+#	ifdef UNIX
+	else if (SS_LOG2LONG == status)
+	{
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log->len, log->addr, sizeof(buf) - 1);
+		return (FALSE);
+	}
+#	endif
+	else
+	{
+		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, log->len, log->addr, status);
+		return (FALSE);
+	}
 }

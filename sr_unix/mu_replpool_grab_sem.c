@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,6 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 	unix_db_info		*udi;
 	unsigned int		full_len;
 
-	error_def(ERR_REPLINSTUNDEF);
 	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_JNLPOOLSETUP);
 	error_def(ERR_REPLFTOKSEM);
@@ -85,8 +84,8 @@ boolean_t mu_replpool_grab_sem(boolean_t immediate)
 	}
 	jnlpool.jnlpool_dummy_reg = replreg;
 	recvpool.recvpool_dummy_reg = replreg;
-	if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1))
-		rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+	if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error))
+		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
 	assert(full_len);
 	memcpy((char *)replreg->dyn.addr->fname, instfilename, full_len);
 	replreg->dyn.addr->fname_len = full_len;

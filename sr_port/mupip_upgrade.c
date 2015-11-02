@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -242,7 +242,7 @@ void mupip_upgrade(void)
 	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file gds blk_size"), v15_csd.blk_size, v15_csd.blk_size);
 	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file total_blks"),
 		   v15_csd.trans_hist.total_blks, v15_csd.trans_hist.total_blks);
-	assert(ROUND_DOWN(v15_csd.blk_size, DISK_BLOCK_SIZE) == v15_csd.blk_size);
+	assert(ROUND_DOWN2(v15_csd.blk_size, DISK_BLOCK_SIZE) == v15_csd.blk_size);
 	assert(((off_t)v15_csd.start_vbn) * DISK_BLOCK_SIZE +
 			(off_t)v15_csd.trans_hist.total_blks * v15_csd.blk_size == v15_file_size VMS_ONLY(* DISK_BLOCK_SIZE));
 	/* Now call mu_upgrd_header() to do file header upgrade in memory */

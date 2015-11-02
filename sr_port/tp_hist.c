@@ -31,6 +31,7 @@
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "memcoherency.h"
+#include "wbox_test_init.h"
 
 #define MMBLK_OFFSET(BLK)     													\
 	(cs_addrs->db_addrs[0] + (cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)(cs_addrs->hdr->blk_size * (BLK)))
@@ -65,6 +66,8 @@ GBLREF	uint4		process_id;
 
 #ifdef DEBUG
 GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+GBLREF	boolean_t	ready2signal_gvundef;	/* TRUE if GET operation is about to signal a GVUNDEF */
+GBLREF	boolean_t	gtm_gvundef_fatal;
 #endif
 
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1);
@@ -85,12 +88,20 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	cache_rec_ptr_t	cr;
 #	ifdef DEBUG
 	boolean_t	wc_blocked;
+	boolean_t	ready2signal_gvundef_lcl;
 #	endif
 
 	error_def(ERR_TRANS2BIG);
 	error_def(ERR_GVKILLFAIL);
 	error_def(ERR_GVPUTFAIL);
 
+	DEBUG_ONLY(
+		/* Store global variable ready2signal_gvundef in a local variable and reset the global right away to ensure that
+		 * the global value does not incorrectly get carried over to the next call of "t_end".
+		 */
+		ready2signal_gvundef_lcl = ready2signal_gvundef;
+		ready2signal_gvundef = FALSE;
+	)
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);
 	si = sgm_info_ptr;
 	store_history = (!gv_target->noisolation || ERR_GVKILLFAIL == t_err || ERR_GVPUTFAIL == t_err);
@@ -179,7 +190,9 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					 */
 					if ((NULL == cse) || !cse->recompute_list_head || cse->write_type)
 					{
-						assert(CDB_STAGNATE > t_tries);
+						assert((CDB_STAGNATE > t_tries)
+							|| (gtm_white_box_test_case_enabled
+							    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number)));
 						if (tprestart_syslog_delta)
 						{
 							n_blkmods++;
@@ -386,6 +399,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 		}
 #		endif
 	}
+	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
+	assert((cdb_sc_normal != status) || !gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
 	gv_target->read_local_tn = local_tn;
 	CWS_RESET;
 	return status;

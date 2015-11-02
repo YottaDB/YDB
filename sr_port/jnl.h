@@ -22,11 +22,17 @@
 #define JPV_LEN_PRCNAM		16
 #define JPV_LEN_TERMINAL	15
 
-/* If you update JNL_LABEL_TEXT, you need to JNL_VER_THIS and repl_internal_filter array.
+/* Whenever JNL_LABEL_TEXT changes, also change the following
+ * 	1) Update JNL_VER_THIS
+ * 	2) Add REPL_JNL_Vxx enum to repl_jnl_t typedef in repl_filter.h
+ * 	3) Add one entry to jnl2filterfmt array in repl_filter.c
+ * 	4) Add a row and column to repl_internal_filter array in repl_filter.c.
+ * If the FILTER format is also changing, then do the following as well
+ * 	5) Add REPL_FILTER_Vxx enum to repl_filter_t typedef in repl_filter.h
  * Also need to follow a set of directions (yet to be written 12/7/2000 -- nars) in case a new set of filters need to be written.
  */
-#define JNL_LABEL_TEXT		"GDSJNL17" /* update JNL_VER_THIS and repl_internal_filter array if you update JNL_LABEL_TEXT */
-#define JNL_VER_THIS		17
+#define JNL_LABEL_TEXT		"GDSJNL18" /* update JNL_VER_THIS and repl_internal_filter array if you update JNL_LABEL_TEXT */
+#define JNL_VER_THIS		18
 #define JNL_VER_EARLIEST_REPL	12 	   /* from GDSJNL12 (V4.3-000) */
 #define	ALIGN_KEY		0xdeadbeef
 
@@ -511,6 +517,8 @@ typedef struct
 	boolean_t		no_prev_link;
 	int4			blks_to_upgrd;		/* Blocks not at current block version level */
 	uint4 			checksum;
+	uint4			free_blocks;		/* free  blocks counter at time of epoch */
+	uint4			total_blks;		/* total blocks counter at time of epoch */
 } jnl_create_info;
 
 /* Journal record definitions */
@@ -651,7 +659,9 @@ typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;
 	seq_num			jnl_seqno;		/* must start at 8-byte boundary */
-	uint4			blks_to_upgrd;		/* Counter at time of epoch */
+	uint4			blks_to_upgrd;		/* blocks-to-upgrade counter at time of epoch */
+	uint4			free_blocks;		/* free  blocks counter at time of epoch */
+	uint4			total_blks;		/* total blocks counter at time of epoch */
 	jrec_suffix		suffix;
 } struct_jrec_epoch;
 

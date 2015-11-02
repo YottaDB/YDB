@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,18 @@
 #ifndef P_tmpdir
 #define P_tmpdir			"/tmp"
 #endif
+#define	DEFAULT_GTM_TMP			P_tmpdir
 #define RENAME				rename
 #define SETVBUF				setvbuf
+
 #define FPRINTF         		fprintf
+
+#ifdef UNIX
+/* #define to be gtm_fprintf to serve as a wrapper for blocking signals since fprintf is not signal-safe. */
+#define	fprintf		gtm_fprintf
+int	gtm_fprintf(FILE *stream, const char *format, ...);	/* Define prototype of "gtm_fprintf" here */
+#endif
+
 #define FSCANF         			fscanf
 #define PRINTF         			printf
 #define SCANF          			scanf

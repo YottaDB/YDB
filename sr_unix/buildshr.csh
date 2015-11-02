@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -123,9 +123,12 @@ if ( $status != 0  ||  ! -x $3/mumps ) then
 	set buildshr_status = `expr $buildshr_status + 1`
 	echo "buildshr-E-linkmumps, Failed to link mumps (see ${dollar_sign}gtm_map/mumps.map)" \
 		>> $gtm_log/error.`basename $gtm_exe`.log
-else if ( "dbg" == $gt_image && "ia64" == $mach_type && "hpux" == $platform_name ) then
-		# For successful debug builds on HPUX, enable debug attributes permits attaching to running process
-		chatr +dbg enable $3/mumps
+else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+        if ( "dbg" == $gt_image ) then
+                chatr +dbg enable +as mpas $3/mumps
+	else
+	        chatr +as mpas $3/mumps
+        endif
 endif
 
 # Note: gtm_svc should link with gtm_dal_svc.o before gtm_mumps_call_clnt.o(libgtmrpc.a) to

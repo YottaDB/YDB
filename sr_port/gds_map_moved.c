@@ -38,7 +38,7 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 {
 	int		hist_index;
 	sm_long_t	adj;
-	srch_hist	*hist, *dir_hist;
+	srch_hist	*hist, *dir_hist, *dir_alt_hist, *hist1, *hist2;
 	ht_ent_mname 	*tabent, *topent;
 	gv_namehead	*gvt;
 	gvnh_reg_t	*gvnh_reg;
@@ -66,20 +66,24 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 		return;
 	adj = (sm_long_t)(new_base - old_base);
 	assert(0 != adj);
-	dir_hist = hist = &cs_addrs->dir_tree->hist;
-	for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)
+	dir_hist = &cs_addrs->dir_tree->hist;
+	dir_alt_hist = cs_addrs->dir_tree->alt_hist;
+	for (hist = dir_hist; (NULL != hist); hist = (hist == dir_hist) ? dir_alt_hist : NULL)
 	{
-		assert(MAX_BT_DEPTH >= hist_index);
-		if ((old_base <= hist->h[hist_index].buffaddr) &&
-			(old_top > hist->h[hist_index].buffaddr))
+		for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)
 		{
-			hist->h[hist_index].buffaddr += adj;
-			assert(new_base <= hist->h[hist_index].buffaddr);
-		} else
-		{
-			/* It has to be a private copy */
-			assert((hist->h[hist_index].first_tp_srch_status != 0) ||
-				(((off_chain *)&(hist->h[hist_index].blk_num))->flag != 0));
+			assert(MAX_BT_DEPTH >= hist_index);
+			if ((old_base <= hist->h[hist_index].buffaddr) &&
+			    (old_top > hist->h[hist_index].buffaddr))
+			{
+				hist->h[hist_index].buffaddr += adj;
+				assert(new_base <= hist->h[hist_index].buffaddr);
+			} else
+			{
+				/* It has to be a private copy */
+				assert((hist->h[hist_index].first_tp_srch_status != 0) ||
+				       (((off_chain *)&(hist->h[hist_index].blk_num))->flag != 0));
+			}
 		}
 	}
 	/* It is possible that more than one global directory has regions mapping to the same physical database file.
@@ -102,22 +106,28 @@ void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_t
 			if ((HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg)) && (NULL != (gvt = gvnh_reg->gvt))
 				&& (cs_addrs == gvt->gd_csa) && (0 < gvt->clue.end))
 			{
-				hist = &(((gvnh_reg_t *)(tabent->value))->gvt->hist);
-				if (hist == dir_hist)
-					continue;
-				for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)
+				hist1 = &gvt->hist;
+				hist2 = gvt->alt_hist;
+				for (hist = hist1; (NULL != hist); hist = (hist == hist1) ? hist2 : NULL)
 				{
-					assert(MAX_BT_DEPTH >= hist_index);
-					if ((old_base <= hist->h[hist_index].buffaddr) && (old_top > hist->h[hist_index].buffaddr))
+					if (((hist == hist1) && (hist == dir_hist))
+							|| ((hist == hist2) && (hist == dir_alt_hist)))
+						continue;
+					for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)
 					{
-						hist->h[hist_index].buffaddr += adj;
-						assert(new_base <= hist->h[hist_index].buffaddr);
-					} else
-					{	/* It's already been adjusted or it has to be a private copy */
-						assert(((new_base <= hist->h[hist_index].buffaddr)
-							&& (hist->h[hist_index].buffaddr < new_base + (old_top - old_base)))
-							|| (0 != hist->h[hist_index].first_tp_srch_status)
-							|| (0 != ((off_chain *)&(hist->h[hist_index].blk_num))->flag));
+						assert(MAX_BT_DEPTH >= hist_index);
+						if ((old_base <= hist->h[hist_index].buffaddr)
+							&& (old_top > hist->h[hist_index].buffaddr))
+						{
+							hist->h[hist_index].buffaddr += adj;
+							assert(new_base <= hist->h[hist_index].buffaddr);
+						} else
+						{	/* It's already been adjusted or it has to be a private copy */
+							assert(((new_base <= hist->h[hist_index].buffaddr)
+								&& (hist->h[hist_index].buffaddr < new_base + (old_top - old_base)))
+								|| (0 != hist->h[hist_index].first_tp_srch_status)
+								|| (0 != ((off_chain *)&(hist->h[hist_index].blk_num))->flag));
+						}
 					}
 				}
 			}

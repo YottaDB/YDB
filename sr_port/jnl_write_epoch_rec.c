@@ -67,6 +67,8 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	epoch_record.prefix.jrec_type = JRT_EPOCH;
 	epoch_record.prefix.forwptr = epoch_record.suffix.backptr = EPOCH_RECLEN;
 	epoch_record.blks_to_upgrd = csd->blks_to_upgrd;
+	epoch_record.total_blks    = csd->trans_hist.total_blks;
+	epoch_record.free_blocks   = csd->trans_hist.free_blocks;
 	epoch_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 	/* in case jpc->pini_addr turns out to be zero (not clear how), we use the pini_addr field of the
 	 * first PINI journal record in the journal file which is nothing but JNL_HDR_LEN.

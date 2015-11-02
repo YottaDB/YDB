@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_string.h"	/* for the RESET_GV_TARGET macro which in turn uses "memcmp" */
+
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsblk.h"
@@ -42,6 +45,7 @@ void preemptive_ch(int preemptive_severe)
 {
 	sgmnt_addrs	*csa;
 	sgm_info	*si;
+
 	if (INVALID_GV_TARGET != reset_gv_target)
 	{
 		if (SUCCESS != preemptive_severe && INFO != preemptive_severe)

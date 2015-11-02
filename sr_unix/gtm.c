@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,12 @@
 #include "gtm_stdlib.h"
 #include "gtm_limits.h"
 #include <dlfcn.h>
+
+/* Since this executable is not going to link in libgtmshr.so (which is what contains gtm_fprintf), we should not expand
+ * fprintf to gtm_fprintf like is done for the entire GT.M codebase. All FPRINTF calls done here should directly go to
+ * the system "fprintf" and not gtm_fprintf. So undefine the fprintf define done in mdef.h
+ */
+#undef	fprintf
 
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -73,7 +79,7 @@ int main (int argc, char **argv, char **envp)
 {
 	int		status;
 #ifndef NOLIBGTMSHR
-	char		gtmshr_file[PATH_MAX];
+	char		gtmshr_file[GTM_PATH_MAX];
 	char_ptr_t	fptr;
 	int		dir_len;
 	void_ptr_t	handle;
@@ -91,10 +97,10 @@ int main (int argc, char **argv, char **envp)
 		return ERR_GTMDISTUNDEF;
 	}
 	dir_len = STRLEN(fptr);
-	if (PATH_MAX <= dir_len + STR_LIT_LEN(GTMSHR_IMAGE_NAME) + 1)
+	if (GTM_PATH_MAX <= dir_len + STR_LIT_LEN(GTMSHR_IMAGE_NAME) + 1)
 	{
 		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, $gtm_dist path is greater than maximum (%lu)\n",
-				(PATH_MAX - STR_LIT_LEN(GTMSHR_IMAGE_NAME) - 2));
+				(GTM_PATH_MAX - STR_LIT_LEN(GTMSHR_IMAGE_NAME) - 2));
 		return ERR_DISTPATHMAX;
 	}
 	memcpy(&gtmshr_file[0], fptr, dir_len);

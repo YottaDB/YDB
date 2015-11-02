@@ -44,7 +44,9 @@
 #include "timers.h"
 #include "send_msg.h"
 #include "dse.h"
+#include "gtmmsg.h"
 
+GBLREF	VSIG_ATOMIC_T	util_interrupt;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		process_id;
@@ -67,7 +69,7 @@ void dse_chng_fhead(void)
 	int4		x, index_x, save_x;
 	unsigned short	buf_len;
 	bool		was_crit;
-	bool		override = FALSE;
+	boolean_t	override = FALSE;
 	int4		nocrit_present;
 	int4		location_present, value_present, size_present, size;
 	uint4		location;
@@ -83,6 +85,7 @@ void dse_chng_fhead(void)
 	error_def(ERR_BLKSIZ512);
 	error_def(ERR_DBRDONLY);
 	error_def(ERR_SIZENOTVALID8);
+	error_def(ERR_FREEZECTRL);
 
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
@@ -269,6 +272,10 @@ void dse_chng_fhead(void)
 	{
 		cs_addrs->hdr->max_key_size = x;
 		gv_cur_region->max_key_size = x;
+	}
+	if ((CLI_PRESENT == cli_present("INHIBIT_KILLS")) && (cli_get_int("INHIBIT_KILLS", &x)))
+	{
+		cs_addrs->nl->inhibit_kills = x;
 	}
 	if (CLI_PRESENT == cli_present("INTERRUPTED_RECOV"))
 	{
@@ -531,14 +538,19 @@ void dse_chng_fhead(void)
 		x = cli_t_f_n("FREEZE");
 		if (1 == x)
 		{
-			while (!region_freeze(gv_cur_region, TRUE, override))
+			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE))
 			{
 				hiber_start(1000);
+				if (util_interrupt)
+				{
+					gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
+					break;
+				}
 			}
 		}
 		else if (0 == x)
 		{
-			if (!region_freeze(gv_cur_region, FALSE, override))
+			if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, FALSE, override, FALSE))
 			{
 				util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
 					TRUE, REG_LEN_STR(gv_cur_region));
@@ -552,6 +564,15 @@ void dse_chng_fhead(void)
 		cs_addrs->hdr->fully_upgraded = (boolean_t)x;
 		if (x)
 			cs_addrs->hdr->db_got_to_v5_once = TRUE;
+	}
+	if (CLI_PRESENT == cli_present("GVSTATSRESET"))
+	{
+		/* Clear statistics in NODE-LOCAL first */
+#		define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	cs_addrs->nl->gvstats_rec.COUNTER = 0;
+#		include "tab_gvstats_rec.h"
+#		undef TAB_GVSTATS_REC
+		/* Do it in the file-header next */
+		gvstats_rec_cnl2csd(cs_addrs);
 	}
 	if (CLI_PRESENT == cli_present("ONLINE_NBB"))
 	{
@@ -578,6 +599,31 @@ void dse_chng_fhead(void)
 			}
 		}
 	}
+	if (CLI_PRESENT == cli_present("ABANDONED_KILLS"))
+	{
+		buf_len = sizeof(buf);
+		if (cli_get_str("ABANDONED_KILLS", buf, &buf_len))
+		{
+			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
+			if (0 == STRCMP(buf, "NONE"))
+				cs_addrs->hdr->abandoned_kills = 0;
+			else
+			{
+				if (('0' == buf[0]) && ('\0' == buf[1]))
+					x = 0;
+				else
+				{
+					x = ATOI(buf);
+					if (0 == x)
+						x = -1;
+				}
+				if (0 > x)
+					util_out_print("Invalid value for abandoned_kills qualifier", TRUE);
+				else
+					cs_addrs->hdr->abandoned_kills = x;
+			}
+		}
+	}
         if (CLI_PRESENT == cli_present("KILL_IN_PROG"))
         {
                 buf_len = sizeof(buf);
@@ -594,9 +640,9 @@ void dse_chng_fhead(void)
                                 {
                                         x = ATOI(buf);
                                         if (0 == x)
-                                                x = -2;
+                                                x = -1;
                                 }
-                                if (x < -1)
+                                if (0 > x)
                                         util_out_print("Invalid value for kill_in_prog qualifier", TRUE);
                                 else
                                         cs_addrs->hdr->kill_in_prog = x;

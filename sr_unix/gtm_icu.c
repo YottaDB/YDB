@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,11 +81,7 @@ void gtm_icu_init(void)
 	char            buf[MAX_TRANS_NAME_LEN + sizeof(ICU_LIBNAME)];
 #endif
 
-	/* kludge to avoid calling gtm_wcswidth()/U_ISPRINT() in util_format()
-	 * before ICU initialization is complete */
-	assert(gtm_utf8_mode);
-	gtm_utf8_mode = FALSE;
-
+	assert(!gtm_utf8_mode);
 	locale = setlocale(LC_CTYPE, "");
 	chset = nl_langinfo(CODESET);
 	if (NULL == locale || NULL == chset || (0 != strcasecmp(chset, "utf-8") &&
@@ -103,7 +99,7 @@ void gtm_icu_init(void)
 	icu_minor_ver.len = STR_LIT_LEN(GTM_ICU_MINOR_ENV);
 	MEMCPY_LIT(buf, ICU_LIBNAME);
 	buflen = STR_LIT_LEN(ICU_LIBNAME);
-	if (SS_NORMAL == trans_log_name(&icu_minor_ver, &trans, &buf[buflen]))
+	if (SS_NORMAL == TRANS_LOG_NAME(&icu_minor_ver, &trans, &buf[buflen], sizeof(buf) - buflen, do_sendmsg_on_log2long))
 		buflen += trans.len;
 	else { /* default minor version is "0" */
 		MEMCPY_LIT(&buf[buflen], "0");
@@ -146,5 +142,6 @@ void gtm_icu_init(void)
 		*icu_fptr[findx] = fptr;
 	}
 	gtm_utf8_mode = TRUE;
+	/* gtm_wcswidth()/U_ISPRINT() in util_format() can henceforth be safely called now that ICU initialization is complete */
 	gtm_conv_init();
 }

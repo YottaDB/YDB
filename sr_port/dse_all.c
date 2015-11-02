@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "cli.h"
 #include "gdsroot.h"
 #include "gt_timer.h"
+#include "gtmmsg.h"
 
 #if defined(UNIX)
 #define GET_CONFIRM(X,Y) {PRINTF("CONFIRMATION: ");FGETS((X), (Y), stdin, fgets_res);Y = strlen(X);}
@@ -52,7 +53,9 @@ GBLREF uint4	user_id;
 #include "mutex.h"
 #endif
 #include "wcs_flu.h"
+#include <signal.h>		/* for VSIG_ATOMIC_T */
 
+GBLREF	VSIG_ATOMIC_T	util_interrupt;
 GBLREF	block_id	patch_curr_blk;
 GBLREF	gd_addr		*gd_header;
 GBLREF	gd_region	*gv_cur_region;
@@ -82,7 +85,7 @@ void dse_all(void)
 	boolean_t	seize = FALSE;
 	boolean_t	release = FALSE;
 	boolean_t	dump = FALSE;
-	bool		override = FALSE;
+	boolean_t	override = FALSE;
 	gd_addr         *temp_gdaddr;
 	gd_binding      *map;
 #ifdef UNIX
@@ -92,6 +95,7 @@ void dse_all(void)
 	error_def(ERR_DSEWCINITCON);
 	error_def(ERR_FREEZE);
         error_def(ERR_DBRDONLY);
+	error_def(ERR_FREEZECTRL);
 
 	old_addrs = cs_addrs;
 	old_region = gv_cur_region;
@@ -202,8 +206,15 @@ void dse_all(void)
 
 			if (freeze)
 			{
-				while (FALSE == region_freeze(gv_cur_region, TRUE, override))
+				while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE))
+				{
 					hiber_start(1000);
+					if (util_interrupt)
+					{
+						gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
+                        	                break;
+					}
+				}
 			}
 			if (seize)
 				grab_crit(gv_cur_region);
@@ -231,7 +242,7 @@ void dse_all(void)
 			}
 			if (nofreeze)
 			{
-				if (!region_freeze(gv_cur_region,FALSE, override))
+				if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region,FALSE, override, FALSE))
 					util_out_print("Region: !AD is frozen by another user, not releasing freeze",TRUE,
 						REG_LEN_STR(gv_cur_region));
 			}

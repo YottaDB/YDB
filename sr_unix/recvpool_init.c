@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,6 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	unsigned int	full_len;
 
 	error_def(ERR_REPLREQRUNDOWN);
-	error_def(ERR_REPLINSTUNDEF);
 	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_NORECVPOOL);
 	error_def(ERR_TEXT);
@@ -100,8 +99,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		reg = recvpool.recvpool_dummy_reg = jnlpool.jnlpool_dummy_reg;
 	}
 	udi = FILE_INFO(reg);
-	if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1))
-		rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+	if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error))
+		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
 	assert((recvpool.recvpool_dummy_reg != jnlpool.jnlpool_dummy_reg)
 		|| (reg->dyn.addr->fname_len == full_len) && !STRCMP(reg->dyn.addr->fname, instfilename));
 	if (recvpool.recvpool_dummy_reg != jnlpool.jnlpool_dummy_reg)

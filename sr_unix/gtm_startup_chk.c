@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,17 +32,17 @@
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
+#include "gtm_limits.h"
 #include "gdsroot.h"
 #include "error.h"
 #include "parse_file.h"
 #include "is_file_identical.h"
 #include "gtm_startup_chk.h"
+#include "gtmimagename.h"
 
-GBLREF boolean_t	gtm_environment_init;
-static char		pbuff[MAX_FBUFF];
-static int		plen = 0;
-static char 		mbuff[MAX_FBUFF];
-static parse_blk	pblk;
+GBLREF	gtmImageName		gtmImageNames[];
+GBLREF	boolean_t		gtm_environment_init;
+GBLREF	enum gtmImageTypes	image_type;
 
 int gtm_chk_dist(char *image)
 {
@@ -52,33 +52,24 @@ int gtm_chk_dist(char *image)
 	int		prefix_len;
 	mstr		gtm_name;
 	int		status;
-	char		save_ch = DIR_SEPARATOR;
+	char 		mbuff[MAX_FBUFF + 1];
+	parse_blk	pblk;
 
 	error_def(ERR_DISTPATHMAX);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_GTMDISTUNDEF);
 	error_def(ERR_FILEPARSE);
 	error_def(ERR_MAXGTMPATH);
+	error_def(ERR_IMAGENAME);
 
-	memset(pbuff, 0, MAX_FBUFF);
-	memset(&pblk, 0, sizeof(pblk));
 	if (NULL != (ptr1 = (char *)GETENV(GTM_DIST)))
 	{
-		plen = STRLEN(ptr1);
-		if (MAX_FBUFF - 2 > plen + GTMSECSHR_NAMELEN)
-			memcpy(pbuff, ptr1, plen);
-		else
-			rts_error(VARLSTCNT(3) ERR_DISTPATHMAX, 1, MAX_FBUFF - GTMSECSHR_NAMELEN);
-	}
-	else
+		assert((INVALID_IMAGE != image_type) && (n_image_types > image_type));	/* assert image_type is initialized */
+		if ((GTM_PATH_MAX - 2) <= (STRLEN(ptr1) + gtmImageNames[image_type].imageNameLen))
+			rts_error(VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_PATH_MAX - gtmImageNames[image_type].imageNameLen - 2);
+	} else
 		rts_error(VARLSTCNT(1) ERR_GTMDISTUNDEF);
-	if (DIR_SEPARATOR != pbuff[plen - 1])
-	{
-		pbuff[plen] = DIR_SEPARATOR;
-		pbuff[plen + 1] = 0;
-		plen++;
-	}
-
+	memset(&pblk, 0, sizeof(pblk));
 	pblk.buffer = mbuff;
 	pblk.buff_size = MAX_FBUFF;
 	pblk.fop = F_SYNTAXO;
@@ -94,9 +85,8 @@ int gtm_chk_dist(char *image)
 		if (NULL == GETCWD(pre_buff, MAX_FBUFF, prefix))
 			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("getcwd"), CALLFROM, errno);
-
 		prefix_len = STRLEN(prefix);
-		if(MAX_FBUFF < prefix_len + pblk.b_esl + 1)
+		if (MAX_FBUFF < prefix_len + pblk.b_esl + 1)
 			rts_error(VARLSTCNT(3) ERR_MAXGTMPATH, 1, MAX_FBUFF - pblk.b_name);
 		if (DIR_SEPARATOR != prefix[prefix_len - 1])
 		{
@@ -105,32 +95,15 @@ int gtm_chk_dist(char *image)
 		}
 		memcpy(prefix + prefix_len, pblk.l_dir, (int)pblk.b_dir);
 		prefix[prefix_len + (int)pblk.b_dir] = 0;
-	}
-	else
+	} else
 	{
 		prefix = pblk.l_dir;
-	/*
-	 *	save the char in the parsed buffer, this is the first char
-	 *	of the file(image) name, restore it after strcmp below;
-	 *	gtm_chk_image might use it
-	 */
-		save_ch = prefix[pblk.b_dir];
-		prefix[pblk.b_dir] = 0;
+		if (DIR_SEPARATOR == prefix[pblk.b_dir])
+			prefix[pblk.b_dir] = 0;
 	}
-	if (DIR_SEPARATOR != save_ch)
-		prefix[pblk.b_dir] = save_ch;
+	if ((GTM_IMAGE == image_type) && memcmp(pblk.l_name, GTM_IMAGE_NAME, GTM_IMAGE_NAMELEN))
+		rts_error(VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), pblk.b_name, pblk.l_name);
 	if (GETENV("gtm_environment_init"))
 		gtm_environment_init = TRUE;
-
-	return 0;
-}
-
-int gtm_chk_image(void)
-{
-	error_def(ERR_IMAGENAME);
-
-	if (memcmp(pblk.l_name, GTM_IMAGE_NAME, GTM_IMAGE_NAMELEN))
-		rts_error(VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), pblk.b_name, pblk.l_name);
-
 	return 0;
 }

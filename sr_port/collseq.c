@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "collseq.h"
 #include "error.h"
 #include "trans_log_name.h"
+#include "gtm_logicals.h"
 
 GBLDEF	collseq		*local_collseq = (collseq*)0;
 GBLDEF	char		*lcl_coll_xform_buff; /* This buffer is meant to be
@@ -46,8 +47,9 @@ int find_local_colltype(void)
 
 	lognam.len = sizeof(LCT_PREFIX) - 1;
 	lognam.addr = LCT_PREFIX;
-	status = trans_log_name(&lognam,&transnam,transbuf);
-	if (status != SS_NORMAL) return 0;
+	status = TRANS_LOG_NAME(&lognam, &transnam, transbuf, sizeof(transbuf), do_sendmsg_on_log2long);
+	if (SS_NORMAL != status)
+		return 0;
 	lct = asc2i((uchar_ptr_t)transnam.addr, transnam.len);
 	return lct >= MIN_COLLTYPE && lct <= MAX_COLLTYPE ? lct : 0;
 }

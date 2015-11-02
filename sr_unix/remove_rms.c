@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,13 @@ void remove_rms (io_desc *ciod)
 	assert (ciod->type == rm);
 	assert (ciod->state == dev_closed || ciod->state == dev_never_opened);
 	rm_ptr = (d_rm_struct *) ciod->dev_sp;
+
+	/* This routine will now be called if there is an open error to remove the partially created device
+	 from the list of devices in io_root_log_name.  This means rm_ptr may be zero so don't use it if it is*/
+
+	/* if this is the stderr device being closed directly by user then let the close of the pipe handle it */
+	if (rm_ptr && rm_ptr->stderr_parent)
+		return;
 	for (lpp = &io_root_log_name, lp = *lpp; lp; lp = *lpp)
 	{
 		if (lp->iod->pair.in == ciod)
@@ -34,7 +41,7 @@ void remove_rms (io_desc *ciod)
 #ifndef __MVS__
 			assert (lp->iod->pair.out == ciod);
 #else
-			if (lp->iod->pair.out != ciod && rm_ptr->fifo)
+			if (lp->iod->pair.out != ciod && (rm_ptr->fifo || rm_ptr->pipe))
 			{
 				free((lp->iod->pair.out)->dev_sp);
 				free(lp->iod->pair.out);
@@ -51,6 +58,21 @@ void remove_rms (io_desc *ciod)
 		else
 			lpp = &lp->next;
 	}
-	free (rm_ptr);
+	if (rm_ptr)
+	{
+		if (rm_ptr->pipe)
+		{
+			int i;
+			/* free up dev_param_pairs if defined */
+			for ( i = 0; i < rm_ptr->dev_param_pairs.num_pairs; i++ )
+			{
+				if (NULL != rm_ptr->dev_param_pairs.pairs[i].name)
+					free(rm_ptr->dev_param_pairs.pairs[i].name);
+				if (NULL != rm_ptr->dev_param_pairs.pairs[i].definition)
+					free(rm_ptr->dev_param_pairs.pairs[i].definition);
+			}
+		}
+		free (rm_ptr);
+	}
 	free (ciod);
 }

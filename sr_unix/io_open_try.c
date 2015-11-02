@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -176,12 +176,16 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		if ((n_io_dev_types == tl->iod->type) && mspace && mspace->str.len)
 		{
 			lower_to_upper(dev_type, (uchar_ptr_t)mspace->str.addr, mspace->str.len);
-			if (((sizeof("TCP") - 1) == mspace->str.len)
-			    && (0 == MEMCMP_LIT(dev_type, "TCP")))
-				tl->iod->type = tcp;
-			else if (((sizeof("SOCKET") - 1) == mspace->str.len)
+
+			if (((sizeof("SOCKET") - 1) == mspace->str.len)
 				 && (0 == MEMCMP_LIT(dev_type, "SOCKET")))
 				tl->iod->type = gtmsocket;
+			else if (((sizeof("PIPE") - 1) == mspace->str.len)
+			    && (0 == MEMCMP_LIT(dev_type, "PIPE")))
+				tl->iod->type = pi;
+			else if (((sizeof("TCP") - 1) == mspace->str.len)
+			    && (0 == MEMCMP_LIT(dev_type, "TCP")))
+				tl->iod->type = tcp;
 			else
 				tl->iod->type = us;
 		}
@@ -286,7 +290,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	active_device = naml->iod;
 
 	if ((-2 == file_des) && (dev_open != naml->iod->state) && (us != naml->iod->type)
-	    && (tcp != naml->iod->type) && (gtmsocket != naml->iod->type))
+	    && (tcp != naml->iod->type) && (gtmsocket != naml->iod->type) && (pi != naml->iod->type))
 	{
 		oflag |= (O_RDWR | O_CREAT | O_NOCTTY);
 #ifdef __MVS__
@@ -380,6 +384,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 
 		if (timed)
 			start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
+
 		/* RW permissions for owner and others as determined by umask. */
 		umask_orig = umask(000);	/* determine umask (destructive) */
 		(void)umask(umask_orig);	/* reset umask */
@@ -426,25 +431,25 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 							break;
 					}
 					FCNTL2(file_des, F_GETFL, oflag_clone);
-                        		FCNTL3(file_des, F_SETFL, (oflag_clone & ~O_NONBLOCK), fcntl_res);
+					FCNTL3(file_des, F_SETFL, (oflag_clone & ~O_NONBLOCK), fcntl_res);
 
 					oflag |= O_WRONLY;
 					oflag &= ~O_RDONLY;
 					while ((-1 == (file_des_w = OPEN4(buf, oflag, umask_creat, size))) && !out_of_time)
-                                        {
-                                                if (0 == msec_timeout)
-                                                        out_of_time = TRUE;
-                                                if (outofband)
-                                                        outofband_action(FALSE);
-                                                if (   EINTR == errno
+					{
+						if (0 == msec_timeout)
+							out_of_time = TRUE;
+						if (outofband)
+							outofband_action(FALSE);
+						if (   EINTR == errno
 						       || ETXTBSY == errno
 						       || ENFILE == errno
 						       || EBUSY == errno
 						       || ((mb == naml->iod->type) && (ENXIO == errno)))
-                                                        continue;
-                                                else
-                                                        break;
-                                        }
+							continue;
+						else
+							break;
+					}
 				}
 #endif
 				break;

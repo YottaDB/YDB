@@ -80,7 +80,7 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	memcpy(v15_csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 	v15_csd->owner_node = csd->owner_node;
 	v15_csd->image_count = csd->image_count;
-	v15_csd->kill_in_prog = csd->kill_in_prog;
+	v15_csd->kill_in_prog = (csd->kill_in_prog + csd->abandoned_kills);
 	v15_csd->trans_hist.curr_tn = (v15_trans_num) csd->trans_hist.curr_tn;
 	v15_csd->trans_hist.early_tn = (v15_trans_num) csd->trans_hist.early_tn;
 	v15_csd->trans_hist.last_mm_sync = (v15_trans_num) csd->trans_hist.last_mm_sync;

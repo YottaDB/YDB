@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -119,13 +119,13 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 #    elif defined(__i386)
 #      ifndef REG_EIP
 #        define REG_EIP EIP
-					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_EIP];
 #      endif
+					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_EIP];
 #    elif defined(__x86_64__)
 #      ifndef REG_RIP
 #        define REG_RIP EIP
-                                        gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_RIP];
 #      endif
+					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_RIP];
 #    else
 #      error "Unsupported Linux Platform"
 #    endif

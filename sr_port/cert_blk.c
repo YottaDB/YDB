@@ -129,7 +129,13 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 	util_buff[util_len] = 0;
 
 	chain = *(off_chain *)&blk;
-	assert(!chain.flag || dollar_tlevel && !csa->t_commit_crit);
+	/* Assert that if at all chain.flag is non-zero (i.e. a created block), we are in TP and not yet in the commit logic.
+	 * The only exception to this rule is if we are in TP and inside phase1 of the commit logic and trying to certify a
+	 * block that was killed inside of the transaction (possible if cert_blk is called directly from tp_tend). In this case,
+	 * the block number passed is a special value GDS_CREATE_BLK_MAX so check that.
+	 */
+	assert(!chain.flag || dollar_tlevel && (!csa->t_commit_crit
+						|| ((T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit) && (GDS_CREATE_BLK_MAX == blk))));
 	if (!chain.flag && ((offset * bplmap) == (uint4)blk))					/* it's a bitmap */
 	{
 		if ((unsigned char)blk_levl != LCL_MAP_LEVL)

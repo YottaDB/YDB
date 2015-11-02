@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,23 +54,24 @@
 #include "repl_log.h"
 #include "repl_comm.h"
 
-GBLREF jnlpool_addrs		jnlpool;
-GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF uint4			process_id;
-GBLREF int			gtmsource_sock_fd;
-GBLREF int			gtmsource_log_fd;
-GBLREF FILE			*gtmsource_log_fp;
-GBLREF int			gtmsource_filter;
-GBLREF boolean_t		gtmsource_logstats;
-GBLREF int			gtmsource_statslog_fd;
-GBLREF FILE			*gtmsource_statslog_fp;
-GBLREF unsigned char		*gtmsource_tcombuff_start;
-GBLREF qw_num			repl_source_data_sent;
-GBLREF qw_num			repl_source_msg_sent;
-GBLREF seq_num			seq_num_zero;
-GBLREF repl_msg_ptr_t		gtmsource_msgp;
-GBLREF uchar_ptr_t		repl_filter_buff;
-GBLREF boolean_t		pool_init;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	uint4			process_id;
+GBLREF	int			gtmsource_sock_fd;
+GBLREF	int			gtmsource_log_fd;
+GBLREF	FILE			*gtmsource_log_fp;
+GBLREF	int			gtmsource_filter;
+GBLREF	boolean_t		gtmsource_logstats;
+GBLREF	int			gtmsource_statslog_fd;
+GBLREF	FILE			*gtmsource_statslog_fp;
+GBLREF	unsigned char		*gtmsource_tcombuff_start;
+GBLREF	qw_num			repl_source_cmp_sent;
+GBLREF	qw_num			repl_source_data_sent;
+GBLREF	qw_num			repl_source_msg_sent;
+GBLREF	seq_num			seq_num_zero;
+GBLREF	repl_msg_ptr_t		gtmsource_msgp;
+GBLREF	uchar_ptr_t		repl_filter_buff;
+GBLREF	boolean_t		pool_init;
 
 int gtmsource_end1(boolean_t auto_shutdown)
 {
@@ -128,8 +129,8 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	repl_log(gtmsource_log_fp, TRUE, FALSE, "REPL INFO - Last written tr num into jnlpool : %llu", log_seqno1);
 	repl_log(gtmsource_log_fp, FALSE, FALSE, "  Last sent tr num : %llu", log_seqno);
 	repl_log(gtmsource_log_fp, FALSE, TRUE, "  Number of unsent tr : %llu\n", diff_seqno);
-	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Tr Total : %llu  Msg Total : %llu\n",
-		 repl_source_data_sent, repl_source_msg_sent);
+	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Tr Total : %llu  Msg Total : %llu  CmpMsg Total : %llu\n",
+		 repl_source_data_sent, repl_source_msg_sent, repl_source_cmp_sent);
 	if (gtmsource_filter & EXTERNAL_FILTER)
 		repl_stop_filter();
 	gtm_event_log_close();

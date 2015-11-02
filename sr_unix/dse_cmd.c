@@ -113,6 +113,7 @@ static readonly CLI_ENTRY db_vers[] = {
 };
 
 static readonly CLI_ENTRY dse_cfhead_qual[] = {
+{ "ABANDONED_KILLS",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "AVG_BLKS_READ",             0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "BLKS_TO_UPGRADE",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "BLK_SIZE",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
@@ -135,9 +136,11 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "FLUSH_TIME",                0, 0, dse_ftime_parm_values, 0,                   0, 0, VAL_NOT_REQ, 0, NON_NEG, VAL_TIME, 0       },
 { "FREEZE",                    0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "FULLY_UPGRADED",            0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "GVSTATSRESET",              0, 0, 0,                     0,                   0, 0, VAL_N_A,     0, NON_NEG, 0,        0       },
 { "HARD_SPIN_COUNT",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "HEXLOCATION",               0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "HEXVALUE",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "INHIBIT_KILLS",             0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "INTERRUPTED_RECOV",         0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "JNL_SYNCIO",                0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "JNL_YIELD_LIMIT",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,6 +69,7 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 	d_socket_struct	*dsocketptr;
 
 	iod = io_curr_device.in;
+	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	vmvalptr->str.len = datalen;
 	vmvalptr->str.addr = (char *)stringpool.free;
 	if (0 < datalen)
@@ -93,7 +94,6 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 		}
 		if (0 < delimlen)
 		{	/* Set $KEY and $ZB with the failing badchar */
-			dsocketptr = (d_socket_struct *)(iod->dev_sp);
 			memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
 			iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
 			memcpy(dsocketptr->dollar_key, delimptr, MIN(delimlen, DD_BUFLEN - 1));

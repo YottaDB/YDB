@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <string.h>
+#include "gtm_string.h"
 #include <errno.h>
 #include "gtm_stdio.h"
 
@@ -23,6 +23,7 @@
 #include "gtmmsg.h"
 #include "trans_log_name.h"
 #include "error.h"
+#include "gtm_logicals.h"
 
 #define MAXARGSIZE	1024
 
@@ -46,12 +47,11 @@ int gtm_event_log_init(void)
 
 	if (gtm_do_event_log) /* Already initialized */
 		return(SS_NORMAL);
-
 	name.len = sizeof(GTM_EVENT_LOG_LIB_ENV) - 1;
 	name.addr = GTM_EVENT_LOG_LIB_ENV;
-	if ((status = trans_log_name(&name, &trans_name, log_name)) != SS_NORMAL || trans_name.len == 0)
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&name, &trans_name, log_name, sizeof(log_name), do_sendmsg_on_log2long))
+			|| (0 == trans_name.len))
 		return(status);
-
 	memcpy(shared_lib, trans_name.addr, trans_name.len);
 	shared_lib[trans_name.len] = '\0';
 	if (NULL == (gtm_event_log_handle = fgn_getpak(shared_lib, INFO)))
@@ -61,14 +61,14 @@ int gtm_event_log_init(void)
 		gtm_putmsg(VARLSTCNT(6) ERR_EVENTLOGERR, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 		return(-1);
 	}
-
 #ifdef GTM_EVENT_LOG_HARDCODE_RTN_NAME
 	trans_name.len = sizeof(GTM_EVENT_LOG_RTN) - 1;
 	trans_name.addr = GTM_EVENT_LOG_RTN;
 #else
 	name.len = sizeof(GTM_EVENT_LOG_RTN_ENV) - 1;
 	name.addr = GTM_EVENT_LOG_RTN_ENV;
-	if ((status = trans_log_name(&name, &trans_name, log_name)) != SS_NORMAL || trans_name.len == 0)
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(&name, &trans_name, log_name, sizeof(log_name), do_sendmsg_on_log2long))
+		|| (0 == trans_name.len))
 	{
 		SPRINTF(print_msg, "%s not set or null. No event logging done", GTM_EVENT_LOG_RTN_ENV);
 		gtm_putmsg(VARLSTCNT(6) ERR_EVENTLOGERR, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));

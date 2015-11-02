@@ -4,6 +4,7 @@ desired_db_format_set
 ext2jnl
 go_load
 gtm_tempnam
+gtm_zlib
 gtmrecv
 gtmrecv_ch
 gtmrecv_changelog
@@ -172,7 +173,6 @@ mur_insert_prev
 mur_interactive
 mur_jctl_from_next_gen
 mur_jnl_ext
-mur_master_map
 mur_multi_rehash
 mur_open_files
 mur_output_record

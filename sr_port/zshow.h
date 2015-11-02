@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 #define ZSHOW_GLOBAL 	2
 #define ZSHOW_LOCAL 	3
 #define ZSHOW_NOPARM	-1
-#define ZSHOW_ALL	"IVBDLSC"
+#define ZSHOW_ALL	"IVBDLGSC"
 
 #define CLEANUP_ZSHOW_BUFF				\
 {							\
@@ -27,6 +27,9 @@
 		zwr_output_buff = NULL;			\
 	}						\
 }
+
+#define	FIRST_LINE_OF_ZSHOW_OUTPUT(out)	(('G' != out->code) && ('g' != out->code)&& ('L' != out->code)&& ('l' != out->code) \
+						? (1 != out->line_num) : (0 != out->line_num))
 
 typedef struct {
 	struct lv_val_struct		*lvar;		/* local variable to output to			*/
@@ -80,6 +83,7 @@ void		zshow_output(zshow_out *out, const mstr *str);
 void		zshow_svn(zshow_out *output);
 void		zshow_zbreaks(zshow_out *output);
 void		zshow_zcalls(zshow_out *output);
+void		zshow_gvstats(zshow_out *output);
 void		zshow_zwrite(zshow_out *output);
 boolean_t	zwr2format(mstr *src, mstr *des);
 int		zwrkeylength(char* ptr, int len);

@@ -60,9 +60,10 @@ GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-onl
 
 void t_retry(enum cdb_sc failure)
 {
-	tp_frame	*tf;
-	unsigned char	*end, buff[MAX_ZWR_KEY_SZ];
-	short		tl;
+	tp_frame		*tf;
+	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
+	short			tl;
+	sgmnt_addrs		*csa;
 
 	error_def(ERR_GBLOFLOW);
 	error_def(ERR_GVIS);
@@ -75,16 +76,32 @@ void t_retry(enum cdb_sc failure)
 	if (mu_reorg_process)
 		CWS_RESET;
 	DEBUG_ONLY(donot_commit = FALSE;)
+	csa = cs_addrs;
 	if (0 == dollar_tlevel)
 	{
-		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(cs_addrs, failure);	/* set wc_blocked if cache related status */
-		cs_addrs->hdr->n_retries[t_tries]++;
-		if (cs_addrs->critical)
-			crash_count = cs_addrs->critical->crashcnt;
+		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, failure);	/* set wc_blocked if cache related status */
+		switch(t_tries)
+		{
+			case 0:
+				INCR_GVSTATS_COUNTER(csa, csa->nl, n_nontp_retries_0, 1);
+				break;
+			case 1:
+				INCR_GVSTATS_COUNTER(csa, csa->nl, n_nontp_retries_1, 1);
+				break;
+			case 2:
+				INCR_GVSTATS_COUNTER(csa, csa->nl, n_nontp_retries_2, 1);
+				break;
+			default:
+				assert(3 == t_tries);
+				INCR_GVSTATS_COUNTER(csa, csa->nl, n_nontp_retries_3, 1);
+				break;
+		}
+		if (csa->critical)
+			crash_count = csa->critical->crashcnt;
 		/* If the restart code is something that should not increment t_tries, handle that by decrementing t_tries
 		 * for these special codes just before incrementing it unconditionally. Note that this should be done ONLY IF
 		 * t_tries is CDB_STAGNATE or higher and not for lower values as otherwise it can cause livelocks (e.g.
-		 * because csd->wc_blocked is set to TRUE, it is possible we end up restarting with cdb_sc_helpedout
+		 * because csa->hdr->wc_blocked is set to TRUE, it is possible we end up restarting with cdb_sc_helpedout
 		 * without even doing a cache-recovery (due to the fast path in t_end that does not invoke grab_crit in case
 		 * of read-only transactions). In this case, not incrementing t_tries will cause us to eternally retry
 		 * the transaction with no one eventually grabbing crit and doing the cache-recovery).
@@ -98,9 +115,7 @@ void t_retry(enum cdb_sc failure)
 		{
 			DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
 			grab_crit(gv_cur_region);
-			if ((dba_mm == cs_addrs->hdr->acc_meth)					/* we have MM and.. */
-					&& (cs_addrs->total_blks != cs_addrs->ti->total_blks))	/* and file has been extended */
-				wcs_mm_recover(gv_cur_region);
+			CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, gv_cur_region);
 			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
 			if (CDB_STAGNATE > t_tries)
 				rel_crit(gv_cur_region);
@@ -108,14 +123,14 @@ void t_retry(enum cdb_sc failure)
 			{
 				assert((failure != cdb_sc_helpedout) && (failure != cdb_sc_future_read)
 					&& (failure != cdb_sc_jnlclose) && (failure != cdb_sc_jnlstatemod)
-					&& (failure != cdb_sc_backupstatemod));
+					&& (failure != cdb_sc_backupstatemod) && (failure != cdb_sc_inhibitkills));
 				if (cdb_sc_unfreeze_getcrit == failure)
 				{
-					GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, cs_data);
+					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, cs_data);
 					t_tries = CDB_STAGNATE;
 				} else
 				{
-					assert(cs_addrs->now_crit);
+					assert(csa->now_crit);
 					rel_crit(gv_cur_region);
 
 					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
@@ -138,34 +153,34 @@ void t_retry(enum cdb_sc failure)
 			}
 		} else  if (cdb_sc_readblocked == failure)
 		{
-			if (cs_addrs->now_crit)
+			if (csa->now_crit)
 			{
 				assert(FALSE);
 				rel_crit(gv_cur_region);
 			}
 			wcs_sleep(TIME_TO_FLUSH);
 		}
-		if ((cdb_sc_blockflush == failure) && !CCP_SEGMENT_STATE(cs_addrs->nl, CCST_MASK_HAVE_DIRTY_BUFFERS))
+		if ((cdb_sc_blockflush == failure) && !CCP_SEGMENT_STATE(csa->nl, CCST_MASK_HAVE_DIRTY_BUFFERS))
 		{
-			assert(cs_addrs->hdr->clustered);
+			assert(csa->hdr->clustered);
 			CCP_FID_MSG(gv_cur_region, CCTR_FLUSHLK);
-			ccp_userwait(gv_cur_region, CCST_MASK_HAVE_DIRTY_BUFFERS, 0, cs_addrs->nl->ccp_cycle);
+			ccp_userwait(gv_cur_region, CCST_MASK_HAVE_DIRTY_BUFFERS, 0, csa->nl->ccp_cycle);
 		}
 		cw_set_depth = 0;
 		cw_map_depth = 0;
-		start_tn = cs_addrs->ti->curr_tn;
+		start_tn = csa->ti->curr_tn;
 		assert(NULL != gv_target);
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
 	} else
 	{	/* for TP, do the minimum; most of the logic is in tp_retry, because it is also invoked directly from t_commit */
 		t_fail_hist[t_tries] = failure;
-		assert(NULL == cs_addrs || NULL != cs_addrs->hdr);	/* both cs_addrs and cs_data should be NULL or non-NULL. */
-		assert(NULL != cs_addrs || cdb_sc_needcrit == failure); /* cs_addrs can be NULL in case of retry in op_lock2 */
-		if (NULL != cs_addrs)					/*  in which case failure code should be cdb_sc_needcrit. */
+		assert((NULL == csa) || (NULL != csa->hdr));	/* both csa and csa->hdr should be NULL or non-NULL. */
+		assert((NULL != csa) || (cdb_sc_needcrit == failure)); /* csa can be NULL in case of retry in op_lock2 */
+		if (NULL != csa)					/*  in which case failure code should be cdb_sc_needcrit. */
 		{
-			SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(cs_addrs, failure);
-			TP_RETRY_ACCOUNTING(cs_addrs, cs_addrs->hdr, failure);
+			SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, failure);
+			TP_RETRY_ACCOUNTING(csa, csa->nl, failure);
 		}
 		assert((NULL != gv_target)
 				|| (cdb_sc_needcrit == failure) && (CDB_STAGNATE <= t_tries) && have_crit(CRIT_HAVE_ANY_REG));

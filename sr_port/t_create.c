@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,24 +26,25 @@
 #include "tp.h"
 #include "t_create.h"
 
-GBLREF cw_set_element	cw_set[];
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF unsigned char	cw_set_depth;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF short		dollar_tlevel;
-GBLREF int		tp_allocation_clue;
-GBLREF gv_namehead	*gv_target;
-GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	cw_set_element		cw_set[];
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	short			dollar_tlevel;
+GBLREF	int			tp_allocation_clue;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	boolean_t		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 
 block_index t_create (
 		      block_id	hint,			/*  A hint block number.  */
-		      unsigned char 	*upd_addr,	/*  address of the block segment array which contains
+		      unsigned char	*upd_addr,	/*  address of the block segment array which contains
 							 *  update info for the block
 							 */
 		      block_offset 	ins_off,	/*  offset to the position in the buffer that is to receive a block number
 							 *  when one is created.
 							 */
-		      block_index 	index,          /*  index into the create/write set.  The specified entry is always a
+		      block_index	index,          /*  index into the create/write set.  The specified entry is always a
 							 *  created entry. When the create gets assigned a block number,
 							 *  the block number is inserted into this buffer at the location
 							 *  specified by ins_off.
@@ -52,15 +53,17 @@ block_index t_create (
 {
 	cw_set_element	*cse;
 
-        if (dollar_tlevel == 0)
-        {
+	if (dollar_tlevel == 0)
+	{
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
 		cse = &cw_set[cw_set_depth];
-        } else
-        {
+	} else
+	{
 		if (!tp_allocation_clue)
-			hint = tp_allocation_clue = MASTER_MAP_SIZE_MAX * BLKS_PER_LMAP + 1;
-		else
+		{
+			tp_allocation_clue = gtm_tp_allocation_clue + 1;
+			hint = tp_allocation_clue;
+		} else
 		{
 			hint = ++tp_allocation_clue;
 			if (tp_allocation_clue < 0)
@@ -70,7 +73,7 @@ block_index t_create (
 		assert(gv_target);
 		cse->blk_target = gv_target;
 		gv_target->write_local_tn = local_tn;
-        }
+	}
 
 	cse->mode = gds_t_create;
 	cse->blk_checksum = 0;

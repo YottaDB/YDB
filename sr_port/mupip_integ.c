@@ -328,7 +328,7 @@ void mupip_integ(void)
 			{
 				if (region)
 				{
-					region_freeze(rptr->reg, FALSE, FALSE);
+					region_freeze(rptr->reg, FALSE, FALSE, FALSE);
 					if (!rptr->reg->read_only)
 					{
 						fc = rptr->reg->dyn.addr->file_cntl;
@@ -351,7 +351,7 @@ void mupip_integ(void)
 			{
 				if (region)
 				{
-					region_freeze(rptr->reg, FALSE, FALSE);
+					region_freeze(rptr->reg, FALSE, FALSE, FALSE);
 					if (!rptr->reg->read_only)
 					{
 						fc = gv_cur_region->dyn.addr->file_cntl;
@@ -509,7 +509,8 @@ void mupip_integ(void)
 				else
 					gtm_putmsg(VARLSTCNT(1) ERR_DBBTUFIXED);
 			}
-			if ((0 != mu_int_data.kill_in_prog) && (!mu_map_errs) && !region && !gv_cur_region->read_only)
+			if (((0 != mu_int_data.kill_in_prog) || (0 != mu_int_data.abandoned_kills)) && (!mu_map_errs) && !region
+				&& !gv_cur_region->read_only)
 			{
 				assert(mu_int_errknt > 0);
 				mu_int_errknt--;
@@ -600,7 +601,7 @@ void mupip_integ(void)
 					if (mu_int_blks_to_upgrd != cs_addrs->hdr->blks_to_upgrd)
 						cs_addrs->hdr->blks_to_upgrd = mu_int_blks_to_upgrd;
 				}
-				region_freeze(gv_cur_region, FALSE, FALSE);
+				region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
 				fc = gv_cur_region->dyn.addr->file_cntl;
 				fc->op = FC_WRITE;
 				fc->op_buff = (unsigned char *)FILE_INFO(gv_cur_region)->s_addrs.hdr;
@@ -608,7 +609,7 @@ void mupip_integ(void)
 				fc->op_pos = 1;
 				dbfilop(fc);
 			} else
-				region_freeze(gv_cur_region, FALSE, FALSE);
+				region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
 			rptr = rptr->fPtr;
 			if (NULL == rptr)
 				break;
@@ -617,8 +618,9 @@ void mupip_integ(void)
 			update_filehdr = FALSE;
 			if ((FALSE == block) && (FALSE == muint_key))
 			{
-				if ((0 == mu_map_errs) && (0 != mu_int_data.kill_in_prog))
+				if ((0 == mu_map_errs) && ((0 != mu_int_data.kill_in_prog) || (0 != mu_int_data.abandoned_kills)))
 				{
+					mu_int_data.abandoned_kills = 0;
 					mu_int_data.kill_in_prog = 0;
 					update_filehdr = TRUE;
 				}

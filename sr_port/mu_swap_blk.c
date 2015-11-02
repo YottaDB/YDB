@@ -559,7 +559,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * 	also the cw_set element will be created to mark the free/recycled block as free.
 		 * kill_set_ptr will save the block which will become free.
 		 */
-		child1 = ROUND_DOWN(dest_blk_id, BLKS_PER_LMAP); /* bit map block */
+		child1 = ROUND_DOWN2(dest_blk_id, BLKS_PER_LMAP); /* bit map block */
 		bmlhist.buffaddr = bmp_buff;
 		bmlhist.blk_num = child1;
 		child1 = dest_blk_id - child1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@ GBLREF	seq_num		seq_num_zero;
 
 uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 {
-	unsigned char	ar[11], *q;
+	unsigned char	ar[MAX_DIGITS_IN_INT], *q;
 	unsigned	m, len;
 
 	q = ar + sizeof(ar);
@@ -32,6 +32,7 @@ uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 			n = m;
 		}
 	}
+	assert((uintszofptr_t)q >= (uintszofptr_t)ar);
 	len = (unsigned int)(ar + sizeof(ar) - q);
 	memcpy(p, q, len);
 	return p + len;
@@ -39,7 +40,7 @@ uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 
 uchar_ptr_t i2ascl(uchar_ptr_t p, qw_num n)
 {
-	unsigned char	ar[22], *q;
+	unsigned char	ar[MAX_DIGITS_IN_INT8], *q;
 	uint4		len;
 	long		 r;
 
@@ -54,6 +55,7 @@ uchar_ptr_t i2ascl(uchar_ptr_t p, qw_num n)
 			*--q = r + '0';
 		}
 	}
+	assert((uintszofptr_t)q >= (uintszofptr_t)ar);
 	len = (uint4)(ar + sizeof(ar) - q);
 	memcpy(p, q, len);
 	return (unsigned char *)(p + len) ;
@@ -61,7 +63,7 @@ uchar_ptr_t i2ascl(uchar_ptr_t p, qw_num n)
 #ifdef INT8_SUPPORTED
 uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 {
-	unsigned char	ar[24], *q;
+	unsigned char	ar[MAX_HEX_DIGITS_IN_INT8], *q;
 	uint4		len;
 	qw_num		m;
 
@@ -80,6 +82,7 @@ uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 			n = n >> 4;
 		}
 	}
+	assert((uintszofptr_t)q >= (uintszofptr_t)ar);
 	len = (uint4)(ar + sizeof(ar) - q);
 	memcpy(p, q, len);
 	return p + len;
@@ -94,7 +97,6 @@ uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 	q = ar + sizeof(ar);
 	lsb = n.value[lsb_index];
 	msb = n.value[msb_index];
-
 	if (msb)
 	{
 		for (i = 0; i < 8; i++)		/* 8 to denote 8 nibbles per 4-byte value */
@@ -122,7 +124,7 @@ uchar_ptr_t i2asclx(uchar_ptr_t p, qw_num n)
 			lsb = lsb >> 4;
 		}
 	}
-
+	assert((uintszofptr_t)q >= (uintszofptr_t)ar);
 	len = ar + sizeof(ar) - q;
 	memcpy(p, q, len);
 	return p + len;

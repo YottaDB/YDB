@@ -77,7 +77,7 @@ CONDITION_HANDLER(util_base_ch)
 				{
 					csa = &FILE_INFO(r_local)->s_addrs;
 					if (!csa->persistent_freeze)
-						region_freeze(r_local, FALSE, FALSE);
+						region_freeze(r_local, FALSE, FALSE, FALSE);
 				}
 			}
 		}

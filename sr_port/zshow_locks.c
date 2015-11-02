@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,26 +15,52 @@
 #include "zshow.h"
 #include "mvalconv.h"
 
-GBLREF uint4 process_id;
-GBLREF mlk_pvtblk *mlk_pvt_root;
+GBLREF	uint4		process_id;
+GBLREF	mlk_pvtblk	*mlk_pvt_root;
+GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
 
 void zshow_locks(zshow_out *output)
 {
 	static readonly char zal[] = "ZAL ";
 	static readonly char lck[] = "LOCK ";
 	static readonly char lvl[] = " LEVEL=";
-	mval v;
-	mlk_pvtblk *temp;
+	static readonly char mlg[] = "MLG:";	/* # of M Lock commands Granted   */
+	static readonly char mlt[] = ",MLT:";	/* # of M Lock commands Timed-out */
+	mval		v;
+	mlk_pvtblk	*temp;
+	unsigned char	valstr[MAX_DIGITS_IN_INT8];
+	uchar_ptr_t	ptr;
+
+	/* Print LUS statistic */
+	output->flush = FALSE;
+	v.str.addr = &mlg[0];
+	v.str.len = sizeof(mlg) - 1;
+	zshow_output(output, &v.str);
+	ptr = i2ascl((uchar_ptr_t)valstr, mlk_stats.n_user_locks_success);
+	v.str.len = ptr - &valstr[0];
+	v.str.addr = (char *)&valstr[0];
+	zshow_output(output, &v.str);
+
+	/* Print LUF statistic */
+	output->flush = FALSE;
+	v.str.addr = &mlt[0];
+	v.str.len = sizeof(mlt) - 1;
+	zshow_output(output, &v.str);
+	ptr = i2ascl((uchar_ptr_t)valstr, mlk_stats.n_user_locks_fail);
+	v.str.len = ptr - &valstr[0];
+	v.str.addr = (char *)&valstr[0];
+	zshow_output(output, &v.str);
+	output->flush = TRUE;
+	v.str.len = 0;
+	zshow_output(output,&v.str);
 
 	for (temp = mlk_pvt_root; temp; temp = temp->next)
 	{
 		if (!temp->granted)
 			continue;
-
 		if (temp->nodptr && (temp->nodptr->owner != process_id
 			|| temp->sequence != temp->nodptr->sequence))
 			continue;
-
 		output->flush = FALSE;
 		if (temp->level && temp->zalloc)
 		{
@@ -55,8 +81,7 @@ void zshow_locks(zshow_out *output)
 			zshow_output(output,&v.str);
 			MV_FORCE_MVAL(&v,(int)temp->level) ;
 			mval_write(output,&v,TRUE);
-		}
-		else if (temp->level)
+		} else if (temp->level)
 		{
 			v.str.addr = &lck[0];
 			v.str.len = sizeof(lck) - 1;
@@ -67,7 +92,7 @@ void zshow_locks(zshow_out *output)
 			zshow_output(output,&v.str);
 			MV_FORCE_MVAL(&v,(int)temp->level) ;
 			mval_write(output,&v,TRUE);
-		}else if (temp->zalloc)
+		} else if (temp->zalloc)
 		{
 			v.str.addr = &zal[0];
 			v.str.len = sizeof(zal) - 1;

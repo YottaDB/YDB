@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	int			save_errno, save_shutdown;
 	char			helper_cmd[UPDHELPER_CMD_MAXLEN];
 	int			status;
+	int4			i4status;
 	mstr			helper_log_cmd, helper_trans_cmd;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 #ifdef UNIX
@@ -74,6 +75,7 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 	$DESCRIPTOR(cmd_desc_reader, UPDHELPER_READER_CMD_STR);
 	$DESCRIPTOR(cmd_desc_writer, UPDHELPER_WRITER_CMD_STR);
 #endif
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_TEXT);
 
@@ -91,16 +93,19 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 		return UPDPROC_START_ERR;
 	}
 	if (0 == helper_pid)
-	{ /* helper */
+	{	/* helper */
 		getjobnum();
 		helper->helper_pid_prev = process_id; /* identify owner of slot */
 		helper_log_cmd.len  = STR_LIT_LEN(UPDHELPER_CMD);
 		helper_log_cmd.addr = UPDHELPER_CMD;
-		if (SS_NORMAL != trans_log_name(&helper_log_cmd, &helper_trans_cmd, helper_cmd))
+		if (SS_NORMAL != (i4status = TRANS_LOG_NAME(&helper_log_cmd, &helper_trans_cmd, helper_cmd, sizeof(helper_cmd),
+								dont_sendmsg_on_log2long)))
 		{
 			helper->helper_shutdown = save_shutdown;
 			gtm_putmsg(VARLSTCNT(6) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				   LEN_AND_LIT("Could not find path of Helper Process. Check value of $gtm_dist"));
+			if (SS_LOG2LONG == i4status)
+				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(UPDHELPER_CMD), sizeof(helper_cmd) - 1);
 			repl_errno = EREPL_UPDSTART_BADPATH;
 			return UPDPROC_START_ERR;
 		}
@@ -126,7 +131,7 @@ static int helper_init(upd_helper_entry_ptr_t helper, recvpool_user helper_type)
 					    		UPDHELPER_MBX_PREFIX, mbx_suffix, &cmd_channel, &helper->helper_pid_prev,
 							ERR_RECVPOOLSETUP)))
 	{
-		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, LIT_AND_LEN("Unable to spawn Helper process"), status);
+		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2, LEN_AND_LIT("Unable to spawn Helper process"), status);
 		helper->helper_shutdown = save_shutdown;
 		repl_errno = EREPL_UPDSTART_FORK;
 		return UPDPROC_START_ERR;

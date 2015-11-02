@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,10 +13,10 @@
 
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
-
-#include <unistd.h>
-#include <errno.h>
+#include "gtm_unistd.h"
 #include "gtm_stat.h"
+
+#include <errno.h>
 
 #include "parse_file.h"
 #include "gdsroot.h"
@@ -32,6 +32,7 @@
 #include "is_file_identical.h"
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
+#include "gtm_logicals.h"
 
 char LITDEF gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE] =
 {
@@ -149,8 +150,8 @@ void dpzgbini(void)
 	uint4 status;
 	parse_blk pblk;
 
-	temp_mstr.addr = DEF_GDR;
-	temp_mstr.len = sizeof(DEF_GDR) - 1;
+	temp_mstr.addr = GTM_GBLDIR;
+	temp_mstr.len = sizeof(GTM_GBLDIR) - 1;
 	memset(&pblk, 0, sizeof(pblk));
 	pblk.buffer = temp_buff;
 	pblk.buff_size = MAX_FBUFF;
@@ -159,8 +160,8 @@ void dpzgbini(void)
 	status = parse_file(&temp_mstr, &pblk);
 
 	dollar_zgbldir.mvtype = MV_STR;
-	dollar_zgbldir.str.len = sizeof(DEF_GDR) - 1;
-	dollar_zgbldir.str.addr = DEF_GDR;
+	dollar_zgbldir.str.len = sizeof(GTM_GBLDIR) - 1;
+	dollar_zgbldir.str.addr = GTM_GBLDIR;
 	if (status & 1)
 	{
 		dollar_zgbldir.str.len = pblk.b_esl;

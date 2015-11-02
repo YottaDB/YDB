@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2006 Fidelity Information Services, Inc	;
+;	Copyright 1987, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -40,7 +40,7 @@ noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
 	q:%ZD="^"
 	w !!
 	i '$l(%ZH) s %ZH="%GO Global Output Utility"
-	u %ZD w %ZH,!,"GT.M ",$zd($h,"DD-MON-YEAR 24:60:SS")  w:fmt " ZWR"  w !
+	u %ZD w %ZH w:"M"'=$ZCHSET " ",$ZCHSET w !,"GT.M ",$zd($h,"DD-MON-YEAR 24:60:SS")  w:fmt " ZWR" w !
 	s gn="",(m,n)=0
 	f  s gn=$o(%ZG(gn)) q:gn=""  s g=gn d
 	. s fmtdone=0

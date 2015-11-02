@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2007 Fidelity Information Services, Inc.*
+ *	Copyright 2002, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -277,8 +277,10 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("CHANGELOG") && !(d_c_cli_present("LOG") || d_c_cli_present("LOG_INTERVAL")));
 	CLI_DIS_CHECK_N_RESET;
-	/* BUFFSIZE and FILTER are supported only with START qualifier */
-	disallow_return_value = (!d_c_cli_present("START") && (d_c_cli_present("BUFFSIZE") || d_c_cli_present("FILTER")));
+	/* BUFFSIZE, CMPSIZE or FILTER are supported only with START qualifier */
+	disallow_return_value = (!d_c_cli_present("START") && (d_c_cli_present("BUFFSIZE")
+								|| d_c_cli_present("CMPLVL")
+								|| d_c_cli_present("FILTER")));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
@@ -313,9 +315,10 @@ boolean_t cli_disallow_mupip_replic_source(void)
 	disallow_return_value = cli_check_any2(VARLSTCNT(11) p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12);
 	CLI_DIS_CHECK_N_RESET;
 
-	/* BUFFSIZE, FILTER, PASSIVE are supported only with START qualifier */
+	/* BUFFSIZE, CMPLVL, FILTER, PASSIVE are supported only with START qualifier */
 	disallow_return_value = (!d_c_cli_present("START")
 					&& (d_c_cli_present("BUFFSIZE")
+						|| d_c_cli_present("CMPLVL")
 						|| d_c_cli_present("FILTER")
 						|| d_c_cli_present("PASSIVE")));
 	CLI_DIS_CHECK_N_RESET;

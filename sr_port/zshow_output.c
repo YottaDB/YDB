@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -354,7 +354,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				out->ptr += len;
 				str_processed += len;
 				MV_FORCE_MVAL(mv, out->line_num);
-				if (out->line_num != 1)
+				if (FIRST_LINE_OF_ZSHOW_OUTPUT(out))
 					op_gvnaked(VARLSTCNT(1) mv);
 				else
 				{
@@ -387,7 +387,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 		if (out->flush && out->ptr != out->buff)
 		{
 			MV_FORCE_MVAL(mv, out->line_num);
-			if (out->line_num != 1)
+			if (FIRST_LINE_OF_ZSHOW_OUTPUT(out))
 				op_gvnaked(VARLSTCNT(1) mv);
 			else
 			{

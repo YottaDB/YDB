@@ -174,6 +174,7 @@ gtm_svc gtm_svc
 gtm_dal_svc gtm_svc
 gtm_rpc_init gtm_svc
 gtmsecshr gtmsecshr
+gtmsecshr_wrapper gtmsecshr
 mumps_clitab mumps
 gtm_main mumps
 semstat2 semstat2
@@ -381,6 +382,9 @@ if (! -z ${TMP_DIR}_src_files) then
 		alias runall_as gt_as_${RUNALL_IMAGE}
 
 		if ($linkonly == 0) then
+			# remove pre-existing object files before the current compilation
+			# to ensure they do not get used if the current compile fails
+			rm -f $gtm_obj/$file.o
 			if ($ext == "s") then
 				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
 				if ( "ia64" == $mach_type && "linux" == $platform_name ) then
@@ -401,6 +405,8 @@ if (! -z ${TMP_DIR}_src_files) then
 					\cp $gtm_src/omi_srvc_xct.c $gtm_src/omi_sx_play.c
 					chmod a-w $gtm_src/omi_sx_play.c
 					echo "$gtm_src/omi_sx_play.c   ---->  $gtm_obj/omi_sx_play.o"
+					# remove pre-existing object
+					rm -f $gtm_obj/omi_sx_play.o
 					runall_cc -DFILE_TCP $RUNALL_EXTRA_CC_FLAGS $gtm_src/omi_sx_play.c
 				endif
 			else if ($ext == "msg") then
@@ -464,9 +470,15 @@ if (! -z ${TMP_DIR}_src_files) then
 		if ("libgtmrpc.a" != $library) then
 			echo "-->  into $gtm_obj/$library <--"
 			gt_ar $gt_ar_option_update $gtm_obj/$library `cat $lib_`
+			if (("ia64" == $mach_type) && ("hpux" == $platform_name)) then
+				ranlib $gtm_obj/$library
+			endif
 		else
 			echo "-->  into $gtm_exe/$library <--"
 			gt_ar $gt_ar_option_update $gtm_exe/$library `cat $lib_`
+			if (("ia64" == $mach_type) && ("hpux" == $platform_name)) then
+				ranlib $gtm_exe/$library
+			endif
 		endif
 		if ($status) then
 			if ($?RUNALL_DEBUG != 0) env

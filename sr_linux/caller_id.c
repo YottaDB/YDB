@@ -35,6 +35,7 @@
 /*We need the callers caller of caller_id */
 #define RETURN_ADDRESS_DEPTH	2
 
+GBLREF	boolean_t	blocksig_initialized;
 GBLREF  sigset_t	block_sigsent;
 
 static boolean_t caller_id_reent = FALSE;	/* If ever true, our helper gets a lobotomy */
@@ -45,24 +46,26 @@ caddr_t caller_id(void)
 	int trace_size;
 	sigset_t	savemask;
 
-	/*
-	 * When backtrace is processing and a signal occurs, there is the potential for a deadlock -- waiting on a
-	 * lock that this process already holds.  A work around is to temporarily block signals (SIGINT, SIGQUIT,
-	 * SIGTERM, SIGTSTP, SIGCONT, SIGALRM) and then restore them after the backtrace call returns.
-	 */
-        sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
 	/* We cannot let this routine nest itself due to the impolite things that
 	   occur when the exception routines get re-entered so just play dead.
 	*/
 	if (caller_id_reent)
-	{
-		sigprocmask(SIG_SETMASK, &savemask, NULL);
 		return (caddr_t)-1;
-	}
+	/* When backtrace is processing and a signal occurs, there is the potential for a deadlock -- waiting on a
+	 * lock that this process already holds.  A work around is to temporarily block signals (SIGINT, SIGQUIT,
+	 * SIGTERM, SIGTSTP, SIGCONT, SIGALRM) and then restore them after the backtrace call returns.
+	 */
+	/* It is possible for this routine to be invoked during process startup (as part of err_init()) so
+	 * block_sigsent could not be initialized yet. Therefore this does not have an assert(blocksig_initialized)
+	 * that similar code in other places (e.g. dollarh.c) has.
+	 */
+	if (blocksig_initialized)
+        	sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
 	caller_id_reent = TRUE;
 	trace_size = backtrace(trace, MAX_TRACE_DEPTH);
 	caller_id_reent = FALSE;
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	if (blocksig_initialized)
+		sigprocmask(SIG_SETMASK, &savemask, NULL);
 
 /* backtrace will return call stack with address.*/
 	if (trace_size >= RETURN_ADDRESS_DEPTH)

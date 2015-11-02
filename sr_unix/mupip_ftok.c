@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,6 @@ void mupip_ftok (void)
 
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_MUNOACTION);
-	error_def(ERR_REPLINSTUNDEF);
 	error_def(ERR_TEXT);
 
 	fn_len = MAX_FN_LEN;
@@ -73,10 +72,8 @@ void mupip_ftok (void)
 	recvpool = (CLI_PRESENT == cli_present("RECVPOOL"));
 	if (jnlpool || recvpool)
 	{
-		if (!repl_inst_get_name(instfilename, &full_len, sizeof(instfilename)))
-			rts_error(VARLSTCNT(6) ERR_REPLINSTUNDEF, 0,
-				ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("$gtm_repl_instance not defined"));
+		if (!repl_inst_get_name(instfilename, &full_len, sizeof(instfilename), issue_rts_error))
+			GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
 		in_mupip_ftok = TRUE;
 		repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, sizeof(repl_inst_hdr));
 		in_mupip_ftok = FALSE;

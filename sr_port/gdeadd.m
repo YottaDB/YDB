@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2005 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -27,6 +27,8 @@ REGION
 	s update=1,s="",regs=regs+1
 	f  s s=$o(tmpreg(s)) q:'$l(s)  s regs(REGION,s)=tmpreg(s)
 	f  s s=$o(lquals(s)) q:'$l(s)  s regs(REGION,s)=lquals(s) i s="ALLOCATION" s regs(REGION,"EXTENSION")=lquals(s)
+	i $d(segs),$d(regs(REGION,"DYNAMIC_SEGMENT")),$d(segs(regs(REGION,"DYNAMIC_SEGMENT"),"ACCESS_METHOD")) d
+	. i "MM"=segs(regs(REGION,"DYNAMIC_SEGMENT"),"ACCESS_METHOD"),'$d(lquals("BEFORE_IMAGE")) s regs(REGION,"BEFORE_IMAGE")=0
 	q
 SEGMENT
 	i $d(segs(SEGMENT)) zm gdeerr("OBJDUP"):"Segment":SEGMENT
@@ -35,6 +37,8 @@ SEGMENT
 	i '$$SQUALS^GDEVERIF(am,.lquals) zm gdeerr("OBJNOTADD"):"Segment":SEGMENT
 	s update=1,s="",segs=segs+1
 	s segs(SEGMENT,"ACCESS_METHOD")=am
+	i "MM"=am s s="" f  s s=$o(regs(s)) q:'$l(s)  d
+	. i regs(s,"DYNAMIC_SEGMENT")=SEGMENT,'$d(lquals("BEFORE_IMAGE")) s regs(s,"BEFORE_IMAGE")=0
 	d seg
 	f  s s=$o(lquals(s)) q:'$l(s)  s segs(SEGMENT,s)=lquals(s)
 	q

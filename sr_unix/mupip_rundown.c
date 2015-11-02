@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -130,9 +130,12 @@ void mupip_rundown(void)
 		}
 		if (region && mu_star_specified)		/* rundown repl pools belonging to this global directory */
 		{
-			if (repl_inst_get_name((char *)replpool_id.instfilename, &full_len, sizeof(replpool_id.instfilename)))
+			if (repl_inst_get_name((char *)replpool_id.instfilename, &full_len, sizeof(replpool_id.instfilename),
+					return_on_error))
+			{
 				if (!mu_rndwn_repl_instance(&replpool_id, TRUE, TRUE))
 					exit_status = ERR_MUNOTALLSEC;
+			}
 		}
 	} else
 	{

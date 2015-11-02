@@ -57,7 +57,7 @@
 		/* On non-allocate related error, give more general error and GTMASSERT */			\
 		gtm_putmsg(VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("mmap()"), CALLFROM,			\
 			   save_errno, 0,									\
-			   ERR_TEXT, 3, LEN_AND_LIT("Storage call made from"), CALLERID);			\
+			   ERR_CALLERID, 3, LEN_AND_LIT("TEXT_ALLOC"), CALLERID);					\
 		GTMASSERT;											\
 	}													\
 }
@@ -72,7 +72,7 @@
 		save_errno = errno;										\
 		gtm_putmsg(VARLSTCNT(14) ERR_SYSCALL, 5, LEN_AND_LIT("munmap"), CALLFROM,			\
 			   save_errno, 0,									\
-			   ERR_TEXT, 3, LEN_AND_LIT("Storage call made from"), CALLERID);			\
+			   ERR_CALLERID, 3, LEN_AND_LIT("TEXT_FREE"), CALLERID);				\
 		GTMASSERT;											\
 	}													\
 }
@@ -208,7 +208,7 @@ error_def(ERR_INVDBGLVL);
 error_def(ERR_MEMORY);
 error_def(ERR_SYSCALL);
 error_def(ERR_MEMORYRECURSIVE);
-error_def(ERR_TEXT);
+error_def(ERR_CALLERID);
 
 /* Initialize the storage manangement system. Things to initialize:
 

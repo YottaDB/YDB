@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc.*
+ *	Copyright 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,9 +18,6 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include "gtm_inet.h"
-#ifdef VMS
-#include <descrip.h> /* Required for gtmrecv.h */
-#endif
 
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -40,30 +37,30 @@
 #include "iosp.h"
 #include "eintr_wrappers.h"
 #include "gt_timer.h"
-#ifdef UNIX
 #include "gtmio.h"
-#endif
 
 #include "util.h"
 #include "tp_change_reg.h"
 
 GBLREF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLREF	int			gtmrecv_max_repl_msglen;
-GBLREF  struct timeval          gtmrecv_poll_interval, gtmrecv_poll_immediate;
+GBLREF	struct timeval		gtmrecv_poll_interval, gtmrecv_poll_immediate;
 GBLREF	int			gtmrecv_listen_sock_fd;
 GBLREF	int			gtmrecv_sock_fd;
 GBLREF	boolean_t		repl_connection_reset;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			gtmrecv_log_fd;
-GBLREF 	FILE			*gtmrecv_log_fp;
+GBLREF	FILE			*gtmrecv_log_fp;
 GBLREF	int			gtmrecv_statslog_fd;
-GBLREF 	FILE			*gtmrecv_statslog_fp;
+GBLREF	FILE			*gtmrecv_statslog_fp;
 GBLREF	boolean_t		gtmrecv_logstats;
 GBLREF	boolean_t		gtmrecv_wait_for_jnl_seqno;
 GBLREF	boolean_t		gtmrecv_bad_trans_sent;
 GBLREF	pid_t			updproc_pid;
 GBLREF	uint4			log_interval;
 GBLREF	volatile time_t		gtmrecv_now;
+GBLREF	boolean_t		src_node_same_endianness;
+GBLREF	boolean_t		gtmrecv_send_cmp2uncmp;
 
 #ifdef INT8_SUPPORTED
 static	seq_num			last_ack_seqno = 0;
@@ -85,15 +82,17 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	static int		next_report_at = 1;
 	static boolean_t	send_xoff = FALSE;
 	static boolean_t	xoff_sent = FALSE;
+	static seq_num		send_seqno;
 	static boolean_t	log_draining_msg = FALSE;
 	static boolean_t	send_badtrans = FALSE;
+	static boolean_t	send_cmp2uncmp = FALSE;
 	static boolean_t	upd_shut_too_early_logged = FALSE;
-	static repl_msg_t	xoff_msg, bad_trans_msg;
- 	static time_t		last_reap_time = 0;
-
+	static time_t		last_reap_time = 0;
+	repl_msg_t		xoff_msg;
+	repl_badtrans_msg_t	bad_trans_msg;
 	boolean_t		alert = FALSE, info = FALSE;
 	int			return_status;
-	gd_region       	*region_top;
+	gd_region		*region_top;
 	unsigned char		*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
@@ -107,8 +106,9 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
- 	upd_helper_ctl_ptr_t	upd_helper_ctl;
-	UNIX_ONLY(pid_t 	waitpid_res;)
+	upd_helper_ctl_ptr_t	upd_helper_ctl;
+	pid_t			waitpid_res;
+	int4			msg_type, msg_len;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_RECVPOOLSETUP);
@@ -117,7 +117,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;
- 	upd_helper_ctl = recvpool.upd_helper_ctl;
+	upd_helper_ctl = recvpool.upd_helper_ctl;
 	jnl_status = 0;
 	if (SHUTDOWN == gtmrecv_local->shutdown)
 	{
@@ -125,28 +125,31 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		gtmrecv_end(); /* Won't return */
 	}
 	/* Reset report_cnt and next_report_at to 1 when a new upd proc is forked */
-	if (1 == report_cnt || report_cnt == next_report_at)
+	if ((1 == report_cnt) || (report_cnt == next_report_at))
 	{
-		if ((alert =
-		     (NO_SHUTDOWN == upd_proc_local->upd_proc_shutdown
-		      && SRV_DEAD == is_updproc_alive() &&
-		      NO_SHUTDOWN == upd_proc_local->upd_proc_shutdown)) ||
-		    (info = ((NORMAL_SHUTDOWN == upd_proc_local->upd_proc_shutdown ||
-			     ABNORMAL_SHUTDOWN == upd_proc_local->upd_proc_shutdown)) &&
-		     	     SRV_DEAD == is_updproc_alive()))
+		/* A comment on the usage of NO_SHUTDOWN below for the alert variable. Since upd_proc_local->upd_proc_shutdown is
+		 * a shared memory field (and could be concurrently changed by either the receiver server or the update process),
+		 * we want to make sure it is the same value BEFORE and AFTER checking whether the update process is alive or not.
+		 * If it is not NO_SHUTDOWN (i.e. is SHUTDOWN or NORMAL_SHUTDOWN or ABNORMAL_SHUTDOWN) it has shut down due to
+		 * an external request so we do want to send out a false update-process-is-not-alive alert.
+		 */
+		if ((alert = ((NO_SHUTDOWN == upd_proc_local->upd_proc_shutdown) && (SRV_DEAD == is_updproc_alive())
+				&& (NO_SHUTDOWN == upd_proc_local->upd_proc_shutdown)))
+			|| (info = (((NORMAL_SHUTDOWN == upd_proc_local->upd_proc_shutdown)
+				|| (ABNORMAL_SHUTDOWN == upd_proc_local->upd_proc_shutdown)) && (SRV_DEAD == is_updproc_alive()))))
 		{
 			if (alert)
 				repl_log(gtmrecv_log_fp, TRUE, TRUE,
 					"ALERT : Receiver Server detected that Update Process is not ALIVE\n");
 			else
 				repl_log(gtmrecv_log_fp, TRUE, TRUE,
-					"INFO : Update process not running. User initiated Update Process shutdown was done\n");
+					"INFO : Update process not running due to user initiated shutdown\n");
 			if (1 == report_cnt)
 			{
 				send_xoff = TRUE;
 				QWASSIGN(recvpool_ctl->old_jnl_seqno, recvpool_ctl->jnl_seqno);
 				QWASSIGNDW(recvpool_ctl->jnl_seqno, 0);
-				UNIX_ONLY(WAITPID(updproc_pid, &upd_exit_status, 0, waitpid_res);) /* Release defunct upd proc */
+				WAITPID(updproc_pid, &upd_exit_status, 0, waitpid_res); /* Release defunct upd proc */
 				upd_proc_local->bad_trans = FALSE; /* No point in doing bad transaction processing */
 			}
 			gtmrecv_wait_for_jnl_seqno = TRUE;
@@ -157,10 +160,16 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		}
 	} else
 		report_cnt++;
-
-	if (upd_proc_local->bad_trans && !send_badtrans)
+	/* Check if REPL_CMP2UNCMP or REPL_BADTRANS message needs to be sent */
+	if (!send_cmp2uncmp && gtmrecv_send_cmp2uncmp)
 	{
 		send_xoff = TRUE;
+		send_seqno = recvpool_ctl->jnl_seqno;
+		send_cmp2uncmp = TRUE;
+	} else if (!send_badtrans && upd_proc_local->bad_trans)
+	{
+		send_xoff = TRUE;
+		send_seqno = upd_proc_local->read_jnl_seqno;
 		send_badtrans = TRUE;
 		bad_trans_detected = TRUE;
 	} else if (!upd_proc_local->bad_trans && send_badtrans && 1 != report_cnt)
@@ -168,94 +177,105 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		send_badtrans = FALSE;
 		bad_trans_detected = FALSE;
 	}
-	if (send_xoff && !xoff_sent && -1 != gtmrecv_sock_fd)
+	if (send_xoff && !xoff_sent)
 	{
-		/* Send XOFF */
-		xoff_msg.type = REPL_XOFF_ACK_ME;
-		memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, sizeof(seq_num));
-		xoff_msg.len = MIN_REPL_MSGLEN;
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, FALSE, &gtmrecv_poll_immediate)
-			; /* Empty Body */
-		if (SS_NORMAL != status)
-		{
-			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
+		if (-1 != gtmrecv_sock_fd)
+		{	/* Send XOFF_ACK_ME */
+			xoff_msg.type = REPL_XOFF_ACK_ME;
+			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&send_seqno, sizeof(seq_num));
+			xoff_msg.len = MIN_REPL_MSGLEN;
+			REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, xoff_msg.len, FALSE, &gtmrecv_poll_immediate)
+				; /* Empty Body */
+			if (SS_NORMAL != status)
 			{
-				repl_close(&gtmrecv_sock_fd);
-				repl_connection_reset = TRUE;
-				xoff_sent = FALSE;
-				send_badtrans = FALSE;
-			} else if (EREPL_SEND == repl_errno)
-				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
-							"Error in send"), status);
-			else if (EREPL_SELECT == repl_errno)
-				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
-							"Error in select"), status);
-		} else
+				if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
+				{
+					repl_close(&gtmrecv_sock_fd);
+					repl_connection_reset = TRUE;
+					xoff_sent = FALSE;
+					send_badtrans = FALSE;
+				} else if (EREPL_SEND == repl_errno)
+					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						RTS_ERROR_LITERAL("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
+								"Error in send"), status);
+				else
+				{
+					assert(EREPL_SELECT == repl_errno);
+					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						RTS_ERROR_LITERAL("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
+								"Error in select"), status);
+				}
+			} else
+			{
+				xoff_sent = TRUE;
+				log_draining_msg = TRUE;
+			}
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_XOFF_ACK_ME sent due to upd shutdown/crash or bad trans\n");
+			send_xoff = FALSE;
+		} else if (repl_connection_reset)
 		{
-			xoff_sent = TRUE;
-			log_draining_msg = TRUE;
+			send_xoff = FALSE; /* connection has been lost, no point sending XOFF */
+			send_badtrans = FALSE;
 		}
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_XOFF_ACK_ME sent due to upd shutdown/crash or bad trans\n");
-		send_xoff = FALSE;
-	} else if (send_xoff && !xoff_sent && repl_connection_reset)
-	{
-		send_xoff = FALSE; /* connection has been lost, no point sending XOFF */
-		send_badtrans = FALSE;
 	}
 	/* Drain pipe */
 	if (xoff_sent)
 	{
 		if (log_draining_msg)
-		{ /* avoid multiple logs per instance */
+		{	/* avoid multiple logs per instance */
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Draining replication pipe due to %s\n",
-					send_badtrans ? "BAD_TRANS" : "UPD shutdown/crash");
+					send_cmp2uncmp ? "CMP2UNCMP" : (send_badtrans ? "BAD_TRANS" : "UPD shutdown/crash"));
 			log_draining_msg = FALSE;
 		}
 		if (0 != *buff_unprocessed)
-		{
-			/* Throw away the current contents of the buffer */
+		{	/* Throw away the current contents of the buffer */
 			buffered_data_len = ((*pending_data_len <= *buff_unprocessed) ? *pending_data_len : *buff_unprocessed);
 			*buff_unprocessed -= buffered_data_len;
 			buffp += buffered_data_len;
 			*pending_data_len -= buffered_data_len;
 			REPL_DPRINT2("gtmrecv_poll_actions : (1) Throwing away %d bytes from old buffer while draining\n",
-					buffered_data_len);
+				buffered_data_len);
 			while (REPL_MSG_HDRLEN <= *buff_unprocessed)
 			{
-				assert(0 == ((unsigned long)buffp & (sizeof(((repl_msg_ptr_t)buffp)->type) - 1)));
-				*pending_data_len = ((repl_msg_ptr_t)buffp)->len;
+				assert(0 == (((unsigned long)buffp) % REPL_MSG_ALIGN));
+				msg_len = ((repl_msg_ptr_t)buffp)->len;
+				msg_type = (((repl_msg_ptr_t)buffp)->type & REPL_TR_CMP_MSG_TYPE_MASK);
+				assert((REPL_TR_CMP_JNL_RECS == msg_type) || (0 == (msg_len % REPL_MSG_ALIGN)));
+				*pending_data_len = ROUND_UP2(msg_len, REPL_MSG_ALIGN);
 				buffered_data_len = ((*pending_data_len <= *buff_unprocessed) ?
 								*pending_data_len : *buff_unprocessed);
 				*buff_unprocessed -= buffered_data_len;
 				buffp += buffered_data_len;
 				*pending_data_len -= buffered_data_len;
-				REPL_DPRINT2("gtmrecv_poll_actions : (2) Throwing away %d bytes from old buffer while draining\n",
-						buffered_data_len);
+				REPL_DPRINT3("gtmrecv_poll_actions : (1) Throwing away message of "
+					"type %d and length %d from old buffer while draining\n", msg_type, buffered_data_len);
 			}
 			if (0 < *buff_unprocessed)
 			{
 				memmove((unsigned char *)gtmrecv_msgp, buffp, *buff_unprocessed);
 				REPL_DPRINT2("gtmrecv_poll_actions : Incomplete header of length %d while draining\n",
-						*buff_unprocessed);
+					*buff_unprocessed);
 			}
 		}
 		status = SS_NORMAL;
 		if (0 != *buff_unprocessed || 0 == *pending_data_len)
-		{
-			/* Receive the header of a message */
+		{	/* Receive the header of a message */
 			REPL_RECV_LOOP(gtmrecv_sock_fd, ((unsigned char *)gtmrecv_msgp) + *buff_unprocessed,
 				       (REPL_MSG_HDRLEN - *buff_unprocessed), FALSE, &gtmrecv_poll_interval)
 				; /* Empty Body */
-
-			REPL_DPRINT3("gtmrecv_poll_actions : Received %d type of message of length %d while draining\n",
-					((repl_msg_ptr_t)gtmrecv_msgp)->type, ((repl_msg_ptr_t)gtmrecv_msgp)->len);
+			if (SS_NORMAL == status)
+			{
+				msg_len = gtmrecv_msgp->len;
+				msg_type = (gtmrecv_msgp->type & REPL_TR_CMP_MSG_TYPE_MASK);
+				assert((REPL_TR_CMP_JNL_RECS == msg_type) || (0 == (msg_len % REPL_MSG_ALIGN)));
+				msg_len = ROUND_UP2(msg_len, REPL_MSG_ALIGN);
+				REPL_DPRINT3("gtmrecv_poll_actions : Received message of type %d and length %d while draining\n",
+					msg_type, msg_len);
+			}
 		}
 		if (SS_NORMAL == status &&
 				(0 != *buff_unprocessed || 0 == *pending_data_len) && REPL_XOFF_ACK == gtmrecv_msgp->type)
-		{
-			/* The rest of the XOFF_ACK msg */
+		{	/* The rest of the XOFF_ACK msg */
 			REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, (MIN_REPL_MSGLEN - REPL_MSG_HDRLEN), FALSE,
 					&gtmrecv_poll_interval)
 				; /* Empty Body */
@@ -268,12 +288,22 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				return_status = STOP_POLL;
 			}
 		} else if (SS_NORMAL == status)
-		{
-			/* Drain the rest of the message */
-			pending_msg_size = ((*pending_data_len > 0) ? *pending_data_len : gtmrecv_msgp->len - REPL_MSG_HDRLEN);
-			REPL_DPRINT2("gtmrecv_poll_actions : Throwing away %d bytes from pipe\n", pending_msg_size);
-			for (; SS_NORMAL == status && 0 < pending_msg_size;
-			     pending_msg_size -= gtmrecv_max_repl_msglen)
+		{	/* Drain the rest of the message */
+			if (0 < *pending_data_len)
+			{
+				pending_msg_size = *pending_data_len;
+				REPL_DPRINT2("gtmrecv_poll_actions : (2) Throwing away %d bytes from pipe\n", pending_msg_size);
+			} else
+			{
+				msg_len = gtmrecv_msgp->len;
+				msg_type = (gtmrecv_msgp->type & REPL_TR_CMP_MSG_TYPE_MASK);
+				assert((REPL_TR_CMP_JNL_RECS == msg_type) || (0 == (msg_len % REPL_MSG_ALIGN)));
+				msg_len = ROUND_UP2(msg_len, REPL_MSG_ALIGN);
+				pending_msg_size = msg_len - REPL_MSG_HDRLEN;
+				REPL_DPRINT3("gtmrecv_poll_actions : (2) Throwing away message of "
+					"type %d and length %d from pipe\n", msg_type, msg_len);
+			}
+			for (; SS_NORMAL == status && 0 < pending_msg_size; pending_msg_size -= gtmrecv_max_repl_msglen)
 			{
 				temp_len = (pending_msg_size < gtmrecv_max_repl_msglen)? pending_msg_size : gtmrecv_max_repl_msglen;
 				REPL_RECV_LOOP(gtmrecv_sock_fd, gtmrecv_msgp, temp_len, FALSE, &gtmrecv_poll_interval)
@@ -302,8 +332,9 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				} else
 					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("Error while draining replication pipe. Error in recv"), status);
-			} else if (EREPL_SELECT == repl_errno)
+			} else
 			{
+				assert(EREPL_SELECT == repl_errno);
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Error while draining replication pipe. Error in select"), status);
 			}
@@ -311,18 +342,22 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	} else
 		return_status = STOP_POLL;
 
-	if (STOP_POLL == return_status && send_badtrans && -1 != gtmrecv_sock_fd)
-	{
-		/* Send BAD_TRANS */
-		bad_trans_msg.type = REPL_BADTRANS;
-		memcpy((uchar_ptr_t)&bad_trans_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, sizeof(seq_num));
-		bad_trans_msg.len = MIN_REPL_MSGLEN;
+	if ((STOP_POLL == return_status) && (send_badtrans || send_cmp2uncmp) && (-1 != gtmrecv_sock_fd))
+	{	/* Send REPL_BADTRANS or REPL_CMP2UNCMP message */
+		bad_trans_msg.type = send_cmp2uncmp ? REPL_CMP2UNCMP : REPL_BADTRANS;
+		bad_trans_msg.len  = MIN_REPL_MSGLEN;
+		if (src_node_same_endianness)
+			bad_trans_msg.start_seqno = send_seqno;
+		else
+			bad_trans_msg.start_seqno = GTM_BYTESWAP_64(send_seqno);
 		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, bad_trans_msg.len, FALSE, &gtmrecv_poll_immediate)
 			; /* Empty Body */
 		if (SS_NORMAL == status)
 		{
-			repl_log(gtmrecv_log_fp, TRUE, TRUE,
-					"REPL_BADTRANS sent with seqno %llu\n", upd_proc_local->read_jnl_seqno);
+			if (send_cmp2uncmp)
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_CMP2UNCMP message sent with seqno %llu\n", send_seqno);
+			else
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_BADTRANS message sent with seqno %llu\n", send_seqno);
 		} else
 		{
 			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
@@ -332,15 +367,26 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				return_status = STOP_POLL;
 			} else if (EREPL_SEND == repl_errno)
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("Error sending BAD_TRANS. Error in send"), status);
-			else if (EREPL_SELECT == repl_errno)
+					RTS_ERROR_LITERAL("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in send"), status);
+			else
+			{
+				assert(EREPL_SELECT == repl_errno);
 				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("Error sending BAD_TRANS. Error in select"), status);
+					RTS_ERROR_LITERAL("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in select"), status);
+			}
 		}
 		send_badtrans = FALSE;
+		if (send_cmp2uncmp)
+		{
+			REPL_DPRINT1("gtmrecv_poll_actions : Setting gtmrecv_wait_for_jnl_seqno to TRUE because this receiver"
+				"server requested a fall-back from compressed to uncompressed operation\n");
+			gtmrecv_wait_for_jnl_seqno = TRUE;/* set this to TRUE to break out and go back to a fresh "do_main_loop" */
+			gtmrecv_bad_trans_sent = TRUE;
+			gtmrecv_send_cmp2uncmp = FALSE;
+			send_cmp2uncmp = FALSE;
+		}
 	}
-	if (upd_proc_local->bad_trans && bad_trans_detected ||
-	    UPDPROC_START == upd_proc_local->start_upd && 1 != report_cnt)
+	if ((upd_proc_local->bad_trans && bad_trans_detected) || (UPDPROC_START == upd_proc_local->start_upd) && (1 != report_cnt))
 	{
 		if (UPDPROC_START == upd_proc_local->start_upd)
 		{
@@ -354,9 +400,9 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		{
 			/* Attempt starting the update process */
 			for (upd_start_attempts = 0;
-	     		     UPDPROC_START_ERR == (upd_start_status = gtmrecv_upd_proc_init(FALSE)) &&
+			     UPDPROC_START_ERR == (upd_start_status = gtmrecv_upd_proc_init(FALSE)) &&
 			     GTMRECV_MAX_UPDSTART_ATTEMPTS > upd_start_attempts;
-	     		     upd_start_attempts++)
+			     upd_start_attempts++)
 			{
 				if (EREPL_UPDSTART_SEMCTL == repl_errno || EREPL_UPDSTART_BADPATH == repl_errno)
 				{
@@ -398,7 +444,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			upd_proc_local->bad_trans = FALSE;
 		}
 	}
-	if (0 == *pending_data_len && 0 != gtmrecv_local->changelog)
+	if ((0 == *pending_data_len) && (0 != gtmrecv_local->changelog))
 	{
 		if (gtmrecv_local->changelog & REPLIC_CHANGE_LOGINTERVAL)
 		{
@@ -410,40 +456,30 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		if (gtmrecv_local->changelog & REPLIC_CHANGE_LOGFILE)
 		{
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Changing log file to %s\n", gtmrecv_local->log_file);
-#ifdef UNIX
 			repl_log_init(REPL_GENERAL_LOG, &gtmrecv_log_fd, NULL, gtmrecv_local->log_file, NULL);
 			repl_log_fd2fp(&gtmrecv_log_fp, gtmrecv_log_fd);
-#elif defined(VMS)
-			util_log_open(STR_AND_LEN(gtmrecv_local->log_file));
-#else
-#error Unsupported platform
-#endif
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Change log to %s successful\n",gtmrecv_local->log_file);
 		}
-		upd_proc_local->changelog = gtmrecv_local->changelog; /* Ask the update process to changelog request */
+		upd_proc_local->changelog = gtmrecv_local->changelog; /* Pass changelog request to the update process */
 		/* NOTE: update process and receiver each ignore any setting specific to the other (REPLIC_CHANGE_UPD_LOGINTERVAL,
 		 * REPLIC_CHANGE_LOGINTERVAL) */
 		gtmrecv_local->changelog = 0;
 	}
 	if (0 == *pending_data_len && !gtmrecv_logstats && gtmrecv_local->statslog)
 	{
-#ifdef UNIX
 		gtmrecv_logstats = TRUE;
 		repl_log_init(REPL_STATISTICS_LOG, &gtmrecv_log_fd, &gtmrecv_statslog_fd, gtmrecv_local->log_file,
 				gtmrecv_local->statslog_file);
 		repl_log_fd2fp(&gtmrecv_statslog_fp, gtmrecv_statslog_fd);
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Starting stats log to %s\n", gtmrecv_local->statslog_file);
 		repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "Begin statistics logging\n");
-#else
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stats logging not supported on VMS\n");
-#endif
 	} else if (0 == *pending_data_len && gtmrecv_logstats && !gtmrecv_local->statslog)
 	{
 		gtmrecv_logstats = FALSE;
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stopping stats log\n");
 		/* Force all data out to the file before closing the file */
 		repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "End statistics logging\n");
-		UNIX_ONLY(CLOSEFILE(gtmrecv_statslog_fd, status);) VMS_ONLY(close(gtmrecv_statslog_fd);)
+		CLOSEFILE(gtmrecv_statslog_fd, status);
 		gtmrecv_statslog_fd = -1;
 		/* We need to FCLOSE because a later open() in repl_log_init() might return the same file descriptor as the one
 		 * that we just closed. In that case, FCLOSE done in repl_log_fd2fp() affects the newly opened file and
@@ -455,25 +491,26 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		FCLOSE(gtmrecv_statslog_fp, status);
 		gtmrecv_statslog_fp = NULL;
 	}
- 	if (0 == *pending_data_len)
-  	{
- 		if (upd_helper_ctl->start_helpers)
-  		{
- 			gtmrecv_helpers_init(upd_helper_ctl->start_n_readers, upd_helper_ctl->start_n_writers);
- 			upd_helper_ctl->start_helpers = FALSE;
-  		}
- 		if (HELPER_REAP_NONE != (status = upd_helper_ctl->reap_helpers) ||
+	if (0 == *pending_data_len)
+	{
+		if (upd_helper_ctl->start_helpers)
+		{
+			gtmrecv_helpers_init(upd_helper_ctl->start_n_readers, upd_helper_ctl->start_n_writers);
+			upd_helper_ctl->start_helpers = FALSE;
+		}
+		if (HELPER_REAP_NONE != (status = upd_helper_ctl->reap_helpers) ||
 			(double)GTMRECV_REAP_HELPERS_INTERVAL <= difftime(gtmrecv_now, last_reap_time))
- 		{
- 			gtmrecv_reap_helpers(HELPER_REAP_WAIT == status);
- 			last_reap_time = gtmrecv_now;
-  		}
-  	}
+		{
+			gtmrecv_reap_helpers(HELPER_REAP_WAIT == status);
+			last_reap_time = gtmrecv_now;
+		}
+	}
 	return (return_status);
 }
 
 int gtmrecv_poll_actions(int pending_data_len, int buff_unprocessed, unsigned char *buffp)
 {
-	while (CONTINUE_POLL == gtmrecv_poll_actions1(&pending_data_len, &buff_unprocessed, buffp));
+	while (CONTINUE_POLL == gtmrecv_poll_actions1(&pending_data_len, &buff_unprocessed, buffp))
+		;
 	return (SS_NORMAL);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@
 
 GBLREF	io_pair		io_curr_device;
 GBLREF	spdesc		stringpool;
-GBLREF	bool		out_of_time;
+GBLREF	volatile bool	out_of_time;
 GBLREF  boolean_t       gtm_utf8_mode;
 LITREF	mstr		chset_names[];
 
@@ -95,21 +95,32 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 	return bom_bytes;
 }
 
-int	iorm_get_bom(io_desc *io_ptr)
+int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
+		     TID timer_id, int4 *msec_timeout, boolean_t pipe_zero_timeout)
 {
 	int4		bytes2read, bytes_read, chars_read, reclen, bom_bytes2read, bom_bytes_read;
 	int		status = 0;
 	gtm_chset_t	chset;
 	d_rm_struct	*rm_ptr;
+	int		fildes;
+	error_def(ERR_SYSCALL);
 
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
+	/* if it is a pipe and it's the stdout returned then we need to get the read file descriptor
+	   from rm_ptr->read_fildes */
+	if (rm_ptr->pipe && rm_ptr->read_fildes)
+		fildes = rm_ptr->read_fildes;
+	else
+		fildes = rm_ptr->fildes;
+
 	chset = io_ptr->ichset;
 	assert(UTF16BE_BOM_LEN == UTF16LE_BOM_LEN);
 	bom_bytes2read = (int4)((CHSET_UTF8 == chset) ? UTF8_BOM_LEN : UTF16BE_BOM_LEN);
 	for (; rm_ptr->bom_buf_cnt < bom_bytes2read; )
 	{
-		DOREADRLTO(rm_ptr->fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], bom_bytes2read - rm_ptr->bom_buf_cnt,
-				out_of_time, status);
+		DOREADRLTO2(fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], bom_bytes2read - rm_ptr->bom_buf_cnt,
+			     out_of_time, blocked_in, ispipe, flags, status, tot_bytes_read,
+			     timer_id, msec_timeout, pipe_zero_timeout);
 		if (0 > status)
 		{
 			rm_ptr->bom_buf_cnt = 0;
@@ -136,25 +147,33 @@ int	iorm_get_bom(io_desc *io_ptr)
 	return 0;
 }
 
-int	iorm_get(io_desc *io_ptr)
+int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
+		 TID timer_id, int4 *msec_timeout, boolean_t pipe_zero_timeout)
 {
 	boolean_t	ret;
 	char		inchar, *temp;
 	unsigned char	*pad_ptr, *nextmb, padchar, padcharray[2];
-	int		flags;
 	int		fcntl_res, save_errno;
-	int4		msec_timeout;	/* timeout in milliseconds */
 	int4		bytes2read, bytes_read, char_bytes_read, add_bytes, chars_read, reclen;
 	wint_t		utf_code;
 	d_rm_struct	*rm_ptr;
 	int4		status, from_bom;
 	gtm_chset_t	chset;
-	TID		timer_id;
+	int		fildes;
 
 	error_def(ERR_IOEOF);
+	error_def(ERR_SYSCALL);
 
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
+
+	/* if it is a pipe and it's the stdout returned then we need to get the read file descriptor
+	   from rm_ptr->read_fildes */
+	if (rm_ptr->pipe && rm_ptr->read_fildes)
+		fildes = rm_ptr->read_fildes;
+	else
+		fildes = rm_ptr->fildes;
+
 	assert(gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE);
 	assert(rm_ptr->fixed);
 	bytes2read = rm_ptr->recordsize;
@@ -166,7 +185,9 @@ int	iorm_get(io_desc *io_ptr)
 	assert(CHSET_M != chset);
 	if (!rm_ptr->done_1st_read)
 	{
-		status = iorm_get_bom(io_ptr);	/* need to check for BOM */ /* smw do this later perhaps or first */
+		/* need to check for BOM *//* smw do this later perhaps or first */
+		status = iorm_get_bom(io_ptr, blocked_in, ispipe, flags, tot_bytes_read,
+				      timer_id, msec_timeout, pipe_zero_timeout);
 		chset = io_ptr->ichset;	/* UTF16 will have changed to UTF16BE or UTF16LE */
 	}
 	assert(CHSET_UTF16 != chset);
@@ -181,7 +202,13 @@ int	iorm_get(io_desc *io_ptr)
 		status = 0;
 	}
 	if (0 <= status && 0 < bytes2read)
-		DOREADRLTO(rm_ptr->fildes, rm_ptr->inbuf_pos, (int)bytes2read, out_of_time, status);
+		DOREADRLTO2(fildes, rm_ptr->inbuf_pos, (int)bytes2read, out_of_time, blocked_in, ispipe,
+			     flags, status, tot_bytes_read, timer_id, msec_timeout, pipe_zero_timeout);
+
+	/* if some bytes were read prior to timeout then process them as if no timeout occurred */
+	if (0 > status && *tot_bytes_read && errno == EINTR && out_of_time)
+		status = *tot_bytes_read;
+
 	if (0 > status)
 	{
 		bytes_read = 0;

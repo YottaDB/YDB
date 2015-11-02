@@ -57,6 +57,7 @@
 #include "repl_instance.h"
 #include "ftok_sems.h"
 #include "gtmmsg.h"
+#include "gtm_zlib.h"
 
 GBLREF	gd_addr			*gd_header;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -65,7 +66,9 @@ GBLREF	seq_num			gtmsource_save_read_jnl_seqno;
 GBLREF	struct timeval		gtmsource_poll_wait, gtmsource_poll_immediate;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	repl_msg_ptr_t		gtmsource_msgp;
+GBLREF	repl_msg_ptr_t		gtmsource_cmpmsgp;
 GBLREF	int			gtmsource_msgbufsiz;
+GBLREF	int			gtmsource_cmpmsgbufsiz;
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	unsigned char		*gtmsource_tcombuffp;
 GBLREF	int			gtmsource_log_fd;
@@ -82,8 +85,10 @@ GBLREF	boolean_t		gtmsource_pool2file_transition;
 GBLREF	repl_ctl_element	*repl_ctl_list;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	boolean_t		secondary_side_std_null_coll;
+GBLREF	uint4			process_id;
+GBLREF	boolean_t		gtmsource_received_cmp2uncmp_msg;
 
-static	unsigned char		*tcombuff, *msgbuff, *filterbuff;
+static	unsigned char		*tcombuff, *msgbuff, *cmpmsgbuff, *filterbuff;
 
 void gtmsource_init_sec_addr(struct sockaddr_in *secondary_addr)
 {
@@ -198,7 +203,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 	}
 	if (0 != (status = get_recv_sock_buff_size(gtmsource_sock_fd, &recv_buffsize)))
 		rts_error(VARLSTCNT(10) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_LIT("Error getting socket recv buffsize"),
-				ERR_TEXT, 2, STRERROR(status));
+			ERR_TEXT, 2, RTS_ERROR_STRING(STRERROR(status)));
 	if (recv_buffsize < GTMSOURCE_TCP_RECV_BUFSIZE)
 	{
 		if (0 != (status = set_recv_sock_buff_size(gtmsource_sock_fd, GTMSOURCE_TCP_RECV_BUFSIZE)))
@@ -219,6 +224,12 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connected to secondary, using TCP send buffer size %d receive buffer size %d\n",
 			repl_max_send_buffsize, repl_max_recv_buffsize);
 	repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp);
+	/* re-determine compression level on the replication pipe after every connection establishment */
+	gtmsource_local->repl_zlib_cmp_level = repl_zlib_cmp_level = ZLIB_CMPLVL_NONE;
+	/* reset any CMP2UNCMP messages received in prior connections. Once a connection encounters a REPL_CMP2UNCMP message
+	 * all further replication on that connection will be uncompressed.
+	 */
+	gtmsource_received_cmp2uncmp_msg = FALSE;
 	return (SS_NORMAL);
 }
 
@@ -286,7 +297,7 @@ int gtmsource_alloc_msgbuff(int maxbuffsize)
 
 	assert(MIN_REPL_MSGLEN < maxbuffsize);
 	maxbuffsize = ROUND_UP2(maxbuffsize, OS_PAGE_SIZE);
-	if (maxbuffsize > gtmsource_msgbufsiz || NULL == gtmsource_msgp)
+	if ((maxbuffsize > gtmsource_msgbufsiz) || (NULL == gtmsource_msgp))
 	{
 		REPL_DPRINT3("Expanding message buff from %d to %d\n", gtmsource_msgbufsiz, maxbuffsize);
 		free_msgp = msgbuff;
@@ -294,12 +305,23 @@ int gtmsource_alloc_msgbuff(int maxbuffsize)
 		msgbuff = (unsigned char *)malloc(maxbuffsize + OS_PAGE_SIZE);
 		gtmsource_msgp = (repl_msg_ptr_t)ROUND_UP2((unsigned long)msgbuff, OS_PAGE_SIZE);
 		if (NULL != free_msgp)
-		{ /* Copy existing data */
+		{	/* Copy existing data */
 			assert(NULL != oldmsgp);
 			memcpy((unsigned char *)gtmsource_msgp, (unsigned char *)oldmsgp, gtmsource_msgbufsiz);
 			free(free_msgp);
 		}
 		gtmsource_msgbufsiz = maxbuffsize;
+		if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+		{	/* Compression is enabled. Allocate parallel buffers to hold compressed journal records.
+			 * Allocate extra space just in case compression actually expands the data (needed only in rare cases).
+			 */
+			free_msgp = cmpmsgbuff;
+			cmpmsgbuff = (unsigned char *)malloc((maxbuffsize * MAX_CMP_EXPAND_FACTOR) + OS_PAGE_SIZE);
+			gtmsource_cmpmsgp = (repl_msg_ptr_t)ROUND_UP2((unsigned long)cmpmsgbuff, OS_PAGE_SIZE);
+			if (NULL != free_msgp)
+				free(free_msgp);
+			gtmsource_cmpmsgbufsiz = (maxbuffsize * MAX_CMP_EXPAND_FACTOR);
+		}
 		gtmsource_alloc_filter_buff(gtmsource_msgbufsiz);
 	}
 	return (SS_NORMAL);
@@ -314,6 +336,14 @@ void gtmsource_free_msgbuff(void)
 		msgbuff = NULL;
 		gtmsource_msgp = NULL;
 		gtmsource_msgbufsiz = 0;
+		if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+		{	/* Compression is enabled. Free up compression buffer as well. */
+			assert(NULL != gtmsource_cmpmsgp);
+			free(cmpmsgbuff);
+			cmpmsgbuff = NULL;
+			gtmsource_cmpmsgp = NULL;
+			gtmsource_cmpmsgbufsiz = 0;
+		}
 	}
 }
 
@@ -535,9 +565,14 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 					QWDECRBYDW(cur_read_addr, save_lastwrite_len);
 					QWDECRBYDW(cur_read_jnl_seqno, 1);
 					prev_read = cur_read;
-					cur_read -= save_lastwrite_len;
-					if (cur_read >= prev_read)
-						cur_read += jnlpool_size;
+					if (cur_read > save_lastwrite_len)
+						cur_read -= save_lastwrite_len;
+					else
+					{
+						cur_read = cur_read - (save_lastwrite_len % jnlpool_size);
+						if (cur_read >= prev_read)
+							cur_read += jnlpool_size;
+					}
 					assert(cur_read == QWMODDW(cur_read_addr, jnlpool_size));
 					REPL_DPRINT2("Srch restart : No more input in jnlpool, backing off to read_jnl_seqno : "
 							  INT8_FMT, INT8_PRINT(cur_read_jnl_seqno));
@@ -928,6 +963,110 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Received %s message\n", msgtypestr);
 		return TRUE;
 	}
+}
+
+/* Given that the source server was started with compression enabled, this function checks if the receiver server was
+ * also started with the decompression enabled and if so sends a compressed test message. The receiver server responds back
+ * whether it is successfully able to decompress that or not. If yes, compression is enabled on the replication pipe and
+ * the input parameter "*repl_zlib_cmp_level_ptr" is set to the compression level used.
+ */
+boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
+{
+	repl_cmpinfo_msg_t	test_msg, solve_msg;
+	char			inputdata[REPL_MSG_CMPDATALEN], cmpbuf[REPL_MSG_CMPEXPDATALEN];
+	int			index, cmpret, start;
+	boolean_t		cmpfail;
+	uLongf			cmplen;
+
+	assert(gtm_zlib_cmp_level);
+	/*************** Send REPL_CMP_TEST message ***************/
+	memset(&test_msg, 0, sizeof(test_msg));
+	test_msg.type = REPL_CMP_TEST;
+	test_msg.len = REPL_MSG_CMPINFOLEN;
+	test_msg.proto_ver = REPL_PROTO_VER_THIS;
+	assert(NULL != zlib_compress_fnptr);
+	/* Fill in test data with random data. The data will be a sequence of bytes from 0 to 255. The start point though
+	 * is randomly chosen using the process_id. If it is 253, the resulting sequence would be 253, 254, 255, 0, 1, 2, ...
+	 */
+	for (start = (process_id & REPL_MSG_CMPDATAMASK), index = 0; index < REPL_MSG_CMPDATALEN; index++)
+		inputdata[index] = (start + index) % REPL_MSG_CMPDATALEN;
+	/* Compress the data */
+	cmplen = sizeof(cmpbuf);	/* initialize it to the available compressed buffer space */
+	cmpret = (*zlib_compress_fnptr)(((Bytef *)&cmpbuf[0]), (uLongf *)&cmplen,
+				(const Bytef *)inputdata, (uLong)REPL_MSG_CMPDATALEN, gtm_zlib_cmp_level);
+	switch(cmpret)
+	{
+		case Z_MEM_ERROR:
+			assert(FALSE);
+			repl_log(gtmsource_log_fp, TRUE, FALSE,
+				"Out-of-memory; Error from zlib compress function before sending REPL_CMP_TEST message\n");
+			break;
+		case Z_BUF_ERROR:
+			assert(FALSE);
+			repl_log(gtmsource_log_fp, TRUE, FALSE, "Insufficient output buffer; Error from zlib compress "
+				"function before sending REPL_CMP_TEST message\n");
+			break;
+		case Z_STREAM_ERROR:
+			/* level was incorrectly specified. Default to NO compression. */
+			repl_log(gtmsource_log_fp, TRUE, FALSE, "Compression level %d invalid; Error from compress function"
+				" before sending REPL_CMP_TEST message\n", gtm_zlib_cmp_level);
+			break;
+	}
+	if (Z_OK != cmpret)
+	{
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Defaulting to NO compression\n");
+		*repl_zlib_cmp_level_ptr = ZLIB_CMPLVL_NONE;	/* no compression */
+		return TRUE;
+	}
+	if (REPL_MSG_CMPEXPDATALEN < cmplen)
+	{	/* The zlib compression library expanded data more than we had allocated for. But handle code for pro */
+		assert(FALSE);
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Compression of %d bytes of test data resulted in %d bytes which is"
+			" more than allocated space of %d bytes\n", REPL_MSG_CMPDATALEN, cmplen, REPL_MSG_CMPEXPDATALEN);
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Defaulting to NO compression\n");
+		*repl_zlib_cmp_level_ptr = ZLIB_CMPLVL_NONE;	/* no compression */
+		return TRUE;
+	}
+	test_msg.datalen = cmplen;
+	memcpy(test_msg.data, cmpbuf, test_msg.datalen);
+	gtmsource_repl_send((repl_msg_ptr_t)&test_msg, "REPL_CMP_TEST", MAX_SEQNO);
+	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))
+		return FALSE; /* send did not succeed */
+
+	/*************** Receive REPL_CMP_SOLVE message ***************/
+	if (!gtmsource_repl_recv((repl_msg_ptr_t)&solve_msg, REPL_MSG_CMPINFOLEN, REPL_CMP_SOLVE, "REPL_CMP_SOLVE"))
+		return FALSE; /* recv did not succeed */
+	assert(REPL_CMP_SOLVE == solve_msg.type);
+	cmpfail = FALSE;
+	if (REPL_MSG_CMPDATALEN != solve_msg.datalen)
+	{
+		assert(REPL_RCVR_CMP_TEST_FAIL == solve_msg.datalen);
+		cmpfail = TRUE;
+	} else
+	{	/* Check that receiver side decompression was correct */
+		for (index = 0; index < REPL_MSG_CMPDATALEN; index++)
+		{
+			if (inputdata[index] != solve_msg.data[index])
+			{
+				cmpfail = FALSE;
+				break;
+			}
+		}
+	}
+	if (!cmpfail)
+	{
+		assert(solve_msg.proto_ver == jnlpool.gtmsource_local->remote_proto_ver);
+		assert(REPL_PROTO_VER_MULTISITE_CMP <= solve_msg.proto_ver);
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Receiver server was able to decompress successfully\n");
+		*repl_zlib_cmp_level_ptr = gtm_zlib_cmp_level;
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Using zlib compression level %d for replication\n", gtm_zlib_cmp_level);
+	} else
+	{
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Receiver server could not decompress successfully\n");
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Defaulting to NO compression\n");
+		*repl_zlib_cmp_level_ptr = ZLIB_CMPLVL_NONE;
+	}
+	return TRUE;
 }
 
 boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary)

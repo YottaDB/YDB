@@ -116,6 +116,7 @@ unsigned char mu_cre_file(void)
 		return EXIT_WRN;
 	}
 	udi = &udi_struct;
+	memset(udi, 0, sizeof(unix_db_info));
 	udi->raw = is_raw_dev(pblk.l_dir);
 	if (udi->raw)
 	{
@@ -203,6 +204,7 @@ unsigned char mu_cre_file(void)
 		}
 	}
 	gv_cur_region->dyn.addr->file_cntl = &fc;
+	memset(&fc, 0, sizeof(file_control));
 	fc.file_info = (void*)&udi_struct;
 	udi->fd = fd;
 	cs_data = (sgmnt_data_ptr_t)malloc(SIZEOF_FILE_HDR_DFLT);

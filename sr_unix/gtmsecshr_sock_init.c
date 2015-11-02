@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,13 +56,14 @@ unsigned char		*mypid2ascx(unsigned char *, pid_t);
 
 int4 gtmsecshr_pathname_init(int caller)
 {
-	int			ret_status = 0;
+	int			ret_status = 0, status;
 	char			*error_mesg;
 	mstr			secshrsock_lognam, secshrsock_transnam;
 	mstr			gtmsecshr_logname;
 	struct stat		buf;
 
 	error_def(ERR_GTMSECSHRSOCKET);
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TEXT);
 
 	if (!process_id)
@@ -71,9 +72,13 @@ int4 gtmsecshr_pathname_init(int caller)
 	secshrsock_lognam.addr = GTMSECSHR_SOCK_DIR;
 	secshrsock_lognam.len = sizeof(GTMSECSHR_SOCK_DIR) - 1;
 
-	if ((SS_NORMAL != trans_log_name(&secshrsock_lognam, &secshrsock_transnam, gtmsecshr_sockpath))
-			|| !ABSOLUTE_PATH(gtmsecshr_sockpath))
+	status = TRANS_LOG_NAME(&secshrsock_lognam, &secshrsock_transnam, gtmsecshr_sockpath, sizeof(gtmsecshr_sockpath),
+					dont_sendmsg_on_log2long);
+	if ((SS_NORMAL != status) || !ABSOLUTE_PATH(gtmsecshr_sockpath))
 	{
+		if (SS_LOG2LONG == status)
+			gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, secshrsock_lognam.len, secshrsock_lognam.addr,
+				sizeof(gtmsecshr_sockpath) - 1);
 		ret_status = INVLOGNAME;
 		strcpy(gtmsecshr_sockpath, DEFAULT_GTMSECSHR_SOCK_DIR);
 		gtmsecshr_sockpath_len = sizeof(DEFAULT_GTMSECSHR_SOCK_DIR) - 1;
@@ -108,8 +113,13 @@ int4 gtmsecshr_pathname_init(int caller)
 	gtmsecshr_logname.addr = GTMSECSHR_PATH;
 	gtmsecshr_logname.len = sizeof(GTMSECSHR_PATH) - 1;
 
-	if (SS_NORMAL != trans_log_name(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path))
+	if (SS_NORMAL !=
+		(status = TRANS_LOG_NAME(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path, sizeof(gtmsecshr_path),
+						dont_sendmsg_on_log2long)))
 	{
+		if (SS_LOG2LONG == status)
+			gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_logname.len, gtmsecshr_logname.addr,
+				sizeof(gtmsecshr_path) - 1);
 		gtmsecshr_pathname.len = 0;
 		gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSOCKET, 3,
 			RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id, ERR_TEXT, 2,
@@ -117,9 +127,7 @@ int4 gtmsecshr_pathname_init(int caller)
 			ERR_TEXT, 2, RTS_ERROR_STRING(gtmsecshr_logname.addr));
 		ret_status = INVLOGNAME;
 	}
-
 	gtmsecshr_path[gtmsecshr_pathname.len] = 0;
-
 	/* We have different project id here. This guarantees to avoid deadlock, if only one gtm installation is there */
 	if (-1 == (gtmsecshr_key = FTOK(gtmsecshr_path, GTMSECSHR_ID)))
 	{
@@ -129,7 +137,6 @@ int4 gtmsecshr_pathname_init(int caller)
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr ftok :"),
 				ERR_TEXT, 2, RTS_ERROR_STRING(gtmsecshr_path), errno);
 	}
-
 	return(ret_status);
 }
 
@@ -156,7 +163,6 @@ int4 gtmsecshr_sock_init(int caller)
 	{
 		if ((init_pathname_status = gtmsecshr_pathname_init(CLIENT)) != 0)
 			return(init_pathname_status);
-		gtmsecshr_pathname_init(CLIENT);
 		gtmsecshr_cli_sock_name.sun_family = AF_UNIX;
 		memcpy(gtmsecshr_cli_sock_name.sun_path, gtmsecshr_sockpath, gtmsecshr_sockpath_len);
 		strcpy(gtmsecshr_cli_sock_name.sun_path + gtmsecshr_sockpath_len, (char *)mypid2ascx(pid_str, process_id));

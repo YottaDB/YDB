@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include <errno.h>
 
 #include "gtm_stdio.h"
@@ -21,14 +21,15 @@
 #include "gtcm_open_cmerrlog.h"
 #include "iosp.h"
 #include "gtm_rename.h"
+#include "gtm_logicals.h"
+
+#define GTCM_GNP_CMERR_FN		GTM_LOG_ENV "/gtcm_gnp_server.log"
 
 GBLREF bool	gtcm_errfile;
 GBLREF bool	gtcm_firsterr;
 GBLREF FILE	*gtcm_errfs;
 GBLREF char	gtcm_gnp_server_log[];
 GBLREF int	gtcm_gnp_log_path_len;
-
-#define CMERR_FN "$gtm_log/gtcm_gnp_server.log"
 
 void gtcm_open_cmerrlog(void)
 {
@@ -48,10 +49,10 @@ void gtcm_open_cmerrlog(void)
 		lfn1.len = len;
 	} else
 	{
-		lfn1.addr = CMERR_FN;
-		lfn1.len = sizeof(CMERR_FN) - 1;
+		lfn1.addr = GTCM_GNP_CMERR_FN;
+		lfn1.len = sizeof(GTCM_GNP_CMERR_FN) - 1;
 	}
-	rval = trans_log_name(&lfn1, &lfn2, lfn_path);
+	rval = TRANS_LOG_NAME(&lfn1, &lfn2, lfn_path, sizeof(lfn_path), do_sendmsg_on_log2long);
 	if (rval == SS_NORMAL || rval == SS_NOLOGNAM)
 	{
 		lfn_path[lfn2.len] = 0;
@@ -75,6 +76,6 @@ void gtcm_open_cmerrlog(void)
 		else
 			fprintf(stderr, "Unable to open %s : %s\n", lfn_path, STRERROR(errno));
 	} else
-		fprintf(stderr, "Unable to resolve %s\n", CMERR_FN);
+		fprintf(stderr, "Unable to resolve %s : return value = %d\n", GTCM_GNP_CMERR_FN, rval);
 	gtcm_firsterr = FALSE;
 }

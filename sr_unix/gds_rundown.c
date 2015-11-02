@@ -209,7 +209,7 @@ void gds_rundown(void)
 	CANCEL_DB_TIMERS(reg, cancelled_timer, cancelled_dbsync_timer);
 	we_are_last_user = FALSE;
 	if (!csa->persistent_freeze)
-		region_freeze(reg, FALSE, FALSE);
+		region_freeze(reg, FALSE, FALSE, FALSE);
 	assert(!csa->read_lock);
 	rel_crit(reg);		/* get locks to known state */
 	mutex_cleanup(reg);

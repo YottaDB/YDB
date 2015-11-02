@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,18 +18,6 @@
 #define MIN_COLLTYPE	0
 #define XFORM	0
 #define XBACK	1
-
-#ifdef UNIX					/* environment variable syntax is OS dependent */
-#	define	CT_PREFIX	"$gtm_collate_"
-#	define LCT_PREFIX	"$gtm_local_collate"
-#	define LCT_STDNULL	"$gtm_lct_stdnull"
-#elif defined VMS
-#	define	CT_PREFIX	"GTM_COLLATE_"
-#	define LCT_PREFIX	"GTM_LOCAL_COLLATE"
-#	define LCT_STDNULL	"GTM_LCT_STDNULL"
-#else
-#error UNSUPPORTED PLATFORM
-#endif
 
 #define ALLOC_XFORM_BUFF(str)								\
 {											\

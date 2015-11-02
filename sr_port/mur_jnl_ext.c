@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -265,6 +265,8 @@ void	mur_extract_epoch(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 	EXTPID(plst);
 	EXTQW(rec->jrec_epoch.jnl_seqno);
 	EXTINT(rec->jrec_epoch.blks_to_upgrd);
+	EXTINT(rec->jrec_epoch.free_blocks);
+	EXTINT(rec->jrec_epoch.total_blks);
 	jnlext_write(fi, murgbl.extr_buff, extract_len);
 }
 

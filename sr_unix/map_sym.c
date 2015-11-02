@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <stdlib.h>
+#include "gtm_stdlib.h"
 
 #include "collseq.h"
 #include "rtnhdr.h"
@@ -41,33 +41,30 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 	boolean_t	coll_lib_found;
 	error_def(ERR_COLLFNMISSING);
 
-        static MSTR_CONST(xform_sym_1, "gtm_ac_xform_1");
-        static MSTR_CONST(xback_sym_1, "gtm_ac_xback_1");
+	static MSTR_CONST(xform_sym_1, "gtm_ac_xform_1");
+	static MSTR_CONST(xback_sym_1, "gtm_ac_xback_1");
 	static MSTR_CONST(xform_sym, "gtm_ac_xform");
 	static MSTR_CONST(xback_sym, "gtm_ac_xback");
 	static MSTR_CONST(verify_sym, "gtm_ac_verify");
 	static MSTR_CONST(version_sym, "gtm_ac_version");
 
 	coll_lib_found = FALSE;
-	if (SS_NORMAL != (status = trans_log_name(fspec, &fspec_trans, buffer)))
-    	    return FALSE;
-
+	if (SS_NORMAL != (status = TRANS_LOG_NAME(fspec, &fspec_trans, buffer, sizeof(buffer), do_sendmsg_on_log2long)))
+		return FALSE;
 	if (NULL == (handle = fgn_getpak(buffer, INFO)))
-    	    return FALSE;
-
+		return FALSE;
 	if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym_1, SUCCESS)))
 	{
 		if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym_1, SUCCESS)))
 		{
 			coll_lib_found = TRUE;
 			ret_collseq->argtype = 1;
-		}
-		else { /* Warn about the missing routine */
-			gtm_putmsg(VARLSTCNT(5) ERR_COLLFNMISSING, 3, LEN_AND_LIT("gtm_ac_xback_1()"), ret_collseq->act );
+		} else
+		{	/* Warn about the missing routine */
+			gtm_putmsg(VARLSTCNT(5) ERR_COLLFNMISSING, 3, LEN_AND_LIT("gtm_ac_xback_1()"), ret_collseq->act);
 			ERR_FGNSYM;
 		}
 	}
-
 	if ( FALSE == coll_lib_found)
 	{
 		if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym, SUCCESS)))
@@ -85,11 +82,9 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 			ERR_FGNSYM;
 	}
 	assert(TRUE == coll_lib_found);
-
 	if (!(ret_collseq->verify = fgn_getrtn(handle, &verify_sym, INFO)))
 		ERR_FGNSYM;
 	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym, INFO)))
 		ERR_FGNSYM;
-
 	return TRUE;
 }

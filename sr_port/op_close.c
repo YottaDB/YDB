@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,10 +30,12 @@ void op_close(mval *v, mval *p)
 	int4		stat;	        /* status */
 	mstr		tn;		/* translated name */
 
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TEXT);
+
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
-	stat = trans_log_name(&v->str, &tn, buf);
+	stat = TRANS_LOG_NAME(&v->str, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long);
 	if (SS_NORMAL == stat)
 	{
 	        if (0 == (tl = get_log_name(&tn, NO_INSERT)))
@@ -52,8 +54,7 @@ void op_close(mval *v, mval *p)
 				l = prev;
 			}
 		}
-	}
-	else if (stat == SS_NOLOGNAM || 0 == v->str.len)
+	} else if ((SS_NOLOGNAM == stat) VMS_ONLY(|| (0 == v->str.len)))
 	{
 	        if (0 == (l = get_log_name(&v->str, NO_INSERT)))
 			return;
@@ -61,6 +62,10 @@ void op_close(mval *v, mval *p)
 			 || (dev_open != ciod->state && tcp != ciod->type))
 			return;
 	}
+#	ifdef UNIX
+	else if (SS_LOG2LONG == stat)
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, sizeof(buf) - 1);
+#	endif
 	else
 		rts_error(VARLSTCNT(1) stat);
 

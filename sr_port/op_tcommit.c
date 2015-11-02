@@ -50,6 +50,10 @@
 #include "have_crit.h"
 #include "jobinterrupt_process.h"
 #include "jnl_get_checksum.h"
+#include "sleep_cnt.h"
+#include "wcs_sleep.h"
+#include "wbox_test_init.h"
+#include "memcoherency.h"
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
@@ -84,7 +88,7 @@ void	op_tcommit(void)
 	sm_uc_ptr_t		bmp;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
 	unsigned int		ctn;
-	int			cw_depth, cycle, len, old_cw_depth;
+	int			cw_depth, cycle, len, old_cw_depth, sleep_counter;
 	sgmnt_addrs		*csa, *next_csa;
 	sgmnt_data_ptr_t	csd;
 	sgm_info		*si, *temp_si;
@@ -216,13 +220,21 @@ void	op_tcommit(void)
 										&& (old_db_addrs[1] >= t1->buffaddr))
 										t1->buffaddr += delta;
 								}
+								/* In case the while loop above needs to repeat more than once,
+								 * the mmaped addresses for the file's start and end could have
+								 * changed if wcs_mm_recover() caused a file extension.  In that
+								 * case, reset the limits to the new values.
+								 */
+								if (csa->db_addrs[0] != old_db_addrs[0])
+								{
+									old_db_addrs[0] = csa->db_addrs[0];
+									old_db_addrs[1] = csa->db_addrs[1];
+									csd = csa->hdr;
+								}
 							}
 							if (0 > new_blk)
 							{
 								GET_CDB_SC_CODE(new_blk, status); /* code is set in status */
-								t_fail_hist[t_tries] = status;
-								SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-								TP_RETRY_ACCOUNTING(csa, csd, status);
 								break;	/* transaction must attempt restart */
 							}
 							/* No need to write before-image in case the block is FREE. In case the
@@ -240,9 +252,6 @@ void	op_tcommit(void)
 								if (NULL == old_block)
 								{
 									status = (enum cdb_sc)rdfail_detail;
-									t_fail_hist[t_tries] = status;
-									SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-									TP_RETRY_ACCOUNTING(csa, csd, status);
 									break;
 								}
 								if ((NULL != jbp) && (old_block->tn < jbp->epoch_tn))
@@ -258,9 +267,6 @@ void	op_tcommit(void)
 									if (bsiz > csd->blk_size)
 									{
 										status = cdb_sc_lostbmlcr;
-										t_fail_hist[t_tries] = status;
-										SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-										TP_RETRY_ACCOUNTING(csa, csd, status);
 										break;
 									}
 									JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, old_block, bsiz);
@@ -277,7 +283,7 @@ void	op_tcommit(void)
 					}	/* for (all cw_set_elements) */
 					if (NULL == si->first_cw_bitmap)
 						si->first_cw_bitmap = last_cw_set_before_maps->next_cw_set;
-					if (cdb_sc_normal == status && 0 != csd->dsid)
+					if ((cdb_sc_normal == status) && 0 != csd->dsid)
 					{
 						for (ks = si->kill_set_head; NULL != ks; ks = ks->next_kill_set)
 						{
@@ -290,6 +296,12 @@ void	op_tcommit(void)
 					}
 					if (NULL != si->kill_set_head)
 					{
+						DEBUG_ONLY(
+							for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
+								assert(csa->now_crit == (FILE_INFO(tr->reg)->s_addrs.now_crit));
+						)
+						if (!csa->now_crit)
+							WAIT_ON_INHIBIT_KILLS(csa->nl, MAXWAIT2KILL);
 						/* temp_si is to maintain index into sgm_info_ptr list till which DECR_CNTs
 						 * have to be done incase abnormal status or tp_tend fails/succeeds
 						 */
@@ -298,9 +310,15 @@ void	op_tcommit(void)
 				} else	/* if (at least one set in segment) */
 					assert(0 == si->cw_set_depth);
 			}	/* for (all segments in the transaction) */
+			if (cdb_sc_normal != status)
+			{
+				t_fail_hist[t_tries] = status;
+				SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+				TP_RETRY_ACCOUNTING(csa, csa->nl, status);
+			}
 			if ((cdb_sc_normal == status) && tp_tend())
 				;
-			else	/* commit failed */
+			else	/* commit failed BEFORE invoking or DURING "tp_tend" */
 			{
 				assert(cdb_sc_normal != t_fail_hist[t_tries]);	/* else will go into an infinite try loop */
 				DEBUG_ONLY(
@@ -352,6 +370,15 @@ void	op_tcommit(void)
 					assert(!si->kip_incremented);
 					continue;	/* no kills in this segment */
 				}
+				GTM_WHITE_BOX_TEST(WBTEST_ABANDONEDKILL, sleep_counter, SLEEP_ONE_MIN);
+#				ifdef DEBUG
+				if (SLEEP_ONE_MIN == sleep_counter)
+				{
+					assert(gtm_white_box_test_case_enabled);
+					while (1 <= sleep_counter)
+						wcs_sleep(sleep_counter--);
+				}
+#				endif
 				TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 				sgm_info_ptr = si;	/* needed in gvcst_expand_free_subtree */
 				gvcst_expand_free_subtree(si->kill_set_head);

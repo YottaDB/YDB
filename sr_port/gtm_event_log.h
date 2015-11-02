@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,22 +13,14 @@
 #define __GTM_EVENT_LOG_H__
 /* GTM external logging */
 
-
-
-#define GTM_EVENT_LOG_LIB_ENV	"$gtm_event_log_libpath"
-
-#define GTM_EVENT_LOG_HARDCODE_RTN_NAME	/* undef this to use
-					 * env variable */
+#define GTM_EVENT_LOG_HARDCODE_RTN_NAME	/* undef this to use env variable */
 
 #ifdef GTM_EVENT_LOG_HARDCODE_RTN_NAME
-#define GTM_EVENT_LOG_RTN		"GtmEventLog"
+#	define GTM_EVENT_LOG_RTN		"GtmEventLog"
 extern	int	GtmEventLog(int argc, char *category, char *code, char *msg);
-#else
-#define GTM_EVENT_LOG_RTN_ENV	"$gtm_event_log_rtn"
 #endif
 
-#define GTM_EVENT_LOG_ARGC	3 /* excluding the argument count -
-				   * category, code and msg */
+#define GTM_EVENT_LOG_ARGC	3 /* excluding the argument count - category, code and msg */
 
 int gtm_event_log_init(void);
 int gtm_event_log_close(void);

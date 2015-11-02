@@ -602,7 +602,7 @@ COLLARGLONG	<Collation sequence !UL does not contain routines for long strings>/
 NOPINI		<PINI journal record expected but not found in journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
 DBNOCRE		<Not all specified database files, or their associated journal files were created>/error/fao=0!/ansi=0
 JNLSPACELOW	<Journal file !AD nearing maximum size, !UL blocks to go>/info/fao=3!/ansi=0
-DBCOMMITCLNUP	<Pid !UL [0x!XL] handled error during commit of !AZ transaction in database file !AD>/info/fao=5!/ansi=0
+DBCOMMITCLNUP	<Pid !UL [0x!XL] handled error (code = !UL) during commit of !AZ transaction in database file !AD>/info/fao=6!/ansi=0
 BFRQUALREQ	<The [NO]BEFORE qualifier is required for this command>/error/fao=0!/ansi=0
 REQDVIEWPARM	<Required View parameter is missing>/error/fao=0!/ansi=0
 COLLFNMISSING	<Routine !AD is not found for collation sequence !UL>/error/fao=3!/ansi=0
@@ -773,7 +773,7 @@ MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
 STOPTIMEOUT	<Waited too long for stopped process to release.  Region: !AD.>/error/fao=2!/ansi=0
-BACKUP2MANYKILL	<Too many large kills in progress to start operation.  Try again later.>/error/fao=0!/ansi=0
+UNUSEDMSG776	<BACKUP2MANYKILL last used in V5.3-002 (release-date 2008/08/18)>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
 JNLREAD		<Error reading from journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
@@ -813,7 +813,7 @@ SOCKETEXIST	<Socket !AD already exists>/error/fao=2!/ansi=79
 LISTENPASSBND	<Controlmnemonic LISTEN can be applied to PASSIVE socket in the state BOUND only>/error/fao=0!/ansi=76
 DBCLNUPINFO	<Database file !AD !/!AD>/info/fao=4!/ansi=0
 MUNODWNGRD	<Database not downgraded because of preceding errors>/error/fao=0!/ansi=0
-REPLTRANS2BIG	<Transaction !16@XQ of size !UL too large to be accommodated in the !AD pool>/error/fao=4!/ansi=0
+REPLTRANS2BIG	<Transaction !16@XQ of size !UL (pre-filter size !UL) too large to be accommodated in the !AD pool>/error/fao=5!/ansi=0
 RDFLTOOLONG	<Length specified for fixed length read exceeds the maximum string size>/error/fao=0!/ansi=0
 MUNOFINISH	<MUPIP unable to finish all requested actions>/error/fao=0!/ansi=0
 DBFILEXT	<Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ>/info/fao=5!/ansi=0
@@ -1296,6 +1296,10 @@ UPDREPLSTATEOFF	<Error replicating global ^!AD as it maps to database !AD which 
 LITNONGRAPH	<M standard requires graphics in string literals>/warning/fao=0!/ansi=0
 DBFHEADERR8	<Database file !AD: control problem: !AD was 0x!XJ expecting 0x!XJ> /info /fao=6!/ansi=0
 MMBEFOREJNL	<BEFORE image journaling cannot be set with MM access method in database file !AD>/warning/fao=2!/ansi=0
+MMNOBFORRPL	<Replication cannot be used in database file !AD which uses MM access method and NOBEFORE image journaling>/warning/fao=2!/ansi=0
+KILLABANDONED	<Abandoned kills counter is greater than zero for file !AD, !AD>/warning/fao=4!/ansi=0
+BACKUPKILLIP	<Kill in progress indicator is set for file !AD, backup database could have incorrectly marked busy integrity errors>/warning/fao=2!/ansi=0
+LOGTOOLONG	<Environment variable !AD is too long. Maximum length allowed is !UL bytes.>/error/fao=3!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

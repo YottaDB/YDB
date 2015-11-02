@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,6 @@
 #include "gvusr.h"
 
 GBLREF gv_namehead	*gv_target;
-GBLREF gv_namehead	*reset_gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF bool		gv_curr_subsc_null;
@@ -115,8 +114,6 @@ void op_zprevious(mval *v)
 	{	/* the following section is for $ZPREVIOUS(^gname) */
 		assert(2 <= gv_currkey->end);
 		assert(gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
-		assert(INVALID_GV_TARGET == reset_gv_target);
-		reset_gv_target = gv_target;
 		for (map = gd_map_top - 1; (map > (gd_map + 1)) &&
 			(0 >= memcmp(gv_currkey->base, map->name,
 				((MAX_MIDENT_LEN + 2) == gv_currkey->end) ? MAX_MIDENT_LEN : gv_currkey->end - 1)); map--)
@@ -174,7 +171,6 @@ void op_zprevious(mval *v)
 		}
 		gv_currkey->end = 0;
 		gv_currkey->base[0] = 0;
-		RESET_GV_TARGET;
 		v->mvtype = MV_STR;
 		if (found)
 		{

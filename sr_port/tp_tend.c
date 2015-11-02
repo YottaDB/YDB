@@ -270,9 +270,9 @@ boolean_t	tp_tend()
 			((dba_mm == csd->acc_meth) &&		/* we have MM and.. */
 			(csa->total_blks != csd->trans_hist.total_blks)))	/* and file has been extended */
 		{	/* Force repair */
-			t_fail_hist[t_tries] = cdb_sc_helpedout; /* special status to prevent punishing altruism */
+			status = cdb_sc_helpedout; /* special status to prevent punishing altruism */
 			TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-			return FALSE;
+			goto failed_skip_revert;
 		}
 		/* Note that there are three ways a deadlock can occur.
 		 * 	(a) If we are not in the final retry and we already hold crit on some region.
@@ -297,11 +297,8 @@ boolean_t	tp_tend()
 			 */
 			assert((CDB_STAGNATE <= t_tries) && csa->now_crit && region_is_frozen);
 			status = cdb_sc_needcrit;	/* break the possible deadlock by signalling a restart */
-			t_fail_hist[t_tries] = status;
-			SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-			TP_RETRY_ACCOUNTING(csa, csd, status);
 			TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-			return FALSE;
+			goto failed_skip_revert;
 		}
 		/* whenever si->first_cw_set is non-NULL, ensure that si->update_trans is TRUE */
 		assert((NULL == si->first_cw_set) || si->update_trans);
@@ -384,6 +381,13 @@ boolean_t	tp_tend()
 		/* Must be done after REVERT since we are no longer in crit */
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
+		for (si = first_sgm_info;  (NULL != si);  si = si->next_sgm_info)
+		{
+			csa = si->tp_csa;
+			cnl = csa->nl;
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkread, si->num_of_blks);
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readonly, 1);
+		}
 		return TRUE;
 	}
 	/* Because secshr_db_clnup uses first_tp_si_by_ftok to determine if a TP transaction is underway and expects
@@ -525,6 +529,14 @@ boolean_t	tp_tend()
 						goto failed;
 					}
 				}
+				/* Flag retry, if other mupip activities like BACKUP, INTEG or FREEZE are in progress.
+				 * If in final retry, go ahead with kill. BACKUP/INTEG/FREEZE will wait for us to be done.
+				 */
+				if ((NULL != si->kill_set_head) && (0 < csa->nl->inhibit_kills) && (CDB_STAGNATE > t_tries))
+				{
+					status = cdb_sc_inhibitkills;
+					goto failed;
+				}
 				/* Caution : since csa->backup_in_prog was initialized in op_tcommit only if si->first_cw_set was
 				 * non-NULL, it should be used in tp_tend only within an if (NULL != si->first_cw_set)
 				 */
@@ -543,6 +555,7 @@ boolean_t	tp_tend()
 					}
 					csa->backup_in_prog = !csa->backup_in_prog; /* reset csa->backup_in_prog to current state */
 				}
+
 				read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);
 				if (!is_mm)
 				{	/* in crit, ensure cache-space is available.
@@ -555,11 +568,9 @@ boolean_t	tp_tend()
 							assert(csd->wc_blocked);	/* only reason we currently know
 											 * why wcs_get_space could fail */
 							assert(gtm_white_box_test_case_enabled);
-							SET_TRACEABLE_VAR(csd->wc_blocked,TRUE);
+							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
 							status = cdb_sc_cacheprob;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 							goto failed;
 						}
@@ -613,9 +624,8 @@ boolean_t	tp_tend()
 								ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush in tp_tend"),
 								jnl_status);
 							assert((!JNL_ENABLED(csd)) && JNL_ENABLED(csa));
-							t_fail_hist[t_tries] = cdb_sc_jnlclose;
+							status = cdb_sc_jnlclose;
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-							status = (enum cdb_sc)cdb_sc_jnlclose;
 							if ((CDB_STAGNATE - 1) == t_tries)
 								release_crit = TRUE;
 							goto failed;
@@ -623,9 +633,8 @@ boolean_t	tp_tend()
 						{
 							assert((!JNL_ENABLED(csd)) && JNL_ENABLED(csa));
 							assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
-							t_fail_hist[t_tries] = cdb_sc_jnlclose;
+							status = cdb_sc_jnlclose;
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-							status = (enum cdb_sc)cdb_sc_jnlclose;
 							if ((CDB_STAGNATE - 1) == t_tries)
 								release_crit = TRUE;
 							goto failed;
@@ -640,9 +649,6 @@ boolean_t	tp_tend()
 							SET_WCS_FLU_FAIL_STATUS(status, csd);
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_wcsflu);
-							t_fail_hist[t_tries] = status;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 							goto failed;
 						}
@@ -671,8 +677,6 @@ boolean_t	tp_tend()
 							|| (cdb_sc_normal != recompute_upd_array(t1, cse)) || !++leafmods)
 						{
 							status = cdb_sc_blkmod;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 							DEBUG_ONLY(continue;)
 							PRO_ONLY(goto failed;)
@@ -737,8 +741,6 @@ boolean_t	tp_tend()
 								}
 								assert(CDB_STAGNATE > t_tries);
 								status = cdb_sc_blkmod;
-								SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-								TP_RETRY_ACCOUNTING(csa, csd, status);
 								TP_TRACE_HIST_MOD(t1->blk_num, t1->blk_target,
 										tp_blkmod_tp_tend, csd, t1->tn, bt->tn, t1->level);
 								DEBUG_ONLY(continue;)
@@ -749,8 +751,6 @@ boolean_t	tp_tend()
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_losthist;
-						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-						TP_RETRY_ACCOUNTING(csa, csd, status);
 						TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 						DEBUG_ONLY(continue;)
 						PRO_ONLY(goto failed;)
@@ -774,8 +774,6 @@ boolean_t	tp_tend()
 								SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 								BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch1);
 								status = cdb_sc_crbtmismatch;
-								SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-								TP_RETRY_ACCOUNTING(csa, csd, status);
 								TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 								goto failed;
 							}
@@ -785,8 +783,6 @@ boolean_t	tp_tend()
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_t1);
 							status = cdb_sc_cacheprob;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 							goto failed;
 						}
@@ -803,15 +799,11 @@ boolean_t	tp_tend()
 									SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 									BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch2);
 									status = cdb_sc_crbtmismatch;
-									SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-									TP_RETRY_ACCOUNTING(csa, csd, status);
 									TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 									goto failed;
 								}
 								assert(CDB_STAGNATE > t_tries);
 								status = cdb_sc_lostcr;
-								SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-								TP_RETRY_ACCOUNTING(csa, csd, status);
 								TP_TRACE_HIST(t1->blk_num, t1->blk_target);
 								DEBUG_ONLY(continue;)
 								PRO_ONLY(goto failed;)
@@ -877,8 +869,6 @@ boolean_t	tp_tend()
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_bmlmod;
-						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-						TP_RETRY_ACCOUNTING(csa, csd, status);
 						TP_TRACE_HIST(cse->blk, NULL);
 						goto failed;
 					}
@@ -892,8 +882,6 @@ boolean_t	tp_tend()
 						{
 							assert(CDB_STAGNATE > t_tries);
 							status = cdb_sc_bmlmod;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(tp_blk, NULL);
 							goto failed;
 						}
@@ -901,8 +889,6 @@ boolean_t	tp_tend()
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_lostbmlhist;
-						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-						TP_RETRY_ACCOUNTING(csa, csd, status);
 						TP_TRACE_HIST(tp_blk, NULL);
 						goto failed;
 					}
@@ -913,8 +899,6 @@ boolean_t	tp_tend()
 						if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 						{
 							status = cdb_sc_cacheprob;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(tp_blk, NULL);
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_bitmap);
@@ -929,8 +913,6 @@ boolean_t	tp_tend()
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch3);
 							status = cdb_sc_crbtmismatch;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							TP_TRACE_HIST(tp_blk, NULL);
 							goto failed;
 						}
@@ -940,8 +922,6 @@ boolean_t	tp_tend()
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_lostbmlcr;
-						SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-						TP_RETRY_ACCOUNTING(csa, csd, status);
 						TP_TRACE_HIST(tp_blk, NULL);
 						goto failed;
 					}
@@ -974,8 +954,6 @@ boolean_t	tp_tend()
 							status = cdb_sc_cacheprob;
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_cwset);
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							goto failed;
 						}
 						/* It is possible that cr->in_cw_set is non-zero in case a concurrent MUPIP REORG
@@ -993,8 +971,6 @@ boolean_t	tp_tend()
 							TP_TRACE_HIST(cse->blk, cse->blk_target);
 							assert(CDB_STAGNATE > t_tries);
 							status = cdb_sc_lostbefor;
-							SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
-							TP_RETRY_ACCOUNTING(csa, csd, status);
 							goto failed;
 						}
 						TP_PIN_CACHE_RECORD(cr, si);
@@ -1626,26 +1602,32 @@ skip_failed:
 			process_deferred_stale();
 		for (si = first_tp_si_by_ftok;  (NULL != si);  si = si->next_tp_si_by_ftok)
 		{
+			csa = si->tp_csa;
+			cnl = csa->nl;
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkread, si->num_of_blks);
 			if (!si->update_trans)
+			{
+				INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readonly, 1);
 				continue;
+			}
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_readwrite, 1);
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_blkwrite, si->cw_set_depth);
+			GVSTATS_SET_CSA_STATISTIC(csa, db_curr_tn, si->start_tn);
 			TP_TEND_CHANGE_REG(si);
-			++cs_data->n_tp_updates;
-			if (NULL == si->first_cw_set)
-				++cs_data->n_tp_updates_duplicate;
 			wcs_timer_start(gv_cur_region, TRUE);
 			if (si->backup_block_saved)
 				backup_buffer_flush(gv_cur_region);
 		}
-		/* Signal t_commit_cleanup/secshr_db_clnup that TP transaction is NOT underway */
-		first_tp_si_by_ftok = NULL;
+		first_tp_si_by_ftok = NULL; /* Signal t_commit_cleanup/secshr_db_clnup that TP transaction is NOT underway */
 		return TRUE;
-	} else
-	{
-		t_fail_hist[t_tries] = status;
-		/* Signal t_commit_cleanup/secshr_db_clnup that TP transaction is NOT underway */
-		first_tp_si_by_ftok = NULL;
-		return FALSE;
 	}
+failed_skip_revert:
+	assert(cdb_sc_normal != status);
+	t_fail_hist[t_tries] = status;
+	SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+	TP_RETRY_ACCOUNTING(csa, csa->nl, status);
+	first_tp_si_by_ftok = NULL;	/* Signal t_commit_cleanup/secshr_db_clnup that TP transaction is NOT underway */
+	return FALSE;
 }
 
 /* --------------------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,7 @@ boolean_t mu_int_fhead(void)
 	trans_num	temp_tn, max_tn_warn;
 	sgmnt_data_ptr_t mu_data;
 
+	error_def(ERR_KILLABANDONED);
 	error_def(ERR_MUKILLIP);
 	error_def(ERR_MUTNWARN);
 	error_def(ERR_DBNOTDB);
@@ -132,6 +133,12 @@ boolean_t mu_int_fhead(void)
         if (0 != mu_data->kill_in_prog)
         {
                 gtm_putmsg(VARLSTCNT(4) ERR_MUKILLIP, 2, DB_LEN_STR(gv_cur_region));
+                mu_int_errknt++;
+        }
+        if (0 != mu_data->abandoned_kills)
+        {
+                gtm_putmsg(VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(gv_cur_region),
+			LEN_AND_LIT("database could have incorrectly marked busy integrity errors"));
                 mu_int_errknt++;
         }
 	if (MAX_KEY_SZ < mu_data->max_key_size)

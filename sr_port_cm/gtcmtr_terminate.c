@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <signal.h>		/* for VSIG_ATOMIC_T type */
+
 #include "cmidef.h"
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
@@ -19,6 +22,10 @@
 #include "gtcmlkdef.h"
 #include "gtcml.h"
 #include "gtcmtr_protos.h"
+#include "have_crit.h"
+#ifdef UNIX
+#include "deferred_signal_handler.h"
+#endif
 
 GBLREF connection_struct *curr_entry;
 GBLREF int4		gtcm_users;
@@ -34,9 +41,13 @@ bool gtcmtr_terminate(bool cm_err)
 #endif
 	uint4		status;
 	struct CLB	*clb;
+	int		save_intrpt_ok_state;
 
 	if (curr_entry)
 	{
+		save_intrpt_ok_state = intrpt_ok_state;
+		/* We are about to rundown databases, clean up structures. Defer MUPIP STOP/signal handling until function end. */
+		intrpt_ok_state = INTRPT_IN_GTCMTR_TERMINATE;
 		cancel_timer((TID)curr_entry);
 		gtcml_lkrundown();
 		gtcmd_rundown(curr_entry, cm_err);
@@ -73,6 +84,8 @@ bool gtcmtr_terminate(bool cm_err)
 		 */
 		VMS_ONLY(free(curr_entry));
 		curr_entry = NULL;
+		intrpt_ok_state = save_intrpt_ok_state;
+		DEFERRED_EXIT_HANDLING_CHECK;	/* check if any MUPIP STOP/signals were deferred while in this function */
 	}
 	gtcm_users--;
 	VMS_ONLY(gtcm_ast_avail++);

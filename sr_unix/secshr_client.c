@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "gtm_logicals.h"
 
 GBLREF struct sockaddr_un       gtmsecshr_sock_name;
 GBLREF key_t                    gtmsecshr_key;
@@ -143,7 +144,7 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	boolean_t		retry = FALSE, recv_complete, send_complete;
 	size_t			server_proc_len;
 	int			semop_res;
-	int			selstat;
+	int			selstat, status;
 	char			*recv_ptr, *send_ptr;
 	struct sockaddr_un	server_proc;
 	struct sembuf		sop[4];
@@ -154,15 +155,16 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 	char			*gtm_tmp_ptr;
 
 	error_def(ERR_GTMSECSHR);
-	error_def(ERR_GTMSECSHRSTART);
-	error_def(ERR_GTMSECSHRSOCKET);
-	error_def(ERR_GTMSECSHRSRVFIL);
-	error_def(ERR_GTMSECSHRSRVFID);
-	error_def(ERR_GTMSECSHRSRVF);
 	error_def(ERR_GTMSECSHRPERM);
-	error_def(ERR_TEXT);
-	error_def(ERR_SYSCALL);
+	error_def(ERR_GTMSECSHRSOCKET);
+	error_def(ERR_GTMSECSHRSRVF);
+	error_def(ERR_GTMSECSHRSRVFID);
+	error_def(ERR_GTMSECSHRSRVFIL);
+	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_GTMSECSHRTMPPATH);
+	error_def(ERR_LOGTOOLONG);
+	error_def(ERR_SYSCALL);
+	error_def(ERR_TEXT);
 
 	timer_id = (TID)send_mesg2gtmsecshr;
 
@@ -172,8 +174,13 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 
 		gtmsecshr_logname.addr = GTMSECSHR_PATH;
                 gtmsecshr_logname.len = sizeof(GTMSECSHR_PATH) - 1;
-                if (SS_NORMAL != trans_log_name(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path))
+		status = TRANS_LOG_NAME(&gtmsecshr_logname, &gtmsecshr_pathname, gtmsecshr_path, sizeof(gtmsecshr_path),
+						dont_sendmsg_on_log2long);
+                if (SS_NORMAL != status)
 		{
+			if (SS_LOG2LONG == status)
+				send_msg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_logname.len, gtmsecshr_logname.addr,
+					sizeof(gtmsecshr_path) - 1);
                         send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
 					ERR_TEXT, 2, RTS_ERROR_STRING(secshr_unbl_start_mesg_code[INVTRANSGTMSECSHR]));
                         rts_error(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
@@ -327,12 +334,6 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 		{
 			switch(req_code)
 			{
-				case CHECK_PROCESS_ALIVE:
-					send_msg(VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6, RTS_ERROR_TEXT("Client"), process_id,
-							mesg.pid, req_code, mesg.mesg.id, ERR_TEXT, 2,
-							RTS_ERROR_STRING(secshr_fail_mesg_code[req_code]),
-							mesg.code);
-					break;
 				case REMOVE_FILE :
 					if (retry  && ENOENT == ret_code)
 						ret_code = 0;  /* assume first time worked */

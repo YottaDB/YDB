@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2005 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -18,7 +18,8 @@ NAME
 REGION
 	n nullsub
 	i '$d(regs(REGION)) zm gdeerr("OBJNOTFND"):"Region":REGION
-	i $d(lquals("JOURNAL")),lquals("JOURNAL"),'regs(REGION,"JOURNAL"),'$d(lquals("BEFORE_IMAGE")) zm gdeerr("QUALREQD"):"Before_image"
+	i $d(lquals("JOURNAL")),lquals("JOURNAL"),'regs(REGION,"JOURNAL"),'$d(lquals("BEFORE_IMAGE")) d
+	. zm gdeerr("QUALREQD"):"Before_image"
 	i $d(lquals("NULL_SUBSCRIPTS")) d
 	. s nullsub=lquals("NULL_SUBSCRIPTS")
 	. s lquals("NULL_SUBSCRIPTS")=$s((nullsub="ALWAYS")!(nullsub="TRUE"):1,nullsub="EXISTING":2,1:0)
@@ -36,4 +37,6 @@ SEGMENT
 	f  s s=$o(tmpseg(am,s)) q:'$l(s)  d
 	. i '$l(tmpseg(am,s)) s segs(SEGMENT,s)="" q
 	. i '$l(segs(SEGMENT,s)) s segs(SEGMENT,s)=tmpseg(am,s)
+	i "MM"=am,"MM"'=tmpacc s s="" f  s s=$o(regs(s)) q:'$l(s)  d
+	. i regs(s,"DYNAMIC_SEGMENT")=SEGMENT,'$d(lquals("BEFORE_IMAGE")) s regs(s,"BEFORE_IMAGE")=0
 	q

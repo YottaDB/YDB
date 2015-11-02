@@ -230,6 +230,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		   backup.
 		*/
 		grab_crit(gv_cur_region);
+		assert(cs_data == cs_addrs->hdr);
 		if (dba_bg == cs_data->acc_meth)
 		{	/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen
 			 * outside of crit, we dont want them to keep writing to the backup temporary file even after the

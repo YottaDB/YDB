@@ -117,26 +117,28 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	dev_in_use = io_curr_device;		/* Save current IO device */
 	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW */
 	saved_util_outbuff_len = 0;
+	if (NULL == util_outptr)
+		util_outptr = util_outbuff;
 	if (0 != (saved_util_outbuff_len = (util_outptr - util_outbuff)))	/* Caution -- assignment */
+	{
+		assert(0 <= saved_util_outbuff_len);
+		assert(saved_util_outbuff_len <= sizeof(saved_util_outbuff));
 		memcpy(saved_util_outbuff, util_outbuff, saved_util_outbuff_len);
-
+	}
 	jobexam_dump(input_dump_file_name, dump_file_spec);
-	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack
-	   to this point and return.
-	*/
-
+	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point and return.  */
 	if (0 != saved_util_outbuff_len)
-	{	/* Restore util_outbuf values */
+	{	/* Restore util_outbuff values */
 		memcpy(util_outbuff, saved_util_outbuff, saved_util_outbuff_len);
 		util_outptr = util_outbuff + saved_util_outbuff_len;
 	}
 	io_curr_device = dev_in_use;		/* Restore IO device */
 	/* If we saved an mval on our stack, we need to pop it off. If there was an error while doing the
-	   jobexam dump, zshow may have left some other mv_stent entries on the stack. Pop them all off with
-	   just a regular POP_MV_STENT macro rather than unw_mv_ent() call because the mv_stent entries
-	   created in zshow_output reference automatic storage that cannot be referenced at this stack
-	   level without potential (C) stack corruption.
-	*/
+	 * jobexam dump, zshow may have left some other mv_stent entries on the stack. Pop them all off with
+	 * just a regular POP_MV_STENT macro rather than unw_mv_ent() call because the mv_stent entries
+	 * created in zshow_output reference automatic storage that cannot be referenced at this stack
+	 * level without potential (C) stack corruption.
+	 */
 	if (saved_mv_stent)
 	{
 		if (mv_chain > new_mv_stent)

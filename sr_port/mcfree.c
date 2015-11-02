@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@ GBLREF mcalloc_hdr 	*mcavailptr, *mcavailbase;
 void mcfree(void)
 {
 	mcavailptr = mcavailbase;
-	mcavail = mcavailptr->size;
+	assert((NULL != mcavailptr) || !mcavail);
+	mcavail = (NULL != mcavailptr) ? mcavailptr->size : 0;
 	return;
 }

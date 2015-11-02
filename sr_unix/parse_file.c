@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ enum	parse_state
 
 GBLREF mval	dollar_zdir;
 
-int4	parse_file (mstr *file, parse_blk *pblk)
+int4	parse_file(mstr *file, parse_blk *pblk)
 {
 	struct stat		statbuf;
 	struct hostent		*hostinfo;
@@ -59,8 +59,15 @@ int4	parse_file (mstr *file, parse_blk *pblk)
 	error_def(ERR_SYSCALL);
 
 	pblk->fnb = 0;
-	assert(((unsigned int)pblk->buff_size + 1) <= MAX_FBUFF + 1);
-	status = trans_log_name(file, &trans, pblk->buffer);
+	assert(((unsigned int)pblk->buff_size + 1) <= (MAX_FBUFF + 1));
+	/* All callers of parse_blk set buff_size to 1 less than the allocated buffer. This is because buff_size is a char
+	 * type (for historical reasons) and so cannot go more than 255 whereas we support a max of 255 characters. So we
+	 * allocate buffers that contain one more byte (for the terminating '\0') but dont set that in buff_size. Use
+	 * that extra byte for the trans_log_name call.
+	 */
+	status = TRANS_LOG_NAME(file, &trans, pblk->buffer, pblk->buff_size + 1, dont_sendmsg_on_log2long);
+	if (SS_LOG2LONG == status)
+		return ERR_PARBUFSM;
 	assert(trans.addr == pblk->buffer);
 
 	memset(&def, 0, sizeof(def));	/* initial the defaults to zero */

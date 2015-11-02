@@ -79,6 +79,11 @@
 typedef uint4	block_offset;
 typedef int4   	block_index;
 
+/* If a new mode is added to the table below, make sure pre-existing mode usages in the current codebase are examined to see
+ * if the new mode needs to be added there as well. For example, there is code in tp_incr_commit.c and tp_incr_clean_up.c
+ * where gds_t_create and kill_t_create are used explicitly. If the new mode is yet another *create* type, then it might need
+ * to be added in those places as well.
+ */
 enum gds_t_mode
 {
 	gds_t_noop = 0,		/* there is code that initializes stuff to 0 relying on it being equal to gds_t_noop */

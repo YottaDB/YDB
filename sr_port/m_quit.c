@@ -37,61 +37,54 @@ int m_quit(void)
 	error_def(ERR_QUITARGUSE);
 	error_def(ERR_QUITARGLST);
 
+	arg = (window_token != TK_EOL && window_token != TK_SPACE);
 	if (for_stack_ptr == for_stack)
-	{
-		arg = (window_token != TK_EOL && window_token != TK_SPACE);
-		cr = NULL;
+	{	/* not FOR */
 		if (dollar_zquit_anyway && !run_time)
 		{	/* turn a plain quit into a set with and without argument conditioned on $QUIT */
 			r = newtriple(OC_SVGET);
 			r->operand[0] = put_ilit(SV_QUIT);
 			x = put_tref(r);
 			coerce(&x, OCT_BOOL);
-			cr = (oprtype *)mcalloc(sizeof(oprtype));	/* jump target to be placed later */
-			bx_tail(x.oprval.tref, arg ? (bool)TRUE : (bool)FALSE, cr);
-			r = newtriple(arg ? OC_RET : OC_RETARG);
-			if (!arg)
-				r->operand[0] = put_lit((mval *)&literal_null);
+			cr = (oprtype *)mcalloc(sizeof(oprtype));	/* for jump target */
+			bx_tail(x.oprval.tref, (bool)TRUE, cr);
+			r = newtriple(OC_RET);
 			x = put_tref(r);
+			r = newtriple(OC_NOOP);				/* need a jump target */
+			x = put_tref(r);
+			*cr = put_tjmp(curtchain->exorder.bl);
+			if (!arg)
+			{
+				r = newtriple(OC_RETARG);
+				r->operand[0] = put_lit((mval *)&literal_null);
+				x = put_tref(r);
+				return TRUE;
+			}
 		}
 		if (!arg)
 		{
-			if (NULL != cr)
-				*cr = put_tjmp(curtchain->exorder.bl);
 			newtriple((run_time) ? OC_HARDRET : OC_RET);
-		} else
+			return TRUE;
+		}
+		if ((rval = expr(&x)) && (window_token != TK_COMMA))
 		{
-			if (!(rval = expr(&x)))
-				return FALSE;
-			if (window_token == TK_COMMA)
-			{
-				stx_error (ERR_QUITARGLST);
-				return FALSE;
-			}
-			if (EXPR_INDR == rval)
-			{	/* Indirect argument */
-				if (NULL != cr)
-					*cr = put_tjmp(curtchain->exorder.bl);
-				make_commarg(&x, indir_quit);
-			} else
+			if (EXPR_INDR != rval)
 			{
 				r = newtriple(OC_RETARG);
 				r->operand[0] = x;
-				if (NULL != cr)
-					*cr = put_tjmp(curtchain->exorder.bl);
-			}
+			} else	/* Indirect argument */
+				make_commarg(&x, indir_quit);
+			return TRUE;
 		}
-	} else
+		if (window_token == TK_COMMA)
+			stx_error (ERR_QUITARGLST);
+		return FALSE;
+	} else if (!arg)						/* FOR */
 	{
-		if (window_token == TK_EOL || window_token == TK_SPACE)
-		{
-			triptr = newtriple(OC_JMP);
-			triptr->operand[0] = for_end_of_scope(1);
-		} else
-		{
-			stx_error(ERR_QUITARGUSE);
-			return FALSE;
-		}
+		triptr = newtriple(OC_JMP);
+		triptr->operand[0] = for_end_of_scope(1);
+		return TRUE;
 	}
-	return TRUE;
+	stx_error(ERR_QUITARGUSE);
+	return FALSE;
 }

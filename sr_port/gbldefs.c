@@ -90,6 +90,7 @@
 #include "mupipbckup.h"
 #include "dpgbldir.h"
 #include "mmemory.h"
+#include "have_crit.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -112,6 +113,7 @@
 #include "fgncal.h"
 #include "parse_file.h"		/* for MAX_FBUFF */
 #include "repl_sem.h"
+#include "gtm_zlib.h"
 #endif
 
 #include "jnl_typedef.h"
@@ -179,6 +181,8 @@ GBLDEF	boolean_t	is_updproc = FALSE,
 GBLDEF	VSIG_ATOMIC_T	forced_exit = FALSE;	/* Asynchronous signal/interrupt handler sets this variable to TRUE,
 						 * hence the VSIG_ATOMIC_T type in the definition.
 						 */
+GBLDEF	intrpt_state_t	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;	/* any other value implies it is not ok to interrupt */
+
 GBLDEF	unsigned char	*msp,
 			*mubbuf,
 			*restart_ctxt,
@@ -509,6 +513,7 @@ GBLDEF z_records	zbrk_recs = {NULL, NULL, NULL};
 GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
 GBLDEF	gd_region	*ftok_sem_reg = NULL;	/* Last region for which ftok semaphore is grabbed */
 GBLDEF	gd_region	*standalone_reg = NULL;	/* We have standalone access for this region */
+GBLDEF	int		gtm_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
 #endif
 
 #ifdef VMS
@@ -540,7 +545,8 @@ GBLDEF	pattern		*pattern_list;
 GBLDEF	pattern		*curr_pattern;
 
 /* Unicode related data */
-GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with Unicode Character Set ? */
+GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with Unicode Character Set; Set only after ICU initialization */
+GBLDEF	boolean_t	is_gtm_chset_utf8;	/* Is gtm_chset environment variable set to UTF8 */
 GBLDEF	boolean_t	utf8_patnumeric;	/* Should patcode N match non-ASCII numbers in pattern match ? */
 GBLDEF	boolean_t	badchar_inhibit = FALSE;/* Suppress malformed UTF-8 characters by default */
 GBLDEF  MSTR_DEF(dollar_zchset, 1, "M");
@@ -763,13 +769,11 @@ GBLDEF	uint4	gtm_memory_noaccess[GTM_MEMORY_NOACCESS_COUNT];	/* see VMS gtm_env_
 
 GBLDEF	volatile boolean_t	in_wcs_recover = FALSE;	/* TRUE if in wcs_recover(), used by "bt_put" and "generic_exit_handler" */
 
-#ifdef DEBUG
 /* Following definitions are related to white_box testing */
 GBLDEF	boolean_t	gtm_white_box_test_case_enabled = FALSE;
 GBLDEF	int		gtm_white_box_test_case_number = 0;
 GBLDEF	int		gtm_white_box_test_case_count = 0;
 GBLDEF	int 		gtm_wbox_input_test_case_count = 0; /* VMS allows maximum 31 characters for external identifer */
-#endif
 
 GBLDEF	boolean_t	in_gvcst_incr = FALSE;	/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
 						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */
@@ -970,3 +974,32 @@ GBLDEF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when 
 GBLDEF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
 GBLDEF	int4		pin_fail_in_wtstart;		/* Count of processes in wcs_wtstart when we failed to pin */
 GBLDEF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 commit when we failed to pin */
+
+#ifdef DEBUG
+GBLDEF	boolean_t	gtm_gvundef_fatal;
+GBLDEF	boolean_t	in_op_gvget;			/* TRUE if op_gvget() is a call ancestor in the C-stack */
+GBLDEF	boolean_t	ready2signal_gvundef;		/* TRUE if GET operation is about to signal a GVUNDEF */
+#endif
+
+GBLDEF	boolean_t	gtm_tp_allocation_clue;		/* block# hint to start allocation for created blocks in TP */
+
+#ifdef UNIX
+GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */
+GBLDEF	int4		repl_zlib_cmp_level;		/* zlib compression level currently in use in replication pipe.
+							 * This is a source-server specific variable and is non-zero only
+							 * if compression is enabled and works in the receiver server as well.
+							 */
+GBLDEF	zlib_cmp_func_t		zlib_compress_fnptr;
+GBLDEF	zlib_uncmp_func_t	zlib_uncompress_fnptr;
+#endif
+
+GBLDEF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
+
+#ifdef UNIX
+/* Initialized blockalrm and block_sigsent can be used by all */
+GBLDEF	boolean_t	blocksig_initialized = FALSE;	/* set to TRUE when blockalrm and block_sigsent are initialized */
+GBLDEF	sigset_t	blockalrm;
+GBLDEF	sigset_t	block_sigsent;	/* block all signals that can be sent externally
+					  (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT) */
+#endif
+

@@ -169,21 +169,32 @@ void ch_trace_point() {return;}
 					return;				\
 				}
 
-#define DRIVECH(x)		{						\
-                                        error_def(ERR_TPRETRY);			\
-                                        CHTRACEPOINT;				\
-                                        if (ERR_TPRETRY != error_condition)	\
-                                                ch_cond_core();			\
-                                        while (active_ch >= &chnd[0])		\
-                                        {					\
-                                                if (!active_ch->ch_active)	\
-                                                       break; 			\
-                                                active_ch--;			\
-					}					\
-                                        if (active_ch >= &chnd[0] && *active_ch->ch) \
-					        (*active_ch->ch)(x);		\
-                                        else					\
-						ch_overrun();			\
+#define DRIVECH(x)		{									\
+					GBLREF int	mumps_status;					\
+													\
+					error_def(ERR_TPRETRY);						\
+					CHTRACEPOINT;							\
+					if (ERR_TPRETRY != error_condition)				\
+						ch_cond_core();						\
+					if (NULL != active_ch)						\
+					{								\
+						while (active_ch >= &chnd[0])				\
+						{							\
+							if (!active_ch->ch_active)			\
+							       break;					\
+							active_ch--;					\
+						}							\
+						if (active_ch >= &chnd[0] && *active_ch->ch)		\
+							(*active_ch->ch)(x);				\
+						else							\
+							ch_overrun();					\
+					} else								\
+					{	/* No condition handler has been ESTABLISHed yet.	\
+						 * Most likely error occuring at process startup.	\
+						 * Just print error and exit with error status.		\
+						 */							\
+						stop_image_ch();					\
+					}								\
                                 }
 
 #define NEXTCH			{					\
@@ -271,6 +282,7 @@ void gtm_fork_n_core(void);
 void ch_cond_core(void);
 void ch_overrun(void);
 void util_cond_flush(void);
+void stop_image_ch(void);
 CONDITION_HANDLER(dbopen_ch);
 CONDITION_HANDLER(gtmsecshr_cond_hndlr);
 CONDITION_HANDLER(mu_extract_handler);

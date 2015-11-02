@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,14 +33,14 @@
 
 typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
 
-/* Although usually a change in the journal file format (i.e. change to JNL_LABEL_TEXT macro in jnl.h) implies a change
- * in the filter format, it is not always the case. This is because the filter format changes only when the format of any
- * REPLICATED jnl record changes as opposed to the jnl format which can change even if the jnl file hdr format changes.
+/* The following is the list of filter-format version number versus the earliest GT.M version number that used it.
+ * Whenever the filter-format version number changes, it is set to the journal-format version number (JNL_LABEL_TEXT macro)
+ * for that version. Although usually a change in the journal file format (i.e. change to JNL_LABEL_TEXT macro in jnl.h)
+ * implies a change in the filter format, it is not always the case. This is because the filter format changes only when
+ * the format of any REPLICATED jnl record changes as opposed to the jnl format which can change if the jnl file hdr format
+ * changes or if the format of a non-replicated journal record (e.g. EPOCH record) changes.
  *
- * the following is the list of filter-format version number versus the earliest GT.M version number that used it.
- * the filter-format version number usually is the journal-format version number (JNL_LABEL_TEXT macro) for that version.
- * there is an exception to this rule in the case of V13 and V14 which is noted below.
- *
+ *	------	-------	--------
  *	Filter	Journal	GT.M
  *	format	format	version
  *	------	-------	--------
@@ -51,7 +51,31 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	V15	V15	GT.M V4.4-002
  *	V16	V16	GT.M V5.0-FT01
  *	V17	V17	GT.M V5.0-000
+ *	V17	V18	GT.M V5.3-003	(EPOCH record format changed so no filter format change)
  */
+
+typedef enum
+{
+	REPL_FILTER_V12,
+	REPL_FILTER_V15,
+	REPL_FILTER_V16,
+	REPL_FILTER_V17,
+	REPL_FILTER_MAX
+} repl_filter_t;
+
+typedef enum
+{
+	REPL_JNL_V12,
+	REPL_JNL_V13,
+	REPL_JNL_V14,
+	REPL_JNL_V15,
+	REPL_JNL_V16,
+	REPL_JNL_V17,
+	REPL_JNL_V18,
+	REPL_JNL_MAX
+} repl_jnl_t;
+
+GBLREF	int	jnl2filterfmt[];	/* Add row to this array in repl_filter.c whenever new REPL_JNL_Vnn gets added */
 
 #define IF_INVALID	((intlfltr_t)0L)
 #define IF_NONE		((intlfltr_t)(-1L))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,7 +75,6 @@ GBLREF	global_latch_t		defer_latch;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	char			cli_err_str[];
-GBLREF	boolean_t		gtm_utf8_mode;
 
 void display_prompt(void);
 
@@ -87,8 +86,7 @@ int main (int argc, char **argv)
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(util_base_ch);
-	if (gtm_utf8_mode)
-		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, NULL, suspsigs_handler);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);
         SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);

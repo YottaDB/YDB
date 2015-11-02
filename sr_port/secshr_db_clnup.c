@@ -192,6 +192,10 @@ GBLREF	gd_region		*gv_cur_region;		/* for the LOCK_HIST macro in the RELEASE_BUF
 GBLREF	node_local_ptr_t	locknl;			/* set explicitly before invoking RELEASE_BUFF_UPDATE_LOCK macro */
 #endif
 
+#ifdef DEBUG
+GBLREF	sgmnt_addrs		*cs_addrs;
+#endif
+
 typedef enum
 {
 	REG_COMMIT_UNSTARTED = 0,/* indicates that GT.M has not committed even one cse in this region */
@@ -215,14 +219,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	boolean_t		dont_reset_data_invalid;	/* set to TRUE in case cr->data_invalid was TRUE in phase2 */
 	int			max_bts;
 	unsigned int		lcnt;
-	cache_rec_ptr_t		clru, cr, cr_alt, cr_top, start_cr;
+	cache_rec_ptr_t		clru, cr, cr_alt, cr_top, start_cr, actual_cr;
 	cache_que_heads_ptr_t	cache_state;
 	cw_set_element		*cs, *cs_ptr, *cs_top, *first_cw_set, *nxt, *orig_cs;
 	gd_addr			*gd_header;
 	gd_region		*reg, *reg_top;
 	jnl_buffer_ptr_t	jbp;
 	off_chain		chain;
-	sgm_info		*si;
+	sgm_info		*si, *firstsgminfo;
 	sgmnt_addrs		*csa, *csaddrs;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
@@ -323,9 +327,13 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 	VMS_ONLY(assert(rundown_process_id);)
 	VMS_ONLY(process_id = rundown_process_id;)	/* used by the UNPIN_CACHE_RECORD macro */
 	is_exiting = (ABNORMAL_TERMINATION == secshr_state) || (NORMAL_TERMINATION == secshr_state);
-	dlr_tlevel = FALSE;
 	if (GTM_PROBE(sizeof(*dollar_tlevel_addrs), dollar_tlevel_addrs, READ))
 		dlr_tlevel = *dollar_tlevel_addrs;
+	else
+	{
+		assert(FALSE);
+		dlr_tlevel = FALSE;
+	}
 	if (dlr_tlevel && GTM_PROBE(sizeof(*first_tp_si_by_ftok_addrs), first_tp_si_by_ftok_addrs, READ))
 	{	/* Determine update_underway for TP transaction. A similar check is done in t_commit_cleanup as well.
 		 * Regions are committed in the ftok order using "first_tp_si_by_ftok". Also crit is released on each region
@@ -1053,6 +1061,29 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 									}
 								} else
 								{
+#									ifdef DEBUG
+									/* secshr_db_clnup relies on the fact that cs->ondsk_blkver
+									 * accurately reflects the on-disk block version of the
+									 * block and therefore can be used to set cr->ondsk_blkver.
+									 * Confirm this by checking that if a cr exists for this
+									 * block, then that cr's ondsk_blkver matches with the cs.
+									 * db_csh_get uses the global variable cs_addrs to determine
+									 * the region. So make it uptodate temporarily holding its
+									 * value in the local variable csaddrs.
+									 */
+									csaddrs = cs_addrs;	/* save cs_addrs in local */
+									cs_addrs = csa;		/* set cs_addrs for db_csh_get */
+									actual_cr = db_csh_get(cs->blk);
+									cs_addrs = csaddrs;	/* restore cs_addrs */
+									/* actual_cr can be NULL if the block is NOT in the cache.
+									 * It can be CR_NOTVALID if the cache record originally
+									 * containing this block got reused for a different block
+									 * (i.e. cr->stopped = 1) as part of secshr_db_clnup.
+									 */
+									assert((NULL == actual_cr)
+										|| ((cache_rec_ptr_t)CR_NOTVALID == actual_cr)
+										|| (cs->ondsk_blkver == actual_cr->ondsk_blkver));
+#									endif
 									cr->ondsk_blkver = cs->ondsk_blkver;
 									if (cr->ondsk_blkver != csd->desired_db_format)
 									{
@@ -1458,7 +1489,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					}
 					if (REG_COMMIT_COMPLETE != this_reg_commit_type)
 					{
-						if ((NULL != si->kill_set_head) && kipincremented_usable && !si->kip_incremented)
+						if (kipincremented_usable && (NULL != si->kill_set_head) && !si->kip_incremented)
 							CAREFUL_INCR_KIP(csd, csa, si->kip_incremented);
 					} else
 						assert((NULL == si->kill_set_head) || si->kip_incremented);
@@ -1466,18 +1497,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				} else
 				{	/* Non-TP. Check need_kip_incr and kip_incremented flags. */
 					assert(non_tp_update_underway);
-					if (GTM_PROBE(sizeof(*kip_incremented_addrs), kip_incremented_addrs, WRITE))
-					{
-						kipincremented_usable = TRUE;
-						/* Note that *kip_incremented_addrs could be FALSE if we are in the
-						 * 1st phase of the M-kill and TRUE if we are in the 2nd phase of the kill.
-						 * Only if it is FALSE, should we increment the kill_in_prog flag.
-						 */
-					} else
-					{
-						kipincremented_usable = FALSE;
-						assert(FALSE);
-					}
+					/* Note that *kip_incremented_addrs could be FALSE if we are in the
+					 * 1st phase of the M-kill and TRUE if we are in the 2nd phase of the kill.
+					 * Only if it is FALSE, should we increment the kill_in_prog flag.
+					 */
+					kipincremented_usable =
+						(GTM_PROBE(sizeof(*kip_incremented_addrs), kip_incremented_addrs, WRITE))
+							? TRUE : FALSE;
+					assert(kipincremented_usable);
 					if (GTM_PROBE(sizeof(*need_kip_incr_addrs), need_kip_incr_addrs, WRITE))
 						needkipincr = *need_kip_incr_addrs;
 					else
@@ -1492,6 +1519,56 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					}
 				}
 			}	/* if (NULL != first_cw_set) */
+			/* If the process is about to exit AND any kills are in progress (bitmap freeup phase of kill), mark
+			 * kill_in_prog as abandoned. Non-TP and TP maintain kill_in_prog information in different structures
+			 * so access them appropriately. Note that even for a TP transaction, the bitmap freeup happens as a
+			 * non-TP transaction so checking dollar_tlevel is not enough to determine if we are in TP or non-TP.
+			 * Thankfully first_sgm_info is guaranteed to be non-NULL in the case of a TP transaction that is
+			 * temporarily running its bitmap freeup phase as a non-TP transaction. And for true non-TP
+			 * transactions, first_sgm_info is guaranteed to be NULL. So we use this for the determination.
+			 * But this global variable value is obtained by dereferencing first_sgm_info_addrs (due to the way
+			 * GTMSECSHR runs as a separate privileged image in VMS). If the probe of first_sgm_info_addrs does
+			 * not succeed (due to some corruption), then we have no clue about the nullness of first_sgm_info.
+			 * Therefore we also check for dlr_tlevel also since if that is TRUE, we are guaranteed it is a TP
+			 * transaction irrespective of the value of first_sgm_info. Note that we store the value of the global
+			 * variable first_sgm_info in a local variable firsgsgminfo (slightly different name) for clarity sake.
+			 */
+			if (is_exiting)
+			{
+				if (GTM_PROBE(sizeof(*first_sgm_info_addrs), first_sgm_info_addrs, READ))
+					firstsgminfo = *first_sgm_info_addrs;
+				else
+				{
+					assert(FALSE);
+					firstsgminfo = NULL;
+				}
+				if (dlr_tlevel || (NULL != firstsgminfo))
+				{
+					si = csa->sgm_info_ptr;
+					kipincremented_usable = (GTM_PROBE(sizeof(sgm_info), si, WRITE)) ? TRUE : FALSE;
+					assert(kipincremented_usable);
+					/* Since the kill process cannot be completed, we need to decerement KIP count
+					 * and increment the abandoned_kills count.
+					 */
+					if (kipincremented_usable && (NULL != si->kill_set_head) && si->kip_incremented)
+					{
+						CAREFUL_DECR_KIP(csd, csa, si->kip_incremented);
+						CAREFUL_INCR_ABANDONED_KILLS(csd, csa);
+					} else
+						assert((NULL == si->kill_set_head) || !si->kip_incremented);
+				} else if (!dlr_tlevel)
+				{
+					kipincremented_usable =
+						(GTM_PROBE(sizeof(*kip_incremented_addrs), kip_incremented_addrs, WRITE))
+						? TRUE : FALSE;
+					assert(kipincremented_usable);
+					if (kipincremented_usable && *kip_incremented_addrs)
+					{
+						CAREFUL_DECR_KIP(csd, csa, *kip_incremented_addrs);
+						CAREFUL_INCR_ABANDONED_KILLS(csd, csa);
+					}
+				}
+			}
 			if (JNL_ENABLED(csd))
 			{
 				if (GTM_PROBE(sizeof(jnl_private_control), csa->jnl, WRITE))

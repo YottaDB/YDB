@@ -25,8 +25,11 @@
 #include "gtmimagename.h"
 
 GBLREF	gv_namehead		*gv_target_list;
+GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	enum gtmImageTypes	image_type;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	int			process_exiting;
 
 gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 {
@@ -54,15 +57,8 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 			{
 				gvt = (gv_namehead *)tabent->value;
 				assert(NULL != gvt);
-				DEBUG_ONLY(
-					/* Ensure that this gvt is already present in the gv_target linked list */
-					for (gvt1 = gv_target_list; NULL != gvt1; gvt1 = gvt1->next_gvnh)
-					{
-						if (gvt1 == gvt)
-							break;
-					}
-					assert(NULL != gvt1);
-				)
+				/* Ensure that this gvt is already present in the gv_target linked list */
+				DBG_CHECK_GVT_IN_GVTARGETLIST(gvt);
 				gvt->regcnt++;
 				assert(csa == gvt->gd_csa);
 				return gvt;
@@ -117,6 +113,8 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 	gvt->write_local_tn = (trans_num)0;
 	gvt->noisolation = FALSE;
 	gvt->alt_hist = (srch_hist *)malloc(sizeof(srch_hist));
+	gvt->hist.h[0].blk_num = HIST_TERMINATOR;
+	gvt->alt_hist->h[0].blk_num = HIST_TERMINATOR;
 	/* Initialize the 0:MAX_BT_DEPTH. Otherwise, memove of the array in mu_reorg can cause problem */
 	for (index = 0; index <= MAX_BT_DEPTH; index++)
 	{
@@ -126,6 +124,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 		gvt->alt_hist->h[index].blk_target = gvt;
 	}
 	gvt->prev_gvnh = NULL;
+	assert(gv_target_list != gvt);
 	gvt->next_gvnh = gv_target_list;		/* Insert into gv_target list */
 	if (NULL != gv_target_list)
 		gv_target_list->prev_gvnh = gvt;
@@ -144,6 +143,16 @@ void	targ_free(gv_namehead *gvt)
 	gv_namehead	*prev_gvnh, *next_gvnh;
 
 	assert(0 == gvt->regcnt);
+	if (gvt == gv_target)
+	{	/* Should not be freeing an actively used global variable. Exceptions are
+		 *      a) We are exiting and in the process of freeing up cs_addrs->dir_tree in gv_rundown
+		 *	b) The GT.CM GNP server which could free up a region as part of running down a client's database.
+		 *	c) In VMS, DAL calls could rundown the database. This is tough to check using an assert.
+		 * Assert accordingly.
+		 */
+		UNIX_ONLY(assert((GTCM_GNP_SERVER_IMAGE == image_type) || (process_exiting && (gvt == cs_addrs->dir_tree)));)
+		gv_target = NULL;	/* In that case, set gv_target to NULL to ensure freed up memory is never used */
+	}
 	prev_gvnh = gvt->prev_gvnh;
 	next_gvnh = gvt->next_gvnh;
 	/* Input "gvt" can NOT be part of the gv_target_list (i.e. not allocated through targ_alloc) in case of a GT.CM GNP or

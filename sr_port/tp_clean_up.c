@@ -46,6 +46,8 @@ GBLREF	buddy_list		*global_tlvl_info_list;
 GBLREF	global_tlvl_info	*global_tlvl_info_head;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int			process_exiting;
+GBLREF	boolean_t		gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
+
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
@@ -292,7 +294,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 		CWS_RESET; /* reinitialize the hashtable before restarting/committing the TP transaction */
 	}	/* if (any database work in the transaction) */
 	VMS_ONLY(tp_has_kill_t_cse = FALSE;)
-	tp_allocation_clue = MASTER_MAP_SIZE_MAX * BLKS_PER_LMAP + 1;
+	tp_allocation_clue = gtm_tp_allocation_clue + 1;
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
 	assert((NULL == first_tp_si_by_ftok) || process_exiting);

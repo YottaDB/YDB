@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -218,7 +218,7 @@ void mupip_downgrade(void)
 	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file gds blk_size"), csd.blk_size, csd.blk_size);
 	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Old file total_blks"),
 				csd.trans_hist.total_blks, csd.trans_hist.total_blks);
-	assert(ROUND_DOWN(csd.blk_size, DISK_BLOCK_SIZE) == csd.blk_size);
+	assert(ROUND_DOWN2(csd.blk_size, DISK_BLOCK_SIZE) == csd.blk_size);
 	assert((((off_t)csd.start_vbn - 1) * DISK_BLOCK_SIZE +
 		(off_t)csd.trans_hist.total_blks * csd.blk_size + (off_t)DISK_BLOCK_SIZE == file_size) ||
 	   (((off_t)csd.start_vbn - 1) * DISK_BLOCK_SIZE +

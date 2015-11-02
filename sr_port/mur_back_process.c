@@ -1,6 +1,6 @@
 /****************************************************************
  *
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -461,10 +461,10 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 						mur_jctl->jnl_fn_len, mur_jctl->jnl_fn, &rec_tn, &rctl->csd->trans_hist.curr_tn);
 					MUR_BACK_PROCESS_ERROR("Epoch transaction number check failed");
 				}
-				assert(mur_options.forward || murgbl.intrpt_recovery ||
-					NULL == rctl->csd || mur_rab.jnlrec->prefix.tn <= rctl->csd->trans_hist.curr_tn);
-				if (rec_time < murgbl.tp_resolve_time &&
-					(!murgbl.resync_seqno || rec_token_seq <= murgbl.resync_seqno))
+				assert(mur_options.forward || murgbl.intrpt_recovery || (NULL == rctl->csd)
+					|| (mur_rab.jnlrec->prefix.tn <= rctl->csd->trans_hist.curr_tn));
+				if ((rec_time < murgbl.tp_resolve_time)
+					&& (!murgbl.resync_seqno || (rec_token_seq <= murgbl.resync_seqno)))
 				{
 					if (!mur_options.forward)
 						save_turn_around_point(rctl, apply_pblk_this_region);

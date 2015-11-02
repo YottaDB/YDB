@@ -33,8 +33,10 @@
 #endif
 #include "dpgbldir_sysops.h"
 #include "targ_alloc.h"
+#include "gtm_logicals.h"
 
-GBLREF gd_addr		*gd_header;
+GBLREF	gd_addr		*gd_header;
+GBLREF	gv_namehead	*gv_target_list;
 
 /*+
 Function:       ZGBLDIR
@@ -62,6 +64,7 @@ Notes:          NONE
 typedef struct gdr_name_struct
 {
 	mstr		name;
+	mstr		exp_name;
 	struct gdr_name	*link;
 	gd_addr		*gd_ptr;
 }gdr_name;
@@ -79,8 +82,8 @@ gd_addr *zgbldir(mval *v)
 			return name->gd_ptr;
 	if (!v->str.len)
 	{
-		temp_mstr.addr = DEF_GDR;
-		temp_mstr.len = sizeof(DEF_GDR) - 1;
+		temp_mstr.addr = GTM_GBLDIR;
+		temp_mstr.len = sizeof(GTM_GBLDIR) - 1;
 		tran_name = get_name(&temp_mstr);
 	} else
 		tran_name = get_name(&v->str);
@@ -91,9 +94,11 @@ gd_addr *zgbldir(mval *v)
 		name->name.addr = (char *)malloc(v->str.len);
 		memcpy(name->name.addr, v->str.addr, v->str.len);
 	}
-	/* free up memory allocated for mstr and its addr field in get_name */
+	/* Store translated global directory name as well */
 	assert(tran_name->len);
-	free(tran_name->addr);
+	name->exp_name = *tran_name;
+	/* free up memory allocated for mstr field in get_name.
+	 * memory allocated for addr field of the mstr is needed as it has been copied over to "name->exp_name" */
 	free(tran_name);
 
 	if (gdr_name_head)
@@ -277,7 +282,7 @@ boolean_t get_first_gdr_name(gd_addr *current_gd_header, mstr *log_nam)
 	{
 		if (name->gd_ptr == current_gd_header)
 		{
-			*log_nam = name->name;
+			*log_nam = name->exp_name;
 			return (TRUE);
 		}
 	}
@@ -301,6 +306,7 @@ void gd_rundown(void)		/* Wipe out the global directory structures */
 		} else
 			free(gda_cur);	/* GT.CM gd_addr and hence header_struct wasn't malloced in cm_add_gdr_ptr */
 	}
+	assert(NULL == gv_target_list);
 	gd_header = gd_addr_head = (gd_addr *)NULL;
 	for (gdn_cur = gdr_name_head; NULL != gdn_cur; gdn_cur = gdn_next)
 	{

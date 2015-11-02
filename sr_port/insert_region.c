@@ -59,6 +59,7 @@
 #include "is_file_identical.h"
 #include "tp_grab_crit.h"
 #include "t_retry.h"
+#include "wcs_mm_recover.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	boolean_t	run_time;
@@ -225,6 +226,7 @@ tp_region	*insert_region(	gd_region	*reg,
 		}
 		DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
 		assert(csa->now_crit);	/* ensure we have crit now */
+		CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg);
 	}
 	DBG_CHECK_TP_REG_LIST_SORTING(*reg_list);
 	return tr_new;

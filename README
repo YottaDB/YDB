@@ -1,36 +1,60 @@
 The make file enclosed (sr_unix/comlist.mk) will build GT.M from source.  
-The prerequisites are GNU make, Linux x86, tcsh and Unicode include files.
-Unicode include files are automatically installed if ICU 3.6 is installed. 
-GNU make 3.81 and RHEL 4.0 were used to do the test builds for this
-distribution.
+The prerequisites are GNU make, GT.M binary installation (which you can
+download from http://sourceforge.net/projects/fis-gtm/), Linux x86, tcsh
+and Unicode include files. Unicode include files are automatically installed
+if ICU 3.6 is installed. GNU make 3.81, Ubuntu 8.04 LTS and RHEL 4.0 were
+used to do the test builds for this distribution.
 
 To build a production version GT.M for linux do the following steps:
-
-1. cd <gtm-directory> 	#<gtm-directory> is where all sr_* directories
-   copied/checked out.
-
-2. Define an environment variable 'gtm_curpro' to point to the full path
-   of the prior GT.M installation.
+1. Fulfill the pre-requisites.
    Download and install GT.M binary distribution from SourceForge if you
    do not have GT.M installed already. The build procedure needs an
    existing GT.M mumps installed on the machine.
 
-   Example:
-   	gtm_curpro=<installation-directory>; export gtm_curpro	#bourne shell
-   	export gtm_curpro=<installation-directory> 		#bash shell
-	setenv gtm_curpro <installation-directory>		#tcsh shell
+   You can download GT.M from http://sourceforge.net/projects/fis-gtm/
+   Unpack the tar file and run the configure script as root. Note: the tar
+   file unpacks everything into your current working directory, not a new
+   subdirectory.
+   $ tar xfz gtm_V53002_linux_i686_src.tar.gz
+   $ sudo ./configure
 
-   By default the build procedure will build 32 bit version of GT.M on
-   a x86_64 bit machine.
+2. Unpack the GT.M sources
+   Change directory in the directory that you will place the GT.M source,
+   here after referred to as <gtm-directory>.
+   $ cd <gtm-directory>
+   $ tar xfz gtm_V53002_linux_i686_src.tar.gz
+
+   You should find this README, COPYING file and sr_* source directroies.
+
+3. Define environment variables needed to build GT.M
+   You will need to use tcsh to build GT.M.  GT.M uses several csh script
+   files the define environment variables used in the build process.  You
+   will need to define several variables prior to intiating your GT.M build.
+
+   - Define 'gtm_curpro' and 'gtm_exe' so that you can compile M programs.
+   This is the directory in which you installed the GT.M binaries from
+   SourceForge.
+   $ setenv gtm_curpro <path to installed GT.M>
+   $ setenv $gtm_exe $gtm_curpro
+
+   - Define 'gtm_tools' and 'gtm_inc'
+   $ setenv gtm_tools `pwd`/sr_linux
+   $ setenv gtm_inc `pwd`/sr_linux
+
+   - [OPTIONAL] Ubuntu users must define 'distro'
+   $ setenv distro ubuntu
+
+   - [OPTIONAL] By default the build procedure will build 32 bit version of
+   GT.M on a x86_64 bit machine.
    If you intend to build 64 bit version of GT.M on a x86_64 bit machine you
    have to explicitly set the environment variable 'OBJECT_MODE' to '64'
+   $ setenv OBJECT_MODE 64
 
-   Example:
-	OBJECT_MODE=64; export OBJECT_MODE #bourne shell
-	export OBJECT_MODE=64		   #bash shell
-	setenv OBJECT_MODE 64		   #tcsh shell
-	
-3. Building GT.M -
+   - Define 'gtm_version_change' and execute gtm_env.csh
+   $ setenv gtm_version_change 1
+   $ source sr_unix/gtm_env.csh
+
+4. Building GT.M -
 
 By default, the gmake will build a production version GT.M. The build type
 of GT.M can be controlled by a parameter "buildtypes" - dbg (debug),
@@ -42,7 +66,11 @@ For example:
 
 will build just a debuggable GT.M release.
 
-4. Packaging GT.M -
+You can clean your builds by appending 'clean' to the make line.
+For example:
+	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=dbg gtm_ver=<gtm-directory> clean
+
+5. Packaging GT.M -
 
 Once the required builds have been done the object distribution can be
 tar'ed by doing:
@@ -53,4 +81,12 @@ Again, buildtypes can be used to package just a subset. For example:
 
 	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=<gtm-directory> package
 
+Appendix: Known warnings and errors
+  - "cc1: note: obsolete option -I- used, please use -iquote instead"
+  You can safely ignore this warning
+
+  - "chk2lev.mdep:2: *** missing separator.  Stop."
+  tcsh is using the builtin echo, you need to set the environment variable
+  'distro' to 'ubuntu' and clean your build.
+  $ setenv distro ubuntu
 

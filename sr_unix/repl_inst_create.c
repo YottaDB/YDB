@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,16 +71,16 @@ void repl_inst_create(void)
 	mstr			log_nam, trans_name;
 	uint4			status2;
 
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_RENAMEFAIL);
 	error_def(ERR_REPLINSTACC);
 	error_def(ERR_REPLINSTNMLEN);
 	error_def(ERR_REPLINSTNMUNDEF);
 	error_def(ERR_REPLINSTSTNDALN);
-	error_def(ERR_REPLINSTUNDEF);
 	error_def(ERR_TEXT);
 
-	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN+1))
-		rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error))
+		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
 	buff_8byte_aligned = &buff_unaligned[0];
 	buff_8byte_aligned = (char *)ROUND_UP2((INTPTR_T)buff_8byte_aligned, 8);
 	repl_instance = (repl_inst_hdr_ptr_t)&buff_8byte_aligned[0];
@@ -129,6 +129,9 @@ void repl_inst_create(void)
 	/************************** Initialize "repl_inst_hdr" section ***************************/
 	memset(repl_instance, 0, sizeof(repl_inst_hdr));
 	memcpy(&repl_instance->label[0], GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ-1);
+	repl_instance->replinst_minorver = GDS_REPL_INST_MINOR_LABEL;
+	repl_instance->is_little_endian = GTM_IS_LITTLE_ENDIAN;
+	repl_instance->is_64bit = GTM_IS_64BIT;
 	repl_instance->jnlpool_semid = INVALID_SEMID;
 	repl_instance->jnlpool_shmid = INVALID_SHMID;
 	repl_instance->recvpool_semid = INVALID_SEMID;
@@ -153,8 +156,14 @@ void repl_inst_create(void)
 		log_nam.addr = GTM_REPL_INSTNAME;
 		log_nam.len = sizeof(GTM_REPL_INSTNAME) - 1;
 		trans_name.addr = &inst_name[0];
-		if (SS_NORMAL != trans_log_name(&log_nam, &trans_name, inst_name))
-			rts_error(VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
+		if (SS_NORMAL != (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, sizeof(inst_name),
+								dont_sendmsg_on_log2long)))
+		{
+			if (SS_LOG2LONG == status)
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, sizeof(inst_name) - 1);
+			else
+				rts_error(VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
+		}
 		inst_name_len = trans_name.len;
 	}
 	inst_name[inst_name_len] = '\0';

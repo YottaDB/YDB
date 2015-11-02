@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +25,12 @@ void zyerror_init(void)
 	mstr		val, tn;
 	char		buf[1024];
 
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TRNLOGFAIL);
 
 	val.addr = ZYERROR;
 	val.len = sizeof(ZYERROR) - 1;
-	if (SS_NORMAL == (status = trans_log_name(&val, &tn, buf)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
 	{
 		dollar_zyerror.mvtype = MV_STR;
 		dollar_zyerror.str.len = tn.len;
@@ -37,6 +38,10 @@ void zyerror_init(void)
 		s2pool(&dollar_zyerror.str);
 	} else if (SS_NOLOGNAM == status)
 		dollar_zyerror.str.len = 0;
+#	ifdef UNIX
+	else if (SS_LOG2LONG == status)
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, sizeof(buf) - 1);
+#	endif
 	else
 		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZYERROR), status);
 	return;

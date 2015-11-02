@@ -525,6 +525,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							exit_status |= EXIT_ERR;
 							break;
 						}
+						/* For MM, set_jnl_file_close() can call wcs_flu() which can remap the file.
+						 * So reset csd and rptr->sd since their value may have changed.
+						 */
+						assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+						rptr->sd = csd = cs_data;
 					}
 				} else if ((jnl_closed == jnl_curr_state) && (jnl_open == rptr->jnl_new_state))
 				{	/* sync db for closed->open transition. for VMS WCSFLU_FSYNC_DB is ignored */
@@ -564,6 +569,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					NULLIFY_JNL_FILE_ID(cs_addrs);
 				}
 				jnl_info.blks_to_upgrd = csd->blks_to_upgrd;
+				jnl_info.free_blocks   = csd->trans_hist.free_blocks;
+				jnl_info.total_blks    = csd->trans_hist.total_blks;
                                 if (EXIT_NRM != (status = cre_jnl_file(&jnl_info)))
 				{	/* There was an error attempting to create the journal file */
 					exit_status |= status;

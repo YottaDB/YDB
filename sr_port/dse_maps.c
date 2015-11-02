@@ -278,7 +278,7 @@ void dse_maps(void)
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
 		free(bml_list);
-		cs_addrs->hdr->kill_in_prog = 0;
+		cs_addrs->hdr->kill_in_prog = cs_addrs->hdr->abandoned_kills = 0;
 		return;
 	}
 	MEMCPY_LIT(util_buff, "!/Block ");

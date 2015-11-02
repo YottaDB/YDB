@@ -30,6 +30,9 @@
 #include "send_msg.h"
 #include "dbfilop.h"
 #include "gds_blk_downgrade.h"
+#include "gdsbml.h"
+#include "bit_clear.h"
+#include "bit_set.h"
 
 #if defined(UNIX)
 #include "gtm_unistd.h"
@@ -231,6 +234,12 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 							 * The adjustment value is maintained in rctl->blks_to_upgrd_adjust.
 							 */
 							rctl->csd->blks_to_upgrd = mur_rab.jnlrec->jrec_epoch.blks_to_upgrd;
+							/* Now that we know the final turn-around point, store free_blocks and
+							 * total_blks counter from epoch record for later processing in
+							 * mur_process_intrpt_recov (to determine free_blocks counter).
+							 */
+							rctl->trnarnd_free_blocks = mur_rab.jnlrec->jrec_epoch.free_blocks;
+							rctl->trnarnd_total_blks = mur_rab.jnlrec->jrec_epoch.total_blks;
 							break;
 						}
 					} else
@@ -304,7 +313,7 @@ uint4 mur_output_pblk(void)
 	file_control		*db_ctl;
 	struct_jrec_blk		pblkrec;
 	uchar_ptr_t		pblkcontents, pblk_jrec_start;
-	int4			size, fbw_size, fullblockwrite_len;
+	int4			size, fbw_size, fullblockwrite_len, blks_in_lmap;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 
@@ -317,6 +326,22 @@ uint4 mur_output_pblk(void)
 	 * copy that address in a local variable "pblkcontents" separately.
 	 */
 	pblkcontents = (uchar_ptr_t)&mur_rab.jnlrec->jrec_pblk.blk_contents[0];
+	csa = rctl->csa;
+	csd = rctl->csd;
+	if (IS_BITMAP_BLK(pblkrec.blknum))
+	{	/* Local bitmap block. Determine master map free/busy status and fix it accordingly. */
+		if (ROUND_DOWN2(csd->trans_hist.total_blks, BLKS_PER_LMAP) == pblkrec.blknum)
+			blks_in_lmap = (csd->trans_hist.total_blks - pblkrec.blknum);
+		else
+			blks_in_lmap = BLKS_PER_LMAP;
+		assert(MM_ADDR(csd) == csa->bmm);
+		if (NO_FREE_SPACE == bml_find_free(0, pblkcontents + sizeof(blk_hdr), blks_in_lmap))
+			bit_clear(pblkrec.blknum / BLKS_PER_LMAP, csa->bmm);
+		else
+			bit_set(pblkrec.blknum / BLKS_PER_LMAP, csa->bmm);
+		if (pblkrec.blknum > csa->nl->highest_lbm_blk_changed)
+			csa->nl->highest_lbm_blk_changed = pblkrec.blknum;
+	}
 	if (IS_GDS_BLK_DOWNGRADE_NEEDED(pblkrec.ondsk_blkver))
 	{	/* This block was not in GDSVCURR format before the GT.M update wrote this PBLK record. But since all buffers in
 		 * the cache are stored in GDSVCURR format, the before-image in the PBLK record is in GDSVCURR
@@ -334,7 +359,6 @@ uint4 mur_output_pblk(void)
 	 * therefore, it will not cause a conflict with the write cache, as the cache will be empty
 	 */
 	db_ctl->op = FC_WRITE;
-	csd = rctl->csd;
 	db_ctl->op_pos = (csd->blk_size / DISK_BLOCK_SIZE) * pblkrec.blknum + csd->start_vbn;
 	/* Use jrec size even if downgrade may have shrunk block. If the block has an integ error, we don't run into any trouble. */
 	size = pblkrec.bsiz;
@@ -344,7 +368,6 @@ uint4 mur_output_pblk(void)
 	/* If full-block-writes are enabled, round size up to next full logical filesys block. We want to use "dbfilop" to
 	 * do the write but it does not honour full-block-writes setting. So prepare the buffer accordingly before invoking it.
 	 */
-	csa = rctl->csa;
 	if (csa->do_fullblockwrites)
 	{	/* Determine full-block-write size corresponding to the current PBLK record block size (need to write only as
 		 * many full-blocks as needed for current block size). For example, with database block size 16K, current block

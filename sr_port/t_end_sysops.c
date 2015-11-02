@@ -138,7 +138,7 @@
 	 * did not change in between phase1 (inside of crit) and phase2 (outside of crit). This is needed to ensure	\
 	 * the correctness of the blks_to_upgrd counter.								\
 	 */														\
-	assert(ctn > csd->desired_db_format_tn);									\
+	assert((ctn > csd->desired_db_format_tn) || ((ctn == csd->desired_db_format_tn) && (1 == ctn)));		\
 	cr->ondsk_blkver = csd->desired_db_format;									\
 }
 
@@ -205,6 +205,7 @@ void fileheader_sync(gd_region *reg)
 				/* Adding lock code to it would remove this restriction */
 	assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
 	cnl = csa->nl;
+	gvstats_rec_cnl2csd(csa);	/* Periodically transfer statistics from database shared-memory to file-header */
 	high_blk = cnl->highest_lbm_blk_changed;
 	cnl->highest_lbm_blk_changed = -1;			/* Reset to initial value */
 	flush_len = SGMNT_HDR_LEN;
@@ -531,7 +532,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	}
 #	endif
 	/* check for online backup -- ATTN: this part of code is similar to the BG_BACKUP_BLOCK macro */
-	if ((blkid >= cs_addrs->nl->nbb)
+	if ((blkid >= cs_addrs->nl->nbb) && (NULL != cs->old_block)
 		&& (0 == cs_addrs->shmpool_buffer->failed)
 		&& (((blk_hdr_ptr_t)(db_addr[0]))->tn < cs_addrs->shmpool_buffer->backup_tn)
 		&& (((blk_hdr_ptr_t)(db_addr[0]))->tn >= cs_addrs->shmpool_buffer->inc_backup_tn))
@@ -645,7 +646,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 #		elif defined(TARGETED_MSYNC)
 		caddr_t start;
 
-		start = (caddr_t)ROUND_DOWN((sm_off_t)db_addr[0], MSYNC_ADDR_INCS);
+		start = (caddr_t)ROUND_DOWN2((sm_off_t)db_addr[0], MSYNC_ADDR_INCS);
 		if (-1 == msync(start,
 			(size_t)ROUND_UP((sm_off_t)((caddr_t)db_addr[0] - start) + cs_data->blk_size, MSYNC_ADDR_INCS), MS_SYNC))
 		{
@@ -1522,6 +1523,9 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 
 	error_def(ERR_GBLOFLOW);
 
+	assert(reg->open); /* there is no reason we know of why a region should be closed at this point */
+	if (!reg->open)    /* in pro, be safe though and dont touch an already closed region */
+		return;
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;

@@ -247,6 +247,16 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			if (JNL_FLUSH_PROG_TRIES > lcnt)
 			{
 				proc_stuck_cnt = 0;
+				/* In VMS, jnl writes are asynchronous. The above call to "jnl_sub_write_attempt" has returned
+				 * SS_NORMAL status. This means the jnl qio lock is not in use by anyone else and is up for grabs.
+				 * We would have scheduled a jnl qio write through a sys$dclast call. We have no control of when
+				 * the AST routine "jnl_start_ast" will actually get control and start the write. Until then
+				 * we dont want to keep reinvoking "jnl_sub_write_attempt" in a hard spin loop. So sleep.
+				 * In Unix, writes are synchronous so SS_NORMAL status return implies we have completed a jnl
+				 * write and "jb->dskaddr" is closer to "threshold" than it was in the previous iteration.
+				 * A sleep at this point will only slow things down unnecessarily. Hence no sleep if Unix.
+				 */
+				VMS_ONLY(wcs_sleep(lcnt);)
 				continue;
 			}
 			jpc->status = SS_NORMAL;
@@ -273,8 +283,15 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			{
 				assert(gtm_white_box_test_case_enabled
 					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number));
-				jnlfile_lost = TRUE;
-				jnl_file_lost(jpc, status);
+				if (JNL_ENABLED(csa->hdr))
+				{
+					jnlfile_lost = TRUE;
+					jnl_file_lost(jpc, status);
+				}
+				/* Else journaling got closed concurrently by another process by invoking "jnl_file_lost"
+				 * just before we got crit. Do not invoke "jnl_file_lost" again on the same journal file.
+				 * Instead continue and next iteration will detect the journal file has switched and terminate.
+				 */
 			}
 			if (!was_crit)
 				rel_crit(jpc->region);

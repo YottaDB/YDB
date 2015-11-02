@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -173,5 +173,11 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 #define DEF_LOCK_SIZE OS_PAGELET_SIZE * 200
 
 #define PRC_FACTOR 160
+
+typedef struct mlk_stats_struct
+{
+	gtm_uint64_t	n_user_locks_success;
+	gtm_uint64_t	n_user_locks_fail;
+} mlk_stats_t;
 
 #endif

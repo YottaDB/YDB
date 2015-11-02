@@ -61,6 +61,9 @@
 #include "gtmmsg.h"
 #include "add_inter.h"
 #include "t_abort.h"
+#include "sleep_cnt.h"
+#include "wcs_sleep.h"
+#include "memcoherency.h"
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
@@ -381,7 +384,11 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 							rtsib_hist->depth = rtsib_hist->depth - level;
 						}
 						if (0 < kill_set_list.used)     /* increase kill_in_prog */
+						{
 							need_kip_incr = TRUE;
+							if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
+								WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
+						}
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), rtsib_hist)))
 						{
 							need_kip_incr = FALSE;
@@ -539,6 +546,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					if (0 < kill_set_list.used)
 					{
 						need_kip_incr = TRUE;
+						if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
+							WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 						/* second history not needed, because,
 						   we are reusing a free block, which does not need history */
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL)))
@@ -658,6 +667,8 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 			{
 				assert(0 < kill_set_list.used);
 				need_kip_incr = TRUE;
+				if (!cs_addrs->now_crit)	/* Do not sleep while holding crit */
+					WAIT_ON_INHIBIT_KILLS(cs_addrs->nl, MAXWAIT2KILL);
 				if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), NULL)))
 				{
 					need_kip_incr = FALSE;

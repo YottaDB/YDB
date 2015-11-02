@@ -51,6 +51,8 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	short		newlevel;
 	tp_region	*tr;
 	gd_region	*save_cur_region;	/* saved copy of gv_cur_region before tp_clean_up/tp_incr_clean_up modifies it */
+	gd_region	*curreg;
+	sgmnt_addrs	*csa;
 
 	error_def(ERR_TLVLZERO);
 	error_def(ERR_TROLLBK2DEEP);
@@ -88,10 +90,13 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		tp_clean_up(TRUE);
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{
-			if (!tr->reg->open)
+			curreg = tr->reg;
+			if (!curreg->open)
 				continue;
-			if (FILE_INFO(tr->reg)->s_addrs.now_crit)
-				rel_crit(tr->reg);			/* release any crit regions */
+			csa = &FILE_INFO(curreg)->s_addrs;
+			INCR_GVSTATS_COUNTER(csa, csa->nl, n_tp_rolledback, 1);
+			if (csa->now_crit)
+				rel_crit(curreg);			/* release any crit regions */
 		}
 		tp_unwind(newlevel, ROLLBACK_INVOCATION);
 		dollar_trestart = 0;

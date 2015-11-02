@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,7 @@
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
 #include "gtm_unistd.h"
+#include "gtm_string.h"
 
 #include "error.h"
 #include "eintr_wrappers.h"
@@ -26,6 +27,13 @@
 #include <sys/time.h>
 #endif
 #include "gtmmsg.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "dpgbldir.h"
 
 GBLREF boolean_t	created_core;		/* core file was created */
 GBLREF boolean_t	core_in_progress;
@@ -51,6 +59,10 @@ void gtm_fork_n_core(void)
 	unsigned char		*p;
 #endif
 	sigset_t		savemask;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd, tmp_csd;
+	gd_region		*reg, *r_top;
+	gd_addr			*addr_ptr;
 DEBUG_ONLY( struct rlimit rlim;)
 
 	error_def(ERR_NOFORKCORE);
@@ -158,6 +170,25 @@ DEBUG_ONLY( struct rlimit rlim;)
 			created_core = TRUE;
 	} else
 	{
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		{
+			for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions;  reg < r_top;  reg++)
+			{
+				if (reg->open && !reg->was_open && (dba_mm == reg->dyn.addr->acc_meth))
+				{	/* Because most OSs don't include mapped memory in the core file, copy file header
+					 * to temporary location that'll show up in the core.
+					 */
+					csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
+					tmp_csd = csa->hdr;
+					if (NULL != tmp_csd)
+					{
+						csd = (sgmnt_data_ptr_t)malloc(sizeof(*csd));
+						memcpy((sm_uc_ptr_t)csd, (uchar_ptr_t)tmp_csd, sizeof(*csd));
+						csa->mm_core_hdr = csd;
+					}
+				}
+			}
+		}
 		DUMP_CORE;	/* This will (should) not return */
 		_exit(-1);	/* Protection to kill fork'd process with no rundown by exit handler(s) */
 	}

@@ -51,6 +51,7 @@
 #include "have_crit.h"
 #include "gds_blk_downgrade.h"
 #include "deferred_signal_handler.h"
+#include "memcoherency.h"
 
 #define	REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, trace_cntr)	\
 {									\
@@ -132,6 +133,15 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		return err_status;			/* Already here, get out */
 	}
 	cnl = csa->nl;
+	INCR_INTENT_WTSTART(cnl);	/* signal intent to enter wcs_wtstart */
+	/* the above interlocked instruction does the appropriate write memory barrier to publish this change to the world */
+	SHM_READ_MEMORY_BARRIER;	/* need to do this to ensure uptodate value of csd->wc_blocked is read */
+	if (csd->wc_blocked)
+	{
+		DECR_INTENT_WTSTART(cnl);
+		BG_TRACE_ANY(csa, wrt_blocked);
+		return err_status;
+	}
 	csa->in_wtstart = TRUE;				/* Tell ourselves we're here and make the csa->in_wtstart (private copy) */
 	INCR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);	/* and cnl->in_wtstart (shared copy) assignments as close as possible.   */
 	SAVE_WTSTART_PID(cnl, process_id, index);
@@ -181,7 +191,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			break;
 		}
 		if (NULL == csr)
-			break;				/* the queue is empty */
+		{
+			NO_MSYNC_ONLY(queue_empty = TRUE;)	/* NO_MSYNC doesn't sync db, make sure it syncs the journal file */
+			break;					/* the queue is empty */
+		}
 		if (csr == csrfirst)
 		{					/* completed a tour of the queue */
 			queue_empty = FALSE;
@@ -303,7 +316,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					size = ROUND_UP(size, csa->fullblockwrite_len);
 				assert(size <= csd->blk_size);
 				offset = (csd->start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)csr->blk * csd->blk_size;
-				INCR_DB_CSH_COUNTER(csa, n_dsk_writes, 1);
+				INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_write, 1);
 				/* Do db write without timer protect (not needed since wtstart not reenterable in one task) */
 				LSEEKWRITE(udi->fd, offset, bp, size, save_errno);
 				if ((blk_hdr_ptr_t)reformat_buffer == bp)
@@ -315,6 +328,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				}
 			} else
 			{
+				save_errno = 0;
 #if defined(TARGETED_MSYNC)
 			        bp = (blk_hdr_ptr_t)(csa->db_addrs[0] + (sm_off_t)csr->blk * MSYNC_ADDR_INCS);
 				if ((sm_uc_ptr_t)bp > csa->db_addrs[1])
@@ -392,6 +406,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 	CLEAR_WTSTART_PID(cnl, index);
 	csa->in_wtstart = FALSE;			/* This process can write again */
+	DECR_INTENT_WTSTART(cnl);
 	DEFERRED_EXIT_HANDLING_CHECK; /* now that in_wtstart is FALSE, check if deferred signal/exit handling needs to be done */
 	if (queue_empty)			/* Active queue has become empty. */
 		wcs_clean_dbsync_timer(csa);	/* Start a timer to flush-filehdr (and write epoch if before-imaging) */

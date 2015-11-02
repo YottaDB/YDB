@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,6 +59,7 @@
 #include "is_file_identical.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#include "gtm_logicals.h"
 
 GBLREF  int		mur_regno;
 GBLREF	jnl_ctl_list	*mur_jctl;
@@ -120,7 +121,6 @@ boolean_t mur_open_files()
 	error_def (ERR_JNLBADRECFMT);
 	error_def (ERR_JNLSTATEOFF);
 	error_def (ERR_REPLSTATEOFF);
-	error_def (ERR_REPLINSTUNDEF);
 	error_def (ERR_RLBKNOBIMG);
 	error_def (ERR_MUPJNLINTERRUPT);
 	error_def (ERR_ROLLBKINTERRUPT);
@@ -173,9 +173,9 @@ boolean_t mur_open_files()
 	if (mur_options.rollback)
 	{	/* Rundown the Jnlpool and Recvpool */
 #if defined(UNIX)
-		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, sizeof(replpool_id.instfilename)))
-		{
-			gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, sizeof(replpool_id.instfilename),
+			issue_gtm_putmsg))
+		{	/* appropriate gtm_putmsg would have already been issued by repl_inst_get_name */
 			return FALSE;
 		}
 		if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE))
@@ -184,8 +184,8 @@ boolean_t mur_open_files()
 		murgbl.repl_standalone = mu_replpool_grab_sem(FALSE);
 		assert(NULL != jnlpool.repl_inst_filehdr);
 #elif defined(VMS)
-		gbldir_mstr.addr = DEF_GDR;
-		gbldir_mstr.len = sizeof(DEF_GDR) - 1;
+		gbldir_mstr.addr = GTM_GBLDIR;
+		gbldir_mstr.len = sizeof(GTM_GBLDIR) - 1;
 		tran_name = get_name(&gbldir_mstr);
 		memcpy(replpool_id.gtmgbldir, tran_name->addr, tran_name->len);
 		full_len = tran_name->len;
@@ -366,10 +366,10 @@ boolean_t mur_open_files()
 					}
 					if (csd->freeze)
 					{	/* region_freeze should release freeze here */
-						reg_frz_status = region_freeze(curr->gd, FALSE, TRUE);
+						reg_frz_status = region_freeze(curr->gd, FALSE, TRUE, FALSE);
 						assert (0 == rctl->csa->hdr->freeze);
-						assert(reg_frz_status);
-						if (!reg_frz_status)
+						assert(REG_FREEZE_SUCCESS == reg_frz_status);
+						if (REG_ALREADY_FROZEN == reg_frz_status)
 						{
 							gtm_putmsg(VARLSTCNT(4) ERR_DBFRZRESETFL, 2, DB_LEN_STR(curr->gd));
 							return FALSE;

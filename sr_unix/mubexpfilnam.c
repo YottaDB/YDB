@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,6 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 	mstr	file;
 	char	tmp_mstr_addr[MAX_FN_LEN];
 
-	error_def(ERR_REPLINSTUNDEF);
 
 	file.len = MAX_FN_LEN;
 	file.addr = tmp_mstr_addr;
@@ -46,8 +45,8 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 		}
 	} else
 	{	/* Replication instance region */
-		if (!repl_inst_get_name(file.addr, (unsigned int *)&file.len, MAX_FN_LEN))
-			rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+		if (!repl_inst_get_name(file.addr, (unsigned int *)&file.len, MAX_FN_LEN, issue_rts_error))
+			GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
 	}
 	for (c1 = file.addr + file.len; (*c1 != '/') && (c1 != file.addr); c1--)
 		;

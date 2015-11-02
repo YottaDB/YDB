@@ -334,6 +334,14 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	tf->old_locks = (NULL != mlk_pvt_root);
 	tf->orig_gv_target = gv_target;
 	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+#	ifdef DEBUG
+	if (!jgbl.forw_phase_recovery)
+	{	/* In case of forward phase of journal recovery, gv_currkey is set by caller (mur_forward) only
+		 * after the call to op_tstart so avoid doing gv_currkey check.
+		 */
+		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+	}
+#	endif
 	/* If the TP structures have not yet been initialized, do that now. */
 	if (NULL == gv_orig_key_ptr)
 	{	/* This need only be set once */

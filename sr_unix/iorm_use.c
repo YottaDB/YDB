@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -158,7 +158,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			}
 			break;
 		case iop_rewind:
-			if (iod->state == dev_open && !rm_ptr->fifo)
+			if (iod->state == dev_open && !rm_ptr->fifo && !rm_ptr->pipe)
 			{
 				iorm_flush(iod);
 				if (lseek(rm_ptr->fildes, (off_t)0, SEEK_SET) == -1)
@@ -178,7 +178,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			rm_ptr->stream = TRUE;
 			break;
 		case iop_truncate:
-			if (!rm_ptr->fifo)
+			if (!rm_ptr->fifo && !rm_ptr->pipe)
 			{
 				/* Warning! ftell() returns a long and fseek only accepts a long
 				 * as its second argument.  this may cause problems for files longer
@@ -346,7 +346,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{	/* DEF_RM_RECORDSIZE is currently an odd number (32K-1). Round it down
 				 * to be a multiple of 4 bytes since a UTF-16 char can be 2 or 4 bytes */
 				assert(DEF_RM_RECORDSIZE == 32767);
-				rm_ptr->recordsize = ROUND_DOWN(rm_ptr->recordsize, 4);
+				rm_ptr->recordsize = ROUND_DOWN2(rm_ptr->recordsize, 4);
 			} else if (0 != rm_ptr->recordsize % 2)
 				rts_error(VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
 		}

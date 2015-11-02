@@ -73,11 +73,10 @@ LITREF	char			*gtm_dbversion_table[];
 #define NOTCURRMDBFORMAT	"minor database format is not the current version"
 #define NOTFULLYUPGRADED	"some blocks are not upgraded to the current version"
 #define KILLINPROG		"kills in progress"
-#define DBFROZEN		"the database is frozen"
+#define ABANDONED_KILLS		"abandoned kills present"
 #define GTCMSERVERACTIVE	"a GT.CM server accessing the database"
 #define	RECOVINTRPT		"recovery was interrupted"
 #define DBCREATE		"database creation in progress"
-#define WCBLOCKED		"wc_blocked is set - rundown needed"
 #define DBCORRUPT		"the database is corrupted"
 
 #define MAX_CONF_RESPONSE	30
@@ -134,7 +133,7 @@ void mupip_endiancvt(void)
 	uint4			cli_status;
 	int			i, db_fd, outdb_fd, mastermap_size;
 	unsigned short		n_len, outdb_len, t_len;
-	boolean_t		outdb_specified, endian_native, swap_boolean, got_standalone;
+	boolean_t		outdb_specified, endian_native, swap_boolean, got_standalone, override_specified;
 	char			outdb[MAX_FN_LEN + 1], conf_buff[MAX_CONF_RESPONSE + 1], *response;
 
 	char			*errptr, *check_error, *mastermap;
@@ -193,6 +192,7 @@ void mupip_endiancvt(void)
 		CLOSEFILE(db_fd, rc);
 		mupip_exit(ERR_MUNOACTION);
 	}
+	override_specified = (CLI_PRESENT == (cli_status = cli_present("OVERRIDE")));
 	check_error = NULL;
 	endian_check.word32 = (uint4)old_data->minor_dbver;
 #ifdef BIGENDIAN
@@ -204,16 +204,40 @@ void mupip_endiancvt(void)
 		endian_native = FALSE;		/* nobody can be using the db */
 		/* do checks after swapping fields */
 		assert(sizeof(int4) == sizeof(old_data->desired_db_format));
+		/* If OVERRIDE is specified, skip checking for those fields that are not critical for the integrity of the db.
+		 * Any field that indicates the db is potentially damaged cannot be overridden.
+		 */
+		if (!override_specified)
+		{
+			swap_mdbver = (enum mdb_ver)GTM_BYTESWAP_32(old_data->minor_dbver);
+			if (GDSMVCURR != swap_mdbver)
+			{
+				check_error = NOTCURRMDBFORMAT;
+				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
+			swap_uint4 = GTM_BYTESWAP_32(old_data->kill_in_prog);
+			if (0 != swap_uint4)
+			{
+				check_error = KILLINPROG;
+				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
+			swap_uint4 = GTM_BYTESWAP_32(old_data->abandoned_kills);
+			if (0 != swap_uint4)
+			{
+				check_error = ABANDONED_KILLS;
+				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
+			swap_uint4 = GTM_BYTESWAP_32(old_data->rc_srv_cnt);
+			if (0 != swap_uint4)
+			{
+				check_error = GTCMSERVERACTIVE;
+				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
+		}
 		swap_dbver = (enum db_ver)GTM_BYTESWAP_32(old_data->desired_db_format);
 		if (GDSVCURR != swap_dbver)
 		{
 			check_error = NOTCURRDBFORMAT;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		swap_mdbver = (enum mdb_ver)GTM_BYTESWAP_32(old_data->minor_dbver);
-		if (GDSMVCURR != swap_mdbver)
-		{
-			check_error = NOTCURRMDBFORMAT;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		assert(sizeof(int4) == sizeof(old_data->fully_upgraded));
@@ -221,24 +245,6 @@ void mupip_endiancvt(void)
 		if (!swap_boolean)
 		{
 			check_error = NOTFULLYUPGRADED;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		swap_uint4 = GTM_BYTESWAP_32(old_data->kill_in_prog);
-		if (0 != swap_uint4)
-		{
-			check_error = KILLINPROG;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		swap_uint4 = GTM_BYTESWAP_32(old_data->freeze);
-		if (0 != swap_uint4)
-		{
-			check_error = DBFROZEN;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		swap_uint4 = GTM_BYTESWAP_32(old_data->rc_srv_cnt);
-		if (0 != swap_uint4)
-		{
-			check_error = GTCMSERVERACTIVE;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		swap_uint4 = GTM_BYTESWAP_32(old_data->recov_interrupted);
@@ -251,12 +257,6 @@ void mupip_endiancvt(void)
 		if (0 != swap_uint4)
 		{
 			check_error = DBCREATE;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		swap_uint4 = GTM_BYTESWAP_32(old_data->wc_blocked);
-		if (0 != swap_uint4)
-		{
-			check_error = WCBLOCKED;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		swap_uint4 = GTM_BYTESWAP_32(old_data->file_corrupt);
@@ -288,34 +288,37 @@ void mupip_endiancvt(void)
 			gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, n_len, db_name);
 			mupip_exit(ERR_MUNOACTION);
 		}
+		if (!override_specified)
+		{
+			if (GDSMVCURR != old_data->minor_dbver)
+			{
+				check_error = NOTCURRMDBFORMAT;
+				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
+			if (0 != old_data->kill_in_prog)
+			{
+				check_error = KILLINPROG;
+				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
+			if (0 != old_data->abandoned_kills)
+			{
+				check_error = ABANDONED_KILLS;
+				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
+			if (0 != old_data->rc_srv_cnt)
+			{
+				check_error = GTCMSERVERACTIVE;
+				gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
+			}
+		}
 		if (GDSVCURR != old_data->desired_db_format)
 		{
 			check_error = NOTCURRDBFORMAT;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
-		if (GDSMVCURR != old_data->minor_dbver)
-		{
-			check_error = NOTCURRMDBFORMAT;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
 		if (!old_data->fully_upgraded)
 		{
 			check_error = NOTFULLYUPGRADED;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		if (0 != old_data->kill_in_prog)
-		{
-			check_error = KILLINPROG;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		if (0 != old_data->freeze)
-		{
-			check_error = DBFROZEN;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		if (0 != old_data->rc_srv_cnt)
-		{
-			check_error = GTCMSERVERACTIVE;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		if (0 != old_data->recov_interrupted)
@@ -326,11 +329,6 @@ void mupip_endiancvt(void)
 		if (0 != old_data->createinprogress)
 		{
 			check_error = DBCREATE;
-			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
-		}
-		if (0 != old_data->wc_blocked)
-		{
-			check_error = WCBLOCKED;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
 		if (0 != old_data->file_corrupt)
@@ -630,9 +628,10 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(last_rec_bkup_last_blk);
 	SWAP_SD4(reorg_restart_block);
 	SWAP_SD4(owner_node);		/* should be zero when not open	*/
-	SWAP_SD4(image_count);
-	SWAP_SD4(freeze);
+	new->image_count = 0;		/* should be zero when db is not open so reset it unconditionally */
+	new->freeze = 0;		/* should be zero when db is not open so reset it unconditionally */
 	SWAP_SD4(kill_in_prog);
+	SWAP_SD4(abandoned_kills);
 	SWAP_SD8(tn_upgrd_blks_0);
 	SWAP_SD8(desired_db_format_tn);
 	SWAP_SD8(reorg_db_fmt_start_tn);
@@ -662,7 +661,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(n_wrt_per_flu);
 	SWAP_SD4(wait_disk_space);
 	SWAP_SD4(defer_time);
-	SWAP_SD4(wc_blocked);		/* checked above to be FALSE */
+	new->wc_blocked = FALSE;	/* is relevant only when database shared memory is up so reset it unconditionally */
 	SWAP_SD4(reserved_for_upd);
 	SWAP_SD4(avg_blks_per_100gbl);
 	SWAP_SD4(pre_read_trigger_factor);
@@ -678,18 +677,10 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 		new->semid = INVALID_SEMID;
 		new->shmid = INVALID_SHMID;
 	}
-	for (n = 0; n < ARRAYSIZE(old->n_retries); n++)
-		new->n_retries[n] = 0;
-	new->n_puts = 0;
-	new->n_kills = 0;
-	new->n_queries = 0;
-	new->n_gets = 0;
-	new->n_order = 0;
-	new->n_zprevs = 0;
-	new->n_data = 0;
-	new->n_puts_duplicate = 0;
-	new->n_tp_updates = 0;
-	new->n_tp_updates_duplicate = 0;
+	/* Convert GVSTATS information */
+#	define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SWAP_SD8(gvstats_rec.COUNTER);
+#	include "tab_gvstats_rec.h"
+#	undef TAB_GVSTATS_REC
 	SWAP_SD4(staleness[0]);
 	SWAP_SD4(staleness[1]);
 	SWAP_SD4(ccp_tick_interval[0]);
@@ -720,10 +711,6 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(multi_site_open);
 	SWAP_SD8(dualsite_resync_seqno);
 
-	for (n = 0; n < ARRAYSIZE(old->n_tp_retries); n++)
-		new->n_tp_retries[n] = 0;
-	for (n = 0; n < ARRAYSIZE(old->n_tp_retries_conflicts); n++)
-		new->n_tp_retries_conflicts[n] = 0;
 	for (n = 0; n < ARRAYSIZE(old->tp_cdb_sc_blkmod); n++)
 		new->tp_cdb_sc_blkmod[n] = 0;
 	SWAP_SD4(jnl_alq);

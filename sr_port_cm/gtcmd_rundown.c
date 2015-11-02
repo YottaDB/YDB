@@ -50,6 +50,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 	uint4			jnl_status;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
+	int			refcnt;
 
 	for (ptr = cnx->region_root;  ptr;)
 	{
@@ -76,7 +77,17 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 				send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 			rel_crit(gv_cur_region);
 		}
-		if (0 == --region->refcnt)
+		refcnt = --region->refcnt;
+		/* Dont know how refcnt can become negative but in pro handle it by bypassing this region. The reason is the
+		 * following. refcnt should have originally been a positive value. Every time this function is invoked, it would
+		 * be decremented by one. There should have been one invocation that saw refcnt to be zero. That would have
+		 * done the rundown of the region or if it is still in the stack the rundown is still in progress. Therefore
+		 * it is not a good idea to try running down this region when we see refcnt to be negative (as otherwise we
+		 * will get confused and could potentially end up with SIG-11 or ACCVIO errors). The worst case is that we
+		 * would not have rundown the region in which case an externally issued MUPIP RUNDOWN would be enough.
+		 */
+		assert(0 <= refcnt);
+		if (0 == refcnt)
 		{	/* free up only as little as needed to facilitate structure reuse when the region is opened again */
 			assert(region->head.fl == region->head.bl);
 			VMS_ONLY(gtcm_ast_avail++);
@@ -88,8 +99,12 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 			targ_free(cs_addrs->dir_tree);
 			cs_addrs->dir_tree = NULL;
 			cm_del_gdr_ptr(gv_cur_region);
-		} else
-			wcs_timer_start(gv_cur_region, TRUE);
+		} else if (0 < refcnt)
+		{
+			assert(gv_cur_region->open); /* there is no reason we know of why a region should be closed at this point */
+			if (gv_cur_region->open)     /* in pro, be safe though and dont try running down an already closed region */
+				wcs_timer_start(gv_cur_region, TRUE);
+		}
 		que_next = (cm_region_list *)((unsigned char *)ptr + ptr->regque.fl);
 		que_last = (cm_region_list *)((unsigned char *)ptr + ptr->regque.bl);
 		link = (int4)((unsigned char *)que_next - (unsigned char *)que_last);

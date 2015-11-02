@@ -96,12 +96,19 @@ void advancewindow(void)
 					cptr = (unsigned char *)UTF8_MBTOWC((sm_uc_ptr_t)cp1, source_buffer + MAX_SRCLINE, ch);
 #endif
 				x = *cp1++;
-				if ((((SP > x) && !gtm_utf8_mode)
-					UNICODE_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch))))) && !run_time)
+				if ((SP > x) UNICODE_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch)))))
 				{
 					last_source_column = cp1 - source_buffer;
-					dec_err(VARLSTCNT(1) ERR_LITNONGRAPH);
-					show_source_line(source_line_buff, TRUE);
+					if ('\0' == x)
+					{
+						director_token = window_token = TK_ERROR;
+						return;
+					}
+					if (!run_time)
+					{
+						show_source_line(source_line_buff, TRUE);
+						dec_err(VARLSTCNT(1) ERR_LITNONGRAPH);
+					}
 				}
 				if ('\"' == x)
 				{

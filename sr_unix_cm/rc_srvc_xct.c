@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,13 +20,12 @@
 static char     rcsid[] = "$Header:$";
 #endif
 
-#include <errno.h>
-
-#include "gtm_stdio.h"
-
 #include "mdef.h"
 
+#include "gtm_stdio.h"
 #include "gtm_string.h"
+
+#include <errno.h>
 
 #include "gtcm.h"
 #include "omi.h"

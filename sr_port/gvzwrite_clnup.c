@@ -36,11 +36,9 @@ void	gvzwrite_clnup(void)
 {
 	gv_key		*old;
 
-	assert(reset_gv_target == ((gv_namehead *)gvzwrite_block.old_targ));
-	RESET_GV_TARGET;
 	gv_cur_region = gvzwrite_block.gd_reg;
 	change_reg();
-	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+	assert(reset_gv_target == ((gv_namehead *)gvzwrite_block.old_targ));
 	if (NULL != gvzwrite_block.old_key)
 	{
 		old = (gv_key *)gvzwrite_block.old_key;
@@ -53,4 +51,5 @@ void	gvzwrite_clnup(void)
 		gvzwrite_block.old_key = gvzwrite_block.old_targ = (unsigned char *)NULL;
 		gvzwrite_block.subsc_count = 0;
 	}
+	RESET_GV_TARGET;
 }

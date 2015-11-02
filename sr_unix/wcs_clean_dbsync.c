@@ -70,18 +70,19 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	sgmnt_data_ptr_t	csd, save_csdata;
 	NOPIO_ONLY(boolean_t	lseekIoInProgress_flag;)
 	DEBUG_ONLY(boolean_t	save_ok_to_call_wcs_recover;)
+	boolean_t		is_mm;
 
 	csa = *csaptr;
 	assert(csa->dbsync_timer);	/* to ensure no duplicate dbsync timers */
 	reg = csa->region;
 	assert(reg->open);
-	/* Don't know how this can happen, but if region is closed, just return in PRO.
-	 * Also not sure if it is meaningful in MM since disk syncing is out of our control */
-	if (dba_mm == reg->dyn.addr->acc_meth || !reg->open)
+	/* Don't know how this can happen, but if region is closed, just return in PRO. */
+	if (!reg->open)
 	{
 		csa->dbsync_timer = FALSE;
 		return;
 	}
+	is_mm = (dba_mm == reg->dyn.addr->acc_meth);
 	save_region = gv_cur_region; /* Save for later restore. See notes about restore */
 	save_csaddrs = cs_addrs;
 	save_csdata = cs_data;
@@ -168,11 +169,20 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			 * It is ok not to do a wcs_flu since whichever process did the journal switch would have written the
 			 * EPOCH record in the older generation journal file. Therefore there is no need to start a new dbsync
 			 * timer in this case.
+			 * For the MM case, we need to make sure the journal file is flushed to disk, but only do it if
+			 * there has been at least one transaction since the last time we flushed so there isn't an excessive
+			 * number of epochs written. No need to do this if jpc is NULL since that means journaling is not
+			 * enabled anyways so we dont need the WCSFLU_WRITE_EPOCH and WCSFLU_SYNC_EPOCH parts and since this is
+			 * MM, we dont anyways need the WCSFLU_FLUSH_HDR part so no need to do the wcs_flu itself.
 			 */
-			if (!jpc || (NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
+			if ((!jpc || (NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
+				&& (!is_mm || (NULL != jpc) && (jpc->jnl_buff->epoch_tn < csa->ti->curr_tn)))
 			{
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 				BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
+				/* If MM, file could have been remapped by wcs_flu above.  If so, cs_data needs to be reset */
+				if (is_mm && (save_csaddrs == cs_addrs) && (save_csdata != cs_data))
+					save_csdata = cs_addrs->hdr;
 			}
 			dbsync_defer_timer = FALSE;
 			rel_crit(reg);

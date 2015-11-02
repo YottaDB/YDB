@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -150,8 +150,8 @@ bool gvcst_zprevious(void)
 					continue;
 				}
 			}
-			if (cs_addrs->read_write)
-				cs_data->n_zprevs++;
+			assert(cs_data == cs_addrs->hdr);
+			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_zprev, 1);
 			return (found && (bh->prev_rec.match >= gv_currkey->prev));
 		}
 restart:	t_retry(status);

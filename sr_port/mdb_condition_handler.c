@@ -80,6 +80,7 @@
 #include "change_reg.h"
 
 #ifdef UNIX
+#include "iormdef.h"
 #include "ftok_sems.h"
 #endif
 
@@ -806,8 +807,30 @@ CONDITION_HANDLER(mdb_condition_handler)
 			}
 		}
 		if (clean_mum_tstart())
+		{
+#ifdef UNIX
+			if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
+			{
+				remove_rms(err_dev);
+				/* err_dev was freed so make sure it's not used again */
+				err_dev = (io_desc *)0;
+			}
+#endif
 			MUM_TSTART;
+		}
 	}
+#ifdef UNIX
+	else
+	{
+		/* executed from the direct mode so do the rms check and cleanup if necessary */
+		if (err_dev && dev_open != err_dev->state && (rm == err_dev->type))
+		{
+			remove_rms(err_dev);
+			/* err_dev was freed so make sure it's not used again */
+			err_dev = (io_desc *)0;
+		}
+	}
+#endif
 	if ((SFT_ZINTR | SFT_COUNT) != proc_act_type || 0 == dollar_ecode.error_last_b_line)
 	{	/* No user console error for $zinterrupt compile problems and if not direct mode. Accomplish
 		   this by bypassing the code inside this if which *will* be executed for most cases

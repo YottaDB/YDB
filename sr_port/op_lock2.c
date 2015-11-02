@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@ GBLREF	unsigned int	t_tries;
 GBLREF	uint4		process_id;
 GBLREF	int4		outofband;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
+GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
 
 /*
  * -----------------------------------------------
@@ -218,8 +219,10 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 				} else
 					prior = &((*prior)->next);
 			}
+			mlk_stats.n_user_locks_fail++;
 			return (FALSE);
 		}
 	}
+	mlk_stats.n_user_locks_success++;
 	return (TRUE);
 }

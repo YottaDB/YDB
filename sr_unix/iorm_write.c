@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,6 +80,7 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 		DOWRITERC(rm_ptr->fildes, outstart, outlen, status);
 		if (0 != status)
 		{
+			DOLLAR_DEVICE_WRITE(rm_ptr,status);
 			iod->dollar.za = 9;
 			rts_error(VARLSTCNT(1) status);
 		}
@@ -135,6 +136,12 @@ void iorm_write_utf(mstr *v)
 				outbytes = UTF16BE_BOM_LEN;
 				outptr += UTF16BE_BOM_LEN;
 				DOWRITERC(rm_ptr->fildes, outstart, outbytes, status);
+				if (0 != status)
+				{
+					DOLLAR_DEVICE_WRITE(rm_ptr,status);
+					iod->dollar.za = 9;
+					rts_error(VARLSTCNT(1) status);
+				}
 				outptr = outstart;
 				rm_ptr->out_bytes = outbytes = 0;
 				iod->ochset = CHSET_UTF16BE;
@@ -185,6 +192,7 @@ void iorm_write_utf(mstr *v)
 				DOWRITERC(rm_ptr->fildes, outstart, outbytes, status);
 				if (0 != status)
 				{
+					DOLLAR_DEVICE_WRITE(rm_ptr,status);
 					iod->dollar.za = 9;
 					rts_error(VARLSTCNT(1) status);
 				}
@@ -224,6 +232,7 @@ void iorm_write_utf(mstr *v)
 						DOWRITERC(rm_ptr->fildes, temppadarray, padsize, status);
 						if (0 != status)
 						{
+							DOLLAR_DEVICE_WRITE(rm_ptr,status);
 							iod->dollar.za = 9;
 							rts_error(VARLSTCNT(1) status);
 						}
@@ -295,10 +304,11 @@ void iorm_write(mstr *v)
 	else
 #endif
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
+	memcpy(rm_ptr->dollar_device, "0", sizeof("0"));
 
 	if (rm_ptr->noread)
 		rts_error(VARLSTCNT(1) ERR_RMSRDONLY);
-	if (!iod->dollar.zeof && !rm_ptr->fifo)
+	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
 	{
 	 	iod->dollar.za = 9;
 		rts_error(VARLSTCNT(1) ERR_NOTTOEOFONPUT);
@@ -328,6 +338,7 @@ void iorm_write(mstr *v)
 		DOWRITERC(rm_ptr->fildes, out, len, status);
 		if (0 != status)
 		{
+			DOLLAR_DEVICE_WRITE(rm_ptr,status);
 			iod->dollar.za = 9;
 			rts_error(VARLSTCNT(1) status);
 		}
@@ -342,9 +353,11 @@ void iorm_write(mstr *v)
 		{
 			if (!rm_ptr->fixed && iod->wrap)
 			{
-				DOWRITERC(rm_ptr->fildes, RMEOL, strlen(RMEOL), status);
+				DOWRITERC(rm_ptr->fildes, RMEOL, STRLEN(RMEOL), status);
 				if (0 != status)
-				{	iod->dollar.za = 9;
+				{
+					DOLLAR_DEVICE_WRITE(rm_ptr,status);
+					iod->dollar.za = 9;
 					rts_error(VARLSTCNT(1) status);
 				}
 			}

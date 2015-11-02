@@ -384,7 +384,7 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
 		errptr = (char *)STRERROR(save_errno);
 		errlen = strlen(errptr);
 		gtm_putmsg(VARLSTCNT(9) ERR_GETSOCKNAMERR, 3, save_errno, errlen, errptr, ERR_TEXT, 2,
-				LIT_AND_LEN("LOCAL"));
+				LEN_AND_LIT("LOCAL"));
 
 		local_port = (unsigned short)-1;
 		strcpy(local_ip, "*UNKNOWN*");
@@ -400,7 +400,7 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
 		errptr = (char *)STRERROR(save_errno);
 		errlen = strlen(errptr);
 		gtm_putmsg(VARLSTCNT(9) ERR_GETSOCKNAMERR, 3, save_errno, errlen, errptr, ERR_TEXT, 2,
-				LIT_AND_LEN("REMOTE"));
+				LEN_AND_LIT("REMOTE"));
 		remote_port = (unsigned short)-1;
 		strcpy(remote_ip, "*UNKNOWN*");
 	}

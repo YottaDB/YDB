@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,8 @@
 #include "gtmmsg.h"
 #include "wcs_flu.h"
 #include "mupip_freeze.h"
+#include "interlock.h"
+#include "sleep_cnt.h"
 
 GBLREF bool		mu_ctrly_occurred;
 GBLREF bool		mu_ctrlc_occurred;
@@ -51,9 +53,10 @@ GBLREF bool		error_mupip;
 void	mupip_freeze(void)
 {
 	int4		status;
-	bool		freeze, record;
+	bool		record;
 	tp_region	*rptr, *rptr1;
-	bool		override;
+	boolean_t	freeze, override;
+	freeze_status	freeze_ret;
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_DBRDONLY);
@@ -61,6 +64,8 @@ void	mupip_freeze(void)
 	error_def(ERR_MUNOACTION);
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_MUNOFINISH);
+	error_def(ERR_MUKILLIP);
+	error_def(ERR_KILLABANDONED);
 
 	status = SS_NORMAL;
 	in_mupip_freeze = TRUE;
@@ -134,8 +139,28 @@ void	mupip_freeze(void)
 				gv_cur_region->dyn.addr->fname);
 			continue;
 		}
-		while (FALSE == region_freeze(gv_cur_region, freeze, override))
-			hiber_start(1000);
+		if (freeze && (0 != cs_addrs->hdr->abandoned_kills))
+		{
+			gtm_putmsg(VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(rptr->reg),
+				LEN_AND_LIT("database could have incorrectly marked busy integrity errors"));
+			continue;
+		}
+		while (REG_FREEZE_SUCCESS != (freeze_ret = region_freeze(gv_cur_region, freeze, override, TRUE)))
+		{
+			if (REG_ALREADY_FROZEN == freeze_ret)
+			{
+				hiber_start(1000);
+				if ((TRUE == mu_ctrly_occurred) || (TRUE == mu_ctrlc_occurred))
+					break;
+			}
+			else if (REG_HAS_KIP == freeze_ret)
+			{
+				assert(!override);
+				rts_error(VARLSTCNT(4) ERR_MUKILLIP, 2, DB_LEN_STR(gv_cur_region));
+			}
+			else
+				assert(FALSE);
+		}
 		cs_addrs->persistent_freeze = freeze;	/* secshr_db_clnup() shouldn't clear the freeze up */
 		if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH))
 			rts_error(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT("FREEZE"), DB_LEN_STR(gv_cur_region));
@@ -149,7 +174,7 @@ void	mupip_freeze(void)
 			gv_cur_region = rptr1->reg;
 			if (FALSE == gv_cur_region->open)
 				continue;
-			region_freeze(gv_cur_region, FALSE, FALSE);
+			region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
 		}
 		gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
 		status = ERR_MUNOFINISH;

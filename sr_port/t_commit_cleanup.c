@@ -203,7 +203,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			process_deferred_stale();
 	} else
 	{	/* Roll forward (complete the partial commit of) the transaction by invoking secshr_db_clnup() */
-		send_msg(VARLSTCNT(7) ERR_DBCOMMITCLNUP, 5, process_id, process_id, trstr, DB_LEN_STR(xactn_err_region));
+		send_msg(VARLSTCNT(8) ERR_DBCOMMITCLNUP, 6, process_id, process_id, signal, trstr, DB_LEN_STR(xactn_err_region));
 		/* if t_ch() (a condition handler) was driving this routine, then doing send_msg() here is not a good idea
 		 * as it will overlay the current error message string driving t_ch(), but this case is an exception since
 		 * we currently do not know of any way by which we will be in this "update_underway == TRUE" code if t_ch()

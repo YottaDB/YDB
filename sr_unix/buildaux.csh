@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc #
+#	Copyright 2001, 2008 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -18,13 +18,15 @@
 #		$1 -	version number or code
 #		$2 -	image type (b[ta], d[bg], or p[ro])
 #		$3 -	target directory
-#		$4 -    [auxillaries to build] e.g. dse mupip ftok gtcm_pkdisp gtcm_server etc.
+#		$4 -	[auxillaries to build] e.g. dse mupip ftok gtcm_pkdisp gtcm_server etc.
 #
 ###########################################################################################
 
 set buildaux_status = 0
 
 set dollar_sign = \$
+set mach_type = `uname -m`
+set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
 
 if ( $1 == "" ) then
 	set buildaux_status = `expr $buildaux_status + 1`
@@ -42,14 +44,17 @@ endif
 switch ($2)
 case "[bB]*":
 	set gt_ld_options = "$gt_ld_options_bta"
+	set gt_image = "bta"
 	breaksw
 
 case "[dD]*":
 	set gt_ld_options = "$gt_ld_options_dbg"
+	set gt_image = "dbg"
 	breaksw
 
 case "[pP]*":
 	set gt_ld_options = "$gt_ld_options_pro"
+	set gt_image = "pro"
 	breaksw
 
 default:
@@ -74,7 +79,7 @@ endif
 #
 #####################################################################################
 
-set buildaux_auxillaries = "gde dse geteuid  gtmsecshr lke mupip gtcm_server gtcm_gnp_server"
+set buildaux_auxillaries = "gde dse geteuid gtmsecshr lke mupip gtcm_server gtcm_gnp_server"
 set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dummy dbcertify"
 set buildaux_executables = "$buildaux_auxillaries $buildaux_utilities"
 set buildaux_validexecutable = 0
@@ -203,6 +208,12 @@ if ( $buildaux_dse == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkdse, Failed to link dse (see ${dollar_sign}gtm_map/dse.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable +as mpas $3/dse
+		else
+			chatr +as mpas $3/dse
+		endif
 	endif
 endif
 
@@ -217,6 +228,10 @@ if ( $buildaux_geteuid == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgeteuid, Failed to link geteuid (see ${dollar_sign}gtm_map/geteuid.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable $3/geteuid
+		endif
 	endif
 endif
 
@@ -225,15 +240,27 @@ if ( $buildaux_gtmsecshr == 1 ) then
 	if ( $HOSTOS == "AIX") then
 		set aix_loadmap_option = "-bloadmap:$gtm_map/gtmsecshr.loadmap"
 	endif
-	$gtm_com/IGS $3/gtmsecshr 1
-	gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/gtmsecshr	-L$gtm_obj $gtm_obj/gtmsecshr.o \
-			$gt_ld_sysrtns -lmumps $gt_ld_syslibs >& $gtm_map/gtmsecshr.map
-	if ( $status != 0  ||  ! -x $3/gtmsecshr ) then
-		set buildaux_status = `expr $buildaux_status + 1`
-		echo "buildaux-E-linkgtmsecshr, Failed to link gtmsecshr (see ${dollar_sign}gtm_map/gtmsecshr.map)" \
-			>> $gtm_log/error.`basename $gtm_exe`.log
-	endif
-	$gtm_com/IGS $3/gtmsecshr 2
+	$gtm_com/IGS $3/gtmsecshr "STOP"	# stop any active gtmsecshr processes
+	$gtm_com/IGS $3/gtmsecshr "RMDIR"	# remove root-owned gtmsecshr, gtmsecshrdir, gtmsecshrdir/gtmsecshr files/dirs
+	foreach file (gtmsecshr gtmsecshr_wrapper)
+		gt_ld $gt_ld_options $aix_loadmap_option ${gt_ld_option_output}$3/${file} -L$gtm_obj $gtm_obj/${file}.o \
+				$gt_ld_sysrtns -lmumps $gt_ld_syslibs >& $gtm_map/${file}.map
+		if ( $status != 0  ||  ! -x $3/${file} ) then
+			set buildaux_status = `expr $buildaux_status + 1`
+			echo "buildaux-E-link${file}, Failed to link ${file} (see ${dollar_sign}gtm_map/${file}.map)" \
+				>> $gtm_log/error.`basename $gtm_exe`.log
+		else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+			if ( "dbg" == $gt_image ) then
+				chatr +dbg enable +as mpas $3/${file}
+			else
+				chatr +as mpas $3/${file}
+			endif
+		endif
+	end
+	mkdir ../gtmsecshrdir
+	mv ../gtmsecshr ../gtmsecshrdir	  	# move actual gtmsecshr into subdirectory
+	mv ../gtmsecshr_wrapper ../gtmsecshr	  # rename wrapper to be actual gtmsecshr
+	$gtm_com/IGS $3/gtmsecshr "CHOWN" # make gtmsecshr, gtmsecshrdir, gtmsecshrdir/gtmsecshr files/dirs root owned
 endif
 
 if ( $buildaux_lke == 1 ) then
@@ -248,6 +275,12 @@ if ( $buildaux_lke == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linklke, Failed to link lke (see ${dollar_sign}gtm_map/lke.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable +as mpas $3/lke
+		else
+			chatr +as mpas $3/lke
+		endif
 	endif
 endif
 
@@ -262,6 +295,12 @@ if ( $buildaux_mupip == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkmupip, Failed to link mupip (see ${dollar_sign}gtm_map/mupip.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable +as mpas $3/mupip
+		else
+			chatr +as mpas $3/mupip
+		endif
 	endif
 endif
 
@@ -277,6 +316,12 @@ if ( $buildaux_gtcm_server == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_server, Failed to link gtcm_server (see ${dollar_sign}gtm_map/gtcm_server.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable +as mpas $3/gtcm_server
+		else
+			chatr +as mpas $3/gtcm_server
+		endif
 	endif
 endif
 
@@ -293,6 +338,12 @@ if ( $buildaux_gtcm_gnp_server == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_gnp_server, Failed to link gtcm_gnp_server" \
 			"(see ${dollar_sign}gtm_map/gtcm_gnp_server.map)" >> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable +as mpas $3/gtcm_gnp_server
+		else
+			chatr +as mpas $3/gtcm_gnp_server
+		endif
 	endif
 endif
 
@@ -309,6 +360,12 @@ if ( $buildaux_gtcm_play == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_play, Failed to link gtcm_play (see ${dollar_sign}gtm_map/gtcm_play.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable +as mpas $3/gtcm_play
+		else
+			chatr +as mpas $3/gtcm_play
+		endif
 	endif
 endif
 
@@ -324,6 +381,10 @@ if ( $buildaux_gtcm_pkdisp == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_pkdisp, Failed to link gtcm_pkdisp (see ${dollar_sign}gtm_map/gtcm_pkdisp.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable $3/gtcm_pkdisp
+		endif
 	endif
 endif
 
@@ -339,6 +400,10 @@ if ( $buildaux_gtcm_shmclean == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkgtcm_shmclean, Failed to link gtcm_shmclean (see ${dollar_sign}gtm_map/gtcm_shmclean.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable $3/gtcm_shmclean
+		endif
 	endif
 endif
 
@@ -353,6 +418,10 @@ if ( $buildaux_semstat2 == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linksemstat2, Failed to link semstat2 (see ${dollar_sign}gtm_map/semstat2.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable $3/semstat2
+		endif
 	endif
 endif
 
@@ -367,6 +436,10 @@ if ( $buildaux_ftok == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkftok, Failed to link ftok (see ${dollar_sign}gtm_map/ftok.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable $3/ftok
+		endif
 	endif
 endif
 
@@ -382,6 +455,12 @@ if ( $buildaux_dbcertify == 1 ) then
 		set buildaux_status = `expr $buildaux_status + 1`
 		echo "buildaux-E-linkdbcertify, Failed to link dbcertify (see ${dollar_sign}gtm_map/dbcertify.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( "ia64" == $mach_type && "hpux" == $platform_name ) then
+		if ( "dbg" == $gt_image ) then
+			chatr +dbg enable +as mpas $3/dbcertify
+		else
+			chatr +as mpas $3/dbcertify
+		endif
 	endif
 endif
 

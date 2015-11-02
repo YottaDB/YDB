@@ -57,8 +57,8 @@
 #include "repl_instance.h"
 #include "iotcpdef.h"
 
-#define MAX_ATTEMPTS_FOR_FETCH_RESYNC	30
-#define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* seconds */
+#define MAX_ATTEMPTS_FOR_FETCH_RESYNC	60 /* max-wait in seconds for source server response after connection is established */
+#define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* max-wait in seconds to establish connection with the source server */
 #define FETCHRESYNC_PRIMARY_POLL	(MICROSEC_IN_SEC - 1) /* micro seconds, almost 1 second */
 
 GBLREF	uint4			process_id;
@@ -225,7 +225,6 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				RTS_ERROR_LITERAL("Error accepting connection from Source Server"), errno);
 			}
 		}
-		repl_log(stdout, TRUE, TRUE, "Connection established\n");
 		repl_close(&gtmrecv_listen_sock_fd);
 		if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))
 			|| 0 != (status = get_recv_sock_buff_size(gtmrecv_sock_fd, &repl_max_recv_buffsize)))
@@ -234,6 +233,10 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				LEN_AND_LIT("Error getting socket send/recv buffsizes"), status);
 			return ERR_REPLCOMM;
 		}
+		repl_log(stdout, TRUE, TRUE, "Connection established, using TCP send buffer size %d receive buffer size %d\n",
+				repl_max_send_buffsize, repl_max_recv_buffsize);
+		repl_log_conn_info(gtmrecv_sock_fd, stdout);
+
 		/* Send REPL_FETCH_RESYNC message */
 		memset(&resync_msg, 0, sizeof(resync_msg));
 		resync_msg.type = REPL_FETCH_RESYNC;

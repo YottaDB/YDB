@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@ VIEWTAB("RCHITS",	VTP_NULL,		VTK_RCHITS,	MV_NM),
 VIEWTAB("RCMISSES",	VTP_NULL,		VTK_RCMISSES,	MV_NM),
 VIEWTAB("RCSIZE",	VTP_NULL,		VTK_RCSIZE,	MV_NM),
 VIEWTAB("REGION",	VTP_DBKEY,		VTK_REGION,	MV_STR),
+VIEWTAB("RESETGVSTATS", VTP_NULL,		VTK_RESETGVSTATS, MV_STR),
 VIEWTAB("RTNNEXT",	VTP_RTNAME,		VTK_RTNEXT,	MV_STR),
 VIEWTAB("SPSIZE",	VTP_NULL,		VTK_SPSIZE,	MV_NM),
 VIEWTAB("STKSIZ",	VTP_NULL,		VTK_STKSIZ,	MV_NM),

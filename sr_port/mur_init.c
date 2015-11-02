@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@ GBLREF	mur_gbls_t	murgbl;
 GBLREF	bool		is_standalone;
 GBLREF	boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	void		(*call_on_signal)();
+GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
 
 
 /****************************************************************************************
@@ -50,12 +51,14 @@ GBLREF	void		(*call_on_signal)();
 
 void mur_init(void)
 {
-/*
- * Layout of mur_desc buffers (consecutive buffers are contiguous)
- *
- * |<--MUR_BUFF_SIZE-->|<--MUR_BUFF_SIZE-->|<--MUR_BUFF_SIZE-->|<--MUR_BUFF_SIZE-->|<--MUR_BUFF_SIZE-->|
- * |   random_buff     |     aux_buff1     |    seq_buff[0]    |    seq_buff[1]    |     aux_buff2     |
- */
+	int	index;
+
+	/*
+	 * Layout of mur_desc buffers (consecutive buffers are contiguous)
+	 *
+	 * |<--MUR_BUFF_SIZE-->|<--MUR_BUFF_SIZE-->|<--MUR_BUFF_SIZE-->|<--MUR_BUFF_SIZE-->|<--MUR_BUFF_SIZE-->|
+	 * |   random_buff     |     aux_buff1     |    seq_buff[0]    |    seq_buff[1]    |     aux_buff2     |
+	 */
 	assert(MUR_BUFF_SIZE > MAX_JNL_REC_SIZE);	/* in order for a journal record to fit in one buffer */
 	mur_desc.alloc_base = malloc(5 * MUR_BUFF_SIZE); /* two for double buffering, two for auxiliary, one for random */
 	mur_desc.random_buff.base = mur_desc.alloc_base;
@@ -67,18 +70,18 @@ void mur_init(void)
 	mur_desc.random_buff.read_in_progress = FALSE;
 	mur_desc.seq_buff[0].read_in_progress = FALSE;
 	mur_desc.seq_buff[1].read_in_progress = FALSE;
-#if defined(UNIX) && defined(MUR_USE_AIO)
+#	if defined(UNIX) && defined(MUR_USE_AIO)
 	mur_desc.seq_buff[0].aiocbp = (struct aiocb *)malloc(sizeof(struct aiocb));
 	mur_desc.seq_buff[1].aiocbp = (struct aiocb *)malloc(sizeof(struct aiocb));
 	memset((char *)mur_desc.seq_buff[0].aiocbp, 0, sizeof(struct aiocb));
 	memset((char *)mur_desc.seq_buff[1].aiocbp, 0, sizeof(struct aiocb));
 	mur_desc.aux_buff2.aiocbp = (struct aiocb *)NULL;	/* no aio for this buffer */
 	mur_desc.random_buff.aiocbp = (struct aiocb *)NULL;	/* no aio for this buffer */
-#elif defined(VMS)
+#	elif defined(VMS)
 	mur_desc.random_buff.iosb.cond = SS_NORMAL;
 	mur_desc.seq_buff[0].iosb.cond = SS_NORMAL;
 	mur_desc.seq_buff[1].iosb.cond = SS_NORMAL;
-#endif
+#	endif
 	murgbl.multi_list = (buddy_list *)malloc(sizeof(buddy_list));
 	initialize_list(murgbl.multi_list, sizeof(multi_struct), MUR_MULTI_LIST_INIT_ALLOC);
 	init_hashtab_int8(&murgbl.token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS);
@@ -94,6 +97,11 @@ void mur_init(void)
 	/* this is because, like the update process, MUPIP JOURNAL RECOVER/ROLLBACK is supposed to simulate GTM
 	 * update activity else there will be transaction-number mismatch in the database */
 	is_standalone = TRUE;
+	/* Because is_standalone is TRUE, t_tries is going to be directly set to CDB_STAGNATE for every TP transaction.
+	 * So initialize t_fail_hist[0] to t_fail_hist[CDB_STAGNATE-1] to '0' for display purposes.
+	 */
+	for (index = 0; index < CDB_STAGNATE; index++)
+		t_fail_hist[index] = '0';
 	call_on_signal = mur_close_files;
 	DEBUG_ONLY(assert_jrec_member_offsets();)
 }

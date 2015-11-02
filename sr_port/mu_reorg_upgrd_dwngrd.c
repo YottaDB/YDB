@@ -294,8 +294,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 		rel_crit(reg);
 		/* Loop through entire database one GDS block at a time and upgrade/downgrade each of them */
 		status1 = SS_NORMAL;
-		start_bmp = ROUND_DOWN(start_blk, BLKS_PER_LMAP);
-		last_bmp  = ROUND_DOWN(stop_blk - 1, BLKS_PER_LMAP);
+		start_bmp = ROUND_DOWN2(start_blk, BLKS_PER_LMAP);
+		last_bmp  = ROUND_DOWN2(stop_blk - 1, BLKS_PER_LMAP);
 		curblk = start_blk;	/* curblk is the block to be upgraded/downgraded */
 		util_out_print("Region !AD : Started processing from block number [0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
 		if (NULL != bptr)

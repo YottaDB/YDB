@@ -143,11 +143,11 @@ static boolean_t first_timeset = TRUE;
  */
 volatile static GT_TIMER *timefree = NULL;
 static int4 timeblk_hdrlen;
-/*
- * Initialized blockalrm and block_sigsent can be used by all
- */
-GBLDEF sigset_t	blockalrm;
-GBLDEF sigset_t	block_sigsent;	/* block all signals that can be sent externally (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT) */
+
+GBLREF	boolean_t	blocksig_initialized;	/* set to TRUE when blockalrm and block_sigsent are initialized */
+GBLREF	sigset_t	blockalrm;
+GBLREF	sigset_t	block_sigsent;
+
 /*
  * Save previous SIGALRM handler if any.
  */
@@ -225,6 +225,8 @@ void	prealloc_gt_timers(void)
 	sigaddset(&block_sigsent, SIGTSTP);
 	sigaddset(&block_sigsent, SIGCONT);
 	sigaddset(&block_sigsent, SIGALRM);
+
+	blocksig_initialized = TRUE;	/* note the fact that blockalrm and block_sigsent are initialized */
 }
 
 /*

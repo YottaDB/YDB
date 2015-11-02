@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,8 +92,8 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		}
                 if (FALSE == (was_crit = csa->now_crit))
 			grab_crit(p->region);
-
 		retval = ctl->wakeups;
+		assert(retval);
 		/* this calculation is size of basic mlk_shrsub blocks plus the padded value length
 		   that already contains the consideration for the length byte. This is so we get
 		   room to put a bunch of nicely aligned blocks so the compiler can give us its
@@ -102,59 +102,63 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		if (ctl->subtop - ctl->subfree < siz || ctl->blkcnt < p->subscript_cnt)
 			mlk_garbage_collect(ctl, siz, p);
 		blocked = mlk_shrblk_find(p, &d, auxown);
-		if (!d)
-		{	/* Needed to create a shrblk but no space was available */
-			if (FALSE == was_crit)
-				rel_crit(p->region);
-			return retval;	/* Resource starve */
-		}
-		if (d->owner)
-		{	/* The lock already exists */
-			if (d->owner == process_id && d->auxowner == auxown)
-			{	/* We are already the owner */
-				p->nodptr = d;
-				retval = 0;
-			} else
-			{	/* Someone else has it. Block on it */
-				if (new)
-					mlk_prcblk_add(p->region, ctl, d, process_id);
-				p->nodptr = d;
-				p->sequence = d->sequence;
-				csa->hdr->trans_hist.lock_sequence++;
-			}
-		} else
-		{	/* Lock was not previously owned */
-			if (blocked)
-			{	/* We can't have it right now because of child or parent locks */
-				if (new)
-					mlk_prcblk_add(p->region, ctl, d, process_id);
-				p->nodptr = d;
-				p->sequence = d->sequence;
-				csa->hdr->trans_hist.lock_sequence++;
-			} else
-			{	/* The lock is graciously granted */
-				if (!new)
-					mlk_prcblk_delete(ctl, d, process_id);
-				d->owner = process_id;
-				d->auxowner = auxown;
-				if (auxown && (GTCM_GNP_SERVER_IMAGE == image_type))
-				{	/* called from gtcml_lock_internal() */
-					curr_entry = (connection_struct *)auxown;
-					d->auxpid = curr_entry->pvec->jpv_pid;
-					assert(sizeof(curr_entry->pvec->jpv_node) <= sizeof(d->auxnode));
-					memcpy(d->auxnode, &curr_entry->pvec->jpv_node[0], sizeof(curr_entry->pvec->jpv_node));
-					/* cases of calls from omi_prc_lock() and rc_prc_lock() are not currently handled */
+		if (NULL != d)
+		{
+			if (d->owner)
+			{	/* The lock already exists */
+				if (d->owner == process_id && d->auxowner == auxown)
+				{	/* We are already the owner */
+					p->nodptr = d;
+					retval = 0;
+				} else
+				{	/* Someone else has it. Block on it */
+					if (new)
+						mlk_prcblk_add(p->region, ctl, d, process_id);
+					p->nodptr = d;
+					p->sequence = d->sequence;
+					csa->hdr->trans_hist.lock_sequence++;
 				}
-				d->sequence = p->sequence = csa->hdr->trans_hist.lock_sequence++;
-				MLK_LOGIN(d);
-				p->nodptr = d;
-				retval = 0;
+			} else
+			{	/* Lock was not previously owned */
+				if (blocked)
+				{	/* We can't have it right now because of child or parent locks */
+					if (new)
+						mlk_prcblk_add(p->region, ctl, d, process_id);
+					p->nodptr = d;
+					p->sequence = d->sequence;
+					csa->hdr->trans_hist.lock_sequence++;
+				} else
+				{	/* The lock is graciously granted */
+					if (!new)
+						mlk_prcblk_delete(ctl, d, process_id);
+					d->owner = process_id;
+					d->auxowner = auxown;
+					if (auxown && (GTCM_GNP_SERVER_IMAGE == image_type))
+					{	/* called from gtcml_lock_internal() */
+						curr_entry = (connection_struct *)auxown;
+						d->auxpid = curr_entry->pvec->jpv_pid;
+						assert(sizeof(curr_entry->pvec->jpv_node) <= sizeof(d->auxnode));
+						memcpy(d->auxnode,
+							&curr_entry->pvec->jpv_node[0], sizeof(curr_entry->pvec->jpv_node));
+						/* cases of calls from omi_prc_lock() and rc_prc_lock() are not currently handled */
+					}
+					d->sequence = p->sequence = csa->hdr->trans_hist.lock_sequence++;
+					MLK_LOGIN(d);
+					p->nodptr = d;
+					retval = 0;
+				}
 			}
-		}
+		} /* else: Needed to create a shrblk but no space was available. Resource starve */
 		if (FALSE == was_crit)
 			rel_crit(p->region);
+		if (!retval)
+		{
+			INCR_GVSTATS_COUNTER(csa, csa->nl, n_lock_success, 1);
+		} else
+		{
+			INCR_GVSTATS_COUNTER(csa, csa->nl, n_lock_fail, 1);
+		}
 	} else	/* acc_meth = dba_usr */
 		retval = gvusr_lock(p->total_length, &p->value[0], p->region);
-
 	return retval;
 }

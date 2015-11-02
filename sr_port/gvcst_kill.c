@@ -52,6 +52,10 @@
 #include "gvcst_protos.h"	/* for gvcst_kill,gvcst_search prototype */
 #include "rc_cpt_ops.h"
 #include "add_inter.h"
+#include "sleep_cnt.h"
+#include "wcs_sleep.h"
+#include "wbox_test_init.h"
+#include "memcoherency.h"
 
 GBLREF	boolean_t		is_updproc;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -83,7 +87,7 @@ void	gvcst_kill(bool do_subtree)
 	bool			clue, flush_cache;
 	boolean_t		left_extra, right_extra;
 	boolean_t		actual_update, next_fenced_was_null, write_logical_recs;
-	int4			prev_update_trans;
+	int4			prev_update_trans, sleep_counter;
 	cw_set_element		*tp_cse;
 	enum cdb_sc		cdb_status;
 	int			lev;
@@ -96,16 +100,22 @@ void	gvcst_kill(bool do_subtree)
 	srch_rec_status		*left_rec_stat, local_srch_rec;
 	sm_uc_ptr_t		jnlpool_instfilename;
 	unsigned char		instfilename_copy[MAX_FN_LEN + 1];
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
 
 	error_def(ERR_SCNDDBNOUPD);
 	error_def(ERR_REPLINSTMISMTCH);
 
-	if (REPL_ALLOWED(cs_data) && is_replicator)
+	csa = cs_addrs;
+	csd = csa->hdr;
+	cnl = csa->nl;
+	if (REPL_ALLOWED(csd) && is_replicator)
 	{
 		if (FALSE == pool_init)
 			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
 		assert(pool_init);
-		if (!cs_addrs->replinst_matches_db)
+		if (!csa->replinst_matches_db)
 		{
 			if (jnlpool_ctl->upd_disabled && !is_updproc)
 			{	/* Updates are disabled in this journal pool. Detach from journal pool and issue error. */
@@ -117,7 +127,7 @@ void	gvcst_kill(bool do_subtree)
 			}
 			UNIX_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instfilename;)
 			VMS_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
-			if (STRCMP(cs_addrs->nl->replinstfilename, jnlpool_instfilename))
+			if (STRCMP(cnl->replinstfilename, jnlpool_instfilename))
 			{	/* Replication instance file mismatch. Issue error. But before that detach from journal pool.
 				 * Copy replication instance file name in journal pool to temporary memory before detaching.
 				 */
@@ -129,9 +139,9 @@ void	gvcst_kill(bool do_subtree)
 				assert(NULL == jnlpool.jnlpool_ctl);
 				assert(FALSE == pool_init);
 				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(instfilename_copy),
-					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cs_addrs->nl->replinstfilename));
+					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cnl->replinstfilename));
 			}
-			cs_addrs->replinst_matches_db = TRUE;
+			csa->replinst_matches_db = TRUE;
 		}
 	}
 	clue = (0 != gv_target->clue.end);
@@ -139,7 +149,7 @@ void	gvcst_kill(bool do_subtree)
 	{
 		kill_set_head.next_kill_set = NULL;
 		if (jnl_fence_ctl.level)	/* next_fenced_was_null is reliable only if we are in ZTransaction */
-			next_fenced_was_null = (NULL == cs_addrs->next_fenced) ? TRUE : FALSE;
+			next_fenced_was_null = (NULL == csa->next_fenced) ? TRUE : FALSE;
 	} else
 		prev_update_trans = sgm_info_ptr->update_trans;
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);
@@ -149,7 +159,7 @@ void	gvcst_kill(bool do_subtree)
 	assert(update_array + update_array_size >= update_array_ptr);
 	for (;;)
 	{
-		assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
+		assert(t_tries < CDB_STAGNATE || csa->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 		if (0 == dollar_tlevel)
 		{
 			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
@@ -158,7 +168,7 @@ void	gvcst_kill(bool do_subtree)
 				ks->used = 0;
 		} else
 		{
-			segment_update_array_size = UA_NON_BM_SIZE(cs_data);
+			segment_update_array_size = UA_NON_BM_SIZE(csd);
 			ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
 		}
 		if (cdb_sc_normal != (cdb_status = gvcst_search(gv_currkey, NULL)))
@@ -275,7 +285,7 @@ void	gvcst_kill(bool do_subtree)
 			if (!actual_update)
 				sgm_info_ptr->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
 		}
-		if ((write_logical_recs = JNL_WRITE_LOGICAL_RECS(cs_addrs)) && actual_update)
+		if ((write_logical_recs = JNL_WRITE_LOGICAL_RECS(csa)) && actual_update)
 		{	/* Maintain journal records only if the kill actually resulted in an update. */
 			if (0 == dollar_tlevel)
 			{
@@ -305,38 +315,47 @@ void	gvcst_kill(bool do_subtree)
 		flush_cache = FALSE;
 		if (0 == dollar_tlevel)
 		{
-			if ((0 != cs_data->dsid) && (0 < kill_set_head.used)
+			if ((0 != csd->dsid) && (0 < kill_set_head.used)
 				&& gv_target->hist.h[1].blk_num != alt_hist->h[1].blk_num)
 			{	/* multi-level delete */
 				rc_cpt_inval();
 				flush_cache = TRUE;
 			}
 			if (0 < kill_set_head.used)		/* increase kill_in_prog */
-				need_kip_incr = TRUE;
-			if ((trans_num)0 == t_end(&gv_target->hist, alt_hist))
 			{
+				need_kip_incr = TRUE;
+				if (!csa->now_crit)	/* Do not sleep while holding crit */
+					WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
+			}
+			if ((trans_num)0 == t_end(&gv_target->hist, alt_hist))
+			{	/* In case this is MM and t_end caused a database extension, reset csd */
+				assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+				csd = cs_data;
 				if (jnl_fence_ctl.level && next_fenced_was_null && actual_update && write_logical_recs)
 				{	/* If ZTransaction and first KILL and the kill resulted in an update
-					 * Note that "write_logical_recs" is used above instead of JNL_WRITE_LOGICAL_RECS(cs_addrs)
+					 * Note that "write_logical_recs" is used above instead of JNL_WRITE_LOGICAL_RECS(csa)
 					 * since the value of the latter macro might have changed inside the call to t_end()
 					 * (since jnl state changes could change the JNL_ENABLED check which is part of the macro).
 					 */
-					assert(NULL != cs_addrs->next_fenced);
-					assert(jnl_fence_ctl.fence_list == cs_addrs);
-					jnl_fence_ctl.fence_list = cs_addrs->next_fenced;
-					cs_addrs->next_fenced = NULL;
+					assert(NULL != csa->next_fenced);
+					assert(jnl_fence_ctl.fence_list == csa);
+					jnl_fence_ctl.fence_list = csa->next_fenced;
+					csa->next_fenced = NULL;
 				}
 				need_kip_incr = FALSE;
 				assert(!kip_incremented);
 				continue;
 			}
+			/* In case this is MM and t_end caused a database extension, reset csd */
+			assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+			csd = cs_data;
 		} else
                 {
                         cdb_status = tp_hist(alt_hist);
                         if (cdb_sc_normal != cdb_status)
                                 goto retry;
                 }
-		++cs_data->n_kills;
+		INCR_GVSTATS_COUNTER(csa, csa->nl, n_kill, 1);
 		if (0 != gv_target->clue.end)
 		{	/* If clue is still valid, then the deletion was confined to a single block */
 			assert(gv_target->hist.h[0].blk_num == alt_hist->h[0].blk_num);
@@ -351,21 +370,39 @@ void	gvcst_kill(bool do_subtree)
 		{
 			assert(0 < kill_set_head.used || !kip_incremented);
 			if (0 < kill_set_head.used)     /* free subtree, decrease kill_in_prog */
-			{	/* If cs_data ->dsid is non-zero then some rc code was exercised before the changes
+			{	/* If csd->dsid is non-zero then some rc code was exercised before the changes
 				 * to prevent pre-commit expansion of the kill subtree. Not clear on what to do now.
 				 */
-				assert(!cs_data->dsid);
+				assert(!csd->dsid);
+                        	GTM_WHITE_BOX_TEST(WBTEST_ABANDONEDKILL, sleep_counter, SLEEP_ONE_MIN);
+#				ifdef DEBUG
+	                        if (SLEEP_ONE_MIN == sleep_counter)
+				{
+					assert(gtm_white_box_test_case_enabled);
+					while (1 <= sleep_counter)
+						wcs_sleep(sleep_counter--);
+				}
+#				endif
 				gvcst_expand_free_subtree(&kill_set_head);
-				DECR_KIP(cs_data, cs_addrs, kip_incremented);
+				/* In case this is MM and gvcst_expand_free_subtree() called gvcst_bmp_mark_free() called t_retry()
+				 * which remapped an extended database, reset csd */
+				assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+				csd = cs_data;
+				DECR_KIP(csd, csa, kip_incremented);
 			}
+			assert(0 < kill_set_head.used || !kip_incremented);
 			for (ks = kill_set_head.next_kill_set;  NULL != ks;  ks = temp_ks)
 			{
 				temp_ks = ks->next_kill_set;
 				free(ks);
 			}
+			assert(0 < kill_set_head.used || !kip_incremented);
 		}
 		return;
 retry:		t_retry(cdb_status);
+		/* In case this is MM and t_retry() remapped an extended database, reset csd */
+		assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+		csd = cs_data;
 research:	;
 	}
 }

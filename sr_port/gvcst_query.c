@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -111,6 +111,8 @@ bool gvcst_query(void)
 					continue;
 				}
 		    	}
+			assert(cs_data == cs_addrs->hdr);
+			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_query, 1);
 			if (found)
 			{
 				c1 = &gv_altkey->base[0];
@@ -122,13 +124,9 @@ bool gvcst_query(void)
 				}
 				if (!*c2 && !*c1)
 				{
-					if (cs_addrs->read_write)
-						cs_data->n_queries++;
 					return TRUE;
 				}
 			}
-			if (cs_addrs->read_write)
-				cs_data->n_queries++;
 			return FALSE;
 		}
 		t_retry(status);

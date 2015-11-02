@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,6 +97,8 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 		}
 		buff = read_reformat_buffer;
 	}
+	assert(NULL != cs_addrs->nl);
+	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
 	LSEEKREAD(udi->fd,
 		  (DISK_BLOCK_SIZE * (cs_data->start_vbn - 1) + (off_t)blk * size),
 		  buff,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,12 +30,13 @@ void ztrap_form_init(void)
 	mstr		val, tn;
 	char		buf[1024], *buf_ptr = &buf[0];
 
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TRNLOGFAIL);
 
 	ztrap_form = ZTRAP_CODE;	/* default */
 	val.addr = ZTRAP_FORM;
 	val.len = STR_LIT_LEN(ZTRAP_FORM);
-	if (SS_NORMAL == (status = trans_log_name(&val, &tn, buf)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
 	{
 		if (STR_LIT_LEN(ZTRAP_FORM_POP) < tn.len && !STRNCASECMP(buf_ptr, ZTRAP_FORM_POP, STR_LIT_LEN(ZTRAP_FORM_POP)))
 		{
@@ -50,6 +51,13 @@ void ztrap_form_init(void)
 		} else if (!STRNCASECMP(buf_ptr, ZTRAP_FORM_ADAPTIVE, MIN(STR_LIT_LEN(ZTRAP_FORM_ADAPTIVE), tn.len)))
 			ztrap_form |= ZTRAP_ENTRYREF;
 	} else if (SS_NOLOGNAM != status)
-		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZTRAP_FORM), status);
+	{
+#		ifdef UNIX
+		if (SS_LOG2LONG == status)
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, sizeof(buf) - 1);
+		else
+#		endif
+			rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZTRAP_FORM), status);
+	}
 	return;
 }

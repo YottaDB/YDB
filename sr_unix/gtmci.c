@@ -58,7 +58,6 @@ GBLREF  mval			dollar_zstatus;
 GBLREF  unsigned char		*fgncal_stack;
 GBLREF  short			dollar_tlevel;
 GBLREF  enum gtmImageTypes	image_type;
-GBLREF  boolean_t		gtm_utf8_mode;
 
 static  callin_entry_list	*ci_table = NULL;
 
@@ -385,8 +384,7 @@ int gtm_init()
 		gtm_wcswidth_fnptr = gtm_wcswidth;
 		gtm_env_init();	/* read in all environment variables */
 		err_init(stop_image_conditional_core);
-		if (gtm_utf8_mode)
-			gtm_icu_init(); /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
 		 * the unwind logic in gtmci_ch() will get rid of the whole stack. */

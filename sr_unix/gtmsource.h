@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -262,11 +262,12 @@ typedef struct
 	gtmsource_state_t	gtmsource_state;/* Current state of the source server. This shared memory flag is maintained in
 						 * sync with the source server specific private global variable "gtmsource_state" */
 	int4			gtmsrc_lcl_array_index;	/* Index of THIS struct in the array of gtmsource_local_struct in jnlpool */
+	int4			repl_zlib_cmp_level;	/* zlib compression level currently used across the replication pipe */
 	char			remote_proto_ver;	/* Set to "proto_ver" field of initial receiver server handshake message
 							 * All "*_proto_ver" fields need to be "signed char" in order to be able
 							 * to do signed comparisons of this with the macros
 							 * REPL_PROTO_VER_DUALSITE (0) and REPL_PROTO_VER_UNINITIALIZED (-1) */
-	unsigned char		filler1_align_8[7];
+	unsigned char		filler1_align_8[3];
 	int4			read_state;  	/* From where to read - pool or the file(s)? */
 	uint4			read; 		/* Offset relative to jnldata_base_off of the next journal record from the pool */
 	qw_off_t		read_addr; 	/* Virtual address of the next journal record in the merged journal file to read */
@@ -412,6 +413,7 @@ typedef struct
 	boolean_t	instsecondary;	/* TRUE if -INSTSECONDARY is explicitly or implicitly specified, FALSE otherwise */
 	boolean_t	needrestart;	/* TRUE if -NEEDRESTART was specified, FALSE otherwise */
 	boolean_t	losttncomplete;	/* TRUE if -LOSTTNCOMPLETE was specified, FALSE otherwise */
+	int4		cmplvl;
 	int4		shutdown_time;
 	int4		buffsize;
 	int4		mode;

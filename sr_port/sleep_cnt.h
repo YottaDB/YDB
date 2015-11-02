@@ -56,6 +56,8 @@
 #define	MAXWRTLATCHWAIT		1000		/* 1sec = 1000 * 1-msec time waits to see if write-latch value of a
 						 * 	cache-record becomes free (i.e. LATCH_CLEAR) in db_csh_getn() */
 #define RETRY_CASLATCH_CUTOFF	16		/* retry loop index cutoff to try performCASLatchCheck() */
+#define MAXWAIT2KILL		(2 * SLEEP_ONE_MIN) /* KILLs wait for MAXWAIT2KILL minute(s) for inhibit_kills
+						     * to become zero */
 
 /*  For use by spin locks, SLEEP is ms, total should be under a minute */
 #define LOCK_TRIES		(50 * 4 * 1000) /* outer loop: 50 secs, 1 loop in 4 is sleep of 1 ms */

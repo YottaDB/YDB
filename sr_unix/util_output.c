@@ -40,6 +40,7 @@ GBLREF	io_pair			io_std_device;
 GBLREF	enum gtmImageTypes	image_type;
 GBLDEF	char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
 GBLDEF	va_list		last_va_list_ptr;
+GBLREF	boolean_t	blocksig_initialized;
 GBLREF  sigset_t	block_sigsent;
 static	boolean_t	first_syslog = TRUE;
 
@@ -526,9 +527,15 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	 * A work around is to temporarily block signals (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT, SIGALRM) and then
 	 * restore them after the syslog call returns.
 	 */
-	sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
+	/* It is possible for early process startup code to invoke this function so blocksig_initialized might not yet be set.
+	 * An example C-stack is main/get_page_size/system-function interrupted by MUPIP STOP/generic_signal_handler/send_msg.
+	 * Therefore this does not have an assert(blocksig_initialized) that similar code in other places (e.g. dollarh.c) has.
+	 */
+	if (blocksig_initialized)	/* In pro, dont take chances and handle case where it is not initialized */
+		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
 	(void)SYSLOG(LOG_USER | LOG_INFO, addr);
-	sigprocmask(SIG_SETMASK, &savemask, NULL);
+	if (blocksig_initialized)
+		sigprocmask(SIG_SETMASK, &savemask, NULL);
 }
 
 
@@ -536,7 +543,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 {
 	char	fmt_buff[OUT_BUFF_SIZE];
 	caddr_t	fmtc;
-	int	rc;
+	int	rc, count;
 
 	/*
 	 * Note: this function checks for EINTR on FPRINTF. This check should not be
@@ -587,10 +594,19 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			switch (flush)
 			{
 				case FLUSH:
+					/* Keep retrying FPRINTF if errno is EINTR. But we have seen a nested FPRINTF call to
+					 * return EINTR incorrectly even though it was a different FPRINTF (that is in the
+					 * C call stack) was interrupted. So no point in retrying indefinitely in this case.
+					 * Hence limit the loop iterations to an arbitrary finite value.
+					 */
+					count = 0;
 					do
 					{
 						rc = FPRINTF(stderr, fmt_buff);
+						if (16 < ++count)
+							break;
 					} while (-1 == rc && EINTR == errno);
+					assert((-1 != rc) || (EINTR != errno));
 					break;
 				case OPER:
 					util_out_send_oper(STR_AND_LEN(fmt_buff));

@@ -35,6 +35,7 @@ GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
+GBLREF	int			process_exiting;
 
 void deferred_signal_handler(void)
 {
@@ -94,6 +95,13 @@ void deferred_signal_handler(void)
 		gtm_putmsg(VARLSTCNT(1) forced_exit_err);
 	}
 	assert(OK_TO_INTERRUPT);
+	/* Signal intent to exit BEFORE driving condition handlers. This avoids checks that will otherwise fail (for example
+	 * if mdb_condition_handler/preemptive_ch gets called below, that could invoke the RESET_GV_TARGET macro which in turn
+	 * would assert that gv_target->gd_csa is equal to cs_addrs. This could not be true in case we were in mainline code
+	 * that was interrupted by the flush timer for a different region which in turn was interrupted by an external signal
+	 * that would drive us to exit. Setting the "process_exiting" variable causes those csa checks to pass.
+	 */
+	process_exiting = TRUE;
 	if ((SIGTERM != exi_condition) && CHANDLER_EXISTS)	/* drive condition-handlers if they exist */
 		DRIVECH(0);
 	/* If a special routine was registered to be driven on a signal, drive it now */

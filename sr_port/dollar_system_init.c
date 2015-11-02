@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +29,8 @@ void dollar_system_init(struct startup_vector *svec)
 	int4		status;
 	mstr		val, tn;
 	char		buf[MAX_TRANS_NAME_LEN];
+
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TRNLOGFAIL);
 
 	dollar_system.mvtype = MV_STR;
@@ -38,7 +40,7 @@ void dollar_system_init(struct startup_vector *svec)
 	stringpool.free += dollar_system.str.len;
 	val.addr = SYSID;
 	val.len = STR_LIT_LEN(SYSID);
-	if (SS_NORMAL == (status = trans_log_name(&val, &tn, buf)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &tn, buf, sizeof(buf), dont_sendmsg_on_log2long)))
 	{
 		dollar_system.str.len += tn.len;
 		memcpy(stringpool.free, tn.addr, tn.len);
@@ -48,7 +50,12 @@ void dollar_system_init(struct startup_vector *svec)
 		dollar_system.str.len += svec->sysid_ptr->len;
 		memcpy(stringpool.free, svec->sysid_ptr->addr, svec->sysid_ptr->len);
                 stringpool.free += svec->sysid_ptr->len ;
-	} else
+	}
+#	ifdef UNIX
+	else if (SS_LOG2LONG == status)
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(SYSID), sizeof(buf) - 1);
+#	endif
+	else
 		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);
 	assert(stringpool.free < stringpool.top);	/* it's process initialization after all */
 	return;

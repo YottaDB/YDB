@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,6 +71,7 @@ error_def(ERR_DBMINRESBYTES);
 error_def(ERR_DBMAXREC2BIG);
 error_def(ERR_DBCKILLIP);
 error_def(ERR_DBCNOTSAMEDB);
+error_def(ERR_LOGTOOLONG);
 error_def(ERR_GTMDISTUNDEF);
 
 /* Open the temporary file that hold the command(s) we are going to execute */
@@ -78,7 +79,7 @@ void dbc_open_command_file(phase_static_area *psa)
 {
 	char_ptr_t	errmsg;
 	int		rc, save_errno;
-	uint4		status;
+	int4		status;
 	char		*dist_ptr;
 	mstr		gtm_dist_m, gtm_dist_path;
 	char		gtm_dist_path_buff[MAX_FN_LEN + 1];
@@ -88,7 +89,13 @@ void dbc_open_command_file(phase_static_area *psa)
 		dbc_gen_temp_file_names(psa);
 	gtm_dist_m.addr = UNIX_ONLY("$")GTM_DIST;
 	gtm_dist_m.len = sizeof(UNIX_ONLY("$")GTM_DIST) - 1;
-	status = trans_log_name(&gtm_dist_m, &gtm_dist_path, gtm_dist_path_buff);
+	status = TRANS_LOG_NAME(&gtm_dist_m, &gtm_dist_path, gtm_dist_path_buff, sizeof(gtm_dist_path_buff),
+					dont_sendmsg_on_log2long);
+#	ifdef UNIX
+	if (SS_LOG2LONG == status)
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtm_dist_m.len, gtm_dist_m.addr, sizeof(gtm_dist_path_buff) - 1);
+	else
+#	endif
 	if (SS_NORMAL != status)
 		rts_error(VARLSTCNT(1) ERR_GTMDISTUNDEF);
 	assert(0 < gtm_dist_path.len);

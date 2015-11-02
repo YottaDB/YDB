@@ -89,3 +89,4 @@ CDB_SC_LCHAR_ENTRY(cdb_sc_unfreeze_getcrit, FALSE, 'i') /* 'i'  gdsfilext found 
 CDB_SC_LCHAR_ENTRY(cdb_sc_backupstatemod,   FALSE, 'j') /* 'j'  t_end/tp_tend found online-backup-in-progress state changed since start of transaction */
 CDB_SC_LCHAR_ENTRY(cdb_sc_crbtmismatch,     TRUE,  'k') /* 'k'  cr->blk and bt->blk does not match */
 CDB_SC_LCHAR_ENTRY(cdb_sc_phase2waitfail,   TRUE,  'l') /* 'l'  wcs_phase2_commit_wait timed out when called from t_qread */
+CDB_SC_LCHAR_ENTRY(cdb_sc_inhibitkills,     FALSE, 'm') /* 'm'  t_end/tp_tend found inhibit_kills counter greater than zero */

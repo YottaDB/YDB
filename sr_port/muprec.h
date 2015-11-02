@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -377,6 +377,8 @@ typedef struct reg_ctl_list_struct
 	boolean_t		jfh_recov_interrupted;	/* Whether latest generation journal file was created by recover */
 	int4			blks_to_upgrd_adjust;	/* delta to adjust turn around point's blks_to_upgrd counter with.
 							 * this will include all bitmaps created in V4 format by gdsfilext */
+	uint4			trnarnd_free_blocks;	/* free_blocks counter stored in the turnaround point epoch record */
+	uint4			trnarnd_total_blks;	/* total_blks  counter stored in the turnaround point epoch record */
 } reg_ctl_list;
 
 typedef struct redirect_list_struct
@@ -551,7 +553,6 @@ void			mur_init(void);
 boolean_t		mur_insert_prev(void);
 boolean_t		mur_interactive(void);
 boolean_t		mur_jctl_from_next_gen(void);
-void			mur_master_map(void);
 void 			mur_multi_rehash(void);
 uint4			mur_next (off_jnl_t dskaddr);
 uint4 			mur_next_rec(void);

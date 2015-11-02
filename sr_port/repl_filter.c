@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,16 +52,30 @@
 GBLREF uchar_ptr_t	repl_filter_buff;
 GBLREF int		repl_filter_bufsiz;
 GBLREF unsigned char	jnl_ver, remote_jnl_ver;
+
+GBLDEF	int	jnl2filterfmt[REPL_JNL_MAX + 1] =
+{
+	REPL_FILTER_V12,	/* filter version for REPL_JNL_V12 */
+	REPL_FILTER_V12,	/* filter version for REPL_JNL_V13 */
+	REPL_FILTER_V12,	/* filter version for REPL_JNL_V14 */
+	REPL_FILTER_V15,	/* filter version for REPL_JNL_V15 */
+	REPL_FILTER_V16,	/* filter version for REPL_JNL_V16 */
+	REPL_FILTER_V17,	/* filter version for REPL_JNL_V17 */
+	REPL_FILTER_V17,	/* filter version for REPL_JNL_V18 */
+	-1,			/* filter version for REPL_JNL_MAX */
+};
+
 GBLDEF	intlfltr_t repl_internal_filter[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1][JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
 	/* This should be a square matrix. If you add a row, make sure you add a column too. */
-		/* 12         13	 14     	15          16    	17	*/
-	/* 12 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,	IF_12TO17},
-	/* 13 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,	IF_12TO17},
-	/* 14 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,	IF_12TO17},
-	/* 15 */{IF_15TO12, IF_15TO12, IF_15TO12, IF_NONE,    IF_15TO16,	IF_15TO17},
-	/* 16 */{IF_16TO12, IF_16TO12, IF_16TO12, IF_16TO15,  IF_16TO16,	IF_NONE	 },
-	/* 17 */{IF_17TO12, IF_17TO12, IF_17TO12, IF_17TO15,  IF_NONE,		IF_17TO17},
+                /* 12          13        14           15          16          17          18     */
+        /* 12 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,  IF_12TO17,  IF_12TO17},
+        /* 13 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,  IF_12TO17,  IF_12TO17},
+        /* 14 */{IF_NONE,   IF_NONE,   IF_NONE,   IF_12TO15,  IF_12TO16,  IF_12TO17,  IF_12TO17},
+        /* 15 */{IF_15TO12, IF_15TO12, IF_15TO12, IF_NONE,    IF_15TO16,  IF_15TO17,  IF_15TO17},
+        /* 16 */{IF_16TO12, IF_16TO12, IF_16TO12, IF_16TO15,  IF_16TO16,  IF_NONE,    IF_NONE  },
+        /* 17 */{IF_17TO12, IF_17TO12, IF_17TO12, IF_17TO15,  IF_NONE,    IF_17TO17,  IF_17TO17},
+        /* 18 */{IF_17TO12, IF_17TO12, IF_17TO12, IF_17TO15,  IF_NONE,    IF_17TO17,  IF_17TO17},
 };
 GBLREF unsigned int	jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF unsigned char	jnl_source_rectype, jnl_dest_maxrectype;

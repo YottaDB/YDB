@@ -10,15 +10,15 @@
  ****************************************************************/
 
 #ifdef __CYGWIN__
-#define GTM_RELEASE_NAME 	"GT.M V5.3-002 CYGWIN x86"
+#define GTM_RELEASE_NAME 	"GT.M V5.3-003 CYGWIN x86"
 #elif defined(__ia64)
-#define GTM_RELEASE_NAME 	"GT.M V5.3-002 Linux IA64"
+#define GTM_RELEASE_NAME 	"GT.M V5.3-003 Linux IA64"
 #elif defined(__x86_64__)
-#define GTM_RELEASE_NAME 	"GT.M V5.3-002 Linux x86_64"
+#define GTM_RELEASE_NAME 	"GT.M V5.3-003 Linux x86_64"
 #elif defined(__s390__)
-#define GTM_RELEASE_NAME 	"GT.M V5.3-002 Linux S390"
+#define GTM_RELEASE_NAME 	"GT.M V5.3-003 Linux S390"
 #else
-#define GTM_RELEASE_NAME 	"GT.M V5.3-002 Linux x86"
+#define GTM_RELEASE_NAME 	"GT.M V5.3-003 Linux x86"
 #endif
 #define GTM_PRODUCT 		"GT.M"
 #define GTM_VERSION		"V5.3"

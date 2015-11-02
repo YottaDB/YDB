@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,7 +87,6 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF char			cli_err_str[];
 GBLREF boolean_t		write_after_image;
-GBLREF boolean_t		gtm_utf8_mode;
 
 static bool	dse_process(int argc);
 static void display_prompt(void);
@@ -106,8 +105,7 @@ int main(int argc, char *argv[])
 	op_open_ptr = op_open;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
-	if (gtm_utf8_mode)
-		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler);
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);

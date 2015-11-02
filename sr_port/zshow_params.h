@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@ enum zshow_params
 {
 zshow_allo,
 zshow_bloc,
+zshow_command,
 zshow_conv,
 zshow_ctra,
 zshow_dele,
@@ -32,6 +33,7 @@ zshow_fil,
 zshow_fixed,
 zshow_host,
 zshow_ichset,
+zshow_independent,
 zshow_inse,
 zshow_lab,
 zshow_leng,
@@ -48,6 +50,7 @@ zshow_notype,
 zshow_nowrap,
 zshow_ochset,
 zshow_pad,
+zshow_parse,
 zshow_past,
 zshow_prmmbx,
 zshow_rchk,
@@ -55,6 +58,8 @@ zshow_read,
 zshow_reads,
 zshow_rec,
 zshow_shar,
+zshow_shell,
+zshow_stderr,
 zshow_term,
 zshow_ttsy,
 zshow_type,

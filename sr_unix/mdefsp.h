@@ -92,6 +92,7 @@ typedef uint4 mach_inst;
 
 #if defined(__ia64)
 #define CACHELINE_SIZE	128
+#define INO_T_LONG		/* define this for both Linux ia64 and HPUX ia64 as these are 64-bit builds */
 #elif defined(__hppa)
 #define CACHELINE_SIZE	64
 #endif /* __ia64 */

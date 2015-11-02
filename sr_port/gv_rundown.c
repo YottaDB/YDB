@@ -49,6 +49,7 @@
 #include "gvcmy_rundown.h"
 #include "rc_cpt_ops.h"
 #include "gv_rundown.h"
+#include "targ_alloc.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -92,10 +93,11 @@ void gv_rundown(void)
 				 */
 				if (NULL != cs_addrs)
 				{
-					if (cs_addrs->dir_tree)
+					if (NULL != cs_addrs->dir_tree)
 					{
-						free(cs_addrs->dir_tree->alt_hist);
-						free(cs_addrs->dir_tree);
+						cs_addrs->dir_tree->regcnt--;	/* targ_free relies on this */
+						targ_free(cs_addrs->dir_tree);
+						cs_addrs->dir_tree = NULL;
 					}
 					if (cs_addrs->sgm_info_ptr)
 					{

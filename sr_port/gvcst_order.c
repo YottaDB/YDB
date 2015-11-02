@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -148,9 +148,9 @@ bool	gvcst_order(void)
 					continue;
 				}
 			}
-			if (cs_addrs->read_write)
-				cs_data->n_order++;
-			return (found  &&  (bh->curr_rec.match >= gv_currkey->prev));
+			assert(cs_data == cs_addrs->hdr);
+			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, 1);
+			return (found && (bh->curr_rec.match >= gv_currkey->prev));
 		}
 restart:	t_retry(status);
 	}

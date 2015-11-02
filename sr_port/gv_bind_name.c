@@ -58,13 +58,13 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 	if ((NULL != (tabent = lookup_hashtab_mname((hash_table_mname *)addr->tab_ptr, &gvent)))
 		&& (NULL != (gvnh_reg = (gvnh_reg_t *)tabent->value)))
 	{
-		gv_target = gvnh_reg->gvt;
 		reg = gvnh_reg->gd_reg;
 		if (!reg->open)
 		{
-			gv_target->clue.end = 0;
-			gv_init_reg(reg);
+			gv_init_reg(reg);	/* could modify gvnh_reg->gvt if multiple regions map to same db file */
+			assert(0 == gvnh_reg->gvt->clue.end);
 		}
+		gv_target = gvnh_reg->gvt;
 		gv_cur_region = reg;
 		acc_meth = gv_cur_region->dyn.addr->acc_meth;
 		if (dollar_trestart)

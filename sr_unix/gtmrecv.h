@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -306,6 +306,7 @@ typedef struct
 	boolean_t	helpers;
 	int4		n_readers;
 	int4		n_writers;
+	int4		cmplvl;
 	char            log_file[MAX_FN_LEN + 1];
 	char            filter_cmd[MAX_FILTER_CMD_LEN];
 } gtmrecv_options_t;

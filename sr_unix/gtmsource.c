@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@
 #include "gt_timer.h"		/* for LONG_SLEEP macro (hiber_start function prototype) */
 #include "init_secshr_addrs.h"
 #include "mutex.h"
+#include "gtm_zlib.h"
 
 GBLDEF	boolean_t		gtmsource_logstats = FALSE, gtmsource_pool2file_transition = FALSE;
 GBLDEF	int			gtmsource_filter = NO_FILTER;
@@ -235,7 +236,8 @@ int gtmsource()
 	if (-1 == (procgp = setsid()))
 		send_msg(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2, RTS_ERROR_LITERAL("Source server error in setsid"), errno);
 #endif /* REPL_DEBUG_NOBACKGROUND */
-
+	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
 	REPL_DPRINT1("Setting up regions\n");
 	gvinit();
 

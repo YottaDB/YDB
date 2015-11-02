@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,6 @@ LITREF	unsigned char	lower_to_upper_table[];
 boolean_t zwr2format(mstr *src, mstr *des)
 {
         unsigned char 	ch, chtmp, *cp, *cpstart, *end, *dstptr, *strnext;
-	unsigned char	buff[10];
 	int 		fastate, num;
 
 	des->len = 0;
@@ -73,6 +72,10 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				{ /* a numeric subscript */
 					FORMAT_CHAR(ch);
 					fastate = 4;
+				} else if ('.' == ch)
+				{
+					FORMAT_CHAR(ch);
+					fastate = 5;
 				} else
 					return FALSE;
 				break;
@@ -154,7 +157,19 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				}
 				break;
 
-			case 4: /* a numeric subscript */
+			case 4: /* a numeric subscript - decimal might still come */
+		        	ch = *cp++;
+				if ('0' <= ch && ch <= '9')
+				{
+					FORMAT_CHAR(ch);
+				} else if ('.' == ch)
+				{
+					FORMAT_CHAR(ch);
+					fastate = 5;
+				} else
+					return FALSE;
+				break;
+			case 5: /* a numeric subscript - already seen decimal */
 		        	ch = *cp++;
 				if ('0' <= ch && ch <= '9')
 				{
@@ -162,7 +177,6 @@ boolean_t zwr2format(mstr *src, mstr *des)
 				} else
 					return FALSE;
 				break;
-
 			default:
 				return FALSE;
 				break;

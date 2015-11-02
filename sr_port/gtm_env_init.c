@@ -18,13 +18,16 @@
 #include "iosp.h"
 #include "wbox_test_init.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() and gtm_env_init_sp() prototype */
-#include "collseq.h"
 #include "gt_timer.h"
 #include "io.h"
 #include "iotcpdef.h"
 #include "iosocketdef.h"
 #include "gtm_malloc.h"
 #include "cache.h"
+#include "gdsroot.h"		/* needed for gdsfhead.h */
+#include "gdskill.h"		/* needed for gdsfhead.h */
+#include "gdsbt.h"		/* needed for gdsfhead.h */
+#include "gdsfhead.h"		/* needed for MAXTOTALBLKS_MAX macro */
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -54,6 +57,11 @@ GBLREF	bool		undef_inhibit;
 GBLREF	uint4		outOfMemoryMitigateSize;	/* Reserve that we will freed to help cleanup if run out of memory */
 GBLREF	uint4		max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
 GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilations */
+GBLREF	boolean_t	gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
+
+#ifdef DEBUG
+GBLREF	boolean_t	gtm_gvundef_fatal;
+#endif
 
 void	gtm_env_init(void)
 {
@@ -81,7 +89,7 @@ void	gtm_env_init(void)
 		}
 		DEBUG_ONLY(gtmdbglvl_inited = TRUE);
 
-		/* Duplicate Set Noop environgment/logical */
+		/* Duplicate Set Noop environment/logical */
 		val.addr = GTM_GVDUPSETNOOP;
 		val.len = sizeof(GTM_GVDUPSETNOOP) - 1;
 		assert(FALSE == gvdupsetnoop);	/* should have been set to FALSE in gbldefs.c */
@@ -89,13 +97,30 @@ void	gtm_env_init(void)
 		if (is_defined)
 			gvdupsetnoop = ret; /* if the logical is not defined, we want gvdupsetnoop to take its default value */
 
-		/* NOUNDEF environgment/logical */
+		/* NOUNDEF environment/logical */
 		val.addr = GTM_NOUNDEF;
 		val.len = sizeof(GTM_NOUNDEF) - 1;
-		assert(FALSE == undef_inhibit);	/* should have been set to FALSE in gbldefs.c */
+		assert(FALSE == undef_inhibit);	/* should have been set to FALSE at global variable definition time */
 		ret = logical_truth_value(&val, FALSE, &is_defined);
 		if (is_defined)
 			undef_inhibit = ret; /* if the logical is not defined, we want undef_inhibit to take its default value */
+
+#		ifdef DEBUG
+		/* GTM_GVUNDEF_FATAL environment/logical */
+		val.addr = GTM_GVUNDEF_FATAL;
+		val.len = sizeof(GTM_GVUNDEF_FATAL) - 1;
+		assert(FALSE == gtm_gvundef_fatal);	/* should have been set to FALSE in gbldefs.c */
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			gtm_gvundef_fatal = ret; /* if logical is not defined, we want gtm_gvundef_fatal to take default value */
+#		endif
+
+		/* Initialize variable that controls TP allocation clue (for created blocks) */
+		val.addr = GTM_TP_ALLOCATION_CLUE;
+		val.len = sizeof(GTM_TP_ALLOCATION_CLUE) - 1;
+		gtm_tp_allocation_clue = trans_numeric(&val, &is_defined, TRUE);
+		if (!is_defined)
+			gtm_tp_allocation_clue = MAXTOTALBLKS_MAX;
 
 		/* Full Database-block Write mode */
 		val.addr = GTM_FULLBLOCKWRITES;
@@ -118,8 +143,11 @@ void	gtm_env_init(void)
 		if (is_defined)
 			local_collseq_stdnull = ret;
 
-		/* Initialize variables for white box testing */
-		DEBUG_ONLY(wbox_test_init();)
+		/* Initialize variables for white box testing. Even though these white-box test variables only control the
+		 * flow of the DBG builds, the PRO builds check on these variables (for example, in tp_restart.c to decide
+		 * whether to fork_n_core or not) so need to do this initialization for PRO builds as well.
+		 */
+		wbox_test_init();
 
 		/* Initialize variable that controls dynamic GT.M block upgrade */
 		val.addr = GTM_BLKUPGRADE_FLAG;
@@ -137,7 +165,7 @@ void	gtm_env_init(void)
 		gtm_max_sockets = MAX_N_SOCKET;
 		val.addr = GTM_MAX_SOCKETS;
 		val.len = sizeof(GTM_MAX_SOCKETS) - 1;
-                if ((tmsock = trans_numeric(&val, &is_defined, TRUE)) && MAX_MAX_N_SOCKET > tmsock) /* Note assignment!! */
+		if ((tmsock = trans_numeric(&val, &is_defined, TRUE)) && MAX_MAX_N_SOCKET > tmsock) /* Note assignment!! */
 			gtm_max_sockets = tmsock;
 
 		/* Initialize storage to allocate and keep in our back pocket in case run out of memory */
@@ -154,10 +182,10 @@ void	gtm_env_init(void)
 		if (memsize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
 			max_cache_memsize = memsize * 1024;
 		max_cache_entries = MAX_CACHE_ENTRIES;
-                val.addr = GTM_MAX_INDRCACHE_COUNT;
-                val.len = sizeof(GTM_MAX_INDRCACHE_COUNT) - 1;
-                if (cachent = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
-                        max_cache_entries = cachent;
+		val.addr = GTM_MAX_INDRCACHE_COUNT;
+		val.len = sizeof(GTM_MAX_INDRCACHE_COUNT) - 1;
+		if (cachent = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+			max_cache_entries = cachent;
 
 		/* Initialize ZQUIT to control funky QUIT compilation */
 		val.addr = GTM_ZQUIT_ANYWAY;

@@ -31,6 +31,7 @@
 #include "gtmmsg.h"
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
+#include "interlock.h"
 
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
@@ -43,15 +44,17 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 	int			lcnt;
 	sgmnt_addrs     	*csa;
 	cache_que_head_ptr_t    crq, crqwip;
+	freeze_status		status;
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_DBRDONLY);
+	error_def(ERR_MUKILLIP);
 	*return_value = FALSE;
 
 	ESTABLISH(mu_int_reg_ch);
 	if (dba_usr == reg->dyn.addr->acc_meth)
 	{
-		util_out_print("!/Can't integ region !AD; not GTC format", TRUE,  REG_LEN_STR(reg));
+		util_out_print("!/Can't integ region !AD; not GDS format", TRUE,  REG_LEN_STR(reg));
 		mu_int_errknt++;
 		return;
 	}
@@ -77,13 +80,29 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		mu_int_errknt++;
 		return;
 	}
-
-	if (FALSE == region_freeze(gv_cur_region, TRUE, FALSE))
+	status = region_freeze(gv_cur_region, TRUE, FALSE, TRUE);
+	switch (status)
 	{
-		util_out_print("!/Database for region !AD is already frozen, not integing", TRUE, gv_cur_region->rname_len,
-				gv_cur_region->rname);
-		mu_int_errknt++;
-		return;
+		case REG_ALREADY_FROZEN:
+			util_out_print("!/Database for region !AD is already frozen, not integing",
+				TRUE, REG_LEN_STR(gv_cur_region));
+			mu_int_errknt++;
+			return;
+		case REG_HAS_KIP:
+			/* We have already waited for KIP to reset. This time do not wait for KIP */
+			status = region_freeze(gv_cur_region, TRUE, FALSE, FALSE);
+			if (REG_ALREADY_FROZEN == status)
+			{
+				util_out_print("!/Database for region !AD is already frozen, not integing",
+					TRUE, REG_LEN_STR(gv_cur_region));
+				mu_int_errknt++;
+				return;
+			}
+			break;
+		case REG_FREEZE_SUCCESS:
+			break;
+		default:
+			assert(FALSE);
 	}
 	if (gv_cur_region->read_only)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,7 +89,7 @@ void dse_f_reg(void)
 	}
 	if (ptr->dyn.addr->acc_meth == dba_usr)
 	{
-		util_out_print("Error:  Cannot edit an non-GTC format database file.",TRUE);
+		util_out_print("Error:  Cannot edit a non-GDS format database file.",TRUE);
 		gd_header = temp_gdaddr;
 		return;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,13 +26,17 @@
 #include "iottdef.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() and gtm_env_init_sp() prototype */
 #include "gtm_utf8.h"		/* UTF8_NAME */
+#include "gtm_zlib.h"
 
-GBLREF	int4			gtm_shmflags;	/* Shared memory flags for shmat() */
+#define	DEFAULT_NON_BLOCKED_WRITE_RETRIES	10	/* default number of retries */
+
+GBLREF	int4			gtm_shmflags;			/* Shared memory flags for shmat() */
 GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
-GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	boolean_t		is_gtm_chset_utf8;
 GBLREF	boolean_t		utf8_patnumeric;
 GBLREF	boolean_t		badchar_inhibit;
 GBLREF	boolean_t		gtm_quiet_halt;
+GBLREF	int			gtm_non_blocked_write_retries; /* number for retries for non_blocked write to pipe */
 
 static nametabent editing_params[] =
 {
@@ -67,10 +71,17 @@ void	gtm_env_init_sp(void)
 	if (is_defined)
 		gtm_quiet_halt = ret;
 
+	/* ZLIB library compression level */
+	val.addr = GTM_ZLIB_CMP_LEVEL;
+	val.len = sizeof(GTM_ZLIB_CMP_LEVEL) - 1;
+	gtm_zlib_cmp_level = trans_numeric(&val, &is_defined, TRUE);
+	if (GTM_CMPLVL_OUT_OF_RANGE(gtm_zlib_cmp_level))
+		gtm_zlib_cmp_level = ZLIB_CMPLVL_MIN;	/* no compression in this case */
+
 	gtm_principal_editing_defaults = 0;
 	val.addr = GTM_PRINCIPAL_EDITING;
 	val.len = sizeof(GTM_PRINCIPAL_EDITING) - 1;
-	if (SS_NORMAL == (status = trans_log_name(&val, &trans, buf)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, sizeof(buf), do_sendmsg_on_log2long)))
 	{
 		assert(trans.len < sizeof(buf));
 		trans.addr[trans.len] = '\0';
@@ -102,24 +113,23 @@ void	gtm_env_init_sp(void)
 			token = strtok(NULL, ":");
 		}
 	}
-
 	val.addr = GTM_CHSET_ENV;
 	val.len = STR_LIT_LEN(GTM_CHSET_ENV);
-	if (SS_NORMAL == (status = trans_log_name(&val, &trans, buf)) && STR_LIT_LEN(UTF8_NAME) == trans.len)
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, sizeof(buf), do_sendmsg_on_log2long))
+		&& STR_LIT_LEN(UTF8_NAME) == trans.len)
 	{
 		if (!strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 		{
-			gtm_utf8_mode = TRUE;
+			is_gtm_chset_utf8 = TRUE;
 			/* Initialize $ZPATNUMERIC only if $ZCHSET is "UTF-8" */
 			val.addr = GTM_PATNUMERIC_ENV;
 			val.len = STR_LIT_LEN(GTM_PATNUMERIC_ENV);
-			if (SS_NORMAL == (status = trans_log_name(&val, &trans, buf)) &&
-				STR_LIT_LEN(UTF8_NAME) == trans.len &&
-				!strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
+			if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, sizeof(buf), do_sendmsg_on_log2long))
+				&& STR_LIT_LEN(UTF8_NAME) == trans.len
+				&& !strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 			{
-					utf8_patnumeric = TRUE;
+				utf8_patnumeric = TRUE;
 			}
-
 			val.addr = GTM_BADCHAR_ENV;
 			val.len = STR_LIT_LEN(GTM_BADCHAR_ENV);
 			status = logical_truth_value(&val, TRUE, &is_defined);
@@ -127,4 +137,10 @@ void	gtm_env_init_sp(void)
 				badchar_inhibit = status ? TRUE : FALSE;
 		}
 	}
+	/* Initialize variable that controls number of retries for non-blocked writes to a pipe on unix */
+	val.addr = GTM_NON_BLOCKED_WRITE_RETRIES;
+	val.len = sizeof(GTM_NON_BLOCKED_WRITE_RETRIES) - 1;
+	gtm_non_blocked_write_retries = trans_numeric(&val, &is_defined, TRUE);
+	if (!is_defined)
+		gtm_non_blocked_write_retries = DEFAULT_NON_BLOCKED_WRITE_RETRIES;
 }

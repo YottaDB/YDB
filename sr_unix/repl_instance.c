@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,28 +75,52 @@ GBLREF	bool			in_backup;
  *	TRUE, on success
  *	FALSE, otherwise.
  */
-boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsize)
+boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsize, instname_act error_action)
 {
 	char		temp_inst_fn[MAX_FN_LEN+1];
 	mstr		log_nam, trans_name;
 	uint4		ustatus;
+	int4		status;
+	boolean_t	ret;
 
-	error_def(ERR_TEXT);
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_REPLINSTACC);
+	error_def(ERR_REPLINSTUNDEF);
+	error_def(ERR_TEXT);
 
-	log_nam.addr = ZREPLINSTANCE;
-	log_nam.len = sizeof(ZREPLINSTANCE) - 1;
+	log_nam.addr = GTM_REPL_INSTANCE;
+	log_nam.len = sizeof(GTM_REPL_INSTANCE) - 1;
 	trans_name.addr = temp_inst_fn;
-	if ((SS_NORMAL != trans_log_name(&log_nam, &trans_name, temp_inst_fn)) || (0 == trans_name.len))
-		return FALSE;
-	temp_inst_fn[trans_name.len] = '\0';
-	if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus))
+	ret = FALSE;
+	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn, sizeof(temp_inst_fn),
+							do_sendmsg_on_log2long)))
+		&& (0 != trans_name.len))
 	{
-		gtm_putmsg(VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,
-			ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);
-		return FALSE;
+		temp_inst_fn[trans_name.len] = '\0';
+		if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus))
+		{
+			gtm_putmsg(VARLSTCNT(9) ERR_REPLINSTACC, 2, trans_name.len, trans_name.addr,
+				ERR_TEXT, 2, RTS_ERROR_LITERAL("full path could not be found"), ustatus);
+		} else
+			ret = TRUE;
 	}
-	return TRUE;
+	if (FALSE == ret)
+	{
+		if (issue_rts_error == error_action)
+		{
+			if (SS_LOG2LONG == status)
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, sizeof(temp_inst_fn) - 1);
+			else
+				rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+		} else if (issue_gtm_putmsg == error_action)
+		{
+			if (SS_LOG2LONG == status)
+				gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, sizeof(temp_inst_fn) - 1);
+			else
+				gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+		}
+	}
+	return ret;
 }
 
 /* Description:
@@ -111,10 +135,11 @@ boolean_t repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsiz
  */
 void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 {
-	int		status, fd;
-	size_t		actual_readlen;
-	unix_db_info	*udi;
-	gd_region	*reg;
+	int			status, fd;
+	size_t			actual_readlen;
+	unix_db_info		*udi;
+	gd_region		*reg;
+	repl_inst_hdr_ptr_t	replhdr;
 
 	error_def(ERR_REPLINSTOPEN);
 	error_def(ERR_REPLINSTREAD);
@@ -147,8 +172,9 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	{
 		LSEEKREAD(fd, offset, buff, buflen, status);
 	} else
-	{	/* Read starts from the replication instance file header.
-		 * Use LSEEKREAD_AVAILABLE macro instead of LSEEKREAD. This is because if we are not able to read the entire
+	{	/* Read starts from the replication instance file header. Assert that the entire file header was requested. */
+		assert(REPL_INST_HDR_SIZE <= buflen);
+		/* Use LSEEKREAD_AVAILABLE macro instead of LSEEKREAD. This is because if we are not able to read the entire
 		 * fileheader, we still want to see if the "label" field of the file header got read in which case we can
 		 * do the format check first. It is important to do the format check before checking "status" returned from
 		 * LSEEKREAD* macros since the inability to read the entire file header might actually be due to the
@@ -164,6 +190,35 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 				rts_error(VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
 					GDS_REPL_INST_LABEL_SZ - 1, GDS_REPL_INST_LABEL, GDS_REPL_INST_LABEL_SZ - 1, buff);
 			}
+		}
+		if (0 == status)
+		{	/* Check a few other fields in the file-header for compatibility */
+			assert(actual_readlen == buflen);
+			replhdr = (repl_inst_hdr_ptr_t)buff;
+			/* Check endianness match */
+			if (GTM_IS_LITTLE_ENDIAN != replhdr->is_little_endian)
+			{
+				if ((NULL != reg) && (udi->grabbed_ftok_sem))
+					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+				rts_error(VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
+					LEN_AND_LIT(ENDIANTHIS), LEN_AND_LIT(ENDIANOTHER));
+			}
+			/* Check 64bitness match */
+			if (GTM_IS_64BIT != replhdr->is_64bit)
+			{
+				if ((NULL != reg) && (udi->grabbed_ftok_sem))
+					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+				rts_error(VARLSTCNT(8) ERR_REPLINSTFMT, 6, LEN_AND_STR(fn),
+					LEN_AND_LIT(GTM_BITNESS_THIS), LEN_AND_LIT(GTM_BITNESS_OTHER));
+			}
+			/* At the time of this writing, the only minor version supported is 1.
+			 * Whenever this gets updated, we need to add code to do the online upgrade.
+			 * Add an assert as a reminder to do this.
+			 */
+			assert(1 == replhdr->replinst_minorver);
+			/* Check if on-the-fly minor-version upgrade is necessary */
+			if (GDS_REPL_INST_MINOR_LABEL != replhdr->replinst_minorver)
+				assert(FALSE);
 		}
 	}
 	assert((0 == status) || in_repl_inst_edit);

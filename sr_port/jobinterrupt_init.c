@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,8 @@ void jobinterrupt_init(void)
 	/* Provide initial setting for $ZINTERRUPT */
 	envvar_logical.addr = GTM_ZINTERRUPT;
 	envvar_logical.len = sizeof(GTM_ZINTERRUPT) - 1;
-	if (SS_NORMAL != trans_log_name(&envvar_logical, &dollar_zinterrupt.str, trans_bufr))
+	if (SS_NORMAL != TRANS_LOG_NAME(&envvar_logical, &dollar_zinterrupt.str, trans_bufr, sizeof(trans_bufr),
+						do_sendmsg_on_log2long))
 	{	/* Translation failed - use default */
 		dollar_zinterrupt.str.addr = DEF_ZINTERRUPT;
 		dollar_zinterrupt.str.len = sizeof(DEF_ZINTERRUPT) - 1;

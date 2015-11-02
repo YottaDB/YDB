@@ -42,6 +42,7 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 	error_def(ERR_REPLJNLCNFLCT);
 	error_def(ERR_JNLDISABLE);
 	error_def(ERR_MMBEFOREJNL);
+	error_def(ERR_MMNOBFORRPL);
 
 	jnl_curr_state = (enum jnl_state_codes)rptr->sd->jnl_state;
 	repl_curr_state = (enum repl_state_codes)rptr->sd->repl_state;
@@ -100,7 +101,7 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 				|| (!jnl_options->image_type_specified || rptr->before_images));
 			if (dba_mm == acc_meth)
 			{
-				gtm_putmsg(VARLSTCNT(4) ERR_MMBEFOREJNL, 2, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg(VARLSTCNT(4) ERR_MMNOBFORRPL, 2, DB_LEN_STR(gv_cur_region));
 				return EXIT_WRN;
 			}
 			rptr->before_images = TRUE;

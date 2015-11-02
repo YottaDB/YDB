@@ -56,6 +56,16 @@ typedef struct
 #include "mdefsa.h"
 #include "mdefsp.h"
 
+/* Now that mdefsp.h is included, GBLDEF should have been #defined. Use it to define STATICDEF for variables
+ * and STATICFNDEF, STATICFNREF for functions. Define STATICDEF to "GBLDEF". This way we know such usages are intended
+ * to be "static" but yet can effectively debug these variables since they are externally visible.
+ * For functions, do not use the "static" keyword to make them externally visible.
+ * Note that a STATICREF for variables does not make sense since statics are supposed to be used only within one module.
+ */
+#define STATICDEF 	GBLDEF
+#define	STATICFNREF	extern
+#define	STATICFNDEF
+
 /* For all platforms except Tru64/VMS (alpha platforms), the [U]INTPTR_T types will be equivalenced to [u]intptr_t.
    But since this type is used for alignment and other checking, and since Tru64/VMS (implemented as a
    32 bit platform) unconditionally sets this type to its 8 char variant, on Tru64/VMS we will explicitly make
@@ -83,12 +93,18 @@ typedef UINTPTR_T uintszofptr_t;
 #	define NON_GTM64_ONLY(X)
 #	define VA_ARG_TYPE long
 #	define VA_ARG_TYPE_BOOL int
+#	define GTM_IS_64BIT		TRUE
+#	define GTM_BITNESS_THIS		"64-bit"
+#	define GTM_BITNESS_OTHER	"32-bit"
 #else
 #       define USER_STACK_SIZE  4096
 #	define GTM64_ONLY(X)
 #	define NON_GTM64_ONLY(X)	X
 #	define VA_ARG_TYPE int
 #	define VA_ARG_TYPE_BOOL int
+#	define GTM_IS_64BIT		FALSE
+#	define GTM_BITNESS_THIS		"32-bit"
+#	define GTM_BITNESS_OTHER	"64-bit"
 #endif /* GTM64 */
 
 #ifdef __CYGWIN__
@@ -168,7 +184,11 @@ typedef UINTPTR_T uintszofptr_t;
 #define BITS_PER_UCHAR  8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
-#define	MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in an integer */
+#define	MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in a  4-byte integer */
+#define	MAX_DIGITS_IN_INT8	20	/* maximum number of decimal digits in an 8-byte integer */
+#define	MAX_HEX_DIGITS_IN_INT	 8 	/* maximum number of hexadecimal digits in a  4-byte integer */
+#define	MAX_HEX_DIGITS_IN_INT8	16	/* maximum number of hexadecimal digits in an 8-byte integer */
+
 #define MAX_DIGITS_IN_EXP       2       /* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
@@ -699,10 +719,18 @@ typedef que_head *	que_head_ptr_t;
 #  define	msb_index		0
 #  define	lsb_index		1
 #  define	NODE_ENDIANNESS		BIG_ENDIAN_MARKER
-#  else
+#  define	ENDIANTHIS		"BIG"
+#  define	ENDIANOTHER		"LITTLE"
+#  define	ENDIANTHISJUSTIFY	"   BIG"	/* right justified */
+#  define	GTM_IS_LITTLE_ENDIAN	FALSE
+#else
 #  define	msb_index		1
 #  define	lsb_index		0
 #  define	NODE_ENDIANNESS		LITTLE_ENDIAN_MARKER
+#  define	ENDIANTHIS		"LITTLE"
+#  define	ENDIANOTHER		"BIG"
+#  define	ENDIANTHISJUSTIFY	"LITTLE"	/* right justified */
+#  define	GTM_IS_LITTLE_ENDIAN	TRUE
 #endif
 
 #ifdef INT8_SUPPORTED
@@ -1226,14 +1254,19 @@ typedef struct repl_triple_struct
 								 * "start_seqno". This is needed to distinguish two invocations
 								 * of the same instance
 								 */
+	/* Time fields have surrounding fillers so all fields in this structure (and hence the replication instance file
+	 * which this is a part of) start at the same offset irrespective of whether time_t is 4-bytes or 8-bytes.
+	 */
+	int4		filler8bytealign_1;
 	time_t		created_time;				/* Time when triple was written to this file */
+	NON_GTM64_ONLY(int4	filler8bytealign_2;)
 	unsigned char	rcvd_from_instname[MAX_INSTNAME_LEN];	/* NULL if this triple was written by a source server (i.e. this
 								 * instance was a root primary then). Non-NULL if this was written
 								 * by the update process (on receipt of a REPL_NEW_TRIPLE record).
 								 * In this case this field holds the instance name of the immediate
 								 * primary that sent this REPL_NEW_TRIPLE record.
 								 */
-	unsigned char	filler_64[16];				/* for future expansion */
+	unsigned char	filler_64[8];				/* for future expansion */
 } repl_triple;
 
 #endif	/* Replication instance file related structures */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,4 +79,6 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	 */
 	assert(jnl_info->autoswitchlimit == ALIGNED_ROUND_DOWN(jnl_info->autoswitchlimit, jnl_info->alloc, jnl_info->extend));
 	jnl_info->blks_to_upgrd = csd->blks_to_upgrd; /* will be copied over to EPOCH record in newly created journal */
+	jnl_info->free_blocks   = csd->trans_hist.free_blocks; /* will be copied over to EPOCH record in newly created journal */
+	jnl_info->total_blks    = csd->trans_hist.total_blks; /* will be copied over to EPOCH record in newly created journal */
 }

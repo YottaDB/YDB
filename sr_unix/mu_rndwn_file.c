@@ -471,9 +471,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			return FALSE;
 		}
 		if (cs_addrs->nl->glob_sec_init)
-		{	/* The following check isn't really necessary -- the gtm_release_name check above is stricter, but is left
-			 * in to maintain the historical progression.
-			 */
+		{
 			glob_sec_init = TRUE;
 			if (memcmp(cs_addrs->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1))
 			{
@@ -674,10 +672,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 				}
 			}
 		} else
-		{
 			glob_sec_init = FALSE;
-			assert(FALSE);
-		}
 	} else
 	{
 		is_gtm_shm = FALSE;

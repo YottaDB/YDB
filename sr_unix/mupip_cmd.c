@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -200,7 +200,8 @@ static readonly	CLI_PARM mup_endian_parm[] = {
 };
 
 static readonly	CLI_ENTRY mup_endian_qual[] = {
-	{ "OUTDB", 0, 0, 0, 0, 0, 0, VAL_REQ, 1, NON_NEG, VAL_STR, 0 },
+	{ "OUTDB",    0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
+	{ "OVERRIDE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ 0 }
 };
 
@@ -427,6 +428,7 @@ static CLI_ENTRY	gtmsource_qual[] = {
 	{"BUFFSIZE",         0, 0,              0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
 	{"CHANGELOG",        0, 0,              0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 	{"CHECKHEALTH",      0, 0,              0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+	{"CMPLVL",           0, 0,              0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
 	{"CONNECTPARAMS",    0, 0,              0,                      0, 0,                                  0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
 	{"DEACTIVATE",       0, 0,              0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 	{"DETAIL",           0, 0,              0,                      0, 0,                                  0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
@@ -459,6 +461,7 @@ static CLI_ENTRY	gtmrecv_qual[] = {
 	{"BUFFSIZE",         0, 0, 0,                      0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
 	{"CHANGELOG",        0, 0, 0,                      0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
 	{"CHECKHEALTH",      0, 0, 0,                      0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+	{"CMPLVL",           0, 0, 0,                      0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
 	{"FILTER",           0, 0, 0,                      0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
 	{"HELPERS",          0, 0, gtmrecv_helpers_parm,   0, 0, 0, VAL_NOT_REQ,    0, NON_NEG, VAL_STR, 0 },
 	{"LISTENPORT",       0, 0, 0,                      0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },

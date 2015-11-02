@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,8 +91,6 @@ int gtmsource_init_heartbeat(void)
 
 	memset(repl_heartbeat_que_head, 0, num_q_entries * sizeof(repl_heartbeat_que_entry_t));
 	repl_heartbeat_free_head = repl_heartbeat_que_head + 1;
-	fprintf(stderr, "repl_heartbeat_que_head (0x%p) repl_heartbeat_free_head (0x%p). Address of ack_time (0x%p)\n",
-		repl_heartbeat_que_head, repl_heartbeat_free_head, &repl_heartbeat_free_head->heartbeat.ack_time[0]);
 	*(gtm_time4_t *)&repl_heartbeat_que_head->heartbeat.ack_time[0] = 0;
 	*(gtm_time4_t *)&repl_heartbeat_free_head->heartbeat.ack_time[0] = 0;
 	for (heartbeat_element = repl_heartbeat_free_head + 1, num_q_entries -= 2;

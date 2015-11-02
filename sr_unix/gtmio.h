@@ -30,7 +30,7 @@
  * LSEEKWRITE	Same as LSEEKREAD but for WRITE.
  * DOREADRC	Performs read, returns code 0 if okay, otherwise returns errno.
  * DOREADRL     Performs read but returns length read or -1 if errno is set.
- * DOREADRLTO	Same as DOREADRL but has a timeout flag to poll on interrupts.
+ * DOREADRLTO2	Same as DOREADRL but has a timeout flag to poll on interrupts.
  * DOWRITE	Performs write with no error checking/return.
  * DOWRITERC	Performs write, returns code 0 if okay, otherwise returns errno.
  * DOWRITERL	Performs write but returns length written or -1 if errno is set.
@@ -44,12 +44,13 @@
 #include "gtm_unistd.h"
 #include "gtm_fcntl.h"
 #include "eintr_wrappers.h"
+#include "min_max.h"
 
 #ifdef __linux__
 #include <sys/vfs.h>
 #endif
 
-#ifdef __MVS__
+#ifdef __KEEP_zOS_EBCDIC__
 #define DOWRITE_A	__write_a
 #define DOREAD_A	__read_a
 #define	DOWRITERL_A	#error need to create as part of z/OS port and make __write_a return status and good errno
@@ -59,8 +60,9 @@
 #define	DOWRITERL_A	DOWRITERL
 #endif
 
-#define MAX_FILE_OPEN_TRIES 	20  /* polling count */
-#define WAIT_FOR_FILE_TIME 	100 /* msec */
+#define MAX_FILE_OPEN_TRIES	20  /* polling count */
+#define WAIT_FOR_FILE_TIME	100 /* msec */
+#define WAIT_FOR_BLOCK_TIME	100 /* msec */
 
 #define IOCTL(FDESC, REQUEST, ARG, RC) \
 { \
@@ -602,15 +604,61 @@
 		RLEN = -1; \
 }
 
-#define DOREADRLTO(FDESC, FBUFF, FBUFF_LEN, TOFLAG, RLEN) \
+#define DOREADRLTO2(FDESC, FBUFF, FBUFF_LEN, TOFLAG, BLOCKED_IN, ISPIPE, FLAGS, RLEN, \
+TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT) \
 { \
 	ssize_t		gtmioStatus; \
+	int		skip_read = FALSE;\
+	int		tfcntl_res;\
 	size_t		gtmioBuffLen; \
 	sm_uc_ptr_t	gtmioBuff; \
 	gtmioBuffLen =  (size_t)FBUFF_LEN; \
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
 	for (;;) \
         { \
+		/* if it is a read x:0 on a pipe and it is not blocked (always the case when starting a read)\
+		   then try and read one char.  If it succeeds then turn on blocked io and read the rest\
+		   of the line.*/\
+		if (ISPIPE && (FALSE == *BLOCKED_IN))			\
+		{\
+			for (;;)\
+			{\
+				if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, 1))) \
+				{ \
+					if (0 == gtmioStatus) /* end of file */\
+					{\
+						skip_read = TRUE;\
+						break;\
+					}\
+					FCNTL3(FDESC, F_SETFL, FLAGS, tfcntl_res); \
+					if (0 > tfcntl_res) \
+						rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);\
+					*BLOCKED_IN = TRUE;		\
+					if (PIPE_ZERO_TIMEOUT) \
+					{\
+						TOFLAG = FALSE;	\
+						/* Set a timer for 1 sec so atomic read x:0 will still work on\
+						   loaded systems but timeout on incomplete reads.  Any characters\
+						   read to this point will be returned. */ \
+						*MSEC_TIMEOUT = timeout2msec(1);\
+						start_timer(TIMER_ID, *MSEC_TIMEOUT, wake_alarm, 0, NULL); \
+					}				\
+					gtmioBuffLen -= gtmioStatus; \
+					gtmioBuff += gtmioStatus;\
+					/* if only asked to read 1 character then skip additional read */\
+					if (0 == gtmioBuffLen)\
+						skip_read = TRUE;\
+					break;\
+				} \
+				else if (EINTR != errno || TOFLAG)\
+				{\
+					skip_read = TRUE;\
+					break;\
+				}\
+			}\
+		}\
+		/* if we didn't read 1 character or it's an error don't read anymore now */\
+		if (TRUE == skip_read) break;\
 		if (-1 != (gtmioStatus = read(FDESC, gtmioBuff, gtmioBuffLen))) \
 	        { \
 			gtmioBuffLen -= gtmioStatus; \
@@ -624,7 +672,11 @@
 	if (-1 != gtmioStatus) \
 		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); 	/* Return length actually read */ \
 	else 	    					/* Had legitimate error - return it */ \
-		RLEN = -1; \
+	{\
+		if (ISPIPE)\
+			*TOT_BYTES_READ = (int)(FBUFF_LEN - gtmioBuffLen); \
+		RLEN = -1;						\
+	}								\
 }
 
 #define DOWRITE(FDESC, FBUFF, FBUFF_LEN) \
@@ -650,56 +702,101 @@
 	/* GTMASSERT? */ \
 }
 
-#define DOWRITERC(FDESC, FBUFF, FBUFF_LEN, RC) \
-{ \
-	ssize_t		gtmioStatus; \
-	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t	gtmioBuff; \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	for (;;) \
-        { \
-		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen))) \
-	        { \
-			gtmioBuffLen -= gtmioStatus; \
-			if (0 == gtmioBuffLen) \
-				break; \
-			gtmioBuff += gtmioStatus; \
-	        } \
-		else if (EINTR != errno) \
-		  break; \
-        } \
-	if (-1 == gtmioStatus)	    	/* Had legitimate error - return it */ \
-		RC = errno; \
-	else if (0 == gtmioBuffLen) \
-	        RC = 0; \
-	else \
-		RC = -1;		/* Something kept us from writing what we wanted */ \
+#define DOWRITERC(FDESC, FBUFF, FBUFF_LEN, RC)							\
+{												\
+	GBLREF	int	gtm_non_blocked_write_retries;						\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	sm_uc_ptr_t	gtmioBuff;								\
+	int		block_cnt = 0;								\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	for (;;)										\
+        {											\
+		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen)))		\
+	        {										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen)							\
+				break;								\
+			gtmioBuff += gtmioStatus;						\
+	        }										\
+		else if (EINTR != errno && EAGAIN != errno)					\
+		        break;									\
+		else if (EAGAIN == errno)							\
+		{										\
+			if (gtm_non_blocked_write_retries <= block_cnt)				\
+				break;								\
+			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
+			block_cnt++;								\
+		}										\
+        }											\
+	if (-1 == gtmioStatus)	    	/* Had legitimate error - return it */			\
+		RC = errno;									\
+	else if (0 == gtmioBuffLen)								\
+	        RC = 0;										\
+	else											\
+		RC = -1;		/* Something kept us from writing what we wanted */	\
 }
 
-#define DOWRITERL(FDESC, FBUFF, FBUFF_LEN, RLEN) \
-{ \
-	ssize_t		gtmioStatus; \
-	size_t		gtmioBuffLen; \
-	sm_uc_ptr_t 	gtmioBuff; \
-	gtmioBuffLen = FBUFF_LEN; \
-	gtmioBuff = (sm_uc_ptr_t)(FBUFF); \
-	for (;;) \
-        { \
-		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen))) \
-	        { \
-			gtmioBuffLen -= gtmioStatus; \
-			if (0 == gtmioBuffLen) \
-			        break; \
-			gtmioBuff += gtmioStatus; \
-	        } \
-		else if (EINTR != errno) \
-		        break; \
-        } \
-	if (-1 != gtmioStatus) \
-		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); 	/* Return length actually written */ \
-	else 	    					/* Had legitimate error - return it */ \
-		RLEN = -1; \
+#define DOLLAR_DEVICE_SET(DEVPTR,STATUS)				\
+{									\
+	len = SIZEOF(ONE_COMMA) - 1;					\
+	memcpy(DEVPTR->dollar_device, ONE_COMMA, len);			\
+	errptr = (char *)STRERROR(STATUS);				\
+	/* make sure there is room for the 1, and the null at the end */ \
+	errlen = MIN(STRLEN(errptr), SIZEOF(DEVPTR->dollar_device) - SIZEOF(ONE_COMMA)); \
+	memcpy(&DEVPTR->dollar_device[len], errptr, errlen);		\
+	DEVPTR->dollar_device[len + errlen] = '\0';			\
+}
+
+#define DOLLAR_DEVICE_WRITE(DEVPTR,STATUS)					\
+{											\
+	int	len;									\
+	int	errlen;								\
+	char	*errptr;								\
+	/* save error in $device */							\
+	if (EAGAIN == STATUS)							\
+	{										\
+		len = SIZEOF(ONE_COMMA_UNAVAILABLE);				\
+		memcpy(DEVPTR->dollar_device, ONE_COMMA_UNAVAILABLE, len);	\
+	} else										\
+		DOLLAR_DEVICE_SET(DEVPTR,STATUS);				\
+}
+
+#define DOWRITERL(FDESC, FBUFF, FBUFF_LEN, RLEN)						\
+{												\
+	ssize_t		gtmioStatus;								\
+	size_t		gtmioBuffLen;								\
+	sm_uc_ptr_t 	gtmioBuff;								\
+	int		block_cnt = 0;								\
+												\
+	GBLREF	int	gtm_non_blocked_write_retries;						\
+												\
+	gtmioBuffLen = FBUFF_LEN;								\
+	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
+	for (;;)										\
+        {											\
+		if (-1 != (gtmioStatus = write(FDESC, gtmioBuff, gtmioBuffLen)))		\
+	        {										\
+			gtmioBuffLen -= gtmioStatus;						\
+			if (0 == gtmioBuffLen)							\
+			        break;								\
+			gtmioBuff += gtmioStatus;						\
+	        }										\
+		else if (EINTR != errno && EAGAIN != errno)					\
+		        break;									\
+		else if (EAGAIN == errno)							\
+		{										\
+			if (gtm_non_blocked_write_retries <= block_cnt)				\
+				break;								\
+			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
+			block_cnt++;								\
+		}										\
+        }											\
+	if (-1 != gtmioStatus)									\
+		RLEN = (int)(FBUFF_LEN - gtmioBuffLen); /* Return length actually written */	\
+	else						/* Had legitimate error - return it */	\
+		RLEN = -1;									\
 }
 
 #define DO_FILE_READ(CHANNEL, OFFSET, READBUFF, LEN, STATUS1, STATUS2)		\

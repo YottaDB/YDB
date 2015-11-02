@@ -304,6 +304,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	int4			wtstart_errno;
 	boolean_t		buffers_flushed;
 	uint4			idle_flush_count = 0;	/* Number of times buffers were flushed without an intermediate sleep */
+	uint4			write_wrap;
 
 	UNIX_ONLY(
 		repl_triple		triple;
@@ -330,9 +331,18 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	{
 		incr_seqno = FALSE;
 		if (repl_allowed)
-		{
-			temp_df_seqnum =  jnlpool_ctl->jnl_seqno - upd_proc_local->read_jnl_seqno;
-			if ((0 != temp_df_seqnum) && seqnum_diff != temp_df_seqnum)
+		{	/* An UPDREPLSTATEOFF error is issued BEFORE applying an update to a non-replicated database.
+			 * But it is possible that replication was turned ON at that time (since we dont hold crit
+			 * at the time we do the UPDREPLSTATEOFF check) but later got turned OFF (for example due to
+			 * no disk space for journal files etc.) just before the actual application of the update.
+			 * In that case, the UPDREPLSTATEOFF error would not have been issued but there is still an
+			 * issue in that an update from the primary got applied to a non-replicated database on the
+			 * secondary. This will be caught by the below test which checks that the journal seqno of
+			 * the secondary AFTER applying each incoming transaction matches the journal seqno of the
+			 * next incoming transaction.
+			 */
+			temp_df_seqnum = upd_proc_local->read_jnl_seqno - jnlpool_ctl->jnl_seqno;
+			if ((0 != temp_df_seqnum) && (seqnum_diff != temp_df_seqnum))
 			{
 				seqnum_diff = temp_df_seqnum;
 				repl_log(updproc_log_fp, TRUE, TRUE,
@@ -342,9 +352,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				repl_log(updproc_log_fp, TRUE, TRUE,
 					"JNLSEQNO of last transaction written to journal pool = "INT8_FMT" "INT8_FMTX" \n",
 					INT8_PRINT(jnlpool_ctl->jnl_seqno), INT8_PRINTX(jnlpool_ctl->jnl_seqno));
-				repl_log(updproc_log_fp, TRUE, TRUE, "Secondary Ahead of Primary by "INT8_FMT" "INT8_FMTX" \n",
+				repl_log(updproc_log_fp, TRUE, TRUE, "Number of transactions from Primary which did NOT update "
+					"JNLSEQNO on Secondary is "INT8_FMT" "INT8_FMTX" \n",
 					INT8_PRINT(temp_df_seqnum), INT8_PRINTX(temp_df_seqnum));
-
 			}
 		}
 		if (SHUTDOWN == upd_proc_local->upd_proc_shutdown)
@@ -393,12 +403,13 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			upd_proc_local->changelog = 0;
 		}
 		if (upd_proc_local->bad_trans
-			|| (0 == tupd_num && FALSE == recvpool.recvpool_ctl->wrapped
+			|| ((0 == tupd_num) && (FALSE == recvpool.recvpool_ctl->wrapped)
 				&& (temp_write = recvpool.recvpool_ctl->write) == upd_proc_local->read))
-		{
-			/* to take care of the startup case where jnl_seqno is 0 in the recvpool_ctl */
-			assert((0 == recvpool.recvpool_ctl->jnl_seqno)
-				||  jnl_seqno <= recvpool.recvpool_ctl->jnl_seqno);
+		{	/* bad-trans OR nothing to process. In case of the former, wait until receiver resets bad_trans.
+			 * In the latter, wait until data is available in the receive pool.
+			 */
+			assert((0 == recvpool.recvpool_ctl->jnl_seqno) || (jnl_seqno <= recvpool.recvpool_ctl->jnl_seqno));
+				/* the 0 == check takes care of the startup case where jnl_seqno is 0 in the recvpool_ctl */
 			/* If any dirty buffers, write them out since nothing else is happening now.
 			 * wcs_wtstart only writes a few buffer a call and putting the call in a loop would flush the
 			 * entire dirty buffer set, but there is no need for a loop around the call since we're already in
@@ -443,35 +454,56 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			continue;
 		}
 		idle_flush_count = 0;
+		/* The update process reads "recvpool_ctl->write" first and assumes that all data in the receive pool
+		 * that it then reads (upto the "write" offset) is valid. In order for this assumption to hold good, the
+		 * receiver server needs to do a write memory barrier after updating the receive pool data but before
+		 * updating "write". The update process does a read memory barrier after reading "write" but before reading
+		 * the receive pool data. Not enforcing this read order would mean we would have seen an updated "write"
+		 * but not yet see the updated receive pool data which would mean whatever data we read from the receive pool
+		 * will be stale (which if successfully processed could cause primary-secondary dbs to get out of sync).
+		 */
+		SHM_READ_MEMORY_BARRIER;
 		/* To take the wrapping of buffer in case of over flow ------------ */
 		/*     assume receiver will update wrapped even for exact overflows */
-		if (temp_read >= recvpool.recvpool_ctl->write_wrap)
+		write_wrap = recvpool.recvpool_ctl->write_wrap;
+		if (temp_read >= write_wrap)
 		{
+			assert(temp_read == write_wrap);
 			if (0 < tupd_num)	/* receive pool cannot wrap in the middle of TP */
 				GTMASSERT;	/* see process_tr_buff in gtmrecv_process for why */
 			if (FALSE == recvpool.recvpool_ctl->wrapped)
-			{ 	/* Update process in keeping up with receiver
-				 * server, notices that there was a wrap
-				 * (thru write and write_wrap). It has to
-				 * wait till receiver sets wrapped */
+			{ 	/* Update process in keeping up with receiver server, notices that there was a wrap
+				 * (thru write and write_wrap). It has to wait till receiver sets wrapped.
+				 */
 				SHORT_SLEEP(1);
 				continue;
 			}
 			DEBUG_ONLY(
 				repl_log(updproc_log_fp, TRUE, FALSE,
 				       "-- Wrapping -- read = %ld :: write_wrap = %ld :: upd_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
-					temp_read, recvpool.recvpool_ctl->write_wrap, INT8_PRINT(jnl_seqno),INT8_PRINTX(jnl_seqno));
+					temp_read, write_wrap, INT8_PRINT(jnl_seqno),INT8_PRINTX(jnl_seqno));
 				repl_log(updproc_log_fp, TRUE, TRUE,
 					"-------------> wrapped = %ld :: write = %ld :: recv_jnl_seqno = "INT8_FMT" "INT8_FMTX" \n",
 					recvpool.recvpool_ctl->wrapped, recvpool.recvpool_ctl->write,
 					INT8_PRINT(recvpool.recvpool_ctl->jnl_seqno),
 					INT8_PRINTX(recvpool.recvpool_ctl->jnl_seqno));
 			)
+			/* The update process reads (a) "recvpool_ctl->wrapped" first and then reads (b) "recvpool_ctl->write".
+			 * If "wrapped" is TRUE, it assumes that "write" will never hold a stale value that corresponds to a
+			 * previous state of "wrapped" For this assumption to hold good, the receiver server needs to do a write
+			 * memory barrier after updating "write" but before updating "wrapped". The update process will do a read
+			 * memory barrier after reading "wrapped" but before reading "write". This way we are guaranteed the
+			 * update process will never see a value of "write" that is at the tail end of the receive pool once it
+			 * sees "wrapped" as TRUE. Not having this guarantee means we would have wrapped to read from the
+			 * beginning of the receive pool but will continue to see "write" at the tail of the receive pool and will
+			 * therefore treat almost the entire receive pool as containing unprocessed data when it is not the case.
+			 */
+			SHM_READ_MEMORY_BARRIER;
 			temp_read = 0;
-			temp_write = recvpool.recvpool_ctl->write;
 			upd_proc_local->read = 0;
 			recvpool.recvpool_ctl->wrapped = FALSE;
 			readaddrs = recvpool.recvdata_base;
+			temp_write = recvpool.recvpool_ctl->write;
 			if (0 == temp_write)
 				continue; /* Receiver server wrapped but hasn't yet written anything into the pool */
 		}
@@ -549,7 +581,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		{	/* We need that so REC_LEN_FROM_SUFFIX does not access unaligned int */
 			bad_trans_type = upd_bad_forwptr;
 			assert(FALSE);
-		} else if (rec_len != (backptr = REC_LEN_FROM_SUFFIX(readaddrs, rec_len)))
+		} else if ((0 == rec_len) || (rec_len != (backptr = REC_LEN_FROM_SUFFIX(readaddrs, rec_len))))
 		{
 			bad_trans_type = upd_bad_backptr;
 			assert(FALSE);

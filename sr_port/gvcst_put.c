@@ -132,18 +132,20 @@ void	gvcst_put(mval *val)
 	sm_uc_ptr_t	jnlpool_instfilename;
 	unsigned char	instfilename_copy[MAX_FN_LEN + 1];
 	int4		jfb_record_size;
+	sgmnt_addrs	*csa;
 
 	error_def(ERR_SCNDDBNOUPD);
 	error_def(ERR_REPLINSTMISMTCH);
 
 	is_dollar_incr = in_gvcst_incr;
 	in_gvcst_incr = FALSE;
+	csa = cs_addrs;
 	if (REPL_ALLOWED(cs_data) && is_replicator)
 	{
 		if (FALSE == pool_init)
 			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
 		assert(pool_init);
-		if (!cs_addrs->replinst_matches_db)
+		if (!csa->replinst_matches_db)
 		{
 			if (jnlpool_ctl->upd_disabled && !is_updproc)
 			{	/* Updates are disabled in this journal pool. Detach from journal pool and issue error. */
@@ -155,7 +157,7 @@ void	gvcst_put(mval *val)
 			}
 			UNIX_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instfilename;)
 			VMS_ONLY(jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.gtmgbldir;)
-			if (STRCMP(cs_addrs->nl->replinstfilename, jnlpool_instfilename))
+			if (STRCMP(csa->nl->replinstfilename, jnlpool_instfilename))
 			{	/* Replication instance file mismatch. Issue error. But before that detach from journal pool.
 				 * Copy replication instance file name in journal pool to temporary memory before detaching.
 				 */
@@ -167,9 +169,9 @@ void	gvcst_put(mval *val)
 				assert(NULL == jnlpool.jnlpool_ctl);
 				assert(FALSE == pool_init);
 				rts_error(VARLSTCNT(8) ERR_REPLINSTMISMTCH, 6, LEN_AND_STR(instfilename_copy),
-					DB_LEN_STR(gv_cur_region), LEN_AND_STR(cs_addrs->nl->replinstfilename));
+					DB_LEN_STR(gv_cur_region), LEN_AND_STR(csa->nl->replinstfilename));
 			}
-			cs_addrs->replinst_matches_db = TRUE;
+			csa->replinst_matches_db = TRUE;
 		}
 	}
 	blk_size = cs_data->blk_size;
@@ -199,6 +201,7 @@ void	gvcst_put(mval *val)
 			;
 	}
 	while (extra_block_split_req);
+	INCR_GVSTATS_COUNTER(csa, csa->nl, n_set, 1);
 }
 
 static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
@@ -234,6 +237,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
 	ht_ent_int4		*tabent;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
+	sgmnt_addrs		*csa;
 
 	error_def(ERR_GVINCRISOLATION);
 	error_def(ERR_GVIS);
@@ -260,7 +264,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		gbl_target_was_set = FALSE;
 		reset_gv_target = save_targ;
 	}
-	assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
+	csa = cs_addrs;
+	assert(t_tries < CDB_STAGNATE || csa->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 	/* Assume we don't require an additional block split */
 	*extra_block_split_req = FALSE;
 	/* level_0 == true and no_pointers == false means that this is a directory tree data block containing pointers to roots */
@@ -293,7 +298,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		 * led us to this conclusion. So scan the directory tree here and validate its history at the end of this function.
 		 * If we decide to restart due to a concurrency conflict, remember to reset gv_target->root to 0 before restarting.
 		 */
-		gv_target = cs_addrs->dir_tree;
+		gv_target = csa->dir_tree;
 		for (cp1 = temp_key->base, cp2 = gv_altkey->base;  0 != *cp1;)
 			*cp2++ = *cp1++;
 		*cp2++ = 0;
@@ -402,7 +407,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		ins_chain_index = t_create(allocation_clue, (uchar_ptr_t)bs1, sizeof(blk_hdr) + sizeof(rec_hdr), next_blk_index, 1);
 		temp_key = gv_altkey;
 		gv_target->hist.h[0].blk_num = HIST_TERMINATOR;
-		gv_target = cs_addrs->dir_tree;
+		gv_target = csa->dir_tree;
 		value.len = sizeof(block_id);
 		value.addr = (char *)&zeroes;
 		no_pointers = FALSE;
@@ -544,8 +549,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			chain1 = *(off_chain *)&bh->blk_num;
 			if ((1 == chain1.flag) && ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth))
 			{
-				assert(sgm_info_ptr->tp_csa == cs_addrs);
-				assert(FALSE == cs_addrs->now_crit);
+				assert(sgm_info_ptr->tp_csa == csa);
+				assert(FALSE == csa->now_crit);
 				status = cdb_sc_blknumerr;
 				goto retry;
 			}
@@ -1431,7 +1436,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 	assert(!dollar_tlevel || !jnl_format_done
 		|| (JNL_SET == ((jnl_format_buffer *)((uchar_ptr_t)sgm_info_ptr->jnl_tail
 								- offsetof(jnl_format_buffer, next)))->ja.operation));
-	if (JNL_WRITE_LOGICAL_RECS(cs_addrs) && (!jnl_format_done || is_dollar_incr))
+	if (JNL_WRITE_LOGICAL_RECS(csa) && (!jnl_format_done || is_dollar_incr))
 	{
 		if (0 == dollar_tlevel)
 		{
@@ -1459,9 +1464,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 		DEBUG_ONLY(jgbl.cumul_index++;)
 		jnl_format_done = TRUE;
 	}
-/* validate: Commenting out thie label as its never referenced. Done to make HP compiler happy and not throw warning. */
 	horiz_growth = FALSE;
-	assert(cs_addrs->dir_tree == gv_target || tp_root);
+	assert(csa->dir_tree == gv_target || tp_root);
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 	if (0 == dollar_tlevel)
 	{
@@ -1471,9 +1475,6 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
                 inctn_opcode = inctn_invalid_op;
 		if (succeeded)
 		{
-			++cs_data->n_puts;
-			if (duplicate_set)
-				++cs_data->n_puts_duplicate;
 			if (NULL != dir_hist)
 				gv_target->clue.end = 0;	/* Invalidate clue */
 		}

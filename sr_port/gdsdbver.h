@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@ enum mdb_ver
 	GDSMV51000ALT,	/* Upgrade from a previous version upgraded to this value for V51000 due to bug */
 	GDSMV52000,	/* Unicode .. no real header changes but db contents could be unusable by previous versions */
 	GDSMV53000,	/* M-Itanium release. secshr_ops_array and index is been copied from sgmnt_data to node_local. */
+	GDSMV53003,	/* ZSHOW "G" release: Db Statistics rearranged in file header */
 	GDSMVLAST
 };
 #define GDSMVCURR (GDSMVLAST - 1)

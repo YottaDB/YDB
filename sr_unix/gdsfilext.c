@@ -20,8 +20,8 @@
 #include "gtm_statvfs.h"	/* for GTM_BAVAIL_TYPE */
 
 #include "buddy_list.h"
-#include "gdskill.h"
 #include "gdsroot.h"
+#include "gdskill.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbml.h"
@@ -105,6 +105,11 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	error_def(ERR_TEXT);
 	error_def(ERR_TOTALBLKMAX);
 	error_def(ERR_WAITDSKSPACE);
+
+#ifdef __hppa
+	if (dba_mm == cs_addrs->hdr->acc_meth)
+		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not allowed ? */
+#endif
 
 	/* Both blocks and total blocks are unsigned ints so make sure we aren't asking for huge numbers that will
 	   overflow and end up doing silly things.
@@ -382,6 +387,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		}
 #endif
 		free(cs_data);			/* note current assumption that cs_data has not changed since memcpy above */
+		/* In addition to updating the internal map values, gds_map_moved sets cs_data to point to the remapped file */
 		gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], new_eof);
                 cs_addrs->total_blks = new_total;       /* Local copy to test if file has extended */
  	}

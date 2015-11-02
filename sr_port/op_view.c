@@ -338,6 +338,30 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				rts_error(VARLSTCNT(4) ERR_PATTABNOTFND, 2, parmblk.value->str.len, parmblk.value->str.addr);
 			}
 			break;
+		case VTK_RESETGVSTATS:
+			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+			{
+				for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
+				{
+					if (!reg->open)
+						continue;
+					switch(reg->dyn.addr->acc_meth)
+					{
+						case dba_mm:
+						case dba_bg:
+							csa = &FILE_INFO(reg)->s_addrs;
+							memset(&csa->gvstats_rec, 0, sizeof(gvstats_rec_t));
+							break;
+						case dba_cm:
+						case dba_usr:
+							break;
+						default:
+							GTMASSERT;
+							break;
+					}
+				}
+			}
+			break;
 		case VTK_YDIRTVAL:
 			/* This is an internal use only call to VIEW which is used to modify directory
 			   tree entries.  It places a string in in the static array ydirt_str.  A subsequent

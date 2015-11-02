@@ -86,7 +86,8 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	memcpy(csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 	csd->owner_node = v15_csd->owner_node;
 	csd->image_count = v15_csd->image_count;
-	csd->kill_in_prog = v15_csd->kill_in_prog;	/* assert to 0 ??? */
+	csd->kill_in_prog = 0;
+	csd->abandoned_kills = v15_csd->kill_in_prog;	/* assert to 0 ??? */
 	csd->blks_to_upgrd = v15_csd->trans_hist.total_blks - v15_csd->trans_hist.free_blocks;	/* New in V5.0-000 */
 	assert(csd->blks_to_upgrd);
 	csd->tn_upgrd_blks_0 = 0;								/* New in V5.0-000 */

@@ -264,7 +264,6 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 	error_def(ERR_REQRUNDOWN);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_VERMISMATCH);
-	error_def(ERR_REPLINSTUNDEF);
 
 	assert(tsd->acc_meth == dba_bg  ||  tsd->acc_meth == dba_mm);
 	is_bg = (dba_bg == tsd->acc_meth);
@@ -528,8 +527,8 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		memcpy(csa->nl->fname, reg->dyn.addr->fname, reg->dyn.addr->fname_len);		/* database filename */
 		if (REPL_ALLOWED(csd))
 		{
-			if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1))
-				rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+			if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error))
+				GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
 			assert(full_len);
 			memcpy(csa->nl->replinstfilename, instfilename, full_len);
 		}
@@ -554,12 +553,13 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 				= (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
 			csd->max_update_array_size += ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
 			/* add current db_csh counters into the cumulative counters and reset the current counters */
-#define TAB_DB_CSH_ACCT_REC(COUNTER, DUMMY1, DUMMY2)					\
+#			define TAB_DB_CSH_ACCT_REC(COUNTER, DUMMY1, DUMMY2)		\
 				csd->COUNTER.cumul_count += csd->COUNTER.curr_count;	\
 				csd->COUNTER.curr_count = 0;
-#include "tab_db_csh_acct_rec.h"
-#undef TAB_DB_CSH_ACCT_REC
+#			include "tab_db_csh_acct_rec.h"
+#			undef TAB_DB_CSH_ACCT_REC
 		}
+		gvstats_rec_csd2cnl(csa);	/* should be called before "db_auto_upgrade" */
 		if (!read_only)
 		{
 			if (is_bg)

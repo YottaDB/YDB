@@ -70,12 +70,19 @@
 #include "deferred_signal_handler.h"
 #endif
 
-/* To debug this routine effectively, normally static routines are turned into
-   GBLDEFs. Also, for vars that need one copy, define GBLRDEF to GBLDEF for
-   debug and GBLREF for pro. This is because the pro builds always have a
-   debug version in them satisfiying the GBLREF but the debug builds won't
-   have any pro code in them so the define must be in the debug version.
-*/
+/* This routine is compiled twice, once as debug and once as pro and put into the same pro build. The alternative
+ * memory manager is selected with the debug flags (any non-zero gtmdbglvl setting invokes debug memory manager in
+ * a pro build). So the global variables (defined using the STATICD macro) have to be two different fields.
+ * One for pro, one for dbg. The fields have different values and different sizes between the two compiles but
+ * exist in the same build. They cannot coexist. That is why STATICD is defined to be static for PRO and GBLDEF for DBG.
+ * This is the reason why we cannot use the STATICDEF macro here because that is defined to be a GBLDEF for PRO and DBG.
+ *
+ * To debug this routine effectively, normally static routines are turned into GBLDEFs. Also, for vars that
+ * need one copy, define GBLRDEF to GBLDEF for debug and GBLREF for pro. This is because the pro builds always
+ * have a debug version in them satisfiying the GBLREF but the debug builds won't have any pro code in them so
+ * the define must be in the debug version. Also note that we cannot use the STATICDEF macro (instead of the
+ * STATICD below) since that evaluates to a GBLDEF in both PRO and DBG which
+ */
 #ifdef DEBUG
 #  define STATICD GBLDEF
 #  define STATICR extern

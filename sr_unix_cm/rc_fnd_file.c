@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,14 +81,16 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	dsid_list->next = NULL;
 	fpath1.addr = RC_NSPACE_PATH;
 	fpath1.len = sizeof(RC_NSPACE_PATH);
-	if (trans_log_name(&fpath1, &fpath2, buff) != SS_NORMAL) {
-	    char msg[256];
-	    sprintf(msg,"Invalid DB filename, \"%s\"",fpath1.addr);
-	    gtcm_rep_err(msg, errno);
-	    return RC_BADFILESPEC;
+	if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, sizeof(buff), do_sendmsg_on_log2long))
+	{
+		char msg[256];
+
+		sprintf(msg,"Invalid DB filename, \"%s\"",fpath1.addr);
+		gtcm_rep_err(msg, errno);
+		return RC_BADFILESPEC;
 	}
 	if (fpath2.len > MAX_FN_LEN)
-	    return RC_BADFILESPEC;
+		return RC_BADFILESPEC;
 	dsid_list->fname = (char *)malloc(fpath2.len + 1);
 	memcpy(dsid_list->fname, fpath2.addr, fpath2.len);
 	*((char*)(dsid_list->fname + fpath2.len)) = 0;

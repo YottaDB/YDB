@@ -94,6 +94,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	error_def(ERR_RBWRNNOTCHG);
 	error_def(ERR_WCERRNOTCHG);
 	error_def(ERR_WCWRNNOTCHG);
+	error_def(ERR_MMNODYNDWNGRD);
 
 	exit_stat = EXIT_NRM;
 	defer_status = cli_present("DEFER_TIME");
@@ -239,7 +240,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		{
 			if (dba_usr == rptr->reg->dyn.addr->acc_meth)
 			{
-				util_out_print("!/Region !AD is not a GTC access type", TRUE, REG_LEN_STR(rptr->reg));
+				util_out_print("!/Region !AD is not a GDS access type", TRUE, REG_LEN_STR(rptr->reg));
 				exit_stat |= EXIT_WRN;
 				continue;
 			}
@@ -276,7 +277,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					   FALSE);
 			if (GDSVLAST != desired_dbver)
 			{
-				status1 = desired_db_format_set(gv_cur_region, desired_dbver, command);
+				if ((dba_mm != access_new) || (GDSV4 != desired_dbver))
+					status1 = desired_db_format_set(gv_cur_region, desired_dbver, command);
+				else
+				{
+					status1 = ERR_MMNODYNDWNGRD;
+					gtm_putmsg(VARLSTCNT(4) status1, 2, REG_LEN_STR(gv_cur_region));
+				}
 				if (SS_NORMAL != status1)
 				{	/* "desired_db_format_set" would have printed appropriate error messages */
 					if (ERR_MUNOACTION != status1)
@@ -384,7 +391,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					csd->defer_time = 0;
 				else  if (CLI_PRESENT == defer_status)
 				{
-					if (!cli_get_int("DEFER_TIME", &defer_time))
+					if (!cli_get_num("DEFER_TIME", &defer_time))
 					{
 						util_out_print("Error getting DEFER_TIME qualifier value", TRUE);
 						db_ipcs_reset(gv_cur_region, FALSE);
@@ -399,7 +406,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 						mu_gv_cur_reg_free();
 						continue;
 					}
-					csd->defer_time = (short)defer_time;
+					csd->defer_time = defer_time;
 				}
 				if (csd->blks_to_upgrd)
 				{
@@ -429,6 +436,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					mu_gv_cur_reg_free();
 					continue;
 				}
+				csd->jnl_before_image = FALSE;
 			} else
 			{
 				if (defer_status)
@@ -457,7 +465,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				util_out_print("Database file !AD now has !UL global buffers",
 						TRUE, fn_len, fn, csd->n_bts);
 			if (defer_status && (dba_mm == csd->acc_meth))
-				util_out_print("Database file !AD now has defer_time set to !ZL",
+				util_out_print("Database file !AD now has defer_time set to !SL",
 						TRUE, fn_len, fn, csd->defer_time);
 			if (rsrvd_bytes_status)
 				util_out_print("Database file !AD now has !UL reserved bytes",

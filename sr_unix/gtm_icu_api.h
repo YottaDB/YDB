@@ -55,4 +55,7 @@ LITREF UChar32 		u32_line_term[];
 void gtm_icu_init(void);
 void gtm_conv_init(void);
 
+GBLREF	boolean_t	is_gtm_chset_utf8;
+#define	GTM_ICU_INIT_IF_NEEDED	if (is_gtm_chset_utf8) gtm_icu_init();
+
 #endif /* ICU_API_H */

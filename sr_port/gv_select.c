@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,6 +72,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	error_def(ERR_SELECTSYNTAX);
 	error_def(ERR_MUNOFINISH);
 	error_def(ERR_MUNOACTION);
+	error_def(ERR_FREEZECTRL);
 
 	memset(gmap, 0, sizeof(gmap));
 	gmap_size = sizeof(gmap) / sizeof(gmap[0]);
@@ -214,7 +215,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 		if (dba_bg != gv_cur_region->dyn.addr->acc_meth && dba_mm != gv_cur_region->dyn.addr->acc_meth)
 		{
 			assert(gv_cur_region->dyn.addr->acc_meth == dba_usr);
-			util_out_print("Can not select globals from non-GTC region !AD",TRUE,gv_cur_region->rname_len,
+			util_out_print("Can not select globals from non-GDS format region !AD",TRUE,gv_cur_region->rname_len,
 					gv_cur_region->rname);
 			mupip_exit(ERR_MUNOFINISH);
 		}
@@ -255,8 +256,15 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 							DB_LEN_STR(gv_cur_region));
 						mupip_exit(ERR_MUNOFINISH);
 					}
-                                        while (FALSE == region_freeze(gv_cur_region, TRUE, FALSE))
-                                                hiber_start(1000);
+					while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE))
+					{
+						hiber_start(1000);
+						if (mu_ctrly_occurred || mu_ctrlc_occurred)
+						{
+							gtm_putmsg(VARLSTCNT(1) ERR_FREEZECTRL);
+                                                	mupip_exit(ERR_MUNOFINISH);
+						}
+					}
 					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
                                 }
                         }

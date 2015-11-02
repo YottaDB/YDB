@@ -112,7 +112,6 @@ GBLDEF char			gtcm_gnp_server_log[MAX_FN_LEN + 1];
 GBLDEF int			gtcm_gnp_log_path_len;
 
 GBLREF FILE			*gtcm_errfs;
-GBLREF boolean_t		certify_all_blocks;
 GBLREF bool			licensed;
 GBLREF boolean_t		run_time;
 GBLREF boolean_t		gtcm_connection;
@@ -128,7 +127,6 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF boolean_t		is_replicator;
-GBLREF boolean_t		gtm_utf8_mode;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -358,11 +356,9 @@ int main(int argc, char **argv, char **envp)
 	int4			timout;
 	cmi_status_t		status;
 	int			eof, arg_index, parse_ret;
-	mstr			name1, name2;
-	mstr			node_name;
 	cmi_descriptor		service_descr, log_path_descr;
 	unsigned short		service_len, log_path_len;
-	char			nbuff[256], *ptr, service[512];
+	char			*ptr, service[512];
 	now_t			now;	/* for GET_CUR_TIME macro */
 	char			time_str[CTIME_BEFORE_NL + 2], *time_ptr; /* for GET_CUR_TIME macro */
 	pid_t			pid;
@@ -384,15 +380,14 @@ int main(int argc, char **argv, char **envp)
 	assert(0 == offsetof(gv_key, top)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(2 == offsetof(gv_key, end)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(4 == offsetof(gv_key, prev)); /* for integrity of CM_GET_GVCURRKEY */
-	if (gtm_utf8_mode)
-		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	/* read comments in gtm.c for cli magic below */
 	cli_lex_setup(argc, argv);
 	if (1 < argc)
 		cli_gettoken(&eof);
 	cli_token_buf[0] = '\0';
 	ptr = cli_lex_in_ptr->in_str;
-	memmove(ptr + sizeof("GTCM_GNP_SERVER ") - 1, ptr, strlen(ptr));
+	memmove(ptr + sizeof("GTCM_GNP_SERVER ") - 1, ptr, strlen(ptr) + 1);
 	MEMCPY_LIT(ptr, "GTCM_GNP_SERVER ");
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 	parse_ret = parse_cmd();
@@ -439,8 +434,6 @@ int main(int argc, char **argv, char **envp)
 
 	procnum = 0;
         memset(proc_to_clb, 0, sizeof(proc_to_clb));
-	node_name.addr = nbuff;
-	node_name.len = 0;
 
 	/* child continues here */
 	gtcm_connection = FALSE;
@@ -481,10 +474,6 @@ int main(int argc, char **argv, char **envp)
 	/* Pre-allocate some timer blocks. */
 	prealloc_gt_timers();
 
-	name1.addr = "GTCM_GDSCERT";
-	name1.len = sizeof("GTCM_GDSCERT") - 1;
-	if (SS_NORMAL == (status = trans_log_name(&name1, &name2, nbuff)))
-		certify_all_blocks = TRUE;
 	SET_LATCH_GLOBAL(&action_que.latch, LOCK_AVAILABLE);
 	mu_gv_cur_reg_init();
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 {
 	bool		was_null, is_null;
 	mval		v;
-	char		*ptr, *end, c[MAX_FN_LEN + 1];
+	char		*ptr, *end, c[MAX_FBUFF + 1];
 	omi_li		li;
 	omi_si		si;
 	parse_blk	pblk;

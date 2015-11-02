@@ -80,8 +80,7 @@ cd $dst_top_dir
 if (-e $dst_ver) then
 	foreach image (pro bta dbg)
 		if (-e $gtm_root/$dst_ver/$image/gtmsecshr) then
-			$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr 1	/* stop gtmsecshr in case it is running */
-			$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr 2	/* reset gtmsecshr to be suid and root owned */
+			$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr "STOP"	# stop gtmsecshr in case it is running
 		endif
 	end
 	# Verify if anybody is using this version before deleting
@@ -108,6 +107,11 @@ if (-e $dst_ver) then
 		mv ${gtm_root}/$dst_ver ${gtm_root}/${dst_ver}_${save_ver}
 	else if (! $mods_only) then
 		echo "Deleting existing $dst_dir directory structure"
+		foreach image (pro bta dbg)
+			if (-e $gtm_root/$dst_ver/$image/gtmsecshrdir) then
+				$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr "RMDIR" # remove root-owned gtmsecshr* files/dirs
+			endif
+		end
 		rm -rf $dst_ver
 		if ($status != 0) then
 			exit $status
@@ -187,6 +191,7 @@ endif
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############
 
 cd $cms_dir
+echo "Copying files from the source version $cms_ver"
 set ref_libs = `set | grep "^gtm_s_${platform_library}[ 	]" | sed 's/^gtm_s_'${platform_library}'[ 	][ 	]*//g'`
 foreach ref_library ( $ref_libs )
     if ( -d $ref_library ) then

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ CONDITION_HANDLER(mu_freeze_ch)
 		gv_cur_region = rptr1->reg;
 		if (!gv_cur_region->open)
 			continue;
-		region_freeze(gv_cur_region, FALSE, FALSE);
+		region_freeze(gv_cur_region, FALSE, FALSE, FALSE);
 	}
 	NEXTCH; /* should do PRN_ERROR for us */
 }

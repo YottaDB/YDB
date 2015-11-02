@@ -323,7 +323,6 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				/* read outside of crit may be of a stale block but should be detected by t_end or tp_tend */
 				assert(0 == cr->dirty);
 				assert(cr->read_in_progress >= 0);
-				INCR_DB_CSH_COUNTER(csa, n_dsk_reads, 1);
 				CR_BUFFER_CHECK(gv_cur_region, csa, csd, cr);
 				if (SS_NORMAL != (status = dsk_read(blk, GDS_REL2ABS(cr->buffaddr), &ondsk_blkver)))
 				{	/* buffer does not contain valid data, so reset blk to be empty */

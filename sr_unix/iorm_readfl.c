@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,12 +53,14 @@ GBLREF	UConverter	*chset_desc[];
 /* Maintenance of $ZB on a badchar error and returning partial data (if any) */
 void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend)
 {
-        int             tmplen, len;
-        unsigned char   *delimend;
-        io_desc         *iod;
+	int             tmplen, len;
+	unsigned char   *delimend;
+	io_desc         *iod;
+	d_rm_struct	*rm_ptr;
 
 	assert(0 <= datalen);
 	iod = io_curr_device.in;
+	rm_ptr = (d_rm_struct *)(iod->dev_sp);
 	vmvalptr->str.len = datalen;
 	vmvalptr->str.addr = (char *)stringpool.free;
         if (0 < datalen)
@@ -76,11 +78,20 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 			}
 		}
                 if (0 < delimlen)
-                {       /* Set $ZB with the failing badchar */
-                        memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
-                        iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
+		{	/* Set $KEY and $ZB with the failing badchar */
+			memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
+			iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
+			memcpy(rm_ptr->dollar_key, delimptr, MIN(delimlen, RM_BUFLEN - 1));
+			rm_ptr->dollar_key[MIN(delimlen, RM_BUFLEN - 1)] = '\0';
                 }
         }
+	/* if this is a pipe then we have to set dollar_device in the output device */
+	if (rm_ptr->pipe)
+	{
+		len = SIZEOF(ONE_COMMA) - 1;
+		memcpy(rm_ptr->dollar_device, ONE_COMMA, len);
+		memcpy(&rm_ptr->dollar_device[len], BADCHAR_DEVICE_MSG, SIZEOF(BADCHAR_DEVICE_MSG));
+	}
 }
 #endif
 
@@ -89,26 +100,51 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 	boolean_t	ret, timed, utf_active, line_term_seen = FALSE, rdone = FALSE;
 	char		inchar, *temp, *temp_start;
 	unsigned char	*nextmb, *char_ptr, *char_start;
-	int		flags;
+	int		flags = 0;
+	int		len;
+	int		errlen, real_errno;
 	int		fcntl_res;
 	int4		msec_timeout;	/* timeout in milliseconds */
 	int4		bytes2read, bytes_read, char_bytes_read, add_bytes, reclen;
 	int4		buff_len, mblen, char_count, bytes_count, tot_bytes_read;
 	int4		status, max_width, ltind, exp_width, from_bom;
 	wint_t		utf_code;
+	char		*errptr;
 	io_desc		*io_ptr;
 	d_rm_struct	*rm_ptr;
 	gtm_chset_t	chset;
 	TID		timer_id;
+	int		fildes;
+	FILE		*filstr;
+	boolean_t	pipe_zero_timeout = FALSE;
+	int		blocked_in = TRUE;
+	unsigned char	tchar;
+	int		tfcntl_res;
 
 	error_def(ERR_IOEOF);
+	error_def(ERR_SYSCALL);
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 
 	io_ptr = io_curr_device.in;
+
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
+
+	/* if it is a pipe and it's the stdout returned then we need to get the read file descriptor
+	   from rm_ptr->read_fildes and the stream pointer from rm_ptr->read_filstr */
+	if (rm_ptr->pipe && rm_ptr->read_fildes)
+	{
+		assert(rm_ptr->read_filstr);
+		fildes = rm_ptr->read_fildes;
+		filstr = rm_ptr->read_filstr;
+	} else
+	{
+		fildes = rm_ptr->fildes;
+		filstr = rm_ptr->filstr;
+	}
+
 	utf_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	if (io_ptr->dollar.x && rm_ptr->lastop == RM_WRITE)
 	{
@@ -149,11 +185,18 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		msec_timeout = timeout2msec(timeout);
 		if (msec_timeout > 0)
 			start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
-		 else
+		else
 		{
 			out_of_time = TRUE;
-			FCNTL2(rm_ptr->fildes, F_GETFL, flags);
-			FCNTL3(rm_ptr->fildes, F_SETFL, (flags | O_NDELAY), fcntl_res);
+			FCNTL2(fildes, F_GETFL, flags);
+			if (0 > flags)
+				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+			FCNTL3(fildes, F_SETFL, (flags | O_NONBLOCK), fcntl_res);
+			if (0 > fcntl_res)
+				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+			blocked_in = FALSE;
+			if (rm_ptr->pipe)
+				pipe_zero_timeout = TRUE;
 		}
 	}
 	errno = status = 0;
@@ -165,19 +208,23 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
                          * Note the check for EINTR below is valid and should not be converted to an EINTR
                          * wrapper macro, since action is taken on EINTR, not a retry.
                          */
-			DOREADRLTO(rm_ptr->fildes, temp, width, out_of_time, status);
+			DOREADRLTO2(fildes, temp, width, out_of_time, &blocked_in, rm_ptr->pipe, flags, status,
+				     &tot_bytes_read, timer_id, &msec_timeout, pipe_zero_timeout);
 			if (0 > status)
 			{
-				bytes_count = 0;
+				if (rm_ptr->pipe)
+					bytes_count = tot_bytes_read;
+				else
+					bytes_count = 0;
 				if (errno == EINTR  &&  out_of_time)
 					status = -2;
 			} else
 				tot_bytes_read = bytes_count = status;
-		} else
-		{
+		} else if (!rm_ptr->pipe)
+		{	/* fifo or rms-file device */
 			do
 			{
-				if ((status = getc(rm_ptr->filstr)) != EOF)
+				if (EOF != (status = getc(filstr)))
 				{
 					inchar = (unsigned char)status;
 					tot_bytes_read++;
@@ -204,6 +251,57 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					break;
 				}
 			} while (bytes_count < width);
+		} else
+		{	/* pipe device */
+			do
+			{
+				status = read(fildes, (sm_uc_ptr_t)&tchar, 1);
+				if (0 > status)
+				{
+					if (!timed || 0 != msec_timeout)
+					{
+						/* process for a non-pipe or r x or r x:1 or r x:0 after timer started*/
+						inchar = 0;
+						if (EINTR == errno)
+						{
+							if (out_of_time)
+								status = -2;
+							else
+								continue; /* Ignore interrupt if not our wakeup */
+						}
+					}
+					break;
+				} else if (status)
+				{
+					status = tchar;
+					inchar = (unsigned char)status;
+					if (pipe_zero_timeout && blocked_in == FALSE)
+					{
+						FCNTL3(fildes, F_SETFL, flags, tfcntl_res);
+						if (0 > tfcntl_res)
+							rts_error(VARLSTCNT(8) ERR_SYSCALL, 5,
+								  LEN_AND_LIT("fcntl"), CALLFROM, errno);
+						blocked_in = TRUE;
+						out_of_time = FALSE;
+						/* Set a timer for 1 sec so atomic read x:0 will still work
+						   on loaded systems but timeout on incomplete reads.  Any
+						   characters read prior a timeout will be returned and
+						   $device will be set to "0".*/
+						msec_timeout = timeout2msec(1);
+						start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
+					}
+					tot_bytes_read++;
+					if (NATIVE_NL == inchar)
+					{
+						line_term_seen = TRUE;
+						if (!rdone)
+							break;
+					}
+					*temp++ = inchar;
+					bytes_count++;
+				} else
+					break; /* it's an EOF */
+			} while (bytes_count < width);
 		}
 	} else
 	{	/* Unicode mode */
@@ -213,7 +311,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			buff_len = (int)(rm_ptr->inbuf_top - rm_ptr->inbuf_off);
 			if (0 == buff_len)
 			{	/* need to refill the buffer */
-				buff_len = iorm_get(io_ptr);
+				buff_len = iorm_get(io_ptr, &blocked_in, rm_ptr->pipe, flags, &tot_bytes_read,
+						    timer_id, &msec_timeout, pipe_zero_timeout);
 				if (0 > buff_len)
 				{
 					bytes_count = 0;
@@ -230,56 +329,56 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				{	/* count chars and check for validity */
 					switch (chset)
 					{
-						case CHSET_UTF8:
-							if (UTF8_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
-							{
-								bytes_count += mblen;
-								char_ptr += mblen;
-							} else
-							{
-								SETZACANCELTIMER;
-								iorm_readfl_badchar(v,
-										    (int)((unsigned char *)temp - stringpool.free),
-										    mblen, char_ptr, rm_ptr->inbuf_top);
-								rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
-								UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
-									chset_names[chset].len, chset_names[chset].addr);
-							}
-							break;
-						case CHSET_UTF16BE:
-							if (UTF16BE_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
-							{
-								bytes_count += mblen;
-								char_ptr += mblen;
-							} else
-							{
-								SETZACANCELTIMER;
-								iorm_readfl_badchar(v,
-										    (int)((unsigned char *)temp - stringpool.free),
-										    mblen, char_ptr, rm_ptr->inbuf_top);
-								rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
-								UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
-									chset_names[chset].len, chset_names[chset].addr);
-							}
-							break;
-						case CHSET_UTF16LE:
-							if (UTF16LE_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
-							{
-								bytes_count += mblen;
-								char_ptr += mblen;
-							} else
-							{
-								SETZACANCELTIMER;
-								iorm_readfl_badchar(v,
-										    (int)((unsigned char *)temp - stringpool.free),
-										    mblen, char_ptr, rm_ptr->inbuf_top);
-								rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
-								UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
-									chset_names[chset].len, chset_names[chset].addr);
-							}
-							break;
-						default:
-							GTMASSERT;
+					case CHSET_UTF8:
+						if (UTF8_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
+						{
+							bytes_count += mblen;
+							char_ptr += mblen;
+						} else
+						{
+							SETZACANCELTIMER;
+							iorm_readfl_badchar(v,
+									    (int)((unsigned char *)temp - stringpool.free),
+									    mblen, char_ptr, rm_ptr->inbuf_top);
+							rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
+							UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
+								     chset_names[chset].len, chset_names[chset].addr);
+						}
+						break;
+					case CHSET_UTF16BE:
+						if (UTF16BE_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
+						{
+							bytes_count += mblen;
+							char_ptr += mblen;
+						} else
+						{
+							SETZACANCELTIMER;
+							iorm_readfl_badchar(v,
+									    (int)((unsigned char *)temp - stringpool.free),
+									    mblen, char_ptr, rm_ptr->inbuf_top);
+							rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
+							UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
+								     chset_names[chset].len, chset_names[chset].addr);
+						}
+						break;
+					case CHSET_UTF16LE:
+						if (UTF16LE_VALID(char_ptr, rm_ptr->inbuf_top, mblen))
+						{
+							bytes_count += mblen;
+							char_ptr += mblen;
+						} else
+						{
+							SETZACANCELTIMER;
+							iorm_readfl_badchar(v,
+									    (int)((unsigned char *)temp - stringpool.free),
+									    mblen, char_ptr, rm_ptr->inbuf_top);
+							rm_ptr->inbuf_off = char_ptr + mblen;	/* mark as read */
+							UTF8_BADCHAR(mblen, char_ptr, rm_ptr->inbuf_top,
+								     chset_names[chset].len, chset_names[chset].addr);
+						}
+						break;
+					default:
+						GTMASSERT;
 					}
 				}
 				v->str.len = INTCAST(char_ptr - rm_ptr->inbuf_off);
@@ -292,7 +391,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					{
 						v->str.addr = (char *)rm_ptr->inbuf_off;
 						v->str.len = gtm_conv(chset_desc[chset], chset_desc[CHSET_UTF8],
-									&v->str, NULL, NULL);
+								      &v->str, NULL, NULL);
 					}
 					v->str.addr = (char *)stringpool.free;
 					rm_ptr->inbuf_off += char_ptr - rm_ptr->inbuf_off;
@@ -317,8 +416,16 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			{
 				if (!rm_ptr->done_1st_read)
 				{
-					status = iorm_get_bom(io_ptr);	/* need to check BOM */
+					/* need to check BOM */
+					status = iorm_get_bom(io_ptr, &blocked_in, rm_ptr->pipe, flags, &tot_bytes_read,
+							      timer_id, &msec_timeout, pipe_zero_timeout);
 					chset = io_ptr->ichset;	/* UTF16 will have changed to UTF16BE or UTF16LE */
+					if (pipe_zero_timeout && 0 <= status)
+					{
+						out_of_time = FALSE;
+						msec_timeout = timeout2msec(1);
+						start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
+					}
 				}
 				if (0 <= status && bytes2read && rm_ptr->bom_buf_cnt > rm_ptr->bom_buf_off)
 				{
@@ -332,7 +439,11 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 					status = 0;
 				}
 				if (0 <= status && 0 < bytes2read)
-					DOREADRLTO(rm_ptr->fildes, rm_ptr->inbuf_pos, bytes2read, out_of_time, status);
+				{
+					DOREADRLTO2(fildes, rm_ptr->inbuf_pos, bytes2read, out_of_time, &blocked_in,
+						     rm_ptr->pipe, flags, status, &tot_bytes_read,
+						     timer_id, &msec_timeout, pipe_zero_timeout);
+				}
 				if (0 <= status)
 				{
 					rm_ptr->inbuf_pos += status;
@@ -349,7 +460,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 								    bytes_read, char_start, rm_ptr->inbuf_pos);
 						rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 						UTF8_BADCHAR(bytes_read, char_start, rm_ptr->inbuf_pos,
-								chset_names[chset].len, chset_names[chset].addr);
+							     chset_names[chset].len, chset_names[chset].addr);
 					} else if (status < bytes2read)
 					{
 						bytes2read -= status;
@@ -373,7 +484,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 										    char_start, (char_start + char_bytes_read));
 								rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 								UTF8_BADCHAR(char_bytes_read, char_start,
-									char_start + char_bytes_read, 0, NULL);
+									     char_start + char_bytes_read, 0, NULL);
 							}
 							if (u32_line_term[U32_LT_LF] == *char_start)
 								if (rm_ptr->crlast)
@@ -420,14 +531,14 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 										    char_start, rm_ptr->inbuf_pos);
 								rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 								UTF8_BADCHAR(char_bytes_read, char_start,
-									rm_ptr->inbuf_pos, 0, NULL);
+									     rm_ptr->inbuf_pos, 0, NULL);
 							}
 							assert(nextmb == rm_ptr->inbuf_pos);
 							rm_ptr->inbuf_off = nextmb;	/* mark as read */
 							rm_ptr->crlast = FALSE;
 							if (u32_line_term[U32_LT_NL] == utf_code ||
-									u32_line_term[U32_LT_LS] == utf_code ||
-									u32_line_term[U32_LT_PS] == utf_code)
+							    u32_line_term[U32_LT_LS] == utf_code ||
+							    u32_line_term[U32_LT_PS] == utf_code)
 							{
 								line_term_seen = TRUE;
 								if (!rdone)
@@ -464,7 +575,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
                                                                                     char_start, rm_ptr->inbuf_pos);
 								rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 								UTF8_BADCHAR(char_bytes_read, char_start, rm_ptr->inbuf_pos,
-									chset_names[chset].len, chset_names[chset].addr);
+									     chset_names[chset].len, chset_names[chset].addr);
 							}
 						}
 						assert(char_bytes_read == (add_bytes + 1));
@@ -479,7 +590,7 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 									    char_bytes_read, char_start, rm_ptr->inbuf_pos);
 							rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 							UTF8_BADCHAR(char_bytes_read, char_start, rm_ptr->inbuf_pos,
-								chset_names[chset].len, chset_names[chset].addr);
+								     chset_names[chset].len, chset_names[chset].addr);
 						}
 						assert(nextmb == rm_ptr->inbuf_pos);
 						if (u32_line_term[U32_LT_LF] == utf_code)
@@ -526,8 +637,10 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 				{
 					inchar = 0;
 					if (errno == 0)
+					{
+						tot_bytes_read = 0;
 						status = 0;
-					else if (errno == EINTR)
+					} else if (EINTR == errno)
 					{
 						if (out_of_time)
 							status = -2;
@@ -539,23 +652,43 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			} while (char_count < width && bytes_count < MAX_STRLEN);
 		}
  	}
-	if (status == EOF && errno != EINTR)
+	real_errno = errno;
+	/* On error, getc() returns EOF while read() returns -1. Both code paths converge here. Thankfully EOF is -1 on all
+	 * platforms that we know of so it is enough to check for -1 status here. Assert that below.
+	 */
+	assert(EOF == -1);
+	if ((-1 == status) && (EINTR != real_errno))
 	{
 		io_ptr->dollar.za = 9;
 		v->str.len = 0;
 		v->str.addr = (char *)stringpool.free;		/* ensure valid address */
 		if (timed && !out_of_time)
 			cancel_timer(timer_id);
-		rts_error(VARLSTCNT(1) errno);
+		if (EAGAIN != real_errno)
+		{
+			/* save error in $device */
+			DOLLAR_DEVICE_SET(rm_ptr, real_errno);
+			rts_error(VARLSTCNT(1) real_errno);
+		}
+		len = SIZEOF(ONE_COMMA_UNAVAILABLE);
+		memcpy(rm_ptr->dollar_device, ONE_COMMA_UNAVAILABLE, len);
+		ret = FALSE;
 	}
 
 	if (timed)
 	{
 		if (msec_timeout == 0)
 		{
-			FCNTL3(rm_ptr->fildes, F_SETFL, flags, fcntl_res);
-			if (rm_ptr->fifo  &&  status == 0)
+			if (!rm_ptr->pipe || FALSE == blocked_in)
+			{
+				FCNTL3(fildes, F_SETFL, flags, fcntl_res);
+				if (0 > fcntl_res)
+					rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+			}
+			if ((rm_ptr->fifo || rm_ptr->pipe) &&  0 == status )
 				ret = FALSE;
+			if (rm_ptr->pipe && !out_of_time)
+				cancel_timer(timer_id);
 		} else
 		{
 			if (out_of_time)
@@ -570,19 +703,37 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 		v->str.len = 0;
 		v->str.addr = (char *)stringpool.free;		/* ensure valid address */
 		UNICODE_ONLY(v->str.char_len = 0;)
+		io_ptr->dollar.za = 0;
 		if (io_ptr->dollar.zeof == TRUE)
 		{
 			io_ptr->dollar.za = 9;
 			rts_error(VARLSTCNT(1) ERR_IOEOF);
 		}
 		io_ptr->dollar.zeof = TRUE;
+		if (pipe_zero_timeout)
+		{
+			/* it is a pipe r x:0 so set $device */
+			len = SIZEOF(ONE_COMMA_UNAVAILABLE);
+			memcpy(rm_ptr->dollar_device, ONE_COMMA_UNAVAILABLE, len);
+			io_ptr->dollar.za = 9;
+		}
 		io_ptr->dollar.x = 0;
-		io_ptr->dollar.za = 0;
 		io_ptr->dollar.y++;
 		if (io_ptr->error_handler.len > 0)
 			rts_error(VARLSTCNT(1) ERR_IOEOF);
 	} else
 	{
+		if (rm_ptr->pipe)
+		{
+			if (tot_bytes_read>0 || (TRUE == out_of_time && TRUE == blocked_in))
+				ret = TRUE;
+			else
+				ret = FALSE;
+		}
+
+		if (pipe_zero_timeout && EINTR == real_errno)
+			io_ptr->dollar.za = 9;
+
 		if (!utf_active || !rm_ptr->fixed)
 		{	/* if Unicode and fixed, already setup the mstr */
 			v->str.len = bytes_count;
@@ -606,6 +757,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			}
 		}
 	}
-	io_ptr->dollar.za = 0;
-	return ret;
+	/* set device to 0 if ok */
+	if (ret == TRUE)
+		memcpy(rm_ptr->dollar_device, "0", SIZEOF("0"));
+	return (rm_ptr->pipe && out_of_time) ? FALSE : ret;
 }

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -25,13 +25,17 @@
 #
 # op_neg ( mval *u, mval *v ) : u = -v
 #
-#	edx - source mval      = &v
-#	eax - destination mval = &u
+#	REG64_RET1 - source mval      = &v
+#	REG64_RET0 - destination mval = &u
 
 .extern	s2n
+.extern underr
 
 # PUBLIC	op_neg
 ENTRY op_neg
+	pushq	REG64_RET0
+	mv_force_defined REG64_RET1, isdefined
+	popq	REG64_RET0
 	mv_if_number REG64_RET1, numer
 	pushq	REG64_RET0
 	pushq	REG64_RET1

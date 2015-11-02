@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,8 +77,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	viewparm	parmblk;
 	gd_binding	*map;
 	gd_region	*reg;
-	sgmnt_addrs	*sa;
-	unsigned char	tmpchar[4];	/* Text for GVSTAT */
+	sgmnt_addrs	*csa;
 	short		tl, newlevel;
 	tp_frame	*tf;
 	viewtab_entry	*vtp;
@@ -213,9 +212,9 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			{
 				if (!parmblk.gv_ptr->open)
 					gv_init_reg(parmblk.gv_ptr);
-				sa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
-				if (NULL != sa->hdr)
-					n = sa->hdr->jnl_state;
+				csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
+				if (NULL != csa->hdr)
+					n = csa->hdr->jnl_state;
 				else
 					n = -1;
 			}
@@ -228,8 +227,8 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			{
 				if (!parmblk.gv_ptr->open)
 					gv_init_reg(parmblk.gv_ptr);
-				sa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
-				if (NULL != sa->hdr)
+				csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
+				if (NULL != csa->hdr)
 					view_jnlfile(dst, parmblk.gv_ptr);
 				else
 					dst->str.len = 0;
@@ -288,9 +287,9 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
 				gv_init_reg(parmblk.gv_ptr);
-			sa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
-			if (NULL != sa->hdr)
-				n = sa->hdr->trans_hist.free_blocks;
+			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
+			if (NULL != csa->hdr)
+				n = csa->hdr->trans_hist.free_blocks;
 			else
 				n = -1;
 			break;
@@ -298,11 +297,11 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
 				gv_init_reg(parmblk.gv_ptr);
-			sa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
-			if (NULL != sa->hdr)
+			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
+			if (NULL != csa->hdr)
 			{
-				n = sa->hdr->trans_hist.total_blks;
-				n -= (n + sa->hdr->bplmap - 1) / sa->hdr->bplmap;
+				n = csa->hdr->trans_hist.total_blks;
+				n -= (n + csa->hdr->bplmap - 1) / csa->hdr->bplmap;
 			} else
 				n = -1;
 			break;
@@ -310,9 +309,9 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
 				gv_init_reg(parmblk.gv_ptr);
-			sa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
-			if (NULL != sa->hdr)
-				n = sa->hdr->freeze;
+			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
+			if (NULL != csa->hdr)
+				n = csa->hdr->freeze;
 			else
 				n = -1;
 			break;
@@ -320,45 +319,29 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
 				gv_init_reg(parmblk.gv_ptr);
-			sa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
-			if (NULL != sa->hdr)
+			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
+			if (NULL != csa->hdr)
 			{
-#define GVSTAT_MAX_DIGITS	MAX_DIGITS_IN_INT
-#define GVSTAT_KEYWORD_SIZE	5		/* THREE PLUS TWO DELIMITERS */
-#define GVSTAT_KEYWORD_COUNT	9
-#define GVSTAT_MAX_SIZE ((GVSTAT_KEYWORD_COUNT + CDB_STAGNATE + ARRAYSIZE(sa->hdr->n_tp_retries) \
-				+ ARRAYSIZE(sa->hdr->n_tp_retries_conflicts)) * (GVSTAT_MAX_DIGITS + GVSTAT_KEYWORD_SIZE))
-				if (stringpool.top - stringpool.free < GVSTAT_MAX_SIZE)
-					stp_gcol(GVSTAT_MAX_SIZE);
+#				define GVSTATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
+#				define GVSTATS_KEYWORD_SIZE	5		/* THREE PLUS TWO DELIMITERS */
+#				define GVSTATS_KEYWORD_COUNT	n_gvstats_rec_types
+#				define GVSTATS_MAX_SIZE (GVSTATS_KEYWORD_COUNT * (GVSTATS_MAX_DIGITS + GVSTATS_KEYWORD_SIZE))
+				if (stringpool.top - stringpool.free < GVSTATS_MAX_SIZE)
+					stp_gcol(GVSTATS_MAX_SIZE);
 				dst->str.addr = (char *)stringpool.free;
-#define GVSTAT_PUT_PARM(B, A) (MEMCPY_LIT(stringpool.free, B), stringpool.free += STR_LIT_LEN(B),\
-	*stringpool.free++ = ':', stringpool.free = i2asc(stringpool.free, sa->hdr->A),		\
-	*stringpool.free++ = ',')
-				GVSTAT_PUT_PARM("SET", n_puts);
-				GVSTAT_PUT_PARM("KIL", n_kills);
-				GVSTAT_PUT_PARM("GET", n_gets);
-				GVSTAT_PUT_PARM("ORD", n_order);
-				GVSTAT_PUT_PARM("QRY", n_queries);
-				GVSTAT_PUT_PARM("ZPR", n_zprevs);
-				GVSTAT_PUT_PARM("DTA", n_data);
-				tmpchar[0] = 'R', tmpchar[1] = 'T', tmpchar[3] = 0;
-				for (n  = 0; n < CDB_STAGNATE; n++)
-				{
-					tmpchar[2] = n + '0';
-					GVSTAT_PUT_PARM(tmpchar, n_retries[n]);
+				/* initialize cnl->gvstats_rec.db_curr_tn field from file header */
+				csa->nl->gvstats_rec.db_curr_tn = csa->hdr->trans_hist.curr_tn;
+#				define GVSTATS_PUT_PARM(TXT, CNTR, cnl)						\
+				{										\
+					MEMCPY_LIT(stringpool.free, TXT);					\
+					stringpool.free += STR_LIT_LEN(TXT);					\
+					*stringpool.free++ = ':';						\
+					stringpool.free = i2ascl(stringpool.free, cnl->gvstats_rec.CNTR);	\
+					*stringpool.free++ = ',';						\
 				}
-				tmpchar[0] = 'T', tmpchar[1] = 'P', tmpchar[3] = 0;
-				for (n  = 0; n < ARRAYSIZE(sa->hdr->n_tp_retries); n++)
-				{
-					tmpchar[2] = n + '0';
-					GVSTAT_PUT_PARM(tmpchar, n_tp_retries[n]);
-				}
-				tmpchar[0] = 'T', tmpchar[1] = 'C', tmpchar[3] = 0;
-				for (n  = 0; n < ARRAYSIZE(sa->hdr->n_tp_retries_conflicts); n++)
-				{
-					tmpchar[2] = n + '0';
-					GVSTAT_PUT_PARM(tmpchar, n_tp_retries_conflicts[n]);
-				}
+#				define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	GVSTATS_PUT_PARM(TEXT1, COUNTER, csa->nl)
+#				include "tab_gvstats_rec.h"
+#				undef TAB_GVSTATS_REC
 				assert(stringpool.free < stringpool.top);
 				/* subtract one to remove extra trailing delimiter */
 				dst->str.len = INTCAST((char *)stringpool.free - dst->str.addr - 1);

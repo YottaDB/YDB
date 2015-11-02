@@ -302,6 +302,8 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		epoch_record->prefix.pini_addr = JNL_HDR_LEN;
 		epoch_record->prefix.time = jgbl.gbl_jrec_time;
 		epoch_record->blks_to_upgrd = info->blks_to_upgrd;
+		epoch_record->free_blocks   = info->free_blocks;
+		epoch_record->total_blks    = info->total_blks;
 		temp_offset = JNL_HDR_LEN + PINI_RECLEN;
 		temp_checksum = ADJUST_CHECKSUM(INIT_CHECKSUM_SEED, temp_offset);
 		epoch_record->prefix.checksum = ADJUST_CHECKSUM(temp_checksum, info->checksum);

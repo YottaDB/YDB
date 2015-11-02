@@ -66,7 +66,7 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	bitnum = blk - bml;
 	/* Find out current status in order to determine if there is going to be a state transition */
-	assert(ROUND_DOWN(blk, cs_data->bplmap) == bml);
+	assert(ROUND_DOWN2(blk, cs_data->bplmap) == bml);
 	GET_BM_STATUS(bmp, bitnum, lbm_status);
 	switch(lbm_status)
 	{

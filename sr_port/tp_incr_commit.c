@@ -83,16 +83,26 @@ void tp_incr_commit(void)
 						 * the first and delete the second (rather than simply deleting the first), since
 						 * the first element may be an intermediate element in the vertical list and
 						 * buddy list wont permit use of both free_element() and free_last_n_elements()
-						 * with a given list together.
-						 * This might disturb the tp_srch_status->cse, so reset it properly.
+						 * with a given list together. This might disturb the tp_srch_status->cse, so
+						 * reset it properly. Note that if cse->mode is gds_t_create, there will be no
+						 * tp_srch_status entry allotted for cse->blk (one will be there only for the
+						 * chain.flag representation of this to-be-created block). Same case with mode of
+						 * kill_t_create as it also corresponds to a non-existent block#. Therefore dont
+						 * try looking up the hashtable for this block in those cases.
 						 */
-						if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&cse->blk)))
-							tp_srch_status = tabent->value;
-						else
-							tp_srch_status = NULL;
-						assert(!tp_srch_status || tp_srch_status->cse == cse);
-						if (tp_srch_status)
-							tp_srch_status->cse = low_cse;
+						assert((gds_t_create == cse->mode) || (kill_t_create == cse->mode)
+							|| (gds_t_write == cse->mode) || (kill_t_write == cse->mode));
+						if ((gds_t_create != cse->mode) && (kill_t_create != cse->mode))
+						{
+							if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use,
+													(uint4 *)&cse->blk)))
+								tp_srch_status = tabent->value;
+							else
+								tp_srch_status = NULL;
+							assert(!tp_srch_status || tp_srch_status->cse == cse);
+							if (tp_srch_status)
+								tp_srch_status->cse = low_cse;
+						}
 						assert(low_cse == orig_cse);
 						/* Members that may not be uptodate in cse need to be copied back from low_cse.
 						 * They are next_cw_set, prev_cw_set, new_buff and done.

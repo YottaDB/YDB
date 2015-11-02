@@ -280,12 +280,26 @@ GBLREF	short	dollar_trestart;
 	}										\
 }
 
-#define	TP_RETRY_ACCOUNTING(csa, csd, status)							\
-{												\
-	if (dollar_trestart < ARRAYSIZE((csd)->n_tp_retries) - 1)				\
-		(csd)->n_tp_retries_conflicts[dollar_trestart]++;				\
-	else											\
-		(csd)->n_tp_retries_conflicts[ARRAYSIZE(csd->n_tp_retries) - 1]++;		\
+#define	TP_RETRY_ACCOUNTING(csa, cnl, status)						\
+{											\
+	switch (dollar_trestart)							\
+	{										\
+		case 0:									\
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_0, 1);	\
+			break;								\
+		case 1:									\
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_1, 1);	\
+			break;								\
+		case 2:									\
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_2, 1);	\
+			break;								\
+		case 3:									\
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_3, 1);	\
+			break;								\
+		default:								\
+			INCR_GVSTATS_COUNTER(csa, cnl, n_tp_cnflct_retries_4, 1);	\
+			break;								\
+	}										\
 }
 
 #define PREV_OFF_INVALID -1

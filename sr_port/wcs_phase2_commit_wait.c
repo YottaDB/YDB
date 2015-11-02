@@ -236,6 +236,11 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	DEBUG_ONLY(incrit_pid = cnl->in_crit;)
 	send_msg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1, cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(csa->region));
 	BG_TRACE_PRO_ANY(csa, wcb_phase2_commit_wait);
-	assert(FALSE);
+	/* If called from wcs_recover(), we dont want to assert(FALSE) as it is possible (in case of STOP/IDs) that
+	 * cnl->wcs_phase2_commit_pidcnt is non-zero even though there is no process in phase2 of commit. In this case
+	 * wcs_recover will call wcs_verify which will clear the flag unconditionally and proceed with normal activity.
+	 * So should not assert. If the caller is wcs_recover, then we expect csd->wc_blocked so be non-zero. Assert that.
+	 */
+	assert(csd->wc_blocked);
 	return FALSE;
 }

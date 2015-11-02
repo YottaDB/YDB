@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,7 @@
 #define DEFAULT_IOD_WRAP	TRUE
 
 #define BADCHAR_DEVICE_MSG "BADCHAR error raised on input"
+#define UNAVAILABLE_DEVICE_MSG "Resource temporarily unavailable"
 
 typedef unsigned char params;
 
@@ -73,6 +74,9 @@ enum io_dev_type
 	ff,		/* fifo device  */
 	tcp,		/* TCP socket  */
 	gtmsocket,	/* socket device, socket is already used by sys/socket.h */
+#ifdef UNIX
+	pi,		/* pipe */
+#endif
 	n_io_dev_types	/* terminator	*/
 };
 
@@ -213,8 +217,10 @@ void io_init_name(void);
 #define xx_dlr_device(X)	void X##_dlr_device(mstr *d)
 #define xx_dlr_key(X)		void X##_dlr_key(mstr *d)
 
-/* Following definitions have a pattern that most of the routines follow. Only exception is:
+/* Following definitions have a pattern that most of the routines follow. Only exceptions are:
  *      1. ioff_open() is an extra routine
+ *      2. iopi_open() is an extra routine on unix
+ *	3. iopi_iocontrol() is an extra routine on unix to handle write /writeof
  */
 
 #define ioxx(X) ioxx_##X(tt);ioxx_##X(mt);ioxx_##X(rm);ioxx_##X(mb);ioxx_##X(nl);ioxx_##X(us);ioxx_##X(tcp);ioxx_##X(socket)
@@ -239,6 +245,10 @@ xxdlr(ious);
 xxdlr(iotcp);
 xxdlr(iosocket);
 ioxx_open(ff);
+#ifdef UNIX
+ioxx_open(pi);
+xxdlr(iopi);	/* we need iopi_iocontrol(), iopi_dlr_device() and iopi_dlr_key() */
+#endif
 ioxx_wttab(us);
 /* iott_ prototypes */
 uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr);

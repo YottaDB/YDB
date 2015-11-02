@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ boolean_t mupfndfil(gd_region *reg, mstr *filestr)
 	case dba_bg:
 		break;
 	case dba_usr:
-		util_out_print("REGION !AD maps to a non-GTC database.  Specified function does not apply to a non-GTC database.",
+		util_out_print("REGION !AD maps to a non-GDS database.  Specified function does not apply to a non-GDS database.",
 			TRUE, REG_LEN_STR(reg));
 		return FALSE;
 	default:

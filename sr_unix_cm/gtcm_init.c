@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,7 +74,6 @@ GBLREF pattern			mumps_pattern;
 GBLREF uint4			*pattern_typemask;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF spdesc			rts_stringpool, stringpool;
-GBLREF boolean_t		certify_all_blocks;
 GBLREF boolean_t		is_replicator;
 
 void	gtcm_fail(int sig);
@@ -99,9 +98,6 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	is_replicator = TRUE;	/* as GT.CM OMI goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	image_type = GTCM_SERVER_IMAGE;
 	gtm_wcswidth_fnptr = gtm_wcswidth;
-
-	if (NULL != getenv("GTCM_GDSCERT"))
-		certify_all_blocks = TRUE;
 
 #ifndef GTCM_DEBUG_NOBACKGROUND
 	if ((pid = fork()) < 0)

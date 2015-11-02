@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,10 @@
 #endif
 #include "send_msg.h"
 #include "caller_id.h"
+#include "sleep_cnt.h"
+#include "interlock.h"
+#include "add_inter.h"
+#include "wcs_sleep.h"
 
 GBLREF	bool		caller_id_flag;
 GBLREF	bool		in_mupip_freeze;
@@ -61,9 +65,9 @@ GBLREF	uint4		image_count;
 	caller_id_flag = TRUE;							\
 }
 
-bool	region_freeze(gd_region *region, bool freeze, bool override)
+freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t override, boolean_t wait_for_kip)
 {
-	uint4			freeze_id;
+	uint4			freeze_id, sleep_counter;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 
@@ -75,19 +79,44 @@ bool	region_freeze(gd_region *region, bool freeze, bool override)
 	if (freeze)
 	{
 		grab_crit(region);	/* really need this to be sure in UNIX, shouldn't be frequent anyway */
+		INCR_INHIBIT_KILLS(csa->nl);
 		if (OWNERSHIP)
 		{
+			DECR_INHIBIT_KILLS(csa->nl);
 			rel_crit(region);
-			return TRUE;
+			return REG_FREEZE_SUCCESS;
 		}
 		if (!override && csd->freeze)
 		{
+			DECR_INHIBIT_KILLS(csa->nl);
 			rel_crit(region);
-			return FALSE;
+			return REG_ALREADY_FROZEN;
+		}
+		/* If override is TRUE we need not wait for KIP to become zero */
+		sleep_counter = 1;
+		if (!override && wait_for_kip && (0 < csd->kill_in_prog))
+		{
+			rel_crit(region);
+			do
+			{
+				grab_crit(region);
+				if (!csd->kill_in_prog)
+					break;
+				rel_crit(region);
+				wcs_sleep(sleep_counter);
+			} while (MAX_CRIT_TRY > sleep_counter++);
+		}
+		/* if can't ever be true when override is true. */
+		if (MAX_CRIT_TRY <= sleep_counter)
+		{
+			DECR_INHIBIT_KILLS(csa->nl);
+			rel_crit(region);
+			return REG_HAS_KIP;
 		}
 		csd->freeze = freeze_id;		/* the order of this line and the next is important */
 		csd->image_count = FREEZE_MATCH;
 		csa->freeze = TRUE;
+		DECR_INHIBIT_KILLS(csa->nl);
 		rel_crit(region);
 #ifdef VVMS_GTCX
 		if (csd->clustered)
@@ -101,10 +130,10 @@ bool	region_freeze(gd_region *region, bool freeze, bool override)
 #ifdef DEBUG_FREEZE
 		SEND_FREEZEID("FREEZE");
 #endif
-		return TRUE;
+		return REG_FREEZE_SUCCESS;
 	}
 	if (0 == csd->freeze)
-		return TRUE;
+		return REG_FREEZE_SUCCESS;
 	if (override || OWNERSHIP)
 	{
 		csd->image_count = 0;		/* the order of this line and the next is important */
@@ -130,7 +159,7 @@ bool	region_freeze(gd_region *region, bool freeze, bool override)
 #ifdef DEBUG_FREEZE
 		SEND_FREEZEID("UNFREEZE");
 #endif
-		return TRUE;
+		return REG_FREEZE_SUCCESS;
 	}
-	return FALSE;
+	return REG_ALREADY_FROZEN;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +22,14 @@
 #define MAX_NUM_SUBSC_LEN 10	/* one for exponent, nine for the 18 significant digits */
 #define EXTEND_WARNING_FACTOR 3
 
-typedef gtm_uint64_t	trans_num;
-typedef uint4		trans_num_4byte;
-typedef int4    block_id;
+typedef	gtm_uint64_t	trans_num;
+typedef	uint4		trans_num_4byte;
+
+typedef	int4		block_id;	/* allows for GDS block #s to have 32 bits but see GDS_MAX_BLK_BITS below */
+
+#define	GDS_MAX_BLK_BITS	28	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
+#define	GDS_MAX_VALID_BLK	(1<<GDS_MAX_BLK_BITS - 1)	/* the maximum valid block # that a GT.M database can have */
+#define	GDS_CREATE_BLK_MAX	(block_id)(-1)	/* i.e. 0xFFFFFFFF which also has 31st bit 1 indicating it is a created block */
 
 enum db_acc_method
 {	dba_rms,

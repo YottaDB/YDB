@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -28,9 +28,13 @@
 #	eax - destination mval = &u
 
 .extern	s2n
+.extern underr
 
 # PUBLIC	op_neg
 ENTRY op_neg
+	pushl	%eax
+	mv_force_defined %edx, isdefined
+	popl	%eax
 	mv_if_number %edx, numer
 	pushl	%eax
 	pushl	%edx

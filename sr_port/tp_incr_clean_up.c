@@ -94,14 +94,22 @@ void tp_incr_clean_up(short newlevel)
 		{
 			assert(NULL == cse->low_tlevel);
 			next_cse = cse->next_cw_set;
-			if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&cse->blk)))
+			/* Note down tp_srch_status corresponding to cse (in case it exists). Need to later reset "->cse" field
+			 * of this structure to point to the new cse for this block. Note that if cse->mode is gds_t_create,
+			 * there will be no tp_srch_status entry allotted for cse->blk (one will be there only for the chain.flag
+			 * representation of this to-be-created block). Same case with mode of kill_t_create as it also corresponds
+			 * to a non-existent block#. Therefore dont try looking up the hashtable for this block in those cases.
+			 */
+			tp_srch_status = NULL;
+			assert((gds_t_create == cse->mode) || (kill_t_create == cse->mode)
+				|| (gds_t_write == cse->mode) || (kill_t_write == cse->mode));
+			if ((gds_t_create != cse->mode) && (kill_t_create != cse->mode)
+					&& (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&cse->blk))))
 				tp_srch_status = tabent->value;
-			else
-				tp_srch_status = NULL;
 			DEBUG_ONLY(
 				tmp_cse = cse;
 				TRAVERSE_TO_LATEST_CSE(tmp_cse);
-				assert(!tp_srch_status || tp_srch_status->cse == tmp_cse);
+				assert((NULL == tp_srch_status) || (tp_srch_status->cse == tmp_cse));
 			)
 			if (newlevel < cse->t_level)
 			{	/* delete the entire horizontal list for this cw-set-element.

@@ -190,9 +190,9 @@ int main(void)
 			rts_error(VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSCKSEL, 0, errno);
 		else if (0 == selstat)
 		{
-				gtm_putmsg(VARLSTCNT(1) ERR_GTMSECSHRTMOUT);
-				loop_limit = 1;
-				gtmsecshr_exit(0,0);	/* doesn't return */
+			gtm_putmsg(VARLSTCNT(1) ERR_GTMSECSHRTMOUT);
+			loop_limit = 1;
+			gtmsecshr_exit(0,0);	/* doesn't return */
 		}
 		recd = 0;
 		mesg_len = 0;
@@ -209,11 +209,8 @@ int main(void)
 			if ((-1 == num_chars_recd) && (gtmsecshr_timer_popped || EINTR != errno))
 			{
 				rts_error(VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRRECVF, 0, errno);
-				mesg.code = PING_MESSAGE;
-				mesg.ack = ACK_NOT_REQUIRED;
-				recv_complete = 1;
-			}
-			else if (0 == num_chars_recd)
+				assert(FALSE);	/* the above rts_error should never return */
+			} else if (0 == num_chars_recd)
 				recv_complete = 1;
 			else
 			{
@@ -245,8 +242,7 @@ int main(void)
 			{
 				 rts_error(VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRSENDF, 0, errno);
 				 send_complete = 1;
-			}
-			else
+			} else
 			{
 				sent += num_chars_sent;
 				if (sent == mesg_len)
@@ -305,12 +301,6 @@ void gtmsecshr_init(void)
 		send_msg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
 				ERR_GTMSECSHRSUIDF, 0, ERR_GTMSECSHROPCMP, 0, errno);
 		gtmsecshr_exit(SETUIDROOT, FALSE);
-	}
-	if (-1 == setgid(ROOTGID))
-	{
-		send_msg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
-				ERR_GTMSECSHRSGIDF, 0, ERR_GTMSECSHROPCMP, 0, errno);
-		gtmsecshr_exit(SETGIDROOT, FALSE);
 	}
 	if ((getsid(process_id) != process_id) && ((pid_t)-1 == setsid()))
 		send_msg(VARLSTCNT(8) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,
@@ -425,21 +415,26 @@ void gtmsecshr_exit (int exit_code, boolean_t dump)
 int gtmsecshr_open_log_file (void)
 {
 	struct stat 	buf;
-	int     	save_errno = 0;
+	int     	save_errno = 0, status;
 	char    	gtmsecshr_path[MAX_TRANS_NAME_LEN], *error_mesg;
 	mstr    	gtmsecshr_lognam, gtmsecshr_transnam;
 
-	error_def(ERR_GTMSECSHRLOGF);
-	error_def(ERR_TEXT);
 	error_def(ERR_GTMSECSHRDEFLOG);
+	error_def(ERR_GTMSECSHRLOGF);
+	error_def(ERR_LOGTOOLONG);
+	error_def(ERR_TEXT);
 
 	gtmsecshr_lognam.addr = GTMSECSHR_LOG_DIR;
 	gtmsecshr_lognam.len = sizeof(GTMSECSHR_LOG_DIR) - 1;
-	if ((SS_NORMAL != trans_log_name(&gtmsecshr_lognam, &gtmsecshr_transnam, gtmsecshr_logpath))
-				|| !ABSOLUTE_PATH(gtmsecshr_logpath))
+	status = TRANS_LOG_NAME(&gtmsecshr_lognam, &gtmsecshr_transnam, gtmsecshr_logpath, sizeof(gtmsecshr_logpath),
+					dont_sendmsg_on_log2long);
+	if ((SS_NORMAL != status) || !ABSOLUTE_PATH(gtmsecshr_logpath))
 	{	/* gtm_log not defined or not defined to absolute path, use default gtm_log
 		 * This is not considered error, just informational
 		 */
+		if (SS_LOG2LONG == status)
+			send_msg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_lognam.len, gtmsecshr_lognam.addr,
+				sizeof(gtmsecshr_logpath) - 1);
 		send_msg(VARLSTCNT(4) ERR_GTMSECSHRDEFLOG, 2, RTS_ERROR_TEXT(DEFAULT_GTMSECSHR_LOG_DIR));
 		strcpy(gtmsecshr_logpath, DEFAULT_GTMSECSHR_LOG_DIR);
 		gtmsecshr_logpath_len = sizeof(DEFAULT_GTMSECSHR_LOG_DIR) - 1;
@@ -623,9 +618,6 @@ int service_request(gtmsecshr_mesg *buf)
 				buf->mesg.id);
 		)
 		break ;
-	    case CHECK_PROCESS_ALIVE:
-		buf->code = (-1 == kill((pid_t )buf->mesg.id, 0)) ? errno : 0;
-		break;
 	    case REMOVE_SEM:
 		buf->code = ( -1 == semctl((int )buf->mesg.id, 0, IPC_RMID, 0)) ? errno : 0;
 		if (!buf->code)
@@ -672,10 +664,8 @@ int service_request(gtmsecshr_mesg *buf)
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to remove shared memory segment"), buf->code);
 		}
 		break;
-	   case PING_MESSAGE :
-		buf->code = 0;
-		break;
 	   case REMOVE_FILE :
+#		ifndef MUTEX_MSEM_WAKE
 		for (index = 0; index < sizeof(buf->mesg.path); index++)
 		{
 			if ('\0' == buf->mesg.path[index])
@@ -711,11 +701,11 @@ int service_request(gtmsecshr_mesg *buf)
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
 					index >= sizeof(buf->mesg.path) ? sizeof(buf->mesg.path) - 1 : index, buf->mesg.path,
 					ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to get file status"), errno);
-#ifndef __MVS__
+#			ifndef __MVS__
 			} else if (!S_ISSOCK(statbuf.st_mode))
-#else
+#			else
 			} else if (!(S_ISSOCK(statbuf.st_mode) || S_ISCHR(statbuf.st_mode)))
-#endif
+#			endif
 			{
 				gtm_putmsg(VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
 					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
@@ -749,6 +739,12 @@ int service_request(gtmsecshr_mesg *buf)
 					RTS_ERROR_STRING(buf->mesg.path));
 			}
 		}
+#		else
+		/* For platforms that use MSEMs for mutex inter process communication, mutex socket files are not used
+		 * by GT.M so the need to remove those (i.e. using the REMOVE_FILE command should not be necessary).
+		 */
+	   	assert(FALSE);
+#		endif
 		break;
 	    case CONTINUE_PROCESS:
 		if (buf->code = (-1 == kill((pid_t)buf->mesg.id, SIGCONT)) ? errno : 0)

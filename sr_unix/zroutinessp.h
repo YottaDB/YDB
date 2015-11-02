@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,6 @@ typedef	struct zro_ent_type
 	void		*shrsym; /* used only on those platforms that generate shared images */
 } zro_ent;
 
-#define ZROUTINE_LOG	"$gtmroutines"
 #define ZRO_EOL 	0
 #define ZRO_IDN 	1
 #define ZRO_DEL 	' '

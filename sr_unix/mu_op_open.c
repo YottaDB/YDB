@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,9 +62,12 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 	char		buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
 	io_log_name	*naml;		/* logical record for passed name */
 	io_log_name	*tl;		/* logical record for translated name */
-	uint4		stat;		/* status */
+	int4		stat;		/* status */
 	mstr		tn;			/* translated name 	  */
+
 	error_def(LP_NOTACQ);			/* bad license 		  */
+	error_def(ERR_LOGTOOLONG);
+
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
 	if (mspace)
@@ -78,22 +81,25 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 		tl = naml;
 	else
 	{
-#ifdef	NOLICENSE
-	licensed= TRUE ;
-#else
+#		ifdef	NOLICENSE
+		licensed= TRUE ;
+#		else
 		CRYPT_CHKSYSTEM;
 		if (!licensed || LP_CONFIRM(lid,lkid)==LP_NOTACQ)
 		{
 			licensed= FALSE ;
 		}
-#endif
-		switch(stat = trans_log_name(&v->str, &tn, &buf1[0]))
+#		endif
+		switch(stat = TRANS_LOG_NAME(&v->str, &tn, &buf1[0], sizeof(buf1), dont_sendmsg_on_log2long))
 		{
 		case SS_NORMAL:
 			tl = get_log_name(&tn, INSERT);
 			break;
-		case (unsigned int)SS_NOLOGNAM:
+		case SS_NOLOGNAM:
 			tl = naml;
+			break;
+		case SS_LOG2LONG:
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, v->str.len, v->str.addr, sizeof(buf1) - 1);
 			break;
 		default:
 			rts_error(VARLSTCNT(1) stat);

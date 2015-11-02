@@ -211,7 +211,7 @@ void gvcst_init (gd_region *greg)
 	{
 		log_nam.addr = GTM_TPRESTART_LOG_LIMIT;
 		log_nam.len = STR_LIT_LEN(GTM_TPRESTART_LOG_LIMIT);
-		if (trans_log_name(&log_nam, &trans_log_nam, trans_buff) == SS_NORMAL)
+		if (SS_NORMAL == TRANS_LOG_NAME(&log_nam, &trans_log_nam, trans_buff, sizeof(trans_buff), do_sendmsg_on_log2long))
 		{
 			tprestart_syslog_limit = ATOI(trans_log_nam.addr);
 			if (0 > tprestart_syslog_limit)
@@ -219,7 +219,7 @@ void gvcst_init (gd_region *greg)
 		}
 		log_nam.addr = GTM_TPRESTART_LOG_DELTA;
 		log_nam.len = STR_LIT_LEN(GTM_TPRESTART_LOG_DELTA);
-		if (trans_log_name(&log_nam, &trans_log_nam, trans_buff) == SS_NORMAL)
+		if (SS_NORMAL == TRANS_LOG_NAME(&log_nam, &trans_log_nam, trans_buff, sizeof(trans_buff), do_sendmsg_on_log2long))
 		{
 			tprestart_syslog_delta = ATOI(trans_log_nam.addr);
 			if (0 > tprestart_syslog_delta)
@@ -461,7 +461,6 @@ void gvcst_init (gd_region *greg)
 		csa->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_ulong_t)csd + (int)(csd->start_vbn - 1) * DISK_BLOCK_SIZE);
 		break;
 	case dba_bg:
-		csa->clustered = csd->clustered;
 		db_csh_ini(csa);
 		break;
 	default:

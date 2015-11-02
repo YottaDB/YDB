@@ -150,6 +150,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 					continue;
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, save_errno);
+			GTM_SEM_CHECK_EINVAL(gtm_environment_init, save_errno, udi);
 			return FALSE;
 		}
 		ftok_sop[0].sem_num = 0; ftok_sop[0].sem_op = 0;	/* Wait for 0 (unlocked) */
@@ -179,7 +180,8 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 				sem_pid = semctl(udi->ftok_semid, 0, GETPID);
 				if (-1 == sem_pid)
 				{
-					if (EINVAL == errno)		/* the sem might have been deleted */
+					/*EIDRM seen only on Linux*/
+					if ((EINVAL == errno) || (EIDRM == errno))	/* the sem might have been deleted */
 						continue;
 					else
 					{
@@ -327,8 +329,7 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
-			assert(EINVAL != save_errno);
-			assert(0 <= udi->ftok_semid);
+			GTM_SEM_CHECK_EINVAL(gtm_environment_init, save_errno, udi);
 			return FALSE;
 		}
 		/* Try again - IPC_NOWAIT is set TRUE, if immediate is TRUE */
@@ -339,6 +340,7 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 			save_errno = errno;
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+			GTM_SEM_CHECK_EINVAL(gtm_environment_init, save_errno, udi);
 			return FALSE;
 		}
 	}
@@ -353,7 +355,7 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
  * Parameters:
  *	reg		: Regions structure
  * Return Value: TRUE, if succsessful
- *	         FALSE, if fails.
+ *               FALSE, if fails.
  */
 boolean_t ftok_sem_incrcnt(gd_region *reg)
 {
@@ -428,6 +430,7 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 			save_errno = errno;
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semctl()"), CALLFROM, save_errno);
+			GTM_SEM_CHECK_EINVAL(gtm_environment_init, save_errno, udi);
 			return FALSE;
 		}
 		if (1 >= ftok_semval)	/* checking against 0, in case already we decremented semaphore number 1 */
@@ -449,6 +452,7 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+			GTM_SEM_CHECK_EINVAL(gtm_environment_init, save_errno, udi);
 			return FALSE;
 		}
 	}
@@ -456,6 +460,7 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 	{
 		gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+		GTM_SEM_CHECK_EINVAL(gtm_environment_init, save_errno, udi);
 		return FALSE;
 	}
 	udi->grabbed_ftok_sem = FALSE;

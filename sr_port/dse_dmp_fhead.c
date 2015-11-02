@@ -43,15 +43,6 @@
 #include "stringpool.h"		/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
 #include "op.h"
 
-/* In mdef.h the definition of ENDIANTHIS is defined to either "BIG" or "LITTLE", however, unique in this module
-   is the need for a right adjusted version of ENDIANTHIS should the value happen to be "BIG". Rather than complicate
-   things in general, just override it for this module.
-*/
-#ifdef BIGENDIAN
-#  undef ENDIANTHIS
-#  define ENDIANTHIS "   BIG"
-#endif
-
 #define MAX_UTIL_LEN    	64
 #define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
 
@@ -68,12 +59,18 @@ LITREF	char		*gtm_dbversion_table[];
 	util_out_print(TEXT"  0x!XL        Transaction =   0x!16@XQ", TRUE, (csd->VARIABLE##_cntr),	\
 		(&csd->VARIABLE##_tn));
 
-#define SHOW_DB_CSH_STAT(COUNTER, TEXT1, TEXT2)								\
+#define SHOW_DB_CSH_STAT(csd, COUNTER, TEXT1, TEXT2)							\
 	if (csd->COUNTER.curr_count || csd->COUNTER.cumul_count)					\
 	{												\
 		util_out_print(TEXT1"  0x!XL      "TEXT2"  0x!XL", TRUE, (csd->COUNTER.curr_count),	\
 				(csd->COUNTER.cumul_count + csd->COUNTER.curr_count));			\
 	}
+
+#define SHOW_GVSTATS_STAT(cnl, COUNTER, TEXT1, TEXT2)							\
+{													\
+	if (cnl->gvstats_rec.COUNTER)									\
+		util_out_print("  " TEXT1 " : " TEXT2"  0x!16@XQ", TRUE, (&cnl->gvstats_rec.COUNTER));	\
+}
 
 /* NEED_TO_DUMP is only for the qualifiers other than "BASIC" and "ALL".
 	file_header is not dumped only if "NOBASIC" is explicitly specified */
@@ -228,7 +225,7 @@ void dse_dmp_fhead (void)
 		util_out_print("  Mutex Spin Sleep Time !19UL", FALSE,
 			(csd->mutex_spin_parms.mutex_spin_sleep_mask == 0) ?
 				0 : (csd->mutex_spin_parms.mutex_spin_sleep_mask + 1));
-		util_out_print("  KILLs in progress     !12UL", TRUE, csd->kill_in_prog);
+		util_out_print("  KILLs in progress     !12UL", TRUE, (csd->kill_in_prog + csd->abandoned_kills));
 		util_out_print("  Replication State           !AD", FALSE, 13,
 			(csd->repl_state == repl_closed ? "          OFF"
 			: (csd->repl_state == repl_open ? "           ON" : " [WAS_ON] OFF")));
@@ -241,7 +238,7 @@ void dse_dmp_fhead (void)
 			util_out_print("  Zqgblmod Seqno         0x!16@XQ", FALSE, &csd->zqgblmod_seqno);
 			util_out_print("  Zqgblmod Trans  0x!16@XQ", TRUE, &csd->zqgblmod_tn);
 		)
-		util_out_print("  Endian Format                      !6AZ", UNIX_ONLY(FALSE) VMS_ONLY(TRUE), ENDIANTHIS);
+		util_out_print("  Endian Format                      !6AZ", UNIX_ONLY(FALSE) VMS_ONLY(TRUE), ENDIANTHISJUSTIFY);
 		UNIX_ONLY(
 		util_out_print("  Commit Wait Spin Count!12UL", TRUE, csd->wcs_phase2_commit_wait_spincnt);
 		)
@@ -249,14 +246,16 @@ void dse_dmp_fhead (void)
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
                 util_out_print(0, TRUE);
-		UNIX_ONLY(
-			util_out_print("  Dualsite Resync Seqno  0x!16@XQ", TRUE, &csd->dualsite_resync_seqno);
-		)
+		UNIX_ONLY(util_out_print("  Dualsite Resync Seqno  0x!16@XQ", FALSE, &csd->dualsite_resync_seqno);)
+		VMS_ONLY(util_out_print("                                           ", FALSE);)
+		util_out_print("  DB Current Minor Version      !4UL", TRUE, csd->minor_dbver);
 		util_out_print("  Blks Last Record Backup        0x!XL", FALSE, csd->last_rec_bkup_last_blk);
-		util_out_print("  Blks Last Stream Backup 0x!XL", TRUE, csd->last_inc_bkup_last_blk);
-		util_out_print("  Blks Last Comprehensive Backup 0x!XL", FALSE, csd->last_com_bkup_last_blk);
+		util_out_print("  Last GT.M Minor Version       !4UL", TRUE, csd->last_mdb_ver);
+		util_out_print("  Blks Last Stream Backup        0x!XL", FALSE, csd->last_inc_bkup_last_blk);
 		util_out_print("  DB Creation Version             !AD", TRUE,
 			       LEN_AND_STR(gtm_dbversion_table[csd->creation_db_ver]));
+		util_out_print("  Blks Last Comprehensive Backup 0x!XL", FALSE, csd->last_com_bkup_last_blk);
+		util_out_print("  DB Creation Minor Version     !4UL", TRUE, csd->creation_mdb_ver);
                 util_out_print(0, TRUE);
 		util_out_print("  Total Global Buffers           0x!XL", FALSE, csd->n_bts);
 		util_out_print("  Phase2 commit pid count 0x!XL", TRUE, cnl->wcs_phase2_commit_pidcnt);
@@ -264,6 +263,8 @@ void dse_dmp_fhead (void)
 		util_out_print("  Write cache timer count 0x!XL", TRUE, cnl->wcs_timers);
 		util_out_print("  Free  Global Buffers           0x!XL", FALSE, cnl->wc_in_free);
 		util_out_print("  wcs_wtstart pid count   0x!XL", TRUE, cnl->in_wtstart);
+		util_out_print("  Write Cache is Blocked              !AD", FALSE, 5, (csd->wc_blocked ? " TRUE" : "FALSE"));
+		util_out_print("  wcs_wtstart intent cnt  0x!XL", TRUE, cnl->intent_wtstart);
 		new_line = FALSE;
 		for (index = 0; MAX_WTSTART_PID_SLOTS > index; index++)
 		{
@@ -275,6 +276,14 @@ void dse_dmp_fhead (void)
 				new_line = !new_line;
 			}
 		}
+		/* Additional information regarding kills that are in progress, abandoned and inhibited */
+		util_out_print(0, TRUE);
+		util_out_print("  Actual kills in progress     !12UL", FALSE, csd->kill_in_prog);
+		util_out_print("  Abandoned Kills       !12UL", TRUE, csd->abandoned_kills);
+		util_out_print("  Process(es) inhibiting KILLs        !5UL", TRUE, cnl->inhibit_kills);
+
+		util_out_print(0, TRUE);
+		util_out_print("  MM defer_time                       !5SL", TRUE, csd->defer_time);
 	}
 	if (NEED_TO_DUMP("ENVIRONMENT"))
 	{
@@ -286,38 +295,16 @@ void dse_dmp_fhead (void)
 	if (NEED_TO_DUMP("DB_CSH"))
 	{
                 util_out_print(0, TRUE);
-#		define TAB_DB_CSH_ACCT_REC(COUNTER,TEXT1,TEXT2)	SHOW_DB_CSH_STAT(COUNTER, TEXT1, TEXT2)
+#		define TAB_DB_CSH_ACCT_REC(COUNTER,TEXT1,TEXT2)	SHOW_DB_CSH_STAT(csd, COUNTER, TEXT1, TEXT2)
 #		include "tab_db_csh_acct_rec.h"
 #		undef TAB_DB_CSH_ACCT_REC
-	}
-	if (NEED_TO_DUMP("RETRIES"))
-	{
-                util_out_print(0, TRUE);
-                util_out_print("  Retries [0]           !12UL", TRUE, csd->n_retries[0]);
-                util_out_print("  Retries [1]           !12UL", TRUE, csd->n_retries[1]);
-                util_out_print("  Retries [2]           !12UL", TRUE, csd->n_retries[2]);
-                util_out_print("  Retries [3]           !12UL", TRUE, csd->n_retries[3]);
-	}
-	if (NEED_TO_DUMP("TPRETRIES"))
-	{
-                util_out_print(0, TRUE);
-		for (index = 0; index < ARRAYSIZE(csd->n_tp_retries); index++)
-			util_out_print("  Total TP Retries [!2UL] !12UL     Cnflct TP Retries [!2UL] !12UL",
-				TRUE, index, csd->n_tp_retries[index], index, csd->n_tp_retries_conflicts[index]);
 	}
 	if (NEED_TO_DUMP("GVSTATS"))
 	{
                 util_out_print(0, TRUE);
-		util_out_print("  Number of        : GET                      : 0x!XL", TRUE, csd->n_gets);
-		util_out_print("  Number of        : ORDER                    : 0x!XL", TRUE, csd->n_order);
-		util_out_print("  Number of        : QUERY                    : 0x!XL", TRUE, csd->n_queries);
-		util_out_print("  Number of        : ZPREV                    : 0x!XL", TRUE, csd->n_zprevs);
-		util_out_print("  Number of        : DATA                     : 0x!XL", TRUE, csd->n_data);
-		util_out_print("  Number of        : KILL                     : 0x!XL", TRUE, csd->n_kills);
-		util_out_print("  Number of Non-TP : SET                      : 0x!XL", TRUE, csd->n_puts);
-		util_out_print("  Number of Non-TP : SET (duplicate SETS)     : 0x!XL", TRUE, csd->n_puts_duplicate);
-		util_out_print("  Number of     TP : UPDATES                  : 0x!XL", TRUE, csd->n_tp_updates);
-		util_out_print("  Number of     TP : UPDATES (duplicate SETS) : 0x!XL", TRUE, csd->n_tp_updates_duplicate);
+#		define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SHOW_GVSTATS_STAT(cnl, COUNTER, TEXT1, TEXT2)
+#		include "tab_gvstats_rec.h"
+#		undef TAB_GVSTATS_REC
 	}
 	if (NEED_TO_DUMP("TPBLKMOD"))
 	{

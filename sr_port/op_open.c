@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +10,13 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "io.h"
 #include "iosp.h"
 #include "io_params.h"
 #include "cryptdef.h"
 #include "op.h"
 #include "trans_log_name.h"
-
 
 GBLREF bool		licensed;
 GBLREF int4		lkid, lid;
@@ -32,6 +32,7 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 	int4		stat;				/* status */
 	mstr		tn;				/* translated name */
 
+	error_def(ERR_LOGTOOLONG);
 	error_def(LP_NOTACQ);				/* bad license */
 
 	MV_FORCE_STR(device);
@@ -47,14 +48,14 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 		tl = naml;
 	else
 	{
-#ifdef	NOLICENSE
-	licensed= TRUE;
-#else
+#		ifdef	NOLICENSE
+		licensed= TRUE;
+#		else
 		CRYPT_CHKSYSTEM;
 		if (!licensed || LP_CONFIRM(lid, lkid)==LP_NOTACQ)
 			licensed= FALSE;
-#endif
-		switch(stat = trans_log_name(&device->str, &tn, &buf1[0]))
+#		endif
+		switch(stat = TRANS_LOG_NAME(&device->str, &tn, &buf1[0], sizeof(buf1), dont_sendmsg_on_log2long))
 		{
 		case SS_NORMAL:
 			tl = get_log_name(&tn, INSERT);
@@ -72,7 +73,12 @@ int op_open(mval *device, mval *devparms, int timeout, mval *mspace)
 					break;
 				}
 			}
-			rts_error(VARLSTCNT(1) stat);
+#			ifdef UNIX
+			if (SS_LOG2LONG == stat)
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, device->str.len, device->str.addr, sizeof(buf1) - 1);
+			else
+#			endif
+				rts_error(VARLSTCNT(1) stat);
 		}
 	}
 	stat = io_open_try(naml, tl, devparms, timeout, mspace);

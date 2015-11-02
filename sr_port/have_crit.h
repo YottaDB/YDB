@@ -26,13 +26,25 @@
 */
 #define CRIT_HAVE_ANY_REG	0x00000000
 
+typedef enum
+{
+	INTRPT_OK_TO_INTERRUPT = 0,
+	INTRPT_IN_GTCMTR_TERMINATE,
+	INTRPT_IN_TP_UNWIND,
+	INTRPT_NUM_STATES
+} intrpt_state_t;
+
+GBLREF	intrpt_state_t	intrpt_ok_state;
+
 /* Macro to check if we are in a state that is ok to interrupt (or to do deferred signal handling).
- * We do not want to interrupt if in the midst of a malloc, holding crit, in the midst of commit, or in
+ * We do not want to interrupt if the global variable intrpt_ok_state indicates it is not ok to interrupt,
+ * if we are in the midst of a malloc, if we are holding crit, if we are in the midst of commit, or in
  * wcs_wtstart. In the last case, we could be causing another process HOLDING CRIT on the region to wait
  * in bg_update_phase1 if we hold the write interlock. Hence it is important for us to finish that as soon
  * as possible and not interrupt it.
  */
-#define	OK_TO_INTERRUPT	((0 == gtmMallocDepth) && (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT | CRIT_IN_WTSTART)))
+#define	OK_TO_INTERRUPT	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (0 == gtmMallocDepth)			\
+				&& (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT | CRIT_IN_WTSTART)))
 
 /* Macro to be used whenever we want to handle any signals that we deferred handling and exit in the process.
  * In VMS, we dont do any signal handling, only exit handling.

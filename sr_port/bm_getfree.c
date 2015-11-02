@@ -271,7 +271,7 @@ boolean_t	is_free_blks_ctr_ok(void)
 		maxbitsthismap = (free_bml != (local_maps - 1)) ? BLKS_PER_LMAP : total_blks - bml;
 		for (free_bit = 0; free_bit < maxbitsthismap; free_bit++)
 		{
-			free_bit = bm_find_blk(free_bit, (sm_uc_ptr_t)bmp + sizeof(blk_hdr), BLKS_PER_LMAP, &blk_used);
+			free_bit = bm_find_blk(free_bit, (sm_uc_ptr_t)bmp + sizeof(blk_hdr), maxbitsthismap, &blk_used);
 			assert(NO_FREE_SPACE <= free_bit);
 			if (0 > free_bit)
 				break;

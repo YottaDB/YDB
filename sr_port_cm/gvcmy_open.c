@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 #  include <rms.h>
 #  include <ssdef.h>
 #elif defined(UNIX)
-#  include <unistd.h>
+#  include "gtm_unistd.h"
 #  include <errno.h>
 #  include "parse_file.h"
 #  include "gtm_stdlib.h"
@@ -65,8 +65,10 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	short		temp_short;
 	VMS_ONLY($DESCRIPTOR(task, "GTCMSVR");)
 	UNIX_ONLY(MSTR_DEF(task, 0, NULL);)
-	error_def(ERR_INVNETFILNM);
+
 	error_def(ERR_BADSRVRNETMSG);
+	error_def(ERR_INVNETFILNM);
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_NETDBOPNERR);
 	error_def(ERR_SYSCALL);
 
@@ -82,7 +84,7 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	node.dsc$a_pointer = nb->nam$l_node;
 	task1.addr = "GTCMSVRNAM";
 	task1.len = sizeof("GTCMSVRNAM") - 1;
-	status = trans_log_name(&task1, &task2, (char *)buff);
+	status = TRANS_LOG_NAME(&task1, &task2, (char *)buff, sizeof(buff), dont_sendmsg_on_log2long);
 #elif defined(UNIX)
 	if (!pb->b_node)
 		rts_error(VARLSTCNT(1) ERR_INVNETFILNM);
@@ -116,7 +118,14 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 	if (SS_NOLOGNAM != status)
 	{
 		if (SS_NORMAL != status)
-			rts_error(VARLSTCNT(1) status);
+		{
+#			ifdef UNIX
+			if (SS_LOG2LONG == status)
+				rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, sizeof(buff) - 1);
+			else
+#			endif
+				rts_error(VARLSTCNT(1) status);
+		}
 		VMS_ONLY(
 			task.dsc$a_pointer = buff;
 			task.dsc$w_length = task2.len;

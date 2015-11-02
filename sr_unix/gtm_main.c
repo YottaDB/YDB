@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,6 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF char			cli_err_str[];
-GBLREF boolean_t		gtm_utf8_mode;
 
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
@@ -77,8 +76,7 @@ int gtm_main (int argc, char **argv, char **envp)
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(stop_image_conditional_core);
-	if (gtm_utf8_mode)
-		gtm_icu_init();	 /* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	cli_lex_setup(argc, argv);
 	/*	put the arguments into buffer, then clean up the token buffer
 		cli_gettoken() copies all arguments except the first one argv[0]
@@ -115,7 +113,6 @@ int gtm_main (int argc, char **argv, char **envp)
 		invocation_mode = MUMPS_RUN;
 
 	gtm_chk_dist(argv[0]);
-	gtm_chk_image();
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
 	dm_start();

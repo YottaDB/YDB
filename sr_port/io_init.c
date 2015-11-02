@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,6 @@ void io_init(bool term_ctrl)
 		(unsigned char)iop_eol
 	};
 
-
 	int4		status;
         mval    	val;
 	mstr		tn;
@@ -68,6 +67,8 @@ void io_init(bool term_ctrl)
 	mval		pars;
 	io_log_name	*inp, *outp;
 	io_log_name	*ln;
+
+	error_def(ERR_LOGTOOLONG);
 
 	io_init_name();
 	/* default logical names */
@@ -79,11 +80,15 @@ void io_init(bool term_ctrl)
 	ln = get_log_name(&val.str, INSERT);
 	assert(ln != 0);
 	val.str = gtm_principal;
-	status = trans_log_name(&val.str, &tn, buf1);
-	if (status == SS_NOLOGNAM)
+	status = TRANS_LOG_NAME(&val.str, &tn, buf1, sizeof(buf1), dont_sendmsg_on_log2long);
+	if (SS_NOLOGNAM == status)
 		dollar_principal = 0;
-	else if (status == SS_NORMAL)
+	else if (SS_NORMAL == status)
 		dollar_principal = get_log_name(&tn, INSERT);
+#	ifdef UNIX
+	else if (SS_LOG2LONG == status)
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, sizeof(buf1) - 1);
+#	endif
 	else
 		rts_error(VARLSTCNT(1) status);
 
@@ -91,12 +96,12 @@ void io_init(bool term_ctrl)
 	val.str = sys_input;
 	inp = get_log_name(&val.str, INSERT);
 	pars.mvtype = MV_STR;
-	status = trans_log_name(&val.str, &tn, buf1);
-	if (status == SS_NOLOGNAM)
+	status = TRANS_LOG_NAME(&val.str, &tn, buf1, sizeof(buf1), dont_sendmsg_on_log2long);
+	if (SS_NOLOGNAM == status)
 	{
 		pars.str.len = sizeof(null_params_list);
 		pars.str.addr = (char *)null_params_list;
-	} else  if (status == SS_NORMAL)
+	} else if (SS_NORMAL == status)
 	{
 		if (!io_is_rm(&val.str))
 		{
@@ -111,19 +116,32 @@ void io_init(bool term_ctrl)
 			pars.str.len = sizeof(shr_params);
 			pars.str.addr = (char *)shr_params;
 		}
-	} else
+	}
+#	ifdef UNIX
+	else if (SS_LOG2LONG == status)
+		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, sizeof(buf1) - 1);
+#	endif
+	else
 		rts_error(VARLSTCNT(1) status);
 	ESTABLISH(io_init_ch);
 	(*op_open_ptr)(&val, &pars, 0, 0);
 	io_curr_device.in  = io_std_device.in  = inp->iod;
 	val.str = sys_output;
-	if ((trans_log_name(&gtm_netout, &tn, buf1) == SS_NORMAL) &&
-		(trans_log_name(&sys_net, &tn, buf1) == SS_NORMAL) && io_is_sn(&sys_net))
+	if ((SS_NORMAL == TRANS_LOG_NAME(&gtm_netout, &tn, buf1, sizeof(buf1), do_sendmsg_on_log2long))
+			&& (SS_NORMAL == TRANS_LOG_NAME(&sys_net, &tn, buf1, sizeof(buf1), do_sendmsg_on_log2long))
+			&& io_is_sn(&sys_net))
 		val.str = sys_net;
 	outp = get_log_name(&val.str, INSERT);
-	status = trans_log_name(&val.str, &tn, buf1);
-	if (status != SS_NORMAL && status != SS_NOLOGNAM)
-		rts_error(VARLSTCNT(1) status);
+	status = TRANS_LOG_NAME(&val.str, &tn, buf1, sizeof(buf1), dont_sendmsg_on_log2long);
+	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
+	{
+#		ifdef UNIX
+		if (SS_LOG2LONG == status)
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.str.len, val.str.addr, sizeof(buf1) - 1);
+		else
+#		endif
+			rts_error(VARLSTCNT(1) status);
+	}
 	if ((val.str.addr == sys_net.addr) && (pars.str.addr == (char *)open_params_list))
 		/* sys$net is the only input thing that uses open_params_list */
 		outp->iod = io_curr_device.in;

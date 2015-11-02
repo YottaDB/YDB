@@ -65,7 +65,7 @@ uint4 mur_process_intrpt_recov()
 	char			prev_jnl_fn[MAX_FN_LEN + 1], rename_fn[MAX_FN_LEN + 1], save_name[MAX_FN_LEN + 1];
 	jnl_create_info		jnl_info;
 	uint4			status, status2;
-	uint4			max_autoswitchlimit, max_jnl_alq, max_jnl_deq;
+	uint4			max_autoswitchlimit, max_jnl_alq, max_jnl_deq, freeblks;
 	sgmnt_data_ptr_t	csd;
 #if defined(VMS)
 	io_status_block_disk	iosb;
@@ -80,9 +80,9 @@ uint4 mur_process_intrpt_recov()
 
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
 	{
-		gv_cur_region = rctl->gd;	/* mur_blocks_free, mur_master_map and wcs_flu require this to be set */
-		cs_addrs = rctl->csa;		/* mur_master_map requires this is set */
-		csd = cs_data = rctl->csd;	/* mur_blocks_free, mur_master_map require this to be set */
+		gv_cur_region = rctl->gd;	/* mur_blocks_free and wcs_flu require this to be set */
+		cs_addrs = rctl->csa;
+		csd = cs_data = rctl->csd;	/* mur_blocks_free requires this to be set */
 		assert(rctl->csd == rctl->csa->hdr);
 		mur_jctl = jctl = rctl->jctl_turn_around;
 		assert(rctl->csd == rctl->csa->hdr);
@@ -118,14 +118,10 @@ uint4 mur_process_intrpt_recov()
 			assert(csd->jnl_deq         == last_jctl->jfh->jnl_deq);
 			assert(csd->autoswitchlimit == last_jctl->jfh->autoswitchlimit);
 		}
-		/* now that rctl->blks_to_upgrd_adjust is completely computed, use that to increment filehdr blks_to_upgrd.
-		 * note that blks_to_upgrd should be adjusted before calling mur_master_map() as otherwise an assert
-		 * in that routine might fail in case the counter is incorrect and a V4 format bitmap block is read in.
-		 */
+		/* now that rctl->blks_to_upgrd_adjust is completely computed, use that to increment filehdr blks_to_upgrd. */
 		csd->blks_to_upgrd += rctl->blks_to_upgrd_adjust;
 		if (csd->blks_to_upgrd)
 			csd->fully_upgraded = FALSE;
-		mur_master_map();
 		jctl = mur_jctl;
 		csd->trans_hist.early_tn = csd->trans_hist.header_open_tn = jctl->turn_around_tn;
 		csd->trans_hist.curr_tn = csd->trans_hist.early_tn;	/* INCREMENT_CURR_TN macro not used but noted in comment
@@ -144,7 +140,18 @@ uint4 mur_process_intrpt_recov()
 		if (csd->tn_upgrd_blks_0 > jctl->turn_around_tn)
 			csd->tn_upgrd_blks_0 = (trans_num)-1;
 		csd->reorg_upgrd_dwngrd_restart_block = 0;
-		csd->trans_hist.free_blocks = mur_blocks_free();
+		/* Compute current value of "free_blocks" based on the value of "free_blocks" at the turnaround point epoch
+		 * record and the change in "total_blks" since that epoch to the present form of the database. Any difference
+		 * in "total_blks" implies database file extensions happened since the turnaround point. A backward rollback
+		 * undoes everything (including all updates) except file extensions (it does not truncate the file size).
+		 * Therefore every block that was newly allocated as part of those file extensions should be considered FREE
+		 * for the current calculations except for the local bitmap blocks which are BUSY the moment they are created.
+		 */
+		assert(rctl->trnarnd_total_blks <= csd->trans_hist.total_blks);
+		csd->trans_hist.free_blocks = rctl->trnarnd_free_blocks + (csd->trans_hist.total_blks - rctl->trnarnd_total_blks)
+			- DIVIDE_ROUND_UP(csd->trans_hist.total_blks, BLKS_PER_LMAP)
+			+ DIVIDE_ROUND_UP(rctl->trnarnd_total_blks, BLKS_PER_LMAP);
+		assert((freeblks = mur_blocks_free()) == csd->trans_hist.free_blocks);
 		if (dba_bg == csd->acc_meth)
 			/* This is taken from bt_refresh() */
 			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = jctl->turn_around_tn - 1;

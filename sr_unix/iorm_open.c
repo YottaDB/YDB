@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@ LITREF	mstr		chset_names[];
 LITREF unsigned char	io_params_size[];
 
 /* WARNING, this routine is called from ioff_open as well as from the dispatch table. */
+/* WARNING, this routine is called from iopi_open as well as from the dispatch table. */
 
 short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 {
@@ -65,6 +66,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		d_rm->fixed = FALSE;
 		d_rm->noread = FALSE;
 		d_rm->fifo = FALSE;
+		d_rm->pipe = FALSE;
 		d_rm->padchar = DEF_RM_PADCHAR;
 		d_rm->inbuf = NULL;
 		d_rm->outbuf = NULL;
@@ -87,7 +89,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			if (iop_append == (ch = *(pp->str.addr + p_offset++)))
 			{
-				if (!d_rm->fifo && (off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_END)))
+				if (!d_rm->fifo && !d_rm->pipe && (off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_END)))
 					rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 						  ERR_TEXT, 2, LEN_AND_LIT("Error setting file pointer to end of file"), errno);
 				if (0 < statbuf.st_size)
@@ -100,7 +102,7 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ? (unsigned char)*(pp->str.addr + p_offset) + 1 :
 					io_params_size[ch]);
 		}
-		if (!d_rm->fifo)
+		if (!d_rm->fifo && !d_rm->pipe)
 		{
 			if ((off_t)-1 == (size = lseek(fd, (off_t)0, SEEK_CUR)))
 				rts_error(VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,

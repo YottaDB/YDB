@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,35 +33,42 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 {
 	const char	*ptr;
 	boolean_t	do_all = FALSE,
-			done_s = FALSE,
 			done_b = FALSE,
-			done_d = FALSE,
-			done_v = FALSE,
-			done_l = FALSE,
 			done_c = FALSE,
-			done_i = FALSE;
+			done_d = FALSE,
+			done_g = FALSE,
+			done_i = FALSE,
+			done_l = FALSE,
+			done_s = FALSE,
+			done_v = FALSE;
 	int		i;
   	zshow_out	output;
+
 	error_def(ERR_ZSHOWBADFUNC);
+
 	MAXSTR_BUFF_DECL(buff);
 
 	MV_FORCE_STR(func);
 	for (i = 0, ptr = func->str.addr; i < func->str.len; i++, ptr++)
-	{	switch (*ptr)
-		{	case 'S':
-			case 's':
-			case 'D':
-			case 'd':
+	{
+		switch (*ptr)
+		{
 			case 'B':
 			case 'b':
-			case 'V':
-			case 'v':
-			case 'L':
-			case 'l':
 			case 'C':
 			case 'c':
+			case 'D':
+			case 'd':
+			case 'G':
+			case 'g':
 			case 'I':
 			case 'i':
+			case 'L':
+			case 'l':
+			case 'S':
+			case 's':
+			case 'V':
+			case 'v':
 				continue;
 			case '*':
 				do_all = TRUE;
@@ -93,7 +100,8 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 	output.size = sizeof(buff);
 	output.ptr = output.buff;
 	for ( ; i ; i--, ptr++)
-	{	output.line_num = 1;
+	{
+		output.line_num = 1;
 		switch (*ptr)
 		{	case 'B':
 			case 'b':
@@ -103,6 +111,14 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 				output.code = 'B';
 				zshow_zbreaks(&output);
 				break;
+			case 'C':
+			case 'c':
+				if (done_c)
+					break;
+				done_c = TRUE;
+				output.code = 'C';
+				zshow_zcalls(&output);
+				break;
 			case 'D':
 			case 'd':
 				if (done_d)
@@ -111,12 +127,30 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 				output.code = 'D';
 				zshow_devices(&output);
 				break;
+			case 'G':
+			case 'g':
+				if (done_g)
+					break;
+				done_g = TRUE;
+				output.code = 'G';
+				output.line_num = 0;	/* G statistics start at 0 for <*,*> output and not 1 like the others */
+				zshow_gvstats(&output);
+				break;
+			case 'I':
+			case 'i':
+				if (done_i)
+					break;
+				done_i = TRUE;
+				output.code = 'I';
+				zshow_svn(&output);
+				break;
 			case 'L':
 			case 'l':
 				if (done_l)
 					break;
 				done_l = TRUE;
 				output.code = 'L';
+				output.line_num = 0;	/* L statistics start at 0 for <LUS,LUF> output and not 1 like the others */
 				zshow_locks(&output);
 				break;
 			case 'S':
@@ -134,22 +168,6 @@ void op_zshow(mval *func,int type,lv_val *lvn)
 				done_v = TRUE;
 				output.code = 'V';
 				zshow_zwrite(&output);
-				break;
-			case 'C':
-			case 'c':
-				if (done_c)
-					break;
-				done_c = TRUE;
-				output.code = 'C';
-				zshow_zcalls(&output);
-				break;
-			case 'I':
-			case 'i':
-				if (done_i)
-					break;
-				done_i = TRUE;
-				output.code = 'I';
-				zshow_svn(&output);
 				break;
 		}
 	}

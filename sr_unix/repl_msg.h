@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,8 @@ enum
 	REPL_TR_JNL_RECS,		/* 1 */
 	REPL_ROLLBACK_FIRST,		/* 2 */
 	REPL_WILL_RESTART_OBSOLETE,	/* 3 */ /* Obsoleted effective V4.4-002 since we no longer support dual site config with
-					     	 * V4.1 versions. But, DO NOT remove this message type to keep other message types
-					     	 * same as in V4.2 and V4.3 versions */
+						 * V4.1 versions. But, DO NOT remove this message type to keep other message types
+						 * same as in V4.2 and V4.3 versions */
 	REPL_XOFF,			/* 4 */
 	REPL_XON,			/* 5 */
 	REPL_BADTRANS,			/* 6 */
@@ -40,47 +40,94 @@ enum
 	REPL_NEW_TRIPLE,		/* 20 */
 	REPL_INST_NOHIST,		/* 21 */
 	REPL_LOSTTNCOMPLETE,		/* 22 */
+	REPL_CMP_TEST,			/* 23 */
+	REPL_CMP_SOLVE,			/* 24 */
+	REPL_CMP2UNCMP,			/* 25 */  /* used to signal a transition to uncompressed messages in case of errors */
+	REPL_TR_CMP_JNL_RECS,		/* 26 */  /* used to send compressed messages whose pre-compressed length is <  2**24 */
+	REPL_TR_CMP_JNL_RECS2,		/* 27 */  /* used to send compressed messages whose pre-compressed length is >= 2**24 */
 	REPL_MSGTYPE_LAST=256		/* 256 */
 	/* any new message need to be added before REPL_MSGTYPE_LAST */
 };
 
 #define	REPL_PROTO_VER_UNINITIALIZED	(char)0xFF	/* -1, the least of the versions to denote an uninitialized version field */
-#define	REPL_PROTO_VER_DUALSITE		(char)0x0
-#define	REPL_PROTO_VER_MULTISITE	(char)0x1	/* Currently the same as REPL_PROTO_VER_THIS. But the latter can increase
-							 * with a new version while this will never change.
+#define	REPL_PROTO_VER_DUALSITE		(char)0x0	/* Versions GT.M V5.0 and prior that dont support multi site replication */
+#define	REPL_PROTO_VER_MULTISITE	(char)0x1	/* Versions V5.1-000 and above that support multi site replication */
+#define	REPL_PROTO_VER_MULTISITE_CMP	(char)0x2	/* Versions V5.3-003 and above that suport multisite replication with
+							 * the ability to compress the logical records in the replication pipe.
 							 */
-#define	REPL_PROTO_VER_THIS		(char)0x1	/* The current version of the communication protocol between the
+#define	REPL_PROTO_VER_THIS		REPL_PROTO_VER_MULTISITE_CMP
+							/* The current/latest version of the communication protocol between the
 							 * primary (source server) and secondary (receiver server or rollback)
-							 * Versions GT.M V5.0 and prior that dont support multi site replication
-							 * functionality have a protocol version of 0.
 							 */
-#define START_FLAG_NONE				0x00000000
-#define START_FLAG_STOPSRCFILTER		0x00000001
-#define START_FLAG_UPDATERESYNC			0x00000002
-#define START_FLAG_HASINFO			0x00000004
-#define START_FLAG_COLL_M			0x00000008
+
+#define	START_FLAG_NONE				0x00000000
+#define	START_FLAG_STOPSRCFILTER		0x00000001
+#define	START_FLAG_UPDATERESYNC			0x00000002
+#define	START_FLAG_HASINFO			0x00000004
+#define	START_FLAG_COLL_M			0x00000008
 #define	START_FLAG_VERSION_INFO			0x00000010
 
 #define	MIN_REPL_MSGLEN		32 /* To keep compiler happy with
 				    * the definition of repl_msg_t as well
 				    * as to accommodate a seq_num */
 
-#define REPL_MSG_HDRLEN	(uint4)(sizeof(int4) + sizeof(int4)) /* For type and
-						     * len fields */
+#define	REPL_MSG_CMPINFOLEN	(sizeof(repl_cmpinfo_msg_t))
+#define	REPL_MSG_CMPDATALEN	256	/* length of data part of message exchanged between source/receiver to test compression */
+#define	REPL_MSG_CMPDATAMASK	0xff
+#define	MAX_CMP_EXPAND_FACTOR	2	/* the worst case factor by which compression could actually expand input data */
+#define	REPL_MSG_CMPEXPDATALEN	(MAX_CMP_EXPAND_FACTOR * REPL_MSG_CMPDATALEN)
+
+/* The "datalen" field of the REPL_CMP_SOLVE message is set to the following value by the receiver server in case of errors. */
+#define	REPL_RCVR_CMP_TEST_FAIL		(-1)
+
+#define	REPL_MSG_ALIGN	8	/* every message sent across the pipe is expected to be at least 8-byte aligned */
+
+#define	REPL_MSG_TYPE	(uint4)(sizeof(int4))
+#define	REPL_MSG_LEN	(uint4)(sizeof(int4))
+#define	REPL_MSG_HDRLEN	(uint4)(REPL_MSG_TYPE + REPL_MSG_LEN) /* For type and len fields */
 
 typedef struct	/* Used also to send a message of type REPL_INST_NOHIST */
 {
 	int4		type;
-	int4		len;
-	unsigned char 	msg[MIN_REPL_MSGLEN - REPL_MSG_HDRLEN];
+	int4		len;	/* Is 8-byte aligned for ALL messages except REPL_TR_CMP_JNL_RECS message */
+	unsigned char	msg[MIN_REPL_MSGLEN - REPL_MSG_HDRLEN];
 	/* All that we need is msg[1], but keep the  compiler happy with
 	 * this definition for msg. Also provide space to accommodate a seq_num
 	 * so that a static definition would suffice instead of malloc'ing a
 	 * small message buffer */
 } repl_msg_t;
 
+/* To send a REPL_TR_CMP_JNL_RECS type of message, we include the pre-compressed length as part of the 4-byte type field
+ * to keep the replication message header overhead to the current 8-bytes. Define macros to access those fields.
+ * If the pre-compressed length cannot fit in 24 bits, then we send a REPL_TR_CMP_JNL_RECS2 message which has 8-more
+ * byte overhead as part of the replication message header. It is considered ok to take this extra 8-byte hit for huge messages.
+ * The threshold is defined as 2**23 (instead of 2**24) so we ensure the most significant bit is 0 and does not give us
+ * problems while doing >> operations (e.g. (((repl_msg_ptr_t)buffp)->type >> REPL_TR_CMP_MSG_TYPE_BITS);
+ */
+#define	REPL_TR_CMP_MSG_TYPE_BITS	8
+#define	REPL_TR_CMP_MSG_UNCMPLEN_BITS	24
+#define	REPL_TR_CMP_THRESHOLD		(1 << (REPL_TR_CMP_MSG_UNCMPLEN_BITS - 1))
+#define	REPL_TR_CMP_MSG_TYPE_MASK	((1 << REPL_TR_CMP_MSG_TYPE_BITS) - 1)
+
+/* Defines for sending REPL_TR_CMP_JNL_RECS2 message */
+#define	REPL_MSG_UNCMPLEN	sizeof(int4)
+#define	REPL_MSG_CMPLEN		sizeof(int4)
+#define	REPL_MSG_HDRLEN2	(REPL_MSG_HDRLEN + REPL_MSG_UNCMPLEN + REPL_MSG_CMPLEN)	/* 16-byte header */
+typedef struct	/* Used also to send a message of type REPL_TR_CMP_JNL_RECS2 */
+{
+	int4		type;
+	int4		len;
+	int4		uncmplen;
+	int4		cmplen;
+	unsigned char	msg[MIN_REPL_MSGLEN - REPL_MSG_HDRLEN2];
+	/* All that we need is msg[1], but keep the  compiler happy with
+	 * this definition for msg. Also provide space to accommodate a seq_num
+	 * so that a static definition would suffice instead of malloc'ing a
+	 * small message buffer */
+} repl_cmpmsg_t;
+
 #define	MAX_REPL_MSGLEN	(1 * 1024 * 1024) /* should ideally match the TCP send (recv) bufsiz of source (receiver) server */
-#define MAX_TR_BUFFSIZE	(MAX_REPL_MSGLEN - REPL_MSG_HDRLEN) /* allow for replication message header */
+#define MAX_TR_BUFFSIZE	(MAX_REPL_MSGLEN - REPL_MSG_HDRLEN2) /* allow for biggest replication message header */
 
 typedef struct
 {
@@ -148,6 +195,18 @@ typedef struct	/* used to send a message of type REPL_INSTANCE_INFO */
 	char		filler_32[7];
 } repl_instinfo_msg_t; /* The first two fields should be as in repl_msg_t */
 
+typedef struct	/* used to send messages of type REPL_CMP_TEST or REPL_CMP_SOLVE */
+{
+	int4		type;
+	int4		len;
+	int4		datalen;		   /* length of compressed or uncompressed data */
+	char		proto_ver;
+	char		filler_16[3];
+	char		data[REPL_MSG_CMPDATALEN]; /* compressed (if REPL_CMP_TEST) or uncompressed (if REPL_CMP_SOLVE) data */
+	char		overflowdata[(MAX_CMP_EXPAND_FACTOR - 1) * REPL_MSG_CMPDATALEN];
+					/* buffer to hold overflow in case compression expands data */
+} repl_cmpinfo_msg_t; /* The first two fields should be as in repl_msg_t */
+
 typedef struct	/* used to send a message of type REPL_TRIPLE_INFO1 */
 {
 	int4		type;
@@ -208,12 +267,21 @@ typedef struct
 	repl_heartbeat_msg_t	heartbeat;
 } repl_heartbeat_que_entry_t;
 
+typedef struct		/* Used to send a message of type REPL_BADTRANS or REPL_CMP2UNCMP */
+{
+	int4		type;
+	int4		len;
+	seq_num		start_seqno;	/* The seqno that source server should restart sending from */
+	char		filler_32[16];
+} repl_badtrans_msg_t;
+
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(save)
 # pragma pointer_size(long)
 #endif
 
-typedef repl_msg_t 		*repl_msg_ptr_t;
+typedef repl_msg_t		*repl_msg_ptr_t;
+typedef repl_cmpmsg_t		*repl_cmpmsg_ptr_t;
 typedef repl_start_msg_t	*repl_start_msg_ptr_t;
 typedef repl_start_reply_msg_t	*repl_start_reply_msg_ptr_t;
 typedef repl_resync_msg_t	*repl_resync_msg_ptr_t;
@@ -225,6 +293,7 @@ typedef repl_tripinfo2_msg_t	*repl_tripinfo2_msg_ptr_t;
 typedef repl_triple_jnl_t	*repl_triple_jnl_ptr_t;
 typedef repl_triple_msg_t	*repl_triple_msg_ptr_t;
 typedef repl_heartbeat_msg_t	*repl_heartbeat_msg_ptr_t;
+typedef repl_cmpinfo_msg_t	*repl_cmpinfo_msg_ptr_t;
 
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(restore)

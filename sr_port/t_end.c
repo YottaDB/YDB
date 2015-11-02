@@ -138,7 +138,9 @@ GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 
 #ifdef DEBUG
-GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+GBLREF	uint4		donot_commit;		/* see gdsfhead.h for the purpose of this debug-only global */
+GBLREF	boolean_t	ready2signal_gvundef;	/* TRUE if GET operation is about to signal a GVUNDEF */
+GBLREF	boolean_t	gtm_gvundef_fatal;
 #endif
 
 #ifdef UNIX
@@ -146,17 +148,18 @@ GBLREF	recvpool_addrs		recvpool;
 #endif
 
 /* This macro isn't enclosed in parantheses to allow for optimizations */
-#define VALIDATE_CYCLE(history)						\
+#define VALIDATE_CYCLE(is_mm, history)					\
 if (history)								\
 {									\
 	for (t1 = history->h;  t1->blk_num;  t1++)			\
 	{								\
-		if (t1->cr->cycle != t1->cycle)				\
-		{		/* cache slot has been stolen */	\
+		if (!is_mm && (t1->cr->cycle != t1->cycle))		\
+		{	/* cache slot has been stolen */		\
 			assert(FALSE == csa->now_crit);			\
 			status = cdb_sc_cyclefail;			\
 			goto failed_skip_revert;			\
 		}							\
+		n_blks_validated++;					\
 	}								\
 }
 
@@ -195,6 +198,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	jnl_tm_t		save_gbl_jrec_time;
 	enum gds_t_mode		mode;
 	uint4			prev_cr_array_index;
+#	ifdef DEBUG
+	boolean_t		ready2signal_gvundef_lcl;
+#	endif
+	int			n_blks_validated;
 
 	error_def(ERR_GVKILLFAIL);
 	error_def(ERR_GVPUTFAIL);
@@ -204,6 +211,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	error_def(ERR_TEXT);
 
 	assert(hist1 != hist2);
+	DEBUG_ONLY(
+		/* Store global variable ready2signal_gvundef in a local variable and reset the global right away to ensure that
+		 * the global value does not incorrectly get carried over to the next call of "t_end".
+		 */
+		ready2signal_gvundef_lcl = ready2signal_gvundef;
+		ready2signal_gvundef = FALSE;
+	)
 	csa = cs_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
@@ -225,17 +239,19 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	{
 		if (!update_trans && (start_tn == csa->ti->early_tn))
 		{	/* read with no change to the transaction history */
-			if (!is_mm)
-			{
-				VALIDATE_CYCLE(hist1);
-				VALIDATE_CYCLE(hist2);
-			}
+			n_blks_validated = 0;
+			VALIDATE_CYCLE(is_mm, hist1);	/* updates n_blks_validated */
+			VALIDATE_CYCLE(is_mm, hist2);	/* updates n_blks_validated */
+			/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
+			assert(!gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
 			if (csa->now_crit)
 				rel_crit(gv_cur_region);
 			if (unhandled_stale_timer_pop)
 				process_deferred_stale();
 			CWS_RESET;
 			t_tries = 0;	/* commit was successful so reset t_tries */
+			INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readonly, 1);
+			INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
 			return csa->ti->curr_tn;
 		}
 	}
@@ -427,6 +443,14 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				goto failed;
 			}
 		}
+		/* Flag retry, if other mupip activities like BACKUP, INTEG or FREEZE are in progress.
+		 * If in final retry, go ahead with kill. BACKUP/INTEG/FREEZE will wait for us to be done.
+		 */
+		if (need_kip_incr && (0 < cnl->inhibit_kills) && (CDB_STAGNATE > t_tries))
+		{
+			status = cdb_sc_inhibitkills;
+			goto failed;
+		}
 		if (cw_depth && (csa->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != cnl->nbb)))
 		{
 			if (!csa->backup_in_prog && !(JNL_ENABLED(csa) && csa->jnl_before_image))
@@ -491,6 +515,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		tnque_earliest_tn = ((th_rec_ptr_t)((sm_uc_ptr_t)csa->th_base + csa->th_base->tnque.fl))->tn;
 	if (update_trans)
 		valid_thru++;
+	n_blks_validated = 0;
 	for (hist = hist1;  (NULL != hist);  hist = (hist == hist1) ? hist2 : NULL)
 	{
 		for (t1 = hist->h;  t1->blk_num;  t1++)
@@ -627,8 +652,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				}
 			}
 			t1->tn = valid_thru;
+			n_blks_validated++;
 		}
 	}
+	/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
+	assert(!gtm_gvundef_fatal || !ready2signal_gvundef_lcl);
 	/* check bit maps for usage */
 	if (0 != cw_map_depth)
 	{	/* Bit maps on end from mu_reorg (from a call to mu_swap_blk) or mu_reorg_upgrd_dwngrd */
@@ -1309,6 +1337,14 @@ skip_cr_array:
 			temp_tn = dbtn + 1;
 			send_msg(VARLSTCNT(6) ERR_NOTREPLICATED, 4, &temp_tn, LEN_AND_LIT("DSE"), process_id);
 		}
+		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readwrite, 1);
+		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
+		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkwrite, cw_set_depth);
+		GVSTATS_SET_CSA_STATISTIC(csa, db_curr_tn, dbtn);
+	} else
+	{
+		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_readonly, 1);
+		INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_blkread, n_blks_validated);
 	}
 	/* "secshr_db_clnup/t_commit_cleanup" assume an active non-TP transaction if cw_set_depth is non-zero
 	 * or if update_trans is set to T_COMMIT_STARTED. Now that the transaction is complete, reset these fields.

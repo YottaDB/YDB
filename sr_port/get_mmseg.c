@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,8 +52,8 @@ caddr_t get_mmseg(size_t size)
 	while (curr)
 	{
 		end_hint = curr->next ? (sm_uc_ptr_t)curr->next->begin : max_mmseg;
-		end_hint = (sm_uc_ptr_t)(ROUND_DOWN((long)end_hint, OS_PAGE_SIZE));
-		begin_hint = (sm_uc_ptr_t)(ROUND_UP((long)(curr->end), OS_PAGE_SIZE));
+		end_hint = (sm_uc_ptr_t)(ROUND_DOWN2((long)end_hint, OS_PAGE_SIZE));
+		begin_hint = (sm_uc_ptr_t)(ROUND_UP2((long)(curr->end), OS_PAGE_SIZE));
 		if (((unsigned long)begin_hint > (unsigned long)min_mmseg) &&
 			((unsigned long)size < (unsigned long)end_hint - (unsigned long)begin_hint))
 			return (caddr_t)begin_hint;

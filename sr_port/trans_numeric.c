@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,10 +32,12 @@ uint4 trans_numeric(mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
 	mstr		tn;
 	char		buf[MAX_TRANS_NAME_LEN], *endptr;
 
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TRNLOGFAIL);
 
 	*is_defined = FALSE;
-	if (SS_NORMAL == (status = trans_log_name(log, &tn, buf)))
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(log, &tn, buf, sizeof(buf),
+							ignore_errors ? do_sendmsg_on_log2long : dont_sendmsg_on_log2long)))
 	{	/* Translation was successful */
 		*is_defined = TRUE;
 		assert(tn.len < sizeof(buf));
@@ -54,7 +56,13 @@ uint4 trans_numeric(mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
 		return 0;
 
 	if (!ignore_errors)
-		/* Only give errors if we can handle them */
-		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, log->len, log->addr, status);
+	{	/* Only give errors if we can handle them */
+#		ifdef UNIX
+		if (SS_LOG2LONG == status)
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log->len, log->addr, sizeof(buf) - 1);
+		else
+#		endif
+			rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, log->len, log->addr, status);
+	}
 	return 0;
 }

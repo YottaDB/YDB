@@ -84,13 +84,13 @@
 #include "mupip_backup.h"
 #include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
+#include "add_inter.h"
+#include "gtm_logicals.h"
 
 #if defined(UNIX)
 # define PATH_DELIM		'/'
-# define TEMPDIR_LOG_NAME	"$GTM_BAKTMPDIR"
 #elif defined(VMS)
 # define PATH_DELIM		']'
-# define TEMPDIR_LOG_NAME	"GTM_BAKTMPDIR"
 static  const   unsigned short  zero_fid[3];
 #else
 # error Unsupported Platform
@@ -169,11 +169,29 @@ void mupip_backup_call_on_signal(void)
 	}
 }
 
+/* When we have crit, check if this region is actively journaled and if gbl_jrec_time needs to be
+ * adjusted (to ensure time ordering of journal records within this region's journal file).
+ * This needs to be done BEFORE writing any journal records for this region. The value of
+ * jgbl.gbl_jrec_time at the end of this loop will be used to write journal records for ALL
+ * regions so all regions will have same eov/bov timestamps.
+ */
+#define UPDATE_GBL_JREC_TIME												\
+{															\
+	if (JNL_ENABLED(cs_data)											\
+		UNIX_ONLY( && (0 != cs_addrs->nl->jnl_file.u.inode))							\
+		VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))))	\
+	{														\
+		jpc = cs_addrs->jnl;											\
+		jbp = jpc->jnl_buff;											\
+		ADJUST_GBL_JREC_TIME(jgbl, jbp);									\
+	}														\
+}
+
 void mupip_backup(void)
 {
 	bool			journal;
 	char			*tempdirname, *tempfilename, *ptr;
-	uint4			level, blk, status, ret;
+	uint4			level, blk, status, ret, kip_count;
 	unsigned short		s_len, length, ntries;
 	int4			size, gds_ratio, buff_size, i, crit_counter, save_errno, rv;
 	uint4			ustatus;
@@ -182,7 +200,7 @@ void mupip_backup(void)
 	shmpool_buff_hdr_ptr_t	sbufh_p;
 	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
 	static boolean_t	once = TRUE;
-	backup_reg_list		*rptr, *rrptr, *clnup_ptr;
+	backup_reg_list		*rptr, *rrptr, *clnup_ptr, *nocritrptr;
 	boolean_t		inc_since_inc , inc_since_rec, result, newjnlfiles, gotit, tn_specified,
 				replication_on, newjnlfiles_specified, keep_prev_link, bkdbjnl_disable_specified,
 				bkdbjnl_off_specified;
@@ -202,7 +220,7 @@ void mupip_backup(void)
 	jnl_tm_t		save_gbl_jrec_time;
 	gd_region		*r_save, *reg;
 	int			sync_io_status;
-	boolean_t		sync_io, sync_io_specified;
+	boolean_t		sync_io, sync_io_specified, wait_for_zero_kip;
 #if defined(VMS)
 	struct FAB		temp_fab;
 	struct NAM		temp_nam;
@@ -229,8 +247,9 @@ void mupip_backup(void)
 #else
 # error UNSUPPORTED PLATFORM
 #endif
+	now_t			now;						/* for GET_CUR_TIME macro */
+	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 
-	error_def(ERR_BACKUP2MANYKILL);
 	error_def(ERR_BACKUPCTRL);
 	error_def(ERR_DBCCERR);
 	error_def(ERR_DBFILERR);
@@ -249,16 +268,17 @@ void mupip_backup(void)
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_NOTRNDMACC);
 	error_def(ERR_PREVJNLLINKCUT);
-	error_def(ERR_REPLINSTUNDEF);
 	error_def(ERR_REPLJNLCNFLCT);
 	error_def(ERR_REPLPOOLINST);
 	error_def(ERR_REPLSTATE);
 	error_def(ERR_REPLSTATEERR);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_TEXT);
-        error_def(ERR_JNLCREATE);
-        error_def(ERR_JNLNOCREATE);
-        error_def(ERR_MUSELFBKUP);
+	error_def(ERR_JNLCREATE);
+	error_def(ERR_JNLNOCREATE);
+	error_def(ERR_MUSELFBKUP);
+	error_def(ERR_KILLABANDONED);
+	error_def(ERR_BACKUPKILLIP);
 
 	/* ==================================== STEP 1. Initialization ======================================= */
 
@@ -487,9 +507,11 @@ void mupip_backup(void)
 	tempfilename = tempdir_full.addr = tempdir_full_buffer;
 	if (TRUE == online)
 	{
-		tempdir_log.addr = TEMPDIR_LOG_NAME;
-		tempdir_log.len = sizeof(TEMPDIR_LOG_NAME) - 1;
-		trans_log_name_status = trans_log_name(&tempdir_log, &tempdir_trans, tempdir_trans_buffer);
+		tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME;
+		tempdir_log.len = sizeof(GTM_BAK_TEMPDIR_LOG_NAME) - 1;
+		trans_log_name_status =
+			TRANS_LOG_NAME(&tempdir_log, &tempdir_trans, tempdir_trans_buffer, sizeof(tempdir_trans_buffer),
+					do_sendmsg_on_log2long);
 		/* save the length of the "base" so we can (restore it and) re-use the string in tempdir_trans.addr */
 		tempdir_trans_len = tempdir_trans.len;
 	} else
@@ -551,7 +573,7 @@ void mupip_backup(void)
 			SPRINTF(&tempnam_prefix[gv_cur_region->rname_len], "_%x", process_id);
 
 			if ((SS_NORMAL == trans_log_name_status)
-				&& (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
+					&& (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 				*(tempdir_trans.addr + tempdir_trans.len) = 0;
 			else if (incremental && (backup_to_file != rptr->backup_to))
 			{
@@ -713,7 +735,7 @@ void mupip_backup(void)
 #endif
 		} else
 		{
-			while (FALSE == region_freeze(gv_cur_region, TRUE, FALSE))
+			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, FALSE, FALSE))
 			{
 				hiber_start(1000);
 				if ((TRUE == mu_ctrly_occurred) || (TRUE == mu_ctrlc_occurred))
@@ -748,8 +770,8 @@ void mupip_backup(void)
 			MEMCPY_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME);
 			reg->rname_len = STR_LIT_LEN(JNLPOOL_DUMMY_REG_NAME);
 			reg->rname[reg->rname_len] = '\0';
-			if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1))
-				rts_error(VARLSTCNT(1) ERR_REPLINSTUNDEF);
+			if (!repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error))
+				GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
 			udi = FILE_INFO(reg);
 			seg = reg->dyn.addr;
 			memcpy((char *)seg->fname, instfilename, full_len);
@@ -760,28 +782,19 @@ void mupip_backup(void)
 				rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 		}
 	)
+	kip_count = 0;
 	SET_GBL_JREC_TIME;	/* routines that write jnl records (e.g. wcs_flu) require this to be initialized */
-	for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
+	for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
 	{
 		if (rptr->not_this_time <= keep_going)
 		{
 			TP_CHANGE_REG(rptr->reg);
 			if (online)
 			{
-				crit_counter = 1;
-				do
-				{
-					grab_crit(gv_cur_region);
-					if (0 == cs_addrs->hdr->kill_in_prog)
-						break;
-					rel_crit(gv_cur_region);
-					wcs_sleep(crit_counter);
-				} while (++crit_counter < MAX_CRIT_TRY);
-				if (crit_counter >= MAX_CRIT_TRY)
-				{
-					mubclnup(rptr, need_to_rel_crit);
-					mupip_exit(ERR_BACKUP2MANYKILL);
-				}
+				grab_crit(gv_cur_region);
+				INCR_INHIBIT_KILLS(cs_addrs->nl);
+				if (cs_data->kill_in_prog)
+					kip_count++;
 			} else if (JNL_ENABLED(cs_data))
 			{	/* For the non-online case, we want to get crit on ALL regions to ensure we write the
 				 * same timestamp in journal records across ALL regions (in wcs_flu below). We will
@@ -789,21 +802,104 @@ void mupip_backup(void)
 				 */
 				grab_crit(gv_cur_region);
 			}
+			/* We will be releasing crit if KIP is set, so don't update jgbl.gbl_jrec_time now */
+			if (!kip_count)
+			{
+				UPDATE_GBL_JREC_TIME;
+			}
+		}
+	}
+	/* If we have KILLs in progress on any of the regions, wait a maximum of 1 minute(s) for those to finish. */
+	wait_for_zero_kip = (online && kip_count);
+	for (crit_counter = 1; wait_for_zero_kip; )
+	{	/* Release all the crits before going into the wait loop */
+		DEBUG_ONLY(nocritrptr = NULL;)
+		for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
+		{
+			if (rptr->not_this_time > keep_going)
+				continue;
+			TP_CHANGE_REG(rptr->reg);
+			/* It is possible to not hold crit on some regions if we are in the second or higher iteration
+			 * of the outer for loop (the one with the loop variable wait_for_zero_kip).
+			 */
+			if (cs_addrs->now_crit)
+			{	/* once we encountered a region in the list that we did not hold crit on, we should also
+				 * not hold crit on all later regions in the list. assert that.
+				 */
+				assert(NULL == nocritrptr);
+				rel_crit(gv_cur_region);
+			}
+			DEBUG_ONLY(
+			else
+				nocritrptr = rptr;
+			)
+		}
+		/* Wait for a maximum of 1 minute on all the regions for KIP to reset */
+		for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
+		{
+			if (rptr->not_this_time > keep_going)
+				continue;
+			TP_CHANGE_REG(rptr->reg);
+			if (debug_mupip)
+			{
+				GET_CUR_TIME;
+				util_out_print("!/MUPIP INFO: !AD : Start kill-in-prog wait for database !AD", TRUE,
+					CTIME_BEFORE_NL, time_ptr, DB_LEN_STR(gv_cur_region));
+			}
+			while (cs_data->kill_in_prog && (MAX_CRIT_TRY > crit_counter++))
+				wcs_sleep(crit_counter);
+		}
+		if (debug_mupip)
+		{
+			GET_CUR_TIME;
+			util_out_print("!/MUPIP INFO: !AD : Done with kill-in-prog wait on ALL databases", TRUE,
+				CTIME_BEFORE_NL, time_ptr);
+		}
+		/* Since we have waited a while for KIP to get reset, get current time again to make it more accurate */
+		SET_GBL_JREC_TIME;
+		/* Most code in this for-loop is similar to the previous for loop where we grab_crit;
+		 * but most of the times the second for loop will never be executed (because KIP will be
+		 * zero on all database files) and in some rare cases, it is okay to take the hit of an
+		 * extra rel_crit/wait-for-kip/grab_crit sequence.
+		 */
+		wait_for_zero_kip = (MAX_CRIT_TRY > crit_counter);
+		kip_count = 0;
+		for (rptr = (backup_reg_list *)(grlist); NULL != rptr; rptr = rptr->fPtr)
+		{
+			if (rptr->not_this_time > keep_going)
+				continue;
+			TP_CHANGE_REG(rptr->reg);
+			grab_crit(gv_cur_region);
+			if (cs_data->kill_in_prog)
+			{	/* It is possible for this to happen in case a concurrent GT.M process is in its 4th retry.
+				 * In that case, it will not honor the inhibit_kills flag since it holds crit and therefore
+				 * could have set kill-in-prog to a non-zero value while we were outside of crit.
+				 * Check if we have waited 1 minute until now. If not, release crit and continue the wait.
+				 * If waited already, then proceed with the backup. The reasoning is that once the GT.M process
+				 * that is in the final retry finishes off the second part of the M-kill, it will not start
+				 * a new transaction in the first try which is outside of crit so will honor the inhibit-kills
+				 * flag and therefore not increment the kill_in_prog counter any more until backup is done.
+				 * So we could be waiting for at most 1 kip increment per concurrent process that is updating
+				 * the database. We expect these kills to be complete within 1 minute.
+				 */
+				if (wait_for_zero_kip)
+				{
+					kip_count++;
+					break;
+				}
+				assert(!kip_count);
+				gtm_putmsg(VARLSTCNT(4) ERR_BACKUPKILLIP, 2, DB_LEN_STR(gv_cur_region));
+			}
 			/* Now that we have crit, check if this region is actively journaled and if gbl_jrec_time needs to be
 			 * adjusted (to ensure time ordering of journal records within this region's journal file).
 			 * This needs to be done BEFORE writing any journal records for this region. The value of
 			 * jgbl.gbl_jrec_time at the end of this loop will be used to write journal records for ALL
 			 * regions so all regions will have same eov/bov timestamps.
 			 */
-			if (JNL_ENABLED(cs_data)
-				UNIX_ONLY( && (0 != cs_addrs->nl->jnl_file.u.inode))
-				VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))))
-			{
-				jpc = cs_addrs->jnl;
-				jbp = jpc->jnl_buff;
-				ADJUST_GBL_JREC_TIME(jgbl, jbp);
-			}
+			UPDATE_GBL_JREC_TIME;
 		}
+		if (0 == kip_count)
+			break;	/* all regions have zero kill-in-prog so we can break out of this loop unconditionally */
 	}
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	/* ========================== STEP 4. Flush cache, calculate tn for incremental, and do backup =========== */
@@ -958,6 +1054,11 @@ repl_inst_bkup_done:
 			memcpy(rptr->backup_hdr, cs_data, SIZEOF_FILE_HDR(cs_data));
 			if (online) /* save a copy of the fileheader, modify current fileheader and release crit */
 			{
+				if (0 != cs_addrs->hdr->abandoned_kills)
+				{
+					gtm_putmsg(VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(rptr->reg),
+						LEN_AND_LIT("backup database could have incorrectly marked busy integrity errors"));
+				}
 				sbufh_p = cs_addrs->shmpool_buffer;
 				if (BACKUP_NOT_IN_PROGRESS != cs_addrs->nl->nbb)
 				{
@@ -967,6 +1068,8 @@ repl_inst_bkup_done:
 						util_out_print("!/Process !UL is backing up region !AD now.", TRUE,
 								sbufh_p->backup_pid, REG_LEN_STR(rptr->reg));
 						rptr->not_this_time = give_up_after_create_tempfile;
+						/* Decerement counter so that inhibited KILLs can now proceed */
+						DECR_INHIBIT_KILLS(cs_addrs->nl);
 						rel_crit(rptr->reg);
 						continue;
 					}
@@ -1002,6 +1105,7 @@ repl_inst_bkup_done:
 									TRUE, jnl_info.jnl_len, jnl_info.jnl);
 								gtm_putmsg(VARLSTCNT(1) status);
 								rptr->not_this_time = give_up_after_create_tempfile;
+								DECR_INHIBIT_KILLS(cs_addrs->nl);
 								rel_crit(rptr->reg);
 								error_mupip = TRUE;
 								continue;
@@ -1017,6 +1121,7 @@ repl_inst_bkup_done:
 								gtm_putmsg(VARLSTCNT(5) ERR_JNLFNF, 2,
 									filestr.len, filestr.addr, ustatus);
 								rptr->not_this_time = give_up_after_create_tempfile;
+								DECR_INHIBIT_KILLS(cs_addrs->nl);
 								rel_crit(rptr->reg);
 								error_mupip = TRUE;
 								continue;
@@ -1051,6 +1156,7 @@ repl_inst_bkup_done:
 									DB_LEN_STR(gv_cur_region), ERR_TEXT, 2,
 									LEN_AND_LIT("Standalone access required"));
 								rptr->not_this_time = give_up_after_create_tempfile;
+								DECR_INHIBIT_KILLS(cs_addrs->nl);
 								rel_crit(rptr->reg);
 								error_mupip = TRUE;
 								continue;
@@ -1064,6 +1170,7 @@ repl_inst_bkup_done:
 									DB_LEN_STR(gv_cur_region),
 									LEN_AND_STR(repl_state_lit[repl_closed]));
 							rptr->not_this_time = give_up_after_create_tempfile;
+							DECR_INHIBIT_KILLS(cs_addrs->nl);
 							rel_crit(rptr->reg);
 							error_mupip = TRUE;
 							continue;
@@ -1113,6 +1220,7 @@ repl_inst_bkup_done:
 										DB_LEN_STR(gv_cur_region), 0, status, 0,
 										gds_info->fab->fab$l_stv, 0);)
 								rptr->not_this_time = give_up_after_create_tempfile;
+								DECR_INHIBIT_KILLS(cs_addrs->nl);
 								rel_crit(rptr->reg);
 								error_mupip = TRUE;
 								continue;
@@ -1121,6 +1229,7 @@ repl_inst_bkup_done:
 						{
 							gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2, jnl_info.jnl_len, jnl_info.jnl);
 							rptr->not_this_time = give_up_after_create_tempfile;
+							DECR_INHIBIT_KILLS(cs_addrs->nl);
 							rel_crit(rptr->reg);
 							error_mupip = TRUE;
 							continue;
@@ -1134,6 +1243,7 @@ repl_inst_bkup_done:
 						ERR_TEXT, 2,
 						LEN_AND_LIT("Cannot turn replication ON without also switching journal file"));
 					rptr->not_this_time = give_up_after_create_tempfile;
+					DECR_INHIBIT_KILLS(cs_addrs->nl);
 					rel_crit(rptr->reg);
 					error_mupip = TRUE;
 					continue;
@@ -1143,6 +1253,7 @@ repl_inst_bkup_done:
 					gtm_putmsg(VARLSTCNT(9) ERR_DBCCERR, 2, REG_LEN_STR(gv_cur_region),
 						   ERR_ERRCALL, 3, CALLFROM);
 					rptr->not_this_time = give_up_after_create_tempfile;
+					DECR_INHIBIT_KILLS(cs_addrs->nl);
 					rel_crit(rptr->reg);
 					continue;
 				}
@@ -1178,6 +1289,8 @@ repl_inst_bkup_done:
 				 * (starting from 0 upto a max. of 2^28-1 which is lesser than 2^31-1=BACKUP_NOT_IN_PROGRESS)
 				 */
 				cs_addrs->nl->nbb = -1; /* start */
+				/* Decerement counter so that inhibited KILLs can now proceed */
+				DECR_INHIBIT_KILLS(cs_addrs->nl);
 				rel_crit(rptr->reg);
 			} else
 				rel_crit(rptr->reg);
@@ -1221,10 +1334,10 @@ repl_inst_bkup_done:
 		mubbuf = (uchar_ptr_t)malloc(BACKUP_READ_SIZE);
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 		{
-			gv_cur_region = rptr->reg;
 			if (rptr->not_this_time > keep_going)
 				continue;
-			cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
+			gv_cur_region = rptr->reg;
+			TP_CHANGE_REG(gv_cur_region);	/* sets cs_addrs and cs_data which mubinccpy/mubfilcpy rely on */
 			result = (incremental ? mubinccpy(rptr) : mubfilcpy(rptr));
 			if (FALSE == result)
 			{

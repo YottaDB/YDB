@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 	if (rm_ptr->noread)
 		rts_error(VARLSTCNT(1) ERR_RMSRDONLY);
-	if (!iod->dollar.zeof && !rm_ptr->fifo)
+	if (!iod->dollar.zeof && !rm_ptr->fifo && !rm_ptr->pipe)
 	{
 		iod->dollar.za = 9;
 		rts_error(VARLSTCNT(1) ERR_NOTTOEOFONPUT);
@@ -67,8 +67,10 @@ void iorm_wteol(int4 x,io_desc *iod)
 					DOWRITERL(rm_ptr->fildes, UTF16BE_BOM, UTF16BE_BOM_LEN, res_size);
 					if (-1 == res_size)
 					{
+						int real_errno = errno;
+						DOLLAR_DEVICE_WRITE(rm_ptr,real_errno);
 						iod->dollar.za = 9;
-						rts_error(VARLSTCNT(1) errno);
+						rts_error(VARLSTCNT(1) real_errno);
 					}
 					iod->ochset = CHSET_UTF16BE;
 					get_chset_desc(&chset_names[iod->ochset]);
@@ -113,6 +115,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 						DOWRITERC(rm_ptr->fildes, temppadarray, bytes_per_char, status);
 						if (0 != status)
 						{
+							DOLLAR_DEVICE_WRITE(rm_ptr,status);
 							iod->dollar.za = 9;
 							rts_error(VARLSTCNT(1) status);
 						}
@@ -134,16 +137,19 @@ void iorm_wteol(int4 x,io_desc *iod)
 				DOWRITERL(rm_ptr->fildes, RM_SPACES_BLOCK, pad_size, res_size);
 				if (-1 == res_size)
 				{
+					int real_errno = errno;
+					DOLLAR_DEVICE_WRITE(rm_ptr,real_errno);
 					iod->dollar.za = 9;
-					rts_error(VARLSTCNT(1) errno);
+					rts_error(VARLSTCNT(1) real_errno);
 				}
 				assert(res_size == pad_size);
 			}
 		} else
 		{
-			DOWRITERC(rm_ptr->fildes, RMEOL, strlen(RMEOL), status);
+			DOWRITERC(rm_ptr->fildes, RMEOL, STRLEN(RMEOL), status);
 			if (0 != status)
 			{
+				DOLLAR_DEVICE_WRITE(rm_ptr,status);
 				iod->dollar.za = 9;
 				rts_error(VARLSTCNT(1) status);
 			}

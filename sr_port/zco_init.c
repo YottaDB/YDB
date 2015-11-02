@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,21 +21,28 @@
 
 GBLREF	mstr	dollar_zcompile;
 
-void zco_init (void)
+void zco_init(void)
 {
 	int4	status;
-	mstr		val, tn;
-	char		buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
+	mstr	val, tn;
+	char	buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
+
+	error_def(ERR_LOGTOOLONG);
 
 	if (dollar_zcompile.addr)
-		free (dollar_zcompile.addr);
-
+		free(dollar_zcompile.addr);
 	val.addr = ZCOMPILE;
 	val.len = sizeof(ZCOMPILE) - 1;
-	status = trans_log_name(&val, &tn, buf1);
-	if (status != SS_NORMAL && status != SS_NOLOGNAM)
-		rts_error(VARLSTCNT(1) status);
-
+	status = TRANS_LOG_NAME(&val, &tn, buf1, sizeof(buf1), dont_sendmsg_on_log2long);
+	if ((SS_NORMAL != status) && (SS_NOLOGNAM != status))
+	{
+#		ifdef UNIX
+		if (SS_LOG2LONG == status)
+			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, sizeof(buf1) - 1);
+		else
+#		endif
+			rts_error(VARLSTCNT(1) status);
+	}
 	if (status == SS_NOLOGNAM)
 		dollar_zcompile.len = 0;
 	else

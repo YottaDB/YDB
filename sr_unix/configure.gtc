@@ -101,13 +101,40 @@ $echo "Copyright "`date '+%Y'`" Fidelity National Information Services, Inc. Use
 $echo "software is restricted by the provisions of your license agreement."
 $echo ""
 
+# create temporary file to test for valid user and group names
+touch tmp_owngrp
 $echo "What account should own the files? (bin) \c"
 read resp
 if [ "$resp" = "" ] ; then
 	owner="bin"
 else
 	owner=$resp
+	chown $resp tmp_owngrp 2> /dev/null
+	if [ 1 = "$?" ] ; then
+		echo $resp is not a valid user name - exiting!
+		rm tmp_owngrp
+		exit
+	fi
 fi
+
+$echo "Should execution of GT.M to be restricted to a group? (y or n) \c"
+read resp
+if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
+	$echo "Enter group name? \c"
+	read group
+	if [ "$group" != "" ] ; then
+		chgrp $group tmp_owngrp 2> /dev/null
+		if [ 1 = "$?" ] ; then
+			echo $group is not a valid group name - exiting!
+			rm tmp_owngrp
+			exit 1
+		fi
+	fi
+else
+	group=""
+fi
+
+rm tmp_owngrp
 
 $echo "In what directory should GT.M be installed? \c"
 read gtmdist
@@ -270,19 +297,6 @@ do
 #		strip $gtmdist/$i >/dev/null 2>&1
 done
 
-# Install gtmsecshr with special permissions
-if [ $arch = "sun" -o $arch = "linux" ]; then
-	install -m 4755 -o root -g bin gtmsecshr $gtmdist
-elif [ $arch = "ibm" ]; then
-	/usr/bin/install -f $gtmdist -M 4755 -O root -G bin gtmsecshr
-elif [ -x /usr/sbin/install ]; then
-	/usr/sbin/install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
-else
-	install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
-fi
-
-strip $gtmdist/gtmsecshr > /dev/null 2>&1
-
 # Install other individual files
 for i in  $ofiles
 do
@@ -330,10 +344,10 @@ if [ "$doutf8" -ne 0 ]; then
 fi
 
 $echo ""
-$echo "All of the GTC MUMPS routines are distributed with uppercase names."
+$echo "All of the GT.M MUMPS routines are distributed with uppercase names."
 $echo "You can create lowercase copies of these routines if you wish, but"
-$echo "to avoid problems with compatibility in the future, GTC suggests that"
-$echo "you keep only the uppercase versions of the files."
+$echo "to avoid problems with compatibility in the future, consider keeping"
+$echo "only the uppercase versions of the files."
 $echo ""
 $echo "Do you want uppercase and lowercase versions of the MUMPS routines? (y or n)\c"
 read resp
@@ -443,17 +457,55 @@ if [ -d utf8 ]; then
 	cd ..
 fi
 
-$echo ""
-$echo "Installation completed. Would you like all the temporary files"
-$echo "removed from this directory? (y or n) \c"
-read resp
+# change group ownership of all files if requested
+if [ "$group" != "" ] ; then
+	chgrp -R $group $gtmdist
+	chmod -R o-rwx $gtmdist
+fi
+
+# Install real gtmsecshr with special permissions in $gtmdist/gtmsecshrdir
+tgtmsecshrdir=$gtmdist/gtmsecshrdir
+mkdir $tgtmsecshrdir
+chmod 700 $tgtmsecshrdir
+chgrp bin $tgtmsecshrdir
+
+# Install gtmsecshr and the wrapper with special permissions
+if [ $arch = "sun" -o $arch = "linux" ]; then
+	install -m 4755 -o root -g bin gtmsecshr $gtmdist
+	install -m 4500 -o root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
+elif [ $arch = "ibm" ]; then
+	/usr/bin/install -f $gtmdist -M 4755 -O root -G bin gtmsecshr
+	/usr/bin/install -f $tgtmsecshrdir -M 4500 -O root -G bin gtmsecshrdir/gtmsecshr
+elif [ -x /usr/sbin/install ]; then
+	/usr/sbin/install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
+	/usr/sbin/install -f $tgtmsecshrdir -m 4500 -u root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir
+else
+	install -f $gtmdist -m 4755 -u root -g bin gtmsecshr $gtmdist
+	install -f $tgtmsecshrdir -m 4500 -u root -g bin gtmsecshrdir/gtmsecshr $tgtmsecshrdir
+fi
+
+strip $gtmdist/gtmsecshr > /dev/null 2>&1
+strip $tgtmsecshrdir/gtmsecshr > /dev/null 2>&1
+
+# change group ownership of wrapper if requested
+# also remove user privileges for wrapper if group changed
+if [ "$group" != "" ] ; then
+	chgrp $group $gtmdist/gtmsecshr
+	chmod 4550 $gtmdist/gtmsecshr
+fi
 
 # leave nothing writeable
 chmod a-w $gtmdist
 chmod a-w $gtmdist/*
+
 if [ -d $gtmdist/utf8 ]; then
 	chmod a-w $gtmdist/utf8/*
 fi
+
+$echo ""
+$echo "Installation completed. Would you like all the temporary files"
+$echo "removed from this directory? (y or n) \c"
+read resp
 
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \

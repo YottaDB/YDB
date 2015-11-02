@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include <signal.h>             /* for VSIG_ATOMIC_T type */
 
 #include "rtnhdr.h"
 #include "mv_stent.h"
@@ -22,8 +24,10 @@
 #include "tp_unwind.h"
 #include "mlk_pvtblk_delete.h"	/* for prototype */
 #include "mlk_unlock.h"		/* for prototype */
-
-error_def(ERR_STACKUNDERFLO);
+#include "have_crit.h"
+#ifdef UNIX
+#include "deferred_signal_handler.h"
+#endif
 
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	unsigned char	*msp, *stackbase, *stacktop;
@@ -43,6 +47,13 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type)
 	tp_var		*restore_ent;
 	mv_stent	*mvc;
 	boolean_t	restore_lv, rollback_locks;
+	int		save_intrpt_ok_state;
+
+	error_def(ERR_STACKUNDERFLO);
+
+	save_intrpt_ok_state = intrpt_ok_state;
+	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
+	intrpt_ok_state = INTRPT_IN_TP_UNWIND;
 
 	restore_lv = (invocation_type == RESTART_INVOCATION);
 
@@ -155,4 +166,6 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type)
 			mlk_pvtblk_delete(prior);
 	}
 	dollar_tlevel = newlevel;
+	intrpt_ok_state = save_intrpt_ok_state;
+	DEFERRED_EXIT_HANDLING_CHECK;	/* check if any MUPIP STOP/signals were deferred while in this function */
 }

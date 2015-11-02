@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@
 #include "repl_instance.h"
 #include "gtmmsg.h"
 #include "repl_sem.h"
+#include "gtm_zlib.h"
 
 #define MAX_HEXDUMP_CHARS_PER_LINE	26 /* 2 characters per byte + space, 80 column assumed */
 
@@ -65,11 +66,12 @@ GBLDEF	struct timeval		gtmsource_poll_wait, gtmsource_poll_immediate;
 GBLDEF	gtmsource_state_t	gtmsource_state = GTMSOURCE_DUMMY_STATE;
 GBLDEF	repl_msg_ptr_t		gtmsource_msgp = NULL;
 GBLDEF	int			gtmsource_msgbufsiz = 0;
-GBLREF	uchar_ptr_t		repl_filter_buff;
-GBLREF	int			repl_filter_bufsiz;
-
+GBLDEF	repl_msg_ptr_t		gtmsource_cmpmsgp = NULL;
+GBLDEF	int			gtmsource_cmpmsgbufsiz = 0;
+GBLDEF	boolean_t		gtmsource_received_cmp2uncmp_msg;
 GBLDEF	qw_num			repl_source_data_sent = 0;
 GBLDEF	qw_num			repl_source_msg_sent = 0;
+GBLDEF	qw_num			repl_source_cmp_sent = 0;
 GBLDEF	qw_num			repl_source_lastlog_data_sent = 0;
 GBLDEF	qw_num			repl_source_lastlog_msg_sent = 0;
 GBLDEF	time_t			repl_source_prev_log_time;
@@ -78,6 +80,8 @@ GBLDEF	gd_region		*gtmsource_mru_reg;
 GBLDEF	time_t			gtmsource_last_flush_time;
 GBLDEF	seq_num			gtmsource_last_flush_reg_seq;
 
+GBLREF	uchar_ptr_t		repl_filter_buff;
+GBLREF	int			repl_filter_bufsiz;
 GBLREF	volatile time_t		gtmsource_now;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	jnlpool_addrs		jnlpool;
@@ -120,14 +124,14 @@ int gtmsource_process(void)
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int				status;					/* needed for REPL_{SEND,RECV}_LOOP */
-	int				tot_tr_len;
+	int				tot_tr_len, send_tr_len;
 	struct timeval			poll_time;
 	int				recvd_msg_type, recvd_start_flags;
 	uchar_ptr_t			in_buff, out_buff, save_filter_buff;
 	uint4				in_size, out_size, out_bufsiz, tot_out_size, pre_intlfilter_datalen;
 	seq_num				log_seqno, diff_seqno, pre_read_seqno, post_read_seqno, jnl_seqno;
 	char				err_string[1024];
-	boolean_t			xon_wait_logged, prev_catchup, catchup, force_recv_check, is_badtrans;
+	boolean_t			xon_wait_logged, prev_catchup, catchup, force_recv_check, already_communicated;
 	double				time_elapsed;
 	seq_num				resync_seqno, zqgblmod_seqno, filter_seqno;
 	gd_region			*reg, *region_top, *gtmsource_upd_reg, *old_upd_reg;
@@ -144,9 +148,12 @@ int gtmsource_process(void)
 	seq_num				local_jnl_seqno, dualsite_resync_seqno;
 	repl_msg_t			xoff_ack, instnohist_msg, losttncomplete_msg;
 	repl_msg_ptr_t			send_msgp;
+	repl_cmpmsg_ptr_t		send_cmpmsgp;
 	repl_start_reply_msg_ptr_t	reply_msgp;
 	boolean_t			rollback_first, secondary_ahead, secondary_was_rootprimary, secondary_is_dualsite;
-	int				semval;
+	int				semval, cmpret;
+	uLongf				cmpbuflen;
+	int4				msghdrlen;
 
 	error_def(ERR_JNLNEWREC);
 	error_def(ERR_JNLSETDATA2LONG);
@@ -164,7 +171,8 @@ int gtmsource_process(void)
 	gtmsource_local = jnlpool.gtmsource_local;
 	gtmsource_msgp = NULL;
 	gtmsource_msgbufsiz = MAX_REPL_MSGLEN;
-
+	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+		gtmsource_cmpmsgp = NULL;
 	assert(GTMSOURCE_POLL_WAIT < MAX_GTMSOURCE_POLL_WAIT);
 	gtmsource_poll_wait.tv_sec = 0;
 	gtmsource_poll_wait.tv_usec = GTMSOURCE_POLL_WAIT;
@@ -228,7 +236,7 @@ int gtmsource_process(void)
 			gtmsource_est_conn(&secondary_addr);
 			if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 				return (SS_NORMAL);
-			repl_source_data_sent = repl_source_msg_sent = 0;
+			repl_source_data_sent = repl_source_msg_sent = repl_source_cmp_sent = 0;
 			repl_source_lastlog_data_sent = 0;
 			repl_source_lastlog_msg_sent = 0;
 
@@ -373,7 +381,7 @@ int gtmsource_process(void)
 				assert((FALSE == secondary_was_rootprimary) || (TRUE == secondary_was_rootprimary));
 			}
 			/* Now get the latest triple information from the secondary. There are three exceptions though.
-			 * 	1) If we came here because of a BAD_TRANS message from the receiver server.
+			 * 	1) If we came here because of a BAD_TRANS or CMP2UNCMP message from the receiver server.
 			 *		In this case, we have already been communicating with the receiver so no need to
 			 *		compare the triple information between primary and secondary.
 			 *	2) If receiver server was started with -UPDATERESYNC. In this case there is no triple
@@ -382,7 +390,7 @@ int gtmsource_process(void)
 			 *		start sending journal records from seqno 1.
 			 */
 			assert(0 != recvd_seqno);
-			if ((1 < recvd_seqno) && ((GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state) || !is_badtrans)
+			if ((1 < recvd_seqno) && ((GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state) || !already_communicated)
 				&& (!(START_FLAG_UPDATERESYNC & recvd_start_flags)))
 			{
 				if (1 < recvd_seqno)
@@ -606,6 +614,39 @@ int gtmsource_process(void)
 		 	LONG_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_TO_QUIT); /* may not be needed after REPL_CLOSE_CONN is sent */
 		 	gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
 		 	continue;
+		}
+		/* Now that REPL_WILL_RESTART_WITH_INFO message has been sent, if compression of the replication stream is
+		 * requested, check if the receiver server supports ability to decompress. Dont do this if this receiver has
+		 * previously sent a REPL_CMP2UNCMP message.
+		 */
+		gtmsource_local->repl_zlib_cmp_level = repl_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* no compression by default */
+		if (!gtmsource_received_cmp2uncmp_msg && (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level))
+		{
+			if (REPL_PROTO_VER_MULTISITE_CMP <= gtmsource_local->remote_proto_ver)
+			{	/* Receiver server is running a version of GT.M that supports compression of replication stream.
+				 * Send test message with compressed data to check if it is able to decompress properly. If so,
+				 * enable compression on the replication pipe. Compression level set in repl_zlib_cmp_level.
+				 */
+				if (!gtmsource_get_cmp_info(&repl_zlib_cmp_level))
+				{
+					if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
+						return (SS_NORMAL);
+					else if (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state)
+						continue;
+					else
+					{	/* Got a REPL_XOFF_ACK_ME from receiver. Restart the initial handshake */
+						assert(GTMSOURCE_WAITING_FOR_RESTART == gtmsource_state);
+						continue;
+					}
+				}
+				/* Note down replication cmp_level in this source-server specific structure in journal pool */
+				gtmsource_local->repl_zlib_cmp_level = repl_zlib_cmp_level;
+			} else
+			{
+				repl_log(gtmsource_log_fp, TRUE, FALSE,
+					"Receiver server does not support compressed data on the replication pipe\n");
+				repl_log(gtmsource_log_fp, TRUE, FALSE, "Defaulting to NO compression\n");
+			}
 		}
 		if (QWLT(gtmsource_local->read_jnl_seqno, sav_read_jnl_seqno) && (NULL != repl_ctl_list))
 		{	/* The journal files may have been positioned ahead of the read_jnl_seqno for the next read.
@@ -874,19 +915,30 @@ int gtmsource_process(void)
 						force_recv_check = TRUE;
 						break;
 					case REPL_BADTRANS:
+					case REPL_CMP2UNCMP:
 					case REPL_START_JNL_SEQNO:
 						QWASSIGN(recvd_seqno, *(seq_num *)&gtmsource_msgp->msg[0]);
 						gtmsource_state = gtmsource_local->gtmsource_state
 							= GTMSOURCE_SEARCHING_FOR_RESTART;
-						if (REPL_BADTRANS == gtmsource_msgp->type)
+						if ((REPL_BADTRANS == gtmsource_msgp->type)
+							|| (REPL_CMP2UNCMP == gtmsource_msgp->type))
 						{
-							is_badtrans = TRUE;
+							already_communicated = TRUE;
 							recvd_start_flags = START_FLAG_NONE;
-							repl_log(gtmsource_log_fp, TRUE, TRUE,
-								"Received REPL_BADTRANS message with SEQNO %llu\n", recvd_seqno);
+							if (REPL_BADTRANS == gtmsource_msgp->type)
+								repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_BADTRANS "
+									"message with SEQNO %llu\n", recvd_seqno);
+							else
+							{
+								repl_log(gtmsource_log_fp, TRUE, TRUE, "Received REPL_CMP2UNCMP "
+									"message with SEQNO %llu\n", recvd_seqno);
+								repl_log(gtmsource_log_fp, TRUE, FALSE,
+									"Defaulting to NO compression for this connection\n");
+								gtmsource_received_cmp2uncmp_msg = TRUE;
+							}
 						} else
 						{
-							is_badtrans = FALSE;
+							already_communicated = FALSE;
 							recvd_start_flags = ((repl_start_msg_ptr_t)gtmsource_msgp)->start_flags;
 							repl_log(gtmsource_log_fp, TRUE, TRUE,
 								 "Received REPL_START_JNL_SEQNO message with SEQNO %llu. Possible "
@@ -1037,6 +1089,81 @@ int gtmsource_process(void)
 					}
 					send_msgp->type = REPL_TR_JNL_RECS;
 					send_msgp->len = data_len + REPL_MSG_HDRLEN;
+					if (ZLIB_CMPLVL_NONE != repl_zlib_cmp_level)
+					{	/* Compress the journal records before replicating them across the pipe.
+						 * Depending on whether the total data length to be sent is within a threshold
+						 * or not (see repl_msg.h before REPL_TR_CMP_THRESHOLD #define for why), send
+						 * either a REPL_TR_CMP_JNL_RECS or REPL_TR_CMP_JNL_RECS2 message
+						 */
+						msghdrlen = (REPL_TR_CMP_THRESHOLD > tot_tr_len)
+									? REPL_MSG_HDRLEN : REPL_MSG_HDRLEN2;
+						cmpbuflen = gtmsource_cmpmsgbufsiz - msghdrlen;
+						assert(0 < (signed)cmpbuflen);
+						assert(NULL != zlib_compress_fnptr);
+						cmpret = (*zlib_compress_fnptr)(((Bytef *)gtmsource_cmpmsgp) + msghdrlen,
+							&cmpbuflen, (const Bytef *)send_msgp, tot_tr_len, repl_zlib_cmp_level);
+						switch(cmpret)
+						{
+							case Z_MEM_ERROR:
+								assert(FALSE);
+								repl_log(gtmsource_log_fp, TRUE, FALSE, "Out-of-memory error from"
+									" compress function while compressing %d bytes\n",
+									tot_tr_len);
+								break;
+							case Z_BUF_ERROR:
+								assert(FALSE);
+								repl_log(gtmsource_log_fp, TRUE, FALSE, "Insufficient output "
+									"buffer error from compress function while "
+									"compressing %d bytes\n", tot_tr_len);
+								break;
+							case Z_STREAM_ERROR:
+								assert(FALSE);
+								/* level was incorrectly specified. Default to NO compression. */
+								repl_log(gtmsource_log_fp, TRUE, FALSE, "Compression level %d "
+									"invalid error from compress function while compressing "
+									"%d bytes\n", repl_zlib_cmp_level, tot_tr_len);
+								break;
+						}
+						if (Z_OK == cmpret)
+						{	/* Send compressed buffer */
+							send_msgp = gtmsource_cmpmsgp;
+							if (REPL_TR_CMP_THRESHOLD > tot_tr_len)
+							{	/* Send REPL_TR_CMP_JNL_RECS message with 8-byte header */
+								send_msgp->type = (tot_tr_len << REPL_TR_CMP_MSG_TYPE_BITS)
+											| REPL_TR_CMP_JNL_RECS;
+								send_msgp->len = cmpbuflen + msghdrlen;
+								/* Note that a compressed message need not be 8-byte aligned even
+								 * though the input message was. So round it up to the nearest
+								 * align boundary. The actual message will contain the unaligned
+								 * length which is what the receiver will receive. But the # of
+								 * bytes transmitted across will be the aligned length.
+								 */
+								send_tr_len = ROUND_UP(send_msgp->len, REPL_MSG_ALIGN);
+							} else
+							{	/* Send REPL_TR_CMP_JNL_RECS2 message with 16-byte header */
+								send_cmpmsgp = (repl_cmpmsg_ptr_t)send_msgp;
+								assert(&send_cmpmsgp->type == &send_msgp->type);
+								assert(&send_cmpmsgp->len == &send_msgp->len);
+								send_cmpmsgp->type = REPL_TR_CMP_JNL_RECS2;
+								/* Note that a compressed message need not be 8-byte aligned even
+								 * though the input message was. So round it up to the nearest
+								 * align boundary.
+								 */
+								send_cmpmsgp->len = ROUND_UP(cmpbuflen + msghdrlen, REPL_MSG_ALIGN);
+								send_cmpmsgp->uncmplen = tot_tr_len;
+								send_cmpmsgp->cmplen = cmpbuflen;
+								send_tr_len = send_msgp->len;
+							}
+						} else
+						{	/* Send normal buffer */
+							repl_log(gtmsource_log_fp, TRUE, FALSE, "Defaulting to NO compression\n");
+							repl_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* no compression */
+							gtmsource_local->repl_zlib_cmp_level = repl_zlib_cmp_level;
+							send_tr_len = tot_tr_len;
+						}
+					} else
+						send_tr_len = tot_tr_len;
+					assert(0 == (send_tr_len % REPL_MSG_ALIGN));
 					/* The following loop tries to send multiple seqnos in one shot. resync_seqno gets
 					 * updated once the send is completely successful. If an error occurs in the middle
 					 * of the send, it is possible that we successfully sent a few seqnos to the other side.
@@ -1050,8 +1177,7 @@ int gtmsource_process(void)
 					 * and secondary). This is done by the call to gtmsource_flush_fh() done within the
 					 * REPL_SEND_LOOP macro as well as in the (SS_NORMAL != status) if condition below.
 					 */
-					REPL_SEND_LOOP(gtmsource_sock_fd, send_msgp, tot_tr_len, UNIX_ONLY(catchup) VMS_ONLY(TRUE),
-							&poll_immediate)
+					REPL_SEND_LOOP(gtmsource_sock_fd, send_msgp, send_tr_len, catchup, &poll_immediate)
 					{
 						gtmsource_poll_actions(FALSE);
 						if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
@@ -1121,9 +1247,10 @@ int gtmsource_process(void)
 					}
 					if (GTMSOURCE_FH_FLUSH_INTERVAL <= difftime(gtmsource_now, gtmsource_last_flush_time))
 						gtmsource_flush_fh(post_read_seqno);
+					repl_source_cmp_sent += (qw_num)send_tr_len;
 					repl_source_msg_sent += (qw_num)tot_tr_len;
-					repl_source_data_sent += (qw_num)(tot_tr_len) -
-								(post_read_seqno - pre_read_seqno) * REPL_MSG_HDRLEN;
+					repl_source_data_sent += (qw_num)(tot_tr_len)
+								- (post_read_seqno - pre_read_seqno) * REPL_MSG_HDRLEN;
 					log_seqno = post_read_seqno - 1; /* post_read_seqno is the "next" seqno to be sent,
 									      * not the last one we sent */
 					if (gtmsource_logstats || (log_seqno - lastlog_seqno >= log_interval))
@@ -1136,8 +1263,9 @@ int gtmsource_process(void)
 						diff_seqno = (jnl_seqno >= post_read_seqno) ?
 								(jnl_seqno - post_read_seqno) : 0;
 						repl_log(gtmsource_log_fp, FALSE, FALSE, "REPL INFO - Tr num : %llu", log_seqno);
-						repl_log(gtmsource_log_fp, FALSE, FALSE, "  Tr Total : %llu  Msg Total : %llu  ",
-							 repl_source_data_sent, repl_source_msg_sent);
+						repl_log(gtmsource_log_fp, FALSE, FALSE, "  Tr Total : %llu  Msg Total : %llu"
+							"  CmpMsg Total : %llu  ", repl_source_data_sent, repl_source_msg_sent,
+							repl_source_cmp_sent);
 						repl_log(gtmsource_log_fp, FALSE, TRUE, "Current backlog : %llu\n", diff_seqno);
 						/* gtmsource_now is updated by the heartbeat protocol every heartbeat
 						 * interval. To cut down on calls to time(), we use gtmsource_now as the

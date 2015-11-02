@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,8 +112,7 @@ mint	gvcst_data(void)
 				continue;
 			}
 		}
-		if (cs_addrs->read_write)
-			cs_addrs->hdr->n_data++;
+		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_data, 1);
 		return val;
 	}
 }

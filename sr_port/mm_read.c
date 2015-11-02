@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gtm_facility.h"
@@ -27,6 +28,7 @@ sm_uc_ptr_t mm_read(block_id blk)
 	assert((cs_addrs->total_blks <= cs_addrs->ti->total_blks) || (!run_time));
 	assert(blk >= 0);
 
+	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
 	if (blk < cs_addrs->total_blks) 		/* use the private copy of total_blks */
 		return (cs_addrs->acc_meth.mm.base_addr + (off_t)cs_addrs->hdr->blk_size * blk);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "trans_log_name.h"	/* for trans_log_name() prototype */
+#include "trans_log_name.h"
 
 int	quiet = 0;
 
@@ -48,7 +48,7 @@ void	clean_mem(char *name)
 
 	path1.len = STRLEN(name);
 	path1.addr = name;
-	if (trans_log_name(&path1, &path2, buff) != SS_NORMAL)
+	if (SS_NORMAL != TRANS_LOG_NAME(&path1, &path2, buff, sizeof(buff), do_sendmsg_on_log2long))
 		fprintf(stderr, "Error translating path: %s\n", name);
 	else
 	{

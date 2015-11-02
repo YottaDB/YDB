@@ -38,9 +38,10 @@
 #include "mvalconv.h"
 #include "tp_set_sgm.h"
 
-GBLDEF bool		gv_curr_subsc_null;
-GBLDEF bool		gv_prev_subsc_null;
-GBLDEF gd_addr		*gd_targ_addr = 0;
+GBLDEF	bool		gv_curr_subsc_null;
+GBLDEF	bool		gv_prev_subsc_null;
+GBLDEF	gd_addr		*gd_targ_addr = 0;
+GBLDEF	gv_namehead	*prev_gv_target;
 
 GBLREF gd_addr		*gd_header;
 GBLREF gv_key		*gv_currkey;
@@ -69,6 +70,7 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	error_def(ERR_GVSUBOFLOW);
 	error_def(ERR_GVIS);
 
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	extnam_str.len = 0;
 	if (!gd_header)
 		gvinit();
@@ -103,6 +105,7 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	assert(bgormm || !dollar_tlevel);
 	assert(!dollar_tlevel || sgm_info_ptr && (sgm_info_ptr->tp_csa == cs_addrs));
 	assert(gv_target->gd_csa == cs_addrs);
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	assert(gd_targ_addr == gd_header);
 	was_null = is_null = FALSE;
 	max_key = gv_cur_region->max_key_size;
@@ -116,5 +119,6 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	gv_curr_subsc_null = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && NEVER == gv_cur_region->null_subs)
 		sgnl_gvnulsubsc();
+	prev_gv_target = gv_target;	/* note down gv_target in another global for debugging purposes (C9I09-003039) */
 	return;
 }

@@ -18,10 +18,10 @@ BEGIN	{
 		input = $0;
 		gsub("\\[.*\\]", " ");
 		gsub("\".*\"", " ");
-		gsub("\'.*\'", " ");
+		gsub("'.*'", " ");
 		gsub("\\[", " & ");	# telecaster's awk doesn't allow for putting [ within a [] block hence this is separate from the following line
 		gsub("\\]", " & ");
-		gsub("[#;,{}=\*]", " & ");
+		gsub("[#;,{}=*]", " & ");
 		if ($1 != "")
 		{
 			for (i = 1; i <= NF; i++)

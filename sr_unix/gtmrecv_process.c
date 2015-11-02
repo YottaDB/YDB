@@ -64,6 +64,18 @@
 #include "is_proc_alive.h"
 #include "jnl_typedef.h"
 #include "iotcpdef.h"
+#include "memcoherency.h"
+#include "gtm_zlib.h"
+#include "wbox_test_init.h"
+
+#define	GTM_ZLIB_UNCMP_ERR_STR		"error from zlib uncompress function "
+#define	GTM_ZLIB_Z_MEM_ERROR_STR	"Out-of-memory " GTM_ZLIB_UNCMP_ERR_STR
+#define	GTM_ZLIB_Z_BUF_ERROR_STR	"Insufficient output buffer " GTM_ZLIB_UNCMP_ERR_STR
+#define	GTM_ZLIB_Z_DATA_ERROR_STR	"Input-data-incomplete-or-corrupt " GTM_ZLIB_UNCMP_ERR_STR
+#define	GTM_ZLIB_UNCMPLEN_ERROR_STR	"Decompressed message data length %d is not equal to precompressed length %d "
+#define	GTM_ZLIB_UNCMP_ERR_SEQNO_STR	"at seqno %llu [0x%llx]\n"
+#define	GTM_ZLIB_UNCMP_ERR_SOLVE_STR	"before sending REPL_CMP_SOLVE message\n"
+#define	GTM_ZLIB_UNCMPTRANSITION_STR	"Defaulting to NO decompression\n"
 
 #define RECVBUFF_REPLMSGLEN_FACTOR 		8
 
@@ -93,11 +105,12 @@ GBLDEF	int			gtmrecv_sock_fd = -1;
 GBLDEF	boolean_t		repl_connection_reset = FALSE;
 GBLDEF	boolean_t		gtmrecv_wait_for_jnl_seqno = FALSE;
 GBLDEF	boolean_t		gtmrecv_bad_trans_sent = FALSE;
+GBLDEF	boolean_t		gtmrecv_send_cmp2uncmp = FALSE;
 GBLDEF	struct sockaddr_in	primary_addr;
 
 GBLDEF	qw_num			repl_recv_data_recvd = 0;
 GBLDEF	qw_num			repl_recv_data_processed = 0;
-GBLDEF	qw_num			repl_recv_prefltr_data_procd = 0;
+GBLDEF	qw_num			repl_recv_postfltr_data_procd = 0;
 GBLDEF	qw_num			repl_recv_lastlog_data_recvd = 0;
 GBLDEF	qw_num			repl_recv_lastlog_data_procd = 0;
 
@@ -108,10 +121,18 @@ GBLDEF	volatile time_t		gtmrecv_now = 0;
 GBLDEF	boolean_t		src_node_same_endianness = TRUE;
 GBLDEF	boolean_t		src_node_endianness_known = FALSE;
 
-GBLREF  gtmrecv_options_t	gtmrecv_options;
+STATICDEF uchar_ptr_t		gtmrecv_cmpmsgp;
+STATICDEF int			gtmrecv_cur_cmpmsglen;
+STATICDEF int			gtmrecv_max_repl_cmpmsglen;
+STATICDEF uchar_ptr_t		gtmrecv_uncmpmsgp;
+STATICDEF int			gtmrecv_max_repl_uncmpmsglen;
+STATICDEF int			gtmrecv_repl_cmpmsglen;
+STATICDEF int			gtmrecv_repl_uncmpmsglen;
+
+GBLREF	gtmrecv_options_t	gtmrecv_options;
 GBLREF	int			gtmrecv_listen_sock_fd;
 GBLREF	recvpool_addrs		recvpool;
-GBLREF  boolean_t               gtmrecv_logstats;
+GBLREF	boolean_t		gtmrecv_logstats;
 GBLREF	int			gtmrecv_filter;
 GBLREF	int			gtmrecv_log_fd;
 GBLREF	int			gtmrecv_statslog_fd;
@@ -125,8 +146,8 @@ GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
 GBLREF	unsigned char		jnl_source_rectype, jnl_dest_maxrectype;
 GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	boolean_t		null_subs_xform;
-GBLREF	boolean_t 		primary_side_std_null_coll;
-GBLREF	boolean_t 		secondary_side_std_null_coll;
+GBLREF	boolean_t		primary_side_std_null_coll;
+GBLREF	boolean_t		secondary_side_std_null_coll;
 GBLREF	seq_num			lastlog_seqno;
 GBLREF	uint4			log_interval;
 GBLREF	qw_num			trans_recvd_cnt, last_log_tr_recvd_cnt;
@@ -139,24 +160,143 @@ GBLREF	mur_gbls_t		murgbl;
 LITREF	int		jrt_update[JRT_RECTYPES];
 LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 
+typedef enum
+{
+	GTM_RECV_POOL,
+	GTM_RECV_CMPBUFF
+} gtmrecv_buff_t;
+
 static	unsigned char	*buffp, *buff_start, *msgbuff, *filterbuff;
 static	int		buff_unprocessed;
 static	int		buffered_data_len;
 static	int		max_recv_bufsiz;
 static	int		data_len;
+static	int		exp_data_len;
 static	boolean_t	xoff_sent;
 static	repl_msg_t	xon_msg, xoff_msg;
 static	int		xoff_msg_log_cnt = 0;
 static	long		recvpool_high_watermark, recvpool_low_watermark;
 static	uint4		write_loc, write_wrap;
-static	uint4		write_len, write_off, pre_filter_write_len, pre_filter_write, pre_intlfilter_datalen;
+static	uint4		write_off;
 static	double		time_elapsed;
 static	int		recvpool_size;
 static	int		heartbeat_period;
 static	char		assumed_remote_proto_ver;
 
+#define	GTMRECV_EXPAND_CMPBUFF_IF_NEEDED(cmpmsglen)			\
+{									\
+	int	lclcmpmsglen;						\
+									\
+	lclcmpmsglen = ROUND_UP2(cmpmsglen, REPL_MSG_ALIGN);		\
+	if (lclcmpmsglen > gtmrecv_max_repl_cmpmsglen)			\
+	{								\
+		if (NULL != gtmrecv_cmpmsgp)				\
+			free(gtmrecv_cmpmsgp);				\
+		gtmrecv_cmpmsgp = (uchar_ptr_t)malloc(lclcmpmsglen);	\
+		gtmrecv_max_repl_cmpmsglen = (lclcmpmsglen);		\
+	}								\
+	assert(0 == (gtmrecv_max_repl_cmpmsglen % REPL_MSG_ALIGN));	\
+}
+
+#define	GTMRECV_EXPAND_UNCMPBUFF_IF_NEEDED(uncmpmsglen)			\
+{									\
+	if (uncmpmsglen > gtmrecv_max_repl_uncmpmsglen)			\
+	{								\
+		if (NULL != gtmrecv_uncmpmsgp)				\
+			free(gtmrecv_uncmpmsgp);			\
+		gtmrecv_uncmpmsgp = (uchar_ptr_t)malloc(uncmpmsglen);	\
+		gtmrecv_max_repl_uncmpmsglen = (uncmpmsglen);		\
+	}								\
+	assert(0 == (gtmrecv_max_repl_uncmpmsglen % REPL_MSG_ALIGN));	\
+}
+
+/* Set an alternate buffer as the target to hold the incoming compressed journal records.
+ * This will then be uncompressed into yet another buffer from where the records will be
+ * transferred to the receive pool one transaction at a time.
+ */
+#define	GTMRECV_SET_BUFF_TARGET_CMPBUFF(cmplen, uncmplen, curcmplen)	\
+{									\
+	GTMRECV_EXPAND_CMPBUFF_IF_NEEDED(cmplen);			\
+	GTMRECV_EXPAND_UNCMPBUFF_IF_NEEDED(uncmplen);			\
+	curcmplen = 0;							\
+}
+
+/* Wrap the "prepare_recvpool_for_write", "copy_to_recvpool", "do_flow_control" and "gtmrecv_poll_actions" functions in macros.
+ * This is needed because every invocation of these functions (except for a few gtmrecv_poll_actions invocations) should check
+ * a few global variables to determine if there was an error and in that case return from the caller.
+ * All callers of these functions should use the macro and not invoke the function directly.
+ * This avoids duplication of the error check logic.
+ */
+#define	PREPARE_RECVPOOL_FOR_WRITE(curdatalen, prefilterdatalen)		\
+{										\
+	prepare_recvpool_for_write(curdatalen, prefilterdatalen);		\
+		/* could update "recvpool_ctl->write" and "write_loc" */	\
+	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)		\
+		return;								\
+}
+#define	COPY_TO_RECVPOOL(ptr, datalen)						\
+{										\
+	copy_to_recvpool(ptr, datalen); /* uses and updates "write_loc" */	\
+	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)		\
+		return;								\
+}
+
+#define	DO_FLOW_CONTROL(write_loc)						\
+{										\
+	do_flow_control(write_loc);						\
+	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)		\
+		return;								\
+}
+
+#define	GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp)			\
+{										\
+	gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);		\
+	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)		\
+		return;								\
+}
+
+#define	CHECK_REPL_SEND_LOOP_ERROR(status, msgstr)		\
+{								\
+	if (SS_NORMAL != status)				\
+	{							\
+		gtmrecv_repl_send_loop_error(status, msgstr);	\
+		if (repl_connection_reset)			\
+			return;					\
+	}							\
+}
+
+static void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
+{
+	char		print_msg[1024];
+
+	error_def(ERR_REPLCOMM);
+	error_def(ERR_TEXT);
+
+	assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
+	if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
+	{
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection got reset while sending %s message\n", msgtypestr);
+		repl_connection_reset = TRUE;
+		repl_close(&gtmrecv_sock_fd);
+		SNPRINTF(print_msg, sizeof(print_msg), "Closing connection on receiver side\n");
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
+		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "ERR_REPLWARN", print_msg);
+		return;
+	} else if (EREPL_SEND == repl_errno)
+	{
+		SNPRINTF(print_msg, sizeof(print_msg), "Error sending %s message. Error in send : %s",
+			msgtypestr, STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	} else if (EREPL_SELECT == repl_errno)
+	{
+		SNPRINTF(print_msg, sizeof(print_msg), "Error sending %s message. Error in select : %s",
+			msgtypestr, STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	}
+}
+
 /* convert endianness of transaction */
-static int repl_tr_endian_convert(uchar_ptr_t jnl_buff, uint4 jnl_len)
+static int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len)
 {
 	unsigned char		*jb, *jstart, *ptr;
 	enum	jnl_record_type	rectype;
@@ -174,7 +314,7 @@ static int repl_tr_endian_convert(uchar_ptr_t jnl_buff, uint4 jnl_len)
 	status = SS_NORMAL;
 	jlen = jnl_len;
 	assert(0 == ((UINTPTR_T)jb % sizeof(UINTPTR_T)));
-   	while (JREC_PREFIX_SIZE <= jlen)
+	while (JREC_PREFIX_SIZE <= jlen)
 	{
 		assert(0 == ((UINTPTR_T)jb % sizeof(UINTPTR_T)));
 		rec = (jnl_record *) jb;
@@ -193,9 +333,9 @@ static int repl_tr_endian_convert(uchar_ptr_t jnl_buff, uint4 jnl_len)
 				rec->jrec_null.jnl_seqno = GTM_BYTESWAP_64(rec->jrec_null.jnl_seqno);
 		}
 		jstart = jb;
-   		if (0 != reclen)
+		if (0 != reclen)
 		{
-   			if (reclen <= jlen)
+			if (reclen <= jlen)
 			{
 				if (JRT_TRIPLE == rectype)
 				{
@@ -262,11 +402,7 @@ static void do_flow_control(uint4 write_pos)
 	int			torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int			status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	int			read_pos;
-	char			print_msg[1024];
 	seq_num			temp_seq_num;
-
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
 
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
@@ -277,9 +413,8 @@ static void do_flow_control(uint4 write_pos)
 	if (!recvpool_ctl->wrapped || space_used > recvpool_size)
 		space_used = write_pos - (read_pos = upd_proc_local->read);
 	if (space_used >= recvpool_high_watermark && !xoff_sent)
-	{
-		/* Send XOFF message */
-		if ( src_node_same_endianness )
+	{	/* Send XOFF message */
+		if (src_node_same_endianness)
 		{
 			xoff_msg.type = REPL_XOFF;
 			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, sizeof(seq_num));
@@ -293,30 +428,9 @@ static void do_flow_control(uint4 write_pos)
 		}
 		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_poll_immediate)
 		{
-			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-				return;
+			GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 		}
-		if (SS_NORMAL != status)
-		{
-			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
-			{
-				repl_connection_reset = TRUE;
-				return;
-			}
-			if (EREPL_SEND == repl_errno)
-			{
-				SNPRINTF(print_msg, sizeof(print_msg), "Error sending XOFF msg. Error in send : %s",
-						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
-			}
-			if (EREPL_SELECT == repl_errno)
-			{
-				SNPRINTF(print_msg, sizeof(print_msg), "Error sending XOFF msg. Error in select : %s",
-						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
-			}
-		}
+		CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_XOFF");
 		if (gtmrecv_logstats)
 			repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "Space used = %ld, High water mark = %d Low water mark = %d, "
 					"Updproc Read = %d, Recv Write = %d, Sent XOFF\n", space_used, recvpool_high_watermark,
@@ -330,7 +444,7 @@ static void do_flow_control(uint4 write_pos)
 		gtmrecv_poll_interval.tv_usec = GTMRECV_WAIT_FOR_UPD_PROGRESS_US;
 	} else if (space_used < recvpool_low_watermark && xoff_sent)
 	{
-		if ( src_node_same_endianness )
+		if (src_node_same_endianness)
 		{
 			xon_msg.type = REPL_XON;
 			memcpy((uchar_ptr_t)&xon_msg.msg[0], (uchar_ptr_t)&upd_proc_local->read_jnl_seqno, sizeof(seq_num));
@@ -344,30 +458,9 @@ static void do_flow_control(uint4 write_pos)
 		}
 		REPL_SEND_LOOP(gtmrecv_sock_fd, &xon_msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_poll_immediate)
 		{
-			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-				return;
+			GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 		}
-		if (SS_NORMAL != status)
-		{
-			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
-			{
-				repl_connection_reset = TRUE;
-				return;
-			}
-			if (EREPL_SEND == repl_errno)
-			{
-				SNPRINTF(print_msg, sizeof(print_msg), "Error sending XON msg. Error in send : %s",
-						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
-			}
-			if (EREPL_SELECT == repl_errno)
-			{
-				SNPRINTF(print_msg, sizeof(print_msg), "Error sending XON msg. Error in select : %s",
-						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
-			}
-		}
+		CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_XON");
 		if (gtmrecv_logstats)
 			repl_log(gtmrecv_statslog_fp, TRUE, TRUE, "Space used now = %ld, High water mark = %d, "
 				 "Low water mark = %d, Updproc Read = %d, Recv Write = %d, Sent XON\n", space_used,
@@ -482,8 +575,8 @@ static int gtmrecv_est_conn(void)
 					sel_timeout_val.tv_sec = 0;
 					sel_timeout_val.tv_usec = HPUX_SEL_TIMEOUT;
 					FD_ZERO(&input_fds);
-				        FD_SET(gtmrecv_listen_sock_fd, &input_fds);
-			        	status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &sel_timeout_val);
+					FD_SET(gtmrecv_listen_sock_fd, &input_fds);
+					status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &sel_timeout_val);
 #else
 					poll_fdlist[0].fd = gtmrecv_listen_sock_fd;
 					poll_fdlist[0].events = POLLIN;
@@ -491,8 +584,8 @@ static int gtmrecv_est_conn(void)
 					poll_timeout = HPUX_SEL_TIMEOUT / 1000;   /* convert to millisecs */
 					status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 #endif
-			                if (0 == status)
-			                        gtmrecv_poll_actions(0, 0, NULL);
+					if (0 == status)
+						gtmrecv_poll_actions(0, 0, NULL);
 					if (0 < status)
 						break;
 					else
@@ -500,11 +593,11 @@ static int gtmrecv_est_conn(void)
 				}
 				if (0 > status)
 				{
-                	       		status = ERRNO;
-	                	        SNPRINTF(print_msg, sizeof(print_msg),"Error in select on listen socket after ENOBUFS : %s",
+					status = ERRNO;
+					SNPRINTF(print_msg, sizeof(print_msg),"Error in select on listen socket after ENOBUFS : %s",
 					STRERROR(status));
-		                        rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
-		                }
+					rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+				}
 				ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr,
 				(GTM_SOCKLEN_TYPE *)&primary_addr_len, gtmrecv_sock_fd);
 				status = ERRNO;
@@ -595,6 +688,10 @@ static int gtmrecv_est_conn(void)
 	repl_log_conn_info(gtmrecv_sock_fd, gtmrecv_log_fp);
 	/* re-determine endianness of other side */
 	src_node_endianness_known = FALSE;
+	/* re-determine journal format of other side */
+	remote_jnl_ver = 0;
+	/* re-determine compression level on the replication pipe after every connection establishment */
+	repl_zlib_cmp_level = ZLIB_CMPLVL_NONE;
 	return (SS_NORMAL);
 }
 
@@ -634,9 +731,6 @@ void gtmrecv_free_filter_buff(void)
 
 int gtmrecv_alloc_msgbuff(void)
 {
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
-
 	gtmrecv_max_repl_msglen = MAX_REPL_MSGLEN + sizeof(gtmrecv_msgp->type); /* add sizeof(...) for alignment */
 	assert(NULL == gtmrecv_msgp); /* first time initialization. The receiver server doesn't need to re-allocate */
 	msgbuff = (unsigned char *)malloc(gtmrecv_max_repl_msglen + OS_PAGE_SIZE);
@@ -656,294 +750,6 @@ void gtmrecv_free_msgbuff(void)
 	}
 }
 
-static void process_tr_buff(int msg_type)
-{
-	recvpool_ctl_ptr_t		recvpool_ctl;
-	upd_proc_local_ptr_t		upd_proc_local;
-	gtmrecv_local_ptr_t		gtmrecv_local;
-	seq_num				log_seqno;
-	uint4				future_write, in_size, out_size, out_bufsiz, tot_out_size, save_buff_unprocessed,
-					save_buffered_data_len;
-	boolean_t			filter_pass = FALSE, is_new_triple;
-	uchar_ptr_t			save_buffp, save_filter_buff, in_buff, out_buff;
-	int				status;
-	qw_num				msg_total;
-	static int			triplelen = 0;
-	static repl_triple_jnl_t	triplecontent;
-
-	error_def(ERR_REPLTRANS2BIG);
-	error_def(ERR_TEXT);
-	error_def(ERR_JNLRECFMT);
-	error_def(ERR_JNLSETDATA2LONG);
-	error_def(ERR_JNLNEWREC);
-	error_def(ERR_REPLGBL2LONG);
-
-	recvpool_ctl = recvpool.recvpool_ctl;
-	upd_proc_local = recvpool.upd_proc_local;
-	gtmrecv_local = recvpool.gtmrecv_local;
-	is_new_triple = (REPL_NEW_TRIPLE == msg_type);
-	do
-	{
-		if (write_loc + data_len > recvpool_size)
-		{
-#ifdef REPL_DEBUG
-			if (recvpool_ctl->wrapped)
-				REPL_DPRINT1("Update Process too slow. Waiting for it to free up space and wrap\n");
-#endif
-			while (recvpool_ctl->wrapped)
-			{
-				 /* Wait till the updproc wraps */
-				SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_PROGRESS);
-				gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-				if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-					return;
-			}
-			assert(recvpool_ctl->wrapped == FALSE);
-			REPL_DPRINT3("Write wrapped%sat : %d\n", (NO_FILTER != gtmrecv_filter && !filter_pass) ?
-				     " prior to filtering " : (NO_FILTER != gtmrecv_filter) ? " after filtering " : " ", write_loc);
-			recvpool_ctl->write_wrap = write_wrap = write_loc;
-			recvpool_ctl->write = write_loc = 0;
-			recvpool_ctl->wrapped = TRUE;
-		}
-		assert(buffered_data_len <= recvpool_size);
-		do_flow_control(write_loc);
-		if (repl_connection_reset)
-		{
-			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset\n");
-			repl_close(&gtmrecv_sock_fd);
-			return;
-		}
-		if (gtmrecv_wait_for_jnl_seqno)
-			return;
-		future_write = write_loc + buffered_data_len;
-#ifdef REPL_DEBUG
-		if (recvpool_ctl->wrapped && (write_loc <= upd_proc_local->read) && (upd_proc_local->read <= future_write))
-			REPL_DPRINT1("Update Process too slow. Waiting for it to free up space\n");
-#endif
-		while (recvpool_ctl->wrapped && write_loc <= upd_proc_local->read && upd_proc_local->read <= future_write)
-		{	/* Write will cause overflow. Wait till there is more space available */
-			SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_PROGRESS);
-			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-				return;
-		}
-		memcpy(recvpool.recvdata_base + write_loc, buffp, buffered_data_len);
-		if (is_new_triple)
-		{
-			assert((triplelen + buffered_data_len) <= sizeof(triplecontent));
-			if ((triplelen + buffered_data_len) <= sizeof(triplecontent))
-			{
-				memcpy(((sm_uc_ptr_t)&triplecontent) + triplelen, buffp, buffered_data_len);
-				triplelen += buffered_data_len;
-			}
-		}
-		write_loc = future_write;
-		if (write_loc > write_wrap)
-			write_wrap = write_loc;
-		repl_recv_data_processed += (qw_num)buffered_data_len;
-		buffp += buffered_data_len;
-		buff_unprocessed -= buffered_data_len;
-		data_len -= buffered_data_len;
-		if (0 != data_len)
-			break;
-		write_len = ((recvpool_ctl->write != write_wrap) ?  (write_loc - recvpool_ctl->write) : write_loc);
-		write_off = ((recvpool_ctl->write != write_wrap) ? recvpool_ctl->write : 0);
-
-		if (!src_node_same_endianness)
-			if (SS_NORMAL != (status = repl_tr_endian_convert(recvpool.recvdata_base + write_off, write_len)))
-				repl_log(gtmrecv_log_fp, FALSE, TRUE,
-					"REPL ERROR - Journal records did not endian convert properly\n");
-
-		if (filter_pass || (NO_FILTER == gtmrecv_filter) || is_new_triple)
-		{
-			if (recvpool_ctl->jnl_seqno - lastlog_seqno >= log_interval)
-			{
-				log_seqno = recvpool_ctl->jnl_seqno;
-				trans_recvd_cnt += (log_seqno - lastlog_seqno);
-				msg_total = repl_recv_data_recvd - buff_unprocessed;
-					/* Don't include data not yet processed, we'll include that count in a later log */
-				if (NO_FILTER == gtmrecv_filter)
-				{
-					repl_log(gtmrecv_log_fp, FALSE, TRUE, "REPL INFO - Tr num : %llu"
-						"  Tr Total : %llu  Msg Total : %llu\n", log_seqno,
-						repl_recv_data_processed, msg_total);
-				} else
-				{
-					repl_log(gtmrecv_log_fp, FALSE, TRUE, "REPL INFO - Tr num : %llu  Pre filter "
-						"total : %llu  Post filter total : %llu  Msg Total : %llu\n", log_seqno,
-						repl_recv_prefltr_data_procd, repl_recv_data_processed, msg_total);
-				}
-				/* Approximate time with an error not more than GTMRECV_HEARTBEAT_PERIOD. We use this
-				 * instead of calling time(), and expensive system call, especially on VMS. The
-				 * consequence of this choice is that we may defer logging when we may have logged. We
-				 * can live with that. Currently, the logging interval is not changeable by users.
-				 * When/if we provide means of choosing log interval, this code may have to be re-examined.
-				 * 	- Vinaya 2003/09/08.
-				 */
-				assert(0 != gtmrecv_now);
-				repl_recv_this_log_time = gtmrecv_now;
-				assert(repl_recv_this_log_time >= repl_recv_prev_log_time);
-				time_elapsed = difftime(repl_recv_this_log_time, repl_recv_prev_log_time);
-				if ((double)GTMRECV_LOGSTATS_INTERVAL <= time_elapsed)
-				{
-					repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO since last log : Time elapsed : "
-						"%00.f  Tr recvd : %llu  Tr bytes : %llu  Msg bytes : %llu\n",
-						time_elapsed, trans_recvd_cnt - last_log_tr_recvd_cnt,
-						repl_recv_data_processed - repl_recv_lastlog_data_procd,
-						msg_total - repl_recv_lastlog_data_recvd);
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO since last log : Time elapsed : "
-						"%00.f  Tr recvd/s : %f  Tr bytes/s : %f  Msg bytes/s : %f\n", time_elapsed,
-						(float)(trans_recvd_cnt - last_log_tr_recvd_cnt)/time_elapsed,
-						(float)(repl_recv_data_processed - repl_recv_lastlog_data_procd)/time_elapsed,
-						(float)(msg_total - repl_recv_lastlog_data_recvd)/time_elapsed);
-					repl_recv_lastlog_data_procd = repl_recv_data_processed;
-					repl_recv_lastlog_data_recvd = msg_total;
-					last_log_tr_recvd_cnt = trans_recvd_cnt;
-					repl_recv_prev_log_time = repl_recv_this_log_time;
-				}
-				lastlog_seqno = log_seqno;
-			}
-			if (gtmrecv_logstats)
-			{
-				if (!filter_pass)
-				{
-					repl_log(gtmrecv_statslog_fp, FALSE, FALSE, "Tr : %llu  Size : %d  Write : %d  "
-						 "Total : %llu\n", recvpool_ctl->jnl_seqno, write_len,
-						 write_off, repl_recv_data_processed);
-				} else
-				{
-					assert(!is_new_triple);
-					repl_log(gtmrecv_statslog_fp, FALSE, FALSE, "Tr : %llu  Pre filter Size : %d  "
-						"Post filter Size  : %d  Pre filter Write : %d  Post filter Write : %d  "
-						"Pre filter Total : %llu  Post filter Total : %llu\n",
-						recvpool_ctl->jnl_seqno, pre_filter_write_len, write_len,
-						pre_filter_write, write_off, repl_recv_prefltr_data_procd,
-						repl_recv_data_processed);
-				}
-			}
-			recvpool_ctl->write_wrap = write_wrap;
-			if (!is_new_triple)
-			{
-				if (recvpool_ctl->jnl_seqno == recvpool_ctl->last_rcvd_triple.start_seqno)
-				{	/* Move over stuff from "last_rcvd_triple" to "last_valid_triple" */
-					memcpy(&recvpool_ctl->last_valid_triple,
-						&recvpool_ctl->last_rcvd_triple, sizeof(repl_triple));
-				}
-				QWINCRBYDW(recvpool_ctl->jnl_seqno, 1);
-				assert(recvpool_ctl->last_valid_triple.start_seqno < recvpool_ctl->jnl_seqno);
-			} else
-			{
-				if ( !src_node_same_endianness )
-				{
-					triplecontent.cycle = GTM_BYTESWAP_32(triplecontent.cycle);
-					triplecontent.forwptr = GTM_BYTESWAP_24(triplecontent.forwptr);
-					triplecontent.start_seqno = GTM_BYTESWAP_64(triplecontent.start_seqno);
-				}
-
-				assert(sizeof(triplecontent) == triplelen);
-				assert(JRT_TRIPLE == triplecontent.jrec_type);
-				assert(triplecontent.forwptr == sizeof(triplecontent));
-				assert(triplecontent.start_seqno == recvpool_ctl->jnl_seqno);
-				assert(triplecontent.start_seqno >= recvpool.upd_proc_local->read_jnl_seqno);
-				assert(triplecontent.start_seqno > recvpool_ctl->last_valid_triple.start_seqno);
-				assert(triplecontent.start_seqno >= recvpool_ctl->last_rcvd_triple.start_seqno);
-				/* Copy relevant fields from received triple message to "last_rcvd_triple" structure */
-				memcpy(recvpool_ctl->last_rcvd_triple.root_primary_instname, triplecontent.instname,
-					MAX_INSTNAME_LEN - 1);
-				recvpool_ctl->last_rcvd_triple.start_seqno = triplecontent.start_seqno;
-				recvpool_ctl->last_rcvd_triple.root_primary_cycle = triplecontent.cycle;
-				triplelen = 0;
-				repl_log(gtmrecv_log_fp, TRUE, TRUE, "New Triple Content : Start Seqno = "
-					"%llu [0x%llx] : Root Primary = [%s] : Cycle = [%d] : Received from "
-					"instance = [%s]\n", triplecontent.start_seqno, triplecontent.start_seqno,
-					triplecontent.instname, triplecontent.cycle, jnlpool_ctl->primary_instname);
-			}
-			recvpool_ctl->write = write_loc;
-			if (filter_pass)
-			{	/* Switch buffers back */
-				buffp = save_buffp;
-				buff_unprocessed = save_buff_unprocessed;
-				buffered_data_len = save_buffered_data_len;
-				filter_pass = FALSE;
-			}
-			break;
-		}
-		/* Need to pass through filter */
-		pre_filter_write = write_off;
-		pre_filter_write_len = write_len;
-		repl_recv_prefltr_data_procd += (qw_num)pre_filter_write_len;
-		if (gtmrecv_filter & INTERNAL_FILTER)
-		{
-			pre_intlfilter_datalen = write_len;
-			in_buff = recvpool.recvdata_base + write_off;
-			in_size = pre_intlfilter_datalen;
-			out_buff = repl_filter_buff;
-			out_bufsiz = repl_filter_bufsiz;
-			tot_out_size = 0;
-			while (SS_NORMAL != (status =
-				repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
-						    [jnl_ver - JNL_VER_EARLIEST_REPL](
-					in_buff, &in_size, out_buff, &out_size, out_bufsiz)) &&
-			       EREPL_INTLFILTER_NOSPC == repl_errno)
-			{
-				save_filter_buff = repl_filter_buff;
-				gtmrecv_alloc_filter_buff(repl_filter_bufsiz + (repl_filter_bufsiz >> 1));
-				in_buff += in_size;
-				in_size = (uint4)(pre_filter_write_len - (in_buff - recvpool.recvdata_base - write_off));
-				out_bufsiz = (uint4)(repl_filter_bufsiz - (out_buff - save_filter_buff) - out_size);
-				out_buff = repl_filter_buff + (out_buff - save_filter_buff) + out_size;
-				tot_out_size += out_size;
-			}
-			if (SS_NORMAL == status)
-				write_len = tot_out_size + out_size;
-			else
-			{
-				assert(FALSE);
-				if (EREPL_INTLFILTER_BADREC == repl_errno)
-					rts_error(VARLSTCNT(1) ERR_JNLRECFMT);
-				else if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
-					rts_error(VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2, jnl_source_datalen,
-						  jnl_dest_maxdatalen);
-				else if (EREPL_INTLFILTER_NEWREC == repl_errno)
-					rts_error(VARLSTCNT(4) ERR_JNLNEWREC, 2, (unsigned int)jnl_source_rectype,
-						  (unsigned int)jnl_dest_maxrectype);
-				else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
-						rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);
-				else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
-					GTMASSERT;
-			}
-		} else
-		{
-			if (write_len > repl_filter_bufsiz)
-				gtmrecv_alloc_filter_buff(write_len);
-			memcpy(repl_filter_buff, recvpool.recvdata_base + write_off, write_len);
-		}
-		assert(write_len <= repl_filter_bufsiz);
-		if ((gtmrecv_filter & EXTERNAL_FILTER) &&
-		    (SS_NORMAL != (status = repl_filter(recvpool_ctl->jnl_seqno, repl_filter_buff, (int*)&write_len,
-							repl_filter_bufsiz))))
-			repl_filter_error(recvpool_ctl->jnl_seqno, status);
-		assert(write_len <= repl_filter_bufsiz);
-		if (write_len > recvpool_size)
-		{
-			rts_error(VARLSTCNT(10) ERR_REPLTRANS2BIG, 4, &recvpool_ctl->jnl_seqno,
-				  write_len, RTS_ERROR_LITERAL("Receive"), ERR_TEXT, 2,
-				  LEN_AND_LIT("Post filter tr len larger than receive pool size"));
-		}
-		/* Switch buffers */
-		save_buffp = buffp;
-		save_buff_unprocessed = buff_unprocessed;
-		save_buffered_data_len = buffered_data_len;
-
-		data_len = buff_unprocessed = buffered_data_len = write_len;
-		buffp = repl_filter_buff;
-		write_loc = write_off;
-		repl_recv_data_processed -= (qw_num)pre_filter_write_len;
-		filter_pass = TRUE;
-	} while (TRUE);
-	return;
-}
-
 /* This function can be used to only send fixed-size message types across the replication pipe.
  * This in turn uses REPL_SEND* macros but also does error checks and sets the global variables
  *	"repl_connection_reset" or "gtmrecv_wait_for_jnl_seqno" accordingly.
@@ -960,9 +766,6 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, char *msgtypestr, seq_num optional_s
 	FILE			*log_fp;
 	int4			msgp_len;
 
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
-
 	assert(!mur_options.rollback || (NULL == recvpool.gtmrecv_local));
 	assert(mur_options.rollback || (NULL != recvpool.gtmrecv_local));
 	assert((REPL_MULTISITE_MSG_START > msgp->type)
@@ -975,31 +778,15 @@ void	gtmrecv_repl_send(repl_msg_ptr_t msgp, char *msgtypestr, seq_num optional_s
 			optional_seqno, optional_seqno);
 	} else
 		repl_log(log_fp, TRUE, TRUE, "Sending %s message\n", msgtypestr);
-	if ( src_node_same_endianness )
+	if (src_node_same_endianness)
 		msgp_len = msgp->len;
 	else
 		msgp_len = GTM_BYTESWAP_32(msgp->len);
 	REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, msgp_len, FALSE, &gtmrecv_poll_immediate)
 	{
-		gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-		if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-			return;
+		GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 	}
-	if (SS_NORMAL != status)
-	{
-		if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
-		{
-			repl_log(log_fp, TRUE, TRUE, "Connection reset while sending %s message\n", msgtypestr);
-			repl_connection_reset = TRUE;
-			repl_close(&gtmrecv_sock_fd);
-			return;
-		} else if (EREPL_SEND == repl_errno)
-			rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error sending %s message. Error in send"), msgtypestr, status);
-		else if (EREPL_SELECT == repl_errno)
-			rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error sending %s message. Error in select"), msgtypestr, status);
-	}
+	CHECK_REPL_SEND_LOOP_ERROR(status, msgtypestr);
 	assert(SS_NORMAL == status);
 }
 
@@ -1014,7 +801,7 @@ void gtmrecv_send_triple_info(repl_triple *triple, int4 triple_num)
 
 	/*************** Send REPL_TRIPLE_INFO1 message ***************/
 	memset(&tripinfo1_msg, 0, sizeof(tripinfo1_msg));
-	if ( src_node_same_endianness )
+	if (src_node_same_endianness)
 	{
 		tripinfo1_msg.type = REPL_TRIPLE_INFO1;
 		tripinfo1_msg.len = MIN_REPL_MSGLEN;
@@ -1031,7 +818,7 @@ void gtmrecv_send_triple_info(repl_triple *triple, int4 triple_num)
 		return;
 	/*************** Send REPL_TRIPLE_INFO2 message ***************/
 	memset(&tripinfo2_msg, 0, sizeof(tripinfo2_msg));
-	if ( src_node_same_endianness )
+	if (src_node_same_endianness)
 	{
 		tripinfo2_msg.type = REPL_TRIPLE_INFO2;
 		tripinfo2_msg.len = MIN_REPL_MSGLEN;
@@ -1046,11 +833,6 @@ void gtmrecv_send_triple_info(repl_triple *triple, int4 triple_num)
 		tripinfo2_msg.cycle = GTM_BYTESWAP_32(triple->root_primary_cycle);
 		tripinfo2_msg.triple_num = GTM_BYTESWAP_32(triple_num);
 	}
-	/* Since this is not a root primary instance, updates should be disabled. Assert that */
-	assert((NULL == jnlpool_ctl) || jnlpool_ctl->upd_disabled);
-	assert((NULL == jnlpool_ctl) || (jnlpool_ctl->jnl_seqno >= jnlpool_ctl->start_jnl_seqno));
-	assert((NULL == jnlpool_ctl) || (recvpool.recvpool_ctl->jnl_seqno >= jnlpool_ctl->jnl_seqno));
-		/* Update process could have done zero or more updates hence the ">=" in the assert above */
 	gtmrecv_repl_send((repl_msg_ptr_t)&tripinfo2_msg, "REPL_TRIPLE_INFO2", triple->start_seqno);
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 		return;
@@ -1067,7 +849,6 @@ static boolean_t	is_active_source_server_running(void)
 {
 	int4			index;
 	uint4			gtmsource_pid;
-	boolean_t		srv_alive;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 
 	gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[0];
@@ -1076,13 +857,414 @@ static boolean_t	is_active_source_server_running(void)
 		if ('\0' == gtmsourcelocal_ptr->secondary_instname[0])
 			continue;
 		gtmsource_pid = gtmsourcelocal_ptr->gtmsource_pid;
-		srv_alive = (0 == gtmsource_pid) ? FALSE : is_proc_alive(gtmsource_pid, 0);
-		if (!srv_alive)
+		if ((0 == gtmsource_pid) || !is_proc_alive(gtmsource_pid, 0))
 			continue;
 		if (GTMSOURCE_MODE_ACTIVE == gtmsourcelocal_ptr->mode)
 			return TRUE;
 	}
 	return FALSE;
+}
+
+static void prepare_recvpool_for_write(int datalen, int pre_filter_write_len)
+{
+	recvpool_ctl_ptr_t	recvpool_ctl;
+
+	error_def(ERR_REPLTRANS2BIG);
+
+	recvpool_ctl = recvpool.recvpool_ctl;
+	if (datalen > recvpool_size)
+	{	/* Too large a transaction to be accommodated in the Receive Pool */
+		rts_error(VARLSTCNT(7) ERR_REPLTRANS2BIG, 5, &recvpool_ctl->jnl_seqno, datalen, pre_filter_write_len,
+			RTS_ERROR_LITERAL("Receive"));
+	}
+	if ((write_loc + datalen) > recvpool_size)
+	{
+		REPL_DEBUG_ONLY(
+			if (recvpool_ctl->wrapped)
+				REPL_DPRINT1("Update Process too slow. Waiting for it to free up space and wrap\n");
+		)
+		while (recvpool_ctl->wrapped)
+		{	/* Wait till the updproc wraps */
+			SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_PROGRESS);
+			GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
+		}
+		assert(recvpool_ctl->wrapped == FALSE);
+		recvpool_ctl->write_wrap = write_wrap = write_loc;
+		/* The update process reads (a) "recvpool_ctl->write" first. If "write" is not equal to
+		 * "upd_proc_local->read", it then reads (b) "recvpool_ctl->write_wrap" and assumes that
+		 * "write_wrap" holds a non-stale value. This is in turn used to compare "temp_read" and
+		 * "write_wrap" to determine how much of unprocessed data there is in the receive pool. If
+		 * it so happens that the receiver server sets "write_wrap" in the above line to a value
+		 * that is lesser than its previous value (possible if in the previous wrap of the pool,
+		 * transactions used more portions of the pool than in the current wrap), it is important
+		 * that the update process sees the updated value of "write_wrap" as long as it sees the
+		 * corresponding update to "write". This is because it will otherwise end up processing
+		 * the tail section of the receive pool (starting from the uptodate value of "write" to the
+		 * stale value of "write_wrap") that does not contain valid journal data. For this read order
+		 * dependency to hold good, the receiver server needs to do a write memory barrier
+		 * after updating "write_wrap" but before updating "write".  The update process
+		 * will do a read memory barrier after reading "wrapped" but before reading "write".
+		 */
+		SHM_WRITE_MEMORY_BARRIER;
+		/* The update process reads (a) "recvpool_ctl->wrapped" first and then reads (b)
+		 * "recvpool_ctl->write". If "wrapped" is TRUE, it assumes that "write" will never hold a stale
+		 * value that reflects a corresponding previous state of "wrapped" (i.e. "write" will point to
+		 * the beginning of the receive pool, either 0 or a small non-zero value instead of pointing
+		 * to the end of the receive pool). For this to hold good, the receiver server needs to do
+		 * a write memory barrier after updating "write" but before updating "wrapped".  The update
+		 * process will do a read memory barrier after reading "wrapped" but before reading "write".
+		 */
+		recvpool_ctl->write = write_loc = 0;
+		SHM_WRITE_MEMORY_BARRIER;
+		recvpool_ctl->wrapped = TRUE;
+	}
+	assert(buffered_data_len <= recvpool_size);
+	DO_FLOW_CONTROL(write_loc);
+}
+
+static void copy_to_recvpool(uchar_ptr_t databuff, int datalen)
+{
+	uint4			upd_read;
+	uint4			future_write;
+	upd_proc_local_ptr_t	upd_proc_local;
+	recvpool_ctl_ptr_t	recvpool_ctl;
+
+	recvpool_ctl = recvpool.recvpool_ctl;
+	upd_proc_local = recvpool.upd_proc_local;
+	future_write = write_loc + datalen;
+	upd_read = upd_proc_local->read;
+	REPL_DEBUG_ONLY(
+		if (recvpool_ctl->wrapped && (upd_read <= future_write))
+		{
+			REPL_DPRINT1("Update Process too slow. Waiting for it to free up space\n");
+		}
+	)
+	while (recvpool_ctl->wrapped && (upd_read <= future_write))
+	{	/* Write will cause overflow. Wait till there is more space available */
+		SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_PROGRESS);
+		GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
+		upd_read = upd_proc_local->read;
+	}
+	memcpy(recvpool.recvdata_base + write_loc, databuff, datalen);
+	write_loc = future_write;
+	if (write_loc > write_wrap)
+		write_wrap = write_loc;
+}
+
+static void wait_for_updproc_to_clear_backlog()
+{
+	upd_proc_local_ptr_t	upd_proc_local;
+	recvpool_ctl_ptr_t	recvpool_ctl;
+
+	recvpool_ctl = recvpool.recvpool_ctl;
+	upd_proc_local = recvpool.upd_proc_local;
+	while (upd_proc_local->read != recvpool_ctl->write)
+	{
+		SHORT_SLEEP(GTMRECV_WAIT_FOR_UPD_PROGRESS);
+		GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
+	}
+}
+
+static void process_tr_buff(int msg_type)
+{
+	recvpool_ctl_ptr_t		recvpool_ctl;
+	seq_num				log_seqno, recv_jnl_seqno;
+	uint4				in_size, out_size, out_bufsiz, tot_out_size, upd_read;
+	boolean_t			filter_pass = FALSE, is_new_triple, is_repl_cmpc;
+	uchar_ptr_t			save_buffp, save_filter_buff, in_buff, out_buff;
+	int				status;
+	qw_num				msg_total;
+	static repl_triple_jnl_t	triplecontent;
+	uLongf				destlen;
+	int				cmpret, cur_data_len;
+	repl_msg_ptr_t			msgp, msgp_top;
+	uint4				write_len, pre_filter_write_len, pre_filter_write;
+	boolean_t			uncmpfail;
+
+	error_def(ERR_JNLRECFMT);
+	error_def(ERR_JNLSETDATA2LONG);
+	error_def(ERR_JNLNEWREC);
+	error_def(ERR_REPLGBL2LONG);
+
+	recvpool_ctl = recvpool.recvpool_ctl;
+	is_repl_cmpc  = ((REPL_TR_CMP_JNL_RECS == msg_type) || (REPL_TR_CMP_JNL_RECS2 == msg_type));
+	is_new_triple = (REPL_NEW_TRIPLE == msg_type);
+	assert(!is_repl_cmpc || !is_new_triple);	/* TRIPLE records should not be compressed in the pipe */
+	if (is_repl_cmpc)
+	{
+		assert(gtmrecv_max_repl_uncmpmsglen);
+		destlen = gtmrecv_max_repl_uncmpmsglen;
+		if (ZLIB_CMPLVL_NONE == gtm_zlib_cmp_level)
+		{	/* Receiver does not have compression enabled in the first place but yet source server has sent
+			 * compressed records. Stop source server from sending compressed records.
+			 */
+			uncmpfail = TRUE;
+		} else
+		{
+			assert(NULL != zlib_uncompress_fnptr);
+			cmpret = (*zlib_uncompress_fnptr)((Bytef *)gtmrecv_uncmpmsgp, (uLongf *)&destlen,
+				(const Bytef *)gtmrecv_cmpmsgp, (uLong)gtmrecv_repl_cmpmsglen);
+			GTM_WHITE_BOX_TEST(WBTEST_REPL_TR_UNCMP_ERROR, cmpret, Z_DATA_ERROR);
+			recv_jnl_seqno = recvpool_ctl->jnl_seqno;
+			switch(cmpret)
+			{
+				case Z_MEM_ERROR:
+					assert(FALSE);
+					repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_Z_MEM_ERROR_STR
+						GTM_ZLIB_UNCMP_ERR_SEQNO_STR, recv_jnl_seqno, recv_jnl_seqno);
+					break;
+				case Z_BUF_ERROR:
+					assert(FALSE);
+					repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_Z_BUF_ERROR_STR
+						GTM_ZLIB_UNCMP_ERR_SEQNO_STR, recv_jnl_seqno, recv_jnl_seqno);
+					break;
+				case Z_DATA_ERROR:
+					assert(gtm_white_box_test_case_enabled
+						&& (WBTEST_REPL_TR_UNCMP_ERROR == gtm_white_box_test_case_number));
+					repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_Z_DATA_ERROR_STR
+						GTM_ZLIB_UNCMP_ERR_SEQNO_STR, recv_jnl_seqno, recv_jnl_seqno);
+					break;
+			}
+			uncmpfail = (Z_OK != cmpret);
+			if (!uncmpfail)
+			{
+				GTM_WHITE_BOX_TEST(WBTEST_REPL_TR_UNCMP_ERROR, destlen, gtmrecv_repl_uncmpmsglen - 1);
+				if (destlen != gtmrecv_repl_uncmpmsglen)
+				{	/* decompression did not yield precompressed data length */
+					assert(gtm_white_box_test_case_enabled
+						&& (WBTEST_REPL_TR_UNCMP_ERROR == gtm_white_box_test_case_number));
+					repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_UNCMPLEN_ERROR_STR
+						GTM_ZLIB_UNCMP_ERR_SEQNO_STR, destlen, gtmrecv_repl_uncmpmsglen,
+						recv_jnl_seqno, recv_jnl_seqno);
+					uncmpfail = TRUE;
+				}
+			}
+		}
+		if (uncmpfail)
+		{	/* Since uncompression failed, default to NO compression. Send a REPL_CMP2UNCMP message accordingly */
+			repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_UNCMPTRANSITION_STR);
+			repl_log(gtmrecv_log_fp, TRUE, FALSE, "Waiting for update process to clear the backlog first\n");
+			wait_for_updproc_to_clear_backlog();
+			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+				return;
+			repl_log(gtmrecv_log_fp, TRUE, FALSE, "Update process has successfully cleared the backlog\n");
+			gtmrecv_send_cmp2uncmp = TRUE;	/* trigger REPL_CMP2UNCMP message processing */
+			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
+			assert(!gtmrecv_send_cmp2uncmp);
+			assert(gtmrecv_wait_for_jnl_seqno);
+			return;
+		}
+		assert(0 == destlen % REPL_MSG_ALIGN);
+		msgp = (repl_msg_ptr_t)gtmrecv_uncmpmsgp;
+		msgp_top = (repl_msg_ptr_t)(gtmrecv_uncmpmsgp + destlen);
+	}
+	do
+	{
+		if (is_repl_cmpc)
+		{
+			if (msgp >= msgp_top)
+			{
+				assert(msgp == msgp_top);
+				break;
+			}
+			/* If primary is of different endianness, endian convert the UNCOMPRESSED message header
+			 * before using the type and len fields (the compressed message header was already endian
+			 * converted as part of receiving the message in do_main_loop())
+			 */
+			if (!src_node_same_endianness)
+			{
+				msgp->type = GTM_BYTESWAP_32(msgp->type);
+				msgp->len = GTM_BYTESWAP_32(msgp->len);
+			}
+			assert(REPL_TR_JNL_RECS == msgp->type);
+			cur_data_len = msgp->len - REPL_MSG_HDRLEN;
+			assert(0 < cur_data_len);
+			assert(0 == (cur_data_len % REPL_MSG_ALIGN));
+			PREPARE_RECVPOOL_FOR_WRITE(cur_data_len, 0);	/* could update "recvpool_ctl->write" and "write_loc" */
+			COPY_TO_RECVPOOL((uchar_ptr_t)msgp + REPL_MSG_HDRLEN, cur_data_len);/* uses and updates "write_loc" */
+			msgp = (repl_msg_ptr_t)((uchar_ptr_t)msgp + cur_data_len + REPL_MSG_HDRLEN);
+		}
+		write_off = recvpool_ctl->write;
+		write_len = (write_loc - write_off);
+		assert((write_off != write_wrap) || (0 == write_off));
+		assert(remote_jnl_ver);
+		if (!src_node_same_endianness)
+		{
+			if (SS_NORMAL != (status = repl_tr_endian_convert(remote_jnl_ver,
+							recvpool.recvdata_base + write_off, write_len)))
+				repl_log(gtmrecv_log_fp, FALSE, TRUE,
+					"REPL ERROR - Journal records did not endian convert properly\n");
+		}
+		if ((NO_FILTER != gtmrecv_filter) && !is_new_triple)
+		{	/* Need to pass through filter */
+			pre_filter_write = write_off;
+			pre_filter_write_len = write_len;
+			if (gtmrecv_filter & INTERNAL_FILTER)
+			{
+				in_buff = recvpool.recvdata_base + write_off;
+				in_size = write_len;
+				out_buff = repl_filter_buff;
+				out_bufsiz = repl_filter_bufsiz;
+				tot_out_size = 0;
+				while (SS_NORMAL != (status =
+					repl_internal_filter[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
+						[jnl_ver - JNL_VER_EARLIEST_REPL](
+							in_buff, &in_size, out_buff, &out_size, out_bufsiz))
+					&& (EREPL_INTLFILTER_NOSPC == repl_errno))
+				{
+					save_filter_buff = repl_filter_buff;
+					gtmrecv_alloc_filter_buff(repl_filter_bufsiz + (repl_filter_bufsiz >> 1));
+					in_buff += in_size;
+					in_size = (uint4)(pre_filter_write_len - (in_buff - recvpool.recvdata_base - write_off));
+					out_bufsiz = (uint4)(repl_filter_bufsiz - (out_buff - save_filter_buff) - out_size);
+					out_buff = repl_filter_buff + (out_buff - save_filter_buff) + out_size;
+					tot_out_size += out_size;
+				}
+				if (SS_NORMAL == status)
+					write_len = tot_out_size + out_size;
+				else
+				{
+					assert(FALSE);
+					if (EREPL_INTLFILTER_BADREC == repl_errno)
+						rts_error(VARLSTCNT(1) ERR_JNLRECFMT);
+					else if (EREPL_INTLFILTER_DATA2LONG == repl_errno)
+						rts_error(VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2, jnl_source_datalen,
+							  jnl_dest_maxdatalen);
+					else if (EREPL_INTLFILTER_NEWREC == repl_errno)
+						rts_error(VARLSTCNT(4) ERR_JNLNEWREC, 2, (unsigned int)jnl_source_rectype,
+							  (unsigned int)jnl_dest_maxrectype);
+					else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
+							rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);
+					else /* (EREPL_INTLFILTER_INCMPLREC == repl_errno) */
+						GTMASSERT;
+				}
+			} else
+			{
+				if (write_len > repl_filter_bufsiz)
+					gtmrecv_alloc_filter_buff(write_len);
+				memcpy(repl_filter_buff, recvpool.recvdata_base + write_off, write_len);
+			}
+			assert(write_len <= repl_filter_bufsiz);
+			if ((gtmrecv_filter & EXTERNAL_FILTER) &&
+			    (SS_NORMAL != (status = repl_filter(recvpool_ctl->jnl_seqno, repl_filter_buff, (int*)&write_len,
+								repl_filter_bufsiz))))
+				repl_filter_error(recvpool_ctl->jnl_seqno, status);
+			assert(write_len <= repl_filter_bufsiz);
+			write_loc = write_off;		/* reset "write_loc" */
+			PREPARE_RECVPOOL_FOR_WRITE(write_len, pre_filter_write_len);	/* could update "->write" and "write_loc" */
+			COPY_TO_RECVPOOL((uchar_ptr_t)repl_filter_buff, write_len);/* uses and updates "write_loc" */
+			write_off = recvpool_ctl->write;
+			repl_recv_postfltr_data_procd += (qw_num)write_len;
+			filter_pass = TRUE;
+		}
+		if (recvpool_ctl->jnl_seqno - lastlog_seqno >= log_interval)
+		{
+			log_seqno = recvpool_ctl->jnl_seqno;
+			trans_recvd_cnt += (log_seqno - lastlog_seqno);
+			msg_total = repl_recv_data_recvd - buff_unprocessed;
+				/* Don't include data not yet processed, we'll include that count in a later log */
+			if (NO_FILTER == gtmrecv_filter)
+			{
+				repl_log(gtmrecv_log_fp, FALSE, TRUE, "REPL INFO - Tr num : %llu"
+					"  Tr Total : %llu  Msg Total : %llu\n", log_seqno,
+					repl_recv_data_processed, msg_total);
+			} else
+			{
+				repl_log(gtmrecv_log_fp, FALSE, TRUE, "REPL INFO - Tr num : %llu  Pre filter "
+					"total : %llu  Post filter total : %llu  Msg Total : %llu\n", log_seqno,
+					repl_recv_data_processed, repl_recv_postfltr_data_procd, msg_total);
+			}
+			/* Approximate time with an error not more than GTMRECV_HEARTBEAT_PERIOD. We use this
+			 * instead of calling time(), and expensive system call, especially on VMS. The
+			 * consequence of this choice is that we may defer logging when we may have logged. We
+			 * can live with that. Currently, the logging interval is not changeable by users.
+			 * When/if we provide means of choosing log interval, this code may have to be re-examined.
+			 * 	- Vinaya 2003/09/08.
+			 */
+			assert(0 != gtmrecv_now);
+			repl_recv_this_log_time = gtmrecv_now;
+			assert(repl_recv_this_log_time >= repl_recv_prev_log_time);
+			time_elapsed = difftime(repl_recv_this_log_time, repl_recv_prev_log_time);
+			if ((double)GTMRECV_LOGSTATS_INTERVAL <= time_elapsed)
+			{
+				repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO since last log : Time elapsed : "
+					"%00.f  Tr recvd : %llu  Tr bytes : %llu  Msg bytes : %llu\n",
+					time_elapsed, trans_recvd_cnt - last_log_tr_recvd_cnt,
+					repl_recv_data_processed - repl_recv_lastlog_data_procd,
+					msg_total - repl_recv_lastlog_data_recvd);
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO since last log : Time elapsed : "
+					"%00.f  Tr recvd/s : %f  Tr bytes/s : %f  Msg bytes/s : %f\n", time_elapsed,
+					(float)(trans_recvd_cnt - last_log_tr_recvd_cnt)/time_elapsed,
+					(float)(repl_recv_data_processed - repl_recv_lastlog_data_procd)/time_elapsed,
+					(float)(msg_total - repl_recv_lastlog_data_recvd)/time_elapsed);
+				repl_recv_lastlog_data_procd = repl_recv_data_processed;
+				repl_recv_lastlog_data_recvd = msg_total;
+				last_log_tr_recvd_cnt = trans_recvd_cnt;
+				repl_recv_prev_log_time = repl_recv_this_log_time;
+			}
+			lastlog_seqno = log_seqno;
+		}
+		if (gtmrecv_logstats)
+		{
+			if (!filter_pass)
+			{
+				repl_log(gtmrecv_statslog_fp, FALSE, FALSE, "Tr : %llu  Size : %d  Write : %d  "
+					 "Total : %llu\n", recvpool_ctl->jnl_seqno, write_len,
+					 write_off, repl_recv_data_processed);
+			} else
+			{
+				assert(!is_new_triple);
+				repl_log(gtmrecv_statslog_fp, FALSE, FALSE, "Tr : %llu  Pre filter Size : %d  "
+					"Post filter Size  : %d  Pre filter Write : %d  Post filter Write : %d  "
+					"Pre filter Total : %llu  Post filter Total : %llu\n",
+					recvpool_ctl->jnl_seqno, pre_filter_write_len, write_len,
+					pre_filter_write, write_off, repl_recv_data_processed,
+					repl_recv_postfltr_data_procd);
+			}
+		}
+		recvpool_ctl->write_wrap = write_wrap;
+		if (is_new_triple)
+		{
+			assert(sizeof(triplecontent) == write_len);
+			memcpy((sm_uc_ptr_t)&triplecontent, (recvpool.recvdata_base + write_off), sizeof(triplecontent));
+			assert(JRT_TRIPLE == triplecontent.jrec_type);
+			assert(triplecontent.forwptr == sizeof(triplecontent));
+			assert(triplecontent.start_seqno == recvpool_ctl->jnl_seqno);
+			assert(triplecontent.start_seqno >= recvpool.upd_proc_local->read_jnl_seqno);
+			assert(triplecontent.start_seqno > recvpool_ctl->last_valid_triple.start_seqno);
+			assert(triplecontent.start_seqno >= recvpool_ctl->last_rcvd_triple.start_seqno);
+			/* Copy relevant fields from received triple message to "last_rcvd_triple" structure */
+			memcpy(recvpool_ctl->last_rcvd_triple.root_primary_instname, triplecontent.instname,
+				MAX_INSTNAME_LEN - 1);
+			recvpool_ctl->last_rcvd_triple.start_seqno = triplecontent.start_seqno;
+			recvpool_ctl->last_rcvd_triple.root_primary_cycle = triplecontent.cycle;
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "New Triple Content : Start Seqno = "
+				"%llu [0x%llx] : Root Primary = [%s] : Cycle = [%d] : Received from "
+				"instance = [%s]\n", triplecontent.start_seqno, triplecontent.start_seqno,
+				triplecontent.instname, triplecontent.cycle, jnlpool_ctl->primary_instname);
+		} else
+		{
+			if (recvpool_ctl->jnl_seqno == recvpool_ctl->last_rcvd_triple.start_seqno)
+			{	/* Move over stuff from "last_rcvd_triple" to "last_valid_triple" */
+				memcpy(&recvpool_ctl->last_valid_triple,
+					&recvpool_ctl->last_rcvd_triple, sizeof(repl_triple));
+			}
+			QWINCRBYDW(recvpool_ctl->jnl_seqno, 1);
+			assert(recvpool_ctl->last_valid_triple.start_seqno < recvpool_ctl->jnl_seqno);
+		}
+		/* The update process looks at "recvpool_ctl->write" first and then reads (a) "recvpool_ctl->write_wrap"
+		 * AND (b) all journal data in the receive pool upto this offset. It assumes that (a) and (b) will never
+		 * hold stale values corresponding to a previous state of "recvpool_ctl->write". In order for this
+		 * assumption to hold good, the receiver server needs to do a write memory barrier after updating the
+		 * receive pool data and "write_wrap" but before updating "write". The update process will do a read
+		 * memory barrier after reading "write" but before reading "write_wrap" or the receive pool data. Not
+		 * enforcing the read order will result in the update process attempting to read/process invalid data
+		 * from the receive pool (which could end up in db out of sync situation between primary and secondary).
+		 */
+		SHM_WRITE_MEMORY_BARRIER;
+		recvpool_ctl->write = write_loc;
+	} while (is_repl_cmpc);
+	return;
 }
 
 static void do_main_loop(boolean_t crash_restart)
@@ -1094,7 +1276,7 @@ static void do_main_loop(boolean_t crash_restart)
 	seq_num				request_from, recvd_jnl_seqno;
 	seq_num				input_triple_seqno, last_valid_triple_seqno;
 	seq_num				first_unprocessed_seqno, last_unprocessed_triple_seqno;
-	int				skip_for_alignment, msg_type, msg_len;
+	int				msg_type, msg_len;
 	unsigned char			*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
@@ -1105,19 +1287,26 @@ static void do_main_loop(boolean_t crash_restart)
 	repl_start_reply_msg_t		*start_msg;
 	repl_needinst_msg_ptr_t		need_instinfo_msg;
 	repl_needtriple_msg_ptr_t	need_tripleinfo_msg;
+	repl_cmpinfo_msg_ptr_t		cmptest_msg;
+	repl_cmpinfo_msg_t		cmpsolve_msg;
 	repl_instinfo_msg_t		instinfo_msg;
 	uint4				recvd_start_flags;
 	repl_triple			triple;
-	int4				triple_num;
+	int4				triple_num, msghdrlen;
 	gtm_time4_t			ack_time;
 	seq_num				ack_seqno, temp_ack_seqno;
+	boolean_t			uncmpfail;
+	int				cmpret;
+	uLong				cmplen;
+	uLongf				destlen;
+	repl_cmpmsg_ptr_t		cmpmsgp;
+	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
+	uchar_ptr_t			old_buffp;
 
 	error_def(ERR_PRIMARYNOTROOT);
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_REPLINSTNOHIST);
-	error_def(ERR_REPLTRANS2BIG);
 	error_def(ERR_REPLUPGRADEPRI);
-	error_def(ERR_REPLWARN);
 	error_def(ERR_SECONDAHEAD);
 	error_def(ERR_TEXT);
 	error_def(ERR_UNIMPLOP);
@@ -1190,34 +1379,9 @@ static void do_main_loop(boolean_t crash_restart)
 		msgp->len = MIN_REPL_MSGLEN;
 		REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, msgp->len, FALSE, &gtmrecv_poll_immediate)
 		{
-			gtmrecv_poll_actions(0, 0, NULL);
-			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-				return;
+			GTMRECV_POLL_ACTIONS(0, 0, NULL);
 		}
-		if (SS_NORMAL != status)
-		{
-			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
-			{
-				repl_close(&gtmrecv_sock_fd);
-				repl_connection_reset = TRUE;
-				sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, RTS_ERROR_LITERAL("Connection closed"));
-				repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
-				gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "ERR_REPLWARN", print_msg);
-				return;
-			}
-			if (EREPL_SEND == repl_errno)
-			{
-				SNPRINTF(print_msg, sizeof(print_msg), "Error sending (re)start jnlseqno. Error in send : %s",
-						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
-			}
-			if (EREPL_SELECT == repl_errno)
-			{
-				SNPRINTF(print_msg, sizeof(print_msg), "Error sending (re)start jnlseqno. Error in select : %s",
-						STRERROR(status));
-				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
-			}
-		}
+		CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_START_JNL_SEQNO");
 	}
 	gtmrecv_bad_trans_sent = FALSE;
 	request_from = recvpool_ctl->jnl_seqno;
@@ -1230,28 +1394,30 @@ static void do_main_loop(boolean_t crash_restart)
 	buffp = buff_start;
 	buff_unprocessed = 0;
 	data_len = 0;
-	skip_for_alignment = 0;
 	write_loc = recvpool_ctl->write;
 	write_wrap = recvpool_ctl->write_wrap;
 
 	repl_recv_data_recvd = 0;
 	repl_recv_data_processed = 0;
-	repl_recv_prefltr_data_procd = 0;
+	repl_recv_postfltr_data_procd = 0;
 	repl_recv_lastlog_data_recvd = 0;
 	repl_recv_lastlog_data_procd = 0;
+	msghdrlen = REPL_MSG_HDRLEN;
 
 	while (TRUE)
 	{
-		recvd_len = gtmrecv_max_repl_msglen - buff_unprocessed - skip_for_alignment;
-		while ((status = repl_recv(gtmrecv_sock_fd, (buffp + buff_unprocessed), &recvd_len, FALSE, &gtmrecv_poll_interval))
-			       == SS_NORMAL && recvd_len == 0)
+		recvd_len = gtmrecv_max_repl_msglen - buff_unprocessed;
+		while ((SS_NORMAL == (status = repl_recv(gtmrecv_sock_fd,
+							(buffp + buff_unprocessed), &recvd_len, FALSE, &gtmrecv_poll_interval)))
+			       && (0 == recvd_len))
 		{
-			recvd_len = gtmrecv_max_repl_msglen - buff_unprocessed - skip_for_alignment;
+			recvd_len = gtmrecv_max_repl_msglen - buff_unprocessed;
 			if (xoff_sent)
-				do_flow_control(write_loc);
-			if (xoff_sent && GTMRECV_XOFF_LOG_CNT <= xoff_msg_log_cnt)
 			{
-				/* update process is still running slow, gtmrecv_poll_interval is now 0.
+				DO_FLOW_CONTROL(write_loc);
+			}
+			if (xoff_sent && GTMRECV_XOFF_LOG_CNT <= xoff_msg_log_cnt)
+			{	/* update process is still running slow, gtmrecv_poll_interval is now 0.
 				 * Force wait before logging any message.
 				 */
 				SHORT_SLEEP(GTMRECV_POLL_INTERVAL >> 10); /* approximate in ms */
@@ -1259,17 +1425,7 @@ static void do_main_loop(boolean_t crash_restart)
 				xoff_msg_log_cnt = 0;
 			} else if (xoff_sent)
 				xoff_msg_log_cnt++;
-			if (repl_connection_reset)
-			{
-				repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset\n");
-				repl_close(&gtmrecv_sock_fd);
-				return;
-			}
-			if (gtmrecv_wait_for_jnl_seqno)
-				return;
-			gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-			if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-				return;
+			GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 		}
 		if (SS_NORMAL != status)
 		{
@@ -1302,12 +1458,11 @@ static void do_main_loop(boolean_t crash_restart)
 		repl_recv_data_recvd += (qw_num)recvd_len;
 		if (gtmrecv_logstats)
 			repl_log(gtmrecv_statslog_fp, FALSE, FALSE, "Recvd : %d  Total : %d\n", recvd_len, repl_recv_data_recvd);
-		while (REPL_MSG_HDRLEN <= buff_unprocessed)
+		while (msghdrlen <= buff_unprocessed)
 		{
 			if (0 == data_len)
 			{
-				assert(0 == ((unsigned long)buffp & (sizeof(((repl_msg_ptr_t)buffp)->type) - 1)));
-
+				assert(0 == ((unsigned long)buffp % REPL_MSG_ALIGN));
 				if (!src_node_endianness_known)
 				{
 					src_node_endianness_known = TRUE;
@@ -1317,36 +1472,103 @@ static void do_main_loop(boolean_t crash_restart)
 					else
 						src_node_same_endianness = TRUE;
 				}
-				if ( !src_node_same_endianness )
+				if (!src_node_same_endianness)
 				{
 					((repl_msg_ptr_t)buffp)->type = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->type);
 					((repl_msg_ptr_t)buffp)->len = GTM_BYTESWAP_32(((repl_msg_ptr_t)buffp)->len);
 				}
-				msg_type = ((repl_msg_ptr_t)buffp)->type;
-				msg_len = data_len = ((repl_msg_ptr_t)buffp)->len - REPL_MSG_HDRLEN;
-				assert(0 == (msg_len & ((sizeof((repl_msg_ptr_t)buffp)->type) - 1)));
-				buffp += REPL_MSG_HDRLEN;
-				buff_unprocessed -= REPL_MSG_HDRLEN;
-				if (data_len > recvpool_size)
-				{	/* Too large a transaction to be accommodated in the Receive Pool */
-					rts_error(VARLSTCNT(6) ERR_REPLTRANS2BIG, 4, &recvpool_ctl->jnl_seqno,
-						  data_len, RTS_ERROR_LITERAL("Receive"));
+				msg_type = (((repl_msg_ptr_t)buffp)->type & REPL_TR_CMP_MSG_TYPE_MASK);
+				if (REPL_TR_CMP_JNL_RECS == msg_type)
+				{
+					msg_len = ((repl_msg_ptr_t)buffp)->len - REPL_MSG_HDRLEN;
+					gtmrecv_repl_cmpmsglen = msg_len;
+					gtmrecv_repl_uncmpmsglen = (((repl_msg_ptr_t)buffp)->type >> REPL_TR_CMP_MSG_TYPE_BITS);
+					assert(0 < gtmrecv_repl_uncmpmsglen);
+					assert(REPL_TR_CMP_THRESHOLD > gtmrecv_repl_uncmpmsglen);
+					/* Since msg_len is compressed length, it need not be 8-byte aligned. Make it so
+					 * since 8-byte aligned length would have been sent by the source server anyways.
+					 */
+					msg_len = ROUND_UP(msg_len, REPL_MSG_ALIGN);
+					buffp += REPL_MSG_HDRLEN;
+					exp_data_len = gtmrecv_repl_uncmpmsglen;
+					buff_unprocessed -= REPL_MSG_HDRLEN;
+					GTMRECV_SET_BUFF_TARGET_CMPBUFF(gtmrecv_repl_cmpmsglen, gtmrecv_repl_uncmpmsglen,
+						gtmrecv_cur_cmpmsglen);
+				} else if (REPL_TR_CMP_JNL_RECS2 == msg_type)
+				{	/* A REPL_TR_CMP_JNL_RECS2 message is special in that it has a bigger message header.
+					 * So check if unprocessed length is greater than the header. If not need to read more.
+					 */
+					msghdrlen = REPL_MSG_HDRLEN2;
+					if (msghdrlen > buff_unprocessed)	/* Did not receive the full-header.            */
+						break;				/* Break out of here and read more data first. */
+					msghdrlen = REPL_MSG_HDRLEN; /* reset to regular msg hdr length for future messages */
+					cmpmsgp = (repl_cmpmsg_ptr_t)buffp;
+					if (!src_node_same_endianness)
+					{
+						cmpmsgp->cmplen = GTM_BYTESWAP_32(cmpmsgp->cmplen);
+						cmpmsgp->uncmplen = GTM_BYTESWAP_32(cmpmsgp->uncmplen);
+					}
+					gtmrecv_repl_cmpmsglen = cmpmsgp->cmplen;
+					gtmrecv_repl_uncmpmsglen = cmpmsgp->uncmplen;
+					assert(0 < gtmrecv_repl_uncmpmsglen);
+					assert(REPL_TR_CMP_THRESHOLD <= gtmrecv_repl_uncmpmsglen);
+					msg_len = ((repl_msg_ptr_t)buffp)->len - REPL_MSG_HDRLEN2;
+					/* Unlike REPL_TR_CMP_JNL_RECS message, msg_len is guaranteed to be 8-byte aligned here */
+					buffp += REPL_MSG_HDRLEN2;
+					exp_data_len = gtmrecv_repl_uncmpmsglen;
+					buff_unprocessed -= REPL_MSG_HDRLEN2;
+					GTMRECV_SET_BUFF_TARGET_CMPBUFF(gtmrecv_repl_cmpmsglen, gtmrecv_repl_uncmpmsglen,
+						gtmrecv_cur_cmpmsglen);
+				} else
+				{
+					msg_len = ((repl_msg_ptr_t)buffp)->len - REPL_MSG_HDRLEN;
+					buffp += REPL_MSG_HDRLEN;
+					exp_data_len = msg_len;
+					buff_unprocessed -= REPL_MSG_HDRLEN;
+					/* If the target buffer is the receive pool, prepare the receive pool for the write.
+					 * In addition, check if transaction will fit in.
+					 * If the target buffer is not the receive pool, we will do this check after uncompression.
+					 */
+					PREPARE_RECVPOOL_FOR_WRITE(exp_data_len, 0);
 				}
+				assert(0 <= buff_unprocessed);
+				assert(0 == (msg_len % REPL_MSG_ALIGN));
+				data_len = msg_len;
+				assert(0 == (exp_data_len % REPL_MSG_ALIGN));
 			}
+			assert(0 == (data_len % REPL_MSG_ALIGN));
 			buffered_data_len = ((data_len <= buff_unprocessed) ? data_len : buff_unprocessed);
+			buffered_data_len = ROUND_DOWN2(buffered_data_len, REPL_MSG_ALIGN);
+			old_buffp = buffp;
+			buffp += buffered_data_len;
+			buff_unprocessed -= buffered_data_len;
+			data_len -= buffered_data_len;
 			switch(msg_type)
 			{
 				case REPL_TR_JNL_RECS:
+				case REPL_TR_CMP_JNL_RECS:
+				case REPL_TR_CMP_JNL_RECS2:
 				case REPL_NEW_TRIPLE:
-					process_tr_buff(msg_type);
-					if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-						return;
+					is_repl_cmpc  = ((REPL_TR_CMP_JNL_RECS == msg_type) || (REPL_TR_CMP_JNL_RECS2 == msg_type));
+					if (!is_repl_cmpc)
+					{
+						COPY_TO_RECVPOOL(old_buffp, buffered_data_len);	/* uses and updates "write_loc" */
+					} else
+					{
+						memcpy(gtmrecv_cmpmsgp + gtmrecv_cur_cmpmsglen, old_buffp, buffered_data_len);
+						gtmrecv_cur_cmpmsglen += buffered_data_len;
+						assert(gtmrecv_cur_cmpmsglen <= gtmrecv_max_repl_cmpmsglen);
+					}
+					repl_recv_data_processed += (qw_num)buffered_data_len;
+					if (0 == data_len)
+					{
+						process_tr_buff(msg_type);
+						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+							return;
+					}
 					break;
 
 				case REPL_LOSTTNCOMPLETE:
-					buffp += buffered_data_len;
-					buff_unprocessed -= buffered_data_len;
-					data_len -= buffered_data_len;
 					if (0 == data_len)
 					{
 						assert(REPL_PROTO_VER_MULTISITE <= recvpool.gtmrecv_local->remote_proto_ver);
@@ -1356,22 +1578,25 @@ static void do_main_loop(boolean_t crash_restart)
 					break;
 
 				case REPL_HEARTBEAT:
-					buffp += buffered_data_len;
-					buff_unprocessed -= buffered_data_len;
-					data_len -= buffered_data_len;
 					if (0 == data_len)
 					{	/* Heartbeat msg contents start from buffp - msg_len */
+						GTM_WHITE_BOX_TEST(WBTEST_REPL_HEARTBEAT_NO_ACK, dont_reply_to_heartbeat, TRUE);
+						if (dont_reply_to_heartbeat)
+						{
+							dont_reply_to_heartbeat = FALSE;
+							break;
+						}
 						memcpy(heartbeat.ack_seqno, buffp - msg_len, msg_len);
-						if ( src_node_same_endianness )
+						if (src_node_same_endianness)
 						{
 							 ack_time = *(gtm_time4_t *)&heartbeat.ack_time[0];
 							 memcpy((uchar_ptr_t)&ack_seqno,
-							 	(uchar_ptr_t)&heartbeat.ack_seqno[0], sizeof(seq_num));
+								(uchar_ptr_t)&heartbeat.ack_seqno[0], sizeof(seq_num));
 						} else
 						{
 							 ack_time = GTM_BYTESWAP_32(*(gtm_time4_t *)&heartbeat.ack_time[0]);
 							 memcpy((uchar_ptr_t)&temp_ack_seqno,
-							 	(uchar_ptr_t)&heartbeat.ack_seqno[0], sizeof(seq_num));
+								(uchar_ptr_t)&heartbeat.ack_seqno[0], sizeof(seq_num));
 							 ack_seqno = GTM_BYTESWAP_64(temp_ack_seqno);
 						}
 						REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO %llu at %ld\n",
@@ -1382,7 +1607,7 @@ static void do_main_loop(boolean_t crash_restart)
 							heartbeat.type = REPL_HEARTBEAT;
 							heartbeat.len = MIN_REPL_MSGLEN;
 							memcpy((uchar_ptr_t)&heartbeat.ack_seqno[0],
-							 	(uchar_ptr_t)&ack_seqno, sizeof(seq_num));
+								(uchar_ptr_t)&ack_seqno, sizeof(seq_num));
 
 						} else
 						{
@@ -1390,26 +1615,20 @@ static void do_main_loop(boolean_t crash_restart)
 							heartbeat.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
 							temp_ack_seqno = GTM_BYTESWAP_64(ack_seqno);
 							memcpy((uchar_ptr_t)&heartbeat.ack_seqno[0],
-							 	(uchar_ptr_t)&temp_ack_seqno, sizeof(seq_num));
+								(uchar_ptr_t)&temp_ack_seqno, sizeof(seq_num));
 						}
 						REPL_SEND_LOOP(gtmrecv_sock_fd, &heartbeat, MIN_REPL_MSGLEN,
 								FALSE, &gtmrecv_poll_immediate)
 						{
-							gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-							if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-								return;
+							GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 						}
-						/* Error handling for the above send_loop is not required as it'll be caught
-						 * in the next recv_loop of the receiver server */
+						CHECK_REPL_SEND_LOOP_ERROR(status, "REPL_HEARTBEAT");
 						REPL_DPRINT4("HEARTBEAT sent with time %ld SEQNO %llu at %ld\n",
 							     ack_time, ack_seqno, time(NULL));
 					}
 					break;
 
 				case REPL_NEED_INSTANCE_INFO:
-					buffp += buffered_data_len;
-					buff_unprocessed -= buffered_data_len;
-					data_len -= buffered_data_len;
 					if (0 == data_len)
 					{
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
@@ -1423,7 +1642,7 @@ static void do_main_loop(boolean_t crash_restart)
 						assert(REPL_PROTO_VER_MULTISITE <= recvpool.gtmrecv_local->remote_proto_ver);
 						/*************** Send REPL_INSTANCE_INFO message ***************/
 						memset(&instinfo_msg, 0, sizeof(instinfo_msg));
-						if ( src_node_same_endianness )
+						if (src_node_same_endianness)
 						{
 							instinfo_msg.type = REPL_INSTANCE_INFO;
 							instinfo_msg.len = MIN_REPL_MSGLEN;
@@ -1454,25 +1673,125 @@ static void do_main_loop(boolean_t crash_restart)
 					}
 					break;
 
+				case REPL_CMP_TEST:
+					if (0 == data_len)
+					{
+						repl_log(gtmrecv_log_fp, TRUE, FALSE, "Received REPL_CMP_TEST message\n");
+						uncmpfail = FALSE;
+						if (ZLIB_CMPLVL_NONE == gtm_zlib_cmp_level)
+						{	/* Receiver does not have compression enabled in the first place.
+							 * Send dummy REPL_CMP_SOLVE response message.
+							 */
+							repl_log(gtmrecv_log_fp, TRUE, FALSE, "Environment variable "
+								"gtm_zlib_cmp_level specifies NO decompression (set to %d)\n",
+								gtm_zlib_cmp_level);
+							uncmpfail = TRUE;
+						}
+						if (!uncmpfail)
+						{
+							assert(msg_len == REPL_MSG_CMPINFOLEN - REPL_MSG_HDRLEN);
+							cmptest_msg = (repl_cmpinfo_msg_ptr_t)(buffp - msg_len - REPL_MSG_HDRLEN);
+							if (src_node_same_endianness)
+								cmplen = cmptest_msg->datalen;
+							else
+								cmplen = GTM_BYTESWAP_32(cmptest_msg->datalen);
+							if (REPL_MSG_CMPEXPDATALEN < cmplen)
+							{
+								assert(FALSE);	/* since src srvr should not have sent such a msg */
+								repl_log(gtmrecv_log_fp, TRUE, FALSE, "Compression test message "
+									"has compressed data length (%d) greater than receiver "
+									"allocated length (%d)\n", (int)cmplen,
+									REPL_MSG_CMPEXPDATALEN);
+								uncmpfail = TRUE;
+							}
+						}
+						if (!uncmpfail)
+						{
+							assert(NULL != zlib_uncompress_fnptr);
+							destlen = REPL_MSG_CMPEXPDATALEN; /* initialize available
+												     * decompressed buffer space */
+							cmpret = (*zlib_uncompress_fnptr)((Bytef *)&cmpsolve_msg.data[0],
+								&destlen, ((const Bytef *)(&cmptest_msg->data[0])), cmplen);
+							GTM_WHITE_BOX_TEST(WBTEST_REPL_TEST_UNCMP_ERROR, cmpret, Z_DATA_ERROR);
+							switch(cmpret)
+							{
+								case Z_MEM_ERROR:
+									assert(FALSE);
+									repl_log(gtmrecv_log_fp, TRUE, FALSE,
+										GTM_ZLIB_Z_MEM_ERROR_STR
+										GTM_ZLIB_UNCMP_ERR_SOLVE_STR);
+									break;
+								case Z_BUF_ERROR:
+									assert(FALSE);
+									repl_log(gtmrecv_log_fp, TRUE, FALSE,
+										GTM_ZLIB_Z_BUF_ERROR_STR
+										GTM_ZLIB_UNCMP_ERR_SOLVE_STR);
+									break;
+								case Z_DATA_ERROR:
+									assert(gtm_white_box_test_case_enabled
+										&& (WBTEST_REPL_TEST_UNCMP_ERROR
+											== gtm_white_box_test_case_number));
+									repl_log(gtmrecv_log_fp, TRUE, FALSE,
+										GTM_ZLIB_Z_DATA_ERROR_STR
+										GTM_ZLIB_UNCMP_ERR_SOLVE_STR);
+									break;
+							}
+							if (Z_OK != cmpret)
+								uncmpfail = TRUE;
+						}
+						if (!uncmpfail)
+						{
+							cmpsolve_msg.datalen = destlen;
+							GTM_WHITE_BOX_TEST(WBTEST_REPL_TEST_UNCMP_ERROR, cmpsolve_msg.datalen,
+								REPL_MSG_CMPDATALEN - 1);
+							if (REPL_MSG_CMPDATALEN != cmpsolve_msg.datalen)
+							{	/* decompression did not yield precompressed data length */
+								assert(gtm_white_box_test_case_enabled
+									&& (WBTEST_REPL_TEST_UNCMP_ERROR
+										== gtm_white_box_test_case_number));
+								repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_UNCMPLEN_ERROR_STR
+									"\n", cmpsolve_msg.datalen, REPL_MSG_CMPDATALEN);
+								uncmpfail = TRUE;
+							}
+						}
+						if (uncmpfail)
+						{
+							cmpsolve_msg.datalen = REPL_RCVR_CMP_TEST_FAIL;
+							repl_log(gtmrecv_log_fp, TRUE, FALSE, GTM_ZLIB_UNCMPTRANSITION_STR);
+						}
+						if (src_node_same_endianness)
+						{
+							cmpsolve_msg.type = REPL_CMP_SOLVE;
+							cmpsolve_msg.len = REPL_MSG_CMPINFOLEN;
+							/* datalen is already initialized to the right value */
+						} else
+						{
+							cmpsolve_msg.type = GTM_BYTESWAP_32(REPL_CMP_SOLVE);
+							cmpsolve_msg.len = GTM_BYTESWAP_32(REPL_MSG_CMPINFOLEN);
+							cmpsolve_msg.datalen = GTM_BYTESWAP_32(cmpsolve_msg.datalen);
+						}
+						cmpsolve_msg.proto_ver = REPL_PROTO_VER_THIS;
+						gtmrecv_repl_send((repl_msg_ptr_t)&cmpsolve_msg, "REPL_CMP_SOLVE", MAX_SEQNO);
+						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
+							return;
+						if (!uncmpfail)
+							repl_zlib_cmp_level = gtm_zlib_cmp_level;
+					}
+					break;
+
 				case REPL_NEED_TRIPLE_INFO:
 					assert(!gtmrecv_options.updateresync);	/* source server would not have sent this message
 										 * if receiver had specified -UPDATERESYNC */
-					buffp += buffered_data_len;
-					buff_unprocessed -= buffered_data_len;
-					data_len -= buffered_data_len;
 					if (0 == data_len)
 					{
 						assert(REPL_PROTO_VER_UNINITIALIZED != recvpool.gtmrecv_local->remote_proto_ver);
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 						need_tripleinfo_msg = (repl_needtriple_msg_ptr_t)(buffp - msg_len
 													- REPL_MSG_HDRLEN);
-						if ( src_node_same_endianness )
-						{
+						if (src_node_same_endianness)
 							input_triple_seqno = need_tripleinfo_msg->seqno;
-						} else
-						{
+						else
 							input_triple_seqno = GTM_BYTESWAP_64(need_tripleinfo_msg->seqno);
-						}
 						repl_log(gtmrecv_log_fp, TRUE, FALSE, "Received REPL_NEED_TRIPLE_INFO message"
 							" for seqno %llu [0x%llx]\n", input_triple_seqno, input_triple_seqno);
 						first_unprocessed_seqno = upd_proc_local->read_jnl_seqno;
@@ -1528,9 +1847,6 @@ static void do_main_loop(boolean_t crash_restart)
 
 				case REPL_WILL_RESTART_WITH_INFO:
 				case REPL_ROLLBACK_FIRST:
-					buffp += buffered_data_len;
-					buff_unprocessed -= buffered_data_len;
-					data_len -= buffered_data_len;
 					if (0 == data_len)
 					{	/* Have received a REPL_WILL_RESTART_WITH_INFO or REPL_ROLLBACK_FIRST message.
 						 * If have not yet received a REPL_NEED_INSTANCE_INFO message (which would have
@@ -1647,7 +1963,7 @@ static void do_main_loop(boolean_t crash_restart)
 						assert((unsigned long)start_msg % sizeof(seq_num) == 0); /* alignment check */
 						memcpy((uchar_ptr_t)&recvd_jnl_seqno,
 							(uchar_ptr_t)start_msg->start_seqno, sizeof(seq_num));
-						if ( !src_node_same_endianness )
+						if (!src_node_same_endianness)
 						{
 							recvd_jnl_seqno = GTM_BYTESWAP_64(recvd_jnl_seqno);
 						}
@@ -1665,7 +1981,7 @@ static void do_main_loop(boolean_t crash_restart)
 							 * so we are okay fetching start_msg->start_flags unconditionally.
 							 */
 							GET_ULONG(recvd_start_flags, start_msg->start_flags);
-							if ( !src_node_same_endianness )
+							if (!src_node_same_endianness)
 							{
 								recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
 							}
@@ -1704,6 +2020,24 @@ static void do_main_loop(boolean_t crash_restart)
 								if (NO_FILTER == gtmrecv_filter)
 									gtmrecv_free_filter_buff();
 							}
+							/* As of GT.M V5.3-003, if endian conversion is deemed necessary, we are
+							 * guaranteed that the remote journal format is the same as the format on
+							 * this side. Therefore we are safe in interpreting the input journal
+							 * record using the journal record layout currently defined in jnl.h.
+							 * Once we change the journal record layout in a future V5 version, the
+							 * "repl_tr_endian_convert" function needs to be modified to handle
+							 * multiple journal formats. Add an assert to note this down.  Note that
+							 * even though the journal format might change, all we care is whether
+							 * the corresponding filter format changed (because we care only about
+							 * replicated journal record format changes). So check just that.
+							 */
+							assert(0 < jnl2filterfmt[REPL_JNL_MAX-1]);
+							assert(-1 == jnl2filterfmt[REPL_JNL_MAX]);
+							assert(REPL_JNL_MAX > (remote_jnl_ver - JNL_VER_EARLIEST_REPL));
+							assert(REPL_JNL_MAX > (jnl_ver - JNL_VER_EARLIEST_REPL));
+							assert(src_node_same_endianness
+								|| (jnl2filterfmt[remote_jnl_ver - JNL_VER_EARLIEST_REPL]
+									== jnl2filterfmt[jnl_ver - JNL_VER_EARLIEST_REPL]));
 							/* Don't send any more stopsourcefilter, or updateresync messages */
 							gtmrecv_options.stopsourcefilter = FALSE;
 							gtmrecv_options.updateresync = FALSE;
@@ -1721,9 +2055,6 @@ static void do_main_loop(boolean_t crash_restart)
 					break;
 
 				case REPL_INST_NOHIST:
-					buffp += buffered_data_len;
-					buff_unprocessed -= buffered_data_len;
-					data_len -= buffered_data_len;
 					if (0 == data_len)
 					{
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
@@ -1747,18 +2078,15 @@ static void do_main_loop(boolean_t crash_restart)
 			if (repl_connection_reset)
 				return;
 		}
-		skip_for_alignment = (int)((unsigned long)buffp & (sizeof(((repl_msg_ptr_t)buffp)->type) - 1));
-		if (0 != buff_unprocessed)
+		assert(0 == ((unsigned long)(buffp) % REPL_MSG_ALIGN));
+		if ((0 != buff_unprocessed) && (buff_start != buffp))
 		{
 			REPL_DPRINT4("Incmpl msg hdr, moving %d bytes from %lx to %lx\n", buff_unprocessed, (caddr_t)buffp,
-				     (caddr_t)buff_start + skip_for_alignment);
-			memmove(buff_start + skip_for_alignment, buffp, buff_unprocessed);
+				     (caddr_t)buff_start);
+			memmove(buff_start, buffp, buff_unprocessed);
 		}
-		buffp = buff_start + skip_for_alignment;
-
-		gtmrecv_poll_actions(data_len, buff_unprocessed, buffp);
-		if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
-			return;
+		buffp = buff_start;
+		GTMRECV_POLL_ACTIONS(data_len, buff_unprocessed, buffp);
 	}
 }
 
@@ -1797,6 +2125,8 @@ void gtmrecv_process(boolean_t crash_restart)
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
 
+	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;
 	gtmrecv_local = recvpool.gtmrecv_local;

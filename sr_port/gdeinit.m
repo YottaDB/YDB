@@ -16,7 +16,8 @@ GDEINIT
 	s ZERO=$c(0),ONE=$c(1),TRUE=ONE,FALSE=ZERO,TAB=$c(9)
 	s endian("VAX","VMS")=FALSE,glo("VMS")=1024
 	s endian("AXP","VMS")=FALSE,endian("AXP","OSF1")=FALSE,glo("VMS")=1024,glo("OSF1")=1024
-	s endian("x86","SCO")=FALSE,endian("x86","UWIN")=FALSE,endian("x86","Linux")=FALSE,endian("x86_64","Linux")=FALSE,endian("x86","CYGWIN")=FALSE
+	s endian("x86","SCO")=FALSE,endian("x86","UWIN")=FALSE,endian("x86","Linux")=FALSE,endian("x86","CYGWIN")=FALSE
+	s endian("x86_64","Linux")=FALSE
 	s glo("SCO")=384,glo("UWIN")=1024,glo("Linux")=1024,glo("CYGWIN")=1024
 	s endian("SEQUOIA_SERIES_400","VAX")=TRUE,glo("VAX")=1024
 	s endian("HP-PA","HP-UX")=TRUE,glo("HP-UX")=1024
@@ -50,6 +51,7 @@ GDEINIT
 	s defglo=glo(ver)
 	s comline=$zcmdline
 	s nullsubs="\NEVER\FALSE\ALWAYS\TRUE\EXISTING"
+	s nommbi=1		; this is used in gdeverif and should be removed along with the code when support is added
 	d UNIX:ver'="VMS"
 	d VMS:ver="VMS"
 	d syntabi
@@ -326,7 +328,6 @@ VMS
 	s dbfilpar=".1AN.1""-"".1""_"".1"":"".1""$"".1""["".1""]"".1""<"".1"">"".1""."".1"";"""
 	s filexfm="$tr(filespec,lower,upper)"
 	s sep="TKSLASH"
-	s nommbi=1		; this is used in gdeverif and should be removed along with the code when support is added
 	q
 
 UNIX:
@@ -342,5 +343,4 @@ UNIX:
 	s dbfilpar="1E"
 	s filexfm="filespec"
 	s sep="TKDASH"
-	s nommbi=0		; this is used in gdeverif and should be removed along with the code when support is added
 	q

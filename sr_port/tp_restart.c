@@ -52,6 +52,7 @@
 #include "tp_restart.h"
 #include "repl_msg.h"		/* for gtmsource.h */
 #include "gtmsource.h"		/* for jnlpool_addrs structure definition */
+#include "wbox_test_init.h"
 
 error_def(ERR_TLVLZERO);
 error_def(ERR_TPFAIL);
@@ -133,7 +134,6 @@ void	tp_restart(int newlevel)
 	unsigned char		*cp;
 	short			tl, top;
 	unsigned int		hist_index;
-	sgm_info		*si;
 	tp_frame		*tf;
 	mv_stent		*mvc;
 	tp_region		*tr;
@@ -165,8 +165,27 @@ void	tp_restart(int newlevel)
 	for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 	{
 		if (tr->reg->open)
-			FILE_INFO(tr->reg)->s_addrs.hdr->n_tp_retries[t_tries]++;
-		else
+		{
+			csa = &FILE_INFO(tr->reg)->s_addrs;
+			switch (dollar_trestart)
+			{
+				case 0:
+					INCR_GVSTATS_COUNTER(csa, csa->nl, n_tp_tot_retries_0, 1);
+					break;
+				case 1:
+					INCR_GVSTATS_COUNTER(csa, csa->nl, n_tp_tot_retries_1, 1);
+					break;
+				case 2:
+					INCR_GVSTATS_COUNTER(csa, csa->nl, n_tp_tot_retries_2, 1);
+					break;
+				case 3:
+					INCR_GVSTATS_COUNTER(csa, csa->nl, n_tp_tot_retries_3, 1);
+					break;
+				default:
+					INCR_GVSTATS_COUNTER(csa, csa->nl, n_tp_tot_retries_4, 1);
+					break;
+			}
+		} else
 		{
 			assert(cdb_sc_needcrit == t_fail_hist[t_tries]);
 			assert(!num_closed);	/* we can have at the most 1 region not opened in the whole tp_reg_list */
@@ -296,9 +315,15 @@ void	tp_restart(int newlevel)
 			{
 				hist_index = t_tries;
 				t_tries = 0;
-				assert(FALSE);
-				UNIX_ONLY(send_msg(VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist, ERR_GVFAILCORE));
-				UNIX_ONLY(gtm_fork_n_core());
+				assert(gtm_white_box_test_case_enabled
+				    	&& (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
+#				ifdef UNIX
+				send_msg(VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist, ERR_GVFAILCORE);
+				/* Generate core only if we are not triggering this codepath using white-box tests */
+				if (!gtm_white_box_test_case_enabled
+				    		|| (WBTEST_TP_HIST_CDB_SC_BLKMOD != gtm_white_box_test_case_number))
+					gtm_fork_n_core();
+#				endif
 				VMS_ONLY(send_msg(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist));
 				rts_error(VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
 				return; /* for the compiler only -- never executed */
@@ -341,13 +366,12 @@ void	tp_restart(int newlevel)
 			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
 			assert(FALSE != tp_tend_status);
 			/* pick up all MM extension information */
-			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+			for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 			{
-				if (dba_mm == si->gv_cur_region->dyn.addr->acc_meth)
+				if (dba_mm == tr->reg->dyn.addr->acc_meth)
 				{
-					TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
-					if (cs_addrs->total_blks < cs_addrs->ti->total_blks)
-						wcs_mm_recover(si->gv_cur_region);
+					TP_CHANGE_REG_IF_NEEDED(tr->reg);
+					MM_DBFILEXT_REMAP_IF_NEEDED(cs_addrs, gv_cur_region);
 				}
 			}
 		}
@@ -380,6 +404,7 @@ void	tp_restart(int newlevel)
 	assert(0 == (((unsigned long)tp_pointer->orig_key) % sizeof(tp_pointer->orig_key->end)));
 	memcpy(gv_currkey, tp_pointer->orig_key, sizeof(*tp_pointer->orig_key) + tp_pointer->orig_key->end);
 	gv_currkey->top = top;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
 	tp_pointer->fp->mpc = tp_pointer->restart_pc;
 	tp_pointer->fp->ctxt = tp_pointer->restart_ctxt;
 	while (frame_pointer != tf->fp)

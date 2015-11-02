@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@
 #include "gtm_logicals.h"	/* for GTM_REPL_INSTSECONDARY */
 #include "trans_log_name.h"
 #include "iosp.h"		/* for SS_NORMAL */
+#include "gtm_zlib.h"
 
 #define MAX_SECONDARY_LEN 	(MAX_HOST_NAME_LEN + 11) /* +11 for ':' and
 							  * port number */
@@ -57,18 +58,19 @@ GBLREF	gtmsource_options_t	gtmsource_options;
 
 int gtmsource_get_opt(void)
 {
-	boolean_t	secondary, dotted_notation, log, log_interval_specified, buffsize_status, filter, connect_parms_badval;
+	boolean_t	secondary, dotted_notation, log, log_interval_specified, connect_parms_badval;
 	char		*connect_parm_token_str, *connect_parm;
 	char		*connect_parms_str, tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		secondary_sys[MAX_SECONDARY_LEN], *c, inst_name[MAX_FN_LEN + 1];
 	char		statslog_val[4]; /* "ON" or "OFF" */
 	char		update_val[sizeof("DISABLE")]; /* "ENABLE" or "DISABLE" */
-	int		tries, index = 0, timeout_status, connect_parms_index;
+	int		tries, index = 0, timeout_status, connect_parms_index, status;
 	mstr		log_nam, trans_name;
 	struct hostent	*sec_hostentry;
 	unsigned short	log_file_len, filter_cmd_len;
 	unsigned short	secondary_len, inst_name_len, statslog_val_len, update_val_len, connect_parms_str_len;
 
+	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_REPLINSTSECLEN);
 	error_def(ERR_REPLINSTSECUNDF);
 
@@ -124,12 +126,16 @@ int gtmsource_get_opt(void)
 			log_nam.addr = GTM_REPL_INSTSECONDARY;
 			log_nam.len = sizeof(GTM_REPL_INSTSECONDARY) - 1;
 			trans_name.addr = &inst_name[0];
-			if (SS_NORMAL == trans_log_name(&log_nam, &trans_name, inst_name))
+			if (SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, sizeof(inst_name),
+									do_sendmsg_on_log2long)))
 			{
 				gtmsource_options.instsecondary = TRUE;
 				inst_name_len = trans_name.len;
 			} else if (!gtmsource_options.checkhealth && !gtmsource_options.showbacklog && !gtmsource_options.shut_down)
 			{
+				if (SS_LOG2LONG == status)
+					gtm_putmsg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr,
+						sizeof(inst_name) - 1);
 				gtm_putmsg(VARLSTCNT(1) ERR_REPLINSTSECUNDF);
 				return (-1);
 			}
@@ -304,7 +310,7 @@ int gtmsource_get_opt(void)
 	{
 		assert(secondary || CLI_PRESENT == cli_present("PASSIVE"));
 		gtmsource_options.mode = ((secondary) ? GTMSOURCE_MODE_ACTIVE : GTMSOURCE_MODE_PASSIVE);
-		if (buffsize_status = (CLI_PRESENT == cli_present("BUFFSIZE")))
+		if (CLI_PRESENT == cli_present("BUFFSIZE"))
 		{
 			if (!cli_get_int("BUFFSIZE", &gtmsource_options.buffsize))
 			{
@@ -317,7 +323,7 @@ int gtmsource_get_opt(void)
 			gtmsource_options.buffsize = DEFAULT_JNLPOOL_SIZE;
 		/* Round up buffsize to the nearest (~JNL_WRT_END_MASK + 1) multiple */
 		gtmsource_options.buffsize = ((gtmsource_options.buffsize + ~JNL_WRT_END_MASK) & JNL_WRT_END_MASK);
-		if (filter = (CLI_PRESENT == cli_present("FILTER")))
+		if (CLI_PRESENT == cli_present("FILTER"))
 		{
 			filter_cmd_len = MAX_FILTER_CMD_LEN;
 	    		if (!cli_get_str("FILTER", gtmsource_options.filter_cmd, &filter_cmd_len))
@@ -327,6 +333,20 @@ int gtmsource_get_opt(void)
 			}
 		} else
 			gtmsource_options.filter_cmd[0] = '\0';
+		/* Check if compression level is specified */
+		if (CLI_PRESENT == cli_present("CMPLVL"))
+		{
+			if (!cli_get_int("CMPLVL", &gtmsource_options.cmplvl))
+			{
+				util_out_print("Error parsing CMPLVL qualifier", TRUE);
+				return(-1);
+			}
+			if (GTM_CMPLVL_OUT_OF_RANGE(gtmsource_options.cmplvl))
+				gtmsource_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
+			/* CMPLVL qualifier should override any value specified in the environment variable gtm_zlib_cmp_level */
+			gtm_zlib_cmp_level = gtmsource_options.cmplvl;
+		} else
+			gtmsource_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
 	}
 	if (gtmsource_options.shut_down)
 	{

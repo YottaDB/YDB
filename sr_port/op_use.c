@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ void op_use(mval *v, mval *p)
 	nl = get_log_name(&v->str, NO_INSERT);
 	if (!nl)
 	{
-		stat = trans_log_name(&v->str, &tn, buf1);
+		stat = TRANS_LOG_NAME(&v->str, &tn, buf1, sizeof(buf1), do_sendmsg_on_log2long);
 		if (stat != SS_NORMAL)
 			rts_error(VARLSTCNT(1) ERR_IONOTOPEN);
 		else

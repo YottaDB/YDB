@@ -45,6 +45,7 @@
 #include "dpgbldir.h"
 #include "gtmmsg.h"
 #include "mupip_recover.h"
+#include "wbox_test_init.h"
 
 #ifdef UNIX
 #include "repl_msg.h"
@@ -87,10 +88,9 @@ CONDITION_HANDLER(mupip_recover_ch)
 	error_def(ERR_STACKOFLOW);
 
 	START_CH;
-	PRN_ERROR;	/* Flush out the error message that is driving us */
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
-		assert(FALSE);
+		assert(gtm_white_box_test_case_enabled && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
 		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
 		tp_restart(1);			/* This SHOULD generate an error (TPFAIL or other) */
 #ifdef UNIX
@@ -113,13 +113,16 @@ CONDITION_HANDLER(mupip_recover_ch)
 			tp_restart_fail_sig_used = FALSE;
 		}
 #endif
+		/* At this point SIGNAL would correspond to TPFAIL (not a TPRETRY) error */
 	}
 	if (SEVERITY == SEVERE || DUMP || SEVERITY == ERROR)
 	{
+		/* Dont do a PRN_ERROR here as NEXTCH will transfer control to util_base_ch() which does the PRN_ERROR for us */
 		NEXTCH;
 	} else
 	{
 		assert(SEVERITY == WARNING || SEVERITY == INFO);
+		PRN_ERROR;	/* flush the message that is driving us before resuming execution flow */
 		CONTINUE;
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,20 +22,25 @@
 #include "sgnl.h"
 #include "op.h"
 
-GBLREF gv_namehead	*gv_target;
-GBLREF gd_region	*gv_cur_region;
-GBLREF bool		gv_curr_subsc_null;
-GBLREF gv_key		*gv_currkey;
-GBLREF bool undef_inhibit;
-LITREF mval literal_null;
+GBLREF	gv_namehead	*gv_target;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	bool		gv_curr_subsc_null;
+GBLREF	gv_key		*gv_currkey;
+GBLREF	bool		undef_inhibit;
+
+#ifdef DEBUG
+GBLREF	boolean_t	gtm_gvundef_fatal;
+GBLREF	boolean_t	in_op_gvget;
+#endif
+
+LITREF	mval		literal_null;
 
 /* From the generated code's point of view, this is a void function.
-	The defined state isn't looked at by MUMPS code.  This routine,
-	however, is used by some servers who would dearly like to know
-	the status of the get, though they don't want to cause any
-	errors.
-*/
-
+ * The defined state isn't looked at by MUMPS code.  This routine,
+ * however, is used by some servers who would dearly like to know
+ * the status of the get, though they don't want to cause any
+ * errors.
+ */
 bool op_gvget(mval *v)
 {
 	bool gotit;
@@ -45,9 +50,15 @@ bool op_gvget(mval *v)
 	if (gv_cur_region->dyn.addr->acc_meth == dba_bg || gv_cur_region->dyn.addr->acc_meth == dba_mm)
 	{
 	 	if (gv_target->root == 0)		/* global does not exist */
+		{	/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
+			assert(!gtm_gvundef_fatal);
 			gotit = FALSE;
-		else
+		} else
+		{
+			DEBUG_ONLY(in_op_gvget = TRUE;)
 		 	gotit = gvcst_get(v);
+			assert(FALSE == in_op_gvget); /* gvcst_get should have reset it right away */
+		}
 	} else  if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
 	 	gotit = gvcmx_get(v);
 	else

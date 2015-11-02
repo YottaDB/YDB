@@ -72,7 +72,7 @@ gt_ar_options=rv
 # and creates package
 
 VPATH=$(addprefix $(gtm_ver)/, $(gt_src_list))
-exe_list=mumps dse geteuid gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean semstat2 ftok dbcertify
+exe_list=mumps dse geteuid lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean semstat2 ftok dbcertify gtmsecshrdir/gtmsecshr
 make_i_flags=$(addprefix -I$(gtm_ver)/, $(gt_src_list))
 
 export #export all variables defined here to sub-make
@@ -84,12 +84,11 @@ all: dirs xfer_build $(addsuffix _all, $(buildtypes)) ;
 #Build xfer_desc.i for ia64 and linux x86_64
 xfer_build:
 ifeq ($(gt_machine_type),ia64)
-	tcsh -f $(gtm_ver)/sr_ia64/gen_xfer_desc.csh $(gt_src_list)
-else
+	tcsh -f $(gtm_ver)/sr_unix/gen_xfer_desc.csh $(gt_src_list)
+endif
 ifeq ($(gt_machine_type),x86_64)
 ifeq ($(linux_build_type),64)
-	tcsh -f $(gtm_ver)/sr_x86_64/gen_xfer_desc.csh $(gt_src_list)
-endif
+	tcsh -f $(gtm_ver)/sr_unix/gen_xfer_desc.csh $(gt_src_list)
 endif
 endif
 
@@ -104,6 +103,14 @@ links: dirs $(addsuffix _links, $(buildtypes)) ;
 
 # Rules to make executables selectively (eg. make mumps, make dse etc..)
 $(exe_list):%: dirs $(addsuffix _%, $(buildtypes)) ;
+
+setperms:
+ifeq ($(shell id -u),0)
+	@chown root:bin ${buildtypes}/gtmsecshr ${buildtypes}/gtmsecshrdir/gtmsecshr
+	@chmod 4750 ${buildtypes}/gtmsecshr ${buildtypes}/gtmsecshrdir/gtmsecshr
+else
+	@echo "Operation requires super user capabilities"
+endif
 
 clean: $(addsuffix _clean, $(buildtypes))
 	rm -f idtemp ostemp
@@ -227,6 +234,7 @@ dse_obj=dse.o dse_cmd.o
 mupip_obj=mupip.o mupip_cmd.o
 dbcertify_obj=dbcertify.o dbcertify_cmd.o
 gtmsecshr_obj=gtmsecshr.o
+gtmsecshr_wrapper_obj=gtmsecshr_wrapper.o
 geteuid_obj=geteuid.o
 semstat2_obj=semstat2.o
 ftok_obj=ftok.o
@@ -250,6 +258,7 @@ exclude_list:= \
 	$(mupip_obj) \
 	$(dbcertify_obj) \
 	$(gtmsecshr_obj) \
+	$(gtmsecshr_wrapper_obj) \
 	$(geteuid_obj) \
 	$(semstat2_obj) \
 	$(ftok_obj) \
@@ -391,7 +400,15 @@ endif
 ../geteuid: $(geteuid_obj) libmumps.a
 	$(gt-ld)
 
-../gtmsecshr: $(gtmsecshr_obj) libmumps.a
+../gtmsecshrdir/gtmsecshr: ../gtmsecshr_real ../gtmsecshr_wrapper
+	@rm -rf ../gtmsecshrdir gtmsecshr && mkdir ../gtmsecshrdir
+	@mv ../gtmsecshr_real ../gtmsecshrdir/gtmsecshr
+	@mv ../gtmsecshr_wrapper ../gtmsecshr
+
+../gtmsecshr_real: $(gtmsecshr_obj) libmumps.a
+	$(gt-ld)
+
+../gtmsecshr_wrapper: $(gtmsecshr_wrapper_obj) libmumps.a
 	$(gt-ld)
 
 ../lke: $(lke_obj) liblke.a libmumps.a libgnpclient.a libmumps.a libgnpclient.a libcmisockettcp.a

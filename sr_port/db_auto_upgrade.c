@@ -79,25 +79,36 @@ void db_auto_upgrade(gd_region *reg)
 			 * is no way to distinguish the two. So we mark both (a) and (b) as FREE. This will mean no PBLKs written
 			 * for (b) and hence no backward journal recovery possible to a point before the start of the REORG UPGRADE.
 			 * We force a MUPIP REORG UPGRADE rerun (to mark RECYCLED blocks FREE) by setting fully_upgraded to FALSE.
+			 * Note that this does not need to be done for databases created by a V5 version (C9I05-002987).
 			 */
-			csd->fully_upgraded = FALSE;
-			csd->reorg_upgrd_dwngrd_restart_block = 0;	/* reorg upgrade should restart from block 0 */
-			/* Ensure reorg_db_fmt_start_tn and desired_db_format_tn are set to different values so fresh reorg
-			 * upgrade can set fully_upgraded to TRUE once it is done.
-			 */
-			csd->reorg_db_fmt_start_tn = 0;
-			csd->desired_db_format_tn = 1;
+			if (MASTER_MAP_SIZE_V4 == csd->master_map_len)
+			{
+				csd->fully_upgraded = FALSE;
+				csd->reorg_upgrd_dwngrd_restart_block = 0;	/* reorg upgrade should restart from block 0 */
+				/* Ensure reorg_db_fmt_start_tn and desired_db_format_tn are set to different
+				 * values so fresh reorg upgrade can set fully_upgraded to TRUE once it is done.
+				 */
+				csd->reorg_db_fmt_start_tn = 0;
+				csd->desired_db_format_tn = 1;
+			} else
+				csd->db_got_to_v5_once = TRUE;	/* db was created by V5 so safe to set this */
 		}
 		switch(csd->minor_dbver)
 		{
 			case GDSMV51000:		/* Multi-site replication available */
 			case GDSMV52000:		/* Unicode */
-			case GDSMV53000:		/* M-Itanium release.*/
-				break;			/* Nothing to do for this version */
+			case GDSMV53000:		/* M-Itanium release */
+				gvstats_rec_upgrade(csa); /* Move GVSTATS information to new place in file header */
+				break;
+			case GDSMV53003:		/* ZSHOW "G" release */
+				/* Nothing to do for this version since it is GDSMVCURR for now. */
+				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
+				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
 		}
 		csd->minor_dbver = (enum mdb_ver)GDSMVCURR;
 		if (0 == csd->wcs_phase2_commit_wait_spincnt)
 			csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	}
+	csd->last_mdb_ver = GDSMVCURR;
 	return;
 }

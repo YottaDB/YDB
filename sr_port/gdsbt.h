@@ -27,6 +27,8 @@
 #include "ast.h"	/* for ENABLE/DISABLE */
 #endif
 
+#include "gvstats_rec.h"
+
 #define CR_NOTVALID (-1L)
 
 #define WC_MAX_BUFFS 64*1024
@@ -280,10 +282,12 @@ typedef struct node_local_struct
 	CACHELINE_PAD(4, 5)
 	volatile CNTR4DCL(ref_cnt, 4);				/* reference count. How many people are using the database */
 	CACHELINE_PAD(4, 6)
-	volatile CNTR4DCL(in_wtstart, 5);			/* Count of processes in wcs_wtstart */
+	volatile CNTR4DCL(intent_wtstart, 5);			/* Count of processes that INTEND to enter wcs_wtstart code */
 	CACHELINE_PAD(4, 7)
-	volatile CNTR4DCL(wcs_phase2_commit_pidcnt, 6);		/* number of processes actively finishing phase2 commit */
+	volatile CNTR4DCL(in_wtstart, 6);			/* Count of processes that are INSIDE wcs_wtstart code */
 	CACHELINE_PAD(4, 8)
+	volatile CNTR4DCL(wcs_phase2_commit_pidcnt, 7);		/* number of processes actively finishing phase2 commit */
+	CACHELINE_PAD(4, 9)
 	int4            mm_extender_pid;			/* pid of the process executing gdsfilext in MM mode */
 	int4            highest_lbm_blk_changed;                /* Records highest local bit map block that
 									changed so we know how much of master bit
@@ -298,7 +302,9 @@ typedef struct node_local_struct
 	volatile int4   wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
 	int4		creation_date_time4;			/* Lower order 4-bytes of database's creation time to be
 								 * compared at sm attach time */
-	int4		time_filler_8byte_align;
+	int4		inhibit_kills;				/* inhibit new KILLs while MUPIP BACKUP, INTEG or FREEZE are
+					 			 * waiting for kill-in-progress to become zero
+					 			 */
 	boolean_t	remove_shm;				/* can this shm be removed by the last process to rundown */
 	union
 	{
@@ -314,7 +320,7 @@ typedef struct node_local_struct
 							  */
    	int4		secshr_ops_index;
    	INTPTR_T	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 4K(on 32-bit platform) and 8K(on 64-bit platforms) */
-
+	gvstats_rec_t	gvstats_rec;
 } node_local;
 
 #ifdef DEBUG

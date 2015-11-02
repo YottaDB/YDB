@@ -114,6 +114,8 @@ GBLREF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst
 void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 {
 	char		*string;
+	char		dststr[MAX_DIGITS_IN_INT], dstlen;
+	int4		minorver;
 
 	util_out_print("", TRUE);
 	PRINT_DASHES;
@@ -121,20 +123,42 @@ void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 	PRINT_DASHES;
 	PRINT_OFFSET_HEADER;
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, label[0]), sizeof(repl_instance->label));;
-	util_out_print( PREFIX_FILEHDR "Label                                      !11AD", TRUE,
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, label[0]), sizeof(repl_instance->label));
+	util_out_print( PREFIX_FILEHDR "Label (contains Major Version)             !11AD", TRUE,
 		GDS_REPL_INST_LABEL_SZ - 1, repl_instance->label);
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, jnlpool_semid), sizeof(repl_instance->jnlpool_semid));;
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, replinst_minorver), sizeof(repl_instance->replinst_minorver));
+	dstlen = 0;
+	minorver = repl_instance->replinst_minorver; /* store minorver in a > 1-byte sized variable to avoid warning in I2A macro */
+	I2A(dststr, dstlen, minorver);
+	assert(dstlen <= 3);
+	util_out_print( PREFIX_FILEHDR "Minor Version                                      !R3AD", TRUE, dstlen, dststr);
+
+	/* Assert that the endianness of the instance file matches the endianness of the GT.M version
+	 * as otherwise we would have errored out long before reaching here.
+	 */
+#	ifdef BIGENDIAN
+	assert(!repl_instance->is_little_endian);
+#	else
+	assert(repl_instance->is_little_endian);
+#	endif
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, is_little_endian), sizeof(repl_instance->is_little_endian));
+	util_out_print( PREFIX_FILEHDR "Endian Format                                   !6AZ", TRUE, ENDIANTHISJUSTIFY);
+
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, is_64bit), sizeof(repl_instance->is_64bit));
+	util_out_print( PREFIX_FILEHDR "64-bit Format                                    !5AZ", TRUE,
+		repl_instance->is_64bit ? " TRUE" : "FALSE");
+
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, jnlpool_semid), sizeof(repl_instance->jnlpool_semid));
 	PRINT_SEM_SHM_ID( PREFIX_FILEHDR "Journal Pool Sem Id                         ", repl_instance->jnlpool_semid);
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, jnlpool_shmid), sizeof(repl_instance->jnlpool_shmid));;
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, jnlpool_shmid), sizeof(repl_instance->jnlpool_shmid));
 	PRINT_SEM_SHM_ID( PREFIX_FILEHDR "Journal Pool Shm Id                         ", repl_instance->jnlpool_shmid);
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, recvpool_semid), sizeof(repl_instance->recvpool_semid));;
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, recvpool_semid), sizeof(repl_instance->recvpool_semid));
 	PRINT_SEM_SHM_ID( PREFIX_FILEHDR "Receive Pool Sem Id                         ", repl_instance->recvpool_semid);
 
-	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, recvpool_shmid), sizeof(repl_instance->recvpool_shmid));;
+	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, recvpool_shmid), sizeof(repl_instance->recvpool_shmid));
 	PRINT_SEM_SHM_ID( PREFIX_FILEHDR "Receive Pool Shm Id                         ", repl_instance->recvpool_shmid);
 
 	PRINT_OFFSET_PREFIX(offsetof(repl_inst_hdr, jnlpool_semid_ctime), sizeof(repl_instance->jnlpool_semid_ctime));
@@ -424,6 +448,11 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 			sizeof(gtmsourcelocal_ptr->gtmsrc_lcl_array_index));
 		util_out_print( PREFIX_SOURCELOCAL "Slot Index                       !15UL", TRUE, idx,
 			gtmsourcelocal_ptr->gtmsrc_lcl_array_index);
+
+		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, repl_zlib_cmp_level),
+			sizeof(gtmsourcelocal_ptr->repl_zlib_cmp_level));
+		util_out_print( PREFIX_SOURCELOCAL "Journal record Compression Level !15UL", TRUE, idx,
+			gtmsourcelocal_ptr->repl_zlib_cmp_level);
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, remote_proto_ver),
 			sizeof(gtmsourcelocal_ptr->remote_proto_ver));

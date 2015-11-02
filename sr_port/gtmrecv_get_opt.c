@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,10 @@
 #include "util.h"
 #include "repl_log.h"
 
+#ifdef UNIX
+#include "gtm_zlib.h"
+#endif
+
 GBLREF	gtmrecv_options_t	gtmrecv_options;
 
 int gtmrecv_get_opt(void)
@@ -47,6 +51,7 @@ int gtmrecv_get_opt(void)
 	unsigned short	statslog_val_len;
 	char		statslog_val[4]; /* "ON" or "OFF" */
 	uint4		n_readers, n_helpers;
+	boolean_t	cmplvl_status;
 
 	gtmrecv_options.start = (CLI_PRESENT == cli_present("START"));
 	gtmrecv_options.shut_down = (CLI_PRESENT == cli_present("SHUTDOWN"));
@@ -77,6 +82,22 @@ int gtmrecv_get_opt(void)
 				gtmrecv_options.buffsize = MIN_RECVPOOL_SIZE;
 		} else
 			gtmrecv_options.buffsize = DEFAULT_RECVPOOL_SIZE;
+#		ifdef UNIX
+		/* Check if compression level is specified */
+		if (cmplvl_status = (CLI_PRESENT == cli_present("CMPLVL")))
+		{
+			if (!cli_get_int("CMPLVL", &gtmrecv_options.cmplvl))
+			{
+				util_out_print("Error parsing CMPLVL qualifier", TRUE);
+				return(-1);
+			}
+			if (GTM_CMPLVL_OUT_OF_RANGE(gtmrecv_options.cmplvl))
+				gtmrecv_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
+			/* CMPLVL qualifier should override any value specified in the environment variable gtm_zlib_cmp_level */
+			gtm_zlib_cmp_level = gtmrecv_options.cmplvl;
+		} else
+			gtmrecv_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
+#		endif
 		/* Round up or down buffsize */
 
 		if (filter = (CLI_PRESENT == cli_present("FILTER")))

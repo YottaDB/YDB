@@ -70,6 +70,7 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "memcoherency.h"
 
 GBLREF	boolean_t		certify_all_blocks;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -164,14 +165,11 @@ void wcs_recover(gd_region *reg)
 	assert((CDB_STAGNATE > t_tries) || ok_to_call_wcs_recover || process_exiting);
 	assert(csa->now_crit || csd->clustered);
 	CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
-	/* ??? this should probably issue an error and
-	 * grab crit on the assumption that it is properly called and something will presently release it */
-	SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);	/* to stop all active writers */
-	for (lcnt=1;  (0 < cnl->in_wtstart) && (lcnt <= MAXWTSTARTWAIT);  lcnt++)
-	{	/* wait for any in wcs_wtstart to finish */
-		/* if this loop hits the limit, or in_wtstart goes negative wcs_verify reports and clears in_wtstart */
-		wcs_sleep(lcnt);
-	}
+	SIGNAL_WRITERS_TO_STOP(csd);		/* to stop all active writers */
+	WAIT_FOR_WRITERS_TO_STOP(cnl, lcnt, MAXWTSTARTWAIT);
+	/* if the wait loop above hits the limit, or cnl->intent_wtstart goes negative, it is ok to proceed since
+	 * wcs_verify (invoked below) reports and clears cnl->intent_wtstart and cnl->in_wtstart.
+	 */
 	assert(!csa->wcs_pidcnt_incremented); /* we should never have come here with a phase2 commit pending for ourself */
 	/* Wait for any pending phase2 commits to finish.
 	 * In case of mupip rundown, we know no one else is accessing shared memory so no point waiting.
@@ -779,7 +777,7 @@ void wcs_recover(gd_region *reg)
 		INCREMENT_CURR_TN(csd);
 	}
 	csa->wbuf_dqd = 0;	/* reset this so the wcs_wtstart below will work */
-	SET_TRACEABLE_VAR(csd->wc_blocked, FALSE);
+	SIGNAL_WRITERS_TO_RESUME(csd);
 	in_wcs_recover = FALSE;
 	if (!reg->read_only)
 	{
@@ -796,6 +794,7 @@ void wcs_recover(gd_region *reg)
 
 #ifdef UNIX
 
+#ifndef __hppa
 void	wcs_mm_recover(gd_region *reg)
 {
 	int			mm_prot;
@@ -812,6 +811,7 @@ void	wcs_mm_recover(gd_region *reg)
 	assert(cs_addrs->hdr == cs_data);
 	if (!(was_crit = cs_addrs->now_crit) && !(cs_addrs->hdr->clustered))
 		grab_crit(gv_cur_region);
+	SET_TRACEABLE_VAR(cs_addrs->hdr->wc_blocked, FALSE);
 	if (cs_addrs->total_blks == cs_addrs->ti->total_blks)
 	{
 		/* I am the one who actually did the extension, don't need to remap again */
@@ -853,6 +853,7 @@ void	wcs_mm_recover(gd_region *reg)
 #ifdef DEBUG_DB64
 	put_mmseg((caddr_t)(cs_addrs->db_addrs[0]), (size_t)stat_buf.st_size);
 #endif
+	/* In addition to updating the internal map values, gds_map_moved also updates cs_data to point to the remapped file */
 	gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], (off_t)stat_buf.st_size);
         cs_addrs->total_blks = cs_addrs->ti->total_blks;
  	if (!was_crit)
@@ -860,7 +861,20 @@ void	wcs_mm_recover(gd_region *reg)
 	sigprocmask(SIG_SETMASK, &savemask, NULL);
 	return;
 }
+#else	/* hppa */
+void	wcs_mm_recover(gd_region *reg)
+{
+	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
 
+	error_def(ERR_GBLOFLOW);
+	error_def(ERR_GVIS);
+
+	if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+		end = &buff[MAX_ZWR_KEY_SZ - 1];
+	rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+	return;
+}
+#endif
 #elif defined(VMS)
 
 void	wcs_mm_recover(gd_region *reg)

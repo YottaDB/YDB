@@ -140,7 +140,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	dskaddr = jb->dskaddr;
 	was_wrapped = (free_ptr < dsk);
 	if (aligned_write)
-		free_ptr = ROUND_DOWN(free_ptr, IO_BLOCK_SIZE);
+		free_ptr = ROUND_DOWN2(free_ptr, IO_BLOCK_SIZE);
 	assert(!(jb->size % IO_BLOCK_SIZE));
 	tsz = (free_ptr < dsk ? jb->size : free_ptr) - dsk;
 	if ((aligned_write && !was_wrapped && (free_ptr <= dsk)) || (NOJNL == jpc->channel))

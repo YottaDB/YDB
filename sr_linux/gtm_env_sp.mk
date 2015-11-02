@@ -60,6 +60,7 @@ gt_as_src_suffix=.s
 gt_cc_compiler=gcc
 
 # Do not lookup the source directory before include directories specified by -I.
+# gcc complains about -I- being obsolete, but using -iquote cause build errors for gcc and as - ABS 2008.12.09
 gt_cc_option_I=-I-
 ifeq ($(gt_os_type),Linux)
 gt_cc_shl_fpic=-fPIC                    # generate Position Independent Code.
@@ -135,7 +136,12 @@ gt_lint_options_common=
 
 gt_cpus=$(shell grep -c process /proc/cpuinfo)
 # used to build VPATH
+# Apparently Ubuntu does not likethe -e option for echo, delete this is the *.mdep make files generate an error
+ifeq ($(distro),ubuntu)
+gt_echoe=echo
+else
 gt_echoe=echo -e
+endif
 
 ifeq ($(linux_build_type), 32)
 gt_cc_options_common+=-m32
