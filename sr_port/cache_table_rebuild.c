@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +17,7 @@
 #include "hashtab_objcode.h"
 #include "cachectl.h"
 #include "gtm_text_alloc.h"
+#include "error.h"
 
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
@@ -25,6 +26,9 @@ void cache_table_rebuild()
 {
 	ht_ent_objcode 	*tabent, *topent;
 	cache_entry	*csp;
+	error_def(ERR_MEMORY);
+	error_def(ERR_VMSMEMORY);
+
 	for (tabent = cache_table.base, topent = cache_table.top; tabent < topent; tabent++)
 	{
 		if (HTENT_VALID_OBJCODE(tabent, cache_entry, csp))
@@ -38,6 +42,9 @@ void cache_table_rebuild()
 			}
 		}
 	}
-	if (COMPACT_NEEDED(&cache_table))
+	/* Only do compaction processing if we are not processing a memory type error (which
+	   involves allocating a smaller table with storage we don't have.
+	*/
+	if (COMPACT_NEEDED(&cache_table) && error_condition != UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY))
 		compact_hashtab_objcode(&cache_table);
 }

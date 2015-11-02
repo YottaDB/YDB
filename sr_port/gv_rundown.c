@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,7 +100,7 @@ void gv_rundown(void)
 					if (cs_addrs->sgm_info_ptr)
 					{
 						si = cs_addrs->sgm_info_ptr;
-						assert(si->gv_cur_region == gv_cur_region);
+						assert(si->tp_csa == cs_addrs);
 						if (si->jnl_tail)
 						{
 							FREEUP_BUDDY_LIST(si->format_buff_list);
@@ -125,7 +125,7 @@ void gv_rundown(void)
 					}
 					if (cs_addrs->jnl)
 					{
-						assert(cs_addrs->jnl->region == gv_cur_region);
+						assert(&FILE_INFO(cs_addrs->jnl->region)->s_addrs == cs_addrs);
 						if (cs_addrs->jnl->jnllsb)
 						{
 							UNIX_ONLY(assert(FALSE));

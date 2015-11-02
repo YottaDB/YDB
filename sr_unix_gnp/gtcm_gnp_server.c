@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -292,11 +292,7 @@ static void gtcm_gnp_server_actions(void)
 			}
 			if (curr_entry)		/* curr_entry can be NULL if went through gtcmtr_terminate */
 			{
-#ifdef GTM64
-			  	time((time_t *)&curr_entry->lastact);
-#else
-			  	time((time_t *)&curr_entry->lastact[0]);
-#endif /* GTM64 */
+			  	time(&curr_entry->lastact);
 				/* curr_entry is used by gtcm_urgread_ast to determine if it needs to defer the interrupt message */
 				prev_curr_entry = curr_entry;
 				if (CM_WRITE == reply)

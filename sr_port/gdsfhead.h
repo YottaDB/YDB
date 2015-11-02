@@ -216,38 +216,6 @@ typedef struct
 #define		FROZEN_BY_ROOT          (uint4)(0xFFFFFFFF)
 #define		BACKUP_NOT_IN_PROGRESS  0x7FFFFFFF
 
-/* The following 3 macros were introduced while solving a problem with $view where a call to $view in */
-/* mumps right after a change to $zgbldir gave the old global directory - not the new one.  On VMS it */
-/* caused a core dump.  If one were to access a global variable via $data right after the change, however, */
-/* the $view worked correctly.  The solution was to make sure the gd_map information matched the current */
-/* gd_header in op_fnview.c.  The code used as a template for this change was in gvinit.c.  The first */
-/* macro gets the gd_header using an mval.  The second macro establishes the gd_map from the gd_header. */
-/* The third macro is an assert (when DEBUG_ONLY is defined) for those cases where the gd_header is already */
-/* set to make sure the mapping is correct. The first 2 macros are executed when the gd_header is null, */
-/* and the 3rd macro is associated with an else clause if it is not.  Therefore, they should be maintained */
-/* as a group. */
-
-#define SET_GD_HEADER(inmval) \
-{\
-	inmval.mvtype = MV_STR;\
-	inmval.str.len = 0;\
-	gd_header = zgbldir(&inmval);\
-}
-
-#define SET_GD_MAP \
-{\
-	gd_map = gd_header->maps;\
-	gd_map_top = gd_map + gd_header->n_maps;\
-	gd_targ_addr = gd_header;\
-}
-
-#define GD_HEADER_ASSERT \
-{\
-	assert(gd_map == gd_header->maps);\
-	assert(gd_map_top == gd_map + gd_header->n_maps);\
-	assert(gd_targ_addr == gd_header);\
-}
-
 typedef struct
 {
 	cache_que_head	cacheq_wip,	/* write-in-progress queue -- unused in Unix */
@@ -294,6 +262,56 @@ void verify_queue(que_head_ptr_t qhdr);
 #define VERIFY_QUEUE(base)
 #define VERIFY_QUEUE_LOCK(base,latch)
 #endif
+
+/* The following 3 macros were introduced while solving a problem with $view where a call to $view in */
+/* mumps right after a change to $zgbldir gave the old global directory - not the new one.  On VMS it */
+/* caused a core dump.  If one were to access a global variable via $data right after the change, however, */
+/* the $view worked correctly.  The solution was to make sure the gd_map information matched the current */
+/* gd_header in op_fnview.c.  The code used as a template for this change was in gvinit.c.  The first */
+/* macro gets the gd_header using an mval.  The second macro establishes the gd_map from the gd_header. */
+/* The third macro is an assert (when DEBUG_ONLY is defined) for those cases where the gd_header is already */
+/* set to make sure the mapping is correct. The first 2 macros are executed when the gd_header is null, */
+/* and the 3rd macro is associated with an else clause if it is not.  Therefore, they should be maintained */
+/* as a group. */
+
+#define SET_GD_HEADER(inmval)				\
+{							\
+	inmval.mvtype = MV_STR;				\
+	inmval.str.len = 0;				\
+	gd_header = zgbldir(&inmval);			\
+}
+
+#define SET_GD_MAP					\
+{							\
+	gd_map = gd_header->maps;			\
+	gd_map_top = gd_map + gd_header->n_maps;	\
+	gd_targ_addr = gd_header;			\
+}
+
+#define GD_HEADER_ASSERT					\
+{								\
+	assert(gd_map == gd_header->maps);			\
+	assert(gd_map_top == gd_map + gd_header->n_maps);	\
+	assert(gd_targ_addr == gd_header);			\
+}
+
+#define	SET_CSA_DIR_TREE(csa, keysize, reg)							\
+{												\
+	if (NULL == csa->dir_tree)								\
+		csa->dir_tree = targ_alloc(keysize, NULL, reg);					\
+	else											\
+		assert((csa->dir_tree->gd_csa == csa) && (DIR_ROOT == csa->dir_tree->root));	\
+}
+
+#define	PROCESS_GVT_PENDING_LIST(GREG, CSA, GVT_PENDING_LIST)						\
+{													\
+	if (NULL != GVT_PENDING_LIST)									\
+	{	/* Now that the region has been opened, check if there are any gv_targets that were	\
+		 * allocated for this region BEFORE the open. If so, re-allocate them if necessary.	\
+		 */											\
+		process_gvt_pending_list(GREG, CSA);							\
+	}												\
+}
 
 /* the file header has relative pointers to its data structures so each process will malloc
  * one of these and fill it in with absolute pointers upon file initialization.
@@ -408,8 +426,8 @@ void verify_queue(que_head_ptr_t qhdr);
 #define	TP_TEND_CHANGE_REG(si)				\
 {							\
 	gv_cur_region = si->gv_cur_region;		\
-	cs_addrs = si->tpcsa;				\
-	cs_data = si->tpcsd;				\
+	cs_addrs = si->tp_csa;				\
+	cs_data = si->tp_csd;				\
 }
 
 #define	GTCM_CHANGE_REG(reghead)										\
@@ -1215,8 +1233,10 @@ typedef struct	sgmnt_addrs_struct
 						 * instance file name stored in the journal pool that this process has attached to.
 						 * Updates are allowed to this replicated database only if this is TRUE.
 						 */
+	int4		regcnt;			/* # of regions that have this as their csa */
+	struct hash_table_mname_struct *gvt_hashtab;	/* NON-NULL only if regcnt > 1;
+							 * Maintains all gv_targets mapped to this db file */
 } sgmnt_addrs;
-
 
 typedef struct	gd_binding_struct
 {
@@ -1283,25 +1303,36 @@ typedef struct	gv_key_struct
  */
 typedef struct	gv_namehead_struct
 {
-	gd_region	*gd_reg;			/* Region of key */
 	gv_key		*first_rec, *last_rec;		/* Boundary recs of clue's data block */
 	struct gv_namehead_struct *next_gvnh;		/* Used to chain gv_target's together */
+	struct gv_namehead_struct *prev_gvnh;		/* Used to chain gv_target's together */
+	sgmnt_addrs	*gd_csa;			/* Pointer to Segment corresponding to this key */
+	srch_hist	*alt_hist;			/* alternate history. initialized once per gv_target */
+	struct collseq_struct	*collseq;		/* pointer to a linked list of user supplied routine addresses
+			 				   for internationalization */
 	trans_num	read_local_tn;			/* local_tn of last reference for this global */
 	trans_num	write_local_tn;			/* local_tn of last update for this global */
 	mname_entry	gvname;				/* the name of the global */
 	boolean_t	noisolation;     		/* whether isolation is turned on or off for this global */
 	block_id	root;				/* Root of global variable tree */
 	srch_hist	hist;				/* block history array */
+	int4		regcnt;				/* number of global directories whose hash-tables point to this gv_target.
+							 * 1 by default. > 1 if the same name in TWO DIFFERENT global directories
+							 * maps to the same physical file (i.e. two regions in different global
+							 * directories have the same physical file).
+							 */
 	unsigned char	nct;				/* numerical collation type for internalization */
 	unsigned char	act;				/* alternative collation type for internalization */
 	unsigned char	ver;
 	char		filler[1];
-	srch_hist	*alt_hist;			/* alternate history. initialized once per gv_target */
-	struct collseq_struct	*collseq;		/* pointer to a linked list of user supplied routine addresses
-			 				   for internationalization */
-	NON_GTM64_ONLY(uint4		filler_uint4;)	/* To make clue start at 8-byte boundary */
 	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer */
 } gv_namehead;
+
+typedef struct	gvnh_reg_struct
+{
+	gv_namehead	*gvt;
+	gd_region	*gd_reg;			/* Region of key */
+} gvnh_reg_t;
 
 #define INVALID_GV_TARGET (gv_namehead *)-1L
 
@@ -1339,6 +1370,8 @@ typedef struct	gv_namehead_struct
 		reset_gv_target = INVALID_GV_TARGET;						\
 	}											\
 }
+
+#define	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC	assert((NULL == gv_target) || (gv_target->gd_csa == cs_addrs))
 
 #define COPY_SUBS_TO_GVCURRKEY(mvarg, gv_currkey, was_null, is_null)								\
 {																\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -170,12 +170,13 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 			curr_symval->lv_flist = mv_st_ent->mv_st_cont.mvs_nval.mvs_val;
 			return 0;
 		case MVST_STCK:
+		case MVST_STCK_SP:
+			assert(mvs_size[MVST_STCK] == mvs_size[MVST_STCK_SP]);
 			if (0 < mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_size)
 			{
 				memcpy(*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr), (char*)mv_st_ent+mvs_size[MVST_STCK],
 				       mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_size);
-			}
-			else {
+			} else {
 				*(mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_addr) =
 					(unsigned char *)mv_st_ent->mv_st_cont.mvs_stck.mvs_stck_val;
 			}

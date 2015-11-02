@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,26 +41,32 @@ GBLREF gd_binding	*gd_map, *gd_map_top;
 
 void gv_bind_name(gd_addr *addr, mstr *targ)
 {
-	gd_binding	*map;
-	ht_ent_mname	*tabent;
-	mname_entry	 gvent;
-	int		res;
-	boolean_t	added;
+	gd_binding		*map;
+	ht_ent_mname		*tabent;
+	mname_entry		 gvent;
+	int			res;
+	boolean_t		added;
+	enum db_acc_method	acc_meth;
+	gd_region		*reg;
+	gvnh_reg_t		*gvnh_reg;
 
 	gd_map = addr->maps;
 	gd_map_top = gd_map + addr->n_maps;
 	gvent.var_name.addr = targ->addr;
 	gvent.var_name.len = MIN(targ->len, MAX_MIDENT_LEN);
 	COMPUTE_HASH_MNAME(&gvent);
-	if ((NULL != (tabent = lookup_hashtab_mname((hash_table_mname *)addr->tab_ptr, &gvent))) &&
-							(NULL != (gv_target = (gv_namehead *)tabent->value)))
+	if ((NULL != (tabent = lookup_hashtab_mname((hash_table_mname *)addr->tab_ptr, &gvent)))
+		&& (NULL != (gvnh_reg = (gvnh_reg_t *)tabent->value)))
 	{
-		if (!gv_target->gd_reg->open)
+		gv_target = gvnh_reg->gvt;
+		reg = gvnh_reg->gd_reg;
+		if (!reg->open)
 		{
 			gv_target->clue.end = 0;
-			gv_init_reg(gv_target->gd_reg);
+			gv_init_reg(reg);
 		}
-		gv_cur_region = gv_target->gd_reg;
+		gv_cur_region = reg;
+		acc_meth = gv_cur_region->dyn.addr->acc_meth;
 		if (dollar_trestart)
 			gv_target->clue.end = 0;
 	} else
@@ -75,30 +81,34 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 		if (!map->reg.addr->open)
 			gv_init_reg(map->reg.addr);
 		gv_cur_region = map->reg.addr;
-		if ((dba_cm == gv_cur_region->dyn.addr->acc_meth) || (dba_usr == gv_cur_region->dyn.addr->acc_meth))
+		acc_meth = gv_cur_region->dyn.addr->acc_meth;
+		if ((dba_cm == acc_meth) || (dba_usr == acc_meth))
 		{
 			gv_target = malloc(sizeof(gv_namehead) + gvent.var_name.len);
 			memset(gv_target, 0, sizeof(gv_namehead) + gvent.var_name.len);
 			gv_target->gvname.var_name.addr = (char *)gv_target + sizeof(gv_namehead);
 			gv_target->nct = 0;
 			gv_target->collseq = NULL;
+			gv_target->regcnt = 1;
 			memcpy(gv_target->gvname.var_name.addr, gvent.var_name.addr, gvent.var_name.len);
 			gv_target->gvname.var_name.len = gvent.var_name.len;
 			gv_target->gvname.hash_code = gvent.hash_code;
 		} else
 		{
 			assert(gv_cur_region->max_key_size <= MAX_KEY_SZ);
-			gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size, &gvent);
+			gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size, &gvent, gv_cur_region);
 		}
-		gv_target->gd_reg = gv_cur_region;
+		gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
+		gvnh_reg->gvt = gv_target;
+		gvnh_reg->gd_reg = gv_cur_region;
 		if (NULL != tabent)
 		{	/* Since the global name was found but gv_target was null and now we created a new gv_target,
 			 * the hash table key must point to the newly created gv_target->gvname. */
 			tabent->key = gv_target->gvname;
-			tabent->value = (char *)gv_target;
+			tabent->value = (char *)gvnh_reg;
 		} else
 		{
-			added = add_hashtab_mname((hash_table_mname *)addr->tab_ptr, &gv_target->gvname, gv_target, &tabent);
+			added = add_hashtab_mname((hash_table_mname *)addr->tab_ptr, &gv_target->gvname, gvnh_reg, &tabent);
 			assert(added);
 		}
 	}
@@ -109,7 +119,7 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 	gv_currkey->base[gvent.var_name.len] = 0;
 	gv_currkey->end = gvent.var_name.len;
 	gv_currkey->prev = 0;
-	if ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))
+	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
 	{
 		if ((0 == gv_target->root) || (DIR_ROOT == gv_target->root))
 			gvcst_root_search();

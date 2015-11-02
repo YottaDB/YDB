@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,8 @@
 
 #ifndef GTM_MALLOC_H__included
 #define GTM_MALLOC_H__included
+
+#define GTM_MEMORY_RESERVE_DEFAULT 64
 
 /* Each allocated block has the following structure. The actual address
    returned to the user for 'malloc' and supplied by the user for 'free'

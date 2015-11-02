@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 #include "tp_change_reg.h"
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
 #include "gdsblkops.h"		/* for RESET_UPDATE_ARRAY macro */
+#include "error.h"
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
@@ -61,6 +62,9 @@ void	tp_clean_up(boolean_t rollback_flag)
 	boolean_t       is_mm;
 	sgmnt_addrs	*csa;
 
+	error_def(ERR_MEMORY);
+	error_def(ERR_VMSMEMORY);
+
 	assert((NULL != first_sgm_info) || (0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
 	if (first_sgm_info != NULL)
@@ -69,7 +73,8 @@ void	tp_clean_up(boolean_t rollback_flag)
 		 * update_arrays each x-bytes in size and we freed them up and requested 2x-bytes of contiguous storage
 		 * and we might error out on that malloc attempt (though this is very improbable).
 		 */
-		if ((NULL != first_ua) && (NULL != first_ua->next_ua))
+		if ((NULL != first_ua) && (NULL != first_ua->next_ua)
+		    && !process_exiting && (UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY) != error_condition))
 		{	/* if the original update array was too small, make a new larger one */
 			/* tmp_update_array_size is used below instead of the global variables (update_array_size,
 			 * first_ua->update_array_size or cumul_update_array_size) to handle error returns from	malloc()
@@ -122,7 +127,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 				chain1 = *(off_chain *)&gvnh->root;
 				if (chain1.flag)
 				{
-					DEBUG_ONLY(csa = &FILE_INFO(gvnh->gd_reg)->s_addrs;)
+					DEBUG_ONLY(csa = gvnh->gd_csa;)
 					assert(csa->dir_tree != gvnh);
 					gvnh->root = 0;
 				}
@@ -257,8 +262,8 @@ void	tp_clean_up(boolean_t rollback_flag)
 				assert(!chain1.flag);
 				if (gvnh->root)
 				{	/* check that gv_target->root falls within total blocks range */
-					assert(gvnh->gd_reg->open);
-					csa = &FILE_INFO(gvnh->gd_reg)->s_addrs;
+					csa = gvnh->gd_csa;
+					assert(NULL != csa);
 					assert(gvnh->root < csa->ti->total_blks);
 				}
 			}

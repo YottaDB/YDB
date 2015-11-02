@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,6 +90,7 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 	seq_num		lcl_seqno;
 	error_def(ERR_NOREPLCTDREG);
 	error_def(ERR_NULLCOLLDIFF);
+	gd_region	*reg;
 
 	lcl_seqno = 0;
 	VMS_ONLY(jgbl.max_resync_seqno = 0;)
@@ -103,10 +104,11 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 	secondary_side_std_null_coll = -1;
 	for (curr = *gld_db_files, *gld_db_files = NULL;  NULL != curr;)
 	{
-		fn = (char *)curr->gd->dyn.addr->fname;
-		csa = &FILE_INFO(curr->gd)->s_addrs;	/* Work of dbfilopn i.e. assigning file_cntl has been done already in read
+		reg = curr->gd;
+		fn = (char *)reg->dyn.addr->fname;
+		csa = &FILE_INFO(reg)->s_addrs;	/* Work of dbfilopn i.e. assigning file_cntl has been done already in read
 								db_files_from_gld module */
-		gvcst_init(curr->gd);
+		gvcst_init(reg);
 		csd = csa->hdr;
 		/* Check whether all regions have same null collation order */
 		if (secondary_side_std_null_coll != csa->hdr->std_null_coll)
@@ -118,11 +120,9 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 		}
 		if (((csa->hdr->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4)) > gv_keysize)
 			gv_keysize = (csa->hdr->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4);
-		csa->dir_tree = (gv_namehead *)targ_alloc(curr->gd->max_key_size, NULL);
-		csa->dir_tree->root = DIR_ROOT;
-		csa->dir_tree->gd_reg = curr->gd;
+		SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
 		csa->now_crit = FALSE;
-		if (curr->gd->was_open)	 /* Should never happen as only open one at a time, but handle for safety */
+		if (reg->was_open)	 /* Should never happen as only open one at a time, but handle for safety */
 		{
 			assert(FALSE);
 			util_out_print("Error opening database file !AZ", TRUE, fn);
@@ -168,7 +168,7 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 		VMS_ONLY(
 			if (recvpool.upd_proc_local->updateresync)
 			{
-				TP_CHANGE_REG(curr->gd);
+				TP_CHANGE_REG(reg);
 				wcs_flu(WCSFLU_FLUSH_HDR);
 			}
 		)

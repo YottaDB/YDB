@@ -184,6 +184,9 @@ if ( "x86_64" == $mach_type && "linux" == $platform_library ) then
 		set platform_library = "linux64"
 	endif
 endif
+if ( $platform_library =~ "cygwin*" ) then
+	set platform_library = "linux"
+endif
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############
 
 cd $cms_dir

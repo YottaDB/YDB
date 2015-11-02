@@ -29,13 +29,13 @@
 #include "gvzwrite_clnup.h"
 #include "mvalconv.h"
 
-
 GBLDEF zshow_out	*zwr_output;
 
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
+GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gvzwrite_struct	gvzwrite_block;
 GBLREF gd_binding	*gd_map;
 GBLREF gd_binding	*gd_map_top;
@@ -56,6 +56,8 @@ void gvzwr_fini(zshow_out *out, int pat)
 	zwr_output = out;
 	assert(INVALID_GV_TARGET == reset_gv_target);
 	reset_gv_target = gv_target;
+	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+	gvzwrite_block.gd_reg = gv_cur_region;
 	gvzwrite_block.old_targ = (unsigned char *)gv_target;
 	old = (gv_key *)malloc(sizeof(gv_key) + gv_currkey->end);
 	gvzwrite_block.old_key = (unsigned char *)old;

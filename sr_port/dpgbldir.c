@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@
 #error unsupported platform
 #endif
 #include "dpgbldir_sysops.h"
+#include "targ_alloc.h"
 
 GBLREF gd_addr		*gd_header;
 
@@ -314,17 +315,20 @@ void gd_rundown(void)		/* Wipe out the global directory structures */
 void gd_ht_kill(hash_table_mname *table, boolean_t contents)	/* wipe out the hash table corresponding to a gld */
 {
 	ht_ent_mname	*tabent, *topent;
+	gvnh_reg_t	*gvnh_reg;
 	gv_namehead	*gvt;
 
 	if (contents)
 	{
 		for (tabent = table->base, topent = tabent + table->size; tabent < topent; tabent++)
 		{
-			if (HTENT_VALID_MNAME(tabent, gv_namehead, gvt))
+			if (HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg))
 			{
-				if (NULL != gvt->alt_hist)
-					free(gvt->alt_hist);	/* can be NULL for GT.CM client */
-				free(gvt);
+				gvt = gvnh_reg->gvt;
+				gvt->regcnt--;
+				if (!gvt->regcnt)
+					targ_free(gvt);
+				free(gvnh_reg);
 			}
 		}
 	}

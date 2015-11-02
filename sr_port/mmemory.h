@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,9 @@
 #define MMEMORY_INCLUDED
 
 #include <stddef.h>
+#include "gtm_malloc.h"		/* Violates imbedded include standard but otherwise need to update nearly 60 modules */
 
-#define MC_DSBLKSIZE 8176 /* 8K - sizeof(debug storage header) */
+#define MC_DSBLKSIZE ((8 * 1024) - offsetof(storElem, userStorage))	/* Total (real) alloc will be for 8K */
 
 /* The header of the memory block allocated by mcalloc */
 typedef struct mcalloc_hdr_struct {

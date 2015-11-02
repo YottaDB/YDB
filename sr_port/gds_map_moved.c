@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,6 @@
 #include "hashtab.h"
 #include "hashtab_mname.h"
 
-GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 
 void gds_map_moved(hash_table_mname *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top)
@@ -37,6 +36,7 @@ void gds_map_moved(hash_table_mname *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_
 	srch_hist	*hist, *dir_hist;
 	ht_ent_mname 	*tabent, *topent;
 	gv_namehead	*gvt;
+	gvnh_reg_t	*gvnh_reg;
 
 	assert(cs_addrs->now_crit);
 	assert((NULL != cs_addrs->dir_tree) && (NULL != &cs_addrs->dir_tree->hist));
@@ -65,7 +65,9 @@ void gds_map_moved(hash_table_mname *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_
 
 	for (tabent = tbl->base, topent = tbl->top; tabent < topent; tabent++)
 	{
-		if ((HTENT_VALID_MNAME(tabent, gv_namehead, gvt)) && gv_cur_region == gvt->gd_reg && gvt->clue.end > 0)
+		if ((HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg))
+			&& (NULL != (gvt = gvnh_reg->gvt))
+			&& (cs_addrs == gvt->gd_csa) && (0 < gvt->clue.end))
 		{
 			hist = &(((gv_namehead *)(tabent->value))->hist);
 			if (hist == dir_hist)

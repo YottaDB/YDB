@@ -23,6 +23,7 @@
 #include "io.h"
 #include "iotcpdef.h"
 #include "iosocketdef.h"
+#include "gtm_malloc.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -48,13 +49,14 @@ GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is 
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
 GBLREF	uint4		gtm_max_sockets;	/* Maximum sockets in a socket device that can be created by this process */
 GBLREF	bool		undef_inhibit;
+GBLREF	uint4		outOfMemoryMitigateSize;	/* Reserve that we will freed to help cleanup if run out of memory */
 
 void	gtm_env_init(void)
 {
 	static boolean_t	gtm_env_init_done = FALSE;
 	mstr			val;
 	boolean_t		ret, is_defined;
-	uint4			tdbglvl, tmsock;
+	uint4			tdbglvl, tmsock, reservesize;
 
 	if (!gtm_env_init_done)
 	{
@@ -133,6 +135,13 @@ void	gtm_env_init(void)
 		val.len = sizeof(GTM_MAX_SOCKETS) - 1;
                 if ((tmsock = trans_numeric(&val, &is_defined, TRUE)) && MAX_MAX_N_SOCKET > tmsock) /* Note assignment!! */
 			gtm_max_sockets = tmsock;
+
+		/* Initialize storage to allocate and keep in our back pocket in case run out of memory */
+		outOfMemoryMitigateSize = GTM_MEMORY_RESERVE_DEFAULT;
+		val.addr = GTM_MEMORY_RESERVE;
+		val.len = sizeof(GTM_MEMORY_RESERVE) - 1;
+		if (reservesize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+			outOfMemoryMitigateSize = reservesize;
 
 		/* Platform specific initializations */
 		gtm_env_init_sp();

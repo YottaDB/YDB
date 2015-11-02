@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,6 @@
 #include "gvusr.h"
 
 GBLREF gv_namehead	*gv_target;
-GBLREF gv_namehead	*reset_gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF bool		gv_curr_subsc_null;
@@ -46,8 +45,7 @@ void op_gvorder (mval *v)
 	gd_binding		*map;
 	mstr			name;
 	enum db_acc_method	acc_meth;
-	boolean_t		found, gbl_target_was_set;
-	gv_namehead		*save_targ;
+	boolean_t		found;
 
 	/* Modify gv_currkey to reflect the next possible key value in collating order */
 	if (!gv_curr_subsc_null || gv_cur_region->std_null_coll)
@@ -114,14 +112,6 @@ void op_gvorder (mval *v)
 	{
 		assert (2 < gv_currkey->end);
 		assert (gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
-		save_targ = gv_target;
-		if (INVALID_GV_TARGET != reset_gv_target)
-			gbl_target_was_set = TRUE;
-		else
-		{
-			gbl_target_was_set = FALSE;
-			reset_gv_target = save_targ;
-		}
 		map = gd_map + 1;
 		while (map < gd_map_top &&
 			(memcmp(gv_currkey->base, map->name,
@@ -187,9 +177,11 @@ void op_gvorder (mval *v)
 				gv_currkey->end += 2;
 			}
 		}
+		/* Reset gv_currkey as we have potentially skipped one or more regions so we no
+		 * longer can expect gv_currkey/gv_cur_region/gv_target to match each other.
+		 */
 		gv_currkey->end = 0;
 		gv_currkey->base[0] = 0;
-		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
 		v->mvtype = MV_STR;
 		if (found)
 		{
@@ -212,7 +204,6 @@ void op_gvorder (mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
-		/* No need to reset gv_currkey (to what it was at function entry) as it is already set to NULL */
 	}
 	return;
 }

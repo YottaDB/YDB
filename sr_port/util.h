@@ -17,6 +17,14 @@ boolean_t util_is_log_open(void);
 #ifdef VMS
 #include <descrip.h>
 
+/* defines for util_out_send_oper in util_output.c */
+
+#define SNDOPR_TRIES 3
+#define SNDOPR_DELAY 10
+#define GTMOPCOMMISSED1 "%GTM-I-OPCOMMISSED "
+#define GTMOPCOMMISSED2 " errors and "
+#define GTMOPCOMMISSED3 " MBFULLs sending prior operator messages"
+
 /* While the maximum for OPER_LOG_SIZE is 1906 (found from experimentation), we
    set it's maximum to 1904 being the largest 4 byte aligned size we can use. This
    4 byte aligned size is necessary to make the header length calculation done as

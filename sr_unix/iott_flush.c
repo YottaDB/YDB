@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,8 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 	error_def(ERR_NOPRINCIO);
 
 	tt_ptr = io_ptr->dev_sp;
-	assert(tt_ptr->write_active);
+	if (!tt_ptr->write_active)
+		return;	/* Was assert but that ended up causing endless loops -- now we just survive */
 	write_len = (ssize_t)(tt_ptr->tbuffp - tt_ptr->ttybuff);
 
 	if (0 < write_len)
@@ -83,7 +84,8 @@ void iott_flush(io_desc *io_ptr)
 		cancel_timer((TID)io_ptr);
 		tt_ptr->timer_set = FALSE;
 	}
-	assert(FALSE == tt_ptr->write_active);
+	if (tt_ptr->write_active)
+		return;	/* We are nesting the buffer flush -- let original copy do its job */
 	tt_ptr->write_active = TRUE;
 	iott_flush_buffer(io_ptr, FALSE);
 }

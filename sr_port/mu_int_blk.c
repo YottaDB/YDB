@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,6 @@
 #include "gdsbml.h"
 #include "gtmmsg.h"
 #include "get_spec.h"
-
 
 #define NEG_SUB	127
 #define NO_SUBSCRIPTS -1
@@ -145,7 +144,7 @@ boolean_t mu_int_blk(
 	boolean_t	first_key, is_top, pstar;
 	boolean_t	muint_range_done = FALSE;
 	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len,
-			num_len, rec_size, size, s_index, start_index, hdr_len;
+			num_len, rec_size, s_index, start_index, hdr_len;
 	block_id	child, root_pointer;
 	sub_list	mu_sub_list[MAX_GVSUBSCRIPTS + 1];
 	sub_num		check_vals;
@@ -376,8 +375,24 @@ boolean_t mu_int_blk(
 				if (KEY_DELIMITER == *ptr++)
 				{
 					if (first_key)
+					{
+						first_key = FALSE;
 						name_len = (int)(ptr - key_base);
-					first_key = FALSE;
+						if (!master_dir)
+						{	/* If NOT directory tree and this is the first key in the block,
+							 * make sure the global name part of the key matches the name
+							 * corresponding to the current global variable tree.
+							 */
+							assert(strlen(trees->key) == trees->keysize);
+							if (0 != memcmp(trees->key, key_base, trees->keysize + 1))
+							{
+								mu_int_err(ERR_DBINVGBL, TRUE, TRUE, bot_key, bot_len,
+									top_key, top_len, (unsigned int)blk_levl);
+								free(blk_base);
+								return FALSE;
+							}
+						}
+					}
 					if (KEY_DELIMITER == *ptr++)
 						break;
 				}
@@ -417,18 +432,6 @@ boolean_t mu_int_blk(
 					(unsigned int)blk_levl);
 				free(blk_base);
 				return FALSE;
-			}
-			if (0 == comp_length)
-			{
-				for (size = 0;  trees->key[size];  size++)
-					;
-				if (0 != memcmp(trees->key, key_base, size))
-				{
-					mu_int_err(ERR_DBKEYORD, TRUE, TRUE, bot_key, bot_len, top_key, top_len,
-							(unsigned int)blk_levl);
-					free(blk_base);
-					return FALSE;
-				}
 			}
 			if (memvcmp(buff + rec_cmpc, comp_length - rec_cmpc, key_base, key_size) >= 0)
 			{
@@ -674,7 +677,7 @@ boolean_t mu_int_blk(
 				memcpy(trees_tail->offset, mu_int_offset, sizeof(uint4) * (MAX_BT_DEPTH + 1));
 				assert(sizeof(trees_tail->key) == sizeof(muint_temp_buff));
 				memcpy(trees_tail->key, muint_temp_buff, sizeof(muint_temp_buff));
-
+				trees_tail->keysize = strlen((char *)muint_temp_buff);
 				hdr_len = SIZEOF(rec_hdr) + STRLEN(trees_tail->key) + 2 - rec_cmpc; /* We cannot use
 									mid_len() which expects mident_fixed structure */
 				/* +2 in the above hdr_len calculation is to take into account

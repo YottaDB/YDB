@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,16 +30,26 @@
 #include "op.h"
 #include "jobinterrupt_process.h"
 
-GBLREF	short		dollar_tlevel, dollar_trestart;
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gv_namehead	*gv_target;
-GBLREF tp_region	*tp_reg_list;		/* Chained list of regions used in this transaction not cleared on tp_restart */
-GBLREF void		(*tp_timeout_clear_ptr)(void);
+GBLREF	short			dollar_tlevel, dollar_trestart;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
+GBLREF  gd_region		*gv_cur_region;
+GBLREF  sgmnt_data_ptr_t	cs_data;
+GBLREF  sgmnt_addrs		*cs_addrs;
+GBLREF	void			(*tp_timeout_clear_ptr)(void);
+
+#define	RESTORE_GV_CUR_REGION						\
+{									\
+	gv_cur_region = save_cur_region;				\
+	TP_CHANGE_REG(gv_cur_region);					\
+}
 
 void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by which we need to rollback */
 {
 	short		newlevel;
 	tp_region	*tr;
+	gd_region	*save_cur_region;	/* saved copy of gv_cur_region before tp_clean_up/tp_incr_clean_up modifies it */
 
 	error_def(ERR_TLVLZERO);
 	error_def(ERR_TROLLBK2DEEP);
@@ -53,6 +63,7 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		rts_error(VARLSTCNT(4) ERR_INVROLLBKLVL, 2, rb_levels, dollar_tlevel);
 
 	newlevel = (0 > rb_levels) ? dollar_tlevel + rb_levels : rb_levels;
+	save_cur_region = gv_cur_region;
 	if (!newlevel)
 	{
 		(*tp_timeout_clear_ptr)();				/* Cancel or clear any pending TP timeout */
@@ -76,11 +87,12 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		}
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
-
+		RESTORE_GV_CUR_REGION;
 		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
 	} else
 	{
 		tp_incr_clean_up(newlevel);
+		RESTORE_GV_CUR_REGION;
 		tp_unwind(newlevel, ROLLBACK_INVOCATION);
 	}
 }

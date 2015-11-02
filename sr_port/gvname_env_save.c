@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,7 @@ void gvname_env_save(gvname_info *  curr_gvname_info)
 	assert((is_bg_or_mm && cs_addrs->hdr == cs_data) || dba_cm == gv_cur_region->dyn.addr->acc_meth ||
 		dba_usr == gv_cur_region->dyn.addr->acc_meth);
 	curr_gvname_info->s_cs_addrs = cs_addrs;
+	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 	assert(gv_currkey->top <= curr_gvname_info->s_gv_currkey->top);
 	curr_gvname_info->s_gv_currkey->end = gv_currkey->end;
 	curr_gvname_info->s_gv_currkey->prev = gv_currkey->prev;

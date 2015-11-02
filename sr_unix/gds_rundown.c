@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -594,6 +594,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 	error_def(ERR_DBRNDWN);
 	error_def(ERR_GTMASSERT);
 	error_def(ERR_OUTOFSPACE);
+        error_def(ERR_MEMORY);
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_GTMCHECK);
 	error_def(ERR_TEXT);

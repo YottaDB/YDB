@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,8 @@
 #define HT_REHASH_TABLE_SIZE(table) 	MIN(table->size, table->count * 4)
 #define INSERT_HTENT(table, tabent, hkey, value)				\
 {										\
+	if (HT_DELETED_ENTRY == (tabent)->value)				\
+		(table)->del_count--; 						\
 	(tabent)->key = *hkey; 							\
 	(tabent)->value = value;						\
 	(table)->count++;							\

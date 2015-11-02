@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -169,7 +169,7 @@ void mupip_integ(void)
 
 	error_mupip = FALSE;
 	if (NULL == gv_target)
-		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL);
+		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
  	gv_altkey = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ - 1);
 	if (CLI_PRESENT == (cli_status = cli_present("MAXKEYSIZE")))
 	{
@@ -391,7 +391,8 @@ void mupip_integ(void)
  			gv_target->ver = trees->ver;
  			gv_altkey->prev = 0;
  			gv_altkey->top = MAX_KEY_SZ;
- 			gv_altkey->end = strlen(trees->key);
+			assert(trees->keysize == strlen(trees->key));
+ 			gv_altkey->end = trees->keysize;
  			memcpy(gv_altkey->base, trees->key, gv_altkey->end);
  			gv_altkey->base[gv_altkey->end++] = '\0';
  			gv_altkey->base[gv_altkey->end] = '\0';

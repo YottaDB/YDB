@@ -11,23 +11,24 @@
 
 #include "mdef.h"
 
+#include <stdarg.h>
 #include "gtm_string.h"
 
 #include "compiler.h"
 #include "stringpool.h"
-#include <stdarg.h>
 #include "op.h"
 
 GBLREF spdesc stringpool;
 
 void op_indname(UNIX_ONLY_COMMA(int argcnt) mval *dst, ...)
 {
-	va_list	var, sublst;
-	mval *src, *subs;
-	int i;
-	VMS_ONLY(int argcnt;)
-	unsigned char *ch, *ctop, *out, *double_chk;
-	unsigned char outch;
+	va_list		var, sublst;
+	mval		*src, *subs;
+	int		i;
+	VMS_ONLY(int	argcnt;)
+	unsigned char	*ch, *ctop, *out, *double_chk;
+	unsigned char	outch;
+
 	error_def(ERR_INDRMAXLEN);
 	error_def(ERR_STRINGOFLOW);
 	error_def(ERR_VAREXPECTED);
@@ -60,8 +61,7 @@ void op_indname(UNIX_ONLY_COMMA(int argcnt) mval *dst, ...)
 			out++;
 			*out++ = '@';
 			outch = '(';
-		}
-		else
+		} else
 		{
 			while(double_chk <= out)
 				if (*double_chk == '@')
@@ -74,31 +74,27 @@ void op_indname(UNIX_ONLY_COMMA(int argcnt) mval *dst, ...)
 				out++;
 				*out++ = '@';
 				outch = '(';
-			}
-			else if (*out != ')')
+			} else if (*out != ')')
 			{
 				outch = '(';
 				out++;
-			}
-			else
-			{
+			} else
 				outch = ',';
-			}
 		}
-	}
-	else if (*out != ')')
+	} else if (*out != ')')
 	{
 		outch = '(';
 		out++;
-	}
-	else
-	{
+	} else
 		outch = ',';
-	}
 	VAR_COPY(sublst,  var);
 	for (i = argcnt - 2 ; i > 0 ; i--)
 	{
 		subs = va_arg(sublst, mval * );
+		/* Note that in this second pass of the mvals, if the mval was undefined in the first pass and we are in 
+		   NOUNDEF mode, that the mval was not modified and is again undefined. Make sure this incarnation is defined..
+		*/
+		MV_FORCE_DEFINED(subs);
 		ch = (unsigned char *)subs->str.addr;
 		ctop = ch + subs->str.len;
 		if (stringpool.top - out < subs->str.len + 5)

@@ -342,6 +342,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	srch_blk_status 	*new_first_tp_hist, *t1;
 	tlevel_info		*tli;
 	srch_blk_status		*srch_stat;
+	sgmnt_addrs		*csa;
 
 	assert(si->cur_tp_hist_size < si->tp_hist_size);
 	si->cur_tp_hist_size <<= 1;
@@ -359,6 +360,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	}
 	for (tli = si->tlvl_info_head; tli; tli = tli->next_tlevel_info)
 		REPOSITION_PTR_IF_NOT_NULL(tli->tlvl_tp_hist_info, srch_blk_status, delta, si->first_tp_hist, si->last_tp_hist);
+	csa = si->tp_csa;
 	for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
 	{
 		/* Bypass gv_targets not used in this transaction. Note that the gvnh == gv_target check done below is
@@ -367,8 +369,8 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 		 */
 		if (gvnh->read_local_tn != local_tn && gvnh != gv_target && gvnh != cs_addrs->dir_tree)
 			continue;		/* Bypass gv_targets not used in this transaction */
-		if (gvnh->gd_reg == si->gv_cur_region)
-		{	/* reposition pointers only if global is of current region */
+		if (gvnh->gd_csa == csa)
+		{	/* reposition pointers only if global corresponds to current database file */
 			for (t1 = &gvnh->hist.h[0]; t1->blk_num; t1++)
 				REPOSITION_PTR_IF_NOT_NULL(t1->first_tp_srch_status, struct srch_blk_status_struct,
 								delta, si->first_tp_hist, si->last_tp_hist);

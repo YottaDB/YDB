@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,11 +114,9 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 					if (dollar_tlevel)
 					{
 						chain = *(off_chain *)&temp_long;
-						if ((1 == chain.flag)
-								&& ((int)chain.cw_index >= sgm_info_ptr->cw_set_depth))
+						if ((1 == chain.flag) && ((int)chain.cw_index >= sgm_info_ptr->cw_set_depth))
 						{
-							assert(&FILE_INFO(sgm_info_ptr->gv_cur_region)->s_addrs
-								== cs_addrs);
+							assert(sgm_info_ptr->tp_csa == cs_addrs);
 							GTMASSERT;
 						}
 						assert(chain.flag || temp_long < csa->ti->total_blks);

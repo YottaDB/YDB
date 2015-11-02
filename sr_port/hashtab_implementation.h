@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ c) hashtab_objcode.c
 */
 
 GBLREF	boolean_t	run_time;
-GBLREF	int4		expand_hashtab_depth;
+LITREF	int		ht_sizes[];
 
 #if defined(INT4_HASH)
 
@@ -196,25 +196,11 @@ void REINITIALIZE_HASHTAB(HASH_TABLE *table);
 void COMPACT_HASHTAB(HASH_TABLE *table);
 
 
-/* This routine initializes hash table. It must be called once before hashing can be used. */
+/* This routine initializes hash table. It must be called once before hashing can be used. Note that
+   the ht_sizes array is defined in mtables.c
+*/
 void INIT_HASHTAB(HASH_TABLE *table, int minsize)
 {
-	/* Following primes are very close to 2 ** x.  These numbers should give best distribution for our hash function.
-	 * Instead of software limiting in hash table sizes, we have a long prime table.
-	 * This commented out table is there for any future reference.
-	 * int ht_sizes[] = {
-	 *	13, 37, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289,  24593, 49157, 98317, 196613, 393241, 786433, 1572869,
-	 * 	3145739, 6291469, 12582917, 25165843, 50331653, 100663319,  201326611, 402653189, 805306457, 1610612741, 0};
-	 */
-	int ht_sizes[] = {
-		13, 37, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289,  24593, 49157,
-		/* Above doubles the table size. But below has slower progression */
-		62501, 102503, 154981, 218459, 290047, 366077, 442861, 517151,
-		603907, 705247, 823541, 961729, 1123079, 1311473, 1531499, 1788443,
-		2088497, 2438881, 2848057, 3325901, 3883903, 4535483, 5296409, 6185021,
-		7222661, 8434427, 9849503, 11502019, 13431661, 15685133, 18316643, 21389671,
-		24978257, 29168903, 34062629, 39777391, 46450931, 54244103, 0};
-
 	unsigned int 	cur_ht_size;
 	int 		index;
 	error_def(ERR_HTOFLOW);
@@ -248,8 +234,6 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	void		*htval;
 	CONDITION_HANDLER(hashtab_rehash_ch);
 
-	assert(0 == expand_hashtab_depth);
-	DEBUG_ONLY(expand_hashtab_depth++;)
 	ESTABLISH(hashtab_rehash_ch);
 	INIT_HASHTAB(&newtable, minsize);
 	REVERT;
@@ -263,7 +247,6 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	}
 	free(table->base); 	/* Deallocate old table entries */
 	*table = newtable;
-	DEBUG_ONLY(expand_hashtab_depth--;)
 }
 
 /* 	Description:
@@ -313,6 +296,13 @@ boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **t
 		RETURN_IF_ADDED(table, *tabentptr, key, value);
 		SET_REHASH_INDEX(ht_index, rhfact, prime);
 	} while(ht_index != save_ht_index);
+	/* All entries either deleted or used. No empty frame found */
+	if (NULL != first_del_ent)
+	{	/* There was a deleted one we could use - reuse the deleted frame */
+		*tabentptr = first_del_ent;
+		INSERT_HTENT(table, *tabentptr, key, value);
+		return TRUE;
+	}
 	GTMASSERT;
 	return FALSE; /* to prevent warnings */
 }

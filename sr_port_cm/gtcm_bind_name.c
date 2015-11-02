@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,25 +38,30 @@ void gtcm_bind_name(cm_region_head *rh, boolean_t xform)
 	ht_ent_mname	*tabent;
 	mname_entry	 gvent;
 	boolean_t	added;
+	gvnh_reg_t	*gvnh_reg;
 
 	GTCM_CHANGE_REG(rh);	/* sets the global variables gv_cur_region/cs_addrs/cs_data appropriately */
 	gvent.var_name.addr = (char *)gv_currkey->base;
 	gvent.var_name.len = STRLEN((char *)gv_currkey->base);
 	COMPUTE_HASH_MNAME(&gvent);
-	if (NULL == (tabent = lookup_hashtab_mname(rh->reg_hash, &gvent)) || NULL == (gv_target = (gv_namehead *)tabent->value))
+	if (NULL == (tabent = lookup_hashtab_mname(rh->reg_hash, &gvent)) || NULL == (gvnh_reg = (gvnh_reg_t *)tabent->value))
 	{
-		gv_target = targ_alloc(cs_data->max_key_size, &gvent);
+		gv_target = targ_alloc(cs_data->max_key_size, &gvent, rh->reg);
+		gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
+		gvnh_reg->gvt = gv_target;
+		gvnh_reg->gd_reg = rh->reg;
 		if (NULL != tabent)
 		{ 	/* Since the global name was found but gv_target was null and now we created a new gv_target,
 			 * the hash table key must point to the newly created gv_target->gvname. */
 			tabent->key = gv_target->gvname;
-			tabent->value = gv_target;
+			tabent->value = (char *)gvnh_reg;
 		} else
 		{
-			added = add_hashtab_mname((hash_table_mname *)rh->reg_hash, &gv_target->gvname, gv_target, &tabent);
+			added = add_hashtab_mname((hash_table_mname *)rh->reg_hash, &gv_target->gvname, gvnh_reg, &tabent);
 			assert(added);
 		}
-	}
+	} else
+		gv_target = gvnh_reg->gvt;
 	if ((!gv_target->root) || (DIR_ROOT == gv_target->root))
 		gvcst_root_search();
 	if ((gv_target->collseq || gv_target->nct) && xform)

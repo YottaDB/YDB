@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,9 +40,9 @@ void gtmci_isv_save(void)
 	 * in ci_ret_code_quit) */
 	assert(frame_pointer->flags & SFF_CI);
 	dollar_ecode_addr = &dollar_ecode_ci;
-	push_stck(&dollar_ecode, sizeof(dollar_ecode), (void**)&dollar_ecode_addr);
+	push_stck(&dollar_ecode, sizeof(dollar_ecode), (void**)&dollar_ecode_addr, MVST_STCK);
 	dollar_stack_addr = &dollar_stack_ci;
-	push_stck(&dollar_stack, sizeof(dollar_stack), (void**)&dollar_stack_addr);
+	push_stck(&dollar_stack, sizeof(dollar_stack), (void**)&dollar_stack_addr, MVST_STCK);
 	ecode_init();
 }
 

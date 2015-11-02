@@ -74,6 +74,7 @@ repl_buff_t *repl_buff_create(int buffsize)
 {
 	repl_buff_t	*tmp_rb;
 	int		index;
+	unsigned char	*buff_ptr;
 
 	tmp_rb = (repl_buff_t *)malloc(sizeof(repl_buff_t));
 	tmp_rb->buffindex = REPL_MAINBUFF;
@@ -83,7 +84,9 @@ repl_buff_t *repl_buff_create(int buffsize)
 		tmp_rb->buff[index].recaddr = JNL_FILE_FIRST_RECORD;
 		tmp_rb->buff[index].readaddr = JNL_FILE_FIRST_RECORD;
 		tmp_rb->buff[index].buffremaining = buffsize;
-		tmp_rb->buff[index].base = (unsigned char *)malloc(buffsize);
+		buff_ptr = (unsigned char *)malloc(buffsize + DISK_BLOCK_SIZE);
+		tmp_rb->buff[index].base_buff = buff_ptr;
+		tmp_rb->buff[index].base = (unsigned char *)ROUND_UP2((uintszofptr_t)buff_ptr, DISK_BLOCK_SIZE);
 		tmp_rb->buff[index].recbuff = tmp_rb->buff[index].base;
 	}
 	tmp_rb->fc = (repl_file_control_t *)malloc(sizeof(repl_file_control_t));
@@ -295,16 +298,16 @@ int repl_ctl_close(repl_ctl_element *ctl)
 	int	index;
 	int	status;
 
-	if (ctl)
+	if (NULL != ctl)
 	{
-		if (ctl->repl_buff)
+		if (NULL != ctl->repl_buff)
 		{
 			for (index = REPL_MAINBUFF; REPL_NUMBUFF > index; index++)
-				if (ctl->repl_buff->buff[index].base)
-					free(ctl->repl_buff->buff[index].base);
-			if (ctl->repl_buff->fc)
+				if (NULL != ctl->repl_buff->buff[index].base_buff)
+					free(ctl->repl_buff->buff[index].base_buff);
+			if (NULL != ctl->repl_buff->fc)
 			{
-				if (ctl->repl_buff->fc->jfh_base)
+				if (NULL != ctl->repl_buff->fc->jfh_base)
 					free(ctl->repl_buff->fc->jfh_base);
 				if (NOJNL != ctl->repl_buff->fc->fd)
 				{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,8 @@ CONDITION_HANDLER(lastchance2)
 	error_def(ERR_GTMASSERT);
 	error_def(ERR_GTMCHECK);
 	error_def(ERR_GVRUNDOWN);
+        error_def(ERR_MEMORY);
+        error_def(ERR_VMSMEMORY);
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_OUTOFSPACE);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@ typedef struct
 	struct zwr_sub_lst *sub;
 	gd_binding	*old_map;
 	gd_binding	*old_map_top;
+	gd_region	*gd_reg;
 } gvzwrite_struct;
 
 void gvzwr_arg(int t, mval *a1, mval *a2);

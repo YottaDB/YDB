@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,20 +21,21 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF stack_frame		*error_frame;
 GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 
-unsigned char *get_symb_line (unsigned char *out, unsigned char **b_line, unsigned char **ctxt)
+unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigned char **ctxt)
 {
-	bool		line_reset;
-	stack_frame	*fp;
+	boolean_t	line_reset, use_fpmpc_exact;
+	stack_frame	*fp, *first_counted_frame;
 	unsigned char	*addr, *out_addr;
 	unsigned char	*fpmpc, *fpctxt;
 
 	line_reset = FALSE;
+	first_counted_frame = NULL;
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
-		fpmpc = ((fp != error_frame) || (fp->mpc != dollar_ecode.error_rtn_addr))
-				? fp->mpc : dollar_ecode.error_frame_mpc;
-		fpctxt = ((fp != error_frame) || (fp->ctxt != dollar_ecode.error_rtn_ctxt))
-				? fp->ctxt : dollar_ecode.error_frame_ctxt;
+		fpmpc = fp->mpc;
+		fpctxt = fp->ctxt;
+		if ((NULL == first_counted_frame) && (fp->type & SFT_COUNT))
+			first_counted_frame = fp;
 		if (ADDR_IN_CODE(fpmpc, fp->rvector))
 		{
 			if (ctxt != 0)
@@ -43,7 +44,8 @@ unsigned char *get_symb_line (unsigned char *out, unsigned char **b_line, unsign
 				addr = fpmpc + 1;
 			else
 				addr = fpmpc;
-			out_addr = symb_line (addr, out, b_line, fp->rvector);
+			use_fpmpc_exact = (fp == first_counted_frame);
+			out_addr = symb_line(addr, out, b_line, fp->rvector, use_fpmpc_exact);
 			assert (out < out_addr);
 			return out_addr;
 		} else

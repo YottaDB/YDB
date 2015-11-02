@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,7 +132,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			}
 			if (NULL != si->first_cw_set)
 			{
-				csa = &FILE_INFO(si->gv_cur_region)->s_addrs;
+				csa = si->tp_csa;
 				/* Assert that if we are in the midst of commit in a region, we better hold crit */
 				assert(!csa->t_commit_crit || csa->now_crit);
 				/* Just to be safe, set update_underway to TRUE only if we have crit on this region. */

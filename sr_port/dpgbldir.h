@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,12 @@
 
 #ifndef __DBGBLDIR_H__
 #define __DBGBLDIR_H__
+
+typedef struct gvt_container_struct
+{
+	gvnh_reg_t			*gvnh_reg;
+	struct gvt_container_struct	*next_gvtc;
+} gvt_container;
 
 boolean_t	get_first_gdr_name(gd_addr *current_gd_header, mstr *log_nam);
 gd_addr		*zgbldir(mval *v);

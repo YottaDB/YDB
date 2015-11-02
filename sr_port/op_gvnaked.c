@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,7 +78,7 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 			tp_set_sgm();
 		if (!gv_target->root || (DIR_ROOT == gv_target->root))
 			gvcst_root_search();
-		assert(gv_target->gd_reg == gv_cur_region);
+		assert(gv_target->gd_csa == cs_addrs);
 	}
 
 	VMS_ONLY(va_count(count);)

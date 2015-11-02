@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,15 +20,17 @@
 #include "dm_setup.h"
 #include "error.h"
 #include "error_trap.h"
+#include "io.h"
 
-GBLREF unsigned short	proc_act_type;
-GBLREF stack_frame	*frame_pointer;
-GBLREF spdesc		stringpool;
-GBLREF spdesc		rts_stringpool;
-GBLREF bool		compile_time;
-GBLREF bool		transform;
-GBLREF mval		dollar_ztrap, dollar_etrap;
-GBLREF mstr             *err_act;
+GBLREF	unsigned short	proc_act_type;
+GBLREF	stack_frame	*frame_pointer;
+GBLREF	spdesc		stringpool;
+GBLREF	spdesc		rts_stringpool;
+GBLREF	bool		compile_time;
+GBLREF	bool		transform;
+GBLREF	mval		dollar_ztrap, dollar_etrap;
+GBLREF	mstr		*err_act;
+GBLREF	io_desc		*active_device;
 
 void trans_code_cleanup(void)
 {
@@ -54,14 +56,10 @@ void trans_code_cleanup(void)
 			assert(0 < dollar_etrap.str.len);
 			err = (int)ERR_ERRWETRAP;
 		}
-		frame_pointer->flags |= SFF_ZTRAP_ERR;
 	} else if (SFT_DEV_ACT == proc_act_type)
-	{
 		err = ERR_ERRWIOEXC;
-		frame_pointer->flags |= SFF_DEV_ACT_ERR;
-	} else
+	else
 		err = 0;
-
 	proc_act_type = 0;
 	if (compile_time)
 	{
@@ -76,8 +74,35 @@ void trans_code_cleanup(void)
 		if (fp->type & SFT_COUNT)
 		{
 			assert(NULL != err_act);
-			if (!IS_ETRAP)
+			if ((ERR_ERRWZTRAP == err) || (ERR_ERRWETRAP == err))
+			{	/* Whether ETRAP or ZTRAP we want to rethrow the error at one level down */
+				SET_ERROR_FRAME(fp);	/* reset error_frame to point to the closest counted frame */
+				assert(fp->flags & SFF_ETRAP_ERR);
+				/* Turn off any device exception related flags now that we are going to handle errors using
+				 * $ETRAP or $ZTRAP AT THE PARENT LEVEL only (no more device exceptions).
+				 */
+				fp->flags &= SFF_DEV_ACT_ERR_OFF;
+				dollar_ztrap.str.len = 0;
+				err_act = &dollar_etrap.str;
+			} else if (ERR_ERRWIOEXC == err)
+			{	/* Error while compiling device exception. Set SFF_ETRAP_ERR bit so control is transferred to
+				 * error_return() which in turn will rethrow the error AT THE SAME LEVEL in order to try and
+				 * use $ZTRAP or $ETRAP whichever is active. Also set the SFF_DEV_ACT_ERR bit to signify this
+				 * is a device exception that is rethrown instead of a ztrap/etrap error. Also assert that
+				 * the rethrow will not use IO exception again (thereby ensuring error processing will
+				 * eventually terminate instead of indefinitely recursing).
+				 */
+				fp->flags |= (SFF_DEV_ACT_ERR | SFF_ETRAP_ERR);
+				assert(NULL == active_device);	/* mdb_condition_handler should have reset it */
+			} else if ((ERR_ERRWZBRK == err) || (ERR_ERRWEXC == err))
+			{	/* For typical exceptions in ZBREAK and ZSTEP, get back to direct mode */
 				dm_setup();
+			} else
+			{	/* The only other value of err that we know possible is ERR_ERRWZINTR. But we dont expect
+				 * to be in trans_code_cleanup in that case so assert false for any other value of err.
+				 */
+				assert(FALSE);
+			}
 			break;
 		}
 		if (fp->type)
@@ -85,8 +110,8 @@ void trans_code_cleanup(void)
 			SET_ERR_CODE(fp, err);
 		}
 		/* If this frame is indicated for cache cleanup, do that cleanup
-		   now before we get rid of the pointers used by that cleanup.
-		*/
+		 * now before we get rid of the pointers used by that cleanup.
+		 */
 		IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
 		fp->mpc = CODE_ADDRESS(pseudo_ret);
 		fp->ctxt = GTM_CONTEXT(pseudo_ret);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,11 +40,15 @@ typedef struct condition_handler_struct
 #endif
 GBLEXP condition_handler	*chnd, *ctxt, *active_ch, *chnd_end;
 GBLEXP int4			severity;
-GBLEXP int4			error_condition;
 
+/* Don't do these GBLREFs if doing above GBLDEFs as this means we are in gbldefs.c where the below
+   are also defined so a REF is likely to cause problems */
+#ifndef CHEXPAND
+GBLREF int4			error_condition;
 GBLREF char 			util_outbuff[];
-
 GBLREF err_ctl			merrors_ctl;
+GBLREF void			(*restart)();
+#endif
 
 #define WARNING		0
 #define SUCCESS		1
@@ -240,6 +244,7 @@ void stop_image_no_core(void);
 #define DUMP			(   SIGNAL == (int)ERR_ASSERT		\
 				 || SIGNAL == (int)ERR_GTMASSERT	\
 				 || SIGNAL == (int)ERR_GTMCHECK		\
+				 || SIGNAL == (int)ERR_MEMORY		\
 				 || SIGNAL == (int)ERR_STACKOFLOW )
 
 /* true if above or SEVERE and GTM error (perhaps add some "system" errors) */
@@ -252,8 +257,6 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 #define SET_ZSTATUS(ctxt)	set_zstatus(&src_line_d, SIGNAL, ctxt, TRUE);
 
 #define MSG_OUTPUT		(1)
-
-GBLREF void			(*restart)();
 
 #define EXIT_HANDLER(x)
 

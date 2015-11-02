@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +14,10 @@
 #include "gtm_string.h"
 #include <errno.h>
 #include <libelf.h>
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
+#include "gtm_stdio.h"
+
 #include "compiler.h"
 #include "rtnhdr.h"
 #include "obj_gen.h"
@@ -23,8 +27,6 @@
 #include "objlabel.h"	/* needed for masscomp.h */
 #include "stringpool.h"
 #include "parse_file.h"
-#include "gtm_fcntl.h"
-#include "gtm_unistd.h"
 #include "gtmio.h"
 #include "mmemory.h"
 #include "obj_file.h"
@@ -47,14 +49,14 @@
 LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0x48, 0xc7, 0xc0, 0xff, 0xff, 0xff, 0xff, 0xc3};
 
 
-GBLDEF command_qualifier cmd_qlf;
-GBLDEF char		object_file_name[];
-GBLDEF int		object_file_des;
-GBLDEF short		object_name_len;
-GBLDEF mident		module_name;
-GBLDEF boolean_t	run_time;
-GBLDEF int4		gtm_object_size;
-DEBUG_ONLY(GBLDEF int   obj_bytes_written;)
+GBLREF command_qualifier cmd_qlf;
+GBLREF char		object_file_name[];
+GBLREF int		object_file_des;
+GBLREF short		object_name_len;
+GBLREF mident		module_name;
+GBLREF boolean_t	run_time;
+GBLREF int4		gtm_object_size;
+DEBUG_ONLY(GBLREF int   obj_bytes_written;)
 
 #define GTM_LANG        "MUMPS"
 static char static_string_tbl[] = {
@@ -79,7 +81,7 @@ static char static_string_tbl[] = {
 #define SEC_STRTAB_INDX 2
 #define SEC_SYMTAB_INDX 3
 
-
+GBLDEF uint4 txtrel_cnt;
 
 LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;
@@ -87,20 +89,16 @@ LITREF int4 gtm_release_name_len;
 GBLREF mliteral 	literal_chain;
 GBLREF char 		source_file_name[];
 GBLREF unsigned short 	source_name_len;
-
 GBLREF mident	routine_name;
 GBLREF mident	module_name;
 GBLREF int4	mlmax, mvmax;
 GBLREF int4	code_size, lit_addrs, lits_size;
-
-GBLDEF int4	psect_use_tab[GTM_LASTPSECT];	/* bytes of each psect in this module */
-GBLDEF char	object_file_name[MAX_FBUFF + 1];
+GBLREF int4	psect_use_tab[];	/* bytes of each psect in this module */
 
 static short int current_psect;
 static char emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */
 static short int emit_buff_used;		/* number of chars in emit_buff */
 
-GBLDEF uint4 txtrel_cnt;
 static uint4 cdlits;
 static struct rel_table *data_rel, *data_rel_end;
 static struct rel_table *text_rel, *text_rel_end;
@@ -166,26 +164,16 @@ void create_object_file(rhdtyp *rhead)
  *   * Update the ELF, write it out to the object file and close the object file */
 void close_object_file(void)
 {
-        int status;
-        size_t bufSize;
-        ssize_t actualSize;
-        char *gtm_obj_code;
-        char *string_tbl;
-        int symIndex, strEntrySize;
-
-
-        Elf *elf;
-        Elf64_Ehdr *ehdr;
-        Elf64_Shdr *shdr;
-        Elf64_Shdr *text_shdr;
-        Elf64_Shdr *symtab_shdr;
-        Elf64_Shdr *strtab_shdr;
-        Elf_Scn *text_scn;
-        Elf_Scn *symtab_scn;
-        Elf_Scn *strtab_scn;
-        Elf_Data *text_data;
-        Elf_Data *symtab_data;
-        Elf_Data *strtab_data;
+        int		status;
+        size_t		bufSize;
+        ssize_t		actualSize;
+        char		*gtm_obj_code, *string_tbl;
+        int		symIndex, strEntrySize;
+        Elf		*elf;
+        Elf64_Ehdr	*ehdr;
+        Elf64_Shdr	*shdr, *text_shdr, *symtab_shdr, *strtab_shdr;
+        Elf_Scn		*text_scn, *symtab_scn, *strtab_scn;
+        Elf_Data	*text_data, *symtab_data, *strtab_data;
 
         buff_flush();
         bufSize = gtm_object_size;
@@ -200,21 +188,19 @@ void close_object_file(void)
         strEntrySize = sizeof(GTM_LANG);
         memcpy((string_tbl + symIndex), GTM_LANG, strEntrySize);
         symIndex += strEntrySize;
-        /*string_tbl[symIndex] = '\0';*/
 
         strEntrySize = sizeof(GTM_PRODUCT);
         memcpy((string_tbl + symIndex), GTM_PRODUCT, strEntrySize);
         symIndex += strEntrySize;
-        /*string_tbl[symIndex] = '\0';*/
 
         strEntrySize = sizeof(GTM_RELEASE_NAME);
         memcpy((string_tbl + symIndex), GTM_RELEASE_NAME, strEntrySize);
         symIndex += strEntrySize;
-        /*string_tbl[symIndex] = '\0';*/
 
         gtm_obj_code = (char *)malloc(bufSize);
-        /* At this point, we have only the GTM object written onto the file. We need to read it back and wrap inside the ELF o
- * bject and write a native ELF object file*/
+        /* At this point, we have only the GTM object written onto the file. We need to read it back and wrap inside 
+	   the ELF object and write a native ELF object file.
+	*/
         lseek(object_file_des, 0, SEEK_SET);
         DOREADRL(object_file_des, gtm_obj_code, bufSize, actualSize);
         /* Reset the pointer back for writing an ELF object. */
@@ -223,20 +209,20 @@ void close_object_file(void)
         /* Generate ELF64 header */
         if (elf_version(EV_CURRENT) == EV_NONE )
         {
-          fprintf(stderr, "Elf library out of date!n");
-          GTMASSERT;
+		FPRINTF(stderr, "Elf library out of date!n");
+		GTMASSERT;
         }
 
         if ((elf = elf_begin(object_file_des, ELF_C_WRITE, NULL)) == 0)
         {
-          fprintf(stderr, "elf_begin failed!\n");
-          GTMASSERT;
+		FPRINTF(stderr, "elf_begin failed!\n");
+		GTMASSERT;
         }
 
         if ( (ehdr = elf64_newehdr(elf)) == NULL )
         {
-          fprintf(stderr, "elf64_newehdr() failed!\n");
-          GTMASSERT;
+		FPRINTF(stderr, "elf64_newehdr() failed!\n");
+		GTMASSERT;
         }
 
         ehdr->e_ident[EI_MAG0] = ELFMAG0;
@@ -261,13 +247,13 @@ void close_object_file(void)
 
         if ((text_scn = elf_newscn(elf)) == NULL)
         {
-                fprintf(stderr, "elf_newscn() failed for text section!\n");
+                FPRINTF(stderr, "elf_newscn() failed for text section!\n");
                 GTMASSERT;
         }
 
         if ((text_data = elf_newdata(text_scn)) == NULL)
         {
-                fprintf(stderr, "elf_newdata() failed for text section!\n");
+                FPRINTF(stderr, "elf_newdata() failed for text section!\n");
                 GTMASSERT;
         }
 
@@ -280,7 +266,7 @@ void close_object_file(void)
 
         if ((text_shdr = elf64_getshdr(text_scn)) == NULL)
         {
-                fprintf(stderr, "elf64_getshdr() failed for text section\n");
+                FPRINTF(stderr, "elf64_getshdr() failed for text section\n");
                 GTMASSERT;
         }
 
@@ -294,13 +280,13 @@ void close_object_file(void)
 
         if ((strtab_scn = elf_newscn(elf)) == NULL)
         {
-                fprintf(stderr, "elf_newscn() failed for strtab section\n");
+                FPRINTF(stderr, "elf_newscn() failed for strtab section\n");
                 GTMASSERT;
         }
 
         if ((strtab_data = elf_newdata(strtab_scn)) == NULL)
         {
-                fprintf(stderr, "elf_newdata() failed for strtab section!\n");
+                FPRINTF(stderr, "elf_newdata() failed for strtab section!\n");
                 GTMASSERT;
         }
 
@@ -313,7 +299,7 @@ void close_object_file(void)
 
         if ((strtab_shdr = elf64_getshdr(strtab_scn)) == NULL)
         {
-                fprintf(stderr, "elf_getshdr() failed for strtab section!\n");
+                FPRINTF(stderr, "elf_getshdr() failed for strtab section!\n");
                 GTMASSERT;
         }
 
@@ -355,13 +341,13 @@ void close_object_file(void)
 
         if ((symtab_scn = elf_newscn(elf)) == NULL)
         {
-                fprintf(stderr, "elf_newscn() failed for symtab section!\n");
+                FPRINTF(stderr, "elf_newscn() failed for symtab section!\n");
                 GTMASSERT;
         }
 
         if ((symtab_data = elf_newdata(symtab_scn)) == NULL)
         {
-                fprintf(stderr, "elf_newdata() failed for symtab section!\n");
+                FPRINTF(stderr, "elf_newdata() failed for symtab section!\n");
                 GTMASSERT;
         }
 
@@ -374,7 +360,7 @@ void close_object_file(void)
 
         if ((symtab_shdr = elf64_getshdr(symtab_scn)) == NULL)
         {
-                fprintf(stderr, "elf_getshdr() failed for symtab section!\n");
+                FPRINTF(stderr, "elf_getshdr() failed for symtab section!\n");
                 GTMASSERT;
         }
 
@@ -386,11 +372,17 @@ void close_object_file(void)
         elf_flagehdr(elf, ELF_C_SET, ELF_F_DIRTY);
         if (elf_update(elf, ELF_C_WRITE) < 0)
         {
-                fprintf(stderr, "elf_update() failed!\n");
+                FPRINTF(stderr, "elf_update() failed!\n");
                 GTMASSERT;
         }
 
         elf_end(elf);
-        CLOSEFILE(object_file_des, status);
+
+        /* Free the memory malloc'ed above */
+        free(string_tbl);
+        free(gtm_obj_code);
+
+	if ((off_t)-1 == lseek(object_file_des, (off_t)0, SEEK_SET))
+		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 }
 

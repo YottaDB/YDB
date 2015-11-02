@@ -229,7 +229,7 @@ void	tp_restart(int newlevel)
 		switch (t_fail_hist[t_tries])
 		{
 		case cdb_sc_helpedout:
-			csa = &FILE_INFO(sgm_info_ptr->gv_cur_region)->s_addrs;
+			csa = sgm_info_ptr->tp_csa;
 			if ((dba_bg == csa->hdr->acc_meth) && !csa->now_crit)
 			{	/* The following grab/rel crit logic is purely to ensure that wcs_recover gets called if
 				 * needed. This is because we saw wc_blocked to be TRUE in tp_tend and decided to restart.
@@ -319,17 +319,20 @@ void	tp_restart(int newlevel)
 						assert(tr->reg->open);
 					}
 				}
+				DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 			}
 			tp_tend_status = tp_crit_all_regions();	/* grab crits on all regions */
 			assert(FALSE != tp_tend_status);
 			/* pick up all MM extension information */
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+			{
 				if (dba_mm == si->gv_cur_region->dyn.addr->acc_meth)
 				{
 					TP_CHANGE_REG_IF_NEEDED(si->gv_cur_region);
 					if (cs_addrs->total_blks < cs_addrs->ti->total_blks)
 						wcs_mm_recover(si->gv_cur_region);
 				}
+			}
 		}
 	}
 	tl = dollar_tlevel;
@@ -351,11 +354,9 @@ void	tp_restart(int newlevel)
 	tp_unwind(newlevel, RESTART_INVOCATION);
 	gd_header = tp_pointer->gd_header;
 	gv_target = tp_pointer->orig_gv_target;
-	if (NULL != gv_target)
-		gv_cur_region = gv_target->gd_reg;
-	else
-		gv_cur_region = NULL;
+	gv_cur_region = tp_pointer->gd_reg;
 	TP_CHANGE_REG(gv_cur_region);
+	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 	dollar_tlevel = newlevel;
 	top = gv_currkey->top;
 	/* ensure proper alignment before dereferencing tp_pointer->orig_key->end */

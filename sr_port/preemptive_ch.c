@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ void preemptive_ch(int preemptive_severe)
 		{
 			if (si->kip_incremented)
 			{
-				csa = &FILE_INFO(si->gv_cur_region)->s_addrs;
+				csa = si->tp_csa;
 				DECR_KIP(csa->hdr, csa, si->kip_incremented);
 			}
 		}

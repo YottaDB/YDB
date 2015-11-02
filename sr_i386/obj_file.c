@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,8 +46,9 @@ GBLREF int4		mlmax, mvmax;
 GBLREF int4		code_size, lit_addrs, lits_size;
 
 GBLDEF int4	psect_use_tab[GTM_LASTPSECT];	/* bytes of each psect in this module */
-GBLDEF char	object_file_name[MAX_FBUFF + 1];
-GBLDEF short	object_name_len;
+GBLREF char	object_file_name[];
+GBLREF short	object_name_len;
+GBLREF int	object_file_des;
 
 static short int current_psect;
 static char emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */
@@ -57,7 +58,6 @@ GBLREF uint4 txtrel_cnt;
 static uint4 cdlits;
 static struct rel_table *data_rel, *data_rel_end;
 static struct rel_table *text_rel, *text_rel_end;
-static int file_des;
 DEBUG_ONLY(static uint4 		txtrel_cnt_in_hdr;)
 
 error_def(ERR_OBJFILERR);
@@ -95,12 +95,9 @@ void create_object_file(rhdtyp *rhead)
 	object_name_len = pblk.b_esl;
 	object_file_name[object_name_len] = 0;
 
-	OPEN_OBJECT_FILE(object_file_name, O_CREAT | O_WRONLY, file_des);
-	if (file_des == -1)
-	{
+	OPEN_OBJECT_FILE(object_file_name, O_CREAT | O_RDWR, object_file_des);
+	if (object_file_des == -1)
 		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
-	}
-
 	memcpy(&rhead->jsb[0], "GTM_CODE", sizeof(rhead->jsb));
 	emit_addr((char *)&rhead->src_full_name.addr - (char *)rhead,
 		(int4)rhead->src_full_name.addr, (int4 *)&rhead->src_full_name.addr);
@@ -133,19 +130,17 @@ void close_object_file(void)
 	output_symbol();
 	if (emit_buff_used)
 		buff_emit();
-	if (close(file_des) == -1)
-	{
+	if ((off_t)-1 == lseek(object_file_des, (off_t)0, SEEK_SET))
 		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
-	}
 }
 
 
 void drop_object_file(void)
 {
-        if (file_des > 0)
+        if (object_file_des > 0)
         {
 		UNLINK(object_file_name);
-		close(file_des);
+		close(object_file_des);
         }
 }
 
@@ -286,7 +281,7 @@ void buff_emit(void)
 {
 	uint4 stat;
 
-	if (write(file_des, emit_buff, emit_buff_used) == -1)
+	if (write(object_file_des, emit_buff, emit_buff_used) == -1)
 	{
 		rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 	}

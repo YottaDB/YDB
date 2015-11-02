@@ -113,11 +113,9 @@ void op_svput(int varnum, mval *v)
 		break;
 	case SV_ZGBLDIR:
 		MV_FORCE_STR(v);
-		if (!(dollar_zgbldir.str.len == v->str.len &&
-		    !memcmp(dollar_zgbldir.str.addr, v->str.addr,
-		    dollar_zgbldir.str.len)))
+		if ((dollar_zgbldir.str.len != v->str.len) || memcmp(dollar_zgbldir.str.addr, v->str.addr, dollar_zgbldir.str.len))
 		{
-			if(v->str.len == 0)
+			if (0 == v->str.len)
 			{
 			        /* set $zgbldir="" */
 	   			dpzgbini();
@@ -131,12 +129,13 @@ void op_svput(int varnum, mval *v)
 	   			dollar_zgbldir.str.addr = v->str.addr;
 	  			s2pool(&dollar_zgbldir.str);
 			}
-		   	if (gv_currkey)
+		   	if (NULL != gv_currkey)
 			{
 				gv_currkey->base[0] = '\0';
 				gv_currkey->prev = gv_currkey->end = 0;
-			}
-		   	if (gv_target)
+			} else if (NULL != gd_header)
+				gvinit();
+		   	if (NULL != gv_target)
 				gv_target->clue.end = 0;
 		}
 		break;

@@ -300,7 +300,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				}
 				if (GTM_PROBE(sizeof(cw_set_element), si->first_cw_set, READ))
 				{	/* Note that SECSHR_PROBE_REGION does a "continue" if any probes fail. */
-					SECSHR_PROBE_REGION(si->gv_cur_region);	/* sets csa */
+					csa = si->tp_csa;
+					if (!GTM_PROBE(sizeof(sgmnt_addrs), csa, READ))
+						continue;
 					/* Assert that if we are in the midst of commit in a region, we better hold crit */
 					assert(!csa->t_commit_crit || csa->now_crit);
 					/* Just to be safe, set update_underway to TRUE only if we have crit on this region. */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,7 @@ typedef struct tp_frame_struct
 	struct gv_namehead_struct	*orig_gv_target;
 	struct gv_key_struct		*orig_key;
 	struct gd_addr_struct		*gd_header;
+	struct gd_region_struct		*gd_reg;
 	struct symval_struct		*sym;
 	tp_var		*vars;
 	mval	zgbldir;

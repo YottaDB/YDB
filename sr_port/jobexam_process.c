@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,11 +12,11 @@
 #include "mdef.h"
 
 #include <sys/types.h>
-#include <unistd.h>
 #include <signal.h>
-
+#include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+
 #include "error.h"
 #include "io_params.h"
 #include "op.h"
@@ -49,8 +49,15 @@ GBLREF uint4		process_id;
 GBLREF io_pair		io_std_device, io_curr_device;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char    *msp, *stackwarn, *stacktop;
+GBLREF char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
+GBLREF boolean_t        created_core;
 UNIX_ONLY(GBLREF sigset_t blockalrm;)
 
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
+error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 error_def(ERR_JOBEXAMFAIL);
@@ -62,6 +69,8 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	io_pair			dev_in_use;
 	mv_stent		*new_mv_stent;
 	boolean_t		saved_mv_stent;
+	char			saved_util_outbuff[OUT_BUFF_SIZE];
+	int			saved_util_outbuff_len;
 #ifdef UNIX
 	struct sigaction	new_action, prev_action;
 	sigset_t		savemask;
@@ -106,12 +115,22 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 #endif
 	*dump_file_spec = empty_str_mval;
 	dev_in_use = io_curr_device;		/* Save current IO device */
+	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW */
+	saved_util_outbuff_len = 0;
+	if (0 != (saved_util_outbuff_len = (util_outptr - util_outbuff)))	/* Caution -- assignment */
+		memcpy(saved_util_outbuff, util_outbuff, saved_util_outbuff_len);
+
 	jobexam_dump(input_dump_file_name, dump_file_spec);
 	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack
 	   to this point and return.
 	*/
-	io_curr_device = dev_in_use;		/* Restore IO device */
 
+	if (0 != saved_util_outbuff_len)
+	{	/* Restore util_outbuf values */
+		memcpy(util_outbuff, saved_util_outbuff, saved_util_outbuff_len);
+		util_outptr = util_outbuff + saved_util_outbuff_len;
+	}
+	io_curr_device = dev_in_use;		/* Restore IO device */
 	/* If we saved an mval on our stack, we need to pop it off. If there was an error while doing the
 	   jobexam dump, zshow may have left some other mv_stent entries on the stack. Pop them all off with
 	   just a regular POP_MV_STENT macro rather than unw_mv_ent() call because the mv_stent entries
@@ -184,6 +203,8 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec)
 
 CONDITION_HANDLER(jobexam_dump_ch)
 {
+	boolean_t	save_created_core;
+
 	START_CH;
 
 	/* Operation:
@@ -192,6 +213,14 @@ CONDITION_HANDLER(jobexam_dump_ch)
 	   3) Unwind the errant frames so we can return to the user without screwing
 	      up the task that got interrupted to do this examine.
 	*/
+#if defined(DEBUG) && defined(UNIX)
+	if (DUMPABLE)
+	{	/* For debug UNIX issues, let's make a core if we would have made one in open code */
+		save_created_core = created_core;
+		gtm_fork_n_core();
+		created_core = save_created_core;
+	}
+#endif
 	UNIX_ONLY(util_out_print(0, OPER));
 	VMS_ONLY(sig->chf$l_sig_args -= 2);
 	VMS_ONLY(callg(send_msg, &sig->chf$l_sig_args));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,6 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 			assert(INVALID_GV_TARGET != gv_target);
 			if ((!gv_target->root) || (DIR_ROOT == gv_target->root))
 				gvcst_root_search();
-			assert(gv_target->gd_reg == gv_cur_region);
 		}
 	} else
 	{
@@ -102,9 +101,8 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	}
 	assert(!bgormm || (gv_cur_region && &FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data));
 	assert(bgormm || !dollar_tlevel);
-	assert(!dollar_tlevel || sgm_info_ptr
-					&& ((sgm_info_ptr->gv_cur_region == gv_cur_region)
-						|| FILE_INFO(sgm_info_ptr->gv_cur_region) == FILE_INFO(gv_cur_region)));
+	assert(!dollar_tlevel || sgm_info_ptr && (sgm_info_ptr->tp_csa == cs_addrs));
+	assert(gv_target->gd_csa == cs_addrs);
 	assert(gd_targ_addr == gd_header);
 	was_null = is_null = FALSE;
 	max_key = gv_cur_region->max_key_size;

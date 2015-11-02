@@ -24,7 +24,6 @@
 #include "svnames.h"
 #include "error_trap.h"
 #include "jobinterrupt_process.h"
-#include "dollar_zlevel.h"		/* for SET_ERROR_FRAME macro to use dollar_zlevel() function */
 
 #define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
 
@@ -44,6 +43,8 @@ GBLREF bool		transform;
 error_def(ERR_ASSERT);
 error_def(ERR_GTMCHECK);
 error_def(ERR_GTMASSERT);
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKCRIT);
@@ -164,10 +165,7 @@ void trans_code(void)
 	 * the error-occuring frame is always unwound and the new error is rethrown
 	 * at one level below */
 	if (IS_ETRAP)
-	{
-		SET_ERROR_FRAME(frame_pointer);	/* reset dollar_ecode.error_frame to point to frame_pointer as well as resetting
-						 * error_frame_mpc, error_frame_ctxt fields and error_frame->{mpc,ctxt} */
-	}
+		SET_ERROR_FRAME(frame_pointer);	/* reset error_frame to point to frame_pointer */
 	if (!(ztrap_form & ZTRAP_CODE) && !IS_ETRAP && POP_SPECIFIED)
 		golevel(level2go);
 	dummy.mvtype = MV_STR;

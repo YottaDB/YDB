@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2007 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2008 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -141,6 +141,7 @@
 !	ERR_DISTPATHMAX		150377682 (reported in gtm.c if $gtm_dist buffer is insufficient)
 !	ERR_DLLNOOPEN		150379250 (reported in gtm.c if libgtmshr cannot be opened)
 !	ERR_DLLNORTN		150379258 (reported in gtm.c if gtm_main is not found in libgtmshr)
+!	ERR_OPCOMMISSED		150381275 (sent via $SNDOPR in util_output.c if prior errors)
 !
 !  List of known undocumented messages follows (along with a comment)
 !	ERR_JNLREQUIRED		message referenced only in GT.CX code (not supported currently)
@@ -296,7 +297,7 @@ JNLFILOPN	<Error opening journal file !AD for database file !AD>/error/fao=4!/an
 MBXRDONLY	<Mailbox is read only, cannot write to it>/error/fao=0!/ansi=0
 JNLINVALID	<!AD is not a valid journal file !/ for database file: !AD>/error/fao=4!/ansi=0
 MBXWRTONLY	<Mailbox is write only, cannot read from it>/error/fao=0!/ansi=0
-MEMORY		<Central memory exhausted during request for !UL bytes from 0x!XL>/error/fao=2!/ansi=0
+MEMORY		<Central memory exhausted during request for !UL bytes from 0x!XL>/fatal/fao=2!/ansi=0
 MTBLKTOOBIG	<Magtape BLOCK_SIZE exceeds maximum size allowed>/error/fao=0!/ansi=70
 MTBLKTOOSM	<Magtape BLOCK_SIZE is less than !UL bytes>/error/fao=1!/ansi=70
 MTFIXRECSZ	<BLOCK_SIZE !UL must be multiple of fixed record size !UL>/error/fao=2!/ansi=70
@@ -692,7 +693,7 @@ DBBMINV		<!AD Bit map contains an invalid pattern> /info /fao=2!/ansi=0
 DBBMMSTR	<!AD Bit map does not match master map> /info /fao=2!/ansi=0
 DBROOTBURN	<!AD Root block has data level> /info /fao=2!/ansi=0
 REPLSTATEERR	<Replication state cannot be changed to the specified value for database file !AD>/error/fao=2!/ansi=0
-VMSMEMORY	<Central memory exhausted during request for !UL bytes from 0x!XL - check page file quota and page file size>/error/fao=2!/ansi=0
+VMSMEMORY	<Central memory exhausted during request for !UL bytes from 0x!XL - check page file quota and page file size>/fatal/fao=2!/ansi=0
 DBDIRTSUBSC	<!AD Directory tree block contains non name-level entries> /info /fao=2!/ansi=0
 TIMEROVFL	<Timer overflow; interval probably too large> /error /fao=0!/ansi=0
 GTMASSERT	<!AD - Assert failed !AD line !UL>/fatal/fao=5!/ansi=0
@@ -1286,6 +1287,9 @@ RLBKJNLNOBIMG	<Journal file !AD has NOBEFORE_IMAGE journaling>/info/fao=2!/ansi=
 RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and journal files will not be modified)>/info/fao=0!/ansi=0
 KILLBYSIGSINFO3	<!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XL>/fatal/fao=5!/ansi=0
 GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
+GTMERREXIT	<GTM image has exited with errors>/error/fao=0!/ansi=0
+INVMEMRESRV	<Could not allocate GT.M memory reserve (!AD)>/warning/fao=2!/ansi=0
+OPCOMMISSED	<OPCOMMISSED !UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -43,11 +43,15 @@ else
 ifeq ($(gt_os_type), OS/390)
 common_dirs_sp=unix_gnp unix_cm unix_nsb unix port_cm port
 else
+ifeq ($(findstring CYGWIN,$(gt_os_type)), CYGWIN)
+common_dirs_sp=unix_gnp unix_cm unix_nsb unix port_cm port
+else
 ifeq ($(gt_os_type), Linux)
 ifeq ($(linux_build_type),32)
 common_dirs_sp=unix_gnp unix_cm unix_nsb unix port_cm port
 else
 common_dirs_sp=unix_gnp unix_cm unix port_cm port
+endif
 endif
 endif
 endif
@@ -65,6 +69,10 @@ endif
 
 ifeq ($(gt_os_type), OSF1)
 lib_dirs_sp=dux alpha $(common_dirs_sp)
+endif
+
+ifeq ($(findstring CYGWIN,$(gt_os_type)), CYGWIN)
+lib_dirs_sp=linux i386 x86_regs $(common_dirs_sp)
 endif
 
 ifeq ($(gt_os_type), Linux)

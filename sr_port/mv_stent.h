@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ typedef struct mv_stent_struct
 } mv_stent;
 
 mval *unw_mv_ent(mv_stent *mv_st_ent);
-void push_stck(void* val, int val_size, void** addr);
+void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 
 #define MVST_MSAV 0	/* An mval and an address to store it at pop time, most
 			   often used to save/restore new'd intrinsic variables.
@@ -115,7 +115,7 @@ void push_stck(void* val, int val_size, void** addr);
 #define MVST_TPHOLD 10	/* Place holder for MUMPS stack pertaining to TSTART */
 #define MVST_ZINTR  11  /* Environmental save for $zinterrupt */
 #define MVST_ZINTDEV 12	/* In I/O when ZINTR, mstr input to now protected */
-
+#define	MVST_STCK_SP 13	/* same as the MVST_STCK type except that it needs special handling in flush_jmp.c (see comment there) */
 
 /* Variation of ROUND_UP2 macro that doesn't have the checking that generates a GTMASSERT. This is necessary because the
    MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it
@@ -133,10 +133,10 @@ LITREF unsigned char mvs_size[];
 	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)), \
 	mv_chain = (mv_stent *) msp)
 
-#define PUSH_MV_STCK(size) (((msp -= (mvs_size[MVST_STCK] + (size))) <= stackwarn) ? \
-	((msp <= stacktop) ? (msp += (mvs_size[MVST_STCK] + (size))/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
+#define PUSH_MV_STCK(size,st_type) (((msp -= (mvs_size[st_type] + (size))) <= stackwarn) ? \
+	((msp <= stacktop) ? (msp += (mvs_size[st_type] + (size))/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) : \
 	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) : \
-	(((mv_stent *) msp)->mv_st_type = MVST_STCK , \
+	(((mv_stent *) msp)->mv_st_type = st_type, \
 	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)), \
 	mv_chain = (mv_stent *) msp)
 

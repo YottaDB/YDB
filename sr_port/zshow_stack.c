@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ void zshow_stack(zshow_out *output)
 			}
 			else
 				addr = fp->mpc;
-			v.len = INTCAST(symb_line(addr, &buff[0], 0, fp->rvector) - &buff[0]);
+			v.len = INTCAST(symb_line(addr, &buff[0], 0, fp->rvector, FALSE) - &buff[0]);
 			if (v.len == 0)
 			{
 				memcpy(&buff[0], UNK_LOC_MESS, sizeof(UNK_LOC_MESS) - 1);

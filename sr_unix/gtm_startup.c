@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -137,6 +137,9 @@ GBLREF boolean_t	utf8_patnumeric;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF casemap_t	casemaps[];
+GBLREF void             (*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
+GBLREF ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
+GBLREF ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
 
 OS_PAGE_SIZE_DECLARE
 
@@ -156,6 +159,9 @@ void gtm_startup(struct startup_vector *svec)
 	assert(svec->argcnt == sizeof(*svec));
 	IA64_ONLY(init_xfer_table();)
 	get_page_size();
+	cache_table_relobjs = &cache_table_rebuild;
+	ht_rhash_ch = &hashtab_rehash_ch;
+	jbxm_dump_ch = &jobexam_dump_ch;
 	rtn_fst_table = rtn_names = (rtn_tabent *)svec->rtn_start;
 	rtn_names_end = rtn_names_top = (rtn_tabent *)svec->rtn_end;
 	if (svec->user_stack_size < 4096)
@@ -170,7 +176,7 @@ void gtm_startup(struct startup_vector *svec)
 	fgncal_stack = stackbase;
 	mv_chain = (mv_stent *)msp;
 	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
-	stackwarn = stacktop + 1024;
+	stackwarn = stacktop + (16 * 1024);
 	break_message_mask = svec->break_message_mask;
 	lv_null_subs = svec->lvnullsubs;
 	if (svec->user_strpl_size < STP_INITSIZE)

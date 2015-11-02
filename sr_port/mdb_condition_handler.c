@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -217,6 +217,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 	error_def(ERR_TPNOTACID);
 	error_def(ERR_JOBINTRRQST);
 	error_def(ERR_JOBINTRRETHROW);
+	error_def(ERR_MEMORY);
+	error_def(ERR_VMSMEMORY);
+	error_def(ERR_GTMERREXIT);
 
 	START_CH;
 	if (repeat_error = (ERR_REPEATERROR == SIGNAL)) /* assignment and comparison */
@@ -327,13 +330,37 @@ CONDITION_HANDLER(mdb_condition_handler)
 		   to really become screwed up. For this reason, this niceness of avoiding a dump on a
 		   stack overflow on VMS is being disabled. The dump can be controlled wih set proc/dump
 		   (or not) as desired.
+
+		   2008-01-29 (se): Added (now) fatal MEMORY error so we no longer generate a core for it by
+		   default unless the DumpOnStackOFlow flag is turned on. Since this flag is not a user-exposed
+		   interface, I'm avoiding renaming it for now. Note the core avoidance applies to both UNIX
+		   and VMS since stack formation is not at issue in this sort of memory request.
 		*/
-#ifndef VMS
-		if ((int)ERR_STACKOFLOW == SIGNAL && !(GDL_DumpOnStackOFlow & gtmDebugLevel))
+
+		if (!(GDL_DumpOnStackOFlow & gtmDebugLevel) &&
+		    VMS_ONLY((int)ERR_VMSMEMORY == SIGNAL)
+		    UNIX_ONLY(((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_MEMORY == SIGNAL)))
 		{
+#ifdef VMS
+			/* Inside this ifdef, we are definitely here because of ERR_VMSMEMORY. If the conditions
+			   of the above if change, revisit these assmuptions.
+
+			   For VMSMEMORY error, we have to send the message to the operator log and to the
+			   console ourselves because the MUMP_EXIT method of exiting on a fatal error does
+			   not preserve the substitution parameters for the message making it useless. After
+			   sending the message change the status code so we exit with something other than the
+			   duplicate message.
+			*/
+			assert(ERR_VMSMEMORY == SIGNAL);
+			send_msg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),
+				 *(int **)(&sig->chf$is_sig_arg1 + 2));
+			gtm_putmsg(VARLSTCNT(4) ERR_VMSMEMORY, 2, *(int **)(&sig->chf$is_sig_arg1 + 1),
+				   *(int **)(&sig->chf$is_sig_arg1 + 2));
+			SIGNAL = ERR_GTMERREXIT;	/* Override reason for "stop" */
+#endif
 			MUMPS_EXIT;	/* Do a clean exit rather than messy core exit */
 		}
-#endif
+
 		gtm_dump();
 		TERMINATE;
 	}
@@ -498,10 +525,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{	/* a primary error occurred already. irrespective of whether ZTRAP or ETRAP is active now,
 				 * we need to consider this as a nested error and trigger nested error processing.
 				 */
-				goerrorframe(error_frame);
-				assert(error_frame == frame_pointer);
-				SET_ERROR_FRAME(frame_pointer);	/* reset dollar_ecode.error_frame to frame_pointer as well as reset
-								 * error_frame_mpc, error_frame_ctxt and error_frame->{mpc,ctxt} */
+				goerrorframe();	/* unwind upto error_frame */
 				proc_act_type = 0;
 			} else if (0 != dollar_ztrap.str.len)
 			{
@@ -588,10 +612,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 	} else  if ((int)ERR_STACKCRIT == SIGNAL)
 	{
 		assert(msp > stacktop);
+		assert(stackwarn > stacktop);
 		cp = stackwarn;
 		stackwarn = stacktop;
-		push_stck(cp, 0, (void**)&stackwarn);
-		push_stck(stacktop, 0, (void**)&stacktop);
+		push_stck(cp, 0, (void**)&stackwarn, MVST_STCK_SP);
 	}
 	if (!repeat_error)
 		dollar_ecode.error_last_b_line = NULL;
@@ -639,9 +663,10 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * errored since we will unwind all frames upto and including zyerr_frame.
 	 * -----------------------------------------------------------------------
 	 */
-	if (FALSE == compile_time && !trans_action && !dm_action && NULL == zyerr_frame)
+	if (FALSE == compile_time && !trans_action && !dm_action && (NULL == zyerr_frame)
+		&& (NULL == error_frame) && (0 != dollar_ztrap.str.len) && !repeat_error)
 	{
-		for (fp = frame_pointer;  fp;  fp = fp->old_frame_pointer)
+		for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 		{
 			/* See if this is a $ZINTERRUPT frame. If yes, we want to restart *this* line
 			   at the beginning. Since it is always an indirect frame, we can use the context
@@ -664,10 +689,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			if (ADDR_IN_CODE(fp->mpc, fp->rvector))
 			{
 				if (dollar_ztrap.str.len > 0)
-				{
-					/* GT.M specific error trapping
-					 * retries the line with the error
-					 */
+				{	/* GT.M specific error trapping retries the line with the error */
 					fp->mpc = dollar_ecode.error_last_b_line;
 					fp->ctxt = context;
 				}
@@ -706,10 +728,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{	/* a primary error occurred already. irrespective of whether ZTRAP or ETRAP is active now, we need to
 			 * consider this as a nested error and trigger nested error processing.
 			 */
-			goerrorframe(error_frame);
-			assert(error_frame == frame_pointer);
-			SET_ERROR_FRAME(frame_pointer);	/* reset dollar_ecode.error_frame to frame_pointer as well as reset
-							 * error_frame_mpc, error_frame_ctxt and error_frame->{mpc,ctxt} */
+			goerrorframe();	/* unwind upto error_frame */
 			proc_act_type = 0;
 			MUM_TSTART;	/* unwind the current C-stack and restart executing from the top of the current M-stack */
 			assert(FALSE);
@@ -749,8 +768,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{ /* Unhandled errors from called-in routines should return to gtm_ci() with error status */
 				mumps_status = SIGNAL;
 				MUM_TSTART;
-			}
-			else if (etrap_handling)
+			} else if (etrap_handling)
 			{
 				proc_act_type = SFT_ZTRAP;
 				err_act = &dollar_etrap.str;
@@ -775,8 +793,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	{
 		if (trans_action || dm_action)
 		{	/* If true transcendental, do trans_code_cleanup. If our counted frame that
-			   is masquerading as a transcendental frame, run jobinterrupt_process_clean
-			*/
+			 * is masquerading as a transcendental frame, run jobinterrupt_process_clean
+			 */
 			if (!(SFT_ZINTR & proc_act_type))
 				trans_code_cleanup();
 			else

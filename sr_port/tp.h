@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,10 @@ typedef struct sgm_info_struct
 				*last_tp_hist;
 	hash_table_int4		*blks_in_use;
 	trans_num		start_tn;
-	gd_region		*gv_cur_region;
+	gd_region		*gv_cur_region;	/* Backpointer to the region; Note that it is not necessarily unique since
+						 * multiple regions could point to the same csa (and hence same sgm_info
+						 * structure) with all but one of them having reg->was_open set to TRUE.
+						 */
 	int4			update_trans;	/* was this region updated; TRUE if cw_set_depth is non-zero, but additionally
 						 * TRUE in case of a duplicate set (cw_set_depth is zero in that case) */
 	cw_set_element		*first_cw_set,
@@ -117,8 +120,8 @@ typedef struct sgm_info_struct
 	buddy_list		*recompute_list;	/* to hold the list of to-be-recomputed keys and values */
 	buddy_list		*tlvl_info_list;	/* to hold the list of tlvl_info structures */
 	cache_rec_ptr_ptr_t	cr_array;
-	sgmnt_data_ptr_t	tpcsd;
-	sgmnt_addrs		*tpcsa;
+	sgmnt_data_ptr_t	tp_csd;
+	sgmnt_addrs		*tp_csa;
 	kill_set		*kill_set_head,
 				*kill_set_tail;
 	tlevel_info		*tlvl_info_head;
@@ -165,14 +168,38 @@ typedef struct
    identical to the first three fields in this structure */
 typedef struct tp_region_struct
 {
-	struct	tp_region_struct *fPtr;			/* Next in list */
-	gd_region	*reg;				/* Region pointer */
-	union						/* we will either use file_id or index */
+	struct	tp_region_struct *fPtr;		/* Next in list */
+	gd_region	*reg;			/* Region pointer. Note that it is not necessarily unique since multiple
+						 * regions could point to the same physical file (with all but one of them
+						 * having reg->was_open set to TRUE.and hence have the same tp_region structure.
+						 */
+	union					/* we will either use file_id or index */
 	{
-		gd_id		file_id; 		/* both for VMS and UNIX */
-		int4		fid_index;		/* copy of csa->fid_index for this region */
+		gd_id		file_id; 	/* both for VMS and UNIX */
+		int4		fid_index;	/* copy of csa->fid_index for this region */
 	} file;
 } tp_region;
+
+#ifdef	DEBUG
+/* Macro to check that the tp_reg_list linked list is sorted properly on the file-id */
+#define	DBG_CHECK_TP_REG_LIST_SORTING(REGLIST)						\
+{											\
+	int4		prev_index;							\
+	tp_region	*tr;								\
+											\
+	prev_index = 0;									\
+	for (tr = REGLIST; NULL != tr; tr = tr->fPtr)					\
+	{										\
+		if (tr->reg->open)							\
+		{									\
+			assert(prev_index < tr->file.fid_index);			\
+			DEBUG_ONLY(prev_index = tr->file.fid_index);			\
+		}									\
+	}										\
+}
+#else
+#define	DBG_CHECK_TP_REG_LIST_SORTING(REGLIST)
+#endif
 
 typedef struct ua_list_struct
 {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -174,7 +174,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		mupip_exit(ERR_MUNOACTION);
 	}
 	gv_keysize = ROUND_UP2(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4);
-	gv_target = targ_alloc(gv_keysize, NULL);	/* t_begin needs this initialized */
+	gv_target = targ_alloc(gv_keysize, NULL, NULL);	/* t_begin needs this initialized */
 	memset(&alt_hist, 0, sizeof(alt_hist));	/* null-initialize history */
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
 	{

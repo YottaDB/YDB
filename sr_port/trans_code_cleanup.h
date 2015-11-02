@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,14 +14,15 @@
 
 void trans_code_cleanup(void);
 
+error_def(ERR_ERRWZTRAP);
+error_def(ERR_ERRWETRAP);
+error_def(ERR_ERRWZBRK);
+error_def(ERR_ERRWIOEXC);
+error_def(ERR_ERRWEXC);
+error_def(ERR_ERRWZINTR);
+
 #define SET_ERR_CODE(fp, err)							\
 {										\
-	error_def(ERR_ERRWZTRAP);						\
-	error_def(ERR_ERRWETRAP);						\
-	error_def(ERR_ERRWZBRK);						\
-	error_def(ERR_ERRWIOEXC);						\
-	error_def(ERR_ERRWEXC);							\
-        error_def(ERR_ERRWZINTR);                                               \
 	switch (fp->type)							\
 	{									\
 	case SFT_ZBRK_ACT:							\

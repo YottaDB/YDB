@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -107,6 +107,7 @@ void	op_tcommit(void)
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	unsigned int		bsiz;
+	gd_region		*save_cur_region;	/* saved copy of gv_cur_region before TP_CHANGE_REG modifies it */
 
 	if (0 == dollar_tlevel)
 		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
@@ -116,6 +117,8 @@ void	op_tcommit(void)
 
 	if (1 == dollar_tlevel)					/* real commit */
 	{
+		save_cur_region = gv_cur_region;
+		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 		if (NULL != first_sgm_info)	/* if (database work in the transaction) */
 		{
 			for (temp_si = si = first_sgm_info; (cdb_sc_normal == status) && (NULL != si); si = si->next_sgm_info)
@@ -358,15 +361,9 @@ void	op_tcommit(void)
 			assert(NULL == temp_si || NULL == si->kill_set_head);
 		}	/* if (kills in the transaction) */
 		tp_clean_up(FALSE);	/* Not the rollback type of cleanup */
-		if (gv_target != NULL)
-		{
-			TP_CHANGE_REG_IF_NEEDED(gv_target->gd_reg);
-		} else
-		{
-			gv_cur_region = NULL;
-			cs_addrs = (sgmnt_addrs *)0;
-			cs_data = (sgmnt_data_ptr_t)0;
-		}
+		gv_cur_region = save_cur_region;
+		TP_CHANGE_REG(gv_cur_region);
+		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 		/* Cancel or clear any pending TP timeout only if real commit (i.e. outermost commit) */
 		(*tp_timeout_clear_ptr)();
 	} else		/* an intermediate commit */

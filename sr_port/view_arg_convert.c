@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,16 +25,19 @@
 #include "hashtab_mname.h"
 #include "hashtab.h"
 #include "valid_mname.h"
+#include "dpgbldir.h"
 
 LITREF mval 		literal_one;
 
 GBLREF	gd_addr 	*gd_header;
+GBLREF	gvt_container	*gvt_pending_list;
+GBLREF	buddy_list	*gvt_pending_buddy_list;
 
 static	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the globals that are noisolated */
 
 void view_arg_convert(viewtab_entry *vtp, mval *parm, viewparm *parmblk)
 {
-static	int4			first_time = TRUE;
+	static	int4		first_time = TRUE;
 	int			n, res;
 	ht_ent_mname		*tabent;
 	mstr			tmpstr, namestr;
@@ -46,6 +49,8 @@ static	int4			first_time = TRUE;
 	unsigned char 		*src, *nextsrc, *src_top, *dst, *dst_top, y;
 	gd_binding		*temp_gd_map, *temp_gd_map_top;
 	gv_namehead		*temp_gv_target;
+	gvt_container		*gvtc;
+	gvnh_reg_t		*gvnh_reg;
 
 	error_def(ERR_VIEWARGCNT);
 	error_def(ERR_NOREGION);
@@ -143,6 +148,8 @@ static	int4			first_time = TRUE;
 		{
 			noisolation_buddy_list = (buddy_list *)malloc(sizeof(buddy_list));
 			initialize_list(noisolation_buddy_list, sizeof(noisolation_element), NOISOLATION_INIT_ALLOC);
+			gvt_pending_buddy_list = (buddy_list *)malloc(sizeof(buddy_list));
+			initialize_list(gvt_pending_buddy_list, sizeof(gvt_container), NOISOLATION_INIT_ALLOC);
 			first_time = FALSE;
 		}
 		if (sizeof(global_names) <= parm->str.len)
@@ -194,8 +201,8 @@ static	int4			first_time = TRUE;
 				temp_gv_target = NULL;
 				gvent.var_name.addr = &lcl_buff.c[0];
 				COMPUTE_HASH_MNAME(&gvent);
-				if (NULL == (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent)) ||
-					NULL == (temp_gv_target = (gv_namehead *)tabent->value))
+				if (NULL == (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent))
+					|| (NULL == (gvnh_reg = (gvnh_reg_t *)tabent->value)))
 				{
 					temp_gd_map = gd_header->maps;
 					temp_gd_map_top = temp_gd_map + gd_header->n_maps;
@@ -207,22 +214,39 @@ static	int4			first_time = TRUE;
 						if (0 == res && 0 != temp_gd_map->name[gvent.var_name.len])
 							break;
 					}
-					assert(temp_gd_map->reg.addr->max_key_size <= MAX_KEY_SZ);
-					temp_gv_target = (gv_namehead *)targ_alloc(temp_gd_map->reg.addr->max_key_size, &gvent);
-					temp_gv_target->gd_reg = temp_gd_map->reg.addr;
+					r_ptr = temp_gd_map->reg.addr;
+					assert(r_ptr->max_key_size <= MAX_KEY_SZ);
+					temp_gv_target = (gv_namehead *)targ_alloc(r_ptr->max_key_size, &gvent, r_ptr);
+					gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
+					gvnh_reg->gvt = temp_gv_target;
+					gvnh_reg->gd_reg = r_ptr;
 					if (NULL != tabent)
 					{	/* Since the global name was found but gv_target was null and
 						 * now we created a new gv_target, the hash table key must point
 						 * to the newly created gv_target->gvname. */
 						tabent->key = temp_gv_target->gvname;
-						tabent->value = (char *)temp_gv_target;
+						tabent->value = (char *)gvnh_reg;
 					} else
 					{
 						if (!add_hashtab_mname((hash_table_mname *)gd_header->tab_ptr,
-								&temp_gv_target->gvname, temp_gv_target, &tabent))
+								&temp_gv_target->gvname, gvnh_reg, &tabent))
 							GTMASSERT;
 					}
-				}
+					if (!r_ptr->open)
+					{	/* Record list of all gv_targets that have been allocated BEFORE the
+						 * region has been opened. Once the region gets opened, we will re-examine
+						 * this list and reallocate them (if needed) since they have now been allocated
+						 * using the region's max_key_size value which could potentially be different
+						 * from the max_key_size value in the corresponding database file header.
+						 */
+						gvtc = (gvt_container *)get_new_free_element(gvt_pending_buddy_list);
+						gvtc->gvnh_reg = gvnh_reg;
+						assert(!gvtc->gvnh_reg->gd_reg->open);
+						gvtc->next_gvtc = (struct gvt_container_struct *)gvt_pending_list;
+						gvt_pending_list = gvtc;
+					}
+				} else
+					temp_gv_target = gvnh_reg->gvt;
 				gvnh_entry = (noisolation_element *)get_new_element(noisolation_buddy_list, 1);
 				gvnh_entry->gvnh = temp_gv_target;
 				gvnh_entry->next = parmblk->ni_list.gvnh_list;

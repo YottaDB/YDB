@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,9 +28,9 @@
 #include "mmemory.h"
 #include "obj_file.h"
 
-GBLDEF char		object_file_name[MAX_FBUFF + 1];
-GBLDEF short		object_name_len;
-GBLDEF int		object_file_des;
+GBLREF char		object_file_name[];
+GBLREF short		object_name_len;
+GBLREF int		object_file_des;
 DEBUG_ONLY(GBLDEF int	obj_bytes_written;)
 
 GBLREF boolean_t	run_time;

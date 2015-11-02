@@ -22,6 +22,7 @@
  *              Sets default perms if it creates a new file.
  * CLOSE_OBJECT_FILE - close the object file after releasing the lock on it.
  * CLOSEFILE	Loop until close succeeds for fails with other than EINTR.
+ * CONVERT_OBJECT_LOCK - convert type of lock held on object file
  * LSEEKREAD	Performs either pread() or an lseek()/ read() combination. In
  *		the latter case, sets global variable to warn off async IO routines.
  * LSEEKREAD_AVAILABLE	Same as LSEEKREAD except it has an extra parameter where the number of bytes
@@ -160,6 +161,7 @@
 	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)    \
 	;  \
 }
+#define CONVERT_OBJECT_LOCK(FDESC, FFLAG, RC)
 #else
 #if defined( __linux__)
 /* A special handling was needed for linux due to its inability to lock
@@ -238,6 +240,19 @@
 		}												\
 		break;												\
 	}													\
+}
+#define CONVERT_OBJECT_LOCK(FDESC, FFLAG, RC)						\
+{											\
+	struct flock	lock;    /* arg to lock the file thru fnctl */			\
+	pid_t		l_pid;								\
+											\
+	l_pid = getpid();								\
+	do {										\
+		lock.l_type = FFLAG;							\
+		lock.l_whence = SEEK_SET;	/*locking offsets from file beginning*/	\
+		lock.l_start = lock.l_len = 0;	/* lock the whole file */ 		\
+		lock.l_pid = l_pid;							\
+	} while (-1 == (RC = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno); 	\
 }
 #endif
 

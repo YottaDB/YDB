@@ -41,7 +41,8 @@ typedef struct {
 	uint4		recaddr;	/* On-disk journal record offset */
 	uint4		readaddr;	/* Next on-disk read offset */
 	uint4		buffremaining;	/* Remaining buffer space */
-	unsigned char	*base;		/* Buffer */
+	unsigned char	*base_buff;	/* Actual malloced buffer start : Not necessarily DISK_BLOCK_SIZE aligned */
+	unsigned char	*base;		/* DISK_BLOCK_SIZE aligned buffer start */
 } repl_buff_desc;
 
 #define REPL_BLKSIZE(x)		((x)->fc->jfh->alignsize)

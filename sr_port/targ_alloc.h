@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #ifndef TARG_ALLOC_INCLUDED
 #define TARG_ALLOC_INCLUDED
 
-gv_namehead *targ_alloc(int keysize, mname_entry *gvent);
+gv_namehead	*targ_alloc(int keysize, mname_entry *gvent, gd_region *reg);
+void		targ_free(gv_namehead *gvt);
 
 #endif /* TARG_ALLOC_INCLUDED */

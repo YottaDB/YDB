@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -660,7 +660,7 @@ void wcs_recover(gd_region *reg)
 		jpc = csa->jnl;
 		if (JNL_ENABLED(csd) && (NULL != jpc) && (NULL != jpc->jnl_buff))
 		{
-			assert(jpc->region == reg);
+			assert(&FILE_INFO(jpc->region)->s_addrs == csa);
 			if (!jgbl.dont_reset_gbl_jrec_time)
 			{
 				SET_GBL_JREC_TIME; /* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_inctn_rec */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	unsigned char		*mstack_ptr;
 	ht_ent_mname		*tabent;
 	mname_entry	 	gvent;
+	gvnh_reg_t		*gvnh_reg;
 
 	error_def(ERR_JNLREADEOF);
 	error_def(ERR_DUPTN);
@@ -105,7 +106,6 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	jgbl.mur_pini_addr_reset_fnptr = (pini_addr_reset_fnptr)mur_pini_addr_reset;
 	gv_keysize = ROUND_UP2(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4);
 	mu_gv_stack_init(&mstack_ptr);
-	gv_target = targ_alloc(gv_keysize, NULL);
 	assert(!mur_options.rollback_losttnonly || !murgbl.db_updated);
 	if (!mur_options.rollback_losttnonly)
 		murgbl.db_updated = mur_options.update;
@@ -137,22 +137,13 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		}
 		if (mur_options.update || mur_options.extr[GOOD_TN])
 		{
-			gv_target->gd_reg = gv_cur_region = rctl->gd;
-			gv_target->clue.prev = gv_target->clue.end = 0;
-			gv_target->root = 0;
-			gv_target->nct = 0;
-			gv_target->act = 0;
-			gv_target->ver = 0;
-			gv_target->collseq = NULL;
-			gv_target->noisolation = FALSE;
+			gv_cur_region = rctl->gd;
 			tp_change_reg();
-			assert(NULL == cs_addrs->dir_tree || cs_addrs->dir_tree->gd_reg == gv_cur_region);
-			if (NULL == cs_addrs->dir_tree)
-			{
-				cs_addrs->dir_tree = targ_alloc(gv_keysize, NULL);
-				cs_addrs->dir_tree->root = DIR_ROOT;
-				cs_addrs->dir_tree->gd_reg = gv_cur_region;
-			}
+			SET_CSA_DIR_TREE(cs_addrs, gv_keysize, gv_cur_region);
+			/* Keep gv_target and gv_cur_region in sync always. Now that region is changed, set gv_target to
+			 * csa->dir_tree. We dont want to set it to NULL as there is code in t_begin that assumes it is non-NULL.
+			 */
+			gv_target = cs_addrs->dir_tree;
 		}
 		curr_tn = 0;
 		rec_token_seq = 0;
@@ -298,29 +289,32 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 					gvent.var_name.addr = (char *)gv_currkey->base;
 					gvent.var_name.len = STRLEN((char *)gv_currkey->base);
 					COMPUTE_HASH_MNAME(&gvent);
-					if ((NULL !=  (tabent = lookup_hashtab_mname(&rctl->gvntab, &gvent))) &&
-								(NULL != (gv_target = (gv_namehead *)tabent->value)))
+					if ((NULL !=  (tabent = lookup_hashtab_mname(&rctl->gvntab, &gvent)))
+						&& (NULL != (gvnh_reg = (gvnh_reg_t *)tabent->value)))
 					{
-						assert(gv_target->gd_reg->open);
-						gv_cur_region = gv_target->gd_reg;
+						gv_target = gvnh_reg->gvt;
+						gv_cur_region = gvnh_reg->gd_reg;
+						assert(gv_cur_region->open);
 						if (dollar_trestart)
 							gv_target->clue.end = 0;
 					} else
 					{
 						assert(gv_cur_region->max_key_size <= MAX_KEY_SZ);
 						gv_target = (gv_namehead *)targ_alloc(gv_cur_region->max_key_size,
-							&gvent);
-						gv_target->gd_reg = gv_cur_region;
+							&gvent, gv_cur_region);
+						gvnh_reg = (gvnh_reg_t *)malloc(sizeof(gvnh_reg_t));
+						gvnh_reg->gvt = gv_target;
+						gvnh_reg->gd_reg = gv_cur_region;
 						if (NULL != tabent)
 						{	/* Since the global name was found but gv_target was null and
 							 * now we created a new gv_target, the hash table key must point
 							 * to the newly created gv_target->gvname. */
 							tabent->key = gv_target->gvname;
-							tabent->value = gv_target;
+							tabent->value = (char *)gvnh_reg;
 						} else
 						{
 							added = add_hashtab_mname(&rctl->gvntab, &gv_target->gvname,
-									gv_target, &tabent);
+									gvnh_reg, &tabent);
 							assert(added);
 						}
 					}

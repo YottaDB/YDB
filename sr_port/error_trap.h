@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,9 +64,6 @@ typedef	struct {
 	dollar_ecode_struct	*array;	/* array of DOLLAR_ECODE_MAXINDEX dollar_ecode_struct structures */
 	uint4			index;	/* current count of number of filled structures in array */
 	int4			error_last_ecode; /* last error code number */
-	unsigned char		*error_frame_mpc; /* ptr to original mpc in case error_frame's mpc was overwritten to error_ret() */
-	unsigned char		*error_frame_ctxt;/* ptr to original ctxt in case error_frame's ctxt was overwritten */
-		/* note that error_frame_mpc and error_frame_ctxt are used only if error_frame->mpc != CODE_ADDRESS(ERROR_RTN) */
 	unsigned char		*error_last_b_line;	/* ptr to beginning of line where error occurred */
 	struct stack_frame_struct *first_ecode_error_frame;	/* "frame_pointer" at the time of adding the first ECODE */
 	unsigned char		*error_rtn_addr;	/* CODE_ADDRESS(ERROR_RTN) */
@@ -97,38 +94,23 @@ typedef struct {
 	dollar_ecode.first_ecode_error_frame = NULL;			\
 }
 
-/* nullify "error_frame" and its associated pointer variables */
+/* nullify "error_frame" */
 #define	NULLIFY_ERROR_FRAME				\
 {							\
 	GBLREF	stack_frame		*error_frame;	\
-	GBLREF	dollar_ecode_type	dollar_ecode;	\
 							\
 	error_frame = NULL;				\
-	dollar_ecode.error_frame_mpc = NULL;		\
-	dollar_ecode.error_frame_ctxt = NULL;		\
 }
 
-/* set "error_frame" and its associated pointer variables to point to "frame_pointer". also reset mpc/ctxt to error_rtn_addr/ctxt */
+/* Set "error_frame" to point to "frame_pointer" and mark it as an error frame type. This is an indication that
+ * whenever we unwind back to this frame, we need to transfer control to error_rtn_addr/ctxt (taken care of by getframe).
+ */
 #define SET_ERROR_FRAME(fp)								\
 {											\
 	GBLREF	stack_frame		*error_frame;					\
-	GBLREF	dollar_ecode_type	dollar_ecode;					\
-	GBLREF	unsigned char		*error_frame_save_mpc[DOLLAR_STACK_MAXINDEX];	\
-	int				level;						\
 											\
+	fp->flags |= SFF_ETRAP_ERR;							\
 	error_frame = fp;								\
-	dollar_ecode.error_frame_mpc = fp->mpc;						\
-	level = dollar_zlevel() - 1;							\
-	if (level < DOLLAR_STACK_MAXINDEX)						\
-	{										\
-		error_frame_save_mpc[level] = error_frame->mpc;				\
-		/* an error at a level can clear higher level saved values */		\
-		for (level = level + 1; level < DOLLAR_STACK_MAXINDEX; level++)		\
-			error_frame_save_mpc[level] = NULL;				\
-	}										\
-	dollar_ecode.error_frame_ctxt = fp->ctxt;					\
-	error_frame->mpc = dollar_ecode.error_rtn_addr;					\
-	error_frame->ctxt = dollar_ecode.error_rtn_ctxt;				\
 }
 
 /* invoke the function error_return() if the necessity of error-rethrow is detected */

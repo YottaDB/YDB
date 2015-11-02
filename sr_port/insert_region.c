@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,7 +80,7 @@ tp_region	*insert_region(	gd_region	*reg,
 #endif
 	int4		local_fid_index;
 	sgmnt_addrs	*csa;
-	int4		prev_index;
+	int4		match;
 
 	assert(size >= sizeof(tp_region));
 	assert(!run_time || dollar_tlevel);
@@ -137,34 +137,47 @@ tp_region	*insert_region(	gd_region	*reg,
 	/* See if the region is already on the list or if we have to add it */
 	for (tr = *reg_list, tr_last = NULL; NULL != tr; tr = tr->fPtr)
 	{
-		if (reg == tr->reg)			/* Region is found */
-		{	/* assert we are not in final retry or we are in TP and have crit on the region already */
-			assert((CDB_STAGNATE > t_tries)
-				|| ((0 < dollar_tlevel) && reg->open && csa->now_crit));
-			return tr;
-		}
 		if (reg->open)
 		{	/* gvcst_init must have sorted them and filled in the fid_index field of node_local */
 			assert(tr->reg->open);
+			/* note that it is possible that "reg" and "tr->reg" are different although their "fid_index" is the same.
+			 * this is possible if both regions point to the same physical file.
+			 * in this case we return the existing "tr" instead of creating a new one.
+			 */
+			if (local_fid_index == tr->file.fid_index)	/* Region is found */
+			{	/* assert we are not in final retry or we are in TP and have crit on the region already */
+				assert((CDB_STAGNATE > t_tries)
+					|| ((0 < dollar_tlevel) && reg->open && csa->now_crit));
+				return tr;
+			}
 			if ((tr->file.fid_index > local_fid_index))
 				break;				/* .. we have found our insertion point */
 		} else
-		{	/* let's sort here */
+		{
+			if (reg == tr->reg)	/* Region is found */
+			{	/* assert we are not in final retry or we are in TP and have crit on the region already */
+				assert((CDB_STAGNATE > t_tries)
+					|| ((0 < dollar_tlevel) && reg->open && csa->now_crit));
+				return tr;
+			}
+			/* let's sort here */
 			if (!tr->reg->open)
 			{	/* all regions closed */
-				VMS_ONLY(if (0 < memcmp(&(tr->file.file_id), local_id_fiptr, sizeof(gd_id))))
-				UNIX_ONLY(if (0 < gdid_cmp(&(tr->file.file_id), &(local_id.uid))))
-					break;				/* .. we have found our insertion point */
+				VMS_ONLY(match = memcmp(&(tr->file.file_id), local_id_fiptr, sizeof(gd_id));)
+				UNIX_ONLY(match = gdid_cmp(&(tr->file.file_id), &(local_id.uid));)
 			} else
 			{	/* the other regions are open, i.e. file is pointing to fid_index, use file_id
 				 * from node_local */
-				VMS_ONLY(if (0 < memcmp(
+				VMS_ONLY(match = memcmp(
 					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.file_id),
-					local_id_fiptr, sizeof(gd_id))))
-				UNIX_ONLY(if (0 < gdid_cmp(
-					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.uid), &(local_id.uid))))
-					break;				/* .. we have found our insertion point */
+					local_id_fiptr, sizeof(gd_id));)
+				UNIX_ONLY(match = gdid_cmp(
+					&(((sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs)->nl->unique_id.uid), &(local_id.uid));)
 			}
+			if (0 == match)
+				return tr;
+			if (0 < match)
+				break;				/* .. we have found our insertion point */
 		}
 		tr_last = tr;
 	}
@@ -207,16 +220,6 @@ tp_region	*insert_region(	gd_region	*reg,
 		}
 		assert(csa->now_crit);	/* ensure we have crit now */
 	}
-	DEBUG_ONLY(
-		prev_index = 0;
-		for (tr = *reg_list; NULL != tr; tr = tr->fPtr)
-		{
-			if (tr->reg->open)
-			{
-				assert(prev_index < tr->file.fid_index);
-				DEBUG_ONLY(prev_index = tr->file.fid_index);
-			}
-		}
-	)
+	DBG_CHECK_TP_REG_LIST_SORTING(*reg_list);
 	return tr_new;
 }

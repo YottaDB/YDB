@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,7 @@ mval *get_ret_targ(void)
 			case MVST_PVAL:
 			case MVST_NVAL:
 			case MVST_STCK:
+			case MVST_STCK_SP:
 			case MVST_TVAL:
 			case MVST_TPHOLD:
 			case MVST_ZINTR:

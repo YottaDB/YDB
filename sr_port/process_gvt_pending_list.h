@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2008 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,7 +9,12 @@
  *								*
  ****************************************************************/
 
-#ifndef HASHTAB_REHASH_CH_H_INCLUDED
-#define HASHTAB_REHASH_CH_H_INCLUDED
-CONDITION_HANDLER(hashtab_rehash_ch);
+#ifndef PROCESS_GVT_PENDING_LIST_DEFINED
+
+/* Declare parms for process_gvt_pending_list.c */
+
+void process_gvt_pending_list(gd_region *reg, sgmnt_addrs *csa);
+
+#define PROCESS_GVT_PENDING_LIST_DEFINED
+
 #endif

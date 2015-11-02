@@ -13,9 +13,11 @@
 ##########################################################################################
 #
 #       gtm_env_sp.mk - environment variable values and aliases specific to Linux
+#       		if not Linux we assume Cygwin and x86
 #
 ##########################################################################################
 gt_machine_type=$(shell uname -m)
+gt_os_type=$(shell uname -s)
 linux_build_type=32
 
 ifeq ($(gt_machine_type),ia64)
@@ -42,7 +44,12 @@ endif
 ifeq ($(linux_build_type),64)
 gt_as_options_common=
 else
+ifeq ($(gt_os_type),Linux)
 gt_as_options_common= --32
+else
+gt_as_option_debug=--gdwarf-2
+gt_as_options_common=--defsym cygwin=1
+endif
 endif
 gt_as_option_DDEBUG=
 gt_as_option_nooptimize=
@@ -54,7 +61,12 @@ gt_cc_compiler=gcc
 
 # Do not lookup the source directory before include directories specified by -I.
 gt_cc_option_I=-I-
+ifeq ($(gt_os_type),Linux)
 gt_cc_shl_fpic=-fPIC                    # generate Position Independent Code.
+else
+gt_cc_shl_fpic=
+endif
+
 
 gt_cpp_compiler=cpp
 gt_cpp_options_common=
@@ -64,9 +76,15 @@ gt_cpp_options_common=
 # For gcc: _BSD_SOURCE for caddr_t, others
 #          _XOPEN_SOURCE=500 should probably define POSIX 199309 and/or
 #               POSIX 199506 but doesnt so...
-gt_cc_options_common=$(gt_cc_shl_fpic) -c -ansi -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -fsigned-char -Wimplicit -Wmissing-prototypes
+ifeq ($(gt_os_type),Linux)
+gt_cc_options_common=-c -ansi $(gt_cc_shl_fpic)
+else
+gt_cc_options_common=-c $(gt_cc_shl_fpic) -DNO_SEM_TIME -DNO_SEM_GETPID
+endif
+gt_cc_options_common+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -fsigned-char -Wimplicit -Wmissing-prototypes
+gt_cc_options_common+=-D_XOPEN_SOURCE=600 -D_LARGEFILE64_SOURCE
 ifeq ($(strip $(patsubst 2.2.%, 2.2, $(shell uname -r))), 2.2)
-gt_cc_options_common:=$(gt_cc_options_common) -DNeedInAddrPort
+gt_cc_options_common+=-DNeedInAddrPort
 endif
 gt_cc_option_nooptimize=
 # -fno-defer-pop to prevent problems with assembly/generated code with optimization
@@ -74,12 +92,16 @@ gt_cc_option_nooptimize=
 # -ffloat-store for consistent results avoiding rounding differences
 gt_cc_option_optimize=-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store
 ifeq ($(linux_build_type),32)
-gt_cc_option_optimize:=$(gt_cc_option_optimize) -march=i686
+gt_cc_option_optimize+=-march=i686
 endif
 # autodepend option
 gt_cc_dep_option=-w
 # -g    generate debugging information for dbx (no longer overrides -O)
+ifeq ($(gt_os_type),Linux)
 gt_cc_option_debug=-g
+else
+gt_cc_option_debug=-g -gdwarf-2 -fno-inline -fno-inline-functions
+endif
 gt_cc_shl_options=-c $(gt_cc_shl_fpic)
 
 
@@ -93,7 +115,11 @@ gt_ld_options_pro=
 ifeq ($(linux_build_type), 64)
 gt_ld_syslibs=-lrt -lelf -lncurses -lm -ldl
 else
+ifeq ($(gt_os_type),Linux)
 gt_ld_syslibs=-lrt -lncurses -lm -ldl
+else
+gt_ld_syslibs=-lncurses -lm -lcrypt
+endif
 endif
 gt_ld_aio_syslib=
 gt_ld_sysrtns=
@@ -112,11 +138,11 @@ gt_cpus=$(shell grep -c process /proc/cpuinfo)
 gt_echoe=echo -e
 
 ifeq ($(linux_build_type), 32)
-gt_cc_options_common:=$(gt_cc_options_common) -m32
-gt_ld_options_gtmshr:=$(gt_ld_options_gtmshr) -m32
-gt_cc_shl_options:=$(gt_cc_shl_options) -m32
-gt_ld_shl_options:=$(gt_ld_shl_options) -m32
-gt_ld_options_common:=$(gt_ld_options_common) -m32
+gt_cc_options_common+=-m32
+gt_ld_options_gtmshr+=-m32
+gt_cc_shl_options+=-m32
+gt_ld_shl_options+=-m32
+gt_ld_options_common+=-m32
 endif
 #
 # gas assembly - the preprocessor works

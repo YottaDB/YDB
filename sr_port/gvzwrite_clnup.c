@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF gv_key		*gv_currkey;
 GBLREF gd_region	*gv_cur_region;
+GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gvzwrite_struct	gvzwrite_block;
 GBLREF gd_binding	*gd_map;
 GBLREF gd_binding	*gd_map_top;
@@ -37,11 +38,9 @@ void	gvzwrite_clnup(void)
 
 	assert(reset_gv_target == ((gv_namehead *)gvzwrite_block.old_targ));
 	RESET_GV_TARGET;
-	if (gv_target)
-	{
-		gv_cur_region = gv_target->gd_reg;
-		change_reg();
-	}
+	gv_cur_region = gvzwrite_block.gd_reg;
+	change_reg();
+	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
 	if (NULL != gvzwrite_block.old_key)
 	{
 		old = (gv_key *)gvzwrite_block.old_key;

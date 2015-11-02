@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 	size_t		util_len ;
 	mval		*status_loc;
 	boolean_t 	trans_frame;
+	error_def(ERR_MEMORY);
 
 	b_line = 0;
 	if (!need_rtsloc)
@@ -103,6 +104,12 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 	status_loc->str.addr = (char *)zstatus_buff;
 	s2pool(&status_loc->str);
 	status_loc->mvtype = MV_STR;
-	ecode_set(arg);
+        /* If this is a MEMORY issue, setting the ecode is of dubious worth since we are not going
+           to drive any handlers and it can definitely be expensive in terms of memory use as ecode_add()
+           (further down the pike) is likely to load the text of the module into storage if it can. So we bypass
+           ecode setting for these two fatal errors. 02/2008 se
+	*/
+	if (ERR_MEMORY != arg)
+		ecode_set(arg);
 	return (b_line);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,7 +90,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		PUT_LONG(&chain1, blk);
 		if ((1 == chain1.flag) && ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth))
 		{
-			assert(&FILE_INFO(sgm_info_ptr->gv_cur_region)->s_addrs == cs_addrs);
+			assert(sgm_info_ptr->tp_csa == cs_addrs);
 			assert(FALSE == cs_addrs->now_crit);
 			return cdb_sc_blknumerr;
 		}
@@ -167,7 +167,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				chain1 = *(off_chain *)&temp_long;
 				if ((1 == chain1.flag) && ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth))
 				{
-					assert(&FILE_INFO(sgm_info_ptr->gv_cur_region)->s_addrs == cs_addrs);
+					assert(sgm_info_ptr->tp_csa == cs_addrs);
 					assert(FALSE == cs_addrs->now_crit);
 					return cdb_sc_blknumerr;
 				}

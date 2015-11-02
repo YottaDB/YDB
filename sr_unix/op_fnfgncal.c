@@ -380,6 +380,12 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	for (i = 0, m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
+		/* Note that even in this second pass at these mvals, we need to do the MV_FORCE processing because
+		   in a NOUNDEF environment, undefiend mvals were NOT modified in the first pass and thus reamin undefined
+		   in this pass.
+		*/
+		if (xc_char_star != entry_ptr->parms[i] && (m1 & 1))
+			MV_FORCE_DEFINED(v);	/* Redefine undef'd mvals */
 		/* Verify that all input values are defined */
 		pre_alloc_size = entry_ptr->param_pre_alloc_size[i];
 		switch(entry_ptr->parms[i])

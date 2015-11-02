@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,6 @@
 #include "hashtab_mname.h"
 #include "buddy_list.h"
 #include "muprec.h"
-#include "hashtab_rehash_ch.h"
 
 GBLREF mur_gbls_t	murgbl;
 #define MUR_ENOUGH_COMPLETE_TRANS(MURGBL) ((MURGBL).broken_cnt <= ((MURGBL).token_table.count >> 2)) /* 75% resolved completely */

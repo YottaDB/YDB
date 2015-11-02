@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,17 +64,15 @@ void gv_init_reg (gd_region *reg)
 	keysize = (reg->max_key_size + MAX_NUM_SUBSC_LEN + 4) & (-4);
 
 	if (keysize > gv_keysize)
-	{	gv_keysize = keysize;
+	{
+		gv_keysize = keysize;
 		temp_key = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
 		if (gv_currkey)
 		{
 			memcpy(temp_key, gv_currkey, sizeof(gv_key) + gv_currkey->end);
 			free(gv_currkey);
-		}
-		else
-		{
+		} else
 			temp_key->base[0] = '\0';
-		}
 		gv_currkey = temp_key;
 		gv_currkey->top = gv_keysize;
 		temp_key = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
@@ -82,11 +80,8 @@ void gv_init_reg (gd_region *reg)
 		{
 			memcpy(temp_key, gv_altkey, sizeof(gv_key) + gv_altkey->end);
 			free(gv_altkey);
-		}
-		else
-		{
+		} else
 			temp_key->base[0] = '\0';
-		}
 		gv_altkey = temp_key;
 		gv_altkey->top = gv_keysize;
 	}
@@ -95,21 +90,14 @@ void gv_init_reg (gd_region *reg)
 		if (!reg->was_open)
 		{
 			csa = (sgmnt_addrs*)&FILE_INFO(reg)->s_addrs;
-			if (NULL == csa->dir_tree)
-			{
-				csa->dir_tree = (gv_namehead*)targ_alloc(reg->max_key_size, NULL);
-				g = csa->dir_tree;
-				g->gd_reg = reg;
-				g->root = DIR_ROOT;
-			} else
+			g = csa->dir_tree;
+			if (NULL != g)
 			{	/* It is possible that dir_tree has already been targ_alloc'ed. This is because GT.CM or VMS DAL
 				 * calls can run down regions without the process halting out. We don't want to double malloc.
 				 */
-				g = csa->dir_tree;
 				g->clue.end = 0;
-				assert(g->gd_reg == reg);
-				assert(DIR_ROOT == g->root);
 			}
+			SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
 		}
 	}
 	return;

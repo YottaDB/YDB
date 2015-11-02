@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,11 +20,13 @@ CONDITION_HANDLER(region_init_ch)
 	error_def(ERR_FORCEDHALT);
 	error_def(ERR_GTMCHECK);
 	error_def(ERR_GTMASSERT);
+        error_def(ERR_MEMORY);
+        error_def(ERR_VMSMEMORY);
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_OUTOFSPACE);
 
 	START_CH;
-	if ((SIGNAL == ERR_GTMCHECK) || !(IS_GTM_ERROR(SIGNAL)) || DUMPABLE)
+	if (!(IS_GTM_ERROR(SIGNAL)) || DUMPABLE)
 		NEXTCH;
      	PRN_ERROR;
 	if (SEVERITY == WARNING || SEVERITY == INFO)

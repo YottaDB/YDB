@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -37,6 +37,12 @@ SFT_EXTFUN		=	0x40
 SFT_ZSTEP_ACT		=	0x80
 SFT_ZINTR		=	0x100
 
+SFF_INDCE		=	0x01
+SFF_ZTRAP_ERR		=	0x02
+SFF_DEV_ACT_ERR		=	0x04
+SFF_CI			=	0x08
+SFF_ETRAP_ERR		=	0x10
+
 	.sbttl	g_msf.si    putframe
 .macro putframe
 	movl	frame_pointer,%edx
@@ -46,9 +52,17 @@ SFT_ZINTR		=	0x100
 	movl	%eax,msf_mpc_off(%edx)
 .endm
 
+.extern	error_return
+
 	.sbttl	g_msf.si    getframe
 .macro getframe
-	movl	frame_pointer,%edx
+	movl	frame_pointer,%edi
+	movb	msf_flags_off(%edi),%dl
+	andb	$SFF_ETRAP_ERR,%dl
+	jz	lab1\@
+	call	error_return
+lab1\@:
+	movl	frame_pointer, %edx
 	movl	msf_temps_ptr_off(%edx),%edi
 	movl	msf_l_symtab_off(%edx),%esi
 	pushl	msf_mpc_off(%edx)

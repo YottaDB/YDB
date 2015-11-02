@@ -29,6 +29,8 @@
 #include "is_proc_alive.h"
 #include "compswap.h"
 #include "is_file_identical.h"
+#include "have_crit.h"
+
 #ifdef UNIX
 #include "gtmmsg.h"
 GBLREF boolean_t		gtm_environment_init;
@@ -102,21 +104,24 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				status = ERR_JNLMEMDSK;			    /* but this process still isn't satisfied */
 			break;
 		}
+		UNIX_ONLY(assert(ERR_JNLWRTNOWWRTR != status);)	/* dont have asynchronous jnl writes in Unix */
+		if ((ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
+		{
+			if (csa->now_crit)
+			{	/* If not waiting for some other writer (or self in VMS) and holding crit better
+				 * turn off journaling and proceed with database update to avoid a database hang.
+				 */
+				jpc->jnl_buff->blocked = 0;
+				jnl_file_lost(jpc, status);
+			}
+			return status;
+		}
 		if ((writer != CURRENT_WRITER) || (1 == *lcnt))
 		{
 			writer = CURRENT_WRITER;
 			loop_image_count = jb->image_count;
 			*lcnt = 1;	/* !!! this should be detected and limited by the caller !!! */
 			break;
-		}
-		UNIX_ONLY(assert(ERR_JNLWRTNOWWRTR != status);)	/* dont have asynchronous jnl writes in Unix */
-		if (csa->now_crit && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
-		{	/* If not waiting for some other writer (or self in VMS) and holding crit better turn off journaling
-			 * and proceed with database update at least to avoid a database hang.
-			 */
-			jpc->jnl_buff->blocked = 0;
-			jnl_file_lost(jpc, status);
-			return status;
 		}
 		if (*lcnt <= JNL_MAX_FLUSH_TRIES)
 		{
@@ -132,7 +137,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		if (writer == CURRENT_WRITER)
 		{
 			if (FALSE == (was_crit = csa->now_crit))
-				grab_crit(jpc->region);	/* ??? be sure that this can't cause a deadlock */
+				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
 			if (VMS_ONLY(0 == writer ||) FALSE == is_proc_alive(writer, jb->image_count))
 			{	/* no one home, clear the semaphore; */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
@@ -180,12 +185,17 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	error_def(ERR_JNLMEMDSK);
 	error_def(ERR_JNLPROCSTUCK);
 	error_def(ERR_JNLWRTDEFER);
+	error_def(ERR_JNLWRTNOWWRTR);
 	error_def(ERR_TEXT);
 
 	jb = jpc->jnl_buff;
 	csa = &FILE_INFO(jpc->region)->s_addrs;
 
 	assert(!csa->now_crit || threshold <= jb->freeaddr);
+	/* Check that we either own crit on the current region or we DONT own crit on ANY region. This is relied upon by
+	 * the grab_crit calls (done in jnl_write_attempt and jnl_sub_write_attempt) to ensure no deadlocks are possible.
+	 */
+	assert(csa->now_crit || (0 == have_crit(CRIT_HAVE_ANY_REG)));
 	for (prev_lcnt = lcnt = cnt = 1, proc_stuck_cnt = 0; (csa->now_crit || NOJNL != jpc->channel) && (jb->dskaddr < threshold);
 	     lcnt++, prev_lcnt = lcnt, cnt++)
 	{
@@ -223,7 +233,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			if (was_crit = csa->now_crit) /* CAUTION : Assigment */
 				jb->blocked = 0;
 			else
-				grab_crit(jpc->region);	/* ??? is this subject to any possible deadlocks ??? */
+				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
 			jnlfile_lost = FALSE;
 			if (jb->free_update_pid)
 			{
@@ -242,12 +252,24 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			else
 				return status;
 		}
-		if (prev_lcnt != lcnt)
+		if ((ERR_JNLWRTDEFER != status) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLPROCSTUCK != status))
+		{	/* If holding crit, then jnl_sub_write_attempt would have invoked jnl_file_lost which would have
+			 * caused the JNL_FILE_SWITCHED check at the beginning of this for loop to succeed and return from
+			 * this function so we should never have gotten here. Assert accordingly. If not holding crit,
+			 * wait for some crit holder to invoke jnl_file_lost. Until then keep sleep looping indefinitely.
+			 * The sleep in this case is not time-limited because the callers of jnl_write_attempt (particularly
+			 * jnl_wait) do not check its return value so they assume success returns from this function. It is
+			 * non-trivial to change the interface and code of all callers to handle the error situation so we
+			 * instead choose to sleep indefinitely here until some crit process encounters the same error and
+			 * triggers jnl_file_lost processing which will terminate the loop due to the JNL_FILE_SWITCHED check.
+			 */
+			assert(!csa->now_crit);
+			wcs_sleep(lcnt);
+		} else if (prev_lcnt != lcnt)
 		{
 			assert(1 == lcnt);
 			if (ERR_JNLWRTDEFER == status)
-			{
-				/* Change of writer */
+			{	/* Change of writer */
 				if (JNL_FLUSH_PROG_TRIES <= cnt)
 				{
 					send_msg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr),

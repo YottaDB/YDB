@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +11,7 @@
 
 #include "mdef.h"
 
-#include <stdlib.h>
+#include "gtm_stdlib.h"
 #ifdef VMS
 #include <descrip.h>
 #endif
@@ -52,6 +52,8 @@ CONDITION_HANDLER(util_base_ch)
 	error_def(ERR_GTMCHECK);
 	error_def(ERR_ASSERT);
 	error_def(ERR_GTMASSERT);
+        error_def(ERR_MEMORY);
+        error_def(ERR_VMSMEMORY);
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_OUTOFSPACE);
 	VMS_ONLY(

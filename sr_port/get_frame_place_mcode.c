@@ -23,9 +23,7 @@
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	stack_frame		*error_frame;
-GBLREF	unsigned char		*error_frame_mpc;
 GBLREF	spdesc			stringpool;
-GBLREF	unsigned char		*error_frame_save_mpc[DOLLAR_STACK_MAXINDEX];
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 
 void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
@@ -62,15 +60,11 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 		if (count == level)
 			break;
 	}
-	if (!(fp->flags & SFF_INDCE))
+	fpmpc = fp->mpc;
+	if (ADDR_IN_CODE(fpmpc, fp->rvector))
 	{
-		if ((dollar_ecode.error_rtn_addr != fp->mpc) || (DOLLAR_STACK_MAXINDEX <= level)
-							|| (NULL == error_frame_save_mpc[level]))
-			fpmpc = fp->mpc;
-		else
-			fpmpc = error_frame_save_mpc[level];
 		result->str.addr = (char *)&pos_str[0];
-		result->str.len = INTCAST(symb_line(fpmpc, &pos_str[0], 0, fp->rvector) - &pos_str[0]);
+		result->str.len = INTCAST(symb_line(fpmpc, &pos_str[0], 0, fp->rvector, FALSE) - &pos_str[0]);
 		indirect_frame = FALSE;
 	} else
 	{

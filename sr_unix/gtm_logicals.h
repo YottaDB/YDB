@@ -36,6 +36,7 @@
 #define	DISABLE_ALIGN_STRINGS		"$gtm_disable_alignstr"
 #define GTM_MAX_SOCKETS			"$gtm_max_sockets"
 #define GTM_QUIET_HALT			"$gtm_quiet_halt"
+#define GTM_MEMORY_RESERVE		"$gtm_memory_reserve"
 
 /* Environment variables for Unicode functionality */
 #define GTM_CHSET_ENV			"$gtm_chset"

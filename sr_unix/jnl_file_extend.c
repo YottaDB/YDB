@@ -82,7 +82,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	csd = csa->hdr;
 	assert(csa == cs_addrs && csd == cs_data);
 	assert(csa->now_crit || (csd->clustered && (CCST_CLOSED == csa->nl->ccp_state)));
-	assert(jpc->region == gv_cur_region);
+	assert(&FILE_INFO(jpc->region)->s_addrs == csa);
 	assert(csa->jnl_state == csd->jnl_state);
 	if (!JNL_ENABLED(csa) || (NOJNL == jpc->channel) || (JNL_FILE_SWITCHED(jpc)))
 		GTMASSERT;	/* crit and messing with the journal file - how could it have vanished? */

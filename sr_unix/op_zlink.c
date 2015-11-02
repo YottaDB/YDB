@@ -34,12 +34,11 @@
 GBLREF spdesc			stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
 GBLREF mstr			dollar_zsource, dollar_zcompile;
-GBLREF char			object_file_name[MAX_FBUFF + 1];
-GBLREF short			object_name_len;
+GBLREF int			object_file_des;
 
 void op_zlink (mval *v, mval *quals)
 {
-	int			obj_desc, status, qlf, tslash;
+	int			status, qlf, tslash;
 	unsigned short		type;
 	char			srcnamebuf[MAX_FBUFF + 1], objnamebuf[MAX_FBUFF + 1], *fname;
 	uint4			objnamelen, srcnamelen;
@@ -61,6 +60,7 @@ void op_zlink (mval *v, mval *quals)
 	if (!v->str.len || v->str.len > MAX_FBUFF)
 		rts_error(VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 
+	object_file_des = -1;
 	srcdir = objdir = (zro_ent *) 0;
 	expdir = FALSE;
 	if (quals)
@@ -209,12 +209,13 @@ void op_zlink (mval *v, mval *quals)
 				objnamebuf[ objnamelen ] = 0;
 			}
 		}
-		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, obj_desc);
-		if (obj_desc == -1)
+		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
+		if (object_file_des == -1)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, errno);
-		if (USHBIN_ONLY(!incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(!incr_link(obj_desc)))
+		if (USHBIN_ONLY(!incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(!incr_link(object_file_des)))
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, ERR_VERSION);
-		status = close (obj_desc);
+		status = close(object_file_des);
+		object_file_des = -1;
 		if (status == -1)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, errno);
 	} else	/* either NO type or SOURCE type */
@@ -275,8 +276,8 @@ void op_zlink (mval *v, mval *quals)
 
 		if (type != SRC)
 		{
-			STAT_FILE(objnamebuf, &obj_stat, status);
-			if (status == -1)
+			OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
+			if (object_file_des == -1)
 			{
 				if (errno == ENOENT)
 					obj_found = FALSE;
@@ -303,11 +304,20 @@ void op_zlink (mval *v, mval *quals)
 			{
 				if (obj_found)
 				{
+					FSTAT_FILE(object_file_des, &obj_stat, status);
+					if (-1 == status)
+						rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 					if (src_stat.st_mtime > obj_stat.st_mtime)
+					{
+						status = close(object_file_des);
+						object_file_des = -1;
+						if (status == -1)
+							rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 						compile = TRUE;
+					}
 				} else
 					compile = TRUE;
-			} else  if (!obj_found)
+			} else if (!obj_found)
 				rts_error (VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
 					ERR_FILENOTFND, 2, objnamelen, objnamebuf);
 		}
@@ -327,18 +337,19 @@ void op_zlink (mval *v, mval *quals)
 				cmd_qlf.qlf = glb_cmd_qlf.qlf;
 				rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
 			}
-			zlcompile (srcnamelen, (uchar_ptr_t)srcnamebuf);
+			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
 			if (type == SRC && !(qlf & CQ_OBJECT))
 				return;
 		}
-
-		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, obj_desc);
-		if (obj_desc == -1)
+		CONVERT_OBJECT_LOCK(object_file_des, F_RDLCK, status);
+		if (status == -1)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
-		status = USHBIN_ONLY(incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(incr_link(obj_desc));
+
+		status = USHBIN_ONLY(incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(incr_link(object_file_des));
 		if (!status)	/* due only to version mismatch, so recompile */
 		{
-			status = close (obj_desc);
+			status = close(object_file_des);
+			object_file_des = -1;
 			if (status == -1)
 				rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 			if (compile)
@@ -353,19 +364,20 @@ void op_zlink (mval *v, mval *quals)
 				cmd_qlf.object_file.str.addr = objnamebuf;
 				cmd_qlf.object_file.str.len = objnamelen;
 			}
-			zlcompile (srcnamelen, (uchar_ptr_t)srcnamebuf);
+			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
 			if (!(cmd_qlf.qlf & CQ_OBJECT) && type != SRC)
 			{
 				cmd_qlf.qlf = glb_cmd_qlf.qlf;
 				rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
 			}
-			OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, obj_desc);
-			if (obj_desc == -1)
+			CONVERT_OBJECT_LOCK(object_file_des, F_RDLCK, status);
+			if (status == -1)
 				rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
-			if (USHBIN_ONLY(!incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(!incr_link(obj_desc)))
+			if (USHBIN_ONLY(!incr_link(object_file_des, NULL)) NON_USHBIN_ONLY(!incr_link(object_file_des)))
 				GTMASSERT;
 		}
-		status = close (obj_desc);
+		status = close(object_file_des);
+		object_file_des = -1;
 		if (status == -1)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 	}

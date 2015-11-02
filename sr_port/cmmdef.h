@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -123,12 +123,13 @@ typedef struct cs_struct
 		unsigned char			new_msg;
 		unsigned char			maxregnum;
 		bool				waiting_in_queue;
-		uint4				connect[2];
-#ifdef GTM64
-		time_t				lastact;
+#ifdef UNIX
+		struct timeval			connect;	/* Debugging tool -- time connection was established */
+		time_t				lastact;	/* Debugging tool -- time of last server action */
 #else
-		uint4				lastact[2];
-#endif /* GTM64 */
+		uint4				connect[2];	/* Debugging tool -- time connection was established */
+		uint4				lastact[2];	/* Debugging tool -- time of last server action */
+#endif
 		uint4				stats;
 		unsigned short			procnum;
 		unsigned short			transnum;

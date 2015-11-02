@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_time.h"
 
 #include "hashtab_mname.h"
 #include "cmidef.h"
@@ -28,8 +30,7 @@
 #include "wcs_timer_start.h"
 #include "gtcmd.h"
 #include "send_msg.h"
-
-#include "gtm_time.h"
+#include "targ_alloc.h"
 
 GBLREF	cm_region_head		*reglist;
 GBLREF	gd_region		*gv_cur_region;
@@ -83,8 +84,9 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 				jpc->pini_addr = 0;
 			gds_rundown();
 			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
-			free(FILE_INFO(gv_cur_region)->s_addrs.dir_tree->alt_hist);
-			free(FILE_INFO(gv_cur_region)->s_addrs.dir_tree);
+			cs_addrs->dir_tree->regcnt--;	/* targ_free relies on this */
+			targ_free(cs_addrs->dir_tree);
+			cs_addrs->dir_tree = NULL;
 			cm_del_gdr_ptr(gv_cur_region);
 		} else
 			wcs_timer_start(gv_cur_region, TRUE);

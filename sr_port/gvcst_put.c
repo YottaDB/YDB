@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -527,7 +527,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			chain1 = *(off_chain *)&bh->blk_num;
 			if ((1 == chain1.flag) && ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth))
 			{
-				assert(&FILE_INFO(sgm_info_ptr->gv_cur_region)->s_addrs == cs_addrs);
+				assert(sgm_info_ptr->tp_csa == cs_addrs);
 				assert(FALSE == cs_addrs->now_crit);
 				status = cdb_sc_blknumerr;
 				goto retry;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,9 @@
 #include "trans_log_name.h"
 #include "gtmmsg.h"
 #include "print_exit_stats.h"
+#include "mmemory.h"
 #include "gtm_logicals.h"
+#include "cache.h"
 #include "gtm_malloc.h"
 
 /* To debug this routine effectively, normally static routines are turned into
@@ -90,9 +92,20 @@
         errnum = lib$get_vm(&msize, &maddr);						\
 	if (SS$_NORMAL != errnum)							\
 	{										\
-		--gtmMallocDepth;							\
-		assert(FALSE);								\
-		rts_error(VARLSTCNT(5) ERR_VMSMEMORY, 2, msize, CALLERID, errnum);	\
+                if (NULL != (addr = outOfMemoryMitigation))				\
+		{									\
+			outOfMemoryMitigation = NULL;					\
+                        lib$free_vm(addr);						\
+                        addr = NULL;							\
+			DEBUG_ONLY(if (0 == outOfMemorySmTn) outOfMemorySmTn = smTn);	\
+			/* Must decr gtmMallocDepth after rlse above but before the  */ \
+			/* call to release_unused_storage() below. 		     */	\
+		        --gtmMallocDepth;						\
+			release_unused_storage();					\
+		} else									\
+		        --gtmMallocDepth;						\
+                /* Note cannot add errnum to end of FATAL error */			\
+		rts_error(VARLSTCNT(4) ERR_VMSMEMORY, 2, size, CALLERID);		\
 	}										\
 	addr = (void *)maddr;								\
 }
@@ -113,16 +126,28 @@
 #  define GTM_MALLOC_REENT
 #else
 /* These routines for Unix are NOT thread-safe */
-#  define MALLOC(size, addr) 							\
-{										\
-	addr = (void *)malloc(size);						\
-	if (NULL == (void *)addr)						\
-	{									\
-		--gtmMallocDepth;						\
-                --fast_lock_count;						\
-		assert(FALSE);							\
-		rts_error(VARLSTCNT(5) ERR_MEMORY, 2, size, CALLERID, errno);	\
-	}									\
+#  define MALLOC(size, addr) 												\
+{															\
+	addr = (void *)malloc(size);											\
+	if (NULL == (void *)addr)											\
+	{														\
+                if (NULL != (addr = (void *)outOfMemoryMitigation) 							\
+		    && !(ht_rhash_ch == active_ch->ch || jbxm_dump_ch == active_ch->ch))				\
+		{	/* Free our reserve only if not in certain condition handlers since it is	*/		\
+			/* going to unwind this error and ignore it.					*/		\
+			outOfMemoryMitigation = NULL;									\
+			free(addr);											\
+			addr = NULL;											\
+			DEBUG_ONLY(if (0 == outOfMemorySmTn) outOfMemorySmTn = smTn);					\
+			/* Must decr gtmMallocDepth after rlse above but before the  */ 				\
+			/* call to release_unused_storage() below. 		     */					\
+		        --gtmMallocDepth;										\
+			release_unused_storage();									\
+		} else													\
+		        --gtmMallocDepth;										\
+                --fast_lock_count;											\
+		rts_error(VARLSTCNT(5) ERR_MEMORY, 2, size, CALLERID, errno);						\
+	}														\
 }
 #  define FREE(size, addr) free(addr);
 #endif
@@ -291,6 +316,7 @@ GBLDEF volatile int smLastFreeIndex;			/* Index to entry of last free-er */
 GBLDEF smTraceItem smMallocs[MAXSMTRACE];		/* Array of recent allocators */
 GBLDEF smTraceItem smFrees[MAXSMTRACE];			/* Array of recent releasers */
 GBLDEF volatile unsigned int smTn;			/* Storage management (wrappable) transaction number */
+GBLDEF unsigned int outOfMemorySmTn;			/* smTN when ran out of memory */
 #ifndef PRO_BUILD
 GBLREF boolean_t gtmdbglvl_inited;			/* gtmDebugLevel has been initialized but only in debug build*/
 #endif
@@ -300,6 +326,13 @@ GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so wi
 							   a DEBUG build, even level 0 implies basic debugging) */
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */
+GBLREF	volatile void	*outOfMemoryMitigation;		/* Reserve that we will freed to help cleanup if run out of memory */
+GBLREF	uint4		outOfMemoryMitigateSize;	/* Size of above reserve in Kbytes */
+GBLREF	int		mcavail;
+GBLREF	mcalloc_hdr	*mcavailptr, *mcavailbase;
+GBLREF	void		(*cache_table_relobjs)(void);	/* Function pointer to call cache_table_rebuild() */
+UNIX_ONLY(GBLREF ch_ret_type (*ht_rhash_ch)();)		/* Function pointer to hashtab_rehash_ch */
+UNIX_ONLY(GBLREF ch_ret_type (*jbxm_dump_ch)();)	/* Function pointer to jobexam_dump_ch */
 /* This var allows us to call ourselves but still have callerid info */
 GBLREF	unsigned char	*smCallerId;			/* Caller of top level malloc/free */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
@@ -398,6 +431,7 @@ GMR_ONLY(STATICD	int	deferFreePending;)	/* Total number of frees that were defer
 /* Internal prototypes */
 STATICR void gtmSmInit(void);
 storElem *findStorElem(int sizeIndex);
+void release_unused_storage(void);
 #ifdef DEBUG
 void backfill(unsigned char *ptr, ssize_t len);
 boolean_t backfillChk(unsigned char *ptr, ssize_t len);
@@ -420,10 +454,9 @@ STATICR void gtmSmInit(void)
 {
 	char		*ascNum;
 	storElem	*uStor;
-	int		i, sizeIndex, testSize, blockSize;
+	int		i, sizeIndex, testSize, blockSize, save_errno;
 
-	error_def(ERR_TRNLOGFAIL);
-	error_def(ERR_INVDBGLVL);
+	error_def(ERR_INVMEMRESRV);
 
 	/* WARNING!! Since this is early initialization, the following asserts are not well behaved if they do
 	   indeed trip. The best that can be hoped for is they give a condition handler exhausted error on
@@ -473,6 +506,28 @@ STATICR void gtmSmInit(void)
 	}
 #endif
 	dqinit(&storExtHdrQ, links);
+
+	/* One last task before we consider ourselves initialized. Allocate the out-of-memory mitigation storage
+	   that we will hold onto but not use. If we get an out-of-memory error, this storage will be released back
+	   to the OS for it or GTM to use as necessary while we try to go about an orderly shutdown of our process.
+	   The term "release" here means a literal release. The thinking is we don't know whether GTM's small storage
+	   manager will make use of this storage (32K at a time) or if a larger malloc() will be done by libc for
+	   buffers or what not so we will just give this chunk back to the OS to use as it needs it.
+	*/
+	if (0 < outOfMemoryMitigateSize)
+	{
+		assert(NULL == outOfMemoryMitigation);
+		outOfMemoryMitigation = malloc(outOfMemoryMitigateSize * 1024);
+		if (NULL == outOfMemoryMitigation)
+		{
+			save_errno = errno;
+			gtm_putmsg(VARLSTCNT(5) ERR_INVMEMRESRV, 2,
+				   RTS_ERROR_LITERAL(UNIX_ONLY("$gtm_memory_reserve")VMS_ONLY("GTM_MEMORY_RESERVE")),
+				   save_errno);
+			exit(save_errno);
+		}
+	}
+
 	gtmSmInitialized = TRUE;
 }
 
@@ -834,7 +889,9 @@ void gtm_free(void *addr)
 #endif
 		if (!gtmSmInitialized)	/* Storage must be init'd before can free anything */
 			GTMASSERT;
-		if (process_exiting)	/* If we are exiting, don't bother with frees. Process destruction can do it */
+		/* If we are exiting, don't bother with frees. Process destruction can do it *UNLESS* we are handling an
+		   out of memory condition with the proviso that we can't return memory if we are already nested */
+		if (process_exiting && (0 != gtmMallocDepth || error_condition != UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY)))
 			return;
 
 #ifndef GTM_MALLOC_REENT
@@ -1036,6 +1093,31 @@ void gtm_free(void *addr)
 		gtm_free_dbg(addr);
 	}
 #endif
+}
+
+
+/* When an out-of-storage type error is encountered, besides releasing our memory reserve, we also
+   want to release as much unused storage within various GTM queues that we can find.
+*/
+void release_unused_storage(void)
+{
+	mcalloc_hdr	*curhdr, *nxthdr;
+
+	/* Release compiler storage if we aren't in the compiling business currently */
+	if (NULL != mcavailbase && mcavailptr == mcavailbase && mcavail == mcavailptr->size)
+	{	/* Buffers are unused and subject to release */
+		for (curhdr = mcavailbase; curhdr; curhdr = nxthdr)
+		{
+			nxthdr = curhdr->link;
+			gtm_free(curhdr);
+		}
+		mcavail = 0;
+		mcavailptr = mcavailbase = NULL;
+	}
+	/* If the cache_table_rebuild() routine is available in this executable, call it through its
+	   function pointer. */
+	if (NULL != cache_table_relobjs)
+		(*cache_table_relobjs)();	/* Release object code in indirect cache */
 }
 
 

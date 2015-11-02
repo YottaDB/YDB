@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -562,6 +562,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			case MVST_PARM:
 			case MVST_TVAL:
 			case MVST_STCK:
+			case MVST_STCK_SP:
 			case MVST_PVAL:
 			case MVST_TPHOLD:
 				continue;

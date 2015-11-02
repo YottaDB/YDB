@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -972,7 +972,7 @@ boolean_t	tp_tend()
 		}
 		if (x_lock)
 			break;
-		assert(csd == FILE_INFO(si->gv_cur_region)->s_addrs.hdr);
+		assert(csd == si->tp_csd);
 		si = si->next_tp_si_by_ftok;	/* Increment so we release the lock we actually got */
 		si_last = si;
 		for (si = first_tp_si_by_ftok;  (si_last != si);  si = si->next_tp_si_by_ftok)
@@ -981,7 +981,7 @@ boolean_t	tp_tend()
 			tp_cr_array_index = si->cr_array_index;
 			while (tp_cr_array_index > 0)
 			{	/* check crit held within loop as may not enter always (and its only dbg) */
-				assert(si->tpcsa->now_crit);
+				assert(si->tp_csa->now_crit);
 				/* Before resetting in_cw_set, check that it is indeed TRUE */
 				assert(tp_cr_array[tp_cr_array_index-1]->in_cw_set);
 				tp_cr_array[--tp_cr_array_index]->in_cw_set = FALSE;
@@ -1282,7 +1282,7 @@ boolean_t	tp_tend()
 			tp_cr_array_index = si->cr_array_index;
 			while (tp_cr_array_index > 0)
 			{	/* check crit held within loop as may not enter always (and its only dbg) */
-				assert(si->tpcsa->now_crit);
+				assert(si->tp_csa->now_crit);
 				/* Before resetting in_cw_set, check that it is indeed TRUE */
 				assert(tp_cr_array[tp_cr_array_index-1]->in_cw_set);
 				tp_cr_array[--tp_cr_array_index]->in_cw_set = FALSE;
@@ -1290,7 +1290,7 @@ boolean_t	tp_tend()
 			si->cr_array_index = 0;
 		}
 		assert(!si->cr_array_index);
-		si->start_tn = si->tpcsd->trans_hist.curr_tn; /* start_tn used temporarily to store currtn before releasing crit */
+		si->start_tn = si->tp_csd->trans_hist.curr_tn; /* start_tn used temporarily to store currtn before releasing crit */
 		rel_crit(si->gv_cur_region);	/* should use si->gv_cur_region (not gv_cur_region) as the latter is not
 						 * set in case we are not updating this region */
 	} /* for (si ... ) */
@@ -1334,13 +1334,13 @@ failed:
 			tp_cr_array_index = si->cr_array_index;
 			while (tp_cr_array_index > 0)
 			{	/* check crit held within loop as may not enter always (and its only dbg) */
-				assert(si->tpcsa->now_crit);
+				assert(si->tp_csa->now_crit);
 				/* Before resetting in_cw_set, check that it is indeed TRUE */
 				assert(tp_cr_array[tp_cr_array_index-1]->in_cw_set);
 				tp_cr_array[--tp_cr_array_index]->in_cw_set = FALSE;
 			}
 			si->cr_array_index = 0;
-			si->start_tn = si->tpcsd->trans_hist.curr_tn;	/* start_tn used temporarily to store currtn
+			si->start_tn = si->tp_csd->trans_hist.curr_tn;	/* start_tn used temporarily to store currtn
 									 * before releasing crit */
 			/* If we are not doing final retry, release all the critical locks we have obtained */
 			if (release_crit)

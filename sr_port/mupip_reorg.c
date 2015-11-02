@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -167,7 +167,7 @@ void mupip_reorg(void)
 	mu_reorg_process = TRUE;
 	gv_currkey_next_reorg = (gv_key *)malloc(sizeof(gv_key) + MAX_KEY_SZ);
 	gv_currkey_next_reorg->top = MAX_KEY_SZ;
-	reorg_gv_target = targ_alloc(MAX_KEY_SZ, NULL);
+	reorg_gv_target = targ_alloc(MAX_KEY_SZ, NULL, NULL);
 	for (gl_ptr = gl_head.next; gl_ptr; gl_ptr = gl_ptr->next)
 	{
 		util_out_print("   ", FLUSH);

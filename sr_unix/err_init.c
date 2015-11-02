@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,9 +13,6 @@
 #include <setjmp.h>
 #include "invocation_mode.h"
 #include "gtmimagename.h"
-
-/* Force defined values in error.h to expand as GBLDEF. */
-#define CHEXPAND
 #include "error.h"
 
 GBLREF enum gtmImageTypes	image_type;

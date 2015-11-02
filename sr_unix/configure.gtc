@@ -11,7 +11,12 @@
 # This script must be run with shell, not Cshell, and it must be a standard compliant sh.
 # On Solaris this is in /usr/xpg4/bin/sh.
 
+# In order to test future configure.csh changes, copy a modified version into /usr/library/Vxxx/pro/configure
+# and /usr/library/Vxxx/dbg/configure.  Then execute $cms_tools/kitstart.csh -ti Vxxx and check output log
+
 . ./arch.gtc
+# we need a copy for gtm_test_install since the version above will be deleted.
+cp arch.gtc ..
 
 # Path to the correct echo program
 if [ $arch = "sun"  -o  $arch = "solaris" ]; then
@@ -138,20 +143,6 @@ fi
 
 
 server_id=42
-if [ $deliver_gtcm = "yes" ]; then
-	$echo ""
-	$echo "Enter the RC node ID of the GT.CM server, if desired ($server_id): \c"
-	read resp
-	if [ -z "$resp" ]; then resp=$server_id; fi
-	until [ $resp -gt 0 -a $resp -lt 256 ]
-	do
-	  $echo "GT.CM server ID must be between 1 and 255 (default $server_id)"
-	  $echo "Enter the RC node ID of the GT.CM server ($server_id): \c"
-	  read resp
-	  if [ -z "$resp" ]; then resp=$server_id; fi
-	done
-	server_id=$resp
-fi
 
 $echo ""
 $echo "Installing GT.M...."
@@ -172,11 +163,11 @@ if [ -d "utf8" ]; then
 	for libpath in $library_path
 	do
 		if [ -d $libpath ]; then
-			found_icu=`\ls -1 $libpath/libicu*36* | wc -l`
+			found_icu=`\ls -1 $libpath/libicu*36* 2>/dev/null | wc -l`
 			if [ "$found_icu" -ne 0 ] ; then
 				# Determine if they are the right 64/32 bit libraries
 				if [ $arch = "ibm" ] ; then
-					is64bit_icu=`nm -X64 $libpath/libicu*36* | head -1 | wc -l`
+					is64bit_icu=`nm -X64 $libpath/libicu*36* 2>/dev/null | head -1 | wc -l`
 				elif [ $arch = "linux" ] ; then
 					is64bit_icu=`file $libpath/libicu*36* | grep 64-bit | wc -l`
 				fi

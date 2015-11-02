@@ -555,10 +555,9 @@ endif
 endif
 
 %.o:%$(gt_as_src_suffix)
-ifeq ($(verbose),1)
-	$(gt-as)
-else
+ifneq ($(verbose),1)
 	@echo "$< ----> $(CURDIR)/$@"
+endif
 ifeq ($(gt_os_type), Linux)
 ifeq ($(gt_machine_type), ia64)
 	@$(gt_cpp)
@@ -567,6 +566,10 @@ ifeq ($(gt_machine_type), ia64)
 else
 	@$(gt-as)
 endif
+else
+ifeq ($(findstring CYGWIN, $(gt_os_type)), CYGWIN)
+	@$(gt-as)
+	objcopy --prefix-symbols="_" $@
 else
 	@$(gt-as)
 endif

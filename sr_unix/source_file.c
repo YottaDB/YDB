@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +16,7 @@
 #include "gtm_stdio.h"
 #include "gtm_time.h"
 #include "gtm_stat.h"
+#include "gtm_unistd.h"
 
 #include "compiler.h"
 #include "parse_file.h"
@@ -34,6 +35,9 @@ GBLREF mident		routine_name, module_name;
 GBLREF unsigned char	*source_buffer;
 GBLREF int4		dollar_zcstatus;
 GBLREF io_pair          io_curr_device;
+GBLREF char		object_file_name[];
+GBLREF short		object_name_len;
+GBLREF int		object_file_des;
 
 static bool	tt_so_do_once;
 static io_pair	compile_src_dev;
@@ -52,6 +56,7 @@ void	compile_source_file(unsigned short flen, char *faddr)
 	error_def	(ERR_FILEPARSE);
 	error_def	(ERR_FILENOTFND);
 	error_def	(ERR_ERRORSUMMARY);
+        error_def	(ERR_OBJFILERR);
 
 	if (MAX_FBUFF < flen)
 	{
@@ -59,6 +64,7 @@ void	compile_source_file(unsigned short flen, char *faddr)
 		dollar_zcstatus = ERR_ERRORSUMMARY;
 	} else
 	{
+		object_file_des = -1;
 		fstr.mvtype = MV_STR;
 		fstr.str.addr = faddr;
 		fstr.str.len = flen;
@@ -94,7 +100,14 @@ void	compile_source_file(unsigned short flen, char *faddr)
 
 			if (compiler_startup())
 				dollar_zcstatus = ERR_ERRORSUMMARY;
-
+			else
+			{
+				if (close(object_file_des) == -1)
+				{
+					rts_error(VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
+				}
+				object_file_des = -1;
+			}
 			if (tt_so_do_once)
 				break;
 		}
@@ -110,6 +123,7 @@ CONDITION_HANDLER(source_ch)
 	error_def(ERR_ERRORSUMMARY);
 	error_def(ERR_GTMASSERT);
 	error_def(ERR_GTMCHECK);
+        error_def(ERR_MEMORY);
 	error_def(ERR_STACKOFLOW);
 
 	START_CH;

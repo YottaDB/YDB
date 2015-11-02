@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -229,6 +229,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	}
 	if (NULL == gd_header)
 		gvinit();
+	assert(NULL != gd_header);
 	if (frame_pointer->old_frame_pointer->type & SFT_DM)
 	{	/* Put a TPHOLD underneath dmode frame */
 		assert(frame_pointer->old_frame_pointer->old_frame_pointer);
@@ -320,16 +321,18 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	tf->restartable = (NORESTART != prescnt);
 	tf->old_locks = (NULL != mlk_pvt_root);
 	tf->orig_gv_target = gv_target;
-	/* If the TP structures have not yet been initialized, do that now.
-	 */
+	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+	/* If the TP structures have not yet been initialized, do that now. */
 	if (NULL == gv_orig_key_ptr)
 	{	/* This need only be set once */
 		gv_orig_key_ptr = (struct gv_orig_key_struct *)malloc(sizeof(struct gv_orig_key_struct));
 		memset(gv_orig_key_ptr, 0, sizeof(struct gv_orig_key_struct));
 	}
 	tf->orig_key = (gv_key *)&(gv_orig_key_ptr->gv_orig_key[dollar_tlevel][0]);
+	assert(NULL != gv_currkey);
 	memcpy(tf->orig_key, gv_currkey, sizeof(gv_key) + gv_currkey->end);
 	tf->gd_header = gd_header;
+	tf->gd_reg = gv_cur_region;
 	tf->zgbldir = dollar_zgbldir;
 	tf->sym = (symval *)NULL;
 	tf->vars = (tp_var *)NULL;
@@ -341,6 +344,12 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		for (pres = 0;  pres < prescnt;  ++pres)
 		{
 			preserve = va_arg(lvname, mval *);
+			/* Note: the assumption (according to the comment below) is that this mval points into the literal table
+			   and thus could not possibly be undefined. In that case, I do not understand why the earlier loop to 
+			   do MV_FORCE_STR on these variables. Future todo -- verify if that loop is needed. On the assumption
+			   that it is not, the below assert will verify that the mval is defined to catch any NOUNDEF case. 
+			*/
+			assert(MV_DEFINED(preserve));
 			/* The incoming 'preserve' is the pointer to a literal mval table entry. For the indirect code
 			 * (eg. Direct Mode), since the literal table is no longer on the M stack, we should not shift
 			 * the incoming va_arg pointer (C9D01-002205) */
@@ -449,7 +458,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		 * allowed on this region (this is a case where replication was ON originally but later transitioned
 		 * into WAS_ON state and journaling got turned OFF.
 		 */
-		csa = &FILE_INFO(si->gv_cur_region)->s_addrs;
+		csa = si->tp_csa;
 		if (JNL_WRITE_LOGICAL_RECS(csa))
 		{
 			for (prev_jfb = NULL, jfb = si->jnl_head; jfb; jfb = jfb->next)

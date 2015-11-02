@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,16 +36,20 @@ void gtcmd_cst_init(cm_region_head *ptr)
 {
 	gv_namehead	*g;
 	gv_key          *temp_key;
+	gd_region	*reg;
+	sgmnt_addrs	*csa;
+
 	error_def(CMERR_CMEXCDASTLM);
 
+	reg = ptr->reg;
 	if (VMS_ONLY(gtcm_ast_avail > 0) UNIX_ONLY(TRUE))
-		gvcst_init(ptr->reg);
+		gvcst_init(reg);
 	else
 		rts_error(VARLSTCNT(1) CMERR_CMEXCDASTLM);
 	VMS_ONLY(gtcm_ast_avail--);
-	if (((ptr->reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (uint4)(-4)) > gv_keysize)
+	if (((reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (uint4)(-4)) > gv_keysize)
 	{
-		gv_keysize = (ptr->reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (uint4)(-4);
+		gv_keysize = (reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (uint4)(-4);
 		temp_key = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
 		if (gv_currkey)
 		{
@@ -67,8 +71,9 @@ void gtcmd_cst_init(cm_region_head *ptr)
 		gv_altkey = temp_key;
 		gv_altkey->top = gv_keysize;
 	}
-	FILE_INFO(ptr->reg)->s_addrs.dir_tree = (gv_namehead *)targ_alloc(ptr->reg->max_key_size, NULL);
-	FILE_INFO(ptr->reg)->s_addrs.dir_tree->root = DIR_ROOT;
+	csa = &FILE_INFO(reg)->s_addrs;
+	assert(NULL == csa->dir_tree);
+	SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
 	init_hashtab_mname(ptr->reg_hash, 0);
-	cm_add_gdr_ptr(ptr->reg);
+	cm_add_gdr_ptr(reg);
 }

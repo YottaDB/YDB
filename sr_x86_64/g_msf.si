@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -118,6 +118,12 @@ SFT_EXTFUN		=	0x40
 SFT_ZSTEP_ACT		=	0x80
 SFT_ZINTR		=	0x100
 
+SFF_INDCE		=	0x01
+SFF_ZTRAP_ERR		=	0x02
+SFF_DEV_ACT_ERR		=	0x04
+SFF_CI			=	0x08
+SFF_ETRAP_ERR		=	0x10
+
 /* Opcode defination needed by assembly files
  * These are defined in i386*.h for using in "c" files
  */
@@ -166,16 +172,24 @@ ARG_COUNT_OFFSET	   =   ARG_SAVE_OFFSET - (8*NO_REG_SAVED)
 	movq	REG64_SCRATCH1,msf_mpc_off(REG_FRAME_POINTER)
 .endm
 
+.extern	error_return
+
 	.sbttl	g_msf.si	getframe
 
 .macro getframe
 	movq	frame_pointer(%rip),REG_FRAME_POINTER
+	movb	msf_flags_off(REG_FRAME_POINTER),REG8_SCRATCH1
+	andb	$SFF_ETRAP_ERR,REG8_SCRATCH1
+	jz	lab1\@
+	call	error_return
+	movq	frame_pointer(%rip),REG_FRAME_POINTER
+lab1\@:
 	movq	msf_temps_ptr_off(REG_FRAME_POINTER),REG_FRAME_TMP_PTR
 	movq	msf_l_symtab_off(REG_FRAME_POINTER),REG_FRAME_VAR_PTR
 	cmpq	$0,msf_literal_ptr_off(REG_FRAME_POINTER)
-	je	lab\@
+	je	lab2\@
 	movq	msf_literal_ptr_off(REG_FRAME_POINTER),REG_LITERAL_BASE
-lab\@:	movq	msf_ctxt_off(REG_FRAME_POINTER),REG_PV
+lab2\@:	movq	msf_ctxt_off(REG_FRAME_POINTER),REG_PV
 	pushq	msf_mpc_off(REG_FRAME_POINTER)
 .endm
 

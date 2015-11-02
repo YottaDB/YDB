@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@
 #ifdef VMS
 # include <descrip.h>		/* Required for gtmsource.h */
 # include <ssdef.h>
+# include <fab.h>
 # include "desblk.h"
 #endif
 #include "cache.h"
@@ -87,6 +88,8 @@
 #include "patcode.h"	/* for pat_everything and sizeof_pat_everything */
 #include "source_file.h"	/* for REV_TIME_BUFF_LEN */
 #include "mupipbckup.h"
+#include "dpgbldir.h"
+#include "mmemory.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -100,6 +103,10 @@
 #include "op_merge.h"
 
 #ifdef UNIX
+/* The define of CHEXPAND below causes error.h to create GBLDEFs */
+#define CHEXPAND
+#include "error.h"
+
 #include "cli.h"
 #include "invocation_mode.h"
 #include "fgncal.h"
@@ -205,7 +212,7 @@ GBLDEF	mval		dollar_zgbldir,
 			dollar_zstatus,
 			dollar_zstep = DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 1, "B", 0, 0),
 			dollar_ztrap,
-			ztrap_pop2level = DEFINE_MVAL_LITERAL(MV_INT, 0, 0, 0, 0, 0, 0),
+			ztrap_pop2level = DEFINE_MVAL_LITERAL(MV_NM | MV_INT, 0, 0, 0, 0, 0, 0),
 			zstep_action,
 			dollar_system,
 			dollar_estack_delta = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0),
@@ -233,6 +240,9 @@ GBLDEF	tp_region	*halt_ptr,
 GBLDEF	trans_num	local_tn;	/* transaction number for THIS PROCESS (starts at 0 each time) */
 GBLDEF	gv_namehead	*gv_target;
 GBLDEF	gv_namehead	*gv_target_list;
+GBLDEF	gvt_container	*gvt_pending_list;	/* list of gvts that need to be re-examined/re-allocated when region is opened */
+GBLDEF	buddy_list	*gvt_pending_buddy_list;/* buddy_list for maintaining memory for gv_targets to be re-examined/allocated */
+
 GBLDEF	int4		exi_condition;
 GBLDEF	uint4		gtmDebugLevel;
 GBLDEF	caddr_t		smCallerId;			/* Caller of top level malloc/free */
@@ -662,8 +672,6 @@ GBLDEF	stack_frame		*error_frame;		/* ptr to frame where last error occurred or 
 GBLDEF	boolean_t		skip_error_ret;		/* set to TRUE by golevel(), used and reset by op_unwind() */
 GBLDEF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
 GBLDEF	dollar_stack_type	dollar_stack;		/* structure containing $STACK related information */
-GBLDEF	unsigned char		*error_frame_save_mpc[DOLLAR_STACK_MAXINDEX];	/* save the mpc before resetting to error_ret()
-										 * do this for 256 levels */
 GBLDEF	boolean_t		ztrap_explicit_null;	/* whether $ZTRAP was explicitly set to NULL in the current frame */
 GBLDEF	int4			gtm_object_size;	/* Size of entire gtm object for compiler use */
 GBLDEF	int4			linkage_size;		/* Size of linkage section during compile */
@@ -788,16 +796,22 @@ GBLDEF	mline		*mline_tail;
 GBLDEF	short int	block_level;
 GBLDEF	triple		t_orig;
 GBLDEF	int		mvmax, mlmax, mlitmax;
-#ifdef DEBUG
-GBLDEF	int4	expand_hashtab_depth;	/* number of nested calls to expand_hashtab_* routines in the current stack trace */
-#endif
 static	char		routine_name_buff[sizeof(mident_fixed)], module_name_buff[sizeof(mident_fixed)];
 GBLDEF	MIDENT_DEF(routine_name, 0, &routine_name_buff[0]);
 GBLDEF	MIDENT_DEF(module_name, 0, &module_name_buff[0]);
 GBLDEF	char		rev_time_buf[REV_TIME_BUFF_LEN];
 GBLDEF	unsigned short	source_name_len;
-UNIX_ONLY(GBLDEF unsigned char	source_file_name[MAX_FBUFF + 1];)
-VMS_ONLY(GBLDEF char	source_file_name[PATH_MAX];)
+GBLDEF	short		object_name_len;
+UNIX_ONLY(
+	GBLDEF unsigned char	source_file_name[MAX_FBUFF + 1];
+	GBLDEF unsigned char	object_file_name[MAX_FBUFF + 1];
+	GBLDEF int		object_file_des;
+)
+VMS_ONLY(
+	GBLDEF char		source_file_name[PATH_MAX];
+	GBLDEF char		object_file_name[256];
+	GBLDEF struct FAB	obj_fab;	/* file access block for the object file */
+)
 
 GBLDEF	int4		curr_addr, code_size;
 GBLDEF	mident_fixed	zlink_mname;
@@ -916,3 +930,13 @@ GBLDEF  int     totalUsed;                              /* Sum of user allocated
 GBLDEF	int	totalRallocGta;				/* Total storage currently (real) mmap alloc'd */
 GBLDEF	int     totalAllocGta;                          /* Total mmap allocated (includes allocation overhead but not free space */
 GBLDEF	int     totalUsedGta;                           /* Sum of "in-use" portions (totalAllocGta - overhead) */
+
+GBLDEF	volatile char		*outOfMemoryMitigation;	/* Cache that we will freed to help cleanup if run out of memory */
+GBLDEF	uint4			outOfMemoryMitigateSize;/* Size of above cache (in Kbytes) */
+
+GBLDEF	int 			mcavail;
+GBLDEF	mcalloc_hdr 		*mcavailptr, *mcavailbase;
+
+GBLDEF  void            (*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
+UNIX_ONLY(GBLDEF ch_ret_type (*ht_rhash_ch)();)         /* Function pointer to hashtab_rehash_ch */
+UNIX_ONLY(GBLDEF ch_ret_type (*jbxm_dump_ch)();)        /* Function pointer to jobexam_dump_ch */

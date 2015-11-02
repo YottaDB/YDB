@@ -83,7 +83,6 @@ static	int			tot_tcom_len = 0;
 static	int			total_wait_for_jnl_recs = 0;
 static	int			total_wait_for_jnlopen = 0;
 static	unsigned char		*tcombuffp = NULL;
-static	unsigned char		tmp_buff_base[JNL_MAX_WRITE + 2 * DISK_BLOCK_SIZE];
 
 static	int			adjust_buff_leaving_hdr(repl_buff_t *rb);
 static	tr_search_state_t	position_read(repl_ctl_element*, seq_num);
@@ -109,8 +108,8 @@ static	int repl_read_file(repl_buff_t *rb)
 	uint4			dskaddr;
 	uint4			read_less, status;
 	int			eof_change;
-	unsigned char		*tmp_buff;
-	uint4			readaddr_adj;
+	uint4			start_addr;
+	uint4			end_addr;
 
 	error_def(ERR_TEXT);
 
@@ -149,31 +148,30 @@ static	int repl_read_file(repl_buff_t *rb)
 		REPL_DPRINT5("READ FILE : Racing with jnl file %s avoided. Read size reduced from %u to %u at offset %u\n",
 				rb->backctl->jnl_fn, b->buffremaining, b->buffremaining - read_less, b->readaddr);
 	}
-	if (csa->jnl->sync_io)
+	start_addr = ROUND_DOWN2(b->readaddr, DISK_BLOCK_SIZE);
+	end_addr = ROUND_UP2(b->readaddr + b->buffremaining - read_less, DISK_BLOCK_SIZE);
+	if (lseek(fc->fd, start_addr, SEEK_SET) == (off_t)-1)
 	{
-		if (lseek(fc->fd, (off_t)ROUND_DOWN2(b->readaddr, DISK_BLOCK_SIZE), SEEK_SET) == (off_t)-1)
-		{
-			repl_errno = EREPL_JNLFILESEEK;
-			return (ERRNO);
-		}
-		readaddr_adj = b->readaddr - ROUND_DOWN2(b->readaddr, DISK_BLOCK_SIZE);
-		tmp_buff = (unsigned char *)(ROUND_UP2((uintszofptr_t)tmp_buff_base, DISK_BLOCK_SIZE));
-		READ_FILE(fc->fd, tmp_buff, ROUND_UP2(b->buffremaining - read_less + readaddr_adj, DISK_BLOCK_SIZE), nb);
-		status = ERRNO;
-		if (nb > b->buffremaining - read_less)
-			nb = b->buffremaining - read_less;
-		memcpy(b->base + REPL_BLKSIZE(rb) - b->buffremaining, tmp_buff + readaddr_adj, b->buffremaining - read_less);
+		repl_errno = EREPL_JNLFILESEEK;
+		return (ERRNO);
+	}
+	READ_FILE(fc->fd, b->base + REPL_BLKSIZE(rb) - b->buffremaining - (b->readaddr - start_addr),
+		  end_addr - start_addr, nb);
+	status = ERRNO;
+	if (nb < (b->readaddr - start_addr))
+	{	/* This case means that we didn't read enough bytes to get from the alignment point in the disk file
+		 * to the start of the actual desired read (the offset we did the lseek to above).  This can't happen
+		 * and represents an out of design situation and we must return an error.
+		 */
+		assert(FALSE);
+		nb = -1;
 	} else
 	{
-		if (lseek(fc->fd, (off_t)b->readaddr, SEEK_SET) == (off_t)-1)
-		{
-			repl_errno = EREPL_JNLFILESEEK;
-			return (ERRNO);
-		}
-		READ_FILE(fc->fd, b->base + REPL_BLKSIZE(rb) - b->buffremaining, b->buffremaining - read_less, nb);
-		status = ERRNO;
+		nb = nb - (b->readaddr - start_addr);
+		if (nb > (b->buffremaining - read_less))
+			nb = b->buffremaining - read_less;
 	}
-	if (nb >= 0)
+	if (0 <= nb)
 	{
 		b->buffremaining -= (uint4)nb;
 		b->readaddr += (uint4)nb;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@ typedef	struct global_list_struct
 	unsigned char			act;
 	unsigned char			ver;
 	char				key[MAX_MIDENT_LEN + 1];	/* max key length plus one for printf terminator */
+	int4				keysize;			/* length of the key */
 } global_list;
 #ifdef BIGENDIAN
 typedef struct

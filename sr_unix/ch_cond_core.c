@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@ GBLREF boolean_t		need_core;
 
    Since ERR_STACKOFLOW has the type of fatal, we must explicitly check that this error
    is NOT ERR_STACKOFLOW. 1/2001 se.
+   The ERR_MEMORY error now gets same treatment as ERR_STACKOFLOW 2008-01-11 se.
 */
 #undef DUMP
 #define DUMP			(   SIGNAL == (int)ERR_ASSERT		\
@@ -44,8 +45,9 @@ void ch_cond_core(void)
 	error_def(ERR_GTMCHECK);
 	error_def(ERR_OUTOFSPACE);
 	error_def(ERR_STACKOFLOW);
+	error_def(ERR_MEMORY);
 
-	if (DUMPABLE && ERR_STACKOFLOW != SIGNAL && !SUPPRESS_DUMP)
+	if (DUMPABLE && ERR_STACKOFLOW != SIGNAL && ERR_MEMORY != SIGNAL && !SUPPRESS_DUMP)
 	{
 		need_core = TRUE;
 		gtm_fork_n_core();

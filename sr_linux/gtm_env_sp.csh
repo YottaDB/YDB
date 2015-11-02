@@ -116,9 +116,8 @@ if ( $?gtm_version_change == "1" ) then
 	endif
 
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "
-        setenv  gt_cc_options_common    "$gt_cc_options_common -DXOPEN_SOURCE=600 -fsigned-char "
+        setenv  gt_cc_options_common    "$gt_cc_options_common -D_XOPEN_SOURCE=600 -fsigned-char "
 
-# [smw] this looks wrong
         if ( "ia64" != $mach_type ) then
 		set tmpgtmval = `echo $gt_cc_compiler | grep icc`
 		if ($status) then

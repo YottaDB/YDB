@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,11 +39,9 @@
 
 #  define gtm_malloc gtm_malloc_dbg
 #  define gtm_free gtm_free_dbg
-#if defined(__linux__) && defined(__ia64)
-#  define gtm_text_malloc gtm_text_malloc_dbg
-#endif /* __linux__ && __ia64 */
 #  define findStorElem findStorElem_dbg
 #  define processDeferredFrees processDeferredFrees_dbg
+#  define release_unused_storage release_unused_storage_dbg
 #  define DEBUG
 #  define PRO_BUILD
 #  define GTM_MALLOC_DEBUG
@@ -59,10 +57,10 @@
    Nobody should be calling these directly so we don't want them where they can
    get included anywhere else.
 
-   Note the real versions of these routines are defined and only used/callable from 
+   Note the real versions of these routines are defined and only used/callable from
    the gtm_malloc_src.h include so when we define them here for completeness in a dbg
    build, we change the return signature to not return anything (saves us from having
-   to put a "return" after the GTMASSERTS). These are just "catchalls" in case the 
+   to put a "return" after the GTMASSERTS). These are just "catchalls" in case the
    expansion functioned incorrectly.
 */
 void gtm_malloc_dbg(size_t size);
@@ -72,13 +70,6 @@ void gtm_malloc_dbg(size_t size)
 	GTMASSERT;
 }
 
-#if defined(__linux__) && defined(__ia64)
-void gtm_text_malloc_dbg(size_t a);
-void gtm_text_malloc_dbg(size_t a)
-{
-	GTMASSERT;
-}
-#endif /* __linux__ && __ia64 */
 void gtm_free_dbg(void *addr)
 {
 	GTMASSERT;

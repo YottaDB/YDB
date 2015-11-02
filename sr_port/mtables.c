@@ -127,7 +127,8 @@ LITDEF unsigned char mvs_size[] =
 		MV_SIZE(mvs_tval),
 		MV_SIZE(mvs_tp_holder),
 		MV_SIZE(mvs_zintr),
-		MV_SIZE(mvs_zintdev)
+		MV_SIZE(mvs_zintdev),
+		MV_SIZE(mvs_stck)
 	};
 
 static readonly unsigned char localpool[3] = {'1' , '1' , '0'};
@@ -237,6 +238,22 @@ LITDEF unsigned char upper_to_lower_table[] =
 240,241,242,243,244,245,246,247,248,249,
 250,251,252,253,254,255
 };
+
+/* Following primes are very close to 2 ** x.  These numbers should give best distribution for our hash function.
+ * Instead of software limiting in hash table sizes, we have a long prime table.
+ * This commented out table is there for any future reference.
+ * int ht_sizes[] = {
+ *      13, 37, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289,  24593, 49157, 98317, 196613, 393241, 786433, 1572869,
+ *      3145739, 6291469, 12582917, 25165843, 50331653, 100663319,  201326611, 402653189, 805306457, 1610612741, 0};
+ */
+LITDEF int ht_sizes[] = {
+	13, 37, 53, 97, 193, 389, 769, 1543, 3079, 6151, 12289,  24593, 49157,
+	/* Above doubles the table size. But below has slower progression */
+	62501, 102503, 154981, 218459, 290047, 366077, 442861, 517151,
+	603907, 705247, 823541, 961729, 1123079, 1311473, 1531499, 1788443,
+	2088497, 2438881, 2848057, 3325901, 3883903, 4535483, 5296409, 6185021,
+	7222661, 8434427, 9849503, 11502019, 13431661, 15685133, 18316643, 21389671,
+	24978257, 29168903, 34062629, 39777391, 46450931, 54244103, 0};
 
 #ifdef DEBUG
 /* These instructions follow the definitions made

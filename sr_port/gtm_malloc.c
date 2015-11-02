@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,3 @@
 
 #include "caller_id.h"
 #include "gtm_malloc_src.h"
-
-#if defined(__linux__) && defined(__ia64)
-GBLDEF boolean_t        force_text_alloc;
-#endif /* __linux__ */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,8 +15,8 @@
 #include "mmemory.h"
 #include "min_max.h"
 
-GBLDEF int 		mcavail;
-GBLDEF mcalloc_hdr 	*mcavailptr, *mcavailbase;
+GBLREF int 		mcavail;
+GBLREF mcalloc_hdr 	*mcavailptr, *mcavailbase;
 
 char *mcalloc(unsigned int n)
 {
@@ -46,8 +46,7 @@ char *mcalloc(unsigned int n)
 					ptr = nxt->link;
 					free(nxt);
 				}
-			}
-			else
+			} else
 				nxt = NULL;
 			new_size = (int)MAX(MC_DSBLKSIZE, (n + MCALLOC_HDR_SZ));
 			hdr = (mcalloc_hdr *)malloc(new_size);

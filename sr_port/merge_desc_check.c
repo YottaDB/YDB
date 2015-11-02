@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,13 +46,21 @@ void merge_desc_check(void)
 {
         unsigned char		buff1[MAX_ZWR_KEY_SZ], buff2[MAX_ZWR_KEY_SZ], *end1, *end2;
 	enum db_acc_method	acc_meth1, acc_meth2;
+	gd_region		*reg1, *reg2;
+	gv_namehead		*gvt1, *gvt2;
 
 	error_def(ERR_MERGEDESC);
 
 	if (MARG1_IS_GBL(merge_args) && MARG2_IS_GBL(merge_args))
 	{
-		acc_meth1 = mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->acc_meth;
-		acc_meth2 = mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->acc_meth;
+		reg1 = mglvnp->gblp[IND1]->s_gv_cur_region;
+		reg2 = mglvnp->gblp[IND2]->s_gv_cur_region;
+		gvt1 = mglvnp->gblp[IND1]->s_gv_target;
+		gvt2 = mglvnp->gblp[IND2]->s_gv_target;
+		acc_meth1 = reg1->dyn.addr->acc_meth;
+		acc_meth2 = reg2->dyn.addr->acc_meth;
+		assert(!(dba_bg == acc_meth1 || dba_mm == acc_meth1) || (NULL != gvt1->gd_csa));
+		assert(!(dba_bg == acc_meth2 || dba_mm == acc_meth2) || (NULL != gvt2->gd_csa));
 		/* if (!(both are bg/mm regions && dbs are same && same global) &&
 		 *     !(both are cm regions && on the same remote node && same region)
 		 *     !(both are usr regions && in the same volume set))
@@ -60,17 +68,12 @@ void merge_desc_check(void)
 		 * endif
 		 */
 		if (!(((dba_bg == acc_meth1 || dba_mm == acc_meth2) && (dba_bg == acc_meth1 || dba_mm == acc_meth2))
-			&& REG_EQUAL(FILE_INFO(mglvnp->gblp[IND1]->s_gv_target->gd_reg), mglvnp->gblp[IND2]->s_gv_target->gd_reg)
-			&& mglvnp->gblp[IND1]->s_gv_target->root == mglvnp->gblp[IND2]->s_gv_target->root) &&
-		   !(dba_cm == acc_meth1 && dba_cm == acc_meth2
-			&& mglvnp->gblp[IND1]->s_gv_cur_region->dyn.addr->cm_blk ==
-			   mglvnp->gblp[IND2]->s_gv_cur_region->dyn.addr->cm_blk
-			&& mglvnp->gblp[IND1]->s_gv_cur_region->cmx_regnum ==
-			   mglvnp->gblp[IND2]->s_gv_cur_region->cmx_regnum)
+			&& (gvt1->gd_csa == gvt2->gd_csa) && (gvt1->root == gvt2->root))
+		   && !((dba_cm == acc_meth1) && (dba_cm == acc_meth2)
+			&& (reg1->dyn.addr->cm_blk == reg2->dyn.addr->cm_blk) && (reg1->cmx_regnum == reg2->cmx_regnum))
 		   VMS_ONLY (&&
-		   !(dba_usr == acc_meth1 && dba_usr == acc_meth2
-			&& ((ddp_info *)(&FILE_INFO(mglvnp->gblp[IND1]->s_gv_cur_region)->file_id))->volset ==
-			   ((ddp_info *)(&FILE_INFO(mglvnp->gblp[IND2]->s_gv_cur_region)->file_id))->volset)))
+		   	!((dba_usr == acc_meth1) && (dba_usr == acc_meth2)
+			&& ((ddp_info *)(&FILE_INFO(reg1)->file_id))->volset == ((ddp_info *)(&FILE_INFO(reg2)->file_id))->volset)))
 		{
 			UNIX_ONLY(assert(dba_usr != acc_meth1 && dba_usr != acc_meth2);)
 			return;

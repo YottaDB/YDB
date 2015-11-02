@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +51,10 @@
 #include "gvcst_protos.h"	/* for gvcst_init,gvcst_init_sysops,gvcst_tp_init prototype */
 #include "compswap.h"
 #include "send_msg.h"
+#include "targ_alloc.h"		/* for "targ_free" prototype */
+#include "hashtab.h"
+#include "hashtab_mname.h"
+#include "process_gvt_pending_list.h"
 
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -79,6 +83,7 @@ GBLREF	int			reformat_buffer_len;
 GBLREF	volatile int		reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		new_dbinit_ipc;
+GBLREF	gvt_container		*gvt_pending_list;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -159,11 +164,16 @@ void gvcst_init (gd_region *greg)
 	unique_file_id		*greg_fid, *reg_fid;
 	gd_addr			*addr_ptr;
 	tp_region		*tr;
-	int4			prev_index;
 	ua_list			*tmp_ua;
 	time_t			curr_time;
 	uint4			curr_time_uint4, next_warn_uint4;
 	unsigned int            minus1 = (unsigned)-1;
+	enum db_acc_method	greg_acc_meth;
+	ht_ent_mname		*tabent, *topent, *stayent;
+	gv_namehead		*gvt, *gvt_stay;
+	gvnh_reg_t		*gvnh_reg;
+	hash_table_mname	*table;
+	boolean_t		added, first_wasopen;
 
 	error_def(ERR_DBFLCORRP);
 	error_def(ERR_DBCREINCOMP);
@@ -175,20 +185,6 @@ void gvcst_init (gd_region *greg)
 
 	CWS_INIT;	/* initialize the cw_stagnate hash-table */
 
-	/* we shouldn't have crit on any region unless we are in TP and in the final retry or we are in
-	 * mupip_set_journal trying to switch journals across all regions. Currently, there is no fine-granular
-	 * checking for mupip_set_journal, hence a coarse MUPIP_IMAGE check for image_type
-	 */
-	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || MUPIP_IMAGE == image_type || (0 == have_crit(CRIT_HAVE_ANY_REG)));
-	if ((0 < dollar_tlevel) && (0 != have_crit(CRIT_HAVE_ANY_REG)))
-	{	/* to avoid deadlocks with currently holding crits and the DLM lock request to be done in db_init(),
-		 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
-		 * having released crit on all regions.
-		 */
-		insert_region(greg, &tp_reg_list, &tp_reg_free_list, sizeof(tp_region));
-		t_retry(cdb_sc_needcrit);
-		assert(FALSE);	/* we should never reach here since t_retry should have unwound the M-stack and restarted the TP */
-	}
 	/* check the header design assumptions */
 	assert(sizeof(th_rec) == (sizeof(bt_rec) - sizeof(bt->blkque)));
 	assert(sizeof(cache_rec) == (sizeof(cache_state_rec) + sizeof(cr->blkque)));
@@ -237,7 +233,59 @@ void gvcst_init (gd_region *greg)
 		memcpy(greg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
 		greg->dyn.addr->fname_len = prev_reg->dyn.addr->fname_len;
 		csa = (sgmnt_addrs *)&FILE_INFO(greg)->s_addrs;
+		PROCESS_GVT_PENDING_LIST(greg, csa, gvt_pending_list);
 		csd = csa->hdr;
+		if (NULL == csa->gvt_hashtab)
+		{	/* Already have another region that points to the same physical database file as this one.
+			 * Since two regions point to the same physical file, start maintaining a list of all global variable
+			 * names whose gv_targets have already been allocated on behalf of the current database file.
+			 * Future targ_allocs will check this list before they allocate (to avoid duplicate allocations).
+			 */
+			csa->gvt_hashtab = (hash_table_mname *)malloc(sizeof(hash_table_mname));
+			init_hashtab_mname(csa->gvt_hashtab, 0);
+			assert(1 == csa->regcnt);
+			first_wasopen = TRUE;
+		} else
+			first_wasopen = FALSE;
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		{
+			table = addr_ptr->tab_ptr;
+			for (tabent = table->base, topent = tabent + table->size; tabent < topent; tabent++)
+			{
+				if (HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg))
+				{	/* Check if the gvt's region is the current region.
+					 * If so add gvt's variable name into the csa hashtable.
+					 */
+					gvt = gvnh_reg->gvt;
+					assert((gvnh_reg->gd_reg != greg) || (csa == gvt->gd_csa));
+					/* If this is the first time a was_open region is happening for this csa, then
+					 * we want to merge gv_targets from both the regions into csa->gvt_hashtab. For
+					 * all future was_open cases, we want only to add gv_targets from the was_open region.
+					 */
+					if (first_wasopen && (csa == gvt->gd_csa) || !first_wasopen && (gvnh_reg->gd_reg == greg))
+					{	/* Add gv_target into csa->gvt_hashtab */
+						added = add_hashtab_mname(csa->gvt_hashtab, &gvt->gvname, gvt, &stayent);
+						assert(!added || (1 <= gvt->regcnt));
+						if (!added)
+						{	/* Entry already present. Increment gvt->regcnt.
+							 * If NOISOLATION status differs between the two,
+							 * choose the more pessimistic one.
+							 */
+							gvt_stay = (gv_namehead *)stayent->value;
+							assert(gvt_stay != gvt);
+							if (FALSE == gvt->noisolation)
+								gvt_stay->noisolation = FALSE;
+							assert(1 <= gvt_stay->regcnt);
+							/* Now make gvnh_reg->gvt point to gvt_stay (instead of gvt) */
+							gvt_stay->regcnt++;
+							gvt->regcnt--;
+							gvnh_reg->gvt = gvt_stay;
+							targ_free(gvt);
+						}
+					}
+				}
+			}
+		}
 		greg->max_rec_size = csd->max_rec_size;
 		greg->max_key_size = csd->max_key_size;
 	 	greg->null_subs = csd->null_subs;
@@ -252,9 +300,27 @@ void gvcst_init (gd_region *greg)
 		greg->open = TRUE;
 		greg->opening = FALSE;
 		greg->was_open = TRUE;
+		assert(1 <= csa->regcnt);
+		csa->regcnt++;	/* Increment # of regions that point to this csa */
 		return;
 	}
 	greg->was_open = FALSE;
+	/* we shouldn't have crit on any region unless we are in TP and in the final retry or we are in
+	 * mupip_set_journal trying to switch journals across all regions. Currently, there is no fine-granular
+	 * checking for mupip_set_journal, hence a coarse MUPIP_IMAGE check for image_type
+	 */
+	assert(dollar_tlevel && (CDB_STAGNATE <= t_tries) || MUPIP_IMAGE == image_type || (0 == have_crit(CRIT_HAVE_ANY_REG)));
+	if ((0 < dollar_tlevel) && (0 != have_crit(CRIT_HAVE_ANY_REG)))
+	{	/* To avoid deadlocks with currently holding crits and the DLM lock request to be done in db_init(),
+		 * we should insert this region in the tp_reg_list and tp_restart should do the gvcst_init after
+		 * having released crit on all regions. Note that this check should be done AFTER checking if the
+		 * region has already been opened (i.e. greg->was_open = TRUE logic above) since in that case we dont
+		 * do any heavyweight processing (like db_init which involves crit/DLM locks) and so dont need to restart.
+		 */
+		insert_region(greg, &tp_reg_list, &tp_reg_free_list, sizeof(tp_region));
+		t_retry(cdb_sc_needcrit);
+		assert(FALSE);	/* we should never reach here since t_retry should have unwound the M-stack and restarted the TP */
+	}
 	csa = (sgmnt_addrs *)&FILE_INFO(greg)->s_addrs;
 
 #ifdef	NOLICENSE
@@ -267,6 +333,7 @@ void gvcst_init (gd_region *greg)
         csa->nl = NULL;
         csa->jnl = NULL;
 	csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
+	csa->regcnt = 1;	/* At this point, only one region points to this csa */
 	UNIX_ONLY(
 		FILE_INFO(greg)->semid = INVALID_SEMID;
 		FILE_INFO(greg)->shmid = INVALID_SHMID;
@@ -283,9 +350,10 @@ void gvcst_init (gd_region *greg)
 				 * just in case this was set to TRUE by a previous "gvcst_init". */
         ESTABLISH(dbinit_ch);
 
+	greg_acc_meth = greg->dyn.addr->acc_meth;
 	temp_cs_data = (sgmnt_data_ptr_t)cs_data_buff;
 	fc = greg->dyn.addr->file_cntl;
-	fc->file_type = greg->dyn.addr->acc_meth;
+	fc->file_type = greg_acc_meth;
 	fc->op = FC_READ;
 	fc->op_buff = (sm_uc_ptr_t)temp_cs_data;
 	fc->op_len = sizeof(*temp_cs_data);
@@ -313,54 +381,56 @@ void gvcst_init (gd_region *greg)
 		rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(greg));
 	if ((dba_mm == temp_cs_data->acc_meth) && temp_cs_data->blks_to_upgrd)
 		rts_error(VARLSTCNT(4) ERR_MMNODYNUPGRD, 2, DB_LEN_STR(greg));
-	assert(greg->dyn.addr->acc_meth != dba_cm);
-	if (greg->dyn.addr->acc_meth != temp_cs_data->acc_meth)
-		greg->dyn.addr->acc_meth = temp_cs_data->acc_meth;
-
-/* Here's the shared memory layout:
- *
- * low address
- *
- * both
- *	segment_data
- *	(file_header)
- *	MM_BLOCK
- *	(master_map)
- *	TH_BLOCK
- * BG
- *	bt_header
- *	(bt_buckets * bt_rec)
- *	th_base (sizeof(que_ent) into an odd bt_rec)
- *	bt_base
- *	(n_bts * bt_rec)
- *	LOCK_BLOCK (lock_space)
- *	(lock_space_size)
- *	cs_addrs->acc_meth.bg.cache_state
- *	(cache_que_heads)
- *	(bt_buckets * cache_rec)
- *	(n_bts * cache_rec)
- *	critical
- *	(mutex_struct)
- *	nl
- *	(node_local)
- *	[jnl_name
- *	jnl_buffer]
- * MM
- *	file contents
- *	LOCK_BLOCK (lock_space)
- *	(lock_space_size)
- *	cs_addrs->acc_meth.mm.mmblk_state
- *	(mmblk_que_heads)
- *	(bt_buckets * mmblk_rec)
- *	(n_bts * mmblk_rec)
- *	critical
- *	(mutex_struct)
- *	nl
- *	(node_local)
- *	[jnl_name
- *	jnl_buffer]
- * high address
- */
+	assert(greg_acc_meth != dba_cm);
+	if (greg_acc_meth != temp_cs_data->acc_meth)
+	{
+		greg_acc_meth = temp_cs_data->acc_meth;
+		greg->dyn.addr->acc_meth = greg_acc_meth;
+	}
+	/* Here's the shared memory layout:
+	 *
+	 * low address
+	 *
+	 * both
+	 *	segment_data
+	 *	(file_header)
+	 *	MM_BLOCK
+	 *	(master_map)
+	 *	TH_BLOCK
+	 * BG
+	 *	bt_header
+	 *	(bt_buckets * bt_rec)
+	 *	th_base (sizeof(que_ent) into an odd bt_rec)
+	 *	bt_base
+	 *	(n_bts * bt_rec)
+	 *	LOCK_BLOCK (lock_space)
+	 *	(lock_space_size)
+	 *	cs_addrs->acc_meth.bg.cache_state
+	 *	(cache_que_heads)
+	 *	(bt_buckets * cache_rec)
+	 *	(n_bts * cache_rec)
+	 *	critical
+	 *	(mutex_struct)
+	 *	nl
+	 *	(node_local)
+	 *	[jnl_name
+	 *	jnl_buffer]
+	 * MM
+	 *	file contents
+	 *	LOCK_BLOCK (lock_space)
+	 *	(lock_space_size)
+	 *	cs_addrs->acc_meth.mm.mmblk_state
+	 *	(mmblk_que_heads)
+	 *	(bt_buckets * mmblk_rec)
+	 *	(n_bts * mmblk_rec)
+	 *	critical
+	 *	(mutex_struct)
+	 *	nl
+	 *	(node_local)
+	 *	[jnl_name
+	 *	jnl_buffer]
+	 * high address
+	 */
  	/* Ensure first 3 members (upto now_running) of node_local are at the same offset for any version.
 	 * This is so that the VERMISMATCH error can be successfully detected in db_init/mu_rndwn_file
 	 *	and so that the db-file-name can be successfully obtained from orphaned shm by mu_rndwn_all.
@@ -374,7 +444,8 @@ void gvcst_init (gd_region *greg)
 	csa->regnum = ++region_open_count;
 	csd = csa->hdr;
 	/* set csd and fill in selected fields */
-	switch (greg->dyn.addr->acc_meth)
+	assert(greg_acc_meth == greg->dyn.addr->acc_meth);
+	switch (greg_acc_meth)
 	{
 	case dba_mm:
 		csa->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_ulong_t)csd + (int)(csd->start_vbn - 1) * DISK_BLOCK_SIZE);
@@ -387,6 +458,7 @@ void gvcst_init (gd_region *greg)
 		GTMASSERT;
 	}
 	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
+	PROCESS_GVT_PENDING_LIST(greg, csa, gvt_pending_list);
 
 	/* If we are not fully upgraded, see if we need to send a warning to the operator console about
 	   performance. Compatibility mode is a known performance drain. Actually, we can send one of two
@@ -485,7 +557,7 @@ void gvcst_init (gd_region *greg)
 	}
 	greg->open = TRUE;
 	greg->opening = FALSE;
-	if (dba_bg == greg->dyn.addr->acc_meth)
+	if (dba_bg == greg_acc_meth)
 	{	/* Check if (a) this region has non-upgraded blocks and if so, (b) the reformat buffer exists and
 		   (c) if it is big enough to deal with this region. If the region does not have any non-upgraded
 		   block (blks_to_upgrd is 0) we will not allocate the buffer at this time. Note that this opens up
@@ -516,13 +588,13 @@ void gvcst_init (gd_region *greg)
 		}
 
 	}
-	if ((dba_bg == greg->dyn.addr->acc_meth) || (dba_mm == greg->dyn.addr->acc_meth))
+	if ((dba_bg == greg_acc_meth) || (dba_mm == greg_acc_meth))
 	{
 		/* Determine fid_index of current region's file_id across sorted file_ids of all regions open until now.
 		 * All regions which have a file_id lesser than that of current region will have no change to their fid_index
 		 * All regions which have a file_id greater than that of current region will have their fid_index incremented by 1
 		 * The fid_index determination algorithm below has an optimization in that if the current region's file_id is
-		 * determined to be greater than a that of a particular region, then all regions whose fid_index is lesser
+		 * determined to be greater than that of a particular region, then all regions whose fid_index is lesser
 		 * than that particular region's fid_index are guaranteed to have a lesser file_id than the current region
 		 * so we do not compare those against the current region's file_id.
 		 * Note that the sorting is done only on DB/MM regions. GT.CM/DDP regions should not be part of TP transactions,
@@ -534,7 +606,7 @@ void gvcst_init (gd_region *greg)
 		{
 			for (prev_reg = addr_ptr->regions, reg_top = prev_reg + addr_ptr->n_regions; prev_reg < reg_top; prev_reg++)
 			{
-				if ((!prev_reg->open) || (greg == prev_reg))
+ 				if (!prev_reg->open || prev_reg->was_open || (greg == prev_reg))
 					continue;
 				/* Only BG/MM regions can be involved in TP transactions, do not sort GT.CM or DDP regions */
 				if (!((dba_bg == prev_reg->dyn.addr->acc_meth) || (dba_mm == prev_reg->dyn.addr->acc_meth)))
@@ -557,13 +629,9 @@ void gvcst_init (gd_region *greg)
 		else
 			csa->fid_index = prevcsa->fid_index + 1;
 		/* Also update tp_reg_list fid_index's as insert_region relies on it */
-		DEBUG_ONLY(prev_index = 0;)
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
-		{
 			tr->file.fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;
-			assert(prev_index < tr->file.fid_index);
-			DEBUG_ONLY(prev_index = tr->file.fid_index);
-		}
+		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 	}
 	REVERT;
 	return;
