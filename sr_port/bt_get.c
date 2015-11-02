@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@ bt_rec_ptr_t bt_get(int4 block)		/* block = block # to get */
 	int			lcnt;
 
 	csa = cs_addrs;
-	assert(csa->read_lock || csa->now_crit);
+	assert(csa->now_crit);
 	bt = csa->bt_header + (block % csa->hdr->bt_buckets);
 	assert(bt->blk == BT_QUEHEAD);
 	for (lcnt = csa->hdr->n_bts; lcnt > 0; lcnt--)

@@ -97,9 +97,23 @@ LITREF int4			gtm_release_name_len;
 
 void	assert_jrec_member_offsets(void)
 {
+	assert(REAL_JNL_HDR_LEN % DISK_BLOCK_SIZE == 0);
 	assert(JNL_HDR_LEN % DISK_BLOCK_SIZE == 0);
+	/* We currently assume that the journal file header size is aligned relative to the filesystem block size.
+	 * which is currently assumed to be a 2-power (e.g. 512 bytes, 1K, 2K, 4K etc.) but never more than 64K
+	 * (MAX_IO_BLOCK_SIZE). Given this, we keep the journal file header size at 64K for Unix and 512-byte aligned
+	 * for VMS. This way any process updating the file header will hold crit and do aligned writes. Any process
+	 * writing the journal file data (journal records) on disk will hold the qio lock and can safely do so without
+	 * ever touching the journal file header area. If ever MAX_IO_BLOCK_SIZE changes (say because some filesystem
+	 * block size changes to 128K) such that JNL_HDR_LEN is no longer aligned to that, we want to know hence this assert.
+	 */
+	assert(JNL_HDR_LEN % MAX_IO_BLOCK_SIZE == 0);
+	assert(REAL_JNL_HDR_LEN == SIZEOF(jnl_file_header));
+	UNIX_ONLY(assert(REAL_JNL_HDR_LEN <= JNL_HDR_LEN);)
+	VMS_ONLY(assert(REAL_JNL_HDR_LEN == JNL_HDR_LEN);)
 	assert(JNL_HDR_LEN == JNL_FILE_FIRST_RECORD);
 	assert(DISK_BLOCK_SIZE >= PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN);
+	assert((JNL_ALLOC_MIN * DISK_BLOCK_SIZE) > JNL_HDR_LEN);
 	/* Following assert is for JNL_FILE_TAIL_PRESERVE macro in tp.h */
 	assert(PINI_RECLEN >= EPOCH_RECLEN && PINI_RECLEN >= PFIN_RECLEN && PINI_RECLEN >= EOF_RECLEN);
 	/* jnl_string structure has a 8-bit nodeflags field and a 24-bit length field. In some cases, this is

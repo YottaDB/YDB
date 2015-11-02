@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -152,7 +152,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			} else
 				break;
 		}
-		if (GTMSOURCE_MAX_SHUTDOWN_WAITLOOP <= lcnt)
+		if (GTMSOURCE_MAX_SHUTDOWN_WAITLOOP < lcnt)
 		{	/* Max timeout over, take stack trace of all the source server(s) which are still running.
 			 * Display the list of pids that wont die along with the secondary instances they correspond to.
 			 * Users need to kill these pids and reissue the shutdown command for the journal pool to be cleaned up.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ void gtcm_gnp_pktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, siz
 	chr = buf;
 	ctim = time(NULL);
 	ltime = localtime(&ctim);
-	fprintf(fp, "%04d%02d%02d%02d%02d%02d (%s) %s length %d\n",
+	FPRINTF(fp, "%04d%02d%02d%02d%02d%02d (%s) %s length %d\n",
 		ltime->tm_year+1900, ltime->tm_mon + 1, ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min, ltime->tm_sec, op, msg, count);
 
@@ -89,10 +89,10 @@ void gtcm_gnp_pktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, siz
 			linebuf[j + j] = digs[nibble];
 			nibble = chr[j] & 0x0f;
 			linebuf[j + j + 1] = digs[nibble];
-			linebuf[j + 32 + 1] = isprint(chr[j])? chr[j]: '.';
+			linebuf[j + 32 + 1] = ISPRINT_ASCII(chr[j])? chr[j]: '.';
 		}
 		linebuf[32 + 1 + 16] = '\0';
-		fprintf(fp, "%.8X %s\n", offset, linebuf);
+		FPRINTF(fp, "%.8X %s\n", offset, linebuf);
 		count -= 16;
 		offset += 16;
 		chr += 16;
@@ -107,12 +107,12 @@ void gtcm_gnp_pktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, siz
 			linebuf[j + j] = digs[nibble];
 			nibble = chr[j] & 0x0f;
 			linebuf[j +j +1] = digs[nibble];
-			linebuf[j + 32 + 1] = isprint(chr[j])? chr[j]: '.';
+			linebuf[j + 32 + 1] = ISPRINT_ASCII(chr[j])? chr[j]: '.';
 		}
 		memset(&linebuf[count + count], ' ' , 2 * (16 - count));
 		memset(&linebuf[32 + 1 + count], ' ', 16 - count);
 		linebuf[32 + 1 + 16] = '\0';
-		fprintf(fp, "%.8X %s\n", offset, linebuf);
+		FPRINTF(fp, "%.8X %s\n", offset, linebuf);
 	}
 	fflush(fp);
 }

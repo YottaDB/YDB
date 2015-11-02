@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,10 +50,10 @@ int resolve_ref(int errknt)
 		walktree((mvar *)mlabtab, resolve_lab, (char *)&errknt);
 	} else
 	{
-		COMPDBG(printf(" ************************************* Begin resolve_ref scan ******************************\n"););
+		COMPDBG(PRINTF(" ************************************* Begin resolve_ref scan ******************************\n"););
 		dqloop(&t_orig, exorder, curtrip)
 		{
-			COMPDBG(printf(" ************************ Triple Start **********************\n"););
+			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
 			COMPDBG(cdbg_dump_triple(curtrip, 0););
 			for (opnd = curtrip->operand ; opnd < ARRAYTOP(curtrip->operand); opnd++)
 			{
@@ -218,8 +218,8 @@ void resolve_tref(triple *curtrip, oprtype *opnd)
 		} while (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode);
 	}
 
-	COMPDBG(printf(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
-		       opnd, &tripref->operand[0]););
+	COMPDBG(PRINTF(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
+		       (long unsigned int) opnd, (long unsigned int) &tripref->operand[0]););
 
 	tripbp = (tbp *) mcalloc(SIZEOF(tbp));
 	tripbp->bpt = curtrip;

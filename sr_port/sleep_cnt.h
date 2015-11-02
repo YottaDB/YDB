@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,6 @@
 #define JNL_FLUSH_PROG_FACTOR	2
 #define JNL_FLUSH_PROG_TRIES	(JNL_MAX_FLUSH_TRIES * JNL_FLUSH_PROG_FACTOR)
 #define MAX_LCK_TRIES 		SLEEP_ONE_MIN	/* vms only: wait in mu_rndwn_file */
-#define TIME_TO_FLUSH           10      	/* milliseconds */
 #define MAX_FSYNC_WAIT_CNT     	(2 * SLEEP_ONE_MIN)	/* 2 mins of total wait for fsync, before GTMASSERTing */
 #define	MAX_TQREAD_WAIT		(4 * BUF_OWNER_STUCK)	/* 4 mins of total wait for t_qread, before GTMASSERTing */
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -183,7 +183,7 @@ rc_srvc_xact(cptr, xend)
 			if (fxhdr->free.value > fxhdr->end.value)
 			{
 				char msg[256];
-				sprintf(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
+				SPRINTF(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
 					fxhdr->free.value, fxhdr->end.value);
 				/*GTM64: Assuming length of packet wont excced MAX_INT */
 				gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
@@ -196,7 +196,7 @@ rc_srvc_xact(cptr, xend)
 			{
 				char msg[256];
 				char *p;
-				sprintf(msg,"corrupted packet, free (%x) > end.value (%x).  Dumped RC header + packet",
+				SPRINTF(msg,"corrupted packet, free (%x) > end.value (%x).  Dumped RC header + packet",
 					fxhdr->free.value,fxhdr->end.value);
 				gtcm_cpktdmp((char *)fxhdr, (int)(((char *)xend) - ((char *)fxhdr)),msg);
 				p = (char *)-1L;
@@ -206,7 +206,7 @@ rc_srvc_xact(cptr, xend)
 			{
 				char msg[256];
 				char *p;
-				sprintf(msg,"corrupted packet, qhdr.a.len.value=%x > fxhdr end (%x).  Dumped RC header + packet",
+				SPRINTF(msg,"corrupted packet, qhdr.a.len.value=%x > fxhdr end (%x).  Dumped RC header + packet",
 					qhdr->a.len.value,fxhdr->end.value);
 				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
 				p = (char *)-1L;
@@ -222,7 +222,7 @@ rc_srvc_xact(cptr, xend)
 				{
 					char msg[256];
 
-					sprintf(msg,"RC error (0x%x).",rc_errno);
+					SPRINTF(msg,"RC error (0x%x).",rc_errno);
 					gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
 					dumped = 1;
 				}
@@ -317,7 +317,7 @@ rc_srvc_xact(cptr, xend)
 	if (fxhdr->free.value > fxhdr->end.value)
 	{
 	    char msg[256];
-	    sprintf(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
+	    SPRINTF(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->free.value, fxhdr->end.value);
 	    /*GTM64: Assuming length of packet wont excced MAX_INT */
 	    gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
@@ -328,7 +328,7 @@ rc_srvc_xact(cptr, xend)
 	else if (fxhdr->cpt_tab.value > fxhdr->end.value)
 	{
 	    char msg[256];
-	    sprintf(msg,"invalid packet :  cpt_tab (%x) > end (%x).  Dumped RC header + packet",
+	    SPRINTF(msg,"invalid packet :  cpt_tab (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->cpt_tab.value, fxhdr->end.value);
 	    /*GTM64: Assuming length of packet wont excced MAX_INT */
 	    gtcm_cpktdmp((char *)fxhdr, (int)(((char *)xend) - ((char *)fxhdr)),msg);
@@ -340,7 +340,7 @@ rc_srvc_xact(cptr, xend)
 		                                      > fxhdr->end.value)
 	{
 	    char msg[256];
-	    sprintf(msg,"invalid packet :  cpt_tab + cpt_siz (%x) > end (%x).  Dumped RC header + packet",
+	    SPRINTF(msg,"invalid packet :  cpt_tab + cpt_siz (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->cpt_tab.value + fxhdr->cpt_siz.value,
 		    fxhdr->end.value);
 	    /*GTM64: Assuming length of packet wont excced MAX_INT */
@@ -353,7 +353,7 @@ rc_srvc_xact(cptr, xend)
 	if (fxhdr->free.value > fxhdr->end.value)
 	{
 	    char msg[256];
-	    sprintf(msg,"invalid Aq packet :  free (%x) > end (%x).  Dumped RC header + packet",
+	    SPRINTF(msg,"invalid Aq packet :  free (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->free.value, fxhdr->end.value);
   	    /*GTM64: Assuming length of packet wont excced MAX_INT */
 	    gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);

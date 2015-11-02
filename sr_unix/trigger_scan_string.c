@@ -13,9 +13,9 @@
 
 #include "trigger_scan_string.h"
 
-boolean_t trigger_scan_string(char *src_ptr, unsigned short *src_len, char *dst_ptr, unsigned short *dst_len)
+boolean_t trigger_scan_string(char *src_ptr, uint4 *src_len, char *dst_ptr, uint4 *dst_len)
 {
-	unsigned short d_len, s_len;
+	uint4 d_len, s_len;
 
 	s_len = *src_len;
 	if (1 >= s_len)

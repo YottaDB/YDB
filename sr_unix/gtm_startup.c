@@ -149,6 +149,7 @@ GBLREF casemap_t		casemaps[];
 GBLREF void             	(*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
 GBLREF ch_ret_type		(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
 GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
+GBLREF enum gtmImageTypes	image_type;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -165,6 +166,7 @@ void gtm_startup(struct startup_vector *svec)
 	static char 	other_mode_buf[] = "OTHER";
 	mstr		log_name;
 
+	assert(INVALID_IMAGE != image_type);
 	assert(svec->argcnt == SIZEOF(*svec));
 	IA64_ONLY(init_xfer_table();)
 	get_page_size();
@@ -178,12 +180,15 @@ void gtm_startup(struct startup_vector *svec)
 	if (svec->user_stack_size > 8388608)
 		svec->user_stack_size = 8388608;
 	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
-        msp = stackbase = mstack_ptr + svec->user_stack_size - SIZEOF(char *);
+        msp = stackbase = mstack_ptr + svec->user_stack_size - mvs_size[MVST_STORIG];
 
 	/* mark the stack base so that if error occur during call-in gtm_init(), the unwind
 	   logic in gtmci_ch() will get rid of the stack completely */
 	fgncal_stack = stackbase;
 	mv_chain = (mv_stent *)msp;
+	mv_chain->mv_st_type = MVST_STORIG;	/* Initialize first (anchor) mv_stent so doesn't do anything */
+	mv_chain->mv_st_next = 0;
+	mv_chain->mv_st_cont.mvs_storig = 0;
 	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
 	stackwarn = stacktop + (16 * 1024);
 	break_message_mask = svec->break_message_mask;
@@ -202,22 +207,21 @@ void gtm_startup(struct startup_vector *svec)
 	ind_source_top = ind_source_sp + svec->user_indrcache_size;
 	rts_stringpool = stringpool;
 	compile_time = FALSE;
+	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */
+#	ifdef DEBUG
 	switch(image_type)
 	{
 		case GTM_IMAGE:
 		case GTM_SVC_DAL_IMAGE:
-			run_time = TRUE;
-			is_replicator = TRUE;
+			assert(is_replicator && run_time);
 			break;
-#		ifdef UNIX
 		case MUPIP_IMAGE:
-			run_time = FALSE;
-			assert(!is_replicator);
+			assert(!is_replicator && !run_time);
 			break;
-#		endif
 		default:
-			GTMASSERT;
+			assert(FALSE);
 	}
+#	endif
 	gtm_utf8_init(); /* Initialize the runtime for Unicode */
 	/* Initialize alignment requirement for the runtime stringpool */
 	log_name.addr = DISABLE_ALIGN_STRINGS;
@@ -322,7 +326,7 @@ void gtm_startup(struct startup_vector *svec)
 	*/
 	assert(FALSE == curr_symval->alias_activity);
 	curr_symval->alias_activity = TRUE;
-	lvzwr_init(0, (mval *)NULL);
+	lvzwr_init((enum zwr_init_types)0, (mval *)NULL);
 	curr_symval->alias_activity = FALSE;
 	fnpca.fnpcsteal = &fnpca.fnpcs[0];		/* Starting place to look for cache reuse */
 	fnpca.fnpcmax = &fnpca.fnpcs[FNPC_MAX - 1];	/* The last element */

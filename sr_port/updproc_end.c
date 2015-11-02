@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,10 +80,13 @@ void  updproc_stop(boolean_t exit)
 {
 	int4		status;
 	int		fclose_res;
+	sgmnt_addrs	*repl_csa;
 
 	call_on_signal = NULL;	/* Don't reenter on error */
 	if (pool_init)
 	{
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		assert(!repl_csa->hold_onto_crit);
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 		/* nullify jnlpool_ctl before detaching from jnlpool since if it is the other way, we might be interrupted
 		 * by the periodic timer routines and end up in jnl_write_epoch_rec() routine that dereferences jnlpool_ctl

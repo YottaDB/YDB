@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,10 +99,9 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr)
 	 * List of who does not need to be considered (with reasons)
 	 * -----------------------------------------------------------
 	 * -> MUPIP RECOVER can hold crit on several regions (through TP or non-TP transactions).
-	 * 	But it has standalone access and hence no possibility of a deadlock.
-	 * -> MUPIP RESTORE too holds standalone access so does not need to be considered.
+	 * -> MUPIP RESTORE holds standalone access so does not need to be considered.
 	 * -> Source Server, Receiver Server etc. can hold only one CRIT resource at any point of time.
-	 * -> DSE, MUPIP BACKUP, MUPIP SET JOURNAL etc. can legitimately hold crit on several regions though in non-TP.
+	 * -> DSE, MUPIP BACKUP, MUPIP SET JOURNAL etc. can legitimately hold crit on several regions even though in non-TP.
 	 */
 	if (is_replicator || mu_reorg_process)
 	{

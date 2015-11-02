@@ -42,7 +42,8 @@
 			LEN = 0; /* Could not skip all specified # of pieces ("skippcs") */			\
 			END_SEEN |= MASK;									\
 		}												\
-	}													\
+	} else													\
+		END_SEEN |= MASK;										\
 }
 
 #define	MATCH_CURPIECE(DELIM_LEN, DELIM_PTR, LEN, PTR, MATCH_LEN, END, END_SEEN, MASK, PIECE_EXISTS)		\

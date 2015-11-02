@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,18 +67,15 @@
 #define MAP_RD_FAIL		-2
 #define EXTEND_SUSPECT		-3
 #define FILE_EXTENDED		-4
-#define	EXTEND_UNFREEZECRIT	-5
 
 #define	GET_CDB_SC_CODE(gdsfilext_code, status)		\
 {							\
 	if (MAP_RD_FAIL == gdsfilext_code)		\
-		status = (enum cdb_sc)rdfail_detail;			\
+		status = (enum cdb_sc)rdfail_detail;	\
 	else if (EXTEND_SUSPECT == gdsfilext_code)	\
-		status = (enum cdb_sc)cdb_sc_extend;			\
+		status = (enum cdb_sc)cdb_sc_extend;	\
 	else if (NO_FREE_SPACE == gdsfilext_code)	\
 		status = cdb_sc_gbloflow;		\
-	else if (EXTEND_UNFREEZECRIT == gdsfilext_code)	\
-		status = (enum cdb_sc)cdb_sc_unfreeze_getcrit;	\
 }
 
 #define MASTER_MAP_BITS_PER_LMAP	1

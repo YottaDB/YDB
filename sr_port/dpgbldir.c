@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,7 +69,7 @@ typedef struct gdr_name_struct
 	gd_addr		*gd_ptr;
 }gdr_name;
 
-static	gdr_name	*gdr_name_head;
+STATICDEF gdr_name	*gdr_name_head;
 
 gd_addr *zgbldir(mval *v)
 {
@@ -137,7 +137,7 @@ Notes:          A) While checking may be done earlier for duplicate names,
 
 LITREF char gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
 
-static gd_addr	*gd_addr_head;
+STATICDEF gd_addr	*gd_addr_head;
 
 gd_addr *gd_load(mstr *v)
 {

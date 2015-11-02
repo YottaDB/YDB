@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,15 +19,12 @@
 #include "mdq.h"
 
 GBLREF sbs_blk 	*sbs_blk_hdr;
+GBLREF int4	lv_sbs_blk_size;
 
 void lv_free_sbs_blk(sbs_blk *b)
 {
-	dqdel (b, sbs_que);
-
-#ifdef DEBUG
-	memset(b,0, SIZEOF(sbs_blk));
-#endif
-
+	dqdel(b, sbs_que);
+	DEBUG_ONLY(memset(b, 0, lv_sbs_blk_size));
 	b->sbs_que.fl = sbs_blk_hdr;
 	sbs_blk_hdr = b;
 }

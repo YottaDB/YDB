@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, LLC.	*
+ *	Copyright 2005, 2010 Fidelity Information Services, LLC.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,9 +57,9 @@ void dbcertify_dbfilop(phase_static_area *psa)
 	switch(psa->fc->op)
 	{
 		case FC_READ:
-			IA64_ONLY(DBC_DEBUG(("DBC_DEBUG: -- Reading database op_pos = %lld  op_len = %d\n",
+			NON_GTM64_ONLY(DBC_DEBUG(("DBC_DEBUG: -- Reading database op_pos = %lld  op_len = %d\n",
 					     psa->fc->op_pos, psa->fc->op_len)));
-			NON_IA64_ONLY(DBC_DEBUG(("DBC_DEBUG: -- Reading database op_pos = %d  op_len = %d\n",
+			GTM64_ONLY(DBC_DEBUG(("DBC_DEBUG: -- Reading database op_pos = %ld  op_len = %d\n",
 						 psa->fc->op_pos, psa->fc->op_len)));
 			assert(psa->fc->op_pos > 0);		/* gt.m uses the vms convention of numbering the blocks from 1 */
 			LSEEKREAD(udi->fd,
@@ -76,9 +76,9 @@ void dbcertify_dbfilop(phase_static_area *psa)
 			}
 			break;
 		case FC_WRITE:
-			IA64_ONLY(DBC_DEBUG(("DBC_DEBUG: -- Writing database op_pos = %lld  op_len = %d\n",
+			NON_GTM64_ONLY(DBC_DEBUG(("DBC_DEBUG: -- Writing database op_pos = %lld  op_len = %d\n",
 					     psa->fc->op_pos, psa->fc->op_len)));
-			NON_IA64_ONLY(DBC_DEBUG(("DBC_DEBUG: -- Writing database op_pos = %d  op_len = %d\n",
+			GTM64_ONLY(DBC_DEBUG(("DBC_DEBUG: -- Writing database op_pos = %ld  op_len = %d\n",
 						 psa->fc->op_pos, psa->fc->op_len)));
 			LSEEKWRITE(udi->fd,
 				   (off_t)(psa->fc->op_pos - 1) * DISK_BLOCK_SIZE,

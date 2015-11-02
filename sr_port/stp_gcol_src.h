@@ -215,8 +215,8 @@ static mstr		**topstr, **array, **arraytop;
  * to enable.
 */
 #if 0
-/* Debug fprintf with pre and post requisite flushing of appropriate streams  */
-#define DBGSTPGCOL(x) {flush_pio(); fprintf x; fflush(stderr);}
+/* Debug FPRINTF with pre and post requisite flushing of appropriate streams  */
+#define DBGSTPGCOL(x) {flush_pio(); FPRINTF x; fflush(stderr);}
 #else
 #define DBGSTPGCOL(x)
 #endif
@@ -702,6 +702,7 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 				case MVST_STCK_SP:
 				case MVST_PVAL:
 				case MVST_RSTRTPC:
+				case MVST_STORIG:
 					continue;
 				case MVST_TPHOLD:
 #					ifdef GTM_TRIGGER

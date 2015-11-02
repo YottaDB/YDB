@@ -78,7 +78,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 	block_id	cseblk, histblk;
 	cache_rec_ptr_t	cr;
 	int4		upd_trans;
-	int		save_intrpt_ok_state;
+	intrpt_state_t	save_intrpt_ok_state;
 
 	error_def(ERR_MEMORY);
 	error_def(ERR_VMSMEMORY);
@@ -158,12 +158,20 @@ void	tp_clean_up(boolean_t rollback_flag)
 				}
 			}
 #			ifdef DEBUG
-			/* Ensure that we did not miss out on resetting clue for any gvtarget */
-			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
-			{
-				assert((gvnh->read_local_tn != local_tn) || (0 == gvnh->clue.end));
-				chain1 = *(off_chain *)&gvnh->root;
-				assert(!chain1.flag);	/* Also assert that all gvts in this process have valid root blk */
+			if (!process_exiting)
+			{	/* Ensure that we did not miss out on resetting clue for any gvtarget.
+				 * Dont do this if the process is cleaning up the TP transaction as part of exit handling
+				 * as the tp_clean_up invocation could be due to an interrupt (MUPIP STOP etc.) and we cannot
+				 * be sure what state the mainline code was when it was interrupted. Thankfully, the clue
+				 * will be used only as part of the next transaction. Since the process is in the process of
+				 * exiting, the clue will never be used so it is ok for it to be non-zero in that case.
+				 */
+				for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+				{
+					assert((gvnh->read_local_tn != local_tn) || (0 == gvnh->clue.end));
+					chain1 = *(off_chain *)&gvnh->root;
+					assert(!chain1.flag);	/* Also assert that all gvts in this process have valid root blk */
+				}
 			}
 #			endif
 			local_tn++;	/* to effectively invalidate first_tp_srch_status of all gv_targets */

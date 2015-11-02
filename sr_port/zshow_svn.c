@@ -118,6 +118,7 @@ static readonly char ztoldval_text[] = "$ZTOLDVAL";
 static readonly char ztrap_text[] = "$ZTRAP";
 #ifdef GTM_TRIGGER
 static readonly char ztriggerop_text[] = "$ZTRIGGEROP";
+static readonly char ztslate_text[] = "$ZTSLATE";
 static readonly char ztupdate_text[] = "$ZTUPDATE";
 static readonly char ztvalue_text[] = "$ZTVALUE";
 static readonly char ztwormhole_text[] = "$ZTWORMHOLE";
@@ -162,14 +163,15 @@ GBLREF size_t		totalUsed;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF boolean_t	dollar_zquit_anyway;
+#ifdef GTM_TRIGGER
 GBLREF mval		*dollar_ztcode;
 GBLREF mval		*dollar_ztdata;
 GBLREF mval		*dollar_ztoldval;
 GBLREF mval		*dollar_ztriggerop;
+GBLREF mval		dollar_ztslate;
 GBLREF mval		*dollar_ztupdate;
 GBLREF mval		*dollar_ztvalue;
 GBLREF mval		dollar_ztwormhole;
-#ifdef GTM_TRIGGER
 GBLREF int4		gtm_trigger_depth;
 #endif
 
@@ -519,6 +521,11 @@ void zshow_svn(zshow_out *output)
 		} else
 			memcpy(&var, &literal_null, SIZEOF(mval));
 		ZS_VAR_EQU(&x, ztriggerop_text);
+		mval_write(output, &var, TRUE);
+	/* SV_ZTSLATE */
+		var.mvtype = MV_STR;
+		var.str = dollar_ztslate.str;
+		ZS_VAR_EQU(&x, ztslate_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZTUPDATE */
 		if (NULL != dollar_ztupdate)

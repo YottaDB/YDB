@@ -33,7 +33,7 @@ enum upd_bad_trans_type
 	upd_bad_key
 };
 
-#define	UPD_GV_BIND_NAME(GD_HEADER, MNAME)	gv_bind_name(GD_HEADER, &MNAME)
+#define	UPD_GV_BIND_NAME(GD_HEADER, MNAME)	GV_BIND_NAME_AND_ROOT_SEARCH(GD_HEADER, &MNAME)
 
 #ifdef GTM_TRIGGER
 #define UPD_GV_BIND_NAME_APPROPRIATE(GD_HEADER, MNAME, KEY, KEYLEN)					\
@@ -57,12 +57,12 @@ enum upd_bad_trans_type
 		tr_ptr += tr_len;									\
 		assert((KEY_DELIMITER == *tr_ptr) && ((char)STR_SUB_PREFIX == *(tr_ptr + 1)));		\
 		tr_ptr += 2;				/* Skip the 0x00 and 0xFF */			\
-		assert((HASHT_GBL_CHAR1 == *tr_ptr) || ('%' == *tr_ptr) || (ISALPHA(*tr_ptr)));		\
+		assert((HASHT_GBL_CHAR1 == *tr_ptr) || ('%' == *tr_ptr) || (ISALPHA_ASCII(*tr_ptr)));	\
 		if (HASHT_GBL_CHAR1 != *tr_ptr)								\
 		{											\
 			gbl_name.addr = tr_ptr;								\
 			gbl_name.len = STRLEN(tr_ptr);							\
-			gv_bind_name(GD_HEADER, &gbl_name);						\
+			GV_BIND_NAME_ONLY(GD_HEADER, &gbl_name);					\
 			csa = cs_addrs;									\
 			SETUP_TRIGGER_GLOBAL;								\
 			gv_target = hasht_tree;								\

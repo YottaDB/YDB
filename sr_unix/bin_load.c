@@ -32,7 +32,7 @@
 #include "op.h"
 #include "gvsub2str.h"
 #include "mupip_exit.h"
-#include "mu_load_input.h"
+#include "file_input.h"
 #include "load.h"
 #include "mvalconv.h"
 #include "mu_gvis.h"
@@ -43,6 +43,7 @@
 #endif
 #include "rtnhdr.h"
 #include "gv_trigger.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 
 GBLREF bool		mupip_DB_full;
 GBLREF bool		mu_ctrly_occurred;
@@ -96,7 +97,8 @@ void bin_load(uint4 begin, uint4 end)
 	unsigned char	hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
 			cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1];
 	unsigned char	*end_buff;
-	unsigned short	len, rec_len, next_cmpc;
+	unsigned short	rec_len, next_cmpc;
+	int		len;
 	int		current, last, length, max_blk_siz, max_key, status;
 	uint4		iter, max_data_len, max_subsc_len, key_count;
 	ssize_t	        rec_count, global_key_count, subsc_len,extr_std_null_coll;
@@ -130,7 +132,7 @@ void bin_load(uint4 begin, uint4 end)
 	assert(4 == SIZEOF(coll_hdr));
 	gvinit();
 	v.mvtype = MV_STR;
-	len = mu_bin_get((char **)&ptr);
+	len = file_input_bin_get((char **)&ptr);
 	hdr_lvl = EXTR_HEADER_LEVEL(ptr);
 	if (!(((hdr_lvl == '4'|| hdr_lvl == '5') && len == BIN_HEADER_SZ) || (hdr_lvl < '4' && len == V3_BIN_HEADER_SZ)))
 	{
@@ -187,7 +189,7 @@ void bin_load(uint4 begin, uint4 end)
 	{
 		int	i, num_indexes;
 
-		len = mu_bin_get((char **)&ptr);
+		len = file_input_bin_get((char **)&ptr);
 		hash_array = (muext_hash_hdr *) malloc(len);
 		/* store hashes of all the files used during extract into muext_hash_hdr structure */
 		memcpy((char *)hash_array, ptr, len);
@@ -206,7 +208,7 @@ void bin_load(uint4 begin, uint4 end)
 #	endif
 	if (hdr_lvl  > '2')
 	{
-		len = mu_bin_get((char **)&ptr);
+		len = file_input_bin_get((char **)&ptr);
 		if (SIZEOF(coll_hdr) != len)
 		{
 			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupt collation header"), ERR_LDBINFMT);
@@ -220,7 +222,7 @@ void bin_load(uint4 begin, uint4 end)
 		begin = 2;
 	for (iter = 2; iter < begin; iter++)
 	{
-		if (!(len = mu_bin_get((char **)&ptr)))
+		if (!(len = file_input_bin_get((char **)&ptr)))
 		{
 			gtm_putmsg(VARLSTCNT(3) ERR_LOADEOF, 1, begin);
 			util_out_print("Error reading record number: !UL\n", TRUE, iter);
@@ -262,7 +264,7 @@ void bin_load(uint4 begin, uint4 end)
 		}
 		/* reset the stringpool for every record in order to avoid garbage collection */
 		stringpool.free = stringpool.base;
-		if (!(len = mu_bin_get((char **)&ptr)) || mupip_error_occurred)
+		if (!(len = file_input_bin_get((char **)&ptr)) || mupip_error_occurred)
 			break;
 		else if (len == SIZEOF(coll_hdr))
 		{
@@ -491,7 +493,7 @@ void bin_load(uint4 begin, uint4 end)
 			free(hash_array);
 	)
 	free(tmp_gvkey);
-	mu_load_close();
+	file_input_close();
 	util_out_print("LOAD TOTAL!_!_Key Cnt: !UL  Max Subsc Len: !UL  Max Data Len: !UL", TRUE, key_count, max_subsc_len,
 			max_data_len);
 	util_out_print("Last LOAD record number: !UL\n", TRUE, key_count ? (rec_count - 1) : 0);
@@ -517,7 +519,7 @@ void bin_call_db(int routine, INTPTR_T parm1, INTPTR_T parm2)
 			op_gvput((mval *)parm1);
 			break;
 		case BIN_BIND:
-			gv_bind_name((gd_addr *)parm1, (mstr *)parm2);
+			GV_BIND_NAME_AND_ROOT_SEARCH((gd_addr *)parm1, (mstr *)parm2);
 			break;
 		case ERR_COR:
 			rts_error(VARLSTCNT(4) ERR_CORRUPT, 2, parm1, parm2);

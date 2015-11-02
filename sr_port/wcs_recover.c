@@ -675,7 +675,7 @@ void wcs_recover(gd_region *reg)
 				{	/* previous cache record is more recent from a cr->stopped record made by sechsr_db_clnup:
 					 * discard this copy as it is old */
 					assert(((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr))->tn
-						< ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
+						<= ((blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr_alt->buffaddr))->tn);
 					assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr_alt));
 					cr->cycle++;	/* increment cycle whenever blk number changes (tp_hist depends on this) */
 					cr->blk = CR_BLKEMPTY;
@@ -847,7 +847,8 @@ void	wcs_mm_recover(gd_region *reg)
 	if (-1 == status)
 	{
 		sigprocmask(SIG_SETMASK, &savemask, NULL);
-		rel_crit(gv_cur_region);
+		if (!was_crit)
+			rel_crit(gv_cur_region);
 		rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), errno);
 	}
 #ifdef DEBUG_DB64
@@ -887,6 +888,7 @@ void	wcs_mm_recover(gd_region *reg)
 	assert(&FILE_INFO(reg)->s_addrs == cs_addrs);
 	assert(cs_addrs->now_crit);
 	assert(cs_addrs->hdr == cs_data);
+	assert(!cs_addrs->hold_onto_crit);
 	/* but it isn't yet implemented on VMS */
 	rel_crit(gv_cur_region);
 	if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))

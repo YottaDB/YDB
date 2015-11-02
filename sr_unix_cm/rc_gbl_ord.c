@@ -64,7 +64,7 @@ void rc_gbl_ord(rc_rsp_page *rsp)
 		}
 		name.addr = (char *)&gv_altkey->base[0];
 		name.len = gv_altkey->end - 1;
-		gv_bind_name(gd_header, &name);
+		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &name);
 		if (gv_target->root != 0)
 		{
 			/* Look to see if key exists */

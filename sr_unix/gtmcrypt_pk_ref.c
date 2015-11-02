@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +79,7 @@ int gc_pk_mask_unmask_passwd(char *in, char *out, int len)
 			sprintf(mumps_ex, "%s/%s", ptr, "mumps");
 			if (0 == stat(mumps_ex, &stat_info))
 			{
-				sprintf(tmp, "%d", stat_info.st_ino);
+				sprintf(tmp, "%ld", (long) stat_info.st_ino);
 				ilen = (int)strlen(tmp);
 				if (ilen < passwd_len)
 					strncpy(inode + (passwd_len - ilen), tmp, ilen);
@@ -98,6 +98,12 @@ int gc_pk_mask_unmask_passwd(char *in, char *out, int len)
 	}
 	GC_ENV_UNSET_ERROR("USER");
 	return GC_FAILURE;
+}
+
+int gc_pk_mask_unmask_passwd_interlude(int nparm, gtm_string_t *in, gtm_string_t *out, int len)
+{
+	out->length=len;
+	return gc_pk_mask_unmask_passwd(in->address, out->address, len);
 }
 
 void gc_pk_scrub_passwd()
@@ -264,6 +270,7 @@ int gc_pk_scrub_plaintext_keys_from_c_stack()
 	char lclarray[8192];
 
 	memset(lclarray, 0, SIZEOF(lclarray));
+	return 0;
 }
 
 /* This function tries to decrypt the cipher file (the file containing the symmetric key with which the database is encrypted).

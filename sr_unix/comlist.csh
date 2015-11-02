@@ -421,13 +421,13 @@ if ( "ia64" == $mach_type || "x86_64" == $mach_type ) then
 endif
 
 echo ""
-echo "Start of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.csh relies on this to detect warnings.
+echo "Start of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.awk relies on this to detect warnings.
 echo ""
 
-#Do not compile gtmcrypt_ref.c, maskpass.c, ascii2hex.c.
+#Do not compile gtmcrypt_ref.c, maskpass.c.
 #$gtm_tools/buildplugin.csh will take care of compilation and building of the reference plugin and the supporting files.
 /bin/ls $gs[1] | egrep '\.c$' | \
-	egrep -v '^gtmcrypt_ref|^gtmcrypt_dbk_ref|^gtmcrypt_pk_ref|^maskpass|^ascii2hex'  | xargs -n25 $shell $gtm_tools/gt_cc.csh
+	egrep -v '^gtmcrypt_ref|^gtmcrypt_dbk_ref|^gtmcrypt_pk_ref|^maskpass'  | xargs -n25 $shell $gtm_tools/gt_cc.csh
 
 # Special compilation for omi_sx_play.c
 set comlist_gt_cc_bak = "$comlist_gt_cc"
@@ -436,12 +436,14 @@ $shell $gtm_tools/gt_cc.csh omi_sx_play.c
 setenv comlist_gt_cc "$comlist_gt_cc_bak"
 
 echo ""
-echo "End of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.csh relies on this to detect warnings.
+echo "End of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.awk relies on this to detect warnings.
 echo ""
 
 if ( $?gt_xargs_insert == 0 ) setenv gt_xargs_insert "-i"
 
 # Assembly language assemblies next so they can supersede the C sources by overwriting the object files:
+
+echo "Start of Assembly"	# Do not change this string. $gtm_tools/buildwarn.awk relies on this to detect warnings.
 
 if ( $gt_as_inc_convert == "true" ) then
 	# Convert assembly language include files to native dialect:
@@ -476,6 +478,9 @@ if ( $HOSTOS =~ "CYGWIN*" ) then
 		objcopy --prefix-symbols="_" $gtm_exe/obj/$x:r:t.o
 	end
 endif
+
+echo "End of Assembly"	# Do not change this string. $gtm_tools/buildwarn.awk relies on this to detect warnings.
+echo ""
 
 ############################################## Archiving object files ###################################################
 

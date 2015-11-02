@@ -85,6 +85,11 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 	match = bh->curr_rec.match;
 	key_size = gv_currkey->end + 1;
 	do_rtsib = FALSE;
+	/* Even if key does not exist, return null string in "val". Caller can use dollar_data to distinguish
+	 * whether the key is undefined or defined and set to the null string.
+	 */
+	val->mvtype = MV_STR;
+	val->str.len = 0;
 	if (key_size == match)
 	{
 		dlr_data = 1;
@@ -100,7 +105,6 @@ enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 		{
 			ENSURE_STP_FREE_SPACE(data_len);
 			memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
-			val->mvtype = MV_STR;
 			val->str.addr = (char *)stringpool.free;
 			val->str.len = data_len;
 			stringpool.free += data_len;

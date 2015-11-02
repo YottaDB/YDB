@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,7 +81,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 /*  Ask for a specific port */
 	else
 	{
-		if (isdigit(*omi_service))
+		if (ISDIGIT_ASCII(*omi_service))
 			port = atoi(omi_service);
 		else
 		{

@@ -40,6 +40,10 @@
 #  error UNSUPPORTED PLATFORM
 #endif
 
+#ifndef UNICODE_SUPPORTED
+#define f_char f_zchar
+#endif
+
 GBLREF	char	window_token;
 GBLREF	char	director_token;
 GBLREF	mval	window_mval;
@@ -114,6 +118,7 @@ LITDEF nametabent svn_names[] =
 	,{ 4, "ZTLE*"}
 	,{ 4, "ZTOL*"}
 	,{ 4, "ZTRI*"}
+	,{ 4, "ZTSL*"}
 	,{ 4, "ZTUP*"}
 	,{ 4, "ZTVA*"}
 	,{ 4, "ZTWO*"}
@@ -127,7 +132,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 87	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 88	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -191,6 +196,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZTLEVEL, FALSE, TRIGGER_OS}
 	,{ SV_ZTOLDVAL, FALSE, TRIGGER_OS }
 	,{ SV_ZTRIGGEROP, FALSE, TRIGGER_OS}
+	,{ SV_ZTSLATE, TRUE, TRIGGER_OS}
 	,{ SV_ZTUPDATE, FALSE, TRIGGER_OS }
 	,{ SV_ZTVALUE, TRUE, TRIGGER_OS }
 	,{ SV_ZTWORMHOLE, TRUE, TRIGGER_OS }
@@ -251,7 +257,6 @@ LITDEF nametabent fun_names[] =
 	,{5, "ZDATA"}
 	,{5, "ZDATE"}
 	,{2, "ZE"}, {8, "ZEXTRACT"}
-	,{6, "ZECHAR"}
 	,{2, "ZF"}, {5, "ZFIND"}
 	,{5, "ZFILE"}, {8, "ZFILEATT*"}
 	,{7, "ZGETDVI"}
@@ -285,7 +290,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 114	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 113	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -316,7 +321,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNTEXT, ALL_SYS }, { OC_FNTEXT, ALL_SYS }
 	,{ OC_FNTRANSLATE, ALL_SYS }, { OC_FNTRANSLATE, ALL_SYS }
 	,{ OC_FNVIEW, ALL_SYS }
-	,{ OC_FNZASCII, UNIX_OS }, { OC_FNZASCII, UNIX_OS }
+	,{ OC_FNZASCII, ALL_SYS }, { OC_FNZASCII, ALL_SYS }
 	,{ OC_FNZAHANDLE, ALL_SYS }, { OC_FNZAHANDLE, ALL_SYS }
 	,{ OC_FNZBITAND, ALL_SYS }
 	,{ OC_FNZBITCOUN, ALL_SYS }
@@ -333,39 +338,38 @@ LITDEF fun_data_type fun_data[] =
 #else
 	,{ OC_FNZCALL, VMS_OS }, { OC_FNZCALL, VMS_OS }
 #endif
-	,{ OC_FNZCHAR, UNIX_OS }, { OC_FNZCHAR, UNIX_OS }
+	,{ OC_FNZCHAR, ALL_SYS }, { OC_FNZCHAR, ALL_SYS }
 	,{ OC_FNZCONVERT2, UNIX_OS }, { OC_FNZCONVERT2, UNIX_OS }
 	,{ OC_FNZDATE, ALL_SYS }
 	,{ OC_FNZDATA, ALL_SYS }
 	,{ OC_FNZDATE, ALL_SYS }
-	,{ OC_FNZEXTRACT, UNIX_OS }, { OC_FNZEXTRACT, UNIX_OS }
-        ,{ OC_FNCHAR, ALL_SYS }
-	,{ OC_FNZFIND, UNIX_OS }, { OC_FNZFIND, UNIX_OS }
+	,{ OC_FNZEXTRACT, ALL_SYS }, { OC_FNZEXTRACT, ALL_SYS }
+	,{ OC_FNZFIND, ALL_SYS }, { OC_FNZFIND, ALL_SYS }
 	,{ OC_FNZFILE, VMS_OS }, { OC_FNZFILE, VMS_OS }
 	,{ OC_FNZGETDVI, VMS_OS }
 	,{ OC_FNZGETJPI, ALL_SYS }
 	,{ OC_FNZGETLKI, VMS_OS }
 	,{ OC_FNZGETSYI, VMS_OS }
 	,{ OC_FNINCR, ALL_SYS }, { OC_FNINCR, ALL_SYS }
-	,{ OC_FNZJ2, UNIX_OS }, { OC_FNZJ2, UNIX_OS}
+	,{ OC_FNZJ2, ALL_SYS }, { OC_FNZJ2, ALL_SYS }
 	,{ OC_FNZJOBEXAM, ALL_SYS }
-	,{ OC_FNZLENGTH, UNIX_OS }, { OC_FNZLENGTH, UNIX_OS}
+	,{ OC_FNZLENGTH, ALL_SYS }, { OC_FNZLENGTH, ALL_SYS }
 	,{ OC_FNZLKID, VMS_OS}
 	,{ OC_FNZM, ALL_SYS }, { OC_FNZM, ALL_SYS }
 	,{ OC_FNZPREVIOUS, ALL_SYS }, { OC_FNZPREVIOUS, ALL_SYS }
 	,{ OC_FNZPARSE, ALL_SYS }
-	,{ OC_FNZPIECE, UNIX_OS }, { OC_FNZPIECE, UNIX_OS }
+	,{ OC_FNZPIECE, ALL_SYS }, { OC_FNZPIECE, ALL_SYS }
 	,{ OC_FNZPID, VMS_OS }
 	,{ OC_FNZPRIV, VMS_OS }, { OC_FNZPRIV, VMS_OS }
 	,{ OC_FNZQGBLMOD, ALL_SYS }, { OC_FNZQGBLMOD, ALL_SYS }
 	,{ OC_FNZSEA, ALL_SYS }
 	,{ OC_FNZSETPRV, VMS_OS }
 	,{ OC_FNZSIGPROC, ALL_SYS }
-	,{ OC_FNZSUBSTR, UNIX_OS }, { OC_FNZSUBSTR, UNIX_OS }
-	,{ OC_FNZTRANSLATE, UNIX_OS }, { OC_FNZTRANSLATE, UNIX_OS }
+	,{ OC_FNZSUBSTR, ALL_SYS }, { OC_FNZSUBSTR, ALL_SYS }
+	,{ OC_FNZTRANSLATE, ALL_SYS }, { OC_FNZTRANSLATE, ALL_SYS }
 	,{ OC_FNZTRIGGER, TRIGGER_OS }, { OC_FNZTRIGGER, TRIGGER_OS }
 	,{ OC_FNZTRNLNM, ALL_SYS }
-	,{ OC_FNZWIDTH, UNIX_OS }, { OC_FNZWIDTH, UNIX_OS }
+	,{ OC_FNZWIDTH, ALL_SYS }, { OC_FNZWIDTH, ALL_SYS }
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -415,7 +419,6 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =
 	f_data,				/* $ZDATA reuses parser for $DATA since only runtime execution differs */
 	f_zdate,
 	f_extract, f_extract,
-	f_zchar,
 	f_find, f_find,
 	f_two_mstrs, f_two_mstrs,
 	f_two_mstrs,

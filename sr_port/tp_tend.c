@@ -26,6 +26,7 @@
 #include <descrip.h>	/* Required for gtmsource.h */
 #endif
 
+#include "gtm_ctype.h"
 #include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -144,6 +145,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		incr_db_trigger_cycle;
+GBLREF	boolean_t		hold_onto_locks;
 
 #ifdef UNIX
 GBLREF	recvpool_addrs		recvpool;
@@ -173,6 +175,7 @@ boolean_t	tp_crit_all_regions()
 	sgmnt_addrs		*tmpcsa;
 	sgm_info		*tmpsi;
 	sgmnt_data_ptr_t	tmpcsd;
+	gd_region		*reg;
 
 	assert(dollar_tlevel > 0);
 	/* This function is in tp_tend because its technique and structures should be maintained in parallel with tp_tend.
@@ -188,7 +191,8 @@ boolean_t	tp_crit_all_regions()
 		x_lock = TRUE;		/* Assume success */
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 		{
-			tmpcsa = &FILE_INFO(tr->reg)->s_addrs;
+			reg = tr->reg;
+			tmpcsa = &FILE_INFO(reg)->s_addrs;
 			tmpcsd = tmpcsa->hdr;
 			tmpsi = (sgm_info *)(tmpcsa->sgm_info_ptr);
 			DEBUG_ONLY(
@@ -198,7 +202,8 @@ boolean_t	tp_crit_all_regions()
 					BG_TRACE_ANY(tmpcsa, tp_crit_retries);
 				}
 			)
-			grab_crit(tr->reg);
+			assert(!tmpcsa->hold_onto_crit);
+			grab_crit(reg);
 			assert(!(tmpsi->update_trans & ~UPDTRNS_VALID_MASK));
 			if (tmpcsd->freeze && tmpsi->update_trans)
 			{
@@ -265,15 +270,7 @@ boolean_t	tp_tend()
 		blk_hdr_ptr_t	save_old_block;
 	)
 #	endif
-	boolean_t		do_restart;
-	bkup_chng_status	bkup_st_chng;
-	ss_chng_status		ss_st_chng;
-	GTM_SNAPSHOT_ONLY(
-		long			lcl_ss_shmid = INVALID_SHMID;
-		int			lcl_ss_shmcycle = 0;
-		shm_snapshot_t		*ss_shm_ptr;
-		snapshot_context_ptr_t	lcl_ss_ctx;
-	)
+	boolean_t		ss_need_to_restart, new_bkup_started;
 	DEBUG_ONLY(
 		int		tmp_jnl_participants;
 		uint4		upd_num;
@@ -335,6 +332,8 @@ boolean_t	tp_tend()
 		 * 		although it was frozen then.
 		 *	The first two cases we don't know of any way they can happen. Case (c) though can happen.
 		 *	Nevertheless, we restart for all the three and in dbg version assert so we get some information.
+		 *	Note that in case of an online mupip journal rollback/recover, we will hold onto crit for the
+		 *		entire life of the process so that needs to be taken into account below.
 		 */
 		update_trans = si->update_trans;
 		assert(!(update_trans & ~UPDTRNS_VALID_MASK));
@@ -342,9 +341,10 @@ boolean_t	tp_tend()
 		assert(!(UPDTRNS_JNL_LOGICAL_MASK & update_trans) || (NULL != si->jnl_head));
 		region_is_frozen = (update_trans && csd->freeze);
 		if ((CDB_STAGNATE > t_tries)
-				? csa->now_crit
+				? (csa->now_crit && !csa->hold_onto_crit)
 				: (!csa->now_crit || region_is_frozen))
 		{
+			assert(!csa->hold_onto_crit);
 			send_msg(VARLSTCNT(8) ERR_DLCKAVOIDANCE, 6, DB_LEN_STR(tr->reg),
 						&csd->trans_hist.curr_tn, t_tries, dollar_trestart, csa->now_crit);
 			/* The only possible case we know of is (c). assert to that effect. Use local variable region_is_frozen
@@ -431,7 +431,7 @@ boolean_t	tp_tend()
 	}
 	if (!do_validation)
 	{
-		if (CDB_STAGNATE <= t_tries)
+		if ((CDB_STAGNATE <= t_tries) && !hold_onto_locks)
 		{
 			for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 				rel_crit(tr->reg);
@@ -566,10 +566,10 @@ boolean_t	tp_tend()
 #				ifdef GTM_TRIGGER
 				if (!skip_dbtriggers && (csa->db_trigger_cycle != csd->db_trigger_cycle))
 				{	/* the process' view of the triggers could be potentially stale. restart to be safe. */
-					/* Triggers can be invoked only by GT.M, Journal recovery and Update process. Out of these,
-					 * we expect only GT.M to see restarts due to concurrent trigger changes. Journal recovery
-					 * operates standalone. Update process is the only updater on the secondary so we dont
-					 * expect either of them to see these changes. Assert accordingly.
+					/* Triggers can be invoked only by GT.M and Update process. Out of these, we expect only
+					 * GT.M to see restarts due to concurrent trigger changes. Update process is the only
+					 * updater on the secondary so we dont expect it to see any concurrent trigger changes
+					 * Assert accordingly.
 					 */
 					assert(CDB_STAGNATE > t_tries);
 					assert(IS_GTM_IMAGE);
@@ -620,65 +620,30 @@ boolean_t	tp_tend()
 					status = cdb_sc_inhibitkills;
 					goto failed;
 				}
-				ss_st_chng = SS_NO_STATE_CHANGE;
-#				ifdef GTM_SNAPSHOT
-				if ((NULL != first_cw_set) && SNAPSHOTS_IN_PROG(csa))
-				{
-					/* init done in op_tcommit or wcs_recover called via grab_crit */
-					assert(NULL != SS_CTX_CAST(csa->ss_ctx));
-					lcl_ss_shmid = SS_CTX_CAST(csa->ss_ctx)->ss_shmid;
-					lcl_ss_shmcycle = SS_CTX_CAST(csa->ss_ctx)->ss_shmcycle;
-					assert(INVALID_SHMID != lcl_ss_shmid);
-				}
-				SS_STATE_CHANGE(csa->nl, csa, ss_st_chng, lcl_ss_shmid, lcl_ss_shmcycle);
-#				endif
-				BKUP_STATE_CHANGE(csa->nl, csa, bkup_st_chng);
 				/* Caution : since csa->backup_in_prog was initialized in op_tcommit only if si->first_cw_set was
 				 * non-NULL, it should be used in tp_tend only within an if (NULL != si->first_cw_set)
 				 */
-				if ((NULL != first_cw_set)
-				    && ((SS_NO_STATE_CHANGE != ss_st_chng) || (BKUP_NO_STATE_CHANGE != bkup_st_chng)))
+				if (NULL != first_cw_set)
 				{
-					do_restart = FALSE;
-					if (NEW_SS_STARTED == ss_st_chng)
+					ss_need_to_restart = new_bkup_started = FALSE;
+					GTM_SNAPSHOT_ONLY(
+						CHK_AND_UPDATE_SNAPSHOT_STATE_IF_NEEDED(csa, csa->nl, ss_need_to_restart);
+					)
+					CHK_AND_UPDATE_BKUP_STATE_IF_NEEDED(csa->nl, csa, new_bkup_started);
+					if (ss_need_to_restart
+						|| (new_bkup_started && !(JNL_ENABLED(csa) && csa->jnl_before_image)))
 					{
-						/* If new snapshots are started for this region after we grab crit, then
-						 * GT.M should mmap the most recent snapshot which is costly doing
-						 * while holding crit. Since, this will be rare, it is okay to restart. Note,
-						 * this restart will happen irrespective of whether before image journaling
-						 * is enabled
+						/* If online backup is in progress now and before-image journaling is
+						 * not enabled, we would not have read before-images for created blocks.
+						 * Although it is possible that this transaction might not have blocks
+						 * with gds_t_create at all, we expect this backup_in_prog state change
+						 * to be so rare that it is ok to restart.
 						 */
-						/* SS_TEST_CASE: Need to test if the below restart condition is actually triggered.
-						 * The restart conditions has to be tested while BACKUP and SNAPSHOT are running
-						 * and while BACKUP, SNAPSHOT and BEFORE IMAGE journaling is enabled
-						 */
-						do_restart = TRUE;
-					} else if ((NEW_BKUP_STARTED == bkup_st_chng)
-						    && !(JNL_ENABLED(csa) && csa->jnl_before_image))
-					{
-						/* If online backup is in progress now and before-image journaling is not enabled,
-						 * we would not have read before-images for created blocks. Although it is possible
-						 * that this transaction might not have blocks with gds_t_create at all, we expect
-						 * this backup_in_prog state change to be so rare that it is ok to restart.
-						 */
-						do_restart = TRUE;
-					}
-					if (do_restart)
-					{
 						status = cdb_sc_bkupss_statemod;
 						if ((CDB_STAGNATE - 1) == t_tries)
 							release_crit = TRUE;
 						goto failed;
 					}
-					/* Toggle if backup state has changed since we grabbed crit */
-					if (BKUP_NO_STATE_CHANGE != bkup_st_chng)
-						csa->backup_in_prog = !csa->backup_in_prog;
-					if (ALL_SS_STOPPED == ss_st_chng)
-					{
-						csa->snapshot_in_prog = FALSE;
-						csa->num_snapshots_in_effect = 0;
-					} else
-						assert(SS_NO_STATE_CHANGE == ss_st_chng);
 				}
 				/* recalculate based on the new values of snapshot_in_prog and backup_in_prog */
 				read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image)
@@ -1197,9 +1162,12 @@ boolean_t	tp_tend()
 			tp_cr_array = &si->cr_array[0];
 			UNPIN_CR_ARRAY_ON_RETRY(tp_cr_array, si->cr_array_index);
 			assert(!si->cr_array_index);
-			rel_crit(si->gv_cur_region);
+			if (!hold_onto_locks)
+				rel_crit(si->gv_cur_region);
 		}
-		assert(0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)); /* Check that we DONT own crit/commit on ANY region */
+		/* Check that we DONT own crit/commit on ANY region. The only exception is online mupip journal rollback/recovery
+		 * which holds crit for the entire process lifetime. */
+		assert(hold_onto_locks || (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
 		/* Wait for it to be unfrozen before re-grabbing crit on ALL regions */
 		WAIT_FOR_REGION_TO_UNFREEZE(csa, csd);
 		assert(CDB_STAGNATE > t_tries);
@@ -1211,7 +1179,8 @@ boolean_t	tp_tend()
 	{
 		jpl = jnlpool_ctl;
 		tjpl = temp_jnlpool_ctl;
-		grab_lock(jnlpool.jnlpool_dummy_reg);
+		if (!hold_onto_locks)
+			grab_lock(jnlpool.jnlpool_dummy_reg);
 		QWASSIGN(tjpl->write_addr, jpl->write_addr);
 		tjpl->write = jpl->write;
 		QWASSIGN(tjpl->jnl_seqno, jpl->jnl_seqno);
@@ -1654,12 +1623,12 @@ boolean_t	tp_tend()
 				fileheader_sync(gv_cur_region);
 			if (NULL != si->kill_set_head)
 				INCR_KIP(csd, csa, si->kip_csa);
-			GTM_SNAPSHOT_ONLY(SS_ORPHAN_RELEASE_IF_NEEDED(csa);)
 		} else
 			ctn = si->tp_csd->trans_hist.curr_tn;
 		si->start_tn = ctn; /* start_tn used temporarily to store currtn (for bg_update_phase2) before releasing crit */
-		rel_crit(si->gv_cur_region);	/* should use si->gv_cur_region (not gv_cur_region) as the latter is not
-						 * set in case we are not updating this region */
+		if (!hold_onto_locks)
+			rel_crit(si->gv_cur_region);	/* should use si->gv_cur_region (not gv_cur_region) as the latter is not
+							 * set in case we are not updating this region */
 	} /* for (si ... ) */
 	assert(cdb_sc_normal == status);
 	if (replication)
@@ -1684,9 +1653,12 @@ boolean_t	tp_tend()
 		QWINCRBYDW(jpl->write_addr, jnl_header->jnldata_len);
 		QWASSIGN(jpl->jnl_seqno, tjpl->jnl_seqno);			/* End atomic stmnts */
 		assert(QWEQ(jpl->early_write_addr, jpl->write_addr));
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		if (!hold_onto_locks)
+			rel_lock(jnlpool.jnlpool_dummy_reg);
 	}
-	assert(0 == have_crit(CRIT_HAVE_ANY_REG)); /* Check that we DONT own crit on ANY region */
+	/* Check that we DONT own crit on ANY region. The only exception is online mupip journal rollback/recovery
+	 * which holds crit for the entire process lifetime. */
+	assert(hold_onto_locks || (0 == have_crit(CRIT_HAVE_ANY_REG)));
 	/* the following section is the actual commitment of the changes in the database (phase2 for BG) */
 	for (si = first_tp_si_by_ftok;  (NULL != si); si = si->next_tp_si_by_ftok)
 	{
@@ -1781,11 +1753,12 @@ failed:
 			si->start_tn = si->tp_csd->trans_hist.curr_tn;	/* start_tn used temporarily to store currtn
 									 * before releasing crit */
 			/* If we are not doing final retry, release all the critical locks we have obtained */
-			if (release_crit)
+			if (release_crit && !hold_onto_locks)
 				rel_crit(si->gv_cur_region);
 		}
-		/* Check that we DONT own crit on ANY region */
-		assert(!release_crit || (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
+		/* Check that we DONT own crit/commit on ANY region. The only exception is online mupip journal rollback/recovery
+		 * which holds crit for the entire process lifetime. */
+		assert(hold_onto_locks || !release_crit || (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
 	}
 	/* We have finished validation on this region. Reset transaction numbers in the gv_target
 	 * histories so they will be valid for a future access utilizing the clue field. This occurs

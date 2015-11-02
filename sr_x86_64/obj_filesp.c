@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,25 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+/*
+ * The native object (ELF) wrapper has the following format:
+ *
+ *	+-------------------------------+
+ *	| ELF header			|
+ *	+-------------------------------+
+ *	| .text section (GTM object)	|
+ *	+-------------------------------+
+ *	| .strtab section(string table)	|
+ *	+-------------------------------+
+ *	| .symtab section(sym table)	|
+ *	+-------------------------------+
+ *	| ELF Section header table	|
+ *	+-------------------------------+
+ *
+ * The GT.M object layout (in the .text section) is described in obj_code.c
+ *
+ */
 
 #include "mdef.h"
 
@@ -148,11 +167,11 @@ void create_object_file(rhdtyp *rhead)
 
 
 /* At this point, we know only gtm_object has been written onto the file.
- *  * Read that gtm_object and wrap it up in .text section, add remaining sections to native object(ELF)
- *   * Update the ELF, write it out to the object file and close the object file */
+ * Read that gtm_object and wrap it up in .text section, add remaining sections to native object(ELF)
+ * Update the ELF, write it out to the object file and close the object file */
 void close_object_file(void)
 {
-        int		status;
+        int		i, status;
         size_t		bufSize;
         ssize_t		actualSize;
         char		*gtm_obj_code, *string_tbl;
@@ -162,6 +181,7 @@ void close_object_file(void)
         Elf64_Shdr	*shdr, *text_shdr, *symtab_shdr, *strtab_shdr;
         Elf_Scn		*text_scn, *symtab_scn, *strtab_scn;
         Elf_Data	*text_data, *symtab_data, *strtab_data;
+        Elf64_Sym	symEntries[3];
 
         buff_flush();
         bufSize = gtm_object_size;
@@ -186,9 +206,9 @@ void close_object_file(void)
         symIndex += strEntrySize;
 
         gtm_obj_code = (char *)malloc(bufSize);
-        /* At this point, we have only the GTM object written onto the file. We need to read it back and wrap inside
-	   the ELF object and write a native ELF object file.
-	*/
+        /* At this point, we have only the GTM object written onto the file.
+         * We need to read it back and wrap inside the ELF object and
+         * write a native ELF object file. */
         lseek(object_file_des, 0, SEEK_SET);
         DOREADRL(object_file_des, gtm_obj_code, bufSize, actualSize);
         /* Reset the pointer back for writing an ELF object. */
@@ -295,8 +315,7 @@ void close_object_file(void)
         ehdr->e_shstrndx = elf_ndxscn(strtab_scn);
 
         /* Creating .symbtab section */
-        int i = 0;
-        Elf64_Sym symEntries[3];
+        i = 0;
 
         /* NULL symbol */
         symEntries[i].st_name = 0;

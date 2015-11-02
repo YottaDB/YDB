@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,14 @@
 #ifndef GTM_C_STACK_TRACE_H
 #define GTM_C_STACK_TRACE_H
 
+#include "gtm_stdio.h"	/* For SPRINTF */
+
 #ifdef VMS
 #define GET_C_STACK_MULTIPLE_PIDS(MESSAGE, CNL_PID_ARRAY, MAX_PID_SLOTS, STUCK_CNT)
 #define GET_C_STACK_FROM_SCRIPT(MESSAGE, WAITINGPID, BLOCKINGPID, COUNT)
 #define GET_C_STACK_FOR_KIP(KIP_PIDS_ARR_PTR, TRYNUM, MAX_TRY, STUCK_CNT, MAX_PID_SLOTS)
 #elif defined(UNIX)
+#include <errno.h>
 #define GET_C_STACK_MULTIPLE_PIDS(MESSAGE, CNL_PID_ARRAY, MAX_PID_SLOTS, STUCK_CNT)		\
 {												\
 	uint4		index;									\
@@ -50,7 +53,7 @@
 		memcpy(currpos, MESSAGE, messagelen);								\
 		currpos += messagelen;										\
 		*currpos++ = ' ';										\
-		sprintf(currpos, "%u %u %u", WAITINGPID, BLOCKINGPID, COUNT);					\
+		SPRINTF(currpos, "%u %u %u", WAITINGPID, BLOCKINGPID, COUNT);					\
 		currpos = (char *)command + STRLEN(command);							\
 		rs = SYSTEM((char *)command);									\
 		send_msg(VARLSTCNT(6) ERR_STUCKACT, 4, STRLEN("SUCCESS"), rs ? "FAILURE" : "SUCCESS",  		\

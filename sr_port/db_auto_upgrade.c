@@ -111,7 +111,7 @@ void db_auto_upgrade(gd_region *reg)
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */
 		}
-		csd->minor_dbver = (enum mdb_ver)GDSMVCURR;
+		csd->minor_dbver = GDSMVCURR;
 		if (0 == csd->wcs_phase2_commit_wait_spincnt)
 			csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	}

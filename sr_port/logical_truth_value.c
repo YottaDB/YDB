@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ boolean_t logical_truth_value(mstr *log, boolean_t negate, boolean_t *is_defined
 			return FALSE;
 		for (is_num = TRUE, zero = TRUE, index = 0; index < tn.len; index++)
 		{
-			if (!isdigit(buf[index]))
+			if (!ISDIGIT_ASCII(buf[index]))
 			{
 				is_num = FALSE;
 				break;

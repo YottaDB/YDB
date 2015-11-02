@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -100,7 +100,7 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 			    break;
 	    if (i + optlist[j].args >= argc)
 	    {
-		    fprintf(stderr, "%s option requires an argument - ignored\n", *argv);
+		    FPRINTF(stderr, "%s option requires an argument - ignored\n", *argv);
 		    continue;
 	    }
 	    switch(opt)
@@ -134,12 +134,12 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 		  case opt_ping: 	ping_keepalive = 1; break;
 		  case opt_null:
 		    inv_option = TRUE;
-		    fprintf(stderr,"Unknown option:  %s\n",*argv);
+		    FPRINTF(stderr,"Unknown option:  %s\n",*argv);
 		    break;
 		  case opt_conn_timeout:
 		    t = atoi(*(argv + 1));
 		    if (t < MIN_TIMEOUT_INTERVAL)
-			fprintf(stderr,"-timeout parameter must be >= %d seconds. The default value %d seconds will be used\n"
+			FPRINTF(stderr,"-timeout parameter must be >= %d seconds. The default value %d seconds will be used\n"
 				, MIN_TIMEOUT_INTERVAL, TIMEOUT_INTERVAL);
 		    else
 			    conn_timeout = t;
@@ -147,7 +147,7 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 		  case opt_servtime:
 		    t = atoi(*(argv + 1));
 		    if (t < MIN_TIMEOUT_INTERVAL)
-			  fprintf(stderr, "-servtime parameter must be >= %d seconds. The default value %d seconds will be used\n",
+			  FPRINTF(stderr, "-servtime parameter must be >= %d seconds. The default value %d seconds will be used\n",
 				    MIN_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL);
 		    else
 			    per_conn_servtime = t;
@@ -157,7 +157,7 @@ int gtcm_prsopt(int argc, char_ptr_t argv[])
 		    break;
 		  default:
 			inv_option = TRUE;
-		    fprintf(stderr,"Unsupported option:  %s\n",*argv);
+		    FPRINTF(stderr,"Unsupported option:  %s\n",*argv);
 		    break;
 	    }
 	    if (inv_option)

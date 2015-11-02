@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,28 +13,20 @@
 #define __SBS_BLK_H__
 
 /* The string, float and integer subscript arrays all occupy the same storage in an sbs_blk so they
-   need to be the same size. Compute the dimensions that will fit into a given sized area. Original
-   implementations had this as a 120 byte area but with the advent of unicode (increasing size of
-   mstr) and 64 bit (increasing address size in all blocks containing them) a larger block is used.
-   Note these sizes do not fit the power2 sizes storage mgmnt uses but since they aren't allocated
-   singly but in groups, this is not an issue. To keep the numeric index at the same minimum for
-   both 32 and 64 bit, we set the element size at 168 for 32 bit and 240 for 64 bit. Given these
-   sizes, array dimensions will end up at the following:
-
-   Block	32Bit	64Bit
-
-   num_int	42	30
-   num_flt	8	10
-   num_str	8	10
-
-   Given the current 6K allocation that gets chopped into sbs_blks in lv_get_sbs_blk(), these values
-   give approx 33 sbs_blks in 32 bit mode and 22 blks in 64 bit mode (05/2007 se).
+   need to be the same size. We want these areas to be able to be scaled up for processes with
+   larger array requirements which will improve the local variable access times. Hence the basic
+   sbs_blk only has one entry in each array in the union block. The actual dimensions of the array
+   are computed in gtm_env_init() where we read in the scaling value (or default it).
 */
 
-#define SBS_ELE_BLK_SIZE	(GTM64_ONLY(240)NON_GTM64_ONLY(184))
-#define SBS_NUM_INT_ELE		(SBS_ELE_BLK_SIZE / SIZEOF(lv_val *))
-#define SBS_NUM_STR_ELE		(SBS_ELE_BLK_SIZE / SIZEOF(sbs_str_struct))
-#define SBS_NUM_FLT_ELE		(SBS_ELE_BLK_SIZE / SIZEOF(sbs_flt_struct))
+#define MIN_INT_ELE_CNT		GTM64_ONLY(30) NON_GTM64_ONLY(45)
+#define SBS_NUM_INT_ELE		lv_sbs_int_ele_cnt
+#define SBS_NUM_FLT_ELE		lv_sbs_flt_ele_cnt
+#define SBS_NUM_STR_ELE		lv_sbs_str_ele_cnt
+
+GBLREF int4	lv_sbs_int_ele_cnt;
+GBLREF int4	lv_sbs_flt_ele_cnt;
+GBLREF int4	lv_sbs_str_ele_cnt;
 
 typedef struct {mstr str; lv_val *lv;} sbs_str_struct;
 typedef struct {mflt flt; lv_val *lv;} sbs_flt_struct;
@@ -55,10 +47,10 @@ typedef struct sbs_blk_struct
 	struct sbs_blk_struct	*nxt;
 	union
 	{
-		/* these arrays should all be approx the same size (in bytes) */
-	      	sbs_str_struct 	sbs_str[SBS_NUM_STR_ELE];
-	  	sbs_flt_struct	sbs_flt[SBS_NUM_FLT_ELE];
-	  	lv_val		*lv[SBS_NUM_INT_ELE];
+		/* these arrays should be the last thing in the block as they are of variable dimension */
+	      	sbs_str_struct 	sbs_str[1];
+	  	sbs_flt_struct	sbs_flt[1];
+	  	lv_val		*lv[1];
        	} ptr;
 } sbs_blk;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,12 +9,9 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-#include "sgnl.h"
+#ifndef GTM_IMAGETYPE_INIT_INCLUDED
+#define GTM_IMAGETYPE_INIT_INCLUDED
 
-int sgnl_assert(unsigned int filesz, unsigned char *file, unsigned int linenum)
-{
-	error_def(ERR_ASSERT);
+void	gtm_imagetype_init(enum gtmImageTypes img_type);
 
-	return rts_error(VARLSTCNT(5) ERR_ASSERT, 3, filesz, file, linenum);
-}
+#endif

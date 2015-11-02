@@ -102,7 +102,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		    return -1;
 		}
 	}
-	gv_bind_name(gd_header, &v.str);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
 	memcpy(gv_currkey->base, req->key.key, req->key.len.value);
 	gv_currkey->end = req->key.len.value;
 	dollar_order = FALSE;

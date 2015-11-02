@@ -88,8 +88,6 @@ GBLREF void			(*restart)();
 #define MAKE_MSG_INFO(x)	((x) & ~SEV_MSK | INFO)
 #define MAKE_MSG_SEVERE(x)	((x) & ~SEV_MSK | SEVERE)
 
-#define GETLASTBYTE(X)		(X & 0xf)
-
 #define ERROR_RTN		error_return
 
 /* The CHTRACEPOINT macros are in place for CH debugging if necessary */
@@ -120,7 +118,10 @@ void ch_trace_point() {return;}
  * error_return which deals with the module appropriately.
  */
 #define MUM_TSTART		{												\
-					GBLREF unsigned short proc_act_type;							\
+					GBLREF unsigned short	proc_act_type;							\
+					GBLREF int		process_exiting;						\
+																\
+					assert(!process_exiting);								\
                                         CHTRACEPOINT;										\
 					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; 		\
 					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active);	\
@@ -134,6 +135,9 @@ void ch_trace_point() {return;}
 				}
 #else
 #define MUM_TSTART		{												\
+					GBLREF int		process_exiting;						\
+																\
+					assert(!process_exiting);								\
                                         CHTRACEPOINT;										\
 					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; 		\
 					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active);	\
@@ -241,13 +245,17 @@ void ch_trace_point() {return;}
 					return;				\
 				}
 
-#define UNWIND(dummy1, dummy2)	{					\
-                                        CHTRACEPOINT;			\
-                                        current_ch->ch_active = FALSE;	\
-					active_ch++;			\
-                                        CHECKHIGHBOUND(active_ch);	\
-					ctxt = active_ch;		\
-					longjmp(active_ch->jmp, -1);	\
+#define UNWIND(dummy1, dummy2)	{									\
+					GBLREF	int		process_exiting;			\
+					GBLREF	boolean_t	ok_to_UNWIND_in_exit_handling;		\
+													\
+					assert(!process_exiting || ok_to_UNWIND_in_exit_handling);	\
+                                        CHTRACEPOINT;							\
+                                        current_ch->ch_active = FALSE;					\
+					active_ch++;							\
+                                        CHECKHIGHBOUND(active_ch);					\
+					ctxt = active_ch;						\
+					longjmp(active_ch->jmp, -1);					\
 				}
 
 #define START_CH		condition_handler *current_ch;		\

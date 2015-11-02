@@ -52,8 +52,9 @@
 #include "gtm_file_stat.h"
 #include "min_max.h"		/* for MAX and JNL_MAX_RECLEN macro */
 #include "gtm_rename.h"		/* for cre_jnl_file_intrpt_rename() prototype */
+#include "send_msg.h"
 
-#define	DB_OR_REG_SIZE	MAX(STR_LIT_LEN(FILE_STR), STR_LIT_LEN(REG_STR))
+#define	DB_OR_REG_SIZE	MAX(STR_LIT_LEN(FILE_STR), STR_LIT_LEN(REG_STR)) + 1 /* trailing null byte */
 
 GBLREF	bool			region;
 GBLREF	gd_region		*gv_cur_region;
@@ -76,7 +77,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	file_control		*fc;
 	int			new_stat_res;	/* gtm_file_stat() return value for new journal file name */
 	int			curr_stat_res; 	/* gtm_file_stat() return value for current journal file name */
-	mu_set_rlist		*rptr, dummy_rlist;
+	mu_set_rlist		*rptr, dummy_rlist, *next_rptr;
 	sgmnt_data_ptr_t	csd;
 	uint4			status,
 				exit_status = EXIT_NRM;
@@ -87,7 +88,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	int			db_reg_name_len, db_or_reg_len, jnl_buffer_size;
 	set_jnl_options		jnl_options;
 	boolean_t		curr_jnl_present,	/* for current state 2, is current journal present? */
-				newjnlfiles, jnlname_same;
+				newjnlfiles, jnlname_same,
+				this_iter_prevlinkcut_error, do_prevlinkcut_error;
 	enum jnl_state_codes	jnl_curr_state;
 	enum repl_state_codes	repl_curr_state;
 	mstr 			jnlfile, jnldef, tmpjnlfile;
@@ -308,8 +310,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	}
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	jgbl.dont_reset_gbl_jrec_time = TRUE;
-	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
+	do_prevlinkcut_error = FALSE;
+	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = next_rptr)
 	{
+		this_iter_prevlinkcut_error = do_prevlinkcut_error;
+		do_prevlinkcut_error = FALSE;
+		next_rptr = rptr->fPtr;
 		gv_cur_region = rptr->reg;
 		if (gv_cur_region->read_only)
 			continue;
@@ -342,12 +348,32 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			db_reg_name_len = jnl_info.fn_len;
 		}
 		if (jnl_notallowed != rptr->jnl_new_state)
-		{ 	/* Fill in any unspecified information and process journal characteristics */
+		{ 	/* Fill in any unspecified information and process journal characteristics.
+			 * If database contains journal characteristics (like allocation, alignsize etc.)
+			 * which are smaller than the new journal minimums (increased in V54001), adjust
+			 * them to ensure we honor the new minimums.
+			 */
 			if (!jnl_options.allocation_specified)
+			{
 				jnl_info.alloc = (0 == csd->jnl_alq) ? JNL_ALLOC_DEF : csd->jnl_alq;
+				assert(JNL_ALLOC_DEF >= JNL_ALLOC_MIN);
+				if (JNL_ALLOC_MIN > jnl_info.alloc)
+				{	/* Fix file header in addition to fixing new journal file settings */
+					csd->jnl_alq = JNL_ALLOC_MIN;
+					jnl_info.alloc = JNL_ALLOC_MIN;
+				}
+			}
 			if (!jnl_options.alignsize_specified)
+			{
 				jnl_info.alignsize = (0 == csd->alignsize) ? (DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) :
 					csd->alignsize; /* In bytes */
+				assert(JNL_DEF_ALIGNSIZE >= JNL_MIN_ALIGNSIZE);
+				if ((DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE) > jnl_info.alignsize)
+				{	/* Fix file header in addition to fixing new journal file settings */
+					csd->alignsize = (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE);
+					jnl_info.alignsize = (DISK_BLOCK_SIZE * JNL_MIN_ALIGNSIZE);
+				}
+			}
 			if (jnl_info.alignsize <= csd->blk_size)
 			{
 				if (region)
@@ -363,12 +389,17 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				assert(jnl_info.alignsize > csd->blk_size);	/* to accommodate a PBLK journal record */
 			}
 			if (!jnl_options.autoswitchlimit_specified)
+			{
 				jnl_info.autoswitchlimit = (0 == csd->autoswitchlimit) ?
 					JNL_AUTOSWITCHLIMIT_DEF : csd->autoswitchlimit;
+				assert(JNL_AUTOSWITCHLIMIT_MIN <= jnl_info.autoswitchlimit);
+			}
 			if (!jnl_options.extension_specified)
+			{
 				jnl_info.extend = (0 == csd->jnl_deq) ? JNL_EXTEND_DEF : csd->jnl_deq;
 				/* jnl_info.extend = (0 == csd->jnl_deq) ? jnl_info.alloc * JNL_EXTEND_DEF_PERC : csd->jnl_deq;
 				 * Uncomment this section when code is ready to use extension = 10% of allocation */
+			}
 			if (!jnl_options.buffer_size_specified || jnl_info.buffer < csd->blk_size / DISK_BLOCK_SIZE + 1)
 			{
 				if (jnl_options.buffer_size_specified)
@@ -380,7 +411,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				jnl_buffer_size = (0 == csd->jnl_buffer_size) ? JNL_BUFFER_DEF : csd->jnl_buffer_size;
 			} else
 				jnl_buffer_size = jnl_info.buffer;
-			jnl_buffer_size = ROUND_UP(jnl_buffer_size, IO_BLOCK_SIZE / DISK_BLOCK_SIZE);
+			jnl_buffer_size = ROUND_UP(jnl_buffer_size, MIN(MAX_IO_BLOCK_SIZE, cs_data->blk_size) / DISK_BLOCK_SIZE);
 			if ((jnl_options.buffer_size_specified && jnl_buffer_size != jnl_info.buffer)
 				|| (!jnl_options.buffer_size_specified
 				&& 0 != csd->jnl_buffer_size && jnl_buffer_size != csd->jnl_buffer_size))
@@ -514,26 +545,38 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				if (jnl_open == jnl_curr_state)
 				{
 					assert(NULL != cs_addrs->nl);
+					jpc = cs_addrs->jnl;
 					UNIX_ONLY(if (cs_addrs->nl->jnl_file.u.inode))
 					VMS_ONLY(if (memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid))))
 					{
 						if (SS_NORMAL != (status = set_jnl_file_close(SET_JNL_FILE_CLOSE_SETJNL)))
 						{
-							if (newjnlfiles)
-							{
-								gtm_putmsg(VARLSTCNT(1) status);
-								gtm_putmsg(VARLSTCNT(4) ERR_JNLNOCREATE, 2,
-												jnl_info.jnl_len, jnl_info.jnl);
-							}
-							exit_status |= EXIT_ERR;
-							break;
+							/* Invoke jnl_file_lost to turn off journaling and retry journal creation
+							 * to create fresh journal files.
+							 */
+							jnl_file_lost(jpc, status);
+							do_prevlinkcut_error = TRUE; /* In the next iteration issue PREVJNLLINKCUT
+										      * information message */
+							next_rptr = rptr;
+							continue;
 						}
-						/* For MM, set_jnl_file_close() can call wcs_flu() which can remap the file.
-						 * So reset csd and rptr->sd since their value may have changed.
+					} else
+					{	/* Ideally, no other process should have a journal file for this database open.
+						 * But, As part of C9I03-002965, we realized it is possible for processes accessing
+						 * the older journal file to continue to write to it even though
+						 * csa->nl->jnl_file.u.inode field is 0. The only way to signal other proceses, that
+						 * have the jnl file open, of a concurrent journal file switch, is by incrementing
+						 * the "jpc->jnl_buff->cycle" field. Therefore be safe and increment this just in
+						 * case some other process has the older generation journal file still open.
 						 */
-						assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
-						rptr->sd = csd = cs_data;
+						assert(NULL != jpc);
+						jpc->jnl_buff->cycle++;
 					}
+					/* For MM, set_jnl_file_close() can call wcs_flu() which can remap the file.
+					 * So reset csd and rptr->sd since their value may have changed.
+					 */
+					assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+					rptr->sd = csd = cs_data;
 				} else if ((jnl_closed == jnl_curr_state) && (jnl_open == rptr->jnl_new_state))
 				{	/* sync db for closed->open transition. for VMS WCSFLU_FSYNC_DB is ignored */
 					wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR);
@@ -589,9 +632,10 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 					db_or_reg_len, db_or_reg, db_reg_name_len, db_reg_name,
 					LEN_AND_STR(before_image_lit[(jnl_info.before_images ? 1 : 0)]));
 				if ((!curr_jnl_present && jnl_open == jnl_curr_state) ||
-						(curr_jnl_present && jnl_info.no_prev_link))
+						(curr_jnl_present && jnl_info.no_prev_link) || this_iter_prevlinkcut_error)
 				{
 					gtm_putmsg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
+					send_msg(VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 				}
                         }
 			/* Following jnl_before_image, jnl_state, repl_state are unique charecteristics per region */

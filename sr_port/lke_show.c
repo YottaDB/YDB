@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,11 +49,10 @@ GBLREF	short		crash_count;
 
 error_def(ERR_NOREGION);
 
-
 void	lke_show(void)
 {
 	bool			locks, all = TRUE, wait = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE;
-	boolean_t		exact = FALSE;
+	boolean_t		exact = FALSE, was_crit;
 	int4			pid;
 	size_t			ls_len;
 	int			n;
@@ -66,11 +65,11 @@ void	lke_show(void)
 
 	/* Get all command parameters */
 	reg.addr = regbuf;
-	reg.len = sizeof regbuf;
+	reg.len = SIZEOF(regbuf);
 	node.addr = nodebuf;
-	node.len = sizeof nodebuf;
+	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
-	one_lock.len = sizeof one_lockbuf;
+	one_lock.len = SIZEOF(one_lockbuf);
 
 	if (lke_getcli(&all, &wait, &interactive, &pid, &reg, &node, &one_lock, &memory, &nocrit, &exact) == 0)
 		return;
@@ -89,37 +88,34 @@ void	lke_show(void)
 			/* If distributed database, the region is located on another node */
 			if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
 			{
-#if defined(LKE_WORKS_OK_WITH_CM)
+#				if defined(LKE_WORKS_OK_WITH_CM)
 				/* Obtain lock info from the remote node */
 				locks = gtcmtr_lke_showreq(gv_cur_region->dyn.addr->cm_blk, gv_cur_region->cmx_regnum,
 							   all, wait, pid, &node);
-#else
+#				else
 				gtm_putmsg(VARLSTCNT(10) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("GT.CM region - locks must be displayed on the local node"),
 						ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 				continue;
-#endif
+#				endif
 			} else if (gv_cur_region->dyn.addr->acc_meth == dba_bg  || gv_cur_region->dyn.addr->acc_meth == dba_mm)
-			{
-				/* Local region */
+			{	/* Local region */
 				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 				ls_len = (size_t)(cs_addrs->lock_addrs[1] - cs_addrs->lock_addrs[0]);
 				ctl = (mlk_ctldata_ptr_t)malloc(ls_len);
-
 				/* Prevent any modification of the lock space while we make a local copy of it */
 				if (cs_addrs->critical != NULL)
 					crash_count = cs_addrs->critical->crashcnt;
-				if (!nocrit)
+				was_crit = cs_addrs->now_crit;
+				if (!nocrit && !was_crit)
 					grab_crit(gv_cur_region);
 				longcpy((uchar_ptr_t)ctl, (uchar_ptr_t)cs_addrs->lock_addrs[0], ls_len);
-				if (!nocrit)
+				if (!nocrit && !was_crit)
 					rel_crit(gv_cur_region);
-
 				locks = ctl->blkroot == 0 ?
 						FALSE:
 						lke_showtree(NULL, (mlk_shrblk_ptr_t)R2A(ctl->blkroot), all, wait, pid,
 												one_lock, memory);
-
 				free(ctl);
 			} else
 			{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,10 +21,9 @@
 #include "numcmp.h"
 #include "mvalconv.h"
 
-LITREF	mval 	SBS_MVAL_INT_ELE;
-
-GBLREF collseq	*local_collseq;
-GBLREF boolean_t local_collseq_stdnull;
+GBLREF  mval 		sbs_mval_int_ele;
+GBLREF	collseq		*local_collseq;
+GBLREF	boolean_t	local_collseq_stdnull;
 
 void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 {
@@ -107,7 +106,7 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 						assert (num);
 						if ( key->m[1] > 0 )
 						{
-							if (1 == numcmp(key, (mval *)&SBS_MVAL_INT_ELE))
+							if (1 == numcmp(key, (mval *)&sbs_mval_int_ele))
 								i = SBS_NUM_INT_ELE;
 							else
 							{
@@ -145,8 +144,8 @@ void op_fnzprevious (lv_val *src, mval *key, mval *dst)
 					found = TRUE;
 				} else
 				{
-					for (i = SBS_NUM_INT_ELE, lvpp = ARRAYTOP(num->ptr.lv);
-							(--i, num->ptr.lv <= --lvpp) && !*lvpp; )
+					for (i = SBS_NUM_INT_ELE, lvpp = (num->ptr.lv + SBS_NUM_INT_ELE);
+					     (--i, num->ptr.lv <= --lvpp) && !*lvpp; )
 						;
 					if (num->ptr.lv <= lvpp)
 					{

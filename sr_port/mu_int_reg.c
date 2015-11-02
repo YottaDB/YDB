@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		int		crypt_status;
 	)
 	node_local_ptr_t	cnl;
-	boolean_t		need_to_wait = FALSE, read_only;
+	boolean_t		need_to_wait = FALSE, read_only, was_crit;
 	int			trynum;
 	uint4			curr_wbox_seq_num;
 
@@ -187,9 +187,12 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 			return;
 		}
 		/* Take a copy of the file-header. To ensure it is consistent, do it while holding crit. */
-		grab_crit(gv_cur_region);
+		was_crit = csa->now_crit;
+		if (!was_crit)
+			grab_crit(gv_cur_region);
 		memcpy((uchar_ptr_t)&mu_int_data, (uchar_ptr_t)cs_data, SIZEOF(sgmnt_data));
-		rel_crit(gv_cur_region);
+		if (!was_crit)
+			rel_crit(gv_cur_region);
 		memcpy(mu_int_master, MM_ADDR(cs_data), MASTER_MAP_SIZE(cs_data));
 	} else
 	{

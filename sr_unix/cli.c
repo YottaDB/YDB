@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -294,7 +294,7 @@ boolean_t cli_get_time(char *entry, uint4 *dst)
 	{
 		for (*dst = 0, factor = 10, cp = buf + strlen(buf) - 1; cp >= buf; cp--)
 		{
-			if (!ISDIGIT((int)*cp))
+			if (!ISDIGIT_ASCII((int)*cp))
 			{
 				if (':' == *cp)
 				{

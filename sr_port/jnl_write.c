@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 #include "gtm_inet.h"
 
@@ -50,7 +51,7 @@ GBLREF	jnl_gbls_t		jgbl;
 
 #ifdef DEBUG
 /* The fancy ordering of operators/operands in the JNL_SPACE_AVAILABLE calculation is to avoid overflows. */
-#define	JNL_SPACE_AVAILABLE(jb, lcl_dskaddr, lcl_freeaddr, lcl_size)				\
+#define	JNL_SPACE_AVAILABLE(jb, lcl_dskaddr, lcl_freeaddr, lcl_size, jnl_wrt_start_mask)	\
 (												\
 	assert(((jb)->dskaddr <= lcl_freeaddr)							\
 		|| (gtm_white_box_test_case_enabled						\
@@ -59,10 +60,11 @@ GBLREF	jnl_gbls_t		jgbl;
 	assert((lcl_freeaddr <= lcl_size) || ((jb)->dskaddr >= lcl_freeaddr - lcl_size)		\
 		|| (gtm_white_box_test_case_enabled						\
 			&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))),	\
-	(lcl_size - (lcl_freeaddr - ((lcl_dskaddr = (jb)->dskaddr) & JNL_WRT_START_MASK)))	\
+	(lcl_size - (lcl_freeaddr - ((lcl_dskaddr = (jb)->dskaddr) & jnl_wrt_start_mask)))	\
 )
 #else
-#define	JNL_SPACE_AVAILABLE(jb, dummy, lcl_freeaddr, lcl_size)	 (lcl_size - (lcl_freeaddr - ((jb)->dskaddr & JNL_WRT_START_MASK)))
+#define	JNL_SPACE_AVAILABLE(jb, dummy, lcl_freeaddr, lcl_size, jnl_wrt_start_mask)		\
+	(lcl_size - (lcl_freeaddr - ((jb)->dskaddr & jnl_wrt_start_mask)))
 #endif
 
 
@@ -109,6 +111,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	sm_uc_ptr_t		lcl_buff;
 	gd_region		*reg;
 	char			*ptr;
+	int			jnl_wrt_start_modulus, jnl_wrt_start_mask;
+	uint4			jnl_fs_block_size, aligned_lcl_free, padding_size;
 
 	error_def(ERR_JNLWRTNOWWRTR);
 	error_def(ERR_JNLWRTDEFER);
@@ -155,6 +159,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		assert (0 == align_rec_len % JNL_REC_START_BNDRY);
 		rlen_with_align = rlen + align_rec_len;
 	}
+	jnl_wrt_start_mask = JNL_WRT_START_MASK(jb);
+	jnl_wrt_start_modulus = JNL_WRT_START_MODULUS(jb);
 	if (rlen_with_align != rlen)
 	{	/* the calls below to jnl_write_attempt() and jnl_file_extend() are duplicated for the ALIGN record and the
 		 * non-ALIGN journal record instead of making it a function. this is purely for performance reasons.
@@ -166,10 +172,10 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		 * check below. Hence also the -1 in lcl_freeaddr - (lcl_size - align_rec_len - 1).
 		 * This means that although we have space we might still be invoking jnl_write_attempt (very unlikely).
 		 */
-		if (JNL_SPACE_AVAILABLE(jb, lcl_dskaddr, lcl_freeaddr, lcl_size) <= align_rec_len)
+		if (JNL_SPACE_AVAILABLE(jb, lcl_dskaddr, lcl_freeaddr, lcl_size, jnl_wrt_start_mask) <= align_rec_len)
 		{	/* The fancy ordering of operators/operands in the calculation done below is to avoid overflows. */
 			if (SS_NORMAL != jnl_write_attempt(jpc,
-						ROUND_UP2(lcl_freeaddr - (lcl_size - align_rec_len- 1), JNL_WRT_START_MODULUS)))
+					ROUND_UP2(lcl_freeaddr - (lcl_size - align_rec_len- 1), jnl_wrt_start_modulus)))
 			{
 				assert(NOJNL == jpc->channel); /* jnl file lost */
 				return; /* let the caller handle the error */
@@ -278,10 +284,9 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	 * Hence also the -1 in lcl_freeaddr - (lcl_size - rlen - 1).
 	 * This means that although we have space we might still be invoking jnl_write_attempt (very unlikely).
 	 */
-	if (JNL_SPACE_AVAILABLE(jb, lcl_dskaddr, lcl_freeaddr, lcl_size) <= rlen)
+	if (JNL_SPACE_AVAILABLE(jb, lcl_dskaddr, lcl_freeaddr, lcl_size, jnl_wrt_start_mask) <= rlen)
 	{	/* The fancy ordering of operators/operands in the calculation done below is to avoid overflows. */
-		if (SS_NORMAL != jnl_write_attempt(jpc,
-					ROUND_UP2(lcl_freeaddr - (lcl_size - rlen - 1), JNL_WRT_START_MODULUS)))
+		if (SS_NORMAL != jnl_write_attempt(jpc, ROUND_UP2(lcl_freeaddr - (lcl_size - rlen - 1), jnl_wrt_start_modulus)))
 		{
 			assert(NOJNL == jpc->channel); /* jnl file lost */
 			return; /* let the caller handle the error */
@@ -312,6 +317,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	}
 	lcl_orig_free = lcl_free;
 	nowrap = (lcl_size >= (lcl_free + rlen));
+	assert(jrt_fixed_size[JRT_EOF]);
 	if (jrt_fixed_size[rectype])
 	{
 		if (nowrap)
@@ -322,6 +328,21 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 				lcl_free = 0;
 		} else
 			JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)jnl_rec, rlen, lcl_size);
+		/* As part of writing the EOF record into the journal buffer, add enough 0-padding needed to reach
+		 * a filesystem-block-size aligned boundary. This way later jnl_qio_start can safely do aligned
+		 * writes without having to write non-zero garbage after the EOF record. Note that this has to be
+		 * done BEFORE updating freeaddr. Otherwise, it is possible that a jnl qio timer pops after freeaddr
+		 * gets updated but before the 0-padding is done and flushes the eof record to disk without the 0-padding.
+		 */
+		if (JRT_EOF == rectype)
+		{
+			jnl_fs_block_size = jb->fs_block_size;
+			aligned_lcl_free = ROUND_UP2(lcl_free, jnl_fs_block_size);
+			padding_size = aligned_lcl_free - lcl_free;
+			assert(0 <= (int4)padding_size);
+			if (padding_size)
+				memset(lcl_buff + lcl_free, 0, padding_size);
+		}
 	} else
 	{
 		if (NULL != blk_ptr)	/* PBLK and AIMG */

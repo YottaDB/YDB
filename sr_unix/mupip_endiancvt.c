@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -719,9 +719,12 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	assert(-1 == INVALID_SEMID);
 	assert(-1 == INVALID_SHMID);
 	if (new_is_native)
-	{	/* if current is native, we should leave it alone to avoid problems with standalone status */
+	{	/* Since we have standalone access, reset volatile fields in the database file header */
 		new->semid = INVALID_SEMID;
 		new->shmid = INVALID_SHMID;
+		new->gt_sem_ctime.ctime = 0;
+		new->gt_shm_ctime.ctime = 0;
+		memset(new->machine_name, 0, MAX_MCNAMELEN);
 	}
 	/* Convert GVSTATS information */
 #	define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2)	SWAP_SD8(gvstats_rec.COUNTER);

@@ -79,6 +79,7 @@
 #include "getzdir.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "suspsigs_handler.h"
+#include "gtm_imagetype_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -112,7 +113,6 @@ GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
-GBLREF boolean_t		is_replicator;
 GBLREF CLI_ENTRY		gtcm_gnp_cmd_ary[];
 
 GBLDEF CLI_ENTRY		*cmd_ary = &gtcm_gnp_cmd_ary[0]; /* Define cmd_ary to be the GTCM_GNP server specific cmd table */
@@ -129,7 +129,6 @@ GBLDEF gd_region		*action_que_dummy_reg;
 GBLDEF char			gtcm_gnp_server_log[MAX_FN_LEN + 1];
 /* the length is the orignal length */
 GBLDEF int			gtcm_gnp_log_path_len;
-GBLDEF boolean_t		skip_dbtriggers;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -372,13 +371,10 @@ int main(int argc, char **argv, char **envp)
 	error_def(ERR_NETFAIL);
 	error_def(ERR_TEXT);
 
-	image_type = GTCM_GNP_SERVER_IMAGE;
-	GTMTRIG_ONLY(skip_dbtriggers = TRUE;) /* GTCM GNP does not support triggers. */
+	gtm_imagetype_init(GTCM_GNP_SERVER_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
-	is_replicator = TRUE;	/* as GT.CM GNP goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	gtm_env_init();	/* read in all environment variables */
 	gtmenvp = envp;
-	run_time = TRUE;
 	getjobnum();
 	err_init(stop_image_conditional_core);
 	assert(0 == offsetof(gv_key, top)); /* for integrity of CM_GET_GVCURRKEY */

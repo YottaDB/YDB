@@ -19,6 +19,9 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#ifdef VMS
+#include <fab.h>		/* needed for dbgbldir_sysops.h */
+#endif
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
 #include "error_trap.h"		/* for STACK_ZTRAP_EXPLICIT_NULL macro */
@@ -37,6 +40,7 @@ GBLREF mval		dollar_zgbldir;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 #ifdef GTM_TRIGGER
 GBLREF int4		gtm_trigger_depth;
+GBLREF mval		dollar_ztwormhole;
 #endif
 
 /* Routine to NEW a special intrinsic variable. Note that gtm_newinstrinsic(),
@@ -100,6 +104,11 @@ void op_newintrinsic(int intrtype)
 		case SV_ZGBLDIR:
 			intrinsic = &dollar_zgbldir;
 			break;
+#		ifdef GTM_TRIGGER
+		case SV_ZTWORMHOLE:
+			intrinsic = &dollar_ztwormhole;
+			break;
+#		endif
 		default:	/* Only above types defined by compiler */
 			GTMASSERT;
 	}

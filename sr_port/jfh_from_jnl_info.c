@@ -31,7 +31,7 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 {
 	/**** We will write journal file header, epoch and eof in order ****/
 	/* Write the file header */
-	memset((char *)header, 0, JNL_HDR_LEN);
+	memset((char *)header, 0, JNL_HDR_LEN);	/* note: In Unix, this means we 0-fill 2K REAL_JNL_HDR_LEN + 62K padding */
 	memcpy(header->label, JNL_LABEL_TEXT, STR_LIT_LEN(JNL_LABEL_TEXT));
 	header->is_little_endian = GTM_IS_LITTLE_ENDIAN;
 	assert(NULL != prc_vec);
@@ -64,6 +64,7 @@ void jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header)
 	header->prev_jnl_file_name_length = info->prev_jnl_len; ;
 	memcpy(header->prev_jnl_file_name, info->prev_jnl, info->prev_jnl_len);
 	header->prev_jnl_file_name[info->prev_jnl_len] = '\0';
+	assert(JNL_ALLOC_MIN <= info->alloc);
 	header->jnl_alq = info->alloc;
 	header->virtual_size = info->alloc;
 	header->jnl_deq = info->extend;

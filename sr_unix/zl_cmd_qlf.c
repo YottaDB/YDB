@@ -39,8 +39,10 @@ void zl_cmd_qlf (mstr *quals, command_qualifier *qualif)
 	cbuf[SIZEOF(COMMAND) - 1 + quals->len] = 0;
 	/* The caller of this function could be GT.M, DSE, MUPIP, GTCM GNP server, GTCM OMI server etc. Most of them have their
 	 * own command parsing tables and some dont even have one. Nevertheless, we need to parse the string as if it was a
-	 * MUMPS compilation command. So we switch temporarily to the MUMPS parsing table "mumps_cmd_ary".
-	 * TODO: What to do in case of errors in between the save and restore. Does it really matter if cmd_ary is not restored?
+	 * MUMPS compilation command. So we switch temporarily to the MUMPS parsing table "mumps_cmd_ary". Note that the only
+	 * rts_errors possible between save and restore of the cmd_ary are in compile_source_file and those are internally
+	 * handled by source_ch which will transfer control back to us (right after the the call to compile_source_file below)
+	 * and hence proper restoring of cmd_ary is guaranteed even in case of errors.
 	 */
 	save_cmd_ary = cmd_ary;
 	cmd_ary = &mumps_cmd_ary[0];

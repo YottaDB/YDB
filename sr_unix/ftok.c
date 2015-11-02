@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,12 +16,9 @@
 
 #include "mdef.h"
 #include "main_pragma.h"
-/* Use system fprintf instead of gtm_fprintf.  Since ftok is a standalone process which has no timers there is no need for
- * gtm_fprintf. This change also eliminates unnecessary code bloat.
- */
-#define NO_GTM_FPRINTF
+#undef	UNIX	/* Cause non-GTM-runtime defines in stdio */
 #include "gtm_stdio.h"
-#undef NO_GTM_FPRINTF
+#define UNIX
 #include "gtm_stdlib.h"
 #include <sys/types.h>
 #include "gtm_ipc.h"

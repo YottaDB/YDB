@@ -1733,15 +1733,17 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					if (cnl->in_crit == rundown_process_id)
 						cnl->in_crit = 0;
+					csa->hold_onto_crit = FALSE;	/* reset this just before csa->now_crit is reset */
 					UNIX_ONLY(
 						DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 						mutex_unlockw(reg, crash_count);/* roll forward step (11) */
+						assert(!csa->now_crit);
 						DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 					)
 					VMS_ONLY(
 						mutex_stoprelw(csa->critical);	/* roll forward step (11) */
+						csa->now_crit = FALSE;
 					)
-					csa->now_crit = FALSE;
 					UNSUPPORTED_PLATFORM_CHECK;
 				} else
 				{
@@ -1749,20 +1751,6 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					SECSHR_ACCOUNTING(__LINE__);
 					SECSHR_ACCOUNTING(cnl);
 					SECSHR_ACCOUNTING(NODE_LOCAL_SIZE_DBS);
-					SECSHR_ACCOUNTING(csa->critical);
-					SECSHR_ACCOUNTING(CRIT_SPACE);
-					assert(FALSE);
-				}
-			} else  if (csa->read_lock)
-			{
-				if (GTM_PROBE(CRIT_SPACE, csa->critical, WRITE))
-				{
-					VMS_ONLY(mutex_stoprelr(csa->critical);)
-					csa->read_lock = FALSE;
-				} else
-				{
-					SECSHR_ACCOUNTING(4);
-					SECSHR_ACCOUNTING(__LINE__);
 					SECSHR_ACCOUNTING(csa->critical);
 					SECSHR_ACCOUNTING(CRIT_SPACE);
 					assert(FALSE);
@@ -1858,9 +1846,11 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				{
 					if (cnl->in_crit == rundown_process_id)
 						cnl->in_crit = 0;
+					csa->hold_onto_crit = FALSE;	/* reset this just before csa->now_crit is reset */
 					UNIX_ONLY(
 						DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 						mutex_unlockw(reg, 0);		/* roll forward step (12) */
+						assert(!csa->now_crit);
 						DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 					)
 					VMS_ONLY(

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 		dsub = (mlk_shrsub_ptr_t)R2A(b->value);
 		memcpy(temp, dsub->data, dsub->length);
 		temp[dsub->length] = '\0';
-		PRINTF("%s%s : [shrblk] %lx : [shrsub] %lx\n", prefix, temp, b, dsub);
+		PRINTF("%s%s : [shrblk] %lx : [shrsub] %lx\n", prefix, temp, (long unsigned int) b, (long unsigned int) dsub);
 		if (b->children)
 			lke_show_memory((mlk_shrblk_ptr_t)R2A(b->children), new_prefix);
 		bnext = (mlk_shrblk_ptr_t)R2A(b->rsib);

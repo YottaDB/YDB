@@ -28,7 +28,7 @@
 #include "mupip_exit.h"
 #include "mlkdef.h"
 #include "zshow.h"
-#include "mu_load_input.h"
+#include "file_input.h"
 #include "load.h"
 #include "mu_gvis.h"
 #include "mupip_put_gvdata.h"
@@ -47,6 +47,17 @@ GBLREF gv_key	*gv_currkey;
 #define GO_PUT_SUB	     0
 #define GO_PUT_DATA	     1
 #define DEFAULT_MAX_REC_SIZE 3096
+#define ISSUE_TRIGDATAIGNORE_IF_NEEDED(KEYLENGTH, PTR, HASHT_GBL)								\
+{																\
+	/* The ordering of the && below is important as the caller uses HASHT_GBL to be set to TRUE if the global pointed to 	\
+	 * by PTR is ^#t. 													\
+	 */															\
+	if ((HASHT_GBL = IS_GVKEY_HASHT_FULL_GBLNAME(KEYLENGTH, PTR)) && !hasht_ignored)					\
+	{															\
+		gtm_putmsg(VARLSTCNT(4) ERR_TRIGDATAIGNORE, 2, KEYLENGTH, PTR);							\
+		hasht_ignored = TRUE;												\
+	}															\
+}
 
 static readonly unsigned char gt_lit[] = "LOAD TOTAL";
 void go_call_db(int routine, char *parm1, int parm2);
@@ -58,13 +69,14 @@ void go_load(uint4 begin, uint4 end)
 	uint4	        iter, max_data_len, max_subsc_len, key_count, max_rec_size;
 	mstr            src, des;
 	unsigned char   *rec_buff, ch;
-	boolean_t	utf8_extract, format_error = FALSE;
+	boolean_t	utf8_extract, format_error = FALSE, hasht_ignored = FALSE, hasht_gbl = FALSE;
 
 	error_def(ERR_LOADCTRLY);
 	error_def(ERR_LOADEOF);
 	error_def(ERR_LOADFILERR);
 	error_def(ERR_MUNOFINISH);
 	error_def(ERR_LOADINVCHSET);
+	error_def(ERR_TRIGDATAIGNORE);
 
 	gvinit();
 
@@ -72,7 +84,7 @@ void go_load(uint4 begin, uint4 end)
 	rec_buff = (unsigned char *)malloc(max_rec_size);
 
 	fmt = MU_FMT_ZWR;	/* by default, the extract format is ZWR (not GO) */
-	len = mu_load_get(&ptr);
+	len = file_input_get(&ptr);
 	if (mupip_error_occurred)
 	{
 		free(rec_buff);
@@ -95,7 +107,7 @@ void go_load(uint4 begin, uint4 end)
 		}
 	} else
 		mupip_exit(ERR_LOADFILERR);
-	len = mu_load_get(&ptr);
+	len = file_input_get(&ptr);
 	if (mupip_error_occurred)
 	{
 		free(rec_buff);
@@ -111,7 +123,7 @@ void go_load(uint4 begin, uint4 end)
 		begin = 3;
 	for (iter = 3; iter < begin; iter++)
 	{
-		len = mu_load_get(&ptr);
+		len = file_input_get(&ptr);
 		if (len < 0)	/* The IO device has signalled an end of file */
 		{
 			gtm_putmsg(VARLSTCNT(3) ERR_LOADEOF, 1, begin);
@@ -144,7 +156,7 @@ void go_load(uint4 begin, uint4 end)
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
 		}
-		if (0 > (len = mu_load_get(&ptr)))
+		if (0 > (len = file_input_get(&ptr)))
 			break;
 		if (mupip_error_occurred)
 		{
@@ -164,8 +176,12 @@ void go_load(uint4 begin, uint4 end)
 		{
 			/* Determine the ZWR key length. -1 (SIZEOF(=)) is needed since ZWR allows '^x(1,2)='*/
 			keylength = zwrkeylength(ptr, len - 1);
-			if ((HASHT_FULL_GBLNM_LEN <= keylength) && (0 == memcmp(ptr, HASHT_FULL_GBLNAME, HASHT_FULL_GBLNM_LEN)))
+			ISSUE_TRIGDATAIGNORE_IF_NEEDED(keylength, ptr, hasht_gbl);
+			if (hasht_gbl)
+			{
+				hasht_gbl = FALSE;
 				continue;
+			}
 			go_call_db(GO_PUT_SUB, ptr, keylength);
 			if (mupip_error_occurred)
 			{
@@ -207,11 +223,13 @@ void go_load(uint4 begin, uint4 end)
 			key_count++;
 		} else
 		{
-			if ((HASHT_FULL_GBLNM_LEN <= len) && (0 == memcmp(ptr, HASHT_FULL_GBLNAME, HASHT_FULL_GBLNM_LEN)))
+			ISSUE_TRIGDATAIGNORE_IF_NEEDED(len, ptr, hasht_gbl);
+			if (hasht_gbl)
 			{
-				if (0 > (len = mu_load_get(&ptr)))
+				if (0 > (len = file_input_get(&ptr)))
 					break;
 				iter++;
+				hasht_gbl = FALSE;
 				continue;
 			}
 		        go_call_db(GO_PUT_SUB, ptr, len);
@@ -229,7 +247,7 @@ void go_load(uint4 begin, uint4 end)
 			        iter--;	/* Decrement as didn't load key */
 				break;
 			}
-			if ((len = mu_load_get(&ptr)) < 0)
+			if ((len = file_input_get(&ptr)) < 0)
 			        break;
 			if (mupip_error_occurred)
 			{
@@ -252,7 +270,7 @@ void go_load(uint4 begin, uint4 end)
 		}
 	}
 	free(rec_buff);
-	mu_load_close();
+	file_input_close();
 	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg(VARLSTCNT(1) ERR_LOADCTRLY);

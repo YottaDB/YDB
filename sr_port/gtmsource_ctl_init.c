@@ -53,6 +53,7 @@
 #include "repl_sp.h"
 #include "tp_change_reg.h"
 #include "is_file_identical.h"
+#include "get_fs_block_size.h"
 #ifdef GTM_CRYPT
 #include "gtmcrypt.h"
 #endif
@@ -74,9 +75,9 @@ GBLREF FILE		*gtmsource_log_fp;
 GBLREF int		gtmsource_statslog_fd;
 GBLREF FILE		*gtmsource_statslog_fp;
 
-repl_buff_t *repl_buff_create(uint4 buffsize);
+repl_buff_t *repl_buff_create(uint4 buffsize, uint4 jnl_fs_block_size);
 
-repl_buff_t *repl_buff_create(uint4 buffsize)
+repl_buff_t *repl_buff_create(uint4 buffsize, uint4 jnl_fs_block_size)
 {
 	repl_buff_t	*tmp_rb;
 	int		index;
@@ -90,9 +91,9 @@ repl_buff_t *repl_buff_create(uint4 buffsize)
 		tmp_rb->buff[index].recaddr = JNL_FILE_FIRST_RECORD;
 		tmp_rb->buff[index].readaddr = JNL_FILE_FIRST_RECORD;
 		tmp_rb->buff[index].buffremaining = buffsize;
-		buff_ptr = (unsigned char *)malloc(buffsize + DISK_BLOCK_SIZE);
+		buff_ptr = (unsigned char *)malloc(buffsize + jnl_fs_block_size);
 		tmp_rb->buff[index].base_buff = buff_ptr;
-		tmp_rb->buff[index].base = (unsigned char *)ROUND_UP2((uintszofptr_t)buff_ptr, DISK_BLOCK_SIZE);
+		tmp_rb->buff[index].base = (unsigned char *)ROUND_UP2((uintszofptr_t)buff_ptr, jnl_fs_block_size);
 		tmp_rb->buff[index].recbuff = tmp_rb->buff[index].base;
 	}
 	tmp_rb->fc = (repl_file_control_t *)malloc(SIZEOF(repl_file_control_t));
@@ -182,7 +183,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		int 		crypt_status;
 	)
 	uint4			jnl_status;
-	boolean_t		did_jnl_ensure_open = FALSE;
+	boolean_t		did_jnl_ensure_open = FALSE, was_crit;
 	int4			lcl_jnl_fn_len;
 	char			lcl_jnl_fn[JNL_NAME_SIZE];
 #ifdef UNIX
@@ -193,6 +194,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 #else
 #error Unsupported platform
 #endif
+	uint4			jnl_fs_block_size;
 
 	error_def(ERR_JNLFILOPN);
 
@@ -210,7 +212,9 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		tp_change_reg();
 		assert(csa == cs_addrs);
 		csa->jnl->channel = NOJNL; /* Not to close the prev gener file */
-		grab_crit(reg);
+		was_crit = csa->now_crit;
+		if (!was_crit)
+			grab_crit(reg);
 		/* Although replication may be WAS_ON, it is possible that source server has not yet sent records
 		 * that were generated when replication was ON. We have to open and read this journal file to
 		 * cover such a case. But in the WAS_ON case, do not ask for a jnl_ensure_open to be done since
@@ -229,7 +233,8 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 			jnl_status = jnl_ensure_open();
 			if (0 != jnl_status)
 			{
-				rel_crit(reg);
+				if (!was_crit)
+					rel_crit(reg);
 				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
 			} else
 			{
@@ -247,7 +252,8 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 			status = repl_open_jnl_file_by_name(tmp_ctl, csd->jnl_file_len, (char *)csd->jnl_file_name,
 													&tmp_fd, &stat_buf);
 		}
-		rel_crit(reg);
+		if (!was_crit)
+			rel_crit(reg);
 		gv_cur_region = r_save;
 		tp_change_reg();
 		assert(NOJNL != tmp_fd);
@@ -255,9 +261,15 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		status = repl_open_jnl_file_by_name(tmp_ctl, jnl_fn_len, jnl_fn, &tmp_fd, &stat_buf);
 	if (status == SS_NORMAL)
 	{
-		tmp_jfh_base = (jnl_file_header *)malloc(SIZEOF(jnl_file_header) + DISK_BLOCK_SIZE);
-		tmp_jfh = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)tmp_jfh_base, DISK_BLOCK_SIZE));
-		F_READ_BLK_ALIGNED(tmp_fd, 0, tmp_jfh, ROUND_UP2(SIZEOF(jnl_file_header), DISK_BLOCK_SIZE), status);
+		jnl_fs_block_size = get_fs_block_size(tmp_fd);
+		/* Because the read below will be to the aligned buffer, and it will read an aligned size, we need
+		 * to allocate jnl_file_header + 2 * jnl_fs_block_size.  There will be some throw-away before the
+		 * buffer to get the alignment in place, and then up to jnl_fs_block_size after the header in order
+		 * for the size to be a multiple of jnl_fs_block_size.
+		 */
+		tmp_jfh_base = (jnl_file_header *)malloc(SIZEOF(jnl_file_header) + (2 * jnl_fs_block_size));
+		tmp_jfh = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)tmp_jfh_base, jnl_fs_block_size));
+		F_READ_BLK_ALIGNED(tmp_fd, 0, tmp_jfh, ROUND_UP2(REAL_JNL_HDR_LEN, jnl_fs_block_size), status);
 		assert(SS_NORMAL == status);
 		if (SS_NORMAL == status)
 			CHECK_JNL_FILE_IS_USABLE(tmp_jfh, status, FALSE, 0, NULL); /* FALSE => NO gtm_putmsg even if errors */
@@ -282,10 +294,11 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		tmp_jfh_base = NULL;
 		rts_error(VARLSTCNT(7) ERR_JNLFILOPN, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg), status);
 	}
-	tmp_ctl->repl_buff = repl_buff_create(tmp_jfh->alignsize);
+	assert(SS_NORMAL == status);	/* so jnl_fs_block_size is guaranteed to have been initialized */
+	tmp_ctl->repl_buff = repl_buff_create(tmp_jfh->alignsize, jnl_fs_block_size);
 	tmp_ctl->repl_buff->backctl = tmp_ctl;
-
 	tmp_ctl->repl_buff->fc->eof_addr = JNL_FILE_FIRST_RECORD;
+	tmp_ctl->repl_buff->fc->fs_block_size = jnl_fs_block_size;
 	tmp_ctl->repl_buff->fc->jfh_base = tmp_jfh_base;
 	tmp_ctl->repl_buff->fc->jfh = tmp_jfh;
 	tmp_ctl->repl_buff->fc->fd = tmp_fd;

@@ -31,7 +31,7 @@
 
 /* Whenever JNL_LABEL_TEXT changes, also change the following
  * 	1) Update JNL_VER_THIS
- * 	2) Add REPL_JNL_Vxx enum to repl_jnl_t typedef in repl_filter.h
+ * 	2) Add REPL_JNL_Vxx enum to repl_jnl_t typedef AND Vxx_JNL_VER #define in repl_filter.h
  * 	3) Add one entry to jnl2filterfmt array in repl_filter.c
  * 	4) Add an entry each to repl_filter_old2cur & repl_filter_cur2old arrays in repl_filter.c.
  * If the FILTER format is also changing, then do the following as well
@@ -49,8 +49,8 @@
  * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
  *
  */
-#define JNL_LABEL_TEXT		"GDSJNL19"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		19
+#define JNL_LABEL_TEXT		"GDSJNL20"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		20
 #define JNL_VER_EARLIEST_REPL	15		/* Replication filter support starts here GDSJNL15 = GT.M V4.4-002 */
 #define JRT_MAX_V15		JRT_AIMG	/* Maximum jnl record type in GDSJNL15 that can be input to replication filter */
 #define JRT_MAX_V17		JRT_AIMG	/* Maximum jnl record type in GDSJNL17 that can be input to replication filter.
@@ -59,8 +59,13 @@
 						 */
 #define	ALIGN_KEY		0xdeadbeef
 
+#ifdef UNIX
+#define JNL_ALLOC_DEF		2048
+#define JNL_ALLOC_MIN		200
+#elif defined(VMS)
 #define JNL_ALLOC_DEF		100
 #define JNL_ALLOC_MIN		10
+#endif
 
 /*	JNL_BUFFER_MIN	database block size / 512 + 1	*/
 #define JNL_BUFFER_MAX		32768	/* # of 512-byte blocks = 16Mb journal buffer size */
@@ -71,44 +76,68 @@
 */
 
 #define JNL_EXTEND_MIN		0
+#ifdef UNIX
+#define JNL_EXTEND_DEF		2048
+#else
 #define JNL_EXTEND_DEF		100
+#endif
 #define JNL_EXTEND_MAX		65535
 #define JNL_MIN_WRITE		32768
 #define JNL_MAX_WRITE		65536
 /* FE was changed to EB because, the bit pattern there seems to vary more than the one for "FE".
  * Also a research in ELWOOD journal file showed that "EB" was one of the few patterns that had the least occurrences */
 #define JNL_REC_SUFFIX_CODE	0xEB
-#define	JNL_WRT_START_MODULUS	512
-#define JNL_WRT_START_MASK	~(JNL_WRT_START_MODULUS - 1)
+
+/* In Unix, with sync_io, we do journal writes to disk at filesystem block size boundaries.
+ * In VMS, the writes are at 512-byte boundaries only.
+ */
+#ifdef UNIX
+#	define	JNL_WRT_START_MODULUS(jb)	jb->fs_block_size
+#elif defined(VMS)
+#	define	JNL_WRT_START_MODULUS(jb)	512
+#endif
+#define JNL_WRT_START_MASK(jb)	~(JNL_WRT_START_MODULUS(jb) - 1)
+
 #define	JNL_WRT_END_MODULUS	8
 #define JNL_WRT_END_MASK	~(JNL_WRT_END_MODULUS - 1)
-#define	JNL_MIN_ALIGNSIZE	(1 <<  5)	/*      32 disk blocks effectively  16K alignsize */
-#define JNL_DEF_ALIGNSIZE	(1 <<  7)	/*     128 disk blocks effectively  64K alignsize */
-#define	JNL_MAX_ALIGNSIZE	(1 << 22)	/* 4194304 disk blocks effectively   2G alignsize */
+
+#ifdef UNIX
+#define	JNL_MIN_ALIGNSIZE	(1 <<  8)	/*     256 disk blocks effectively  128K alignsize */
+#define JNL_DEF_ALIGNSIZE	(1 << 11)	/*    2048 disk blocks effectively    1M alignsize */
+#else
+#define	JNL_MIN_ALIGNSIZE	(1 <<  5)	/*      32 disk blocks effectively   16K alignsize */
+#define JNL_DEF_ALIGNSIZE	(1 <<  7)	/*     128 disk blocks effectively   64K alignsize */
+#endif
+#define	JNL_MAX_ALIGNSIZE	(1 << 22)	/* 4194304 disk blocks effectively    2G alignsize */
 #define JNL_REC_START_BNDRY	8
 #define MAX_LOGI_JNL_REC_SIZE	(MAX_DB_BLK_SIZE)			  /* maximum logical journal record size */
 #define	MAX_JNL_REC_SIZE	(MAX_LOGI_JNL_REC_SIZE + DISK_BLOCK_SIZE) /* one more disk-block for PBLK record header/footer */
 
-#define ALIGNMENT_SIZE		DISK_BLOCK_SIZE	/* For direct I/O, buffers need to be aligned on DISK_BLOCK_SIZE boundaries */
-
 #ifdef GTM_TRIGGER
 /* Define maximum size that $ZTWORMHOLE can be. Since $ZTWORMHOLE should be able to fit in a journal record and the
- * minimum alignsize is 16K, we do not want it to go more than 16K (that way irrespective of whatever alignsize the user
+ * minimum alignsize is 128K, we do not want it to go more than 128K (that way irrespective of whatever alignsize the user
  * specifies for the journal file, $ZTWORMHOLE will fit in the journal record). Leaving a max of 512 bytes for the
  * journal record prefix/suffix (32-byte overhead) and MIN_ALIGN_RECLEN (see comment in JNL_MAX_RECLEN macro for why
- * this is needed) we allow for a max of 16K-512 bytes in $ZTWORMHOLE.
+ * this is needed) we allow for a max of 128K-512 bytes in $ZTWORMHOLE.
  */
-#define	MAX_ZTWORMHOLE_SIZE	16384 - 512
-#define	MAX_ZTWORM_JREC_LEN	16384 - MIN_ALIGN_RECLEN
+#define	MAX_ZTWORMHOLE_LEN	(128 * 1024)
+#define	MAX_ZTWORMHOLE_SIZE	(MAX_ZTWORMHOLE_LEN - 512)
+#define	MAX_ZTWORM_JREC_LEN	(MAX_ZTWORMHOLE_LEN - MIN_ALIGN_RECLEN)
 #endif
 
 #define MIN_YIELD_LIMIT		0
 #define MAX_YIELD_LIMIT		2048
 #define DEFAULT_YIELD_LIMIT	8
 
+#ifdef UNIX
+/* Have a minimum jnl-file-auto-switch-limit of 16 align boundaries (currently each align boundary is 128K) */
+#define	JNL_AUTOSWITCHLIMIT_MIN	(16 * JNL_MIN_ALIGNSIZE)
+#define	JNL_AUTOSWITCHLIMIT_DEF	8386560	/* Instead of 8388607 it is adjusted for default allocation = extension = 2048 */
+#else
 /* Have a minimum jnl-file-auto-switch-limit of 128 align boundaries (currently each align boundary is 16K) */
 #define	JNL_AUTOSWITCHLIMIT_MIN	(128 * JNL_MIN_ALIGNSIZE)
 #define	JNL_AUTOSWITCHLIMIT_DEF	8388600	/* Instead of 8388607 it is adjusted for default allocation = extension = 100 */
+#endif
 
 /* options (SIZEOF(char)) to wcs_flu() (currently flush_hdr, write_epoch, sync_epoch) are bit-wise ored */
 #define	WCSFLU_NONE		 0
@@ -340,7 +369,7 @@ typedef struct
 	int4			epoch_interval;	/* Time between successive epochs in epoch-seconds */
 	boolean_t		before_images;	/* If TRUE, before-image processing is enabled */
 						/* end not volatile QUAD */
-	uintszofptr_t		buff_off;	/* relative offset to DISK_BLOCK_SIZE aligned buffer start */
+	uintszofptr_t		buff_off;	/* relative offset to filesystem-block-size aligned buffer start */
 	volatile int4		free;		/* relative index of first byte to write in buffer */
 	volatile uint4		freeaddr,	/* virtual on-disk address which will correspond to free, when it is written */
 				end_of_data,	/* Synched offset updated by jnl_write_epoch. Used by recover/rollback */
@@ -381,6 +410,8 @@ typedef struct
 	uint4			enospc_errcnt;		/* number of times jb->errcnt was last incremented due to ENOSPC error
 							 * when writing to this journal file */
 	uint4			max_jrec_len;		/* copy of max_jrec_len from journal file header */
+	uint4			fs_block_size;		/* underlying journal file system block size;
+							 * primarily used in Unix, 512 in VMS */
 	/* CACHELINE_PAD macros provide spacing between the following latches so that they do
 	   not interfere with each other which can happen if they fall in the same data cacheline
 	   of a processor.
@@ -1035,7 +1066,19 @@ typedef struct
 	}										\
 }
 
-#define	JNL_HDR_LEN		SIZEOF(jnl_file_header)
+/* In Unix, the journal file header size is currently set to 64K so it is aligned with any possible filesystem block size
+ * known at this point. This will help us do aligned writes to the journal file header as well as the journal file contents
+ * without needing to mix both of them in the same aligned disk write. In VMS, we continue with 512-byte alignment so no change.
+ * Note that the journal_file_header structure is only 2K currently and is captured using the REAL_JNL_HDR_LEN macro while
+ * the padded 64K file header is captured using the JNL_HDR_LEN macro. Use either one as appropriate in the code. Both of them
+ * are identical in VMS where it is currently 2K.
+ */
+#define	REAL_JNL_HDR_LEN	SIZEOF(jnl_file_header)
+#ifdef UNIX
+#	define	JNL_HDR_LEN		64*1024
+#elif defined(VMS)
+#	define	JNL_HDR_LEN		REAL_JNL_HDR_LEN
+#endif
 #define	JNL_FILE_FIRST_RECORD	JNL_HDR_LEN
 
 /* Minimum possible journal file size */

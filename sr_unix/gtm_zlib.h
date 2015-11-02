@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,5 +68,38 @@ GBLREF	int4			repl_zlib_cmp_level;	/* zlib compression level currently in use in
 #define	GTM_CMPLVL_OUT_OF_RANGE(x)	(ZLIB_CMPLVL_MIN > x)
 
 void gtm_zlib_init(void);
+
+/* Macros for zlib compress2 and uncompress function calls. Since 'malloc' or 'free' inside zlib library does NOT go
+ * through gtm_malloc or gtm_free respectively, defer signals (MUPIP STOP for instance) until the corresponding zlib
+ * call is completed so as to avoid deadlocks involving nested 'malloc' or 'free' each waiting for the other's
+ * completion
+ */
+#define ZLIB_COMPRESS(CMPBUFF_PTR, CMPLEN, UNCMPBUFF_PTR, UNCMPLEN, ZLIB_CMP_LEVEL, RC)					\
+{															\
+	GBLREF zlib_cmp_func_t		zlib_compress_fnptr;								\
+															\
+	intrpt_state_t			save_intrpt_ok_state;								\
+															\
+	SAVE_INTRPT_OK_STATE(INTRPT_IN_ZLIB_CMP_UNCMP);									\
+	assert(0 < (signed)(CMPLEN));											\
+	assert(NULL != zlib_compress_fnptr);										\
+	RC = (*zlib_compress_fnptr)(((Bytef *)(CMPBUFF_PTR)), (uLongf *)&(CMPLEN), (const Bytef *)(UNCMPBUFF_PTR), 	\
+					(uLong)(UNCMPLEN), ZLIB_CMP_LEVEL);						\
+	RESTORE_INTRPT_OK_STATE;											\
+}
+
+#define ZLIB_UNCOMPRESS(UNCMPBUFF_PTR, UNCMPLEN, CMPBUFF_PTR, CMPLEN, RC)						\
+{															\
+	GBLREF zlib_uncmp_func_t	zlib_uncompress_fnptr;								\
+															\
+	intrpt_state_t			save_intrpt_ok_state;								\
+															\
+	SAVE_INTRPT_OK_STATE(INTRPT_IN_ZLIB_CMP_UNCMP);									\
+	assert(0 < (signed)(UNCMPLEN));											\
+	assert(NULL != zlib_uncompress_fnptr);										\
+	RC = (*zlib_uncompress_fnptr)(((Bytef *)(UNCMPBUFF_PTR)), (uLongf *)&(UNCMPLEN), (const Bytef *)(CMPBUFF_PTR),	\
+					(uLong)(CMPLEN));								\
+	RESTORE_INTRPT_OK_STATE;											\
+}
 
 #endif

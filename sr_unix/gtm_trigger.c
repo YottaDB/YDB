@@ -53,6 +53,7 @@
 #include "flush_jmp.h"
 #include "dollar_zlevel.h"
 #include "gtmimagename.h"
+#include "wbox_test_init.h"
 
 #ifdef GTM_TRIGGER
 
@@ -64,6 +65,7 @@
 #define NAMEOFRTN_PARM		" -NAMEOFRTN="
 #define S_CUTOFF 		7
 #define GTM_TRIGGER_SOURCE_NAME	"GTM Trigger"
+#define MAX_MKSTEMP_RETRIES	100
 
 GBLREF	boolean_t		run_time;
 GBLREF	mv_stent		*mv_chain;
@@ -106,8 +108,6 @@ GBLREF	gv_trigger_t		*gtm_trigdsc_last;
 GBLREF	gtm_trigger_parms	*gtm_trigprm_last;
 #endif
 
-LITREF	char			alphanumeric_table[];
-LITREF	int			alphanumeric_table_len;
 LITREF	mval			literal_null;
 
 STATICDEF int4			gtm_trigger_comp_prev_run_time;
@@ -123,6 +123,7 @@ error_def(ERR_REPEATERROR);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRIGCOMPFAIL);
 error_def(ERR_TRIGNAMEUNIQ);
@@ -279,25 +280,41 @@ STATICFNDEF int gtm_trigger_invoke(void)
 
 int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 {
-	char		rtnname[GTM_PATH_MAX + 1];
+	char		rtnname[GTM_PATH_MAX + 1], rtnname_template[GTM_PATH_MAX + 1];
 	char		objname[GTM_PATH_MAX + 1];
 	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)];
 	mstr		save_zsource;
-	int		rtnfd, rc, lenrtnname, lenobjname, len;
+	int		rtnfd, rc, lenrtnname, lenobjname, len, alphnum_len, retry, save_errno;
 	char		*mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2, *zcomp_parms_ptr;
 	mval		zlfile, zcompprm;
 
 	ESTABLISH_RET(gtm_trigger_complink_ch, ((0 == error_condition) ? dollar_zcstatus : error_condition ));
 	 /* Verify there are 2 available chars for uniqueness */
-	assert((MAX_MIDENT_LEN - TRIGGER_NAME_RESERVED_SPACE) > (trigdsc->rtn_desc.rt_name.len));
+	assert((MAX_MIDENT_LEN - TRIGGER_NAME_RESERVED_SPACE) >= (trigdsc->rtn_desc.rt_name.len));
 	assert(NULL == trigdsc->rtn_desc.rt_adr);
 	gtm_trigger_comp_prev_run_time = run_time;
 	run_time = TRUE;	/* Required by compiler */
 	/* Verify the routine name set by MUPIP TRIGGER and read by gvtr_db_read_hasht() is not in use */
 	if (NULL != find_rtn_hdr(&trigdsc->rtn_desc.rt_name))
 	{	/* Ooops .. need name to be more unique.. */
+		/* Though variable definitions are conventionally done at the function entry, the reason alphanumeric_table
+		 * definition is done here is to minimize the time taken to initialize the below table in the most common case
+		 * (i.e. no trigger name collisions).
+		 */
+		char 		alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+							'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+							'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+							't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
+							'8', '9', '\0'};
+		alphnum_len = STR_LIT_LEN(alphanumeric_table);
 		namesub1 = trigdsc->rtn_desc.rt_name.addr + trigdsc->rtn_desc.rt_name.len++;
-		mident_suffix_top = (char *)alphanumeric_table + alphanumeric_table_len;
+		/* If WBTEST_HELPOUT_TRIGNAMEUNIQ is defined, set alphnum_len to 1. This way, we make the maximum
+		 * possible combinations for the uniqe trigger names to be 3 which is significantly lesser than
+		 * the actual number of combinations (62x62 = 3844). For eg., if ^a is a global having triggers defined
+		 * in 4 global directories, then the possible unique trigger names are a#1# ; a#1#A ; a#1#AA.
+		 */
+		GTM_WHITE_BOX_TEST(WBTEST_HELPOUT_TRIGNAMEUNIQ, alphnum_len, 1);
+		mident_suffix_top = (char *)alphanumeric_table + alphnum_len;
 		/* Phase 1. See if any single character can add uniqueness */
 		for (mident_suffix_p1 = (char *)alphanumeric_table; mident_suffix_p1 < mident_suffix_top; mident_suffix_p1++)
 		{
@@ -325,39 +342,69 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 			}
 			if (mident_suffix_p1 == mident_suffix_top)
 			{	/* Phase 3: Punt */
-				assert(FALSE);
+				assert(WBTEST_HELPOUT_TRIGNAMEUNIQ == gtm_white_box_test_case_number);
 				rts_error(VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3, trigdsc->rtn_desc.rt_name.len - 2,
-					  trigdsc->rtn_desc.rt_name.addr, alphanumeric_table_len * alphanumeric_table_len);
+					  trigdsc->rtn_desc.rt_name.addr, alphnum_len * alphnum_len);
 			}
 		}
 	}
 	/* Write trigger execute string out to temporary file and compile it */
 	assert(MAX_SRCLINE > (trigdsc->xecute_str.str.len + 1));
-	SPRINTF(rtnname, "%s/trgtmpXXXXXXXXXX", DEFAULT_GTM_TMP);
-	assert(GTM_PATH_MAX > strlen(rtnname));
-	rtnfd = mkstemp(rtnname);
-	if (0 > rtnfd)
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("mkstemp()"), CALLFROM, errno);
+	rc = SNPRINTF(rtnname_template, GTM_PATH_MAX, "%s/trgtmpXXXXXX", DEFAULT_GTM_TMP);
+	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
+	assert(GTM_PATH_MAX >= rc);
+	/* The mkstemp() routine is known to bogus-fail for no apparent reason at all especially on AIX 6.1. In the event
+	 * this shortcoming plagues other platforms as well, we add a low-cost retry wrapper.
+	 */
+	retry = MAX_MKSTEMP_RETRIES;
+	do
+	{
+		strcpy(rtnname, rtnname_template);
+		rtnfd = mkstemp(rtnname);
+	} while ((-1 == rtnfd) && (EEXIST == errno) && (0 < --retry));
+	if (-1 == rtnfd)
+	{
+		save_errno = errno;
+		assert(FALSE);
+		rts_error(VARLSTCNT(12) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("mkstemp()"), CALLFROM,
+			  ERR_TEXT, 2, RTS_ERROR_TEXT(rtnname), save_errno);
+	}
+	assert(0 < rtnfd);	/* Verify file descriptor */
 	rc = 0;
 #	ifdef GEN_TRIGCOMPFAIL_ERROR
 	{	/* Used ONLY to generate an error in a trigger compile by adding some junk in a previous line */
 		DOWRITERC(rtnfd, ERROR_CAUSING_JUNK, strlen(ERROR_CAUSING_JUNK), rc); /* BYPASSOK */
 		if (0 != rc)
+		{
+			UNLINK(rtnname);
 			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+		}
 	}
 #	endif
 	DOWRITERC(rtnfd, PREFIX_SPACE, strlen(PREFIX_SPACE), rc);	/* BYPASSOK */
 	if (0 != rc)
+	{
+		UNLINK(rtnname);
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+	}
 	DOWRITERC(rtnfd, trigdsc->xecute_str.str.addr, trigdsc->xecute_str.str.len, rc);
 	if (0 != rc)
+	{
+		UNLINK(rtnname);
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+	}
 	DOWRITERC(rtnfd, NEWLINE, strlen(NEWLINE), rc);			/* BYPASSOK */
 	if (0 != rc)
+	{
+		UNLINK(rtnname);
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("write()"), CALLFROM, rc);
+	}
 	CLOSEFILE(rtnfd, rc);
 	if (0 != rc)
+	{
+		UNLINK(rtnname);
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, rc);
+	}
 	assert(MAX_MIDENT_LEN > trigdsc->rtn_desc.rt_name.len);
 	zcomp_parms_ptr = zcomp_parms;
 	lenrtnname = STRLEN(rtnname);
@@ -643,7 +690,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		if (dollar_tlevel < dollar_tlevel_start)
 		{	/* Our TP level was unwound during the trigger so throw an error */
 			DBGTRIGR((stderr, "gtm_trigger: $TLEVEL less than at start - throwing TRIGTLVLCHNG\n"));
-			gtm_trigger_fini(TRUE);	/* dump this trigger level */
+			gtm_trigger_fini(TRUE, FALSE);	/* dump this trigger level */
 			rts_error(VARLSTCNT(4) ERR_TRIGTLVLCHNG, 2, trigdsc->rtn_desc.rt_name.len,
 				  trigdsc->rtn_desc.rt_name.addr);
 		}
@@ -660,7 +707,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		assert(dollar_tlevel && (tstart_trigger_depth <= gtm_trigger_depth));
 		if ((tstart_trigger_depth < gtm_trigger_depth) || !tp_pointer->implicit_tstart)
 		{	/* Unwind a trigger level to restart level or to next trigger boundary */
-			gtm_trigger_fini(FALSE);	/* Get rid of this trigger level - we won't be returning */
+			gtm_trigger_fini(FALSE, FALSE);	/* Get rid of this trigger level - we won't be returning */
 			DBGTRIGR((stderr, "gtm_trigger: dm_start returned rethrow code - rethrowing ERR_TPRETRY\n"));
 			INVOKE_RESTART;
 		} else
@@ -671,7 +718,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			assert(donot_INVOKE_MUMTSTART);
 			if (SFT_TRIGR & frame_pointer->type)
 			{	/* Normal case when TP restart unwinding back to implicit beginning */
-				gtm_trigger_fini(FALSE);
+				gtm_trigger_fini(FALSE, FALSE);
 				DBGTRIGR((stderr, "gtm_trigger: dm_start returned rethrow code - returning to gvcst_<caller>\n"));
 			} else
 			{       /* Unusual case of trigger that died in no-mans-land before trigger base frame established.
@@ -700,7 +747,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		for (unwinds = 0, fp = frame_pointer; (NULL != fp) && !(SFT_TRIGR & fp->type); fp = fp->old_frame_pointer)
 			unwinds++;
 		assert((NULL != fp) && (SFT_TRIGR & fp->type));
-		GOFRAMES(unwinds, TRUE);
+		GOFRAMES(unwinds, TRUE, FALSE);
 		assert((NULL != frame_pointer) && !(SFT_TRIGR & frame_pointer->type));
 		DBGTRIGR((stderr, "gtm_trigger: Unsupported return code (%d) - unwound %d frames and now rethrowing error\n",
 			  rc, unwinds));
@@ -714,10 +761,10 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
  * order to maintain these values properly in the event of a major unwind. This routine is THE routine to use to unwind
  * trigger base frames in all cases due to the cleanups it takes care of.
  */
-void gtm_trigger_fini(boolean_t forced_unwind)
+void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 {
 	if (0 == (frame_pointer->type & SFT_TRIGR))
-		GTMASSERT;		/* Would normally be an assert but frame potential stack damage so severe
+		GTMASSERT;		/* Would normally be an assert but potential frame stack damage so severe
 					   and resulting debug difficulty that we GTMASSERT instead. */
 	op_unwind();
 	/* restore frame_pointer stored at msp (see base_frame.c) */
@@ -734,8 +781,18 @@ void gtm_trigger_fini(boolean_t forced_unwind)
 		if (tstart_trigger_depth == gtm_trigger_depth) /* Unwinding gvcst_put() so get rid of flag it potentially set */
 			donot_INVOKE_MUMTSTART = FALSE;
 #		endif
-		if (tp_pointer && (tp_pointer->fp == frame_pointer) && tp_pointer->implicit_tstart)
-			op_trollback(-1);	/* We just unrolled the implicitly started TSTART so unroll what it did */
+		if (tp_pointer)
+		{	/* This TP transaction can never be allowed to commit if this is the first trigger
+			 * (see comment in tp_frame.h against "cannot_commit" field for details).
+			 */
+			if ((0 == gtm_trigger_depth) && !fromzgoto)
+			{
+				DBGTRIGR((stderr, "gtm_trigger: cannot_commit flag set to TRUE\n"))
+				tp_pointer->cannot_commit = TRUE;
+			}
+			if ((tp_pointer->fp == frame_pointer) && tp_pointer->implicit_tstart)
+				OP_TROLLBACK(-1); /* We just unrolled the implicitly started TSTART so unroll what it did */
+		}
 	}
 	DBGTRIGR((stderr, "gtm_trigger: POP: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n", frame_pointer, ctxt));
 }

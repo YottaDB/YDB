@@ -51,6 +51,9 @@ void util_out_write(unsigned char *addr, unsigned int len);
 void util_in_open(void *);
 char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);
 void util_out_print_gtmio(caddr_t message, int flush, ...);
+/* util_out_save() and util_out_restore() are UNIX only - called from the UNIX send_msg() */
+void util_out_save(void);
+void util_out_restore(void);
 #endif
 
 #define OUT_BUFF_SIZE	2048

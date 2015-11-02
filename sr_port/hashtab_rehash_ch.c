@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "error.h"
+#include "util.h"
 
 CONDITION_HANDLER(hashtab_rehash_ch)
 {
@@ -28,6 +29,7 @@ CONDITION_HANDLER(hashtab_rehash_ch)
 	 */
 	if (ERR_HTOFLOW == SIGNAL || ERR_MEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL)
 	{
+		UNIX_ONLY(util_out_print("", RESET));	/* Prevents error message from being flushed later by rts_error() */
 		UNWIND(NULL, NULL);
 	} else
 	{

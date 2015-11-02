@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -843,7 +843,8 @@ int	iorm_readfl (mval *v, int4 width, int4 timeout) /* timeout in seconds */
 			v->str.len = bytes_count;
 			v->str.addr = (char *)stringpool.free;
 			UNICODE_ONLY(v->str.char_len = char_count;)
-			NON_UNICODE_ONLY(char_count = bytes_count;)
+			if (!utf_active && !rm_ptr->fixed)
+				char_count = bytes_count;
 		}
 		if (!rm_ptr->fixed && line_term_seen)
 		{

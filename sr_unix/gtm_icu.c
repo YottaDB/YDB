@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -161,7 +161,7 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char **major_
 	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver)))
 	{
 		/* Construct the first part of the ICUVERLT36 error message. */
-		sprintf(tmp_errstr, "%s%s", GTM_ICU_VERSION, GTM_ICU_VERSION_SUFFIX);
+		SPRINTF(tmp_errstr, "%s%s", GTM_ICU_VERSION, GTM_ICU_VERSION_SUFFIX);
 		rts_error(VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
 	}
 	return TRUE;
@@ -282,7 +282,7 @@ void gtm_icu_init(void)
 	each_libpath = strtok(search_path_ptr, DELIM);
 	while (NULL != each_libpath)
 	{
-		sprintf(temp_path, "%s/%s", each_libpath, libname);
+		SPRINTF(temp_path, "%s/%s", each_libpath, libname);
 		if (NULL == realpath(temp_path, real_path) && (0 != Stat(real_path, &real_path_stat)))
 		{
 			each_libpath = strtok(NULL, DELIM);
@@ -296,7 +296,7 @@ void gtm_icu_init(void)
 		buflen = 0;
 		/* real_path = /usr/local/lib64/libicuio36.0.a */
 		ptr = basename(real_path);
-		sprintf(buf, "%s(%s", real_path, ptr);	/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+		SPRINTF(buf, "%s(%s", real_path, ptr);	/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
 		buflen += (STRLEN(real_path) + STRLEN(ptr) + 1);
 		ptr = strrchr(buf, '.');
 		strcpy(ptr, ".so)");			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.so) */
@@ -388,7 +388,7 @@ void gtm_icu_init(void)
 			if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
 			{
 				/* Construct the first part of the ICUVERLT36 error message. */
-				sprintf(tmp_errstr, "%s%s", ICU_LIBNAME, ICU_LIBNAME_SUFFIX);
+				SPRINTF(tmp_errstr, "%s%s", ICU_LIBNAME, ICU_LIBNAME_SUFFIX);
 				rts_error(VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), icu_version[0], icu_version[1]);
 			}
 		}

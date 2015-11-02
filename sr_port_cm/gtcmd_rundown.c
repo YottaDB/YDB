@@ -51,6 +51,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	int			refcnt;
+	boolean_t		was_crit;
 
 	for (ptr = cnx->region_root;  ptr;)
 	{
@@ -60,7 +61,9 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 		if (ptr->pini_addr && clean_exit && JNL_ENABLED(cs_data) && (NOJNL != jpc->channel))
 		{
 			jpc->pini_addr = ptr->pini_addr;
-			grab_crit(gv_cur_region);
+			was_crit = cs_addrs->now_crit;
+			if (!was_crit)
+				grab_crit(gv_cur_region);
 			SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_put_jrt_pfin needs this to be set */
 			jbp = jpc->jnl_buff;
 			/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl records.
@@ -75,7 +78,8 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 					jnl_put_jrt_pfin(cs_addrs);
 			} else
 				send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
-			rel_crit(gv_cur_region);
+			if (!was_crit)
+				rel_crit(gv_cur_region);
 		}
 		refcnt = --region->refcnt;
 		/* Dont know how refcnt can become negative but in pro handle it by bypassing this region. The reason is the

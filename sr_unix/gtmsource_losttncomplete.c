@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@ int gtmsource_losttncomplete(void)
 {
 	int			idx;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
+	sgmnt_addrs	*repl_csa;
 
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_TEXT);
@@ -57,6 +58,8 @@ int gtmsource_losttncomplete(void)
 	 */
 	if (!jnlpool.jnlpool_ctl->upd_disabled)
 	{
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 		grab_lock(jnlpool.jnlpool_dummy_reg);
 		jnlpool.jnlpool_ctl->send_losttn_complete = TRUE;
 		gtmsourcelocal_ptr = jnlpool.gtmsource_local_array;

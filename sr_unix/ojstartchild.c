@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@
 #include "fileinfo.h"
 #include "gtmio.h"
 
-#define MAX_CMD_LINE		8192	/* Maximum command line length */
+#define MAX_JOB_LEN		8192	/* Arbitrary length maximum used for checking job arguments and parameters */
 #define MAX_PATH		 128	/* Maximum file path length */
 #define MAX_LAB_LEN		  32		/* Maximum Label string length */
 #define MAX_RTN_LEN		  32		/* Maximum Routine string length */
@@ -144,7 +144,7 @@ void job_term_handler(int sig){
 int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[])
 {
 	char			cbuff[TEMP_BUFF_SIZE], pbuff[TEMP_BUFF_SIZE];
-	char			tbuff[MAX_CMD_LINE], tbuff2[MAX_CMD_LINE];
+	char			tbuff[MAX_JOB_LEN], tbuff2[MAX_JOB_LEN];
 	char			*pgbldir_str;
 	char			*transfer_addr;
 	int4			index, environ_count, string_len, temp;
@@ -330,7 +330,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #endif
 
 		string_len = STRLEN("%s=%d") + STRLEN(CHILD_FLAG_ENV) + MAX_NUM_LEN - 4;
-		if (string_len > MAX_CMD_LINE)
+		if (string_len > MAX_JOB_LEN)
 			rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		c1 = (char *)malloc(string_len + 1);
 #ifdef KEEP_zOS_EBCDIC
@@ -514,21 +514,25 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 
 		for (index = 0, jp = jparms->parms;  jp ;  index++, jp = jp->next)
 		{
-			if (jp->parm->str.len > MAX_CMD_LINE - 2)
+			if (jp->parm->str.len > MAX_JOB_LEN - 2)
 				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			string_len = STRLEN(PARM_STR) + jp->parm->str.len + 1;
-			if (string_len > MAX_CMD_LINE)
-				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
-			c1 = (char *)malloc(string_len);
-#ifdef KEEP_zOS_EBCDIC
-			__getEstring1_a_copy(c1, STR_AND_LEN(PARM_STRING));
-			__getEstring1_a_copy(c1 + strlen(PARM_STRING), jp->parm->str.addr, jp->parm->str.len);
-#else
-			SPRINTF(c1, GTMJ_FMT, index);
-			memcpy(c1 + strlen(PARM_STR), jp->parm->str.addr, jp->parm->str.len);
-#endif
-			*(c1 + string_len - 1) = 0;
-			*env_ind++ = c1;
+			if (0 != jp->parm->mvtype)
+			{
+				MV_FORCE_STR(jp->parm);
+				string_len = STRLEN(PARM_STR) + jp->parm->str.len + 1;
+				if (string_len > MAX_JOB_LEN)
+					rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
+				c1 = (char *)malloc(string_len);
+#			ifdef KEEP_zOS_EBCDIC
+				__getEstring1_a_copy(c1, STR_AND_LEN(PARM_STRING));
+				__getEstring1_a_copy(c1 + strlen(PARM_STRING), jp->parm->str.addr, jp->parm->str.len);
+#			else
+				SPRINTF(c1, GTMJ_FMT, index);
+				memcpy(c1 + strlen(PARM_STR), jp->parm->str.addr, jp->parm->str.len);
+#			endif
+				*(c1 + string_len - 1) = 0;
+				*env_ind++ = c1;
+			}
 		}
 		string_len = STRLEN("%s=%ld") + STRLEN(GTMJCNT_ENV) + MAX_NUM_LEN - 5;
 		if (string_len > TEMP_BUFF_SIZE)

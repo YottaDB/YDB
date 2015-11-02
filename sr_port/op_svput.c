@@ -27,6 +27,9 @@
 #include "op.h"
 #include "mvalconv.h"
 #include "zroutines.h"
+#ifdef VMS
+#include <fab.h>		/* needed for dbgbldir_sysops.h */
+#endif
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
 #include "gtmmsg.h"
@@ -74,6 +77,7 @@ GBLREF boolean_t	dollar_zquit_anyway;
 GBLREF mval		*dollar_ztvalue;
 GBLREF boolean_t	*ztvalue_changed_ptr;
 GBLREF mval		dollar_ztwormhole;
+GBLREF mval		dollar_ztslate;
 GBLREF int4		gtm_trigger_depth;
 GBLREF int4		tstart_trigger_depth;
 GBLREF short		dollar_tlevel;
@@ -336,8 +340,20 @@ void op_svput(int varnum, mval *v)
 			assert(MAX_ZTWORMHOLE_SIZE < (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE));
 			if (MAX_ZTWORMHOLE_SIZE < v->str.len)
 				rts_error(VARLSTCNT(4) ERR_ZTWORMHOLE2BIG, 2, v->str.len, MAX_ZTWORMHOLE_SIZE);
-			assert(MV_STR == dollar_ztwormhole.mvtype);
+			assert(MV_STR & dollar_ztwormhole.mvtype);
 			dollar_ztwormhole.str = v->str;
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTSLATE:
+#			ifdef GTM_TRIGGER
+			assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
+			if (!dollar_tlevel || (tstart_trigger_depth == gtm_trigger_depth))
+				rts_error(VARLSTCNT(4) ERR_SETINTRIGONLY, 2, RTS_ERROR_TEXT("$ZTSLATE"));
+			assert(0 < gtm_trigger_depth);
+			memcpy((char *)&dollar_ztslate, v, SIZEOF(mval));
+			dollar_ztvalue->mvtype &= ~MV_ALIASCONT;	/* Make sure to shut off alias container flag on copy */
 			break;
 #			else
 			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);

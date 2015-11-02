@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,7 @@
 #define	GTMCRYPT_PK_REF_H
 
 int 			gc_pk_mask_unmask_passwd(char *in, char *out, int len);
+int 			gc_pk_mask_unmask_passwd_interlude(int nparm, gtm_string_t *in, gtm_string_t *out, int len);
 void 			gc_pk_scrub_passwd();
 void 			gc_pk_crypt_load_gtmci_env();
 xc_status_t 		gc_pk_crypt_prompt_passwd_if_needed(int prompt_passwd);
@@ -23,9 +24,11 @@ int 			gc_pk_crypt_passphrase_callback(void *opaque,
 							int fd);
 int 			gc_pk_crypt_retrieve_plain_text(gpgme_data_t plain_data, char *plain_text);
 gpgme_error_t 		gc_pk_get_decrypted_key(const char *cipher_file, char *plain_text, int *plain_text_length);
-int			gc_pk_gpghome_has_permissions();
-
-
+int			gc_pk_mask_unmask_passwd(char *in, char *out, int len);
+void			gc_pk_scrub_passwd(void);
+void			gc_pk_crypt_load_gtmci_env(void);
+int			gc_pk_scrub_plaintext_keys_from_c_stack(void);
+int			gc_pk_gpghome_has_permissions(void);
 
 /* Public key cryptography related macros */
 #define GC_PK_INIT													\
@@ -91,9 +94,10 @@ int			gc_pk_gpghome_has_permissions();
 	char	in_buff[HASH_INPUT_BUFF_LEN];								\
 													\
 	GC_PK_APPEND_UNIQ_STRING(in_buff, key_string);							\
-	EVP_Digest(in_buff, HASH_INPUT_BUFF_LEN, (hash).address, NULL, EVP_sha512(), NULL);		\
+	EVP_Digest(in_buff, HASH_INPUT_BUFF_LEN, (unsigned char *)((hash).address), NULL, 		\
+			EVP_sha512(), NULL);								\
 	(hash).length = GTMCRYPT_HASH_LEN;								\
-	memset(in_buff, 0, HASH_INPUT_BUFF_LEN);								\
+	memset(in_buff, 0, HASH_INPUT_BUFF_LEN);							\
 }
 #else
 #define GC_PK_COMPUTE_HASH(hash, key_string)								\
@@ -101,9 +105,10 @@ int			gc_pk_gpghome_has_permissions();
 	char	in_buff[HASH_INPUT_BUFF_LEN];								\
 													\
 	GC_PK_APPEND_UNIQ_STRING(in_buff, key_string);							\
+	GC_SYM_INIT;											\
 	gcry_md_hash_buffer(GCRY_MD_SHA512, (hash).address, in_buff, HASH_INPUT_BUFF_LEN); 		\
 	(hash).length = GTMCRYPT_HASH_LEN;								\
-	memset(in_buff, 0, HASH_INPUT_BUFF_LEN);								\
+	memset(in_buff, 0, HASH_INPUT_BUFF_LEN);							\
 }
 #endif
 

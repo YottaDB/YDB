@@ -82,21 +82,27 @@
 #include "gtm_zos_io.h"
 #endif
 #include "db_snapshot.h"
+#include "lockconst.h"	/* for LOCK_AVAILABLE */
 
 #ifndef GTM_SNAPSHOT
 # error "Snapshot facility not supported in this platform"
 #endif
 
-#define SS_INFO_INIT(csa)												\
+#define REQRUNDOWN_TEXT	"semid is invalid but shmid is valid or at least one of sem_ctime or shm_ctime are non-zero"
+
+#define SS_INFO_INIT(CSA)												\
 {															\
 	shm_snapshot_ptr_t	ss_shm_ptr;										\
+	node_local_ptr_t	lcl_cnl;										\
 															\
-	csa->nl->ss_shmid = INVALID_SHMID;										\
-	csa->nl->ss_shmcycle = 0;											\
-	csa->nl->snapshot_in_prog = FALSE;										\
-	csa->nl->num_snapshots_in_effect = 0;										\
+	lcl_cnl = CSA->nl;												\
+	lcl_cnl->ss_shmid = INVALID_SHMID;										\
+	lcl_cnl->ss_shmcycle = 0;											\
+	lcl_cnl->snapshot_in_prog = FALSE;										\
+	lcl_cnl->num_snapshots_in_effect = 0;										\
+	SET_LATCH_GLOBAL(&lcl_cnl->snapshot_crit_latch, LOCK_AVAILABLE);						\
 	assert(1 == MAX_SNAPSHOTS); /* To ensure that we revisit this whenever multiple snapshots is implemented */	\
-	ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(csa));								\
+	ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(CSA));								\
 	SS_DEFAULT_INIT_POOL(ss_shm_ptr);										\
 }
 
@@ -370,7 +376,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		int		init_status;
 		boolean_t	do_crypt_init = FALSE;
 	)
-	int			save_intrpt_ok_state;
+	intrpt_state_t		save_intrpt_ok_state;
 	boolean_t		shm_setup_ok = FALSE;
 	boolean_t		vermismatch = FALSE;
 	boolean_t		vermismatch_already_printed = FALSE;
@@ -470,8 +476,11 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		if (INVALID_SEMID == udi->semid)
 		{
 			if (0 != udi->gt_sem_ctime || INVALID_SHMID != udi->shmid || 0 != udi->gt_shm_ctime)
-			/* We must have somthing wrong in protocol or, code, if this happens */
-				GTMASSERT;
+			{	/* We must have somthing wrong in protocol or, code, if this happens. */
+				assert(FALSE);
+				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
+					ERR_TEXT, 2, LEN_AND_LIT(REQRUNDOWN_TEXT));
+			}
 			/*
 			 * Create new semaphore using IPC_PRIVATE. System guarantees a unique id.
 			 */

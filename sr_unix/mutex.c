@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,10 @@
 #include "heartbeat_timer.h"
 #include "gtmio.h"
 #include "wbox_test_init.h"
+#ifdef DEBUG
+#include "repl_msg.h"			/* needed by gtmsource.h */
+#include "gtmsource.h"			/* required for jnlpool GBLREF */
+#endif
 
 #define QUANT_RETRY			10000
 #define QUEUE_RETRY			255
@@ -63,6 +67,32 @@
 #define MUTEX_MAX_HEARTBEAT_WAIT        2 /* so that total wait for both select and msem wait will be the same */
 #define MUTEX_LCKALERT_PERIOD		8
 #endif
+
+/* The following CAREFUL_* macros invoke the corresponding * macros except in the case csa->hdr is NULL.
+ * This is possible if the csa corresponds to the journal pool where there is no notion of a db hdr.
+ * In that case, we skip invoking the * macros.
+ */
+#define	CAREFUL_SET_TRACEABLE_VAR(CSA, VALUE)					\
+{										\
+	sgmnt_data_ptr_t	lcl_csd;					\
+										\
+	lcl_csd = CSA->hdr;							\
+	assert((NULL != lcl_csd)						\
+		|| (CSA == &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs));	\
+	if (NULL != lcl_csd)							\
+		SET_TRACEABLE_VAR(lcl_csd->wc_blocked, TRUE);			\
+}
+
+#define	CAREFUL_BG_TRACE_PRO_ANY(CSA, EVENT)					\
+{										\
+	sgmnt_data_ptr_t	lcl_csd;					\
+										\
+	lcl_csd = CSA->hdr;							\
+	assert((NULL != lcl_csd)						\
+		|| (CSA == &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs));	\
+	if (NULL != lcl_csd)							\
+		BG_TRACE_PRO_ANY(CSA, EVENT);					\
+}
 
 GBLREF boolean_t		disable_sigcont;
 GBLREF pid_t			process_id;
@@ -82,6 +112,9 @@ GBLREF fd_set			mutex_wait_on_descs;
 #endif
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		mu_rndwn_file_dbjnl_flush;
+#ifdef DEBUG
+GBLREF	jnlpool_addrs		jnlpool;
+#endif
 
 DECLARE_MUTEX_TRACE_CNTRS
 
@@ -542,7 +575,11 @@ static	enum cdb_sc mutex_sleep(sgmnt_addrs *csa, mutex_lock_t mutex_lock_type)
 				} while (quant_retry_counter_insq);
 			} else if ((mutex_que_entry_ptr_t)NULL == free_slot)
 			{
-				BG_TRACE_PRO_ANY(csa, mutex_queue_full);
+				/* Record queue full event in db file header if applicable.
+				 * Take care not to do it for jnlpool which has no concept of a db cache.
+				 * In that case csa->hdr is NULL so use CAREFUL_BG_TRACE_PRO_ANY macro.
+				 */
+				CAREFUL_BG_TRACE_PRO_ANY(csa, mutex_queue_full);
 				MUTEX_DPRINT2("%d: Free Queue full\n", process_id);
 				/* Wait a second, then try again */
 				MICROSEC_SLEEP(ONE_MILLION - 1);
@@ -890,8 +927,11 @@ void mutex_salvage(gd_region *reg)
 		{	/* We were trying to obtain a lock we already held -- very odd */
 			RELEASE_SWAPLOCK(&csa->critical->semaphore);
 			csa->nl->in_crit = 0;
-			/* Mutex crash repaired, want to do write cache recovery, just in case */
-			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);
+			/* Mutex crash repaired, want to do write cache recovery, just in case.
+			 * Take care not to do it for jnlpool which has no concept of a db cache.
+			 * In that case csa->hdr is NULL so use CAREFUL_SET_TRACEABLE_VAR macro.
+			 */
+			CAREFUL_SET_TRACEABLE_VAR(csa, TRUE);
 			mutex_salvaged = TRUE;
 			MUTEX_DPRINT2("%d : mutex salvaged, culprit was our own process\n", process_id);
 		} else if (!is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt)))
@@ -903,8 +943,10 @@ void mutex_salvage(gd_region *reg)
 			/* Mutex crash repaired, want to do write cache recovery, in case previous holder of crit had set
 			 * some cr->in_cw_set to a non-zero value. Not doing cache recovery could cause incorrect
 			 * GTMASSERTs in PIN_CACHE_RECORD macro in t_end/tp_tend.
+			 * Take care not to do it for jnlpool which has no concept of a db cache.
+			 * In that case csa->hdr is NULL so use CAREFUL_SET_TRACEABLE_VAR macro.
 			 */
-			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);
+			CAREFUL_SET_TRACEABLE_VAR(csa, TRUE);
 			COMPSWAP_UNLOCK(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 			mutex_salvaged = TRUE;
 			/* Reset jb->blocked as well if the holder_pid had it set */
@@ -917,9 +959,16 @@ void mutex_salvage(gd_region *reg)
 			 * process forward */
 			continue_proc(holder_pid);
 		}
-		if (mutex_salvaged)
+		/* Record salvage event in db file header if applicable.
+		 * Take care not to do it for jnlpool which has no concept of a db cache.
+		 * In that case csa->hdr is NULL so check accordingly.
+		 */
+		assert((NULL != csa->hdr) || (csa == &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs));
+		if (mutex_salvaged && (NULL != csa->hdr))
 		{
-			BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage);
+			BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage); /* no need to use CAREFUL_BG_TRACE_PRO_ANY macro
+								   * since we already checked for csa->hdr non-NULL.
+								   */
 			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_mutex_salvage"),
 				process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 		}

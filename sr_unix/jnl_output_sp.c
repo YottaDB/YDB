@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,15 +59,11 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	unix_db_info		*udi;
 	unsigned int		status;
 	int			save_errno;
-	uint4			syncio_dskaddr, dskaddr;
-	int4			syncio_dsk, dsk;
-	int			syncio_tsz;
-	sm_uc_ptr_t		syncio_base;
-	int			flags;
-	int			fcntl_res;
-	LINUX_ONLY(boolean_t	direct_io;)
-	unsigned char		jbuff_base[DISK_BLOCK_SIZE + ALIGNMENT_SIZE];
-	unsigned char		*jbuff;
+	uint4			aligned_dskaddr, dskaddr;
+	int4			aligned_dsk, dsk;
+	int			aligned_tsz;
+	sm_uc_ptr_t		aligned_base;
+	uint4			jnl_fs_block_size;
 
 	error_def(ERR_DBFSYNCERR);
 	error_def(ERR_JNLACCESS);
@@ -140,86 +136,54 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	dsk = jb->dsk;
 	dskaddr = jb->dskaddr;
 	was_wrapped = (free_ptr < dsk);
+	jnl_fs_block_size = jb->fs_block_size;
 	if (aligned_write)
-		free_ptr = ROUND_DOWN2(free_ptr, IO_BLOCK_SIZE);
-	assert(!(jb->size % IO_BLOCK_SIZE));
+		free_ptr = ROUND_DOWN2(free_ptr, jnl_fs_block_size);
+	assert(!(jb->size % jnl_fs_block_size));
 	tsz = (free_ptr < dsk ? jb->size : free_ptr) - dsk;
 	if ((aligned_write && !was_wrapped && (free_ptr <= dsk)) || (NOJNL == jpc->channel))
 		tsz = 0;
 	assert(0 <= tsz);
 	assert(dskaddr + tsz <= jb->freeaddr);
-	base = &jb->buff[dsk + jb->buff_off];
 	status = SS_NORMAL;
-	if (jpc->sync_io)
-	{
-		syncio_dsk = ROUND_DOWN2(dsk, DISK_BLOCK_SIZE);
-		LINUX_ONLY(direct_io = TRUE;)
-		if ((0 == jb->end_of_data) && (dsk != syncio_dsk))
-		{	/* The first time jnl_sub_qio_start() is called and is writing to a "new" journal file, the location
-			 * of the data in the journal buffer corresponds to where it will be written on disk, i.e. the data
-			 * is offset from the start of the buffer by the size of the initialized journal file, but there is
-			 * no data in the buffer before that offset (it's where the journal file header and initialization
-			 * records would be which hasn't loaded into the journal buffer).  Thus, we can't back up to the
-			 * aligned, disk block boundary and start writing from there since that would overwrite valid data
-			 * in the journal file with uninitialized data.  Therefore, we first load some data into the buffer
-			 * from the initial journal file.
-			 */
-			jbuff = (unsigned char *)(ROUND_UP2((uintszofptr_t)jbuff_base, DISK_BLOCK_SIZE));
-			syncio_dskaddr = ROUND_DOWN2(dskaddr, DISK_BLOCK_SIZE);
-			syncio_tsz = ROUND_UP2(tsz + (dskaddr - syncio_dskaddr), DISK_BLOCK_SIZE);
-			syncio_base = (sm_uc_ptr_t)ROUND_DOWN2((uintszofptr_t)base, DISK_BLOCK_SIZE);
-			LSEEKREAD(jpc->channel, (off_t)syncio_dskaddr, jbuff, DISK_BLOCK_SIZE, jpc->status);
-			if (SS_NORMAL == jpc->status)
-				memcpy(syncio_base, jbuff, base - syncio_base);
-			else
-			{
-				jb->errcnt++;
-				jnl_send_oper(jpc, ERR_JNLACCESS);
-				assert(FALSE);
-				status = ERR_JNLRDERR;
-				tsz = 0;	/* skip the write below */
-			}
-		} else if ((syncio_dsk <= free_ptr) && (dsk > free_ptr))
-		{	/* If the start of the aligned write (syncio_dsk) backs up to before where the free pointer is after
-			 * a buffer wrap around (dsk > free), then we turn off O_DIRECT (for Linux) and write unaligned.
-			 * Otherwise, we'd overwrite previously written journal file data with buffer data that's different
-			 * (as opposed to overwriting with identical data which is what we normally do).  If this situation
-			 * happens, then either the buffer is quite small or the buffer has almost completely filled since the
-			 * last write.  Either scenario is an indication that something peculiar is happening.  Therefore, we
-			 * don't expect this code to be executed very often (if at all).
-			 */
-			syncio_dskaddr = dskaddr;
-			syncio_tsz = ROUND_UP2(tsz, DISK_BLOCK_SIZE);
-			syncio_base = base;
-			LINUX_ONLY(
-				FCNTL2(jpc->channel, F_GETFL, flags);
-				assert(0 < flags);
-				FCNTL3(jpc->channel, F_SETFL, flags & ~O_DIRECT, fcntl_res);
-				assert(-1 != fcntl_res);
-				direct_io = FALSE;
-			)
-		} else
-		{
-			syncio_dskaddr = ROUND_DOWN2(dskaddr, DISK_BLOCK_SIZE);
-			syncio_tsz = ROUND_UP2(tsz + (dskaddr - syncio_dskaddr), DISK_BLOCK_SIZE);
-			syncio_base = (sm_uc_ptr_t)ROUND_DOWN2((uintszofptr_t)base, DISK_BLOCK_SIZE);
-		}
-	} else
-	{
-		syncio_dskaddr = dskaddr;
-		syncio_tsz = tsz;
-		syncio_base = base;
-	}
 	if (tsz)
 	{	/* ensure that dsk and free are never equal and we have left space for JNL_WRT_START_MASK */
 		assert(SS_NORMAL == status);
-		assert((free_ptr > dsk) || (free_ptr < (dsk & JNL_WRT_START_MASK))
-		       || (dsk != (dsk & JNL_WRT_START_MASK)));
+		assert((free_ptr > dsk) || (free_ptr < (dsk & JNL_WRT_START_MASK(jb)))
+			|| (dsk != (dsk & JNL_WRT_START_MASK(jb))));
 		jb->wrtsize = tsz;
 		jb->qiocnt++;
-		assert((base + tsz) <= (jb->buff + jb->size + OS_PAGE_SIZE));
+		base = &jb->buff[dsk + jb->buff_off];
+		assert((base + tsz) <= (jb->buff + jb->size + jnl_fs_block_size));
 		assert(NOJNL != jpc->channel);
-		LSEEKWRITE(jpc->channel, (off_t)syncio_dskaddr, syncio_base, syncio_tsz, jpc->status);
+		/* If sync_io is turned on, we would have turned on the O_DIRECT flag on some platforms. That will
+		 * require us to do aligned writes. Both the source buffer and the size of the write need to be aligned
+		 * for this to work on some platforms. The alignment needs to be on a filesystem-block-size granularity.
+		 * If sync_io is not turned on, doing aligned writes saves us from the OS doing a read of the block
+		 * under the covers in case we write only a part of the filesystem block.
+		 * Therefore we do aligned writes no matter what. This means we could be writing some garbage padding
+		 * data out after the last valid journal record jut to fit in the alignment requirements. But that is
+		 * considered okay because as part of writing the EOF record out (for a clean termination), jnl_write
+		 * would have 0-padded the journal buffer for us. So a cleanly shutdown journal file will have 0-padding
+		 * following the EOF record but an actively used journal file might have garbage padding following the
+		 * last valid record. This is considered okay as journal recovery has logic to scan past the garbage and
+		 * locate the last valid record in case of a crash before writing the EOF.
+		 */
+		aligned_dsk = ROUND_DOWN2(dsk, jnl_fs_block_size);
+		aligned_dskaddr = ROUND_DOWN2(dskaddr, jnl_fs_block_size);
+		aligned_tsz = ROUND_UP2((tsz + (dskaddr - aligned_dskaddr)), jnl_fs_block_size);
+		aligned_base = (sm_uc_ptr_t)ROUND_DOWN2((uintszofptr_t)base, jnl_fs_block_size);
+		/* Assert that aligned_dsk never backs up to a point BEFORE where the free pointer is */
+		assert((aligned_dsk > free_ptr) || (dsk <= free_ptr));
+		/* Assert that aligned_dskaddr never backs up to a point inside journal file header territory.
+		 * This is because those fields are always updated inside crit and therefore we should
+		 * never touch those while we hold only the jnl qio lock.
+		 */
+		assert(JNL_HDR_LEN <= aligned_dskaddr);
+		/* Assert that both ends of the source buffer for the write falls within journal buffer limits */
+		assert(aligned_base >= &jb->buff[jb->buff_off]);
+		assert(aligned_base + aligned_tsz <= &jb->buff[jb->buff_off + jb->size]);
+		LSEEKWRITE(jpc->channel, (off_t)aligned_dskaddr, aligned_base, aligned_tsz, jpc->status);
 		status = jpc->status;
 		if (SS_NORMAL == status)
 		{	/* update jnl_buff pointers to reflect the successful write to the journal file */
@@ -267,13 +231,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		}
 	}
 	RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-	LINUX_ONLY(
-		if (jpc->sync_io && !direct_io)
-		{
-			FCNTL2(jpc->channel, F_GETFL, flags);
-			FCNTL3(jpc->channel, F_SETFL, flags | O_DIRECT, fcntl_res);
-		}
-	)
 	if ((jnl_closed == csa->hdr->jnl_state) && (NOJNL != jpc->channel))
 	{
 		JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
@@ -286,7 +243,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 
 /* This is a wrapper for jnl_sub_qio_start that tries to divide the writes into optimal chunks.
  * It calls jnl_sub_qio_start() with appropriate arguments in two stages, the first one with
- * optimal IO_BLOCK_SIZE boundary and the other suboptimal tail end of the write. The latter
+ * optimal "jnl_fs_block_size" boundary and the other suboptimal tail end of the write. The latter
  * call is made only if no other process has finished the jnl write upto the required point
  * during the time this process yields */
 
@@ -297,13 +254,14 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	jnl_buffer_ptr_t	jb;
 	sgmnt_addrs		*csa;
 	unix_db_info		*udi;
+	uint4			jnl_fs_block_size;
 
 	assert(NULL != jpc);
 	udi = FILE_INFO(jpc->region);
 	csa = &udi->s_addrs;
 	jb = jpc->jnl_buff;
 
-	/* this block of code (till yield()) processes the buffer upto an IO_BLOCK_SIZE alignment boundary
+	/* this block of code (till yield()) processes the buffer upto an "jnl_fs_block_size" alignment boundary
 	 * and the next block of code (after the yield()) processes the tail end of the data (if necessary) */
 
 	lcl_dskaddr = jb->dskaddr;
@@ -311,8 +269,9 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	if (lcl_dskaddr >= target_freeaddr)
 		return SS_NORMAL;
 
-	/* ROUND_DOWN2 macro is used under the assumption that IO_BLOCK_SIZE would be a power of 2 */
-	if (ROUND_DOWN2(lcl_dskaddr, IO_BLOCK_SIZE) != ROUND_DOWN2(target_freeaddr, IO_BLOCK_SIZE))
+	/* ROUND_DOWN2 macro is used under the assumption that "jnl_fs_block_size" would be a power of 2 */
+	jnl_fs_block_size = jb->fs_block_size;
+	if (ROUND_DOWN2(lcl_dskaddr, jnl_fs_block_size) != ROUND_DOWN2(target_freeaddr, jnl_fs_block_size))
 	{	/* data crosses/touches an alignment boundary */
 		if (SS_NORMAL != (status = jnl_sub_qio_start(jpc, TRUE)))
 			return status;

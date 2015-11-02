@@ -64,8 +64,8 @@ error_def(ERR_TPFAIL);
 error_def(ERR_TPRESTART);
 error_def(ERR_TRESTNOT);
 error_def(ERR_TRESTLOC);
+error_def(ERR_TPRETRY);
 UNIX_ONLY(error_def(ERR_GVFAILCORE);)
-GTMTRIG_ONLY(error_def(ERR_TPRETRY);)
 
 #define	MAX_TRESTARTS		16
 #define	FAIL_HIST_ARRAY_SIZE	32
@@ -83,30 +83,31 @@ GBLDEF	int4		n_pvtmods, n_blkmods;
 GBLDEF	gv_namehead	*tp_fail_hist[CDB_MAX_TRIES];
 GBLDEF	block_id	t_fail_hist_blk[CDB_MAX_TRIES];
 GBLDEF	gd_region	*tp_fail_hist_reg[CDB_MAX_TRIES];
-GBLREF	symval		*curr_symval;
 
-GBLREF	short		dollar_tlevel, dollar_trestart;
-GBLREF	int		dollar_truth;
-GBLREF	mval		dollar_zgbldir;
-GBLREF	gd_addr		*gd_header;
-GBLREF	gv_key		*gv_currkey;
-GBLREF	gv_namehead	*gv_target;
-GBLREF	stack_frame	*frame_pointer;
-GBLREF	tp_frame	*tp_pointer;
-GBLREF	sgm_info	*sgm_info_ptr;
-GBLREF	tp_region	*tp_reg_list;		/* Chained list of regions used in this transaction not cleared on tp_restart */
-GBLREF	mv_stent	*mv_chain;
-GBLREF	unsigned char	*msp, *stackbase, *stacktop, t_fail_hist[CDB_MAX_TRIES];
-GBLREF	sgm_info	*first_sgm_info;
-GBLREF	unsigned int	t_tries;
-GBLREF	int		process_id;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	jnlpool_addrs	jnlpool;
-GBLREF	bool		caller_id_flag;
-GBLREF	unsigned char	*tpstackbase, *tpstacktop;
-GBLREF	trans_num	local_tn;	/* transaction number for THIS PROCESS */
-GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	short			dollar_tlevel, dollar_trestart;
+GBLREF	int			dollar_truth;
+GBLREF	mval			dollar_zgbldir;
+GBLREF	gd_addr			*gd_header;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	tp_frame		*tp_pointer;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transaction not cleared on tp_restart */
+GBLREF	mv_stent		*mv_chain;
+GBLREF	unsigned char		*msp, *stackbase, *stacktop, t_fail_hist[CDB_MAX_TRIES];
+GBLREF	sgm_info		*first_sgm_info;
+GBLREF	unsigned int		t_tries;
+GBLREF	int			process_id;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	bool			caller_id_flag;
+GBLREF	unsigned char		*tpstackbase, *tpstacktop;
+GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	symval			*curr_symval;
+GBLREF	boolean_t		hold_onto_locks;
 #ifdef VMS
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t	tp_restart_fail_sig_used;
@@ -117,6 +118,8 @@ GBLREF	boolean_t	ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose
 #ifdef GTM_TRIGGER
 GBLREF	int		tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
 GBLREF	mval		dollar_ztwormhole;	/* Previous value (mval) restored on restart */
+GBLREF	mval		dollar_ztslate;
+LITREF	mval		literal_null;
 #endif
 
 STATICDEF mval 		bangHere;	/* Mval created early in tprestart processing needs to survive across tp_restart states */
@@ -141,11 +144,11 @@ CONDITION_HANDLER(tp_restart_ch)
 	UNWIND(NULL, NULL);
 }
 
-/* Note that adding a new rts_error in tp_restart() might need a change to the INVOKE_RESTART macro in tp.h and
+/* Note that adding a new rts_error in "tp_restart" might need a change to the INVOKE_RESTART macro in tp.h and
  * TPRESTART_ARG_CNT in errorsp.h (sl_vvms). See comment in tp.h for INVOKE_RESTART macro for the details.
  */
 
-int tp_restart(int newlevel)
+int tp_restart(int newlevel, boolean_t handle_errors_internally)
 {
 	unsigned char		*cp;
 	short			top;
@@ -158,7 +161,7 @@ int tp_restart(int newlevel)
 	int4			num_closed = 0;
 	boolean_t		tp_tend_status;
 	mstr			gvname_mstr, reg_mstr;
-	gd_region		*restart_reg;
+	gd_region		*restart_reg, *reg;
 	int			tprestart_rc;
 #	ifdef DEBUG
 	static int4		uncounted_restarts;	/* do not count some failure codes towards MAX_TRESTARTS */
@@ -167,7 +170,29 @@ int tp_restart(int newlevel)
 #	endif
 
 	tprestart_rc = 0;
-	ESTABLISH_RET(tp_restart_ch, tprestart_rc);
+	/* Some callers of "tp_restart" want this function to return with an error code instead of issue an rts_error
+	 * if there is an error inside tp_restart. The SIGNAL macro is supposed to reflect the error code in that
+	 * case and the caller handles this error code accordingly after tp_restart returns.  For those callers,
+	 * establish the "tp_restart_ch" condition handler to catch all errors. For the remaining callers, any errors
+	 * inside tp_restart will invoke whatever parent condition handler is active at that point.
+	 *
+	 * The reason why a few callers prefer this inside-tprestart error handling is because they are already a
+	 * condition/error handler (e.g. mdb_condition_handler) when they invoke tp_restart and do not want another
+	 * rts_error to happen inside tp_restart and trigger any other condition/error handlers that can alter the
+	 * flow of control elsewhere until this condition handler returns.
+	 */
+	if (handle_errors_internally)
+	{	/* Currently, the only callers of tp_restart with handle_errors_internally set to TRUE are
+		 * "mdb_condition_handler", "updproc.c" and "mupip_recover.c". All of those have SIGNAL set
+		 * to ERR_TPRETRY so assert that. This is one way of protecting against a new caller of tp_restart
+		 * inadvertently using a TRUE value for "handle_errors_internally". One reason for being paranoid
+		 * about the TRUE usage is for example in gv_trigger.c, if tp_restart is incorrectly invoked with
+		 * TRUE as the second paramter, it will result in indefinite number of cores on a broken database.
+		 * In VMS, SIGNAL can be used only if we are inside a condition handler so do the assert only in Unix.
+		 */
+		UNIX_ONLY(assert(ERR_TPRETRY == SIGNAL);)
+		ESTABLISH_RET(tp_restart_ch, tprestart_rc);
+	}
 	assert(1 == newlevel);
 	if (0 == dollar_tlevel)
 	{
@@ -187,9 +212,10 @@ int tp_restart(int newlevel)
 		/* Increment restart counts for each region in this transaction */
 		for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 		{
-			if (tr->reg->open)
+			reg = tr->reg;
+			if (reg->open)
 			{
-				csa = &FILE_INFO(tr->reg)->s_addrs;
+				csa = &FILE_INFO(reg)->s_addrs;
 				switch (dollar_trestart)
 				{
 					case 0:
@@ -284,6 +310,7 @@ int tp_restart(int newlevel)
 							 * gets called if needed. This is because we saw wc_blocked to be TRUE in
 							 * tp_tend and decided to restart.
 							 */
+							assert(!csa->hold_onto_crit);
 							grab_crit(sgm_info_ptr->gv_cur_region);
 							rel_crit(sgm_info_ptr->gv_cur_region);
 						} else
@@ -309,7 +336,6 @@ int tp_restart(int newlevel)
 				case cdb_sc_future_read:
 					t_tries = CDB_STAGNATE;		/* go straight to crit, pay $200 and do not pass go */
 					/* WARNING - fallthrough !!! */
-				case cdb_sc_unfreeze_getcrit:
 				case cdb_sc_needcrit:
 					/* Here when a final (4th) attempt has failed with a need for crit in some routine. The
 					 * assumption is that the previous attempt failed somewhere before transaction end
@@ -323,16 +349,24 @@ int tp_restart(int newlevel)
 					{	/* regions might not have been opened if we t_retried in gvcst_init(). dont
 						 * rel_crit in that case.
 						 */
-						if (tr->reg->open)
-							rel_crit(tr->reg);  /* to ensure deadlock safe order, release all regions
-									     * before retry
-									     */
+						reg = tr->reg;
+						if (reg->open)
+						{
+							DEBUG_ONLY(csa = &FILE_INFO(reg)->s_addrs;)
+							assert(!csa->hold_onto_crit);
+							rel_crit(reg);  /* to ensure deadlock safe order, release all regions
+									 * before retry
+									 */
+						}
 					}
 					if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
 					{
 						csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
 						if (csa->now_crit)
+						{
+							assert(!csa->hold_onto_crit);
 							rel_lock(jnlpool.jnlpool_dummy_reg);
+						}
 					}
 					wcs_backoff(dollar_trestart * TP_DEADLOCK_FACTOR); /* Sleep so needed locks have a chance
 											    *  to get released
@@ -340,9 +374,11 @@ int tp_restart(int newlevel)
 					break;
 				case cdb_sc_jnlclose:
 				case cdb_sc_jnlstatemod:
-				case cdb_sc_bkupss_statemod:
-					t_tries--;
-					DEBUG_ONLY(uncounted_restarts++);
+					if (CDB_STAGNATE <= t_tries)
+					{
+						t_tries--;
+						DEBUG_ONLY(uncounted_restarts++);
+					}
 					/* fall through */
 				default:
 					if (CDB_STAGNATE < ++t_tries)
@@ -380,19 +416,24 @@ int tp_restart(int newlevel)
 			}
 			if ((CDB_STAGNATE <= t_tries))
 			{	/* If there are any regions that haven't yet been opened, open them before attempting for crit on
-				 * all. This is safe to do now since we don't hold any crit locks now so we can't create a
-				 * deadlock.
+				 * all. Since we don't hold any crit locks now, we can rest assured this cannot cause a deadlock.
+				 * The only exception (to holding crit) currently is mupip journal rollback/recovery if online when
+				 * we will be holding crit on all regions but in that case we should have opened all necessary
+				 * regions at process startup (and set "hold_onto_locks" to TRUE) so we should not be here at all.
+				 * Assert this.
 				 */
+				assert(!hold_onto_locks);
 				if (num_closed)
 				{
 					for (tr = tp_reg_list;  NULL != tr;  tr = tr->fPtr)
 					{	/* to open region use gv_init_reg() instead of gvcst_init() since that does extra
 						 * manipulations with gv_keysize, gv_currkey and gv_altkey.
 						 */
-						if (!tr->reg->open)
+						reg = tr->reg;
+						if (!reg->open)
 						{
-							gv_init_reg(tr->reg);
-							assert(tr->reg->open);
+							gv_init_reg(reg);
+							assert(reg->open);
 						}
 					}
 					DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
@@ -404,9 +445,10 @@ int tp_restart(int newlevel)
 				/* pick up all MM extension information */
 				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 				{
-					if (dba_mm == tr->reg->dyn.addr->acc_meth)
+					reg = tr->reg;
+					if (dba_mm == reg->dyn.addr->acc_meth)
 					{
-						TP_CHANGE_REG_IF_NEEDED(tr->reg);
+						TP_CHANGE_REG_IF_NEEDED(reg);
 						MM_DBFILEXT_REMAP_IF_NEEDED(cs_addrs, gv_cur_region);
 					}
 				}
@@ -501,6 +543,8 @@ int tp_restart(int newlevel)
 #	ifdef GTM_TRIGGER
 	/* Revert $ZTWormhole to its previous value */
 	memcpy(&dollar_ztwormhole, &mvc->mv_st_cont.mvs_tp_holder.ztwormhole_save, SIZEOF(mval));
+	if (1 == newlevel)
+		memcpy(&dollar_ztslate, &literal_null, SIZEOF(mval));	/* Zap $ZTSLate at (re)start of lvl 1 transaction */
 #	endif
 	assert(curr_symval == tf->sym);
 	if (frame_pointer->flags & SFF_UNW_SYMVAL)
@@ -551,7 +595,8 @@ int tp_restart(int newlevel)
 		dollar_trestart--;
 	dollar_truth = tp_pointer->dlr_t;
 	dollar_zgbldir = tp_pointer->zgbldir;
-	REVERT;
+	if (handle_errors_internally)
+		REVERT;
 	GTMTRIG_ONLY(tprestart_state = TPRESTART_STATE_NORMAL);
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: completed\n"));)
 	return 0;

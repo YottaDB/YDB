@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,7 +96,7 @@ void t_write_map (
 	 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV5 (or GDSVCURR) to this field.
 	 */
 	assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-	cs->ondsk_blkver = (NULL == cr) ? (enum db_ver)GDSVCURR : cr->ondsk_blkver;
+	cs->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
 	cs->ins_off = 0;
 	cs->index = 0;
 	assert(reference_cnt < csa->hdr->bplmap);	/* Cannot allocate more blocks than a bitmap holds */

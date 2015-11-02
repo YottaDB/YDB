@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,10 +17,12 @@
 #include "gtm_netdb.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
+#include "iotcp_select.h"
 
 #include "cmidef.h"
 #include "gtmio.h"
 #include "eintr_wrappers.h"
+#include "outofband.h"
 
 #include "relqop.h"
 
@@ -41,6 +43,9 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	struct protoent *p;
 	sigset_t oset;
 	int new_fd, rc, save_errno;
+	int			sockerror;
+	GTM_SOCKLEN_TYPE	sockerrorlen;
+	fd_set			writefds;
 
 	if (!ntd_root)
 	{
@@ -73,9 +78,36 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	if (FD_INVALID == new_fd)
 		return errno;
 
-	while ((-1 == (rval = connect(new_fd, (struct sockaddr *)&in, SIZEOF(in)))) && EINTR ==errno && 0 == outofband)
-		;
-	if (-1 == rval)
+	rval = connect(new_fd, (struct sockaddr *)&in, SIZEOF(in));
+	if ((-1 == rval) && ((EINTR == errno) || (EINPROGRESS == errno)
+#if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
+            || (EWOULDBLOCK == errno)
+#endif
+		))
+	{	/* connection attempt will continue so wait for completion */
+		do
+		{
+			if ((EINTR == errno) && outofband && (jobinterrupt != outofband))
+				break;		/* abort unless job interrupt */
+			FD_ZERO(&writefds);
+			FD_SET(new_fd, &writefds);
+			rval = select(new_fd + 1, NULL, &writefds, NULL, NULL);
+			if (-1 == rval && EINTR == errno)
+				continue;
+			if (0 < rval)
+			{	/* check for socket error */
+				sockerrorlen = SIZEOF(sockerror);
+				rval = getsockopt(new_fd, SOL_SOCKET, SO_ERROR, &sockerror, &sockerrorlen);
+				if (0 == rval && 0 != sockerror)
+				{	/* return socket error */
+					rval = -1;
+					errno = sockerror;
+				}
+			}
+			break;
+		} while (TRUE);
+	}
+	if (-1 == rval && EISCONN != errno)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */

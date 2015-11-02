@@ -404,6 +404,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			}
 			if (0 != save_errno)
 			{
+				if (!is_mm)	/* before releasing update lock, clear epid as well in case of bg */
+					csr->epid = 0;
 				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
 				REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail4);
 				/* note: this will be automatically retried after csd->flush_time[0] msec, if this was called

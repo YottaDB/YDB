@@ -48,7 +48,16 @@ typedef struct tp_frame_struct
 	unsigned int			implicit_tstart : 1;	/* TRUE if op_tstart was invoked by gvcst_put/gvcst_kill as part of
 								 * trigger processing. Field is inherited across nested op_tstarts
 								 */
-	unsigned int			filler : 26;
+	unsigned int			cannot_commit : 1;	/* TRUE if at least one explicit (i.e. triggering) update in this
+								 * transaction ended up dropping back through the trigger boundary
+								 * with an unhandled error. In this case, we might have a bunch of
+								 * partly completed database work that, if committed, would break
+								 * the atomicity of triggers (an update and its triggers should go
+								 * either all together or none). It is ok to rollback such partial
+								 * transactions. Only commit is disallowed. This field is currently
+								 * maintained only on trigger supported platforms.
+								 */
+	unsigned int			filler : 25;
 	unsigned char 			*restart_pc;
 	struct stack_frame_struct	*fp;
 	struct mv_stent_struct		*mvc;

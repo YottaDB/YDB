@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,12 +49,11 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 
 	error_def(ERR_SSPREMATEOF);
 	error_def(ERR_SSFILOPERR);
-	error_def(ERR_SSTMPFILOPEN);
 	OPENFILE(filename, O_RDONLY, shdw_fd);
 	if (FD_INVALID == shdw_fd)
 	{
 		status = errno;
-		gtm_putmsg(VARLSTCNT(5) ERR_SSTMPFILOPEN, 2, flen, filename, status);
+		gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"), flen, filename, status);
 	}
 	LSEEKREAD(shdw_fd, 0, ((sm_uc_ptr_t)&ss_filhdr), SNAPSHOT_HDR_SIZE, status);
 	if (0 != status)

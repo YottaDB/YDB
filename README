@@ -57,7 +57,12 @@ To build a production version GT.M for linux do the following steps:
    $ setenv OBJECT_MODE 32
 
    - Specify which ICU version is installed.
-   $ setenv gtm_icu_version `icu-config --version`
+   ICU version needs to be of the form #.#  If the result of running
+   "icu-config --version" has the form #.#.#, just use the first two
+   parts.  For example, if "icu-config --version" returns 3.8.1, use
+   3.8 in the  "setenv" step. 
+   $ icu-config --version
+   $ setenv gtm_icu_version <result of previous step>
 
    - Define 'gtm_version_change' and execute gtm_env.csh
    $ setenv gtm_version_change 1

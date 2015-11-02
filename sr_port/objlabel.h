@@ -33,12 +33,12 @@
  * Note that OBJ_UNIX_LABEL and OBJ_PLATFORM_LABEL should not exceed 255.
  */
 
-#define OBJ_UNIX_LABEL	18
+#define OBJ_UNIX_LABEL	19	/* When changed, be sure to zero the platform specific numbers below (if any non-0) */
 
 #if defined(__osf__)
-#	define	OBJ_PLATFORM_LABEL	0
+#	define	OBJ_PLATFORM_LABEL	0		/* Alpha/Tru64 */
 #elif defined(_AIX)
-#	define	OBJ_PLATFORM_LABEL	0
+#	define	OBJ_PLATFORM_LABEL	0		/* AIX/pSeries */
 #elif defined(__linux__) && defined(Linux390)
 #	define	OBJ_PLATFORM_LABEL	0		/* s390 Linux */
 #elif defined(__linux__) && defined(__ia64)
@@ -48,17 +48,17 @@
 #elif defined(__linux__) && defined(__x86_64)
 #       define  OBJ_PLATFORM_LABEL      0               /* x86_64 Linux */
 #elif defined(__MVS__)
-#	define	OBJ_PLATFORM_LABEL	0		/* os390 */
+#	define	OBJ_PLATFORM_LABEL	0		/* OS390 aka z/OS */
 #elif defined(__hpux) && defined(__ia64)
 #	define	OBJ_PLATFORM_LABEL	0		/* Itanium HP-UX */
 #elif defined(__hpux) && defined(__hppa)
 #	define	OBJ_PLATFORM_LABEL	0		/* HPPA HP-UX */
 #elif defined(SUNOS)
-#	define	OBJ_PLATFORM_LABEL	0
+#	define	OBJ_PLATFORM_LABEL	0		/* Solaris/Sparc */
 #elif defined(__CYGWIN__)
 #	define OBJ_PLATFORM_LABEL	0		/* CYGWIN on Windows i386 */
 #elif defined(VMS)
-#	define OBJ_PLATFORM_LABEL	0
+#	define OBJ_PLATFORM_LABEL	0		/* Alpha/VMS */
 #else
 #error UNSUPPORTED PLATFORM
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ void dse_save(void)
 	block_id	blk;
 	unsigned	i, j, util_len;
 	unsigned short	buff_len;
-	bool		was_block, was_crit;
+	boolean_t	was_block, was_crit;
 	char		buff[100], *ptr, util_buff[MAX_UTIL_LEN];
 	sm_uc_ptr_t	bp;
 	int4		dummy_int, nocrit_present;
@@ -129,25 +129,11 @@ void dse_save(void)
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = TRUE;
-		else
-			grab_crit(gv_cur_region);
-	}
-
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(bp = t_qread(blk, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	memcpy(patch_save_set[patch_save_count].bp, bp, cs_addrs->hdr->blk_size);
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = FALSE;
-		else
-			rel_crit(gv_cur_region);
-	}
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	buff_len = SIZEOF(buff);
 	if ((cli_present("COMMENT") == CLI_PRESENT) && cli_get_str("COMMENT", buff, &buff_len))
 	{

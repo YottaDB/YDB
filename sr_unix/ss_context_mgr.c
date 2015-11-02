@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,6 +58,7 @@
 #endif
 #include "shmpool.h"
 #include "db_snapshot.h"
+#include "do_shmat.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	enum gtmImageTypes	image_type;
@@ -72,7 +73,7 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 	void				*ss_shmaddr;
 	ZOS_ONLY(int			realfiletag;)
 
-	error_def(ERR_SSTMPFILOPEN);
+	error_def(ERR_SYSCALL);
 	ZOS_ONLY(error_def(ERR_BADTAG);)
 	ZOS_ONLY(error_def(ERR_TEXT);)
 
@@ -80,8 +81,7 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 	csa = cs_addrs;
 	cnl = csa->nl;
 
-	/* We want to create a new context, so relinquish the existing one */
-	ss_destroy_context(lcl_ss_ctx);
+	ss_destroy_context(lcl_ss_ctx); /* Before creating a new one relinquish the existing one */
 	lcl_ss_ctx->ss_shmcycle = ss_shmcycle;
 	/* SS_MULTI: In case of multiple snapshots, we can't assume that the first index of the snapshot structure in the db
 	 * shared memory is the currently active snapshot.
@@ -93,69 +93,82 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 	 * values of the other members in the snapshot structure (copied below).
 	 */
 	SHM_READ_MEMORY_BARRIER;
-	lcl_ss_ctx->ss_shmid = cnl->ss_shmid;
 	STRCPY(lcl_ss_ctx->shadow_file, ss_shm_ptr->ss_info.shadow_file);
 	lcl_ss_ctx->total_blks = ss_shm_ptr->ss_info.total_blks;
 	lcl_ss_ctx->shadow_vbn = ss_shm_ptr->ss_info.shadow_vbn;
 	lcl_ss_ctx->ss_shm_ptr = ss_shm_ptr;
-	/* Attach to the shared storage created by the recent snapshot */
-	if (-1 != lcl_ss_ctx->ss_shmid)
+	lcl_ss_ctx->nl_shmid = cnl->ss_shmid;
+	/* Attach to the shared memory created by snapshot */
+	if (INVALID_SHMID != lcl_ss_ctx->nl_shmid)
 	{
-		ss_shmaddr = ss_attach_shmseg(0, &lcl_ss_ctx->ss_shmid, &status, FALSE);
-		if (0 != status)
+		if (-1 == (sm_long_t)(ss_shmaddr = do_shmat(lcl_ss_ctx->nl_shmid, 0, 0)))
 		{
+			status = errno;
 			/* It's possible that by the time we attach to the shared memory, the identifier has been removed from the
 			 * system by INTEG which completed it's processing.
 			 */
 			assert((EIDRM == status) || (EINVAL == status));
-			/* Since we never attached to the shared memory, reset the private copy of shmid */
-			lcl_ss_ctx->ss_shmid = INVALID_SHMID;
+			assert(INVALID_SHMID == lcl_ss_ctx->attach_shmid);
+			lcl_ss_ctx->cur_state = SNAPSHOT_SHM_ATTACH_FAIL;
+			lcl_ss_ctx->failure_errno = status;
 			return FALSE;
 		}
+		lcl_ss_ctx->attach_shmid = lcl_ss_ctx->nl_shmid;
 		lcl_ss_ctx->start_shmaddr = (sm_uc_ptr_t)ss_shmaddr;
 		lcl_ss_ctx->bitmap_addr = ((sm_uc_ptr_t)ss_shmaddr + SNAPSHOT_HDR_SIZE);
 	} else
-	{	/* Snapshots were released after we entered this function. Do early return */
+	{	/* No ongoing snapshots. Do early return. t_end and tp_tend during validation will identify this change in state
+		 * and will turn off snapshot activities
+		 */
 		lcl_ss_ctx->start_shmaddr = NULL;
 		lcl_ss_ctx->bitmap_addr = NULL;
+		lcl_ss_ctx->cur_state = SNAPSHOT_NOT_INITED;
 		return FALSE;
 	}
 	OPENFILE(lcl_ss_ctx->shadow_file, O_RDWR, shdw_fd);
 	lcl_ss_ctx->shdw_fd = shdw_fd;
 	if (FD_INVALID == shdw_fd)
 	{
-		if (csa->now_crit)
+		assert((NULL != ss_shmaddr)
+			&& (-1 != lcl_ss_ctx->attach_shmid)); /* shared memory attach SHOULD have succeeded */
+		if (-1 == SHMDT(ss_shmaddr))
 		{
 			status = errno;
-			ss_shm_ptr->failed_pid = process_id;
-			ss_shm_ptr->failure_errno = status;
-			send_msg(VARLSTCNT(5) ERR_SSTMPFILOPEN, 2, LEN_AND_STR(ss_shm_ptr->ss_info.shadow_file), status);
+			assert(FALSE);
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
 		}
+		lcl_ss_ctx->attach_shmid = lcl_ss_ctx->nl_shmid = INVALID_SHMID; /* reset shmid since we failed */
+		lcl_ss_ctx->cur_state = SHADOW_FIL_OPEN_FAIL;
+		lcl_ss_ctx->failure_errno = errno;
 		return FALSE;
 	}
 #	ifdef __MVS__
 	if (-1 == gtm_zos_tag_to_policy(shdw_fd, TAG_BINARY, &realfiletag))
 		TAG_POLICY_SEND_MSG(ss_shm_ptr->ss_info.shadow_file, errno, realfiletag, TAG_BINARY);
 #	endif
+	lcl_ss_ctx->cur_state = SNAPSHOT_INIT_DONE;
 	return TRUE;
 }
 
 boolean_t	ss_destroy_context(snapshot_context_ptr_t lcl_ss_ctx)
 {
 	int				status;
-	long				ss_shmid;
-	DEBUG_ONLY(struct shmid_ds	ss_shmstat;)
+
+	error_def(ERR_SYSCALL);
 
 	assert(NULL != lcl_ss_ctx);
-	ss_shmid = lcl_ss_ctx->ss_shmid;
 	if (FD_INVALID != lcl_ss_ctx->shdw_fd)
 	{
 		CLOSEFILE_RESET(lcl_ss_ctx->shdw_fd, status);
 	}
-	if (INVALID_SHMID != ss_shmid)
+	if (INVALID_SHMID != lcl_ss_ctx->attach_shmid)
 	{
-		status = ss_detach_shmseg((void *)(lcl_ss_ctx->start_shmaddr), ss_shmid, FALSE, FALSE);
-		assert(0 == status);
+		if (0 != SHMDT((void *)(lcl_ss_ctx->start_shmaddr)))
+		{
+			status = errno;
+			assert(FALSE);
+			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), CALLFROM, status);
+		}
 	}
 	/* Invalidate the context */
 	DEFAULT_INIT_SS_CTX(lcl_ss_ctx);

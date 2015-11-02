@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -473,7 +473,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	/* For a pro build, this var wasn't set so the assert makes no sense so bypass it */
 	assert(gtmdbglvl_inited);
 #endif
-#if defined(__linux__) && (defined(__ia64) || defined(__x86_64__))
+#if defined(__linux__) && !defined(__i386)
         /* This will make sure that all the memory allocated using 'malloc' will be in heap and no 'mmap' is used.
          * This is needed to make sure that the offset calculation that we do at places(que_ent, chache_que, etc..)
          * using 2 'malloc'ed memory can be hold in an integer. Though this will work without any problem as the

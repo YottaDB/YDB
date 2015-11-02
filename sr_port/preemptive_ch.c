@@ -30,6 +30,9 @@
 #include "interlock.h"
 #include "preemptive_ch.h"
 #include "add_inter.h"
+#include "gtmimagename.h"
+#include "t_abort.h"
+#include "dpgbldir.h"
 
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	gv_namehead		*gv_target;
@@ -45,6 +48,8 @@ void preemptive_ch(int preemptive_severe)
 {
 	sgmnt_addrs	*csa;
 	sgm_info	*si;
+	gd_region	*r_top, *reg;
+	gd_addr		*addr_ptr;
 
 	if (INVALID_GV_TARGET != reset_gv_target)
 	{
@@ -82,4 +87,24 @@ void preemptive_ch(int preemptive_severe)
 		}
 	} else if (NULL != kip_csa && (NULL != kip_csa->hdr) && (NULL != kip_csa->nl))
 		DECR_KIP(kip_csa->hdr, kip_csa, kip_csa);
+	if (IS_DSE_IMAGE)
+	{	/* Release crit on any region that was obtained for the current erroring DSE operation.
+		 * Take care NOT to release crits obtained by a previous CRIT -SEIZE command.
+		 */
+		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
+		{
+			for (reg = addr_ptr->regions, r_top = reg + addr_ptr->n_regions; reg < r_top; reg++)
+			{
+				if (reg->open && !reg->was_open)
+				{
+					csa = &FILE_INFO(reg)->s_addrs;
+					if (csa->now_crit && !csa->hold_onto_crit)
+					{
+						rel_crit(reg);
+						t_abort(reg, csa);	/* cancel mini-transaction if any in progress */
+					}
+				}
+			}
+		}
+	}
 }

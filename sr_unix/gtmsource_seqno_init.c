@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 void gtmsource_seqno_init(void)
 {
 	gd_region		*region_top, *reg;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa, *repl_csa;
 	sgmnt_data_ptr_t	csd;
 	seq_num			db_seqno, replinst_seqno, zqgblmod_seqno, max_dualsite_resync_seqno;
 	sm_uc_ptr_t		gld_fn;
@@ -94,6 +94,8 @@ void gtmsource_seqno_init(void)
 	 * server command is still waiting with the ftok lock for the pool to be initialized by this child). Even then it
 	 * does not hurt to get the lock on the journal pool before updating fields in there.
 	 */
+	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 	grab_lock(jnlpool.jnlpool_dummy_reg);
 	jnlpool_ctl->start_jnl_seqno = db_seqno;
 	jnlpool_ctl->jnl_seqno = db_seqno;

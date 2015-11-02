@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,7 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 	mstr			dnode;
 	show_reply		srep;
 	uint4			status;
+	boolean_t		was_crit;
 
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, creq->rnum)->reghead->reg;
 	if (dba_bg == cur_region->dyn.addr->acc_meth || dba_mm == cur_region->dyn.addr->acc_meth)
@@ -60,12 +61,15 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 		dnode.addr = creq->node;
 		if (cs_adr->critical != NULL)
 			crash_count = cs_adr->critical->crashcnt;
-		grab_crit(cur_region);
+		was_crit = cs_adr->now_crit;
+		if (!was_crit)
+			grab_crit(cur_region);
 		if (lke_ctl->blkroot != 0)
 			/* Remote lock clears are not supported, so LKE CLEAR -EXACT qualifier will not be supported on GT.CM.*/
 			lke_cleartree(cur_region, lnk, lke_ctl, (mlk_shrblk_ptr_t)R2A(lke_ctl->blkroot), creq->all,
 				      creq->interactive, creq->pid, dnode, FALSE);
-		rel_crit(cur_region);
+		if (!was_crit)
+			rel_crit(cur_region);
 	}
 	srep.code = CMMS_U_LKEDELETE;
 	lnk->cbl = SIZEOF(srep.code);

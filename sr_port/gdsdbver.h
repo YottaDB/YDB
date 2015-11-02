@@ -39,7 +39,7 @@ enum db_ver
 	GDSV5,
 	GDSVLAST
 };
-#define GDSVCURR (GDSVLAST - 1)
+#define GDSVCURR ((enum db_ver)(GDSVLAST - 1))
 
 /* Database minor version as an enum quantity. This is an ever increasing number that may skip actual
    releases as it is only added to when a file-header field is added or changed or if there is a
@@ -59,6 +59,6 @@ enum mdb_ver
 	GDSMV54000,	/* New fields(db_trigger_cycle) for triggers */
 	GDSMVLAST
 };
-#define GDSMVCURR (GDSMVLAST - 1)
+#define GDSMVCURR ((enum mdb_ver)(GDSMVLAST - 1))
 
 #endif

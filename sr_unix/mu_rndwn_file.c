@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@
 #include "db_snapshot.h"
 #include "shmpool.h"	/* Needed for the shmpool structures */
 #include "is_proc_alive.h"
+#include "ss_lock_facility.h"
 
 #ifndef GTM_SNAPSHOT
 # error "Snapshot facility not available in this platform"
@@ -193,7 +194,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	struct semid_ds		semstat;
 	union semun		semarg;
 	int			semop_res, stat_res;
-	uint4			status_msg;
+	uint4			status_msg, ss_pid;
 	gd_id			tmp_dbfid;
 	int			rc;
 	GTMCRYPT_ONLY(
@@ -632,9 +633,9 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			/* cleanup mutex stuff */
 			cs_addrs->hdr->image_count = 0;
 			gtm_mutex_init(reg, NUM_CRIT_ENTRY, FALSE); /* it is ensured, this is the only process running */
+			assert(!cs_addrs->hold_onto_crit); /* so it is safe to do unconditional grab_crit/rel_crit below */
 			cs_addrs->nl->in_crit = 0;
-			cs_addrs->now_crit = cs_addrs->read_lock = FALSE;
-
+			cs_addrs->now_crit = FALSE;
 			reg->open = TRUE;
 			if (rc_cpt_removed)
 				csd->rc_srv_cnt = csd->dsid = csd->rc_node = 0;   /* reset RC values if we've rundown the RC CPT */
@@ -645,11 +646,12 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			 * "possible" snapshots in progress and clean them up
 			 */
 			assert(1 == MAX_SNAPSHOTS);
+			ss_get_lock(gv_cur_region); /* Snapshot initiator will wait until this cleanup is done */
 			ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(cs_addrs);
-			grab_crit(gv_cur_region);
-			if ((0 != ss_shm_ptr->ss_info.ss_pid) && !is_proc_alive(ss_shm_ptr->ss_info.ss_pid, 0))
+			ss_pid = ss_shm_ptr->ss_info.ss_pid;
+			if (ss_pid && !is_proc_alive(ss_pid, 0))
 				ss_release(NULL);
-			rel_crit(gv_cur_region);
+			ss_release_lock(gv_cur_region);
 			/* If csa->nl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we
 			 * should not flush shared memory contents to disk as they might be in an inconsistent state.
 			 * In this case, we will go ahead and remove shared memory (without flushing the contents) in this routine.

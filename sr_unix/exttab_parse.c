@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ static void	*get_memory(size_t n)
 /* skip white space */
 static char	*scan_space(char *c)
 {
-	for ( ; ISSPACE(*c); c++, ext_source_column++)
+	for ( ; ISSPACE_ASCII(*c); c++, ext_source_column++)
 		;
 	return c;
 }
@@ -117,15 +117,20 @@ static char	*scan_ident(char *c)
 	char	*b;
 
 	b = c;
-	for (  ; ISALNUM(*b)  ||  ('_' == *b); b++, ext_source_column++)
+	for (  ; ISALNUM_ASCII(*b)  ||  ('_' == *b); b++, ext_source_column++)
 		;
 	return (b == c) ? 0 : b;
 }
 
+/* if this is a label (alphameric, underscore, caret, and percent (C9E12-002681)), then
+   return the address after the end of the label.
+   Otherwise, return zero
+  */
 static char	*scan_labelref(char *c)
 {
 	char	*b = c;
-	for ( ; (ISALNUM(*b) || '_' == *b || '^' == *b); b++,ext_source_column++)
+
+	for ( ; (ISALNUM_ASCII(*b) || '_' == *b || '^' == *b || '%' == *b); b++,ext_source_column++)
 		;
 	return (b == c) ? 0 : b;
 }
@@ -250,7 +255,7 @@ static 	int scan_array_bound(char **b,int curr_type)
 	{
 		if ('\0' != *c)
 		{
-			if (ISDIGIT((int)*c))
+			if (ISDIGIT_ASCII((int)*c))
 				number[index++] = *c;
 			else
 				ext_stx_error(ERR_ZCPREALLNUMEX, ext_table_file_name);
@@ -476,6 +481,9 @@ struct extcall_package_list	*exttab_parse(mval *package)
 				ext_stx_error(ERR_ZCPREALLVALINV, ext_table_file_name);
 		} else
 			ret_pre_alloc_val = -1;
+		/* Fix C9E12-002681 */
+		if ('%' == *tbp)
+			*tbp = '_';
 		end = scan_ident(tbp);
 		if (!end)
 			ext_stx_error(ERR_ZCRCALLNAME, ext_table_file_name);

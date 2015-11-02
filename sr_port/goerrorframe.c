@@ -37,17 +37,17 @@ void	goerrorframe()
 		fpprev = fp->old_frame_pointer;
 #		ifdef GTM_TRIGGER
 		if (SFT_TRIGR & fpprev->type)
+		{
 			fpprev = *(stack_frame **)(fpprev + 1);
-		else
-			unwind++;
-#		else
-		unwind++;
+			unwind++;	/* Skipping over trigger frame but it needs unwinding too */
+		}
 #		endif
+		unwind++;
 		assert(fpprev);
 	}
 	assert(fp == error_frame);
 	DBGEHND((stderr, "goerrorframe: Unwinding %d frames\n", unwind));
-	GOFRAMES(unwind, FALSE);
+	GOFRAMES(unwind, FALSE, FALSE);
 	assert(error_frame == frame_pointer);
 	/* Now that we (the caller mdb_condition_handler) are going to rethrow an error, ensure that the
 	 * SFF_ETRAP_ERR bit is set in "error_frame" in case it got reset by flush_jmp.

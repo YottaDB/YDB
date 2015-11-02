@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -181,8 +181,15 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 			   heavier weight memcmp call.
 			*/
 			assert(0 < mblen);
-			if (mblen == dlmlen && 0 == memcmp(last, ldelim.unibytes_val, dlmlen))
-				break;
+			if (mblen == dlmlen)
+			{
+				if (1 == dlmlen)
+				{
+					if (*last == ldelim.unibytes_val[0])			/* Shortcut - test single byte */
+						break;
+				} else if (0 == memcmp(last, ldelim.unibytes_val, dlmlen))	/* Longcut - for multibyte chk */
+					break;
+			}
 			last += mblen;  	/* Find delim signaling end of piece */
 		}
 		last += dlmlen;				/* Bump past delim to first byte of next piece. The length of

@@ -271,9 +271,9 @@ void lvzwr_out(lv_val *lvp)
 			zshow_output(zwr_output, &semi_star);
 		}
 	} else
-	{
+	{	/* MERGE assignment from local variable */
 		if (MARG1_IS_GBL(merge_args))
-		{
+		{	/* Target global var */
 			memcpy(gv_currkey->base, mglvnp->gblp[IND1]->s_gv_currkey->base, mglvnp->gblp[IND1]->s_gv_currkey->end + 1);
 			gv_currkey->end = mglvnp->gblp[IND1]->s_gv_currkey->end;
 			for (n = 0 ; n < lvzwrite_block->curr_subsc ; n++)
@@ -287,7 +287,7 @@ void lvzwr_out(lv_val *lvp)
 			MV_FORCE_STR(val);
 			op_gvput(val);
 		} else
-		{
+		{	/* Target local var - pre-process target in case is a container */
 			assert(MARG1_IS_LCL(merge_args));
 			dst_lv = mglvnp->lclp[IND1];
 			if (MV_SBS == dst_lv->ptrs.val_ent.parent.sbs->ident && MAX_LVSUBSCRIPTS
@@ -307,6 +307,7 @@ void lvzwr_out(lv_val *lvp)
 					dst_lv = op_putindx(VARLSTCNT(2) dst_lv, subscp);
 			}
 			MV_FORCE_STR(val);
+			DECR_AC_REF(dst_lv, TRUE);
 			dst_lv->v = *val;
 			dst_lv->v.mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 		}

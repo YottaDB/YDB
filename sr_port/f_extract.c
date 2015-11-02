@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,10 +32,6 @@ int f_extract(oprtype *a, opctype op)
 	last = newtriple(OC_PARAMETER);
 	r->operand[1] = put_tref(first);
 	first->operand[1] = put_tref(last);
-#ifndef UNICODE_SUPPORTED
-	if (OC_FNEXTRACT != op)
-		GTMASSERT;
-#endif
 	if (window_token != TK_COMMA)
 	{
 		first->operand[0] = put_ilit(1);

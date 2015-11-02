@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,31 +87,20 @@ boolean_t dse_b_dmp(void)
 	patch_rec_counter = 1;
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = TRUE;
-		else
-			grab_crit(gv_cur_region);
-	}
-
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	for ( ; ; )
 	{
 		if (blk / bplmap * bplmap != blk)
 		{
-			if(!(bp = t_qread(blk, &dummy_int, &cr)))
+			if (!(bp = t_qread(blk, &dummy_int, &cr)))
+			{
+				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+			}
 			if (((blk_hdr_ptr_t) bp)->levl && patch_is_fdmp)
 			{
+				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 				util_out_print("Error:  cannot perform GLO/ZWR dump on index block.", TRUE);
-				if (!was_crit)
-				{
-					if (nocrit_present)
-						cs_addrs->now_crit = FALSE;
-					else
-						rel_crit(gv_cur_region);
-				}
 				return FALSE;
 			}
 			if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
@@ -149,8 +138,7 @@ boolean_t dse_b_dmp(void)
 			}
 			if (util_interrupt)
 			{
-				if (!was_crit)
-					rel_crit(gv_cur_region);
+				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 				rts_error(VARLSTCNT(1) ERR_CTRLC);
 				break;
 			}
@@ -158,9 +146,11 @@ boolean_t dse_b_dmp(void)
 				util_out_print(0, TRUE);
 		} else if (!patch_is_fdmp)
 		{
-			if(!(bp = t_qread(blk, &dummy_int, &cr)))
+			if (!(bp = t_qread(blk, &dummy_int, &cr)))
+			{
+				DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-
+			}
 			if (CLI_NEGATED != head)
 			{
 
@@ -245,15 +235,17 @@ boolean_t dse_b_dmp(void)
 					util_out_print("|", TRUE);
 					if (util_interrupt)
 					{
-						if (!was_crit)
-							rel_crit(gv_cur_region);
+						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 						rts_error(VARLSTCNT(1) ERR_CTRLC);
 					}
 				}
 				util_out_print("!/'!AD' == BUSY  '!AD' == FREE  '!AD' == REUSABLE  '!AD' == CORRUPT!/",
 					TRUE,1, BUSY_CHAR, 1, FREE_CHAR, 1, REUSABLE_CHAR, 1, CORRUPT_CHAR);
 				if (invalid_bitmap)
+				{
+					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 					rts_error(VARLSTCNT(1) ERR_BITMAPSBAD);
+				}
 			}
 		}
 		count--;
@@ -264,12 +256,6 @@ boolean_t dse_b_dmp(void)
 			blk = 0;
 	}
 	patch_curr_blk = blk;
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = FALSE;
-		else
-			rel_crit(gv_cur_region);
-	}
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return TRUE;
 }

@@ -38,7 +38,8 @@
 #define	GTM_MAX_INDRCACHE_COUNT		"$gtm_max_indrcache_count"
 
 /* MUPIP BACKUP */
-#define	GTM_BAK_TEMPDIR_LOG_NAME	"$GTM_BAKTMPDIR"
+#define	GTM_BAK_TEMPDIR_LOG_NAME	"$gtm_baktmpdir"
+#define	GTM_BAK_TEMPDIR_LOG_NAME_UC	"$GTM_BAKTMPDIR"
 
 /* Pattern match operator */
 #define	PAT_FILE			"$gtm_pattern_file"
@@ -71,6 +72,7 @@
 #define	GTM_ZQUIT_ANYWAY		"$gtm_zquit_anyway"
 #define	GTM_NOUNDEF			"$gtm_noundef"
 #define	GTM_PROMPT			"$gtm_prompt"
+#define GTM_LVSCALE			"$gtm_lvscale"
 
 /* -------------------------- Unix only --------------------------  */
 
@@ -78,6 +80,7 @@
 #define	GTM_TMP_ENV			"$gtm_tmp"
 #define	GTM_SHMFLAGS			"$gtm_shmatflags"
 #define GTM_TRIGGER_ETRAP		"$gtm_trigger_etrap"
+#define GTM_SNAPTMPDIR			"$gtm_snaptmpdir"
 
 /* Replication */
 #define	GTM_REPL_INSTANCE		"$gtm_repl_instance"

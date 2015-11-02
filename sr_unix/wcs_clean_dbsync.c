@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -196,6 +196,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 					save_csdata = cs_addrs->hdr;
 			}
 			dbsync_defer_timer = FALSE;
+			assert(!csa->hold_onto_crit); /* this ensures we can safely do unconditional rel_crit */
 			rel_crit(reg);
 		}
 		DEBUG_ONLY(

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include "gdsbgtr.h"
 #include "iosp.h"
 #include "min_max.h"
+#include "gtm_time.h"		/* needed for SET_GBL_JREC_TIME */
 
 /* Include prototypes */
 #include "dse_simulate_t_end.h"

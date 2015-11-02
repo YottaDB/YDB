@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,8 +101,9 @@ int4	time();
 #ifndef SLACKTIME
 # define SLACKTIME	10
 #endif
-#define INIT_GT_TIMERS	64
-#define GT_TIMER_INIT_DATA_LEN 16
+#define TIMER_BLOCK_SIZE	64	/* # of timer entries allocated initially as well as at every expansion */
+#define GT_TIMER_EXPAND_TRIGGER	8	/* if the # of timer entries in the free queue goes below this, allocate more */
+#define GT_TIMER_INIT_DATA_LEN	8
 
 #ifdef BSD_TIMER
 static struct itimerval sys_timer, old_sys_timer;
@@ -116,8 +117,9 @@ static boolean_t first_timeset = TRUE;
 /*
  * Chain of unused timer request blocks
  */
-volatile static GT_TIMER *timefree = NULL;
-static int4 timeblk_hdrlen;
+volatile static GT_TIMER	*timefree = NULL;
+volatile static int4		num_timers_free;	/* # of timers in the unused queue */
+static		int4		timeblk_hdrlen;
 
 GBLREF	boolean_t	blocksig_initialized;	/* set to TRUE when blockalrm and block_sigsent are initialized */
 GBLREF	sigset_t	blockalrm;
@@ -163,6 +165,25 @@ STATICFNDEF void hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag)
 	**waitover_flag = TRUE;
 }
 
+STATICFNDEF void gt_timers_alloc(void)
+{
+	int4		gt_timer_cnt;
+       	GT_TIMER	*timeblk, *timeblks;
+
+	assert(!timer_in_handler);
+	timeblk_hdrlen = OFFSETOF(GT_TIMER, hd_data[0]);
+	timeblk = timeblks = (GT_TIMER *)malloc((timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * TIMER_BLOCK_SIZE);
+	for (gt_timer_cnt = TIMER_BLOCK_SIZE; 0 < gt_timer_cnt; --gt_timer_cnt)
+	{
+		timeblk->hd_len_max = GT_TIMER_INIT_DATA_LEN;	/* Set amount it can store */
+		timeblk->next = (GT_TIMER *)timefree;		/* Put on free queue */
+		timefree = timeblk;
+		timeblk = (GT_TIMER *)((char *)timeblk + timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN);	/* Next! */
+	}
+	assert(((char *)timeblk - (char *)timeblks) == (timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * TIMER_BLOCK_SIZE);
+	num_timers_free += TIMER_BLOCK_SIZE;
+}
+
 /*
  * --------------------------------------
  * Initialize group of timer blocks
@@ -170,26 +191,16 @@ STATICFNDEF void hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag)
  */
 void	prealloc_gt_timers(void)
 {
-	int4		gt_timer_cnt;
-       	GT_TIMER	*timeblk, *timeblks;
 
-	/* Preallocate some timer blocks. This will be all the timer blocks we
-	   hope to need (dbg versions will assert fail if this number is exceeded).
-	   Allocate them with 16 bytes of possible data each. */
-
+	/* Preallocate some timer blocks. This will be all the timer blocks we hope to need.
+	 * Allocate them with 8 bytes of possible data each.
+	 * If more timer blocks are needed, we will allocate them as needed.
+	 */
 #ifdef __MVS__
 	gtm_zos_HZ == sysconf(_SC_CLK_TCK);	/* get the real value */
 #endif
-	timeblk_hdrlen = OFFSETOF(GT_TIMER, hd_data[0]);
-	timeblk = timeblks = (GT_TIMER *)malloc((timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * INIT_GT_TIMERS);
-	for (gt_timer_cnt = INIT_GT_TIMERS; 0 < gt_timer_cnt; --gt_timer_cnt)
-	{
-		timeblk->hd_len_max = GT_TIMER_INIT_DATA_LEN;	/* Set amount it can store */
-		timeblk->next = (GT_TIMER *)timefree;		/* Put on free queue */
-		timefree = timeblk;
-		timeblk = (GT_TIMER *)((char *)timeblk + timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN);	/* Next! */
-	}
-	assert(((char *)timeblk - (char *)timeblks) == (timeblk_hdrlen + GT_TIMER_INIT_DATA_LEN) * INIT_GT_TIMERS);
+
+	gt_timers_alloc();	/* Allocate timers */
 
 	/* While we are initializing things, initialize blockalrm and block_sigsent */
 	sigemptyset(&blockalrm);
@@ -372,6 +383,9 @@ STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 			sys_canc_timer(tid);
 		remove_timer(tid); /* Remove timer from chain */
 	)
+	/* Check if # of free timer slots is less than minimum threshold. If so allocate more of those while it is safe to do so */
+	if ((GT_TIMER_EXPAND_TRIGGER > num_timers_free) && !timer_in_handler)
+		gt_timers_alloc();
 	/* Link new timer into timer chain */
 	add_timer(&at, tid, time_to_expir, handler, hdata_len, hdata);
 	if ((timeroot->tid == tid) || !timer_active)
@@ -543,7 +557,8 @@ STATICFNDEF void timer_handler(int why)
 			/* put timer block on the free chain */
 			tpop->next = (GT_TIMER *)timefree;
 			timefree = tpop;
-
+			num_timers_free++;
+			assert(0 < num_timers_free);
 		}
 	}
 
@@ -586,7 +601,6 @@ STATICFNDEF GT_TIMER *find_timer(TID tid, GT_TIMER **tprev)
 	return (0);
 }
 
-
 /*
  * --------------------------------------------------
  * Add timer to timer chain
@@ -616,48 +630,49 @@ STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*ha
 	/* Obtain a new timer block */
 	ntp = (GT_TIMER *)timefree;			/* Start at first free block */
 	lastntp = NULL;
-	for (; NULL != ntp;)
-	{
+	for ( ; NULL != ntp; )
+	{	/* We expect all callers of timer functions to not require more than 8 bytes of data. Any violations
+		 * of this assumption need to be caught hence the assert below.
+		 */
+		assert(GT_TIMER_INIT_DATA_LEN == ntp->hd_len_max);
+		assert(ntp->hd_len_max >= hdata_len);
 		if (ntp->hd_len_max >= hdata_len)	/* Found one that can hold our data */
 		{	/* Dequeue block */
 			if (NULL == lastntp)		/* First one on queue */
-			{
 				timefree = ntp->next;	/* Dequeue 1st element */
-				break;
-			}
-			/* Else is not 1st on queue -- use simple dequeue */
-			lastntp->next = ntp->next;
+			else /* is not 1st on queue -- use simple dequeue */
+				lastntp->next = ntp->next;
+			assert(0 < num_timers_free);
+			num_timers_free--;
 			break;
 		}
-
 		/* Still looking, try next block */
 		lastntp = ntp;
 		ntp = ntp->next;
 	}
-
 	/* If didn't find one, fail if dbg; else malloc a new one */
 	if (NULL == ntp)
 	{
-		assert(FALSE);			/* If dbg, we should have enough already */
-		if (timer_in_handler)
-			GTMASSERT;	/* malloc not safe in interrupt */
-		ntp = (GT_TIMER *) malloc(timeblk_hdrlen + hdata_len);
+		assert(FALSE);		/* If dbg, we should have enough already */
+		ntp = (GT_TIMER *)malloc(timeblk_hdrlen + hdata_len); /* if we are in a timer, this malloc may error out */
 		ntp->hd_len_max = hdata_len;
 	}
-
 	ntp->tid = tid;
 	ntp->handler = handler;
 	ntp->safe = FALSE;
         if (NULL == handler)
                 ntp->safe = TRUE;
         else
+	{
                 for (i = 0; NULL != safe_handlers[i]; i++)
+		{
                         if (safe_handlers[i] == handler)
                         {
                                 ntp->safe = TRUE;   /* known to just set flags, etc. */
                                 break;
                         }
-
+		}
+	}
 	ntp->hd_len = hdata_len;
 	if (0 < hdata_len)
 		memcpy(ntp->hd_data, hdata, hdata_len);
@@ -679,7 +694,6 @@ STATICFNDEF void add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*ha
 		timeroot = ntp;
 	else
 		tpp->next = ntp;
-
 	return;
 }
 
@@ -701,6 +715,8 @@ STATICFNDEF void remove_timer(TID tid)
 		/* Place element on free queue */
 		tp->next = (GT_TIMER *)timefree;
 		timefree = tp;
+		num_timers_free++;
+		assert(0 < num_timers_free);
 		/* Assert that no duplicate timer entry with the same "tid" exists in the timer chain */
 		assert((NULL == find_timer(tid, &tpp)));
 	}
@@ -711,7 +727,7 @@ STATICFNDEF void remove_timer(TID tid)
  * System call to cancel timer.
  * ---------------------------------------------
  */
-STATICFNDEF void	sys_canc_timer (TID tid)
+STATICFNDEF void	sys_canc_timer(TID tid)
 {
 #ifdef BSD_TIMER
 	struct itimerval zero;

@@ -24,13 +24,15 @@
 #include "dollar_quit.h"
 #if defined(__sparc)
 #  include "sparc.h"
-#elif defined(__MVS__)
+#elif defined(__s390__)
 #  include "s390.h"
 #elif defined(__hppa)
 #  include "hppa.h"
 #elif defined(__ia64)
 #  include "ia64.h"
 #endif
+
+GBLREF	int	process_exiting;
 
 /* Determine value to return for $QUIT:
  *
@@ -148,7 +150,7 @@ int dollar_quit(void)
 			} else
 				xfer_index = -1;
 		}
-#		elif defined(__MVS__) || defined(Linux390)
+#		elif defined(__s390__)
 		{
 			format_RXY	instr_LG;
 			union
@@ -249,8 +251,12 @@ int dollar_quit(void)
 			/* Need a QUIT with an alias return value */
 			retval = 11;
 		else
-		{	/* Something weird afoot - had parm block can can't locate EXFUNRET[ALS] opcode */
-			assert(FALSE);
+		{	/* Something weird afoot - had parm block can can't locate EXFUNRET[ALS] opcode. This can happen if
+			 * a fatal error occurs during a call before the callee stack frame is actually pushed and we are
+			 * called during GTM_FATAL_ERROR.* file creation. Assert that this is the case, else, we just pretend
+			 * we didn't find a parm block..
+			 */
+			assert(process_exiting);
 			retval = 0;
 		}
 	}

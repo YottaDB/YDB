@@ -165,7 +165,7 @@ void op_gvorder (mval *v)
 				name.len = gv_altkey->end - 1;
 				if (acc_meth == dba_cm)
 					break;
-				gv_bind_name(gd_header, &name);
+				GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &name);
 				if (gv_cur_region != map->reg.addr)
 				{
 					found = FALSE;

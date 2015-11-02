@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,36 +58,47 @@ typedef struct
 #define	ENSURE_UPDATE_ARRAY_SPACE(space_needed)											\
 {																\
 	GBLREF	ua_list		*first_ua, *curr_ua;										\
+	GBLREF char		*update_array, *update_array_ptr;								\
+	GBLREF uint4		update_array_size, cumul_update_array_size;							\
 	GBLREF	short		dollar_tlevel;											\
-	ua_list		*tmpua;													\
+	ua_list			*tmpua;												\
 																\
 	assert((0 != update_array_size) && (NULL != update_array));								\
 	if (ROUND_DOWN2(update_array + update_array_size - update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE) < (space_needed))	\
 	{	/* the space remaining is too small for safety - chain on a new array */					\
-		assert((NULL != first_ua) && (NULL != curr_ua) && (NULL == curr_ua->next_ua));					\
-		/* care should be taken to ensure things will work right even if malloc() errors out with ERR_MEMORY.		\
-		 * that is why multiple assignments are not done in a single line that has a malloc() call in it.		\
-		 * in addition, the field taking in the result of malloc() should be initialized to NULL before the call.	\
-		 * this is because tp_clean_up() (invoked in case of error handling) relies on the integrity of this 		\
-		 * update array linked list in order to do its cleanup.								\
-		 * Not following the above rules will cause difficult-to-debug memory related problems (even corruption) */	\
-		tmpua = (ua_list *)malloc(SIZEOF(ua_list));									\
-		memset(tmpua, 0, SIZEOF(ua_list));	/* initialize tmpua->update_array and tmpua->next_ua to NULL */		\
-		/* it is important that all parameters in the MIN-MAX calculation below be unsigned numbers */			\
-		tmpua->update_array_size = MIN(MAX(cumul_update_array_size, (space_needed)), BIG_UA);				\
-		tmpua->update_array = (char *)malloc(tmpua->update_array_size);							\
-		/* update globals only after above mallocs succeed */								\
-		update_array_size = tmpua->update_array_size;									\
-		cumul_update_array_size += update_array_size;									\
-		update_array = update_array_ptr = tmpua->update_array;								\
-		if (NULL == curr_ua) /* in PRO, don't take chances, reset first_ua/curr_ua to newly created upd array */	\
+		assert((NULL != first_ua) && (NULL != curr_ua)); 								\
+		if ((NULL == curr_ua) || (NULL == curr_ua->next_ua))								\
 		{														\
-			if (dollar_tlevel && (NULL != first_ua)) /* if already in TP, we will lose all updates until now	\
-								    if we reset first_ua. do not proceed in this case */	\
-				GTMASSERT;											\
-			first_ua = curr_ua = tmpua;										\
+			/* care should be taken to ensure things will work right even if malloc() errors out with ERR_MEMORY.	\
+			 * that is why multiple assignments are not done in a single line that has a malloc() call in it.	\
+			 * in addition, the field taking in the result of malloc() should be initialized to NULL before the 	\
+			 * call. This is because tp_clean_up() (invoked in case of error handling) relies on the integrity of 	\
+			 * this update array linked list in order to do its cleanup. Not following the above rules will cause 	\
+			 * difficult-to-debug memory related problems (even corruption) */					\
+			tmpua = (ua_list *)malloc(SIZEOF(ua_list));								\
+			memset(tmpua, 0, SIZEOF(ua_list));	/* initialize tmpua->update_array and tmpua->next_ua to NULL */	\
+			/* it is important that all parameters in the MIN-MAX calculation below be unsigned numbers */		\
+			tmpua->update_array_size = MIN(MAX(cumul_update_array_size, (space_needed)), BIG_UA);			\
+			tmpua->update_array = (char *)malloc(tmpua->update_array_size);						\
+			/* update globals only after above mallocs succeed */							\
+			cumul_update_array_size += tmpua->update_array_size;							\
+			if (NULL == curr_ua) /* in PRO, don't take chances, reset first_ua/curr_ua to newly created upd array */\
+			{													\
+				if (dollar_tlevel && (NULL != first_ua)) /* if already in TP, we will lose all updates until now\
+									    if we reset first_ua. do not proceed in this case */\
+					GTMASSERT;										\
+				first_ua = curr_ua = tmpua;									\
+			} else													\
+				curr_ua = curr_ua->next_ua = tmpua;								\
 		} else														\
-			curr_ua = curr_ua->next_ua = tmpua;									\
+		{	/* No need to do malloc as curr_ua->next_ua could be REUSED */						\
+			curr_ua = curr_ua->next_ua;										\
+			/* No need to reset cumul_update_array_size as no ua_list is deleted/added from/to the first_ua		\
+			 * linked list */											\
+		}														\
+		assert((NULL != first_ua) && (NULL != curr_ua));								\
+		update_array_size = curr_ua->update_array_size;									\
+		update_array = update_array_ptr = curr_ua->update_array;							\
 	}															\
 }
 

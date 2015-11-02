@@ -152,7 +152,8 @@ LITDEF unsigned char mvs_size[] =
 	MV_SIZE(mvs_stck),
 	MV_SIZE(mvs_lvval),
 	MV_SIZE(mvs_trigr),
-	MV_SIZE(mvs_rstrtpc)
+	MV_SIZE(mvs_rstrtpc),
+	MV_SIZE(mvs_storig)
 };
 
 /* All mv_stent types that need to be preserved are indicated by the mvs_save[] array.
@@ -182,7 +183,8 @@ LITDEF boolean_t mvs_save[] =
 	TRUE,	/* MVST_STCK_SP */
 	TRUE,	/* MVST_LVAL */
 	FALSE,	/* MVST_TRIGR */
-	FALSE	/* MVST_RSTRTPC */
+	FALSE,	/* MVST_RSTRTPC */
+	TRUE	/* MVST_STORIG */
 };
 
 static readonly unsigned char localpool[7] = {'1', '1' , '1' , '0', '1', '0', '0'};
@@ -195,7 +197,6 @@ LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0,
 LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 101000 );
 LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 110000 );
 LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[0], 0, 111000 );
-LITDEF mval SBS_MVAL_INT_ELE	= DEFINE_MVAL_LITERAL(MV_NM | MV_INT         , 0, 0, 0, 0, 0, SBS_NUM_INT_ELE * 1000);
 
 /* --------------------------------------------------------------------------------------------------------------------------
  * All string mvals defined in this module using LITDEF need to have MV_NUM_APPROX bit set. This is because these mval
@@ -381,14 +382,6 @@ LITDEF int ht_sizes[] =
 	7222661, 8434427, 9849503, 11502019, 13431661, 15685133, 18316643, 21389671,
 	24978257, 29168903, 34062629, 39777391, 46450931, 54244103, 0
 };
-
-/* Table used in various ways (e.g. mident generation) */
-LITDEF char alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
-				    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
-				    'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4',
-				    '5', '6', '7', '8', '9', '\0'};
-LITDEF int alpha_table_len = 52;					/* Length of just the alphas in the table */
-LITDEF int alphanumeric_table_len = SIZEOF(alphanumeric_table) - 1;	/* For the apps not wanting to use strlen() */
 
 #ifdef DEBUG
 /* These instructions follow the definitions made

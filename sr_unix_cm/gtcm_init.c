@@ -53,6 +53,7 @@
 #include "hashtab_int4.h"
 #include "tp.h"
 #include "init_secshr_addrs.h"
+#include "gtm_imagetype_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -74,10 +75,7 @@ GBLREF pattern			*pattern_list;
 GBLREF pattern			*curr_pattern;
 GBLREF pattern			mumps_pattern;
 GBLREF uint4			*pattern_typemask;
-GBLREF enum gtmImageTypes	image_type;
 GBLREF spdesc			rts_stringpool, stringpool;
-GBLREF boolean_t		is_replicator;
-GBLDEF boolean_t		skip_dbtriggers;
 
 void	gtcm_fail(int sig);
 
@@ -98,9 +96,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 
 	/*  Disassociate from the rest of the universe */
 	get_page_size();
-	is_replicator = TRUE;	/* as GT.CM OMI goes through t_end() and can write jnl records to the jnlpool for replicated db */
-	image_type = GTCM_SERVER_IMAGE;
-	GTMTRIG_ONLY(skip_dbtriggers = TRUE;) /* GTCM OMI SERVER does not support triggers. */
+	gtm_imagetype_init(GTCM_SERVER_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 
 #ifndef GTCM_DEBUG_NOBACKGROUND

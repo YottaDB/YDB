@@ -273,7 +273,7 @@ if [ -d "utf8" ]; then
 		is64bit_gtm=`file mumps | grep "64-bit" | wc -l`
 	fi
 	if [ $is64bit_gtm -eq 1 ] ; then
-		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib"
+		library_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib"
 	else
 		library_path="/usr/local/lib32 /usr/local/lib /usr/lib32 /usr/lib /lib32 /lib"
 	fi
@@ -345,7 +345,7 @@ if [ -d "utf8" ]; then
 					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "IA64" | wc -l`
 				elif [ $arch = "ibm" ] ; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
-					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -1 | wc -l`
+					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l`
 				elif [ $arch = "zos" ] ; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
 					is64bit_icu=`file $libpath/$icu_full_ver_lib 2>/dev/null | grep "amode=64" |head -n1 |wc -l`
@@ -512,20 +512,20 @@ plugin_gtmcrypt="$plugin/gtmcrypt"
 gtmcryptbldfiles="install.sh build.sh"
 
 # Gtmcrypt Binaries
-gtmcryptbinaries="ascii2hex maskpass"
+gtmcryptbinaries="maskpass"
 
 # Gtmcrypt shared library
 gtmcryptsharedlib="libgtmcrypt$ext"
 
 # Gtmcrypt scripts
-gtmcryptscripts="add_db_key.ksh gen_sym_key.ksh encrypt_db_key.ksh decrypt_db_key.ksh gen_keypair.ksh"
-gtmcryptscripts="$gtmcryptscripts import_and_sign_key.ksh gen_entropy.ksh kill_entropy.ksh gen_sym_hash.ksh"
+gtmcryptscripts="add_db_key.sh gen_sym_key.sh encrypt_sign_db_key.sh gen_keypair.sh pinentry-gtm.sh"
+gtmcryptscripts="$gtmcryptscripts import_and_sign_key.sh gen_sym_hash.sh"
 
 # Gtmcrypt related M file
-gtmcryptmfile="GETPASS.m"
+gtmcryptmfile="pinentry.m"
 
 # Gtmcrypt source files
-gtmcryptsrcfiles="gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h gtmxc_types.h ascii2hex.c maskpass.c"
+gtmcryptsrcfiles="gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h gtmxc_types.h maskpass.c"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_dbk_ref.c gtmcrypt_dbk_ref.h gtmcrypt_pk_ref.c gtmcrypt_pk_ref.h"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h $gtmcryptbldfiles $gtmcryptmfile"
 
@@ -589,19 +589,11 @@ if [ -d "$plugin_gtmcrypt" ]; then
 		install -f $gtmdist/$plugin -m 755 -u $owner -g $binuser $plugin/$gtmcryptsharedlib $gtmdist/$plugin
 	fi
 
-	# Install the plugin related M file
-	cp $plugin_gtmcrypt/$gtmcryptmfile $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-	chmod 0644 $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-	chown $owner $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-	chgrp $binuser $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-	# If utf8 is supported, soft link the GETPASS.m into $gtmdist/plugin/gtmcrypt/utf8 directory.
-	if [ $doutf8 -ne 0 ]; then
-		mkdir -p $gtmdist/$plugin_gtmcrypt/utf8
-		chmod 0755 $gtmdist/$plugin_gtmcrypt/utf8
-		chown $owner $gtmdist/$plugin_gtmcrypt/utf8
-		chgrp $binuser $gtmdist/$plugin_gtmcrypt/utf8
-		(cd $gtmdist/$plugin_gtmcrypt/utf8; ln -s ../$gtmcryptmfile $gtmcryptmfile)
-	fi
+        # Install the plugin related M file
+        cp $plugin_gtmcrypt/$gtmcryptmfile $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+        chmod 0644 $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+        chown $owner $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+        chgrp $binuser $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
 
 	# Install other plugin files
 	for i in $gtmcryptofiles
@@ -611,6 +603,10 @@ if [ -d "$plugin_gtmcrypt" ]; then
 		chown $owner $gtmdist/$plugin_gtmcrypt/$i
 		chgrp $binuser $gtmdist/$plugin_gtmcrypt/$i
 	done
+
+	# Install gpgagent.tab
+	# This is an external call table so the path to the shared library has to be adjusted
+	sed "1c $gtmdist/plugin/libgtmcrypt.so" < $plugin/gpgagent.tab > $gtmdist/$plugin/gpgagent.tab
 
 	# Tar the source files
 	(cd $plugin_gtmcrypt; chmod 0644 $gtmcryptsrcfiles; chown $owner $gtmcryptsrcfiles; chgrp $binuser $gtmcryptsrcfiles)
@@ -663,14 +659,8 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	$echo ""
 	$echo "Creating lowercase versions of the MUMPS routines."
 	(cd $gtmdist; ./lowerc_cp *.m)
-	if [ "$dogtmcrypt" -ne 0 ]; then
-		(cd $gtmdist/$plugin_gtmcrypt; ln -s $gtmcryptmfile `$echo $gtmcryptmfile | tr '[A-Z]' '[a-z]'`)
-	fi
 	if [ "$doutf8" -ne 0 ]; then
 		(cd $gtmdist/utf8; ./lowerc_cp *.m)
-		if [ "$dogtmcrypt" -ne 0 ]; then
-			(cd $gtmdist/$plugin_gtmcrypt/utf8; ln -s $gtmcryptmfile `$echo $gtmcryptmfile | tr '[A-Z]' '[a-z]'`)
-		fi
 	fi
 fi
 
@@ -692,9 +682,6 @@ $echo ""
 gtm_chset="M"
 export gtm_chset
 (cd $gtmdist; ./mumps -noignore *.m; $echo $?>compstat)
-if [ "$dogtmcrypt" -ne 0 ]; then
-	(cd $gtmdist/plugin/gtmcrypt; $gtmdist/mumps -noignore *.m; $echo $?>>$gtmdist/compstat; mv *.o $gtmdist)
-fi
 if [ "$doutf8" -ne 0 ]; then
 	# Ensure we ARE in UTF-8 mode
 	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
@@ -726,10 +713,6 @@ if [ "$doutf8" -ne 0 ]; then
 		export LD_LIBRARY_PATH
 	fi
 	(gtm_dist=$gtmdist/utf8; export gtm_dist; cd $gtm_dist; ./mumps -noignore *.m; $echo $?>>$gtmdist/compstat)
-	if [ "$dogtmcrypt" -ne 0 ]; then
-		(cd $gtmdist/plugin/gtmcrypt/utf8; $gtmdist/utf8/mumps -noignore *.m; \
-		$echo $?>>$gtmdist/compstat; mv *.o $gtmdist/utf8)
-	fi
 	gtm_chset="M"
 	export gtm_chset
 fi
@@ -760,11 +743,6 @@ if [ "$dogtmcrypt" -ne 0 ]; then
 	chmod 0644 $gtmdist/plugin/gtmcrypt/*.m
 	chown $owner $gtmdist/plugin/gtmcrypt/*.m
 	chgrp $binuser $gtmdist/plugin/gtmcrypt/*.m
-	if [ "$doutf8" -ne 0 ]; then
-		chmod 0644 $gtmdist/plugin/gtmcrypt/utf8/*.m
-		chown $owner $gtmdist/plugin/gtmcrypt/utf8/*.m
-		chgrp $binuser $gtmdist/plugin/gtmcrypt/utf8/*.m
-	fi
 fi
 
 gtm_dist=$gtmdist
@@ -888,10 +866,6 @@ if [ -d $gtmdist/plugin/gtmcrypt ]; then
 	chmod a-w $gtmdist/plugin/gtmcrypt/*
 fi
 
-if [ -d $gtmdist/plugin/gtmcrypt/utf8 ]; then
-	chmod a-w $gtmdist/plugin/gtmcrypt/utf8/*
-fi
-
 # if we had a mumps error then remove executable bit recursively and exit
 # this could include compile and/or library load errors
 if [ 0 != `grep -c '[1-9]' $gtm_dist/compstat` ]; then
@@ -913,7 +887,7 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid \
 		esnecil *.hlp core *.h libgtmrpc.a *.m gdehelp.* COPYING
-	\rm -rf GETPASS.o plugin
+	\rm -rf GETPASS.o plugin PINENTRY.o
 	if [ -d utf8 ]; then
 		\rm -rf utf8
 	fi

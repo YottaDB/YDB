@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@
 #include "gtm_string.h"
 #include "gtm_unistd.h"		/* for execlp() and fork() */
 #include "gtm_stdlib.h"		/* for exit() */
-#include "gtm_stdio.h"		/* for sprintf */
+#include "gtm_stdio.h"		/* for SPRINTF */
 
 #include <sys/wait.h>		/* for wait() */
 

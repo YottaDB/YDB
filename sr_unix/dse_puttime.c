@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,7 @@ void dse_puttime(int_ptr_t time, char *c, bool flush)
 {
 	char 	outbuf[TIME_SIZE * 4];		/* Leave room for unexpected values */
 
-	SPRINTF(outbuf,"%2.2d:%02.2d:%02.2d:%02.2d", *time / 3600000,
+	SPRINTF(outbuf,"%2.2d:%2.2d:%2.2d:%2.2d", *time / 3600000,
 		(*time % 3600000) / 60000, (*time % 60000) / 1000,
 		(*time % 1000) / 10);
 	util_out_print(c,flush,TIME_SIZE,outbuf);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@
 #include "wcs_sleep.h"
 #include "rel_quant.h"
 #include "send_msg.h"
+#include "gtm_c_stack_trace.h"
 
 GBLREF	uint4		process_id;
 GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
@@ -66,7 +67,8 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	int4			waitarray[1024];
 	int4			waitarray_size;
 #	endif
-
+	static uint4		stuck_cnt = 0; /* stuck_cnt signifies the number of times the same process
+						has called gtmstuckexec for the same condition*/
 	error_def(ERR_COMMITWAITPID);
 	error_def(ERR_COMMITWAITSTUCK);
 
@@ -231,7 +233,11 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		} else
 			blocking_pid = 0;
 		if (blocking_pid)
+		{
+			stuck_cnt++;
+			GET_C_STACK_FROM_SCRIPT("COMMITWAITPID", process_id, blocking_pid, stuck_cnt);
 			send_msg(VARLSTCNT(8) ERR_COMMITWAITPID, 6, process_id, 1, blocking_pid, blk, DB_LEN_STR(csa->region));
+		}
 	}
 	DEBUG_ONLY(incrit_pid = cnl->in_crit;)
 	send_msg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1, cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(csa->region));

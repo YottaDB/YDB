@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,8 +72,8 @@ boolean_t	ss_write_block(sgmnt_addrs *csa,
 		 */
 		return FALSE;
 	}
-	assert(cnl->ss_shmid == lcl_ss_ctx->ss_shmid);
-	assert(ss_shm_ptr->ss_info.ss_shmid == lcl_ss_ctx->ss_shmid);
+	assert(cnl->ss_shmid == lcl_ss_ctx->attach_shmid);
+	assert(ss_shm_ptr->ss_info.ss_shmid == lcl_ss_ctx->attach_shmid);
 	/* If this block falls outside the total number of blocks that were present during the time of snapshot initiation, then
 	 * we should not be writing the before image as the shadow bitmap might not have that much space. Hence do an early return
 	 * to let GT.M continue as if the block was already written to the shadow file.

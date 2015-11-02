@@ -27,7 +27,7 @@ IA64_ONLY(GBLREF char 		asm_mode;)
 
 /* Due to the complex instruction set of x86_64, we require a function to implement the macro VALID_CALLING_SEQUENCE
    and this function will calculate both the offsets (rtnhdr & labaddr) and store them into these global variables */
-#if defined(__x86_64__) || defined(__MVS__)
+#if defined(__x86_64__) || defined(__MVS__) || defined(Linux390)
 GBLDEF int4		rtnhdr_off;
 GBLDEF int4		labaddr_off;
 #endif
@@ -65,7 +65,7 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 		NON_IA64_ONLY(GTMASSERT;)
 
 	/* Calling sequence O.K.; get address(address(routine header)) and address(address(label offset)).  */
-#ifdef __ia64 /* __ia64 */
+#	ifdef __ia64 /* __ia64 */
 	{
 		uint8 imm;
 		int8 *buf2, i;
@@ -79,7 +79,7 @@ rhdtyp	*auto_zlink(mach_inst *pc, lnr_tabent ***line)
 		LABADDR_PV_OFF(pc, imm);
 		A_labaddr = (lnk_tabent *)(imm + frame_pointer->ctxt);
 	}
-#endif /* __ia64 */
+#	endif /* __ia64 */
 
         NON_IA64_ONLY(A_rtnhdr  = (lnk_tabent *)(RTNHDR_PV_OFF(pc) + frame_pointer->ctxt);)
         NON_IA64_ONLY(A_labaddr = (lnk_tabent *)(LABADDR_PV_OFF(pc) + frame_pointer->ctxt);)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,11 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_unistd.h"
+#include "gtm_inet.h"
 
 #include <signal.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <sys/shm.h>
 
 #include "gdsroot.h"
@@ -44,19 +44,23 @@
 #include "invocation_mode.h"
 #include "secshr_db_clnup.h"
 
-GBLREF	int4		exi_condition;
-GBLREF	short		dollar_tlevel;
-GBLREF	int		process_exiting;
-GBLREF	boolean_t	need_core;			/* Core file should be created */
-GBLREF	boolean_t	created_core;			/* core file was created */
-GBLREF	boolean_t	core_in_progress;
-GBLREF	boolean_t	dont_want_core;
-GBLREF	int4		process_id;
-GBLREF	boolean_t	exit_handler_active;
-GBLREF	boolean_t	pool_init;
-GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	int4			exi_condition;
+GBLREF	short			dollar_tlevel;
+GBLREF	boolean_t		need_core;			/* Core file should be created */
+GBLREF	boolean_t		created_core;			/* core file was created */
+GBLREF	boolean_t		core_in_progress;
+GBLREF	boolean_t		dont_want_core;
+GBLREF	int4			process_id;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		pool_init;
+GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF 	boolean_t	is_tracing_on;
+GBLREF 	boolean_t		is_tracing_on;
+
+#ifdef DEBUG
+GBLREF	int			process_exiting;
+GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
+#endif
 
 void gtm_exit_handler(void)
 {
@@ -67,7 +71,7 @@ void gtm_exit_handler(void)
 	if (is_tracing_on)
 		turn_tracing_off(NULL);
 	exit_handler_active = TRUE;
-	process_exiting = TRUE;
+	SET_PROCESS_EXITING_TRUE;
 	cancel_timer(0);		/* Cancel all timers - No unpleasant surprises */
 	ESTABLISH(lastchance1);
 	secshr_db_clnup(NORMAL_TERMINATION);
@@ -80,7 +84,7 @@ void gtm_exit_handler(void)
 		pool_init = FALSE;
 	}
 	if (dollar_tlevel)
-		op_trollback(0);
+		OP_TROLLBACK(0);
 	zcall_halt();
 	op_lkinit();
 	op_unlock();
@@ -92,13 +96,22 @@ void gtm_exit_handler(void)
 	REVERT;
 
 	ESTABLISH(lastchance3);
+	/* We know of at least one case where the below code would error out. That is if this were a replication external
+	 * filter M program halting out after the other end of the pipe has been closed by the source server. In this case,
+	 * the io_rundown call below would error out and would invoke the lastchance3 condition handler which will do an
+	 * UNWIND that will return from gtm_exit_handler right away. To avoid an assert in the UNWIND macro (that checks
+	 * we never do UNWINDs while process_exiting is set to TRUE) set a debug-only variable to TRUE. This variable is
+	 * also checked by the assert in the UNWIND macro (see <C9K06_003278_test_failures/resolution_v2.txt> for details).
+	 */
+	assert(process_exiting);
+	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE;)
 	if (MUMPS_CALLIN & invocation_mode)
 	{
 		flush_pio();
 		io_rundown(RUNDOWN_EXCEPT_STD);
-	}
-	else
+	} else
 		io_rundown(NORMAL_RUNDOWN);
+	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = FALSE;)
 	REVERT;
 
 	print_exit_stats();

@@ -94,7 +94,7 @@ void error_return(void)
 	}
 	assert(0 < parent_level);
 	DBGEHND((stderr, "error_return: unwcnt: %d  rethrow_needed: %d  dev_act_err: %d\n", unwcnt, rethrow_needed, dev_act_err));
-	GOFRAMES(unwcnt, FALSE);
+	GOFRAMES(unwcnt, FALSE, FALSE);
 	assert(parent_counted_frame == frame_pointer);
 	assert(!proc_act_type);
 	if (rethrow_needed)

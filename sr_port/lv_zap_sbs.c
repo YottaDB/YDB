@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,7 +73,7 @@ void lv_zap_sbs(lv_sbs_tbl *tbl, lv_val *lv)
 		if (tbl->int_flag)
 		{
 			blk = tbl->num;
-			for (lvp = &blk->ptr.lv[0], top = (char *)ARRAYTOP(blk->ptr.lv); lvp < (lv_val **)top; lvp++)
+			for (lvp = &blk->ptr.lv[0], top = (char *)(lvp + SBS_NUM_INT_ELE); lvp < (lv_val **)top; lvp++)
 			{
 				if (*lvp == lv)
 				{

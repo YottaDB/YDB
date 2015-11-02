@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,12 +39,14 @@ GBLREF short		crash_count;
 void dse_wcreinit (void)
 {
 	unsigned char	*c;
-	char	confirm[256];
-	uint4	large_block;
+	char		confirm[256];
+	uint4		large_block;
 	short		len;
-#ifdef UNIX
-	char	*fgets_res;
-#endif
+	boolean_t	was_crit;
+#	ifdef UNIX
+	char		*fgets_res;
+#	endif
+
 	error_def(ERR_DSEWCINITCON);
 	error_def(ERR_DSEINVLCLUSFN);
 	error_def(ERR_DSEONLYBGMM);
@@ -72,7 +74,9 @@ void dse_wcreinit (void)
 		rts_error(VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("WCINIT"));
 		return;
 	}
-	grab_crit(gv_cur_region);
+	was_crit = cs_addrs->now_crit;
+	if (!was_crit)
+		grab_crit(gv_cur_region);
 	bt_init(cs_addrs);
 	if (cs_addrs->hdr->acc_meth == dba_bg)
 	{
@@ -80,7 +84,8 @@ void dse_wcreinit (void)
 		db_csh_ini(cs_addrs);
 		db_csh_ref(cs_addrs);
 	}
-	rel_crit (gv_cur_region);
+	if (!was_crit)
+		rel_crit (gv_cur_region);
 
 	return;
 }

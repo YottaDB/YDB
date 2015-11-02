@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,12 +59,13 @@
 #include "gtmmsg.h"		/* for gtm_putmsg prototype */
 #include "gtmcrypt.h"
 
-GBLREF tp_region		*grlist;
-GBLREF gd_region		*gv_cur_region;
-GBLREF sgmnt_data_ptr_t		cs_data;
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF bool			region;
-GBLREF bool			in_backup;
+GBLREF	tp_region		*grlist;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	bool			region;
+GBLREF	bool			in_backup;
+
 LITREF char			*gtm_dbversion_table[];
 
 #define MAX_ACC_METH_LEN	2
@@ -280,6 +281,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				mu_gv_cur_reg_free();
 				continue;
 			}
+			assert(!cs_addrs->hold_onto_crit); /* this ensures we can safely do unconditional grab_crit and rel_crit */
 			grab_crit(gv_cur_region);
 			status = EXIT_NRM;
 			access_new = (n_dba == access ? cs_data->acc_meth : access);

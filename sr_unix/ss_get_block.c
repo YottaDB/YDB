@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,42 +33,32 @@
 #include "gtmio.h"
 #include "shmpool.h"
 #include "db_snapshot.h"
+#include "wbox_test_init.h"
 
 GBLREF	gd_region	*gv_cur_region;
 /*
  * This function returns the before image of a block (if it exists in the snapshot file)
  */
-boolean_t ss_get_block(sgmnt_addrs *csa,
-			snapshot_context_ptr_t lcl_ss_ctx,
-			block_id blk,
-			sm_uc_ptr_t blk_buff_ptr,
-			boolean_t *read_failed)
+boolean_t ss_get_block(sgmnt_addrs *csa, block_id blk, sm_uc_ptr_t blk_buff_ptr)
 {
 	shm_snapshot_ptr_t		ss_shm_ptr;
+	snapshot_context_ptr_t		lcl_ss_ctx;
 
-	error_def(ERR_REGSSFAIL);
-
+	lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
 	assert(NULL != lcl_ss_ctx);
 	ss_shm_ptr = lcl_ss_ctx->ss_shm_ptr;
 	DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
-	*read_failed = FALSE;
-	/* Issue error if GT.M failed while writing blocks to snapshot file */
-	if (ss_shm_ptr->failure_errno)
-	{
-		/* Detailed error will be issued in the operator log by GT.M */
-		gtm_putmsg(VARLSTCNT(6) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid, DB_LEN_STR(gv_cur_region),
-			ss_shm_ptr->failure_errno);
-		*read_failed = TRUE;
-		return FALSE;
-	}
 	assert(ss_shm_ptr->in_use && SNAPSHOTS_IN_PROG(csa->nl));
-	assert(blk < ss_shm_ptr->ss_info.total_blks);
+	/* Ensure that we never try to request a block that is outside the snapshot range. The only exception is when GT.M
+	 * failed while initializing snapshot resources and hence refrained from writing before images. Include whitebox
+	 * test case to account for invalid snapshot
+	 */
+	assert((blk < ss_shm_ptr->ss_info.total_blks) || (WBTEST_INVALID_SNAPSHOT_EXPECTED == gtm_white_box_test_case_number));
 	if (blk >= ss_shm_ptr->ss_info.total_blks)
 		return FALSE;
 	if (ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blk))
 	{
-		if (!ss_read_block(lcl_ss_ctx, blk, blk_buff_ptr))
-			*read_failed = TRUE;
+		ss_read_block(lcl_ss_ctx, blk, blk_buff_ptr); /* no return in case of failure */
 		return TRUE;
 	}
 	return FALSE;

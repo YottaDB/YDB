@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,5 +42,6 @@
 #endif
 
 int gtm_socket(int domain, int type, int protocol);
+int gtm_connect(int socket, struct sockaddr *address, size_t address_len);
 
 #endif

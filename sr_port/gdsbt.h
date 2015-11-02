@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -325,6 +325,9 @@ typedef struct node_local_struct
 	gvstats_rec_t	gvstats_rec;
 	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
 	sm_off_t	encrypt_glo_buff_off;	/* offset from unencrypted global buffer to its encrypted counterpart */
+	global_latch_t	snapshot_crit_latch;	/* To be acquired by any process that wants to clean up an orphaned snapshot or
+						 * initiate a new snapshot
+						 */
 	long		ss_shmid;		 /* Identifier of the shared memory for the snapshot that started
 						  * recently.
 						  */

@@ -58,7 +58,9 @@ CONDITION_HANDLER(dbinit_ch)
 		udi = FILE_INFO(db_init_region);
 	if (NULL != udi)
 	{
-		CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
+		if (FD_INVALID != udi->fd)
+			CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID */
+		assert(FD_INVALID == udi->fd);
 		csa = &udi->s_addrs;
 		if (NULL != csa->hdr)
 		{

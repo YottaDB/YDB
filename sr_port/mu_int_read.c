@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,8 +29,10 @@
 #endif
 #include "min_max.h"
 #ifdef GTM_SNAPSHOT
+#include "shmpool.h"		/* Needed for DBG_ENSURE_PTR_WITHIN_SS_BOUNDS */
 #include "db_snapshot.h"
 #endif
+#include "mupip_exit.h"
 
 GBLREF sgmnt_data	mu_int_data;
 GBLREF int4		mu_int_ovrhd;
@@ -44,33 +46,43 @@ GBLREF	uint4		mu_int_errknt;
 
 uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 {
-	int4		status;
-	file_control	*fc;
-	unsigned char	*tmp_ptr;
+	int4			status;
+	file_control		*fc;
+	unsigned char		*tmp_ptr;
 	GTMCRYPT_ONLY(
-		int	req_dec_blk_size;
-		int	crypt_status;
+		int		req_dec_blk_size;
+		int		crypt_status;
 	)
-	boolean_t 	have_blk = FALSE;
-	sgmnt_addrs	*csa;
-	GTM_SNAPSHOT_ONLY(boolean_t	read_failed;)
+	boolean_t 		have_blk = FALSE;
+	sgmnt_addrs		*csa;
+	GTM_SNAPSHOT_ONLY(
+		boolean_t	read_failed;
+		shm_snapshot_t	*ss_shm_ptr;
+	)
 
 	error_def(ERR_DBRDERR);
 	error_def(ERR_DYNUPGRDFAIL);
+	error_def(ERR_REGSSFAIL);
+	error_def(ERR_INTEGERRS);
 
 	csa = cs_addrs;
 	tmp_ptr = malloc(mu_int_data.blk_size);
 #	ifdef GTM_SNAPSHOT
 	if (ointeg_this_reg)
 	{
-		if (ss_get_block(csa, csa->ss_ctx, blk, tmp_ptr, &read_failed))
-			have_blk = TRUE;
-		else if (read_failed)
-		{
-			/* ss_get_block error'ed out for some reason. */
-			assert(FALSE);
-			mu_int_errknt++;
-			return NULL;
+		assert(NULL != csa->ss_ctx);
+		ss_shm_ptr = (SS_CTX_CAST(csa->ss_ctx))->ss_shm_ptr;
+		DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
+		if (!ss_shm_ptr->failure_errno)
+			have_blk = ss_get_block(csa, blk, tmp_ptr);
+		else
+		{	/* GT.M has failed initiating snapshot resources. Report error and exit so that we don't continue with
+			 * an INTEG which is unusable. Note that, it's okay to check failure_errno (in the shared memory) outside
+			 * crit as GT.M is the only one that sets it and INTEG (while doing snapshot cleanup) is the only one
+			 * that resets it
+			 */
+			gtm_putmsg(VARLSTCNT(5) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid, DB_LEN_STR(gv_cur_region));
+			mupip_exit(ERR_INTEGERRS);
 		}
 	}
 #	endif
@@ -85,24 +97,21 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 #		ifdef GTM_SNAPSHOT
 		if (ointeg_this_reg)
 		{
-			/* Since we did not have locks up, ensure we didn't miss a before-image	while we where reading 	*/
-			/* in this block. Note we don't have to check the return status since it will either get the 	*/
-			/* before-image or not.										*/
-			ss_get_block(csa, csa->ss_ctx, blk, tmp_ptr, &read_failed);
-			if (read_failed)
+			assert(NULL != ss_shm_ptr); /* should have been initialized above */
+			/* Since we did not have locks up, ensure we didn't miss a before-image	while we were reading
+			 * in this block. Note we don't have to check the return status since it will either get the
+			 * before-image or not.
+			 */
+			if (!ss_shm_ptr->failure_errno)
+				ss_get_block(csa, blk, tmp_ptr);
+			else
 			{
-				/* ss_get_block error'ed out for some reason. */
-				assert(FALSE);
-				mu_int_errknt++;
-				return NULL;
+				gtm_putmsg(VARLSTCNT(5) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid, DB_LEN_STR(gv_cur_region));
+				mupip_exit(ERR_INTEGERRS);
 			}
 		}
 #		endif
 	}
-	GTM_SNAPSHOT_ONLY(
-		if (ointeg_this_reg)
-			(SS_CTX_CAST(csa->ss_ctx))->ss_shm_ptr->ss_read_progress++;
-	)
 #	ifdef GTM_CRYPT
 	req_dec_blk_size = MIN(mu_int_data.blk_size, ((blk_hdr_ptr_t)tmp_ptr)->bsiz) - SIZEOF(blk_hdr);
 	if (BLOCK_REQUIRE_ENCRYPTION(mu_int_data.is_encrypted, (((blk_hdr_ptr_t)tmp_ptr)->levl), req_dec_blk_size))

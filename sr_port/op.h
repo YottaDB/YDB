@@ -247,6 +247,20 @@ void	op_svget(int varnum, mval *v);
 void	op_svput(int varnum, mval *v);
 /*	op_tcommit : prototype defined separately in op_tcommit.h since it returns "enum cdb_sc" type. */
 void	op_trestart(int newlevel);
+
+/* Macro to be called by C Runtime code to invoke op_trollback. Sets implicit_trollback to TRUE. Note: The interface of
+ * OP_TROLLBACK macro and op_trollback function needs to be maintained in parallel.
+ */
+#define OP_TROLLBACK(RB_LEVELS)													\
+{																\
+	GBLREF	boolean_t		implicit_trollback;									\
+																\
+	assert(!implicit_trollback); 												\
+	implicit_trollback = TRUE;												\
+	op_trollback(RB_LEVELS);												\
+	assert(!implicit_trollback); /* Should have been reset by op_trollback at the beginning of the function entry */	\
+}
+
 void	op_trollback(int rb_levels);
 void	op_tstart(int dollar_t, ...);
 void	op_unlock(void);

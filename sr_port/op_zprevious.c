@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -164,7 +164,7 @@ void op_zprevious(mval *v)
 				name.len = gv_altkey->end - 1;
 				if (dba_cm == acc_meth)
 					break;
-				gv_bind_name(gd_header, &name);
+				GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &name);
 				if (gv_cur_region != map->reg.addr)
 				{
 					found = FALSE;

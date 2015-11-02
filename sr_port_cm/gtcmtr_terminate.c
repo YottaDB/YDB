@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ bool gtcmtr_terminate(bool cm_err)
 #endif
 	uint4		status;
 	struct CLB	*clb;
-	int		save_intrpt_ok_state;
+	intrpt_state_t	save_intrpt_ok_state;
 
 	if (curr_entry)
 	{

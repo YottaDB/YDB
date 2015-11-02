@@ -13,6 +13,7 @@
 
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
+#include <stddef.h>		/* For offsetof macro */
 
 #include "gtm_logicals.h"
 #include "logical_truth_value.h"
@@ -32,6 +33,8 @@
 #include "gdskill.h"		/* needed for gdsfhead.h */
 #include "gdsbt.h"		/* needed for gdsfhead.h */
 #include "gdsfhead.h"		/* needed for MAXTOTALBLKS_MAX macro */
+#include "sbs_blk.h"
+#include "mvalconv.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -66,6 +69,12 @@ GBLREF	char		prombuf[MAX_MIDENT_LEN];
 GBLREF	mstr		gtmprompt;
 GBLREF	boolean_t	gtm_environment_init;
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
+GBLREF	int4		lv_sbs_int_ele_cnt;	/* Number of elements in an int type sbs_blk array */
+GBLREF	int4		lv_sbs_flt_ele_cnt;	/* Number of elements in an mflt type sbs_blk array */
+GBLREF	int4		lv_sbs_str_ele_cnt;	/* Number of elements in a str type sbs_blk array */
+GBLREF	int4		lv_sbs_blk_size;	/* Size of an sbs_blk */
+GBLREF	int4		lv_sbs_blk_scale;	/* Scale factor - default 1 */
+GBLREF	mval		sbs_mval_int_ele;	/* mval version of lv_sbs_int_ele_cnt */
 #ifdef DEBUG
 GBLREF	boolean_t	gtm_gvundef_fatal;
 #endif
@@ -76,7 +85,7 @@ void	gtm_env_init(void)
 	mstr			val, trans;
 	boolean_t		ret, is_defined;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent;
-	int4			status;
+	int4			status, num, sbs_blk_union_size;
 	char			buf[MAX_TRANS_NAME_LEN];
 
 	if (!gtm_env_init_done)
@@ -97,6 +106,20 @@ void	gtm_env_init(void)
 			gtmDebugLevel |= tdbglvl;
 		}
 		DEBUG_ONLY(gtmdbglvl_inited = TRUE);
+
+		/* gtm_lvscale environment/logical */
+		val.addr = GTM_LVSCALE;
+		val.len = SIZEOF(GTM_LVSCALE) - 1;
+		lv_sbs_blk_scale = trans_numeric(&val, &is_defined, TRUE);
+		if (!is_defined || (0 >= lv_sbs_blk_scale))
+			lv_sbs_blk_scale = 1;	/* Default value */
+		/* Calculate the sbs_blk element sizes based on lv_sbs_blk_scale */
+		lv_sbs_int_ele_cnt =  MIN_INT_ELE_CNT * lv_sbs_blk_scale;
+		sbs_blk_union_size = (lv_sbs_int_ele_cnt * SIZEOF(lv_val *));
+		lv_sbs_flt_ele_cnt = (sbs_blk_union_size / SIZEOF(sbs_flt_struct));
+		lv_sbs_str_ele_cnt = (sbs_blk_union_size / SIZEOF(sbs_str_struct));
+		lv_sbs_blk_size = (OFFSETOF(sbs_blk, ptr) + sbs_blk_union_size);
+		i2mval(&sbs_mval_int_ele, lv_sbs_int_ele_cnt);
 
 		/* Duplicate Set Noop environment/logical */
 		val.addr = GTM_GVDUPSETNOOP;

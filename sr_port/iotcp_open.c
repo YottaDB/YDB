@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,7 @@
 #include "gtm_ctype.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
+#include "gtm_netdb.h"
 
 #include "copy.h"
 #include "gt_timer.h"
@@ -45,6 +46,14 @@
 #include "outofband.h"
 #include "wake_alarm.h"
 
+#ifdef __osf__
+/* Tru64 does not have the prototype for "hstrerror" even though the function is available in the library.
+ * Until we revamp the TCP communications setup stuff to use the new(er) POSIX definitions, we cannot move
+ * away from "hstrerror". Declare prototype for this function in Tru64 manually until then.
+ */
+const char *hstrerror(int err);
+#endif
+
 GBLREF tcp_library_struct	tcp_routines;
 GBLREF bool			out_of_time;
 GBLREF volatile int4		outofband;
@@ -54,7 +63,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 {
 	boolean_t		no_time_left = FALSE, timed;
 	char			addr[SA_MAXLEN+1], *errptr, sockaddr[SA_MAXLEN+1],
-				temp_addr[SA_MAXLEN+1], temp_ch;
+				temp_addr[SA_MAXLEN+1], temp_ch, *adptr;
 	unsigned char		ch, len;
 	int4			length, width;
 	unsigned short		port;
@@ -72,6 +81,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 	fd_set			tcp_fd;
 	int			lsock;
 	short 			retry_num;
+	const char		*terrptr;
 
 	error_def(ERR_DEVPARMNEG);
 	error_def(ERR_INVADDRSPEC);
@@ -155,15 +165,30 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 			{
 				ii = 0;
 				temp_ch = temp_addr[0];
-				while(ISDIGIT(temp_ch) || ('.' == temp_ch))
+				while(ISDIGIT_ASCII(temp_ch) || ('.' == temp_ch))
 				{
 					ii++;
 					temp_ch = temp_addr[ii];
 				}
+
 				if ('\0' != temp_ch)
-					SPRINTF(addr, "%s", iotcp_name2ip(temp_addr));
-				else
+				{
+					adptr = iotcp_name2ip(temp_addr);
+					if (NULL == adptr)
+					{
+#if !defined(__hpux) && !defined(__MVS__)
+						terrptr = HSTRERROR(h_errno);
+						rts_error(VARLSTCNT(6) ERR_INVADDRSPEC, 0, ERR_TEXT, 2, LEN_AND_STR(terrptr));
+#else
+						/* Grumble grumble HPUX and z/OS don't have hstrerror() */
+						rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
+#endif
+						return FALSE;
+					}
+					SPRINTF(addr, "%s", adptr);
+				} else
 					SPRINTF(addr, "%s", temp_addr);
+
 				if ((in_addr_t)-1 == (newtcp.sin.sin_addr.s_addr = tcp_routines.aa_inet_addr(addr)))
 				{
 					rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);

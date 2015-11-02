@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,10 +16,9 @@
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "gtm_inet.h"
+#include "gtm_ctype.h"
 
-#include <netinet/in.h>
 #include <errno.h>
-#include <ctype.h>
 
 #include "cmidef.h"
 #include "eintr_wrappers.h"
@@ -50,7 +49,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *tnd, struct sockaddr_in *inp)
 		/* look for : */
 		for (ip_len = 0, cp = tnd_str; cp < tnd_str + tnd_len; cp++)
 		{
-			if (*cp != ':' && *cp != '.' && !isdigit(*cp))
+			if (*cp != ':' && *cp != '.' && !ISDIGIT_ASCII(*cp))
 				return CMI_BADIPADDRPORT;
 			if (*cp == ':')
 			{

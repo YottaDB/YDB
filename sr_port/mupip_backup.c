@@ -133,7 +133,9 @@ GBLREF	char		*jnl_state_lit[];
 GBLREF	char		*repl_state_lit[];
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	void            (*call_on_signal)();
+#ifdef DEBUG
 GBLREF  int		process_exiting;		/* Process is on it's way out */
+#endif
 
 #ifdef UNIX
 GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
@@ -160,11 +162,10 @@ enum
 
 void mupip_backup_call_on_signal(void)
 {	/* Called if mupip backup is terminated by a signal. Performs cleanup of temporary files and shutdown backup. */
-	call_on_signal = NULL;	/* Do not recurse via call_on_signal if there is an error */
-	process_exiting = TRUE;	/* Signal function "free" (in gtm_malloc_src.h) not to bother with frees as we are anyways exiting.
-				 * This avoids assert failures that would otherwise occur due to nested storage mgmt calls
-				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
-				 */
+	assert(NULL == call_on_signal);	/* Should have been reset by signal handling caller before invoking this function.
+					 * This will ensure we do not recurse via call_on_signal if there is another error.
+					 */
+	assert(process_exiting);	/* should have been set by caller */
 	if (backup_started)
 	{	/* Cleanup that which we have messed */
 		backup_interrupted = TRUE;
@@ -517,10 +518,21 @@ void mupip_backup(void)
 	if (TRUE == online)
 	{
 		tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME;
-		tempdir_log.len = SIZEOF(GTM_BAK_TEMPDIR_LOG_NAME) - 1;
+		tempdir_log.len = STR_LIT_LEN(GTM_BAK_TEMPDIR_LOG_NAME);
 		trans_log_name_status =
 			TRANS_LOG_NAME(&tempdir_log, &tempdir_trans, tempdir_trans_buffer, SIZEOF(tempdir_trans_buffer),
 					do_sendmsg_on_log2long);
+#ifdef UNIX	/* UNIX has upper (deprecated) and lower case versions of this env var where as VMS only has upper */
+		if ((SS_NORMAL != trans_log_name_status)
+		    || (NULL == tempdir_trans.addr) || (0 == tempdir_trans.len))
+		{	/* GTM_BAK_TEMPDIR_LOG_NAME not found, attempt GTM_BAK_TEMPDIR_LOG_NAME_UC instead */
+			tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME_UC;
+			tempdir_log.len = STR_LIT_LEN(GTM_BAK_TEMPDIR_LOG_NAME_UC);
+			trans_log_name_status =
+				TRANS_LOG_NAME(&tempdir_log, &tempdir_trans, tempdir_trans_buffer, SIZEOF(tempdir_trans_buffer),
+					       do_sendmsg_on_log2long);
+		}
+#endif
 		/* save the length of the "base" so we can (restore it and) re-use the string in tempdir_trans.addr */
 		tempdir_trans_len = tempdir_trans.len;
 	} else

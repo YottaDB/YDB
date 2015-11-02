@@ -228,18 +228,18 @@ GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");
 GBLDEF int              (*gtm_env_xlate_entry)() = NULL;
 GBLDEF void             (*gtm_sigusr1_handler)() = NULL;
 GBLDEF	mval		dollar_zgbldir,
-			dollar_zsource = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0),
+			dollar_zsource = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_zstatus,
-			dollar_zstep = DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 1, "B", 0, 0),
+			dollar_zstep = DEFINE_MVAL_STRING(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 1, "B", 0, 0),
 			dollar_ztrap,
-			ztrap_pop2level = DEFINE_MVAL_LITERAL(MV_NM | MV_INT, 0, 0, 0, 0, 0, 0),
+			ztrap_pop2level = DEFINE_MVAL_STRING(MV_NM | MV_INT, 0, 0, 0, 0, 0, 0),
 			zstep_action,
 			dollar_system,
-			dollar_estack_delta = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0),
+			dollar_estack_delta = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_etrap,
-			dollar_zerror = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, DEFAULT_ZERROR_LEN, DEFAULT_ZERROR_STR, 0, 0),
+			dollar_zerror = DEFINE_MVAL_STRING(MV_STR, 0, 0, DEFAULT_ZERROR_LEN, DEFAULT_ZERROR_STR, 0, 0),
 			dollar_zyerror,
-			dollar_ztexit = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
+			dollar_ztexit = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 GBLDEF  uint4		dollar_zjob;
 GBLDEF	mval		dollar_zinterrupt;
 GBLDEF	boolean_t	dollar_zininterrupt;
@@ -295,7 +295,7 @@ GBLDEF	hash_table_str	*complits_hashtab = NULL;
 GBLDEF	hash_table_str	*compsyms_hashtab = NULL;
 GBLDEF	mem_list	*mem_list_head;
 GBLDEF	boolean_t	debug_mupip;
-GBLDEF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
+GBLDEF	unsigned char	t_fail_hist[CDB_MAX_TRIES];	/* type has to be unsigned char and not enum cdb_sc to ensure single byte */
 GBLDEF	cache_rec_ptr_t	cr_array[((MAX_BT_DEPTH * 2) - 1) * 2];	/* Maximum number of blocks that can be in transaction */
 GBLDEF	unsigned int	cr_array_index;
 GBLDEF	boolean_t	need_core;		/* Core file should be created */
@@ -545,7 +545,7 @@ GBLDEF	int4			zdate_form = 0;
 GBLDEF	boolean_t		need_no_standalone = FALSE;
 
 GBLDEF	int4	zdir_form = ZDIR_FORM_FULLPATH; /* $ZDIR shows full path including DEVICE and DIRECTORY */
-GBLDEF	mval	dollar_zdir = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
+GBLDEF	mval	dollar_zdir = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 
 GBLDEF	int * volatile		var_on_cstack_ptr = NULL; /* volatile pointer to int; volatile so that nothing gets optimized out */
 GBLDEF	boolean_t		gtm_environment_init = FALSE;
@@ -1109,7 +1109,8 @@ GBLDEF	mval		*dollar_ztcode,
 			*dollar_ztriggerop,
 			*dollar_ztupdate,
 			*dollar_ztvalue,
-			dollar_ztwormhole = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0),
+			dollar_ztwormhole = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
+			dollar_ztslate = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			gtm_trigger_etrap;  		/* Holds $ETRAP value for inside trigger */
 GBLDEF	int		tprestart_state;		/* When triggers restart, multiple states possible. See tp_restart.h */
 GBLDEF	boolean_t	skip_INVOKE_RESTART = FALSE;	/* set to TRUE if caller of op_tcommit/t_retry does not want it to
@@ -1119,13 +1120,6 @@ GBLDEF	boolean_t	skip_INVOKE_RESTART = FALSE;	/* set to TRUE if caller of op_tco
 							 * did not do opp_tstart.s so we dont want control to be transferred
 							 * using the MUM_TSTART macro by mdb_condition_handler (which assumes
 							 * opp_tstart.s invocation).
-							 */
-GBLDEF	boolean_t	skip_dbtriggers = FALSE;	/* Set to FALSE by default (i.e. triggers are invoked). Set to TRUE
-							 * unconditionally by MUPIP LOAD as it always skips triggers. Also set
-							 * to TRUE by journal recovery/update-process only when they encounter
-							 * updates done by MUPIP LOAD so they too skip trigger processing. In the
-							 * case of update process, this keeps primary/secondary in sync. In the
-							 * case of journal recovery, this keeps the db and jnl in sync.
 							 */
 GBLDEF	boolean_t	goframes_unwound_trigger;	/* goframes() unwound a trigger base frame during its unwinds */
 GBLDEF	symval		*trigr_symval_list;		/* List of availalable symvals for use in (nested) triggers */
@@ -1142,6 +1136,14 @@ GBLDEF	boolean_t	explicit_update_repl_state;	/* Initialized just before an expli
 							 */
 #endif
 
+GBLDEF	boolean_t	skip_dbtriggers = FALSE;	/* Set to FALSE by default (i.e. triggers are invoked). Set to TRUE
+							 * unconditionally by MUPIP LOAD as it always skips triggers. Also set
+							 * to TRUE by journal recovery/update-process only when they encounter
+							 * updates done by MUPIP LOAD so they too skip trigger processing. In the
+							 * case of update process, this keeps primary/secondary in sync. In the
+							 * case of journal recovery, this keeps the db and jnl in sync.
+							 */
+
 GBLDEF	boolean_t expansion_failed, retry_if_expansion_fails; /* used by string pool when trying to expand */
 
 GBLDEF	boolean_t	mupip_exit_status_displayed;	/* TRUE if mupip_exit has already displayed a message for non-zero status.
@@ -1150,3 +1152,29 @@ GBLDEF	boolean_t	mupip_exit_status_displayed;	/* TRUE if mupip_exit has already 
 							 * invoked but we will still go through mur_close_files e.g. if exit is
 							 * done directly without invoking mupip_exit).
 							 */
+/* Vars for local variable sbs_blk array scaling */
+GBLDEF	int4		lv_sbs_int_ele_cnt;		/* Number of elements in an int type sbs_blk array */
+GBLDEF	int4		lv_sbs_flt_ele_cnt;		/* Number of elements in an mflt type sbs_blk array */
+GBLDEF	int4		lv_sbs_str_ele_cnt;		/* Number of elements in a str type sbs_blk array */
+GBLDEF	int4		lv_sbs_blk_scale;		/* Scale factor - default 1 */
+GBLDEF	int4		lv_sbs_blk_size;		/* Size of an sbs_blk */
+GBLDEF	mval		sbs_mval_int_ele;		/* mval version of lv_sbs_int_ele_cnt setup by gtm_env_init() */
+GBLDEF	boolean_t	implicit_trollback = FALSE;	/* Set to TRUE by OP_TROLLBACK macro before calling op_trollback. Set
+							 * to FALSE by op_trollback. Used to indicate op_trollback as to
+							 * whether it is being called from generated code (opp_trollback.s)
+							 * or from C runtime code.
+							 */
+GBLDEF	boolean_t	hold_onto_locks;		/* Currently TRUE for the lifetime of an online rollback. This means
+							 * a variety of locks (db crit locks, jnlpool crit locks, instance file
+							 * ftok locks, db access control semaphore etc.) are held for an extended
+							 * period of time by rollback until it terminates. To the database runtime
+							 * code, this global primarily signals it NOT to release the crit lock
+							 * on ANY region after each transaction commit. Since online rollback is
+							 * currently supported only in Unix, this variable is set to FALSE in VMS.
+							 * A field "hold_onto_crit" is similarly defined in the "sgmnt_addrs"
+							 * structure. This one pertains specifically to the db/jnlpool crit lock.
+							 * See comment there on how to decide which one to use in the runtime code.
+							 */
+#ifdef DEBUG
+GBLDEF	boolean_t	ok_to_UNWIND_in_exit_handling;	/* see gtm_exit_handler.c for comments */
+#endif

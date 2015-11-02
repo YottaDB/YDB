@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,6 @@ GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
-GBLREF	int			process_exiting;
 
 void deferred_signal_handler(void)
 {
@@ -101,9 +100,7 @@ void deferred_signal_handler(void)
 	 * that was interrupted by the flush timer for a different region which in turn was interrupted by an external signal
 	 * that would drive us to exit. Setting the "process_exiting" variable causes those csa checks to pass.
 	 */
-	process_exiting = TRUE;
-	if ((SIGTERM != exi_condition) && CHANDLER_EXISTS)	/* drive condition-handlers if they exist */
-		DRIVECH(0);
+	SET_PROCESS_EXITING_TRUE;
 	/* If a special routine was registered to be driven on a signal, drive it now */
 	if (0 != exi_condition && call_on_signal)
 	{

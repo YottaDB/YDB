@@ -64,6 +64,7 @@
 #include "file_head_write.h"
 #include "suspsigs_handler.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+#include "gtm_imagetype_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -81,7 +82,6 @@ GBLREF	int			gtmsecshr_sockpath_len;
 GBLREF	key_t			gtmsecshr_key;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		need_core;
-GBLREF	enum gtmImageTypes	image_type;
 
 static	volatile int		gtmsecshr_timer_popped;
 static	volatile boolean_t	ready_to_switch_log_file = FALSE;
@@ -170,7 +170,7 @@ int main(void)
 	error_def(ERR_GTMSECSHRSTART);
 	error_def(ERR_TEXT);
 
-	image_type = GTMSECSHR_IMAGE;
+	gtm_imagetype_init(GTMSECSHR_IMAGE); /* Side-effect : Sets skip_dbtriggers to TRUE for trigger non-supporting platforms */
 	gtm_wcswidth_fnptr = NULL;
 	gtm_env_init();	/* read in all environment variables */
 	err_init(gtmsecshr_cond_hndlr);

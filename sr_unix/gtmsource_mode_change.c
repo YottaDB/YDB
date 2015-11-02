@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@ int gtmsource_mode_change(int to_mode)
 	uint4		savepid;
 	int		exit_status;
 	int		status, detach_status, remove_status;
+	sgmnt_addrs	*repl_csa;
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	repl_log(stdout, TRUE, TRUE, "Initiating %s operation on source server pid [%d] for secondary instance [%s]\n",
@@ -66,6 +67,8 @@ int gtmsource_mode_change(int to_mode)
 		 */
 		gtmsource_rootprimary_init(jnlpool.jnlpool_ctl->jnl_seqno);
 	}
+	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 	grab_lock(jnlpool.jnlpool_dummy_reg);
 	/* Any ACTIVATE/DEACTIVATE versus ROOTPRIMARY/PROPAGATE incompatibilities have already been checked in the
 	 * function "jnlpool_init" so go ahead and document the impending activation/deactivation and return.

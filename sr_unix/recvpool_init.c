@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@ GBLREF	int			recvpool_shmid;
 GBLREF 	uint4			process_id;
 GBLREF 	gtmrecv_options_t	gtmrecv_options;
 GBLREF	gd_region		*gv_cur_region;
+
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
 
@@ -72,6 +73,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	sm_long_t	status_l;
 	unix_db_info	*udi;
 	unsigned int	full_len;
+	sgmnt_addrs	*repl_csa;
 
 	error_def(ERR_REPLREQRUNDOWN);
 	error_def(ERR_RECVPOOLSETUP);
@@ -313,6 +315,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		 * Before updating jnlpool fields, ensure the journal pool lock is grabbed.
 		 */
 		assert(NULL != jnlpool.repl_inst_filehdr);
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 		grab_lock(jnlpool.jnlpool_dummy_reg);
 		jnlpool.repl_inst_filehdr->recvpool_shmid = udi->shmid;
 		jnlpool.repl_inst_filehdr->recvpool_semid = udi->semid;

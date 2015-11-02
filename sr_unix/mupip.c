@@ -63,6 +63,7 @@
 #include "startup.h"
 #include "gtm_startup.h"
 #include "invocation_mode.h"
+#include "gtm_imagetype_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -76,7 +77,6 @@ GBLREF	bool			transform;
 GBLREF	int			(*func)();
 GBLREF	mval			curr_gbl_root;
 GBLREF	global_latch_t		defer_latch;
-GBLREF	enum gtmImageTypes	image_type;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	char			cli_err_str[];
 GBLREF	CLI_ENTRY		mupip_cmd_ary[];
@@ -89,7 +89,7 @@ int main (int argc, char **argv)
 {
 	int		res;
 
-	image_type = MUPIP_IMAGE;
+	gtm_imagetype_init(MUPIP_IMAGE);
 	invocation_mode = MUMPS_UTILTRIGR;
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */

@@ -153,9 +153,9 @@ typedef struct
 #define is_gdid_gdid_identical(A, B) (0 == gdid_cmp(A, B) ? TRUE: FALSE)
 #endif
 
-#define	VALFIRSTCHAR(X)			(ISALPHA(X) || ('%' == X))
-#define	VALFIRSTCHAR_WITH_TRIG(X)	(ISALPHA(X) || ('%' == X) GTMTRIG_ONLY(|| (HASHT_GBL_CHAR1 == X)))
-#define	VALKEY(X)			(ISALPHA(X) || ISDIGIT(X))
+#define	VALFIRSTCHAR(X)			(ISALPHA_ASCII(X) || ('%' == X))
+#define	VALFIRSTCHAR_WITH_TRIG(X)	(ISALPHA_ASCII(X) || ('%' == X) GTMTRIG_ONLY(|| (HASHT_GBL_CHAR1 == X)))
+#define	VALKEY(X)			(ISALPHA_ASCII(X) || ISDIGIT_ASCII(X))
 
 /* Prototypes below */
 block_id get_dir_root(void);

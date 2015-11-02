@@ -20,14 +20,14 @@
 #    To build a version enabling optimizations -
 #    	gmake -f sr_unix/comlist.mk -I./sr_unix -I./sr_linux buildtypes=pro gtm_ver=<the current directory>
 #
-#    By default the build procedure will build 32 bit version of GT.M
-#    on a x86_64 bit machine.
-#    If you intend to build 64 bit version of GT.M on a x86_64 bit machine you
-#    have to explicitly set the environment variable 'OBJECT_MODE' to '64'
+#    By default the build procedure will build 64 bit version of GT.M
+#    on a x86_64 machine.
+#    If you intend to build 32 bit version of GT.M on a x86_64 bit machine you
+#    have to explicitly set the environment variable 'OBJECT_MODE' to '32'
 #    Example:
-#        OBJECT_MODE=64; export OBJECT_MODE #bourne shell
-#        export OBJECT_MODE=64              #bash shell
-#        setenv OBJECT_MODE 64              #tcsh shell
+#        OBJECT_MODE=32; export OBJECT_MODE #bourne shell
+#        export OBJECT_MODE=32              #bash shell
+#        setenv OBJECT_MODE 32              #tcsh shell
 #
 #   This procedure requires the tcsh shell to be installed.
 
@@ -35,21 +35,12 @@
 gt_machine_type=$(shell uname -m)
 gt_os_type=$(shell uname -s)
 
-linux_build_type=32
-
-ifeq ($(gt_machine_type),ia64)
-linux_build_type=64
-endif
-
-ifeq ($(gt_machine_type),x86_64)
-ifeq ($(OBJECT_MODE),64)
-linux_build_type=64
-else
-linux_build_type=32
-endif
-endif
-
 verbose ?= 0
+# get_lib_dirs.mk defines library directories
+# linux_build_type
+# use_nsb
+# gt_build_xfer_desc
+# it also santizes the CYGWIN gt_os_type
 include get_lib_dirs.mk
 
 CURDIR=$(shell pwd)
@@ -92,15 +83,11 @@ export #export all variables defined here to sub-make
 # help files etc.
 all: dirs xfer_build $(addsuffix _all, $(buildtypes)) ;
 
-#Build xfer_desc.i for ia64 and linux x86_64
+# Build xfer_desc.i for ia64 || linux x86_64
+# set in get_lib_dirs.mk
 xfer_build:
-ifeq ($(gt_machine_type),ia64)
+ifeq ($(gt_build_xfer_desc),1)
 	tcsh -f $(gtm_ver)/sr_unix/gen_xfer_desc.csh $(gt_src_list)
-endif
-ifeq ($(gt_machine_type),x86_64)
-ifeq ($(linux_build_type),64)
-	tcsh -f $(gtm_ver)/sr_unix/gen_xfer_desc.csh $(gt_src_list)
-endif
 endif
 
 dirs: 	$(addprefix $(gtm_ver)/, $(addsuffix /obj, $(buildtypes))) \
@@ -137,9 +124,9 @@ ifeq ($(MACHTYPE),x86_64)
 # On a 64 bit machine switch between 64 bit and 32 bit depending upon
 # the OBJECT_MODE environment variable
 ifeq ($(linux_build_type),64)
-	@tar -zcvf gtm_`head -1 idtemp`_$(OSTYPE)_$(MACHTYPE)_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+	@tar -zcvf gtm_`head -n 1 idtemp`_$(OSTYPE)_$(MACHTYPE)_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
 else
-	@tar -zcvf gtm_`head -1 idtemp`_$(OSTYPE)_i686_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+	@tar -zcvf gtm_`head -n 1 idtemp`_$(OSTYPE)_i686_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
 endif
 else
 
@@ -147,15 +134,15 @@ ifeq ($(OSTYPE),hpux)
 # IA64 HP-UX has MACHTYPE set to unknown; so use uname -m
 # tar doesnt support "z" (to zip) option; so needs a separate gzip command
 ifeq ($(gt_machine_type), ia64)
-	@tar -cvf gtm_`head -1 idtemp`_$(OSTYPE)_$(gt_machine_type)_$*.tar -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
-	@gzip gtm_`head -1 idtemp`_$(OSTYPE)_$(gt_machine_type)_$*.tar
+	@tar -cvf gtm_`head -n 1 idtemp`_$(OSTYPE)_$(gt_machine_type)_$*.tar -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+	@gzip gtm_`head -n 1 idtemp`_$(OSTYPE)_$(gt_machine_type)_$*.tar
 else
-	@tar -cvf gtm_`head -1 idtemp`_$(OSTYPE)_`echo $(MACHTYPE) | sed 's/_//1'`_$*.tar -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
-	@gzip gtm_`head -1 idtemp`_$(OSTYPE)_`echo $(MACHTYPE) | sed 's/_//1'`_$*.tar
+	@tar -cvf gtm_`head -n 1 idtemp`_$(OSTYPE)_`echo $(MACHTYPE) | sed 's/_//1'`_$*.tar -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+	@gzip gtm_`head -n 1 idtemp`_$(OSTYPE)_`echo $(MACHTYPE) | sed 's/_//1'`_$*.tar
 endif
 
 else
-	@tar -zcvf gtm_`head -1 idtemp`_$(OSTYPE)_$(MACHTYPE)_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
+	@tar -zcvf gtm_`head -n 1 idtemp`_$(OSTYPE)_$(MACHTYPE)_$*.tar.gz -C $* $(filter-out obj map, $(notdir $(wildcard $*/*)))
 endif
 endif
 	rm -f idtemp
@@ -199,7 +186,7 @@ exe_list:=libgtmshr$(gt_ld_shl_suffix) $(exe_list) $(gt_svc_exe)
 
 # m file stuff.  These list builds go to great pain to insure that either
 # post cms_load forms and pre-cms load forms work.
-plugin_cfiles:= gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c maskpass.c ascii2hex.c
+plugin_cfiles:= gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c maskpass.c
 plugin_hfiles:= gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h gtmxc_types.h main_pragma.h
 plugin_sh_file:= build.sh install.sh
 plugin_mfile:=getpass.m
@@ -630,7 +617,7 @@ else
 	@$(gt-as)
 endif
 else
-ifeq ($(findstring CYGWIN, $(gt_os_type)), CYGWIN)
+ifeq ($(gt_os_type)), CYGWIN)
 	@$(gt-as)
 	objcopy --prefix-symbols="_" $@
 else

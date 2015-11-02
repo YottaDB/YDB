@@ -33,6 +33,7 @@
 #include "mmemory.h"
 #include "gtm_ffs.h"
 #include "cert_blk.h"
+#include "gtm_ctype.h"
 #ifdef GTM_TRIGGER
 #include "rtnhdr.h"
 #include "gv_trigger.h"

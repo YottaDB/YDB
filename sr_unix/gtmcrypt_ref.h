@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -128,6 +128,8 @@ static int			gcry_already_inited = FALSE;
 #define GTM_ZSTATUS_FUNC		"gtm_zstatus"
 #define GTM_IS_FILE_IDENTICAL_FUNC	"gtm_is_file_identical"
 #define GTM_XCFILEID_FREE_FUNC		"gtm_xcfileid_free"
+
+xc_status_t gc_init_interface(int prompt_passwd);
 
 typedef void *		(*gtm_malloc_fptr_t)(size_t);
 typedef void		(*gtm_free_fptr_t)(void *);

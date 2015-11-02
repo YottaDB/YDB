@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,7 +73,7 @@ rc_prc_kill(rc_q_hdr *qhdr)
 #endif
 		return -1;
 	}
-    gv_bind_name(gd_header, &v.str);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
     memcpy(gv_currkey->base, req->key.key, req->key.len.value);
     gv_currkey->end = req->key.len.value;
     gv_currkey->base[gv_currkey->end] = 0;

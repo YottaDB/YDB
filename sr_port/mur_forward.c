@@ -64,9 +64,7 @@ GBLREF	mur_opt_struct		mur_options;
 GBLREF	short			dollar_tlevel;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
-#ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
-#endif
 
 static	void	(* const extraction_routine[])() =
 {
@@ -98,7 +96,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	error_def(ERR_JNLREADEOF);
 	error_def(ERR_BLKCNTEDITFAIL);
 
-	GTMTRIG_ONLY(skip_dbtriggers = TRUE;)	/* do not want to invoke any triggers for updates done by journal recovery */
+	skip_dbtriggers = TRUE;	/* do not want to invoke any triggers for updates done by journal recovery */
 	murgbl.extr_buff = (char *)malloc(murgbl.max_extr_record_length);
 	for (recstat = (enum broken_type)0; recstat < TOT_EXTR_TYPES; recstat++)
 		murgbl.extr_file_create[recstat] = TRUE;
@@ -261,7 +259,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			 */
 			if (FENCE_NONE != mur_options.fences)
 			{
-				rectype = rec->prefix.jrec_type;
+				rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 				if (IS_TP(rectype) && IS_TUPD(rectype))
 				{
 					assert(IS_SET_KILL_ZKILL_ZTWORM(rectype));

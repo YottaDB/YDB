@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-#       Copyright 2001, 2009 Fidelity Information Services, Inc #
+#       Copyright 2001, 2010 Fidelity Information Services, Inc #
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -16,102 +16,124 @@
 #       		if not Linux we assume Cygwin and x86
 #
 ##########################################################################################
-gt_machine_type=$(shell uname -m)
-gt_os_type=$(shell uname -s)
-linux_build_type=32
-
-ifeq ($(gt_machine_type),ia64)
-linux_build_type=64
-endif
-
-ifeq ($(gt_machine_type),x86_64)
-ifeq ($(OBJECT_MODE),64)
-linux_build_type=64
-else
-linux_build_type=32
-endif
-endif
-
 # GNU assembler options
+
+gt_as_assembler=as
+gt_as_option_DDEBUG=
+gt_as_option_debug=--gstabs
+gt_as_option_nooptimize=
+gt_as_option_optimize=
+gt_as_options=
+gt_as_options_common=
+gt_as_src_suffix=.s
+
 ifeq ($(gt_machine_type), ia64)
 gt_as_assembler=gcc -c
+gt_as_option_debug=
 else
-gt_as_assembler=as
-gt_as_option_debug=--gstabs
-endif
-# to avoid naming files with .S
-# smw 1999/12/04 gt_as_options_common=-c -x assembler-with-cpp
-ifeq ($(linux_build_type),64)
-gt_as_options_common=
+ifeq  ($(gt_machine_type), s390x)
+gt_as_option_debug=--gdwarf-2
 else
-ifeq ($(gt_os_type),Linux)
-gt_as_options_common= --32
-else
+ifeq  ($(gt_machine_type), CYGWIN)
 gt_as_option_debug=--gdwarf-2
 gt_as_options_common=--defsym cygwin=1
 endif
 endif
-gt_as_option_DDEBUG=
-gt_as_option_nooptimize=
-gt_as_option_optimize=
-gt_as_src_suffix=.s
+endif
+ifeq ($(linux_build_type), 32)
+ifeq ($(gt_os_type),Linux)
+gt_as_options_common= --32
+endif
+endif
 
 # C compiler options
-gt_cc_compiler=gcc
 
+gt_cc_shl_fpic=-fPIC
+gt_cc_options_common=-c -ansi
+ifeq ($(gt_os_type),CYGWIN)
+gt_cc_option_debug=$(gt_cc_option_debug) -gdwarf-2 -fno-inline -fno-inline-functions
+gt_cc_shl_fpic=
+gt_cc_options_common=-c
+endif
+
+gt_cc_compiler=cc
+gt_cc_option_DBTABLD=-DNOLIBGTMSHR
+gt_cc_option_DDEBUG=-DDEBUG
+gt_cc_option_debug=-g
+gt_cc_option_nooptimize=
+gt_cc_option_optimize=-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store
+gt_cc_options_common+= -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_XOPEN_SOURCE=600 -fsigned-char
+
+ifeq ($(linux_build_type),32)
+gt_cc_option_I=-I-
+endif
+
+ifeq ($(gt_machine_type), x86_64)
+ifeq ($(linux_build_type),32)
 # Do not lookup the source directory before include directories specified by -I.
 # gcc complains about -I- being obsolete, but using -iquote cause build errors for gcc and as - ABS 2008.12.09
-gt_cc_option_I=-I-
-ifeq ($(gt_os_type),Linux)
-gt_cc_shl_fpic=-fPIC                    # generate Position Independent Code.
+#
+# The -I- option is only needed for 32 bit builds on x86_64.  It provides a feature that is not present in
+# -iquote - namely -I- disables the ability to search the current directory for include files.  This is needed
+# when compiling something in sr_port which includes a file that is in both sr_port and the architecture specific
+# sr_386.  We don't want the sr_port version.  An example is sr_port/code_gen.c which includes emit_code.h.
+# emit_code.h is found in both sr_port and sr_i386.  Using -I- will find the sr_i386 version, but without it the
+# sr_port version is used. SLJ 2010.03.31
+
+# The /emul/ia32-linux/... directory doesn't exist on most machines, but when it's there we need it.  No problem
+# with always includeing it.
+
+gt_cc_option_I+= -I/emul/ia32-linux/usr/include/
 else
-gt_cc_shl_fpic=
+gt_cc_option_I=
+endif
 endif
 
-
-gt_cpp_compiler=cpp
-gt_cpp_options_common=
-#       gt_cc_options_common=-c -D_LARGEFILE64_SOURCE=1 -D_FILE_OFFSET_BITS=64
-#       gt_cc_options_common=-c -ansi -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -D_POSIX_C_SOURCE=199506L -D_FILE_OFFSET_BITS=64
-#               FULLBLOCKWRITES to make all block IO read/write the entire block to stave off prereads (assumes blind writes supported)
-# For gcc: _BSD_SOURCE for caddr_t, others
-#          _XOPEN_SOURCE=500 should probably define POSIX 199309 and/or
-#               POSIX 199506 but doesnt so...
-ifeq ($(gt_os_type),Linux)
-gt_cc_options_common=-c -ansi $(gt_cc_shl_fpic)
-else
-gt_cc_options_common=-c $(gt_cc_shl_fpic) -DNO_SEM_TIME -DNO_SEM_GETPID
-endif
-gt_cc_options_common+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -fsigned-char -Wimplicit -Wmissing-prototypes
-gt_cc_options_common+=-D_XOPEN_SOURCE=600 -D_LARGEFILE64_SOURCE
-ifeq ($(strip $(patsubst 2.2.%, 2.2, $(shell uname -r))), 2.2)
-gt_cc_options_common+=-DNeedInAddrPort
-endif
-gt_cc_option_nooptimize=
-# -fno-defer-pop to prevent problems with assembly/generated code with optimization
-# -fno-strict-aliasing since we don't comply with the rules
-# -ffloat-store for consistent results avoiding rounding differences
-gt_cc_option_optimize=-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store
-ifeq ($(linux_build_type),32)
-gt_cc_option_optimize+=-march=i686
-endif
 # autodepend option
 gt_cc_dep_option=-w
-# -g    generate debugging information for dbx (no longer overrides -O)
-ifeq ($(gt_os_type),Linux)
-gt_cc_option_debug=-g
+
+ifeq ($(gt_machine_type), ia64)
+gt_cc_option_optimize=-O
 else
-gt_cc_option_debug=-g -gdwarf-2 -fno-inline -fno-inline-functions
+gt_cc_options_common+= $(gt_cc_shl_fpic) -Wmissing-prototypes -D_LARGEFILE64_SOURCE
+ifeq ($(linux_build_type),32)
+gt_cc_option_optimize+= -march=i686
 endif
+endif
+
 gt_cc_shl_options=-c $(gt_cc_shl_fpic)
 
+ifeq ($(gt_os_type),CYGWIN)
+gt_cc_options_common+= -DNO_SEM_TIME -DNO_SEM_GETPID
+endif
 
 # Linker definitions:
+
+gt_ld_aio_syslib=
+gt_ld_ci_options=-Wl,-u,gtm_ci -Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export
+gt_ld_ci_u_option=-Wl,-u,gtm_ci
 gt_ld_linker=$(gt_cc_compiler)
-gt_ld_options_common=-Wl,-M             # to generate link map onto standard output
-gt_ld_options_bta=-g
-gt_ld_options_dbg=-g
-gt_ld_options_pro=
+gt_ld_m_shl_linker=ld
+gt_ld_m_shl_options=-shared
+gt_ld_option_output=-o
+gt_ld_options_all_exe=-rdynamic -Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmexe_symbols.export
+gt_ld_options_bta=-Wl,-M
+gt_ld_options_common=-Wl,-M
+gt_ld_options_dbg=-Wl,-M
+gt_ld_options_gtmshr=-Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export
+gt_ld_options_pro=-Wl,-M
+gt_ld_shl_linker=cc
+gt_ld_shl_options=-shared
+gt_ld_shl_suffix=.so
+gt_ld_syslibs= -lrt -lelf -lncurses -lm -ldl
+gt_ld_sysrtns=
+
+ifeq ($(linux_build_type),32)
+gt_ld_m_shl_options=
+gt_ld_syslibs= -lrt -lncurses -lm -ldl
+endif
+
+
 # -lrt for async I/O in mupip recover/rollback
 ifeq ($(linux_build_type), 64)
 gt_ld_syslibs=-lrt -lelf -lncurses -lm -ldl
@@ -122,13 +144,6 @@ else
 gt_ld_syslibs=-lncurses -lm -lcrypt
 endif
 endif
-gt_ld_aio_syslib=
-gt_ld_sysrtns=
-gt_ld_options_gtmshr=-Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export
-gt_ld_options_all_exe=-rdynamic -Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmexe_symbols.export
-gt_ld_shl_linker=$(gt_ld_linker)
-gt_ld_shl_options=-shared
-gt_ld_shl_suffix=.so
 
 # lint definition overrides
 gt_lint_linter=
@@ -137,7 +152,7 @@ gt_lint_options_common=
 
 gt_cpus=$(shell grep -c process /proc/cpuinfo)
 # used to build VPATH
-# Apparently Ubuntu does not likethe -e option for echo, delete this is the *.mdep make files generate an error
+# Apparently Ubuntu does not like the -e option for echo, delete this if the *.mdep make files generate an error
 ifeq ($(distro),ubuntu)
 gt_echoe=echo
 else
@@ -148,7 +163,6 @@ ifeq ($(linux_build_type), 32)
 gt_cc_options_common+=-m32
 gt_ld_options_gtmshr+=-m32
 gt_cc_shl_options+=-m32
-gt_ld_shl_options+=-m32
 gt_ld_options_common+=-m32
 endif
 #
@@ -168,7 +182,7 @@ endef
 #
 define gt-dep
         @echo $*.o $*.d : '\' > $@; \
-        echo $(notdir $(filter-out /usr/include% /usr/lib/% /usr/local/include% /usr/local/lib/%, $(filter %.c %.h,$(shell $(gt_cc_compiler) -M $(gt_cc_options) $(gt_cc_dep_option) $<)))) >> $@
+        echo $(notdir $(filter-out /usr/include% /usr/lib% /usr/local/include% /usr/local/lib/%, $(filter %.c %.h,$(shell $(gt_cc_compiler) -M $(gt_cc_options) $(gt_cc_dep_option) $<)))) >> $@
 endef
 define gt-export
         @echo "VERSION {" >$@

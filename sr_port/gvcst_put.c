@@ -47,7 +47,6 @@
 #include "gtm_trigger.h"
 #include "gv_trigger_protos.h"
 #include "subscript.h"
-#include "tp_restart.h"
 #include "mv_stent.h"
 #include "stringpool.h"
 #	ifdef DEBUG
@@ -55,6 +54,7 @@
 #	include "tp_frame.h"
 #	endif
 #endif
+#include "tp_restart.h"
 
 /* Include prototypes */
 #include "t_write.h"
@@ -104,11 +104,11 @@ GBLREF	uint4			update_array_size, cumul_update_array_size;	/* the current total 
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int		t_tries;
 GBLREF	cw_set_element		cw_set[];		/* create write set. */
+GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 #ifdef GTM_TRIGGER
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
 GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
 #endif
@@ -262,7 +262,7 @@ void	gvcst_put(mval *val)
 	mstr_len_t		dbg_vallen;
 	mval			*dbg_lcl_val;
 	int			dbg_num_iters = -1;	/* number of iterations through gvcst_put */
-	int			lcl_dollar_tlevel;
+	int			lcl_dollar_tlevel, lcl_t_tries;
 	typedef struct
 	{
 		unsigned int	t_tries;
@@ -297,6 +297,7 @@ void	gvcst_put(mval *val)
 	error_def(ERR_REC2BIG);
 	error_def(ERR_RSVDBYTE2HIGH);
 	error_def(ERR_TPRETRY);
+	error_def(ERR_GVPUTFAIL);
 
 	is_dollar_incr = in_gvcst_incr;
 	in_gvcst_incr = FALSE;
@@ -345,11 +346,19 @@ void	gvcst_put(mval *val)
 		lcl_dollar_tlevel = dollar_tlevel;
 	)
 fresh_tn_start:
+	DEBUG_ONLY(lcl_t_tries = -1;)
 	DEBUG_ONLY(is_fresh_tn_start = TRUE;)
 	assert(!jnl_format_done || (dollar_tlevel GTMTRIG_ONLY(&& ztval_gvcst_put_redo)));
 	DEBUG_ONLY(start_root = gv_target->root;)
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVPUTFAIL);
 tn_restart:
+	/* t_tries should never decrease - it either increases or stays the same. If should decrease we could live-lock with
+	 * an oscillating t_tries and never reach CDB_STAGNATE (go from optimistic to pessimistic concurrency). Since we
+	 * typically do a normal increment and then, for certain conditions, do a complementary decrement, we assert that
+	 * the net effect is never a decrease.
+	 */
+	assert((((int)t_tries) > lcl_t_tries) || (CDB_STAGNATE == t_tries) || (cdb_sc_helpedout == t_fail_hist[t_tries]));
+	DEBUG_ONLY(lcl_t_tries = t_tries;) /* update lcl_t_tries */
 	DEBUG_ONLY(
 		dbg_num_iters++;
 		assert(dbg_num_iters < ARRAYSIZE(dbg_trace_array));
@@ -371,27 +380,29 @@ tn_restart:
 	gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
 	assert(!ztval_gvcst_put_redo || IS_PTR_INSIDE_M_STACK(val));
 	is_tpwrap = FALSE;
-	GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap, ERR_GVPUTFAIL);
-	assert(skip_dbtriggers || (gvt_trigger == gv_target->gvt_trigger));
-	if (is_tpwrap)
-	{	/* The above call to GVTR_INIT* macro created a TP transaction (by invoking op_tstart).
-		 * Save all pertinent global variable information that needs to be restored in case of
-		 * a restart.  Note that the restart could happen in a nested trigger so these global
-		 * variables could have changed in value from what they were at gvcst_put entry, hence
-		 * the need to save/restore them.  If this is not an implicitly tp wrapped transaction,
-		 * there is no need to do this save/restore because a restart will transfer control
-		 * back to the M code corresponding to the start of the transaction which would
-		 * automatically initialize these global variables to the appropriate values.
-		 */
-		assert(lcl_implicit_tstart);
-		lcl_is_dollar_incr = is_dollar_incr;
-		lcl_val = val;
-		lcl_post_incr_mval = post_incr_mval;
-		lcl_increment_delta_mval = increment_delta_mval;
+	if (!skip_dbtriggers)
+	{
+		GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap, ERR_GVPUTFAIL);
+		assert(gvt_trigger == gv_target->gvt_trigger);
+		if (is_tpwrap)
+		{	/* The above call to GVTR_INIT* macro created a TP transaction (by invoking op_tstart).
+			 * Save all pertinent global variable information that needs to be restored in case of
+			 * a restart.  Note that the restart could happen in a nested trigger so these global
+			 * variables could have changed in value from what they were at gvcst_put entry, hence
+			 * the need to save/restore them.  If this is not an implicitly tp wrapped transaction,
+			 * there is no need to do this save/restore because a restart will transfer control
+			 * back to the M code corresponding to the start of the transaction which would
+			 * automatically initialize these global variables to the appropriate values.
+			 */
+			assert(lcl_implicit_tstart);
+			lcl_is_dollar_incr = is_dollar_incr;
+			lcl_val = val;
+			lcl_post_incr_mval = post_incr_mval;
+			lcl_increment_delta_mval = increment_delta_mval;
+		}
+		if ((NULL != gvt_trigger) && !ztval_gvcst_put_redo)
+			PUSH_ZTOLDMVAL_ON_M_STACK(ztold_mval, save_msp, save_mv_chain);
 	}
-	assert(skip_dbtriggers || (gvt_trigger == gv_target->gvt_trigger));
-	if (!skip_dbtriggers && (NULL != gvt_trigger) && !ztval_gvcst_put_redo)
-		PUSH_ZTOLDMVAL_ON_M_STACK(ztold_mval, save_msp, save_mv_chain);
 #	endif
 	assert(csd == cs_data);	/* assert csd is in sync with cs_data even if there were MM db file extensions */
 	si = sgm_info_ptr;	/* Cannot be moved before GVTR_INIT_AND_TPWRAP_IF_NEEDED macro since we could enter gvcst_put
@@ -1638,10 +1649,8 @@ tn_restart:
 	if (0 == dollar_tlevel)
 	{
 		nodeflags = 0;
-		GTMTRIG_ONLY(
-			if (skip_dbtriggers)
-				nodeflags |= JS_SKIP_TRIGGERS_MASK;
-		)
+		if (skip_dbtriggers)
+			nodeflags |= JS_SKIP_TRIGGERS_MASK;
 		assert(!jnl_format_done || !is_dollar_incr && (JNL_SET == non_tp_jfb_ptr->ja.operation));
 		if (need_extra_block_split)
                         inctn_opcode = inctn_gvcstput_extra_blk_split;
@@ -1712,6 +1721,8 @@ tn_restart:
 		if (dollar_tlevel)
 		{
 			nodeflags = 0;
+			if (skip_dbtriggers)
+				nodeflags |= JS_SKIP_TRIGGERS_MASK;
 			ja_val = (!is_dollar_incr ? val : post_incr_mval);
 			write_logical_jnlrecs = JNL_WRITE_LOGICAL_RECS(csa);
 #			ifdef GTM_TRIGGER
@@ -1786,18 +1797,21 @@ tn_restart:
 				}
 				POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
 					/* pop any stacked mvals before op_tcommit as it does its own popping */
-			} else
-				nodeflags |= JS_SKIP_TRIGGERS_MASK;
+			}
 #			endif
 			if (write_logical_jnlrecs && !jnl_format_done)
 			{
 				assert(dollar_tlevel);
-				GTMTRIG_ONLY(
-					/* Do not replicate implicit update or $ztval redo update */
-					assert(tstart_trigger_depth <= gtm_trigger_depth);
-					if ((gtm_trigger_depth > tstart_trigger_depth) || ztval_gvcst_put_redo)
-						nodeflags = JS_NOT_REPLICATED_MASK;
-				)
+#				ifdef GTM_TRIGGER
+				/* Do not replicate implicit update or $ztval redo update */
+				assert(tstart_trigger_depth <= gtm_trigger_depth);
+				if ((gtm_trigger_depth > tstart_trigger_depth) || ztval_gvcst_put_redo)
+				{
+					/* Ensure that JS_SKIP_TRIGGERS_MASK and JS_NOT_REPLICATED_MASK are mutually exclusive. */
+					assert(!(nodeflags & JS_SKIP_TRIGGERS_MASK));
+					nodeflags |= JS_NOT_REPLICATED_MASK;
+				}
+#				endif
 				jfb = jnl_format(JNL_SET, gv_currkey, ja_val, nodeflags);
 				assert(NULL != jfb);
 				jnl_format_done = TRUE;
@@ -1859,7 +1873,7 @@ retry:
 		 * to complete pending "tprestart_state" related work.
 		 */
 		GTMTRIG_ONLY(assert(ERR_TPRETRY == gtm_trig_status);)
-		tp_restart(1);
+		tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 	}
 	GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART);) /* if set to TRUE a few statements above, should have been reset by t_retry */
 	/* At this point, we can be in TP only if we implicitly did a tstart in gvcst_put (as part of a trigger update).

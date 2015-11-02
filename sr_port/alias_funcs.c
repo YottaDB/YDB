@@ -122,7 +122,7 @@
 			{	/* And it has descendents to process */					\
 				DBGRFCT((stderr, "MARK_REACHABLE: Scanning same lv for containers\n"));	\
 				als_scan_for_containers((lvp), &als_prcs_markreached_cntnr_node,	\
-							(void *)NULL, (void *)NULL); 			\
+							(void *)NULL, (void *)NULL, (int *)NULL);	\
 			}										\
 		}											\
 	}
@@ -153,7 +153,8 @@
 	    PRO_ONLY(&& (lv_base)->has_aliascont))										\
 	{															\
 		(lv_base)->stats.lvtaskcycle = lvtaskcycle;									\
-		als_scan_for_containers(lv_base, &als_prcs_xnew_alias_cntnr_node, (void *)popdsymval, (void *)cursymval);	\
+		als_scan_for_containers(lv_base, &als_prcs_xnew_alias_cntnr_node, (void *)popdsymval, (void *)cursymval,	\
+					(int *)NULL);										\
 	}
 
 
@@ -637,22 +638,34 @@ void als_xnew_killaliasarray(lv_sbs_tbl *stbl)
    the has_aliascont flag is is not on in the base mval. But this allows us to check the integrity of the has_aliascont flag
    in DBG because we will fail if ever a container is found in an array with the flag turned off.
 */
-void als_scan_for_containers(lv_val *lv_base, void (*als_container_processor)(lv_val *, void *, void *), void *arg1, void *arg2)
+void als_scan_for_containers(lv_val *lv_base, void (*als_container_processor)(lv_val *, void *, void *), void *arg1, void *arg2,
+			     int *cntnr_cnt)
 {
 	lv_val		*lv;
-	lv_sbs_tbl	*stbl;
+	lv_sbs_tbl	*stbl, *child;
 	sbs_blk		*num, *str;
 	int		i, cntnrs_found;
+	boolean_t	nested;
 
 	assert(lv_base);
-	DEBUG_ONLY(if (!lv_base->has_aliascont)
-			   DBGRFCT((stderr, "als_scan_for_containers: Scan would have been avoided in PRO\n")));
-	assert(MV_SYM == lv_base->ptrs.val_ent.parent.sym->ident);
+	if (NULL == cntnr_cnt)
+	{	/* This is a primary invocation on a base variable */
+
+		nested = FALSE;
+		assert(MV_SYM == lv_base->ptrs.val_ent.parent.sym->ident);
+		DEBUG_ONLY(if (!lv_base->has_aliascont)
+				   DBGRFCT((stderr, "als_scan_for_containers: Scan would have been avoided in PRO\n")));
+		cntnr_cnt = &cntnrs_found;
+		cntnrs_found =0;
+	} else
+	{	/* This is a nested invocation so we are processing a subscript level */
+		nested = TRUE;
+		assert(MV_SBS == lv_base->ptrs.val_ent.parent.sbs->ident);
+	}
 	stbl = lv_base->ptrs.val_ent.children;
 	assert(stbl);
 	assert(MV_SBS == stbl->ident);
 	assert(MV_SYM == stbl->sym->ident);
-	cntnrs_found = 0;
 	num = stbl->num;
 	str = stbl->str;
 	if (num)
@@ -664,10 +677,12 @@ void als_scan_for_containers(lv_val *lv_base, void (*als_container_processor)(lv
 			{	/* Look in each bucket .. since index is subscript, not all may have values */
 				if ((lv = num->ptr.lv[i]) && (lv->v.mvtype & MV_ALIASCONT))	/* Note lv assignment */
 				{
-					assert(lv_base->has_aliascont);
-					++cntnrs_found;
+					++*cntnr_cnt;
 					(*als_container_processor)(lv, arg1, arg2);
 				}
+				/* Since we go through each lv, it is possible for lv to be NULL in this array */
+				if (lv && (child = lv->ptrs.val_ent.children))				/* Note child assignment */
+					als_scan_for_containers(lv, als_container_processor, arg1, arg2, cntnr_cnt);
 			}
 
 		} else
@@ -678,10 +693,13 @@ void als_scan_for_containers(lv_val *lv_base, void (*als_container_processor)(lv
 				{
 					if ((lv = num->ptr.sbs_flt[i].lv) && (lv->v.mvtype & MV_ALIASCONT)) /* Note lv assign */
 					{
-						assert(lv_base->has_aliascont);
-						++cntnrs_found;
+						++*cntnr_cnt;
 						(*als_container_processor)(lv, arg1, arg2);
 					}
+					assert(NULL != lv);					/* Should never be null in this
+												 * structure */
+					if (child = lv->ptrs.val_ent.children)			/* Note child assignment */
+						als_scan_for_containers(lv, als_container_processor, arg1, arg2, cntnr_cnt);
 				}
 				num = num->nxt;
 			}
@@ -693,17 +711,26 @@ void als_scan_for_containers(lv_val *lv_base, void (*als_container_processor)(lv
 		{
 			if ((lv = str->ptr.sbs_str[i].lv) && (lv->v.mvtype & MV_ALIASCONT))	/* Note lv assignment */
 			{
-				assert(lv_base->has_aliascont);
-				++cntnrs_found;
+				++*cntnr_cnt;
 				(*als_container_processor)(lv, arg1, arg2);
 			}
+			assert(NULL != lv);							/* Should never be null in this
+												 * structure */
+			/* If this node has children, run scan on them as well */
+			if (child = lv->ptrs.val_ent.children)				/* Note child assignment */
+				als_scan_for_containers(lv, als_container_processor, arg1, arg2, cntnr_cnt);
 
 		}
 		str = str->nxt;
 	}
 	/* If no alias containers found in this base var, make sure flag gets turned off */
-	if (0 == cntnrs_found)
-		lv_base->has_aliascont = FALSE;
+	if (!nested)
+	{
+		if (0 == *cntnr_cnt)
+			lv_base->has_aliascont = FALSE;
+		else
+			assert(lv_base->has_aliascont);
+	}
 }
 
 
@@ -720,6 +747,7 @@ void als_prcs_xnew_alias_cntnr_node(lv_val *lv, void *popdsymvalv, void *cursymv
 	cursymval = (symval *)cursymvalv;
 	assert(MV_SBS == lv->ptrs.val_ent.parent.sym->ident);
 	oldlv = (lv_val *)lv->v.str.addr;
+	assert(oldlv);
 	if (MV_LVCOPIED == oldlv->v.mvtype)
 	{	/* This lv_val has been copied over already so use that pointer instead */
 		newlv = oldlv->ptrs.copy_loc.newtablv;
@@ -876,6 +904,7 @@ void als_prcs_markreached_cntnr_node(lv_val *lv, void *dummy1, void *dummy2)
 	assert(MV_SBS == lv->ptrs.val_ent.parent.sbs->ident);	/* Verify subscripted var */
 	lv_base = (lv_val *)lv->v.str.addr;
 	assert(lv_base);
+	assert(MV_SYM == lv_base->ptrs.val_ent.parent.sym->ident);
 	MARK_REACHABLE(lv_base);
 }
 
@@ -894,6 +923,7 @@ void als_prcs_xnewref_cntnr_node(lv_val *lv, void *dummy1, void *dummy2)
 	assert(MV_SBS == lv->ptrs.val_ent.parent.sbs->ident);	/* Verify subscripted var */
 	lv_base = (lv_val *)lv->v.str.addr;
 	assert(lv_base);
+	assert(MV_SYM == lv_base->ptrs.val_ent.parent.sym->ident);
 	if (lv_base->stats.lvtaskcycle != lvtaskcycle)
 	{
 		INCR_CREFCNT(lv_base);

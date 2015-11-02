@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -229,5 +229,6 @@ CONDITION_HANDLER(jobexam_dump_ch)
 	send_msg(VARLSTCNT(3) ERR_JOBEXAMFAIL, 1, process_id);
 
 	/* Stop the errors here and return to caller */
+	UNIX_ONLY(util_out_print("", RESET));	/* Prevent rts_error from flushing this error later */
 	UNWIND(NULL, NULL);
 }

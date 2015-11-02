@@ -115,9 +115,9 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 		cre_jnl_file_intrpt_rename(jctl->jnl_fn_len, jctl->jnl_fn);
 		if (!mur_fopen_sp(jctl))
 			return NULL;
-		jctl->jfh = (jnl_file_header *)malloc(JNL_HDR_LEN);
+		jctl->jfh = (jnl_file_header *)malloc(REAL_JNL_HDR_LEN);
 		jfh = jctl->jfh;
-		DO_FILE_READ(jctl->channel, 0, jfh, JNL_HDR_LEN, jctl->status, jctl->status2);
+		DO_FILE_READ(jctl->channel, 0, jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
 		if (SS_NORMAL != jctl->status) /* read fails */
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0, jctl->status);

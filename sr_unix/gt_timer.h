@@ -91,6 +91,7 @@ void		check_for_timer_pops(void);
 GT_TIMER	*find_timer_intr_safe(TID tid, GT_TIMER **tprev);
 
 STATICFNDCL void	hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
+STATICFNDCL void	gt_timers_alloc(void);
 STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata);
 STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir, void (*handler)());
 STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);

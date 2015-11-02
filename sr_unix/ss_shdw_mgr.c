@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -102,8 +102,8 @@ void		ss_set_shdw_bitmap(sgmnt_addrs *csa, snapshot_context_ptr_t lcl_ss_ctx, bl
 	/* Before dereferencing the shared memory, verify if the shared memory that GT.M has attached to and the one that
 	 * INTEG has created is actually in sync
 	 */
-	assert(lcl_ss_ctx->ss_shmid == cnl->ss_shmid);
-	assert(ss_shm_ptr->ss_info.ss_shmid == lcl_ss_ctx->ss_shmid);
+	assert(lcl_ss_ctx->attach_shmid == cnl->ss_shmid);
+	assert(ss_shm_ptr->ss_info.ss_shmid == lcl_ss_ctx->attach_shmid);
 	bitmap_addr = (unsigned int *)(lcl_ss_ctx->bitmap_addr);	/* Point to the beginning of the shadow bitmap */
 	COMPUTE_BLOCK_OFFSET(blk, word, bit);
 	DEBUG_ONLY(prev_val = (*(unsigned int *)(bitmap_addr + word));)

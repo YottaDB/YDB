@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,8 @@ GBLREF sgmnt_addrs	*cs_addrs;
 
 void dse_flush(void)
 {
+	boolean_t	was_crit;
+
 	error_def(ERR_DSEONLYBGMM);
 	error_def(ERR_DBRDONLY);
 
@@ -40,9 +42,12 @@ void dse_flush(void)
 	case dba_mm:
 		if (cs_addrs->critical)
 			crash_count = cs_addrs->critical->crashcnt;
-		grab_crit(gv_cur_region);
+		was_crit = cs_addrs->now_crit;
+		if (!was_crit)
+			grab_crit(gv_cur_region);
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-		rel_crit(gv_cur_region);
+		if (!was_crit)
+			rel_crit(gv_cur_region);
 		break;
 	default:
 		rts_error(VARLSTCNT(4) ERR_DSEONLYBGMM, 2, LEN_AND_LIT("BUFFER_FLUSH"));

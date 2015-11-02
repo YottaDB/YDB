@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+#include <errno.h>
 #include "gtm_time.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
@@ -37,6 +38,7 @@ int repl_log(FILE *fp, boolean_t stamptime, boolean_t flush, char *fmt, ...)
 	now_t	now; /* for GET_CUR_TIME macro */
 	char	*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	char	fmt_str[BUFSIZ];
+	int	rc;
 
 	assert(NULL != fp);
 	if (stamptime)
@@ -51,7 +53,8 @@ int repl_log(FILE *fp, boolean_t stamptime, boolean_t flush, char *fmt, ...)
 	}
 
 	va_start(printargs, fmt);
-	VFPRINTF(fp, fmt, printargs);
+	VFPRINTF(fp, fmt, printargs, rc);
+	assert(0 <= rc);
 	va_end(printargs);
 
 	if (flush)

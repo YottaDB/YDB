@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,7 +118,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 		if (NULL != retptr)
 		{
 			if (remove_leading_spaces)
-				while (*retptr && ISSPACE(*retptr))
+				while (*retptr && ISSPACE_ASCII(*retptr))
 					retptr++;
 			in_len = strlen(buffer);
 			if ('\n' == buffer[in_len - 1])

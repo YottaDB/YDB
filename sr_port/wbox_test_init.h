@@ -49,7 +49,17 @@ typedef enum {
 	WBTEST_BUFOWNERSTUCK_STACK,		/* 25 : Get stack trace of the blocking pid for stuck messages*/
 	WBTEST_OINTEG_WAIT_ON_START,		/* 26 : Have online integ wait 60 after initiating the snapshot */
 	WBTEST_MUR_ABNORMAL_EXIT_EXPECTED,	/* 27 : We expect MUPIP JOURNAL RECOVER/ROLLBACK to exit with non-zero status */
-	WBTEST_REPLBRKNTRANS			/* 28 : We expect a REPLBRKNTRANS error from the source server */
+	WBTEST_REPLBRKNTRANS,			/* 28 : We expect a REPLBRKNTRANS error from the source server */
+	WBTEST_CRASH_SHUTDOWN_EXPECTED,		/* 29 : Prevent assert if a crash shutdown is attempted (by kill -9) that
+						 *      could potentially leave some dirty buffers NOT to be flushed to the disk */
+	WBTEST_HELPOUT_TRIGNAMEUNIQ,		/* 30 : Use to skip alphanumeric processing in gtm_trigger_complink so as to
+						 	test TRIGNAMEUNIQ error */
+	WBTEST_HELPOUT_TRIGDEFBAD,		/* 31 : Use to prevent asserts from tripping while intentionally testing ^#t
+						        integrity (in gv_trigger.c) */
+	WBTEST_SEMTOOLONG_STACK_TRACE,		/* 32 : Get stack trace of the process which is holding on to
+						 *     the semaphore too long */
+	WBTEST_INVALID_SNAPSHOT_EXPECTED,	/* 33 : Prevent asserts from tripping in case of an invalid snapshot */
+	WBTEST_JNLOPNERR_EXPECTED		/* 34 : Prevent asserts in jnl_file_open in case of a JNLMOVED error */
 } wbtest_code_t;
 
 #ifdef DEBUG

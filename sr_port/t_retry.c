@@ -40,6 +40,7 @@
 #include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
 #include "wcs_backoff.h"
 #include "tp_restart.h"
+#include "gtm_ctype.h"		/* for ISALPHA_ASCII */
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -127,20 +128,26 @@ void t_retry(enum cdb_sc failure)
 		 * the transaction with no one eventually grabbing crit and doing the cache-recovery).
 		 */
 		assert(CDB_STAGNATE >= t_tries);
-		if ((CDB_STAGNATE <= t_tries)
-			&& ((cdb_sc_jnlclose == failure) || (cdb_sc_jnlstatemod == failure) || (cdb_sc_bkupss_statemod == failure)
-				|| (cdb_sc_future_read == failure) || (cdb_sc_helpedout == failure)))
-			t_tries = CDB_STAGNATE - 1;
+		if (CDB_STAGNATE <= t_tries)
+		{
+			/* Both backup and snapshot state change cannot happen when we are in final retry as they need crit
+			 * which is held by us in the final retry.
+			 */
+			assert(cdb_sc_bkupss_statemod != failure);
+			if ((cdb_sc_jnlstatemod == failure) || (cdb_sc_jnlclose == failure) || (cdb_sc_future_read == failure)
+				|| (cdb_sc_helpedout == failure))
+				t_tries = CDB_STAGNATE - 1;
+		}
 		if (CDB_STAGNATE <= ++t_tries)
 		{
 			DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
-			grab_crit(gv_cur_region);
+			if (!csa->hold_onto_crit)
+				grab_crit(gv_cur_region);
+			assert(csa->now_crit);
 			CHECK_MM_DBFILEXT_REMAP_IF_NEEDED(csa, gv_cur_region);
 			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
 			csd = cs_data;
-			if (CDB_STAGNATE > t_tries)
-				rel_crit(gv_cur_region);
-			else if (CDB_STAGNATE == t_tries)
+			if (CDB_STAGNATE == t_tries)
 			{
 				if (csd->freeze && update_trans)
 				{	/* Final retry on an update transaction and region is frozen.
@@ -153,41 +160,25 @@ void t_retry(enum cdb_sc failure)
 				assert((failure != cdb_sc_helpedout) && (failure != cdb_sc_future_read)
 					&& (failure != cdb_sc_jnlclose) && (failure != cdb_sc_jnlstatemod)
 					&& (failure != cdb_sc_bkupss_statemod) && (failure != cdb_sc_inhibitkills));
-				if (cdb_sc_unfreeze_getcrit == failure)
-				{
-					GRAB_UNFROZEN_CRIT(gv_cur_region, csa, csd);
-					t_tries = CDB_STAGNATE;
-				} else
-				{
-					assert(csa->now_crit);
+				assert(csa->now_crit);
+				if (!csa->hold_onto_crit)
 					rel_crit(gv_cur_region);
-
-					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-						end = &buff[MAX_ZWR_KEY_SZ - 1];
-
-					if (cdb_sc_gbloflow == failure)
-						rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
-					if (IS_DOLLAR_INCREMENT)
-					{
-						assert(ERR_GVPUTFAIL == t_err);
-						t_err = ERR_GVINCRFAIL;	/* print more specific error message */
-					}
-					UNIX_ONLY(send_msg(VARLSTCNT(9) t_err, 2, t_tries, t_fail_hist,
-							   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE));
-					UNIX_ONLY(gtm_fork_n_core());
-					VMS_ONLY(send_msg(VARLSTCNT(8) t_err, 2, t_tries, t_fail_hist,
-							   ERR_GVIS, 2, end-buff, buff));
-					rts_error(VARLSTCNT(8) t_err, 2, t_tries, t_fail_hist, ERR_GVIS, 2, end-buff, buff);
+				if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
+					end = &buff[MAX_ZWR_KEY_SZ - 1];
+				if (cdb_sc_gbloflow == failure)
+					rts_error(VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+				if (IS_DOLLAR_INCREMENT)
+				{
+					assert(ERR_GVPUTFAIL == t_err);
+					t_err = ERR_GVINCRFAIL;	/* print more specific error message */
 				}
+				UNIX_ONLY(send_msg(VARLSTCNT(9) t_err, 2, t_tries, t_fail_hist,
+						   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE));
+				UNIX_ONLY(gtm_fork_n_core());
+				VMS_ONLY(send_msg(VARLSTCNT(8) t_err, 2, t_tries, t_fail_hist,
+						   ERR_GVIS, 2, end-buff, buff));
+				rts_error(VARLSTCNT(8) t_err, 2, t_tries, t_fail_hist, ERR_GVIS, 2, end-buff, buff);
 			}
-		} else  if (cdb_sc_readblocked == failure)
-		{
-			if (csa->now_crit)
-			{
-				assert(FALSE);
-				rel_crit(gv_cur_region);
-			}
-			wcs_sleep(TIME_TO_FLUSH);
 		}
 		if ((cdb_sc_blockflush == failure) && !CCP_SEGMENT_STATE(csa->nl, CCST_MASK_HAVE_DIRTY_BUFFERS))
 		{
@@ -228,6 +219,6 @@ void t_retry(enum cdb_sc failure)
 		{
 			INVOKE_RESTART;
 		} else	/* explicit trigger update caused implicit tp wrap so should return to caller without rts_error */
-			tp_restart(1);
+			tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 	}
 }

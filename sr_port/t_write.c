@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -198,7 +198,7 @@ cw_set_element *t_write (
 		 */
 		cr = blkhist->cr;
 		assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-		cse->ondsk_blkver = (NULL == cr) ? (enum db_ver)GDSVCURR : cr->ondsk_blkver;
+		cse->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
 	} else
 	{	/* we did not create a new cse. assert the integrity of few fields filled in when this cse was created */
 		assert(cse->blk == blk);

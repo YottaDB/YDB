@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,7 +143,7 @@ void gvcmz_int_lkcancel(void)
 		{
 			if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 			{
-				sprintf(errbuf, "gvcmz_int_lkcancel: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
+				SPRINTF(errbuf, "gvcmz_int_lkcancel: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
 				rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
 			} else
 				gvcmz_errmsg(lkerrlnk, FALSE);

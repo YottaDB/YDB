@@ -39,6 +39,7 @@ GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];
 GBLREF int		last_fnquery_return_subcnt;
 GBLREF boolean_t 	local_collseq_stdnull;
 GBLREF int		lv_null_subs;
+GBLREF int4		lv_sbs_blk_size;
 
 void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 {
@@ -341,7 +342,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 				assert((unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv <=
 					(unsigned char *)h2->addr.intnum);
 				assert((unsigned char *)h2->addr.intnum <
-					(unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv + SIZEOF(sbs_blk));
+					(unsigned char *)parent->ptrs.val_ent.children->num->ptr.lv + lv_sbs_blk_size);
 				if (!IS_STP_SPACE_AVAILABLE(MAX_NUM_SIZE))
 				{
 					v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);

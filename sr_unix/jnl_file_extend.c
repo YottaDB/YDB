@@ -60,7 +60,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	jnl_buffer_ptr_t     	jb;
 	jnl_create_info 	jnl_info;
 	jnl_file_header		*header;
-	unsigned char		hdr_buff[JNL_HDR_LEN + ALIGNMENT_SIZE];
+	unsigned char		hdr_buff[REAL_JNL_HDR_LEN + MAX_IO_BLOCK_SIZE];
 	uint4			new_alq;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -69,6 +69,7 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	int			new_blocks, result;
 	GTM_BAVAIL_TYPE		avail_blocks;
 	uint4			aligned_tot_jrec_size, count;
+	uint4			jnl_fs_block_size, read_write_size;
 
 	switch(jpc->region->dyn.addr->acc_meth)
 	{
@@ -201,17 +202,20 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 		{
 			assert(!need_extend);	/* ensure we won't go through the for loop again */
 			/* Virtually extend currently used journal file */
-			header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_buff, DISK_BLOCK_SIZE));
-			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
-			DO_FILE_READ(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
+			jnl_fs_block_size = jb->fs_block_size;
+			header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_buff, jnl_fs_block_size));
+			read_write_size = ROUND_UP2(REAL_JNL_HDR_LEN, jnl_fs_block_size);
+			assert((unsigned char *)header + read_write_size <= ARRAYTOP(hdr_buff));
+			DO_FILE_READ(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 			if (SS_NORMAL != jpc->status)
 			{
 				assert(FALSE);
 				rts_error(VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			assert((header->virtual_size + new_blocks) == new_alq);
+			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
 			header->virtual_size = new_alq;
-			DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
+			DO_FILE_WRITE(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 			if (SS_NORMAL != jpc->status)
 			{
 				assert(FALSE);

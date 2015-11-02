@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -83,8 +83,8 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 			socketptr->local.port = port;
 		} else
 		{
-			for (ii = 0; ISDIGIT(temp_addr[ii]) || '.' == temp_addr[ii]; ii++) /* NOTE: only ASCII digits allowed for */
-				;							   /* dotted notation address */
+			for (ii = 0; ISDIGIT_ASCII(temp_addr[ii]) || '.' == temp_addr[ii]; ii++) /* NOTE: only ASCII digits */
+				;							   /* allowed for dotted notation address */
 			if (temp_addr[ii] != '\0')
 			{
 				SPRINTF(socketptr->remote.saddr_lit, "%s", temp_addr);

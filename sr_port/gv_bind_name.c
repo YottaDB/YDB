@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -116,10 +116,5 @@ void gv_bind_name(gd_addr *addr, mstr *targ)
 	gv_currkey->base[gvent.var_name.len] = 0;
 	gv_currkey->end = gvent.var_name.len;
 	gv_currkey->prev = 0;
-	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))
-	{
-		if ((0 == gv_target->root) || (DIR_ROOT == gv_target->root))
-			gvcst_root_search();
-	}
 	return;
 }

@@ -170,12 +170,12 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	error_def(ERR_PRIMARYNOTROOT);
 	error_def(ERR_REPLINSTNMSAME);
 	error_def(ERR_REPLINSTNOHIST);
-	error_def(ERR_REPLINSTSECNONE);
 	error_def(ERR_REPLINSTSEQORD);
 	error_def(ERR_REPLREQROLLBACK);
 	error_def(ERR_REPLREQRUNDOWN);
 	error_def(ERR_REPLUPGRADEPRI);
 	error_def(ERR_REPLUPGRADESEC);
+	error_def(ERR_REPLINSTSECNONE);
 	error_def(ERR_SRCSRVEXISTS);
 	error_def(ERR_SRCSRVNOTEXIST);
 	error_def(ERR_SRCSRVTOOMANY);
@@ -448,15 +448,15 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		 *	-------------------------------------------------------------------------------------------------------
 		 *				Used Slot found		Unused slot found	No slot found
 		 *	-------------------------------------------------------------------------------------------------------
-		 *	activate		Set gtmsource_local	SRCSRVNOTEXIST		REPLINSTSECNONE
-		 *	deactivate		Set gtmsource_local	SRCSRVNOTEXIST		REPLINSTSECNONE
-		 *	showbacklog		Set gtmsource_local	BBBB			REPLINSTSECNONE
-		 *	checkhealth		Set gtmsource_local	SRCSRVNOTEXIST		REPLINSTSECNONE
-		 *	statslog		Set gtmsource_local	SRCSRVNOTEXIST		REPLINSTSECNONE
-		 *	changelog		Set gtmsource_local	SRCSRVNOTEXIST		REPLINSTSECNONE
-		 *	stopsourcefilter	Set gtmsource_local	SRCSRVNOTEXIST		REPLINSTSECNONE
+		 *	activate		Set gtmsource_local	REPLINSTSECNONE		REPLINSTSECNONE
+		 *	deactivate		Set gtmsource_local	REPLINSTSECNONE		REPLINSTSECNONE
+		 *	showbacklog		Set gtmsource_local	REPLINSTSECNONE		REPLINSTSECNONE
+		 *	checkhealth		Set gtmsource_local	REPLINSTSECNONE		REPLINSTSECNONE
+		 *	statslog		Set gtmsource_local	REPLINSTSECNONE		REPLINSTSECNONE
+		 *	changelog		Set gtmsource_local	REPLINSTSECNONE		REPLINSTSECNONE
+		 *	stopsourcefilter	Set gtmsource_local	REPLINSTSECNONE		REPLINSTSECNONE
 		 *	start			AAAA			BBBB    		CCCC
-		 *	shutdown		Set gtmsource_local	SRCSRVNOTEXIST		REPLINSTSECNONE
+		 *	shutdown		Set gtmsource_local	REPLINSTSECNONE		REPLINSTSECNONE
 		 *	needrestart		Set gtmsource_local	DDDD			DDDD
 		 *
 		 *	AAAA : if the slot has a gtmsource_pid value that is still alive, then issue error message SRCSRVEXISTS
@@ -506,10 +506,14 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 						CHECK_SLOT(gtmsourcelocal_ptr);
 						slot_needs_init = TRUE;
 						reset_gtmsrclcl_info = FALSE;
-					} else if (!gtmsource_options.needrestart)
+					} else if (!gtmsource_options.needrestart && !gtmsource_options.showbacklog
+							&& !gtmsource_options.checkhealth)
 					{	/* If NEEDRESTART, we dont care if the source server is alive or not. All that
 						 * we care about is if the primary and secondary did communicate or not. That
 						 * will be determined in gtmsource_needrestart.c. Do not trigger an error here.
+						 * If SHOWBACKLOG or CHECKHEALTH, do not trigger an error as slot was found
+						 * even though the source server is not alive. We can generate backlog/checkhealth
+						 * information using values from the matched slot.
 						 */
 						rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 						ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
@@ -576,7 +580,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				}
 			} else
 			{	/* No used slot found. But an unused slot was found. */
-				if (gtmsource_options.start || gtmsource_options.showbacklog)
+				if (gtmsource_options.start)
 				{	/* Initialize the unused slot. We want to reinitialize the source server related fields
 					 * in "gtmsource_local" as well as reinitialize any fields that intersect with "gtmsrc_lcl"
 					 * as this slot is being reused for the first time for any secondary instance name.
@@ -587,14 +591,15 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 					reset_gtmsrclcl_info = TRUE;
 				} else
 				{	/* One of the following qualifiers has been specified. Issue error.
-					 *   ACTIVATE, CHANGELOG, CHECKHEALTH, DEACTIVATE, STATSLOG, SHUTDOWN or STOPSOURCEFILTER
+					 *   ACTIVATE, CHANGELOG, CHECKHEALTH, DEACTIVATE, SHOWBACKLOG,
+					 *   STATSLOG, SHUTDOWN or STOPSOURCEFILTER
 					 */
 					rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
 					ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 					/* Assert we did not create shm or sem so no need to remove any */
 					assert(!new_ipc);
-					rts_error(VARLSTCNT(4) ERR_SRCSRVNOTEXIST, 2,
-						LEN_AND_STR(gtmsource_options.secondary_instname));
+					rts_error(VARLSTCNT(6) ERR_REPLINSTSECNONE, 4,
+						LEN_AND_STR(gtmsource_options.secondary_instname), full_len, udi->fn);
 				}
 			}
 		}

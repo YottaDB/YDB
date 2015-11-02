@@ -95,7 +95,7 @@ GBLREF	uint4			mutex_per_process_init_pid;
 int gtmsource()
 {
 	gd_region		*reg, *region_top;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa, *repl_csa;
 	boolean_t		jnlpool_creator, all_files_open, isalive;
 	int			status, log_init_status, waitpid_res, save_errno;
 	pid_t			pid, ppid, procgp;
@@ -361,12 +361,9 @@ int gtmsource()
 		gtmsource_poll_actions(FALSE);
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			continue;
-		NON_IA64_ONLY(SPRINTF(tmpmsg,
-				      "GTM Replication Source Server now in ACTIVE mode using port %ld",
-				      gtmsource_local->secondary_port));
-		IA64_ONLY(SPRINTF(tmpmsg,
+		SPRINTF(tmpmsg,
 				  "GTM Replication Source Server now in ACTIVE mode using port %d",
-				  gtmsource_local->secondary_port));
+				  gtmsource_local->secondary_port);
 		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
@@ -384,6 +381,8 @@ int gtmsource()
 					gtmsource_exit(ABNORMAL_SHUTDOWN);
 			}
 		}
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 		grab_lock(jnlpool.jnlpool_dummy_reg);
 		QWASSIGN(gtmsource_local->read_addr, jnlpool.jnlpool_ctl->write_addr);
 		gtmsource_local->read = jnlpool.jnlpool_ctl->write;

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -23,22 +23,29 @@
 
 set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
 set mach_type = `uname -m`
+
+### Sanitize platform_name and match_type
 # Cygwin adds the Windows version e.g. uname = CYGWIN_NT-5.1
 set platform_only = `echo $platform_name | sed 's/_.*//'`
 
-#### To determine whether the build type is 64 or 32. On x86_64 linux box, use the header file "x86_64.h" in the inc directory.
-if ( "ia64" == $mach_type || ( "x86_64" == $mach_type && -e $gtm_inc/x86_64.h) ) then
+# sanitize i386 thru i686 to one option, do not use this to set build optimizations!
+if ( "linux" == $platform_name ) then
+	set mach_type = `uname -m | sed 's/i[3456]86/ia32/' `
+endif
+
+### 64bit vs 32bit builds
+# The only 32 bit targets are cygwin, ia32 and x86_64 without $gtm_inc/x86_64.h
+if ( ("ia32" == $mach_type) || ( "x86_64" == $mach_type && ! -e $gtm_inc/x86_64.h ) || ("cywgin" == $platform_only) ) then
+	setenv linux_build_type 32
+else
 	setenv linux_build_type 64
 	setenv gt_ld_m_shl_options "-shared"
-else
-	setenv linux_build_type 32
 endif
 
 if ( $?gtm_version_change == "1" ) then
 
-	# Archiver definitions:
-	# GNU ar q equals r, S prevents generating the symbol table but
-	#			requires ranlib before linking
+	# Compiler selections:
+	#
 
 	if !( $?gtm_linux_compiler ) then
 	 setenv gtm_linux_compiler gcc
@@ -51,6 +58,10 @@ if ( $?gtm_version_change == "1" ) then
 	  endif
          endif
 	endif
+
+	# Archiver definitions:
+	# GNU ar q equals r, S prevents generating the symbol table but
+	#			requires ranlib before linking
 
 	setenv	gt_ar_option_create	"qSv"		# quick, verbose
 	setenv	gt_ar_option_update	"rv"		# replace, verbose
@@ -78,7 +89,10 @@ if ( $?gtm_version_change == "1" ) then
 
         if ( "ia64" != $mach_type ) then
             setenv gt_as_assembler          "as"
-	    if ( "cygwin" == $platform_only ) then
+	    if ("s390x" == $mach_type) then
+	        setenv gt_as_options_common	"-march=z9-109"
+		setenv gt_as_option_debug	"--gdwarf-2"
+	    else if ( "cygwin" == $platform_only ) then
 	        setenv gt_as_options_common	"--defsym cygwin=1"
 	    	setenv gt_as_option_debug	"--gdwarf-2"
 	    else
@@ -93,10 +107,9 @@ if ( $?gtm_version_change == "1" ) then
 	# C definitions:
 
 	# generate position independent code
+	setenv 	gt_cc_shl_fpic		"-fPIC"
 	if ( "cygwin" == $platform_only ) then
 		setenv gt_cc_shl_fpic	""
-	else
-		setenv 	gt_cc_shl_fpic		"-fPIC"
 	endif
 
         #	setenv	gt_cc_options_common 	"-c -D_LARGEFILE64_SOURCE=1 -D_FILE_OFFSET_BITS=64"
@@ -134,11 +147,9 @@ if ( $?gtm_version_change == "1" ) then
 		setenv gt_cc_options_common "$gt_cc_options_common -DNO_SEM_TIME -DNO_SEM_GETPID"
 	endif
 
-	# 64 bit ICU headers of 64 bit linux are in /emul/ia64-linux/usr/include/
-	if ( "x86_64" == $mach_type ) then
-		if ( "32" == $linux_build_type ) then
-			if (-d /emul/ia32-linux/usr/include/) setenv gt_cc_option_I  "-I/emul/ia32-linux/usr/include/"
-		endif
+	# 32 bit ICU headers of 32 bit linux are in /emul/ia32-linux/usr/include/
+	if ( "32" == $linux_build_type ) then
+		if (-d /emul/ia32-linux/usr/include/) setenv gt_cc_option_I  "-I/emul/ia32-linux/usr/include/"
 	endif
 
 	if ( "linux" == $platform_name ) then
@@ -147,14 +158,26 @@ if ( $?gtm_version_change == "1" ) then
         	if ($ltemp_ver[3] == "2"  && $ltemp_ver[1] == "2") then
             		setenv gt_cc_options_common "$gt_cc_options_common -DNeedInAddrPort"
         	endif
+		if ( "x86_64" == $mach_type ) then
+			# see if the compiler supports unused-result warnings
+			# Note: Compilers that dont support --help=warnings will not output unused-result.
+			# Currently, only compilers that support --help=warnings need to have unused-result
+			# turned off. Trying to turn it off on compilers that dont support it causes errors.
+			cc --help=warnings | & grep unused-result >/dev/null
+			if (! $status ) then
+				# if it does, turn them off
+				setenv gt_cc_options_common "$gt_cc_options_common -Wno-unused-result"
+			endif
+		endif
 	endif
 
 	# -fno-defer-pop to prevent problems with assembly/generated code with optimization
 	# -fno-strict-aliasing since we don't comply with the rules
 	# -ffloat-store for consistent results avoiding rounding differences
-        if ( "ia64" != $mach_type ) then
+	if ( "ia64" != $mach_type ) then
 		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store"
-		if ( 64 != $linux_build_type ) then
+		if ( "32" == $linux_build_type ) then
+			# applies to 32bit x86_64, ia32 and cygwin
 			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -march=i686"
 		endif
 	endif
@@ -173,28 +196,20 @@ if ( $?gtm_version_change == "1" ) then
 	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id"
 	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,gtmexe_symbols.export"
 
-        if ( "ia64" == $mach_type ) then
-		# Added -lelf
-        	setenv	gt_ld_syslibs		" -lrt -lelf -lncurses -lm -ldl"
-        endif
-
-        if ( "ia64" != $mach_type && "linux" == $platform_name ) then
-		if ( "x86_64" == $mach_type && 64 == $linux_build_type ) then
-	        	setenv  gt_ld_syslibs           " -lrt -lelf -lncurses -lm -ldl"
-		else
-			setenv  gt_ld_syslibs           " -lrt -lncurses -lm -ldl"
-		endif
-        endif
-
+	# optimize for all 64bit platforms
+        setenv	gt_ld_syslibs		" -lrt -lelf -lncurses -lm -ldl"
+	if ( 32 == $linux_build_type ) then
+		# 32bit x86_64 and ia32 - decided at the beginning of the file
+		setenv  gt_ld_syslibs           " -lrt -lncurses -lm -ldl"
+	endif
 	if ( "cygwin" == $platform_only ) then
 		setenv  gt_ld_syslibs           "-lncurses -lm -lcrypt"
 	endif
 
 	# -lrt for async I/O in mupip recover/rollback
+	setenv gt_ld_aio_syslib         "-lrt"
 	if ( "cygwin" == $platform_only ) then
 		setenv gt_ld_aio_syslib         ""
-	else
-		setenv gt_ld_aio_syslib         "-lrt"
 	endif
 
 	# Shared library definition overrides:
@@ -233,16 +248,16 @@ set gtm_build_image = `basename $gtm_exe`
 if ( "ia64" == $mach_type  && "pro" == $gtm_build_image && "icc" == $gtm_linux_compiler) then
 	setenv gt_cc_option_optimize	"-O3"
 	if ($?gtm_pbo_option) then
+		@ need_mkdir = 0
 		if !($?gtm_pbo_db) then
-			if !(-e $gtm_log/pbo) then
-				mkdir -p $gtm_log/pbo
-			endif
+			@ need_mkdir = 1
 			setenv  gtm_pbo_db	"$gtm_log/pbo"
 		else if !(-e $gtm_pbo_db) then
-			if !(-e $gtm_log/pbo) then
-				mkdir -p $gtm_log/pbo
-			endif
-			setenv  gtm_pbo_db	"$gtm_log/pbo"
+			@ need_mkdir = 1
+		endif
+		if (1 == $need_mkdir) then
+			mkdir -p $gtm_pbo_db
+			chmod 775 $gtm_pbo_db		# Others need ability to write to the pbo files
 		endif
 		if ($gtm_pbo_option == "collect") then
 			setenv 	gt_cc_option_optimize	"-prof-gen -prof-dir $gtm_pbo_db"
@@ -262,12 +277,16 @@ if ( "ia64" == $mach_type ) then
 	alias	gt_as_dbg	'gt_as $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize'
 	alias	gt_as_pro	'gt_as $gt_as_option_optimize '
 endif
+
+if ( "s390x" == $mach_type) then
+	setenv assembler_op_arch_size "-m64"
+else if ( "64" == $linux_build_type) then
+	setenv assembler_op_arch_size "--64"
+else
+	setenv assembler_op_arch_size "--32"
+endif
+
 if ( "ia64" != $mach_type ) then
-	if ( "64" == $linux_build_type) then
-		setenv assembler_op_arch_size "--64"
-	else
-		setenv assembler_op_arch_size "--32"
-	endif
 	alias	gt_as_bta \
 		'gt_as $gt_as_option_debug $gt_as_option_nooptimize $assembler_op_arch_size -o `basename \!:1 .s`.o \!:1'
 		# If the value of the alias variable extends the 132 character limit, use a temporary variable

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,10 +32,10 @@ GBLREF	uint4 			process_id;
 GBLREF	volatile int		suspend_status;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
+GBLREF	boolean_t		hold_onto_locks;
 
 void	rel_crit(gd_region *reg)
 {
-
 	unix_db_info 		*udi;
 	sgmnt_addrs  		*csa;
 	enum cdb_sc		status;
@@ -45,6 +45,7 @@ void	rel_crit(gd_region *reg)
 
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
+	assert(!hold_onto_locks && !csa->hold_onto_crit);
 	if (csa->now_crit)
 	{
 		assert(0 == crit_count);

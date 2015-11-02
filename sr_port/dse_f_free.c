@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ void dse_f_free(void)
 	error_def(ERR_DSEBLKRDFAIL);
 
 	if (cs_addrs->hdr->bplmap == 0)
-	{	util_out_print("Cannot perform free block search:  bplmap field of file header is zero.",TRUE);
+	{	util_out_print("Cannot perform free block search:  bplmap field of file header is zero.", TRUE);
 		return;
 	}
 	bplmap = cs_addrs->hdr->bplmap;
@@ -55,72 +55,49 @@ void dse_f_free(void)
 	if(!cli_get_hex("HINT", (uint4 *)&blk))
 		return;
 	if (blk < 0 || blk >= cs_addrs->ti->total_blks || (blk / bplmap * bplmap == blk))
-	{	util_out_print("Error: invalid block number.",TRUE);
+	{	util_out_print("Error: invalid block number.", TRUE);
 		return;
 	}
 	hint_over_bplmap = blk / bplmap;
 	master_bit = bmm_find_free(hint_over_bplmap, cs_addrs->bmm,
 			(cs_addrs->ti->total_blks + bplmap - 1)/ bplmap);
 	if (master_bit == -1)
-	{	util_out_print("Error: database full.",TRUE);
+	{	util_out_print("Error: database full.", TRUE);
 		return;
 	}
 	in_last_bmap = (master_bit == (cs_addrs->ti->total_blks / bplmap));
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = TRUE;
-		else
-			grab_crit(gv_cur_region);
-	}
-
-	if(!(lmap_base = t_qread(master_bit * bplmap,&dummy_int,&dummy_cr)))
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
+	if(!(lmap_base = t_qread(master_bit * bplmap, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (master_bit == hint_over_bplmap)
 		hint_mod_bplmap = blk - blk / bplmap * bplmap;
 	else
 		hint_mod_bplmap = 0;
-
 	if (in_last_bmap)
 		total_blks = (cs_addrs->ti->total_blks - master_bit);
 	else
 		total_blks = bplmap;
-
 	lmap_bit = bml_find_free(hint_mod_bplmap, lmap_base + SIZEOF(blk_hdr), total_blks);
 	if (lmap_bit == -1)
-	{	memcpy(util_buff,"Error: bit map in block ",24);
+	{	memcpy(util_buff, "Error: bit map in block ", 24);
 		util_len = 24;
 		util_len += i2hex_nofill(master_bit * bplmap, (uchar_ptr_t)&util_buff[util_len], 8);
-		memcpy(&util_buff[util_len], " incorrectly marked free in master map.",39);
+		memcpy(&util_buff[util_len], " incorrectly marked free in master map.", 39);
 		util_len += 39;
 		util_buff[util_len] = 0;
-		util_out_print(util_buff,TRUE);
-		if (!was_crit)
-		{
-			if (nocrit_present)
-				cs_addrs->now_crit = FALSE;
-			else
-				rel_crit(gv_cur_region);
-		}
+		util_out_print(util_buff, TRUE);
+		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 		return;
 	}
-
-	memcpy(util_buff,"!/Next free block is ",21);
+	memcpy(util_buff, "!/Next free block is ", 21);
 	util_len = 21;
 	util_len += i2hex_nofill(master_bit * bplmap + lmap_bit, (uchar_ptr_t)&util_buff[util_len], 8);
-	memcpy(&util_buff[util_len], ".!/",3);
+	memcpy(&util_buff[util_len], ".!/", 3);
 	util_len += 3;
 	util_buff[util_len] = 0;
-	util_out_print(util_buff,TRUE);
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = FALSE;
-		else
-			rel_crit(gv_cur_region);
-	}
+	util_out_print(util_buff, TRUE);
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return;
 }

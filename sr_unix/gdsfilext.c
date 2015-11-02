@@ -151,36 +151,33 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	}
 	cs_addrs->extending = TRUE;
 	was_crit = cs_addrs->now_crit;
-	/* If we are coming from mupip_extend (which gets crit itself) we better have waited for any unfreezes to occur */
-	assert(!was_crit || CDB_STAGNATE == t_tries || FALSE == cs_data->freeze);
-	for ( ; ; )
-	{	/* If we are in the final retry and already hold crit, it is possible that csd->wc_blocked is also set to TRUE
-		 * (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
-		 * finished the job for it). In this case we do NOT want to invoke wcs_recover as that will update the "bt"
-		 * transaction numbers without correspondingly updating the history transaction numbers (effectively causing
-		 * a cdb_sc_blkmod type of restart). Therefore do NOT call grab_crit (which unconditionally invokes wcs_recover)
-		 * if we already hold crit.
-		 */
-		if (!was_crit)
+	assert(!cs_addrs->hold_onto_crit || was_crit);
+	/* If we are coming from mupip_extend (which gets crit itself) we better have waited for any unfreezes to occur.
+	 * If we are coming from GT.M and final retry (in which case we come in holding crit) we better have waited for
+	 * 	any unfreezes to occur (TP or non-TP) before coming into this function.
+	 * If we are coming from online rollback (when that feature is available), we will come in holding crit and in
+	 * 	the final retry. In that case too, we expect to have waited for unfreezes to occur in the caller itself.
+	 * Therefore if we are coming in holding crit, we expect the db to be unfrozen so no need to wait for freeze.
+	 * If ever, we later attempt to invoke grab_crit below while already holding crit, here is why that should be avoided.
+	 *	   If we are in the final retry and already hold crit, it is possible that csd->wc_blocked is also set to TRUE
+	 *	   (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
+	 *	   finished the job for it). In this case we do NOT want to invoke wcs_recover as that will update the "bt"
+	 *	   transaction numbers without correspondingly updating the history transaction numbers (effectively causing
+	 *	   a cdb_sc_blkmod type of restart). Therefore do NOT call grab_crit (which unconditionally invokes wcs_recover)
+	 *	   if we already hold crit.
+	 */
+	assert(!was_crit || !cs_data->freeze);
+	if (!was_crit)
+	{
+		for ( ; ; )
+		{
 			grab_crit(gv_cur_region);
-		if (FALSE == cs_data->freeze)
-			break;
-		rel_crit(gv_cur_region);
-		if (was_crit)
-		{	/* Two cases.
-			 * (i)  Final retry and in TP. We might be holding crit in other regions too.
-			 *	We can't do a grab_crit() on this region again unless it is deadlock-safe.
-			 *      To be on the safer side, we do a restart. The tp_restart() logic will wait
-			 *	for this region's freeze to be removed before grabbing crit.
-			 * (ii) Final retry and not in TP. In that case too, it is better to restart in case there is
-			 *	some validation code that shortcuts the checking for the final retry assuming we were
-			 *	in crit from "t_begin" to "t_end". "t_retry" has logic that will wait for unfreeze.
-			 * In either case, we need to restart. Returning EXTEND_UNFREEZECRIT will cause one in t_end/tp_tend.
-			 */
-			return (uint4)(EXTEND_UNFREEZECRIT);
+			if (!cs_data->freeze)
+				break;
+			rel_crit(gv_cur_region);
+			while (cs_data->freeze)
+				hiber_start(1000);
 		}
-		while (cs_data->freeze)
-			hiber_start(1000);
 	}
 	assert(cs_addrs->ti->total_blks == cs_data->trans_hist.total_blks);
 	if (cs_data->trans_hist.total_blks != filesize)

@@ -78,7 +78,6 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	char		*jnl_state_lit[];
 GBLREF	char		*repl_state_lit[];
-GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	boolean_t	mupip_exit_status_displayed;
 GBLREF	boolean_t	mur_close_files_done;
 
@@ -91,6 +90,7 @@ void	mur_close_files(void)
 	reg_ctl_list		*rctl, *rctl_top;
 	jnl_ctl_list		jctl_temp, *jctl, *prev_jctl, *end_jctl;
 	gd_region		*reg;
+	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sgmnt_data		csd_temp;
 	int			head_jnl_fn_len, wrn_count = 0;
@@ -138,12 +138,9 @@ void	mur_close_files(void)
 		return;
 	}
 	call_on_signal = NULL;	/* Do not recurs via call_on_signal if there is an error */
-	process_exiting = TRUE;	/* Signal function "free" (in gtm_malloc_src.h) not to bother with frees as we are any exiting.
-				 * This avoids assert failures that would otherwise occur due to nested storage mgmt calls
-				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
-				 * In case the database is encrypted, this value is used to avoid using mur_ctl->csd in mur_fopen
-				 * as it would be invalid due to the gds_rundown() done below.
-				 */
+	SET_PROCESS_EXITING_TRUE;	/* In case the database is encrypted, this value is used to avoid using
+					 * mur_ctl->csd in mur_fopen as it would be invalid due to the gds_rundown() done below.
+					 */
 	csd = &csd_temp;
 	/* If journaling, gds_rundown will need to write PINI/PFIN records. The timestamp of that journal record will
 	 * need to be adjusted to the current system time to reflect that it is recovery itself writing that record
@@ -153,36 +150,50 @@ void	mur_close_files(void)
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
 	{
 		reg = rctl->gd;
-		/* Note that even if rctl->gd->open is FALSE, rctl->csa could be non-NULL in case mur_open_files went through
+		/* reg could be NULL at this point in some rare cases (e.g. if we come to mur_close_files through
+		 * deferred_signal_handler as part of call_on_signal invocation and run down this region but encounter
+		 * an error while running down another region, we could re-enter mur_close_files as part of exit handling.
+		 * In this case, since this region has already been rundown, skip running this down.
+		 */
+		if (NULL == reg)
+			continue;
+		/* Note that even if reg->open is FALSE, rctl->csa could be non-NULL in case mur_open_files went through
 		 * "mupfndfil" path (e.g. journal file names were explicitly specified for a journal extract command) so it
 		 * would not have done gvcst_init in that case. But we would have set rctl->csa to a non-NULL value in order
 		 * to be able to switch amongst regions in mur_forward. So we should check for gd->open below to know for
 		 * sure if a gvcst_init was done which in turn requires a gds_rundown to be done.
 		 */
-		if (rctl->gd->open)
+		if (reg->open)
 		{ 	/* gvcst_init was called */
 			gv_cur_region = reg;
 			tp_change_reg();
+			/* Even though reg->open is TRUE, rctl->csa could be NULL in cases where we are in
+			 * mur_open_files, doing a mu_rndwn_file (as part of the STANDALONE macro) and get a
+			 * signal (say MUPIP STOP) that causes exit handling processing which invokes this function.
+			 * In this case, cs_addrs would still be set to a non-NULL value so use that instead of rctl->csa.
+			 */
+			assert((NULL != rctl->csa) && (rctl->csa == cs_addrs) || (NULL == rctl->csa) && !murgbl.clean_exit);
+			csa = cs_addrs;
+			assert(NULL != csa);
 			if (mur_options.update && JNL_ENABLED(rctl))
-				cs_addrs->jnl->pini_addr = 0; /* Stop simulation of GTM process journal record writing */
+				csa->jnl->pini_addr = 0; /* Stop simulation of GTM process journal record writing */
 			if (NULL != rctl->jctl && murgbl.clean_exit && mur_options.rollback && !mur_options.rollback_losttnonly)
 			{	/* to write proper jnl_seqno in epoch record */
 				assert(murgbl.stop_rlbk_seqno >= murgbl.resync_seqno);
 				assert(murgbl.stop_rlbk_seqno >= murgbl.consist_jnl_seqno);
 				UNIX_ONLY(assert(murgbl.consist_jnl_seqno);)
 				if (murgbl.consist_jnl_seqno) /* can be zero if this command is a no-operation in VMS */
-					jgbl.mur_jrec_seqno = cs_addrs->hdr->reg_seqno = murgbl.consist_jnl_seqno;
+					jgbl.mur_jrec_seqno = csa->hdr->reg_seqno = murgbl.consist_jnl_seqno;
 				VMS_ONLY(
 					if (rctl->jctl->jfh->crash && rctl->jctl->jfh->update_disabled)
 						/* Set resync_to_region seqno for a crash and update_disable case */
 						set_resync_to_region = TRUE;
 				)
 			}
-			assert(NULL != rctl->csa->nl);
-			assert(!mur_options.update || rctl->csa->nl->donotflush_dbjnl);
-			assert(mur_options.update || !rctl->csa->nl->donotflush_dbjnl);
-			if (mur_options.update && (murgbl.clean_exit || !rctl->db_updated) && (NULL != rctl->csa->nl))
-				rctl->csa->nl->donotflush_dbjnl = FALSE;	/* shared memory is now clean for dbjnl flushing */
+			assert(NULL != csa->nl);
+			assert(!(mur_options.update ^ csa->nl->donotflush_dbjnl));
+			if (mur_options.update && (murgbl.clean_exit || !rctl->db_updated) && (NULL != csa->nl))
+				csa->nl->donotflush_dbjnl = FALSE;	/* shared memory is now clean for dbjnl flushing */
 			gds_rundown();
 			if (rctl->standalone && (murgbl.clean_exit || !rctl->db_updated) &&
 					!reg->read_only && file_head_read((char *)reg->dyn.addr->fname, csd,
@@ -293,7 +304,7 @@ void	mur_close_files(void)
 					if (jctl->jfh->recover_interrupted)
 					{
 						jctl->jfh->recover_interrupted = FALSE;
-						DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, JNL_HDR_LEN,
+						DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, REAL_JNL_HDR_LEN,
 							jctl->status, jctl->status2);
 						WARN_STATUS(jctl);
 					}
@@ -323,7 +334,7 @@ void	mur_close_files(void)
 				assert(jctl->jfh->prev_recov_blks_to_upgrd_adjust <= rctl->blks_to_upgrd_adjust);
 				jctl->jfh->prev_recov_blks_to_upgrd_adjust = rctl->blks_to_upgrd_adjust;
 				jctl->jfh->next_jnl_file_name_length = 0;
-				DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, JNL_HDR_LEN, jctl->status, jctl->status2);
+				DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
 				WARN_STATUS(jctl);
 				/* we have to clear next_jnl_file_name fields in the post-turn-around-point journal files.
 				 * but if we get killed in this process, a future recover should be able to resume
@@ -337,7 +348,7 @@ void	mur_close_files(void)
 				{	/* Clear next_jnl_file_name fields in the post-turn-around-point journal files */
 					assert(0 == end_jctl->turn_around_offset);
 					end_jctl->jfh->next_jnl_file_name_length = 0;
-					DO_FILE_WRITE(end_jctl->channel, 0, end_jctl->jfh, JNL_HDR_LEN,
+					DO_FILE_WRITE(end_jctl->channel, 0, end_jctl->jfh, REAL_JNL_HDR_LEN,
 						end_jctl->status, end_jctl->status2);
 					WARN_STATUS(end_jctl);
 					/* Rename journals whose entire contents have been undone with
@@ -358,7 +369,7 @@ void	mur_close_files(void)
 					}
 				} /* end for */
 			}
-		} /* end if (NULL != rctl->csa) */
+		} /* end if (reg->open) */
 		rctl->csa = NULL;
 		for (jctl = rctl->jctl_head; NULL != jctl; )
 		{	/* NULL value of jctl_head possible if we errored out in mur_open_files() before constructing jctl list.

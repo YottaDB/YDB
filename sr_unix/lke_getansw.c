@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@ bool lke_get_answ(char *prompt)
 {
 	char buff[11], *bp = buff;
 
-	PRINTF(prompt);
+	PRINTF("%s", prompt);
 	if (NULL != (bp = util_input(buff, 10, stdin, TRUE)))
 	{
 		if (*bp == 'Y' || *bp == 'y')

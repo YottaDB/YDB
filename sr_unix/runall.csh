@@ -210,11 +210,10 @@ gtmcrypt_dbk_ref gtmcrypt
 gtmcrypt_pk_ref gtmcrypt
 gtmcrypt_sym_ref gtmcrypt
 gtmcrypt_ref gtmcrypt
-ascii2hex gtmcrypt
 maskpass gtmcrypt
 LABEL
 
-set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_pk_ref gtmcrypt_ref ascii2hex maskpass"
+set exclude_compile_list = "gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_pk_ref gtmcrypt_ref maskpass"
 # find all libnames other than mumps
 pushd $gtm_tools >& /dev/null
 set comlist_liblist = `ls *.list | sed 's/.list//' | sed 's/^lib//'`
@@ -251,7 +250,7 @@ else
 	# Look down the $gtm_exe recursively so that the search for recent build executable is inclusive of $gtm_exe/plugin/ and
 	# $gtm_exe/plugin/gtmcrypt. Also the new shell invocation is needed to redirect the stderr that will arise due to the
 	# gtmsecshr privileges for which (find .) will issue 'permission denied'.
-	(ls -lart `find . -type f`| grep "\-..x..x..x" | tail -1 | awk '{print $NF}' > ${TMP_DIR}_latest_exe) >&! /dev/null
+	(ls -lart `find . -type f`| grep "\-..x..x..x" | tail -n 1 | awk '{print $NF}' > ${TMP_DIR}_latest_exe) >&! /dev/null
 	set latest_exe_with_rel_path = `cat ${TMP_DIR}_latest_exe`
 	set latest_exe = `basename $latest_exe_with_rel_path`
 	rm -f ${TMP_DIR}_latest_exe

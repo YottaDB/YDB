@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,9 +118,9 @@ void mutex_sock_init(void)
 				send_msg(VARLSTCNT(8) ERR_MUTEXRSRCCLNUP, 2, mutex_sock_path_len, mutex_sock_path,
 					 ERR_TEXT, 2, LEN_AND_LIT("Resource removed by gtmsecshr"));
 			else if (status != ENOENT) /* don't bother if somebody removed the file before gtmsecshr got to it */
-				rts_error(VARLSTCNT(11) ERR_MUTEXERR, 0, ERR_TEXT, 2,
+				rts_error(VARLSTCNT(10) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				          LEN_AND_LIT("gtmsecshr failed to remove leftover mutex resource"),
-					  ERR_TEXT, 2, mutex_sock_path_len, mutex_sock_path, status);
+					  ERR_TEXT, 2, mutex_sock_path_len, mutex_sock_path);
 		}
 	} else  /* unlink succeeded */
 		send_msg(VARLSTCNT(4) ERR_MUTEXRSRCCLNUP, 2, mutex_sock_path_len, mutex_sock_path);

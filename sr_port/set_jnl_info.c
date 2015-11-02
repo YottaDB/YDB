@@ -52,6 +52,15 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	/* note that csd->jnl_deq can be 0 since a zero journal extension size is accepted */
 	jnl_info->status = jnl_info->status2 = SS_NORMAL;
 	jnl_info->no_rename = jnl_info->no_prev_link = FALSE;
+	UNIX_ONLY(
+		if ((JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE) > csd->alignsize)
+		{	/* Possible if a pre-V54001 journaled db (which allows alignsize to be as low as 16K) is used
+			 * with V54001 and higher (where minimum allowed alignsize is 128K). Fix fileheader to be
+			 * at least minimum (i.e. an on-the-fly upgrade of the db file header).
+			 */
+			csd->alignsize = (JNL_MIN_ALIGNSIZE * DISK_BLOCK_SIZE);
+		}
+	)
 	jnl_info->alignsize = csd->alignsize;
 	jnl_info->before_images = csd->jnl_before_image;
 	jnl_info->buffer = csd->jnl_buffer_size;
@@ -69,6 +78,15 @@ void set_jnl_info(gd_region *reg, jnl_create_info *jnl_info)
 	jnl_info->repl_state = csd->repl_state;
 	JNL_MAX_RECLEN(jnl_info, csd);
 	jnl_info->tn = csd->trans_hist.curr_tn;
+	UNIX_ONLY(
+		if (JNL_ALLOC_MIN > csd->jnl_alq)
+		{	/* Possible if a pre-V54001 journaled db (which allows allocation values as low as 10) is used
+			 * with V54001 and higher (where minimum allowed allocation value is 200). Fix fileheader to be
+			 * at least minimum (an on-the-fly upgrade of the db file header).
+			 */
+			csd->jnl_alq = JNL_ALLOC_MIN;
+		}
+	)
 	jnl_info->alloc = csd->jnl_alq;
 	jnl_info->extend = csd->jnl_deq;
 	jnl_info->autoswitchlimit = csd->autoswitchlimit;

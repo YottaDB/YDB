@@ -63,7 +63,7 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	error_def(ERR_MAXNRSUBSCRIPTS);
 
 	extnam_str.len = 0;
-	if (!gv_currkey || (0 == gv_currkey->prev))
+	if (!gv_currkey || (0 == gv_currkey->prev) || (0 == gv_currkey->end))
 		rts_error(VARLSTCNT(1) ERR_GVNAKED);
 
 	if ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))

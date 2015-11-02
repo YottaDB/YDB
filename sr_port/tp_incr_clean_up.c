@@ -37,6 +37,10 @@ GBLREF  buddy_list		*global_tlvl_info_list;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF jnl_gbls_t		jgbl;
 GBLREF	trans_num		local_tn;
+GBLREF	uint4			update_array_size;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	ua_list			*curr_ua, *first_ua;
+DEBUG_ONLY(GBLREF	uint4			cumul_update_array_size;)
 
 /* undo all the changes done in transaction levels greater than 'newlevel' */
 /* Note that we do not make any effort to release crit grabbed in tlevels beyond the 'newlevel'
@@ -72,8 +76,11 @@ void tp_incr_clean_up(short newlevel)
 	sgmnt_addrs		*csa;
 
 	assert(newlevel > 0);
-	if (JNL_FENCE_LIST_END != jnl_fence_ctl.fence_list)	/* currently global_tlvl_info struct holds only jnl related info */
+	if (NULL != first_sgm_info)
+	{
+		assert(NULL != global_tlvl_info_list);
 		rollbk_gbl_tlvl_info(newlevel);
+	}
 	for (si = first_sgm_info;  si != NULL;  si = si->next_sgm_info)
 	{
 		num_free = 0;
@@ -157,14 +164,13 @@ void tp_incr_clean_up(short newlevel)
 				 * free up only the latter category in the loop below. free up of the head of the horizontal
 				 * 	list is done later below in the call to free_last_n_elements(si->cw_set_list, num_free);
 				 */
-				if (NULL == cse->low_tlevel)
-					cse = cse->high_tlevel;	/* do not free up the head of the horizontal list */
 				while (NULL != cse)
 				{
 					tmp_cse = cse->high_tlevel;
 					if (cse->new_buff)
 						free_element(si->new_buff_list, (char *)cse->new_buff - SIZEOF(que_ent));
-					free_element(si->tlvl_cw_set_list, (char *)cse);
+					if (NULL != cse->low_tlevel) /* do not free up the head of the horizontal list */
+						free_element(si->tlvl_cw_set_list, (char *)cse);
 					cse = tmp_cse;
 				}
 				if (NULL != tp_srch_status)
@@ -241,6 +247,8 @@ void rollbk_gbl_tlvl_info(short newlevel)
 {
 	global_tlvl_info	*gtli, *next_gtli, *tmp_gtli, *prev_gtli;
 	sgmnt_addrs		*old_csa, *tmp_next_csa;
+	ua_list			*ua_ptr;
+	DEBUG_ONLY(uint4	dbg_upd_array_size;)
 
 	old_csa = jnl_fence_ctl.fence_list;
 
@@ -262,6 +270,9 @@ void rollbk_gbl_tlvl_info(short newlevel)
 		jgbl.cumul_jnl_rec_len = gtli->tlvl_cumul_jrec_len;
 		jgbl.tp_ztp_jnl_upd_num = gtli->tlvl_tp_ztp_jnl_upd_num;
 		DEBUG_ONLY(jgbl.cumul_index = gtli->tlvl_cumul_index;)
+		assert(NULL != gtli->curr_ua);
+		curr_ua = (ua_list *)(gtli->curr_ua);
+		update_array_ptr = gtli->upd_array_ptr;
 	} else
 	{
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
@@ -272,7 +283,24 @@ void rollbk_gbl_tlvl_info(short newlevel)
 		jgbl.cumul_jnl_rec_len = 0;
 		jgbl.tp_ztp_jnl_upd_num = 0;
 		DEBUG_ONLY(jgbl.cumul_index = 0;)
+		curr_ua = first_ua;
+		update_array_ptr = curr_ua->update_array;
 	}
+	/* Restore update array related global variables. It is possible that more ua_list structures could
+	 * have been created and chained in transactions ($TLEVEL >= newlevel + 1). Do not reclaim that memory
+	 * as the subsequent transactions could use that memory (if needed)
+	 */
+	assert((NULL != first_ua) && (NULL != curr_ua)); /* A prior database activity should have created at least one ua_list */
+	update_array = curr_ua->update_array;
+	update_array_size = curr_ua->update_array_size;
+	assert((update_array_ptr >= update_array) && (update_array_ptr <= (update_array + curr_ua->update_array_size)));
+	DEBUG_ONLY(
+		dbg_upd_array_size = 0;
+		for (ua_ptr = first_ua; ua_ptr; ua_ptr = ua_ptr->next_ua)
+			dbg_upd_array_size += ua_ptr->update_array_size;
+		assert(dbg_upd_array_size == cumul_update_array_size);
+	)
+	/* No need to reset cumul_update_array_size since we are not free'ing up any ua_list structures */
 	FREE_GBL_TLVL_INFO(gtli);
 	if (prev_gtli)
 		prev_gtli->next_global_tlvl_info = NULL;
@@ -297,7 +325,6 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 	void			*dummy = NULL;
 	block_id		blk;
 	kill_set        	*ks, *temp_kill_set;
-	jnl_format_buffer	*jfb, *temp_jfb;
 	tlevel_info		*tli, *next_tli, *prev_tli;
 	srch_blk_status		*th, *tp_srch_status;
 	sgmnt_addrs		*csa;
@@ -325,8 +352,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 	{	/* freeup the kill set used in tlevels > newlevel */
 		if (tli->tlvl_kill_set)
 		{
-			for (ks = si->kill_set_head; ks != tli->tlvl_kill_set; ks = ks->next_kill_set)
-				;
+			ks = tli->tlvl_kill_set;
 			assert(ks);
 			ks->used = tli->tlvl_kill_used;
 			si->kill_set_tail = ks;
@@ -339,25 +365,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 			FREE_KILL_SET(si, temp_kill_set);
 			si->kill_set_head = si->kill_set_tail = NULL;
 		}
-		if (JNL_WRITE_LOGICAL_RECS(csa))
-		{
-			if (tli->tlvl_jfb_info)
-			{
-				for (jfb = si->jnl_head; jfb != tli->tlvl_jfb_info; jfb = jfb->next)
-					;
-				assert(jfb);
-				temp_jfb = jfb->next;
-				FREE_JFB_INFO(si, temp_jfb);
-				jfb->next = NULL;
-				si->jnl_tail = &jfb->next;
-			} else
-			{
-				temp_jfb = si->jnl_head;
-				FREE_JFB_INFO(si, temp_jfb);
-				si->jnl_head = NULL;
-				si->jnl_tail = &si->jnl_head;
-			}
-		}
+		FREE_JFB_INFO_IF_NEEDED(csa, si, tli, FALSE);
 		DEBUG_ONLY(invalidate = FALSE;)
 		for (th = tli->tlvl_tp_hist_info; th != si->last_tp_hist; th++)
 		{
@@ -392,13 +400,7 @@ void rollbk_sgm_tlvl_info(short newlevel, sgm_info *si)
 		temp_kill_set = si->kill_set_head;
 		FREE_KILL_SET(si, temp_kill_set);
 		si->kill_set_head = si->kill_set_tail = NULL;
-		if (JNL_WRITE_LOGICAL_RECS(csa))
-		{
-			temp_jfb = si->jnl_head;
-			FREE_JFB_INFO(si, temp_jfb);
-			si->jnl_head = NULL;
-			si->jnl_tail = &si->jnl_head;
-		}
+		FREE_JFB_INFO_IF_NEEDED(csa, si, tli, TRUE);
 		reinitialize_hashtab_int4(si->blks_in_use);
 		si->num_of_blks = 0;
 		si->update_trans = 0;

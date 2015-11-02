@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,8 +59,8 @@
 #include "gtmio.h"
 #include "repl_shutdcode.h"
 #include "op.h"
+#include "io.h"
 
-GBLREF	int			process_exiting;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	boolean_t		have_standalone_access;
 GBLREF	boolean_t		need_core;
@@ -105,7 +105,7 @@ void mupip_exit_handler(void)
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
 		return;
 	exit_handler_active = TRUE;
-	process_exiting = TRUE;
+	SET_PROCESS_EXITING_TRUE;
 	if (jgbl.mupip_journal)
 	{
 		mur_close_files();
@@ -124,7 +124,7 @@ void mupip_exit_handler(void)
 		pool_init = FALSE;
 	}
 	if (dollar_tlevel)
-		op_trollback(0);
+		OP_TROLLBACK(0);
 	gv_rundown();
 	if (standalone_reg)
 		db_ipcs_reset(standalone_reg, TRUE);
@@ -205,9 +205,11 @@ void mupip_exit_handler(void)
 		repl_log(fp, TRUE, TRUE, "Helper exiting...\n\n");
 	} else
 		mu_reset_term_characterstics(); /* the replication servers use files for output/error, not terminal */
+	flush_pio();
 	util_out_close();
 	close_repl_logfiles();
 	print_exit_stats();
+	io_rundown(RUNDOWN_EXCEPT_STD);
 	if (need_core && !created_core)
 	{
 		core_in_progress = TRUE;

@@ -40,6 +40,11 @@ void t_abort(gd_region *reg, sgmnt_addrs *csa)
 	cw_set_depth = 0;
 	update_trans = 0;
 	t_tries = 0;
-	if (csa->now_crit)
+	/* Do not release crit in case of
+	 * 	a) MUPIP RECOVER ONLINE  OR
+	 * 	b) DSE where a CRIT SEIZE had been done on this region previously
+	 * csa->hold_onto_crit is TRUE in both cases.
+	 */
+	if (csa->now_crit && !csa->hold_onto_crit)
 		rel_crit(reg);
 }

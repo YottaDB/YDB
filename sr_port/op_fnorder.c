@@ -20,8 +20,7 @@
 #include "numcmp.h"
 #include "mvalconv.h"
 
-LITREF	mval	SBS_MVAL_INT_ELE;
-
+GBLREF	mval		sbs_mval_int_ele;
 GBLREF	collseq		*local_collseq;
 GBLREF	boolean_t 	local_collseq_stdnull;
 GBLREF	int         	lv_null_subs;
@@ -86,7 +85,7 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 							i = 0;
 						else
 						{
-							if (!is_fnnext && (1 == numcmp(key, (mval *)&SBS_MVAL_INT_ELE)))
+							if (!is_fnnext && (1 == numcmp(key, (mval *)&sbs_mval_int_ele)))
 								i = SBS_NUM_INT_ELE;
 							else
 							{

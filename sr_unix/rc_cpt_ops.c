@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,11 +37,12 @@
 #include "do_shmat.h"
 #include "trans_log_name.h"
 
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gd_region	*gv_cur_region;
-GBLREF bool		rc_locked;
-GBLDEF trans_num	rc_read_stamp;
+GBLDEF	trans_num		rc_read_stamp;
+
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	bool			rc_locked;
 
 error_def(ERR_DBFILERR);
 error_def(ERR_TEXT);
@@ -555,6 +556,7 @@ void rc_send_cpt(rc_xblk_hdr *head, rc_rsp_page *last_aq)	/* Zero if no read op 
 	{
 		int4 blknum;
 
+		assert(!cs_addrs->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
 		grab_crit(gv_cur_region); /* DBP Need to verify that block hasn't changed since copied.  look in BT? */
 		rc_cpt_lock();
 		GET_LONG(blknum, last_aq->pageaddr);

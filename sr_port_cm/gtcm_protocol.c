@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@ LITDEF	gtcm_proto_cpu_info_t	gtcm_proto_cpu_info[] =
 	LIT_AND_LEN("x86"),			"X86",
 	LIT_AND_LEN("x86_64"),			"X86_64",
 	LIT_AND_LEN("S390"),			"390",
+	LIT_AND_LEN("S390X"),			"390",
 	LIT_AND_LEN("SPARC"),			"SPA",
 	LIT_AND_LEN("VAX"),			"VAX",
 	LIT_AND_LEN(GTCM_PROTO_BAD_CPU),	GTCM_PROTO_BAD_CPU
@@ -62,13 +63,15 @@ void gtcm_protocol(protocol_msg *pro)
 		memcpy(proto.msg + CM_OS_OFFSET, encode_os(), 3);
 		memcpy(proto.msg + CM_IMPLEMENTATION_OFFSET, "GTM", 3);
 		/* gtm_version is of the form Vi.j where i and j are digits */
-		assert('V' == gtm_version[0] && ISDIGIT(gtm_version[1]) && '.' == gtm_version[2] && ISDIGIT(gtm_version[3]));
+		assert('V' == gtm_version[0] && ISDIGIT_ASCII(gtm_version[1]) && '.' == gtm_version[2]
+			&& ISDIGIT_ASCII(gtm_version[3]));
 		proto.msg[CM_VERSION_OFFSET] = '0';
 		proto.msg[CM_VERSION_OFFSET + 1] = gtm_version[1];
 		proto.msg[CM_VERSION_OFFSET + 2] = gtm_version[3];
 		memcpy(proto.msg + CM_TYPE_OFFSET, CMM_PROTOCOL_TYPE, 3);
 		/* cm_ver_name is of the form Vijk where i, j, and k are digits */
-		assert('V' == cm_ver_name[0] && ISDIGIT(cm_ver_name[1]) && ISDIGIT(cm_ver_name[2]) && ISDIGIT(cm_ver_name[3]));
+		assert('V' == cm_ver_name[0] && ISDIGIT_ASCII(cm_ver_name[1]) && ISDIGIT_ASCII(cm_ver_name[2])
+			&& ISDIGIT_ASCII(cm_ver_name[3]));
 		memcpy(proto.msg + CM_LEVEL_OFFSET, &cm_ver_name[1], 3);
 #ifdef BIGENDIAN
 		proto.msg[CM_ENDIAN_OFFSET] = GTCM_BIG_ENDIAN_INDICATOR;

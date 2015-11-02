@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 #include <netinet/in.h>
 GBLREF gd_addr	*gd_header;
 #endif
+#include "min_max.h"
 
 /* Needs mdef.h, gdsfhead.h and its dependencies */
 #define JNLPOOL_DUMMY_REG_NAME		"JNLPOOL_REG"
@@ -82,7 +83,13 @@ typedef enum
 #define GTMSOURCE_WAIT_FOR_SOURCESTART		(1000 - 1) /* ms, almost 1 sec */
 #define	GTMSOURCE_WAIT_FOR_FIRSTTRIPLE		(1000 - 1) /* ms, almost 1 sec */
 
-#define	GTMSOURCE_MAX_SHUTDOWN_WAITLOOP	((gd_header->n_regions) * 90) /*Wait for one and a half minutes per region*/
+/* Wait for a max of 2 minutes on a single region database as all the source server shutdown
+ * timeouts seen so far have been on a single region database. For multi-region databases, wait
+ * for a max of one and a half minute per region. If ever we see timeouts with multi-region
+ * databases, this value needs to be bumped as well.
+ */
+
+#define	GTMSOURCE_MAX_SHUTDOWN_WAITLOOP	(MAX(120, (gd_header->n_regions) * 90))
 
 #define GTMSOURCE_SHUTDOWN_PAD_TIME		5 /* seconds */
 

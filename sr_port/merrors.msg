@@ -75,7 +75,7 @@
 !    M52, Required attribute missing
 !    M53, Invalid argument for font function
 !    M54, Attempt to create non-modal child of a modal parent
-!    M55, Invalid nested ESTART command
+!    M55, Invalid nested TSTART command
 !    M56, Name length exceeds implementation's limit
 !    M57, More than one defining occurrence of label in routine
 !    M58, Too few formal parameters
@@ -445,7 +445,7 @@ MAXACTARG	<Maximum number of actual arguments exceeded>/error/fao=0!/ansi=0
 GTMDUMPFAIL	<Could not create DUMP FILE>/error/fao=0!/ansi=0
 JNLTMQUAL2	<Time qualifier LOOKBACK_TIME="!AZ" is later than SINCE_TIME="!AZ">/error/fao=2!/ansi=0
 GDINVALID	<Unrecognized Global Directory file format: !AD, expected label: !AD, found: !AD>/error/fao=6!/ansi=0
-ASSERT		<Assert failed !AD line !UL>/fatal/fao=3!/ansi=0
+ASSERT		<Assert failed in !AD line !UL for expression (!AD) >/fatal/fao=5!/ansi=0
 MUFILRNDWNSUC	<File !AD successfully rundown>/info/fao=2!/ansi=0
 LOADEDSZ	<Load error: END too small.  No records loaded.>/error/fao=0!/ansi=0
 QUITARGLST	<Quit cannot take a list of arguments>/error/fao=0!/ansi=16
@@ -628,7 +628,7 @@ MTIOERR		<I/O Error with magnetic tape device !AD>/error/fao=2!/ansi=0
 RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
-JOBPARM		<Error accessing job parameters>/error/fao=0!/ansi=0
+JOBARGMISSING	<Missing job argument !UL - can't skip non-trailing arguments to a JOB command in OpenVMS editions>/error/fao=1!/ansi=0
 RUNPARAMERR	<Error accessing parameter for run command>/error/fao=0!/ansi=0
 FNNAMENEG	<Depth argument to $NAME cannot be negative>/error/fao=0!/ansi=0
 ORDER2		<Invalid second argument to $ORDER.  Must be -1 or 1.>/error/fao=0!/ansi=0
@@ -711,7 +711,7 @@ NOTERMENV	<Environment variable TERM not set.  Assuming "unknown."> /info /fao=0
 NOTERMENTRY	<TERM = "!AD" has no "terminfo" entry.  Possible terminal handling problems.> /info /fao=2!/ansi=0
 NOTERMINFODB	<No "terminfo" database.  Terminal handling problems likely.> /info /fao=0!/ansi=0
 INVACCMETHOD	<Invalid access method> /error /fao=0!/ansi=0
-JNLOPNERR	<Error opening journal file !AD!/  for region !AD>/error/fao=4!/ansi=0
+JNLOPNERR	<Error opening journal file !AD!/  for database !AD>/error/fao=4!/ansi=0
 JNLRECTYPE	<Journal record type does not match expected type>/error/fao=0!/ansi=0
 JNLTRANSGTR	<Transaction number in journal is greater than in database>/error/fao=0!/ansi=0
 JNLTRANSLSS	<Transaction number in journal is less than in database>/error/fao=0!/ansi=0
@@ -744,7 +744,7 @@ BUFRDTIMEOUT	<Pid [0x!XL] timed out waiting for buffered read of blk [0x!XL] int
 INVALIDRIP	<Invalid read-in-progress field in Cache Record.  Resetting and continuing.  Region: !AD.>/error/fao=2!/ansi=0
 BLKSIZ512	<Block size !UL rounds to !UL>/info/fao=2!/ansi=0
 MUTEXERR	<Mutual Exclusion subsystem failure>/error/fao=0!/ansi=0
-JNLVSIZE	<Journal File !AD has incorrect virtual_filesize !UL.  Allocation is !UL extension is !UL filesize is !UL>/error/fao=6!/ansi=0
+JNLVSIZE	<Journal File !AD has incorrect virtual_filesize !UL.  Allocation : !UL, Extension : !UL, Filesize : !UL, File system block size : !UL>/error/fao=7!/ansi=0
 MUTEXLCKALERT	<Mutual Exclusion subsystem ALERT - lock attempt threshold crossed for region !AD.  Process !UL is in crit.>/warning/fao=3!/ansi=0
 MUTEXFRCDTERM	<Mutual Exclusion subsystem detected forced termination of process !UL.  Crit salvaged from region !AD.>/warning/fao=3!/ansi=0
 GTMSECSHR	<!UL : Error during gtmsecshr operation>/error/fao=1!/ansi=0
@@ -1247,7 +1247,7 @@ REPLINSTNMLEN	<Replication instance name !AD should be 1 to 15 characters long>/
 REPLINSTNOHIST	<History information for !AD not found in replication instance file !AD>/error/fao=4!/ansi=0
 REPLINSTSECLEN	<Secondary replication instance name !AD should be 1 to 15 characters long>/error/fao=2!/ansi=0
 REPLINSTSECMTCH	<Secondary replication instance name !AD sent by receiver does not match !AD specified at source server startup>/error/fao=4!/ansi=0
-REPLINSTSECNONE	<No slot found for secondary instance !AD in instance file !AD>/error/fao=4!/ansi=0
+REPLINSTSECNONE	<No information found for secondary instance !AD in instance file !AD>/error/fao=4!/ansi=0
 REPLINSTSECUNDF	<Secondary replication instance name not defined>/error/fao=0!/ansi=0
 REPLINSTSEQORD	<!AD has seqno [0x!16@XQ] which is less than last record seqno [0x!16@XQ] in replication instance file !AD>/error/fao=6!/ansi=0
 REPLINSTSTNDALN	<Could not get exclusive access to replication instance file !AD>/error/fao=2!/ansi=0
@@ -1329,7 +1329,7 @@ SNAPSHOTNOV4	<Cannot downgrade (to V4) while snapshots are in progress. Currentl
 SSV4NOALLOW	<Database snapshots are supported only on fully upgraded V5 databases. !AD has V4 format blocks.>/error/fao=2!/ansi=0
 SSTMPDIRSTAT	<Cannot access temporary directory !AD>/error/fao=2!/ansi=0
 SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested snapshot>/error/fao=2!/ansi=0
-SSTMPFILOPEN	<Failed to open shadow snapshot file !AD>/error/fao=2!/ansi=0
+UNUSEDMSG1332	<SSTMPFILOPEN Last used in V5.4-000A>/error/fao=0!/ansi=0
 SSPREMATEOF	<Premature end of file while reading block !UL of size: !UL bytes at offset: !UL from !AD>/error/fao=5!/ansi=0
 SSFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
 REGSSFAIL	<Process !UL encountered error contributing to the snapshot for region !AD - the snapshot is no longer valid>/error/fao=3!/ansi=0
@@ -1350,12 +1350,19 @@ ZGOTOINVLVL	<ZGOTO in a trigger running in !AD cannot ZGOTO level !UL>/error/fao
 TRIGTCOMMIT	<TCOMMIT at $ZTLEVEL=!UL not allowed as corresponding TSTART was done at lower $ZTLEVEL=!UL>/error/fao=2!/ansi=0
 TRIGTLVLCHNG	<Detected a net transaction level ($TLEVEL) change during trigger !AD. Transaction level must be the same at exit as when the trigger started>/error/fao=2!/ansi=0
 TRIGNAMEUNIQ	<Unable to make trigger name !AD unique beyond !UL versions already loaded>/error/fao=3!/ansi=0
-ZTRIGINVACT	<Missing or invalid subcode (first) parameter given to $ZTRIGGER()>/error/fao=0!/ansi=0
+ZTRIGINVACT	<Missing or invalid parameter in position !UL given to $ZTRIGGER()>/error/fao=1!/ansi=0
 ZTRIGNOTP	<$ZTRIGGER() cannot use update subcodes FILE or ITEM when a TP transaction is in progress ($TLEVEL greater than zero)>/error/fao=0!/ansi=0
 QUITALSINV	<QUIT * return when the extrinsic was not invoked with SET *>/error/fao=0!/ansi=0
 PROCTERM	<!AD process termination due to !AD from !AD>/warning/fao=6!/ansi=0
 SRCLNNTDSP	<Source lines exceeding !UL character width are not displayed>/info/fao=1!/ansi=0
 ARROWNTDSP	<Unable to display ^----- due to length of source line>/info/fao=0!/ansi=0
+TRIGDEFBAD	<Trigger initialization failed for global ^!AD. Error while processing ^#t("!AD",!AD)>/error/fao=6!/ansi=0
+TRIGSUBSCRANGE	<Trigger definition for global ^!AD has one or more invalid subscript range(s) : !AD>/error/fao=4!/ansi=0
+TRIGDATAIGNORE	<Ignoring trigger data !AD. Use MUPIP TRIGGER to load trigger definitions>/info/fao=2!/ansi=0
+TRIGIS		<!_!_Trigger name: !AD>/info/fao=2!/ansi=0
+TCOMMITDISALLOW	<TROLLBACK required after an unhandled error in trigger context>/error/fao=0!/ansi=0
+SSATTACHSHM	<Error while attaching to shared memory identifier !UL>/error/fao=1!/ansi=0
+TRIGDEFNOSYNC	<Global ^!AD has triggers defined on the !AD instance but none on the !AD instance. Current journal sequence number is 0x!16@XQ>/warning/fao=7!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

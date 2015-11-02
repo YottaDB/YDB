@@ -45,7 +45,6 @@
 #endif
 /* Include prototypes */
 #include "t_qread.h"
-#include "t_begin_crit.h"
 #include "t_end.h"
 #include "dbfilop.h"
 #include "gvcst_blk_build.h"

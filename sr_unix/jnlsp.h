@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ typedef unix_file_info		fi_type;
 #else
 #define JNL_ALLOC_MAX		8388607  /* 4GB - 512 Bytes */
 #endif
-#define JNL_BUFFER_DEF		ROUND_UP2(128, IO_BLOCK_SIZE / DISK_BLOCK_SIZE)
+#define JNL_BUFFER_DEF		ROUND_UP2(128, MAX_IO_BLOCK_SIZE / DISK_BLOCK_SIZE)
 #define NOJNL			FD_INVALID_NONPOSIX
 #define MID_TIME(W)		W
 #define EXTTIMEVMS(T)

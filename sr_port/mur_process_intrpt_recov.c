@@ -221,7 +221,7 @@ uint4 mur_process_intrpt_recov()
 			}
 			if (jfh_changed)
 			{
-				DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, JNL_HDR_LEN, jctl->status, jctl->status2);
+				DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
 				if (SS_NORMAL != jctl->status)
 				{
 					assert(FALSE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,40 +42,40 @@ void iomt_close(io_desc *dv, mval *pp)
 		{
 			switch (ch = *(pp->str.addr + p_offset++))
 			{
-			case iop_exception:
-				dv->error_handler.len = *(pp->str.addr + p_offset);
-				dv->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-				s2pool(&dv->error_handler);
-				break;
-			case iop_skipfile:
-				GET_LONG(skips, (pp->str.addr + p_offset));
-				iomt_skipfile(dv, skips);
-				break;
-			case iop_unload:
+				case iop_exception:
+					dv->error_handler.len = *(pp->str.addr + p_offset);
+					dv->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
+					s2pool(&dv->error_handler);
+					break;
+				case iop_skipfile:
+					GET_LONG(skips, (pp->str.addr + p_offset));
+					iomt_skipfile(dv, skips);
+					break;
+				case iop_unload:
 #ifdef UNIX
-				rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+					rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
 #else
-				assert(FALSE);
+					assert(FALSE);
 #endif
-				break;
-			case iop_rewind:
-				iomt_rewind(dv);
-				break;
-			case iop_erasetape:
-				iomt_erase(dv);
-				break;
-			case iop_space:
-				GET_LONG(skips, (pp->str.addr + p_offset));
-				iomt_skiprecord(dv, skips);
-				break;
-			case iop_writeof:
-				iomt_eof(dv);
-				break;
-			default:
-				break;
+					break;
+				case iop_rewind:
+					iomt_rewind(dv);
+					break;
+				case iop_erasetape:
+					iomt_erase(dv);
+					break;
+				case iop_space:
+					GET_LONG(skips, (pp->str.addr + p_offset));
+					iomt_skiprecord(dv, skips);
+					break;
+				case iop_writeof:
+					iomt_eof(dv);
+					break;
+				default:
+					break;
 			}
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+				     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
 		if (mt_ptr->labeled == MTLAB_ANSI)
 		{
@@ -95,12 +95,12 @@ void iomt_close(io_desc *dv, mval *pp)
 			if (mt_ptr->cap.req_extra_filemark
 			    && mt_ptr->last_op == mt_eof)
 #else
-			if (mt_ptr->last_op == mt_eof)
+				if (mt_ptr->last_op == mt_eof)
 #endif
-			{
-				iomt_eof(dv);
-				iomt_skipfile(dv, -1);
-			}
+				{
+					iomt_eof(dv);
+					iomt_skipfile(dv, -1);
+				}
 		}
 		if (mt_ptr->buffer)
 		{

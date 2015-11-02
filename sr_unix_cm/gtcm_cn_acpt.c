@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,7 +143,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 			int		errno_save;
 			char		pklog[1024];
 
-			(void) sprintf(pklog, "%s.%04d", omi_pklog, cptr->stats.id);
+			(void)SPRINTF(pklog, "%s.%04d", omi_pklog, cptr->stats.id);
 			if (INV_FD_P((cptr->pklog = OPEN3(pklog, O_WRONLY|O_CREAT|O_APPEND|O_TRUNC, 0644))))
 			{
 				errno_save = errno;

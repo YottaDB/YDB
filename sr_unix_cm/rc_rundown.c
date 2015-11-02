@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,10 +26,10 @@
 #include "rc_nspace.h"
 #include "filestruct.h"
 
-GBLREF rc_dsid_list	*dsid_list;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data       *cs_data;
-GBLREF gd_region	*gv_cur_region;
+GBLREF	rc_dsid_list		*dsid_list;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	gd_region		*gv_cur_region;
 
 void rc_rundown(void)
 {
@@ -48,6 +48,7 @@ void rc_rundown(void)
 
 			if (fdi_ptr->dsid != RC_NSPACE_DSID)
 			{
+			    assert(!cs_addrs->hold_onto_crit);	/* so we can safely do unconditional grab_crit and rel_crit */
 			    grab_crit(gv_cur_region);
 			    if (--cs_data->rc_srv_cnt <= 0)
 			    {

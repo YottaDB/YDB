@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #define GC_SYM_CREATE_HANDLES(cur_entry)							\
 {												\
 	int		ecode;									\
-	char		*key = cur_entry->key_string.address;					\
+	unsigned char	*key = (unsigned char *)(cur_entry->key_string.address);		\
 												\
 	EVP_CIPHER_CTX_init(&(cur_entry->encr_key_handle));					\
 	ecode = EVP_CipherInit(&(cur_entry->encr_key_handle), ALGO, key, NULL, GC_ENCRYPT);	\

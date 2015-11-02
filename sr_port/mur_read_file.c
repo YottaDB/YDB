@@ -762,11 +762,17 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 		assert(mid_off < hi_off);	/* Note : It is also possible that, mid_off < lo_off */
 		assert(MUR_BUFF_SIZE >= jfh->max_jrec_len);
 		/* max_jrec_len size read enough to verify valid record */
-		blen = (0 != mid_off) ? MIN(jfh->max_jrec_len, jctl->eof_addr - mid_off) :
-					MIN(JNL_HDR_LEN + jfh->max_jrec_len, jctl->eof_addr);
+		if (0 != mid_off)
+		{
+			blen = MIN(jfh->max_jrec_len, jctl->eof_addr - mid_off);
+			mur_desc->random_buff.dskaddr = mid_off;
+		} else
+		{
+			blen = MIN(JNL_HDR_LEN + jfh->max_jrec_len, jctl->eof_addr) - JNL_HDR_LEN;
+			mur_desc->random_buff.dskaddr = JNL_HDR_LEN;
+		}
 		assert(MUR_BUFF_SIZE >= blen);
 		mur_desc->random_buff.blen = blen;
-		mur_desc->random_buff.dskaddr = mid_off;
 		if (SS_NORMAL != (status = mur_read(jctl)))
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, mur_desc->random_buff.dskaddr,
@@ -774,8 +780,6 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 			return status;
 		}
 		rec = (jnl_record *)mur_desc->random_buff.base;
-		if (0 == mid_off)
-			rec = (jnl_record *)((unsigned char *)rec + JNL_HDR_LEN);
 		/* check the validity of the record */
 		this_rec_valid = (blen > JREC_PREFIX_UPTO_LEN_SIZE && blen >= rec->prefix.forwptr && IS_VALID_JNLREC(rec, jfh));
 		if (this_rec_valid)
@@ -930,29 +934,23 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		return FALSE;
 	jctl->eof_addr = jctl->os_filesize;
 	assert(NULL == jctl->jfh);
-	jfh = jctl->jfh = (jnl_file_header *)malloc(JNL_HDR_LEN);
-	if (JNL_HDR_LEN < jctl->os_filesize)
+	jfh = jctl->jfh = (jnl_file_header *)malloc(REAL_JNL_HDR_LEN);
+	if (REAL_JNL_HDR_LEN < jctl->os_filesize)
 	{
-		DO_FILE_READ(jctl->channel, 0, jfh, JNL_HDR_LEN, jctl->status, jctl->status2);
-		if (SS_NORMAL == jctl->status)
-		{
-			cre_jnl_rec_size = JNL_HAS_EPOCH(jfh)
-					? PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN
-					: PINI_RECLEN + PFIN_RECLEN + EOF_RECLEN;
-			if (cre_jnl_rec_size + JNL_HDR_LEN <= jctl->os_filesize)
-			{
-				DO_FILE_READ(jctl->channel, JNL_HDR_LEN, jrecbuf, cre_jnl_rec_size, jctl->status, jctl->status2);
-			} else
-				jctl->status = ERR_JNLINVALID;
-		}
+		DO_FILE_READ(jctl->channel, 0, jfh, REAL_JNL_HDR_LEN, jctl->status, jctl->status2);
+		if (SS_NORMAL != jctl->status)
+			jctl->status = ERR_JNLINVALID;
 	} else
 		jctl->status = ERR_JNLINVALID;
 	if (SS_NORMAL != jctl->status) /* read failed or size of jnl file less than minimum expected */
-	{
+	{	/* error while reading journal file header implies we cannot rely on fields inside the file header
+		 * so reset db file name length to 0 before printing JNLINVALID message.
+		 */
+		jfh->data_file_name_length = 0;
 		if (ERR_JNLINVALID == jctl->status)
 			gtm_putmsg(VARLSTCNT(10) ERR_JNLINVALID, 4, jctl->jnl_fn_len, jctl->jnl_fn, jfh->data_file_name_length,
 					jfh->data_file_name, ERR_TEXT, 2,
-					LEN_AND_LIT("File size is less than minimum expected for a valid journal file"));
+					LEN_AND_LIT("Journal file does not have complete file header"));
 		else if (SS_NORMAL != jctl->status2)
 			gtm_putmsg(VARLSTCNT1(7) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0, jctl->status,
 					PUT_SYS_ERRNO(jctl->status2));
@@ -960,9 +958,31 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, 0, jctl->status);
 		return FALSE;
 	}
-	CHECK_JNL_FILE_IS_USABLE(jfh, jctl->status, TRUE, jctl->jnl_fn_len, jctl->jnl_fn);
-	if (SS_NORMAL != jctl->status)
-		return FALSE;	/* gtm_putmsg would have already been done by CHECK_JNL_FILE_IS_USABLE macro */
+	if (SS_NORMAL == jctl->status)
+	{
+		CHECK_JNL_FILE_IS_USABLE(jfh, jctl->status, TRUE, jctl->jnl_fn_len, jctl->jnl_fn);
+		if (SS_NORMAL != jctl->status)
+			return FALSE;	/* gtm_putmsg would have already been done by CHECK_JNL_FILE_IS_USABLE macro */
+	}
+	/* Now that we know for sure, jfh is of the format we expect it to be, we can safely access fields inside it */
+	cre_jnl_rec_size = JNL_HAS_EPOCH(jfh)
+			? PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN
+			: PINI_RECLEN + PFIN_RECLEN + EOF_RECLEN;
+	if ((cre_jnl_rec_size + JNL_HDR_LEN) <= jctl->os_filesize)
+	{
+		DO_FILE_READ(jctl->channel, JNL_HDR_LEN, jrecbuf, cre_jnl_rec_size, jctl->status, jctl->status2);
+		if (SS_NORMAL != jctl->status)
+		{
+			gtm_putmsg(VARLSTCNT(6) ERR_JNLREAD, 3, jctl->jnl_fn_len, jctl->jnl_fn, JNL_HDR_LEN, jctl->status);
+			return FALSE;
+		}
+	} else
+	{
+		gtm_putmsg(VARLSTCNT(10) ERR_JNLINVALID, 4, jctl->jnl_fn_len, jctl->jnl_fn,
+			jfh->data_file_name_length, jfh->data_file_name,
+			ERR_TEXT, 2, LEN_AND_LIT("File size is less than minimum expected for a valid journal file"));
+		return FALSE;
+	}
 	if (!mur_options.forward && !jfh->before_images)
 	{
 		VMS_ONLY(assert(!mur_options.rollback_losttnonly);)

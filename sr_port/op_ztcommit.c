@@ -45,7 +45,7 @@ void    op_ztcommit(int4 n)
 {
 	boolean_t			replication, yes_jnl_no_repl;
 	uint4				jnl_status;
-        sgmnt_addrs			*csa, *csa_next, *new_fence_list, *tcsa, **tcsa_insert;
+        sgmnt_addrs			*csa, *csa_next, *new_fence_list, *repl_csa, *tcsa, **tcsa_insert;
 	gd_region			*save_gv_cur_region;
 	jnl_private_control		*jpc;
 	jnl_buffer_ptr_t		jbp;
@@ -121,7 +121,9 @@ void    op_ztcommit(int4 n)
 		gv_cur_region = jpc->region;	/* needed for jnl_ensure_open */
 		tp_change_reg();		/* needed for jnl_ensure_open */
 		assert(csa == cs_addrs);
-		grab_crit(gv_cur_region);
+		if (!csa->hold_onto_crit)
+			grab_crit(gv_cur_region);
+		assert(csa->now_crit);
 		jbp = jpc->jnl_buff;
 		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl
 		 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records
@@ -139,7 +141,9 @@ void    op_ztcommit(int4 n)
 	{
 		if (yes_jnl_no_repl) /* journal is ON but replication is OFF for a region in the replicated instance */
 			rts_error(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
-		grab_lock(jnlpool.jnlpool_dummy_reg);
+		repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
+		if (!repl_csa->hold_onto_crit)
+			grab_lock(jnlpool.jnlpool_dummy_reg);
 	}
 	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa->next_fenced)
 	{
@@ -152,13 +156,14 @@ void    op_ztcommit(int4 n)
 		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
 		ztcom_record.prefix.time = jgbl.gbl_jrec_time;
 		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
-		rel_crit(jpc->region);
+		if (!csa->hold_onto_crit)
+			rel_crit(jpc->region);
 	}
 	/* Ensure jgbl.gbl_jrec_time did not get reset by any of the jnl writing functions. This is necessary to ensure that
 	 * the same timestamp is written in the ZTCOM record for ALL regions (which is currently required by journal recovery).
 	 */
 	assert(save_gbl_jrec_time == jgbl.gbl_jrec_time);
-	if (replication)
+	if (replication && !repl_csa->hold_onto_crit)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa_next)
 	{       /* do the waits in a separate loop to prevent spreading out the transaction */

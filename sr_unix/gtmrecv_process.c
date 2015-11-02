@@ -69,6 +69,8 @@
 #include "jnl_typedef.h"
 #include "iotcpdef.h"
 #include "memcoherency.h"
+#include "have_crit.h"			/* needed for ZLIB_UNCOMPRESS */
+#include "deferred_signal_handler.h"	/* needed for ZLIB_UNCOMPRESS */
 #include "gtm_zlib.h"
 #include "wbox_test_init.h"
 #ifdef GTM_TRIGGER
@@ -326,10 +328,12 @@ static int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_
 	assert(remote_jnl_ver <= jnl_ver);
 	/* Journal record format is different between local and remote sides of replication.
 	 * Endian conversion supported started only in V5.3-003 (jnl format V18 and filter format V17)
-	 * and current jnl format is V19 so we expect remote_jnl_ver to be either V18 or V19. The below
+	 * and current jnl format is V20 so we expect remote_jnl_ver to be either V18 or V19 or V20. The below
 	 * endian conversion code below assumes this. Assert accordingly. If this assert fails, the code below
 	 * needs to be modified to handle the new journal record formats.
 	 */
+	if (V20_JNL_VER == remote_jnl_ver)	/* If ver is V20, reset it to V19 since the journal record format is */
+		remote_jnl_ver = V19_JNL_VER;	/* essentially the same. The only changes are in the journal file header layout */
 	assert((V18_JNL_VER == remote_jnl_ver) || (V19_JNL_VER == remote_jnl_ver));
 	jb = jnl_buff;
 	status = SS_NORMAL;
@@ -1066,9 +1070,7 @@ static void process_tr_buff(int msg_type)
 			uncmpfail = TRUE;
 		} else
 		{
-			assert(NULL != zlib_uncompress_fnptr);
-			cmpret = (*zlib_uncompress_fnptr)((Bytef *)gtmrecv_uncmpmsgp, (uLongf *)&destlen,
-				(const Bytef *)gtmrecv_cmpmsgp, (uLong)gtmrecv_repl_cmpmsglen);
+			ZLIB_UNCOMPRESS(gtmrecv_uncmpmsgp, destlen, gtmrecv_cmpmsgp, gtmrecv_repl_cmpmsglen, cmpret);
 			GTM_WHITE_BOX_TEST(WBTEST_REPL_TR_UNCMP_ERROR, cmpret, Z_DATA_ERROR);
 			recv_jnl_seqno = recvpool_ctl->jnl_seqno;
 			switch(cmpret)
@@ -1213,7 +1215,7 @@ static void process_tr_buff(int msg_type)
 				}
 				assert(write_len <= repl_filter_bufsiz);
 				GTMTRIG_ONLY(
-					if (V19_JNL_VER <= remote_jnl_ver)
+					if ((unsigned char)V19_JNL_VER <= remote_jnl_ver)
 					{
 						repl_sort_tr_buff(repl_filter_buff, write_len);
 						DBG_VERIFY_TR_BUFF_SORTED(repl_filter_buff, write_len);
@@ -1228,7 +1230,7 @@ static void process_tr_buff(int msg_type)
 					 * update_num
 					 */
 					DEBUG_ONLY(
-						if (V19_JNL_VER <= remote_jnl_ver)
+						if ((unsigned char)V19_JNL_VER <= remote_jnl_ver)
 							DBG_VERIFY_TR_BUFF_SORTED(repl_filter_buff, write_len);
 					)
 				)
@@ -1243,7 +1245,7 @@ static void process_tr_buff(int msg_type)
 			} else
 			{
 				GTMTRIG_ONLY(
-					if (V19_JNL_VER <= remote_jnl_ver)
+					if ((unsigned char)V19_JNL_VER <= remote_jnl_ver)
 					{
 						repl_sort_tr_buff((uchar_ptr_t)(recvpool.recvdata_base + write_off), write_len);
 						DBG_VERIFY_TR_BUFF_SORTED((recvpool.recvdata_base + write_off), write_len);
@@ -1806,11 +1808,10 @@ static void do_main_loop(boolean_t crash_restart)
 						}
 						if (!uncmpfail)
 						{
-							assert(NULL != zlib_uncompress_fnptr);
 							destlen = REPL_MSG_CMPEXPDATALEN; /* initialize available
 												     * decompressed buffer space */
-							cmpret = (*zlib_uncompress_fnptr)((Bytef *)&cmpsolve_msg.data[0],
-								&destlen, ((const Bytef *)(&cmptest_msg->data[0])), cmplen);
+							ZLIB_UNCOMPRESS(&cmpsolve_msg.data[0], destlen, &cmptest_msg->data[0],
+										cmplen, cmpret);
 							GTM_WHITE_BOX_TEST(WBTEST_REPL_TEST_UNCMP_ERROR, cmpret, Z_DATA_ERROR);
 							switch(cmpret)
 							{

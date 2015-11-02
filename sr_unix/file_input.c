@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@
 #include "io_params.h"
 #include "gtm_stat.h"
 #include "op.h"
-#include "mu_load_input.h"
+#include "file_input.h"
 #include "iotimer.h"
 
 #define BUFF_SIZE	65536
@@ -40,7 +40,7 @@ GBLREF io_pair          io_curr_device;
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 
 
-void mu_load_init(char *fn, short fn_len)
+void file_input_init(char *fn, short fn_len)
 {
 	mval            val;
 	mval            pars;
@@ -49,6 +49,7 @@ void mu_load_init(char *fn, short fn_len)
 		(unsigned char)iop_readonly,
 		(unsigned char)iop_rewind,
 		(unsigned char)iop_m,
+		(unsigned char)iop_nowrap,
 		(unsigned char)iop_eol
 	};
 
@@ -72,7 +73,7 @@ void mu_load_init(char *fn, short fn_len)
 	return;
 }
 
-void mu_load_close(void)
+void file_input_close(void)
 {
 	mval            val;
 	mval            pars;
@@ -86,7 +87,7 @@ void mu_load_close(void)
 	op_close(&val, &pars);
 }
 
-short	mu_bin_get(char **in_ptr)
+int	file_input_bin_get(char **in_ptr)
 {
 	short	s1s;
 	int	s1;
@@ -99,7 +100,7 @@ short	mu_bin_get(char **in_ptr)
 	ESTABLISH_RET(mupip_load_ch, 0);
 	if (buff1_end - buff1_ptr < SIZEOF(short))
 	{
-		if ((rd_len = mu_bin_read()) <= 0)
+		if ((rd_len = file_input_bin_read()) <= 0)
 		{
 			if (buff1_end != buff1_ptr)
 				rts_error(VARLSTCNT(1) ERR_PREMATEOF);
@@ -119,7 +120,7 @@ short	mu_bin_get(char **in_ptr)
 	if (buff1_end - buff1_ptr < s1)
 	{
 		/* not enough data in buffer, read additional bytes */
-		rd_len = mu_bin_read();
+		rd_len = file_input_bin_read();
 		if (rd_len + (buff1_end - buff1_ptr) < s1)
 		{
 			if (-1 == rd_len)
@@ -134,7 +135,7 @@ short	mu_bin_get(char **in_ptr)
 	return s1;
 }
 
-int mu_bin_read(void)
+int file_input_bin_read(void)
 {
 	int		s1, rdlen;
 	io_desc		*iod;
@@ -151,7 +152,7 @@ int mu_bin_read(void)
 	return rdlen;
 }
 
-short	mu_load_get(char **in_ptr)
+int file_input_get(char **in_ptr)
 {
 	int	s1;
 	int	rd_len, ret_len;
@@ -164,23 +165,30 @@ short	mu_load_get(char **in_ptr)
 
 	ESTABLISH_RET(mupip_load_ch, 0);
 	buff1_ptr = buff1_end = buff1;
+	ret_len = 0;
 	for (;;)
 	{
 		/* do untimed reads */
 		op_read(&val, NO_M_TIMEOUT);
-		if (!val.str.len && io_curr_device.in->dollar.zeof)
+		rd_len = val.str.len;
+		if ((0 == rd_len) && io_curr_device.in->dollar.zeof)
 		{
 			REVERT;
 			if (io_curr_device.in->dollar.x)
 				rts_error(VARLSTCNT(1) ERR_PREMATEOF);
 			return -1;
 		}
-		memcpy(buff1_end, val.str.addr, val.str.len);
-		buff1_end = buff1_end + val.str.len;
+		ret_len += rd_len;
+		if (SIZEOF(buff1) < ret_len)
+		{
+			REVERT;
+			return -1;
+		}
+		memcpy(buff1_end, val.str.addr, rd_len);
+		buff1_end = buff1_end + rd_len;
 		if ( !(io_curr_device.in->dollar.x) )
 		{
 			*in_ptr = buff1_ptr;
-			ret_len = (int)(buff1_end - buff1_ptr);
 			REVERT;
 			return ret_len;
 		}

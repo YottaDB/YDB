@@ -50,11 +50,16 @@ int rts_error(int argcnt, ...)
 
 	if (-1 == gtm_errno)
 		gtm_errno = errno;
-
 	VAR_START(var, argcnt);
 	msgid = va_arg(var, int);
 	va_end(var);
-
+	/* If there was a previous fatal error that did not yet get printed, do it before overwriting the
+	 * util_output buffer with the about-to-be-handled nested error. This way one will see ALL the
+	 * fatal error messages (e.g. assert failures) in the order in which they occurred instead of
+	 * just the last nested one.
+	 */
+	if (DUMPABLE)
+		PRN_ERROR;
 	/* This is simply a place holder msg to signal tp restart or otherwise rethrow an error */
 	if (ERR_TPRETRY == msgid || ERR_REPEATERROR == msgid)
 	{
@@ -73,13 +78,11 @@ int rts_error(int argcnt, ...)
 			created_core = dont_want_core = FALSE;		/* We can create a(nother) core now */
 
 	}
-
 	DRIVECH(msgid);				/* Drive the topmost (inactive) condition handler */
-
 	/* Note -- at one time there was code here to catch if we returned from the condition handlers
-	   when the severity was error or above. That code had to be removed because of several errors
-	   that are handled and returned from. An example is EOF errors.  SE 9/2000
-	*/
+	 * when the severity was error or above. That code had to be removed because of several errors
+	 * that are handled and returned from. An example is EOF errors.  SE 9/2000
+	 */
 	return 0;
 }
 

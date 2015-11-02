@@ -125,7 +125,7 @@ boolean_t mur_insert_prev(jnl_ctl_list **jjctl)
 		}
 		if (new_jctl->jfh->turn_around_offset && cur_jctl->jfh->turn_around_offset)
 		{
-			if (rctl->jfh_recov_interrupted)
+			if (rctl->recov_interrupted)
 			{	/* Possible if a first recovery with a turn-around-point (T2) got interrupted and a second
 				 * recovery with a new turn-around-point (T1 which is in a previous generation journal file)
 				 * was re-interrupted while in the middle of mur_process_intrpt_recov just after it had

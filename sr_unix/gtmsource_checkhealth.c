@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@ int gtmsource_checkhealth(void)
 
 	error_def(ERR_NOTALLDBOPN);
 	error_def(ERR_REPLJNLCLOSED);
+	error_def(ERR_SRCSRVNOTEXIST);
 
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 	if (NULL != jnlpool.gtmsource_local)	/* Check health of a specific source server */
@@ -95,12 +96,12 @@ int gtmsource_checkhealth(void)
 				((GTMSOURCE_MODE_ACTIVE == gtmsourcelocal_ptr->mode) ? "ACTIVE" : "PASSIVE"));
 			status |= SRV_ALIVE;
 			num_servers++;
-		} else if (!srv_alive)
+		} else
 		{
 			repl_log(stderr, FALSE, TRUE, FORMAT_STR, gtmsource_pid, "Source server", " NOT");
+			gtm_putmsg(VARLSTCNT(4) ERR_SRCSRVNOTEXIST, 2, LEN_AND_STR(gtmsourcelocal_ptr->secondary_instname));
 			status |= SRV_DEAD;
-		} else
-			status |= SRV_ERR;
+		}
 		if (NULL != jnlpool.gtmsource_local)
 			break;
 	}

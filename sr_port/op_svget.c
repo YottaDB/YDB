@@ -106,6 +106,7 @@ GBLREF	mval		*dollar_ztcode;
 GBLREF	mval		*dollar_ztdata;
 GBLREF	mval		*dollar_ztoldval;
 GBLREF	mval		*dollar_ztriggerop;
+GBLREF	mval		dollar_ztslate;
 GBLREF	mval		*dollar_ztupdate;
 GBLREF	mval		*dollar_ztvalue;
 GBLREF	mval		dollar_ztwormhole;
@@ -463,6 +464,15 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_STR(mvp);
 			memcpy(v, mvp, SIZEOF(mval));
 			ztwormhole_used = TRUE;
+			break;
+#			else
+			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
+#			endif
+		case SV_ZTSLATE:
+#			ifdef GTM_TRIGGER
+			mvp = &dollar_ztslate;
+			MV_FORCE_STR(mvp);
+			memcpy(v, mvp, SIZEOF(mval));
 			break;
 #			else
 			rts_error(VARLSTCNT(1) ERR_UNIMPLOP);

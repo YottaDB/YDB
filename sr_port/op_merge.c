@@ -67,6 +67,7 @@
 #include "sgnl.h"
 #include "util.h"
 #include "collseq.h"
+#include "alias.h"
 
 #define UNDO_ACTIVE_LV										\
 {												\
@@ -323,7 +324,11 @@ void op_merge(void)
 					dst_lv = op_putindx(VARLSTCNT(2) dst_lv, subsc);
 					while (*ptr++);	/* skip to start of next subscript */
 				}
-				/* We created the key. Just assign the value now */
+				/* We created the key. Pre-process the node in case a container is being replaced,
+				 * then assign the value directly. Note there is no need to worry about MV_ALIASCONT
+				 * propagation since the source in this source is a global var.
+				 */
+				DECR_AC_REF(dst_lv, TRUE);
 				dst_lv->v = *value;
 			}
 			gvname_env_restore(mglvnp->gblp[IND2]);	 /* naked indicator is restored into gv_currkey */

@@ -100,7 +100,7 @@ CONDITION_HANDLER(mupip_recover_ch)
 	{
 		assert(gtm_white_box_test_case_enabled && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
 		VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
-		rc = tp_restart(1);			/* This SHOULD generate an error (TPFAIL or other) */
+		rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);	/* This SHOULD generate an error (TPFAIL or other) */
 		GTMTRIG_ONLY(assert(ERR_TPRETRY != rc));
 #ifdef UNIX
 		if (ERR_TPRETRY == SIGNAL)		/* (signal value undisturbed) */

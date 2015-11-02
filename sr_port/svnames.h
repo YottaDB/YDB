@@ -75,6 +75,7 @@ enum
 	SV_ZTVALUE,		/* 62 */
 	SV_ZTWORMHOLE,		/* 63 */
 	SV_ZTLEVEL,		/* 64 */
+	SV_ZTSLATE,		/* 65 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

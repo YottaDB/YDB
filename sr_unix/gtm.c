@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,18 +12,14 @@
 #include "mdef.h"
 #include "main_pragma.h"
 
+#undef UNIX		/* Causes non-GTM-runtime routines (libgtmshr) to be used since libgtmshr is not yet available */
 #include "gtm_stdio.h"
+#define UNIX
 #include "gtm_string.h"
 #include "gtm_strings.h"
 #include "gtm_stdlib.h"
 #include "gtm_limits.h"
 #include <dlfcn.h>
-
-/* Since this executable is not going to link in libgtmshr.so (which is what contains gtm_fprintf), we should not expand
- * fprintf to gtm_fprintf like is done for the entire GT.M codebase. All FPRINTF calls done here should directly go to
- * the system "fprintf" and not gtm_fprintf. So undefine the fprintf define done in mdef.h
- */
-#undef	fprintf
 
 #ifdef __osf__
 	/* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may

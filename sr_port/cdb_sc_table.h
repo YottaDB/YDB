@@ -71,7 +71,7 @@ CDB_SC_UCHAR_ENTRY(cdb_sc_critreset,        FALSE, 'R') /* 'R'  mutex found (in 
 CDB_SC_UCHAR_ENTRY(cdb_sc_maxlvl,           FALSE, 'S') /* 'S'  t_write_root or gvcst_search found maximum legal block level for database exceeded */
 CDB_SC_UCHAR_ENTRY(cdb_sc_blockflush,       FALSE, 'T') /* 'T'  t_end (hist, or bitmap) found an to update a buffer that is being flushed (GT.CX) */
 CDB_SC_UCHAR_ENTRY(cdb_sc_cyclefail,        TRUE,  'U') /* 'U'  t_end or tp_tend found a buffer in read(only) set was overwritten though tn static */
-CDB_SC_UCHAR_ENTRY(cdb_sc_readblocked,      FALSE, 'V') /* 'V'  t_qread found db_csh_getn couldn't get a buffer for a read_only process */
+CDB_SC_UCHAR_ENTRY(cdb_sc_UNUSED1,          FALSE, 'V') /* 'V'  FORMERLY cdb_sc_readblocked; SLOT IS NOW UP FOR REUSE */
 CDB_SC_UCHAR_ENTRY(cdb_sc_future_read,      FALSE, 'W') /* 'W'  dsk_read return to t_qread indicated block transaction exceeds curr_tn (GT.CX) */
 CDB_SC_UCHAR_ENTRY(cdb_sc_badbitmap,        FALSE, 'X') /* 'X'  bm_getfree found bitmap had bad size or level */
 CDB_SC_UCHAR_ENTRY(cdb_sc_badoffset,        FALSE, 'Y') /* 'Y'  gvcst_blk_search (in gvcst_search_blk or gvcst_search_tail) found a bad record offset */
@@ -85,7 +85,7 @@ CDB_SC_LCHAR_ENTRY(cdb_sc_blknumerr,        FALSE, 'e') /* 'e'  t_qread or op_tc
 CDB_SC_LCHAR_ENTRY(cdb_sc_blksplit,         FALSE, 'f') /* 'f'  recompute_upd_array recognized that the block needs to be split */
 CDB_SC_LCHAR_ENTRY(cdb_sc_toomanyrecompute, FALSE, 'g') /* 'g'  more than 25% of the blocks in read-set need to be recomputed */
 CDB_SC_LCHAR_ENTRY(cdb_sc_jnlstatemod,      FALSE, 'h') /* 'h'  csd->jnl_state changed or csd->jnl_before_image changed since start of the transaction */
-CDB_SC_LCHAR_ENTRY(cdb_sc_unfreeze_getcrit, FALSE, 'i') /* 'i'  gdsfilext found region frozen. Wait for unfreeze and reattempt crit */
+CDB_SC_LCHAR_ENTRY(cdb_sc_UNUSED2,          FALSE, 'i') /* 'i'  FORMERLY cdb_sc_unfreeze_getcrit; SLOT IS NOW UP FOR REUSE */
 CDB_SC_LCHAR_ENTRY(cdb_sc_bkupss_statemod,  FALSE, 'j') /* 'j'  t_end/tp_tend found that either online-backup-in-progress or snapshot
 								state changed since start of transaction */
 CDB_SC_LCHAR_ENTRY(cdb_sc_crbtmismatch,     TRUE,  'k') /* 'k'  cr->blk and bt->blk does not match */

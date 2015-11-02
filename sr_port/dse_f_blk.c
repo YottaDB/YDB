@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,7 @@
 #include "t_qread.h"
 
 GBLDEF global_root_list	*global_roots_head, *global_roots_tail;
-GBLDEF block_id		patch_left_sib,patch_right_sib,patch_find_blk;
+GBLDEF block_id		patch_left_sib, patch_right_sib, patch_find_blk;
 GBLDEF block_id		patch_path[MAX_BT_DEPTH + 1];
 GBLDEF block_id		patch_path1[MAX_BT_DEPTH + 1];
 GBLDEF int4		patch_offset[MAX_BT_DEPTH + 1];
@@ -48,7 +48,7 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF short int	patch_path_count;
 
 #define MAX_UTIL_LEN 33
-static bool		was_crit;
+static boolean_t	was_crit;
 static int4		nocrit_present;
 
 void dse_f_blk(void)
@@ -74,7 +74,7 @@ void dse_f_blk(void)
 	if (blk < 0 || blk >= cs_addrs->ti->total_blks
 	    || !(blk % cs_addrs->hdr->bplmap))
 	{
-	    util_out_print("Error: invalid block number.",TRUE);
+	    util_out_print("Error: invalid block number.", TRUE);
 	    return;
 	}
 	patch_curr_blk = blk;
@@ -83,21 +83,13 @@ void dse_f_blk(void)
     patch_find_blk = patch_curr_blk;
     was_crit = cs_addrs->now_crit;
     nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-
-    if (!was_crit)
-    {
-	if (nocrit_present)
-	    cs_addrs->now_crit = TRUE;
-	else
-	    grab_crit(gv_cur_region);
-    }
-
+    DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
     /* ESTABLISH is done here because dse_f_blk_ch() assumes we already
      * have crit.
      */
     ESTABLISH(dse_f_blk_ch);
 
-    if(!(bp = t_qread(patch_find_blk,&dummy_int,&dummy_cr)))
+    if(!(bp = t_qread(patch_find_blk, &dummy_int, &dummy_cr)))
 	rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
     if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 	b_top = bp + cs_addrs->hdr->blk_size;
@@ -131,30 +123,23 @@ void dse_f_blk(void)
     {
 	if (size < 0)
 	{
-	    util_out_print("No keys in block, cannot perform ordered search.",
-			   TRUE);
-	    if (!was_crit)
-	    {
-		if (nocrit_present)
-		    cs_addrs->now_crit = FALSE;
-		else
-		    rel_crit(gv_cur_region);
-	    }
+	    util_out_print("No keys in block, cannot perform ordered search.", TRUE);
+            DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	    REVERT;
 	    return;
 	}
 	if (patch_exh_found = (patch_find_blk == patch_path[0]))
 	{
 	    if (patch_find_sibs)
-		util_out_print("!/    Left siblings    Right siblings!/	none		none",TRUE);
+		util_out_print("!/    Left siblings    Right siblings!/	none		none", TRUE);
 	    else
 	    {
-		memcpy(util_buff,"!/    Paths--blk:off!/	",24);
+		memcpy(util_buff, "!/    Paths--blk:off!/	", 24);
 		util_len = 24;
-		util_len += i2hex_nofill(patch_find_blk,(uchar_ptr_t)&util_buff[util_len],
+		util_len += i2hex_nofill(patch_find_blk, (uchar_ptr_t)&util_buff[util_len],
 					 8);
 		util_buff[util_len] = 0;
-		util_out_print(util_buff,TRUE);
+		util_out_print(util_buff, TRUE);
 	    }
 	}
 	else
@@ -163,7 +148,7 @@ void dse_f_blk(void)
 	    global_roots_tail = global_roots_head;
 	    global_roots_head->link = (global_root_list *)0;
 	    global_roots_head->dir_path = (global_dir_path *)0;
-	    dse_exhaus(1,0);
+	    dse_exhaus(1, 0);
 	    patch_find_root_search = FALSE;
 	    while (!patch_exh_found && global_roots_head->link)
 	    {
@@ -173,64 +158,62 @@ void dse_f_blk(void)
 		if (patch_exh_found = (patch_find_blk == patch_path[0]))
 		{
 		    if (patch_find_sibs)
-			util_out_print("!/    Left siblings    Right siblings!/	none		none",TRUE);
+			util_out_print("!/    Left siblings    Right siblings!/	none		none", TRUE);
 		    else
 		    {
 			patch_path_count--;
-			util_out_print("	Directory path!/	Path--blk:off",TRUE);
+			util_out_print("	Directory path!/	Path--blk:off", TRUE);
 			if (!patch_find_root_search)
 			{
 			    d_ptr = global_roots_head->link->dir_path;
 			    while(d_ptr)
 			    {
-				memcpy(util_buff,"	",1);
+				memcpy(util_buff, "	", 1);
 				util_len = 1;
 				util_len += i2hex_nofill(d_ptr->block,
 							 (uchar_ptr_t)&util_buff[util_len],
 							 8);
-				memcpy(&util_buff[util_len],":",1);
+				memcpy(&util_buff[util_len], ":", 1);
 				util_len += 1;
 				util_len += i2hex_nofill(d_ptr->offset,
 							 (uchar_ptr_t)&util_buff[util_len],
 							 4);
-				memcpy(&util_buff[util_len],",",1);
+				memcpy(&util_buff[util_len], ",", 1);
 				util_len += 1;
 				util_buff[util_len] = 0;
-				util_out_print(util_buff,FALSE);
+				util_out_print(util_buff, FALSE);
 				temp = (global_root_list *)d_ptr;
 				d_ptr = d_ptr->next;
 				free(temp);
 			    }
 			    global_roots_head->link->dir_path = 0;
-			    util_out_print("!/!/	Global paths!/	Path--blk:off",TRUE);
+			    util_out_print("!/!/	Global paths!/	Path--blk:off", TRUE);
 			}
 			for (count = 0; count < patch_path_count ;count++)
 			{
-			    memcpy(util_buff,"	",1);
+			    memcpy(util_buff, "	", 1);
 			    util_len = 1;
 			    util_len += i2hex_nofill(patch_path[count],
 						     (uchar_ptr_t)&util_buff[util_len],
 						     8);
-			    memcpy(&util_buff[util_len],":",1);
+			    memcpy(&util_buff[util_len], ":", 1);
 			    util_len += 1;
-			    util_len += i2hex_nofill(patch_offset[count],
-						     (uchar_ptr_t)&util_buff[util_len],
-						     4);
-			    memcpy(&util_buff[util_len],",",1);
+			    util_len += i2hex_nofill(patch_offset[count], (uchar_ptr_t)&util_buff[util_len], 4);
+			    memcpy(&util_buff[util_len], ",", 1);
 			    util_len += 1;
 			    util_buff[util_len] = 0;
-			    util_out_print(util_buff,FALSE);
+			    util_out_print(util_buff, FALSE);
 			}
-			memcpy(util_buff,"	",1);
+			memcpy(util_buff, "	", 1);
 			util_len = 1;
 			util_len += i2hex_nofill(patch_path[count],
-						 (uchar_ptr_t)&util_buff[util_len],8);
+						 (uchar_ptr_t)&util_buff[util_len], 8);
 			util_buff[util_len] = 0;
-			util_out_print(util_buff,TRUE);
+			util_out_print(util_buff, TRUE);
 		    }
 		}
 		else
-		    dse_exhaus(1,0);
+		    dse_exhaus(1, 0);
 		temp = global_roots_head;
 		d_ptr = global_roots_head->link->dir_path;
 		while(d_ptr)
@@ -260,22 +243,16 @@ void dse_f_blk(void)
 	{
 	    if (exhaust)
 	    {
-		util_out_print("Error: exhaustive search fail.",TRUE);
+		util_out_print("Error: exhaustive search fail.", TRUE);
 	    }
 	    else
 	    {
-		util_out_print("Error: ordered search fail.",TRUE);
+		util_out_print("Error: ordered search fail.", TRUE);
 	    }
 	}
 	else
-	    util_out_print(0,TRUE);
-	if (!was_crit)
-	{
-	    if (nocrit_present)
-		cs_addrs->now_crit = FALSE;
-	    else
-		rel_crit(gv_cur_region);
-	}
+	    util_out_print(0, TRUE);
+        DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	REVERT;
 	return;
     }
@@ -283,113 +260,94 @@ void dse_f_blk(void)
     {
 	if (!dse_is_blk_in(rp, r_top, size))
 	{
-	    util_out_print("Error: ordered search fail.",TRUE);
-	    if (!was_crit)
-	    {
-		if (nocrit_present)
-		    cs_addrs->now_crit = FALSE;
-		else
-		    rel_crit(gv_cur_region);
-	    }
+	    util_out_print("Error: ordered search fail.", TRUE);
+            DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	    REVERT;
 	    return;
 	}
     }
     if (patch_find_sibs)
     {
-	util_out_print("!/!_Left sibling!_Right sibling",TRUE);
+	util_out_print("!/!_Left sibling!_Right sibling", TRUE);
 	if (patch_left_sib)
 	{
-	    memcpy(util_buff,"!_",2);
+	    memcpy(util_buff, "!_", 2);
 	    util_len = 2;
-	    util_len += i2hex_nofill(patch_left_sib,(uchar_ptr_t)&util_buff[util_len],8);
+	    util_len += i2hex_nofill(patch_left_sib, (uchar_ptr_t)&util_buff[util_len], 8);
 	    util_buff[util_len] = 0;
-	    util_out_print(util_buff,FALSE);
+	    util_out_print(util_buff, FALSE);
 	}
 	else
-	    util_out_print("!_none",FALSE);
+	    util_out_print("!_none", FALSE);
 	if (patch_right_sib)
 	{
-	    memcpy(util_buff,"!_!_",4);
+	    memcpy(util_buff, "!_!_", 4);
 	    util_len = 4;
-	    util_len += i2hex_nofill(patch_right_sib,(uchar_ptr_t)&util_buff[util_len],8);
-	    memcpy(&util_buff[util_len],"!/",2);
+	    util_len += i2hex_nofill(patch_right_sib, (uchar_ptr_t)&util_buff[util_len], 8);
+	    memcpy(&util_buff[util_len], "!/", 2);
 	    util_len += 2;
 	    util_buff[util_len] = 0;
-	    util_out_print(util_buff,TRUE);
-	}else
-	    util_out_print("!_!_none!/",TRUE);
-	if (!was_crit)
-	{
-	    if (nocrit_present)
-		cs_addrs->now_crit = FALSE;
-	    else
-		rel_crit(gv_cur_region);
-	}
+	    util_out_print(util_buff, TRUE);
+	} else
+	    util_out_print("!_!_none!/", TRUE);
+        DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	REVERT;
 	return;
     }
-    util_out_print("!/    Directory path!/    Path--blk:off",TRUE);
+    util_out_print("!/    Directory path!/    Path--blk:off", TRUE);
     patch_dir_path_count--;
     for (count = 0; count < patch_dir_path_count ;count++)
     {
-	memcpy(util_buff,"	",1);
+	memcpy(util_buff, "	", 1);
 	util_len = 1;
-	util_len += i2hex_nofill(patch_path[count],(uchar_ptr_t)&util_buff[util_len],8);
-	memcpy(&util_buff[util_len],":",1);
+	util_len += i2hex_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+	memcpy(&util_buff[util_len], ":", 1);
 	util_len += 1;
-	util_len += i2hex_nofill(patch_offset[count],(uchar_ptr_t)&util_buff[util_len],4);
-	memcpy(&util_buff[util_len],",",1);
+	util_len += i2hex_nofill(patch_offset[count], (uchar_ptr_t)&util_buff[util_len], 4);
+	memcpy(&util_buff[util_len], ",", 1);
 	util_len += 1;
 	util_buff[util_len] = 0;
-	util_out_print(util_buff,FALSE);
+	util_out_print(util_buff, FALSE);
     }
-    util_out_print("!/    Global tree path!/    Path--blk:off",TRUE);
+    util_out_print("!/    Global tree path!/    Path--blk:off", TRUE);
     if (patch_path_count)
     {
 	patch_path_count--;
 	for (count = 0; count < patch_path_count ;count++)
 	{
-	    memcpy(util_buff,"	",1);
+	    memcpy(util_buff, "	", 1);
 	    util_len = 1;
-	    util_len += i2hex_nofill(patch_path1[count],(uchar_ptr_t)&util_buff[util_len],8);
-	    memcpy(&util_buff[util_len],":",1);
+	    util_len += i2hex_nofill(patch_path1[count], (uchar_ptr_t)&util_buff[util_len], 8);
+	    memcpy(&util_buff[util_len], ":", 1);
 	    util_len += 1;
-	    util_len += i2hex_nofill(patch_offset1[count],(uchar_ptr_t)&util_buff[util_len],4);
-	    memcpy(&util_buff[util_len],",",1);
+	    util_len += i2hex_nofill(patch_offset1[count], (uchar_ptr_t)&util_buff[util_len], 4);
+	    memcpy(&util_buff[util_len], ",", 1);
 	    util_len += 1;
 	    util_buff[util_len] = 0;
-	    util_out_print(util_buff,FALSE);
+	    util_out_print(util_buff, FALSE);
 	}
-	memcpy(util_buff,"	",1);
+	memcpy(util_buff, "	", 1);
 	util_len = 1;
-	util_len += i2hex_nofill(patch_path1[count],(uchar_ptr_t)&util_buff[util_len],8);
-	memcpy(&util_buff[util_len],"!/",2);
+	util_len += i2hex_nofill(patch_path1[count], (uchar_ptr_t)&util_buff[util_len], 8);
+	memcpy(&util_buff[util_len], "!/", 2);
 	util_len += 2;
 	util_buff[util_len] = 0;
-	util_out_print(util_buff,TRUE);
+	util_out_print(util_buff, TRUE);
     }
     else
     {
-	memcpy(util_buff,"	",1);
+	memcpy(util_buff, "	", 1);
 	util_len = 1;
-	util_len += i2hex_nofill(patch_path[count],(uchar_ptr_t)&util_buff[util_len],8);
-	memcpy(&util_buff[util_len],"!/",2);
+	util_len += i2hex_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+	memcpy(&util_buff[util_len], "!/", 2);
 	util_len += 2;
 	util_buff[util_len] = 0;
-	util_out_print(util_buff,TRUE);
+	util_out_print(util_buff, TRUE);
     }
-    if (!was_crit)
-    {
-	if (nocrit_present)
-	    cs_addrs->now_crit = FALSE;
-	else
-	    rel_crit(gv_cur_region);
-    }
+    DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
     REVERT;
     return;
 }
-
 
 /* Control-C condition handler */
 CONDITION_HANDLER(dse_f_blk_ch)
@@ -398,15 +356,7 @@ CONDITION_HANDLER(dse_f_blk_ch)
     START_CH;
 
     if (SIGNAL == ERR_CTRLC)
-    {
-	if (!was_crit)
-	{
-	    if (nocrit_present)
-		cs_addrs->now_crit = FALSE;
-	    else
-		rel_crit(gv_cur_region);
-	}
-    }
+        DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
     NEXTCH;
 }
 

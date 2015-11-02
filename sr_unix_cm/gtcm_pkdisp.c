@@ -12,7 +12,9 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#undef UNIX		/* Cause non-GTM-runtime routines to be used since this is a standalone module */
 #include "gtm_stdio.h"
+#define UNIX
 #include "gtm_stdlib.h"		/* for exit() */
 
 /* The use of "open" below involves pulling in gtm_open() (from gtm_fd_trace.c) which in turn pulls in caller_id and the works.

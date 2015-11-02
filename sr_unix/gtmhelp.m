@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2002, 2008 Fidelity Information Services, Inc	;
+;	Copyright 2002, 2010 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -16,11 +16,13 @@ gtmhelp(subtopic,gbldir)
 	set $ztrap="zgoto "_$zl_":error"
 	set %gbldir=$zgbldir
 	set $zgbldir=gbldir
+	set dio=$io
 	set COUNT=0,NOTFOUND=0
 	do parse(subtopic)
 	for  do display quit:COUNT<0
 	if ($zsearch(%gbldir)'="") set $zgbldir=%gbldir
 	else  set $zgbldir=""
+	use dio
 	quit
 	;
 	;
@@ -41,7 +43,7 @@ display
 	;
 	new (COUNT,TOPIC,MATCH,PROMPT,NEW,NOTFOUND)
 	if $g(TOPIC(COUNT))="?" set COUNT=COUNT-1
-	write $$CLEAR
+	write #
 	if $$MATCH do
  .		if NOTFOUND do
  ..			write !!,"Sorry, no Documentation on "
@@ -62,6 +64,7 @@ display
  ...				quit
  ..			quit
  .		else   for i=1:1:NEW  set COUNT=COUNT-1
+ .		if $zeof write # set COUNT=COUNT-1 quit
  .		write $$PROMPT
  .		read subtopic,!
  .		if subtopic="" set COUNT=COUNT-1
@@ -151,6 +154,7 @@ error	; Error handler called by $ztrap
 	use outfile
 	zshow "*"
 	close outfile
+	use dio
 	set $ecode=""
 	quit
 MATCH() ; Return array MATCH which contains all Global references which match
@@ -167,12 +171,11 @@ MATCH() ; Return array MATCH which contains all Global references which match
 	if $g(FLAG)=1 set COUNT=COUNT-1
 	quit MATCH
 WIDTH()	quit 80	; Width of the current device
-PAGE() quit 24	; Page length of the current device
-CLEAR() use 0:(x=0:y=0:clear) quit ""	; Clear the screan
+PAGE()	quit 24	; Page length of the current device
 FORMAT(newlines)
 	if $y>($$PAGE-newlines-3) do
- .		read !!,"Press RETURN to continue ...",dummy
- .		write $$CLEAR
+ .		if '$zeof read !!,"Press RETURN to continue ...",dummy
+ .		write #
  .		quit
 	quit ""
 COLUMNS(subref,x)

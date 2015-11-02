@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,10 +57,13 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 	max_label = label_table++;
 	adjusted_in_addr = in_addr + (mpc_reset_to_linestart ? 1 : 0);
 	while (label_table < last_label)
-	{	/* Find first label that equals or goes past the input addr depending on mpc_reset_to_linestart.
-		 * If past, the previous label is then the target line */
+	{	/* Label table entries are sorted by label name (for faster lookup by indirects using op_labaddr) so we
+		 * scan to find all of the label addresses that meet our specification (adjusted addr > label address) and
+		 * keep the one with the lowest linenumber offset. This means we have to go through all of them rather than
+		 * stop at the first label meeting our address criteria but this is not a high-use module so it is ok.
+		 */
 		if (adjusted_in_addr > LABEL_ADDR(routine, label_table))
-		{
+		{	/* Now check if this label is a keeper by checking for minimum LNR_OFFSET */
 			if (max_label->LABENT_LNR_OFFSET <= label_table->LABENT_LNR_OFFSET)
 				max_label = label_table;
 		}

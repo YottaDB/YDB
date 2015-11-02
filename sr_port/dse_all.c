@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,6 +86,7 @@ void dse_all(void)
 	boolean_t	release = FALSE;
 	boolean_t	dump = FALSE;
 	boolean_t	override = FALSE;
+	boolean_t	was_crit;
 	gd_addr         *temp_gdaddr;
 	gd_binding      *map;
 #ifdef UNIX
@@ -199,11 +200,11 @@ void dse_all(void)
 				UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY, TRUE);)
 				VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY, TRUE);)
 				cs_addrs->nl->in_crit = 0;
-				cs_addrs->now_crit = cs_addrs->read_lock = FALSE;
+				cs_addrs->hold_onto_crit = FALSE;	/* reset this just before cs_addrs->now_crit is reset */
+				cs_addrs->now_crit = FALSE;
 			}
 			if (cs_addrs->critical)
 				crash_count = cs_addrs->critical->crashcnt;
-
 			if (freeze)
 			{
 				while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE))
@@ -218,11 +219,16 @@ void dse_all(void)
 				if (freeze != !(cs_addrs->hdr->freeze))
 					util_out_print("Region !AD is now FROZEN", TRUE, REG_LEN_STR(gv_cur_region));
 			}
+			was_crit = cs_addrs->now_crit;
 			if (seize)
-				grab_crit(gv_cur_region);
+			{
+				if (!was_crit)
+					grab_crit(gv_cur_region);	/* no point seizing crit if WE already have it held */
+				cs_addrs->hold_onto_crit = TRUE;	/* need to do this AFTER grab_crit */
+			}
 			if (wc)
 			{
-				if (FALSE == seize)
+				if (!was_crit && !seize)
 					grab_crit(gv_cur_region);
 				bt_init(cs_addrs);
 				if (cs_addrs->hdr->acc_meth == dba_bg)
@@ -231,16 +237,19 @@ void dse_all(void)
 					db_csh_ini(cs_addrs);
 					db_csh_ref(cs_addrs);
 				}
-				if ((FALSE == seize) || (TRUE == release))
+				if (!was_crit && (!seize || release))
 					rel_crit(gv_cur_region);
 			}
 			if (flush)
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-			if (release && cs_addrs->now_crit)
-				rel_crit(gv_cur_region);
-			else if (release && !cs_addrs->now_crit)
-			{
-				util_out_print("Current process does not own the Region: !AD.",TRUE, REG_LEN_STR(gv_cur_region));
+			if (release)
+			{	/* user wants crit to be released unconditionally so "was_crit" not checked like everywhere else */
+				cs_addrs->hold_onto_crit = FALSE;	/* need to do this BEFORE rel_crit */
+				if (cs_addrs->now_crit)
+					rel_crit(gv_cur_region);
+				else
+					util_out_print("Current process does not own the Region: !AD.",
+						TRUE, REG_LEN_STR(gv_cur_region));
 			}
 			if (nofreeze)
 			{

@@ -14,7 +14,7 @@
 
 #include <sys/types.h>
 
-#if defined(__ia64) || defined(__x86_64__) || defined(__sparc)
+#if defined(__ia64) || defined(__x86_64__) || defined(__sparc) || defined(__s390__)
 #define GTM64
 #endif /* __ia64 */
 
@@ -35,7 +35,7 @@ typedef unsigned long	uint4;
 typedef		 short int2;		/* 2-byte signed integer */
 typedef	unsigned short uint2;		/* 2-byte unsigned integer */
 #define LINKAGE_PSECT_BOUNDARY	8
-typedef uint4 mach_inst;
+typedef uint2 mach_inst;
 #endif
 
 #define INT8_SUPPORTED
@@ -54,12 +54,6 @@ typedef uint4 mach_inst;
 #define LITDEF const
 #define LITREF extern const
 #define error_def(x) LITREF int x
-#ifdef DEBUG
-error_def(ERR_ASSERT);
-#define assert(x) ((x) ? 1 : rts_error(VARLSTCNT(5) ERR_ASSERT, 3, LEN_AND_LIT(__FILE__), __LINE__))
-#else
-#define assert(x)
-#endif
 
 #define UNIX 1
 #undef VMS
@@ -130,8 +124,15 @@ typedef unsigned short	in_port_t;
 
 #ifdef __linux__
 #define SYS_ERRLIST_INCLUDE	"gtm_stdio.h"
-#define MUTEX_MSEM_WAKE
-#define POSIX_MSEM
+/* For 32-bit linux in i386, we noticed during the RHEL 5.5 upgrade that using msems affects process wakeup times
+ * dramatically enough to cause test hangs/failures.  Not sure if it is a linux kernel or package issue.
+ * Therefore disabling msems on that platform for now until we know better. The alternative is socket waits (using
+ * select/poll system call). Performance differences, if any, is expected to be only a marginally slowdown.
+ */
+#  ifndef __i386
+#  define MUTEX_MSEM_WAKE
+#  define POSIX_MSEM
+#  endif
 #endif
 
 #ifdef __CYGWIN__
@@ -144,18 +145,11 @@ typedef unsigned short	in_port_t;
 
 #ifdef __s390__
 #define CACHELINE_SIZE	256
-/* typedef struct {
-	unsigned char	*code_address;
-	unsigned char	*toc;
-	int		unknown;
-} func_desc; */
-
 #define	GTM_CONTEXT(func)	(unsigned char *)func
-
 #define SSM_SIZE		256*1024*1024	/* Segments on 256M boundary */
 #define SHMAT_ADDR_INCS 	SSM_SIZE
 #define MSYNC_ADDR_INCS 	OS_PAGE_SIZE
-
+#define USHBIN_SUPPORTED
 #endif /* __s390__ */
 
 #ifdef __ia64
@@ -195,8 +189,11 @@ typedef char  mach_inst;	/* machine instruction */
 typedef char  mach_inst;	/* machine instruction */
 #endif
 
-#define INTERLOCK_ADD(X,Y,Z)	(add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
-
+#ifdef Linux390
+#  define INTERLOCK_ADD(X,Y,Z)	(interlock_add(Z, (sm_int_ptr_t)(X)))
+#else
+#  define INTERLOCK_ADD(X,Y,Z)	(add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
+#endif
 
 /* On NON_USHBIN_ONLY platforms, reserve enough space in routine header for the dummy
  * string "GTM_CODE". On USHBIN_ONLY platforms, reserve space of 16 bytes that holds
@@ -236,15 +233,6 @@ typedef struct
 	int4	m[2];
 	mstr	str;
 } mval ;
-
-
-#ifdef BIGENDIAN
-#define DEFINE_MVAL_LITERAL(TYPE, EXPONENT, SIGN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, MANT_LOW, MANT_HIGH, 0, LENGTH, ADDRESS}
-#else
-#define DEFINE_MVAL_LITERAL(TYPE, EXPONENT, SIGN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, 0, LENGTH, ADDRESS}
-#endif
 
 #define VAR_START(a, b)	va_start(a, b)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/

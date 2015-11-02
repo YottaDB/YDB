@@ -76,7 +76,7 @@ void	tp_unwind(short newlevel, enum tp_unwind_invocation invocation_type, int *t
 	boolean_t	restore_lv, rollback_locks;
 	lvscan_blk	*lvscan, *lvscan_next, first_lvscan;
 	int		elemindx, rc;
-	int		save_intrpt_ok_state;
+	intrpt_state_t	save_intrpt_ok_state;
 
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
 	SAVE_INTRPT_OK_STATE(INTRPT_IN_TP_UNWIND);

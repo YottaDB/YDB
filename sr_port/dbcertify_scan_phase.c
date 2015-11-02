@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -662,10 +662,18 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 				       "   Key\n");
 			}
 #ifndef __osf__
-			PRINTF("   0x%08x %16llx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
+			GTM64_ONLY(PRINTF("   0x%08x %16lx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
 			       (have_dt_blk ? "   DT   " : "   GVT  "),
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
-			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr);
+			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr));
+			NON_GTM64_ONLY(PRINTF("   0x%08x %16llx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
+			       (have_dt_blk ? "   DT   " : "   GVT  "),
+			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
+			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr));
+			VMS_ONLY(PRINTF("   0x%08x %16llx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
+			       (have_dt_blk ? "   DT   " : "   GVT  "),
+			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
+			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr));
 #else
 			PRINTF("   0x%08x %16lx %s %5d   %9d %6d\n   %s%s", blk_num, dbptr,
 			       (have_dt_blk ? "   DT   " : "   GVT  "),

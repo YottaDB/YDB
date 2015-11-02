@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -168,7 +168,7 @@ int gtmsource_get_opt(void)
 			dotted_notation = TRUE;
 			while(*c && *c != ':')
 			{
-				if ('.' != *c && !ISDIGIT(*c))
+				if ('.' != *c && !ISDIGIT_ASCII(*c))
 					dotted_notation = FALSE;
 				gtmsource_options.secondary_host[index++] = *c++;
 			}

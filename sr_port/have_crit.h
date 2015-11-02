@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,8 @@ typedef enum
 	INTRPT_IN_DB_CSH_GETN,
 	INTRPT_IN_DB_INIT,
 	INTRPT_IN_GDS_RUNDOWN,
+	INTRPT_IN_SS_INITIATE,
+	INTRPT_IN_ZLIB_CMP_UNCMP,
 	INTRPT_NUM_STATES
 } intrpt_state_t;
 

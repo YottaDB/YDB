@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,7 +85,7 @@ void gtcm_rep_err(char *msg, int errcode)
 		first_syslog = FALSE;
 		(void)OPENLOG("GTCM", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
     }
-    SYSLOG(LOG_ERR, outbuf);
+    SYSLOG(LOG_ERR, "%s", outbuf);
 #endif /* defined(BSD_LOG) */
 
     return;

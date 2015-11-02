@@ -91,7 +91,7 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 		}
 	} else
 	{
-		gv_bind_name(gd_header, &(val->str));
+		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &(val->str));
 		DEBUG_ONLY(
 			bgormm = ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth));)
 	}

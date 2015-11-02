@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@ GBLREF short			crash_count;
 GBLREF gd_addr			*original_header;
 
 #define MAX_UTIL_LEN 80
+
 void dse_crit(void)
 {
 	int			util_len, dse_crit_count;
@@ -58,6 +59,7 @@ void dse_crit(void)
 		}
 		crash_count = cs_addrs->critical->crashcnt;
 		grab_crit(gv_cur_region);
+		cs_addrs->hold_onto_crit = TRUE;	/* need to do this AFTER grab_crit */
 		util_out_print("!/Seized write critical section.!/", TRUE);
 		if (!cycle)
 			return;
@@ -66,14 +68,15 @@ void dse_crit(void)
 	{
 		if (gv_cur_region->read_only && !cycle)
 			rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-		if (!cs_addrs->now_crit && !cs_addrs->read_lock)
+		if (!cs_addrs->now_crit)
 		{
 			util_out_print("!/Critical section already released.!/", TRUE);
 			return;
 		}
 		crash_count = cs_addrs->critical->crashcnt;
 		if (cs_addrs->now_crit)
-		{
+		{	/* user wants crit to be released unconditionally so "was_crit" not checked like everywhere else */
+			cs_addrs->hold_onto_crit = FALSE;	/* need to do this before the rel_crit */
 			rel_crit(gv_cur_region);
 			util_out_print("!/Released write critical section.!/", TRUE);
 		}
@@ -84,11 +87,8 @@ void dse_crit(void)
 		if (gv_cur_region->read_only)
 			rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 		cs_addrs->hdr->image_count = 0;
-#if defined(UNIX)
-		gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY, crash);
-#elif defined(VMS)
-		mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY, crash);
-#endif
+		UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY, crash);)
+		VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY, crash);)
 		cs_addrs->nl->in_crit = 0;
 		cs_addrs->now_crit = FALSE;
 		util_out_print("!/Reinitialized critical section.!/", TRUE);
@@ -103,27 +103,31 @@ void dse_crit(void)
 			util_out_print("!/The write critical section is unowned!/", TRUE);
 			return;
 		}
-#ifdef UNIX
-		assert(LOCK_AVAILABLE != cs_addrs->critical->semaphore.u.parts.latch_pid);
-#elif defined(VMS)
-		assert(cs_addrs->critical->semaphore >= 0);
-#endif
+		UNIX_ONLY(assert(LOCK_AVAILABLE != cs_addrs->critical->semaphore.u.parts.latch_pid);)
+		VMS_ONLY(assert(cs_addrs->critical->semaphore >= 0);)
 		cs_addrs->now_crit = TRUE;
 		cs_addrs->nl->in_crit = process_id;
 		crash_count = cs_addrs->critical->crashcnt;
+		/* user wants crit to be removed unconditionally so "was_crit" not checked (before rel_crit) like everywhere else */
 		if (dba_bg == cs_addrs->hdr->acc_meth)
 		{
 			wcs_recover(gv_cur_region);
+			/* In case, this crit was obtained through a CRIT -SEIZE, csa->hold_onto_crit would have been set to
+			 * TRUE. Set that back to FALSE now that we are going to release control of crit.
+			 */
+			cs_addrs->hold_onto_crit = FALSE;	/* need to do this before the rel_crit */
 			rel_crit(gv_cur_region);
 			util_out_print("!/Removed owner of write critical section!/", TRUE);
-		}
-		else
+		} else
 		{
+			/* In case, this crit was obtained through a CRIT -SEIZE, csa->hold_onto_crit would have been set to
+			 * TRUE. Set that back to FALSE now that we are going to release control of crit.
+			 */
+			cs_addrs->hold_onto_crit = FALSE;	/* need to do this before the rel_crit */
 			rel_crit(gv_cur_region);
 			util_out_print("!/Removed owner of write critical section!/", TRUE);
 			util_out_print("!/WARNING: No recovery because database is MM.!/", TRUE);
 		}
-
 		return;
 	}
 	if (crash)
@@ -164,19 +168,17 @@ void dse_crit(void)
 	}
 	if (cs_addrs->nl->in_crit)
 	{
-#if defined(UNIX)
+#		if defined(UNIX)
 		util_out_print("!/Write critical section owner is process id !UL", TRUE, cs_addrs->nl->in_crit);
 		if (cs_addrs->now_crit)
 			util_out_print("DSE (process id:  !UL) owns the write critical section", TRUE, process_id);
-#elif defined(VMS)
+#		elif defined(VMS)
 		util_out_print("!/Write critical section owner is process id !XL", TRUE, cs_addrs->nl->in_crit);
 		if (cs_addrs->now_crit)
 			util_out_print("DSE (process id:  !XL) owns the write critical section", TRUE, process_id);
-#endif
+#		endif
 		util_out_print(0, TRUE);
 	} else
-	{
 		util_out_print("!/Write critical section is currently unowned", TRUE);
-	}
 	return;
 }

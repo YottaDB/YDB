@@ -63,34 +63,34 @@
 			gvnh->gvname.var_name.addr, gvnh->noisolation, status);				\
 }
 
-GBLREF boolean_t	certify_all_blocks;
-GBLREF bool		undef_inhibit, jobpid;
-GBLREF int		lv_null_subs;
-GBLREF bool		view_debug1, view_debug2, view_debug3, view_debug4;
-GBLREF bool		zdefactive;
-GBLREF unsigned short	zdefbufsiz;
-GBLREF int4		break_message_mask;
-GBLREF collseq		*local_collseq;
-GBLREF command_qualifier cmd_qlf, glb_cmd_qlf;
-GBLREF gd_addr		*gd_header;
-GBLREF gd_region	*gv_cur_region;
-GBLREF gv_namehead	*gv_target, *gv_target_list;
-GBLREF gv_namehead	*reset_gv_target;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF symval		*curr_symval;
-GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
-GBLREF short		dollar_tlevel;
-GBLREF int4		zdate_form;
-GBLREF int4		zdir_form;
-GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
-GBLREF boolean_t 	local_collseq_stdnull;
-GBLREF boolean_t	badchar_inhibit;
-GBLREF int		gv_fillfactor;
-GBLREF symval		*curr_symval;
-GBLREF uint4		gtmDebugLevel;
-GBLREF boolean_t	lvmon_enabled;
-GBLREF spdesc		stringpool;
+GBLREF	boolean_t		certify_all_blocks;
+GBLREF	bool			undef_inhibit, jobpid;
+GBLREF	int			lv_null_subs;
+GBLREF	bool			view_debug1, view_debug2, view_debug3, view_debug4;
+GBLREF	bool			zdefactive;
+GBLREF	unsigned short		zdefbufsiz;
+GBLREF	int4			break_message_mask;
+GBLREF	collseq			*local_collseq;
+GBLREF	command_qualifier	cmd_qlf, glb_cmd_qlf;
+GBLREF	gd_addr			*gd_header;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_namehead		*gv_target, *gv_target_list;
+GBLREF	gv_namehead		*reset_gv_target;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	symval			*curr_symval;
+GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	short			dollar_tlevel;
+GBLREF	int4			zdate_form;
+GBLREF	int4			zdir_form;
+GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	boolean_t		local_collseq_stdnull;
+GBLREF	boolean_t		badchar_inhibit;
+GBLREF	int			gv_fillfactor;
+GBLREF	symval			*curr_symval;
+GBLREF	uint4			gtmDebugLevel;
+GBLREF	boolean_t		lvmon_enabled;
+GBLREF	spdesc			stringpool;
 
 #define MAX_YDIRTSTR 32
 #define ZDEFMIN 1024
@@ -121,7 +121,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
         int			table_size_orig;
         ht_ent_mname		*table_base_orig;
 	hash_table_mname	*table;
-	boolean_t		dbgdmpenabled;
+	boolean_t		dbgdmpenabled, was_crit;
 	symval			*lvlsymtab;
 	lv_blk			*lvbp;
 	lv_val			*lvp, *lvp_top;
@@ -282,10 +282,9 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				csa = cs_addrs;
 				if (JNL_ENABLED(csa->hdr))
 				{
-					if (FALSE == csa->now_crit)
+					was_crit = csa->now_crit;
+					if (!was_crit)
 						grab_crit(reg);
-					else
-						GTMASSERT;
 					jnl_status = jnl_ensure_open();
 					if (0 == jnl_status)
 					{
@@ -305,7 +304,8 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 						}
 					} else
 						send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
-					rel_crit(reg);
+					if (!was_crit)
+						rel_crit(reg);
 				}
 			}
 			gv_cur_region = save_reg;

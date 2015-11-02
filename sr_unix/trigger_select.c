@@ -49,6 +49,7 @@
 #include "tp.h"
 #include "io_params.h"
 #include "min_max.h"			/* Needed for MIN */
+#include "gtmimagename.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -57,7 +58,8 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gv_key			*gv_altkey;
-GBLREF	io_log_name		*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
+GBLREF	io_pair			io_curr_device;
+GBLREF	io_pair			io_std_device;			/* standard device */
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 
@@ -70,21 +72,88 @@ LITREF	mval			literal_ten;
 
 #define NAM_LEN(PTR, LEN)	MIN(STRLEN((PTR)), (LEN))
 
-#define MAKE_ZWR_STR(STR, STR_LEN, OUT_STR)						\
+#define COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(OUT_BUFF, OUT_PTR, VAL, VAL_LEN)		\
+{											\
+	mval		op_val;								\
+											\
+	assert(MAX_BUFF_SIZE >= VAL_LEN);						\
+	if ((INTCAST(OUT_PTR - OUT_BUFF) + VAL_LEN) > MAX_BUFF_SIZE)			\
+	{										\
+		STR2MVAL(op_val, OUT_BUFF, (unsigned int)(OUT_PTR - OUT_BUFF));		\
+		op_write(&op_val);							\
+		io_curr_device.out->dollar.x = 0;					\
+		OUT_PTR = OUT_BUFF;							\
+	}										\
+	memcpy(OUT_PTR, (const void *)VAL, VAL_LEN);					\
+	OUT_PTR += VAL_LEN;								\
+}
+
+#define COPY_SUBSCRIPT(OUT_BUFF, OUT_PTR, CHPTR, LEN_LEFT, IS_TYPE)			\
+{											\
+	COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(OUT_BUFF, OUT_PTR, CHPTR, 1);		\
+	CHPTR++;									\
+	LEN_LEFT--;									\
+	while ((0 < LEN_LEFT) && IS_TYPE(*CHPTR))					\
+	{										\
+		COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(OUT_BUFF, OUT_PTR, CHPTR, 1);	\
+		CHPTR++;								\
+		LEN_LEFT--;								\
+	}										\
+}
+
+#define MAKE_ZWR_STR(STR, STR_LEN, OUT_START, OUT_STR)					\
 {											\
 	int		lcl_len;				       			\
+	unsigned char	tmp_buff[MAX_ZWR_EXP_RATIO * MAX_BUFF_SIZE];			\
 											\
-	format2zwr((sm_uc_ptr_t)STR, STR_LEN, (unsigned char *)OUT_STR, &lcl_len);	\
-	OUT_STR += lcl_len;								\
+	format2zwr((sm_uc_ptr_t)STR, STR_LEN, tmp_buff, &lcl_len);			\
+	COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(OUT_START, OUT_STR, tmp_buff, lcl_len);	\
+}
+
+#define CHECK_FOR_M_NAME(START, PTR, LEN, STR, ERR, MAX_LEN)				\
+{											\
+	int		lcl_len;							\
+	int		cur_len;							\
+											\
+	assert(0 < MAX_LEN);								\
+	if (!ISALPHA_ASCII(*PTR) && ('%' != *PTR))					\
+	{										\
+		lcl_len = STRLEN(START);						\
+		CONV_STR_AND_PRINT(STR, lcl_len, START);				\
+		ERR = TRIG_FAILURE;							\
+		continue;								\
+	}										\
+	PTR++;										\
+	LEN--;										\
+	cur_len = 1;									\
+	while (ISALNUM_ASCII(*PTR) && (0 < LEN))					\
+	{										\
+		if (MAX_LEN < ++cur_len)						\
+			break;								\
+		PTR++;									\
+		LEN--;									\
+	}										\
+	if ('*' == *PTR)								\
+	{										\
+		PTR++;									\
+		LEN--;									\
+	}										\
+	if (('\0' != *PTR) && (0 != LEN))						\
+	{										\
+		lcl_len = STRLEN(START);						\
+		CONV_STR_AND_PRINT(STR, lcl_len, START);				\
+		ERR = TRIG_FAILURE;							\
+		continue;								\
+	}										\
 }
 
 STATICDEF char *triggerfile_quals[] = {"-name=", "", "-commands=", "-options=", "-delim=", "-zdelim=", "-pieces=", "-xecute="};
 
-STATICFNDEF void write_subscripts(char **out_ptr, char **sub_ptr, int *sub_len)
+STATICFNDEF void write_subscripts(char *out_rec, char **out_ptr, char **sub_ptr, int *sub_len)
 {
 	char			*out_p, *ptr, *dst_ptr;
 	int			str_len;
-	unsigned short		len_left, dst_len, len;
+	uint4			len_left, dst_len, len;
 	char			dst[MAX_GVSUBS_LEN];
 
 	len_left = *sub_len;
@@ -92,35 +161,24 @@ STATICFNDEF void write_subscripts(char **out_ptr, char **sub_ptr, int *sub_len)
 	out_p = *out_ptr;
 	while (0 < len_left)
 	{
-		if (ISDIGIT(*ptr) || ('-' == *ptr))
+		if (ISDIGIT_ASCII(*ptr) || ('-' == *ptr))
 		{
-			*out_p++ = *ptr++;
-			len_left--;
-			while ((0 < len_left) && ISDIGIT(*ptr))
-			{
-				*out_p++ = *ptr++;
-				len_left--;
-			}
+			COPY_SUBSCRIPT(out_rec, out_p, ptr, len_left, ISDIGIT_ASCII);
 		}
-		else if (ISALPHA(*ptr) || ('%' == *ptr))
+		else if (ISALPHA_ASCII(*ptr) || ('%' == *ptr))
 		{
-			*out_p++ = *ptr++;
-			len_left--;
-			while ((0 < len_left) && ISALNUM(*ptr))
-			{
-				*out_p++ = *ptr++;
-				len_left--;
-			}
+			COPY_SUBSCRIPT(out_rec, out_p, ptr, len_left, ISALNUM_ASCII);
 		} else if ('"' == *ptr)
 		{
 			len = len_left;
 			trigger_scan_string(ptr, &len_left, dst, &dst_len);
-			MAKE_ZWR_STR(dst, dst_len, out_p);
-			len_left--;		/* Need to skip the " */
+			MAKE_ZWR_STR(dst, dst_len, out_rec, out_p);
+			len_left--;		/* Need to skip the trailing " */
 			ptr += (len - len_left);
 		} else
 		{
-			*out_p++ = *ptr++;
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_p, ptr, 1);
+			ptr++;
 			len_left--;
 		}
 	}
@@ -129,8 +187,7 @@ STATICFNDEF void write_subscripts(char **out_ptr, char **sub_ptr, int *sub_len)
 	*out_ptr = out_p;
 }
 
-STATICFNDEF void write_out_trigger(char *gbl_name, unsigned short gbl_name_len, unsigned short file_name_len, mval *op_val,
-				   int nam_indx)
+STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, uint4 file_name_len, mval *op_val, int nam_indx)
 {
 	char			out_rec[MAX_BUFF_SIZE];
 	char			*out_rec_ptr;
@@ -143,15 +200,16 @@ STATICFNDEF void write_out_trigger(char *gbl_name, unsigned short gbl_name_len, 
 	int			sub_len;
 	char			*sub_ptr;
 	char			*tmp_str_ptr, tmp_string[MAX_SRCLINE];
-	unsigned short		tmp_str_len;
+	uint4			tmp_str_len;
 	char			cycle[MAX_DIGITS_IN_INT + 1];
+	int			trig_len, size_to_print;
 
-	BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCOUNT, STRLEN(LITERAL_HASHCOUNT));
+	BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCOUNT, LITERAL_HASHCOUNT_LEN);
 	if (gvcst_get(&trigger_count))
 	{
 		mv_trig_cnt_ptr = &trigger_count;
 		count = MV_FORCE_INT(mv_trig_cnt_ptr);
-		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCYCLE, STRLEN(LITERAL_HASHCYCLE));
+		BUILD_HASHT_SUB_SUB_CURRKEY(gbl_name, gbl_name_len, LITERAL_HASHCYCLE, LITERAL_HASHCYCLE_LEN);
 		if (!gvcst_get(&trigger_value))
 			assert(FALSE);
 		assert(MAX_DIGITS_IN_INT >= trigger_value.str.len);
@@ -168,38 +226,31 @@ STATICFNDEF void write_out_trigger(char *gbl_name, unsigned short gbl_name_len, 
 			if (gvcst_get(&trigger_value))
 			{
 				*out_rec_ptr++ = COMMENT_LITERAL;
-				memcpy(out_rec_ptr, TRIGGER_NAME_COMMENT, STRLEN(TRIGGER_NAME_COMMENT));
-				out_rec_ptr += STR_LIT_LEN(TRIGGER_NAME_COMMENT);
-				memcpy(out_rec_ptr, trigger_value.str.addr, trigger_value.str.len);
-				out_rec_ptr += trigger_value.str.len;
-				memcpy(out_rec_ptr, TRIGGER_CYCLE_COMMENT, STRLEN(TRIGGER_CYCLE_COMMENT));
-				out_rec_ptr += STR_LIT_LEN(TRIGGER_CYCLE_COMMENT);
-				memcpy(out_rec_ptr, cycle, STRLEN(cycle));
-				out_rec_ptr += STRLEN(cycle);
-				if (0 != file_name_len)
-				{
-					*out_rec_ptr++ = '\n';
-					op_val->str.addr = (char *)out_rec;
-					op_val->str.len = (unsigned int)(out_rec_ptr - out_rec);
-					op_write(op_val);
-				} else
-					util_out_print_gtmio("!AD", TRUE, (unsigned int)(out_rec_ptr - out_rec),
-						       (char *)out_rec);
+
+				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, TRIGGER_NAME_COMMENT,
+					STR_LIT_LEN(TRIGGER_NAME_COMMENT));
+				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, trigger_value.str.addr,
+					trigger_value.str.len);
+				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, TRIGGER_CYCLE_COMMENT,
+					STR_LIT_LEN(TRIGGER_CYCLE_COMMENT));
+				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, cycle, STRLEN(cycle));
+				STR2MVAL((*op_val), out_rec, (unsigned int)(out_rec_ptr - out_rec));
+				op_write(op_val);
+				op_wteol(1);
 			}
 			out_rec_ptr = out_rec;
 			*out_rec_ptr++ = '+';
 			*out_rec_ptr++ = '^';
-			memcpy(out_rec_ptr, gbl_name, gbl_name_len);
-			out_rec_ptr += gbl_name_len;
+			COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, gbl_name, gbl_name_len);
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(gbl_name, gbl_name_len, mi, trigger_subs[GVSUBS_SUB],
 				STRLEN(trigger_subs[GVSUBS_SUB]));
 			if (gvcst_get(&trigger_value))
 			{
-				*out_rec_ptr++ = '(';
+				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, "(", 1);
 				sub_ptr = trigger_value.str.addr;
 				sub_len = trigger_value.str.len;
-				write_subscripts(&out_rec_ptr, &sub_ptr, &sub_len);
-				*out_rec_ptr++ = ')';
+				write_subscripts(out_rec, &out_rec_ptr, &sub_ptr, &sub_len);
+				COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, ")", 1);
 			}
 			for (sub_indx = 0; sub_indx < NUM_SUBS; sub_indx++)
 			{
@@ -215,14 +266,15 @@ STATICFNDEF void write_out_trigger(char *gbl_name, unsigned short gbl_name_len, 
 							continue;
 						trigger_value.str.len--;	/* Don't include trailing # */
 					}
-					*out_rec_ptr++ = ' ';
-					memcpy(out_rec_ptr, triggerfile_quals[sub_indx], STRLEN(triggerfile_quals[sub_indx]));
-					out_rec_ptr += STRLEN(triggerfile_quals[sub_indx]);
+					COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, " ", 1);
+					COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr, triggerfile_quals[sub_indx],
+						STRLEN(triggerfile_quals[sub_indx]));
 					switch (sub_indx)
 					{
 						case DELIM_SUB:
 						case ZDELIM_SUB:
-							MAKE_ZWR_STR(trigger_value.str.addr, trigger_value.str.len, out_rec_ptr);
+							MAKE_ZWR_STR(trigger_value.str.addr, trigger_value.str.len, out_rec,
+								     out_rec_ptr);
 							break;
 						case XECUTE_SUB:
 							assert(MAX_SRCLINE > trigger_value.str.len);
@@ -230,36 +282,29 @@ STATICFNDEF void write_out_trigger(char *gbl_name, unsigned short gbl_name_len, 
 							{
 								tmp_str_ptr = &tmp_string[0];
 								trigger_scan_string(trigger_value.str.addr,
-									(unsigned short *)(&trigger_value.str.len), tmp_str_ptr,
-									&tmp_str_len);
+									(uint4 *)&trigger_value.str.len, tmp_str_ptr, &tmp_str_len);
 							} else
 							{
 								tmp_str_ptr = trigger_value.str.addr;
 								tmp_str_len = trigger_value.str.len;
 							}
-							MAKE_ZWR_STR(tmp_str_ptr, tmp_str_len, out_rec_ptr);
+							MAKE_ZWR_STR(tmp_str_ptr, tmp_str_len, out_rec, out_rec_ptr);
 							break;
 						default:
-							memcpy(out_rec_ptr, trigger_value.str.addr, trigger_value.str.len);
-							out_rec_ptr += trigger_value.str.len;
+							COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(out_rec, out_rec_ptr,
+								trigger_value.str.addr,trigger_value.str.len);
 							break;
 					}
 				}
 			}
-			if (0 != file_name_len)
-			{
-				*out_rec_ptr++ = '\n';
-				op_val->str.addr = (char *)out_rec;
-				op_val->str.len = (unsigned int)(out_rec_ptr - out_rec);
-				op_write(op_val);
-			} else
-				util_out_print_gtmio("!AD", TRUE, (unsigned int)(out_rec_ptr - out_rec), (char *)out_rec);
+			STR2MVAL((*op_val), out_rec, (unsigned int)(out_rec_ptr - out_rec));
+			op_write(op_val);
+			op_wteol(1);
 		}
 	}
 }
 
-STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len, unsigned short file_name_len, mval *op_val,
-				     boolean_t trig_name)
+STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, uint4 file_name_len, mval *op_val, boolean_t trig_name)
 {
 	char			save_name[MAX_MIDENT_LEN + 1], curr_name[MAX_MIDENT_LEN + 1];
 	boolean_t		wildcard;
@@ -289,7 +334,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len
 	}
 	if (trig_name)
 	{
-		BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), gbl_name, gbl_name_len);
+		BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME), gbl_name, gbl_name_len);
 	} else
 	{
 		BUILD_HASHT_SUB_CURRKEY(gbl_name, gbl_name_len);
@@ -304,7 +349,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len
 			break;
 		if (trig_name)
 		{
-			BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
+			BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
 			if (!gvcst_get(&mv_trigger_val))
 			{
 				if (wildcard)
@@ -326,7 +371,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len
 			SAVE_TRIGGER_REGION_INFO;
 			ms_gbl_nam.addr = mv_trigger_val.str.addr;
 			ms_gbl_nam.len = trigvn_len;
-			gv_bind_name(gd_header, &ms_gbl_nam);
+			GV_BIND_NAME_ONLY(gd_header, &ms_gbl_nam);
 			csa = gv_target->gd_csa;
 			SETUP_TRIGGER_GLOBAL;
 			INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
@@ -348,7 +393,8 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len
 		{
 			if (trig_name)
 			{
-				BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME), curr_name, curr_name_len);
+				BUILD_HASHT_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME), curr_name,
+					curr_name_len);
 			} else
 			{
 				BUILD_HASHT_SUB_CURRKEY(curr_name, curr_name_len);
@@ -363,7 +409,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, unsigned short gbl_name_len
 	}
 }
 
-STATICFNDEF void dump_all_triggers(unsigned short file_name_len, mval *op_val)
+STATICFNDEF void dump_all_triggers(uint4 file_name_len, mval *op_val)
 {
 	mval			curr_gbl_name, val;
 	gd_region		*reg;
@@ -397,7 +443,7 @@ STATICFNDEF void dump_all_triggers(unsigned short file_name_len, mval *op_val)
 			op_gvdata(&val);
 			if ((literal_ten.m[0] == val.m[0]) && (literal_ten.m[1] == val.m[1]))
 			{ /* $DATA(^#t) is 10 - get first subscript (trigger's global) */
-				BUILD_HASHT_SUB_CURRKEY(LITERAL_MAXHASHVAL, STRLEN(LITERAL_MAXHASHVAL));
+				BUILD_HASHT_SUB_CURRKEY(LITERAL_MAXHASHVAL, STR_LIT_LEN(LITERAL_MAXHASHVAL));
 				while (TRUE)
 				{
 					op_gvorder(&curr_gbl_name);
@@ -406,7 +452,7 @@ STATICFNDEF void dump_all_triggers(unsigned short file_name_len, mval *op_val)
 					gbl_len = curr_gbl_name.str.len;
 					memcpy(global, curr_gbl_name.str.addr, gbl_len);
 					write_out_trigger(global, gbl_len, file_name_len, op_val, 0);
-					BUILD_HASHT_SUB_CURRKEY(curr_gbl_name.str.addr, curr_gbl_name.str.len);
+					BUILD_HASHT_SUB_CURRKEY(global, gbl_len);
 				}
 			} else
 				assert((literal_zero.m[0] == val.m[0]) && (literal_zero.m[1] == val.m[1]));
@@ -437,6 +483,8 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 	boolean_t		dump_all;
 	mval			op_val, op_pars;
 	boolean_t		select_error;
+	io_pair			save_io_curr_device;
+
 	static readonly unsigned char	open_params_list[] =
 	{
 		(unsigned char)iop_m,
@@ -445,18 +493,51 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 		(unsigned char)iop_stream,
 		(unsigned char)iop_eol
 	};
+	static readonly unsigned char	use_params[] =
+	{
+		(unsigned char)iop_nowrap,
+		(unsigned char)iop_eol
+	};
 	static readonly unsigned char	no_param = (unsigned char)iop_eol;
 
 	error_def(ERR_MUPCLIERR);
 	error_def(ERR_MUNOACTION);
 
 	/* make a local copy of the select list and use it to avoid string-pool problems */
-	assert(MAX_BUFF_SIZE > select_list_len);
+	if (MAX_BUFF_SIZE <= select_list_len)
+		return TRIG_FAILURE;
 	memcpy(save_select_list, select_list, select_list_len);
 	save_select_list[select_list_len] = '\0';
 	gvinit();
 	dump_all = FALSE;
 	prev_len = 0;
+	op_pars.mvtype = MV_STR;
+	op_val.mvtype = MV_STR;
+	if (0 == file_name_len)
+	{
+		op_pars.str.len = SIZEOF(use_params);
+		op_pars.str.addr = (char *)use_params;
+		if (IS_MUPIP_IMAGE)
+		{
+			PRINTF("\n");
+			fflush(NULL);
+			op_val.str.len = io_std_device.out->trans_name->len;
+			op_val.str.addr = io_std_device.out->trans_name->dollar_io;
+		} else
+		{
+			op_val.str.len = io_curr_device.out->trans_name->len;
+			op_val.str.addr = io_curr_device.out->trans_name->dollar_io;
+		}
+	} else
+	{
+		op_pars.str.len = SIZEOF(open_params_list);
+		op_pars.str.addr = (char *)open_params_list;
+		op_val.str.len = file_name_len;
+		op_val.str.addr = (char *)file_name;
+		(*op_open_ptr)(&op_val, &op_pars, 0, 0);
+	}
+	save_io_curr_device = io_curr_device;
+	op_use(&op_val, &op_pars);
 	if (0 == select_list_len)
 		dump_all = TRUE;
 	else
@@ -474,19 +555,8 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 					|| ((0 < len1) && (0 < len) && (',' == *(ptr2 - 1)) && (',' == *(ptr2 + 1))))
 				break;
 		}
-		if (0 != file_name_len)
-		{
-			op_pars.mvtype = MV_STR;
-			op_pars.str.len = SIZEOF(open_params_list);
-			op_pars.str.addr = (char *)open_params_list;
-			op_val.mvtype = MV_STR;
-			op_val.str.len = file_name_len;
-			op_val.str.addr = (char *)file_name;
-			(*op_open_ptr)(&op_val, &op_pars, 0, 0);
-			op_use(&op_val, &op_pars);
-		}
 	}
-	select_error = FALSE;
+	select_error = TRIG_SUCCESS;
 	if (dump_all)
 		dump_all_triggers(file_name_len, &op_val);
 	else
@@ -501,32 +571,8 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 			{
 				ptr1++;
 				len--;
-				if (!ISALPHA(*ptr1) && ('%' != *ptr1))
-				{
-					util_out_print_gtmio("Invalid global variable name in SELECT list- !AD", TRUE,
-						NAM_LEN(sel_ptr, len), sel_ptr);
-					select_error = TRUE;
-					continue;
-				}
-				ptr1++;
-				len--;
-				while (ISALNUM(*ptr1) && (0 < len))
-				{
-					ptr1++;
-					len--;
-				}
-				if ('*' == *ptr1)
-				{
-					ptr1++;
-					len--;
-				}
-				if (('\0' != *ptr1) && (0 != len))
-				{
-					util_out_print_gtmio("Invalid entry in SELECT list - !AD", TRUE, NAM_LEN(sel_ptr, len),
-						sel_ptr);
-					select_error = TRUE;
-					continue;
-				}
+				CHECK_FOR_M_NAME(sel_ptr, ptr1, len, "Invalid global variable name in SELECT list: ",
+						 select_error, MAX_MIDENT_LEN);
 				SAVE_TRIGGER_REGION_INFO;
 				gbl_len = NAM_LEN(sel_ptr + 1, (int)(ptr1 - sel_ptr) - 1);
 				ptr1 = sel_ptr + 1;
@@ -536,24 +582,14 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 					gbl_name.len = gbl_len;
 					prev_ptr = ptr1;
 					prev_len = gbl_len;
-					gv_bind_name(gd_header, &gbl_name);
+					GV_BIND_NAME_ONLY(gd_header, &gbl_name);
 				}
 				csa = gv_target->gd_csa;
 				SETUP_TRIGGER_GLOBAL;
 			} else
 			{	/* It should be a trigger name */
-				while (ISGRAPH(*ptr1) && (0 < len))
-				{
-				       ptr1++;
-				       len--;
-				}
-				if ('\0' != *ptr1 && (0 != len))
-				{
-					util_out_print_gtmio("Invalid entry in SELECT list - !AD", TRUE, NAM_LEN(sel_ptr, len),
-						sel_ptr);
-					select_error = TRUE;
-					continue;
-				}
+				CHECK_FOR_M_NAME(sel_ptr, ptr1, len, "Invalid name entry in SELECT list: ",
+						 select_error, MAX_TRIGNAME_LEN);
 				gbl_name.addr = sel_ptr;
 				gbl_name.len = NAM_LEN(sel_ptr, (int)(ptr1 - sel_ptr));
 				SAVE_TRIGGER_REGION_INFO;
@@ -578,6 +614,14 @@ boolean_t trigger_select(char *select_list, uint4 select_list_len, char *file_na
 		op_pars.str.len = SIZEOF(no_param);
 		op_pars.str.addr = (char *)&no_param;
 		op_close(&op_val, &op_pars);
+		/* Return back to the current device */
+		io_curr_device = save_io_curr_device;
+		op_val.mvtype = MV_STR;
+		op_pars.str.len = SIZEOF(no_param);
+		op_pars.str.addr = (char *)&no_param;
+		op_val.str.len = io_curr_device.out->trans_name->len;
+		op_val.str.addr = io_curr_device.out->trans_name->dollar_io;
+		op_use(&op_val, &op_pars);
 	}
 	return select_error;
 }

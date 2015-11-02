@@ -59,7 +59,6 @@ GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		gtm_quiet_halt;
-GBLREF	int			process_exiting;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 
 LITREF	gtmImageName		gtmImageNames[];
@@ -286,7 +285,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			}
 			break;
 	} /* switch (sig) */
-	process_exiting = TRUE;	/* set this BEFORE cancelling timers as wcs_phase2_commit_wait relies on this */
+	SET_PROCESS_EXITING_TRUE;	/* set this BEFORE cancelling timers as wcs_phase2_commit_wait relies on this */
 	cancel_timer(0);	/* Don't want any interruptions */
 	fflush(stdout);
 	if (!dont_want_core)
@@ -294,9 +293,6 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		need_core = TRUE;
 		gtm_fork_n_core();
 	}
-	/* As on VMS, a mupip stop does not drive the condition handlers unless we are in crit */
-	if ((0 != have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT) || SIGTERM != exi_condition) && CHANDLER_EXISTS)
-		DRIVECH(exi_condition);
 	/* If a special routine was registered to be driven on a signal, drive it now */
 	if (0 != exi_condition && call_on_signal)
 	{

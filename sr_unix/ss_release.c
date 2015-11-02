@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@
 #include "ipcrmid.h"
 #include "shmpool.h"
 #include "db_snapshot.h"
+#include "ss_lock_facility.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data		*cs_data;
@@ -51,25 +52,25 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			process_id;
 GBLREF	enum gtmImageTypes	image_type;
 
-#define CLEANUP_SHADOW_FILE(preserve_snapshot, shadow_file)							 		 \
-{																 \
-	int		status;											 		 \
-	struct stat	stat_buf;												 \
-	int		save_errno;												 \
-																 \
-	if (!preserve_snapshot && (-1 != stat(shadow_file, &stat_buf)))			 					 \
-	{															 \
-		status = UNLINK(shadow_file);									 		 \
-		if (0 != status)												 \
-		{														 \
-			save_errno = errno;											 \
-			if (GTM_IMAGE == image_type)										 \
-				send_msg(VARLSTCNT(5) ERR_SSFILCLNUPFAIL, 2, LEN_AND_STR(shadow_file), save_errno);	 	 \
-			else													 \
-				gtm_putmsg(VARLSTCNT(5) ERR_SSFILCLNUPFAIL, 2, LEN_AND_STR(shadow_file), save_errno);		 \
-		}														 \
-	}															 \
-}																 \
+#define CLEANUP_SHADOW_FILE(preserve_snapshot, shadow_file)							 		\
+{																\
+	int		status;											 		\
+	struct stat	stat_buf;												\
+	int		save_errno;												\
+																\
+	if (!preserve_snapshot && (-1 != stat(shadow_file, &stat_buf)))			 					\
+	{															\
+		status = UNLINK(shadow_file);									 		\
+		if (0 != status)												\
+		{														\
+			save_errno = errno;											\
+			if (IS_MUMPS_IMAGE)										 	\
+				send_msg(VARLSTCNT(5) ERR_SSFILCLNUPFAIL, 2, LEN_AND_STR(shadow_file), save_errno);	 	\
+			else													\
+				gtm_putmsg(VARLSTCNT(5) ERR_SSFILCLNUPFAIL, 2, LEN_AND_STR(shadow_file), save_errno);		\
+		}														\
+	}															\
+}																\
 
 #define CLEANUP_SHARED_MEMORY(ss_shmid)												\
 {																\
@@ -81,7 +82,7 @@ GBLREF	enum gtmImageTypes	image_type;
 		if (0 != shmctl((int)ss_shmid, IPC_RMID, &ss_shmstat))								\
 		{														\
 			save_errno = errno;											\
-			if (GTM_IMAGE == image_type)										\
+			if (IS_MUMPS_IMAGE)											\
 				send_msg(VARLSTCNT(6) ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl"), ss_shmid, save_errno);	\
 			else													\
 				gtm_putmsg(VARLSTCNT(6) ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl"), ss_shmid, save_errno);	\
@@ -106,7 +107,7 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 {
 	int			status, ss_shmsize;
 	long			ss_shmid;
-	boolean_t		preserve_snapshot;
+	boolean_t		preserve_snapshot = FALSE;
 	sgmnt_addrs		*csa;
 	DEBUG_ONLY(sgmnt_data	*csd;)
 	node_local_ptr_t	cnl;
@@ -116,12 +117,12 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 	struct shmid_ds		ss_shmstat;
 	struct stat		stat_buf;
 	char			shadow_file[GTM_PATH_MAX];
+	ss_proc_status		cur_state;
 
 	error_def(ERR_COMMITWAITSTUCK);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_SSFILCLNUPFAIL);
 	error_def(ERR_SSSHMCLNUPFAIL);
-	error_def(ERR_REGSSFAIL);
 
 	assert(NULL != cs_addrs && (NULL != gv_cur_region));
 	csa = cs_addrs;
@@ -131,10 +132,10 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 
 	if (NULL == ss_ctx) /* orphaned cleanup */
 	{
+		assert(ss_lock_held_by_us(gv_cur_region));
 		ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(csa));
 		DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
 		ss_shmid = ss_shm_ptr->ss_info.ss_shmid;
-		assert(was_crit);
 		CLEANUP_SHADOW_FILE(FALSE, ss_shm_ptr->ss_info.shadow_file);
 		CLEANUP_SHARED_MEMORY(ss_shmid);
 		ADJUST_SHARED_MEMORY_FIELDS(cnl, ss_shm_ptr);
@@ -142,8 +143,11 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 	}
 	assert(NULL != *ss_ctx);
 	lcl_ss_ctx = *ss_ctx;
-	if (SNAPSHOT_INIT_DONE == lcl_ss_ctx->cur_state)
+	cur_state = lcl_ss_ctx->cur_state;
+	if (SNAPSHOT_INIT_DONE == cur_state)
 	{
+		/* Ensure that we don't try to grab_crit and wait for Phase2 commits to complete if we are dying */
+		assert(!process_exiting);
 		ss_shm_ptr = lcl_ss_ctx->ss_shm_ptr;
 		DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
 		ss_shmsize = ss_shm_ptr->ss_info.ss_shmsize;
@@ -157,13 +161,6 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 		if (!was_crit)
 			grab_crit(gv_cur_region);
 		assert(cs_data == cs_addrs->hdr);
-		/* Issue error if GT.M failed while writing blocks to snapshot file */
-		if (ss_shm_ptr->failure_errno)
-		{
-			/* Detailed error will be issued in the operator log by GT.M */
-			gtm_putmsg(VARLSTCNT(6) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid, DB_LEN_STR(gv_cur_region),
-				ss_shm_ptr->failure_errno);
-		}
 		if (dba_bg == cs_data->acc_meth)
 		{
 			/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen
@@ -197,10 +194,10 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 		}
 	}
 	STRCPY(shadow_file, lcl_ss_ctx->shadow_file);
-	ss_shmid = lcl_ss_ctx->ss_shmid;
+	ss_shmid = lcl_ss_ctx->attach_shmid;
 	ss_destroy_context(lcl_ss_ctx);
 	/* Do cleanup depending on what state of the snapshot init we are in */
-	switch(lcl_ss_ctx->cur_state)
+	switch(cur_state)
 	{
 		case SNAPSHOT_INIT_DONE:
 		case AFTER_SHM_CREAT:

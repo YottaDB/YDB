@@ -57,7 +57,7 @@ STATICFNDEF boolean_t compare_vals(char *trigger_val, uint4 trigger_val_len, cha
 	return ((end_ptr > t_ptr) && ('\0' == *k_ptr));
 }
 
-void build_kill_cmp_str(char *trigvn, int trigvn_len, char **values, unsigned short *value_len, mstr *kill_key)
+void build_kill_cmp_str(char *trigvn, int trigvn_len, char **values, uint4 *value_len, mstr *kill_key)
 {
 	uint4			lcl_len;
 	char			*ptr;
@@ -73,7 +73,7 @@ void build_kill_cmp_str(char *trigvn, int trigvn_len, char **values, unsigned sh
 	kill_key->len = INTCAST(ptr - kill_key->addr) - 1;
 }
 
-void build_set_cmp_str(char *trigvn, int trigvn_len, char **values, unsigned short *value_len, mstr *set_key)
+void build_set_cmp_str(char *trigvn, int trigvn_len, char **values, uint4 *value_len, mstr *set_key)
 {
 	uint4			lcl_len;
 	char			*ptr;

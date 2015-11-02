@@ -58,6 +58,7 @@ mval *get_ret_targ(stack_frame **retsf)
 				case MVST_ZINTDEV:
 				case MVST_TRIGR:
 				case MVST_RSTRTPC:
+				case MVST_STORIG:
 					break;
 				default:
 					assert(FALSE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,24 +37,22 @@ GBLREF	short	crash_count;
  *	FALSE - otherwise
  * ------------------------------------------------
  */
-bool lk_check_own(mlk_pvtblk *x)
+boolean_t	lk_check_own(mlk_pvtblk *x)
 {
 	int4		status;
 	int4		icount, time[2];
-	bool		ret_val;
-
+	boolean_t	ret_val, was_crit;
 	sgmnt_addrs	*csa;
 
 	if (!x->blocked)
 		return FALSE;
-
 	csa = &FILE_INFO(x->region)->s_addrs;
 	if (csa->critical)
 		crash_count = csa->critical->crashcnt;
-
-	grab_crit(x->region);           /* check on process that owns lock */
+	was_crit = csa->now_crit;
+	if (!was_crit)
+		grab_crit(x->region);           /* check on process that owns lock */
 	ret_val = FALSE;
-
 	if (x->blocked->owner)
 	{	/* There is an owner for the blocking node */
 		if (x->blocked->sequence != x->blk_sequence)
@@ -69,9 +67,8 @@ bool lk_check_own(mlk_pvtblk *x)
 			ret_val = TRUE;
 		}
 	} else
-	{	/* There is no owner. Take credit for freeing it.. */
-		ret_val = TRUE;
-	}
-	rel_crit(x->region);
+		ret_val = TRUE;	/* There is no owner. Take credit for freeing it.. */
+	if (!was_crit)
+		rel_crit(x->region);
 	return ret_val;
 }

@@ -47,6 +47,7 @@
 #include "is_file_identical.h"
 #include "jnl_get_checksum.h"
 #include "gtmimagename.h"
+#include "get_fs_block_size.h"
 
 /* Note : Now all system error messages are issued here. So callers do not need to issue them again */
 #define STATUS_MSG(info)										\
@@ -75,7 +76,10 @@ if (SYSCALL_ERROR(info->status) || SYSCALL_ERROR(info->status2))	\
 	int	status;							\
 	F_CLOSE(channel, status);/* resets "channel" to FD_INVALID */	\
 	if (NULL != jrecbuf_base)					\
+	{								\
 		free(jrecbuf_base);					\
+		jrecbuf_base = NULL;					\
+	}								\
 	return EXIT_ERR;						\
 }
 
@@ -147,16 +151,15 @@ uint4	cre_jnl_file(jnl_create_info *info)
 uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len)
 {
 	jnl_file_header		*header;
-	unsigned char		hdr_base[JNL_HDR_LEN + ALIGNMENT_SIZE];
+	unsigned char		hdr_base[JNL_HDR_LEN + MAX_IO_BLOCK_SIZE];
 	struct_jrec_pfin	*pfin_record;
 	struct_jrec_pini	*pini_record;
 	struct_jrec_epoch	*epoch_record;
 	struct_jrec_eof		*eof_record;
 	unsigned char		*create_fn, fn_buff[MAX_FN_LEN];
-	int			create_fn_len, cre_jnl_rec_size, status;
+	int			create_fn_len, cre_jnl_rec_size, status, write_size, jrecbufbase_size;
 	fd_type			channel;
-	char            	*jrecbuf;
-	char			*jrecbuf_base;
+	char            	*jrecbuf, *jrecbuf_base;
 	gd_id			jnlfile_id;
 #if defined(VMS)
 	struct FAB      	fab;
@@ -174,6 +177,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	int			perm;
 #endif
 	uint4			temp_offset, temp_checksum;
+	uint4			jnl_fs_block_size;
 
 	error_def(ERR_FILERENAME);
 	error_def(ERR_RENAMEFAIL);
@@ -253,9 +257,18 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */
 		return EXIT_ERR;
 	}
-	jrecbuf_base = malloc(DISK_BLOCK_SIZE + ALIGNMENT_SIZE);
-	jrecbuf = (char *)ROUND_UP2((uintszofptr_t)jrecbuf_base, DISK_BLOCK_SIZE);
-	memset(jrecbuf, 0, DISK_BLOCK_SIZE);
+	jnl_fs_block_size = get_fs_block_size(channel);
+	/* We need to write the journal file header, followed by pini/epoch/pfin/eof records followed by 0-padding
+	 * to ensure the final size of the journal file is filesystem-block-size aligned.
+	 * To have a "jnl_fs_block_size" aligned buffer that is also a multiple of jnl_fs_block_size long,
+	 * we need to allocate the needed size + 2 * jnl_fs_block_size.  This will leave up to jnl_fs_block_size
+	 * before the actual "used" part for alignment plus enough left after the "used" part to make up a buffer
+	 * to write that is a multiple of jnl_fs_block_size.
+	 */
+	jrecbufbase_size = PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN + (2 * jnl_fs_block_size);
+	jrecbuf_base = malloc(jrecbufbase_size);
+	jrecbuf = (char *)ROUND_UP2((uintszofptr_t)jrecbuf_base, jnl_fs_block_size);
+	memset(jrecbuf, 0, jnl_fs_block_size);
 	set_gdid_from_stat(&jnlfile_id, &stat_buf);
 #elif defined(VMS)
 	nam = cc$rms_nam;
@@ -284,6 +297,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 		return EXIT_ERR;
 	}
 	channel = fab.fab$l_stv;
+	jrecbufbase_size = ZERO_SIZE;
 	jrecbuf_base = jrecbuf = malloc(ZERO_SIZE);
 	memset(jrecbuf, 0, ZERO_SIZE);
 	block = (JNL_HDR_LEN >> LOG2_DISK_BLOCK_SIZE);
@@ -299,14 +313,24 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	memcpy(jnlfile_id.dvi, &nam.nam$t_dvi, SIZEOF(jnlfile_id.dvi));
 	memcpy(jnlfile_id.did, &nam.nam$w_did, SIZEOF(jnlfile_id.did));
 	memcpy(jnlfile_id.fid, &nam.nam$w_fid, SIZEOF(jnlfile_id.fid));
+	jnl_fs_block_size = get_fs_block_size(channel);
 #endif
 	info->checksum = jnl_get_checksum_entire((uint4 *)&jnlfile_id, SIZEOF(gd_id));
 	/* Journal file header size relies on this assert */
 	assert(256 == GTMCRYPT_RESERVED_HASH_LEN);
+	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, jnl_fs_block_size));
 	/* We have already saved previous journal file name in info */
-	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, DISK_BLOCK_SIZE));
 	jfh_from_jnl_info(info, header);
 	header->recover_interrupted = mupip_jnl_recover;
+	assert(ROUND_UP2(JNL_HDR_LEN, jnl_fs_block_size) == JNL_HDR_LEN);
+	assert((unsigned char *)header + JNL_HDR_LEN <= ARRAYTOP(hdr_base));
+	/* Although the real journal file header is REAL_JNL_HDR_LEN, we write the entire journal file header
+	 * including padding (64K in Unix) so we write 0-padding instead of some garbage. Not necessary
+	 * but makes analysis of journal file using dump utilities (like od) much easier. Also 0-initialization
+	 * might help us in the future when we add some fields in the file header. The cost of the extra padding
+	 * write is not so much since it is only once per journal file at creation time. All future writes of the
+	 * file header write only the real file header and not the 0-padding.
+	 */
 	DO_FILE_WRITE(channel, 0, header, JNL_HDR_LEN, info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
@@ -376,7 +400,20 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	eof_record->prefix.time = jgbl.gbl_jrec_time;
 	QWASSIGN(eof_record->jnl_seqno, info->reg_seqno);
 	eof_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-	DO_FILE_WRITE(channel, JNL_HDR_LEN, jrecbuf, ROUND_UP2(cre_jnl_rec_size, DISK_BLOCK_SIZE), info->status, info->status2);
+	/* Write the journal records, but also 0-fill the tail of the journal file enough to fill
+	 * an aligned filesystem-block-size boundary. Take into account that the file header is already written.
+	 */
+	write_size = ROUND_UP2((JNL_HDR_LEN + cre_jnl_rec_size), jnl_fs_block_size) - JNL_HDR_LEN;
+	assert((jrecbuf + write_size) <= (jrecbuf_base + jrecbufbase_size));
+	/* Assert that initial virtual-size of the journal file (which is nothing but the journal allocation)
+	 * gives us enough space to keep the journal file header + padding + PINI/PFIN/EPOCH/EOF records.
+	 * Do the assertion in units of 512-byte blocks as that keeps the values well under 4G. Keeping the
+	 * units in bytes causes the highest autoswitchlimit value to round up to 4G effectively becoming 0
+	 * on certain platforms and therefore failing the assert.
+	 */
+	assert(ROUND_UP2(header->virtual_size, jnl_fs_block_size/DISK_BLOCK_SIZE)
+			> DIVIDE_ROUND_UP(JNL_HDR_LEN + write_size, DISK_BLOCK_SIZE));
+	DO_FILE_WRITE(channel, JNL_HDR_LEN, jrecbuf, write_size, info->status, info->status2);
 	STATUS_MSG(info);
 	RETURN_ON_ERROR(info);
 	F_CLOSE(channel, status);	/* resets "channel" to FD_INVALID */

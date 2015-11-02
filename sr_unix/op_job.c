@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -149,7 +149,6 @@ int	op_job(int4 argcnt, ...)
 		for(;;)
 		{
 			inp = va_arg(var, mval *);
-			MV_FORCE_STR(inp);
 			jp->parm = inp;
 			if (0 == --i)
 				break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2006 Fidelity Information Services, Inc       *
+ *      Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -18,7 +18,6 @@ GBLREF char window_token;
 /* $ZWIDTH(): Single parameter - string expression */
 int f_zwidth(oprtype *a, opctype op)
 {
-#ifdef UNICODE_SUPPORTED
         triple *r;
 
         r = maketriple(op);
@@ -27,8 +26,5 @@ int f_zwidth(oprtype *a, opctype op)
         ins_triple(r);
         *a = put_tref(r);
         return TRUE;
-#else /* Unicode is not supported .. should not be here */
-	GTMASSERT;
-#endif
 }
 

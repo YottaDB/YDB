@@ -31,6 +31,7 @@
 #include "mvalconv.h"
 #include "rtnhdr.h"
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
+#include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 
 /*the header files below are for environment translation*/
 #ifdef UNIX
@@ -94,7 +95,7 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 	val = va_arg(var, mval *);
 	if (!MV_IS_STRING(val))
 		GTMASSERT;
-	gv_bind_name(gd_targ_addr, &(val->str));
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_targ_addr, &(val->str));
 	was_null = is_null = FALSE;
 	max_key = gv_cur_region->max_key_size;
 	for (count -= 3;  count > 0;  count--)

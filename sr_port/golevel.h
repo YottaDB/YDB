@@ -19,13 +19,13 @@
  * of frames (counted and uncounted). Note goframes is used by both golevel and goerrorframe.
  */
 #ifdef GTM_TRIGGER
-#define GOLEVEL(level, unwtrigrframe)	golevel(level, unwtrigrframe)
-#define GOFRAMES(frames, unwtrigrframe)	goframes(frames, unwtrigrframe)
+#define GOLEVEL(level, unwtrigrframe)			golevel(level, unwtrigrframe)
+#define GOFRAMES(frames, unwtrigrframe, fromzgoto)	goframes(frames, unwtrigrframe, fromzgoto)
 void	golevel(int4 level, boolean_t unwtrigrframe);
-void	goframes(int4 frames, boolean_t unwtrigrframe);
+void	goframes(int4 frames, boolean_t unwtrigrframe, boolean_t fromzgoto);
 #else
-#define GOLEVEL(level, unwtrigrframe)	golevel(level)
-#define GOFRAMES(frames, unwtrigrframe)	goframes(frames)
+#define GOLEVEL(level, unwtrigrframe)			golevel(level)
+#define GOFRAMES(frames, unwtrigrframe, fromzgoto)	goframes(frames)
 void	golevel(int4 level);		/* unwind upto the counted frame corresponding to frame level "level" */
 void	goframes(int4 frames);		/* unwind "frames" number of frames */
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,7 @@ bool	lke_showlock(
         int4            gtcmbufidx, item, ret;
 	uint4		status;
 	char		*msg, save_ch, format[64], gtcmbuf[64];	/* gtcmbuf[] is to hold ": CLNTNODE = %s : CLNTPID = %s" */
-	static	mval	subsc = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
+	static	mval	subsc = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 	VMS_ONLY(
 		char		sysinfo[NDIM];
 		$DESCRIPTOR	(sysinfo_dsc, sysinfo);

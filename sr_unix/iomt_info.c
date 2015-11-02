@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +13,8 @@
  *
  *  ** see iomt_info.c in SL_HPUX for a template **
  */
-#include "gtm_stdio.h"
 #include "mdef.h"
+#include "gtm_stdio.h"
 #include "io.h"
 #include "iottdef.h"
 #include "iomtdef.h"
@@ -23,7 +23,7 @@
 /* *****************
 #include "gtm_mtio.h"
 #include "gtm_stat.h"
-#include <termios.h>
+#include <gtm_termios.h>
 #include <errno.h>
    **************** */
 

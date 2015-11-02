@@ -43,6 +43,7 @@
 #include "change_reg.h"
 #include "op.h"
 #include "util.h"
+#include "zshow.h"			/* for format2zwr() prototype */
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgm_info		*sgm_info_ptr;
@@ -72,7 +73,7 @@ LITREF	mval			literal_hasht;
 		assert(FALSE);													\
 }
 
-STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **values, unsigned short *value_len, uint4 set_hash,
+STATICFNDEF void cleanup_trigger_hash(char *trigvn, int trigvn_len, char **values, uint4 *value_len, uint4 set_hash,
 				      uint4 kill_hash, boolean_t del_kill_hash, int match_index)
 {
 	sgmnt_addrs		*csa;
@@ -224,7 +225,7 @@ STATICFNDEF int4 update_trigger_name_value(int trigvn_len, char *trig_name, int 
 	return result;
 }
 
-STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **values, unsigned short *value_len, uint4 set_hash,
+STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **values, uint4 *value_len, uint4 set_hash,
 					   uint4 kill_hash, int old_trig_index, int new_trig_index)
 {
 	sgmnt_addrs		*csa;
@@ -344,24 +345,23 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		*ptr1 = '\0';
 		trigger_name_len--;
 	}
-	if (!check_name(trigger_name, trigger_name_len))
+	if (!check_trigger_name(trigger_name, &trigger_name_len))
 	{	/* name#<number># is OK here */
 		if ((TRIGNAME_SEQ_DELIM == *ptr1)
 				&& (ptr1 != (ptr = strchr(trigger_name, TRIGNAME_SEQ_DELIM)))
-				&& (ISDIGIT(*(ptr + 1))))
+				&& (ISDIGIT_ASCII(*(ptr + 1))))
 		{
 			for (ptr++ ; ptr < ptr1; ptr++)
 			{
-				if (!ISDIGIT(*ptr))
+				if (!ISDIGIT_ASCII(*ptr))
 				{
-					util_out_print_gtmio("Invalid trigger NAME string : !AD", FLUSH, trigger_name_len,
-						trigger_name);
+					CONV_STR_AND_PRINT("Invalid trigger NAME string: ", trigger_name_len, trigger_name);
 					return TRIG_FAILURE;
 				}
 			}
 		} else
 		{
-			util_out_print_gtmio("Invalid trigger NAME string : !AD", FLUSH, trigger_name_len, trigger_name);
+			CONV_STR_AND_PRINT("Invalid trigger NAME string: ", trigger_name_len, trigger_name);
 			return TRIG_FAILURE;
 		}
 
@@ -370,7 +370,10 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
 	if (0 == gv_target->root)
 	{
-		util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, trigger_name_len, trigger_name);
+		if (wildcard)
+			util_out_print_gtmio("Trigger names matching !AD* do not exist", FLUSH, trigger_name_len, trigger_name);
+		else
+			util_out_print_gtmio("Trigger named !AD does not exist", FLUSH, trigger_name_len, trigger_name);
 		return TRIG_FAILURE;
 	}
 	name_found = FALSE;
@@ -408,7 +411,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		A2I(ptr, trig_gbl.str.addr + trig_gbl.str.len, trig_indx);
 		gbl_name.addr = trigvn;
 		gbl_name.len = trigvn_len;
-		gv_bind_name(gd_header, &gbl_name);
+		GV_BIND_NAME_ONLY(gd_header, &gbl_name);
 		csa = gv_target->gd_csa;
 		SETUP_TRIGGER_GLOBAL;
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
@@ -457,7 +460,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	int			trig_name_len;
 	int			tmp_len;
 	char			*tt_val[NUM_SUBS];
-	unsigned short		tt_val_len[NUM_SUBS];
+	uint4			tt_val_len[NUM_SUBS];
 	mval			trigger_value;
 	mval			trigger_index;
 	uint4			used_trigvn_len;

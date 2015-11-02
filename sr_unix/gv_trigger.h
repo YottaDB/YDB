@@ -49,6 +49,12 @@
 /* This macro assumes addr points to an mname (i.e. unsubscripted) */
 #define	IS_MNAME_HASHT_GBLNAME(MNAME)	((HASHT_GBLNAME_LEN == MNAME.len) && !MEMCMP_LIT(MNAME.addr, HASHT_GBLNAME))
 
+/* Similar to IS_GVKEY_HASHT_GBLNAME but used in places where ADDR points to ZWR formatted KEY (includes '^') */
+#define IS_GVKEY_HASHT_FULL_GBLNAME(LEN, ADDR)	((HASHT_FULL_GBLNM_LEN <= LEN)				\
+							&& ('^' == ADDR[0])				\
+							&& (HASHT_GBL_CHAR1 == ADDR[1])			\
+							&& (HASHT_GBL_CHAR2 == ADDR[2]))
+
 #define	LITERAL_HASHLABEL_LEN	STR_LIT_LEN(LITERAL_HASHLABEL)
 #define	LITERAL_HASHCYCLE_LEN	STR_LIT_LEN(LITERAL_HASHCYCLE)
 #define	LITERAL_HASHCOUNT_LEN	STR_LIT_LEN(LITERAL_HASHCOUNT)
@@ -192,98 +198,147 @@ typedef struct gvtr_invoke_parms_struct
 } gvtr_invoke_parms_t;
 
 /* Requires #include of op.h, tp_set_sgm.h, t_begin.h in the caller of this macro */
-#define	GVTR_INIT_AND_TPWRAP_IF_NEEDED(CSA, CSD, GVT, GVT_TRGR, LCL_TSTART, IS_TPWRAP, T_ERR)				\
-{															\
-	GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */	\
-	GBLREF	sgmnt_data_ptr_t	cs_data;									\
-	GBLREF	short			dollar_tlevel;									\
-	GBLREF	boolean_t		implicit_tstart;								\
-	GBLREF	jnl_gbls_t		jgbl;										\
-	GBLREF	gv_namehead		*reset_gv_target;								\
-															\
-	DEBUG_ONLY(GBLREF boolean_t	donot_INVOKE_MUMTSTART;)							\
-	DEBUG_ONLY(GBLREF tp_frame	*tp_pointer;)									\
-	DEBUG_ONLY(GBLREF stack_frame	*frame_pointer;)								\
-	DEBUG_ONLY(GBLREF mv_stent	*mv_chain;)									\
-	DEBUG_ONLY(GBLREF unsigned char	*msp;)										\
-	DEBUG_ONLY(GBLREF int		tprestart_state;)								\
-	DEBUG_ONLY(error_def(ERR_GVKILLFAIL);)										\
-	DEBUG_ONLY(error_def(ERR_GVPUTFAIL);)										\
-															\
-	LITREF	mval			literal_batch;									\
-															\
-	uint4				cycle;										\
-	DEBUG_ONLY(gv_namehead		*save_reset_gv_target;)								\
-															\
-	assert(TPRESTART_STATE_NORMAL == tprestart_state);								\
-	/* No trigger init needed if skip_dbtriggers is TRUE (e.g. mupip load etc.) */					\
-	if (!skip_dbtriggers)												\
-	{														\
-		/* If start of transaction, read in GVT's triggers from ^#t global if not already done.			\
-		 * If restart and if it was due to GVT's triggers being out-of-date re-read them.			\
-		 * We can use CSD or CSA to get the cycle # for comparison with GVT. Either approach is correct. But	\
-		 * using CSD (versus CSA) can relatively reduce the # of times "gvtr_init" is invoked for a GVT.	\
-		 */													\
-		cycle = CSD->db_trigger_cycle;										\
-		assert(CSD == cs_data);											\
-		if (GVT->db_trigger_cycle != cycle)									\
-		{													\
-			assert(GVT->db_trigger_cycle < cycle);								\
-			assert(GVT->gd_csa == CSA);									\
-			DEBUG_ONLY(save_reset_gv_target = reset_gv_target;)						\
-			gvtr_init(GVT, cycle, LCL_TSTART);								\
-			/* Check that gvtr_init does not play with "reset_gv_target" a global variable that callers	\
-			 * of this function (e.g. gvcst_put) might have set to a non-default value.			\
-			 */												\
-			assert(reset_gv_target == save_reset_gv_target);						\
-			/* GVT could be equal to CSA->dir_tree in case of op_gvput done by VIEW "YDIRTREE".		\
-			 * In that case, gvtr_init would have returned right away without updating db_trigger_cycle.	\
-			 */												\
-			assert((GVT->db_trigger_cycle == cycle) || (GVT == CSA->dir_tree));				\
-			CSD = cs_data; /* if MM and db extension occurred, reset CSD to cs_data to avoid stale value */	\
-		}													\
-		assert(CSD == cs_data);											\
-		GVT_TRGR = GVT->gvt_trigger;										\
-		if ((NULL != GVT_TRGR) && !dollar_tlevel)								\
-		{	/* A non-TP update is being attempted on a global that has triggers defined. Wrap it inside	\
-			 * TP unconditionally. Note that even though every trigger driven update is supposed to be	\
-			 * wrapped in TP, it is possible for $ZTLEVEL (gtm_trigger_depth) to be non-zero and yet	\
-			 * $TLEVEL is 0 (e.g. if inside of the trigger, a TROLLBACK occurs which resets $TLEVEL but	\
-			 * code following the TROLLBACK still inside the trigger does an update which in turn drives	\
-			 * its own triggers and reaches here) so we cannot assert that gtm_trigger_depth is 0 here.	\
-			 */												\
-			assert(!LCL_TSTART);										\
-			/* Set a debug-only global variable to indicate that from now onwards, until the		\
-			 * completion of this tp-wrapped non-tp update, we dont expect "t_retry" to be called		\
-			 * while this gvcst_put is in the C-call-stack. This is because we have not set up the		\
-			 * TP transaction using opp_tstart (like what M code does) and so there is no point		\
-			 * to go back to generated code (mdb_condition_handler invoked from t_retry does this		\
-			 * transfer of control using the MUM_TSTART macro). We instead expect to handle retries		\
-			 * internally in gvcst_put. We also expect any restarts occurring in nested trigger		\
-			 * code to eventually end up as a RESTART return code from "gtm_trigger" so we get to		\
-			 * choose how to handle the restart for this implicit TSTART.					\
-			 */												\
-			assert(!donot_INVOKE_MUMTSTART);								\
-			DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE;)							\
-			/* With journal recovery, we expect it to play non-TP journal records as non-TP transactions	\
-			 * and ZTP journal records as ZTP transactions so we dont expect an implicit TP wrap to be	\
-			 * done inside recovery due to a trigger (as this means GT.M and recovery have different 	\
-			 * values for GVT->gvt_trigger which is not possible). Assert that.				\
-			 */												\
-			assert(!jgbl.forw_phase_recovery);								\
-			assert(!implicit_tstart);									\
-			implicit_tstart = TRUE;										\
-			LCL_TSTART= TRUE;										\
-			op_tstart(TRUE, TRUE, &literal_batch, 0); /* 0 ==> save no locals but RESTART OK */		\
-			assert((tp_pointer->fp == frame_pointer) && (MVST_TPHOLD == mv_chain->mv_st_type)		\
-				&& (msp == (unsigned char *)mv_chain));							\
-			assert(FALSE == implicit_tstart); /* should have been reset by op_tstart at very beginning */	\
-			IS_TPWRAP = TRUE;										\
-			tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start */				\
-			assert((ERR_GVKILLFAIL == T_ERR) || (ERR_GVPUTFAIL == T_ERR));					\
-			T_BEGIN_SETORKILL_NONTP_OR_TP(T_ERR); /* set update_trans and t_err for wrapped TP */		\
-		}													\
-	}														\
+#define	GVTR_INIT_AND_TPWRAP_IF_NEEDED(CSA, CSD, GVT, GVT_TRGR, LCL_TSTART, IS_TPWRAP, T_ERR)					\
+{																\
+	GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */		\
+	GBLREF	sgmnt_data_ptr_t	cs_data;										\
+	GBLREF	short			dollar_tlevel;										\
+	GBLREF	boolean_t		implicit_tstart;									\
+	GBLREF	jnl_gbls_t		jgbl;											\
+	GBLREF	uint4			t_err;											\
+																\
+	DEBUG_ONLY(GBLREF gv_namehead	*reset_gv_target;)									\
+	DEBUG_ONLY(GBLREF boolean_t	donot_INVOKE_MUMTSTART;)								\
+	DEBUG_ONLY(GBLREF tp_frame	*tp_pointer;)										\
+	DEBUG_ONLY(GBLREF stack_frame	*frame_pointer;)									\
+	DEBUG_ONLY(GBLREF mv_stent	*mv_chain;)										\
+	DEBUG_ONLY(GBLREF unsigned char	*msp;)											\
+	DEBUG_ONLY(GBLREF int		tprestart_state;)									\
+	DEBUG_ONLY(GBLREF sgm_info	*sgm_info_ptr;)										\
+	DEBUG_ONLY(gv_namehead		*save_reset_gv_target;)									\
+	DEBUG_ONLY(boolean_t		was_nontp;)										\
+																\
+	LITREF	mval			literal_batch;										\
+	uint4				cycle;											\
+	boolean_t			set_upd_trans_t_err, cycle_mismatch;							\
+																\
+	assert(TPRESTART_STATE_NORMAL == tprestart_state);									\
+	assert(!skip_dbtriggers);												\
+	/* If start of transaction, read in GVT's triggers from ^#t global if not already done.					\
+	 * If restart and if it was due to GVT's triggers being out-of-date re-read them.					\
+	 * We can use CSD or CSA to get the cycle # for comparison with GVT. Either approach is correct. But			\
+	 * using CSD (versus CSA) can relatively reduce the # of times "gvtr_init" is invoked for a GVT.			\
+	 */															\
+	cycle = CSD->db_trigger_cycle;												\
+	assert(CSD == cs_data);													\
+	/* triggers can be invoked only by updates currently */									\
+	assert(!dollar_tlevel || sgm_info_ptr);											\
+	assert((dollar_tlevel && sgm_info_ptr->update_trans) || (!dollar_tlevel && update_trans)); 				\
+	set_upd_trans_t_err = FALSE;												\
+	cycle_mismatch = (GVT->db_trigger_cycle != cycle);									\
+	if (cycle_mismatch || (NULL != GVT->gvt_trigger))									\
+	{	/* Create TP wrap if needed */											\
+		if (!dollar_tlevel)												\
+		{	/* need to create implicit TP wrap */									\
+			DEBUG_ONLY(was_nontp = TRUE;)										\
+			assert(!LCL_TSTART);											\
+			assert(!implicit_tstart);										\
+			/* Set a debug-only global variable to indicate that from now onwards, until the			\
+			 * completion of this tp-wrapped non-tp update, we dont expect "t_retry" to be called			\
+			 * while this gvcst_put is in the C-call-stack. This is because we have not set up the			\
+			 * TP transaction using opp_tstart (like what M code does) and so there is no point			\
+			 * to go back to generated code (mdb_condition_handler invoked from t_retry does this			\
+			 * transfer of control using the MUM_TSTART macro). We instead expect to handle retries			\
+			 * internally in gvcst_put. We also expect any restarts occurring in nested trigger			\
+			 * code to eventually end up as a RESTART return code from "gtm_trigger" so we get to			\
+			 * choose how to handle the restart for this implicit TSTART.						\
+			 */													\
+			assert(!donot_INVOKE_MUMTSTART);									\
+			DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE;)								\
+			/* With journal recovery, we expect it to play non-TP journal records as non-TP transactions		\
+			 * and ZTP journal records as ZTP transactions so we dont expect an implicit TP wrap to be		\
+			 * done inside recovery due to a trigger (as this means GT.M and recovery have different		\
+			 * values for GVT->gvt_trigger which is not possible). Assert that.					\
+			 */													\
+			assert(!jgbl.forw_phase_recovery);									\
+			LCL_TSTART = TRUE;											\
+			implicit_tstart = TRUE;											\
+			op_tstart(TRUE, TRUE, &literal_batch, 0); /* 0 ==> save no locals but RESTART OK */			\
+			assert(FALSE == implicit_tstart); /* should have been reset by op_tstart at very beginning */		\
+			/* Ensure that the op_tstart done above has set up the TP frame and that the first entry is		\
+			 * of MVST_TPHOLD type. */										\
+			assert((tp_pointer->fp == frame_pointer) && (MVST_TPHOLD == mv_chain->mv_st_type)			\
+				&& (msp == (unsigned char *)mv_chain));								\
+			IS_TPWRAP = TRUE;											\
+			assert(CSA->sgm_info_ptr->fresh_start && !CSA->sgm_info_ptr->update_trans);				\
+			tp_set_sgm();												\
+			/* tp_set_sgm above will update CSA->db_trigger_cycle (from CSD->db_trigger_cycle). Set local variable 	\
+			 * cycle to match CSA->db_trigger_cycle so as to pass the updated value to gvtr_init. 			\
+			 */													\
+			cycle = CSA->db_trigger_cycle;										\
+			/* Assert that if cycle_mismatch was TRUE above, it better be TRUE after 'cycle' update as well */	\
+			assert(!cycle_mismatch || (GVT->db_trigger_cycle != cycle));						\
+			/* An implicit TP wrap is created for an explicit TP update. tp_set_sgm call done above will initalize	\
+			 * sgm_info_ptr for this TP transaction and will have sgm_info_ptr->update_trans set to zero. If the 	\
+			 * op_tstart done above is for ^#t read, then set_upd_trans_t_err set to TRUE just after gvtr_init will \
+			 * take care of resetting si->update_trans and t_err at macro exit. However, if this op_tstart is for	\
+			 * the actual transaction (for eg., triggers for this global is already read for this process and an	\
+			 * explicit non-tp update is in progress) then we need to set si->update_trans and t_err to correct 	\
+			 * values before the macro exit. 									\
+			 */													\
+			set_upd_trans_t_err = TRUE;										\
+		} else														\
+		{														\
+			/* Already in TP */											\
+			DEBUG_ONLY(was_nontp = FALSE;)										\
+			assert(sgm_info_ptr == CSA->sgm_info_ptr);								\
+		}														\
+		if (cycle_mismatch)												\
+		{	/* Process' trigger view changed. Re-read triggers */							\
+			assert(GVT->db_trigger_cycle < cycle);									\
+			assert(GVT->gd_csa == CSA);										\
+			DEBUG_ONLY(save_reset_gv_target = reset_gv_target;)							\
+			gvtr_init(GVT, cycle, LCL_TSTART);									\
+			/* ^#t reads done via gvtr_init will cause t_err to be set to GVGETFAIL which needs to be reset to 	\
+			 * T_ERR (incoming parameter to this macro) before leaving the macro. Also, in case of an implicit	\
+			 * tstart (LCL_TSTART = TRUE), if a restart happens while reading ^#t global, gvtr_tpwrap_ch will	\
+			 * be invoked which inturn will invoke tp_restart that would reset sgm_info_ptr->update_trans to 	\
+			 * zero. The caller of the macro (gvcst_put and gvcst_kill) relies on sgm_info_ptr->update_trans	\
+			 * being non-zero. 											\
+			 */													\
+			set_upd_trans_t_err = TRUE;										\
+			/* Check that gvtr_init does not play with "reset_gv_target" a global variable that callers		\
+			 * of this function (e.g. gvcst_put) might have set to a non-default value.				\
+			 */													\
+			assert(reset_gv_target == save_reset_gv_target);							\
+			/* GVT could be equal to CSA->dir_tree in case of op_gvput done by VIEW "YDIRTREE".			\
+			 * In that case, gvtr_init would have returned right away without updating db_trigger_cycle.		\
+			 */													\
+			assert((GVT->db_trigger_cycle == cycle) || (GVT == CSA->dir_tree));					\
+			CSD = cs_data; /* if MM and db extension occurred, reset CSD to cs_data to avoid stale value */		\
+		}														\
+	}															\
+	GVT_TRGR = GVT->gvt_trigger;												\
+	assert((NULL == GVT_TRGR) || dollar_tlevel);										\
+	if ((NULL == GVT_TRGR) && IS_TPWRAP && !dollar_tlevel)									\
+	{															\
+		assert(set_upd_trans_t_err);											\
+		assert(was_nontp);												\
+		assert(0 == t_tries);												\
+		/* We came in as a non-tp update and initiated op_tstart to do the ^#t reads. However, no triggers were defined	\
+		 * because of which we did the corresponding op_tcommit in gvtr_db_tpwrap_helper. Now the TP wrap is complete	\
+		 * restore any global variables the wrap messed with. 								\
+		 */														\
+		IS_TPWRAP = LCL_TSTART = FALSE;											\
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE;)									\
+	} 															\
+	if (set_upd_trans_t_err) /* Reset update_trans/si->update_trans and t_err */						\
+	{															\
+		/* If non-tp, the below macro will invoke t_begin which will set up the necessary structures for the Non-TP 	\
+		 * update													\
+		 */														\
+		T_BEGIN_SETORKILL_NONTP_OR_TP(T_ERR);										\
+	}															\
 }
 
 #define	GVTR_OP_TCOMMIT(STATUS)										\
@@ -431,17 +486,14 @@ typedef struct gvtr_invoke_parms_struct
 	}															\
 }
 
-#define	TRIG_PROCESS_JNL_STR_NODEFLAGS(KEYSTR)				\
+#define	TRIG_PROCESS_JNL_STR_NODEFLAGS(NODEFLAGS)			\
 {									\
-	uint4			nodeflags;				\
-									\
 	GBLREF	boolean_t	skip_dbtriggers;			\
 	GBLREF	mval		dollar_ztwormhole;			\
 									\
-	nodeflags = KEYSTR->nodeflags;					\
-	assert(!(JS_NOT_REPLICATED_MASK & nodeflags));			\
-	skip_dbtriggers = (nodeflags & JS_SKIP_TRIGGERS_MASK);		\
-	if (nodeflags & JS_NULL_ZTWORM_MASK)				\
+	assert(!(JS_NOT_REPLICATED_MASK & NODEFLAGS));			\
+	skip_dbtriggers = (NODEFLAGS & JS_SKIP_TRIGGERS_MASK);		\
+	if (NODEFLAGS & JS_NULL_ZTWORM_MASK)				\
 		dollar_ztwormhole.str.len = 0;				\
 }
 

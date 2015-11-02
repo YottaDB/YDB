@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,9 +20,7 @@
 
 #include <errno.h>
 
-#ifdef DEBUG
 #include "gtm_stdio.h"
-#endif
 #include "gtm_unistd.h"
 #include "gtm_string.h"
 #include "gtm_time.h"		/* for time() */
@@ -109,7 +107,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 		else
 		{
 			char	msg[256];
-			sprintf(msg, "Attempted read from connection %d to %s failed",
+			SPRINTF(msg, "Attempted read from connection %d to %s failed",
 				cptr->stats.id, gtcm_hname(&cptr->stats.sin));
 			gtcm_rep_err(msg, save_errno);
 		}
@@ -173,7 +171,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 	{
 		char	msg[256];
 
-		sprintf(msg, "OMI packet length (%d) larger than max (%d)", mlen.value+4, OMI_BUFSIZ);
+		SPRINTF(msg, "OMI packet length (%d) larger than max (%d)", mlen.value+4, OMI_BUFSIZ);
 		gtcm_cpktdmp((char *)cptr->bptr, cptr->blen, msg);
 		return -1;
 	}
@@ -220,7 +218,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 		{
 			char	msg[256];
 
-			sprintf(msg, "invalid OMI packet (invalid nxact)");
+			SPRINTF(msg, "invalid OMI packet (invalid nxact)");
 			gtcm_cpktdmp((char *)cptr->bptr, cptr->blen, msg);
 			return -1;
 		}
@@ -269,7 +267,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 		else if (cptr->state == OMI_ST_DISC  &&  rh.op_type.value != OMI_CONNECT)
 		{
 			char	msg[256];
-			sprintf(msg, "Request (%x) sent before session was established",
+			SPRINTF(msg, "Request (%x) sent before session was established",
 				rh.op_type.value);
 			eh.type = OMI_ER_SE_NOSESS;
 		}
@@ -443,7 +441,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 			else
 			{
 				char	msg[256];
-				sprintf(msg, "Write attempt to connection %d failed", cptr->stats.id);
+				SPRINTF(msg, "Write attempt to connection %d failed", cptr->stats.id);
 				gtcm_rep_err(msg, save_errno);
 			}
 			return -1;

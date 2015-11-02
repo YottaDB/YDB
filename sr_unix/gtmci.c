@@ -41,6 +41,8 @@
 #include "push_lvval.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
+#include "gtm_imagetype_init.h"
+
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
@@ -64,7 +66,6 @@ GBLDEF 	unsigned int		nested_level;		/* current nested depth of callin environme
 GBLREF  mval			dollar_zstatus;
 GBLREF  unsigned char		*fgncal_stack;
 GBLREF  short			dollar_tlevel;
-GBLREF  enum gtmImageTypes	image_type;
 GBLREF	int			process_exiting;
 
 static  callin_entry_list	*ci_table = NULL;
@@ -134,7 +135,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	job_addr(&routine, &label, 0, (char **)&base_addr, (char **)&transfer_addr);
 
-	memset(&param_blk, SIZEOF(param_blk), 0);
+	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)base_addr;
 	/* lnr_entry below is a pointer to the code offset for this label from the
 	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
@@ -410,7 +411,7 @@ int gtm_init()
 
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
-		image_type = GTM_IMAGE;
+		gtm_imagetype_init(GTM_IMAGE);
 		gtm_wcswidth_fnptr = gtm_wcswidth;
 		gtm_env_init();	/* read in all environment variables */
 		err_init(stop_image_conditional_core);
@@ -477,7 +478,7 @@ int gtm_exit()
 		{
 #			ifdef GTM_TRIGGER
 			if (SFT_TRIGR & frame_pointer->type)
-				gtm_trigger_fini(TRUE);
+				gtm_trigger_fini(TRUE, FALSE);
 			else
 #			endif
 				op_unwind();

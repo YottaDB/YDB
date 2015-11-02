@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,7 @@
 int lke_getki(char* src, int srclen, char* outbuff)
 {
 	char	*inptr, *nextptr, *intop, *outptr, *tmpptr;
-	mval	subsc = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, NULL, 0, 0);
+	mval	subsc = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
 	char	one_lockbuf[MAX_ZWR_KEY_SZ + 1];
 
 	if (srclen > 1 && '"' == src[0] && '"' == src[srclen - 1])

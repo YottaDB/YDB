@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,11 +31,14 @@ boolean_t wcs_flu(uint4 options);
 #endif
 
 #define	SET_WCS_FLU_FAIL_STATUS(status, csd)								\
-{	/* Only reason we currently know why wcs_flu can fail (when called from t_end or tp_tend)	\
-	 * is if wcs_flu avoided invoking wcs_recover because csd->wc_blocked is already set to TRUE.	\
-	 * Possible only if cache-recoveries are induced by white-box testing. Assert accordingly.	\
+{	/* Reasons we currently know why wcs_flu can fail (when called from t_end or tp_tend) is if	\
+	 * 	a) wcs_flu avoided invoking wcs_recover because csd->wc_blocked is already set to TRUE.	\
+	 * 		(this is possible only if cache-recoveries are induced by white-box testing).	\
+	 * OR	b) if wcs_flu encountered errors in the "jnl_flush" call. The only way we know this	\
+	 * 		out-of-design situation can happen is if journal buffer fields are tampered	\
+	 * 		with by white-box testing. In this case csd->wc_blocked need not be TRUE.	\
+	 * In either case, white-box testing should be true. Assert accordingly.			\
 	 */												\
-	assert(csd->wc_blocked);									\
 	assert(gtm_white_box_test_case_enabled);							\
 	assert(CDB_STAGNATE >= t_tries);								\
 	if ((dba_bg == csd->acc_meth) && (CDB_STAGNATE <= t_tries))					\

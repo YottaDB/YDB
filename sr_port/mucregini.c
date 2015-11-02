@@ -67,13 +67,13 @@ void mucregini(int4 blk_init_size)
 	error_def(ERR_FILEPARSE);
 
 	MEMCPY_LIT(cs_data->label, GDS_LABEL);
-	cs_data->desired_db_format = (enum db_ver)GDSVCURR;
+	cs_data->desired_db_format = GDSVCURR;
 	cs_data->fully_upgraded = TRUE;
 	cs_data->db_got_to_v5_once = TRUE;	/* no V4 format blocks that are non-upgradeable */
-	cs_data->minor_dbver = (enum mdb_ver)GDSMVCURR;
-	cs_data->certified_for_upgrade_to = (enum db_ver)GDSVCURR;
-	cs_data->creation_db_ver = (enum db_ver)GDSVCURR;
-	cs_data->creation_mdb_ver = (enum mdb_ver)GDSMVCURR;
+	cs_data->minor_dbver = GDSMVCURR;
+	cs_data->certified_for_upgrade_to = GDSVCURR;
+	cs_data->creation_db_ver = GDSVCURR;
+	cs_data->creation_mdb_ver = GDSMVCURR;
 	cs_data->master_map_len = MASTER_MAP_SIZE_DFLT;
 	cs_data->bplmap = BLKS_PER_LMAP;
 	assert(BLK_SIZE <= MAX_DB_BLK_SIZE);
@@ -113,8 +113,9 @@ void mucregini(int4 blk_init_size)
 	cs_data->alignsize = JNL_ALLOWED(cs_data) ? (DISK_BLOCK_SIZE * JNL_DEF_ALIGNSIZE) : 0;
 	cs_data->autoswitchlimit = JNL_ALLOWED(cs_data) ? ALIGNED_ROUND_DOWN(JNL_ALLOC_MAX, cs_data->jnl_alq, cs_data->jnl_deq) : 0;
 #ifdef UNIX
-	assert(!(IO_BLOCK_SIZE % DISK_BLOCK_SIZE));
-	cs_data->jnl_buffer_size = ROUND_UP(gv_cur_region->jnl_buffer_size, IO_BLOCK_SIZE / DISK_BLOCK_SIZE);
+	assert(!(MAX_IO_BLOCK_SIZE % DISK_BLOCK_SIZE));
+	cs_data->jnl_buffer_size = ROUND_UP(gv_cur_region->jnl_buffer_size,
+		MIN(MAX_IO_BLOCK_SIZE, cs_data->blk_size) / DISK_BLOCK_SIZE);
 #else
 	cs_data->jnl_buffer_size = gv_cur_region->jnl_buffer_size;
 #endif

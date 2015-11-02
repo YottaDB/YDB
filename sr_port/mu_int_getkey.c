@@ -81,7 +81,7 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 					TRUE, src - 1 - startsrc, top - startsrc, startsrc);
 			CLNUP_AND_RETURN_FALSE;
 		}
-		if (ISALPHA(*src) || ('%' == *src))
+		if (ISALPHA_ASCII(*src) || ('%' == *src))
 			*dest++ = *src++;
 		else
 		{
@@ -93,7 +93,7 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 		{
 			if (':' == *src)
 				break;
-			if (ISALNUM(*src))
+			if (ISALNUM_ASCII(*src))
 				*dest++ = *src++;
 			else
 			{

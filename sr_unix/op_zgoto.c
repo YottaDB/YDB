@@ -70,7 +70,7 @@ void op_zgoto(rhdtyp *rtnhdr, lnr_tabent USHBIN_ONLY(*)*lnrptr, int4 level)
 	assert(level == (dlevel = dollar_zlevel()));
 	/* Convert current stack frame to the frame for the entry ref we want to branch to */
 	flush_jmp(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr), LINE_NUMBER_ADDR(rtnhdr, USHBIN_ONLY(*)lnrptr));
-	DBGTRIGR((stderr, "op_zg1: Resuming at frame 0x%016lx with type 0x%04lx\n", frame_pointer, frame_pointer->type));
+	DBGEHND((stderr, "op_zgoto: Resuming at frame 0x%016lx with type 0x%04lx\n", frame_pointer, frame_pointer->type));
 #	ifdef GTM_TRIGGER
 	if (goframes_unwound_trigger)
 	{

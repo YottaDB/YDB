@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ GBLREF 	jnl_gbls_t	jgbl;
 GBLREF 	bool		in_backup;
 GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 
-#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)								\
+#define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(FIX_IN_WTSTART, WAS_CRIT)							\
 {															\
 	GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, (cnl->in_wtstart), 1);						\
 	if (WRITERS_ACTIVE(cnl))											\
@@ -83,7 +83,8 @@ GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 				(WBTEST_BUFOWNERSTUCK_STACK == gtm_white_box_test_case_number));			\
 				cnl->wcsflu_pid = 0;									\
 				SIGNAL_WRITERS_TO_RESUME(csd);								\
-				rel_crit(gv_cur_region);								\
+				if (!WAS_CRIT)										\
+					rel_crit(gv_cur_region);							\
 				/* Disable white box testing after the first time the					\
 				WBTEST_BUFOWNERSTUCK_STACK mechanism has kicked in. This is because as			\
 				part of the exit handling process, the control once agin comes to wcs_flu		\
@@ -106,7 +107,7 @@ GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 			{												\
 				assert((FALSE == csa->in_wtstart) && (0 <= cnl->in_wtstart));				\
 				cnl->in_wtstart = 0;	/* fix improper value of in_wtstart if you are standalone */	\
-				fix_in_wtstart = TRUE;									\
+				FIX_IN_WTSTART = TRUE;									\
 				cnl->intent_wtstart = 0;/* fix improper value of intent_wtstart if standalone */	\
 			} else												\
 				wcs_sleep(lcnt);		/* wait for any in wcs_wtstart to finish */		\
@@ -283,7 +284,7 @@ boolean_t wcs_flu(uint4 options)
 		 * to flush the dirty buffer that it has already removed from the active queue. Wait for it to finish.
 		 */
 		fix_in_wtstart = FALSE;		/* set to TRUE by the following macro if we needed to correct cnl->in_wtstart */
-		WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart);
+		WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit);
 		/* Ideally at this point, the cache should have been flushed. But there is a possibility that the other
 		 *   process in wcs_wtstart which had already removed the dirty buffer from the active queue found (because
 		 *   csr->jnl_addr > jb->dskaddr) that it needs to be reinserted and placed it back in the active queue.
@@ -298,7 +299,7 @@ boolean_t wcs_flu(uint4 options)
 		if (cnl->wcs_active_lvl || crq->fl)
 		{
 			wtstart_errno = wcs_wtstart(gv_cur_region, csd->n_bts);		/* Flush it all */
-			WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart);
+			WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit);
 			if (cnl->wcs_active_lvl || crq->fl)		/* give allowance in PRO */
 			{
 				if (ENOSPC == wtstart_errno)
@@ -327,17 +328,22 @@ boolean_t wcs_flu(uint4 options)
 						rts_error(VARLSTCNT(5) ERR_OUTOFSPACE, 3, DB_LEN_STR(gv_cur_region), process_id);
 					}
 				} else
-				{	/* The only case we know of currently when this is possible is if a process encountered
-					 * an error in the midst of committing in phase2 and secshr_db_clnup completed the commit
-					 * for it and set wc_blocked to TRUE (even though it was out of crit) causing
-					 * the wcs_wtstart calls done above to do nothing. But phase2 commit errors are currently
-					 * enabled only through white-box testing.  The only exception to this is if this is a
-					 * crash shutdown and later mupip rundown or mupip integ is being invoked on this shared
-					 * memory where it is the only process attached to the database shared memory.  Also
-					 * mupip integ freezes the database so assert accordingly.
+				{	/* There are three cases we know of currently when this is possible:
+					 * (a) If a process encountered an error in the midst of committing in phase2 and
+					 * secshr_db_clnup completed the commit for it and set wc_blocked to TRUE (even though
+					 * it was OUT of crit) causing the wcs_wtstart calls done above to do nothing.
+					 * (b) If a process performing multi-region TP transaction encountered an error in
+					 * phase1 of the commit, but at least one of the participating regions have completed
+					 * the phase1 and released crit, secshr_db_clnup will set wc_blocked on all the regions
+					 * (including those that will be OUTSIDE crit) that participated in the commit. Hence,
+					 * like (a), wcs_wtstart calls done above will return immediately.
+					 * But phase1 and phase2 commit errors are currently enabled only through white-box testing.
+					 * (c) If a test does crash shutdown (kill -9) that hit the process in the middle of
+					 * wcs_wtstart which means the writes did not complete successfully.
 					 */
-					assert(gtm_white_box_test_case_enabled || mu_rndwn_file_dbjnl_flush
-								      || (csd->freeze && (csd->image_count == process_id)));
+					assert((WBTEST_BG_UPDATE_PHASE2FAIL == gtm_white_box_test_case_number)
+						|| (WBTEST_BG_UPDATE_BTPUTNULL == gtm_white_box_test_case_number)
+						|| (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
 					SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 					BG_TRACE_PRO_ANY(csa, wcb_wcs_flu1);
 					send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_wcs_flu1"),
@@ -382,7 +388,7 @@ boolean_t wcs_flu(uint4 options)
 						}
 					}
 					wcs_wtstart(gv_cur_region, csd->n_bts);		/* Flush it all */
-					WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart);
+					WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart, was_crit);
 					if (cnl->wcs_active_lvl || crq->fl)
 					{
 						cnl->wcsflu_pid = 0;

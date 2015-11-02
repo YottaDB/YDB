@@ -43,7 +43,7 @@ GBLREF	stack_frame	*frame_pointer;
 LITREF mval             literal_null;
 
 #ifdef GTM_TRIGGER
-void	goframes(int4 frames, boolean_t unwtrigrframe)
+void	goframes(int4 frames, boolean_t unwtrigrframe, boolean_t fromzgoto)
 #else
 void	goframes(int4 frames)
 #endif
@@ -54,7 +54,9 @@ void	goframes(int4 frames)
         for (ret_targ = NULL; frames--; )
         {
 		while (tp_pointer && tp_pointer->fp <= frame_pointer)
-               	        op_trollback(-1);
+		{
+               	        OP_TROLLBACK(-1);
+		}
 		if (0 == frames)
 		{
 			ret_targ = (mval *)get_ret_targ(NULL);
@@ -75,7 +77,7 @@ void	goframes(int4 frames)
 		} else
 		{	/* Trigger base frame unwind (special case) */
 			DBGTRIGR((stderr, "goframes: unwinding trigger base frame at %016lx\n", frame_pointer));
-			gtm_trigger_fini(TRUE);
+			gtm_trigger_fini(TRUE, fromzgoto);
 			goframes_unwound_trigger = TRUE;
 		}
 #		else
@@ -94,7 +96,7 @@ void	goframes(int4 frames)
 		 * land on a trigger frame, go ahead and unwind that one too.
 		 */
 		DBGTRIGR((stderr, "goframes: unwinding trailing trigger base frame at %016lx\n", frame_pointer));
-		gtm_trigger_fini(TRUE);
+		gtm_trigger_fini(TRUE, fromzgoto);
 		goframes_unwound_trigger = TRUE;
 	}
 #	endif

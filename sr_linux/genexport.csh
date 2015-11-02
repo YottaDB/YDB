@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -18,7 +18,7 @@
 #		$2 - output verstion script file to be specified with ld --version-script.
 #
 # 	Example output:
-#		VERSION {
+#		{
 #			global:
 #        			gtm_ci;
 #        			gtm_exit;
@@ -28,7 +28,7 @@
 #		};
 ############################################################################################
 
-echo "VERSION {" >$2
+echo "{" >$2
 echo "global:"	>>$2
 sed 's/\(.*\)/	\1;/g' $1 >>$2
 echo "local:"	>>$2

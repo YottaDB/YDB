@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 	assert(udi->grabbed_ftok_sem);
 	assert(NULL != jnlpool.repl_inst_filehdr);
 	/* Update journal pool fields to reflect this is a root primary startup and updates are enabled */
+	assert(!udi->s_addrs.hold_onto_crit);	/* this ensures we can safely do unconditional grab_lock and rel_lock */
 	grab_lock(jnlpool.jnlpool_dummy_reg);
 	jnlpool.repl_inst_filehdr->root_primary_cycle++;
 	jnlpool.repl_inst_filehdr->was_rootprimary = TRUE;

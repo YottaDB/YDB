@@ -142,6 +142,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 		case MVST_MVAL:
 		case MVST_IARR:
 		case MVST_TPHOLD:
+		case MVST_STORIG:
 			return NULL;
 		case MVST_LVAL:
 			/* Reduce the reference count of this unanchored lv_val (current usage as callin argument

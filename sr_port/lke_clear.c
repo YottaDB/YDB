@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,7 @@ error_def(ERR_NOREGION);
 void	lke_clear(void)
 {
 	bool		locks, all = TRUE, wait = FALSE, interactive = TRUE, match = FALSE, memory = FALSE, nocrit = FALSE;
-	boolean_t	exact = TRUE;
+	boolean_t	exact = TRUE, was_crit;
 	int4		pid;
 	int		n;
 	char		regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
@@ -78,51 +78,43 @@ void	lke_clear(void)
 	for (gv_cur_region = gd_header->regions, n = 0;
 	     n != gd_header->n_regions;
 	     ++gv_cur_region, ++n)
-	{
-		/* If region matches and is open */
+	{	/* If region matches and is open */
 		if ((reg.len == 0  ||
 		     gv_cur_region->rname_len == reg.len  &&  memcmp(gv_cur_region->rname, reg.addr, reg.len) == 0)  &&
 		    gv_cur_region->open)
 		{
 			match = TRUE;
 			util_out_print("!/!AD!/", NOFLUSH, REG_LEN_STR(gv_cur_region));
-
 			/* If distributed database, the region is located on another node */
 			if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
 			{
-#if defined(LKE_WORKS_OK_WITH_CM)
-/* Remote lock clears are not supported, so LKE CLEAR -EXACT qualifier will not be supported on GT.CM.*/
+#				if defined(LKE_WORKS_OK_WITH_CM)
+				/* Remote lock clears are not supported, so LKE CLEAR -EXACT qualifier
+				 * will not be supported on GT.CM.*/
 				locks = gtcmtr_lke_clearreq(gv_cur_region->dyn.addr->cm_blk, gv_cur_region->cmx_regnum,
 							    all, interactive, pid, &node);
-#else
+#				else
 				gtm_putmsg(VARLSTCNT(10) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 						LEN_AND_LIT("GT.CM region - locks must be cleared on the local node"),
 						ERR_TEXT, 2, REG_LEN_STR(gv_cur_region));
 				continue;
-#endif
-				/*** Used to be:
-				util_out_print(NULL, RESET);
-				util_out_print("!AD", NOFLUSH, REG_LEN_STR(gv_cur_region));
-				util_out_print(" -  GT.CM region, locks must be cleared on the local node", FLUSH);
-				locks = TRUE;
-				***/
-			} else  if (gv_cur_region->dyn.addr->acc_meth == dba_bg  ||
-				    gv_cur_region->dyn.addr->acc_meth == dba_mm)
+#				endif
+			} else if ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth))
 			{	/* Local region */
 				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 				ctl = (mlk_ctldata_ptr_t)cs_addrs->lock_addrs[0];
-
 				/* Prevent any modifications of locks while we are clearing */
 				if (cs_addrs->critical != NULL)
 					crash_count = cs_addrs->critical->crashcnt;
-				grab_crit(gv_cur_region);
-
+				was_crit = cs_addrs->now_crit;
+				if (!was_crit)
+					grab_crit(gv_cur_region);
 				locks = ctl->blkroot == 0 ? FALSE
 							  : lke_cleartree(gv_cur_region, NULL, ctl,
 									 (mlk_shrblk_ptr_t)R2A(ctl->blkroot),
 									  all, interactive, pid, one_lock, exact);
-
-				rel_crit(gv_cur_region);
+				if (!was_crit)
+					rel_crit(gv_cur_region);
 			} else
 			{
 				util_out_print(NULL, RESET);

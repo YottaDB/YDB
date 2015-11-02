@@ -54,7 +54,7 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	boolean_t	dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 
-GBLDEF mval dse_dmp_time_fmt = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, STR_LIT_LEN(DSE_DMP_TIME_FMT), DSE_DMP_TIME_FMT, 0, 0);
+GBLDEF mval dse_dmp_time_fmt = DEFINE_MVAL_STRING(MV_STR, 0, 0, STR_LIT_LEN(DSE_DMP_TIME_FMT), DSE_DMP_TIME_FMT, 0, 0);
 
 LITREF	char		*jrt_label[JRT_RECTYPES];
 LITREF	char		*gtm_dbversion_table[];
@@ -393,6 +393,7 @@ void dse_dmp_fhead (void)
 		util_out_print("  fsync addrs             0x!XL", FALSE, jb->fsync_dskaddr);
 		util_out_print("      ", FALSE);
 		util_out_print("  Need_db_fsync                !AD", TRUE, 5, (jb->need_db_fsync ? " TRUE" : "FALSE"));
+		util_out_print("  Filesystem block size   0x!XL", TRUE, jb->fs_block_size);
 		for (rectype = JRT_BAD + 1; rectype < JRT_RECTYPES - 1; rectype++)
 		{
 			util_out_print("  Jnl Rec Type    !5AZ      !7UL      ", FALSE, jrt_label[rectype],

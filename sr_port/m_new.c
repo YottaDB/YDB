@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,6 +88,7 @@ int m_new(void)
 						case SV_ESTACK:
 						case SV_ZYERROR:
 						case SV_ZGBLDIR:
+						GTMTRIG_ONLY(case SV_ZTWORMHOLE:)
 							tmp = maketriple(OC_NEWINTRINSIC);
 							tmp->operand[0] = put_ilit(svn_data[n].opcode);
 							break;

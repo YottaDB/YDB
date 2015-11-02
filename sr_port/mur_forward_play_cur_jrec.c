@@ -240,7 +240,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			assert(FALSE);
 			gtm_putmsg(VARLSTCNT(6) ERR_JNLTPNEST, 4, jctl->jnl_fn_len,
 				jctl->jnl_fn, jctl->rec_offset, &rec->prefix.tn);
-			op_trollback(0);
+			OP_TROLLBACK(0);
 		}
 		if (!dollar_tlevel)
 		{	/* Note: op_tstart resets gv_currkey. So set gv_currkey later. */
@@ -330,7 +330,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 				if (dollar_tlevel)
 				{
 					assert(murgbl.ok_to_update_db);
-					op_trollback(0);
+					OP_TROLLBACK(0);
 				}
 			}
 			rctl->last_tn = curr_tn;

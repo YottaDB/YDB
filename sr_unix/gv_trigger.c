@@ -52,6 +52,8 @@
 #include "gv_trigger_protos.h"
 #include "strpiecediff.h"
 #include "gtm_utf8.h"		/* for CHSET_M_STR and CHSET_UTF8_STR */
+#include "trigger.h"		/* for MAX_TRIGNAME_LEN */
+#include "wbox_test_init.h"
 
 #ifdef GTM_TRIGGER
 
@@ -97,13 +99,44 @@ LITREF	mval	literal_chset;
 LITREF	mval	literal_zdelim;
 LITREF	mval	literal_zero;
 
-error_def(ERR_GVGETFAIL);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRIGINVCHSET);
+error_def(ERR_TRIGSUBSCRANGE);
 
 #define	GVTR_PARSE_POINT	1
 #define	GVTR_PARSE_LEFT		2
 #define	GVTR_PARSE_RIGHT	3
+#define MAX_UTIL_LEN 		40	/* needed for storing the trigger index and the property (CMD, TRIGNAME.. etc.)
+					 * in util_buff to be passed as the last parameter for TRIGDEFBAD error message.
+					 * Both the index and the property name are guaranteed to be less than 20
+					 * and hence MAX_UTIL_LEN set to 40 should be enough
+					 */
+
+#define SET_PARAM_STRING(UTIL_BUFF, UTIL_LEN, TRIGIDX, PARAM)				\
+{											\
+	uchar_ptr_t		util_ptr;						\
+											\
+	util_ptr = i2asc(&UTIL_BUFF[0], TRIGIDX);	/* UTIL_BUFF = 1 */		\
+	assert(MAX_UTIL_LEN >= STR_LIT_LEN(PARAM));					\
+	MEMCPY_LIT(util_ptr, PARAM);		/* UTIL_BUFF = 1,"CMD" */		\
+	util_ptr += STR_LIT_LEN(PARAM);							\
+	UTIL_LEN = UINTCAST(util_ptr - &UTIL_BUFF[0]);					\
+	assert(MAX_UTIL_LEN >= UTIL_LEN);						\
+}
+
+#define SAVE_RTN_NAME(SAVE_RTN_NAME, SAVE_RTN_NAME_LEN, TRIGDSC)			\
+{											\
+	SAVE_RTN_NAME_LEN = MIN(MAX_TRIGNAME_LEN, TRIGDSC->rtn_desc.rt_name.len);	\
+	assert(SAVE_RTN_NAME_LEN <= SIZEOF(SAVE_RTN_NAME));				\
+	memcpy(SAVE_RTN_NAME, TRIGDSC->rtn_desc.rt_name.addr, SAVE_RTN_NAME_LEN);	\
+}
+
+#define SAVE_VAR_NAME(SAVE_VAR_NAME, SAVE_VAR_NAME_LEN, GVT)				\
+{											\
+	SAVE_VAR_NAME_LEN = MIN(MAX_MIDENT_LEN, GVT->gvname.var_name.len);		\
+	assert(SAVE_VAR_NAME_LEN <= SIZEOF(SAVE_VAR_NAME));				\
+	memcpy(SAVE_VAR_NAME, GVT->gvname.var_name.addr, SAVE_VAR_NAME_LEN);		\
+}
 
 #define	GVTR_HASHTGBL_READ_CLEANUP(do_gvtr_cleanup)					\
 {											\
@@ -132,21 +165,36 @@ error_def(ERR_TRIGINVCHSET);
 	memcpy(dst_mstr->addr, addr, len);										\
 }
 
-#define	GVTR_PROCESS_GVSUBS(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT)			\
-{											\
-	uint4	status;									\
-											\
-	status = gvtr_process_gvsubs(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT);		\
-	if (status)									\
-	{										\
-		GVTR_HASHTGBL_READ_CLEANUP(TRUE);					\
-		/* TODO : Issue error return from patstr or ARRAYSIZE check */		\
-		rts_error(VARLSTCNT(1) status);						\
-	}										\
-	/* End of a range (in a set of ranges) or a subscript itself.			\
-	 * Either case, colon_imbalance can be safely reset.				\
-	 */										\
-	COLON_IMBALANCE = FALSE;							\
+#define	GVTR_PROCESS_GVSUBS(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT, SUBSCSTRLEN, SUBSCSTR)			\
+{														\
+	uint4		status, rt_name_len, save_var_name_len;							\
+	gv_trigger_t	*lcl_trigdsc;										\
+	char		rt_name[MAX_TRIGNAME_LEN], save_var_name[MAX_MIDENT_LEN];				\
+														\
+	error_def(ERR_PATMAXLEN);										\
+	error_def(ERR_TRIGIS);											\
+	status = gvtr_process_gvsubs(PTR, END, SUBSDSC, COLON_IMBALANCE, GVT);					\
+	if (status)												\
+	{													\
+		lcl_trigdsc = GVT->gvt_trigger->gv_trig_array;							\
+		assert(NULL != lcl_trigdsc);									\
+		assert((NULL != lcl_trigdsc->rtn_desc.rt_name.addr)						\
+			&& (0 != lcl_trigdsc->rtn_desc.rt_name.len));						\
+		SAVE_VAR_NAME(save_var_name, save_var_name_len, GVT);						\
+		SAVE_RTN_NAME(rt_name, rt_name_len, lcl_trigdsc);						\
+		GVTR_HASHTGBL_READ_CLEANUP(TRUE);								\
+		if (ERR_PATMAXLEN == status) 									\
+			rts_error(VARLSTCNT(6) status, 0, ERR_TRIGIS, 2, rt_name_len, rt_name);			\
+		else if (ERR_TRIGSUBSCRANGE == status)								\
+			rts_error(VARLSTCNT(10) status, 4, save_var_name_len, save_var_name, SUBSCSTRLEN,	\
+				SUBSCSTR, ERR_TRIGIS, 2, rt_name_len, rt_name);					\
+		else	/* error return from patstr */								\
+			rts_error(VARLSTCNT(1) status);								\
+	}													\
+	/* End of a range (in a set of ranges) or a subscript itself.						\
+	 * Either case, colon_imbalance can be safely reset.							\
+	 */													\
+	COLON_IMBALANCE = FALSE;										\
 }
 
 #define	KEYSUB_S2POOL_IF_NEEDED(KEYSUB_MVAL, KEYSUB, THISSUB)				\
@@ -169,56 +217,6 @@ error_def(ERR_TRIGINVCHSET);
 	}										\
 }
 
-STATICFNDEF void	gvtr_db_tpwrap(sgmnt_addrs *csa, boolean_t tp_is_implicit)
-{
-	mval		ts_mv;
-	unsigned int	lcl_t_tries;
-
-	assert((!dollar_tlevel && !tp_is_implicit) || (dollar_tlevel && tp_is_implicit));
-	if (!dollar_tlevel)
-	{	/* We are not in TP. But we want to read a consistent copy of ALL triggers for this global as of this point.
-		 * Therefore we need to wrap the read inside a TP transaction. But if we are in the final retry of the
-		 * non-TP transaction, then we already hold crit and therefore do not need the TP wrap. Not doing so also
-		 * saves us from having to change op_tstart which currently unconditionally resets t_tries to 0 assuming it
-		 * will never be invoked in the final retry when dollar_tlevel is 0.
-		 */
-		if (CDB_STAGNATE > t_tries)
-		{
-			ts_mv.mvtype = MV_STR;
-			ts_mv.str.len = 0;
-			ts_mv.str.addr = NULL;
-			implicit_tstart = TRUE;
-			op_tstart(TRUE, TRUE, &ts_mv, 0);	/* 0 ==> save no locals but RESTART OK */
-			assert(FALSE == implicit_tstart);	/* should have been reset by op_tstart at very beginning */
-		}
-	} else
-	{
-		lcl_t_tries = t_tries;
-		t_fail_hist[lcl_t_tries] = cdb_sc_normal;
-	}
-	do
-	{
-		if (dollar_tlevel)
-			tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start as well as restart (hence inside loop) */
-		gvtr_db_tpwrap_helper(csa, tp_is_implicit);
-		if (tp_is_implicit)
-		{
-			assert(t_tries >= lcl_t_tries);
-			if ((lcl_t_tries == t_tries) && (cdb_sc_normal == t_fail_hist[lcl_t_tries]))
-				break;
-			lcl_t_tries = t_tries;
-			t_fail_hist[lcl_t_tries] = cdb_sc_normal;
-		} else if (!dollar_tlevel)
-		{	/* If dollar_tlevel is still non-zero, this means we encountered a TP restart (which would have
-			 * triggered a call to t_retry which in turn would have done a rts_error(TPRETRY) which would
-			 * have been caught by gvtr_tpwrap_ch which would in turn have unwound the C-stack upto the point
-			 * where the ESTABLISH is done in gvtr_tpwrap_helper and then returned from there.
-			 */
-			break;
-		}
-	} while (TRUE);
-}
-
 /* This code is modeled around "updproc_ch" in updproc.c */
 CONDITION_HANDLER(gvtr_tpwrap_ch)
 {
@@ -231,7 +229,7 @@ CONDITION_HANDLER(gvtr_tpwrap_ch)
 		tprestart_state = TPRESTART_STATE_NORMAL;
 		assert(NULL != first_sgm_info);
 		/* This only happens at the outer-most layer so state should be normal now */
-		rc = tp_restart(1);
+		rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 		assert(0 == rc);
 		assert(TPRESTART_STATE_NORMAL == tprestart_state);	/* No rethrows possible */
 		/* gvtr* code could be called by gvcst_put which plays with "reset_gv_target". But the only gvcst* functions
@@ -244,19 +242,39 @@ CONDITION_HANDLER(gvtr_tpwrap_ch)
 	NEXTCH;
 }
 
-STATICFNDEF void	gvtr_db_tpwrap_helper(sgmnt_addrs *csa, boolean_t tp_is_implicit)
+STATICFNDEF void	gvtr_db_tpwrap_helper(sgmnt_addrs *csa)
 {
 	enum cdb_sc		status;
+	DEBUG_ONLY(gv_namehead	*save_gv_target;)
 
 	ESTABLISH(gvtr_tpwrap_ch);
+	DEBUG_ONLY(save_gv_target = gv_target;)
 	gvtr_db_read_hasht(csa);
-	/* Do not do op_tcommit in TWO cases
-	 * 	a) If we were already in a TP transaction (i.e. "gvtr_db_tpwrap" did not do the op_tstart).
-	 * 	b) If we came into "gvtr_db_tpwrap" as a non-TP transaction but in the final retry.
-	 * 		In this case we would not have done any implicit tstart so should not do any commit either.
+	assert(save_gv_target == gv_target); /* ensure gv_target was not inadvertently modified by gvtr_db_read_hasht */
+
+	/* If no triggers are defined for this global and we came in as non-TP and did op_tstart in GVTR_INIT_AND_TPWRAP_IF_NEEDED
+	 * do the op_tcommit. However, do it only for t_tries = 0 for two reasons:
+	 *
+	 * (a) If in final retry of a non-TP set, we will be holding crit. op_tcommit releases crit which is an out-of-design
+	 * situation as that could cause restarts in final retry of the non-TP set. So, complete the non-TP update as a TP update
+	 * by deferring the op_tcommit until we reach GVTR_OP_TCOMMIT in gvcst_put/gvcst_kill.
+	 *
+	 * (b) Assume t_tries = 1 or 2 and we came in as non-TP. If we found no triggers defined and invoked op_tcommit, to resume
+	 * the non-TP set, we will invoke t_begin to reset global variables which also resets t_tries. Now, with t_tries = 0,
+	 * if a restart happens and we come back here (due to concurrent $ZTRIGGER and MUPIP TRIGGER) and find no triggers defined
+	 * for this global, we will again invoke op_tcommit. This can happen in a spinlock thereby not letting the final retry
+	 * optimistic -> pessimistic concurrency scheme kick in at all. One workaround would be to not call t_begin
+	 * after doing an op_tcommit. But, this would mean examining the various global variables that t_begin resets and
+	 * making sure it's okay NOT to do the t_begin. Instead, complete the non-TP update as a TP update by deferring the
+	 * op_tcommit until we reach GVTR_OP_TCOMMIT in gvcst_put/gvcst_kill.
+	 *
+	 * Note: Not doing op_tcommit will cause this non-TP SET to be completed as a TP SET even though no triggers were defined.
+	 * This would mean, a non-TP set (in a concurrent environment with trigger loads happening frequently) could end up
+	 * writing a TSET record in the corresponding regions' journal file. In a non-trigger environment, this will NOT
+	 * be an issue since we come here only if process' trigger cycle is different from database trigger cycle.
 	 */
-	if (!tp_is_implicit && dollar_tlevel)
-	{
+	if ((NULL == gv_target->gvt_trigger) && (0 == t_tries))
+	{	/* No triggers exist for this global. TP wrap not needed any more for this transaction */
 		status = op_tcommit();
 		assert(cdb_sc_normal == status); /* if retry, an rts_error should have been issued and we should not reach here */
 	}
@@ -283,7 +301,7 @@ STATICFNDEF boolean_t	gvtr_get_hasht_gblsubs(mval *subs_mval, mval *ret_mval)
 	return is_defined;
 }
 
-STATICFNDEF void	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int type, char *start, char *end)
+STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int type, char *start, char *end)
 {
 	mval		tmpmval;
 	gv_namehead	*save_gvt;
@@ -393,8 +411,8 @@ STATICFNDEF void	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int 
 								subsdsc->gvtr_subs_range.subs_key2, min);
 					if ((0 < cmpres) || (0 == cmpres) && (len1 > len))
 					{	/* Invalid range. Issue error */
-						assert(FALSE);
-						/* TODO : Issue error */
+						DBG_MARK_STRINGPOOL_USABLE;
+						return ERR_TRIGSUBSCRANGE;
 					}
 				}
 			} else
@@ -412,6 +430,7 @@ STATICFNDEF void	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int 
 	assert(&subsdsc->gvtr_subs_range.next_range == &subsdsc->gvtr_subs_point.next_range);
 	subsdsc->gvtr_subs_range.next_range = NULL;
 	DBG_MARK_STRINGPOOL_USABLE;
+	return 0;
 }
 
 STATICFNDEF uint4	gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsdsc, gvt_trigger_t *gvt_trigger)
@@ -421,6 +440,8 @@ STATICFNDEF uint4	gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsds
 	ptstr		pat_ptstr;
 	uint4		status;
 
+	error_def(ERR_PATMAXLEN);
+
 	assert('?' == *ptr);
 	ptr++;
 	len--;
@@ -428,8 +449,7 @@ STATICFNDEF uint4	gvtr_process_pattern(char *ptr, uint4 len, gvtr_subs_t *subsds
 	if (ARRAYSIZE(source_buffer) <= len)
 	{
 		assert(FALSE);
-		/* TODO: return whatever error currently compiler issues for > MAX_SRCLINE */
-		return (uint4)-1;
+		return ERR_PATMAXLEN;
 	}
 	memcpy(source_buffer, ptr, len);
 	instr.addr = source_buffer;
@@ -465,7 +485,14 @@ STATICFNDEF uint4 gvtr_process_gvsubs(char *start, char *end, gvtr_subs_t *subsd
 		subsdsc->gvtr_subs_type = GVTR_SUBS_STAR; /* allow ANY value for this subscript */
 		subsdsc->gvtr_subs_star.next_range = NULL;
 	} else
-		gvtr_process_range(gvt, subsdsc, colon_imbalance ? GVTR_PARSE_RIGHT : GVTR_PARSE_POINT, start, end);
+	{
+		if (status = gvtr_process_range(gvt, subsdsc, colon_imbalance ? GVTR_PARSE_RIGHT : GVTR_PARSE_POINT, start, end))
+		{
+			/* As of now we expect only ERR_TRIGSUBSCRANGE (which is triggered only for GVTR_PARSE_RIGHT) */
+			assert((ERR_TRIGSUBSCRANGE == status) && colon_imbalance);
+			return status;
+		}
+	}
 	return 0;
 }
 
@@ -611,12 +638,13 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	mname_entry		gvent;
 	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	char			save_altkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	unsigned char		util_buff[MAX_UTIL_LEN];
 	gv_key			*save_gv_currkey;
 	gv_key			*save_gv_altkey;
 	mval			tmpmval, *ret_mval;
 	boolean_t		is_defined, was_null = FALSE, is_null = FALSE, zdelim_defined, delim_defined;
 	short int		max_key;
-	int4			tmpint4;
+	int4			tmpint4, util_len;
 	gvt_trigger_t		*gvt_trigger;
 	uint4			trigidx, num_gv_triggers, num_pieces, len, cmdtype, index, minpiece, maxpiece;
 	gv_trigger_t		*gv_trig_array, *trigdsc;
@@ -628,6 +656,12 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	mname_entry		*lvnamedsc;
 	uint4			*lvindexdsc, status;
 	int			ctype;
+	char			save_rtn_name[MAX_TRIGNAME_LEN], save_var_name[MAX_MIDENT_LEN];
+	uint4			save_rtn_name_len, save_var_name_len;
+
+	error_def(ERR_TEXT);
+	error_def(ERR_TRIGDEFBAD);
+	error_def(ERR_INDRMAXLEN);
 
 	save_gvtarget = gv_target;
 	SETUP_TRIGGER_GLOBAL;
@@ -698,10 +732,11 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	}
 	if ((STR_LIT_LEN(HASHT_GBL_CURLABEL) != ret_mval->str.len) || MEMCMP_LIT(ret_mval->str.addr, HASHT_GBL_CURLABEL))
 	{	/* ^#t("GBL","#LABEL") is NOT expected value so issue error */
-		assert(FALSE);
+		assert(WBTEST_HELPOUT_TRIGDEFBAD);
+		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		/* TODO : issue error */
-		return;
+		rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
+			save_var_name_len, save_var_name, LEN_AND_LIT("\"#LABEL\""));
 	}
 	/* So we can go ahead and read other ^#t("GBL") records */
 	/* -----------------------------------------------------------------------------
@@ -709,20 +744,25 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	 * -----------------------------------------------------------------------------
 	 */
 	is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcycle, ret_mval);
-	assert(is_defined);
 	if (!is_defined)
 	{	/* ^#t("GBL","#LABEL") is defined but NOT ^#t("GBL","#CYCLE"). ^#t global integrity is suspect */
-		assert(FALSE);
+		assert(WBTEST_HELPOUT_TRIGDEFBAD);
+		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		/* TODO : issue error */
+		rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
+			save_var_name_len, save_var_name, LEN_AND_LIT("\"#CYCLE\""),
+			ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is missing"));
 		return;
 	}
 	tmpint4 = mval2i(ret_mval);	/* decimal values are truncated by mval2i so we will accept a #CYCLE of 1.5 as 1 */
 	if (0 >= tmpint4)
 	{	/* ^#t("GBL","#CYCLE") is not a positive integer. Error out */
-		assert(FALSE);
+		assert(WBTEST_HELPOUT_TRIGDEFBAD);
+		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		/* TODO : issue error */
+		rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
+			save_var_name_len, save_var_name, LEN_AND_LIT("\"#CYCLE\""),
+			ERR_TEXT, 2, RTS_ERROR_TEXT("#CYCLE field is negative"));
 		return;
 	}
 	cycle = (uint4)tmpint4;
@@ -743,6 +783,7 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	}
 	gvt_trigger = (gvt_trigger_t *)malloc(SIZEOF(gvt_trigger_t));
 	gvt_trigger->gv_trig_array = NULL;
+	gvt_trigger->gv_trig_list = NULL;
 	/* Set gvt->gvt_trigger to this malloced memory (after gv_trig_array has been initialized to NULL to avoid garbage
 	 * values). If we encounter an error below, we will remember to free this up the next time we are in this function
 	 */
@@ -754,17 +795,23 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcount, ret_mval);
 	if (!is_defined)
 	{	/* ^#t("GBL","#LABEL") is defined but NOT ^#t("GBL","#COUNT"). ^#t global integrity is suspect */
-		assert(FALSE);
+		assert(WBTEST_HELPOUT_TRIGDEFBAD);
+		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		/* TODO : issue error */
+		rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
+			save_var_name_len, save_var_name, LEN_AND_LIT("\"#COUNT\""),
+			ERR_TEXT, 2, RTS_ERROR_TEXT("#COUNT field is missing"));
 		return;
 	}
 	tmpint4 = mval2i(ret_mval);	/* decimal values are truncated by mval2i so we will accept a #COUNT of 1.5 as 1 */
 	if (0 >= tmpint4)
 	{	/* ^#t("GBL","#COUNT") is not a positive integer. Error out */
-		assert(FALSE);
+		assert(WBTEST_HELPOUT_TRIGDEFBAD);
+		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-		/* TODO : issue error */
+		rts_error(VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
+			save_var_name_len, save_var_name, LEN_AND_LIT("\"#COUNT\""),
+			ERR_TEXT, 2, RTS_ERROR_TEXT("#COUNT field is negative"));
 		return;
 	}
 	num_gv_triggers = (uint4)tmpint4;
@@ -797,9 +844,39 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 		i2mval(&tmpmval, trigidx);
 		assert(ret_mval == &tmpmval);
 		COPY_SUBS_TO_GVCURRKEY(ret_mval, max_key, gv_currkey, was_null, is_null); /* updates gv_currkey */
+		/* Read in ^#t("GBL",1,"TRIGNAME")="GBL#1" */
+		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_trigname, ret_mval);
+		if (!is_defined)
+		{	/* mupip trigger should be making sure trigger name is created */
+			assert(WBTEST_HELPOUT_TRIGDEFBAD);
+			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
+			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
+			/* Construct 1,"TRIGNAME" for the error message */
+			SET_PARAM_STRING(util_buff, util_len, trigidx, ",\"TRIGNAME\"");
+			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
+				save_var_name_len, save_var_name, util_len, util_buff);
+		}
+		trigdsc->rtn_desc.rt_name = ret_mval->str;	/* Copy trigger name mident */
+		trigdsc->rtn_desc.rt_adr = NULL;
+		/* Reserve extra space when triggername is placed in buddy list. This space is used by gtm_trigger() if
+		 * the trigger name is not unique within the process.One or two of the chars are appended to the trigger
+		 * name until an unused name is found.
+		 */
+		trigdsc->rtn_desc.rt_name.len += TRIGGER_NAME_RESERVED_SPACE;
+		GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->rtn_desc.rt_name);
+		trigdsc->rtn_desc.rt_name.len -= TRIGGER_NAME_RESERVED_SPACE;	/* Not using the space yet */
 		/* Read in ^#t("GBL",1,"CMD")="S,K,ZK,ZTK" */
 		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_cmd, ret_mval);
-		assert(is_defined); /* ^#t("GBL","#COUNT") is set to 1 so ^#t("GBL",1,"CMD") should be defined */
+		if (!is_defined)
+		{	/* ^#t("GBL","#COUNT") is set to 1 so ^#t("GBL",1,"CMD") should be defined */
+			assert(WBTEST_HELPOUT_TRIGDEFBAD);
+			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
+			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
+			/* Construct 1,"CMD" for the error message */
+			SET_PARAM_STRING(util_buff, util_len, trigidx, ",\"CMD\"");
+			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
+				save_var_name_len, save_var_name, util_len, util_buff);
+		}
 		/* Initialize trigdsc->cmdmask */
 		ptr = ret_mval->str.addr;
 		ptr_top = ptr + ret_mval->str.len;
@@ -951,7 +1028,8 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 					ptr_start = &ptr[1];
 				} else if (';' == ch)
 				{	/* End of current range and beginning of new range within same subscript */
-					GVTR_PROCESS_GVSUBS(ptr_start, ptr, subsdsc, colon_imbalance, gvt);
+					GVTR_PROCESS_GVSUBS(ptr_start, ptr, subsdsc, colon_imbalance, gvt, ret_mval->str.len,
+						ret_mval->str.addr);
 					/* Assert that irrespective of the type of the subscript, all of them have the
 					 * "next_range" member at the same offset so it is safe for us to use any one below.
 					 */
@@ -965,7 +1043,8 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 					ptr_start = &ptr[1];
 				} else if (':' == ch)
 				{	/* Left side of range */
-					gvtr_process_range(gvt, subsdsc, GVTR_PARSE_LEFT, ptr_start, ptr);
+					status = gvtr_process_range(gvt, subsdsc, GVTR_PARSE_LEFT, ptr_start, ptr);
+					assert(0 == status); /* ERR_TRIGSUBSCRANGE is issued only in case of GVTR_PARSE_RIGHT */
 					assert(!colon_imbalance);
 					colon_imbalance = TRUE;
 					ptr_start = &ptr[1];
@@ -974,7 +1053,8 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 				{
 					assert(!quote_imbalance);
 					assert(!paren_imbalance);
-					GVTR_PROCESS_GVSUBS(ptr_start, ptr, subsdsc, colon_imbalance, gvt);
+					GVTR_PROCESS_GVSUBS(ptr_start, ptr, subsdsc, colon_imbalance, gvt, ret_mval->str.len,
+						ret_mval->str.addr);
 					cursub++;
 					/* We cannot do subsdsc++ because subsdsc could at this point have followed a chain of
 					 * "next_range" pointers so could be different from what we had at the start of the loop.
@@ -1056,44 +1136,43 @@ STATICFNDEF void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 			}
 			assert(index == num_pieces);
 		}
-		/* Read in ^#t("GBL",1,"TRIGNAME")="GBL#1" */
-		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_trigname, ret_mval);
-		assert(is_defined);	/* mupip trigger should be making sure trigger name is created */
-		trigdsc->rtn_desc.rt_name = ret_mval->str;	/* Copy trigger name mident */
-		trigdsc->rtn_desc.rt_adr = NULL;
-		/* Reserve extra space when triggername is placed in buddy list. This space is used by gtm_trigger() if
-		 * the trigger name is not unique within the process.One or two of the chars are appended to the trigger
-		 * name until an unused name is found.
-		 */
-		trigdsc->rtn_desc.rt_name.len += TRIGGER_NAME_RESERVED_SPACE;
-		GVTR_POOL2BUDDYLIST(gvt_trigger, &trigdsc->rtn_desc.rt_name);
-		trigdsc->rtn_desc.rt_name.len -= TRIGGER_NAME_RESERVED_SPACE;	/* Not using the space yet */
 		/* Read in ^#t("GBL",1,"CHSET")="UTF-8". If CHSET does not match gtm_chset issue error. */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_chset, ret_mval);
-		assert(is_defined);	/* mupip trigger should have made sure of this */
+		if (!is_defined)
+		{	/* mupip trigger should have made sure of this */
+			assert(WBTEST_HELPOUT_TRIGDEFBAD);
+			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
+			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
+			/* Construct 1,"CHSET" for the error message */
+			SET_PARAM_STRING(util_buff, util_len, trigidx, ",\"CHSET\"");
+			rts_error(VARLSTCNT(8) ERR_TRIGDEFBAD, 6, save_var_name_len, save_var_name,
+				save_var_name_len, save_var_name, util_len, util_buff);
+		}
 		if ((!gtm_utf8_mode && ((STR_LIT_LEN(CHSET_M_STR) != ret_mval->str.len)
 						|| memcmp(ret_mval->str.addr, CHSET_M_STR, STR_LIT_LEN(CHSET_M_STR))))
 			|| (gtm_utf8_mode && ((STR_LIT_LEN(CHSET_UTF8_STR) != ret_mval->str.len)
 						|| memcmp(ret_mval->str.addr, CHSET_UTF8_STR, STR_LIT_LEN(CHSET_UTF8_STR)))))
 		{	/* CHSET mismatch */
-			rts_error(VARLSTCNT(8) ERR_TRIGINVCHSET, 6, trigdsc->rtn_desc.rt_name.len, trigdsc->rtn_desc.rt_name.addr,
-				gvt->gvname.var_name.len, gvt->gvname.var_name.addr, ret_mval->str.len, ret_mval->str.addr);
+			SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);
+			SAVE_RTN_NAME(save_rtn_name, save_rtn_name_len, trigdsc);
+			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
+			rts_error(VARLSTCNT(8) ERR_TRIGINVCHSET, 6, save_rtn_name_len, save_rtn_name,
+				save_var_name_len, save_var_name, ret_mval->str.len, ret_mval->str.addr);
 		}
 		/* Read in ^#t("GBL",1,"XECUTE")="do ^XNAMEinGBL"	*/
-		ret_mval->str.len = 0;	/* Initialize "len" to 0 (instead of garbage) in case is_defined comes back as FALSE */
-		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_xecute, ret_mval);
-		assert(is_defined);
-		/* ^#t("GBL",1,"CMD") is defined but ^#t("GBL",1,"XECUTE") is undefined.
+		/* If ^#t("GBL",1,"CMD") is defined but ^#t("GBL",1,"XECUTE") is undefined.
 		 * We set xecute_str.len to 0 this way we will see a runtime error when trying to compile this null length
 		 * string. We dont do any checks of is_defined here for performance reasons (assuming MUPIP TRIGGER would have
 		 * loaded the proper content) and yet handle out-of-design situations gracefully.
-		 * TODO: Verify if above is still necessary - MUPIP TRIGGER now pre-compiling triggers (SEstes)
 		 */
+		ret_mval->str.len = 0;	/* Initialize "len" to 0 (instead of garbage) in case is_defined comes back as FALSE */
+		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_xecute, ret_mval);
+		assert(is_defined);
 		if (MAX_SRCLINE <= ret_mval->str.len)
 		{
 			assert(FALSE);
 			GVTR_HASHTGBL_READ_CLEANUP(TRUE);
-			/* TODO : Issue error */
+			rts_error(VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);
 		}
 		/* Initialize trigdsc->xecute_str */
 		trigdsc->xecute_str = *ret_mval;
@@ -1251,11 +1330,11 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	gv_namehead		*dir_tree;
-	boolean_t		is_nontp;
-	uint4			save_t_err;
-	uint4			save_update_trans;
+	uint4			lcl_t_tries, loopcnt;
 
+	assert(dollar_tlevel);		/* A TP wrap should have been done by the caller if needed */
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
+	assert(gv_target == gvt);
 	csa = gvt->gd_csa;
 	assert(NULL != csa);	/* database for this gvt better be opened at this point */
 	dir_tree = csa->dir_tree;
@@ -1264,55 +1343,63 @@ void	gvtr_init(gv_namehead *gvt, uint4 cycle, boolean_t tp_is_implicit)
 	csd = csa->hdr;
 	assert(csa->db_trigger_cycle <= cycle);
 	assert(gvt->db_trigger_cycle < cycle);
-	is_nontp = !dollar_tlevel;
-	/* Save t_err (for non-TP and TP) and update_trans (for non-TP) of explicit update */
-	save_t_err = t_err;
-	if (is_nontp)
-	{	/* Wrap the ^#t global read as a separate TP transaction as we dont know how many records we will
-		 * need to read and might not be able to fit all of it into the non-TP transaction structures which
-		 * assume at most two "gvcst_search"es.
-		 */
-		save_update_trans = update_trans;
-		assert(save_update_trans);	/* triggers can be invoked only by updates currently */
-		assert(FALSE == tp_is_implicit);
-		gvtr_db_tpwrap(csa, FALSE);
-		/* Restore t_err and update_trans for non-TP */
-		t_begin(save_t_err, save_update_trans);
-	} else	/* already in TP */
+	/* Check if TP was in turn an implicit TP (e.g. created by the GVTR_INIT_AND_TPWRAP_IF_NEEDED macro).
+	 * If so, we need to go through gvtr_db_tpwrap_helper since we don't want any t_retry calls to end up
+	 * invoking MUM_TSTART.
+	 */
+	if (tp_is_implicit)
 	{
-		assert(sgm_info_ptr == csa->sgm_info_ptr);
-		save_update_trans = sgm_info_ptr->update_trans;
-		assert(save_update_trans); /* triggers can be invoked only by updates currently */
-		/* Just set t_err to reflect this particular action */
-		t_err = ERR_GVGETFAIL;
-		/* Check if TP was in turn an implicit TP (e.g. created by the GVTR_INIT_AND_TPWRAP_IF_NEEDED macro).
-		 * If so, we still need to do something like the gvtr_db_tpwrap done above since we do not want any
-		 * t_retry calls to end up invoking MUM_TSTART.
-		 */
-		if (tp_is_implicit)
-		{	/* If implicit tp, for the first try, we would not yet have invoked the implicit
-			 * "op_tstart" (in GVTR_INIT_AND_TPWRAP_IF_NEEDED macro) when calling gvtr_init.
-			 * Therefore, this should have been the second (or more) invocation of the GVTR_INIT_AND_TPWRAP_IF_NEEDED
-			 * macro for the same gvcst_put or gvcst_kill action which means there was at least one retry.
-			 * Note that some retries could be uncounted (e.g. cdb_sc_helpedout) so we cannot check t_tries
-			 * but can check dollar_trestart which is incremented unconditionally on a retry.
+		lcl_t_tries = t_tries;
+		t_fail_hist[lcl_t_tries] = cdb_sc_normal;
+		assert(donot_INVOKE_MUMTSTART);
+		for (loopcnt = 0; ; loopcnt++)
+		{
+			/* In case of restart in gvtr_db_read_hasht (handled by gvtr_tpwrap_ch), tp_restart will call tp_clean_up
+			 * which will reset sgm_info_ptr to NULL and csa->sgm_info_ptr->fresh_start to TRUE. Call tp_set_sgm
+			 * to set sgm_info_ptr and first_sgm_info as gvcst_get relies on this being set.
 			 */
-			assert(dollar_trestart);
-			assert(donot_INVOKE_MUMTSTART);
-			gvtr_db_tpwrap(csa, tp_is_implicit);
-			assert(sgm_info_ptr == csa->sgm_info_ptr);
-			/* If a TP restart happened inside gvtr_db_tpwrap, we would have reset sgm_info_ptr->update_trans to 0
-			 * but we want to leave this function with update_trans unchanged since the caller (gvcst_put/gvcst_kill)
-			 * relies on that. So reset update_trans.
+			tp_set_sgm();
+			gvtr_db_tpwrap_helper(csa);
+			assert(t_tries >= lcl_t_tries);
+			if (!dollar_tlevel)
+			{	/* Came in as non-tp. Did op_tstart in the caller (GVTR_INIT_AND_TPWRAP_IF_NEEDED).
+				 * op_tcommit was completed by gvtr_db_tpwrap_helper as no triggers were defined.
+				 * Can break out of the loop.
+				 */
+				assert((0 == t_tries) && (NULL == gvt->gvt_trigger));
+				break;
+			} else
+			{
+				if ((lcl_t_tries == t_tries) && (cdb_sc_normal == t_fail_hist[lcl_t_tries]))
+				{	/* Read of ^#t completed successfully as there is no change in t_tries.
+					 * Safe to break out of the loop.
+					 */
+					break;
+				}
+				/* else we encountered a TP restart (which would have triggered a call to t_retry
+				 * which in turn would have done a rts_error(TPRETRY) which would have been caught
+				 * by gvtr_tpwrap_ch which would in turn have unwound the C-stack upto the point
+				 * where the ESTABLISH is done in gvtr_tpwrap_helper and then returned from there).
+				 * In this case we have to keep retrying the read until there are no tp restarts or
+				 * an op_tcommit is done by gvtr_db_tpwrap_helper (in the event that no triggers
+				 * are defined).
+				 */
+				assert(dollar_trestart);
+				/* update lcl_t_tries to reflect the fact that a restart happened */
+				lcl_t_tries = t_tries;
+				t_fail_hist[lcl_t_tries] = cdb_sc_normal;
+			}
+			/* We expect the above function to return with either op_tcommit or a tp_restart invoked.
+			 * In the case of op_tcommit, we expect dollar_tlevel to be 0 and if so we break out of the loop.
+			 * In the tp_restart case, we expect a maximum of 4 tries/retries and much lesser usually.
+			 * Additionally we also want to avoid an infinite loop so limit the loop to what is considered
+			 * a huge iteration count and GTMASSERT if that is reached as it suggests an out-of-design situation.
 			 */
-			sgm_info_ptr->update_trans = save_update_trans;
-		} else
-			gvtr_db_read_hasht(csa);
-		/* Restore t_err for TP */
-		t_err = save_t_err;
-		assert(sgm_info_ptr == csa->sgm_info_ptr);
-		assert(csa->sgm_info_ptr->update_trans); /* triggers can be invoked only by updates currently */
-	}
+			if (TPWRAP_HELPER_MAX_ATTEMPTS < loopcnt)
+				GTMASSERT;
+		}
+	} else
+		gvtr_db_read_hasht(csa);
 	/* Note that only gvt->db_trigger_cycle (and not CSA->db_trigger_cycle) should be touched here.
 	 * CSA->db_trigger_cycle should be left untouched and updated only in t_end/tp_tend in crit.
 	 * This way we are protected from the following situation which would arise if we incremented CSA here.
@@ -1340,6 +1427,8 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	boolean_t		is_set_trigger, ok_to_invoke_trigger, trigtop_reached;
 	char			*key_ptr, *key_start, *key_end;
 	char			*keysub_start[MAX_KEY_SZ + 1];
+	gv_key			*save_gv_currkey;
+	char			save_currkey[SIZEOF(short) + SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	gv_trigger_t		*trigdsc, *trigtop, *trigstart, *trigcmd_start;
 	int			gtm_trig_status, num_triggers_invoked;
 	mstr			*ztupd_mstr;
@@ -1353,8 +1442,6 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	sgm_info		*si;
-	gv_key			*save_gv_currkey;
-	char			save_currkey[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	gv_namehead		*save_targ;
 	int			lcl_gtm_trigger_depth;
 #	endif
@@ -1389,10 +1476,19 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	}
 	trigparms->lvvalarray = &lvvalarray[0];
 	trigparms->ztvalue_changed = FALSE;
-	/* Parse gv_currkey into array of subscripts to facilitate trigger matching */
-	key_ptr = (char *)gv_currkey->base;
+	/* Parse gv_currkey into array of subscripts to facilitate trigger matching.
+	 * Save contents of gv_currkey into local array as the global variable gv_currkey could change
+	 * in between invocations of the "gtm_trigger" function in the for loop below. Not just that,
+	 * gv_currkey could be even freed and remalloced as a bigger array (if a db with a bigger keysize
+	 * gets opened) inside any of the "gtm_trigger" invocations. So we should maintain pointers only
+	 * to the local copy (not the global gv_currkey) for use inside all iterations of the for loop.
+	 */
+	save_gv_currkey = (gv_key *)ROUND_UP2((INTPTR_T)&save_currkey[0], SIZEOF(gv_currkey->end));
+	assert(((char *)save_gv_currkey + SIZEOF(gv_key) + gv_currkey->end) < ARRAYTOP(save_currkey));
+	memcpy(save_gv_currkey, gv_currkey, OFFSETOF(gv_key, base[0]) + gv_currkey->end + 1); /* + 1 for second null terminator */
+	key_ptr = (char *)save_gv_currkey->base;
 	DEBUG_ONLY(key_start = key_ptr;)
-	key_end = key_ptr + gv_currkey->end;
+	key_end = key_ptr + save_gv_currkey->end;
 	assert(KEY_DELIMITER == *key_end);
 	assert(KEY_DELIMITER == *(key_end - 1));
 	keysubs = 0;
@@ -1413,12 +1509,6 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	assert(NULL == lvvalarray[keysubs]);
 	DEBUG_ONLY(keylen = INTCAST(key_end - key_start);)
 	assert(!keysubs || keylen);
-	/* Save gv_currkey to check that it is restored correctly after "gtm_trigger_fini" is invoked */
-	DEBUG_ONLY(
-		assert((SIZEOF(gv_key) + gv_currkey->end) < ARRAYSIZE(save_currkey));
-		save_gv_currkey = (gv_key *)&save_currkey[0];
-		memcpy(save_gv_currkey, gv_currkey, OFFSETOF(gv_key, base[0]) + gv_currkey->end);
-	)
 	/* Match & Invoke triggers. Take care to ensure they are invoked in an UNPREDICTABLE order.
 	 * Current implementation is to invoke triggers in a rotating order. For example, if there are
 	 * 3 triggers 0, 1 and 2, the first update to this global will match triggers in the order
@@ -1557,7 +1647,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	assert(INVALID_GV_TARGET == reset_gv_target);
 	assert(0 <= num_triggers_invoked);
 	if (num_triggers_invoked)
-		gtm_trigger_fini(FALSE);
+		gtm_trigger_fini(FALSE, FALSE);
 	/* Verify that gtm_trigger_fini restored gv_cur_region/cs_addrs/cs_data/gv_target/gv_currkey
 	 * properly (gtm_trigger could have changed these values depending on the M code that was invoked).
 	 */

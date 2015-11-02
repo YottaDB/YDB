@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,7 @@
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4			process_id;
 GBLREF	node_local_ptr_t	locknl;
+GBLREF	boolean_t		hold_onto_locks;
 
 /* Note about usage of this function : Create dummy gd_region, gd_segment, file_control,
  * unix_db_info, sgmnt_addrs, and allocate mutex_struct (and NUM_CRIT_ENTRY * mutex_que_entry),
@@ -45,6 +46,7 @@ void	grab_lock(gd_region *reg)
 
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
+	assert(!hold_onto_locks && !csa->hold_onto_crit);
 	if (!csa->now_crit)
 	{
 		assert(0 == crit_count);

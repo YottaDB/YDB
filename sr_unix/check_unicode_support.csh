@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc #
+#	Copyright 2007, 2010 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -18,7 +18,7 @@
 #		FALSE - if either of them is not available
 ###########################################################################################
 
-set found_icu = ""
+set found_icu = 0
 set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
 set host_platform_name = `uname`
 if ($host_platform_name == "AIX" || $host_platform_name == "SunOS" || $host_platform_name == "OS/390") then
@@ -33,7 +33,16 @@ else
 # Optional parameter added. This script can be executed from remote system using ssh
 # The environment $gtm_* variable's will not defined.
 # Test system can pass an optional paramter of include path($gtm_inc) to check_unicode_support.csh
-# to verify the presence of x86_64.h.
+# to verify the presence of x86_64.h or s390.h (zLinux)
+#
+# Its worth noting that SuSE+RedHat,Debian & Ubuntu handle the lib32 vs lib64 differently
+# Debian way: 		/lib		32bit		points to /emul/ia32-linux/lib
+#			/lib64		64bit
+# Ubuntu way:		/lib		ARCH default	points to either lib32 or lib64
+#			/lib32		32bit
+#			/lib64		64bit
+# Redhat/SuSE way:	/lib		32bit
+#			/lib64		64bit
 	if ( $# == 1 ) then
 		set incdir = "$1"
 	else
@@ -44,8 +53,8 @@ else
 		endif
 	endif
 
-	if ( -e $incdir/x86_64.h ) then
-		setenv LD_LIBRARY_PATH "/usr/local/lib64:/usr/local/lib:/usr/lib:/usr/lib32"
+	if (( -e $incdir/s390.h ) || ( -e $incdir/x86_64.h )) then
+		setenv LD_LIBRARY_PATH "/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib"
 	else
 		setenv LD_LIBRARY_PATH "/usr/local/lib:/usr/lib:/usr/lib32"
         endif

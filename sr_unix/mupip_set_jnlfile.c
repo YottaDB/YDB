@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ GBLREF boolean_t	need_no_standalone;
 int4 mupip_set_jnlfile(char *jnl_fname, int jnl_fn_len)
 {
 	int 		jnl_fd, status;
-	char		hdr_buffer[SIZEOF(jnl_file_header)];
+	char		hdr_buffer[REAL_JNL_HDR_LEN];
 	jnl_file_header	*header;
 	char		*errptr;
 	int		save_no;

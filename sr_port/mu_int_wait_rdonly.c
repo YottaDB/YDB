@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@ boolean_t	mu_int_wait_rdonly(sgmnt_addrs *csa, char *waiting_process)
 	VMS_ONLY(
 		cache_que_head_ptr_t	crqwip;
 	)
-	boolean_t		ok;
+	boolean_t			ok, was_crit;
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_DBRDONLY);
@@ -49,16 +49,17 @@ boolean_t	mu_int_wait_rdonly(sgmnt_addrs *csa, char *waiting_process)
 	crq = &csa->acc_meth.bg.cache_state->cacheq_active;
 	VMS_ONLY(crqwip = &csa->acc_meth.bg.cache_state->cacheq_wip;)
 	assert(reg->read_only);
-
 	for (lcnt = 1; (lcnt <= BUF_OWNER_STUCK) && ((0 != crq->fl) VMS_ONLY(|| (0 != crqwip->fl)));  lcnt++)
 	{
 #		ifdef VMS
 		if (0 != crqwip->fl)
 		{
-
-			grab_crit(reg);
+			was_crit = csa->now_crit;
+			if (!was_crit)
+				grab_crit(reg);
 			ok = wcs_wtfini(reg);
-			rel_crit(reg);
+			if (!was_crit)
+				rel_crit(reg);
 			if (!ok)
 			{
 				gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_STR(waiting_process), DB_LEN_STR(reg));
@@ -71,8 +72,7 @@ boolean_t	mu_int_wait_rdonly(sgmnt_addrs *csa, char *waiting_process)
 			wcs_sleep(lcnt);
 	}
 	if (0 != crq->fl VMS_ONLY(|| 0 != crqwip->fl))
-	{
-		/* Cannot proceed for read-only data files */
+	{	/* Cannot proceed for read-only data files */
 		gtm_putmsg(VARLSTCNT(8) ERR_DBRDONLY, 2, DB_LEN_STR(reg), ERR_TEXT, 2, LEN_AND_LIT(NO_WRITE_ACCESS_ERR_STRING));
 		return FALSE;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,19 +42,19 @@ char *gtcm_hname(struct sockaddr_in *sin)
 #ifndef SUNOS
     if ((he = gethostbyaddr((void *)&sin->sin_addr.s_addr,
 			    SIZEOF(struct in_addr), AF_INET)))
-	sprintf(name,"%s (%d.%d.%d.%d)",he->h_name,
+	SPRINTF(name,"%s (%d.%d.%d.%d)",he->h_name,
 		   sin->sin_addr.s_addr >> 24,
 		   sin->sin_addr.s_addr >> 16 & 0xFF,
 		   sin->sin_addr.s_addr >> 8 & 0xFF,
 		   sin->sin_addr.s_addr & 0xFF);
     else
-	sprintf(name,"%d.%d.%d.%d",
+	SPRINTF(name,"%d.%d.%d.%d",
 		   sin->sin_addr.s_addr >> 24,
 		   sin->sin_addr.s_addr >> 16 & 0xFF,
 		   sin->sin_addr.s_addr >> 8 & 0xFF,
 		   sin->sin_addr.s_addr & 0xFF);
 #else
-    sprintf(name,"%d.%d.%d.%d",
+    SPRINTF(name,"%d.%d.%d.%d",
 	    sin->sin_addr.s_addr >> 24,
 	    sin->sin_addr.s_addr >> 16 & 0xFF,
 	    sin->sin_addr.s_addr >> 8 & 0xFF,
@@ -74,7 +74,7 @@ void gtcm_cpktdmp(char *ptr, int length, char *msg)
 
     if (curr_conn && (512-strlen(msg)) > 25)
     {
-	sprintf(newmsg,"Conn: %s - %s",
+	SPRINTF(newmsg,"Conn: %s - %s",
 		gtcm_hname(&curr_conn->stats.sin), msg);
 
 	gtcm_pktdmp(ptr, length, newmsg);
@@ -102,7 +102,7 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 
 	ctim = time(0);
 	ltime = localtime(&ctim);
-	sprintf(tbuf, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
+	SPRINTF(tbuf, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min);
 
 	if (gtm_dist=getenv("gtm_dist"))
@@ -114,34 +114,34 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 		 * If the subdirectory exists, place the log file there.
 		 * Otherwise...place the file in $gtm_dist/log.
 		 */
-		sprintf(subdir,"%s/log/%s", gtm_dist, omi_service);
+		SPRINTF(subdir,"%s/log/%s", gtm_dist, omi_service);
 		if (stat(subdir,&buf) == 0
 		    && S_ISDIR(buf.st_mode))
 		{
-		    sprintf(fileName,"%s/%s_%s.%d", subdir, omi_service,
+		    SPRINTF(fileName,"%s/%s_%s.%d", subdir, omi_service,
 			tbuf, fileID++);
 		}
 		else
 		{
-		    sprintf(fileName,"%s/log/%s_%s.%d", gtm_dist, omi_service,
+		    SPRINTF(fileName,"%s/log/%s_%s.%d", gtm_dist, omi_service,
 			    tbuf, fileID++);
 		}
 	}
 	else
-		sprintf(fileName,"/usr/tmp/%s_%s.%d", omi_service,
+		SPRINTF(fileName,"/usr/tmp/%s_%s.%d", omi_service,
 			tbuf, fileID++);
 
 #ifdef __MVS__
 	if (-1 == gtm_zos_create_tagged_file(fileName, TAG_EBCDIC))
 	{
-		fprintf(stderr,"Could not create and tag new packet dump file (%s).\n", fileName);
+		FPRINTF(stderr,"Could not create and tag new packet dump file (%s).\n", fileName);
 		perror(fileName);
 	}
 #endif
 	fp = fopen(fileName, "w");
 	if (fp == NULL)
 	{
-		fprintf(stderr,"Could not open packet dump file (%s).\n", fileName);
+		FPRINTF(stderr,"Could not open packet dump file (%s).\n", fileName);
 		perror(fileName);
 		return;
 	}
@@ -149,7 +149,7 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	OMI_DBG((omi_debug, "%s\n", msg));
 	OMI_DBG((omi_debug, "Log dumped to %s.\n", fileName));
 
-	fprintf(fp,"%s\n", msg);
+	FPRINTF(fp,"%s\n", msg);
 
 	buf[4] = '\0';
 
@@ -165,13 +165,13 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 		for (j = len; j < 16; j++)
 		    chr[j] = '\0';
 		for (j = 0; j < 4; j++)
-		    fprintf(fp,"%08x ", buf[j]);
+		    FPRINTF(fp,"%08x ", buf[j]);
 		for (j = 0; j < 16; j++)
 		    if (j >= len)
 			chr[j] = ' ';
 		    else if (chr[j] < 32 || chr[j] > 126)
 			chr[j] = '.';
-		fprintf(fp,"%16s %x\n", chr, offset);
+		FPRINTF(fp,"%16s %x\n", chr, offset);
 	    }
 	fflush(fp);
 	fclose(fp);

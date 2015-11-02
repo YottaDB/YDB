@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,10 +13,12 @@
 
 #include "mdef.h"
 #include "error.h"
+#include "gtmdbglvl.h"
 
 GBLREF boolean_t		created_core;
 GBLREF boolean_t		dont_want_core;
 GBLREF boolean_t		need_core;
+GBLREF uint4			gtmDebugLevel;
 
 /* Create our own version of the DUMP macro that does not include stack overflow. This
    error is handled better inside mdb_condition_handler which should be the top level
@@ -39,6 +41,8 @@ GBLREF boolean_t		need_core;
 
 void ch_cond_core(void)
 {
+	boolean_t	cond_core_signal;
+
 	error_def(ERR_ASSERT);
 	error_def(ERR_GTMASSERT);
 	error_def(ERR_ASSERT);
@@ -47,7 +51,8 @@ void ch_cond_core(void)
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_MEMORY);
 
-	if (DUMPABLE && ERR_STACKOFLOW != SIGNAL && ERR_MEMORY != SIGNAL && !SUPPRESS_DUMP)
+	cond_core_signal = (ERR_STACKOFLOW == SIGNAL) || (ERR_MEMORY == SIGNAL);
+	if (DUMPABLE && ((cond_core_signal && (GDL_DumpOnStackOFlow & gtmDebugLevel)) || !cond_core_signal) && !SUPPRESS_DUMP)
 	{
 		need_core = TRUE;
 		gtm_fork_n_core();

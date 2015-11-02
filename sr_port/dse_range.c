@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,16 +42,15 @@ GBLREF bool		patch_find_root_search;
 
 void dse_range(void)
 {
-
-    char	lower[256], targ_key[256], upper[256], util_buff[MAX_UTIL_LEN];
-    block_id	from, to, blk, blk_child;
-    sm_uc_ptr_t	bp, b_top, key_bot, key_top, key_top1, rp, r_top;
-    char	level;
-    int4	dummy_int, nocrit_present;
+    char		lower[256], targ_key[256], upper[256], util_buff[MAX_UTIL_LEN];
+    block_id		from, to, blk, blk_child;
+    sm_uc_ptr_t		bp, b_top, key_bot, key_top, key_top1, rp, r_top;
+    char		level;
+    int4		dummy_int, nocrit_present;
     cache_rec_ptr_t	dummy_cr;
-    short int	rsize, size, size1;
-    int		cnt, dummy, lower_len, util_len, upper_len;
-    bool	busy_matters, free, got_lonely_star, index, low, lost, star, up, was_crit;
+    short int		rsize, size, size1;
+    int			cnt, dummy, lower_len, util_len, upper_len;
+    boolean_t		busy_matters, free, got_lonely_star, index, low, lost, star, up, was_crit;
 
     error_def(ERR_DSEBLKRDFAIL);
     error_def(ERR_CTRLC);
@@ -63,7 +62,7 @@ void dse_range(void)
 	if (from < 0 || from > cs_addrs->ti->total_blks
 	    || !(from % cs_addrs->hdr->bplmap))
 	{
-	    util_out_print("Error: invalid block number.",TRUE);
+	    util_out_print("Error: invalid block number.", TRUE);
 	    return;
 	}
     }
@@ -76,7 +75,7 @@ void dse_range(void)
 	if (to < 0 || to > cs_addrs->ti->total_blks
 	    || !(to % cs_addrs->hdr->bplmap))
 	{
-	    util_out_print("Error: invalid block number.",TRUE);
+	    util_out_print("Error: invalid block number.", TRUE);
 	    return;
 	}
     }
@@ -84,18 +83,18 @@ void dse_range(void)
 	to = cs_addrs->ti->total_blks - 1;
     if (low = (cli_present("LOWER") == CLI_PRESENT))
     {
-	if (!dse_getki(&lower[0],&lower_len,LIT_AND_LEN("LOWER")))
+	if (!dse_getki(&lower[0], &lower_len, LIT_AND_LEN("LOWER")))
 	    return;
     }
     if (up = (cli_present("UPPER") == CLI_PRESENT))
     {
-	if (!dse_getki(&upper[0],&upper_len,LIT_AND_LEN("UPPER")))
+	if (!dse_getki(&upper[0], &upper_len, LIT_AND_LEN("UPPER")))
 	    return;
     }
     star = (cli_present("STAR") == CLI_PRESENT);
     if (!low && !up && !star)
     {
-	util_out_print("Must specify star, or a lower or upper key limit.",TRUE);
+	util_out_print("Must specify star, or a lower or upper key limit.", TRUE);
 	return;
     }
     index = (cli_present("INDEX") == CLI_PRESENT);
@@ -114,26 +113,12 @@ void dse_range(void)
     cnt = 0;
     was_crit = cs_addrs->now_crit;
     nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-
-    if (!was_crit)
-    {
-	if (nocrit_present)
-	    cs_addrs->now_crit = TRUE;
-	else
-	    grab_crit(gv_cur_region);
-    }
-
+    DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
     for (blk = from; blk <= to ;blk++)
     {
 	if (util_interrupt)
 	{
-	    if (!was_crit)
-	    {
-		if (nocrit_present)
-		    cs_addrs->now_crit = FALSE;
-		else
-		    rel_crit(gv_cur_region);
-	    }
+	    DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	    rts_error(VARLSTCNT(1) ERR_CTRLC);
 	    break;
 	}
@@ -196,9 +181,9 @@ void dse_range(void)
 			if (dse_is_blk_in(rp, r_top, size1))
 				continue;
 		}
-		if (low && memcmp(lower, key_bot, MIN(lower_len,size)) > 0)
+		if (low && memcmp(lower, key_bot, MIN(lower_len, size)) > 0)
 		    continue;
-		if (up && memcmp(upper, key_bot, MIN(upper_len,size)) < 0)
+		if (up && memcmp(upper, key_bot, MIN(upper_len, size)) < 0)
 		    continue;
 	} else
 	{
@@ -241,25 +226,13 @@ void dse_range(void)
 		}
 	}
 	if (!cnt++)
-	    util_out_print("!/Blocks in the specified key range:",TRUE);
-	util_out_print("Block:  !8XL Level: !2UL",TRUE,blk,level);
-/*	memcpy(util_buff,"	",1);
-	util_len = 1;
-	util_len += i2hex_nofill(blk,&util_buff[util_len],8);
-	util_buff[util_len] = 0;
-	util_out_print(util_buff,TRUE);
-*/
+	    util_out_print("!/Blocks in the specified key range:", TRUE);
+	util_out_print("Block:  !8XL Level: !2UL", TRUE, blk, level);
     }
-    if (!was_crit)
-    {
-	if (nocrit_present)
-	    cs_addrs->now_crit = FALSE;
-	else
-	    rel_crit(gv_cur_region);
-    }
+    DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
     if (cnt)
-	util_out_print("Found !UL blocks",TRUE,cnt);
+	util_out_print("Found !UL blocks", TRUE, cnt);
     else
-	util_out_print("None found.",TRUE);
+	util_out_print("None found.", TRUE);
     return;
 }

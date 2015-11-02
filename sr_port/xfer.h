@@ -262,10 +262,9 @@ XFER(xf_fnztranslate, op_fnztranslate),
 #ifdef UNICODE_SUPPORTED
 XFER(xf_fnzconvert2, op_fnzconvert2),
 XFER(xf_fnzconvert3, op_fnzconvert3),
+#endif
 XFER(xf_fnzwidth, op_fnzwidth),
 XFER(xf_fnzsubstr, op_fnzsubstr),
-#endif
-XFER(xf_fnzechar, op_fnzechar),
 XFER(xf_setals2als, op_setals2als),
 XFER(xf_setalsin2alsct, op_setalsin2alsct),
 XFER(xf_setalsctin2als, op_setalsctin2als),

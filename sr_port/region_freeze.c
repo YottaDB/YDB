@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,6 +82,7 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 	sgmnt_data_ptr_t	csd;
 	now_t			now;                                            /* for GET_CUR_TIME macro */
 	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2];       /* for GET_CUR_TIME macro */
+	boolean_t		was_crit;
 
 	error_def(ERR_FREEZEID);
 
@@ -90,25 +91,30 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 	csd = csa->hdr;
 	if (freeze)
 	{
-		grab_crit(region);	/* really need this to be sure in UNIX, shouldn't be frequent anyway */
+		was_crit = csa->now_crit;
+		if (!was_crit)
+			grab_crit(region);	/* really need this to be sure in UNIX, shouldn't be frequent anyway */
 		INCR_INHIBIT_KILLS(csa->nl);
 		if (OWNERSHIP)
 		{
 			DECR_INHIBIT_KILLS(csa->nl);
-			rel_crit(region);
+			if (!was_crit)
+				rel_crit(region);
 			return REG_FREEZE_SUCCESS;
 		}
 		if (!override && csd->freeze)
 		{
 			DECR_INHIBIT_KILLS(csa->nl);
-			rel_crit(region);
+			if (!was_crit)
+				rel_crit(region);
 			return REG_ALREADY_FROZEN;
 		}
 		/* If override is TRUE we need not wait for KIP to become zero */
 		sleep_counter = 1;
 		if (!override && wait_for_kip && (0 < csd->kill_in_prog))
 		{
-			rel_crit(region);
+			if (!was_crit)
+				rel_crit(region);
 			/* MUPIP FREEZE/INTEG and BACKUP's DBG qualifier prints extra debug messages while waiting for KIP */
 			if (debug_mupip)
 			{
@@ -118,10 +124,12 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 			}
 			do
 			{
-				grab_crit(region);
+				if (!was_crit)
+					grab_crit(region);
 				if (!csd->kill_in_prog)
 					break;
-				rel_crit(region);
+				if (!was_crit)
+					rel_crit(region);
 				wcs_sleep(sleep_counter);
 			} while (MAX_CRIT_TRY > sleep_counter++);
 			if (debug_mupip)
@@ -135,14 +143,16 @@ freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t overr
 		if (MAX_CRIT_TRY <= sleep_counter)
 		{
 			DECR_INHIBIT_KILLS(csa->nl);
-			rel_crit(region);
+			if (!was_crit)
+				rel_crit(region);
 			return REG_HAS_KIP;
 		}
 		csd->freeze = freeze_id;		/* the order of this line and the next is important */
 		csd->image_count = FREEZE_MATCH;
 		csa->freeze = TRUE;
 		DECR_INHIBIT_KILLS(csa->nl);
-		rel_crit(region);
+		if (!was_crit)
+			rel_crit(region);
 #ifdef VVMS_GTCX
 		if (csd->clustered)
 		{

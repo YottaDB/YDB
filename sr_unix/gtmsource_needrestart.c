@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@ GBLREF 	gtmsource_options_t	gtmsource_options;
 int gtmsource_needrestart(void)
 {
 	gtmsource_local_ptr_t	gtmsource_local;
+	sgmnt_addrs		*repl_csa;
 
 	error_def(ERR_MUPCLIERR);
 
@@ -51,6 +52,8 @@ int gtmsource_needrestart(void)
 	} else
 		repl_log(stderr, TRUE, TRUE, "Initiating NEEDRESTART operation for secondary instance [%s]\n",
 			gtmsource_options.secondary_instname);
+	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 	grab_lock(jnlpool.jnlpool_dummy_reg);
 	if ((NULL != gtmsource_local) && (gtmsource_local->connect_jnl_seqno >= jnlpool.jnlpool_ctl->start_jnl_seqno))
 		util_out_print("Secondary Instance [!AZ] DOES NOT NEED to be restarted", TRUE, gtmsource_local->secondary_instname);

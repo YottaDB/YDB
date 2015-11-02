@@ -53,6 +53,8 @@ typedef struct tlevel_info_struct
 	srch_blk_status	*tlvl_tp_hist_info;	/* state of the tp_hist array (tail) before this t_level started */
 	int4		t_level;
 	uint4		update_trans;		/* a copy of sgm_info_ptr->update_trans before this t_level started */
+	uint4		jnl_list_elems;		/* # of si->jnl_list elements consumed before this transaction started */
+	uint4		jfb_list_elems;	/* # of si->format_buff_list elements consumed before this transaction started */
 } tlevel_info;
 
 /* structure to hold the global (across all segments) dollar_tlevel specific information.
@@ -73,6 +75,8 @@ typedef struct global_tlvl_info_struct
 #	ifdef GTM_TRIGGER
 	unsigned char	*tlvl_prev_ztworm_ptr;
 #	endif
+	struct ua_list	*curr_ua;		/* points to global variable curr_ua at start of this transaction */
+	char		*upd_array_ptr;		/* points to global variable update_array_ptr at start of this transaction */
 } global_tlvl_info;
 
 /* A note on the buddy lists used in sgm_info structure,
@@ -303,7 +307,7 @@ GBLREF	short	dollar_trestart;
 		GBLREF	boolean_t	is_lchar_wcs_code[];				\
 			boolean_t	is_wcs_code = FALSE;				\
 											\
-		if (ISALPHA(status))							\
+		if (ISALPHA_ASCII(status))						\
 		{									\
 			if (status > 'Z')						\
 				is_wcs_code = is_lchar_wcs_code[status - 'a'];		\
@@ -418,23 +422,78 @@ GBLREF	short	dollar_trestart;
 	}							\
 }
 
-/* freeup jnl_format_buff_info_list starting from the link 'jfb' */
-
-#define FREE_JFB_INFO(si, jfb)							\
-{										\
-	int	macro_cnt, format_buf_cnt;					\
-	for (macro_cnt = 0, format_buf_cnt = 0; jfb; jfb = jfb->next)		\
-	{									\
-		format_buf_cnt += jfb->record_size;				\
-		macro_cnt++;							\
-	}									\
-	assert(0 == format_buf_cnt % JFB_ELE_SIZE);				\
-	format_buf_cnt = format_buf_cnt >> JFB_ELE_SIZE_IN_BITS;		\
-	if (!free_last_n_elements(si->format_buff_list, format_buf_cnt))	\
-		assert(FALSE);							\
-	if (!free_last_n_elements(si->jnl_list, macro_cnt))			\
-		assert(FALSE);							\
+/* Determine previous jfb, if any */
+#define SET_PREV_JFB(SI, PREV_JFB)											\
+{															\
+	if (SI->jnl_tail != &SI->jnl_head)										\
+		PREV_JFB = (jnl_format_buffer *)((uchar_ptr_t)SI->jnl_tail - OFFSETOF(jnl_format_buffer, next));	\
+	else														\
+		PREV_JFB = NULL;											\
 }
+
+/* freeup si->jnl_list and si->format_buff_list elements which are no more needed
+ * as the sub-transactions in which they have been created are now being rolled back
+ */
+
+#define FREE_JFB_INFO(SI, TLI, FREE_ALL_ELEMS)								\
+{													\
+	int	jnl_list_cnt, format_buf_list_cnt;							\
+													\
+	jnl_list_cnt = SI->jnl_list->nElems;								\
+	format_buf_list_cnt = SI->format_buff_list->nElems;						\
+	if (!FREE_ALL_ELEMS)										\
+	{												\
+		assert(TLI);										\
+		assert(jnl_list_cnt >= TLI->jnl_list_elems);						\
+		assert(format_buf_list_cnt >= TLI->jfb_list_elems);					\
+		jnl_list_cnt -= TLI->jnl_list_elems;							\
+		format_buf_list_cnt -= TLI->jfb_list_elems;						\
+	}												\
+	/* else all elements from si->jnl_head can be free'ed up since the sub-transactions		\
+	 * in which journal activity started for this region is been currently rolled			\
+	 * back												\
+	 */												\
+	if (format_buf_list_cnt && !free_last_n_elements(SI->format_buff_list, format_buf_list_cnt))	\
+		assert(FALSE);										\
+	if (jnl_list_cnt && !free_last_n_elements(SI->jnl_list, jnl_list_cnt))				\
+		assert(FALSE);										\
+}
+
+/* Calls FREE_JFB_INFO based on whether journal activity existed in the prior, non-rolled back levels.
+ * FREE_ALL_ELEMS is TRUE if either (a) No TLI exists for this region OR (b) All such TLI are now
+ * being actively rolled back. In either case, the entire SI->jnl_list and SI->format_buff_list can be
+ * freed up.
+ */
+#define FREE_JFB_INFO_IF_NEEDED(CSA, SI, TLI, FREE_ALL_ELEMS)									\
+{																\
+	jnl_format_buffer		*jfb;											\
+																\
+	if (JNL_WRITE_LOGICAL_RECS(CSA))											\
+	{															\
+		if (!FREE_ALL_ELEMS && (TLI->tlvl_jfb_info))									\
+		{	/* Journal activity existed in $TLEVEL <= newlevel which should not be free'ed up */			\
+			assert(0 < TLI->jnl_list_elems);									\
+			assert(0 < TLI->jfb_list_elems);									\
+			jfb = TLI->tlvl_jfb_info; /* last journal format buffer in the non-rolled back levels */		\
+			FREE_JFB_INFO(SI, TLI, FALSE);										\
+			jfb->next = NULL;											\
+			SI->jnl_tail = &jfb->next;										\
+			/* Ensure that size of si->jnl_list and si->format_buff_list matches the one noted down at op_tstart	\
+			 * of $TLEVEL = (newlevel + 1)										\
+			 */													\
+			assert(SI->jnl_list->nElems == TLI->jnl_list_elems);							\
+			assert(SI->format_buff_list->nElems == TLI->jfb_list_elems);						\
+		} else														\
+		{	/* Either journal activity did not exist on $TLEVEL <= newlevel OR the sub-transactions in which 	\
+			 * they existed are now being rolled back. So, free all the jnl_list and format_buff_list buddy lists */\
+			FREE_JFB_INFO(SI, TLI, TRUE);										\
+			SI->jnl_head = NULL;											\
+			SI->jnl_tail = &SI->jnl_head;										\
+			assert(0 == SI->jnl_list->nElems);									\
+			assert(0 == SI->format_buff_list->nElems);								\
+		}														\
+	}															\
+}																\
 
 /* freeup gbl_tlvl_info_list starting from the link 'gti' */
 
@@ -520,6 +579,7 @@ GBLREF	unsigned int	t_tries;
 		if (!tr->reg->open)						\
 			continue;						\
 		csa = (sgmnt_addrs *)&FILE_INFO(tr->reg)->s_addrs;		\
+		assert(!csa->hold_onto_crit);					\
 		if (csa->now_crit)						\
 			rel_crit(tr->reg);					\
 	}									\

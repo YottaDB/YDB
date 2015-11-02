@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,11 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
+
 #include <stdarg.h>
+#include <errno.h>
 #include "gtm_stdio.h"
+
 #include "cmidef.h"
 
 #ifdef GTCM_CMI_DEBUG
@@ -22,10 +25,12 @@ GBLDEF int cmi_debug_enabled = FALSE;
 void cmi_dprint(char *cs, ...)
 {
 	va_list ap;
+	int	rc;
 
 #ifdef DEBUG
 	VAR_START(ap, cs);
-	VFPRINTF(stderr, cs, ap);
+	VFPRINTF(stderr, cs, ap, rc);
+	assert(0 <= rc);
 	va_end(ap);
 	fflush(stderr);
 #endif

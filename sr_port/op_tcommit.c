@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_ctype.h"
 #include "cdb_sc.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -75,6 +76,7 @@ error_def(ERR_TLVLZERO);
 error_def(ERR_TPRETRY);
 #ifdef GTM_TRIGGER
 error_def(ERR_TRIGTCOMMIT);
+error_def(ERR_TCOMMITDISALLOW);
 #endif
 
 GBLREF	short			dollar_tlevel, dollar_trestart;
@@ -99,6 +101,7 @@ GBLREF	tp_region		*tp_reg_list;	/* Chained list of regions used in this transact
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
 GBLREF	boolean_t		block_is_free;
+GBLREF	boolean_t		hold_onto_locks;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		skip_INVOKE_RESTART;
 GBLREF	int4			gtm_trigger_depth;
@@ -172,6 +175,15 @@ enum cdb_sc	op_tcommit(void)
 				 */
 				rts_error(VARLSTCNT(4) ERR_TRIGTCOMMIT, 2, gtm_trigger_depth, tstart_trigger_depth);
 			}
+			if (tp_pointer->cannot_commit)
+			{	/* If this TP transaction was implicit, any unhandled error when crossing the trigger boundary
+				 * would have caused a rethrow of the error in the M frame that held the non-TP update which
+				 * would then have invoked "error_return" that would in turn have rolled back the implicit TP
+				 * transaction so we should never see an implicit TP inside op_tcommit.
+				 */
+				assert(!tp_pointer->implicit_tstart);
+				rts_error(VARLSTCNT(1) ERR_TCOMMITDISALLOW);
+			}
 		)
 		save_cur_region = gv_cur_region;
 		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
@@ -215,15 +227,10 @@ enum cdb_sc	op_tcommit(void)
 #					ifdef GTM_SNAPSHOT
 					if (SNAPSHOTS_IN_PROG(cnl))
 					{
-						/* If snapshots are already in progress, then try to release the existing context
-						 * if a new one has started after we last updated csa->snapshot_in_prog
-						 */
-						if (SNAPSHOTS_IN_PROG(csa))
-							SS_RELEASE_IF_NEEDED(csa, cnl);
-						/* Try to create a new context if a new one has started after we last updated
-						 * csa->snapshot_in_prog. After this, with respect to snapshots all the remaining
-						 * transaction logic in t_end, bg_update_phase2 and secshr_db_clnup should use csa
-						 * and should not rely on cnl
+						/* If snapshot context is not already created, then create one now to be used
+						 * by this transaction. If context creation failed (for instance, on snapshot
+						 * file open fail), then SS_INIT_IF_NEEDED sets csa->snapshot_in_prog is to
+						 * FALSE.
 						 */
 						SS_INIT_IF_NEEDED(csa, cnl);
 					} else
@@ -395,7 +402,7 @@ enum cdb_sc	op_tcommit(void)
 			else	/* commit failed BEFORE invoking or DURING "tp_tend" */
 			{
 				if (cdb_sc_normal == status) /* get failure return code from tp_tend (stored in t_fail_hist) */
-					status = t_fail_hist[t_tries];
+					status = (enum cdb_sc)t_fail_hist[t_tries];
 				assert(cdb_sc_normal != status);	/* else will go into an infinite try loop */
 				DEBUG_ONLY(
 					for (si = first_sgm_info;  si != temp_si; si = si->next_sgm_info)
@@ -411,7 +418,7 @@ enum cdb_sc	op_tcommit(void)
 				GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return status = %d\n", status));)
 				return status;	/* return status to caller who cares about it */
 			}
-			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
+			assert(hold_onto_locks || (0 == have_crit(CRIT_HAVE_ANY_REG)));
 			csa = jnl_fence_ctl.fence_list;
 			if ((JNL_FENCE_LIST_END != csa) && jgbl.wait_for_jnl_hard && !is_updproc && !mupip_jnl_recover)
 			{	/* For mupip journal recover all transactions applied during forward phase are treated as
@@ -429,13 +436,14 @@ enum cdb_sc	op_tcommit(void)
 			}
 		} else if ((CDB_STAGNATE <= t_tries) && (NULL != tp_reg_list))
 		{	/* this is believed to be a case of M-lock work with no database work. release crit on all regions */
+			assert(!hold_onto_locks); /* if hold_onto_locks is TRUE, we should not be here releasing crit at all */
 			for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 			{
 				assert(FILE_INFO(tr->reg)->s_addrs.now_crit);
 				rel_crit(tr->reg);
 			}
 		}
-		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
+		assert(hold_onto_locks || (0 == have_crit(CRIT_HAVE_ANY_REG)));
 		/* Commit was successful */
 		dollar_trestart = 0;
 		t_tries = 0;

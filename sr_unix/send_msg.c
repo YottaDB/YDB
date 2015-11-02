@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +21,15 @@
 #include "util_out_print_vaparm.h"
 #include "send_msg.h"
 #include "caller_id.h"
+#include "gtmsiginfo.h"
 
-GBLREF bool caller_id_flag;
-GBLREF va_list	last_va_list_ptr;
+GBLREF bool		caller_id_flag;
+GBLREF va_list		last_va_list_ptr;
+GBLREF volatile int4	exit_state;
+
+#ifdef DEBUG
+static uint4		nesting_level = 0;
+#endif
 
 #define NOFLUSH 0
 #define FLUSH   1
@@ -46,8 +52,17 @@ void send_msg(int arg_count, ...)
         char    msg_buffer[1024];
         mstr    msg_string;
 
+	/* Since send_msg uses a global variable buffer, reentrant calls to send_msg will use the same buffer.
+	 * Ensure we never overwrite an under-construction send_msg buffer with a nested send_msg call. The
+	 * only exception to this is if the nested call to send_msg is done by exit handling code in which case
+	 * the latest send_msg call prevails and it is ok since we will never return to the original send_msg()
+	 * call again.  Detect if ever this assmption gets violated with an assert.
+	 */
+	assert((0 == nesting_level) || (EXIT_IMMED == exit_state));
+	DEBUG_ONLY(nesting_level++;)
         VAR_START(var, arg_count);
         assert(arg_count > 0);
+	util_out_save();
         util_out_print(NULL, RESET);
 
         for (;;)
@@ -90,7 +105,9 @@ void send_msg(int arg_count, ...)
 	va_end(var);
 
         util_out_print(NULL, OPER);
+	util_out_restore();
         /* it has been suggested that this would be a place to check a view_debugN
          * and conditionally enter a "forever" loop on wcs_sleep for unix debugging
          */
+	DEBUG_ONLY(nesting_level--;)
 }

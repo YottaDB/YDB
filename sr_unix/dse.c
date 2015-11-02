@@ -63,6 +63,7 @@
 #include "gtmmsg.h"
 #include "suspsigs_handler.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+#include "gtm_imagetype_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -83,7 +84,6 @@ GBLREF int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF boolean_t		dse_running;
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF global_latch_t		defer_latch;
-GBLREF enum gtmImageTypes	image_type;
 GBLREF VSIG_ATOMIC_T		util_interrupt;
 GBLREF char			cli_err_str[];
 GBLREF boolean_t		write_after_image;
@@ -99,11 +99,9 @@ int main(int argc, char *argv[])
 {
 	static char	prompt[]="DSE> ";
 
-	image_type = DSE_IMAGE;
+	gtm_imagetype_init(DSE_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
-	dse_running = TRUE;
-	write_after_image = TRUE;	/* In case it calls it changes a block, we write after image */
 	licensed = TRUE;
 	transform = TRUE;
 	op_open_ptr = op_open;

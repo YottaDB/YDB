@@ -384,7 +384,8 @@ void gtmcrypt_entry(void);
 	GBLREF  volatile int4   fast_lock_count;										\
 	xc_string_t		unencrypted_block, encrypted_block;								\
 	xc_status_t		status;												\
-	int             	save_intrpt_ok_state, save_fast_lock_count;							\
+	int             	save_fast_lock_count;										\
+	intrpt_state_t		save_intrpt_ok_state;										\
 	GBLREF int4		gbl_encryption_ecode;										\
 																\
 	RC = gbl_encryption_ecode;												\
@@ -410,7 +411,8 @@ void gtmcrypt_entry(void);
 	GBLREF  volatile int4   fast_lock_count;										\
 	xc_string_t		unencrypted_block, encrypted_block;								\
 	xc_status_t		status;												\
-	int             	save_intrpt_ok_state, save_fast_lock_count;							\
+	int             	save_fast_lock_count;										\
+	intrpt_state_t		save_intrpt_ok_state;										\
 	GBLREF int4		gbl_encryption_ecode;										\
 																\
 	RC = gbl_encryption_ecode;												\

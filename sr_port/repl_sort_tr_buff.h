@@ -27,7 +27,7 @@
 	while(JREC_PREFIX_SIZE <= tlen)										\
 	{													\
 		prefix = (jrec_prefix *)tb;									\
-		rectype = prefix->jrec_type;									\
+		rectype = (enum jnl_record_type)prefix->jrec_type;	\
 		reclen = prefix->forwptr;									\
 		rec = (jnl_record *)(tb);									\
 		if (JRT_TCOM != rectype)									\

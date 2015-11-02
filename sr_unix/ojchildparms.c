@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "compiler.h"
 #include "gcall.h"
 #include "stringpool.h"
+#include "op.h"		/* for op_nullexp() */
 
 GBLREF	spdesc stringpool;
 
@@ -168,6 +169,7 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 
 	if (argcnt = (int)(ATOL(sp)))
 	{
+		ENSURE_STP_FREE_SPACE(argcnt * MAX_TRANS_NAME_LEN);
 		g_args->callargs = argcnt + 4;
 		g_args->truth = 1;
 		g_args->retval = 0;
@@ -178,17 +180,16 @@ void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval *arglst)
 		{
 			if (sp = GETENV(parm_string))
 			{
-				if (stringpool.free + strlen(sp) > stringpool.top)
+				if (!IS_STP_SPACE_AVAILABLE_PRO(STRLEN(sp)))
 					rts_error(VARLSTCNT(1) (ERR_STRINGOFLOW));
 				arglst[i].str.len = STRLEN(sp);
 				arglst[i].str.addr = (char *)stringpool.free;
 				memcpy(stringpool.free, sp, arglst[i].str.len);
 				stringpool.free += arglst[i].str.len;
 				arglst[i].mvtype = MV_STR;
-				g_args->argval[i] = &arglst[i];
-
 			} else
-				GTMASSERT;
+				op_nullexp(&arglst[i]);
+			g_args->argval[i] = &arglst[i];
 			if (parm_string[6] == '9')
 			{
 				if (parm_string[5] == '9')

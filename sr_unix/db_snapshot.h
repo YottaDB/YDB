@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,14 +15,18 @@
 #include "gtm_limits.h"
 
 #define		SNAPSHOT_HDR_LABEL		"SNAPSHOTV1"
+
 /* Possible states when snapshot is being init'ed */
 typedef enum
 {
-	BEFORE_SHADOW_FIL_CREAT = 0,
+	SNAPSHOT_NOT_INITED = 0,
+	SNAPSHOT_SHM_ATTACH_FAIL,
+	SHADOW_FIL_OPEN_FAIL,
+	BEFORE_SHADOW_FIL_CREAT,
 	AFTER_SHADOW_FIL_CREAT,
 	AFTER_SHM_CREAT,
 	SNAPSHOT_INIT_DONE,
-	SS_NUM_PROC_STATUS,
+	SS_NUM_PROC_STATUS
 } ss_proc_status;
 
 typedef struct snapshot_info_struct
@@ -44,7 +48,6 @@ typedef struct shm_snapshot_struct
 	volatile uint4	failure_errno;		/* the status code of the failure. */
 	volatile pid_t	failed_pid;		/* the process_id that encountered the snapshot failure */
 	int		in_use;
-	uint4		ss_read_progress;	/* incremented every time snapshot initiator does progress */
 	boolean_t	preserve_snapshot;
 	global_latch_t	bitmap_latch;		/* latch to be passed on to add_inter while modifying the shadow bitmap */
 	trans_num	ss_tn_count;		/* count of transactions after the snapshot started */
@@ -63,16 +66,17 @@ typedef struct util_snapshot_struct
 typedef	struct snapshot_context_struct
 {
 	int			shdw_fd;		/* open file descriptor for the shadow file */
-	long			ss_shmid;
+	long			nl_shmid;
+	long			attach_shmid;
 	int			ss_shmcycle;
 	uint4			total_blks;
+	uint4			failure_errno;
 	shm_snapshot_ptr_t	ss_shm_ptr;
 	sm_uc_ptr_t		start_shmaddr;
 	void			*bitmap_addr;
 	int4			shadow_vbn;
-	uint4			last_ss_read_progress;
 	char			shadow_file[GTM_PATH_MAX];
-	ss_proc_status		cur_state;		/* similar to backup_reg_list->not_this_time */
+	ss_proc_status		cur_state;
 } snapshot_context_t;
 
 typedef struct snapshot_filehdr_struct
@@ -90,14 +94,16 @@ typedef snapshot_context_t	*snapshot_context_ptr_t;
 #define DEFAULT_INIT_SS_CTX(lcl_ss_ctx)					\
 {									\
 	lcl_ss_ctx->shdw_fd = FD_INVALID;				\
-	lcl_ss_ctx->ss_shmid = INVALID_SHMID;				\
+	lcl_ss_ctx->nl_shmid = INVALID_SHMID;				\
+	lcl_ss_ctx->attach_shmid = INVALID_SHMID;			\
 	lcl_ss_ctx->ss_shmcycle = 0;					\
 	lcl_ss_ctx->total_blks = 0;					\
+	lcl_ss_ctx->failure_errno = 0;					\
 	lcl_ss_ctx->ss_shm_ptr = NULL;					\
 	lcl_ss_ctx->start_shmaddr = lcl_ss_ctx->bitmap_addr = NULL;	\
 	lcl_ss_ctx->shadow_vbn = 0;					\
-	lcl_ss_ctx->last_ss_read_progress = 0;				\
 	memset(lcl_ss_ctx->shadow_file, 0, GTM_PATH_MAX);		\
+	lcl_ss_ctx->cur_state = SNAPSHOT_NOT_INITED;			\
 }
 
 #define SS_DEFAULT_INIT_INFO(ss_ptr)				\
@@ -118,7 +124,6 @@ typedef snapshot_context_t	*snapshot_context_ptr_t;
 	ss_shm_ptr->failure_errno = 0;			\
 	ss_shm_ptr->failed_pid = 0;			\
 	ss_shm_ptr->in_use = 0;				\
-	ss_shm_ptr->ss_read_progress = 0;		\
 	ss_shm_ptr->preserve_snapshot = FALSE;		\
 	ss_shm_ptr->ss_tn_count = 0;			\
 }
@@ -126,13 +131,10 @@ typedef snapshot_context_t	*snapshot_context_ptr_t;
 #define 	MAX_SNAPSHOTS			1
 #define		SNAPSHOT_HDR_SIZE		SIZEOF(snapshot_filhdr_t)
 #define		SINGLE_SHM_SNAPSHOT_SIZE	ROUND_UP(SIZEOF(shm_snapshot_t), OS_PAGE_SIZE)
-#define		SNAPSHOT_TMP_DIR		GTM_BAK_TEMPDIR_LOG_NAME
 #define		SS_CTX_CAST(X)			((snapshot_context_ptr_t)(X))
 #define		BLKS_PER_WORD			32
 #define		SS_GETSTARTPTR(CSA)		(((sm_uc_ptr_t)CSA->shmpool_buffer) + SHMPOOL_BUFFER_SIZE)
 #define		SS_IDX2ABS(CSA, N)		((shm_snapshot_ptr_t)(SS_GETSTARTPTR(CSA) + SNAPSHOT_SECTION_SIZE))
-/* Check for snapshot liveliness every 64K transactions after the snapshot startup */
-#define		NUM_TRANSACTIONS_FOR_SS_HEALTHCHECK	65536
 #ifdef DEBUG
 #	define	DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(CSA, PTR)		\
 		assert((PTR) >= SS_GETSTARTPTR(CSA) && ((PTR) < SS_GETSTARTPTR(CSA) + SHMPOOL_SECTION_SIZE))
@@ -151,9 +153,9 @@ boolean_t	ss_initiate(gd_region *, util_snapshot_ptr_t, snapshot_context_ptr_t *
 
 void		ss_release(snapshot_context_ptr_t *);
 
-boolean_t 	ss_get_block(sgmnt_addrs *, snapshot_context_ptr_t, block_id, sm_uc_ptr_t, boolean_t *);
+boolean_t 	ss_get_block(sgmnt_addrs *, block_id, sm_uc_ptr_t);
 
-boolean_t 	ss_read_block(snapshot_context_ptr_t, block_id, sm_uc_ptr_t);
+void		ss_read_block(snapshot_context_ptr_t, block_id, sm_uc_ptr_t);
 
 boolean_t	ss_write_block(sgmnt_addrs *, block_id, cache_rec_ptr_t, sm_uc_ptr_t, snapshot_context_ptr_t);
 
@@ -165,11 +167,8 @@ boolean_t	ss_create_context(snapshot_context_ptr_t, int);
 
 boolean_t	ss_destroy_context(snapshot_context_ptr_t );
 
-void		*ss_attach_shmseg(int, long *, int *, boolean_t);
-
-int		ss_detach_shmseg(void *, long, boolean_t, boolean_t);
-
 void		ss_anal_shdw_file(char *, int);
 
-void		mupip_snapshot(void);
+void		ss_initiate_call_on_signal(void);
+
 #endif

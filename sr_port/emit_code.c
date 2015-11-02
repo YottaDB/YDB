@@ -38,27 +38,20 @@
 
 /* Required to find out variable length argument runtime function calls*/
 #if defined(__x86_64__) || defined(__ia64)
-
-#include "code_address_type.h"
-
-#ifdef XFER
-#	undef XFER
-#endif /* XFER */
-
-#define XFER(a,b) #b
-
-
-#include "xfer_desc.i"
+#  include "code_address_type.h"
+#  ifdef XFER
+#    undef XFER
+#  endif /* XFER */
+#  define XFER(a,b) #b
+#  include "xfer_desc.i"
 DEFINE_XFER_TABLE_DESC;
-
 GBLDEF int call_4lcldo_variant;	 /* used in emit_jmp for call[sp] and forlcldo */
-
 #endif /* __x86_64__ || __ia64 */
 
 #define MVAL_INT_SIZE DIVIDE_ROUND_UP(SIZEOF(mval), SIZEOF(UINTPTR_T))
 
 #ifdef DEBUG
-#include "vdatsize.h"
+#  include "vdatsize.h"
 /* VAX DISASSEMBLER TEXT */
 static const char	vdat_bdisp[VDAT_BDISP_SIZE + 1] = "B^";
 static const char	vdat_wdisp[VDAT_WDISP_SIZE + 1] = "W^";
@@ -145,11 +138,9 @@ void trip_gen (triple *ct)
 	error_def	(ERR_UNIMPLOP);
 	error_def	(ERR_MAXARGCNT);
 
-#ifndef TRUTH_IN_REG
-#if !(defined(__osf__) || defined(__x86_64__))
+#	if !defined(TRUTH_IN_REG) && (!(defined(__osf__) || defined(__x86_64__) || defined(Linux390)))
 	GTMASSERT;
-#endif
-#endif
+#	endif
 
 	DEBUG_ONLY(opcode_emitted = FALSE);
 	current_triple = ct;	/* save for possible use by internal rtns */
@@ -210,7 +201,7 @@ void trip_gen (triple *ct)
 			case OC_CALL:
 			case OC_FORLCLDO:
 			case OC_CALLSP:
-#ifdef __x86_64__
+#				ifdef __x86_64__
 				tsp = (short *)&ttt[ttt[tp]];
 				if (-128 <= tsp[CALL_4LCLDO_XFER] && 127 >= tsp[CALL_4LCLDO_XFER])
 					off = jmp_offset - XFER_BYTE_INST_SIZE;
@@ -231,7 +222,7 @@ void trip_gen (triple *ct)
 						tsp = (short *)&ttt[ttt[tp + 2]];
 				}
 				break;
-#else
+#				else
 				off = (jmp_offset - CALL_INST_SIZE)/INST_SIZE;	/* [kmk] */
 				if (off >= -128 && off <= 127)
 					tsp = &ttt[ttt[tp]];
@@ -240,7 +231,7 @@ void trip_gen (triple *ct)
 				else
 					tsp = &ttt[ttt[tp + 2]];
 				break;
-#endif /* __x86_64__ */
+#				endif /* __x86_64__ */
 			case OC_JMP:
 			case OC_JMPEQU:
 			case OC_JMPGEQ:
@@ -299,10 +290,10 @@ void trip_gen (triple *ct)
 				{
 					tsp = repl;
 					tsp = emit_vax_inst((short *)tsp, &saved_opr[0], --sopr);
-#ifdef DEBUG
+#					ifdef DEBUG
 					if (cg_phase == CGP_ASSEMBLY)
 						emit_asmlist(ct);
-#endif
+#					endif
 				} while (sopr > &saved_opr[repcnt]);
 			} else
 			{
@@ -313,10 +304,10 @@ void trip_gen (triple *ct)
 		{
 			assert(*tsp > 0 && *tsp <= 511);
 			tsp = emit_vax_inst((short *)tsp, &saved_opr[0], sopr);
-#ifdef DEBUG
+#			ifdef DEBUG
 			if (cg_phase == CGP_ASSEMBLY)
 				emit_asmlist(ct);
-#endif
+#			endif
 		}/* else */
 	}/* for */
 
@@ -381,7 +372,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	switch (cg_phase)
 	{
 		case CGP_ASSEMBLY:
-#ifdef DEBUG
+#			ifdef DEBUG
 			list_chkpage();
 			obpt = &outbuf[0];
 			memset(obpt, SP, SIZEOF(outbuf));
@@ -396,7 +387,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 			*obpt++ = SP;
 			*obpt++ = SP;
 			/*****  WARNING - FALL THRU *****/
-#endif
+#			endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -425,18 +416,18 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					assert(*inst == VXT_REG);
 					inst++;
 
-#ifdef TRUTH_IN_REG
+#					ifdef TRUTH_IN_REG
 					reg = GTM_REG_CODEGEN_TEMP;
 					NON_GTM64_ONLY(GEN_LOAD_WORD(reg, gtm_reg(*inst++), 0);)
 					GTM64_ONLY(  GEN_LOAD_WORD_4(reg, gtm_reg(*inst++), 0);)
-#else
+#					else
 					/* For platforms, where the $TRUTH value is not carried in a register and
 						must be fetched from a global variable by subroutine call. */
 					assert(*inst == 0x5a);		/* VAX r10 or $TEST register */
 					inst++;
 					emit_call_xfer(SIZEOF(intszofptr_t) * xf_dt_get);
 					reg = GTM_REG_R0;	/* function return value */
-#endif
+#					endif
 					/* Generate a cmp instruction using the return value of the previous call,
 						which will be in EAX */
 					X86_64_ONLY(GEN_CMP_EAX_IMM32(0);)
@@ -459,9 +450,9 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					break;
 
 				case VXI_BICB2:
-#ifdef TRUTH_IN_REG
+#					ifdef TRUTH_IN_REG
 					GEN_CLEAR_TRUTH;
-#endif
+#					endif
 					assert(*inst == VXT_LIT);
 					inst++;
 					assert(*inst == 1);
@@ -471,9 +462,9 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					inst++;
 					break;
 				case VXI_BISB2:
-#ifdef TRUTH_IN_REG
+#					ifdef TRUTH_IN_REG
 					GEN_SET_TRUTH;
-#endif
+#					endif
 					assert(*inst == VXT_LIT);
 					inst++;
 					assert(*inst == 1);
@@ -497,7 +488,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						ct = opr->oprval.tref;
 						if (ct->destination.oprclass)
 							opr = &ct->destination;
-#ifdef __vms
+#						ifdef __vms
 						/* This is a case where VMS puts the argument count in a special register so
 							handle that differently here.
 						*/
@@ -519,7 +510,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							emit_trip(opr, TRUE, ALPHA_INS_LDL, reg);
 							emit_push(reg);
 						}
-#else
+#						else
 						/* All other platforms put argument counts in normal parameter
 							registers and go through this path instead.
 						*/
@@ -541,7 +532,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							emit_trip(opr, TRUE, GENERIC_OPCODE_LOAD, reg);
 						}
 						emit_push(reg);
-#endif
+#						endif
 					}
 					assert(*inst == VXT_XFER);
 					inst++;
@@ -645,8 +636,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					inst++;
 					emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, MOVC3_TRG_REG);
 
-#ifdef					__MVS__
-					/* The MVC instruction on zOS facilitates memory copy(mval in this case) in a single
+#					if defined(__MVS__) || defined(Linux390)
+					/* The MVC instruction on zSeries facilitates memory copy(mval in this case) in a single
 					 * instruction instead of multiple 8/4 byte copies.
 					 *
 					 * TODO: Revisit other platforms using generic emit_code and verify if the below
@@ -654,7 +645,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					 * available on that particular platform.
 					 */
 					GEN_MVAL_COPY(MOVC3_SRC_REG, MOVC3_TRG_REG, SIZEOF(mval));
-#else
+#					else
 					for (words_to_move = MVAL_INT_SIZE, reg_offset = 0; words_to_move;)
 					{
 						reg = MACHINE_FIRST_ARG_REG;
@@ -678,7 +669,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							GTM64_ONLY(GEN_STORE_WORD_8(targ_reg, MOVC3_TRG_REG, save_reg_offset);)
 						}
 					}
-#endif
+#					endif
 					break;
 				case VXI_MOVL:
 					if (*inst == VXT_REG)
@@ -708,7 +699,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							{
 								inst++;
 
-#ifdef TRUTH_IN_REG
+#								ifdef TRUTH_IN_REG
 								if (*inst == 0x5a)	/* to VAX r10 or $TEST */
 								{
 									NON_GTM64_ONLY(GEN_STORE_WORD(MOVL_RETVAL_REG,
@@ -719,7 +710,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 								{
 									GEN_MOVE_REG(gtm_reg(*inst), MOVL_RETVAL_REG);
 								}
-#else
+#								else
 								if (*inst == 0x5a)	/* to VAX r10 or $TEST */
 								{
 									reg = get_arg_reg();
@@ -730,7 +721,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 								{
 									GEN_MOVE_REG(gtm_reg(*inst), MOVL_RETVAL_REG);
 								}
-#endif
+#								endif
 								inst++;
 							} else
 								GTMASSERT;
@@ -828,26 +819,26 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	if (cg_phase == CGP_MACHINE)
 	{
 		generated_code_size += code_idx;
-#ifdef DEBUG
+#		ifdef DEBUG
 		if (generated_count < MAX_CODE_COUNT)
 		{
 		generated_details[generated_count].size = code_idx;
 		generated_details[generated_count++].sav_in = sav_in;
 		}
-#endif /* DEBUG */
+#		endif /* DEBUG */
 		emit_immed ((char *)&code_buf[0], (uint4)(INST_SIZE * code_idx));
 	} else if (cg_phase != CGP_ASSEMBLY)
 	{
 		if (cg_phase == CGP_APPROX_ADDR)
 		{
-		calculated_code_size += code_idx;
-#ifdef DEBUG
-		if (calculated_count < MAX_CODE_COUNT)
-		{
-		 calculated_details[calculated_count].size = code_idx;
-		 calculated_details[calculated_count++].sav_in = sav_in;
-		}
-#endif /* DEBUG */
+			calculated_code_size += code_idx;
+#			ifdef DEBUG
+			if (calculated_count < MAX_CODE_COUNT)
+			{
+				calculated_details[calculated_count].size = code_idx;
+				calculated_details[calculated_count++].sav_in = sav_in;
+			}
+#			endif /* DEBUG */
 		}
 		curr_addr += (INST_SIZE * code_idx);
 	}
@@ -858,7 +849,6 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 }
 
 #ifndef __x86_64__ /* For x86_64, this is defined in emit_code_sp.c */
-
 void	emit_jmp (uint4 branchop, short **instp, int reg)
 {
 	uint4 	branchop_opposite;
@@ -873,10 +863,10 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 
 	/* size of this particular instruction */
 	jmp_offset -= (int)((char *)&code_buf[code_idx] - (char *)&code_buf[0]);
-#ifndef __MVS__
-	/* The code_buff on zOS is filled with 2 byte chunks */
+#	if !(defined(__MVS__) || defined(Linux390))
+	/* The code_buff on zSeries is filled with 2 byte chunks */
 	assert((jmp_offset & 3) == 0);
-#endif
+#	endif
 	branch_offset = jmp_offset / INST_SIZE;
 
 	/* Some platforms have a different origin for the offset */
@@ -884,7 +874,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 
 	switch (cg_phase)
 	{
-#ifdef DEBUG
+#		ifdef DEBUG
 		case CGP_ASSEMBLY:
 			*obpt++ = 'x';
 			*obpt++ = '^';
@@ -894,7 +884,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 			*obpt++ = ',';
 			*obpt++ = ' ';
 		/*****  WARNING - FALL THRU *****/
-#endif
+#		endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -938,14 +928,14 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 						case GENERIC_OPCODE_BNE:
 							branchop_opposite = GENERIC_OPCODE_BEQ;
 							break;
-#ifdef __alpha
+#						ifdef __alpha
 						case GENERIC_OPCODE_BLBC:
 							branchop_opposite = GENERIC_OPCODE_BLBS;
 							break;
 						case GENERIC_OPCODE_BLBS:
 							branchop_opposite = GENERIC_OPCODE_BLBC;
 							break;
-#endif
+#						endif
 						default:
 							GTMASSERT;
 							break;
@@ -960,10 +950,10 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 						IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0)
 						branch_offset -= NUM_INST_IGEN_COND_BRANCH_REG_OFFSET;
 					)
-#ifdef DELAYED_BRANCH
+#					ifdef DELAYED_BRANCH
 						code_buf[code_idx++] = GENERIC_OPCODE_NOP;
 						branch_offset--;
-#endif
+#					endif
 
 				}
 				if (EMIT_JMP_LONG_CODE_CHECK)
@@ -976,9 +966,9 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 					RISC_ONLY(
 					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
 					)
-#ifdef DELAYED_BRANCH
+#					ifdef DELAYED_BRANCH
 					code_buf[code_idx++] = GENERIC_OPCODE_NOP;
-#endif
+#					endif
 				} else
 				{
 					if (EMIT_JMP_OPPOSITE_BR_CHECK)
@@ -1028,7 +1018,7 @@ void	emit_pcrel(void)
 
 	switch (cg_phase)
 	{
-#ifdef DEBUG
+#		ifdef DEBUG
 		case CGP_ASSEMBLY:
 			*obpt++ = 'x';
 			*obpt++ = '^';
@@ -1038,7 +1028,7 @@ void	emit_pcrel(void)
 			*obpt++ = ',';
 			*obpt++ = ' ';
 				/*****  WARNING - FALL THRU *****/
-#endif
+#		endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
 		case CGP_MACHINE:
@@ -1117,11 +1107,11 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							}
 
 							X86_64_ONLY(IGEN_LOAD_ADDR_REG(trg_reg))
-#ifndef __MVS__
+#							if !(defined(__MVS__) || defined(Linux390))
 							NON_X86_64_ONLY(code_idx++;)
-#else
+#							else
 							IGEN_LOAD_ADDR_REG(trg_reg);
-#endif
+#							endif
 							inst_emitted = TRUE;
 							break;
 						case OC_CDLIT:
@@ -1257,7 +1247,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 				RISC_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg);)
 			}
 			break;
-#ifdef DEBUG
+#		ifdef DEBUG
 		case CGP_ASSEMBLY:
 			offset = 0;
 			switch (opr->oprclass)
@@ -1463,7 +1453,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			*obpt++ = ',';
 			*obpt++ = ' ';
 			break;
-#endif
+#		endif
 		case CGP_MACHINE:
 			switch (opr->oprclass)
 			{
@@ -1698,7 +1688,7 @@ int	gtm_reg(int vax_reg)
 			reg = GTM_REG_FRAME_TMP_PTR;
 			break;
 
-#ifdef TRUTH_IN_REG
+#		ifdef TRUTH_IN_REG
 		case 10:
 			/* The value of $TEST is maintained in r10 for the VAX GT.M
 			 * implementation.  On platforms with an insufficient number of
@@ -1708,7 +1698,7 @@ int	gtm_reg(int vax_reg)
 			 */
 			reg = GTM_REG_DOLLAR_TRUTH;
 			break;
-#endif
+#		endif
 
 		case 11:
 			reg = GTM_REG_XFER_TABLE;
@@ -1848,7 +1838,7 @@ void	emit_call_xfer(int xfer)
 	int		offset;
 	unsigned char	*c;
 
-#ifdef DEBUG
+#	ifdef DEBUG
 	if (CGP_ASSEMBLY == cg_phase)
 	{
 		memcpy(obpt, &vdat_def[0], VDAT_DEF_SIZE);
@@ -1870,11 +1860,11 @@ void	emit_call_xfer(int xfer)
 		*obpt++ = ',';
 		*obpt++ = ' ';
 	}
-#endif
+#	endif
 
 	assert(0 == (xfer & 0x3));
 	offset = (int)(xfer / SIZEOF(char *));
-#ifdef __x86_64__
+#	ifdef __x86_64__
 /* Set RAX to 0 for variable argument function calls. This is part of the ABI.
 	The RAX represents the # of floating of values being passed
 */
@@ -1882,9 +1872,9 @@ void	emit_call_xfer(int xfer)
 	{
 		GEN_LOAD_IMMED(I386_REG_RAX, 0);
 	}
-#endif /* __x86_64__ */
+#	endif /* __x86_64__ */
 
-#ifdef __ia64
+#	ifdef __ia64
         if (ASM == xfer_table_desc[offset])
         {
                 GEN_XFER_TBL_CALL_FAKE(xfer);
@@ -1893,9 +1883,9 @@ void	emit_call_xfer(int xfer)
                 GEN_XFER_TBL_CALL_DIRECT(xfer);
 
         }
-#else
+#	else
 	GEN_XFER_TBL_CALL(xfer);
-#endif /* __ia64 */
+#	endif /* __ia64 */
 
 	/* In the normal case we will return */
 	if (!ocnt_ref_seen)

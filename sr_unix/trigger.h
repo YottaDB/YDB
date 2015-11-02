@@ -43,11 +43,14 @@ typedef enum
 #define TRIG_FAILURE		FALSE
 
 #define MAX_COUNT_DIGITS	6			/* Max of 999,999 triggers for a global */
-#define MAX_BUFF_SIZE		65536			/* Size of input and output buffers */
+#define MAX_BUFF_SIZE		32768			/* Size of input and output buffers.  The cli routines can't handle lines
+							 * longer than 32767 + 256 (MAX_LINE -- see cli.h).  Longer lines will
+							 * be truncated by cli_str_setup().
+							 */
 #define COMMENT_LITERAL		';'
 #define TRIGNAME_SEQ_DELIM	'#'
 #define MAX_GVSUBS_LEN		8192			/* Maximum length of the gvsubs string */
-#define	MAX_HASH_INDEX_LEN	1024			/* Max length of value for hash index entries */
+#define	MAX_HASH_INDEX_LEN	32768			/* Max length of value for hash index entries */
 
 #define	NUM_TRIGNAME_SEQ_CHARS	6
 #define	MAX_TRIGNAME_LEN	(MAX_MIDENT_LEN - 2)				/* 2 for runtime characters */
@@ -80,18 +83,55 @@ typedef enum
 static char *trigger_subs[]	= {LITERAL_TRIGNAME, LITERAL_GVSUBS, LITERAL_CMD, LITERAL_OPTIONS, LITERAL_DELIM, LITERAL_ZDELIM,
 				   LITERAL_PIECES, LITERAL_XECUTE, LITERAL_CHSET, LITERAL_LHASH, LITERAL_BHASH};
 
-/* Build up a comma delimited string */
-#define ADD_COMMA_IF_NEEDED(COUNT, PTR)						\
-{										\
-	if (0 != COUNT)								\
-	{									\
-		MEMCPY_LIT(PTR, ",");						\
-		PTR++;								\
-	}									\
+
+#define CONV_TO_ZWR(LEN, PTR, OUT_LEN, OUT_STR)						\
+{											\
+	LEN = MIN(OUT_BUFF_SIZE, LEN);							\
+	format2zwr((sm_uc_ptr_t)PTR, LEN, OUT_STR, &OUT_LEN);				\
 }
-#define ADD_STRING(COUNT, PTR, LEN, COMMAND)					\
+
+#define CONV_TO_ZWR_AND_PRINT(STR, LEN, PTR, OUT_LEN, OUT_STR)				\
+{											\
+	CONV_TO_ZWR(LEN, PTR, OUT_LEN, OUT_STR);					\
+	util_out_print_gtmio(STR"!AD", FLUSH, OUT_LEN, OUT_STR);			\
+}
+
+#define CONV_STR_AND_PRINT(STR, LEN, PTR)						\
+{											\
+	int		out_len;							\
+	unsigned char	out_str[MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE];			\
+											\
+	CONV_TO_ZWR_AND_PRINT(STR, LEN, PTR, out_len, out_str);				\
+}
+
+#define CHECK_FOR_ROOM_IN_OUTPUT_AND_COPY(SRC, DST, LEN, MAX_LEN)		\
 {										\
-	memcpy(PTR, COMMAND, LEN);						\
+	if (MAX_LEN < LEN)							\
+	{									\
+		util_out_print_gtmio("Trigger definition too long", FLUSH);	\
+		return FALSE;							\
+	}									\
+	MAX_LEN -= LEN;								\
+	memcpy(DST, SRC, LEN);							\
+}
+
+/* Build up a comma delimited string */
+#define ADD_COMMA_IF_NEEDED(COUNT, PTR, MAX_LEN)					\
+{											\
+	if (0 != COUNT)									\
+	{										\
+		if (0 > --MAX_LEN)							\
+		{									\
+			util_out_print_gtmio("Trigger definition too long", FLUSH);	\
+			return FALSE;							\
+		}									\
+		MEMCPY_LIT(PTR, ",");							\
+		PTR++;									\
+	}										\
+}
+#define ADD_STRING(COUNT, PTR, LEN, COMMAND, MAX_LEN)				\
+{										\
+	CHECK_FOR_ROOM_IN_OUTPUT_AND_COPY(COMMAND, PTR, LEN, MAX_LEN)		\
 	PTR += LEN;								\
 	COUNT++;								\
 }

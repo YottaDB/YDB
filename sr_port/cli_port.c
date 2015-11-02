@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,7 @@
 */
 int cli_is_dcm(char *p)
 {
-        while (*p && ISDIGIT(*p))
+        while (*p && ISDIGIT_ASCII(*p))
                 p++;
 
         if (*p) return (FALSE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,14 +40,14 @@
 #include "gvcst_blk_build.h"
 #include "t_begin_crit.h"
 
-GBLREF gd_region        *gv_cur_region;
-GBLREF char		*update_array, *update_array_ptr;
-GBLREF uint4		update_array_size;	/* for the BLK_* macros */
-GBLREF srch_hist	dummy_hist;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t cs_data;
-GBLREF cw_set_element   cw_set[];
-GBLREF unsigned char    *non_tp_jfb_buff_ptr;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	uint4			update_array_size;	/* for the BLK_* macros */
+GBLREF	srch_hist		dummy_hist;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 /* Modified on the similar lines of dse AIMG record logic, needed for recover to write journal records */
 
 void mur_put_aimg_rec(jnl_record *rec)
@@ -55,7 +55,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 	sm_uc_ptr_t	aimg_blk_ptr;
 	int4		blk_seg_cnt, blk_size;
 	blk_segment	*bs1, *bs_ptr;
-	cw_set_element  *cse;
+	cw_set_element	*cse;
 	srch_blk_status	blkhist;
 
 	error_def(ERR_MURAIMGFAIL);
@@ -66,9 +66,10 @@ void mur_put_aimg_rec(jnl_record *rec)
 	 * Therefore, it is best to call t_end().
 	 */
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-	assert(!cs_addrs->now_crit);
+	assert(!cs_addrs->now_crit || cs_addrs->hold_onto_crit);
 
 	t_begin_crit(ERR_MURAIMGFAIL);
+	assert(cs_addrs->now_crit);
 	blk_size = cs_addrs->hdr->blk_size;
 	blkhist.blk_num = rec->jrec_aimg.blknum;
 	if (NULL == (blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
@@ -93,6 +94,6 @@ void mur_put_aimg_rec(jnl_record *rec)
 	/* Call t_end till it succeeds or aborts (error will be reported) */
 	while ((trans_num)0 == t_end(&dummy_hist, 0))
 		;
-	assert(!cs_addrs->now_crit);
+	assert(!cs_addrs->now_crit || cs_addrs->hold_onto_crit);
 	return;
 }

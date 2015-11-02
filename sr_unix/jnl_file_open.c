@@ -44,6 +44,8 @@
 #include "gtm_dbjnl_dupfd_check.h"
 #endif
 
+#include "wbox_test_init.h"
+
 GBLREF	boolean_t		is_src_server;
 
 error_def(ERR_JNLFILOPN);
@@ -190,7 +192,8 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 			{	/* not init and file moved */
 				jpc->status = ERR_JNLMOVED;
 				sts = ERR_JNLOPNERR;
-				assert(FALSE);
+				assert(gtm_white_box_test_case_enabled
+					&& (WBTEST_JNLOPNERR_EXPECTED == gtm_white_box_test_case_number));
 			}
 		} else
 		{	/* stat failed */

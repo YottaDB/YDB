@@ -56,7 +56,7 @@ void	clean_mem(char *name)
 	path1.len = STRLEN(name);
 	path1.addr = name;
 	if (SS_NORMAL != TRANS_LOG_NAME(&path1, &path2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
-		fprintf(stderr, "Error translating path: %s\n", name);
+		FPRINTF(stderr, "Error translating path: %s\n", name);
 	else
 	{
 		path2.addr[path2.len] = '\0';
@@ -67,20 +67,20 @@ void	clean_mem(char *name)
 			if ((q_id = msgget(msg_key, 0)) != -1)
 			{
 				if (!quiet)
-					printf("shmclean: removing msg queue %d\n", q_id);
+					PRINTF("shmclean: removing msg queue %d\n", q_id);
 				if (msgctl(q_id, IPC_RMID, 0) == -1)
 				{
-					fprintf(stderr,"shmclean: error removing msg queue %d\n", q_id);
+					FPRINTF(stderr,"shmclean: error removing msg queue %d\n", q_id);
 					perror("shmclean");
 				}
 			}
 			if ((semid = semget(msg_key, 2, RWDALL)) != -1)
 			{
 				if (!quiet)
-					printf("shmclean: removing semid %d\n", semid);
+					PRINTF("shmclean: removing semid %d\n", semid);
 				if (semctl(semid, 0, IPC_RMID, 0) == -1)
 				{
-					fprintf(stderr,"shmclean: error removing semid %d\n", semid);
+					FPRINTF(stderr,"shmclean: error removing semid %d\n", semid);
 					perror("shmclean");
 				}
 			} else
@@ -88,10 +88,10 @@ void	clean_mem(char *name)
 			if ((m_id = shmget(msg_key, 10, RWDALL)) != -1)
 			{
 				if (!quiet)
-					printf("shmclean: removing shmid %d\n", m_id);
+					PRINTF("shmclean: removing shmid %d\n", m_id);
 				if (shmctl(m_id, IPC_RMID, 0) == -1)
 				{
-					fprintf(stderr,"shmclean: error removing shmid %d\n", m_id);
+					FPRINTF(stderr,"shmclean: error removing shmid %d\n", m_id);
 					perror("shmclean");
 				}
 			} else
@@ -109,16 +109,16 @@ void	database_clean(char *path)
 	if ((d_key = ftok(path, GTM_ID)) == -1)
 	{
 		perror("Error with database ftok");
-		printf("File: %s\n", path);
+		PRINTF("File: %s\n", path);
 		return;
 	}
 	if ((shmid = shmget(d_key, 10, RWALL)) != -1)
 	{
 		if (!quiet)
-			printf("shmclean: removing shmid %d\n", shmid);
+			PRINTF("shmclean: removing shmid %d\n", shmid);
 		if (shmctl(shmid, IPC_RMID, 0) == -1)
 		{
-			fprintf(stderr,"shmclean: error removing shmid %d\n", shmid);
+			FPRINTF(stderr,"shmclean: error removing shmid %d\n", shmid);
 			perror("shmclean");
 		}
 	} else
@@ -126,10 +126,10 @@ void	database_clean(char *path)
 	if ((semid = semget(d_key, 2, 0600)) != -1)
 	{
 		if (!quiet)
-			printf("shmclean: removing semid %d\n", semid);
+			PRINTF("shmclean: removing semid %d\n", semid);
 		if (semctl(semid, 0, IPC_RMID, 0) == -1)
 		{
-			fprintf(stderr,"shmclean: error removing semid %d\n", semid);
+			FPRINTF(stderr,"shmclean: error removing semid %d\n", semid);
 			perror("shmclean");
 		}
 	} else
@@ -178,11 +178,11 @@ int main(int argc, char_ptr_t argv[])
 	}
 	if (quiet != 1)
 	{
-		fprintf(stderr,"If this program is used to remove shared memory from running\n");
-		fprintf(stderr,"processes, it will cause the program to fail. Please make\n");
-		fprintf(stderr,"sure all GTM processes have been shut down cleanly before running\n");
-		fprintf(stderr,"this program.\n\n");
-		fprintf(stderr,"Do you want to contine? (y or n)  ");
+		FPRINTF(stderr,"If this program is used to remove shared memory from running\n");
+		FPRINTF(stderr,"processes, it will cause the program to fail. Please make\n");
+		FPRINTF(stderr,"sure all GTM processes have been shut down cleanly before running\n");
+		FPRINTF(stderr,"this program.\n\n");
+		FPRINTF(stderr,"Do you want to contine? (y or n)  ");
 		read(0, &resp, 1);
 		if ((resp != 'y') && (resp != 'Y'))
 		{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ static char rcsid[] = "$Header:$";
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "op.h"
-
+#include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 
 int
 omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
@@ -99,7 +99,7 @@ omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 		    return -OMI_ER_PR_INVGLOBREF;
 		}
 		vo.str.addr++;	vo.str.len--;
-		gv_bind_name(cptr->ga, &vo.str);
+		GV_BIND_NAME_AND_ROOT_SEARCH(cptr->ga, &vo.str);
 		vo.str.addr--;	vo.str.len++;
 		gv_curr_subsc_null = FALSE;
 	    }

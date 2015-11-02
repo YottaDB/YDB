@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ GBLREF uint4			process_id;
 GBLREF uint4			crit_deadlock_check_cycle;
 GBLREF short			dollar_tlevel;
 GBLREF unsigned int		t_tries;
-
+GBLREF	boolean_t		hold_onto_locks;
 
 /* Return number of regions (including jnlpool dummy region) if have or are aquiring crit or in_wtstart
  * ** NOTE **  This routine is called from signal handlers and is thus called asynchronously.
@@ -58,7 +58,10 @@ uint4 have_crit(uint4 crit_state)
 
 	/* in order to proper release the necessary regions, CRIT_RELEASE implies going through all the regions */
 	if (crit_state & CRIT_RELEASE)
+	{
+		assert(!hold_onto_locks);	/* should not request crit to be released with this variable set to TRUE */
 		crit_state |= CRIT_ALL_REGIONS;
+	}
 	if (0 != crit_count)
 	{
 		crit_reg_cnt++;

@@ -30,6 +30,9 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gdskill.h"
+#ifdef VMS
+#include <rms.h>		/* needed for muextr.h */
+#endif
 #include "muextr.h"
 #include "iosp.h"
 #include "cli.h"

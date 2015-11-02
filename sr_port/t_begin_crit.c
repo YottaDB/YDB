@@ -39,12 +39,13 @@ GBLREF	uint4			update_trans;
 GBLREF	boolean_t		write_after_image;
 GBLREF	volatile int4		fast_lock_count;
 #ifdef DEBUG
-GBLREF	boolean_t	ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
+GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
 #endif
 
-void t_begin_crit(uint4 err)
-/* err - error code for current gvcst_routine */
+void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
 {
+	boolean_t	was_crit;
+
 	CWS_RESET;
 	start_tn = cs_addrs->ti->curr_tn;
 	cw_set_depth = 0;
@@ -63,11 +64,15 @@ void t_begin_crit(uint4 err)
 	 */
 	assert(write_after_image);
 	update_trans = UPDTRNS_DB_UPDATED_MASK;
-	/* We are going to grab_crit. If csd->wc_blocked is set to TRUE, we will end up calling wcs_recover as part of
-	 * grab_crit. Set variable to indicate it is ok to do so even though t_tries is CDB_STAGNATE since we are not
-	 * in the middle of any transaction.
-	 */
-	DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
-	grab_crit(gv_cur_region);
-	DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
+	was_crit = cs_addrs->now_crit;
+	assert(!was_crit || cs_addrs->hold_onto_crit);
+	if (!was_crit)
+	{	/* We are going to grab_crit. If csd->wc_blocked is set to TRUE, we will end up calling wcs_recover as part of
+		 * grab_crit. Set variable to indicate it is ok to do so even though t_tries is CDB_STAGNATE since we are not
+		 * in the middle of any transaction.
+		 */
+		DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
+		grab_crit(gv_cur_region);
+		DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
+	}
 }

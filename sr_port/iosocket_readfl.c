@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +57,7 @@ GBLREF	mstr			chset_names[];
 GBLREF	UConverter		*chset_desc[];
 GBLREF  boolean_t       	dollar_zininterrupt;
 GBLREF	int			socketus_interruptus;
+GBLREF	boolean_t		gtm_utf8_mode;
 
 #ifdef UNICODE_SUPPORTED
 /* Maintenance of $KEY, $DEVICE and $ZB on a badchar error */
@@ -65,7 +66,7 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 {
 	int		tmplen, len;
 	unsigned char	*delimend;
- 	io_desc		*iod;
+	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
 
 	iod = io_curr_device.in;
@@ -74,12 +75,12 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 	vmvalptr->str.addr = (char *)stringpool.free;
 	if (0 < datalen)
 	{	/* Return how much input we got */
-                if (CHSET_M != iod->ichset && CHSET_UTF8 != iod->ichset)
-                {
-                        SOCKET_DEBUG(PRINTF("socrflbc: Converting UTF16xx data back to UTF8 for internal use\n"); DEBUGSOCKFLUSH);
-                        vmvalptr->str.len = gtm_conv(chset_desc[iod->ichset], chset_desc[CHSET_UTF8], &vmvalptr->str, NULL, NULL);
-                        vmvalptr->str.addr = (char *)stringpool.free;
-                }
+		if (CHSET_M != iod->ichset && CHSET_UTF8 != iod->ichset)
+		{
+			SOCKET_DEBUG(PRINTF("socrflbc: Converting UTF16xx data back to UTF8 for internal use\n"); DEBUGSOCKFLUSH);
+			vmvalptr->str.len = gtm_conv(chset_desc[iod->ichset], chset_desc[CHSET_UTF8], &vmvalptr->str, NULL, NULL);
+			vmvalptr->str.addr = (char *)stringpool.free;
+		}
 		stringpool.free += vmvalptr->str.len;
 	}
 	if (NULL != strend && NULL != delimptr)
@@ -111,9 +112,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	/* width == 0 is a flag for non-fixed length read */
 					/* timeout in seconds */
 {
-	int		ret;
+	int		ret, byteperchar;
 	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done;
-	boolean_t	zint_restart, outofband_terminate, one_read_done;
+	boolean_t	zint_restart, outofband_terminate, one_read_done, utf8_active;
 	int		flags, len, real_errno, save_errno, fcntl_res, errlen, charlen, stp_need;
 	int		bytes_read, orig_bytes_read, ii, max_bufflen, bufflen, chars_read, mb_len, match_delim;
 	io_desc		*iod;
@@ -144,6 +145,25 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
+	iod = io_curr_device.in;
+	ichset = iod->ichset;
+	assert(dev_open == iod->state);
+	assert(gtmsocket == iod->type);
+	dsocketptr = (d_socket_struct *)(iod->dev_sp);
+	if (0 >= dsocketptr->n_socket)
+	{
+		iod->dollar.za = 9;
+		rts_error(VARLSTCNT(1) ERR_NOSOCKETINDEV);
+		return 0;
+	}
+	if (dsocketptr->n_socket <= dsocketptr->current_socket)
+	{
+		iod->dollar.za = 9;
+		rts_error(VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
+		return 0;
+	}
+	utf8_active = NON_UNICODE_ONLY(FALSE) UNICODE_ONLY(gtm_utf8_mode ? IS_UTF_CHSET(ichset) : FALSE);
+	byteperchar = UNICODE_ONLY(utf8_active ? GTM_MB_LEN_MAX :) 1;
 	if (0 == width)
 	{	/* op_readfl won't do this; must be a call from iosocket_read */
 		vari = TRUE;
@@ -155,22 +175,15 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	}
 	/* if width is set to MAX_STRLEN, we might be overly generous (assuming every char is just one byte) we must check if byte
 	 * length crosses the MAX_STRLEN boundary */
-
-	iod = io_curr_device.in;
-	ichset = iod->ichset;
-	assert(dev_open == iod->state);
-	assert(gtmsocket == iod->type);
-	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	assert(socketptr);
 	sockintr = &dsocketptr->sock_save_state;
+	assert(sockintr);
 	outofband_terminate = FALSE;
 	one_read_done = FALSE;
-
+	zint_restart = FALSE;
 	/* Check if new or resumed read */
-	if (!dsocketptr->mupintr)
-		/* Simple path, no worries*/
-		zint_restart = FALSE;
-	else
+	if (dsocketptr->mupintr)
 	{	/* We have a pending read restart of some sort */
 		if (sockwhich_invalid == sockintr->who_saved)
 			GTMASSERT;      /* Interrupt should never have an invalid save state */
@@ -180,89 +193,98 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
                 if (sockwhich_readfl != sockintr->who_saved)
                         GTMASSERT;      /* ZINTRECURSEIO should have caught */
 		SOCKET_DEBUG(PRINTF("socrfl: *#*#*#*#*#*#*#  Restarted interrupted read\n"); DEBUGSOCKFLUSH);
+		dsocketptr->mupintr = FALSE;
+		sockintr->who_saved = sockwhich_invalid;
 		mv_zintdev = io_find_mvstent(iod, FALSE);
-		if (mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
+		assert(mv_zintdev);
+		if (mv_zintdev)
 		{
-			if (sockintr->end_time_valid)
-				/* Restore end_time for timeout */
-				end_time = sockintr->end_time;
-			max_bufflen = sockintr->max_bufflen;
-			bytes_read = sockintr->bytes_read;
-			chars_read = sockintr->chars_read;
-
-                        buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
+			if (mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
+			{
+				bytes_read = mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.len;
+				assert(bytes_read == sockintr->bytes_read);
+				if (bytes_read)
+				{
+					buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
+					zint_restart = TRUE;
+				}
+			} else
+			{
+				assert(FALSE);
+				SOCKET_DEBUG(PRINTF("Evidence of an interrupt, but it was invalid\n"); DEBUGSOCKFLUSH);
+			}
 			/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
 			if (mv_chain == mv_zintdev)
 				POP_MV_STENT();         /* pop if top of stack */
 			else
 			{	/* else mark it unused */
 				mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
-				mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+				mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = 0;
+				mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = NULL;
 			}
-			SOCKET_DEBUG2(PRINTF("socrfl: .. mv_stent found - bytes_read: %d  chars_read: %d  max_bufflen: %d"
-					    "  interrupts: %d\n", bytes_read, chars_read, max_bufflen, socketus_interruptus);
-				     DEBUGSOCKFLUSH);
-			SOCKET_DEBUG(PRINTF("socrfl: .. timeout: %d\n", timeout); DEBUGSOCKFLUSH);
-                        SOCKET_DEBUG(if (sockintr->end_time_valid) PRINTF("socrfl: .. endtime: %d/%d\n", end_time.at_sec,
-									  end_time.at_usec); DEBUGSOCKFLUSH);
-			SOCKET_DEBUG2(PRINTF("socrfl: .. buffer address: 0x%08lx  stringpool: 0x%08lx\n",
-					    buffer_start, stringpool.free); DEBUGSOCKFLUSH);
-			if (stringpool.free != (buffer_start + bytes_read)) /* BYPASSOK */
-			{
-				/* End of stringpool not open for expansion, must move what we got. First
-				   see if we need to expand stringpool.
-				*/
-				SOCKET_DEBUG2(PRINTF("socrfl: .. Stuff put on string pool after our buffer\n"); DEBUGSOCKFLUSH);
-				if (!IS_STP_SPACE_AVAILABLE(max_bufflen))
-				{
-					v->str.addr = (char *)buffer_start;	/* Protect buffer from reclaim */
-					v->str.len = bytes_read;
-					INVOKE_STP_GCOL(max_bufflen);
-					buffer_start = (unsigned char *)v->str.addr;
-					SOCKET_DEBUG2(PRINTF("socrfl: .. garbage collection done\n"); DEBUGSOCKFLUSH);
-				}
-				memcpy(stringpool.free, buffer_start, bytes_read);
-			} else
-			{	/* Previously read buffer piece is still last thing in stringpool. Make sure the rest of the
-				   space we need (sized to max_bufflen) is available. If not, make it available.
-				*/
-				SOCKET_DEBUG2(PRINTF("socrfl: .. Our buffer did not move in the stringpool\n"); DEBUGSOCKFLUSH);
-				stp_need = max_bufflen - bytes_read;
-				if (!IS_STP_SPACE_AVAILABLE(stp_need))
-				{
-					v->str.addr = (char *)buffer_start;     /* Protect buffer from reclaim */
-					v->str.len = bytes_read;		/* stringpool.free already covers these bytes */
-					INVOKE_STP_GCOL(stp_need);
-					SOCKET_DEBUG2(PRINTF("socrfl: .. garbage collection done in no movement case\n");
-						     DEBUGSOCKFLUSH);
-				}
-				stringpool.free = buffer_start;
-			}
-			v->str.len = 0;		/* Clear incase interrupt or error -- don't want to hold this buffer */
-			/* At this point, our previous buffer is sitting at stringpool.free and can be
-			   expanded if necessary. This is what the rest of the code is expecting.
-			*/
-			zint_restart = TRUE;
 		} else
-                        SOCKET_DEBUG2(PRINTF("socrfl: no mv_stent found !!\n"); DEBUGSOCKFLUSH);
-		dsocketptr->mupintr = FALSE;
-		sockintr->who_saved = sockwhich_invalid;
-	}
-
-	if (0 >= dsocketptr->n_socket)
+		{
+			sockintr->end_time_valid = FALSE;
+			SOCKET_DEBUG(PRINTF("Evidence of an interrupt, but no MV_STENT\n"); DEBUGSOCKFLUSH);
+		}
+	} else
+		sockintr->end_time_valid = FALSE;
+	if (!zint_restart)
+	{	/* Simple path (not restart or nothing read,) no worries*/
+		/* compute the worst case byte requirement knowing that width is in chars */
+		max_bufflen = (vari) ? MAX_STRBUFF_INIT
+			: ((MAX_STRLEN > (width * byteperchar)) ? (width * byteperchar) : MAX_STRLEN);
+		ENSURE_STP_FREE_SPACE(max_bufflen);
+		bytes_read = 0;
+		chars_read = 0;
+	} else
 	{
-		iod->dollar.za = 9;
-		rts_error(VARLSTCNT(1) ERR_NOSOCKETINDEV);
-		return 0;
+		max_bufflen = sockintr->max_bufflen;
+		chars_read = sockintr->chars_read;
+		assert(chars_read <= bytes_read);
+		SOCKET_DEBUG2(PRINTF("socrfl: .. mv_stent found - bytes_read: %d  chars_read: %d  max_bufflen: %d"
+			"  interrupts: %d\n", bytes_read, chars_read, max_bufflen, socketus_interruptus);
+			DEBUGSOCKFLUSH);
+		SOCKET_DEBUG(PRINTF("socrfl: .. timeout: %d\n", timeout); DEBUGSOCKFLUSH);
+		SOCKET_DEBUG(if (sockintr->end_time_valid) PRINTF("socrfl: .. endtime: %d/%d\n", end_time.at_sec,
+			end_time.at_usec); DEBUGSOCKFLUSH);
+		SOCKET_DEBUG2(PRINTF("socrfl: .. buffer address: 0x%08lx  stringpool: 0x%08lx\n",
+			buffer_start, stringpool.free); DEBUGSOCKFLUSH);
+		if (stringpool.free != (buffer_start + bytes_read))	/* BYPASSOK */
+		{	/* Not @ stringpool.free - must move what we have, so we need room for the whole anticipated message */
+			SOCKET_DEBUG2(PRINTF("socrfl: .. Stuff put on string pool after our buffer\n"); DEBUGSOCKFLUSH);
+			stp_need = max_bufflen;
+		} else
+		{	/* Previously read buffer piece is still last thing in stringpool, so we need room for the rest */
+			SOCKET_DEBUG2(PRINTF("socrfl: .. Our buffer did not move in the stringpool\n"); DEBUGSOCKFLUSH);
+			stp_need = max_bufflen - bytes_read;
+			assert(stp_need < max_bufflen);
+		}
+		if (!IS_STP_SPACE_AVAILABLE(stp_need))
+		{	/* need more room */
+			SOCKET_DEBUG2(PRINTF("socrfl: .. garbage collection done in starting after interrupt\n"); DEBUGSOCKFLUSH);
+			v->str.addr = (char *)buffer_start;	/* Protect buffer from reclaim */
+			v->str.len = bytes_read;
+			INVOKE_STP_GCOL(max_bufflen);
+			buffer_start = (unsigned char *)v->str.addr;
+		}
+		if ((buffer_start + bytes_read) < stringpool.free)	/* BYPASSOK */
+		{	/* now need to move it to the top */
+			assert(stp_need == max_bufflen);
+			memcpy(stringpool.free, buffer_start, bytes_read);
+		} else
+		{	/* it should still be just under the used space */
+			assert((buffer_start + bytes_read) == stringpool.free);	/* BYPASSOK */
+			stringpool.free = buffer_start;		/* backup the free pointer */
+		}
+		v->str.len = 0;		/* Clear incase interrupt or error -- don't want to hold this buffer */
+		/* At this point, our previous buffer is sitting at stringpool.free and can be
+		   expanded if necessary. This is what the rest of the code is expecting.
+		*/
 	}
-	if (dsocketptr->n_socket <= dsocketptr->current_socket)
-        {
-		iod->dollar.za = 9;
-		rts_error(VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
-                return 0;
-        }
 	if (iod->dollar.x  &&  (TCP_WRITE == socketptr->lastop))
 	{	/* switching from write to read */
+		assert(!zint_restart);
 		if (!iod->dollar.za)
 			iosocket_flush(iod);
 		iod->dollar.x = 0;
@@ -279,7 +301,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		time_for_read.at_usec = INITIAL_MOREREAD_TIMEOUT * 1000;
 	SOCKET_DEBUG(PRINTF("socrfl: moreread_timeout = %d def_moreread_timeout= %d time = %d \n",
 			    socketptr->moreread_timeout,socketptr->def_moreread_timeout,time_for_read.at_usec); DEBUGSOCKFLUSH);
-
 	timer_id = (TID)iosocket_readfl;
 	out_of_time = FALSE;
 	if (NO_M_TIMEOUT == timeout)
@@ -315,18 +336,19 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			}
 #endif
 			sys_get_curr_time(&cur_time);
-			if (!zint_restart || !sockintr->end_time_valid)
+			if (!sockintr->end_time_valid)
 				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 			else
 			{	/* end_time taken from restart data. Compute what msec_timeout should be so timeout timer
 				   gets set correctly below.
 				*/
-                                cur_time = sub_abs_time(&end_time, &cur_time);
-                                if (0 > cur_time.at_sec)
-                                {
+			 	end_time = sockintr->end_time;	 /* Restore end_time for timeout */
+				cur_time = sub_abs_time(&end_time, &cur_time);
+				if (0 > cur_time.at_sec)
+				{
 					msec_timeout = -1;
-                                        out_of_time = TRUE;
-                                } else
+					out_of_time = TRUE;
+				} else
 					msec_timeout = (int4)(cur_time.at_sec * 1000 + cur_time.at_usec / 1000);
 				SOCKET_DEBUG(PRINTF("socrfl: Taking timeout end time from read restart data - "
 						    "computed msec_timeout: %d\n", msec_timeout); DEBUGSOCKFLUSH);
@@ -343,15 +365,6 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	dsocketptr->dollar_key[0] = '\0';
 	iod->dollar.zb[0] = '\0';
 	more_data = TRUE;
-
-	/* compute the worst case byte requirement knowing that width is in chars */
-	if (!zint_restart)
-	{
-		max_bufflen = (vari) ? MAX_STRBUFF_INIT : ((MAX_STRLEN > (width * 4)) ? (width * 4) : MAX_STRLEN);
-		ENSURE_STP_FREE_SPACE(max_bufflen);
-		bytes_read = 0;
-		chars_read = 0;
-	}
 	real_errno = 0;
 	requeue_done = FALSE;
 	SOCKET_DEBUG(PRINTF("socrfl: ##################### Entering read loop ######################\n");

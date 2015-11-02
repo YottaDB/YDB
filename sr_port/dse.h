@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,30 @@ enum dse_fmt
 	ZWR_FMT,
 	OPEN_FMT
 };
+
+/* Grab crit for dse* functions taking into account -nocrit if specified */
+#define	DSE_GRAB_CRIT_AS_APPROPRIATE(WAS_CRIT, NOCRIT_PRESENT, CS_ADDRS, GV_CUR_REGION)	\
+{											\
+	if (!WAS_CRIT)									\
+	{										\
+		if (NOCRIT_PRESENT)							\
+			CS_ADDRS->now_crit = TRUE;					\
+		else									\
+			grab_crit(GV_CUR_REGION);					\
+	}										\
+}
+
+/* Rel crit for dse* functions taking into account -nocrit if specified */
+#define	DSE_REL_CRIT_AS_APPROPRIATE(WAS_CRIT, NOCRIT_PRESENT, CS_ADDRS, GV_CUR_REGION)	\
+{											\
+	if (!WAS_CRIT)									\
+	{										\
+		if (NOCRIT_PRESENT)							\
+			CS_ADDRS->now_crit = FALSE;					\
+		else									\
+			rel_crit(GV_CUR_REGION);					\
+	}										\
+}
 
 void dse_ctrlc_setup(void);
 int dse_data(char *dst, int *len);

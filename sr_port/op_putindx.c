@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+#include <stddef.h> 		/* for offsetof */
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
@@ -32,6 +33,7 @@
 GBLDEF lv_val		*active_lv;
 GBLREF int		lv_null_subs;
 GBLREF collseq		*local_collseq;
+GBLREF int4		lv_sbs_blk_size;		/* Size of an sbs_blk */
 
 lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 {
@@ -83,7 +85,8 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 				memset(tbl, 0, SIZEOF(lv_sbs_tbl));
 				tbl->sym = start->ptrs.val_ent.parent.sbs->sym;
 			} else
-			{	assert(MV_SYM == tbl->ident);
+			{
+				assert(MV_SYM == tbl->ident);
 				assert(MV_SYM == start->ptrs.val_ent.parent.sym->ident);
 				start->ptrs.val_ent.children = (lv_sbs_tbl *)lv_getslot(start->ptrs.val_ent.parent.sym);
 				tbl = start->ptrs.val_ent.children;
@@ -135,7 +138,8 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 					if (temp >= 0 && temp < SBS_NUM_INT_ELE)
 					{
 						tbl->int_flag = TRUE;
-						memset(&blk->ptr, 0, SIZEOF(blk->ptr));
+						/* Clean the ptr section of the sbs_blk */
+						memset(&blk->ptr, 0, (lv_sbs_blk_size - OFFSETOF(sbs_blk, ptr)));
 						blk->cnt = 1;
 						lv = blk->ptr.lv[temp] = lv_getslot(tbl->sym);
 						memset(lv, 0, SIZEOF(lv_val));

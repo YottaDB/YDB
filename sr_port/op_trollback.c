@@ -47,6 +47,8 @@ GBLREF	int4			tstart_trigger_depth;
 #ifdef DEBUG
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
+GBLREF	boolean_t		implicit_trollback;
+GBLREF	tp_frame		*tp_pointer;
 
 #define	RESTORE_GV_CUR_REGION						\
 {									\
@@ -61,11 +63,22 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	gd_region	*save_cur_region;	/* saved copy of gv_cur_region before tp_clean_up/tp_incr_clean_up modifies it */
 	gd_region	*curreg;
 	sgmnt_addrs	*csa;
+	boolean_t	lcl_implicit_trollback = FALSE;
+	gv_key		*gv_orig_key_ptr;
 
 	error_def(ERR_TLVLZERO);
 	error_def(ERR_TROLLBK2DEEP);
 	error_def(ERR_INVROLLBKLVL);
 
+	if (implicit_trollback)
+	{
+		/* Unlike the call to op_trollback from generated code, this invocation of op_trollback is from C runtime code.
+		 * Set the global variable to FALSE right away to avoid incorrect values from persisting in case of errors
+		 * down below. Before the reset of the global variable, copy it into a local variable.
+		 */
+		lcl_implicit_trollback = implicit_trollback;
+		implicit_trollback = FALSE;
+	}
 	if (0 == dollar_tlevel)
 		rts_error(VARLSTCNT(1) ERR_TLVLZERO);
 	if (0 > rb_levels && dollar_tlevel < -rb_levels)
@@ -104,20 +117,41 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 				continue;
 			csa = &FILE_INFO(curreg)->s_addrs;
 			INCR_GVSTATS_COUNTER(csa, csa->nl, n_tp_rolledback, 1);
-			if (csa->now_crit)
+			if (csa->now_crit && !csa->hold_onto_crit)
 				rel_crit(curreg);			/* release any crit regions */
 		}
-		tp_unwind(newlevel, ROLLBACK_INVOCATION, NULL);
-		/* Now that we are out of TP, reset the debug-only global variable that is relevant only if we are in TP */
-		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE;)
-		dollar_trestart = 0;
-		if (gv_currkey != NULL)
+		if (lcl_implicit_trollback && tp_pointer->implicit_tstart)
+		{	/* This is an implicit TROLLBACK of an implicit TSTART started for a non-tp explicit update.
+			 * gv_currkey needs to be restored to the value it was at the beginning of the implicit TSTART.
+			 * This is necessary so as to maintain $reference accurately in case of an error during the
+			 * ^#t processing initiated by an explicit non-tp update.
+			 */
+			assert(NULL != gv_currkey);
+			assert(tp_pointer && tp_pointer->orig_key);
+			gv_orig_key_ptr = tp_pointer->orig_key;
+			/* At this point we expect tp_pointer->orig_key and gv_currkey to be in sync. However there are two
+			 * exceptions to this.
+			 * (a) If MUPIP TRIGGER detects that all of the triggers are erroneous and attempts an op_trollback,
+			 *     gv_currkey would be pointing to ^#t. However, tp_pointer->orig_key would remain at "" (initialized
+			 *     during op_tstart).
+			 * (b) If an M program defines $etrap to do a halt and an explicit Non-TP update causes a trigger to be
+			 *     executed that further causes a runtime error which will now invoke the $etrap code. Since the
+			 *     $etrap code does a halt, gtm_exit_handler will invoke op_trollback (since dollar_tlevel is > 0).
+			 *     At this point, tp_pointer->orig_key and gv_currkey need not be in sync.
+			 * To maintain $reference accurately, we need to restore gv_currkey from tp_pointer->orig_key.
+			 */
+			memcpy(gv_currkey->base, gv_orig_key_ptr->base, gv_orig_key_ptr->end);
+		} else if (gv_currkey != NULL)
 		{
 			gv_currkey->base[0] = '\0';
 			gv_currkey->end = gv_currkey->prev = 0;
 		}
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
+		tp_unwind(newlevel, ROLLBACK_INVOCATION, NULL);
+		/* Now that we are out of TP, reset the debug-only global variable that is relevant only if we are in TP */
+		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE;)
+		dollar_trestart = 0;
 		RESTORE_GV_CUR_REGION;
 		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
 	} else

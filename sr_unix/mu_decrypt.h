@@ -26,8 +26,8 @@
 		save_errno = errno;											\
 		GC_DISPLAY_FILE_ERROR_AND_RETURN("Error accessing file !AD.", FNAME, FLEN, save_errno);			\
 	}														\
-	hdr_sz = JNL_HDR_LEN;												\
-	header = malloc(JNL_HDR_LEN);											\
+	hdr_sz = REAL_JNL_HDR_LEN;												\
+	header = malloc(REAL_JNL_HDR_LEN);											\
 	LSEEKREAD(FD, 0, header, hdr_sz, save_errno);									\
 	if (0 != save_errno)												\
 	{														\

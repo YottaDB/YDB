@@ -150,9 +150,7 @@ if ( $buildaux_gde == 1 ) then
 		chmod 664 *.m *.o
 
 		\rm -f *.m *.o	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
-		# Let's not copy getpass.m along with the other M files. We will anyway be compiling GETPASS separately
-		# in build.sh.
-		cp `ls $gtm_pct/*.m | grep -v -E "getpass\.m"` .
+		cp $gtm_pct/*.m .
 
 		# GDE and the % routines should all be in upper-case.
 		if ( `uname` !~ "CYGWIN*") then
@@ -185,10 +183,8 @@ if ( $buildaux_gde == 1 ) then
 			unsetenv LC_ALL
 			setenv gtm_chset UTF-8	# switch to "UTF-8" mode
 			\rm -f utf8/*.m	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
-			#Avoid linking getpass.m to the utf8 directory. The compilation and the subsequent copy of the GETPASS.o
-			#will be done in build.sh
 			# get a list of all m files to link
-			setenv mfiles `ls *.m | grep -v -E "getpass\.m"`
+			setenv mfiles `ls *.m`
 			cd utf8
 			foreach mfile ($mfiles)
 				ln -s ../$mfile $mfile
@@ -508,33 +504,26 @@ if ($buildaux_gtmcrypt == 1) then
 		rm -rf $gtm_dist/plugin/
 		mkdir -p $gtm_dist/plugin/gtmcrypt >&! /dev/null
 		setenv gtm_dist_plugin $gtm_dist/plugin/gtmcrypt
-		cp -pf $gtm_src/gtmcrypt_*ref.c $gtm_src/maskpass.c $gtm_src/ascii2hex.c $gtm_dist_plugin >&! /dev/null
+		cp -pf $gtm_src/gtmcrypt_*ref.c $gtm_src/maskpass.c $gtm_dist_plugin >&! /dev/null
 		cp -pf $gtm_inc/gtmcrypt_*ref.h $gtm_inc/gtmcrypt_interface.h $gtm_inc/gtmxc_types.h $gtm_dist_plugin >&! /dev/null
-		if ("OS/390" == $HOSTOS) then
-			foreach file (`ls $gtm_tools/*.ksh`)
-				# the simple way to switch from Korn to Bourne.
-				sed 's,#\!/bin/ksh,#\!/bin/sh,' $file >> $gtm_dist_plugin/$file:t
-			end
-		else
-			cp -pf $gtm_tools/*.ksh $gtm_dist_plugin >&! /dev/null
-		endif
-		cp -pf $gtm_tools/build.sh $gtm_tools/install.sh $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_pct/getpass.m $gtm_dist_plugin/GETPASS.m >&! /dev/null
-		chmod +x $gtm_dist_plugin/*.ksh
+		cp -pf $gtm_tools/build.sh $gtm_tools/install.sh $gtm_tools/add_db_key.sh $gtm_dist_plugin >&! /dev/null
+		cp -pf $gtm_tools/encrypt_sign_db_key.sh $gtm_tools/gen_keypair.sh $gtm_dist_plugin >&! /dev/null
+		cp -pf $gtm_tools/gen_sym_hash.sh $gtm_tools/gen_sym_key.sh $gtm_dist_plugin >&! /dev/null
+		cp -pf $gtm_tools/import_and_sign_key.sh $gtm_tools/pinentry-gtm.sh $gtm_dist_plugin >&! /dev/null
+		cp -pf $gtm_pct/pinentry.m $gtm_dist_plugin >&! /dev/null
 		chmod +x $gtm_dist_plugin/*.sh
 		pushd $gtm_dist_plugin >&! /dev/null
 		set bstat = 0
 		if ( $HOSTOS == "AIX") then
 			#For AIX we will be building the encryption library with openssl support.
-			$gtm_dist_plugin/build.sh openssl $plugin_build_type >&! $gtm_map/gtmcryptbuild.map
+			sh -x $gtm_dist_plugin/build.sh openssl $plugin_build_type >&! $gtm_map/gtmcryptbuild.map
 			set bstat = $status;
 		else
-			$gtm_dist_plugin/build.sh gcrypt $plugin_build_type >&! $gtm_map/gtmcryptbuild.map
+			sh -x $gtm_dist_plugin/build.sh gcrypt $plugin_build_type >&! $gtm_map/gtmcryptbuild.map
 			set bstat = $status;
 		endif
 		cat $gtm_map/gtmcryptbuild.map
-		if (0 != $bstat || ! -x $gtm_dist_plugin/libgtmcrypt$gt_ld_shl_suffix || ! -x $gtm_dist_plugin/ascii2hex \
-			|| ! -x $gtm_dist_plugin/maskpass ) then
+		if (0 != $bstat || ! -x $gtm_dist_plugin/libgtmcrypt$gt_ld_shl_suffix || ! -x $gtm_dist_plugin/maskpass ) then
 			set buildaux_status = `expr $buildaux_status + 1`
 			echo "buildaux-E-libgtmcrypt, failed to build gtmcrypt and/or helper scripts \
 			(see ${dollar_sign}gtm_map/gtmcryptbuild.map)" >> $gtm_log/error.`basename $gtm_exe`.log

@@ -130,7 +130,6 @@ GBLREF	boolean_t		tp_restart_fail_sig_used;
 #endif
 GBLREF	int			merge_args;
 GBLREF	lvzwrite_datablk	*lvzwrite_block;
-GBLREF	int			process_exiting;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
@@ -175,7 +174,7 @@ boolean_t clean_mum_tstart(void);
 	if ((0 == gtm_trigger_depth) && tp_pointer && tp_pointer->implicit_tstart)	\
 	{										\
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);				\
-		op_trollback(-1);	/* Unroll implicit TP frame */			\
+		OP_TROLLBACK(-1);	/* Unroll implicit TP frame */			\
 	}										\
 }
 #else
@@ -195,7 +194,7 @@ boolean_t clean_mum_tstart(void)
 	{
 		while ((NULL != frame_pointer) && (NULL != zyerr_frame))
 		{
-			GOFRAMES(1, TRUE);
+			GOFRAMES(1, TRUE, FALSE);
 		}
 		assert(NULL != frame_pointer);
 		proc_act_type = 0;
@@ -301,7 +300,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 		alias_retarg->mvtype = 0;	/* Kill the temp var (no longer a container) */
 		alias_retarg = NULL;		/* .. and no more in-flight return argument */
 	}
-	assert((NULL == cs_addrs) || (FALSE == cs_addrs->read_lock));
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{
 		/* ---------------------------------------------------------------------
@@ -356,11 +354,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 */
 			GTMASSERT;
 #		endif
-		rc = tp_restart(1);
+		rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);
 
 #		ifdef GTM_TRIGGER
 		if (0 != rc)
-		{	/* The only time tp_restart() will return non-zero is if the error needs to be
+		{	/* The only time "tp_restart" will return non-zero is if the error needs to be
 			   rethrown. To accomplish that, we will unwind this handler which will return to
 			   the inner most initiating dm_start() with the return code set to whatever mumps_status
 			   is set to.
@@ -374,7 +372,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			DBGTRIGR((stderr, "mdb_condition_handler: Rethrowing TPRETRY to earlier level\n"));
 			UNWIND(NULL, NULL);
 		}
-		/* tp_restart() has succeeded so we have unwound back to the return point but check if the
+		/* "tp_restart" has succeeded so we have unwound back to the return point but check if the
 		 * transaction was initiated by an implicit trigger TSTART. This can occur if an error was
 		 * encountered in a trigger before the trigger base-frame was setup. It can occur at any trigger
 		 * level if a triggered update is preceeded by a TROLLBACK.
@@ -457,7 +455,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		   3) VMS: If we got an ACCVIO for the same as reason (2).
 		   Note that we will bypass checks 2 and 3 if GDL_ZSHOWDumpOnSignal debug flag is on
 		*/
-		process_exiting = TRUE;		/* So zshow doesn't push stuff on stack to "protect" it when
+		SET_PROCESS_EXITING_TRUE;	/* So zshow doesn't push stuff on stack to "protect" it when
 						   we potentially already have a stack overflow */
 		cancel_timer(0);		/* No interruptions now that we are dying */
 		if (UNIX_ONLY(0 == gtmMallocDepth && ((SIGBUS != exi_condition && SIGSEGV != exi_condition) ||
@@ -490,16 +488,22 @@ CONDITION_HANDLER(mdb_condition_handler)
 		   stack overflow on VMS is being disabled. The dump can be controlled wih set proc/dump
 		   (or not) as desired.
 
-		   2008-01-29 (se): Added (now) fatal MEMORY error so we no longer generate a core for it by
+		   2008-01-29 (se): Added fatal MEMORY error so we no longer generate a core for it by
 		   default unless the DumpOnStackOFlow flag is turned on. Since this flag is not a user-exposed
 		   interface, I'm avoiding renaming it for now. Note the core avoidance applies to both UNIX
 		   and VMS since stack formation is not at issue in this sort of memory request.
+
+		   Finally note that in UNIX, ch_cond_core (called by DRIVECH macro which invoked this condition
+		   handler has likely already created the core and set the created_core flag which will prevent
+		   this process from creating another core for the same SIGNAL. We leave this code in here in
+		   case methods exist in the future for this module to be driven without invoking cond_core_ch
+		   first.
 		*/
 
 		if (!(GDL_DumpOnStackOFlow & gtmDebugLevel) &&
 		    VMS_ONLY((int)ERR_VMSMEMORY == SIGNAL)
 		    UNIX_ONLY(((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
-			       || (int)ERR_MEMORY == SIGNAL)  || (int)ERR_MEMORY == arg))
+			       || (int)ERR_MEMORY == SIGNAL  || (int)ERR_MEMORY == arg)))
 		{
 #			ifdef VMS
 			/* Inside this ifdef, we are definitely here because of ERR_VMSMEMORY. If the conditions
@@ -586,7 +590,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 				if (reg_local->open && !reg_local->was_open)
 				{
 					csa = (sgmnt_addrs *)&FILE_INFO(reg_local)->s_addrs;
-					if (csa && (csa->now_crit))
+					if (csa && csa->now_crit)
 						rel_crit(reg_local);
 				}
 			}
@@ -634,7 +638,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 */
 		assert(((int)ERR_CTRLY != SIGNAL) && ((int)ERR_CTRLC != SIGNAL) && ((int)ERR_CTRAP != SIGNAL)
 		       && ((int)ERR_JOBINTRRQST != SIGNAL) && ((int)ERR_JOBINTRRETHROW != SIGNAL));
-		gtm_trigger_fini(TRUE);
+		gtm_trigger_fini(TRUE, FALSE);
 		DBGEHND((stderr, "mdb_condition_handler: Current trigger frame unwound so error is thrown"
 			 " on trigger invoker's frame instead.\n"));
 	}

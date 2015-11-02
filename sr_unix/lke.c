@@ -59,6 +59,7 @@
 #include "suspsigs_handler.h"
 #include "patcode.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+#include "gtm_imagetype_init.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -70,7 +71,6 @@ GBLREF bool			licensed;
 GBLREF void			(*func)(void);
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF global_latch_t		defer_latch;
-GBLREF enum gtmImageTypes	image_type;
 GBLREF char			cli_err_str[];
 GBLREF CLI_ENTRY		lke_cmd_ary[];
 
@@ -81,7 +81,7 @@ static void display_prompt(void);
 
 int main (int argc, char *argv[])
 {
-	image_type = LKE_IMAGE;
+	gtm_imagetype_init(LKE_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
 	licensed = TRUE;

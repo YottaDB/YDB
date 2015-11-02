@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,17 +44,17 @@
 #include "gvcst_blk_build.h"	/* for the BUILD_AIMG_IF_JNL_ENABLED macro */
 #include "dse_simulate_t_end.h"
 
-GBLREF char		*update_array, *update_array_ptr;
-GBLREF uint4		update_array_size;
-GBLREF srch_hist	dummy_hist;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF block_id		patch_curr_blk;
-GBLREF gd_region	*gv_cur_region;
-GBLREF gd_addr		*gd_header;
-GBLREF cache_rec	*cr_array[((MAX_BT_DEPTH * 2) - 1) * 2];	/* Maximum number of blocks that can be in transaction */
-GBLREF boolean_t	unhandled_stale_timer_pop;
-GBLREF unsigned char	*non_tp_jfb_buff_ptr;
+GBLREF	char			*update_array, *update_array_ptr;
+GBLREF	uint4			update_array_size;
+GBLREF	srch_hist		dummy_hist;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	block_id		patch_curr_blk;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gd_addr			*gd_header;
+GBLREF	cache_rec		*cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
+GBLREF	boolean_t		unhandled_stale_timer_pop;
+GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
 
 void dse_chng_bhead(void)
 {
@@ -179,7 +179,6 @@ void dse_chng_bhead(void)
 		csa->ti->early_tn++;
 		if (NULL == (blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 		{
-			rel_crit(gv_cur_region);
 			util_out_print("Error: Unable to read buffer.", TRUE);
 			t_abort(gv_cur_region, csa);
 			return;
@@ -195,7 +194,7 @@ void dse_chng_bhead(void)
 			((blk_hdr_ptr_t)blkhist.buffaddr)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 		/* Pass the desired tn as argument to bg_update/mm_update below */
 		dse_simulate_t_end(gv_cur_region, csa, tn);
-		rel_crit(gv_cur_region);
+		t_abort(gv_cur_region, csa); /* primarily to do rel_crit if necessary since dse_simulate_t_end does not do that */
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
 	}

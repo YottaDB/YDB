@@ -70,6 +70,7 @@
 #include "shmpool.h"
 #include "db_snapshot.h"
 #include "tp_grab_crit.h"
+#include "ss_lock_facility.h"
 
 #ifndef GTM_SNAPSHOT
 # error "Snapshot facility not available on this platform"
@@ -130,7 +131,7 @@ void gds_rundown(void)
 	unix_db_info		*udi;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
-	int			save_intrpt_ok_state;
+	intrpt_state_t		save_intrpt_ok_state;
 	shm_snapshot_t		*ss_shm_ptr;
 	boolean_t		is_cur_process_ss_initiator;
 	uint4			ss_pid;
@@ -179,6 +180,7 @@ void gds_rundown(void)
 		return;
 	}
 	ESTABLISH(gds_rundown_ch);
+	assert(!csa->hold_onto_crit);	/* because of this, we dont need to do "was_crit" checks before doing "rel_crit" below */
 	if (!reg->open)				/* Not open, no point to rundown */
 	{
 		if (reg->opening)		/* Died partway open, kill rest of way */
@@ -222,7 +224,6 @@ void gds_rundown(void)
 	we_are_last_user = FALSE;
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE, FALSE);
-	assert(!csa->read_lock);
 	rel_crit(reg);		/* get locks to known state */
 	mutex_cleanup(reg);
 	/*
@@ -308,14 +309,15 @@ void gds_rundown(void)
 	is_cur_process_ss_initiator = (process_id == ss_pid);
 	if (ss_pid && (is_cur_process_ss_initiator || we_are_last_user))
 	{
-		/* Try getting crit using tp_grab_crit. If we don't get crit, we would not hang for eternity and will skip
-		 * doing the orphaned snapshot cleanup. It will be cleaned up eventually.
+		/* Try getting snapshot crit latch. If we don't get latch, we won't hang for eternity and will skip
+		 * doing the orphaned snapshot cleanup. It will be cleaned up eventually either by subsequent MUPIP
+		 * INTEG or by a MUPIP RUNDOWN.
 		 */
-		if (tp_grab_crit(reg) && (ss_pid == ss_shm_ptr->ss_info.ss_pid)
+		if (ss_get_lock_nowait(reg) && (ss_pid == ss_shm_ptr->ss_info.ss_pid)
 			&& (is_cur_process_ss_initiator || !is_proc_alive(ss_pid, 0)))
 		{
 			ss_release(NULL);
-			rel_crit(reg);
+			ss_release_lock(reg);
 		}
 	}
 	/* If csa->nl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we should
@@ -657,6 +659,7 @@ CONDITION_HANDLER(gds_rundown_ch)
 	{
 		if (csa->now_crit)		/* Might hold crit if wcs_flu or other failure */
 		{
+			assert(!csa->hold_onto_crit);
 			if (NULL != csa->nl)
 				rel_crit(gv_cur_region); /* also sets csa->now_crit to FALSE */
 			else

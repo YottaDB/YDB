@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +27,9 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF tp_frame		*tp_pointer;
 GBLREF symval		*curr_symval;
 GBLREF short		dollar_tlevel;
+#ifdef GTM_TRIGGER
+GBLREF mval		dollar_ztwormhole;
+#endif
 
 /* Note this module follows the basic pattern of op_newvar which handles the same
    function except for local vars instead of intrinsic vars. */
@@ -144,8 +147,15 @@ void gtm_newintrinsic(mval *intrinsic)
 		mv_st_ent->mv_st_cont.mvs_msav.v = *intrinsic;
 		mv_st_ent->mv_st_cont.mvs_msav.addr = intrinsic;
 	}
-	/* New the intrinsic var's current value */
-	intrinsic->mvtype = MV_STR;
-	intrinsic->str.len = 0;
+	/* New the intrinsic var's current value if not $ZTWORMHOLE */
+#	ifdef GTM_TRIGGER
+	if (&dollar_ztwormhole != intrinsic)
+	{
+#	endif
+		intrinsic->mvtype = MV_STR;
+		intrinsic->str.len = 0;
+#	ifdef GTM_TRIGGER
+	}
+#	endif
 	return;
 }

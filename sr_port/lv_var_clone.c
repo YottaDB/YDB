@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include <stddef.h>		/* For offsetof() macro */
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 
@@ -24,6 +25,8 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+
+GBLREF	int4	lv_sbs_blk_size;
 
 /* Routine to clone the children of a tree. The input lv_val should be a clone of the base lv_val
    owning the tree we wish to clone. The pointers in this copy will be duplicated and the new tree
@@ -67,7 +70,7 @@ void lv_var_clone(lv_val *clone_var)
 				assert(0 == newsbs->nxt);
 				assert(newsbs->sbs_que.fl && newsbs->sbs_que.bl);
 				newsbs->cnt = (*num)->cnt;
-				memcpy(&newsbs->ptr, &(*num)->ptr, SIZEOF(newsbs->ptr));
+				memcpy(&newsbs->ptr, &(*num)->ptr, (lv_sbs_blk_size - OFFSETOF(sbs_blk, ptr)));
 				for (i = 0;  i < SBS_NUM_INT_ELE;  i++)
 				{
 					if (newsbs->ptr.lv[i])
@@ -94,7 +97,7 @@ void lv_var_clone(lv_val *clone_var)
 					assert(0 == newsbs->nxt);
 					assert(newsbs->sbs_que.fl && newsbs->sbs_que.bl);
 					newsbs->cnt = (*num)->cnt;
-					memcpy(&newsbs->ptr, &(*num)->ptr, SIZEOF(newsbs->ptr));
+					memcpy(&newsbs->ptr, &(*num)->ptr, (lv_sbs_blk_size - OFFSETOF(sbs_blk, ptr)));
 					for (i = 0;  i < newsbs->cnt;  i++)
 					{
 						lv = lv_getslot(ownsym);
@@ -117,7 +120,7 @@ void lv_var_clone(lv_val *clone_var)
 			assert(0 == newsbs->nxt);
 			assert(newsbs->sbs_que.fl && newsbs->sbs_que.bl);
 			newsbs->cnt = (*str)->cnt;
-			memcpy(&newsbs->ptr, &(*str)->ptr, SIZEOF(newsbs->ptr));
+			memcpy(&newsbs->ptr, &(*str)->ptr, (lv_sbs_blk_size - OFFSETOF(sbs_blk, ptr)));
 			for (i = 0;  i < newsbs->cnt;  i++)
 			{
 				lv = lv_getslot(ownsym);

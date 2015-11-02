@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,8 +32,9 @@ void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 		return;
 	}
 	srctop = src->str.addr + src->str.len;
-	if (!gtm_utf8_mode || (src_is_singlebyte = MV_IS_SINGLEBYTE(src))) /* entirely single byte string */
+	UNICODE_ONLY(if (!gtm_utf8_mode || (src_is_singlebyte = MV_IS_SINGLEBYTE(src)))) /* entirely single byte string */
 		srcbase =  src->str.addr + first - 1;
+#	ifdef UNICODE_SUPPORTED
 	else
 	{ /* generic extraction of a multi-byte string */
 		for (srcbase = src->str.addr, skip = first - 1; (skip > 0 && srcbase < srctop); --skip)
@@ -48,10 +49,12 @@ void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 			return;
 		}
 	}
+#	endif
 	dest->str.addr = srcbase;
 	if (srctop - srcbase > byte_width)
 	{
 		srcptr = srcbase + byte_width;
+#		ifdef UNICODE_SUPPORTED
 		if (gtm_utf8_mode)
 		{
 			if (src_is_singlebyte)
@@ -64,9 +67,12 @@ void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 				srcptr = tmpptr;
 			}
 		}
+#		endif
 		dest->str.len = INTCAST(srcptr - srcbase);
 	} else /* width exceeds the length, so return the rest of the entire string */
 		dest->str.len = INTCAST(srctop - srcbase);
+#	ifdef UNICODE_SUPPORTED
 	if (gtm_utf8_mode && !src_is_singlebyte && !badchar_inhibit)
 		MV_FORCE_LEN(dest); /* catch BADCHAR (if any) */
+#	endif
 }

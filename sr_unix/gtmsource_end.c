@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,11 +78,14 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	int		exit_status;
 	seq_num		log_seqno, log_seqno1, diff_seqno;
 	int		fclose_res;
+	sgmnt_addrs	*repl_csa;
 #ifdef VMS
 	int4		status;
 #endif
 
 	gtmsource_ctl_close();
+	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke and "rel_lock" unconditionally */
 	rel_lock(jnlpool.jnlpool_dummy_reg);
 	UNIX_ONLY(mutex_cleanup(jnlpool.jnlpool_dummy_reg);)
 	exit_status = NORMAL_SHUTDOWN;

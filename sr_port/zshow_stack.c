@@ -62,8 +62,7 @@ void zshow_stack(zshow_out *output)
 			*nfp++ = fp->type;
 			if (fp->type & SFT_ZTRAP || fp->type & SFT_DEV_ACT || HAS_TRANS_CODE_ERR(fp))
 				line_reset = TRUE;
-		}
-		else
+		} else
 		{
 			if (HAS_TRANS_CODE_ERR(fp))
 			{
@@ -74,8 +73,7 @@ void zshow_stack(zshow_out *output)
 			{
 				addr = fp->mpc + 1;
 				line_reset = FALSE;
-			}
-			else
+			} else
 				addr = fp->mpc;
 			v.len = INTCAST(symb_line(addr, &buff[0], 0, fp->rvector) - &buff[0]);
 			if (v.len == 0)
@@ -89,35 +87,35 @@ void zshow_stack(zshow_out *output)
 				{
 					switch(*nfp)
 					{
-					case SFT_ZBRK_ACT:
-						MEMCPY_LIT(&buff[v.len], ZBRK_FRAME);
-						v.len += SIZEOF(ZBRK_FRAME) - 1;
-						break;
-					case SFT_DEV_ACT:
-						MEMCPY_LIT(&buff[v.len], DEVERR_FRAME);
-						v.len += SIZEOF(DEVERR_FRAME) - 1;
-						break;
-					case SFT_ZTRAP:
-						MEMCPY_LIT(&buff[v.len], ZTRAP_FRAME);
-						v.len += SIZEOF(ZTRAP_FRAME) - 1;
-						break;
-					case SFT_DM:
-						MEMCPY_LIT(&buff[v.len], DIR_MODE_MESS);
-						v.len += SIZEOF(DIR_MODE_MESS) - 1;
-						break;
-					case (SFT_COUNT | SFT_ZINTR):
-						MEMCPY_LIT(&buff[v.len], ZINTR_FRAME);
-						v.len += SIZEOF(DIR_MODE_MESS) - 1;
-						break;
-					default:
-						break;
+						case SFT_ZBRK_ACT:
+							MEMCPY_LIT(&buff[v.len], ZBRK_FRAME);
+							v.len += SIZEOF(ZBRK_FRAME) - 1;
+							break;
+						case SFT_DEV_ACT:
+							MEMCPY_LIT(&buff[v.len], DEVERR_FRAME);
+							v.len += SIZEOF(DEVERR_FRAME) - 1;
+							break;
+						case SFT_ZTRAP:
+							MEMCPY_LIT(&buff[v.len], ZTRAP_FRAME);
+							v.len += SIZEOF(ZTRAP_FRAME) - 1;
+							break;
+						case SFT_DM:
+							MEMCPY_LIT(&buff[v.len], DIR_MODE_MESS);
+							v.len += SIZEOF(DIR_MODE_MESS) - 1;
+							break;
+						case (SFT_COUNT | SFT_ZINTR):
+							MEMCPY_LIT(&buff[v.len], ZINTR_FRAME);
+							v.len += SIZEOF(DIR_MODE_MESS) - 1;
+							break;
+						default:
+							break;
 					}
 					output->flush = TRUE;
 					zshow_output(output, &v);
 					v.len = 0;
 				}
 				nfp = &nocount_frames[0];
-			}else
+			} else
 			{
 				output->flush = TRUE;
 				zshow_output(output, &v);

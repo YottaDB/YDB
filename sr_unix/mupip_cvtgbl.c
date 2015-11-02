@@ -26,16 +26,14 @@
 #include "gtm_caseconv.h"
 #include "mupip_exit.h"
 #include "mupip_cvtgbl.h"
-#include "mu_load_input.h"
+#include "file_input.h"
 #include "load.h"
 #include "mu_outofband_setup.h"
 
 GBLREF	int		gv_fillfactor;
 GBLREF	bool		mupip_error_occurred;
 GBLREF	boolean_t	is_replicator;
-#ifdef GTM_TRIGGER
 GBLREF	boolean_t	skip_dbtriggers;
-#endif
 
 void mupip_cvtgbl(void)
 {
@@ -55,11 +53,11 @@ void mupip_cvtgbl(void)
 	error_def(ERR_LOADEDSZ2);
 
 	is_replicator = TRUE;
-	GTMTRIG_ONLY(skip_dbtriggers = TRUE;)
+	skip_dbtriggers = TRUE;
 	fn_len = 256;
 	if (!cli_get_str("FILE", fn, &fn_len))
 		mupip_exit(ERR_MUPCLIERR);
-	mu_load_init(fn, fn_len);
+	file_input_init(fn, fn_len);
 	if (mupip_error_occurred)
 		exit(-1);
 	mu_outofband_setup();

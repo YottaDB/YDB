@@ -46,7 +46,6 @@
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "gv_trigger_protos.h"
-#include "tp_restart.h"
 #include "mv_stent.h"
 #include "stringpool.h"
 #	ifdef DEBUG
@@ -54,6 +53,7 @@
 #	include "tp_frame.h"
 #	endif
 #endif
+#include "tp_restart.h"
 
 /* Include prototypes */
 #include "gvcst_kill_blk.h"
@@ -80,12 +80,14 @@ LITREF	mval	literal_null;
 LITREF	mval	*fndata_table[2][2];
 #endif
 
-GBLREF	char			*update_array, *update_array_ptr;
+#ifdef DEBUG
+GBLREF char			*update_array, *update_array_ptr;
+GBLREF uint4			update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
+#endif
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
 GBLREF	int4			gv_keysize;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	uint4			update_array_size, cumul_update_array_size; /* needed for the ENSURE_UPDATE_ARRAY_SPACE macro */
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	kill_set		*kill_set_tail;
 GBLREF	short			dollar_tlevel;
@@ -98,11 +100,11 @@ GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	sgmnt_addrs		*kip_csa;
+GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 #ifdef GTM_TRIGGER
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
 GBLREF	boolean_t		skip_INVOKE_RESTART;
-GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
 GBLREF	boolean_t		ztwormhole_used;	/* TRUE if $ztwormhole was used by trigger code */
 GBLREF	mval			dollar_ztwormhole;
@@ -152,6 +154,7 @@ void	gvcst_kill(bool do_subtree)
 #	endif
 
 	error_def(ERR_TPRETRY);
+	error_def(ERR_GVKILLFAIL);
 
 	csa = cs_addrs;
 	csd = csa->hdr;
@@ -202,60 +205,65 @@ void	gvcst_kill(bool do_subtree)
 		write_logical_jnlrecs = JNL_WRITE_LOGICAL_RECS(csa);
 #		ifdef GTM_TRIGGER
 		gvtr_parms.num_triggers_invoked = 0;	/* clear any leftover value */
-		GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap, ERR_GVKILLFAIL);
-		assert(skip_dbtriggers || (gvt_trigger == gv_target->gvt_trigger));
 		dlr_data = 0;
-		if (!skip_dbtriggers && (NULL != gvt_trigger))
+		is_tpwrap = FALSE;
+		if (!skip_dbtriggers) /* No trigger init needed if skip_dbtriggers is TRUE (e.g. mupip load etc.) */
 		{
-			PUSH_ZTOLDMVAL_ON_M_STACK(ztold_mval, save_msp, save_mv_chain);
-			/* Determine $ZTOLDVAL & $ZTDATA to fill in trigparms */
-			cdb_status = gvcst_dataget(&dlr_data, ztold_mval);
-                        if (cdb_sc_normal != cdb_status)
-                                goto retry;
-			assert((11 >= dlr_data) && (1 >= (dlr_data % 10)));
-			/* Invoke triggers for KILL as long as $data is nonzero (1 or 10 or 11).
-			 * Invoke triggers for ZKILL only if $data is 1 or 11 (for 10 case, ZKILL is a no-op).
-			 */
-			if (do_subtree ? dlr_data : (dlr_data & 1))
-			{	/* Either node or its descendants exists. Invoke KILL triggers for this node.
-				 * But first write journal records (ZTWORM and/or KILL) for the triggering nupdate.
-				 * "ztworm_jfb", "jfb" and "jnl_format_done" are set by the below macro.
-				 */
-				JNL_FORMAT_ZTWORM_IF_NEEDED(csa, write_logical_jnlrecs,
-						operation, gv_currkey, NULL, ztworm_jfb, jfb, jnl_format_done);
-				/* Initialize trigger parms that dont depend on the context of the matching trigger */
-				trigparms.ztoldval_new = ztold_mval;
-				trigparms.ztdata_new = fndata_table[dlr_data / 10][dlr_data & 1];
-				if (NULL == trigparms.ztvalue_new)
-				{	/* Do not pass literal_null directly since $ztval can be modified inside trigger code
-					 * and literal_null is in read-only segment so will not be modifiable. Hence the
-					 * need for a dummy local variable mval "ztvalue_new" in the C stack.
-					 */
-					ztvalue_new = literal_null;
-					trigparms.ztvalue_new = &ztvalue_new;
-				}
-				gvtr_parms.gvtr_cmd = do_subtree ? GVTR_CMDTYPE_KILL : GVTR_CMDTYPE_ZKILL;
-				gvtr_parms.gvt_trigger = gvt_trigger;
-				/* gvtr_parms.duplicate_set : No need to initialize as it is SET-specific */
-				/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
-				gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
-				assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
-				if (ERR_TPRETRY == gtm_trig_status)
-				{	/* A restart has been signalled inside trigger code for this implicit TP wrapped
-					 * transaction. Redo gvcst_kill logic. The t_retry/tp_restart call has already
-					 * been done on our behalf by gtm_trigger so we need to skip that part and do
-					 * everything else before redoing gvcst_kill.
-					 */
-					assert(lcl_implicit_tstart);
-					assert(0 < t_tries);
-					assert(CDB_STAGNATE >= t_tries);
-					cdb_status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
+			GVTR_INIT_AND_TPWRAP_IF_NEEDED(csa, csd, gv_target, gvt_trigger, lcl_implicit_tstart, is_tpwrap,
+							ERR_GVKILLFAIL);
+			assert(gvt_trigger == gv_target->gvt_trigger);
+			if (NULL != gvt_trigger)
+			{
+				PUSH_ZTOLDMVAL_ON_M_STACK(ztold_mval, save_msp, save_mv_chain);
+				/* Determine $ZTOLDVAL & $ZTDATA to fill in trigparms */
+				cdb_status = gvcst_dataget(&dlr_data, ztold_mval);
+				if (cdb_sc_normal != cdb_status)
 					goto retry;
+				assert((11 >= dlr_data) && (1 >= (dlr_data % 10)));
+				/* Invoke triggers for KILL as long as $data is nonzero (1 or 10 or 11).
+				 * Invoke triggers for ZKILL only if $data is 1 or 11 (for 10 case, ZKILL is a no-op).
+				 */
+				if (do_subtree ? dlr_data : (dlr_data & 1))
+				{	/* Either node or its descendants exists. Invoke KILL triggers for this node.
+					 * But first write journal records (ZTWORM and/or KILL) for the triggering nupdate.
+					 * "ztworm_jfb", "jfb" and "jnl_format_done" are set by the below macro.
+					 */
+					JNL_FORMAT_ZTWORM_IF_NEEDED(csa, write_logical_jnlrecs,
+							operation, gv_currkey, NULL, ztworm_jfb, jfb, jnl_format_done);
+					/* Initialize trigger parms that dont depend on the context of the matching trigger */
+					trigparms.ztoldval_new = ztold_mval;
+					trigparms.ztdata_new = fndata_table[dlr_data / 10][dlr_data & 1];
+					if (NULL == trigparms.ztvalue_new)
+					{	/* Do not pass literal_null directly since $ztval can be modified inside trigger
+						 * code and literal_null is in read-only segment so will not be modifiable.
+						 * Hence the need for a dummy local variable mval "ztvalue_new" in the C stack.
+						 */
+						ztvalue_new = literal_null;
+						trigparms.ztvalue_new = &ztvalue_new;
+					}
+					gvtr_parms.gvtr_cmd = do_subtree ? GVTR_CMDTYPE_KILL : GVTR_CMDTYPE_ZKILL;
+					gvtr_parms.gvt_trigger = gvt_trigger;
+					/* gvtr_parms.duplicate_set : No need to initialize as it is SET-specific */
+					/* Now that we have filled in minimal information, let "gvtr_match_n_invoke" do the rest */
+					gtm_trig_status = gvtr_match_n_invoke(&trigparms, &gvtr_parms);
+					assert((0 == gtm_trig_status) || (ERR_TPRETRY == gtm_trig_status));
+					if (ERR_TPRETRY == gtm_trig_status)
+					{	/* A restart has been signalled inside trigger code for this implicit TP wrapped
+						 * transaction. Redo gvcst_kill logic. The t_retry/tp_restart call has already
+						 * been done on our behalf by gtm_trigger so we need to skip that part and do
+						 * everything else before redoing gvcst_kill.
+						 */
+						assert(lcl_implicit_tstart);
+						assert(0 < t_tries);
+						assert(CDB_STAGNATE >= t_tries);
+						cdb_status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
+						goto retry;
+					}
+					REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, sgm_info_ptr);
 				}
-				REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, sgm_info_ptr);
+				/* else : we dont invoke any KILL/ZTKILL type triggers for a node whose $data is 0 */
+				POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
 			}
-			/* else : we dont invoke any KILL/ZTKILL type triggers for a node whose $data is 0 */
-			POP_MVALS_FROM_M_STACK_IF_NEEDED(ztold_mval, save_msp, save_mv_chain);
 		}
 #		endif
 		assert(csd == cs_data);	/* assert csd is in sync with cs_data even if there were MM db file extensions */
@@ -422,28 +430,35 @@ research:
 				si->update_trans = prev_update_trans;	/* restore status prior to redundant KILL */
 		}
 		if (write_logical_jnlrecs && actual_update)
-		{	/* Maintain journal records only if the kill actually resulted in a database update. */
+		{	/* Maintain journal records only if the kill actually resulted in a database update.
+			 * skip_dbtriggers is set to TRUE for trigger unsupporting platforms. So, nodeflags will be set to skip
+			 * triggers on secondary. This ensures that updates happening in primary (trigger unsupporting platform)
+			 * is treated in the same order in the secondary (trigger supporting platform) irrespective of whether
+			 * the secondary has defined triggers or not for the global that is being updated.
+			 */
 			if (0 == dollar_tlevel)
 			{
 				nodeflags = 0;
-				GTMTRIG_ONLY(
-					if (skip_dbtriggers)
-						nodeflags = JS_SKIP_TRIGGERS_MASK;
-				)
+				if (skip_dbtriggers)
+					nodeflags |= JS_SKIP_TRIGGERS_MASK;
 				assert(!jnl_format_done);
 				jfb = jnl_format(operation, gv_currkey, NULL, nodeflags);
 				assert(NULL != jfb);
 			} else if (!jnl_format_done)
 			{
 				nodeflags = 0;
-				GTMTRIG_ONLY(
-					if (skip_dbtriggers)
-						nodeflags = JS_SKIP_TRIGGERS_MASK;
-					/* Do not replicate implicit updates */
-					assert(tstart_trigger_depth <= gtm_trigger_depth);
-					if (gtm_trigger_depth > tstart_trigger_depth)
-						nodeflags = JS_NOT_REPLICATED_MASK;
-				)
+				if (skip_dbtriggers)
+					nodeflags |= JS_SKIP_TRIGGERS_MASK;
+#				ifdef GTM_TRIGGER
+				/* Do not replicate implicit updates */
+				assert(tstart_trigger_depth <= gtm_trigger_depth);
+				if (gtm_trigger_depth > tstart_trigger_depth)
+				{
+					/* Ensure that JS_SKIP_TRIGGERS_MASK and JS_NOT_REPLICATED_MASK are mutually exclusive. */
+					assert(!(nodeflags & JS_SKIP_TRIGGERS_MASK));
+					nodeflags |= JS_NOT_REPLICATED_MASK;
+				}
+#				endif
 				/* Write KILL journal record */
 				jfb = jnl_format(operation, gv_currkey, NULL, nodeflags);
 				assert(NULL != jfb);
@@ -481,6 +496,12 @@ research:
 				}
 				need_kip_incr = FALSE;
 				assert(NULL == kip_csa);
+				/* We could have entered gvcst_kill trying to kill a global that does not exist but later due to a
+				 * concurrent set, we are about to retry. In such a case, update_trans could have been set to 0
+				 * (from actual_update above). Reset update_trans to non-zero for the next retry as we expect the
+				 * kill to happen in this retry.
+				 */
+				update_trans = UPDTRNS_DB_UPDATED_MASK;
 				continue;
 			}
 			/* In case this is MM and t_end caused a database extension, reset csd */
@@ -562,7 +583,7 @@ retry:
 			 * to complete pending "tprestart_state" related work.
 			 */
 			GTMTRIG_ONLY(assert(ERR_TPRETRY == gtm_trig_status);)
-			tp_restart(1);
+			tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 		}
 		GTMTRIG_ONLY(assert(!skip_INVOKE_RESTART);) /* if set to TRUE above, should have been reset by t_retry */
 		/* At this point, we can be in TP only if we implicitly did a tstart in gvcst_kill (as part of a trigger update).
@@ -574,6 +595,14 @@ retry:
 		{
 			tp_set_sgm();	/* set sgm_info_ptr & first_sgm_info for TP start */
 			T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);	/* set update_trans and t_err for wrapped TP */
+		} else
+		{
+			/* We could have entered gvcst_kill trying to kill a global that does not exist but later due to a
+			 * concurrent set, came here for retry. In such a case, update_trans could have been set to 0
+			 * (from actual_update). Reset update_trans to non-zero for the next retry as we expect the kill to
+			 * happen in this retry.
+			 */
+			update_trans = UPDTRNS_DB_UPDATED_MASK;
 		}
 		/* In case this is MM and t_retry() remapped an extended database, reset csd */
 		assert(is_mm || (csd == cs_data));

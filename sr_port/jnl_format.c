@@ -170,13 +170,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 		jfb = (jnl_format_buffer *)get_new_element(si->jnl_list, 1);
 		jfb->next = NULL;
 		assert(NULL != si->jnl_tail);
-#		ifdef GTM_TRIGGER
-		/* Determine previous jfb, if any */
-		if (si->jnl_tail != &si->jnl_head)
-			jfb->prev = (jnl_format_buffer *)((uchar_ptr_t)si->jnl_tail - OFFSETOF(jnl_format_buffer, next));
-		else
-			jfb->prev = NULL;
-#		endif
+		GTMTRIG_ONLY(SET_PREV_JFB(si, jfb->prev);)
 		assert(NULL == *si->jnl_tail);
 		*si->jnl_tail = jfb;
 		si->jnl_tail = &jfb->next;

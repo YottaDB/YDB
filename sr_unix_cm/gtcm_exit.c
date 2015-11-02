@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,13 +35,12 @@ static char rcsid[] = "$Header:$";
 #include "op.h"			/* for op_unlock() and op_lkinit() prototype */
 
 GBLREF int4	 gtcm_exi_condition;
-GBLREF int	 process_exiting;
 
 void gtcm_exit()
 {
 	op_lkinit();
 	op_unlock();
-	process_exiting = TRUE;
+	SET_PROCESS_EXITING_TRUE;
 	gv_rundown();
 #ifdef GTCM_RC
 	rc_delete_cpt();

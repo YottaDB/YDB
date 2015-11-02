@@ -341,9 +341,6 @@ OC_FNZDATE:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#5,xfer.xf_fnzdate
-OC_FNZECHAR:	irepl	val.2
-		pushab	val.0
-		calls	val.1,xfer.xf_fnzechar
 OC_FNZEXTRACT:	pushab	val.0
 		pushab	val.1
 		pushl	val.2

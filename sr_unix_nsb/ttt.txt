@@ -136,9 +136,6 @@ OC_FNZAHANDLE:	pushab	val.0
 OC_FNZCHAR:	irepl	val.2
 		pushab	val.0
 		calls	val.1,xfer.xf_fnzchar
-OC_FNZECHAR:	irepl	val.2
-		pushab	val.0
-		calls	val.1,xfer.xf_fnzechar
 OC_FNDATA:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fndata

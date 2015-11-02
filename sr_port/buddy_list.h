@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +31,6 @@ typedef struct	buddy_list_struct
 {
 	char	**ptrArray;     /* the array of pointers */
 	int4	elemSize;	/* the size of each structure-element */
-	int4	maxElems;	/* the maximum number of elements that can be totally stored */
-	int4	maxElemsBits;	/* 1 + number of bits associated with 2PowerCeil(maxElems) */
 	int4	initAlloc;	/* the number of structures in the ptrArray[0] and ptrArray[1] */
 	int4	initAllocBits;	/* number of bits corresponding to initAlloc */
 	int4	nElems;		/* the current number of elements used up in the total array */

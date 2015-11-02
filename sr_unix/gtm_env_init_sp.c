@@ -162,7 +162,7 @@ void	gtm_env_init_sp(void)
 		token = strtok(trans.addr, ":");
 		while (NULL != token)
 		{
-			if (ISALPHA(token[0]))
+			if (ISALPHA_ASCII(token[0]))
 				index = namelook(editing_index, editing_params, STR_AND_LEN(token));
 			else
 				index = -1;	/* ignore this token */

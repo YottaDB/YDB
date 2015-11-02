@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,9 +15,9 @@
 #include "op.h"
 #include "io.h"
 
-static mval com 	= DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , 1 , (char *) "," , 0 , 0 );
-static mval rpar 	= DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , 1 , (char *) ")" , 0 , 0 );
-static mval dlib 	= DEFINE_MVAL_LITERAL(MV_STR, 0 , 0 , sizeof ("$gtm_dist/gtmhelp.gld") - 1 ,
+static mval com 	= DEFINE_MVAL_STRING(MV_STR, 0 , 0 , 1 , (char *) "," , 0 , 0 );
+static mval rpar 	= DEFINE_MVAL_STRING(MV_STR, 0 , 0 , 1 , (char *) ")" , 0 , 0 );
+static mval dlib 	= DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF("$gtm_dist/gtmhelp.gld") - 1 ,
 					 (char *) "$gtm_dist/gtmhelp.gld" , 0 , 0 );
 
 GBLREF spdesc stringpool;
@@ -35,7 +35,7 @@ void op_zhelp_xfr(mval *subject, mval *lib)
 	flush_pio();
 	action = push_mval(subject);
 	action->mvtype = 0;
-	action->str.len = sizeof ("D ^GTMHELP(") - 1;
+	action->str.len = SIZEOF("D ^GTMHELP(") - 1;
 	action->str.addr = "D ^GTMHELP(";
 	s2pool(&action->str);
 	action->mvtype = MV_STR;

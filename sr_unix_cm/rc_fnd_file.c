@@ -13,9 +13,7 @@
 
 #include <errno.h>
 #include "gtm_string.h"
-#ifdef DEBUG
 #include "gtm_stdio.h"
-#endif
 
 #include "rc.h"
 #include "gdsroot.h"
@@ -41,17 +39,18 @@
 /* TEMPORARY CONSTANT - minimum value of the database RC_RESERVED field */
 #define RC_RESERVED	128
 
-GBLREF gd_region	*gv_cur_region;
 GBLDEF int		rc_server_id = RC_DEF_SERV_ID;
 GBLDEF rc_dsid_list	*dsid_list=0;
-GBLREF gv_key		*gv_currkey;
-GBLREF gv_key		*gv_altkey;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gv_namehead	*gv_target;
-GBLREF int4		gv_keysize;
-GBLREF sgmnt_data	*cs_data;
-GBLREF gd_addr		*gd_header;
-GBLREF rc_oflow	*rc_overflow;
+
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	gv_key			*gv_currkey;
+GBLREF	gv_key			*gv_altkey;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	int4			gv_keysize;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	gd_addr			*gd_header;
+GBLREF	rc_oflow		*rc_overflow;
 
 static rc_dsid_list	*fdi_ptr=0;
 static int		rc_overflow_size=0;
@@ -85,7 +84,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	{
 		char msg[256];
 
-		sprintf(msg,"Invalid DB filename, \"%s\"",fpath1.addr);
+		SPRINTF(msg,"Invalid DB filename, \"%s\"",fpath1.addr);
 		gtcm_rep_err(msg, errno);
 		return RC_BADFILESPEC;
 	}
@@ -172,7 +171,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	v.mvtype = MV_STR;
 	v.str.len = RC_NSPACE_GLOB_LEN-1;
 	v.str.addr = RC_NSPACE_GLOB;
-	gv_bind_name(gd_header, &v.str);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
 	if (!gv_target->root)	/* No namespace global */
 	{	return RC_UNDEFNAMSPC;
 	    }
@@ -238,6 +237,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	    gv_cur_region=0;
 	    return RC_FILEACCESS;
 	}
+	assert(!cs_addrs->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
 	grab_crit(gv_cur_region);
 	cs_data->rc_srv_cnt++;
 	if (!cs_data->dsid)

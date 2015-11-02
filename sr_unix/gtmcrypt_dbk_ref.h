@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,13 +27,13 @@ typedef struct
 }db_key_map;
 
 
-void 				gc_dbk_scrub_entries();
-xc_status_t 			gc_dbk_is_db_key_file_modified();
+void 				gc_dbk_scrub_entries(void);
+xc_status_t 			gc_dbk_is_db_key_file_modified(void);
 db_key_map* 			gc_dbk_get_entry_by_fileid(xc_fileid_ptr_t fileid);
 db_key_map* 			gc_dbk_get_entry_by_hash(xc_string_t *hash);
 dbkeyfile_line_type 		gc_dbk_get_line_info (char *buf, char *data);
 xc_status_t 			gc_dbk_load_gtm_dbkeys(FILE **gtm_dbkeys);
-xc_status_t 			gc_dbk_load_entries_from_file();
+xc_status_t 			gc_dbk_load_entries_from_file(void);
 xc_status_t 			gc_dbk_fill_sym_key_and_hash(xc_fileid_ptr_t req_fileid, char *req_hash);
 void	 			gc_dbk_get_hash(db_key_map *entry,  xc_string_t *hash);
 
@@ -105,7 +105,7 @@ void	 			gc_dbk_get_hash(db_key_map *entry,  xc_string_t *hash);
 {												\
 	if (TRUE != gtm_filename_to_id_fptr(filename, &fileid))					\
 	{											\
-		snprintf(err_string, ERR_STRLEN, "database file %s not found", filename); 	\
+		snprintf(err_string, ERR_STRLEN, "database file %s not found", filename->address); 	\
 		return GC_FAILURE;								\
 	}											\
 }

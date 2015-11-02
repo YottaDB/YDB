@@ -46,8 +46,9 @@ GBLREF  sigset_t	block_sigsent;
 GBLREF	void		(*op_write_ptr)(mval *v);
 GBLREF	void		(*op_wteol_ptr)(int4 n);
 
-
 static	boolean_t	first_syslog = TRUE;
+static	char		save_util_outbuff[OUT_BUFF_SIZE];
+static	int4		save_buff_used;
 
 /*
  *	This routine implements a SUBSET of FAO directives, namely:
@@ -91,7 +92,7 @@ static	boolean_t	first_syslog = TRUE;
  */
 
 /*
- *	util_format - convert FAO format string to C printf format string.
+ *	util_format - convert FAO format string to C PRINTF format string.
  *
  *	input arguments:
  *		message	- one of the message strings from, for example, merrors.c
@@ -100,7 +101,7 @@ static	boolean_t	first_syslog = TRUE;
  *		size	- size of buff
  *
  *	output argument:
- *		buff	- will contain C printf-style format statement with any
+ *		buff	- will contain C PRINTF-style format statement with any
  *			  "A" (character) fields filled in from fao list
  *
  *	output global value:
@@ -322,7 +323,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					if ((outptr + chlen) > outtop1)	/* adding next input char will cross output buffer limit */
 						break;
 					if (!isprintable && (('F' == type2) UNICODE_ONLY(|| (('D' == type2) && gtm_utf8_mode))))
-					{	/* Since HPUX stops printing lines (via fprintf) when it
+					{	/* Since HPUX stops printing lines (via FPRINTF) when it
 						   encounters a bad character, all platforms in utf8 mode
 						   will behave as if !AF were specified and put a "." in place
 						   of non-printable characters. SE 01/2007
@@ -566,7 +567,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	 */
 	if (blocksig_initialized)	/* In pro, dont take chances and handle case where it is not initialized */
 		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
-	(void)SYSLOG(LOG_USER | LOG_INFO, addr);
+	(void)SYSLOG(LOG_USER | LOG_INFO, "%s", addr);
 	if (blocksig_initialized)
 		sigprocmask(SIG_SETMASK, &savemask, NULL);
 }
@@ -634,23 +635,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 			switch (flush)
 			{
 				case FLUSH:
-					/* Note that although upper-case FPRINTF is used below, it is NOT EINTR safe (reason
-					 * being fprintf accepts variable # of arguments and it is not possible to write a
-					 * wrapper macro accepting the same # of arguments and implementing EINTR protection).
-					 * Therefore we have our own EINTR handling code here. Keep retrying FPRINTF if errno
-					 * is EINTR. We have seen a NESTED FPRINTF call return EINTR incorrectly even though
-					 * it was a different FPRINTF in the current C stack that was interrupted. So no point
-					 * in retrying indefinitely in this case. Hence limit the loop iterations to an
-					 * arbitrary finite value.
-					 */
-					count = 0;
-					do
-					{
-						rc = FPRINTF(stderr, fmt_buff);
-						if (16 < ++count)
-							break;
-					} while (-1 == rc && EINTR == errno);
-					assert((-1 != rc) || (EINTR != errno));
+					FPRINTF(stderr, fmt_buff);
 					break;
 				case OPER:
 					util_out_send_oper(fmt_buff, UINTCAST(fmtc - fmt_buff));
@@ -729,4 +714,25 @@ void util_cond_flush(void)
 		FPRINTF(stderr, "\n");
 	if (util_outptr != util_outbuff)
 		util_out_print(NULL, FLUSH);
+}
+
+void util_out_save(void)
+{
+	if (NULL != util_outptr)
+	{
+		save_buff_used = MIN(OUT_BUFF_SIZE, ((NULL != util_outptr) ? (int4)(util_outptr - util_outbuff) : 0));
+		if (0 != save_buff_used)
+			memcpy(save_util_outbuff, util_outbuff, save_buff_used);
+	}
+}
+
+void util_out_restore(void)
+{
+	if (0 != save_buff_used)
+	{
+		assert(OUT_BUFF_SIZE >= save_buff_used);
+		memcpy(util_outbuff, save_util_outbuff, save_buff_used);
+		util_outptr = util_outbuff + save_buff_used;
+		save_buff_used = 0;
+	}
 }

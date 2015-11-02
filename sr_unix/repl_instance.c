@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -436,7 +436,9 @@ void	repl_inst_ftok_sem_lock(void)
 
 	error_def(ERR_REPLFTOKSEM);
 
-	assert(0 == have_crit(CRIT_HAVE_ANY_REG));
+	/* If caller is online rollback, we would already be holding all the locks
+	 * (db crit, ftok lock on instance file etc.) so account for that in the below code.
+	 */
 	assert((NULL != jnlpool.jnlpool_dummy_reg) || (NULL != recvpool.recvpool_dummy_reg));
 	assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL == recvpool.recvpool_dummy_reg)
 		|| (recvpool.recvpool_dummy_reg == jnlpool.jnlpool_dummy_reg));
@@ -445,9 +447,10 @@ void	repl_inst_ftok_sem_lock(void)
 		reg = recvpool.recvpool_dummy_reg;
 	assert(NULL != reg);
 	udi = FILE_INFO(reg);
-	assert(!udi->grabbed_ftok_sem);
-	if (!udi->grabbed_ftok_sem)	/* Be safe in PRO and avoid a deadlock in case we already hold the ftok semaphore */
+	assert(!udi->grabbed_ftok_sem || udi->s_addrs.hold_onto_crit);
+	if (!udi->grabbed_ftok_sem)
 	{
+		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
 		if (!ftok_sem_lock(reg, FALSE, FALSE))
 		{
 			assert(FALSE);
@@ -465,7 +468,9 @@ void	repl_inst_ftok_sem_release(void)
 
 	error_def(ERR_REPLFTOKSEM);
 
-	assert(0 == have_crit(CRIT_HAVE_ANY_REG));
+	/* If caller is online rollback, we would already be holding all the locks
+	 * (db crit, ftok lock on instance file etc.) so account for that in the below code.
+	 */
 	assert((NULL != jnlpool.jnlpool_dummy_reg) || (NULL != recvpool.recvpool_dummy_reg));
 	assert((NULL == jnlpool.jnlpool_dummy_reg) || (NULL == recvpool.recvpool_dummy_reg)
 		|| (recvpool.recvpool_dummy_reg == jnlpool.jnlpool_dummy_reg));
@@ -474,16 +479,17 @@ void	repl_inst_ftok_sem_release(void)
 		reg = recvpool.recvpool_dummy_reg;
 	assert(NULL != reg);
 	udi = FILE_INFO(reg);
-	assert(udi->grabbed_ftok_sem);
-	if (udi->grabbed_ftok_sem)	/* Be safe in PRO and avoid releasing in case we do not already hold the ftok semaphore */
+	assert(udi->grabbed_ftok_sem); /* Be safe in PRO and avoid releasing if we do not hold the ftok semaphore */
+	if (udi->grabbed_ftok_sem && !udi->s_addrs.hold_onto_crit)
 	{
+		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
 		if (!ftok_sem_release(reg, FALSE, FALSE))
 		{
 			assert(FALSE);
 			rts_error(VARLSTCNT(4) ERR_REPLFTOKSEM, 2, LEN_AND_STR(udi->fn));
 		}
 	}
-	assert(!udi->grabbed_ftok_sem);
+	assert(!udi->grabbed_ftok_sem || udi->s_addrs.hold_onto_crit);
 }
 
 /* Description:
@@ -597,7 +603,8 @@ int4	repl_inst_wrapper_triple_find_seqno(seq_num seqno, repl_triple *local_tripl
 	if ((0 != status) || (-1 == *local_triple_num))
 	{
 		status = ERR_REPLINSTNOHIST;
-		SPRINTF(histdetail, "seqno [0x%llx]", seqno - 1);
+		NON_GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%llx]", seqno - 1));
+		GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%lx]", seqno - 1));
 		gtm_putmsg(VARLSTCNT(6) ERR_REPLINSTNOHIST, 4, LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 	} else
 		assert(0 <= *local_triple_num);
@@ -653,6 +660,7 @@ void	repl_inst_triple_add(repl_triple *triple)
 			triple_num--;
 		}
 	}
+	assert(!udi->s_addrs.hold_onto_crit);	/* this ensures we can safely do unconditional grab_lock and rel_lock */
 	grab_lock(jnlpool.jnlpool_dummy_reg);
 	offset = REPL_INST_TRIPLE_OFFSET + (SIZEOF(repl_triple) * (off_t)triple_num);
 	time(&triple->created_time);
@@ -701,7 +709,8 @@ void	repl_inst_triple_truncate(seq_num rollback_seqno)
 		if (0 != status)
 		{
 			assert(ERR_REPLINSTNOHIST == status);	/* the only error returned by "repl_inst_triple_find_seqno" */
-			SPRINTF(histdetail, "seqno [0x%llx]", rollback_seqno - 1);
+			NON_GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%llx]", rollback_seqno - 1));
+			GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%lx]", rollback_seqno - 1));
 			gtm_putmsg(VARLSTCNT(6) MAKE_MSG_WARNING(ERR_REPLINSTNOHIST),
 				4, LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 			index = -1;
@@ -756,13 +765,16 @@ void	repl_inst_flush_filehdr()
 	/* If the journal pool exists, this function should hold the journal pool lock throughout its operation
 	 * as it needs to read a consistent copy of the journal pool.  It should use "grab_lock" and "rel_lock"
 	 * to achieve this.  Note that it is possible that the journal pool does not exist (if the caller is MUPIP
-	 * ROLLBACK) in which case it does not need to hold any lock on the journal pool.
+	 * ROLLBACK) in which case it does not need to hold any lock on the journal pool. In case of online rollback,
+	 * we should already be holding the lock so dont need to grab or release it.
 	 */
-	if (jnlpool.jnlpool_dummy_reg->open)	/* journal pool exists and this process has done "jnlpool_init" */
+	if (jnlpool.jnlpool_dummy_reg->open && !udi->s_addrs.hold_onto_crit)   /* journal pool exists and this process has done
+										* "jnlpool_init" and is not online rollback */
 		grab_lock(jnlpool.jnlpool_dummy_reg);
 	/* flush the instance file header */
 	repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)jnlpool.repl_inst_filehdr, REPL_INST_HDR_SIZE);
-	if (jnlpool.jnlpool_dummy_reg->open)	/* journal pool exists and this process has done "jnlpool_init" */
+	if (jnlpool.jnlpool_dummy_reg->open && !udi->s_addrs.hold_onto_crit)   /* journal pool exists and this process has done
+										* "jnlpool_init" and is not online rollback */
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 }
 
@@ -924,6 +936,7 @@ void	repl_inst_reset_zqgblmod_seqno_and_tn(void)
 		 * determine if it is really necessary to grab crit. But since the update to zqgblmod_seqno is a rare operation,
 		 * we decide to play it safe.
 		 */
+		assert(!cs_addrs->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
 		grab_crit(reg);
 		cs_addrs->hdr->zqgblmod_seqno = (seq_num)0;
 		cs_addrs->hdr->zqgblmod_tn = (trans_num)0;

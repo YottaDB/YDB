@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,6 @@
 void sgnl_gvnulsubsc(void);
 void sgnl_gvreplerr(void);
 void sgnl_gvundef(void);
-int sgnl_assert(unsigned int filesz, unsigned char *file, unsigned int linenum);
 
 
 #endif /* SGNL_INCLUDED */

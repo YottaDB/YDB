@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,6 +103,10 @@
 
 #if defined(_AIX)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
+/* Note: putting the DIRECTIO_FLAG definition before the #if and then redefining it below for the two exceptions
+ * causes a warning on sparc - "macro redefined: DIRECTIO_FLAG" so it is repeated in each part of the big #define
+ */
+#define DIRECTIO_FLAG	O_DIRECT
 #elif defined(__osf__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)										\
 {															\
@@ -125,6 +129,7 @@
 		OPENFILE(FNAME, FFLAGS | O_DSYNC, FDESC);								\
 	}														\
 }
+#define DIRECTIO_FLAG	O_DIRECTIO
 #elif defined(__sparc)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)										\
 {															\
@@ -140,7 +145,7 @@
 	} else if (strcmp(FSTYPE_UFS, statvfs_buf.f_basetype))								\
 			dio_success = FALSE;										\
 	OPENFILE(FNAME, FFLAGS | O_DSYNC, FDESC);									\
-	if (dio_success && -1 != FDESC)											\
+	if (dio_success && (FD_INVALID != FDESC))									\
 	{														\
 		if (-1 == directio(FDESC, DIRECTIO_ON))									\
 		{													\
@@ -150,25 +155,20 @@
 		}													\
 	}														\
 }
+#define DIRECTIO_FLAG	0
 #elif defined(__MVS__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_SYNC, FDESC);
+#define DIRECTIO_FLAG	0
 #elif defined(__linux__)
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
+#define DIRECTIO_FLAG	O_DIRECT
+#elif defined(__hpux)
+#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DIRECT | O_DSYNC, FDESC);
+#define DIRECTIO_FLAG	O_DIRECT
 #else
-#define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DSYNC, FDESC);
+#error UNSUPPORTED PLATFORM
 #endif
 
-#if defined (Linux390)
-/* fcntl on Linux390 2.2.16 sometimes returns EINVAL */
-#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)					\
-{										\
-	int status;								\
-	struct flock lock;    /* arg to lock the file thru fnctl */		\
-	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)	\
-	;  \
-}
-#define CONVERT_OBJECT_LOCK(FDESC, FFLAG, RC)
-#else
 #if defined( __linux__)
 /* A special handling was needed for linux due to its inability to lock
  * over NFS.  The only difference in code is an added check for NFS file
@@ -263,9 +263,7 @@
 		lock.l_pid = l_pid;							\
 	} while (-1 == (RC = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno);		\
 }
-#endif
 
-#ifndef Linux390
 #define CLOSE_OBJECT_FILE(FDESC, RC)						\
 {										\
 	struct flock lock;    /* arg to unlock the file thru fnctl */		\
@@ -277,9 +275,6 @@
 	} while (-1 == (RC = fcntl(FDESC, F_SETLK, &lock)) && EINTR == errno);	\
 	CLOSEFILE_RESET(FDESC, RC);						\
 }
-#else
-#define CLOSE_OBJECT_FILE(FDESC, RC)	CLOSEFILE_RESET(FDESC, RC)
-#endif
 
 #define CLOSEFILE(FDESC, RC)					\
 {								\

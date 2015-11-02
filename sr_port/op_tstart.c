@@ -12,6 +12,8 @@
 #include "mdef.h"
 
 #include <stdarg.h>
+#include <stddef.h>	/* for OFFSETOF macro */
+
 #include "gtm_string.h"
 #include "gdsroot.h"
 #include "gdsblk.h"
@@ -84,11 +86,15 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		tp_in_use;
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	uint4			tstartcycle;
+GBLREF	char			*update_array_ptr;
+GBLREF	ua_list			*curr_ua, *first_ua;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		implicit_tstart;	/* see gbldefs.c for comment */
 GBLREF	mval			dollar_ztwormhole;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
+GBLREF	mval			dollar_ztslate;
+LITREF	mval			literal_null;
 #endif
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
@@ -199,11 +205,38 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	{
 		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		jgbl.cumul_jnl_rec_len = 0;
-		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
-		t_tries = (FALSE == mupip_jnl_recover) ? 0 : CDB_STAGNATE;
-		t_fail_hist[t_tries] = cdb_sc_normal;
-		/* ensure that we don't have crit on any region at the beginning of a TP transaction (be it GT.M or MUPIP) */
-		assert(0 == have_crit(CRIT_HAVE_ANY_REG));
+		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0);
+#		ifdef GTM_TRIGGER
+		memcpy(&dollar_ztslate, &literal_null, SIZEOF(mval));	/* Zap $ZTSLate at start of lvl 1 transaction */
+		if (!lcl_implicit_tstart)
+		{
+#		endif
+			t_tries = (FALSE == mupip_jnl_recover) ? 0 : CDB_STAGNATE;
+			t_fail_hist[t_tries] = cdb_sc_normal;
+			/* ensure that we don't have crit on any region at the beginning of a TP transaction
+			 * (be it GT.M or MUPIP) */
+			assert(0 == have_crit(CRIT_HAVE_ANY_REG));
+#		ifdef GTM_TRIGGER
+		} else
+		{
+			/* This is an implicit TP wrap created for an explicit update. In such case, we do not want to reset
+			 * t_tries for below reasons:
+			 * (a) If an explicit non-tp update undergoes 3 restarts (t_tries = 3) and on the final retry gvcst_put
+			 * sees that triggers are defined (due to concurrent $ZTRIGGER or MUPIP TRIGGER), it would have invoked
+			 * op_tstart to create a TP wrap in final retry in which case we should NOT reset t_tries to zero as we
+			 * would be holding crit at that time.
+			 *
+			 * (b) If an explicit non-tp update underwent 1 restart and on the next try(t_tries = 1), gvcst_put
+			 * sees that triggers are defined (due to concurrent $ZTRIGGER or MUPIP TRIGGER), it would have invoked
+			 * op_tstart to create a TP wrap in which case we should NOT reset t_tries. In the event, we did the
+			 * reset of t_tries and no triggers were defined for the update in question, op_tcommit would be done
+			 * and we will be back in non-TP BUT with t_tries reset to 0. The above can continue in a cycle causing
+			 * a live spin-lock that does not let the final-retry optimistic -> pessimistic concurrency scheme from
+			 * kicking in at all.
+			 */
+			assert(FALSE == mupip_jnl_recover); /* recovery logic does not invoke triggers */
+		}
+#		endif
 		for (tr = tp_reg_list; NULL != tr; tr = tr_next)
 		{	/* start with empty list, place all existing entries on free list */
 			tp_reg_list = tr_next = tr->fPtr;	/* Remove from queue */
@@ -233,7 +266,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 				if (tid->str.len > TID_STR_SIZE)
 					tid->str.len = TID_STR_SIZE;
 			}
-			UNICODE_ONLY(
+#			ifdef UNICODE_SUPPORTED
 			else
 			{	/* In UTF8 mode, take only as many valid multi-byte characters as can fit in TID_STR_SIZE */
 				if (gtm_utf8_mode)
@@ -248,7 +281,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 					}
 				}
 			}
-			)
+#			endif
 			assert(TID_STR_SIZE >= tid->str.len);
 			memcpy(tcom_record.jnl_tid, (char *)tid->str.addr, tid->str.len);
 			if ((TP_BATCH_SHRT == tid->str.len) || (TP_BATCH_LEN == tid->str.len))
@@ -392,6 +425,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	tf->sym = curr_symval;
 	tf->tp_save_all_flg = FALSE;
 	tf->implicit_tstart = (NULL == tp_pointer) ? lcl_implicit_tstart : tp_pointer->implicit_tstart;
+	GTMTRIG_ONLY(tf->cannot_commit = FALSE;)
 	tf->vars = (tp_var *)NULL;
 	tf->old_tp_frame = tp_pointer;
 	tp_pointer = tf;
@@ -484,8 +518,8 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		}
 	}
 	++dollar_tlevel;
-	/* Store the global (across all segments) dollar_tlevel specific information. Curently, it holds only jnl related info. */
-	if (JNL_FENCE_LIST_END != jnl_fence_ctl.fence_list)
+	/* Store the global (across all segments) dollar_tlevel specific information. */
+	if (NULL != first_sgm_info) /* database activity existed in prior levels */
 	{
 		for (prev_gtli = NULL, gtli = global_tlvl_info_head; gtli; gtli = gtli->next_global_tlvl_info)
 			prev_gtli = gtli;
@@ -496,6 +530,10 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		new_gtli->tlvl_cumul_jrec_len = jgbl.cumul_jnl_rec_len;
 		DEBUG_ONLY(new_gtli->tlvl_cumul_index = jgbl.cumul_index;)
 		new_gtli->tlvl_tp_ztp_jnl_upd_num = jgbl.tp_ztp_jnl_upd_num;
+		/* Store current state of update_array global variables */
+		assert((NULL != first_ua) && (NULL != curr_ua)); /* Since first_sgm_info is NOT NULL, database activity existed */
+		new_gtli->curr_ua = (struct ua_list *)(curr_ua);
+		new_gtli->upd_array_ptr = update_array_ptr;
 		new_gtli->next_global_tlvl_info = NULL;
 		if (prev_gtli)
 		{
@@ -526,9 +564,17 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		csa = si->tp_csa;
 		if (JNL_WRITE_LOGICAL_RECS(csa))
 		{
-			for (prev_jfb = NULL, jfb = si->jnl_head; jfb; jfb = jfb->next)
-				prev_jfb = jfb;
+			assert((NULL != si->jnl_head) || (NULL == csa->next_fenced));
+			assert((NULL == si->jnl_head) || (NULL != csa->next_fenced));
+			assert((NULL == csa->next_fenced) || (JNL_FENCE_LIST_END == csa->next_fenced)
+								|| (NULL != csa->next_fenced->sgm_info_ptr->jnl_head));
+			assert(NULL == *si->jnl_tail);
+			SET_PREV_JFB(si, prev_jfb);
 			new_tli->tlvl_jfb_info = prev_jfb;
+			assert(NULL != si->jnl_list);
+			assert(NULL != si->format_buff_list);
+			new_tli->jnl_list_elems = si->jnl_list->nElems;
+			new_tli->jfb_list_elems = si->format_buff_list->nElems;
 		}
 		new_tli->next_tlevel_info = NULL;
 		new_tli->update_trans = si->update_trans;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,6 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 
 	memset(gtmsi, 0, SIZEOF(*gtmsi));
 	gtmsi->signal = sig;
-#if (!defined(Linux390))
 	if (NULL != info)
 	{
 		switch(info->si_code)
@@ -126,6 +125,8 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 #        define REG_RIP EIP
 #      endif
 					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_RIP];
+#    elif defined(__s390__)
+					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.psw.addr;
 #    else
 #      error "Unsupported Linux Platform"
 #    endif
@@ -253,19 +254,4 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 			}
 		}
 	}
-#elif defined(Linux390)
-	/* Linux as of when the Linux390 port was done did not yet support returning signal information properly
-	   so we will pull what information we can out of the context blocks.
-	   When it is revived, investigate what information is available. */
-	if (NULL != context)
-	{
-		if (NULL != context->sregs)
-		{
-                	gtmsi->int_iadr = (caddr_t)context->sregs->regs.psw.addr;
-                	gtmsi->infotype |= GTMSIGINFO_ILOC;
-		}
-	}
-#else
-#  error "Unsupported Platform"
-#endif
 }

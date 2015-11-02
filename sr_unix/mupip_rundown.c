@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001,2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@
 #include "mu_rndwn_repl_instance.h"
 
 GBLDEF	bool		in_backup;
+GBLREF	bool		error_mupip;
 GBLREF	tp_region	*grlist;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	boolean_t	mu_star_specified;
@@ -88,6 +89,8 @@ void mupip_rundown(void)
 		gvinit();
 		mu_getlst("WHAT", SIZEOF(tp_region));
 		rptr = grlist;
+		if (error_mupip)
+			exit_status = ERR_MUNOTALLSEC;
 	} else if (file)
 	{
 		mu_gv_cur_reg_init();
@@ -106,7 +109,10 @@ void mupip_rundown(void)
 			if (region)
 			{
 				if (!mupfndfil(rptr->reg, NULL))
+				{
+					exit_status = ERR_MUNOTALLSEC;
 					continue;
+				}
 				gv_cur_region = rptr->reg;
 				if (NULL == gv_cur_region->dyn.addr->file_cntl)
 				{

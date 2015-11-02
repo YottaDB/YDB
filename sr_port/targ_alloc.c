@@ -129,6 +129,7 @@ gv_namehead *targ_alloc(int keysize, mname_entry *gvent, gd_region *reg)
 #	ifdef GTM_TRIGGER
 	gvt->gvt_trigger = NULL;
 	gvt->db_trigger_cycle = 0;
+	gvt->trig_mismatch_test_done = FALSE;
 #	endif
 	gvt->next_gvnh = gv_target_list;		/* Insert into gv_target list */
 	if (NULL != gv_target_list)

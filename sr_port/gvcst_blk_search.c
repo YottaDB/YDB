@@ -143,8 +143,9 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 		memcpy(regbuff, gv_cur_region->rname, gv_cur_region->rname_len);
 		regbuff[gv_cur_region->rname_len] = '\0';
 		SPRINTF(buff, "Possible data corruption in region %s : blk = 0x%X : buff = 0x%lX : cr = 0x%lX %s : "
-				"csa = 0x%lX : csalock = 0x%lX", regbuff, pStat->blk_num, pStat->buffaddr,
-				pStat->cr, crbuff, cs_addrs, cs_addrs->lock_addrs[0]);
+				"csa = 0x%lX : csalock = 0x%lX", regbuff, pStat->blk_num, (long unsigned int) pStat->buffaddr,
+				(long unsigned int) pStat->cr, crbuff, (long unsigned int) cs_addrs,
+				(long unsigned int) cs_addrs->lock_addrs[0]);
 		send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(buff));
 	}
 }

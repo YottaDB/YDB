@@ -135,6 +135,10 @@ DEBUG_ONLY(GBLREF ch_ret_type	(*ch_at_trigger_init)();)
 GBLREF	int			tprestart_state;        /* When triggers restart, multiple states possible. See tp_restart.h */
 GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related information */
 #endif
+GBLREF	boolean_t		skip_dbtriggers;
+GBLREF	bool			gv_curr_subsc_null;
+GBLREF	bool			gv_prev_subsc_null;
+GBLREF	gv_namehead		*gv_target;
 
 LITREF	mval			literal_hasht;
 static	boolean_t		updproc_continue = TRUE;
@@ -166,7 +170,7 @@ CONDITION_HANDLER(updproc_ch)
 		if (first_sgm_info GTMTRIG_ONLY( || (TPRESTART_STATE_NORMAL != tprestart_state)))
 		{
 			VMS_ONLY(assert(FALSE == tp_restart_fail_sig_used);)
-			rc = tp_restart(1);
+			rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);
 			assert(0 == rc);			/* No partials restarts can happen at this final level */
 			GTMTRIG_ONLY(assert(TPRESTART_STATE_NORMAL == tprestart_state));
 			NON_GTMTRIG_ONLY(assert(INVALID_GV_TARGET == reset_gv_target);)
@@ -215,10 +219,10 @@ int updproc(void)
 	seq_num			start_jnl_seqno;
 	uint4			status;
 	gld_dbname_list 	*gld_db_files;
-#ifdef VMS
+#	ifdef VMS
 	char			proc_name[PROC_NAME_MAXLEN + 1];
 	struct dsc$descriptor_s proc_name_desc;
-#endif
+#	endif
 
 	error_def(ERR_TEXT);
 	error_def(ERR_SECONDAHEAD);
@@ -227,7 +231,7 @@ int updproc(void)
 	call_on_signal = updproc_sigstop;
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &updproc_ch);
 
-#ifdef VMS
+#	ifdef VMS
 	/* Get a meaningful process name */
 	proc_name_desc.dsc$w_length = get_proc_name(LIT_AND_LEN("GTMUPD"), getpid(), proc_name);
 	proc_name_desc.dsc$a_pointer = proc_name;
@@ -236,9 +240,10 @@ int updproc(void)
 	if (SS$_NORMAL != (status = sys$setprn(&proc_name_desc)))
 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Unable to change update process name"), status);
-#endif
+#	endif
 	is_updproc = TRUE;
 	is_replicator = TRUE;	/* as update process goes through t_end() and can write jnl recs to the jnlpool for replicated db */
+	NON_GTMTRIG_ONLY(skip_dbtriggers = TRUE;)
 	gvdupsetnoop = FALSE;	/* disable optimization to avoid multiple updates to the database and journal for duplicate sets */
 	/* if duplicate SETs cause multiple updates to the database and journal in the primary, we want to do the same
 	 * here in order to maintain the jnl_seqno in sync. note that the primary can run the VIEW "GVDUPSETNOOP" command
@@ -309,7 +314,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	char			*val_ptr;
 	jnl_string		*keystr;
 	mstr			mname;
-	char			*key;
+	char			*key, *keytop;
 	enum upd_bad_trans_type	bad_trans_type;
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
@@ -318,7 +323,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	char	           	gv_mname[MAX_KEY_SZ];
-	unsigned char		buff[MAX_ZWR_KEY_SZ], *end;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, scan_char, next_char;
 	boolean_t		log_switched = FALSE;
 	static	seq_num		seqnum_diff = 0;
 	jnl_private_control	*jpc;
@@ -328,11 +333,16 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	int4			wtstart_errno;
 	boolean_t		buffers_flushed;
 	uint4			idle_flush_count = 0;	/* Number of times buffers were flushed without an intermediate sleep */
-	uint4			write_wrap;
+	uint4			write_wrap, cntr, last_nullsubs, last_subs, keyend;
 	UNIX_ONLY(
 		repl_triple		triple;
 		repl_triple_jnl_ptr_t	triplecontent;
 	)
+#	ifdef GTM_TRIGGER
+	uint4			nodeflags;
+	boolean_t		primary_has_trigdef, secondary_has_trigdef;
+	const char		*trigdef_inst = NULL, *no_trigdef_inst = NULL;
+#	endif
 
 	error_def(ERR_UPDREPLSTATEOFF);
 	error_def(ERR_TPRETRY);
@@ -340,6 +350,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	error_def(ERR_GVSUBOFLOW);
 	error_def(ERR_GVIS);
 	error_def(ERR_REC2BIG);
+	error_def(ERR_TRIGDEFNOSYNC);
 
 	ESTABLISH(updproc_ch);
 	recvpool_ctl = recvpool.recvpool_ctl;
@@ -401,7 +412,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				if (0 < tupd_num)
 				{
 					assert(dollar_tlevel);
-					op_trollback(0);
+					OP_TROLLBACK(0);
 					tupd_num = 0;
 				}
 			}
@@ -428,11 +439,21 @@ void updproc_actions(gld_dbname_list *gld_db_files)
                                                      recvpool.upd_proc_local->log_file);
 			upd_proc_local->changelog = 0;
 		}
+		/* Assert that dollar_tlevel & tupd_num are in sync with each other. The only exception is if dollar_tlevel
+		 * is non-zero, it is possible tupd_num is 0 in case we come here after a TP restart.
+		 */
+		assert((dollar_tlevel && (tupd_num || dollar_trestart)) || !dollar_tlevel && !tupd_num);
 		if (upd_proc_local->bad_trans
-			|| ((0 == tupd_num) && (FALSE == recvpool.recvpool_ctl->wrapped)
+			|| (!dollar_tlevel && (FALSE == recvpool.recvpool_ctl->wrapped)
 				&& (temp_write = recvpool.recvpool_ctl->write) == upd_proc_local->read))
 		{	/* bad-trans OR nothing to process. In case of the former, wait until receiver resets bad_trans.
 			 * In the latter, wait until data is available in the receive pool.
+			 * Note that we check two shared memory fields "recvpool_ctl->wrapped" and "recvpool_ctl->write" in
+			 * that order. The receiver server updates them in the opposite order when it sets "wrapped" to TRUE.
+			 * So it is possible we read an uptodate value of "write" but an outofdate value of "wrapped". This
+			 * means we could incorrectly conclude the pool is empty when actually it is full. But we expect these
+			 * situations to be rare enough that it is ok to do an idle buffer flush in this case. We will eventually
+			 * get to see the uptodate value of "wrapped" at which point we will move on to process the transactions.
 			 */
 			assert((0 == recvpool.recvpool_ctl->jnl_seqno) || (jnl_seqno <= recvpool.recvpool_ctl->jnl_seqno));
 				/* the 0 == check takes care of the startup case where jnl_seqno is 0 in the recvpool_ctl */
@@ -440,7 +461,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			 * wcs_wtstart only writes a few buffer a call and putting the call in a loop would flush the
 			 * entire dirty buffer set, but there is no need for a loop around the call since we're already in
 			 * the main updproc loop and this is the only place it really sleeps. */
-			assert(!dollar_tlevel);	/* We should not be idle while in TP */
 			save_reg = gv_cur_region;
 			/* Make sure cs_addrs and cs_data are in sync with gv_cur_region before TP_CHANGE_REG changes them */
 			assert((NULL == gv_cur_region) || (cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs));
@@ -582,7 +602,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					{
 						repl_log(updproc_log_fp, TRUE, TRUE, "OP_TROLLBACK IS CALLED "
 							"-->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
-						op_trollback(0);
+						OP_TROLLBACK(0);
 					}
 					readaddrs = recvpool.recvdata_base;
 					upd_proc_local->read = 0;
@@ -633,9 +653,12 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			{
 				assert(!IS_ZTP(rectype));
 				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
-				GTMTRIG_ONLY(TRIG_PROCESS_JNL_STR_NODEFLAGS(keystr);)
+				GTMTRIG_ONLY(
+					nodeflags = keystr->nodeflags;
+					TRIG_PROCESS_JNL_STR_NODEFLAGS(nodeflags);
+				)
 				key_len = keystr->length;	/* local copy of shared recvpool key */
-				if ((MAX_KEY_SZ >= key_len && 0 <= key_len && 0 == keystr->text[key_len - 1]) &&
+				if ((MAX_KEY_SZ >= key_len && 0 < key_len && 0 == keystr->text[key_len - 1]) &&
 					(upd_good_record == updproc_get_gblname(keystr->text, key_len, gv_mname, &mname)))
 				{
 					if (IS_SET(rectype))
@@ -711,9 +734,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				gv_cur_region = gld_db_files->gd;
 				tp_change_reg();
 				csa = cs_addrs;
+				assert(!csa->hold_onto_crit);
 				assert(!csa->now_crit);
-				if (!csa->now_crit)
-					grab_crit(gv_cur_region);
+				grab_crit(gv_cur_region);
 				grab_lock(jnlpool.jnlpool_dummy_reg);
 				temp_jnlpool_ctl->write_addr = jnlpool_ctl->write_addr;
 				temp_jnlpool_ctl->write = jnlpool_ctl->write;
@@ -796,6 +819,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				jnlpool_ctl->write = temp_jnlpool_ctl->write;
 				jnlpool_ctl->jnl_seqno = temp_jnlpool_ctl->jnl_seqno;
 				INCREMENT_CURR_TN(csa->hdr);
+				assert(!csa->hold_onto_crit);
 				rel_lock(jnlpool.jnlpool_dummy_reg);
 				rel_crit(gv_cur_region);
 				jgbl.cumul_jnl_rec_len = 0;
@@ -863,6 +887,69 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number));
 				} else
 				{
+					/* Scan the global for two reasons :
+					 * (a) Need to setup gv_currkey->prev as update process can invoke triggers which
+					 * could use naked references which relies on gv_currkey->prev being properly set
+					 * (b) Set gv_prev_subsc_null (if any of the subscripts in a global other than the
+					 * last subscript IS NULL) and gv_curr_subsc_null (if the last subscript in a global
+					 * IS NULL) to issue GTM-E-NULSUSBC if needed.
+					 */
+					key = (char *)(gv_currkey->base);
+					keyend = gv_currkey->end;
+					cntr = last_nullsubs = last_subs = 0;
+					assert((0 < keyend) && (KEY_DELIMITER != *key)); /* we better not have an empty key */
+					assert((KEY_DELIMITER == key[keyend])
+						&& (KEY_DELIMITER == key[keyend - 1]));
+					keytop = (char *)((&gv_currkey->base[0]) + keyend);
+					scan_char = (unsigned char)(*key);
+					while (cntr < keyend)
+					{
+						if (key >= keytop)
+						{	/* We should never come here as this would mean that we are attempting
+							 * to cross gv_currkey->base boundary. */
+							assert(FALSE);
+							break;
+						}
+						assert(scan_char == (unsigned char)(*key)); /* ensure that scan_char was updated in
+											     * the previous iteration*/
+						next_char = (unsigned char)(*(key + 1));
+						/* null subscripts are identified based on whether the region has standard null
+						 * collation or default null collation. If former, the sequence is 0x01 0x00.
+						 * If latter, the sequence is 0xFF 0x00
+						 */
+						if (last_subs == cntr)
+						{	/* Beginning of a new subscript. Ensure that if we have standard null
+							 * collation, then we better don't see 0xFF 0x00 at the start of a
+							 * subscript. Similary, if we have default null collation, we better not
+							 * see 0x01 0x00 at the start of a subscript
+							 */
+							if (KEY_DELIMITER == next_char)
+							{
+								if (STR_SUB_PREFIX == scan_char)
+								{
+									assert(!secondary_side_std_null_coll);
+									last_nullsubs = cntr;
+								} else if (SUBSCRIPT_STDCOL_NULL == scan_char)
+								{
+									assert(secondary_side_std_null_coll);
+									last_nullsubs = cntr;
+								}
+							}
+						}
+						cntr++;
+						if ((KEY_DELIMITER == scan_char) && (KEY_DELIMITER != next_char))
+						{	/* New subscript. Note down the position for gv_currkey->prev. */
+							last_subs = cntr;
+						}
+						key++;
+						scan_char = next_char; /* set scan_char for next iteration */
+					}
+					assert(cntr == keyend);
+					assert(last_subs < keyend);
+					assert(last_nullsubs < keyend);
+					gv_prev_subsc_null = (last_nullsubs && (last_nullsubs < last_subs));
+					gv_curr_subsc_null = (last_nullsubs && (last_nullsubs == last_subs));
+					gv_currkey->prev = last_subs;
 					if (IS_KILL(rectype))
 						op_gvkill();
 					else if (IS_ZKILL(rectype))
@@ -879,6 +966,31 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						} else
 						op_gvput(&val_mv);
 					}
+#					ifdef GTM_TRIGGER
+					if (!gv_target->trig_mismatch_test_done)
+					{
+						gv_target->trig_mismatch_test_done = TRUE; /* reset only in targ_alloc */
+						primary_has_trigdef = (0 != (nodeflags & JS_HAS_TRIGGER_MASK));
+						secondary_has_trigdef = (NULL != gv_target->gvt_trigger);
+						if (primary_has_trigdef != secondary_has_trigdef)
+						{	/* trigger definitions out-of-sync between the primary and secondary.
+							 * Issue warning in operator log
+							 */
+							if (primary_has_trigdef)
+							{
+								trigdef_inst = "originating";
+								no_trigdef_inst = "replicating";
+							} else
+							{
+								trigdef_inst = "replicating";
+								no_trigdef_inst = "originating";
+							}
+							send_msg(VARLSTCNT(9) ERR_TRIGDEFNOSYNC, 7, mname.len, mname.addr,
+									LEN_AND_STR(trigdef_inst), LEN_AND_STR(no_trigdef_inst),
+									&jnl_seqno);
+						}
+					}
+#					endif
 					if ((upd_good_record == bad_trans_type) && !IS_TP(rectype))
 						incr_seqno = TRUE;
 					if (disk_blk_read || 0 >= csa->n_pre_read_trigger)
@@ -917,7 +1029,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			{
 				repl_log(updproc_log_fp, TRUE, TRUE,
 					"OP_TROLLBACK IS CALLED -->Bad trans :: dollar_tlevel = %ld\n", dollar_tlevel);
-				op_trollback(0);	/* this should also release crit (if any) on all regions in TP */
+				OP_TROLLBACK(0);	/* this should also release crit (if any) on all regions in TP */
 				assert(!dollar_tlevel);
 			} else
 			{	/* Non-TP : Release crit if any */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
 	ht_ent_int4		*tabent;
-	int			save_intrpt_ok_state;
+	intrpt_state_t		save_intrpt_ok_state;
 
 	error_def(ERR_BUFRDTIMEOUT);
 	error_def(ERR_INVALIDRIP);

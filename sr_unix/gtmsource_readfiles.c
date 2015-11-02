@@ -148,8 +148,8 @@ static	int repl_read_file(repl_buff_t *rb)
 		REPL_DPRINT5("READ FILE : Racing with jnl file %s avoided. Read size reduced from %u to %u at offset %u\n",
 				rb->backctl->jnl_fn, b->buffremaining, b->buffremaining - read_less, b->readaddr);
 	}
-	start_addr = ROUND_DOWN2(b->readaddr, DISK_BLOCK_SIZE);
-	end_addr = ROUND_UP2(b->readaddr + b->buffremaining - read_less, DISK_BLOCK_SIZE);
+	start_addr = ROUND_DOWN2(b->readaddr, fc->fs_block_size);
+	end_addr = ROUND_UP2(b->readaddr + b->buffremaining - read_less, fc->fs_block_size);
 	if ((off_t)-1 == lseek(fc->fd, (off_t)start_addr, SEEK_SET))
 	{
 		repl_errno = EREPL_JNLFILESEEK;
@@ -243,7 +243,7 @@ static	int repl_next(repl_buff_t *rb)
 		if (rb->fc->jfh->is_encrypted)
 		{
 			rec = ((jnl_record *)(b->recbuff));
-			rectype = rec->prefix.jrec_type;
+			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 			if (IS_SET_KILL_ZKILL_ZTWORM(rectype))
 			{
 				assert(!IS_ZTP(rectype));
@@ -432,7 +432,7 @@ static	int update_eof_addr(repl_ctl_element *ctl, int *eof_change)
 			     csa->nl->jnl_file.u.device,  csa->nl->jnl_file.u.st_gen);
 		if (!ctl->fh_read_done)
 		{
-			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, ROUND_UP(SIZEOF(jnl_file_header), 8), status);
+			F_READ_BLK_ALIGNED(fc->fd, 0, fc->jfh, REAL_JNL_HDR_LEN, status);
 			if (SS_NORMAL != status)
 				rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, ctl->jnl_fn_len, ctl->jnl_fn,
 						ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in reading jfh in update_eof_addr"), status);

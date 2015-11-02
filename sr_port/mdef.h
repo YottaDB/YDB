@@ -57,6 +57,13 @@ typedef struct
 #include "mdefsp.h"
 #include "gtm_sizeof.h"
 
+#ifdef DEBUG
+error_def(ERR_ASSERT);
+#define assert(x) ((x) ? 1 : rts_error(VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__, (SIZEOF(#x) - 1), (#x)))
+#else
+#define assert(x)
+#endif
+
 /* Define GT.M interlude functions for open, close, pipe, creat and dup system calls. This lets GT.M trace through all file
  * descriptor activity (needed for D9I11-002714). Do this on all Unix platforms. Note that only the macro GTM_FD_TRACE is
  * defined here. gtm_unistd.h and gtm_fcntl.h define the actual GT.M interlude functions based on this macro.
@@ -147,6 +154,12 @@ typedef UINTPTR_T uintszofptr_t;
 #	define ZOS_ONLY(X) X
 #else
 #	define ZOS_ONLY(X)
+#endif
+
+#ifdef Linux390
+#	define Linux390_ONLY(X) X
+#else
+#	define Linux390_ONLY(X)
 #endif
 
 #if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips) && !defined(__ia64)
@@ -359,9 +372,11 @@ GBLREF	boolean_t		gtm_utf8_mode;
 #ifdef UNICODE_SUPPORTED
 #	define ZWR_EXP_RATIO(X)	((!gtm_utf8_mode) ? (((X) * 6 + 7)) : ((X) * 9 + 11))
 #	define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 9 + 11)
+#	define MAX_ZWR_EXP_RATIO	9
 #else
 #	define ZWR_EXP_RATIO(X)	((X) * 6 + 7)
 #	define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 6 + 7)
+#	define MAX_ZWR_EXP_RATIO	6
 #endif
 
 #define MAX_SYSERR		1000000
@@ -410,6 +425,40 @@ mval *underr (mval *start, ...);
 #define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = 0xff,		\
 				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
 
+/* DEFINE_MVAL_LITERAL is intended to be used to define a string mval where the string is a literal or defined with type
+ * "readonly".  In other words, the value of the string does not change.  Since we expect all callers of this macro to use
+ * ASCII literals, the MV_UTF_LEN bit is set in the type, and the character length is set to the same value as the byte length.
+ */
+#define DEFINE_MVAL_LITERAL(TYPE, EXPONENT, SIGN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH)		\
+	DEFINE_MVAL_COMMON(TYPE | MV_UTF_LEN, EXPONENT, SIGN, LENGTH, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH)
+
+/* DEFINE_MVAL_STRING is intended to be used to define a string mval where the value of the string can change */
+#define DEFINE_MVAL_STRING(TYPE, EXPONENT, SIGN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH)		\
+	DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, 0, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH)
+
+#ifdef VMS
+#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, EXPONENT, SIGN, 0xff, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH}
+#else
+#ifdef BIGENDIAN
+#ifdef UNICODE_SUPPORTED
+#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, SIGN, EXPONENT, 0xff, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+#else
+#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, SIGN, EXPONENT, 0xff, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
+#endif
+#else	/* BIGENDIAN */
+#ifdef UNICODE_SUPPORTED
+#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, UTF_LEN, LENGTH, ADDRESS}
+#else
+#define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
+	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
+#endif	/* UNICODE */
+#endif	/* BIGENDIAN */
+#endif	/* VMS */
+
 #define	ASCII_MAX		(unsigned char)0x7F
 #define	IS_ASCII(X)		((uint4)(X) <= ASCII_MAX)	/* X can be greater than 255 hence the typecast to uint4 */
 
@@ -453,9 +502,17 @@ mval *underr (mval *start, ...);
 #  define PRO_ONLY(statement)			statement
 #endif
 
-/* these are the analogs of the preceeding, but are more efficient when the MODULUS is a Power Of Two */
-#define ROUND_UP2(VALUE, MODULUS)		(CHECKPOT(MODULUS) ((VALUE) + ((MODULUS) - 1)) & ~((MODULUS) - 1))
-#define ROUND_DOWN2(VALUE, MODULUS)		(CHECKPOT(MODULUS) (VALUE) & ~((MODULUS) - 1))
+/* These are the analogs of the preceeding, but are more efficient when the MODULUS is a Power Of Two.
+ * One thing to watch for is that VALUE could be 8-byte and MODULUS could be 4-bytes. In that case, we
+ * want to return an 8-byte value. So need to typecast MODULUS to 8-bytes before we do "& ~(MODULUS -1)"
+ * or else that will be a 4-byte value and cause a bitwise & with an 8-byte value resulting in a truncated
+ * 8-byte return value (loss of high order bits). We choose sm_long_t to reflect that type as it is 8-bytes
+ * on the 64-bit platforms and 4-bytes on the 32-bit platforms. Choosing gtm_uint64_t unconditionally will
+ * make it 8-bytes on the 32-bit platforms too and result in warnings due to the 8-byte value eventually being
+ * truncated to 4-bytes by the caller after the return from the below macro.
+ */
+#define ROUND_UP2(VALUE, MODULUS)	(CHECKPOT(MODULUS) ((VALUE) + ((MODULUS) - 1)) & ~(((sm_long_t)MODULUS) - 1))
+#define ROUND_DOWN2(VALUE, MODULUS)	(CHECKPOT(MODULUS) (VALUE) & ~(((sm_long_t)MODULUS) - 1))
 
 /* Length needed to pad out to a given power of 2 boundary */
 #define PADLEN(value, bndry) (int)(ROUND_UP2((sm_long_t)(value), bndry) - (sm_long_t)(value))
@@ -467,9 +524,6 @@ mval *underr (mval *start, ...);
 	for (log2_of_number = 0; 0 < temp; log2_of_number++)	\
 	   temp = (temp) >> 1; 					\
 }
-
-#define ISDIGIT(x)	( (x) >='0' && (x) <= '9' )
-#define ISALPHA(x)	( (x) >='a' && (x) <= 'z' || (x) >= 'A' && (x) <= 'Z' )
 
 #define CALLFROM	LEN_AND_LIT(__FILE__), __LINE__
 void gtm_assert ( int file_name_len, char file_name[], int line_no);
@@ -514,6 +568,18 @@ int4 timeout2msec(int4 timeout);
 
 #define	STRCPY(SOURCE, DEST)		strcpy((char *)(SOURCE), (char *)(DEST))
 #define	STRCMP(SOURCE, DEST)		strcmp((char *)(SOURCE), (char *)(DEST))
+
+#define	SET_PROCESS_EXITING_TRUE				\
+{								\
+	GBLREF	int		process_exiting;		\
+	GBLREF	boolean_t	hold_onto_locks;		\
+								\
+	process_exiting = TRUE;					\
+	/* as we are about to exit, no point requiring crit	\
+	 * to be held in case we held it until now (e.g. online	\
+	 * mupip journal recover/rollback */			\
+	hold_onto_locks = FALSE;				\
+}
 
 /* Macro to copy a source string to a malloced area that is set to the destination pointer.
  * Since it is possible that DST might have multiple pointer dereferences in its usage, we
@@ -720,7 +786,11 @@ int m_usleep(int useconds);
 
 #define OS_PAGE_SIZE		gtm_os_page_size
 #define OS_PAGE_SIZE_DECLARE	GBLREF int4 gtm_os_page_size;
-#define IO_BLOCK_SIZE		OS_PAGE_SIZE
+#ifdef VMS
+#	define MAX_IO_BLOCK_SIZE	DISK_BLOCK_SIZE
+#else
+#	define MAX_IO_BLOCK_SIZE	65536
+#endif
 
 #ifndef GTM_INT64T_DEFINED
 #define GTM_INT64T_DEFINED
@@ -1417,7 +1487,8 @@ typedef enum
 #define IS_UTF_CHSET(chset) ((CHSET_UTF_MIN <= (chset)) && (CHSET_UTF_MAX >= (chset)))
 
 #define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (SIZEOF(UINTPTR_T) - 1))
-#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__MVS__)
+#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__MVS__)	\
+				|| defined(__s390__)
 #define GTM_CRYPT
 #define GTMCRYPT_ONLY(X)		X
 #else
@@ -1432,7 +1503,7 @@ typedef enum
 										\
 	assert(0 == len % 2);							\
 	for (i = 0; i < len; i+=2)						\
-		sprintf((char *)out + i, "%02X", (unsigned char)in[i/2]);	\
+		SPRINTF((char *)out + i, "%02X", (unsigned char)in[i/2]);	\
 }
 
 #ifdef UNIX
@@ -1464,9 +1535,9 @@ typedef struct gtm_num_range_struct
 	uint4   max;    /* included in range */
 } gtm_num_range_t;
 
-/* Debug fprintf with pre and post requisite flushing of appropriate streams */
+/* Debug FPRINTF with pre and post requisite flushing of appropriate streams */
 #ifndef DBGFPF
-# define DBGFPF(x) {flush_pio(); fprintf x; fflush(stderr);}
+# define DBGFPF(x) {flush_pio(); FPRINTF x; fflush(stderr);}
 #endif
 
 /* Settings for lv_null_subs */

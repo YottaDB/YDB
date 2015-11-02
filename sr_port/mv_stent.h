@@ -173,6 +173,7 @@ typedef struct mv_stent_struct
 	  	mvs_tphold_struct	mvs_tp_holder;
 		mvs_rstrtpc_struct	mvs_rstrtpc;
 		int4			mvs_tval;
+		int4			mvs_storig;
 	} mv_st_cont;
 } mv_stent;
 
@@ -201,6 +202,7 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MVST_LVAL	14	/* Same as MVST_MVAL except we are pushing an lv_val instead of an mval */
 #define MVST_TRIGR	15	/* Used to save the base environment for Trigger execution */
 #define MVST_RSTRTPC	16	/* Used to save/restore the restartpc/context across error or jobinterrupt frames */
+#define MVST_STORIG	17	/* This is the origin mv_stent placed on the stack during initialization */
 
 /* Variation of ROUND_UP2 macro that doesn't have the checking that generates a GTMASSERT. This is necessary because the
    MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it

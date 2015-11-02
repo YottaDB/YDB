@@ -56,7 +56,7 @@ typedef struct
 } gtm_trigger_parms;
 
 int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm);
-void gtm_trigger_fini(boolean_t forced_unwind);
+void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto);
 void gtm_trigger_cleanup(gv_trigger_t *trigdsc);
 int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink);
 

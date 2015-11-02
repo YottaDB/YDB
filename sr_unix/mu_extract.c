@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +51,8 @@
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #include "filestruct.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
+
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
 GBLREF bool		mu_ctrlc_occurred;
 GBLREF bool		mu_ctrly_occurred;
@@ -453,7 +455,7 @@ void mu_extract(void)
 				global_total.recknt, global_total.keylen, global_total.datalen, global_total.reclen);
 			mu_ctrlc_occurred = FALSE;
 		}
-		gv_bind_name(gd_header, &gl_ptr->name.str);
+		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &gl_ptr->name.str);
 		if (MU_FMT_BINARY == format)
 		{
 			label_len = SIZEOF(extr_collhdr);

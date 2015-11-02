@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,6 @@
 #include "gtm_unistd.h"
 #endif
 #include "advancewindow.h"
-#include "ebc_xlat.h"
 
 GBLREF char window_token;
 GBLREF spdesc stringpool;
@@ -39,9 +38,6 @@ int f_zchar(oprtype *a, opctype op)
 	int 		argc, i;
 	unsigned char	*tmp_ptr;
 	unsigned int	tmp_len;
-#ifdef KEEP_zOS_EBCDIC
-	iconv_t		tmp_cvt_cd;
-#endif
 
 	error_def(ERR_FCHARMAXARGS);
 	error_def(ERR_TEXT);
@@ -71,7 +67,7 @@ int f_zchar(oprtype *a, opctype op)
 	{
 		ENSURE_STP_FREE_SPACE(argc + 1);
 		v.mvtype = MV_STR;
-		v.str.addr = c = (char *) stringpool.free;
+		v.str.addr = c = (char *)stringpool.free;
 		argp = &argv[0];
 		for (; argc > 0 ;argc--, argp++)
 		{
@@ -81,17 +77,7 @@ int f_zchar(oprtype *a, opctype op)
 		}
 		*c = '\0';
 		v.str.len = INTCAST(c - v.str.addr);
-#ifdef KEEP_zOS_EBCDIC
-		if (OC_FNZECHAR == op)
-		{
-			tmp_ptr = (unsigned char *)v.str.addr;
-			tmp_len = v.str.len;
-			ICONV_OPEN_CD(tmp_cvt_cd, "IBM-1047", "ISO8859-1");
-			ICONVERT(tmp_cvt_cd, &tmp_ptr, &tmp_len, &tmp_ptr, &tmp_len);
-			ICONV_CLOSE_CD(tmp_cvt_cd);
-		}
-#endif
-		stringpool.free =(unsigned char *)  c;
+		stringpool.free = (unsigned char *)c;
 		s2n(&v);
 		*a = put_lit(&v);
 		return TRUE;
@@ -100,7 +86,7 @@ int f_zchar(oprtype *a, opctype op)
 	root->operand[0] = put_ilit(argc + 1);
 	last = root;
 	argp = &argv[0];
-	for (; argc > 0 ;argc--, argp++)
+	for (; argc > 0; argc--, argp++)
 	{
 		curr = newtriple(OC_PARAMETER);
 		curr->operand[0] = *argp;

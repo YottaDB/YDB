@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 			{
 				if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 				{
-					sprintf(errbuf, "gvcmy_remlkmgr 1: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
+					SPRINTF(errbuf, "gvcmy_remlkmgr 1: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
 					rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
 				} else
 					gvcmz_errmsg(lkerrlnk, FALSE);
@@ -134,7 +134,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 				else
 				{	if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 					{
-						sprintf(errbuf, "gvcmy_remlkmgr 2: expected CMMS_E_ERROR, got %d",
+						SPRINTF(errbuf, "gvcmy_remlkmgr 2: expected CMMS_E_ERROR, got %d",
 							(int)(*(lkerrlnk->mbf)));
 						rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
 					} else
@@ -150,7 +150,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 			{
 				if (CMMS_E_ERROR != *(lktask_x->mbf))
 				{
-					sprintf(errbuf, "gvcmy_remlkmgr 3: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
+					SPRINTF(errbuf, "gvcmy_remlkmgr 3: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
 					rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
 				}
 				gvcmz_errmsg(lktask_x, FALSE);
@@ -200,7 +200,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 				{
 					if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 					{
-						sprintf(errbuf, "gvcmy_remlkmgr 4: expected CMMS_E_ERROR, got %d",
+						SPRINTF(errbuf, "gvcmy_remlkmgr 4: expected CMMS_E_ERROR, got %d",
 							(int)(*(lkerrlnk->mbf)));
 						rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
 					} else

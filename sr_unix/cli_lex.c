@@ -28,6 +28,7 @@
 
 #include "cli.h"
 #include "eintr_wrappers.h"
+#include "min_max.h"
 
 GBLDEF char	cli_token_buf[MAX_LINE + 1];	/* Token buffer */
 GBLREF int	cmd_cnt;
@@ -39,11 +40,11 @@ GBLDEF IN_PARMS *cli_lex_in_ptr;
 GBLREF	boolean_t	gtm_utf8_mode;
 #define CLI_GET_CHAR(PTR, BUFEND, CHAR) (gtm_utf8_mode ? UTF8_MBTOWC(PTR, BUFEND, CHAR) : (CHAR = (wint_t)*(PTR), (PTR) + 1))
 #define CLI_PUT_CHAR(PTR, CHAR) (gtm_utf8_mode ? UTF8_WCTOMB(CHAR, PTR) : (*(PTR) = CHAR, (PTR) + 1))
-#define CLI_ISSPACE(CHAR) (gtm_utf8_mode ? U_ISSPACE(CHAR) : ISSPACE((int)CHAR))
+#define CLI_ISSPACE(CHAR) (gtm_utf8_mode ? U_ISSPACE(CHAR) : ISSPACE_ASCII((int)CHAR))
 #else
 #define CLI_GET_CHAR(PTR, BUFEND, CHAR) (CHAR = (int)*(PTR), (PTR) + 1)
 #define CLI_PUT_CHAR(PTR, CHAR) (*(PTR) = CHAR, (PTR) + 1)
-#define CLI_ISSPACE(CHAR) ISSPACE(CHAR)
+#define CLI_ISSPACE(CHAR) ISSPACE_ASCII(CHAR)
 #endif
 
 static int tok_string_extract(void)
@@ -172,22 +173,25 @@ void	cli_lex_setup (int argc, char **argv)
 	cli_lex_in_ptr->tp = NULL;
 }
 
-void cli_str_setup(int length, char *addr)
+void cli_str_setup(int addrlen, char *addr)
 {
+	int	alloclen;
+
 	assert(cli_lex_in_ptr);
-	length = (length > MAX_LINE ? MAX_LINE : length) + 1;
-	if (!cli_lex_in_ptr || length > cli_lex_in_ptr->buflen)
+	alloclen = (addrlen > MAX_LINE ? MAX_LINE : addrlen) + 1;
+	if (!cli_lex_in_ptr || alloclen > cli_lex_in_ptr->buflen)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + length);
-		cli_lex_in_ptr->buflen = length;
+		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen);
+		cli_lex_in_ptr->buflen = alloclen;
 	}
 	cli_lex_in_ptr->argv = NULL;
 	cli_lex_in_ptr->argc = 0;
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
-	memcpy(cli_lex_in_ptr->in_str, addr, length);
-	(cli_lex_in_ptr->in_str)[length] = '\0';
+	addrlen = MIN(addrlen, alloclen - 1);
+	memcpy(cli_lex_in_ptr->in_str, addr, addrlen);
+	(cli_lex_in_ptr->in_str)[addrlen] = '\0';
 }
 
 /*
@@ -217,12 +221,12 @@ int cli_is_hex(char *p)
 	if (('+' == *p) || ('-' == *p))
 		p++;
 
-	if (('0' == *p) && ('X' == toupper(*(p + 1))))
+	if (('0' == *p) && ('X' == TOUPPER(*(p + 1))))
         {
                 p = p + 2;
         }
 
-	while (*p && ISXDIGIT(*p))
+	while (*p && ISXDIGIT_ASCII(*p))
 		p++;
 
 	return ((*p) ? FALSE : TRUE);
@@ -291,7 +295,7 @@ void	skip_white_space(void)
 	}
 	else
 #endif
-		while(ISSPACE((int)*in_sp))
+		while(ISSPACE_ASCII((int)*in_sp))
 			in_sp++;
 
 	cli_lex_in_ptr->tp = (char *)in_sp;
@@ -673,7 +677,7 @@ int cli_has_space(char *p)
 	}
 	else
 #endif
-		while (*p && !ISSPACE(*p))
+		while (*p && !ISSPACE_ASCII(*p))
 			p++;
 
 	return ((*p) ? (TRUE) : (FALSE));

@@ -62,6 +62,8 @@
 #include "repl_instance.h"
 #include "gtmmsg.h"
 #include "repl_sem.h"
+#include "have_crit.h"			/* needed for ZLIB_COMPRESS */
+#include "deferred_signal_handler.h"	/* needed for ZLIB_COMPRESS */
 #include "gtm_zlib.h"
 #include "repl_sort_tr_buff.h"
 
@@ -145,7 +147,7 @@ int gtmsource_process(void)
 	double				time_elapsed;
 	seq_num				resync_seqno, zqgblmod_seqno, filter_seqno;
 	gd_region			*reg, *region_top, *gtmsource_upd_reg, *old_upd_reg;
-	sgmnt_addrs			*csa;
+	sgmnt_addrs			*csa, *repl_csa;
 	qw_num				backlog_bytes, backlog_count, delta_sent_cnt, delta_data_sent, delta_msg_sent;
 	long				prev_msg_sent = 0;
 	time_t				prev_now = 0, save_now;
@@ -164,6 +166,7 @@ int gtmsource_process(void)
 	int				semval, cmpret;
 	uLongf				cmpbuflen;
 	int4				msghdrlen;
+	Bytef				*cmpbufptr;
 
 	error_def(ERR_JNLNEWREC);
 	error_def(ERR_JNLSETDATA2LONG);
@@ -582,6 +585,8 @@ int gtmsource_process(void)
 		/* After having established connection, initialize a few fields in the gtmsource_local
 		 * structure and flush those changes to the instance file on disk.
 		 */
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 		grab_lock(jnlpool.jnlpool_dummy_reg);
 		gtmsource_local->connect_jnl_seqno = jctl->jnl_seqno;
 		gtmsource_local->send_losttn_complete = jctl->send_losttn_complete;
@@ -1143,10 +1148,9 @@ int gtmsource_process(void)
 						msghdrlen = (REPL_TR_CMP_THRESHOLD > tot_tr_len)
 									? REPL_MSG_HDRLEN : REPL_MSG_HDRLEN2;
 						cmpbuflen = gtmsource_cmpmsgbufsiz - msghdrlen;
-						assert(0 < (signed)cmpbuflen);
-						assert(NULL != zlib_compress_fnptr);
-						cmpret = (*zlib_compress_fnptr)(((Bytef *)gtmsource_cmpmsgp) + msghdrlen,
-							&cmpbuflen, (const Bytef *)send_msgp, tot_tr_len, repl_zlib_cmp_level);
+						cmpbufptr = ((Bytef *)gtmsource_cmpmsgp) + msghdrlen;
+						ZLIB_COMPRESS(cmpbufptr, cmpbuflen, send_msgp, tot_tr_len,
+								repl_zlib_cmp_level, cmpret);
 						switch(cmpret)
 						{
 							case Z_MEM_ERROR:

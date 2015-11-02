@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,17 +8,14 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#include "main_pragma.h"
-#include <stdio.h>
 
-#define MAX_LEN	32
-int main()
-{
-	unsigned char	inbuf[MAX_LEN];
-	int		i;
+#ifndef __FILE_INPUT_INPUT_H__
+#define __FILE_INPUT_INPUT_H__
 
-	fread(inbuf, MAX_LEN, MAX_LEN, stdin);
-	for (i = 0; i < MAX_LEN; i++)
-		printf("%02X", inbuf[i]);
-	return 0;
-}
+void file_input_init(char *fn, short fn_len);
+void file_input_close(void);
+int file_input_bin_get(char **in_ptr);
+int file_input_bin_read(void);
+int file_input_get(char **in_ptr);
+
+#endif

@@ -12,6 +12,6 @@
 #ifndef TRIGGER_SCAN_STRING_INCLUDED
 #define TRIGGER_SCAN_STRING_INCLUDED
 
-boolean_t trigger_scan_string(char *src_ptr, unsigned short *src_len, char *dst_ptr, unsigned short *dst_len);
+boolean_t trigger_scan_string(char *src_ptr, uint4 *src_len, char *dst_ptr, uint4 *dst_len);
 
 #endif /* TRIGGER_SCAN_STRING_INCLUDED */

@@ -12,7 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include "ctype.h"
+#include "gtm_ctype.h"
 
 #include "compiler.h"
 #include "mdq.h"
@@ -945,7 +945,7 @@ void allow_dzwrtac_as_mident(void)
 	     chrp > chrpmin;
 	     --chrp, --chrplast)
 	{
-		if (!isdigit((int)*chrp))
+		if (!ISDIGIT_ASCII((int)*chrp))
 			return;		/* Couldn't be $ZWRTACxxx without all numeric suffix (if exists) */
 		*chrplast = *chrp;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ void dse_maps(void)
 	bt_rec_ptr_t		btr;
 	int			util_len;
 	uchar_ptr_t		blk_ptr;
-	bool			was_crit;
+	boolean_t		was_crit;
 	uint4			jnl_status;
 	srch_blk_status		blkhist;
 	jnl_private_control	*jpc;

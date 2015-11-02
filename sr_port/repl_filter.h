@@ -53,6 +53,7 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  *	V17	V17	GT.M V5.0-000
  *	V17	V18	GT.M V5.3-003	(EPOCH record format changed so no filter format change)
  *	V19	V19	GT.M V5.4-000	(SET/KILL records have nodeflags, New ZTWORMHOLE record, file header max_jrec_len changes)
+ *	V19	V20	GT.M V5.4-001	64K journal file header change in Unix but V20 change for VMS too; No jnlrec format change
  */
 
 typedef enum
@@ -71,6 +72,7 @@ typedef enum
 	REPL_JNL_V17,
 	REPL_JNL_V18,
 	REPL_JNL_V19,
+	REPL_JNL_V20,
 	REPL_JNL_MAX
 } repl_jnl_t;
 
@@ -123,6 +125,7 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define V15_JNL_VER			15
 #define V18_JNL_VER			18
 #define V19_JNL_VER			19
+#define V20_JNL_VER			20
 
 typedef struct
 {

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,19 +50,20 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	jnl_buffer_ptr_t	jb;
 	jnl_private_control	*jpc;
 	jnl_file_header		*header;
-	unsigned char		hdr_base[JNL_HDR_LEN + ALIGNMENT_SIZE];
+	unsigned char		hdr_base[REAL_JNL_HDR_LEN + MAX_IO_BLOCK_SIZE];
 	sgmnt_data_ptr_t	csd;
 #if defined(VMS)
 	io_status_block_disk	iosb;
 #endif
+	uint4			jnl_fs_block_size, read_write_size;
 
 	error_def		(ERR_PREMATEOF);
 
 	assert(csa->now_crit);
 	jpc = csa->jnl;
-	assert(0 != jpc->pini_addr);
+	jb = jpc->jnl_buff;
 	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
-	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, DISK_BLOCK_SIZE));
+	assert(0 != jpc->pini_addr);
 	csd = csa->hdr;
 	epoch_record.prefix.jrec_type = JRT_EPOCH;
 	epoch_record.prefix.forwptr = epoch_record.suffix.backptr = EPOCH_RECLEN;
@@ -74,7 +75,6 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	 * first PINI journal record in the journal file which is nothing but JNL_HDR_LEN.
 	 */
 	epoch_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
-	jb = jpc->jnl_buff;
 	jb->epoch_tn = epoch_record.prefix.tn = csa->ti->curr_tn;
 	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
@@ -93,7 +93,11 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 		QWASSIGN(epoch_record.jnl_seqno, seq_num_zero);
 	if (jb->end_of_data)
 	{
-		DO_FILE_READ(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
+		jnl_fs_block_size = jb->fs_block_size;
+		header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, jnl_fs_block_size));
+		read_write_size = ROUND_UP2(REAL_JNL_HDR_LEN, jnl_fs_block_size);
+		assert((unsigned char *)header + read_write_size <= ARRAYTOP(hdr_base));
+		DO_FILE_READ(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 		assert(SS_NORMAL != jpc->status || SS_NORMAL == jpc->status2);
 		if (SS_NORMAL == jpc->status)
 		{
@@ -101,7 +105,7 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 			header->eov_tn = jb->eov_tn;
 			header->eov_timestamp = jb->eov_timestamp;
 			header->end_seqno = jb->end_seqno;
-			DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
+			DO_FILE_WRITE(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 			/* for abnormal status do not do anything. journal file header will have previous end_of_data */
 		}
 	}

@@ -1095,8 +1095,9 @@ GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 com
 	assert(FALSE == reg->read_only);                                                				\
 	if (JNL_ENABLED(csa->hdr) && NULL != csa->jnl && NOJNL == csa->jnl->channel)  					\
 	{                                                                       					\
-		bool 	was_crit;                                               					\
-		uint4	jnl_status;											\
+		boolean_t	was_crit;                                               				\
+		uint4		jnl_status;										\
+															\
 		was_crit = csa->now_crit;                                         					\
 		if (!was_crit)                                                  					\
 			grab_crit(reg);                                         					\
@@ -1734,6 +1735,15 @@ typedef struct	sgmnt_addrs_struct
 	struct hash_table_mname_struct		*gvt_hashtab;	/* NON-NULL only if regcnt > 1;
 								 * Maintains all gv_targets mapped to this db file */
 	struct reg_ctl_list_struct	*rctl;	/* pointer to rctl for this region (used only if jgbl.forw_phase_recovery) */
+	struct sgmnt_addrs_struct	*next_csa; /* points to csa of NEXT database that has been opened by this process */
+#	ifdef GTM_CRYPT
+	char		*encrypted_blk_contents;
+	gtmcrypt_key_t	encr_key_handle;
+	int4		encrypt_init_status;
+#	endif
+#	ifdef GTM_SNAPSHOT
+	struct snapshot_context_struct 	*ss_ctx;
+#	endif
 	union
 	{
 		sgmm_addrs	mm;
@@ -1756,7 +1766,6 @@ typedef struct	sgmnt_addrs_struct
 	volatile uint4	timer;                  /* This process has a timer for this region */
 	volatile uint4	in_wtstart;		/* flag we are busy writing */
 	volatile uint4	now_crit;		/* This process has the critical write lock */
-	volatile uint4	read_lock;		/* This process has the critical read lock */
 	volatile uint4	wbuf_dqd;		/* A write buffer has been dequeued - signals that
 						   extra cleanup required if die while on */
 	uint4		stale_defer;		/* Stale processing deferred this region */
@@ -1778,7 +1787,6 @@ typedef struct	sgmnt_addrs_struct
 	uint4		crit_check_cycle;	/* Used to mark which regions in a transaction legiticamtely have crit */
 	int4		backup_in_prog;		/* true if online backup in progress for this region (used in op_tcommit/tp_tend) */
 	boolean_t	snapshot_in_prog;	/* true if snapshots are in progress for this region */
-	int4		num_snapshots_in_effect;/* number of snapshots active for this region */
 	int4		ref_cnt;		/* count of number of times csa->nl->ref_cnt was incremented by this process */
 	int4		fid_index;		/* index for region ordering based on unique_id */
 	boolean_t	do_fullblockwrites;	/* This region enabled for full block writes */
@@ -1799,15 +1807,13 @@ typedef struct	sgmnt_addrs_struct
 	boolean_t	wcs_pidcnt_incremented;	/* set to TRUE if we incremented cnl->wcs_phase2_commit_pidcnt.
 						 * used by secshr_db_clnup to decrement the shared counter. */
 	uint4		db_trigger_cycle;	/* mirror of csd->db_trigger_cycle; used to detect concurrent ^#t global changes */
-	struct sgmnt_addrs_struct	*next_csa; /* points to csa of NEXT database that has been opened by this process */
-#ifdef GTM_CRYPT
-	gtmcrypt_key_t	encr_key_handle;
-	int4		encrypt_init_status;
-	char		*encrypted_blk_contents;
-#endif
-#	ifdef GTM_SNAPSHOT
-	struct snapshot_context_struct 	*ss_ctx;
-#	endif
+	boolean_t	hold_onto_crit;		/* TRUE currently for dse if a CRIT -SEIZE has been done on this region.
+						 * Set to FALSE by a DSE CRIT -RELEASE done on this region. Will also be TRUE in
+						 * case of ONLINE ROLLBACK when that is implemented. Any code that can be invoked
+						 * by both DSE and ROLLBACK should use csa->hold_onto_crit. Any code that can be
+						 * invoked only by ROLLBACK can use the global variable "hold_onto_locks" as that
+						 * is faster (avoids the csa-> dereference) and encompasses all database regions.
+						 */
 } sgmnt_addrs;
 
 typedef struct	gd_binding_struct
@@ -1901,9 +1907,11 @@ typedef struct	gv_namehead_struct
 							 * (is non-NULL only if db_trigger_cycle is non-zero) */
 	uint4		db_trigger_cycle;		/* copy of csd->db_trigger_cycle when triggers for this global were
 							 * last read/initialized from ^#t global (in gvtr_init) */
-	GTM64_ONLY(uint4	filler_8byte_align2;)	/* To ensure 8-byte alignment of next field (targ_alloc relies on this) */
+	boolean_t	trig_mismatch_test_done;	/* whether update process has checked once if there is a mismatch
+							 * in trigger definitions between originating and replicating instance */
+	NON_GTM64_ONLY(uint4	filler_8byte_align2;)	/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
 #	endif
-	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer */
+	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer. */
 } gv_namehead;
 
 typedef struct	gvnh_reg_struct
@@ -2026,10 +2034,14 @@ GBLREF	int		process_exiting;
 	unsigned short		keyend;												\
 	unsigned char		*keybase;											\
 																\
+	GBLREF int4	gv_keysize;												\
+																\
 	GBLREF gv_key		*gv_currkey;											\
 	GBLREF gv_namehead	*reset_gv_target;										\
 																\
 	assert((NULL != gv_currkey) || (NULL == gv_target));									\
+	/* make sure gv_currkey->top always reflects the maximum keysize across all dbs that we opened until now */		\
+	assert((NULL == gv_currkey) || (gv_currkey->top == gv_keysize));							\
 	keybase = &gv_currkey->base[0];												\
 	if (!process_exiting && (NULL != gv_currkey) && (0 != keybase[0]) && (INVALID_GV_TARGET == reset_gv_target))		\
 	{															\
@@ -2653,10 +2665,12 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 			break;								\
 		prevcsa = tmpcsa;							\
 	}										\
-	assert(tmpcsa == CSA);								\
 	/* tmpcsa could not be equal to CSA in case CSA was never added to this list	\
-	 * (possible in case of errors during gvcst_init) so we handle this in PRO.	\
+	 * (possible in case of errors during gvcst_init). In dbg, the only case we 	\
+	 * know of this is if an external signal causes exit processing before db_init	\
+	 * completes. Assert accordingly.						\
 	 */										\
+	assert((tmpcsa == CSA) || process_exiting);					\
 	if (tmpcsa == CSA)								\
 	{										\
 		if (NULL != prevcsa)							\
@@ -2766,43 +2780,72 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 #define UPD_RESERVED_AREA		50
 #define UPD_WRITER_TRIGGER_FACTOR	33
 
-/* SNAPSHOT and BACKUP related macros */
-typedef enum
-{
-	SS_NO_STATE_CHANGE = 0,
-	NEW_SS_STARTED,
-	ALL_SS_STOPPED,
-} ss_chng_status;
-
-typedef enum
-{
-	BKUP_NO_STATE_CHANGE = 0,
-	NEW_BKUP_STARTED,
-	ALL_BKUP_STOPPED,
-} bkup_chng_status;
-
-
 #define SNAPSHOT_ALONE_IN_PROG(CSA) (CSA->snapshot_in_prog && !CSA->backup_in_prog && !(JNL_ENABLED(CSA) && CSA->jnl_before_image))
-
 
 #ifdef GTM_SNAPSHOT
 # define SNAPSHOTS_IN_PROG(X)	((X)->snapshot_in_prog)
 /* Creates a new snapshot context. Called by GT.M (or utilities like update process, MUPIP LOAD which uses
  * GT.M runtime. As a side effect sets csa->snapshot_in_prog to TRUE if the context creation went fine.
  */
-# define SS_INIT_IF_NEEDED(CSA, CNL)									\
-{													\
-	int			ss_shmcycle;								\
-	snapshot_context_ptr_t	lcl_ss_ctx;								\
-													\
-	lcl_ss_ctx = SS_CTX_CAST(CSA->ss_ctx);								\
-	assert(NULL != lcl_ss_ctx);									\
-	ss_shmcycle = CNL->ss_shmcycle;									\
-	CSA->snapshot_in_prog = TRUE;									\
-	if ((ss_shmcycle != lcl_ss_ctx->ss_shmcycle) && !ss_create_context(lcl_ss_ctx, ss_shmcycle))	\
-		CSA->snapshot_in_prog = FALSE;								\
+# define SS_INIT_IF_NEEDED(CSA, CNL)											\
+{															\
+	int			ss_shmcycle;										\
+	boolean_t		status;											\
+	snapshot_context_ptr_t	lcl_ss_ctx;										\
+															\
+	lcl_ss_ctx = SS_CTX_CAST(CSA->ss_ctx);										\
+	assert(NULL != lcl_ss_ctx);											\
+	ss_shmcycle = CNL->ss_shmcycle;											\
+	CSA->snapshot_in_prog = TRUE;											\
+	assert(lcl_ss_ctx->ss_shmcycle <= ss_shmcycle);									\
+	if (lcl_ss_ctx->ss_shmcycle != ss_shmcycle)									\
+	{	/* Process' view of snapshot is stale. Create/Update snapshot context */				\
+		status = ss_create_context(lcl_ss_ctx, ss_shmcycle);							\
+		if (!status)												\
+		{	/* snapshot context creation failed. Reset private copy of snapshot_in_prog so that we don't	\
+			 * read the before images in t_end or op_tcommit */						\
+			CSA->snapshot_in_prog = FALSE;									\
+		}													\
+		assert(!status || (SNAPSHOT_INIT_DONE == lcl_ss_ctx->cur_state));					\
+		assert(status || (SHADOW_FIL_OPEN_FAIL == lcl_ss_ctx->cur_state)					\
+			|| (SNAPSHOT_SHM_ATTACH_FAIL  == lcl_ss_ctx->cur_state)						\
+			|| (SNAPSHOT_NOT_INITED == lcl_ss_ctx->cur_state));						\
+	} else if ((SHADOW_FIL_OPEN_FAIL == lcl_ss_ctx->cur_state) 							\
+			|| (SNAPSHOT_SHM_ATTACH_FAIL == lcl_ss_ctx->cur_state))						\
+	{	/* Previous attempt at snapshot context creation failed (say, snapshot file open failed) and the error	\
+		 * has been reported in the shared memory. However, the snapshot is not yet complete. So, set 		\
+		 * snapshot_in_prog to FALSE since the ongoing snapshot is not valid (as indicated by us in the prior	\
+		 * transaction/retry inside crit) 									\
+		 * Note that we will be doing this 'if' check unconditionally until MUPIP INTEG detects the error in 	\
+		 * shared memory which can be avoided by making GT.M itself set CNL->snapshot_in_prog to FALSE when it	\
+		 * detects inside crit that snapshot initialization failed for this process and hence the ongoing	\
+		 * snapshot is no longer valid. This way we don't wait for MUPIP INTEG to detect and terminate the 	\
+		 * snapshots												\
+		 */													\
+		CSA->snapshot_in_prog = FALSE;										\
+	}														\
 }
 
+#ifdef DEBUG
+# define DBG_ENSURE_SNAPSHOT_GOOD_TO_GO(LCL_SS_CTX, CNL)				\
+{											\
+	shm_snapshot_ptr_t		ss_shm_ptr;					\
+											\
+	assert(SNAPSHOTS_IN_PROG(CNL));							\
+	assert(NULL != LCL_SS_CTX);							\
+	ss_shm_ptr = LCL_SS_CTX->ss_shm_ptr;						\
+	assert(NULL != ss_shm_ptr);							\
+	assert(SNAPSHOT_INIT_DONE == LCL_SS_CTX->cur_state);				\
+	assert(0 == LCL_SS_CTX->failure_errno);						\
+	assert((-1 != CNL->ss_shmid) && 						\
+		(LCL_SS_CTX->attach_shmid == CNL->ss_shmid));				\
+	assert(NULL != LCL_SS_CTX->start_shmaddr);					\
+	assert(0 == strcmp(LCL_SS_CTX->shadow_file, ss_shm_ptr->ss_info.shadow_file));	\
+	assert(-1 != LCL_SS_CTX->shdw_fd);						\
+}
+#else
+# define DBG_ENSURE_SNAPSHOT_GOOD_TO_GO(LCL_SS_CTX, CNL)
+#endif
 /* Destroy an existing snapshot. Called by GT.M (or utilities like update process, MUPIP LOAD which uses
  * GT.M runtime. Assumes that csa->snapshot_in_prog is TRUE and as a side effect sets csa->snapshot_in_prog
  * to FALSE if the context is destroyed
@@ -2822,35 +2865,6 @@ typedef enum
 	}										\
 }
 
-#define SS_ORPHAN_RELEASE_IF_NEEDED(CSA)										\
-{															\
-	snapshot_context_ptr_t	lcl_ss_ctx;										\
-	shm_snapshot_ptr_t	ss_shm_ptr;										\
-															\
-	if (SNAPSHOTS_IN_PROG(CSA))											\
-	{														\
-		lcl_ss_ctx = SS_CTX_CAST(CSA->ss_ctx);									\
-		assert(NULL != lcl_ss_ctx);										\
-		ss_shm_ptr = lcl_ss_ctx->ss_shm_ptr;									\
-		DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(CSA, (sm_uc_ptr_t)ss_shm_ptr);						\
-		/* For every NUM_TRANSACTIONS_FOR_SS_HEALTHCHECK transactions, check for on-going snapshot liveliness */\
-		if (ss_shm_ptr->ss_tn_count && !(ss_shm_ptr->ss_tn_count & (NUM_TRANSACTIONS_FOR_SS_HEALTHCHECK - 1)))	\
-		{													\
-			if (ss_shm_ptr->ss_read_progress <= lcl_ss_ctx->last_ss_read_progress)				\
-			{	/* Not much progress happened since we checked last time */				\
-				if (ss_shm_ptr->ss_info.ss_pid && !is_proc_alive(ss_shm_ptr->ss_info.ss_pid, 0))	\
-				{											\
-					ss_release(NULL);								\
-					/* No more before image writes for snapshots until a new snapshot starts */	\
-					CSA->snapshot_in_prog = FALSE;							\
-				}											\
-			}												\
-			lcl_ss_ctx->last_ss_read_progress = ss_shm_ptr->ss_read_progress;				\
-			ss_shm_ptr->ss_tn_count = 0;									\
-		} else	/* We haven't reached the threshold yet. Increment the ss_tn_count and continue */		\
-			ss_shm_ptr->ss_tn_count++;									\
-	}														\
-}															\
 /* No need to write before-image in case the block is FREE. In case the database had never been fully upgraded from V4 to V5 format
  * (after the MUPIP UPGRADE), all RECYCLED blocks can basically be considered FREE (i.e. no need to write before-images since
  * backward journal recovery will never be expected to take the database to a point BEFORE the mupip upgrade).
@@ -2869,23 +2883,85 @@ typedef enum
 	retval = retval && (!SNAPSHOT_ALONE_IN_PROG(csa) || !ss_chk_shdw_bitmap(csa, SS_CTX_CAST(csa->ss_ctx), blk_no));\
 }
 
-/* Determine if the state of 'snapshots in progress' has changed since we grabbed crit in t_end.c/tp_tend.c */
-# define SS_STATE_CHANGE(CNL, CSA, ss_st_chng, lcl_ss_shmid, lcl_ss_shmcycle)						\
-{															\
-	if (SNAPSHOTS_IN_PROG(CSA) != SNAPSHOTS_IN_PROG(CNL))								\
-		ss_st_chng = (SNAPSHOTS_IN_PROG(CSA) ? ALL_SS_STOPPED : NEW_SS_STARTED);				\
-	else if (SNAPSHOTS_IN_PROG(CSA) && (lcl_ss_shmcycle != CNL->ss_shmcycle))					\
-		ss_st_chng = NEW_SS_STARTED;										\
-	else	/* Snapshot state did not change since we grabbed crit */						\
-	{														\
-		assert(SNAPSHOTS_IN_PROG(CSA) == SNAPSHOTS_IN_PROG(CNL));						\
-		if (SNAPSHOTS_IN_PROG(CSA))										\
-		{													\
-			assert(lcl_ss_shmid == CNL->ss_shmid);								\
-			assert(lcl_ss_shmcycle == CNL->ss_shmcycle);							\
-		}													\
-		ss_st_chng = SS_NO_STATE_CHANGE;									\
-	}														\
+# define CHK_AND_UPDATE_SNAPSHOT_STATE_IF_NEEDED(CSA, CNL, SS_NEED_TO_RESTART)							\
+{																\
+	GBLREF	uint4		process_id;											\
+																\
+	uint4			lcl_failure_errno;										\
+	ss_proc_status		cur_state;											\
+	shm_snapshot_ptr_t	ss_shm_ptr;											\
+	snapshot_context_ptr_t	lcl_ss_ctx;											\
+	boolean_t		csa_snapshot_in_prog, cnl_snapshot_in_prog;							\
+																\
+	error_def(ERR_SSFILOPERR);												\
+	error_def(ERR_SSATTACHSHM);												\
+																\
+	assert(CSA->now_crit);													\
+	csa_snapshot_in_prog = SNAPSHOTS_IN_PROG(CSA);										\
+	cnl_snapshot_in_prog = SNAPSHOTS_IN_PROG(CNL);										\
+	if (csa_snapshot_in_prog || cnl_snapshot_in_prog)									\
+	{															\
+		lcl_ss_ctx = SS_CTX_CAST(CSA->ss_ctx);										\
+		ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(CSA));								\
+		assert(lcl_ss_ctx->ss_shmcycle <= CNL->ss_shmcycle);								\
+		if (!cnl_snapshot_in_prog || ss_shm_ptr->failure_errno)								\
+		{	/* No on going snapshots or on going snapshot is invalid. Even if we encountered error during snapshot	\
+			 * context creation outside crit, we ignore it as the snapshot is no more active/valid. 		\
+			 */													\
+			CSA->snapshot_in_prog = FALSE;										\
+		} else if (lcl_ss_ctx->ss_shmcycle == CNL->ss_shmcycle)								\
+		{	/* Neither new snapshots started nor existing ones completed. However, it's possible that we might have \
+			 * encountered error during snapshot context creation outside crit. If the values noted outside crit 	\
+			 * matches with the global values, then the error is genuine. If not, then we might have done operations\
+			 * (shm attach and file open) when things in the shared memory were in flux in which case we need to	\
+			 * restart												\
+			 */													\
+			lcl_failure_errno = lcl_ss_ctx->failure_errno;								\
+			assert(!ss_shm_ptr->failure_errno);									\
+			SS_NEED_TO_RESTART = FALSE;										\
+			cur_state = lcl_ss_ctx->cur_state;									\
+			switch(cur_state)											\
+			{													\
+				case SNAPSHOT_INIT_DONE:									\
+					/* Most common case. Ensure the local values of snapshot context matches with the 	\
+					 * values stored in shared memory */							\
+					assert(csa_snapshot_in_prog);								\
+					DBG_ENSURE_SNAPSHOT_GOOD_TO_GO(lcl_ss_ctx, CNL);					\
+					break;											\
+				case SNAPSHOT_SHM_ATTACH_FAIL:									\
+					assert(0 != lcl_failure_errno);								\
+					assert(FALSE == CSA->snapshot_in_prog);							\
+					if (lcl_ss_ctx->nl_shmid == CNL->ss_shmid)						\
+					{	/* Error encountered outside crit is genuine. Indicate MUPIP INTEG that the 	\
+						 * snapshot is no more valid 							\
+						 */										\
+						send_msg(VARLSTCNT(4) ERR_SSATTACHSHM, 1, lcl_ss_ctx->nl_shmid, 		\
+							lcl_failure_errno);							\
+						ss_shm_ptr->failure_errno = lcl_failure_errno;					\
+						ss_shm_ptr->failed_pid = process_id;						\
+					} else /* snapshot context creation done while things were in flux */			\
+						SS_NEED_TO_RESTART = TRUE;							\
+					break;											\
+				case SHADOW_FIL_OPEN_FAIL:									\
+					assert(0 != lcl_failure_errno);								\
+					assert(FALSE == CSA->snapshot_in_prog);							\
+					if (0 == STRCMP(lcl_ss_ctx->shadow_file, ss_shm_ptr->ss_info.shadow_file))		\
+					{	/* Error encountered outside crit is genuine. Indicate MUPIP INTEG that the 	\
+						 * snapshot is no more valid							\
+						 */										\
+						send_msg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"), 			\
+							LEN_AND_STR(lcl_ss_ctx->shadow_file), lcl_failure_errno);		\
+						ss_shm_ptr->failure_errno = lcl_failure_errno;					\
+						ss_shm_ptr->failed_pid = process_id;						\
+					} else	/* snapshot context creation done while things were in flux */			\
+						SS_NEED_TO_RESTART = TRUE;							\
+					break;											\
+				default:											\
+					assert(FALSE);										\
+			}													\
+		} else /* A new snapshot has started after we grabbed crit in t_end. Need to restart */				\
+			SS_NEED_TO_RESTART = TRUE;										\
+	}															\
 }
 
 # define WRITE_SNAPSHOT_BLOCK(csa, cr, mm_blk_ptr, blkid, lcl_ss_ctx)			\
@@ -2915,12 +2991,14 @@ typedef enum
 #endif
 
 /* Determine if the state of 'backup in progress' has changed since we grabbed crit in t_end.c/tp_tend.c */
-#define BKUP_STATE_CHANGE(CNL, CSA, bkup_st_chng)						\
+#define CHK_AND_UPDATE_BKUP_STATE_IF_NEEDED(CNL, CSA, NEW_BKUP_STARTED)				\
 {												\
 	if (CSA->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != CNL->nbb))			\
-		bkup_st_chng = (CSA->backup_in_prog) ? ALL_BKUP_STOPPED : NEW_BKUP_STARTED;	\
-	else											\
-		bkup_st_chng = BKUP_NO_STATE_CHANGE;						\
+	{											\
+		if (!CSA->backup_in_prog)							\
+			NEW_BKUP_STARTED = TRUE;						\
+		CSA->backup_in_prog = !CSA->backup_in_prog;					\
+	}											\
 }
 
 #define BLK_HDR_EMPTY(bp) ((0 == (bp)->bsiz) && (0 == (bp)->tn))
@@ -2931,6 +3009,23 @@ typedef enum
 	REG_ALREADY_FROZEN,
 	REG_HAS_KIP
 }freeze_status;
+
+#define GV_BIND_NAME_ONLY(ADDR, TARG)	gv_bind_name(ADDR, TARG)
+
+#define GV_BIND_NAME_AND_ROOT_SEARCH(ADDR, TARG)				\
+{										\
+	enum db_acc_method	acc_meth;					\
+	GBLREF gd_region	*gv_cur_region;					\
+	GBLREF gv_namehead	*gv_target;					\
+										\
+	GV_BIND_NAME_ONLY(ADDR, TARG);						\
+	acc_meth = gv_cur_region->dyn.addr->acc_meth;				\
+	if ((dba_bg == acc_meth) || (dba_mm == acc_meth))			\
+	{									\
+		if ((0 == gv_target->root) || (DIR_ROOT == gv_target->root))	\
+			gvcst_root_search();					\
+	}									\
+}
 
 void		assert_jrec_member_offsets(void);
 bt_rec_ptr_t	bt_put(gd_region *r, int4 block);

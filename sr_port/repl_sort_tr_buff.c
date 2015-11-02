@@ -47,7 +47,7 @@ void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 	assert(0 != tr_bufflen);
 	assert(0 == ((UINTPTR_T)tb % SIZEOF(uint4)));
 	prefix = (jrec_prefix *)tb;
-	rectype = prefix->jrec_type;
+	rectype = (enum jnl_record_type)prefix->jrec_type;
 	assert(!IS_ZTP(rectype));
 	if (prefix->forwptr == tlen)
 	{	/* there is only one journal record in this buffer. Make sure it is either JRT_SET/JRT_KILL/JRT_NULL */
@@ -89,7 +89,7 @@ void repl_sort_tr_buff(uchar_ptr_t tr_buff, uint4 tr_bufflen)
 	{
 		assert(0 == ((UINTPTR_T)tb % SIZEOF(uint4)));
 		prefix = (jrec_prefix *)tb;
-		rectype = prefix->jrec_type;
+		rectype = (enum jnl_record_type)prefix->jrec_type;
 		assert(!IS_ZTP(rectype));
 		rec = (jnl_record *)tb;	/* Start of this record */
 		reclen = prefix->forwptr;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,7 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 	mstr 			dnode;
 	show_reply		srep;
 	uint4			status;
+	boolean_t		was_crit;
 
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, sreq->rnum)->reghead->reg;
 	if (dba_bg == cur_region->dyn.addr->acc_meth || dba_mm == cur_region->dyn.addr->acc_meth)
@@ -65,9 +66,12 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 		/* Prevent any modification of the lock space while we make a local copy of it */
 		if (cs_adr->critical != NULL)
 			crash_count = cs_adr->critical->crashcnt;
-		grab_crit(cur_region);
+		was_crit = cs_adr->now_crit;
+		if (!was_crit)
+			grab_crit(cur_region);
 		longcpy((uchar_ptr_t)lke_ctl, cs_adr->lock_addrs[0], ls_len);
-		rel_crit(cur_region);
+		if (!was_crit)
+			rel_crit(cur_region);
 		util_cm_print(lnk, 0, NULL, RESET);
 		dnode.len = sreq->nodelength;
 		dnode.addr = sreq->node;

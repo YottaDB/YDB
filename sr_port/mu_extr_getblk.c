@@ -24,6 +24,9 @@
 #include "t_retry.h"
 #include "t_begin.h"
 #include "gvcst_protos.h"	/* for gvcst_rtsib,gvcst_search,gvcst_search_blk prototype */
+#ifdef VMS
+#include <rms.h>		/* needed for muextr.h */
+#endif
 #include "muextr.h"
 
 GBLREF gd_region	*gv_cur_region;

@@ -80,7 +80,7 @@ void op_unwind(void)
 		unw_mv_ent(mvc);
 		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 	}
-	if (is_tracing_on)
+	if (is_tracing_on GTMTRIG_ONLY( && !(frame_pointer->type & SFT_TRIGR)))
 		(*unw_prof_frame_ptr)();
 	mv_chain = mvc;
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);

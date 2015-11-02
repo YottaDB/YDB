@@ -220,11 +220,11 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 
 	if (*tmp_buf++ != '(')
 		return 0;
-	if (!ISDIGIT(*tmp_buf))
+	if (!ISDIGIT_ASCII(*tmp_buf))
 		return 0;
 	while (tmp_buf != top)
 	{
-		if (ISDIGIT(*tmp_buf))
+		if (ISDIGIT_ASCII(*tmp_buf))
 			lcl_buf[indx++] = *tmp_buf;
 		else if (',' == *tmp_buf || ')' == *tmp_buf)
 		{

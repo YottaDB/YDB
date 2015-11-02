@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,7 +73,7 @@ int m_job(void)
 	{
 		advancewindow();
 		argptr = &arglst;
-		while(TK_RPAREN != window_token)
+		do
 		{
 			if (argcnt > MAX_ACTUALS)
 			{
@@ -85,7 +85,11 @@ int m_job(void)
 				stx_error(ERR_JOBACTREF);
 				return FALSE;
 			}
-			if (!expr(&argval))
+			if ((TK_COMMA == window_token) || (TK_RPAREN == window_token))
+			{
+				ref = newtriple(OC_NULLEXP);
+				argval = put_tref(ref);
+			} else if (!expr(&argval))
 				return FALSE;
 			ref = newtriple(OC_PARAMETER);
 			ref->operand[0] = argval;
@@ -94,12 +98,12 @@ int m_job(void)
 			argcnt++;
 			if (TK_COMMA == window_token)
 				advancewindow();
-			else  if (TK_RPAREN != window_token)
+			else if (TK_RPAREN != window_token)
 			{
 				stx_error(ERR_COMMAORRPAREXP);
 				return FALSE;
 			}
-		}
+		} while (TK_RPAREN != window_token);
 		advancewindow();	/* jump over close paren */
 	}
 	if (TK_COLON == window_token)

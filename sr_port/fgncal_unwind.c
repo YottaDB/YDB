@@ -42,7 +42,7 @@ void fgncal_unwind(void)
 	{
 #		ifdef GTM_TRIGGER
 		if (SFT_TRIGR & frame_pointer->type)
-			gtm_trigger_fini(TRUE);
+			gtm_trigger_fini(TRUE, FALSE);
 		else
 #		endif
 			op_unwind();

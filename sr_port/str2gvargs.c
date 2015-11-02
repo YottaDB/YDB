@@ -90,7 +90,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 		for ( ; cp < c_top && *cp != '('; )
 		{
 			ch = *cp++;
-			if (!ISALPHA(ch) && !ISDIGIT(ch))
+			if (!ISALPHA_ASCII(ch) && !ISDIGIT_ASCII(ch))
 				rts_error(VARLSTCNT(4) ERR_GVINVALID, 2, len, c_ref);
 		}
 		spt->str.len = INTCAST(cp - spt->str.addr);
@@ -222,7 +222,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 			} else
 			{
 				dot_seen = FALSE;
-				if (!ISDIGIT(ch) && '.' != ch && '-' != ch && '+' != ch)
+				if (!ISDIGIT_ASCII(ch) && '.' != ch && '-' != ch && '+' != ch)
 					rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
 				if (!concat)
 				{
@@ -235,7 +235,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 				{
 					if (cp == c_top)
 						rts_error(VARLSTCNT(4) ERR_NUMUNXEOR, 2, len, c_ref);
-					if (!ISDIGIT(*cp))
+					if (!ISDIGIT_ASCII(*cp))
 					{
 						if ('.' != *cp)
 							break;

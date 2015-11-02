@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc *
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ void gtmcrypt_entry()
 		rts_error(VARLSTCNT(1) ERR_GTMDISTUNDEF);
 
 	memset(libpath, 0, GTM_PATH_MAX);
-	snprintf(libpath, GTM_PATH_MAX, "%s/%s/%s", gtm_dist_path, "plugin", GTMCRYPT_LIBNAME);
+	SNPRINTF(libpath, GTM_PATH_MAX, "%s/%s/%s", gtm_dist_path, "plugin", GTMCRYPT_LIBNAME);
 
 	gbl_encryption_ecode = 0;
 	handle = dlopen(libpath, GTMCRYPT_LIBFLAGS);

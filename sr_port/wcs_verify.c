@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,6 +89,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	if ((csa->now_crit == FALSE) && (csd->clustered == FALSE))
 	{
 		assert(expect_damage);
+		assert(!csa->hold_onto_crit);
 		ret = FALSE;
 		send_msg(VARLSTCNT(8) ERR_DBFHEADERR4, 6, DB_LEN_STR(reg), RTS_ERROR_TEXT("now_crit"), csa->now_crit, TRUE);
 		grab_crit(reg);		/* what if it has it but lost track of it ??? should there be a crit reset ??? */

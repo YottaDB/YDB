@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ typedef struct
 #define GTMSIGINFO_BADR		0x2	/* Bad virtual address information is available */
 #define GTMSIGINFO_USER		0x4	/* User information is available */
 
-#if defined(__osf__) || defined(Linux390)
+#if defined(__osf__)
 typedef	struct sigcontext	gtm_sigcontext_t;
 #elif defined(__CYGWIN__)
 typedef	struct ucontext		gtm_sigcontext_t;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #endif
 #include "op.h"
 #include <stdarg.h>
-#include "ebc_xlat.h"
 
 GBLREF spdesc stringpool;
 
@@ -95,47 +94,4 @@ void op_fnzchar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
 	va_end(var);
 	dst->str.len = INTCAST((char *)base - dst->str.addr);
 	stringpool.free += dst->str.len;
-}
-
-/* Single-byte implementation of $ZECHAR() that creates a string from EBCDIC codes */
-void op_fnzechar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...)
-{
-	va_list 	var;
-	int 		ch;
-	unsigned char 	*base;
-	VMS_ONLY(int	cnt;)
-	unsigned char	*tmp_ptr;
-	unsigned int	tmp_len;
-#ifdef KEEP_zOS_EBCDIC
-	iconv_t		tmp_cvt_cd;
-#endif
-
-	VAR_START(var, dst);
-	VMS_ONLY(va_count(cnt);)
-	cnt -= 1;
-
-	ENSURE_STP_FREE_SPACE(cnt);
-
-	dst->mvtype = MV_STR;
-	dst->str.addr = (char *)stringpool.free;
-	base = stringpool.free;
-
-	while (cnt-- > 0)
-	{
-		ch = va_arg(var, int4);
-		if ((ch >= 0) && (ch < 256))	/* only true for single byte character set */
-			*base++ = ch;
-	}
-	va_end(var);
-	dst->str.len = INTCAST((char *)base - dst->str.addr);
-	stringpool.free += dst->str.len;
-
-	*base = '\0';
-	tmp_ptr = (unsigned char *)dst->str.addr;
-	tmp_len = dst->str.len;
-#ifdef KEEP_zOS_EBCDIC
-	ICONV_OPEN_CD(tmp_cvt_cd, "IBM-1047", "ISO8859-1");
-	ICONVERT(tmp_cvt_cd, &tmp_ptr, &tmp_len, &tmp_ptr, &tmp_len);
-	ICONV_CLOSE_CD(tmp_cvt_cd);
-#endif
 }

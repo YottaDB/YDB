@@ -236,7 +236,8 @@
 		if (DEBUG_ONLY(TRUE) PRO_ONLY(lv_base->has_aliascont))								\
 		{														\
 			DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base)); 	\
-			als_scan_for_containers((lv_base), &als_prcs_tpsav_cntnr_node, (void *)tp_pointer, (void *)NULL);	\
+			als_scan_for_containers((lv_base), &als_prcs_tpsav_cntnr_node, (void *)tp_pointer, (void *)NULL,	\
+						(int *)NULL);									\
 			DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base)); 	\
 		}														\
 	} else															\
@@ -253,7 +254,7 @@
 	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
 	{															\
 		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base));		\
-		als_scan_for_containers((lv_base), &als_prcs_tprest_cntnr_node, (void *)NULL, (void *)NULL);			\
+		als_scan_for_containers((lv_base), &als_prcs_tprest_cntnr_node, (void *)NULL, (void *)NULL, (int *)NULL); 	\
 		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base));		\
 	}															\
 }
@@ -265,7 +266,7 @@
 	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
 	{															\
 		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base));		\
-		als_scan_for_containers((lv_base), &als_prcs_tpunwnd_cntnr_node, (void *)NULL, (void *)NULL);			\
+		als_scan_for_containers((lv_base), &als_prcs_tpunwnd_cntnr_node, (void *)NULL, (void *)NULL, (int *)NULL); 	\
 		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base));		\
 	} else															\
 		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Scan for tree at 0x"lvaddr" bypassed - no containers", lv_base));\
@@ -275,13 +276,13 @@
 #define KILL_CNTNRS_IN_TREE(lv_base)												\
 {																\
 	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
-		als_scan_for_containers((lv_base), &als_prcs_kill_cntnr_node, (void *)NULL, (void *)NULL);			\
+		als_scan_for_containers((lv_base), &als_prcs_kill_cntnr_node, (void *)NULL, (void *)NULL, (int *)NULL); 	\
 }
 
 /* Macro to scan an lvval for containers pointing to other structures that need to be scanned in xnew pop processing */
 #define XNEWREF_CNTNRS_IN_TREE(lv_base)												\
 	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
-		als_scan_for_containers((lv_base), &als_prcs_xnewref_cntnr_node, (void *)NULL, (void *)NULL);
+		als_scan_for_containers((lv_base), &als_prcs_xnewref_cntnr_node, (void *)NULL, (void *)NULL, (int *)NULL);
 
 /* Macro to mark the base frame of the current var as having a container */
 #define MARK_CONTAINER_ONBOARD(lvp) 										\
@@ -310,7 +311,8 @@ void als_prcs_tprest_cntnr_node(lv_val *lv, void *dummy1, void *dummy2);
 void als_prcs_tpunwnd_cntnr_node(lv_val *lv, void *dummy1, void *dummy2);
 void als_prcs_kill_cntnr_node(lv_val *lv, void *dummy1, void *dummy2);
 void als_prcs_xnewref_cntnr_node(lv_val *lv, void *dummy1, void *dummy2);
-void als_scan_for_containers(lv_val *lv_base, void (*als_container_processor)(lv_val *, void *, void *), void *arg1, void *arg2);
+void als_scan_for_containers(lv_val *lv_base, void (*als_container_processor)(lv_val *, void *, void *), void *arg1, void *arg2,
+			     int *cntnr_cnt );
 ht_ent_mname *als_lookup_base_lvval(lv_val *lvp);
 zwr_alias_var *als_getzavslot(void);
 int als_lvval_gc(void);

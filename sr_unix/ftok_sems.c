@@ -52,6 +52,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
+#include "gtm_c_stack_trace.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	uint4			process_id;
@@ -94,6 +95,7 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 	uint4		lcnt;
 	unix_db_info	*udi;
 	union semun	semarg;
+	uint4		stuck_cnt = 0;
 
 	error_def(ERR_FTOKERR);
 	error_def(ERR_CRITSEMFAIL);
@@ -189,7 +191,14 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 						RTS_ERROR_LITERAL("semop() and semctl()"), CALLFROM, errno);
 					return FALSE;
 				}
-			}
+			} /* Someone else holding the semaphore and semctl did not return error. We are
+				going to start a timer and in case the timer pops and the blocking call
+				also fails, we are guaranteed at least two stack traces of the processes
+				holding the semaphore at both the times. In case it is the same process,
+				we are ensured two stack traces and can deduce
+				whether the process was making any progress or not*/
+			else if (sem_pid != process_id)
+				stuck_cnt++;
 			if (!IS_DSE_IMAGE)
 			{
 				if (!gtm_environment_init)
@@ -225,6 +234,11 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 				sem_pid = semctl(udi->ftok_semid, 0, GETPID);
 				if (-1 != sem_pid)
 				{
+					if (sem_pid != process_id)	/* check needed because of Linux behavior with semctl */
+					{
+						stuck_cnt++;
+						GET_C_STACK_FROM_SCRIPT("SEMWT2LONG", process_id, sem_pid, stuck_cnt);
+					}
 					gtm_putmsg(VARLSTCNT(5) ERR_SEMWT2LONG, 3,  DB_LEN_STR(reg), sem_pid);
 					return FALSE;
 				} else

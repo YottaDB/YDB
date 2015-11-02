@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -387,7 +387,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		name_buf_len = (PATH_MAX > hdr->src_full_name.len) ? hdr->src_full_name.len : PATH_MAX;
 		memcpy(name_buf, hdr->src_full_name.addr, name_buf_len);
 		name_buf[name_buf_len] = '\0';
-		PRINTF("incr_link: %s loaded at 0x%08lx\n", name_buf, hdr->ptext_adr);
+		PRINTF("incr_link: %s loaded at 0x%08lx\n", name_buf, (long unsigned int) hdr->ptext_adr);
 	}
 
 	/* Read-write non-releasable section */

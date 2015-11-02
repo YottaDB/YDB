@@ -74,9 +74,8 @@ void gv_rundown(void)
 	gvcmy_rundown();
 	ENABLE_AST
 
-	if (TRUE == pool_init)
+	if (pool_init)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
-
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
 		for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ int	gtm_reg(int vax_reg);
 #elif defined(__ia64)
 #  define CODE_TYPE ia64_bundle
 #  define NUM_BUFFERRED_INSTRUCTIONS 25
-#elif defined(__MVS__)
+#elif defined(__MVS__) || defined(Linux390)
 #  define CODE_TYPE uint2
 #  define NUM_BUFFERRED_INSTRUCTIONS 100
 #else
@@ -54,7 +54,7 @@ int	gtm_reg(int vax_reg);
 #if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux) || (defined(__linux__) && defined(__ia64)) \
 	|| defined(__MVS__)
 #  define TRUTH_IN_REG
-#elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__))
+#elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390)
 #  undef TRUTH_IN_REG
 #else
 #  error UNSUPPORTED PLATFORM

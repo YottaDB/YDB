@@ -61,6 +61,8 @@
 #include "repl_instance.h"
 #include "ftok_sems.h"
 #include "gtmmsg.h"
+#include "have_crit.h"			/* needed for ZLIB_COMPRESS */
+#include "deferred_signal_handler.h"	/* needed for ZLIB_COMPRESS */
 #include "gtm_zlib.h"
 
 GBLREF	gd_addr			*gd_header;
@@ -128,7 +130,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 		 gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD]);
 	do
 	{
-		CONNECT_SOCKET(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, SIZEOF(*secondary_addr), status);
+		status = gtm_connect(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, SIZEOF(*secondary_addr));
 		if (0 == status)
 			break;
 		repl_log(gtmsource_log_fp, FALSE, FALSE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
@@ -158,7 +160,7 @@ int gtmsource_est_conn(struct sockaddr_in *secondary_addr)
 		connection_attempts = 0;
 		do
 		{
-			CONNECT_SOCKET(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, SIZEOF(*secondary_addr), status);
+			status = gtm_connect(gtmsource_sock_fd, (struct sockaddr *)secondary_addr, SIZEOF(*secondary_addr));
 			if (0 == status)
 				break;
 			repl_close(&gtmsource_sock_fd);
@@ -514,13 +516,15 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 	jnlpool_ctl_ptr_t	jctl;
 	gtmsource_local_ptr_t	gtmsource_local;
 	gd_region		*reg, *region_top;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa, *repl_csa;
 
 	jctl = jnlpool.jnlpool_ctl;
 	jnlpool_size = jctl->jnlpool_size;
 	gtmsource_local = jnlpool.gtmsource_local;
 	if (recvd_start_flags & START_FLAG_UPDATERESYNC)
 	{
+		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 		grab_lock(jnlpool.jnlpool_dummy_reg);
 		QWASSIGN(gtmsource_local->read_jnl_seqno, jctl->jnl_seqno);
 		QWASSIGN(gtmsource_local->read_addr, jctl->write_addr);
@@ -705,15 +709,17 @@ int gtmsource_srch_restart(seq_num recvd_jnl_seqno, int recvd_start_flags)
 			csa = &FILE_INFO(reg)->s_addrs;
 			if (REPL_ALLOWED(csa->hdr))
 			{
-#ifndef INT8_SUPPORTED
+#				ifndef INT8_SUPPORTED
+				assert(!csa->hold_onto_crit);	/* so it is ok to invoke "grab_crit" unconditionally */
 				grab_crit(reg); /* File-header sync is done in crit, and so grab_crit here */
-#endif
+#				endif
 				QWASSIGN(FILE_INFO(reg)->s_addrs.hdr->dualsite_resync_seqno, recvd_jnl_seqno);
 				REPL_DPRINT3("Setting dualsite_resync_seqno of %s to "INT8_FMT"\n", reg->rname,
 					INT8_PRINT(recvd_jnl_seqno));
-#ifndef INT8_SUPPORTED
+#				ifndef INT8_SUPPORTED
+				assert(!csa->hold_onto_crit);	/* so it is ok to invoke "rel_crit" unconditionally */
 				rel_crit(reg);
-#endif
+#				endif
 			}
 		}
 	}
@@ -1003,7 +1009,6 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 	test_msg.type = REPL_CMP_TEST;
 	test_msg.len = REPL_MSG_CMPINFOLEN;
 	test_msg.proto_ver = REPL_PROTO_VER_THIS;
-	assert(NULL != zlib_compress_fnptr);
 	/* Fill in test data with random data. The data will be a sequence of bytes from 0 to 255. The start point though
 	 * is randomly chosen using the process_id. If it is 253, the resulting sequence would be 253, 254, 255, 0, 1, 2, ...
 	 */
@@ -1011,8 +1016,7 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 		inputdata[index] = (start + index) % REPL_MSG_CMPDATALEN;
 	/* Compress the data */
 	cmplen = SIZEOF(cmpbuf);	/* initialize it to the available compressed buffer space */
-	cmpret = (*zlib_compress_fnptr)(((Bytef *)&cmpbuf[0]), (uLongf *)&cmplen,
-				(const Bytef *)inputdata, (uLong)REPL_MSG_CMPDATALEN, gtm_zlib_cmp_level);
+	ZLIB_COMPRESS(&cmpbuf[0], cmplen, inputdata, REPL_MSG_CMPDATALEN, gtm_zlib_cmp_level, cmpret);
 	switch(cmpret)
 	{
 		case Z_MEM_ERROR:

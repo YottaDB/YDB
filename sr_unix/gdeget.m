@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006, 2009 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2010 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -114,6 +114,9 @@ LOAD
 	f s="JOURNAL","KEY_SIZE","NULL_SUBSCRIPTS","RECORD_SIZE" d tmpreg(s) ;,"STOP_ENABLE"
 	; need to handle versioning
 	i 'v44&'v30 d tmpreg("STDNULLCOLL")
+	; minimum allocation/extension was changed in V54001; check if default current value is lower and if so adjust it
+	i tmpreg("ALLOCATION")<minreg("ALLOCATION")  s tmpreg("ALLOCATION")=minreg("ALLOCATION"),update=1
+	i tmpreg("EXTENSION")<minreg("EXTENSION")  s tmpreg("EXTENSION")=minreg("EXTENSION"),update=1
 	f i=2:1:$l(accmeth,"\") s am=$p(accmeth,"\",i) d
 	. i am="MM" d:$zl(rec)-(rel-1)<3 nextrec i +$ze(rec,rel,rel+2)'=2 d tmpmm q
 	. f s="ACCESS_METHOD","ALLOCATION","BLOCK_SIZE","BUCKET_SIZE","DEFER" d tmpseg(am,s)
@@ -190,7 +193,11 @@ region:
 	s regs(s,"NULL_SUBSCRIPTS")=$$bin2num($ze(rec,rel)),rel=rel+1
 	s regs(s,"JOURNAL")=$$bin2num($ze(rec,rel)),rel=rel+1
 	s regs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4					; journal options
+	; check if allocation is below new minimums (changed in V54001) if so adjust it to be at least that much
+	i regs(s,"ALLOCATION")<minreg("ALLOCATION")  s regs(s,"ALLOCATION")=minreg("ALLOCATION"),update=1
 	s regs(s,"EXTENSION")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
+	; check if allocation is below new minimums (changed in V54001) if so adjust it to be at least that much
+	i regs(s,"EXTENSION")<minreg("EXTENSION")  s regs(s,"EXTENSION")=minreg("EXTENSION"),update=1
 	s regs(s,"BUFFER_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s regs(s,"BEFORE_IMAGE")=$$bin2num($ze(rec,rel)),rel=rel+1
 	i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")				; 4 chars
@@ -305,11 +312,11 @@ CREATE
 	s am=tmpacc d maktseg
 	q
 cretmps:
-	s tmpreg("ALLOCATION")=100
+	s tmpreg("ALLOCATION")=2048
 	s tmpreg("BEFORE_IMAGE")=1
 	s tmpreg("BUFFER_SIZE")=128
 	s tmpreg("COLLATION_DEFAULT")=0
-	s tmpreg("EXTENSION")=100
+	s tmpreg("EXTENSION")=2048
 	s tmpreg("FILE_NAME")=""
 	s tmpreg("JOURNAL")=0
 	s tmpreg("KEY_SIZE")=64

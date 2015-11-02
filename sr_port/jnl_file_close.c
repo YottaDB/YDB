@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,15 +60,16 @@ static	const	unsigned short	zero_fid[3];
 void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 {
 	jnl_file_header		*header;
-	unsigned char		hdr_base[JNL_HDR_LEN + ALIGNMENT_SIZE];
+	unsigned char		hdr_base[REAL_JNL_HDR_LEN + MAX_IO_BLOCK_SIZE];
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;
 	struct_jrec_eof		eof_record;
 	off_jnl_t		eof_addr;
-	uint4			status;
+	uint4			status, read_write_size;
 	int			rc, save_errno;
+	uint4			jnl_fs_block_size;
 
 	error_def(ERR_JNLCLOSE);
 	error_def(ERR_JNLFLUSH);
@@ -99,10 +100,11 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 #endif
 	if ((NULL == jpc) || (NOJNL == jpc->channel))
 		return;
-	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, DISK_BLOCK_SIZE));
+	jb = jpc->jnl_buff;
+	jnl_fs_block_size = jb->fs_block_size;
+	header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_base, jnl_fs_block_size));
 	if (clean)
 	{
-		jb = jpc->jnl_buff;
 		jnl_write_eof_rec(csa, &eof_record);
 		if (SS_NORMAL != (jpc->status = jnl_flush(reg)))
 		{
@@ -118,7 +120,9 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 		UNIX_ONLY(jnl_fsync(reg, jb->dskaddr);)
 		UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr);)
 		eof_addr = jb->freeaddr - EOF_RECLEN;
-		DO_FILE_READ(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
+		read_write_size = ROUND_UP2(REAL_JNL_HDR_LEN, jnl_fs_block_size);
+		assert((unsigned char *)header + read_write_size <= ARRAYTOP(hdr_base));
+		DO_FILE_READ(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 		if (SYSCALL_SUCCESS(jpc->status))
 		{
 			assert(header->end_of_data <= eof_addr);
@@ -129,7 +133,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			assert(header->eov_tn >= header->bov_tn);
 			header->end_seqno = eof_record.jnl_seqno;
 			header->crash = FALSE;
-			DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
+			DO_FILE_WRITE(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 			if (SYSCALL_ERROR(jpc->status))
 			{
 				assert(FALSE);

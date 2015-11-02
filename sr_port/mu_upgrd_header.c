@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,7 +73,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->max_update_array_size = v15_csd->max_update_array_size;			/* New from V4.0-001G */
 	csd->max_non_bm_update_array_size = v15_csd->max_non_bm_update_array_size;	/* New from V4.0-001G */
 	csd->file_corrupt = v15_csd->file_corrupt;
-	csd->minor_dbver = (enum mdb_ver)GDSMVCURR;					/* New in V5.0-000 */
+	csd->minor_dbver = GDSMVCURR;					/* New in V5.0-000 */
 	csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;	/* New from V5.3-002 */
 	csd->createinprogress = v15_csd->createinprogress;
 	time(&ctime);
@@ -92,7 +92,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	assert(csd->blks_to_upgrd);
 	csd->tn_upgrd_blks_0 = 0;								/* New in V5.0-000 */
 	csd->fully_upgraded = FALSE;								/* New in V5.0-000 */
-	csd->desired_db_format = (enum db_ver)GDSVCURR;							/* New in V5.0-000 */
+	csd->desired_db_format = GDSVCURR;							/* New in V5.0-000 */
 	csd->desired_db_format_tn = v15_csd->trans_hist.curr_tn - 1;				/* New in V5.0-000 */
 	csd->reorg_db_fmt_start_tn = 0;								/* New in V5.0-000 */
 	csd->certified_for_upgrade_to = v15_csd->certified_for_upgrade_to;			/* New in V5.0-000 */

@@ -1,7 +1,7 @@
 #! tcsh -f
 #################################################################
 #								#
-#	Copyright 2007, 2009 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2010 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -23,9 +23,20 @@
 
 set checkunicode = "../sr_unix/check_unicode_support.csh"
 if ( -e $checkunicode ) then
-    set x8664inc = ""
-    if ( "Linux" == `uname` && "x86_64" == `uname -m` && "64" == "$linux_build_type" ) set x8664inc = "../sr_x86_64"
-    source $checkunicode $x8664inc
+    set incdir = ""
+    if ( "Linux" == `uname` && "64" == "$linux_build_type" ) then
+	switch (`uname -m`)
+	case "x86_64":
+	    set incdir = "../sr_x86_64"
+	    breaksw
+	case "s390x":
+	    set incdir = "../sr_s390"
+	    breaksw
+	default:
+	    breaksw
+	endsw
+    endif
+    source $checkunicode $incdir
     if ("TRUE" == "$is_unicode_support") then
 	if (! -e utf8) mkdir utf8
 	if ( "OS/390" == $HOSTOS ) then

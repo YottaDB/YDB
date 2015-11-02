@@ -321,6 +321,7 @@ GBLDEF	int	jnl2filterfmt[REPL_JNL_MAX + 1] =
 	REPL_FILTER_V17,	/* filter version for REPL_JNL_V17 */
 	REPL_FILTER_V17,	/* filter version for REPL_JNL_V18 */
 	REPL_FILTER_V19,	/* filter version for REPL_JNL_V19 */
+	REPL_FILTER_V19,	/* filter version for REPL_JNL_V20 */
 	-1,			/* filter version for REPL_JNL_MAX */
 };
 
@@ -330,6 +331,7 @@ GBLDEF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] 
 	IF_NONE,
 	IF_19TO17,
 	IF_19TO17,
+	IF_19TO19,
 	IF_19TO19
 };
 
@@ -339,6 +341,7 @@ GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] 
 	IF_NONE,
 	IF_17TO19,
 	IF_17TO19,
+	IF_19TO19,
 	IF_19TO19
 };
 
@@ -354,8 +357,6 @@ GBLREF	boolean_t	secondary_side_trigger_support;
 GBLREF	uchar_ptr_t	repl_filter_buff;
 GBLREF	int		repl_filter_bufsiz;
 GBLREF	unsigned char	jnl_ver, remote_jnl_ver;
-GBLREF	boolean_t	is_src_server;
-GBLREF	boolean_t	is_rcvr_server;
 GBLREF	seq_num		trig_replic_suspect_seqno;
 
 static	pid_t	repl_filter_pid = -1;
@@ -1408,11 +1409,6 @@ int jnl_v19TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
-	/* Assert that same version conversion (in this case v19 to v19) should always be done by source server.
-	 * Prior to V19, this was being always done at the receiver server side.
-	 */
-	assert(is_src_server);
-	assert(!is_rcvr_server);
 	QWASSIGN(this_upd_seqno, seq_num_zero);
 	promote_uupd_to_tupd = FALSE;
    	while (JREC_PREFIX_SIZE <= jlen)
@@ -1469,7 +1465,8 @@ int jnl_v19TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 					 * the secondary supports triggers. In that case, we don't want to replicate this
 					 * update as we know the secondary side will have the same trigger definitions and
 					 * will be invoking this update anyways. This way, the data size sent in the replication
-					 * pipe is minimized.
+					 * pipe is minimized. If we are already on the secondary when inside this function,
+					 * discard this record.
 					 */
 					assert((jb == jstart) && (cb == cstart));
 					/* Note down if this journal record was either TSET/TKILL/TZKILL. This is needed
@@ -1577,7 +1574,7 @@ int jnl_v19TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	while (JREC_PREFIX_SIZE <= clen)
 	{
 		prefix = (jrec_prefix *)(cb);
-		rectype = prefix->jrec_type;
+		rectype = (enum jnl_record_type)prefix->jrec_type;
 		reclen = prefix->forwptr;
 		if (IS_TUPD(rectype))
 			tupd_num++;

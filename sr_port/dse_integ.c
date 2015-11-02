@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void dse_integ(void)
 	int4		dummy_int, nocrit_present;
 	cache_rec_ptr_t	dummy_cr;
 	int		util_len;
-	bool		was_crit;
+	boolean_t	was_crit;
 
 	error_def(ERR_DSEBLKRDFAIL);
 
@@ -65,27 +65,13 @@ void dse_integ(void)
 	util_out_print(util_buff, TRUE);
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = TRUE;
-		else
-			grab_crit(gv_cur_region);
-	}
-
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!(bp = t_qread(patch_curr_blk, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (TRUE == cert_blk(gv_cur_region, patch_curr_blk, (blk_hdr_ptr_t)bp, 0, FALSE))
 		util_out_print("!/  No errors detected.!/", TRUE);
 	else
 		util_out_print(NULL, TRUE);
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = FALSE;
-		else
-			rel_crit(gv_cur_region);
-	}
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return;
 }

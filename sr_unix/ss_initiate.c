@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,13 +57,19 @@
 #include "shmpool.h"
 #include "db_snapshot.h"
 #include "gtm_c_stack_trace.h"
+#include "sys/shm.h"
+#include "do_shmat.h"
+#include "have_crit.h"
+#include "ss_lock_facility.h"
+#include "gtmimagename.h"
 
-GBLREF	uint4				process_id;
-GBLREF	uint4				mu_int_errknt;
-GBLREF	boolean_t			ointeg_this_reg;
-GBLREF  boolean_t			online_specified;
-
-static int init_shm_and_sparse_file(int, uint4 *, uint4 *, int *, long *, void **, gd_region*, char *, int);
+GBLREF	uint4			process_id;
+GBLREF	uint4			mu_int_errknt;
+GBLREF	boolean_t		ointeg_this_reg;
+GBLREF  boolean_t		online_specified;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF 	void			(*call_on_signal)();
+GBLREF	int			process_exiting;
 
 #define SNAPSHOT_TMP_PREFIX	"gtm_snapshot_"
 #define ISSUE_WRITE_ERROR_AND_EXIT(reg, RC, csa, tempfilename)								\
@@ -79,7 +85,11 @@ static int init_shm_and_sparse_file(int, uint4 *, uint4 *, int *, long *, void *
 
 #define TOT_BYTES_REQUIRED(BLKS)	DIVIDE_ROUND_UP(BLKS, 8) /* One byte can represent 8 blocks' before image state */
 #define EOF_MARKER_SIZE			DISK_BLOCK_SIZE
-#define MAX_TRY_FOR_TOT_BLKS		CDB_STAGNATE
+#define MAX_TRY_FOR_TOT_BLKS		3	/* This value is the # of tries we do outside of crit in the hope that no
+						 * concurrent db extensions occur. This is chosen to be the same as
+						 * CDB_STAGNATE but is kept as a different name because there is no reason
+						 * for it to be the same.
+						 */
 
 #define FILL_SS_FILHDR_INFO(ss_shm_ptr, ss_filhdr_ptr)						\
 {												\
@@ -95,25 +105,54 @@ static int init_shm_and_sparse_file(int, uint4 *, uint4 *, int *, long *, void *
 	ss_filhdr_ptr->ss_info.ss_shmsize = ss_shm_ptr->ss_info.ss_shmsize;			\
 }
 
-#define GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, csa, cnl)			\
+#define GET_CRIT_AND_DECR_INHIBIT_KILLS(REG, CNL)			\
 {									\
-	if (!csa->now_crit)						\
-		grab_crit(reg);						\
-	DECR_INHIBIT_KILLS(cnl);					\
-	rel_crit(reg);							\
+	grab_crit(REG);							\
+	DECR_INHIBIT_KILLS(CNL);					\
+	rel_crit(REG);							\
 }
 
-#define SS_INIT_SHM(TOT_BLKS, SS_SHMSIZE, SS_SHMADDR, SS_SHMID, RC)					\
+#define SS_INIT_SHM(SS_SHMSIZE, SS_SHMADDR, SS_SHMID, RESIZE_NEEDED, RC)				\
 {													\
-	long	lcl_shmid = INVALID_SHMID;								\
-	int	lcl_status;										\
+	error_def(ERR_SYSCALL);										\
 													\
-	SS_SHMSIZE = (int)(ROUND_UP((SNAPSHOT_HDR_SIZE + TOT_BYTES_REQUIRED(TOT_BLKS)), OS_PAGE_SIZE));	\
-	SS_SHMADDR = ss_attach_shmseg(SS_SHMSIZE, &lcl_shmid, &lcl_status, TRUE);			\
-	RC = lcl_status;										\
-	SS_SHMID = lcl_shmid;										\
-	if (0 == lcl_status)										\
-		memset(SS_SHMADDR, 0, SS_SHMSIZE);							\
+	RC = 0;												\
+													\
+	if (RESIZE_NEEDED)										\
+	{												\
+		assert(INVALID_SHMID != SS_SHMID);							\
+		assert(NULL != SS_SHMADDR);								\
+		assert(0 == ((long)SS_SHMADDR % OS_PAGE_SIZE));						\
+		if (0 != SHMDT(SS_SHMADDR))								\
+		{											\
+			RC = errno;									\
+			assert(FALSE);									\
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmdt"), 	\
+					CALLFROM, RC);							\
+		}											\
+		if (0 != shmctl(SS_SHMID, IPC_RMID, 0))							\
+		{											\
+			RC = errno;									\
+			assert(FALSE);									\
+			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmctl"),	\
+					CALLFROM, RC);							\
+		}											\
+	}												\
+	SS_SHMID = shmget(IPC_PRIVATE, SS_SHMSIZE, RWDALL | IPC_CREAT);					\
+	if (-1 == SS_SHMID)										\
+	{												\
+		RC = errno;										\
+		assert(FALSE);										\
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmget"), CALLFROM,	\
+				RC);									\
+	}												\
+	if (-1 == (sm_long_t)(SS_SHMADDR = do_shmat(SS_SHMID, 0, 0)))					\
+	{												\
+		RC = errno;										\
+		assert(FALSE);										\
+		gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("Error with shmat"), CALLFROM,	\
+			RC);										\
+	}												\
 }
 
 /* In case of an error, un-freeze the region before returning if we had done the region_freeze
@@ -128,67 +167,88 @@ static int init_shm_and_sparse_file(int, uint4 *, uint4 *, int *, long *, void *
 	}							\
 }
 
+/* The below function is modelled around mupip_backup_call_on_signal. This is invoked for doing snapshot clean up if ss_initiate
+ * gets interrupted by a MUPIP STOP or other interruptible signals. In such cases, information would not have been transferred to
+ * database shared memory and hence gds_rundown cannot do the cleanup.
+ */
+void	ss_initiate_call_on_signal(void)
+{
+	sgmnt_addrs		*csa;
+
+	csa = &FILE_INFO(gv_cur_region)->s_addrs;
+	call_on_signal = NULL;	/* Do not recurse via call_on_signal if there is an error */
+	process_exiting = TRUE; /* Signal function "free" (in gtm_malloc_src.h) not to bother with frees as we are anyways exiting.
+				 * This avoids assert failures that would otherwise occur due to nested storage mgmt calls
+				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
+				 */
+	assert(NULL != csa->ss_ctx);
+	ss_release(&csa->ss_ctx);
+	return;
+}
+
 boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be started */
 			    util_snapshot_ptr_t	util_ss_ptr, 	/* Utility specific snapshot structure */
 			    snapshot_context_ptr_t *ss_ctx, 	/* Snapshot context */
 			    boolean_t preserve_snapshot, 	/* Should the snapshots be preserved ? */
 			    char *calling_utility)		/* Who called ss_initiate */
 {
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
+	shm_snapshot_ptr_t	ss_shm_ptr;
+	snapshot_context_ptr_t	lcl_ss_ctx, ss_orphan_ctx;
+	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
 	int			shdw_fd, tmpfd, fclose_res, fstat_res, status, perm, group_id, pwrite_res, dsk_addr = 0;
 	int			retries, idx, this_snapshot_idx, save_errno, ss_shmsize, ss_shm_vbn;
+	intrpt_state_t		save_intrpt_ok_state;
+	ZOS_ONLY(int		realfiletag;)
 	long			ss_shmid = INVALID_SHMID;
-	char			tempnamprefix[MAX_FN_LEN + 1], tempdir_full_buffer[GTM_PATH_MAX];
-	char			tempdir_trans_buffer[GTM_PATH_MAX];
-	char			*tempfilename;
+	char			tempnamprefix[MAX_FN_LEN + 1], tempdir_full_buffer[GTM_PATH_MAX], *tempfilename;
+	char			tempdir_trans_buffer[GTM_PATH_MAX], eof_marker[EOF_MARKER_SIZE];
+	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	struct stat		stat_buf;
 	enum db_acc_method	acc_meth;
 	void			*ss_shmaddr;
 	gtm_int64_t		db_file_size;
-	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t	cnl;
-	uint4			tempnamprefix_len, crit_counter, tot_blks;
-	uint4			rem_blks, native_size, bytes2write, fstat_status;
-	mstr			tempdir_log, tempdir_full, tempdir_trans;
-	boolean_t		debug_mupip = FALSE, wait_for_zero_kip;
-	shm_snapshot_ptr_t	ss_shm_ptr;
-	snapshot_context_ptr_t	lcl_ss_ctx, ss_orphan_ctx;
-	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
-	char			*time_ptr, time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
-	now_t			now;
-	boolean_t		was_crit;
-	ZOS_ONLY(int		realfiletag;)
+	uint4			tempnamprefix_len, crit_counter, tot_blks, prev_ss_shmsize, native_size, fstat_status;
 	uint4			*kip_pids_arr_ptr;
+	mstr			tempdir_log, tempdir_full, tempdir_trans;
+	boolean_t		debug_mupip = FALSE, wait_for_zero_kip, final_retry;
+	now_t			now;
+	DEBUG_ONLY(int		intrpt_state_at_entry;)
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_FILEPARSE);
 	error_def(ERR_MAXSSREACHED);
 	error_def(ERR_SSTMPDIRSTAT);
-	error_def(ERR_SSTMPFILOPEN);
+	error_def(ERR_SSFILOPERR);
 	error_def(ERR_SYSCALL);
 	error_def(ERR_SSTMPCREATE);
 	error_def(ERR_SSV4NOALLOW);
 	ZOS_ONLY(error_def(ERR_BADTAG);)
 	ZOS_ONLY(error_def(ERR_TEXT);)
 
+	assert(IS_MUPIP_IMAGE);
 	assert(NULL != calling_utility);
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	cnl = csa->nl;
 	acc_meth = csd->acc_meth;
+	DEBUG_ONLY(intrpt_state_at_entry = intrpt_ok_state;)
 	debug_mupip = (CLI_PRESENT == cli_present("DBG"));
 
 	/* Create a context containing default information pertinent to this initiate invocation */
 	lcl_ss_ctx = malloc(SIZEOF(snapshot_context_t)); /* should be free'd by ss_release */
 	DEFAULT_INIT_SS_CTX(lcl_ss_ctx);
+	call_on_signal = ss_initiate_call_on_signal;
 	/* Snapshot context created. Any error below before the next cur_state assignment and a later call to ss_release will
 	 * have to free the malloc'ed snapshot context instance
 	 */
 	lcl_ss_ctx->cur_state = BEFORE_SHADOW_FIL_CREAT;
 	*ss_ctx = lcl_ss_ctx;
-	was_crit = csa->now_crit;
-	if (!was_crit)
-		grab_crit(reg);
+	assert(!csa->now_crit);	/* Right now mu_int_reg (which does not hold crit) is the only one that calls ss_initiate */
+	assert(!csa->hold_onto_crit);	/* this ensures we can safely do unconditional grab_crit and rel_crit */
+	ss_get_lock(reg);	/* Grab hold of the snapshot crit lock (low level latch) */
 	ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(csa);
 	if (MAX_SNAPSHOTS == cnl->num_snapshots_in_effect)
 	{
@@ -202,23 +262,22 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		else
 		{
 			gtm_putmsg(VARLSTCNT(5) ERR_MAXSSREACHED, 3, MAX_SNAPSHOTS, REG_LEN_STR(reg));
-			if (!was_crit)
-				rel_crit(reg);
+			ss_release_lock(reg);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
 			return FALSE;
 		}
 	}
-	assert(csa->now_crit);
 	ss_shm_ptr->ss_info.ss_pid = process_id;
 	cnl->num_snapshots_in_effect++;
-	if (!was_crit)
-		rel_crit(reg);
+	assert(ss_lock_held_by_us(reg));
+	ss_release_lock(reg);
 
 	/* For a readonly database for the current process, we better have the region frozen */
 	assert(!reg->read_only || csd->freeze);
 	/* ============================ STEP 1 : Shadow file name construction ==============================
 	 *
-	 * --> use $gtm_tmp (denoted by SNAPSHOT_TMP_DIR) if available, else use current directory
+	 * --> Directory is taken from GTM_SNAPTMPDIR, if available, else GTM_BAK_TEMPDIR_LOG_NAME_UC, if available,
+	 *     else use current directory.
 	 * --> use the template - gtm_snapshot_<region_name>_<pid_in_hex>_XXXXXX
 	 * --> the last six characters will be replaced by MKSTEMP below
 	 * Note: MUPIP RUNDOWN will rely on the above template to do the cleanup if there were a
@@ -238,11 +297,11 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	tempnamprefix_len += reg->rname_len;
 	SNPRINTF(&tempnamprefix[tempnamprefix_len], MAX_FN_LEN, "_%x", process_id);
 
-	tempdir_log.addr = SNAPSHOT_TMP_DIR;
-	tempdir_log.len = STR_LIT_LEN(SNAPSHOT_TMP_DIR);
+	tempdir_log.addr = GTM_SNAPTMPDIR;
+	tempdir_log.len = STR_LIT_LEN(GTM_SNAPTMPDIR);
 	tempfilename = tempdir_full.addr = tempdir_full_buffer;
-	/* check if the SNAPSHOT_TMP_DIR environment variable is defined (actually $gtm_tmp)
-	 * side-effect: tempdir_trans.addr = tempdir_trans_buffer irrespective of whether TRANS_LOG_NAME
+	/* Check if the  environment variable is defined or not.
+	 * Side-effect: tempdir_trans.addr = tempdir_trans_buffer irrespective of whether TRANS_LOG_NAME
 	 * succeeded or not.
 	 */
 	status = TRANS_LOG_NAME(&tempdir_log,
@@ -254,10 +313,22 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	if (SS_NORMAL == status && (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 		*(tempdir_trans.addr + tempdir_trans.len) = 0;
 	else
-	{
-		tempdir_trans_buffer[0] = '.';
-		tempdir_trans_buffer[1] = '\0';
-		tempdir_trans.len = 1;
+	{	/* Not found - try GTM_BAK_TEMPDIR_LOG_NAME_UC instead */
+		tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME_UC;
+		tempdir_log.len = STR_LIT_LEN(GTM_BAK_TEMPDIR_LOG_NAME_UC);
+		status = TRANS_LOG_NAME(&tempdir_log,
+					&tempdir_trans,
+					tempdir_trans_buffer,
+					SIZEOF(tempdir_trans_buffer),
+					do_sendmsg_on_log2long);
+		if (SS_NORMAL == status && (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
+			*(tempdir_trans.addr + tempdir_trans.len) = 0;
+		else
+		{	/* Not found - use the current directory via a relative filespec */
+			tempdir_trans_buffer[0] = '.';
+			tempdir_trans_buffer[1] = '\0';
+			tempdir_trans.len = 1;
+		}
 	}
 
 	/* Verify if we can stat the temporary directory */
@@ -271,7 +342,13 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 
 	/* ========================== STEP 2 : Create the shadow file ======================== */
 	/* get a unique temporary file name. The file gets created on success */
+	SAVE_INTRPT_OK_STATE(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP till the file is created */
 	MKSTEMP(tempfilename, tmpfd);
+	STRCPY(lcl_ss_ctx->shadow_file, tempfilename);
+	/* Shadow file created. Any error below before the next cur_state assignment and a later call to ss_release will have
+	 * to delete at least the shadow file apart from free'ing the malloc'ed snapshot context instance
+	 */
+	lcl_ss_ctx->cur_state = AFTER_SHADOW_FIL_CREAT;
 	if (FD_INVALID == tmpfd)
 	{
 		status = errno;
@@ -283,10 +360,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	if (-1 == gtm_zos_set_tag(tmpfd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
 		TAG_POLICY_GTM_PUTMSG(tempfilename, realfiletag, TAG_BINARY, errno);
 #	endif
-	/* Shadow file created. Any error below before the next cur_state assignment and a later call to ss_release will have
-	 * to delete at least the shadow file apart from free'ing the malloc'ed snapshot context instance
-	 */
-	lcl_ss_ctx->cur_state = AFTER_SHADOW_FIL_CREAT;
 	/* Temporary file for backup was created above using "mkstemp" which on AIX opens the file without
 	 * large file support enabled. Work around that by closing the file descriptor returned and reopening
 	 * the file with the "open" system call (which gets correctly translated to "open64"). We need to do
@@ -297,7 +370,8 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	if (FD_INVALID == shdw_fd)
 	{
 		status = errno;
-		gtm_putmsg(VARLSTCNT(5) ERR_SSTMPFILOPEN, 2, tempdir_full.len, tempdir_full.addr, status);
+		gtm_putmsg(VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"),
+				tempdir_full.len, tempdir_full.addr, status);
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
 		return FALSE;
 	}
@@ -307,9 +381,10 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 #	endif
 	/* Now that the temporary file has been opened successfully, close the fd returned by mkstemp */
 	F_CLOSE(tmpfd, fclose_res);
+	lcl_ss_ctx->shdw_fd = shdw_fd;
+	RESTORE_INTRPT_OK_STATE;
 	tempdir_full.len = STRLEN(tempdir_full.addr); /* update the length */
 	assert(GTM_PATH_MAX >= tempdir_full.len);
-	STRCPY(lcl_ss_ctx->shadow_file, tempfilename);
 
 	/* give temporary files the group and permissions as other shared resources - like journal files */
 	FSTAT_FILE(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
@@ -363,39 +438,87 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	grab_crit(reg);
 	INCR_INHIBIT_KILLS(cnl);
 	kip_pids_arr_ptr = cnl->kip_pid_array;
-	for (retries = -1; MAX_TRY_FOR_TOT_BLKS > retries; ++retries)
+	prev_ss_shmsize = 0;
+	for (retries = 0; MAX_TRY_FOR_TOT_BLKS >= retries; ++retries)
 	{
-		/* On all but the 5th retry (inclusive of retries = -1), release crit */
-		if (MAX_TRY_FOR_TOT_BLKS != retries)
+		final_retry = (MAX_TRY_FOR_TOT_BLKS == retries);
+		/* On all but the 4th retry (inclusive of retries = -1), release crit */
+		if (!final_retry)
 			rel_crit(reg);
 		/*
-		 * Calculations outside crit (on the final retry, we will be holding crit while calculating the below):
+		 * Outside crit (on the final retry, we will be holding crit while calculating the below):
 		 * 1. total blocks
-		 * 2. native size (total number of blocks in terms of DISK_BLOCK_SIZE
-		 * 3. write 0x00 at an offset equal to the current database file size
-		 * 4. create shared memory segment of size just enough to represent the before image state of total
-		 * blocks in the database
+		 * 2. native size (total number of blocks in terms of DISK_BLOCK_SIZE)
+		 * 3. write EOF an offset equal to the current database file size
+		 * 4. create shared memory segment to be used as bitmap for storing whether a given database block
+		 *    was before imaged or not.
 		 */
-		if (!init_shm_and_sparse_file(shdw_fd, &tot_blks, &native_size, &ss_shmsize, &ss_shmid, &ss_shmaddr, reg,
-			tempfilename, retries))
-		{
-			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, csa, cnl);
+		SAVE_INTRPT_OK_STATE(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP till the shared memory is created */
+		tot_blks = csd->trans_hist.total_blks;
+		prev_ss_shmsize = ss_shmsize;
+		ss_shmsize = (int)(ROUND_UP((SNAPSHOT_HDR_SIZE + TOT_BYTES_REQUIRED(tot_blks)), OS_PAGE_SIZE));
+		assert((0 == retries) || (0 != prev_ss_shmsize));
+		if (0 == retries)
+		{	/* If this is the first try, then create shared memory anyways. */
+			SS_INIT_SHM(ss_shmsize, ss_shmaddr, ss_shmid, FALSE, status);
+		} else if ((prev_ss_shmsize - SNAPSHOT_HDR_SIZE) < TOT_BYTES_REQUIRED(tot_blks))
+		{	/* Shared memory created with SS_INIT_SHM (in prior retries) is aligned at the OS page size boundary.
+			 * So, in case of an extension (in subsequent retry) we check if the newly added blocks would fit in
+			 * the existing shared memory (possible if the extra bytes allocated for OS page size alignment will
+			 * be enough to hold the newly added database blocks). If not, remove the original shared memory and
+			 * create a new one.
+			 */
+			if (debug_mupip)
+			{
+				util_out_print("!/MUPIP INFO: Existing shared memory !UL of size !UL not enough for total blocks \
+						!UL. Creating new shared memory", TRUE, ss_shmid, prev_ss_shmsize, tot_blks);
+			}
+			SS_INIT_SHM(ss_shmsize, ss_shmaddr, ss_shmid, TRUE, status);
+		}
+		if (status)
+		{	/* error while creating shared memory */
+			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
 			return FALSE;
 		}
+		/* At this point, we are done with allocating shared memory (aligned with OS_PAGE_SIZE) enough to hold
+		 * the total number of blocks. Any error below before the next cur_state assignment and a later call
+		 * to ss_release will have to detach/rmid the shared memory identifier apart from deleting the shadow
+		 * file and free'ing the malloc'ed snapshot context instance.
+		 */
+		lcl_ss_ctx->attach_shmid = ss_shmid;
+		lcl_ss_ctx->start_shmaddr = ss_shmaddr;
+		lcl_ss_ctx->cur_state = AFTER_SHM_CREAT;
+		RESTORE_INTRPT_OK_STATE;
+		if (debug_mupip)
+		{
+			util_out_print("!/MUPIP INFO: Shared memory created. SHMID = !UL",
+					TRUE,
+					ss_shmid);
+		}
+		/* Write EOF block in the snapshot file */
+		native_size = mu_file_size(reg->dyn.addr->file_cntl);
+		db_file_size = (gtm_int64_t)(native_size) * DISK_BLOCK_SIZE; /* Size of database file in bytes */
+		LSEEKWRITE(shdw_fd, ((off_t)db_file_size + ss_shmsize), eof_marker, EOF_MARKER_SIZE, status);
+		if (0 != status)
+		{	/* error while writing EOF record to snapshot file */
+			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
+			ISSUE_WRITE_ERROR_AND_EXIT(reg, status, csa, tempfilename);
+		}
+		/* Wait for KIP to reset */
 		wait_for_zero_kip = csd->kill_in_prog;
 		/* Wait for existing kills-in-progress to be reset. Since a database file extension is possible as
 		 * we don't hold crit while wcs_sleep below, we will retry if the total blocks have changed since
-		 * we last initialized the shared memory. However, in the final retry, the shared memory and shadow
-		 * file initialization will happen in crit. Also, in the final retry, we won't be waiting for the
-		 * kills in progress as we would be holding crit and cannot afford to wcs_sleep. So, in such a case,
-		 * MUKILLIP should be issued by the caller of ss_initiate if csd->kill_in_prog is set to TRUE. But,
-		 * such a case should be rare.*/
-		for (crit_counter = 1; wait_for_zero_kip && (MAX_TRY_FOR_TOT_BLKS != retries); )
+		 * we last checked it. However, in the final retry, the shared memory and shadow file initialization
+		 * will happen in crit. Also, in the final retry, we won't be waiting for the kills in progress as
+		 * we would be holding crit and cannot afford to wcs_sleep. So, in such a case, MUKILLIP should be
+		 * issued by the caller of ss_initiate if csd->kill_in_prog is set to TRUE. But, such a case should
+		 * be rare.
+		 */
+		for (crit_counter = 1; wait_for_zero_kip && !final_retry; )
 		{
 			/* Release crit before going into the wait loop */
-			if (csa->now_crit)
-				rel_crit(reg);
+			rel_crit(reg);
 			if (debug_mupip)
 			{
 				GET_CUR_TIME;
@@ -433,21 +556,18 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			} else
 				break;
 		}
-		if (!csa->now_crit)
-			grab_crit(reg);
-		/* After we have written the bitmap and before we grab crit, another process can add new blocks to the database
-		 * in which case csd->trans_hist.total_blks is no longer the value as we grabbed. To work around this, note down
-		 * the total_blks inside the crit once again, release the crit, update the bitmap and grab crit once more to see
-		 * if the total blks changed. Repeat this process until the total_blks inside and outside crit are the same or we
-		 * exhaust our retires and do the whole thing in crit. Note that change in total blocks can result in the existing
-		 * shared memory not enough. In such a case, detach the existing shared memory and create new shared memory so
-		 * that it can hold the newly calculated total blocks. It is also possible that csd->kill_in_prog was FALSE before
-		 * we grab crit above and hence we decided not to do wcs_sleep but before we could grab crit, csd->kill_in_prog was
-		 * set to TRUE by a parallel GT.M process. In such a case, we would continue again and wait for the
-		 * kill-in-progress to reset to FALSE.
+		grab_crit(reg);
+		/* There are two reasons why we might go for another iteration of this loop
+		 * (a) After we have created the shared memory and before we grab crit, another process can add new blocks to the
+		 * database, in which case csd->trans_hist.total_blks is no longer the value as we noted down above. Check if this
+		 * is the case and if so, retry to obtain a consistent copy of the total number of blocks.
+		 * (b) Similarly, csd->kill_in_prog was FALSE before grab_crit, but non-zero after grab-crit due to concurrency
+		 * reasons. Check if this is the case and if so, retry to wait for KIP to reset.
 		 */
 		if ((tot_blks == csd->trans_hist.total_blks) && !csd->kill_in_prog)
-		{
+		{	/* We have a consistent copy of the total blocks and csd->kill_in_prog is FALSE inside crit. No need for
+			 * retry.
+			 */
 			assert(native_size == ((tot_blks * (csd->blk_size / DISK_BLOCK_SIZE)) + (csd->start_vbn)));
 			break;
 		}
@@ -465,12 +585,14 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	assert(INVALID_SHMID != ss_shmid);
 	assert(0 == (ss_shmsize % DISK_BLOCK_SIZE));
 	ss_shm_vbn = ss_shmsize / DISK_BLOCK_SIZE; /* # of DISK_BLOCK_SIZEs the shared memory spans across */
-	/* At this point, we are done with allocating shared memory (aligned with OS_PAGE_SIZE) enough to hold
-	 * the total number of blocks. Any error below before the next cur_state assignment and a later call to ss_release will have
-	 * to detach/rmid the shared memory identifier apart from deleting the shadow file and free'ing the malloc'ed snapshot
-	 * context instance
-	 */
-	lcl_ss_ctx->cur_state = AFTER_SHM_CREAT;
+	assert(ss_shmid == lcl_ss_ctx->attach_shmid);
+	assert(AFTER_SHM_CREAT == lcl_ss_ctx->cur_state);
+	if (debug_mupip)
+	{
+		util_out_print("!/MUPIP INFO: Successfully created shared memory. SHMID = !UL",
+			TRUE,
+			ss_shmid);
+	}
 	/* It is possible that we did saw csd->full_upgraded TRUE before invoking ss_initiate but MUPIP SET -VER=V4 was done after
 	 * ss_initiate was called. Handle appropriately.
 	 */
@@ -482,7 +604,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			gtm_putmsg(VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(reg));
 			util_out_print(NO_ONLINE_ERR_MSG, TRUE);
 			mu_int_errknt++;
-			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, csa, cnl);
+			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
 			return FALSE;
 		} else
@@ -492,7 +614,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			ointeg_this_reg = FALSE;
 			assert(NULL != *ss_ctx);
 			ss_release(ss_ctx);
-			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, csa, cnl);
+			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
 			return TRUE;
 		}
@@ -511,10 +633,9 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	{
 		assert(process_id != csd->freeze); /* We would not have frozen the region if the database is read-write */
 		gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_STR(calling_utility), DB_LEN_STR(reg));
-		GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, csa, cnl);
+		GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
 		return FALSE;
 	}
-
 	assert(0 < cnl->num_snapshots_in_effect || (!SNAPSHOTS_IN_PROG(cnl)));
 	assert(csa->now_crit);
 	/* ========== STEP 6: Copy the file header, master map and the native file size into a private structure =========== */
@@ -523,6 +644,10 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	memcpy(util_ss_ptr->master_map, MM_ADDR(csd), MASTER_MAP_SIZE_MAX);
 	util_ss_ptr->native_size = native_size;
 
+	/* We are about to copy the process private variables to shared memory. Although we have done grab_crit above, we take
+	 * snapshot crit lock to ensure that no other process attempts snapshot cleanup.
+	 */
+	SAVE_INTRPT_OK_STATE(INTRPT_IN_SS_INITIATE); /* Defer MUPIP STOP until we complete copying to shared memory */
 	/* == STEP 7: Populate snapshot context, database shared memory snapshot structure and snapshot file header structure == */
 	ss_shm_ptr = (shm_snapshot_ptr_t)SS_GETSTARTPTR(csa);
 	DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
@@ -539,13 +664,10 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	ss_shm_ptr->ss_info.ss_shmsize = ss_shmsize;
 	ss_shm_ptr->in_use = 1;
 	/* Fill in the information for the process specific snapshot context information */
-	lcl_ss_ctx->shdw_fd = shdw_fd;
-	lcl_ss_ctx->ss_shmid = ss_shmid;
 	lcl_ss_ctx->ss_shm_ptr = (shm_snapshot_ptr_t)(ss_shm_ptr);
 	lcl_ss_ctx->start_shmaddr = (sm_uc_ptr_t)ss_shmaddr;
 	lcl_ss_ctx->bitmap_addr = ((sm_uc_ptr_t)ss_shmaddr + SNAPSHOT_HDR_SIZE);
 	lcl_ss_ctx->shadow_vbn = ss_shm_ptr->ss_info.shadow_vbn;
-	lcl_ss_ctx->last_ss_read_progress = ss_shm_ptr->ss_read_progress = 0;
 	lcl_ss_ctx->total_blks = ss_shm_ptr->ss_info.total_blks;
 	/* Fill snapshot file header information. This data will be persisted if -PRESERVE option is given */
 	ss_filhdr_ptr = (snapshot_filhdr_ptr_t)(ss_shmaddr);
@@ -581,52 +703,9 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	dsk_addr += MASTER_MAP_SIZE_MAX;
 	assert(0 == (dsk_addr % OS_PAGE_SIZE));
 	lcl_ss_ctx->cur_state = SNAPSHOT_INIT_DONE; /* Same as AFTER_SHM_CREAT but set for clarity of the snapshot state */
-	return TRUE;
-}
-
-static int init_shm_and_sparse_file(int	shdw_fd,
-				    uint4 *tot_blks,
-				    uint4 *native_size,
-	   			    int *ss_shmsize,
-				    long *ss_shmid,
-				    void **ss_shmaddr,
-				    gd_region *reg,
-				    char *tempfilename,	/* For error reporting */
-				    int retries)
-{
-	static boolean_t	first_time = TRUE;
-	long			lcl_shmid = INVALID_SHMID;
-	char			eof_marker[EOF_MARKER_SIZE];
-	int			status;
-	sgmnt_data_ptr_t	csd;
-	sgmnt_addrs		*csa;
-	gtm_int64_t		db_file_size;
-
-	if (first_time)
-	{
-		memset(eof_marker, 0, EOF_MARKER_SIZE);
-		first_time = FALSE;
-	}
-	csa = &FILE_INFO(reg)->s_addrs;
-	csd = csa->hdr;
-	*tot_blks = csd->trans_hist.total_blks;
-	*native_size = mu_file_size(reg->dyn.addr->file_cntl);
-	db_file_size = (gtm_int64_t)(*native_size) * DISK_BLOCK_SIZE; /* Size of database file in bytes */
-	if (-1 == retries) /* First time we called this function. So, initialize shared memory anyways. */
-	{
-		SS_INIT_SHM(*tot_blks, *ss_shmsize, *ss_shmaddr, *ss_shmid, status);
-		if (0 != status)
-			return FALSE;
-	} else if ((*ss_shmsize - SNAPSHOT_HDR_SIZE) < TOT_BYTES_REQUIRED(*tot_blks))
-	{ 	/* The existing shared memory size is not enough for the newly added blocks. So, detach and re-attach */
-		if (0 != ss_detach_shmseg(*ss_shmaddr, *ss_shmid, TRUE, TRUE)) /* Error will be reported inside the function */
-			return FALSE;
-		SS_INIT_SHM(*tot_blks, *ss_shmsize, *ss_shmaddr, *ss_shmid, status);
-		if (0 != status)
-			return FALSE;
-	}
-	LSEEKWRITE(shdw_fd, ((off_t)db_file_size + *ss_shmsize), eof_marker, EOF_MARKER_SIZE, status);
-	if (0 != status)
-		ISSUE_WRITE_ERROR_AND_EXIT(reg, status, csa, tempfilename);
+	call_on_signal = NULL; /* Any further cleanup on signals will be taken care by gds_rundown */
+	RESTORE_INTRPT_OK_STATE;
+	assert(intrpt_ok_state == intrpt_state_at_entry);
+	assert(!ss_lock_held_by_us(reg)); /* We should never leave the function with the snapshot latch not being released */
 	return TRUE;
 }

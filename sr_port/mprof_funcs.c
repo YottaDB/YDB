@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,8 @@
 #include "gtm_stat.h"
 #include "gtm_times.h"
 #include "gtm_unistd.h"
+#include <sys/resource.h>
+#include "min_max.h"
 #elif defined(VMS)
 #include <ssdef.h>
 #include <descrip.h>
@@ -104,12 +106,25 @@ static struct mprof_struct *mprof_ptr;
 						ERR_TEXT, 2, RTS_ERROR_STRING(x));
 
 #ifdef UNIX
-#define TIMES			times
+#define TIMES			times_usec
 #elif defined(VMS)
 #define TIMES			get_cputime
 #endif
 
-#if defined(VMS)
+#ifdef UNIX
+static void times_usec(struct tms *curr)
+{
+	int res;
+	struct rusage usage;
+	error_def(ERR_SYSCALL);
+
+	res = getrusage(RUSAGE_SELF, &usage);
+	if (res == -1)
+		rts_error(VARLSTCNT(6) ERR_SYSCALL, 5, CALLFROM, errno);
+	curr->tms_utime = (usage.ru_utime.tv_sec * 1000000) + usage.ru_utime.tv_usec;
+	curr->tms_stime = (usage.ru_stime.tv_sec * 1000000) + usage.ru_stime.tv_usec;
+}
+#elif defined(VMS)
 static void get_cputime (struct tms *curr)
 {
 	int4	cpu_time_used;
@@ -122,6 +137,8 @@ static void get_cputime (struct tms *curr)
 	curr->tms_utime = cpu_time_used;
 	curr->tms_stime = 0;
 }
+#else
+#error UNSUPPORTED PLATFORM
 #endif
 
 static void parse_gvn(mval *);
@@ -529,7 +546,16 @@ void unw_prof_frame(void)
 			mprof_ptr->curr_tblnd = NULL;
 			prof_fp = (stack_frame_prof *)prof_msp;
 			save_fp = frame_pointer;
-			frame_pointer = frame_pointer->old_frame_pointer;
+#			ifdef GTM_TRIGGER
+			if (frame_pointer->type & SFT_TRIGR)
+			{	/* In a trigger base frame, old_frame_pointer is NULL */
+				assert(NULL == frame_pointer->old_frame_pointer);
+				/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
+				frame_pointer = *(stack_frame **)(frame_pointer + 1);
+			} else
+#			endif
+				frame_pointer = frame_pointer->old_frame_pointer;
+			assert(frame_pointer);
 			get_entryref_information(FALSE, NULL);
 			frame_pointer = save_fp;
 			if (NULL == prof_fp)
@@ -679,9 +705,15 @@ static void get_entryref_information(boolean_t line, trace_entry *tmp_trc_tbl_en
 	line_reset = FALSE;
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
-		/*The equality check in the second half of the expression below is to
-		  account for the delay-slot in HP-UX for implicit quits.
-		  */
+#		ifdef GTM_TRIGGER
+		if (fp->type & SFT_TRIGR)
+		{
+			assert(NULL == fp->old_frame_pointer);
+			/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
+			fp = *(stack_frame **)(fp + 1);
+		}
+#		endif
+		assert(fp);
 		if (ADDR_IN_CODE(fp->mpc, fp->rvector))
 		{
 			if (line_reset)
@@ -782,12 +814,12 @@ static void parse_gvn(mval *gvn)
 	spt->mvtype = MV_STR;
 	spt->str.addr = mpsp;
 	ch = *mpsp++ = *c_ref++;
-	if (!ISALPHA(ch) && (ch != '%'))
+	if (!ISALPHA_ASCII(ch) && (ch != '%'))
 		RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	for ( ; (c_ref < c_top) && ('(' != *c_ref); )
 	{
 		ch = *mpsp++ = *c_ref++;
-		if (!ISALNUM(ch))
+		if (!ISALNUM_ASCII(ch))
 			RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	}
 	spt->str.len = INTCAST(mpsp - spt->str.addr);
@@ -823,7 +855,7 @@ static void parse_gvn(mval *gvn)
 				if (*c_ref != 'J' && *c_ref != 'j')
 					RTS_ERROR_VIEWNOTFOUND("Intrinsic value passed is not $j");
 				c_ref++; 	/* Past 'J' */
-				if ((c_ref < c_top) && (ISALPHA(*c_ref)))
+				if ((c_ref < c_top) && (ISALPHA_ASCII(*c_ref)))
 				{
 					ch = *c_ref;
 					if (c_top >= c_ref + 2)
@@ -841,7 +873,7 @@ static void parse_gvn(mval *gvn)
 			} else
 			{
 				dot_seen = FALSE;
-				if (!ISDIGIT(ch)  &&  ch != '.'  &&  ch != '-'  &&  ch != '+')
+				if (!ISDIGIT_ASCII(ch)  &&  ch != '.'  &&  ch != '-'  &&  ch != '+')
 					RTS_ERROR_VIEWNOTFOUND("Improperly formatted numeric subscript");
 				if ('.' == ch)
 					dot_seen = TRUE;
@@ -850,7 +882,7 @@ static void parse_gvn(mval *gvn)
 				{
 					if (c_ref == c_top)
 						RTS_ERROR_VIEWNOTFOUND("Right parenthesis expected");
-					if (!ISDIGIT(*c_ref))
+					if (!ISDIGIT_ASCII(*c_ref))
 					{
 						if (*c_ref != '.')
 							break;
@@ -897,6 +929,10 @@ void stack_leak_check(void)
 
 	if (NULL == var_on_cstack_ptr)
 		var_on_cstack_ptr = &var_on_cstack;
-	if (&var_on_cstack != var_on_cstack_ptr)
+	if ((&var_on_cstack != var_on_cstack_ptr)
+#ifdef	__i386	/* for 32-bit Linux allow a two pointer variation to accommodate ZHELP */
+		&& ((SIZEOF(var_on_cstack) * 2) < ABS(&var_on_cstack - var_on_cstack_ptr))
+#endif
+		)
 		GTMASSERT;
 }

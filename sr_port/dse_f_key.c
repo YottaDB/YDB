@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,25 +51,11 @@ void dse_f_key(void)
 	patch_find_root_search = TRUE;
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
-
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = TRUE;
-		else
-			grab_crit(gv_cur_region);
-	}
-
+	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	if (!dse_ksrch(root_path[0],&root_path[1],&root_offset[0],&targ_key_root[0],size_root))
 	{
 		util_out_print("!/Key not found, no root present.!/",TRUE);
-		if (!was_crit)
-		{
-			if (nocrit_present)
-				cs_addrs->now_crit = FALSE;
-			else
-				rel_crit(gv_cur_region);
-		}
+		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 		return;
 	}
 	root_path_count = patch_path_count;
@@ -122,8 +108,7 @@ void dse_f_key(void)
 			util_out_print(util_buff,FALSE);
 		}
 		util_out_print(0,TRUE);
-	}
-	else
+	} else
 	{	memcpy(util_buff,"	",1);
 		util_len = 1;
 		util_len += i2hex_nofill(root_path[count],(uchar_ptr_t)&util_buff[util_len], 8);
@@ -132,12 +117,6 @@ void dse_f_key(void)
 		util_buff[util_len] = 0;
 		util_out_print(util_buff,TRUE);
 	}
-	if (!was_crit)
-	{
-		if (nocrit_present)
-			cs_addrs->now_crit = FALSE;
-		else
-			rel_crit(gv_cur_region);
-	}
+	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, nocrit_present, cs_addrs, gv_cur_region);
 	return;
 }

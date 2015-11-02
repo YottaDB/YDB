@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 #include "error.h"
+#include "util.h"
 
 GBLREF boolean_t	expansion_failed, retry_if_expansion_fails;
 
@@ -25,6 +26,7 @@ CONDITION_HANDLER(stp_gcol_ch)
 
 	if ((ERR_MEMORY == SIGNAL || ERR_VMSMEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL) && retry_if_expansion_fails)
 	{
+		UNIX_ONLY(util_out_print("", RESET));	/* Prevent rts_error from flushing error later */
 		expansion_failed = TRUE;
 		UNWIND(NULL, NULL);
 	}

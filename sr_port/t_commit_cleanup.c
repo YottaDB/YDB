@@ -40,22 +40,22 @@
 #include "gtmsource.h"		/* for jnlpool_addrs structure definition */
 #include "send_msg.h"
 
-GBLREF unsigned char		cw_set_depth;
-GBLREF cw_set_element		cw_set[];
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF sgmnt_data_ptr_t		cs_data;
-GBLREF gd_region		*gv_cur_region;
-GBLREF unsigned int		t_tries;
-GBLREF short			dollar_tlevel;
-GBLREF sgm_info			*first_sgm_info;
-GBLREF cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
-GBLREF unsigned int		cr_array_index;
-GBLREF boolean_t		unhandled_stale_timer_pop;
-GBLREF jnlpool_addrs		jnlpool;
-GBLREF uint4			process_id;
-GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
-GBLREF gv_namehead		*gv_target;
-GBLREF uint4			update_trans;
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	cw_set_element		cw_set[];
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	unsigned int		t_tries;
+GBLREF	short			dollar_tlevel;
+GBLREF	sgm_info		*first_sgm_info;
+GBLREF	cache_rec_ptr_t		cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
+GBLREF	unsigned int		cr_array_index;
+GBLREF	boolean_t		unhandled_stale_timer_pop;
+GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	uint4			process_id;
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
+GBLREF	gv_namehead		*gv_target;
+GBLREF	uint4			update_trans;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 
 #define	RESET_EARLY_TN_IF_NEEDED(csa)						\
@@ -67,10 +67,16 @@ GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the T
 	assert(!csa->now_crit || csa->ti->curr_tn == csa->ti->early_tn);	\
 }
 
-#define	RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg)	\
-{						\
-	if (NULL != jpl_reg)			\
-		rel_lock(jpl_reg);		\
+#define	RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg)				\
+{									\
+        sgmnt_addrs		*repl_csa;				\
+									\
+	if (NULL != jpl_reg)						\
+	{								\
+		repl_csa = &FILE_INFO(jpl_reg)->s_addrs;		\
+		if (!repl_csa->hold_onto_crit)				\
+			rel_lock(jpl_reg);				\
+	}								\
 }
 
 #define	RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa)					\
@@ -181,8 +187,9 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 				assert(!csa->now_crit || (csa->ti->curr_tn == csa->ti->early_tn));
 				ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between
 											  * seqno of filehdr and jnlpool */
-				/* Do not release crit on the region until reg_seqno has been reset above */
-				rel_crit(gv_cur_region); /* step (1) of the commit logic is iteratively undone here */
+				/* Do not release crit on the region until reg_seqno has been reset above. */
+				if (!csa->hold_onto_crit)
+					rel_crit(gv_cur_region); /* step (1) of the commit logic is iteratively undone here */
 			}
 			/* Do not release crit on jnlpool until reg_seqno has been reset above */
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
@@ -198,7 +205,8 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			}
 			/* Do not release crit on jnlpool or the region until reg_seqno has been reset above */
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
-			rel_crit(gv_cur_region);	/* step (1) of the commit logic is undone here */
+			if (!csa->hold_onto_crit)
+				rel_crit(gv_cur_region);	/* step (1) of the commit logic is undone here */
 		}
 		if ((t_tries < CDB_STAGNATE) && unhandled_stale_timer_pop)
 			process_deferred_stale();

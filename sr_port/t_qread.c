@@ -102,7 +102,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	uint4			status, blocking_pid;
 	cache_rec_ptr_t		cr;
 	bt_rec_ptr_t		bt;
-	bool			clustered, was_crit;
+	boolean_t		clustered, hold_onto_crit, was_crit;
 	int			dummy, lcnt, ocnt;
 	cw_set_element		*cse;
 	off_chain		chain1;
@@ -300,14 +300,16 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	was_crit = csa->now_crit;
 	ocnt = 0;
 	set_wc_blocked = FALSE;	/* to indicate whether csd->wc_blocked was set to TRUE by us */
+	hold_onto_crit = csa->hold_onto_crit;	/* note down in local to avoid csa-> dereference in multiple usages below */
 	do
 	{
 		if (NULL == (cr = db_csh_get(blk)))
 		{	/* not in memory */
 			if (clustered && (NULL != (bt = bt_get(blk))) && (FALSE == bt->flushing))
 				bt = NULL;
-			if (FALSE == csa->now_crit)
+			if (!csa->now_crit)
 			{
+				assert(!hold_onto_crit);
 				if (NULL != bt)
 				{	/* at this point, bt is not NULL only if clustered and flushing - wait no crit */
 					assert(clustered);
@@ -340,7 +342,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				assert(0 <= cr->read_in_progress);
 				*cycle = cr->cycle;
 				cr->tn = csd->trans_hist.curr_tn;
-				if (FALSE == was_crit)
+				if (!was_crit && !hold_onto_crit)
 					rel_crit(gv_cur_region);
 				/* read outside of crit may be of a stale block but should be detected by t_end or tp_tend */
 				assert(0 == cr->dirty);
@@ -393,8 +395,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
 				}
 				return (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
-			} else  if ((FALSE == was_crit) && (BAD_LUCK_ABOUNDS > ocnt))
+			} else  if (!was_crit && (BAD_LUCK_ABOUNDS > ocnt))
 			{
+				assert(!hold_onto_crit);
 				assert(TRUE == csa->now_crit);
 				assert(csa->nl->in_crit == process_id);
 				rel_crit(gv_cur_region);
@@ -450,7 +453,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				)
 				if (cr->blk != blk)
 					break;
-				if (was_crit != csa->now_crit)
+				if ((was_crit != csa->now_crit) && !hold_onto_crit)
 					rel_crit(gv_cur_region);
 				assert(was_crit == csa->now_crit);
 				/* Check if "cr" is locked for phase2 update by a concurrent process. Before doing so, need to
@@ -520,7 +523,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				break;
 			if (lcnt >= BUF_OWNER_STUCK && (0 == (lcnt % BUF_OWNER_STUCK)))
 			{
-				if (FALSE == csa->now_crit)
+				if (!csa->now_crit && !hold_onto_crit)
 					grab_crit(gv_cur_region);
 				if (cr->read_in_progress < -1)
 				{	/* outside of design; clear to known state */
@@ -548,7 +551,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							RELEASE_BUFF_READ_LOCK(cr);
 						} else
 						{
-							rel_crit(gv_cur_region);
+							if (!hold_onto_crit)
+								rel_crit(gv_cur_region);
 							send_msg(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region));
 							send_msg(VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id, blocking_pid,
 								cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
@@ -578,7 +582,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							LOCK_BUFF_FOR_READ(cr, dummy);
 					}
 				}
-				if (was_crit != csa->now_crit)
+				if ((was_crit != csa->now_crit) && !hold_onto_crit)
 					rel_crit(gv_cur_region);
 			} else
 			{
@@ -598,16 +602,16 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 */
 		if ((BAD_LUCK_ABOUNDS - was_crit) < ocnt)
 		{
+			assert(!hold_onto_crit);
 			assert(!csa->now_crit);
-			rel_crit(gv_cur_region);
 			GTMASSERT;
 		}
-		if (FALSE == csa->now_crit)
+		if (!csa->now_crit && !hold_onto_crit)
 			grab_crit(gv_cur_region);
 	} while (TRUE);
 	assert(set_wc_blocked && (csd->wc_blocked || !csa->now_crit));
 	rdfail_detail = cdb_sc_cacheprob;
-	if (was_crit != csa->now_crit)
+	if ((was_crit != csa->now_crit) && !hold_onto_crit)
 		rel_crit(gv_cur_region);
 	assert(was_crit == csa->now_crit);
 	return (sm_uc_ptr_t)NULL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,7 @@ static char rcsid[] = "$Header:$";
 #include "parse_file.h"
 #include "gbldirnam.h"
 #include "dpgbldir.h"
+#include "gvcst_protos.h"	/* for gvcst_root_search in GV_BIND_NAME_AND_ROOT_SEARCH macro */
 
 GBLREF bool		gv_curr_subsc_null;
 GBLREF bool		gv_prev_subsc_null;
@@ -98,7 +99,7 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 	v.str.len   = si.value;
 	v.str.addr  = ptr;
 	gd_header   = cptr->ga;
-	gv_bind_name(cptr->ga, &v.str);
+	GV_BIND_NAME_AND_ROOT_SEARCH(cptr->ga, &v.str);
 	ptr        += si.value;
 	/* Refine the gd_addr given these subscripts */
 	was_null = is_null  = FALSE;

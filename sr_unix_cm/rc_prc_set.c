@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ assert(rc_overflow->buff != 0);
 #endif
 		return -1;
 	}
-    gv_bind_name(gd_header, &v.str);
+	GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &v.str);
     memcpy(gv_currkey->base, req->key.key, req->key.len.value);
 assert(rc_overflow->buff != 0);
     gv_currkey->end = req->key.len.value;

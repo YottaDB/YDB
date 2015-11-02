@@ -26,7 +26,6 @@
 GBLDEF tcp_library_struct        tcp_routines;
 
 int	gtm_accept(int socket, struct sockaddr *address, sssize_t *address_len);
-int	gtm_connect(int socket, struct sockaddr *address, size_t address_len);
 int	gtm_recv(int socket, void *buffer, size_t length, int flags);
 int	gtm_send(int socket, void *buffer, size_t length, int flags);
 

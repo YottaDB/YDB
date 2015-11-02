@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,7 @@ const static char readonly secshr_fail_mesg_code[][MAX_GTMSECSHR_FAIL_MESG_LEN] 
 	"Continue Process failed",
 };
 
-const static char readonly secshr_unbl_start_mesg_code[][MAX_GTMSECSHR_FAIL_MESG_LEN] = {
+const static char readonly secshrstart_error_code[][MAX_GTMSECSHR_FAIL_MESG_LEN] = {
 	"",
 	"gtmsecshr unable to set-uid to root",
 	"gtmsecshr unable to set-gid to root",
@@ -89,25 +89,33 @@ const static char readonly secshr_unbl_start_mesg_code[][MAX_GTMSECSHR_FAIL_MESG
 	"The environmental variable gtm_log is pointing to an invalid path",
 	"Error with gtmsecshr semaphore",
 	"Invalid gtm exit message",
+	"See syslog for cause of failure",
 };
 
 #define MAX_RETRIES			7
 #define CLIENT_ACK_TIMER		5
 
-
 #define START_SERVER										\
 {												\
+	int	arraysize, errorindex;								\
+												\
 	if (0 != (create_server_status = create_server()))					\
 	{											\
+		assert(ARRAYSIZE(secshrstart_error_code) == (SYSLOGHASERRORDETAIL + 1));	\
+		errorindex = create_server_status;						\
+		if ((0 > errorindex) || (SYSLOGHASERRORDETAIL < errorindex))			\
+			errorindex = SYSLOGHASERRORDETAIL;					\
+		assert(0 <= errorindex);							\
+		assert(ARRAYSIZE(secshrstart_error_code) > errorindex);				\
 		gtm_putmsg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"),	\
 			process_id, ERR_TEXT, 2,						\
-			RTS_ERROR_STRING(secshr_unbl_start_mesg_code[create_server_status]));	\
+			RTS_ERROR_STRING(secshrstart_error_code[errorindex]));			\
 		if (FATALFAILURE(create_server_status))						\
 		{										\
 			gtmsecshr_sock_cleanup(CLIENT);						\
 			return create_server_status;						\
 		}										\
-		/* Transient Failures and will continue after printing out message */		\
+		/* For transient failures we will continue after printing out message */	\
 	}											\
 	hiber_start(3000); /* 3000 ms (3 sec) to allow server to come up */			\
 }
@@ -182,9 +190,9 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 				send_msg(VARLSTCNT(5) ERR_LOGTOOLONG, 3, gtmsecshr_logname.len, gtmsecshr_logname.addr,
 					SIZEOF(gtmsecshr_path) - 1);
                         send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
-					ERR_TEXT, 2, RTS_ERROR_STRING(secshr_unbl_start_mesg_code[INVTRANSGTMSECSHR]));
+					ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
                         rts_error(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
-					ERR_TEXT, 2, RTS_ERROR_STRING(secshr_unbl_start_mesg_code[INVTRANSGTMSECSHR]));
+					ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
 		}
 		gtmsecshr_pathname.addr[gtmsecshr_pathname.len] = '\0';
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
@@ -398,7 +406,7 @@ int create_server (void)
 		if (-1 == status)
 		{
                         send_msg(VARLSTCNT(9) ERR_GTMSECSHRSTART, 3, RTS_ERROR_TEXT("Client"), process_id,
-					ERR_TEXT, 2, RTS_ERROR_STRING(secshr_unbl_start_mesg_code[INVTRANSGTMSECSHR]));
+					ERR_TEXT, 2, RTS_ERROR_STRING(secshrstart_error_code[INVTRANSGTMSECSHR]));
 			exit(UNABLETOEXECGTMSECSHR);
 		}
         } else
@@ -417,7 +425,7 @@ int create_server (void)
 			done_pid = wait(&CSTAT);
 			if (done_pid == child_pid)
 			{
-				status = GETLASTBYTE(WEXITSTATUS(CSTAT));
+				status = WEXITSTATUS(CSTAT);
 				break;
 			} else if (-1 == done_pid)
 			{

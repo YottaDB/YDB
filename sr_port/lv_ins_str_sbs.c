@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
 			*dst = *src;
 	 	slot = (sbs_str_struct *)stat->ptr;
 	       	blk->cnt++;
+		assert(blk->cnt <= max_count);
        	} else if (stat->prev != stat->blk && stat->prev->cnt < max_count)
  	{	/* flow into previous block */
  	       	prev = stat->prev;
@@ -60,6 +61,7 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
        	       	       	slot = (sbs_str_struct *)((char *)stat->ptr - SIZEOF(sbs_str_struct));
 	 	}
  	       	prev->cnt++;
+		assert(prev->cnt <= max_count);
 	} else if (blk->nxt && blk->nxt->cnt < max_count)
 	{      	/* flow into next block */
 	 	nxt = blk->nxt;
@@ -80,6 +82,7 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
 	 	 	slot = (sbs_str_struct *)stat->ptr;
 	 	}
 	 	nxt->cnt++;
+		assert(nxt->cnt <= max_count);
 	} else
 	{    	/* split block */
 	     	new = lv_get_sbs_blk (tbl->sym);
@@ -109,6 +112,7 @@ lv_val *lv_ins_str_sbs(sbs_search_status *stat, mval *key, lv_sbs_tbl *tbl)
        	       	       	for ( ; src < (sbs_str_struct *)top; src++, dst++)
 				*dst = *src;
 			blk->cnt = blk->cnt - new->cnt + 1;
+			assert((blk->cnt <= max_count) && (0 < blk->cnt));
 	 	}
 	}
        	slot->str = key->str;
