@@ -9,148 +9,189 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-###########################################################################################
-#
-#	check_encrypt_support.sh - Checks if encryption library and executables required for
-#	building encryption plugin are available
-#	Returns :
-#		TRUE - if ksh, gpg, crypt headers and libraries are available
-#		FALSE - if not all of them are available i.e the host does not support encryption
-###########################################################################################
+
+#################################################################
+#								#
+#	check_encrypt_support.sh - Checks if headers, libraries	#
+#				   and executables required for	#
+#				   building encryption plugin	#
+#				   are available		#
+#	Returns - If encryption is supported, returns either	#
+#		  "libgcrypt" or "openssl" or "libgcrypt openssl#
+#		  FALSE, otherwise.				#
+#################################################################
+
+#################################
+#	Helper functions	#
+#################################
+check_files()
+{
+	# Check if a given list of files with a given list of extensions is
+	# present in a given list of search paths
+	srch_path=$1
+	srch_files=$2
+	srch_ext=$3
+	missing=""
+	ret=0
+	for each_file in $srch_files
+	do
+		flag=0
+		for each_path in $srch_path
+		do
+			for each_ext in $srch_ext
+			do
+				if [ -f $each_path/$each_file$each_ext ]; then flag=1 break ; fi
+			done
+			# The below takes care of files whose extensions are already determined by the caller
+			if [ -f $each_path/$each_file ]; then flag=1 break; fi
+		done
+		if [ $flag -eq 0 ]; then
+			missing="$missing $each_file"
+			ret=1
+		fi
+	done
+	return $ret
+}
+
+send_mail()
+{
+	msg=$1
+	echo $encrypt_dist_servers | grep -w $hostname > /dev/null
+	if [ $? -eq 0 ]; then
+		msg="Please setup the required dependencies for this distribution server.\n\n$msg"
+		msg="$msg\nAt least one of Libgcrypt or OpenSSL dependencies must be met."
+		sub="ENCRYPTSUPPORTED-E-ERROR : Distribution server $hostname will not build encryption plugin"
+	fi
+	echo "$encrypt_other_servers $encrypt_desktops" | grep -w $hostname > /dev/null
+	if [ $? -eq 0 ]; then
+		msg="This system supports encryption but does not have the required dependencies setup\n\n.$msg"
+		msg="$msg\nAt least one of Libgcrypt or OpenSSL dependencies must be met."
+		sub="ENCRYPTSUPPORTED-W-WARNING : Server $hostname will not build encryption plugin"
+	fi
+	printf "$msg" | mailx -s "$sub" gglogs
+}
+
+#################################
+#	Helper functions ends	#
+#################################
 
 hostos=`uname -s`
-# We know we don't support these platforms
-if [ "OSF1" = "$hostos" -o \( "HP-UX" = "$hostos" -a "ia64" != `uname -m` \) ]; then
-	echo "FALSE"
-	exit 0
-fi
-
-lib_search_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib /usr/lib/x86_64-linux-gnu"
-lib_search_path="$lib_search_path /usr/lib/i386-linux-gnu /lib/x86_64-linux-gnu /lib/i386-linux-gnu"
-include_search_path="/usr/include /usr/local/include /usr/local/include/gpgme"
-bin_search_path="/usr/bin /usr/local/bin /bin"
-
-sym_headers="gcrypt.h gcrypt-module.h"
-req_lib_files="libgpg-error libgpgme"
-lib_ext="so"
-if [ "AIX" = "$hostos" ]; then
-	sym_headers="openssl/evp.h openssl/sha.h openssl/blowfish.h"
-	req_lib_files="libcrypto $req_lib_files"
-	lib_ext="$lib_ext a"
-else
-	req_lib_files="libgcrypt $req_lib_files"
-fi
-if [ "OS/390" = "$hosotos" ]; then
-	lib_ext="dll"
-fi
-req_inc_files="gpgme.h gpg-error.h $sym_headers"
-req_bin_files="gpg ksh"
-
-found_headers="TRUE"
-found_libs="TRUE"
-found_bins="TRUE"
-
-whatsmissing=""
-
-for each_lib in $req_lib_files
-do
-	find_flag=0
-	for each_lib_path in $lib_search_path
-	do
-		for each_ext in $lib_ext
-		do
-			if [ -f $each_lib_path/$each_lib.$each_ext ]; then
-				find_flag=1
-				break
-			fi
-		done
-	done
-	if [ $find_flag -eq 0 ]; then
-		found_libs="FALSE"
-		whatsmissing="$whatsmissing library $each_lib is missing \n"
-	fi
-done
-for each_header in $req_inc_files
-do
-	find_flag=0
-	for each_path in $include_search_path
-	do
-		if [ -f $each_path/$each_header ]; then
-			find_flag=1
-			break
-		fi
-	done
-	if [ $find_flag -eq 0 ]; then
-		found_headers="FALSE"
-		whatsmissing="$whatsmissing include file $each_header is missing \n"
-	fi
-done
-
-for each_bin in $req_bin_files
-do
-	find_flag=0
-	for each_path in $bin_search_path
-	do
-		if [ -x $each_path/$each_bin ]; then
-			find_flag=1
-			break
-		fi
-	done
-	if [ $find_flag -eq 0 ]; then
-		found_bins="FALSE"
-		whatsmissing="$whatsmissing executable $each_bin is missing \n"
-	fi
-done
-
+hostname=`uname -n | awk -F. '{print $1}'`
+machtype=`uname -m`
 server_list="$cms_tools/server_list"
-
-if [ -f $server_list ];then
-	hostname=`uname -n | awk -F. '{print $1}'`
+this_host_noencrypt="FALSE"
+if [ -f $server_list ]; then
 	eval `/usr/local/bin/tcsh -efc "
 		source $server_list;
 		echo non_encrypt_machines=\'\\\$non_encrypt_machines\';
 		echo encrypt_desktops=\'\\\$encrypt_desktops\';
 		echo encrypt_dist_servers=\'\\\$encrypt_dist_servers\';
 		echo encrypt_other_servers=\'\\\$encrypt_other_servers\';
-	" || echo echo ERROR \; exit 1`
-	if [ $found_headers = "TRUE" -a $found_libs = "TRUE" -a $found_bins = "TRUE" ];then
-	#	We want to keep at least one server without support for encryption.  So if it send a warning if it is not the case.
-		echo $non_encrypt_machines | grep -w $hostname > /dev/null
-		if [ $? -eq 0 ]; then
-			errmsg="This system should not supports encryption, but it does.\n"
-			printf "$errmsg" | mailx -s \
-				"ENCRYPTSUPPORTED-W-WARNING : Server $hostname will build encryption plugin (but should not)" \
-				gglogs
-		fi
-		echo "TRUE"
-	else
-	# 	These are distribution servers that support encryption. If can't build encryption plugin send error.
-		echo $encrypt_dist_servers | grep -w $hostname > /dev/null
-		if [ $? -eq 0 ]; then
-			errmsg="Please setup the required dependencies for this distribution server:\n"
-			errmsg="$errmsg$whatsmissing"
-			printf "$errmsg" | mailx -s \
-				"ENCRYPTSUPPORTED-E-ERROR : Distribution server $hostname will not build encryption plugin" \
-				gglogs
-		fi
-	#	There are machines that can support encryption. If can't build encryption plugin send warning.
-		encrypt_machines="$encrypt_other_servers $encrypt_desktops"
-		echo $encrypt_machines | grep -w $hostname > /dev/null
-		if [ $? -eq 0 ]; then
-			errmsg="This system supports encryption but does not have the required dependencies setup:\n"
-			errmsg="$errmsg$whatsmissing"
-			printf "$errmsg" | mailx -s \
-				"ENCRYPTSUPPORTED-W-WARNING : Server $hostname will not build encryption plugin" \
-				gglogs
-		fi
-		echo "FALSE"
-	fi
-else
-	if [ $found_headers = "TRUE" -a $found_libs = "TRUE" -a $found_bins = "TRUE" ];then
-		echo "TRUE"
-	else
-		echo "FALSE"
+		" || echo echo ERROR \; exit 1`
+	echo $non_encrypt_machines | grep -w $hostname > /dev/null
+	if [ $? -eq 0 ]; then
+		this_host_noencrypt="TRUE"
 	fi
 fi
 
-exit 0
+if [ "OSF1" = "$hostos" -o \( "HP-UX" = "$hostos" -a "ia64" != "$machtype" \) -o "TRUE" = "$this_host_noencrypt" ]; then
+	echo "FALSE"
+	exit 0
+fi
+
+lib_search_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib /usr/lib/x86_64-linux-gnu"
+lib_search_path="$lib_search_path /usr/lib/i386-linux-gnu /lib/x86_64-linux-gnu /lib/i386-linux-gnu /opt/openssl/0.9.8/lib/hpux64"
+include_search_path="/usr/include /usr/local/include /usr/local/include/gpgme /usr/local/ssl/include /opt/openssl/0.9.8/include"
+bin_search_path="/usr/bin /usr/local/bin /bin"
+
+mandate_headers="gpgme.h gpg-error.h"
+mandate_libs="libgpg-error libgpgme"
+mandate_bins="gpg"
+gcrypt_headers="gcrypt.h gcrypt-module.h"
+gcrypt_libs="libgcrypt"
+openssl_headers="openssl/evp.h openssl/sha.h openssl/blowfish.h"
+openssl_libs="libcrypto"
+lib_ext=".so"
+if [ "AIX" = "$hostos" ]; then
+	lib_ext="$lib_ext .a"
+elif [ "OS/390" = "$hosotos" ]; then
+	lib_ext=".dll"
+fi
+
+# ------------------------------------------------------ #
+# 		Mandatory checks			 #
+# ------------------------------------------------------ #
+found_mandates="TRUE"
+check_files "$include_search_path" "$mandate_headers" ""
+if [ $? -eq 1 ]; then
+	found_mandates="FALSE"
+	mandate_missing_list="Mandatory header files - $missing - are missing"
+fi
+
+check_files "$lib_search_path" "$mandate_libs" "$lib_ext"
+if [ $? -eq 1 ]; then
+	found_mandates="FALSE"
+	mandate_missing_list="$mandate_missing_list\nMandatory library files - $missing - are missing"
+fi
+
+check_files "$bin_search_path" "$mandate_bins" ""
+if [ $? -eq 1 ]; then
+	found_mandates="FALSE"
+	mandate_missing_list="$mandate_missing_list\nMandatory executables - $missing - are missing"
+fi
+
+
+# ------------------------------------------------------ #
+# 		Check for libgcrypt			 #
+# ------------------------------------------------------ #
+found_gcrypt="TRUE"
+check_files "$include_search_path" "$gcrypt_headers" ""
+if [ $? -eq 1 ]; then
+	found_gcrypt="FALSE"
+	gcrypt_missing_list="\nLibgcrypt header files - $missing - are missing"
+fi
+
+check_files "$lib_search_path" "$gcrypt_libs" "$lib_ext"
+if [ $? -eq 1 ]; then
+	found_gcrypt="FALSE"
+	gcrypt_missing_list="$gcrypt_missing_list\nLibgcrypt library files - $missing - are missing"
+fi
+
+# ------------------------------------------------------ #
+# 		Check for OpenSSL			 #
+# ------------------------------------------------------ #
+found_openssl="TRUE"
+check_files "$include_search_path" "$openssl_headers" ""
+if [ $? -eq 1 ]; then
+	found_openssl="FALSE"
+	openssl_missing_list="\nOpenSSL header files - $missing - are missing"
+fi
+
+check_files "$lib_search_path" "$openssl_libs" "$lib_ext"
+if [ $? -eq 1 ]; then
+	found_openssl="FALSE"
+	openssl_missing_list="$openssl_missing_list\nOpenSSL library files - $missing - are missing\n"
+fi
+
+# ------------------------------------------------------ #
+# 		Figure out supported list 		 #
+# ------------------------------------------------------ #
+mail_msg=""
+supported_list=""
+if [ "TRUE" = $found_mandates ] ; then
+	if [ "TRUE" = "$found_gcrypt" ]; then supported_list="$supported_list gcrypt" ; fi
+	if [ "TRUE" = "$found_openssl" ]; then supported_list="$supported_list openssl" ; fi
+	if [ "" != "$supported_list" ] ; then
+		echo $supported_list
+		exit 0
+	fi
+fi
+# Some of the dependencies are unmet.
+mail_msg="$mandate_missing_list \n \n $gcrypt_missing_list \n \n $openssl_missing_list"
+if [ "mail" = "$1" ]; then
+	if [ -f $server_list ]; then
+		send_mail "$mail_msg"
+	fi
+fi
+echo "FALSE"
+exit 1

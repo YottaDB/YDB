@@ -18,6 +18,7 @@
 #include "stack_frame.h"
 #include "mprof.h"
 #include "error.h"
+#include "glvn_pool.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
@@ -51,7 +52,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	sf->ctxt = context;
 	sf->mpc = transfer_addr;
 	sf->flags = 0;
-	sf->for_ctrl_stack = NULL;
+	SET_GLVN_INDX(sf, GLVN_POOL_UNTOUCHED);
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;
 #ifdef HAS_LITERAL_SECT

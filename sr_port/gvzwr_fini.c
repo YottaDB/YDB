@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void gvzwr_fini(zshow_out *out, int pat)
 	zwr_output = out;
 	assert(INVALID_GV_TARGET == reset_gv_target);
 	reset_gv_target = gv_target;
-	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	gvzwrite_block->gd_reg = gv_cur_region;
 	gvzwrite_block->old_targ = (unsigned char *)gv_target;
 	old = (gv_key *)malloc(SIZEOF(gv_key) + gv_currkey->end);

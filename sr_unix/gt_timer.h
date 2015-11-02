@@ -101,6 +101,7 @@ void		check_for_timer_pops(void);
 GT_TIMER	*find_timer_intr_safe(TID tid, GT_TIMER **tprev);
 void		check_for_deferred_timers(void);
 void		add_safe_timer_handler(int safetmr_cnt, ...);
+void		sys_canc_timer(void);
 
 STATICFNDCL void	hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
 STATICFNDCL void	gt_timers_alloc(void);
@@ -111,7 +112,6 @@ STATICFNDCL void	timer_handler(int why);
 STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
 STATICFNDCL void	add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata);
 STATICFNDCL void	remove_timer(TID tid);
-STATICFNDCL void	sys_canc_timer(void);
 STATICFNDCL void 	uninit_all_timers(void);
 STATICFNDCL void	cancel_all_timers(void);
 STATICFNDCL void	init_timers(void);

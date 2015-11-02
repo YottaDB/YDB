@@ -46,6 +46,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "repl_instance.h"
+#include "util.h"		/* For OUT_BUFF_SIZE */
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	recvpool_addrs		recvpool;
@@ -78,6 +79,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	boolean_t	shm_created, new_ipc = FALSE;
 	char		instfilename[MAX_FN_LEN + 1];
         char           	machine_name[MAX_MCNAMELEN];
+	char		scndry_msg[OUT_BUFF_SIZE];
 	gd_region	*r_save, *reg;
 	int		status, save_errno;
 	union semun	semarg;
@@ -143,7 +145,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0,
 				  ERR_TEXT, 2,
-			          RTS_ERROR_LITERAL("Error creating recv pool"), REPL_SEM_ERRNO);
+			          RTS_ERROR_LITERAL("Error creating recv pool"), errno);
 		}
 		/* Following will set semaphore RECV_ID_SEM value as GTM_ID. In case we have orphaned semaphore for some reason,
 		 * mupip rundown will be able to identify GTM semaphores checking the value and can remove.
@@ -177,13 +179,17 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		{
 			save_errno = errno;
 			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(5) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, save_errno);
+			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with semctl on Receive Pool SEMID (%d)",
+					repl_instance.recvpool_semid);
+			rts_error(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+					ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 		}
 		else if (semarg.buf->sem_ctime != repl_instance.recvpool_semid_ctime)
 		{
 			ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
-				ERR_TEXT, 2, RTS_ERROR_TEXT("recvpool sem_ctime does not match"));
+			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Creation time for Receive Pool SEMID (%d) is %d; Expected %d",
+					repl_instance.recvpool_semid, semarg.buf->sem_ctime, repl_instance.recvpool_semid_ctime);
+			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 		}
 		udi->semid = repl_instance.recvpool_semid;
 		udi->gt_sem_ctime = repl_instance.recvpool_semid_ctime;
@@ -196,7 +202,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	{
 		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
 		rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error with receive pool semaphores"), REPL_SEM_ERRNO);
+				RTS_ERROR_LITERAL("Error with receive pool semaphores"), errno);
 	}
 	udi->grabbed_access_sem = TRUE;
 	if (INVALID_SHMID == repl_instance.recvpool_shmid)
@@ -230,7 +236,8 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 		save_errno = errno;
 		REMOVE_OR_RELEASE_SEM(new_ipc, udi);
 		ftok_sem_release(recvpool.recvpool_dummy_reg, TRUE, TRUE);
-		rts_error(VARLSTCNT(5) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, save_errno);
+		SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with shmctl on Receive Pool SHMID (%d)", repl_instance.recvpool_shmid);
+		rts_error(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 	} else if (shmstat.shm_ctime != repl_instance.recvpool_shmid_ctime)
 	{	/* shared memory was possibly reused (causing shm_ctime and jnlpool_shmid_ctime to be different. We can't rely
 		 * on the shmid as it could be connected to a valid instance file in a different environment. Create new IPCs
@@ -409,7 +416,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 	 */
 	if ((GTMRECV == pool_user) && gtmrecv_options.start && (0 != grab_sem(RECV, RECV_SERV_OPTIONS_SEM)))
 	{
-		save_errno = REPL_SEM_ERRNO;
+		save_errno = errno;
 		if (new_ipc)
 			remove_sem_set(RECV);
 		else

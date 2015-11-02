@@ -34,6 +34,8 @@
 #include "error.h"
 #include <rtnhdr.h>
 #include "io.h"
+#include "iormdef.h"
+#include "io_params.h"
 #include "iosp.h"
 #include "eintr_wrappers.h"
 #include "compiler.h"
@@ -149,7 +151,7 @@ void job_term_handler(int sig){
 
 int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[])
 {
-	char			cbuff[TEMP_BUFF_SIZE], pbuff[TEMP_BUFF_SIZE];
+	char			cbuff[TEMP_BUFF_SIZE], pbuff[TEMP_BUFF_SIZE], cmdbuff[TEMP_BUFF_SIZE];
 	char			tbuff[MAX_JOB_LEN], tbuff2[MAX_JOB_LEN];
 	char			*pgbldir_str;
 	char			*transfer_addr;
@@ -170,7 +172,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #endif
 
 	char		*c1, *c2, **c3;
-	char		*argv[3];
+	char		*argv[4];
 	char		**env_ary, **env_ind;
 	char		**new_env_cur, **new_env_top, **old_env_cur, **old_env_top, *env_end;
 
@@ -309,7 +311,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 * then the environment array passed is as follows
 		 *	 gtmj0=			// parent pid
 		 *	 gtmgbldir=mumps.gld	// current global directory
-		 *	 gtmjb=			// startup parameter to job command
 		 *	 gtmj3=/dev/null	// input file parameter to job command
 		 *	 gtmj4=x.mjo		// output file parameter to job command
 		 *	 gtmj5=x.mje		// error file parameter to job command
@@ -317,6 +318,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 *	 gtmj8=			// label name to job off
 		 *	 gtmj9=0		// offset to job off
 		 *	 gtmja=			// base priority;
+		 *	 gtmjb=			// startup parameter to job command
 		 *	 gtmj000=1		// parameter 1 to routine ^x
 		 *	 gtmj001=2		// parameter 2 to routine ^x
 		 *	 gtmjcnt=2		// number of parameters to routine ^x
@@ -610,6 +612,16 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #		pragma convlit(resume)
 #		endif
 
+		/* pass cmdline to child */
+		if (jparms->cmdline.len != 0)
+		{
+			if (jparms->cmdline.len > TEMP_BUFF_SIZE)
+				rts_error(VARLSTCNT(1) ERR_JOBPARTOOLONG);
+			memcpy(cmdbuff, jparms->cmdline.addr, jparms->cmdline.len);
+			*(cmdbuff + jparms->cmdline.len) = 0;
+		} else
+			memset(cmdbuff, 0, TEMP_BUFF_SIZE);
+
 #ifdef KEEP_zOS_EBCDIC
 		__getEstring1_a_copy(tbuff2, STR_AND_LEN(tbuff));
 		argv[0] = tbuff2;
@@ -617,7 +629,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		argv[0] = tbuff;
 #endif
 		argv[1] = cbuff;
-		argv[2] = (char *)0;
+		argv[2] = cmdbuff;
+		argv[3] = (char *)0;
 
 		EXECVE(tbuff, argv, env_ary);
 		/* if we got here, error starting the Job */

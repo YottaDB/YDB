@@ -70,6 +70,8 @@
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
 #endif
+#include "muextr.h"
+#include "mupip_reorg.h"
 
 /* This section documents DOs and DONTs about code used by GTMSECSHR on Alpha VMS. Any module linked into GTMSECSHR (see
  * secshrlink.axp for the current list) must follow certain rules as GTMSECSHR provides user-defined system services
@@ -1071,7 +1073,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 #								endif
 								/* wcs_recover need not copy before images of FREE blocks
 								 * to the backup buffer */
-								if (!WAS_FREE(cs))
+								if (!WAS_FREE(cs->blk_prior_state))
 									cr->twin = GDS_ANY_ABS2REL(csa, cs->old_block);
 							} else
 							{	/* We have to finish phase2 update.
@@ -1087,7 +1089,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 								blk_hdr_ptr = (blk_hdr_ptr_t)cs->old_block;
 								assert(GDS_ANY_REL2ABS(csa, cr->buffaddr)
 										== (sm_uc_ptr_t)blk_hdr_ptr);
-								if (!WAS_FREE(cs) && (cr->blk >= cnl->nbb)
+								if (!WAS_FREE(cs->blk_prior_state) && (cr->blk >= cnl->nbb)
 									&& (0 == csa->shmpool_buffer->failed)
 									&& (blk_hdr_ptr->tn < csa->shmpool_buffer->backup_tn)
 									&& (blk_hdr_ptr->tn >= csa->shmpool_buffer->inc_backup_tn))
@@ -1584,7 +1586,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 						*need_kip_incr_addrs = FALSE;
 					}
 #					ifdef UNIX
-					if (TREF(in_mu_swap_root))
+					if (MUSWP_INCR_ROOT_CYCLE == TREF(in_mu_swap_root_state))
 						cnl->root_search_cycle++;
 #					endif
 				}

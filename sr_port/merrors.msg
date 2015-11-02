@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2012 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2013 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -229,7 +229,7 @@ ERRWZTRAP	<Error while processing $ZTRAP>/error/fao=0!/ansi=0
 NUMUNXEOR	<!_!AD!/!_!_!_unexpected end of record in numeric subscript>/error/fao=2!/ansi=0
 EXPR		<Expression expected but not found>/error/fao=0!/ansi=0
 STRUNXEOR	<!_!AD!/!_!_!_unexpected end of record in string subscript>/error/fao=2!/ansi=0
-JNLEXTEND	<Journal file extension error.  Journal file !AD closed.>/error/fao=2!/ansi=0
+JNLEXTEND	<Journal file extension error for file !AD>/error/fao=2!/ansi=0
 FCHARMAXARGS	<Argument count of $CHAR function exceeded the maximum of 255>/error/fao=0!/ansi=0
 FCNSVNEXPECTED	<Function or special variable expected in this context>/error/fao=0!/ansi=0
 FNARGINC	<Format specifiers to $FNUMBER are incompatible: "!AD">/error/fao=2!/ansi=2
@@ -257,7 +257,7 @@ GVSUBOFLOW	<Maximum combined length of subscripts exceeded>/error/fao=0!/ansi=0
 GVUNDEF		<Global variable undefined: !AD>/error/fao=2!/ansi=7
 TRANSNEST	<Maximum transaction nesting levels exceeded>/error/fao=0!/ansi=0
 INDEXTRACHARS	<Indirection string contains extra trailing characters>/error/fao=0!/ansi=0
-INDMAXNEST	<Maximum nesting of indirection expressions exceeded>/error/fao=0!/ansi=0
+UNUSEDMSG260	<INDMAXNEST Last used in V6.0-000>/error/fao=0!/ansi=0
 INDRMAXLEN	<Maximum length !UL of an indirection argument was exceeded>/error/fao=1!/ansi=0
 INSFFBCNT	<Insufficient byte count quota left for requested operation>/error/fao=0!/ansi=0
 INTEGERRS	<Database integrity errors>/error/fao=0!/ansi=0
@@ -596,7 +596,7 @@ UNUSEDMSG595	<JNLBUFFTOOSM Last used in V5.5-000>/error/fao=0!/ansi=0
 MUNODBNAME	<A database name or the region qualifier must be specified>/error/fao=0!/ansi=0
 FILECREATE	<!AD file !AD created>/info/fao=4!/ansi=0
 FILENOTCREATE	<!AD file !AD not created>/info/fao=4!/ansi=0
-JNLPROCSTUCK	<Journal file writes blocked by process !UL>/info/fao=1!/ansi=0
+JNLPROCSTUCK	<Journal file writes blocked by process !UL>/warning/fao=1!/ansi=0
 INVGLOBALQUAL	<Error in GLOBAL qualifier : Parse error at offset !UL in !AD>/error/fao=3!/ansi=0
 COLLARGLONG	<Collation sequence !UL does not contain routines for long strings>/error/fao=1!/ansi=0
 NOPINI		<PINI journal record expected but not found in journal file !AD at offset [0x!XL]>/error/fao=3!/ansi=0
@@ -704,7 +704,7 @@ DBCRERR		<Database file !AD, cr location 0x!XJ blk = 0x!XL error: !AD was 0x!XL,
 MUSTANDALONE	<Could not get exclusive access to !AD> /info /fao=2!/ansi=0
 MUNOACTION	<MUPIP unable to perform requested action> /error /fao=0!/ansi=0
 RMBIGSHARE	<File with BIGRECORD specified may only be shared if READONLY>/error/fao=0!/ansi=0
-TPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: !16@XQ> /info /fao=14!/ansi=0
+TPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ> /info /fao=14!/ansi=0
 SOCKWRITE	<Write to a TCP/IP socket failed> /error /fao=0!/ansi=0
 DBCNTRLERR	<Database file !AD: control error suspected but not found> /info /fao=2!/ansi=0
 NOTERMENV	<Environment variable TERM not set.  Assuming "unknown."> /info /fao=0!/ansi=0
@@ -738,7 +738,7 @@ ZCCSQRBR	<Closing Square bracket expected>/error/fao=0!/ansi=0
 ZCPREALLNUMEX	<Pre-allocation value should be a decimal number>/error/fao=0!/ansi=0
 ZCPREALLVALPAR	<Pre-allocation allowed only for variables passed by reference>/error/fao=0!/ansi=0
 VERMISMATCH	<Attempt to access !AD with version !AD, while already using !AD>/error/fao=6!/ansi=0
-JNLCNTRL	<Journal control unsynchronized.  Journaling closed for !AD.>/error/fao=2!/ansi=0
+JNLCNTRL	<Journal control unsynchronized for !AD.>/error/fao=2!/ansi=0
 TRIGNAMBAD	<Trigger initialization failed. Error while processing ^#t("!AD",!AD)>/error/fao=4!/ansi=0
 BUFRDTIMEOUT	<Pid [0x!XL] timed out waiting for buffered read of blk [0x!XL] into cr [0x!XL] by process [0x!XL] to complete in database file !AD>/error/fao=6!/ansi=0
 INVALIDRIP	<Invalid read-in-progress field in Cache Record.  Resetting and continuing.  Region: !AD.>/error/fao=2!/ansi=0
@@ -1022,7 +1022,7 @@ MUREPLPOOL	<Error with replpool section !AD>/info/fao=2!/ansi=0
 REPLACCSEM	<Error with replication access semaphore (id = !UL) for instance file !AD>/error/fao=3!/ansi=0
 JNLFLUSHNOPROG	<No progress while attempting to flush journal file !AD>/error/fao=2!/ansi=0
 REPLINSTCREATE	<Error creating replication instance file !AD>/error/fao=2!/ansi=0
-SUSPENDING	<Suspending processing on user request or attempt to do terminal I/O while running in the background>/info/fao=0!/ansi=0
+SUSPENDING	<Process Received Signal !UL. Suspending processing on user request or attempt to do terminal I/O while running in the background>/info/fao=1!/ansi=0
 SOCKBFNOTEMPTY	<Socket buffer size cannot be set to 0x!XL due to 0x!XL bytes of buffered data.  Read first.>/error/fao=2!/ansi=0
 ILLESOCKBFSIZE	<The specified socket buffer size is 0x!XL, which is either 0 or too big>/error/fao=1!/ansi=0
 NOSOCKETINDEV	<There is no socket in the current socket device>/error/fao=0!/ansi=0
@@ -1094,7 +1094,7 @@ SETZDIR		<Cannot change working directory to !AD>/error/fao=2!/ansi=0
 JOBACTREF	<Actual parameter in job command passed by reference>/error/fao=0!/ansi=40
 ECLOSTMID	<$ECODE overflow, the first and last ecodes are retained, but some intervening ecodes have been lost>/warning/fao=0!/ansi=0
 ZFF2MANY	<Number of characters specified for ZFF deviceparameter (!UL) is more than the maximum allowed (!UL)>/error/fao=2!/ansi=0
-JNLFSYNCLSTCK	<Journaling fsync lock is stuck in journal file !AD>/info/fao=2!/ansi=0
+JNLFSYNCLSTCK	<Journaling fsync lock is stuck in journal file !AD>/warning/fao=2!/ansi=0
 DELIMWIDTH	<Delimiter length !UL exceeds device width !UL>/error/fao=2!/ansi=0
 DBBMLCORRUPT	<Database !AD : Bitmap blk [0x!XL] is corrupt (size = [0x!XL], levl = [0x!XL], tn = [0x!16@XQ]) : Dbtn = [0x!16@XQ] : Database integrity errors likely>/error/fao=7!/ansi=0
 DLCKAVOIDANCE	<Possible deadlock detected: Database !AD : Dbtn [0x!16@XQ] : t_tries [0x!XL] : dollar_trestart [0x!XL] : now_crit [0x!XL] : TP transaction restarted>/error/fao=6!/ansi=0
@@ -1307,15 +1307,15 @@ DZWRNOPAREN	<$ZWRTACxxx is not allowed inside a parenthesized SET target>/error/
 DZWRNOALIAS	<$ZWRTAC cannot be aliased>/error/fao=0!/ansi=0
 FREEZEERR	<Error while trying to !AD region !AD>/error/fao=4!/ansi=0
 CLOSEFAIL	<Error while closing file descriptor !SL>/error/fao=1!/ansi=0
-CRYPTINIT		<Error initializing encryption library. !AD>/error/fao=2!/ansi=0
-CRYPTOPFAILED		<Encrypt/Decrypt operation failed. !AD>/error/fao=2!/ansi=0
-CRYPTDLNOOPEN		<Error loading encryption library. !AD>/error/fao=2!/ansi=0
+CRYPTINIT		<Could not initialize encryption library while opening encrypted file !AD. !AD>/error/fao=4!/ansi=0
+CRYPTOPFAILED		<Encrypt/Decrypt operation failed for file !AD. !AD>/error/fao=4!/ansi=0
+CRYPTDLNOOPEN		<Could not load encryption library while opening encrypted file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTNOV4		<!AD is an encrypted database. Cannot downgrade(to V4) with Encryption option enabled.>/error/fao=2!/ansi=0
 CRYPTNOMM		<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2!/ansi=0
 CRYPTJNLWRONGHASH	<Encryption key hash mismatch between journal file !AD and corresponding database file !AD>/error/fao=4!/ansi=0
-CRYPTKEYFETCHFAILED	<Cannot obtain encryption key for !AD. !AD>/error/fao=4!/ansi=0
-CRYPTKEYFETCHFAILEDNF	<Cannot obtain encryption key. !AD>/error/fao=2!/ansi=0
-CRYPTHASHGENFAILED	<Error generating encryption hash. !AD>/error/fao=2!/ansi=0
+CRYPTKEYFETCHFAILED	<Could not retrieve encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
+CRYPTKEYFETCHFAILEDNF	<Could not retrieve encryption key during !AD operation key. !AD>/error/fao=4!/ansi=0
+CRYPTHASHGENFAILED	<Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTNOPSWDINTP	<Cannot prompt for password inside a TP transaction.>/error/fao=0!/ansi=0
 BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
 ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used>/error/fao=4!/ansi=0
@@ -1410,8 +1410,8 @@ NORESYNCSUPPLONLY	<NORESYNC only supported for Supplementary Instances>/error/fa
 NORESYNCUPDATERONLY	<NORESYNC qualifier only allowed on a Supplementary Instance which allows local updates>/error/fao=0!/ansi=0
 NOSUPPLSUPPL	<Instance !AD is configured to perform local updates so it cannot receive from Supplementary Instance !AD>/error/fao=4!/ansi=0
 REPL2OLD	<Instance !AD uses a GT.M version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
-UNUSEDMSG1413	<RCVR2MANY: Never used before so slot free for reuse>/info/fao=0!/ansi=0
-UNUSEDMSG1414	<RLBKCONFIGBNDRY: Never used before so slot free for reuse>/info/fao=0!/ansi=0
+EXTRFILEXISTS	<Error opening output file: !AD -- File exists>/error/fao=2!/ansi=0
+UNUSEDMSG1414	<!AD : An error encountered with the shared object : !AZ>/error/fao=3!/ansi=0
 SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD >/error/fao=4!/ansi=0
 SUPRCVRNEEDSSUPSRC	<Instance !AD is not configured to perform local updates so it cannot act as a receiver for non-Supplementary Instance !AD>/error/fao=4!/ansi=0
 UNUSEDMSG1417	<SYNCTOSAMETYPE: Never used before so slot free for reuse>/info/fao=0!/ansi=0
@@ -1490,6 +1490,22 @@ LDSPANGLOINCMP	<Incomplete spanning node found during load>/error/fao=0!/ansi=0
 MUFILRNDWNFL2	<Database section (id = !UL) belonging to database file !AD rundown failed>/info/fao=3!/ansi=0
 MUINSTFROZEN	<!AD : Instance !AZ is frozen. Waiting for instance to be unfrozen before proceeding with writes to database file !AD>/info/fao=5!/ansi=0
 MUINSTUNFROZEN	<!AD : Instance !AZ is now Unfrozen. Continuing with writes to database file !AD>/info/fao=5!/ansi=0
+GTMEISDIR	<!AD : Is a directory>/error/fao=2!/ansi=0
+SPCLZMSG	<The following error message cannot be driven through ZMESSAGE>/error/fao=0!/ansi=0
+MUNOTALLINTEG	<At least one region skipped. See the earlier messages>/warning/fao=0!/ansi=0
+BKUPRUNNING	<Process !UL is currently backing up region !AD. Cannot start another backup.>/error/fao=3!/ansi=0
+MUSIZEINVARG	<MUPIP SIZE : Invalid parameter value for: !AD>/error/fao=2!/ansi=0
+MUSIZEFAIL	<MUPIP SIZE : failed.  Failure code: !AD.>/error/fao=2!/ansi=0
+SIDEEFFECTEVAL	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in actuallist, function arguments, non-Boolean binary operands or subscripts>/warning/fao=0!/ansi=0
+CRYPTINIT2	<Could not initialize encryption library !AD. !AD>/error/fao=4!/ansi=0
+CRYPTDLNOOPEN2	<Could not load encryption library !AD. !AD>/error/fao=4!/ansi=0
+CRYPTBADCONFIG	<Could not retrieve data from encrypted file !AD due to bad encryption configuration. !AD>/error/fao=4!/ansi=0
+DBCOLLREQ	<JOURNAL EXTRACT proceeding without collation information for globals in database. !AD !AD>/warning/fao=4!/ansi=0
+SETEXTRENV	<Database files are missing or Instance is frozen; supply the database files, wait for the freeze to lift or define gtm_extract_nocol to extract possibly incorrect collation>/error/fao=0!/ansi=0
+NOTALLDBRNDWN	<Not all regions were successfully rundown>/error/fao=0!/ansi=0
+TPRESTNESTERR	<TP restart signaled while handing error - treated as nested error - Use TROLLBACK in error handler to avoid this>/error/fao=0!/ansi=0
+JNLFILRDOPN	<Error opening journal file !AD for read for database file !AD>/error/fao=4!/ansi=0
+SEQNUMSEARCHTIMEOUT	<Timed out trying to find sequence number !@ZQ [0x!16@XQ] in Journal File(s). See above messages for details. Source server exiting>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

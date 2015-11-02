@@ -158,7 +158,7 @@ void op_zprevious(mval *v)
 					break;
 				assert(1 < gv_altkey->end);
 				assert(gv_altkey->end < (MAX_MIDENT_LEN + 2));	/* until names are not in midents */
-				if (memcmp(gv_altkey->base, (map - 1)->name, gv_altkey->end - 1) < 0)
+				if (memcmp(gv_altkey->base, (map - 1)->name, gv_altkey->end) < 0)
 				{
 					found = FALSE;
 					break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2012 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,6 +93,9 @@ GBLREF	recvpool_addrs		recvpool;
 GBLREF	upd_helper_entry_ptr_t	helper_entry;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		is_updhelper;
+#ifdef UNIX
+GBLREF	boolean_t		jnlpool_init_needed;
+#endif
 
 error_def(ERR_NOTALLDBOPN);
 error_def(ERR_RECVPOOLSETUP);
@@ -143,6 +146,7 @@ void updhelper_init(recvpool_user who)
 	helper_entry = helper;
 
 	gvinit();
+	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	if (!region_init(FALSE))
 		gtm_putmsg(VARLSTCNT(1) ERR_NOTALLDBOPN);
 	return;

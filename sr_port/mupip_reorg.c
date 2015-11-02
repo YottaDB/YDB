@@ -90,8 +90,9 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF uint4		process_id;
 GBLREF tp_region	*grlist;
 GBLREF bool		error_mupip;
+#ifdef UNIX
 GBLREF	boolean_t	jnlpool_init_needed;
-
+#endif
 void mupip_reorg(void)
 {
 	boolean_t		resume, reorg_success = TRUE;
@@ -116,7 +117,7 @@ void mupip_reorg(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	jnlpool_init_needed = TRUE;
+	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	mu_outofband_setup();
 	truncate = FALSE;
 	GTM_TRUNCATE_ONLY(

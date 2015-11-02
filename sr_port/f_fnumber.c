@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,7 @@ error_def(ERR_COMMA);
 
 int f_fnumber(oprtype *a, opctype op)
 {
-	triple *ref, *next, *r;
-	oprtype z;
+	triple	*r, *ref, *ref1;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -34,26 +33,20 @@ int f_fnumber(oprtype *a, opctype op)
 		return FALSE;
 	}
 	advancewindow();
-	if (EXPR_FAIL == expr(&r->operand[1], MUMPS_STR))
+	ref = newtriple(OC_PARAMETER);
+	r->operand[1] = put_tref(ref);
+	if (EXPR_FAIL == expr(&ref->operand[0], MUMPS_STR))
 		return FALSE;
-	if (TK_COMMA != TREF(window_token))
-	{
-		ref = newtriple(OC_FORCENUM);
-		ref->operand[0] = r->operand[0];
-		r->operand[0] = put_tref(ref);
-	} else
+	ref1 = newtriple(OC_PARAMETER);
+	ref->operand[1] = put_tref(ref1);
+	if (TK_COMMA == TREF(window_token))
 	{
 		advancewindow();
-		if (EXPR_FAIL == expr(&z, MUMPS_INT))
+		if (EXPR_FAIL == expr(&ref1->operand[1], MUMPS_INT))
 			return FALSE;
-		ref = newtriple(OC_FNJ3);
-		ref->operand[0] = r->operand[0];
-		r->operand[0] = put_tref(ref);
-		next = newtriple(OC_PARAMETER);
-		ref->operand[1] = put_tref(next);
-		next->operand[0] = put_ilit((mint) 0);
-		next->operand[1] = z;
-	}
+		ref1->operand[0] = put_ilit((mint)(1));				/* flag that the 3rd argument is real */
+	} else
+		ref1->operand[0] = ref1->operand[1] = put_ilit((mint)0);	/* flag no 3rd argument and give it default value */
 	ins_triple(r);
 	*a = put_tref(r);
 	return TRUE;

@@ -140,7 +140,6 @@ void op_gvrectarg(mval *v)
 		assert(KEY_DELIMITER == gv_currkey->base[end - 1]);
 	}
 	gv_currkey->base[end] = KEY_DELIMITER;
-	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
-	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	return;
 }

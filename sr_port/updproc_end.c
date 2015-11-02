@@ -62,6 +62,7 @@
 #include "repl_log.h"
 #ifdef UNIX
 #include "mutex.h"
+#include "anticipatory_freeze.h"
 #endif
 #include "gtm_event_log.h"
 #include "mupip_exit.h"
@@ -86,8 +87,12 @@ void  updproc_stop(boolean_t exit)
 	sgmnt_addrs	*repl_csa;
 	UNIX_ONLY(
 		int4	strm_idx;
+		DCL_THREADGBL_ACCESS;
 	)
 
+	UNIX_ONLY(
+		SETUP_THREADGBL_ACCESS;
+	)
 	call_on_signal = NULL;	/* Don't reenter on error */
 	if (pool_init)
 	{
@@ -116,10 +121,13 @@ void  updproc_stop(boolean_t exit)
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Update process Read Seqno : %llu\n", log_seqno1);
 		repl_log(updproc_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n", log_seqno);
 #		ifdef UNIX
-		mutex_cleanup(jnlpool.jnlpool_dummy_reg);
-		JNLPOOL_SHMDT(status, save_errno);
-		if (0 > status)
-			repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", STRERROR(save_errno));
+		if (!ANTICIPATORY_FREEZE_AVAILABLE)
+		{
+			mutex_cleanup(jnlpool.jnlpool_dummy_reg);
+			JNLPOOL_SHMDT(status, save_errno);
+			if (0 > status)
+				repl_log(stderr, TRUE, TRUE, "Error detaching from jnlpool : %s\n", STRERROR(save_errno));
+		}
 #		elif defined(VMS)
 		jnlpool_ctl = jnlpool.jnlpool_ctl = NULL;
 		if (SS$_NORMAL != (status = detach_shm(jnlpool.shm_range)))

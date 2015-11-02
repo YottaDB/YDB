@@ -38,7 +38,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	double 		x, x1, y, z, z2, z3, z4, z5, id, il;
 	int		im0, im1, ie, i, j, j1;
 	boolean_t	fraction = FALSE, in = FALSE;
-	boolean_t	neg = FALSE, change_sn = FALSE, even = TRUE;
+	boolean_t	neg = FALSE, even = TRUE;
 	mval    	w, zmv;
 	int4    	n, n1;
 	int4		z1_rnd, z2_rnd, pten;
@@ -76,7 +76,7 @@ void op_exp(mval *u, mval* v, mval *p)
 		if ((n1 * MV_BIAS) == n)
 		{	/* True non-fractional exponent */
 			if (0 == v->m[1])
-			{	/* Duplicate of check on line 63? */
+			{	/* Duplicate of check on line 58? */
 				*p = literal_one;
 				return;
 			}
@@ -195,18 +195,10 @@ void op_exp(mval *u, mval* v, mval *p)
 					even = FALSE;
 			}
 		}
-		if (!fraction)
-		{	/* Exponent is not fractional */
-			if (neg && !even)
-				/* Base is negative and non-even exponent means sign needs to change in final result */
-				change_sn = TRUE;
-		} else
-		{	/* Have fractional exponent */
-			if (neg)
-			{	/* Negative fractional exponent not valid */
-				rts_error(VARLSTCNT(1) ERR_NEGFRACPWR);
-				return;
-			}
+		if (fraction && neg)
+		{	/* Fractional exponent and negative base not valid */
+			rts_error(VARLSTCNT(1) ERR_NEGFRACPWR);
+			return;
 		}
 	}
 	x = mval2double(u1_p);		/* Convert base and exponent to double for feeding to pow*() function */
@@ -220,6 +212,7 @@ void op_exp(mval *u, mval* v, mval *p)
 	}
 #	endif
 	assert(!neg);	/* Should be taken care of in one of the op_mul() using sections dealing with whole exponents */
+	p->sgn = 0;	/* Positive numbers only from here on out */
 	if (0 == z)
 	{
 		*p = literal_zero;

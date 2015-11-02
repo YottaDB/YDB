@@ -78,6 +78,7 @@ GBLREF	int			tprestart_state;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	pid_t			process_id;
+GBLREF	trans_num		local_tn;
 #ifdef DEBUG
 GBLREF	uint4			dollar_trestart;
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
@@ -635,6 +636,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(dollar_tlevel);		/* the code below is not designed to work in non-TP */
 	save_gvtarget = gv_target;
 	SETUP_TRIGGER_GLOBAL;
 	/* Save gv_currkey and gv_altkey */
@@ -1152,7 +1154,31 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 #	endif
 	GVTR_HASHTGBL_READ_CLEANUP(FALSE);	/* do NOT free gvt->gvt_trigger so pass FALSE */
 	DBGTRIGR((stderr, "gvtr_db_read_hasht: gvt_trigger->gv_trigger_cycle = cycle\n"));
-	gvt_trigger->gv_trigger_cycle = cycle;	/* Now that ^#t has been read, we can safely update "cycle" to the higher value */
+	/* Now that ^#t has been read, we update "cycle" to the higher value. In case this transaction restarts,
+	 * we cannot be sure of the correctness of whatever we read so we need to undo the "cycle" update.
+	 * We take care of this by setting "gvt_triggers_read_this_tn" to TRUE and use this in "tp_clean_up".
+	 * Set gvt->trig_read_tn as well so this gvt is part of the list of gvts whose cycle gets restored in tp_clean_up.
+	 * In addition, make sure this gvt is added to the gvt_tp_list. In case callers are gvcst_put or gvcst_kill, they
+	 * do database operations on gvt and an accompanying tp_hist which automatically ensures this. But in case the caller
+	 * is ZTRIGGER, it is possible only the ^#t global gvtarget gets added as part of the above "gvtr_get_hasht_gblsubs"
+	 * calls and the triggering global does not get referenced anywhere else in the TP transaction. Since ZTRIGGER command
+	 * does no db operations on the triggering global, it is possible "gvt" does not get added to the gvt_tp_list which
+	 * means if a trollback/tprestart occurs we would not undo this gvt's trigger related cycles. To avoid
+	 * this issue, we add this gvt to the gvt_tp_list always. The macro anyways does nothing if this gvt has already been
+	 * added so we should be fine correctness and performance wise.
+	 */
+	gvt_trigger->gv_trigger_cycle = cycle;
+	TREF(gvt_triggers_read_this_tn) = TRUE;
+	gvt->trig_read_tn = local_tn;
+	/* This ADD_TO_GVT_TP_LIST could potentially happen BEFORE a gvcst_search of this gvt occurred in this transaction.
+	 * This means if gvt->clue.end is non-zero, gvcst_search would not get a chance to clear the first_tp_srch_status
+	 * fields (which it does using the GVT_CLEAR_FIRST_TP_SRCH_STATUS macro) because gvt->read_local_tn would be set to
+	 * local_tn as part of the ADD_TO_GVT_TP_LIST macro invocation. We therefore pass the second parameter indicating
+	 * that first_tp_srch_status needs to be cleared too if gvt->read_local_tn gets synced to local_tn. All other callers
+	 * of ADD_TO_GVT_TP_LIST (as of this writing) happen AFTER a gvcst_search of this gvt occurred in this TP transaction.
+	 * Therefore this is currently the only place which uses TRUE for the second parameter.
+	 */
+	ADD_TO_GVT_TP_LIST(gvt, RESET_FIRST_TP_SRCH_STATUS_TRUE);
 	return;
 }
 
@@ -1693,8 +1719,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	assert(si == sgm_info_ptr);
 	assert(gv_target == save_targ);
 	assert(0 == memcmp(save_gv_currkey, gv_currkey, OFFSETOF(gv_key, base[0]) + gv_currkey->end));
-	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
-	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	gvtr_parms->num_triggers_invoked = num_triggers_invoked;
 	return 0;
 }

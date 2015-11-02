@@ -130,6 +130,7 @@ int main(int argc, char *argv[])
 	getjobname();
 	INVOKE_INIT_SECSHR_ADDRS;
 	getzdir();
+	gtm_chk_dist(argv[0]);
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();
@@ -141,7 +142,6 @@ int main(int argc, char *argv[])
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));
 	cli_lex_setup(argc, argv);
 	CREATE_DUMMY_GBLDIR(gd_header, original_header, gv_cur_region, gd_map, gd_map_top);
-	gtm_chk_dist(argv[0]);
 	OPERATOR_LOG_MSG;
 #	ifdef DEBUG
 	if ((gtm_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == gtm_white_box_test_case_number) ))

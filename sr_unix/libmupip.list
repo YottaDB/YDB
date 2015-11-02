@@ -91,6 +91,9 @@ mu_rndwn_file
 mu_rndwn_repl_instance
 mu_rndwn_replpool
 mu_signal_process
+mu_size_arsample
+mu_size_impsample
+mu_size_scan
 mu_split
 mu_swap_blk
 mu_swap_root
@@ -139,6 +142,7 @@ mupip_set_journal
 mupip_set_journal_fname
 mupip_set_journal_newstate
 mupip_set_journal_parse
+mupip_size
 mupip_stop
 mupip_trigger
 mupip_upgrade

@@ -76,7 +76,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	mlk_ctldata_ptr_t	ctl;
 	mlk_shrblk_ptr_t	d;
 	int			siz, retval, status;
-	boolean_t		blocked, was_crit, have_space;
+	boolean_t		blocked, was_crit;
 	sgmnt_addrs		*csa;
 	connection_struct	*curr_entry;	/* for GT.CM GNP server */
 	DCL_THREADGBL_ACCESS;
@@ -85,16 +85,14 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	if (p->region->dyn.addr->acc_meth != dba_usr)
 	{
 		csa = &FILE_INFO(p->region)->s_addrs;
-
 		ctl = p->ctlptr;
 		if (csa->critical)
 			crash_count = csa->critical->crashcnt;
-
-		if (dollar_tlevel && !((t_tries < CDB_STAGNATE) || csa->now_crit)) /* Final retry and region not locked down */
-		{	/* make sure this region is in the list in case we end up retrying */
+		if (dollar_tlevel)
+		{
+			assert((CDB_STAGNATE > t_tries) || csa->now_crit);
+			/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
-			/* insert_region() will additionally attempt CRIT on the region and restart if not possible */
-			assert(csa->now_crit);
 		}
                 if (FALSE == (was_crit = csa->now_crit))
 			grab_crit(p->region);
@@ -107,18 +105,12 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		siz = MLK_PVTBLK_SHRSUB_SIZE(p, p->subscript_cnt);
 		assert(siz >= 0);
 		assert(ctl->blkcnt >= 0);
-		have_space = TRUE;
 		if (ctl->subtop - ctl->subfree < siz || ctl->blkcnt < p->subscript_cnt)
 		{
 			mlk_garbage_collect(ctl, siz, p);
-			/* If there isn't any created space after garbage collection, don't attempt to lock anything. */
-			if (ctl->subtop - ctl->subfree < siz || ctl->blkcnt < p->subscript_cnt)
-				have_space = FALSE;
 		}
-		if (have_space)
-			blocked = mlk_shrblk_find(p, &d, auxown);
-		else
-			d = NULL;
+		assert(!new || (0 == TREF(mlk_yield_pid)) || (MLK_FAIRNESS_DISABLED == TREF(mlk_yield_pid)));
+		blocked = mlk_shrblk_find(p, &d, auxown);
 		if (NULL != d)
 		{
 			if (d->owner)

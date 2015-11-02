@@ -105,7 +105,7 @@ void deferred_signal_handler(void)
 	}
 	assert(OK_TO_INTERRUPT);
 	/* Signal intent to exit BEFORE driving condition handlers. This avoids checks that will otherwise fail (for example
-	 * if mdb_condition_handler/preemptive_ch gets called below, that could invoke the RESET_GV_TARGET macro which in turn
+	 * if mdb_condition_handler/preemptive_db_clnup gets called below, that could invoke the RESET_GV_TARGET macro which in turn
 	 * would assert that gv_target->gd_csa is equal to cs_addrs. This could not be true in case we were in mainline code
 	 * that was interrupted by the flush timer for a different region which in turn was interrupted by an external signal
 	 * that would drive us to exit. Setting the "process_exiting" variable causes those csa checks to pass.

@@ -123,6 +123,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	char			*errptr, *command = "MUPIP SET VERSION";
 	int			save_errno;
 	int			rc;
+
 	ZOS_ONLY(int 		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
@@ -379,7 +380,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			} else
 				exit_stat |= status;
 			rel_crit(gv_cur_region);
-			gds_rundown();
+			UNIX_ONLY(exit_stat |=)gds_rundown();
 		} else
 		{	/* Following part needs standalone access */
 			assert(GDSVLAST == desired_dbver);

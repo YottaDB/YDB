@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,6 @@
 #define GTM_DIST		"gtm_dist"
 #define GTM_IMAGE_NAME		"mumps"
 #define GTM_IMAGE_NAMELEN	(SIZEOF(GTM_IMAGE_NAME) - 1)
-#define	DIR_SEPARATOR		'/'
 #define	GTMSECSHR_NAME		"gtmsecshr"
 #define GTMSECSHR_NAMELEN	(SIZEOF(GTMSECSHR_NAME) - 1)
 
@@ -76,6 +75,5 @@
 #define hiber_start		GTM_PREFIX(hiber_start)
 #define hiber_start_wait_any	GTM_PREFIX(hiber_start_wait_any)
 #define start_timer		GTM_PREFIX(start_timer)
-#define jnlpool_detach		GTM_PREFIX(jnlpool_detach)
 
 #endif /* MDEFSA_included */

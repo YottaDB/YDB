@@ -287,7 +287,18 @@ void ch_trace_point() {return;}
                                         CHTRACEPOINT;							\
                                         chnd[current_ch].ch_active = FALSE;				\
                                         DRIVECH(arg);							\
-					return;								\
+					/* If ever DRIVECH does a CONTINUE and returns back to us, we	\
+					 * need to do a CONTINUE as well so we re-establish ourselves	\
+					 * on the condition handler stack. This cancels out the		\
+					 * START_CH (done before the NEXTCH invocation) which would	\
+					 * have removed us from the condition handler stack. This way	\
+					 * we restore the condition handler stack to what it was at 	\
+					 * entry into the current condition handler before returning	\
+					 * on a successfully handled condition. Assert that we should	\
+					 * never have been in a DUMPABLE state if DRIVECH returned.	\
+					 */								\
+					assert(!DUMPABLE);						\
+					CONTINUE;							\
 				}
 
 #define UNWIND(dummy1, dummy2)	{									\
@@ -345,6 +356,14 @@ void stop_image_no_core(void);
 #define EXIT(x)			{					\
 						exit(x);		\
 				}
+
+error_def(ERR_ASSERT);
+error_def(ERR_GTMASSERT);
+error_def(ERR_GTMASSERT2);
+error_def(ERR_GTMCHECK);
+error_def(ERR_MEMORY);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_OUTOFSPACE);
 
 #define DUMP			(SIGNAL == (int)ERR_ASSERT			\
 				 || SIGNAL == (int)ERR_GTMASSERT		\

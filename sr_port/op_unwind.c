@@ -26,6 +26,8 @@
 #include "tp_timeout.h"
 #include "compiler.h"
 #include "parm_pool.h"
+#include "opcode.h"
+#include "glvn_pool.h"
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
 #endif
@@ -53,7 +55,6 @@ error_def(ERR_TPQUIT);
 void op_unwind(void)
 {
 	mv_stent 		*mvc;
-	stack_frame		*rfp;
 	DBGEHND_ONLY(stack_frame *prevfp;)
 	DCL_THREADGBL_ACCESS;
 
@@ -88,25 +89,6 @@ void op_unwind(void)
 	assert(msp <= stackbase && msp > stacktop);
 	assert(mv_chain <= (mv_stent *)stackbase && mv_chain > (mv_stent *)stacktop);
 	assert(frame_pointer <= (stack_frame*)stackbase && frame_pointer > (stack_frame *)stacktop);
-	if (NULL != frame_pointer->for_ctrl_stack)
-	{	/* someone used an ugly FOR control variable */
-		if (frame_pointer->flags & SFF_INDCE)
-		{	/* a FOR control variable indx set up in an indirect frame belongs in the underlying "real" frame
-			 * By "real" we mean non-indirect as in not @ induced, in other words: normal code, or XECUTE-like code
-			 * ZTRAP is an interesting case because it might be a label rather than code, but fortunately that condition
-			 * can't intersect with a FOR control variable, which is the case the outer if condition filters on
-			 */
-			for (rfp = frame_pointer; rfp && !(rfp->type & SFT_LINE_OF_CODE_FRAME); rfp = rfp->old_frame_pointer)
-				;
-			assert(rfp);
-			if (NULL == rfp->for_ctrl_stack)
-				rfp->for_ctrl_stack = frame_pointer->for_ctrl_stack;
-			else	/* indirect compilation already cloned the pointer */
-				assert(rfp->for_ctrl_stack == frame_pointer->for_ctrl_stack);
-		} else	/* otherwise, done with this level - clean it up */
-			FREE_SAVED_FOR_INDX(frame_pointer);
-		frame_pointer->for_ctrl_stack = NULL;
-	}
 	/* See if unwinding an indirect frame */
 	IF_INDR_FRAME_CLEANUP_CACHE_ENTRY(frame_pointer);
 	for (mvc = mv_chain; mvc < (mv_stent *)frame_pointer; )
@@ -127,12 +109,13 @@ void op_unwind(void)
 		DBGTRIGR((stderr, "op_unwind: Unwinding frame 0x"lvaddr" with type %d which has SFF_IMPLTSTART_CALLD turned on\n",
 			  frame_pointer, frame_pointer->type));
 #	endif
+	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "op_unwind: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
 		 prevfp, frame_pointer, msp));
 	if (NULL != zyerr_frame && frame_pointer > zyerr_frame)
-		zyerr_frame = NULL;
+		zyerr_frame = NULL;	/* If we have unwound past zyerr_frame, clear it */
 	if (frame_pointer)
 	{
 		if ((frame_pointer < (stack_frame *)msp) || (frame_pointer > (stack_frame *)stackbase)

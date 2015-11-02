@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,12 +25,14 @@
 GBLREF gv_namehead 	*gv_target;
 GBLREF gd_region	*gv_cur_region;
 
-/* This code is very similar to "op_fngvget1.c" except that this one returns the default value
- * (while op_fngvget1 returns an undefined value) if the global variable that we are trying to get is undefined.
- *
+LITREF	mval		literal_null;
+
+/* This code is very similar to op_fngvget1.c except if the gvn is undefined, this one returns the default empty string
+ * while op_fngvget1 returns an undefined value as a signal to op_fnget2, which, in turn, returns a specified "default" string;
+ * that slight of hand deals with order of evaluation issues.
  * Any changes to this routine most likely have to be made in op_fngvget1.c as well.
  */
-void op_fngvget(mval *v, mval *def)
+void op_fngvget(mval *dst)
 {
 	boolean_t	gotit;
 	DCL_THREADGBL_ACCESS;
@@ -42,24 +44,19 @@ void op_fngvget(mval *v, mval *def)
 	{
 		case dba_bg :
 		case dba_mm :
-			if (gv_target->root)
-				gotit = gvcst_get(v);
-			else
-				gotit = FALSE;
+			gotit = gv_target->root ? gvcst_get(dst) : FALSE;
 			break;
 		case dba_cm :
-			gotit = gvcmx_get(v);
+			gotit = gvcmx_get(dst);
 			break;
 		default :
-			gotit = gvusr_get(v);
-			if (gotit)
-				s2pool(&v->str);
+			;
+			if (gotit = gvusr_get(dst))	/* NOTE: assignment */
+				s2pool(&dst->str);
 			break;
 	}
 	if (!gotit)
-	{
-		*v = *def;
-		v->mvtype &= ~MV_ALIASCONT;	/* Make sure do not allow alias container property to pass */
-	}
+		*dst = literal_null;
+	assert(0 == (dst->mvtype & MV_ALIASCONT));	/* Should be no alias container flag */
 	return;
 }

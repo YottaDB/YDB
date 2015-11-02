@@ -475,12 +475,31 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		*/
 		rts_error(VARLSTCNT(3) ERR_DBCMODBLK2BIG, 1, blk_num);
 	}
-
 	/* Isolate the full key in the first record of the block */
 	dbc_init_key(psa, &psa->first_rec_key);
 	dbc_find_key(psa, psa->first_rec_key, blk_p + SIZEOF(v15_blk_hdr), psa->blk_set[0].blk_levl);
+	if ((0 < psa->blk_set[0].blk_levl) && (0 == psa->first_rec_key->end))
+	{	/* dbc_find_key found just a star-key in this index block. dbc_find_record/dbc_match_key (invoked later)
+		 * does not know to handle this scenario so we finish this case off right away. No need to do any splits
+		 * anyways since the block is obviously not too full.
+		 */
+		DBC_DEBUG(("DBC_DEBUG: Block not processed as it now has sufficient room (index block with only *-key)\n"));
+		psa->blks_bypassed++;
+		psa->blks_read++;
+		if (psa->blk_set[0].found_in_cache)
+			psa->blks_cached++;
+		return FALSE;	/* No restart needed */
+	}
 	psa->first_rec_key->gvn_len = USTRLEN((char_ptr_t)psa->first_rec_key->base);	/* The GVN we need to lookup in the DT */
-
+	if (UNIX_ONLY(8) VMS_ONLY(9) <= blk_size - blk_len)
+	{	/* This block has room now - no longer need to split it */
+		DBC_DEBUG(("DBC_DEBUG: Block not processed as it now has sufficient room\n"));
+		psa->blks_bypassed++;
+		psa->blks_read++;
+		if (psa->blk_set[0].found_in_cache)
+			psa->blks_cached++;
+		return FALSE;	/* No restart needed */
+	}
 	/* Possibilities at this point:
 	   1) We are looking for a DT (directory tree) block.
 	   2) We are looking for a GVT (global variable tree) block.
@@ -494,7 +513,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	   from there using the level from the original block as a stopping point. One special case here is if our
 	   target block was a gvtroot block, we don't need to traverse the GVT tree to find it. We get it from the
 	   directory tree and stop our search there.
-	*/
+	 */
 	switch(blk_type)
 	{
 		case gdsblk_dtindex:
@@ -635,10 +654,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		psa->block_depth = save_block_depth;
 		blk_index = 0;	/* reset to start *our* work in the very first block */
 	}
-
 	/* Now we have done the gvtroot check if we were going to. If this particular block has sufficient room in it
-	   we don't need to split it of course.
-	*/
+	 * we don't need to split it of course.
+	 */
 	if (UNIX_ONLY(8) VMS_ONLY(9) <= blk_size - blk_len)
 	{	/* This block has room now - no longer need to split it */
 		DBC_DEBUG(("DBC_DEBUG: Block not processed as it now has sufficient room\n"));

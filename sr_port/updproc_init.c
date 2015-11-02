@@ -46,6 +46,10 @@
 GBLREF	boolean_t	pool_init;
 GBLREF	gd_addr		*gd_header;
 GBLREF	recvpool_addrs	recvpool;
+#ifdef UNIX
+GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	FILE		*updproc_log_fp;
+#endif
 
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_TEXT);
@@ -54,6 +58,7 @@ error_def(ERR_UPDATEFILEOPEN);
 int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 {
 	mval            	v;
+	int			save_errno;
 	uint4			log_file_len;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -71,13 +76,20 @@ int updproc_init(gld_dbname_list **gld_db_files , seq_num *start_jnl_seqno)
 	 */
 	if (0 != grab_sem_immediate(RECV, UPD_PROC_COUNT_SEM))
 	{
+		save_errno = errno;
 		if (REPL_SEM_NOT_GRABBED)
-			return(UPDPROC_EXISTS);
+			return UPDPROC_EXISTS;
 		else
 			rts_error(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Receive pool semop error"), REPL_SEM_ERRNO);
+				RTS_ERROR_LITERAL("Receive pool semop error"), UNIX_ONLY(save_errno) VMS_ONLY(REPL_SEM_ERRNO));
 	}
 	jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);
+#	ifdef UNIX
+	repl_log(updproc_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
+			jnlpool.repl_inst_filehdr->jnlpool_shmid, jnlpool.repl_inst_filehdr->jnlpool_semid);
+	repl_log(updproc_log_fp, TRUE, TRUE, "Attached to existing recvpool with shmid = [%d] and semid = [%d]\n",
+			jnlpool.repl_inst_filehdr->recvpool_shmid, jnlpool.repl_inst_filehdr->recvpool_semid);
+#	endif
 	gvinit();	/* get the desired global directory and update the gd_map */
 	*gld_db_files = read_db_files_from_gld(gd_header);/* read all the database files to be opened in this global directory */
 	if (!updproc_open_files(gld_db_files, start_jnl_seqno)) /* open and initialize all regions */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,14 +17,22 @@
 #include "indir_enum.h"
 #include "advancewindow.h"
 #include "subscript.h"
+#include "fullbool.h"
+#include "show_source_line.h"
 
+GBLREF	boolean_t	run_time;
+GBLREF	short int	source_column;
+
+error_def(ERR_SIDEEFFECTEVAL);
 error_def(ERR_VAREXPECTED);
 
 int f_name(oprtype *a, opctype op)
 {
 	boolean_t	gbl;
+	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	oprtype		*depth;
-	triple		*r;
+	short int	column;
+	triple		*r, *s;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -42,10 +50,15 @@ int f_name(oprtype *a, opctype op)
 		depth = &r->operand[0];
 		break;
 	case TK_ATSIGN:
-		r->opcode = OC_INDFNNAME;
-		if (!indirection(&(r->operand[0])))
+		r->opcode = OC_INDFNNAME2;			/* chomps extra subscripts of resulting string */
+		s = maketriple(OC_INDFNNAME);
+		if (!indirection(&(s->operand[0])))
 			return FALSE;
-		depth = &r->operand[1];
+		s->operand[1] = put_ilit(MAX_LVSUBSCRIPTS + 1);	/* first, get all the subscripts. r will chomp them */
+		coerce(&s->operand[1], OCT_MVAL);
+		ins_triple(s);
+		depth = &r->operand[0];
+		r->operand[1] = put_tref(s);
 		break;
 	default:
 		stx_error(ERR_VAREXPECTED);
@@ -59,9 +72,17 @@ int f_name(oprtype *a, opctype op)
 		assert(MAX_LVSUBSCRIPTS == MAX_GVSUBSCRIPTS);	/* add assert to ensure our assumption is valid */
 	} else
 	{
+		DISABLE_SIDE_EFFECT_AT_DEPTH;		/* doing this here let's us know specifically if direction had SE threat */
 		advancewindow();
+		column = source_column;
 		if (EXPR_FAIL == expr(depth, MUMPS_STR))
 			return FALSE;
+		if (!run_time && (OC_INDFNNAME2 == r->opcode) && (SE_WARN == TREF(side_effect_handling)))
+		{
+			TREF(last_source_column) = column - 1;
+			show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
+			dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);
+		}
 	}
 	coerce(depth, OCT_MVAL);
 	ins_triple(r);

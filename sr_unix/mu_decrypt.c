@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@
 int	mu_decrypt(char *fname, uint4 off, uint4 len)
 {
 #	ifdef GTM_CRYPT
-	int				fd, n_len, save_errno, status, i;
+	int				fd, n_len, save_errno, gtmcrypt_errno, i;
 	char				hash[GTMCRYPT_HASH_LEN], *buff;
 	boolean_t			is_encrypted;
 	gtmcrypt_key_t			key_handle;
@@ -48,15 +48,15 @@ int	mu_decrypt(char *fname, uint4 off, uint4 len)
 	}
 	if (is_encrypted)
 	{
-		INIT_PROC_ENCRYPTION(status);
-		GTMCRYPT_GETKEY(hash, key_handle, status);
-		if (0 == status)
-			GTMCRYPT_DECODE_FAST(key_handle, buff, len, NULL, status);
-		if (0 != status)
+		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+		GTMCRYPT_GETKEY(NULL, hash, key_handle, gtmcrypt_errno);
+		if (0 == gtmcrypt_errno)
+			GTMCRYPT_DECRYPT(NULL, key_handle, buff, len, NULL, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
 			close(fd);
 			free(buff);
-			GC_RTS_ERROR(status, fname);
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, n_len, fname);
 		}
 	}
 	for (i = 0; i < len; i++)
@@ -68,7 +68,7 @@ int	mu_decrypt(char *fname, uint4 off, uint4 len)
 	}
 	free(buff);
 	close(fd);
-#endif
+#	endif
 	return SS_NORMAL;
 
 }

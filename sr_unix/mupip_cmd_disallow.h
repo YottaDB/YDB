@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,4 +25,6 @@ boolean_t cli_disallow_mupip_replic_updhelper(void);
 boolean_t cli_disallow_mupip_rundown(void);
 boolean_t cli_disallow_mupip_set(void);
 boolean_t cli_disallow_mupip_trigger(void);
+boolean_t cli_disallow_mupip_size(void);
+boolean_t cli_disallow_mupip_size_heuristic(void);
 #endif

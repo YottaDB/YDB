@@ -11,6 +11,10 @@
 
 #include "mdef.h"
 
+#if defined(VMS) && defined(DEBUG)
+#include <descrip.h>
+#endif
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -42,19 +46,19 @@
 #include "tp_restart.h"
 #include "gtm_ctype.h"		/* for ISALPHA_ASCII */
 #include "anticipatory_freeze.h"
+#include "wcs_recover.h"
+#include "wbox_test_init.h"
 #ifdef GTM_TRIGGER
 #include "gtm_trigger_trc.h"
 #endif
 #ifdef UNIX
-#include "wcs_recover.h"
 #include "gvcst_protos.h"
 #include "gtmimagename.h"
-#include "wbox_test_init.h"
+#include "caller_id.h"
 #endif
-#ifdef UNIX
+#ifdef DEBUG
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include "caller_id.h"
 #endif
 
 /* In mu_reorg if we are in gvcst_bmp_mark_free, we actually have a valid gv_target. Find its root before the next iteration
@@ -252,16 +256,20 @@ void t_retry(enum cdb_sc failure)
 			DEBUG_ONLY(TREF(ok_to_call_wcs_recover) = TRUE;)
 			if (!csa->hold_onto_crit)
 				grab_crit(gv_cur_region);
-#			ifdef UNIX
-			if (cnl->wc_blocked)
+			else if (cnl->wc_blocked)
 			{	/* Possible ONLY for online rollback or DSE that grabs crit during startup and never grabs again.
 				 * In such cases grab_crit (such as above) is skipped. As a result wcs_recover is also skipped.
 				 * To avoid this, do wcs_recover if wc_blocked is TRUE. But, that's possible only if white box test
 				 * cases to induce Phase 1 and Phase 2 errors are set. So, assert accordingly.
 				 */
-				assert(csa->hold_onto_crit && WB_COMMIT_ERR_ENABLED);
+				assert(WB_COMMIT_ERR_ENABLED);
 				wcs_recover(gv_cur_region);
+				/* Note that if a concurrent Phase 2 error sets wc_blocked to TRUE anytime between now
+				 * and the wc_blocked check at the top of t_end, we'll end up restarting and doing wcs_recover
+				 * on the next restart.
+				 */
 			}
+#			ifdef UNIX
 			if (MISMATCH_ROOT_CYCLES(csa, cnl))
 			{	/* We came in to handle a different restart code in the penultimate retry and grab_crit before going
 				 * to final retry. As part of grabbing crit, we detected an online rollback. Although we could treat

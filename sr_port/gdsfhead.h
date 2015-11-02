@@ -244,6 +244,7 @@ typedef struct
 #define		MBR_BLKEMPTY		-1
 #define		FROZEN_BY_ROOT		(uint4)(0xFFFFFFFF)
 #define		BACKUP_NOT_IN_PROGRESS	0x7FFFFFFF
+#define		DB_CSH_RDPOOL_SZ	0x20	/* These many non-dirty buffers exist at all points in time in shared memory */
 
 typedef struct
 {
@@ -685,6 +686,21 @@ void verify_queue(que_head_ptr_t qhdr);
 		}										\
 	}											\
 	assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data);	\
+}
+
+#define PUSH_GV_CUR_REGION(reg, sav_reg, sav_cs_addrs, sav_cs_data)				\
+{												\
+	sav_reg = gv_cur_region;								\
+	sav_cs_addrs = cs_addrs;								\
+	sav_cs_data = cs_data;									\
+	TP_CHANGE_REG(reg)									\
+}
+
+#define POP_GV_CUR_REGION(sav_reg, sav_cs_addrs, sav_cs_data)					\
+{												\
+	gv_cur_region = sav_reg;								\
+	cs_addrs = sav_cs_addrs;								\
+	cs_data = sav_cs_data;									\
 }
 
 /* The TP_TEND_CHANGE_REG macro is a special macro used in tp_tend.c to optimize out the unnecessary checks in
@@ -1916,14 +1932,13 @@ typedef struct	sgmnt_addrs_struct
 	struct jnl_private_control_struct	*jnl;
 	struct sgm_info_struct			*sgm_info_ptr;
 	gd_region				*region;		/* the region corresponding to this csa */
-	struct hash_table_mname_struct		*gvt_hashtab;	/* NON-NULL only if regcnt > 1;
-								 * Maintains all gv_targets mapped to this db file */
+	struct hash_table_mname_struct		*gvt_hashtab;		/* NON-NULL only if regcnt > 1;
+								 	 * Maintains all gv_targets mapped to this db file */
 	struct reg_ctl_list_struct	*rctl;	/* pointer to rctl for this region (used only if jgbl.forw_phase_recovery) */
 	struct sgmnt_addrs_struct	*next_csa; /* points to csa of NEXT database that has been opened by this process */
 #	ifdef GTM_CRYPT
-	char		*encrypted_blk_contents;
-	gtmcrypt_key_t	encr_key_handle;
-	int4		encrypt_init_status;
+	char					*encrypted_blk_contents;
+	gtmcrypt_key_t				encr_key_handle;
 #	endif
 #	ifdef GTM_SNAPSHOT
 	struct snapshot_context_struct 	*ss_ctx;
@@ -1935,6 +1950,10 @@ typedef struct	sgmnt_addrs_struct
 		/* May add new pointers here for other methods or change to void ptr */
 	} acc_meth;
 	gvstats_rec_t		gvstats_rec;
+	trans_num		dbsync_timer_tn;/* copy of csa->ti->curr_tn when csa->dbsync_timer became TRUE.
+						 * used to check if any updates happened in between when we flushed all
+						 * dirty buffers to disk and when the idle flush timer (5 seconds) popped.
+						 */
 	/* 8-byte aligned at this point on all platforms (32-bit, 64-bit or Tru64 which is a mix of 32-bit and 64-bit pointers) */
 	sgmnt_data_ptr_t	mm_core_hdr;	/* Most OSs don't include memory mapped files in the core dump.  For MM access
 						 * mode, this is a pointer to a copy of the header that will be in the corefile.
@@ -2008,9 +2027,9 @@ typedef struct	sgmnt_addrs_struct
 	boolean_t	dse_crit_seize_done;	/* TRUE if DSE does a CRIT -SEIZE for this region. Set to FALSE when CRIT -RELEASE
 						 * or CRIT -REMOVE is done. Other than the -SEIZE and -RELEASE window, if any other
 						 * DSE module sets csa->hold_onto_crit to TRUE (like dse_b_dmp) but encounters a
-						 * runtime error before getting a chance to do a rel_crit, preemptive_ch should know
-						 * to release crit even if hold_onto_crit is set to TRUE and so will rely on this
-						 * variable
+						 * runtime error before getting a chance to do a rel_crit, preemptive_db_clnup
+						 * should know to release crit even if hold_onto_crit is set to TRUE and so will
+						 * rely on this variable
 						 */
 #	ifdef UNIX
 	uint4		root_search_cycle;	/* local copy of cnl->root_search_cycle */
@@ -2047,7 +2066,18 @@ typedef struct srch_blk_status_struct
 	int4		cycle;
 	int4		level;
 	struct cw_set_element_struct	*cse;
-	struct srch_blk_status_struct	*first_tp_srch_status;
+	struct srch_blk_status_struct	*first_tp_srch_status;	/* In TP, this points to an entry in the si->first_tp_hist array
+								 * that contains the srch_blk_status structure of this block the
+								 * first time it was referenced in this TP transaction. So basically
+								 * gvt->hist contains pointers to the first_tp_hist array. At
+								 * tp_clean_up time, the first_tp_hist array is cleared but all
+								 * pointers to it are not cleaned up then. That instead happens
+								 * when the gvt->clue gets used first in the next TP transaction,
+								 * at which point we are guaranteed local_tn is much higher than
+								 * gvt->read_local_tn which is an indication to complete this
+								 * deferred cleanup.
+								 * In non-TP, this field is maintained but not used.
+								 */
 	struct gv_namehead_struct	*blk_target;
 } srch_blk_status;
 
@@ -2130,6 +2160,7 @@ typedef struct	gv_namehead_struct
 							   for internationalization */
 	trans_num	read_local_tn;			/* local_tn of last reference for this global */
 	GTMTRIG_ONLY(trans_num trig_local_tn;)		/* local_tn of last trigger driven for this global */
+	GTMTRIG_ONLY(trans_num trig_read_tn;)		/* local_tn when triggers for this global (^#t records) were read from db */
 	boolean_t	noisolation;     		/* whether isolation is turned on or off for this global */
 	block_id	root;				/* Root of global variable tree */
 	mname_entry	gvname;				/* the name of the global */
@@ -2197,12 +2228,17 @@ typedef struct gvsavtarg_struct
  * This mechanism ensures that, when there are multiple functions in a given call stack that save and
  * restore gv_target, only the bottom most function gets to store its value in the global, reset_gv_target.
  * In case of rts errors, if the error is not SUCCESS or INFO, then gv_target gets restored to reset_gv_target
- * (in preemptive_ch()). For SUCCESS or INFO, no restoration is necessary because CONTINUE from the condition
+ * (in preemptive_db_clnup()). For SUCCESS or INFO, no restoration is necessary because CONTINUE from the condition
  * handlers would take us through the normal path for gv_target restoration.
  */
 
-#define	SKIP_GVT_GVKEY_CHECK	FALSE
-#define	DO_GVT_GVKEY_CHECK	TRUE
+#define	SKIP_GVT_GVKEY_CHECK		0
+#define	DO_GVT_GVKEY_CHECK		1
+#define	DO_GVT_GVKEY_CHECK_RESTART	2	/* do GVT_GVKEY check but skip gvt/csa check since we are in a TP transaction
+						 * and about to restart, gv_target and cs_addrs will anyways get back in sync
+						 * as part of the tp_restart process. This flag should be used only in TP
+						 * as non-TP restart does not do this reset/sync.
+						 */
 
 #define RESET_GV_TARGET(GVT_GVKEY_CHECK)							\
 {												\
@@ -2211,27 +2247,33 @@ typedef struct gvsavtarg_struct
 	reset_gv_target = INVALID_GV_TARGET;							\
 	DEBUG_ONLY(										\
 		if (GVT_GVKEY_CHECK)								\
-		{										\
-			DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;					\
-			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;					\
-		}										\
+			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);			\
 	)											\
 }
 
 #define RESET_GV_TARGET_LCL(SAVE_TARG)	gv_target = SAVE_TARG;
 
-#define RESET_GV_TARGET_LCL_AND_CLR_GBL(SAVE_TARG, GVT_GVKEY_CHECK)				\
-{												\
-	gv_target = SAVE_TARG;									\
-	if (!gbl_target_was_set)								\
-	{											\
-		assert(SAVE_TARG == reset_gv_target || INVALID_GV_TARGET == reset_gv_target);	\
-		DEBUG_ONLY(									\
-			if (GVT_GVKEY_CHECK)							\
-				DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;				\
-		)										\
-		reset_gv_target = INVALID_GV_TARGET;						\
-	}											\
+#define RESET_GV_TARGET_LCL_AND_CLR_GBL(SAVE_TARG, GVT_GVKEY_CHECK)							\
+{															\
+	GBLREF	uint4			dollar_tlevel;									\
+															\
+	gv_target = SAVE_TARG;												\
+	if (!gbl_target_was_set)											\
+	{														\
+		assert(SAVE_TARG == reset_gv_target || INVALID_GV_TARGET == reset_gv_target);				\
+		DEBUG_ONLY(												\
+			if (DO_GVT_GVKEY_CHECK == (GVT_GVKEY_CHECK))							\
+			{												\
+				DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);					\
+			} else												\
+			{												\
+				assert((SKIP_GVT_GVKEY_CHECK == (GVT_GVKEY_CHECK))					\
+					|| (dollar_tlevel && (DO_GVT_GVKEY_CHECK_RESTART == (GVT_GVKEY_CHECK))));	\
+				DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_FALSE);					\
+			}												\
+		)													\
+		reset_gv_target = INVALID_GV_TARGET;									\
+	}														\
 }
 
 
@@ -2242,10 +2284,25 @@ GBLREF	int		process_exiting;
 GBLREF	trans_num	local_tn;
 GBLREF	gv_namehead	*gvt_tp_list;
 
-#define	ADD_TO_GVT_TP_LIST(GVT)													\
+#define	RESET_FIRST_TP_SRCH_STATUS_FALSE	FALSE
+#define	RESET_FIRST_TP_SRCH_STATUS_TRUE		TRUE
+
+#define	GVT_CLEAR_FIRST_TP_SRCH_STATUS(GVT)								\
+{													\
+	srch_blk_status	*srch_status;									\
+													\
+	assert(GVT->clue.end);	/* or else first_tp_srch_status will be reset as part of traversal */	\
+	assert(GVT->read_local_tn != local_tn);								\
+	for (srch_status = &(GVT)->hist.h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)	\
+		srch_status->first_tp_srch_status = NULL;						\
+}
+
+#define	ADD_TO_GVT_TP_LIST(GVT, RESET_FIRST_TP_SRCH_STATUS)									\
 {																\
 	if (GVT->read_local_tn != local_tn)											\
 	{	/* Set read_local_tn to local_tn; Also add GVT to list of gvtargets referenced in this TP transaction. */	\
+		if (GVT->clue.end && RESET_FIRST_TP_SRCH_STATUS)								\
+			GVT_CLEAR_FIRST_TP_SRCH_STATUS(GVT);									\
 		GVT->read_local_tn = local_tn;											\
 		GVT->next_tp_gvnh = gvt_tp_list;										\
 		gvt_tp_list = GVT;												\
@@ -2254,6 +2311,10 @@ GBLREF	gv_namehead	*gvt_tp_list;
 		DBG_CHECK_IN_GVT_TP_LIST(GVT, TRUE);	/* TRUE => we check that GVT IS present in the gvt_tp_list */		\
 	}															\
 }
+
+/* Although the below macros are used only in DBG code, they are passed as parameters so need to be defined for pro code too */
+#define	CHECK_CSA_FALSE		FALSE
+#define	CHECK_CSA_TRUE		TRUE
 
 #ifdef DEBUG
 #define	DBG_CHECK_IN_GVT_TP_LIST(gvt, present)						\
@@ -2272,26 +2333,40 @@ GBLREF	gv_namehead	*gvt_tp_list;
 	assert(present || (NULL == gvtarg) || (process_exiting && !dollar_tlevel));	\
 }
 
-#define	DBG_CHECK_GVT_IN_GVTARGETLIST(gvt)						\
-{											\
-	gv_namehead	*gvtarg;							\
-											\
-	GBLREF gd_region	*gv_cur_region;						\
-	GBLREF gv_namehead	*gv_target_list;					\
-											\
-	for (gvtarg = gv_target_list; NULL != gvtarg; gvtarg = gvtarg->next_gvnh)	\
-	{										\
-		if (gvtarg == gvt)							\
-			break;								\
-	}										\
-	/* For dba_cm or dba_usr type of regions, gv_target_list is not maintained so	\
-	 * if gv_target is not part of gv_target_list, assert region is not BG or MM.	\
-	 */										\
-	assert((NULL != gvtarg) || (dba_cm == gv_cur_region->dyn.addr->acc_meth)	\
-		|| (dba_usr == gv_cur_region->dyn.addr->acc_meth));			\
+#define	DBG_CHECK_GVT_IN_GVTARGETLIST(gvt)								\
+{													\
+	gv_namehead	*gvtarg;									\
+													\
+	GBLREF gd_region	*gv_cur_region;								\
+	GBLREF gv_namehead	*gv_target_list;							\
+													\
+	for (gvtarg = gv_target_list; NULL != gvtarg; gvtarg = gvtarg->next_gvnh)			\
+	{												\
+		if (gvtarg == gvt)									\
+			break;										\
+	}												\
+	/* For dba_cm or dba_usr type of regions, gv_target_list is not maintained so			\
+	 * if gv_target is not part of gv_target_list, assert region is not BG or MM.			\
+	 * The only exception is if the region was dba_cm but later closed due to an error on		\
+	 * the server side (in which case access method gets reset back to BG. (e.g. gvcmz_error.c)	\
+	 */												\
+	assert((NULL != gvtarg) || (dba_cm == gv_cur_region->dyn.addr->acc_meth)			\
+		|| (dba_usr == gv_cur_region->dyn.addr->acc_meth)					\
+		|| ((FALSE == gv_cur_region->open) && (dba_bg == gv_cur_region->dyn.addr->acc_meth)));	\
 }
 
-#define	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC											\
+/* If CHECK_CSADDRS input parameter is CHECK_CSA_TRUE, then check that GV_CURRKEY, GV_TARGET and CS_ADDRS are all in sync.
+ * If CHECK_CSADDRS input parameter is CHECK_CSA_FALSE, then only check GV_CURRKEY and GV_TARGET are in sync (skip CS_ADDRS check).
+ * The hope is that most callers of this macro use CHECK_CSA_TRUE (i.e. a stricter check).
+ *
+ * The DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSADDRS) macro is used at various points in the database code to check that
+ * gv_currkey, gv_target and cs_addrs are in sync. This is because op_gvname relies on this in order to avoid a gv_bind_name
+ * function call (if incoming key matches gv_currkey from previous call, it uses gv_target and cs_addrs right
+ * away instead of recomputing them). The only exception is if we were interrupted in the middle of TP transaction by an
+ * external signal which resulted in us terminating right away. In this case, we are guaranteed not to make a call to op_gvname
+ * again (because we are exiting) so it is ok not to do this check if process_exiting is TRUE.
+ */
+#define	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSADDRS)									\
 {																\
 	mname_entry		*gvent;												\
 	mstr			*varname;											\
@@ -2307,24 +2382,29 @@ GBLREF	gv_namehead	*gvt_tp_list;
 	assert((NULL != gv_currkey) || (NULL == gv_target));									\
 	/* make sure gv_currkey->top always reflects the maximum keysize across all dbs that we opened until now */		\
 	assert((NULL == gv_currkey) || (gv_currkey->top == gv_keysize));							\
-	keybase = &gv_currkey->base[0];												\
-	if (!process_exiting && (NULL != gv_currkey) && (0 != keybase[0]) && (INVALID_GV_TARGET == reset_gv_target))		\
+	if (!process_exiting)													\
 	{															\
-		assert(NULL != gv_target);											\
-		gvent = &gv_target->gvname;											\
-		varname = &gvent->var_name;											\
-		varlen = varname->len;												\
-		assert(varlen);													\
-		assert((0 != keybase[varlen]) || !memcmp(keybase, varname->addr, varlen));					\
-		keyend = gv_currkey->end;											\
-		assert(!keyend || (KEY_DELIMITER == keybase[keyend]));								\
-		assert(!keyend || (KEY_DELIMITER == keybase[keyend - 1]));							\
-		/* Check that gv_target is part of the gv_target_list */							\
-		DBG_CHECK_GVT_IN_GVTARGETLIST(gv_target);									\
+		keybase = &gv_currkey->base[0];											\
+		if ((NULL != gv_currkey) && (0 != keybase[0]) && (INVALID_GV_TARGET == reset_gv_target))			\
+		{														\
+			assert(NULL != gv_target);										\
+			gvent = &gv_target->gvname;										\
+			varname = &gvent->var_name;										\
+			varlen = varname->len;											\
+			assert(varlen);												\
+			assert((0 != keybase[varlen]) || !memcmp(keybase, varname->addr, varlen));				\
+			keyend = gv_currkey->end;										\
+			assert(!keyend || (KEY_DELIMITER == keybase[keyend]));							\
+			assert(!keyend || (KEY_DELIMITER == keybase[keyend - 1]));						\
+			/* Check that gv_target is part of the gv_target_list */						\
+			DBG_CHECK_GVT_IN_GVTARGETLIST(gv_target);								\
+			if (CHECK_CSADDRS)											\
+				DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;								\
+		}														\
+		/* Do gv_target sanity check too; Do not do this if it is NULL or if it is GT.CM GNP client (gd_csa is NULL) */	\
+		if ((NULL != gv_target) && (NULL != gv_target->gd_csa))								\
+			DBG_CHECK_GVTARGET_INTEGRITY(gv_target);								\
 	}															\
-	/* Do gv_target sanity check as well; Do not do this if it is NULL or if it is GT.CM GNP client (gd_csa is NULL) */	\
-	if ((NULL != gv_target) && (NULL != gv_target->gd_csa))									\
-		DBG_CHECK_GVTARGET_INTEGRITY(gv_target);									\
 }
 
 /* Do checks on the integrity of various fields in gv_target. targ_alloc initializes these and they are supposed to
@@ -2336,7 +2416,6 @@ GBLREF	gv_namehead	*gvt_tp_list;
 {																\
 	int			keysize, partial_size;										\
 	GBLREF	boolean_t	dse_running;											\
-	GBLREF	jnl_gbls_t	jgbl;												\
 																\
 	keysize = GVT->gd_csa->hdr->max_key_size;										\
 	keysize = DBKEYSIZE(keysize);												\
@@ -2355,7 +2434,7 @@ GBLREF	gv_namehead	*gvt_tp_list;
 #else
 #	define	DBG_CHECK_IN_GVT_TP_LIST(gvt, present)
 #	define	DBG_CHECK_GVT_IN_GVTARGETLIST(gvt)
-#	define	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC
+#	define	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSADDRS)
 #	define	DBG_CHECK_GVTARGET_INTEGRITY(GVT)
 #endif
 
@@ -3207,7 +3286,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 # define BEFORE_IMAGE_NEEDED(read_before_image, CS, csa, csd, blk_no, retval)				 		\
 {													 		\
 	retval = (read_before_image && csd->db_got_to_v5_once);								\
-	retval = retval && (!WAS_FREE(CS) || SNAPSHOTS_IN_PROG(csa));				\
+	retval = retval && (!WAS_FREE(CS->blk_prior_state) || SNAPSHOTS_IN_PROG(csa));				\
 	retval = retval && (!ONLY_SS_BEFORE_IMAGES(csa) || !ss_chk_shdw_bitmap(csa, SS_CTX_CAST(csa->ss_ctx), blk_no));\
 }
 
@@ -3313,7 +3392,7 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
  * backward journal recovery will never be expected to take the database to a point BEFORE the mupip upgrade).
  */
 # define BEFORE_IMAGE_NEEDED(read_before_image, CS, csa, csd, blk_no, retval)		\
-	retval = (read_before_image && csd->db_got_to_v5_once && !WAS_FREE(CS));
+	retval = (read_before_image && csd->db_got_to_v5_once && !WAS_FREE(CS->blk_prior_state));
 #endif
 
 /* Determine if the state of 'backup in progress' has changed since we grabbed crit in t_end.c/tp_tend.c */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,9 @@ GBLREF	gv_namehead	*gv_target;
 GBLREF	boolean_t	dollar_ztrigger_invoked;
 GBLREF	int4		gtm_trigger_depth;
 GBLREF	mstr		*dollar_ztname;
+#ifdef DEBUG
+GBLREF	boolean_t	donot_INVOKE_MUMTSTART;
+#endif
 
 LITREF	mval	literal_zero;
 LITREF	mval	literal_one;
@@ -63,9 +66,10 @@ STATICDEF boolean_t	save_gv_last_subsc_null, save_gv_some_subsc_null;
 STATICDEF boolean_t	in_op_fnztrigger;
 #endif
 
+error_def(ERR_DZTRIGINTRIG);
 error_def(ERR_FILENAMETOOLONG);
 error_def(ERR_ZTRIGINVACT);
-error_def(ERR_DZTRIGINTRIG);
+
 
 enum ztrprms
 {
@@ -135,6 +139,7 @@ CONDITION_HANDLER(op_fnztrigger_ch)
 	START_CH;
 
 	RESTORE_ZTRIGGER_ENTRY_STATE;
+	DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
 
 	NEXTCH;
 
@@ -243,10 +248,11 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	return;
 }
 #else /* !GTM_TRIGGER */
+
+error_def(ERR_UNIMPLOP);
+
 void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 {
-	error_def(ERR_UNIMPLOP);
-
 	rts_error(VARLSTCNT(1) ERR_UNIMPLOP);
 }
 #endif

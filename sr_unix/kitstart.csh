@@ -9,12 +9,15 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-# kitstart.csh creates distribution kits for pro and dbg.
+# kitstart.csh creates distribution kits for pro and dbg and bta.
 # In order to test any configure.csh changes, copy a modified version into /usr/library/Vxxx/pro/configure
 # and /usr/library/Vxxx/dbg/configure.  Then execute $gtm_tools/kitstart.csh -ti Vxxx and check output log.
 # If changes are made to the configure script, such as removing files or changing permissions in the install
 # directory there may need to be changes made to files used by kitstart.csh to execute
 # $gtm_tools/gtm_compare_dist.csh.
+#
+# set echo
+# set verbose
 #
 # Make sure don't start in utf-8 mode
 if ($?gtm_chset) then
@@ -44,10 +47,6 @@ endif
 source $cms_tools/cms_cshrc.csh
 
 source $cms_tools/server_list
-if ("$distrib_servers_unix" !~ *${HOST:r:r:r}*) then
-	echo "This is not a distribution server. Exiting."
-	exit
-endif
 
 setenv PATH "/usr/local/bin:/usr/sbin:/usr/ccs/bin:/usr/bin:/bin"
 
@@ -65,9 +64,27 @@ foreach server ( $servers )
 		break
 	endif
 end
+
+# if not found in distribution servers then try from uname in case -allow entered
+if (! $?os_arch) then
+	# make a directory in /tmp to use to run unamearch.m
+	setenv randstr `$gtm_dist/mumps -r %XCMD 'do ^%RANDSTR'`
+	set tempdir = /tmp/kit_unamearch_${randstr}
+	mkdir $tempdir
+	cp $cms_tools/unamearch.m $tempdir
+	set os_arch=`(cd $tempdir; $gtm_dist/mumps -r unamearch $distrib_unix_platformarch%$uname_platformarch)`
+	if ("" == "$os_arch") then
+		echo "Problem getting platform and arch from uname -a"
+		rm -rf $tempdir
+		exit 1
+	endif
+	set os_arch="${os_arch:s/_/ /}"			# and spilt OS_ARCH into "OS ARCH" and
+	set os_arch=( ${os_arch:s/_/ /} )		# enclose it inside parenthesis to force conversion to an array
+	rm -rf $tempdir
+endif
+
 set osname = $os_arch[1]
 set arch = $os_arch[2]
-
 
 set package = "tar cf"
 set repackage = "tar rf"
@@ -92,20 +109,31 @@ else
 		set testinstall = 1
 		shift
 	endif
-	if ("$1" == "" || "$2" != "" && "$2" != "pro" && "$2" != "dbg") then
+	set allow = 0
+	if ("$1" == "-allow") then
+		set allow = 1
+		shift
+	endif
+	if ("$1" == "" || "$2" != "" && "$2" != "pro" && "$2" != "dbg" && "$2" != "bta") then
 		set syntaxerr = 1
 	endif
 endif
 
 if ($syntaxerr) then
 	echo ""
-	echo "Usage : $0 [-ti] <ver> [pro | dbg]"
+	echo "Usage : $0 [-ti] [-allow] <ver> [pro | dbg | bta]"
 	echo ""
 	echo "<ver>       : Version with no punctuations; create distribution of this GT.M version (must be in $gtm_root)"
 	echo "-ti         : Test installation"
-	echo "[pro | dbg] : Create distribution of this image; both if not specified"
+	echo "-allow      : allow kit to be built on a non-distribution server"
+	echo "[pro | dbg | bta] : Create distribution of this image; or pro and dbg if not specified"
 	echo ""
 	exit 1
+endif
+
+if (! $allow && ("$distrib_servers_unix" !~ *${HOST:r:r:r}*)) then
+	echo "This is not a distribution server. Exiting."
+	exit
 endif
 
 set version = "${1:au}"		# ':au' - 'a' means apply to the whole string and 'u' means uppercase everything

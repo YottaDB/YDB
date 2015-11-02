@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,8 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	jnl_gbls_t		jgbl;
 
+error_def(ERR_NOTALLDBRNDWN);
+
 #ifdef VMS
 GBLREF short		gtcm_ast_avail;
 #endif
@@ -52,6 +54,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 	jnl_buffer_ptr_t	jbp;
 	int			refcnt;
 	boolean_t		was_crit;
+	int4			rundown_status = EXIT_NRM;			/* if gds_rundown went smoothly */
 
 	for (ptr = cnx->region_root;  ptr;)
 	{
@@ -100,7 +103,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 			VMS_ONLY(gtcm_ast_avail++);
 			if (JNL_ALLOWED(cs_data))
 				jpc->pini_addr = 0;
-			gds_rundown();
+			UNIX_ONLY(rundown_status |=) gds_rundown();
 			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
 			FREE_CSA_DIR_TREE(cs_addrs);
 			cm_del_gdr_ptr(gv_cur_region);
@@ -114,4 +117,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 		ptr = ptr->next;
 		free(last);
 	}
+
+	if (EXIT_NRM != rundown_status)
+		rts_error(VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 }

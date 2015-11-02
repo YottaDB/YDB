@@ -56,7 +56,6 @@ GBLREF 	bool		in_backup;
 #ifdef DEBUG
 GBLREF	boolean_t	in_mu_rndwn_file;
 GBLREF	boolean_t	mupip_jnl_recover;
-GBLREF	boolean_t	ok_to_UNWIND_in_exit_handling;
 #endif
 
 error_def(ERR_DBFILERR);
@@ -379,7 +378,6 @@ boolean_t wcs_flu(uint4 options)
 			}
 			if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_OUTOFSPACE == gtm_white_box_test_case_number))
 			{
-				ok_to_UNWIND_in_exit_handling = TRUE;
 				cnl->wcs_active_lvl = 1;
 				wtstart_errno = ENOSPC;
 			}
@@ -440,19 +438,16 @@ boolean_t wcs_flu(uint4 options)
 						BG_TRACE_PRO_ANY(csa, wcb_wcs_flu1);
 						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_wcs_flu1"),
 								 process_id, &csa->ti->curr_tn, DB_LEN_STR(gv_cur_region));
+					} else
+					{	/* Encountered I/O error. Transfer control to error trap */
+						rts_error(VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(gv_cur_region),
+								DB_LEN_STR(gv_cur_region), wtstart_errno);
 					}
 					if (in_commit)
 					{	/* We should NOT be invoking wcs_recover as otherwise the callers (t_end or tp_tend)
 						 * will get confused (see explanation above where variable "in_commit" gets set).
 						 */
 						assert(was_crit);	/* so dont need to rel_crit */
-						if (0 != wtstart_errno)
-						{	/* Encountered I/O error in the middle of commit. No point continuing this
-							 * transaction. Transfer control to error trap
-							 */
-							rts_error(VARLSTCNT(7) ERR_DBIOERR, 4, REG_LEN_STR(gv_cur_region),
-									DB_LEN_STR(gv_cur_region), wtstart_errno);
-						}
 						return FALSE;
 					}
 					assert(!jnl_enabled || jb->fsync_dskaddr == jb->freeaddr);

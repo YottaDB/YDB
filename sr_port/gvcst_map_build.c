@@ -57,10 +57,14 @@ void gvcst_map_build(uint4 *array, sm_uc_ptr_t base_addr, cw_set_element *cs, tr
 			cs_addrs->nl->highest_lbm_with_busy_blk = MAX(cs->blk, cs_addrs->nl->highest_lbm_with_busy_blk);
 		} else if (cs->reference_cnt < 0)
 		{
-			if (cs_addrs->hdr->db_got_to_v5_once)
+			if (cs_addrs->hdr->db_got_to_v5_once && (CSE_LEVEL_DRT_LVL0_FREE != cs->level))
 				bml_func = bml_recycled;
-			else
+			else /* always set the block as free when gvcst_bmp_mark_free a level-0 block in DIR tree */
+			{
 				bml_func = bml_free;
+				/* reset level since t_end will call bml_status_check which has an assert for bitmap block level */
+				cs->level = LCL_MAP_LEVL;
+ 			}
 		} else	/* cs->reference_cnt == 0 */
 		{
 			if (cs_addrs->hdr->db_got_to_v5_once && mu_reorg_upgrd_dwngrd_in_prog)

@@ -241,12 +241,12 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 		reset_gv_target = save_targ;
 	}
 	gv_target = cs_addrs->dir_tree;
-	lcl_root = 0;
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVGETFAIL);
 	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
 	assert((t_tries < CDB_STAGNATE) || cs_addrs->now_crit || mupip_jnl_recover);
 	for (;;)
 	{
+		lcl_root = 0; /* set lcl_root to 0 at the start of every iteration (this way even retry will get fresh value) */
 		hdr_len = rlen = 0;
 		gv_target = cs_addrs->dir_tree;
 		if (dollar_trestart)

@@ -364,8 +364,8 @@ GBLREF	int4		tp_fail_n;
 GBLREF	int4		tp_fail_level;
 GBLREF	trans_num	tp_fail_histtn[], tp_fail_bttn[];
 
-#ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
-
+#define TRANS_RESTART_HIST_ARRAY_SZ	512 /* See comment (6) in gtm_threadgbl_defs.h as to why this is not inside #ifdef DEBUG */
+#ifdef DEBUG
 /* The following structure stores information pertaining to the most recent invocation of t_retry OR tp_restart. Maintain a 512
  * element array per-process to track the recent t_retry and tp_restart invocations.  Instead of keeping track of dollar_tlevel,
  * keep track of the current csa which is always Non-NULL for Non-TP. For TP, csa can be NULL but store it as NULL in the history
@@ -383,8 +383,6 @@ typedef struct trans_restart_hist_struct
 	} seq_or_tn;
 	sgmnt_addrs		*csa;		/* NULL if TP, Non-NULL if Non-TP */
 } trans_restart_hist_t;
-
-# define TRANS_RESTART_HIST_ARRAY_SZ		512
 
 # define TRACE_TRANS_RESTART(RETRY_CODE)								\
 {													\
@@ -412,7 +410,7 @@ typedef struct trans_restart_hist_struct
 }
 #else
 # define TRACE_TRANS_RESTART(RETRY_CODE)
-#endif
+#endif	/* DEBUG */
 
 #define TP_TRACE_HIST(X, Y) 										\
 {													\
@@ -646,7 +644,7 @@ typedef struct trans_restart_hist_struct
 }
 
 #ifdef GTM_TRIGGER
-#define INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(INCREMENTAL, COMMIT)								\
+#define TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(INCREMENTAL, COMMIT)								\
 {																\
 	GBLREF	boolean_t	dollar_ztrigger_invoked;									\
 	GBLREF	trans_num	local_tn;											\
@@ -657,7 +655,11 @@ typedef struct trans_restart_hist_struct
 	cw_set_element		*cse;												\
 	sgmnt_addrs		*csa;												\
 	sgm_info		*si;												\
+	gvt_trigger_t		*gvt_trigger;											\
+	DEBUG_ONLY(boolean_t	matched_one_gvnh;)										\
+	DCL_THREADGBL_ACCESS;													\
 																\
+	SETUP_THREADGBL_ACCESS;													\
 	if (dollar_ztrigger_invoked)												\
 	{	/* There was at least one region where a $ZTRIGGER() was invoked. */						\
 		dollar_ztrigger_invoked = FALSE;										\
@@ -679,23 +681,23 @@ typedef struct trans_restart_hist_struct
 		{														\
 			/* Now that the transaction is rolled back/restarted, invalidate gvt->gvt_trigger->gv_trigger_cycle	\
 			 * (by resetting it to zero) for all gvt read/updated in this transaction. Note that even though we	\
-			 * reset db_trigger_cycle (to -1) for non-incremental rollbacks/restarts and increment db_dztrigger_cycle\
+			 * reset db_trigger_cycle for non-incremental rollbacks/restarts and increment db_dztrigger_cycle	\
 			 * for incremental rollbacks we still need to reset gv_trigger_cycle as otherwise gvtr_init will find 	\
-			 * that gv_trigger_cycle has NOT changed since it was updated last and will NOT do any trigger reads	\
+			 * that gv_trigger_cycle has NOT changed since it was updated last and will NOT do any trigger reads.	\
 			 */													\
 			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)					\
 			{													\
 				assert(gvnh->read_local_tn == local_tn);							\
-				if (NULL != gvnh->gvt_trigger)									\
-					((gvt_trigger_t *)(gvnh->gvt_trigger))->gv_trigger_cycle = 0;				\
+				if (NULL != (gvt_trigger = gvnh->gvt_trigger))							\
+					gvt_trigger->gv_trigger_cycle = 0;							\
 				if (!INCREMENTAL)										\
 				{	/* TROLLBACK(0) or TRESTART. Reset db_dztrigger_cycle to 0 since we are going to start 	\
-					 * a new transaction. But, we want to ensure that the new transaction re-read triggers	\
+					 * a new transaction. But, we want to ensure that the new transaction re-reads triggers	\
 					 * since any gvt which updated its gvt_trigger in this transaction will be stale as	\
-					 * they never got committed								\
+					 * they never got committed.								\
 					 */											\
 					gvnh->db_dztrigger_cycle = 0;								\
-					gvnh->db_trigger_cycle = (uint4)-1;							\
+					gvnh->db_trigger_cycle = 0;								\
 				}												\
 			}													\
 		}														\
@@ -724,9 +726,7 @@ typedef struct trans_restart_hist_struct
 					if (NULL != cse)									\
 						csa->incr_db_trigger_cycle = FALSE;						\
 				} else												\
-				{												\
 					assert(!csa->incr_db_trigger_cycle);							\
-				}												\
 				if (csa->db_dztrigger_cycle)									\
 					csa->db_dztrigger_cycle++; /* so that future updates in this TN re-read triggers */	\
 			}													\
@@ -746,9 +746,39 @@ typedef struct trans_restart_hist_struct
 			}													\
 		}														\
 	}															\
+	/* If gvt_triggers_read_this_tn is TRUE and INCREMENTAL is TRUE, we are in an incremental commit or rollback.		\
+	 * In either case, we dont need to worry about resetting gv_target's trigger cycles as we will do this when the		\
+	 * outermost commit or rollback (or a restart) occurs. The key is that even if a gv_target gets used in a nested	\
+	 * tstart/tcommit that gets incrementally rolled back, it is still part of the gvt_tp_list and hence we can wait	\
+	 * to clean the cycle fields at restart/commit/non-incremental-rollback time. In case of a commit, no need to reset	\
+	 * the gv_trigger_cycle, db_dztrigger_cycle and db_trigger_cycle fields of gvnh as those are valid going forward.	\
+	 */															\
+	if (TREF(gvt_triggers_read_this_tn) && !INCREMENTAL)									\
+	{															\
+		if (!COMMIT)													\
+		{	/* There was at least one GVT where ^#t records were read and this is a complete			\
+			 * (i.e. non-incremental) transaction restart or rollback. In this case, reset cycle fields		\
+			 * in corresponding gv_target to force re-reads of ^#t records of this gvt (if any) in next retry.	\
+			 */													\
+			DEBUG_ONLY(matched_one_gvnh = TRUE;)									\
+			for (gvnh = gvt_tp_list; NULL != gvnh; gvnh = gvnh->next_tp_gvnh)					\
+			{													\
+				assert(gvnh->read_local_tn == local_tn);							\
+				if (gvnh->trig_read_tn != local_tn)								\
+					continue;										\
+				DEBUG_ONLY(matched_one_gvnh = FALSE;)								\
+				if (NULL != (gvt_trigger = gvnh->gvt_trigger))							\
+					gvt_trigger->gv_trigger_cycle = 0;							\
+				gvnh->db_dztrigger_cycle = 0;									\
+				gvnh->db_trigger_cycle = 0;									\
+			}													\
+			assert(!matched_one_gvnh);	/* we expect at least one gvnh with trig_read_tn == local_tn */		\
+		}														\
+		TREF(gvt_triggers_read_this_tn) = FALSE;									\
+	}															\
 }
 # ifdef DEBUG
-#  define ASSERT_ZTRIGGER_CYCLE_RESET											\
+#  define TP_ASSERT_ZTRIGGER_CYCLE_RESET										\
 {	/* At the end of a transaction (either because of trestart, complete trollback or tcommit) ensure that 		\
 	 * csa->db_dztrigger_cycle is reset to zero. It's okay not to check if all gvt updated in this transaction	\
 	 * also has gvt->db_dztrigger_cycle set back to zero because if they don't there are other asserts that 	\
@@ -762,9 +792,9 @@ typedef struct trans_restart_hist_struct
 		assert(0 == si->tp_csa->db_dztrigger_cycle);								\
 }
 # else
-#  define ASSERT_ZTRIGGER_CYCLE_RESET
-# endif
-#endif
+#  define TP_ASSERT_ZTRIGGER_CYCLE_RESET
+# endif	/* #ifdef DEBUG */
+#endif	/* #ifdef GTM_TRIGGER */
 
 #ifdef VMS
 /* The error below has special handling in a few condition handlers because it not so much signals an error

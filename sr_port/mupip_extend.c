@@ -56,7 +56,9 @@ GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+#ifdef UNIX
 GBLREF	boolean_t		jnlpool_init_needed;
+#endif
 
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBRDONLY);
@@ -75,7 +77,7 @@ void mupip_extend(void)
 	int		fd;
 
 	r_len = SIZEOF(regionname);
-	jnlpool_init_needed = TRUE;
+	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	if (cli_get_str("REG_NAME", regionname, &r_len) == FALSE)
 		rts_error(VARLSTCNT(1) ERR_MUNODBNAME);
 	if (cli_get_int("BLOCKS",&tblocks))

@@ -159,8 +159,8 @@ void mupip_restore(void)
 	muinc_blk_hdr_ptr_t	sblkh_p;
 	int			rc;
 #	ifdef GTM_CRYPT
-	char			bkup_hash[GTMCRYPT_HASH_LEN];
-	int			req_dec_blk_size, crypt_status;
+	char			bkup_hash[GTMCRYPT_HASH_LEN], *inptr;
+	int			in_len, gtmcrypt_errno;
 	gtmcrypt_key_t		bkup_key_handle, target_key_handle;
 	boolean_t		is_bkup_file_encrypted, is_same_hash = FALSE;
 #	endif
@@ -461,31 +461,29 @@ void mupip_restore(void)
 #		ifdef GTM_CRYPT
 		if (is_bkup_file_encrypted || old_data.is_encrypted)
 		{
-			/* See if the backup file and the target file are going to have
-			 * the same hash thereby speeding up the most common case. */
+			/* See if the backup file and the target file have the same hash thereby speeding up the most common case */
 			if (!memcmp(bkup_hash, old_data.encryption_hash, GTMCRYPT_HASH_LEN))
 				is_same_hash = TRUE;
+			ASSERT_ENCRYPTION_INITIALIZED;	/* should have been done in mu_rndwn_file (called from STANDALONE) */
 			if (!is_same_hash)
 			{
-				INIT_PROC_ENCRYPTION(crypt_status);
-				if (0 != crypt_status)
-					CLNUP_AND_EXIT(crypt_status, inbuf);
 				if (is_bkup_file_encrypted)
 				{
-					GTMCRYPT_GETKEY(bkup_hash, bkup_key_handle, crypt_status);
-					if (0 != crypt_status)
+					GTMCRYPT_GETKEY(NULL, bkup_hash, bkup_key_handle, gtmcrypt_errno);
+					if (0 != gtmcrypt_errno)
 					{
-						GC_GTM_PUTMSG(crypt_status, ptr->input_file.addr);
-						CLNUP_AND_EXIT(crypt_status, inbuf);
+						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, ptr->input_file.len,
+										ptr->input_file.addr);
+						CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
 					}
 				}
 				if (old_data.is_encrypted)
 				{
-					GTMCRYPT_GETKEY(old_data.encryption_hash, target_key_handle, crypt_status);
-					if (0 != crypt_status)
+					GTMCRYPT_GETKEY(NULL, old_data.encryption_hash, target_key_handle, gtmcrypt_errno);
+					if (0 != gtmcrypt_errno)
 					{
-						GC_GTM_PUTMSG(crypt_status, db_name);
-						CLNUP_AND_EXIT(crypt_status, inbuf);
+						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, n_len, db_name);
+						CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
 					}
 				}
 			}
@@ -542,36 +540,31 @@ void mupip_restore(void)
 			}
 #			ifdef GTM_CRYPT
 			assert((size <= old_blk_size) && (size >= SIZEOF(blk_hdr)));
-			req_dec_blk_size = MIN(old_blk_size, size) - SIZEOF(blk_hdr);
-			if (!is_same_hash && (BLOCK_REQUIRE_ENCRYPTION(is_bkup_file_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl),
-							req_dec_blk_size)))
+			in_len = MIN(old_blk_size, size) - SIZEOF(blk_hdr);
+			if (!is_same_hash
+				&& (BLOCK_REQUIRE_ENCRYPTION(is_bkup_file_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl), in_len)))
 			{
-				GTMCRYPT_DECODE_FAST(bkup_key_handle,
-							blk_ptr + SIZEOF(blk_hdr),
-							req_dec_blk_size,
-							NULL,
-							crypt_status);
-				if (0 != crypt_status)
+				inptr = blk_ptr + SIZEOF(blk_hdr);
+				GTMCRYPT_DECRYPT(NULL, bkup_key_handle, inptr, in_len, NULL, gtmcrypt_errno);
+				if (0 != gtmcrypt_errno)
 				{
-					GC_GTM_PUTMSG(crypt_status, ptr->input_file.addr);
-					CLNUP_AND_EXIT(crypt_status, inbuf);
+					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, ptr->input_file.len,
+									ptr->input_file.addr);
+					CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
 				}
 			}
 #			endif
 			offset = (old_start_vbn - 1) * DISK_BLOCK_SIZE + ((off_t)old_blk_size * blk_num);
 #			ifdef GTM_CRYPT
-			if (!is_same_hash && (BLOCK_REQUIRE_ENCRYPTION(old_data.is_encrypted,
-							(((blk_hdr_ptr_t)blk_ptr)->levl), req_dec_blk_size)))
+			if (!is_same_hash
+				&& (BLOCK_REQUIRE_ENCRYPTION(old_data.is_encrypted, (((blk_hdr_ptr_t)blk_ptr)->levl), in_len)))
 			{
-				GTMCRYPT_ENCODE_FAST(target_key_handle,
-							blk_ptr + SIZEOF(blk_hdr),
-							req_dec_blk_size,
-							NULL,
-							crypt_status);
-				if (0 != crypt_status)
+				inptr = blk_ptr + SIZEOF(blk_hdr);
+				GTMCRYPT_ENCRYPT(NULL, target_key_handle, inptr, in_len, NULL, gtmcrypt_errno);
+				if (0 != gtmcrypt_errno)
 				{
-					GC_GTM_PUTMSG(crypt_status, db_name);
-					CLNUP_AND_EXIT(crypt_status, inbuf);
+					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, n_len, db_name);
+					CLNUP_AND_EXIT(gtmcrypt_errno, inbuf);
 				}
 			}
 #			endif

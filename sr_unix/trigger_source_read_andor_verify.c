@@ -259,6 +259,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, trigger_action trigger_op)
 	uint4			cycle_start;
 	boolean_t		triggers_reloaded, db_trigger_cycle_mismatch, ztrig_cycle_mismatch;
 
+	assert(dollar_tlevel);		/* A TP wrap should have been done by the caller if needed */
 	/* First lets locate the trigger. Try simple way first - lookup in routine name table */
 	if (NULL == (rtn_vector = find_rtn_hdr(trigname)))	/* Note assignment */
 	{	/* Wasn't found - look for it the harder way in the #t of the default region */

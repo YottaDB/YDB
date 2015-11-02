@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -160,102 +160,4 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	}
 	active_lv = lv;
 	return lv;
-}
-
-/* this tucks all the information needed to reaccess a subscripted FOR control variable into a single mval
- * so that op_rfrshindx can later either replace the control variable or determine it was ditched in the scope of the loop
- * the saved information hangs off the stack because the compiler doesn't seem to have a way (assembly modules possible
- * excepted) to manage an mval pointer and no where else provides a stable enough anchor
- */
-lv_val	*op_savputindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
-{	/* this saves the arguments as statics and then does a putindx */
-	char			*c, *ptr;
-	lvname_info_ptr		lvn_info;
-	lv_val			*lv;
-	mname_entry		*targ_key;
-	mval			*key, *saved_indx;
-	uint4			subs_level, total_len;
-	va_list			var;
-	VMS_ONLY(int		argcnt;)
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	VAR_START(var, start);
-	VMS_ONLY(va_count(argcnt);)
-	assert(0 < argcnt);
-	assert(NULL != start);
-	total_len = SIZEOF(mval) + SIZEOF(mname_entry) + SIZEOF(mident_fixed) + SIZEOF(lvname_info);
-	total_len += (SIZEOF(mval) * (argcnt - 1));
-	saved_indx = (mval *)malloc(total_len);
-	ptr = (char *)saved_indx + SIZEOF(mval);
-	saved_indx->mvtype = MV_STR;
-	saved_indx->str.addr = (char *)ptr;
-	saved_indx->str.len = total_len - SIZEOF(mval);
-	targ_key = (mname_entry *)ptr;
-	ptr += SIZEOF(mname_entry);
-	targ_key->var_name.addr = (char *)ptr;
-	ptr += SIZEOF(mident_fixed);
-	lvn_info = (lvname_info_ptr)ptr;
-	ptr += SIZEOF(lvname_info);
-	lvn_info->total_lv_subs = argcnt--;
-	assert((0 <= argcnt) && (MAX_FORARGS > argcnt));
-	lvn_info->start_lvp = start;
-	for (subs_level = 0; subs_level < argcnt; subs_level++)
-	{
-		key = va_arg(var, mval *);
-		lvn_info->lv_subs[subs_level] = (mval *)ptr;
-		*(mval *)ptr = *(mval *)key;
-		ptr += SIZEOF(mval);
-	}
-	assert((char *)saved_indx + total_len >= ptr);
-	va_end(var);
-	lv = (lv_val *)callg((INTPTR_T (*)(intszofptr_t argcnt_arg, ...))op_putindx, (gparam_list *)lvn_info);
-	c = (char *)format_lvname(start, (unsigned char *)targ_key->var_name.addr, SIZEOF(mident_fixed));
-	assert((c < ptr) && (c > (char *)targ_key->var_name.addr));
-	targ_key->var_name.len = c - targ_key->var_name.addr;
-	COMPUTE_HASH_MNAME(targ_key)
-	targ_key->marked = FALSE;
-	MANAGE_FOR_INDX(frame_pointer, TREF(for_nest_level), saved_indx);
-	return lv;
-}
-/* this fishs out values saved by op_savputindx or op_indlvaddr, looks up the variable using add_hashtab_mname_symval and calls
- * op_putindx or op_srchtindx as appropriate protecting the long-lived FOR control variable from subsequent actons on the line
- */
-lv_val	*op_rfrshindx(uint4 level, boolean_t put)
-{
-	boolean_t		added;
-	ht_ent_mname		*tabent;
-	lvname_info_ptr 	lvn_info;
-	lv_val			*lv;
-	mname_entry		*targ_key;
-	mval			*saved_indx;
-	unsigned char		buff[512], *end;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	saved_indx = frame_pointer->for_ctrl_stack->saved_for_indx[level];
-	assert(MV_STR & saved_indx->mvtype);
-	targ_key = (mname_entry *)saved_indx->str.addr;
-	assert((mname_entry *)((char *)saved_indx + SIZEOF(mval)) == targ_key);
-	assert((char *)targ_key + SIZEOF(mname_entry) == targ_key->var_name.addr);
-	assert(SIZEOF(mident_fixed) > targ_key->var_name.len);
-	added = add_hashtab_mname_symval(&curr_symval->h_symtab, targ_key, NULL, &tabent);
-	lvn_info = (lvname_info_ptr)((char *)targ_key + SIZEOF(mname_entry) + SIZEOF(mident_fixed));
-	if ((saved_indx->str.addr + saved_indx->str.len) < (char *)lvn_info)
-	{	/* Only a name */
-		assert((SIZEOF(mname_entry) + ((mname_entry *)(saved_indx->str.addr))->var_name.len) == saved_indx->str.len);
-		if (put || MV_DEFINED((mval *)tabent->value))
-			return (lv_val *)tabent->value;
-		rts_error(VARLSTCNT(4) ERR_UNDEF, 2, targ_key->var_name.len, targ_key->var_name.addr);
-	}
-	lvn_info->start_lvp = (lv_val *)tabent->value;
-	lv = (added && !put) ? NULL : (lv_val *)callg((INTPTR_T (*)(intszofptr_t argcnt_arg, ...))(put ? op_putindx : op_srchindx),
-				(gparam_list *)lvn_info);
-	assert(NULL != lv || !put);
-	if ((NULL != lv) && (put || LV_IS_VAL_DEFINED(lv)))
-		return lv;
-	end = format_key_mvals(buff, SIZEOF(buff), lvn_info);
-	rts_error(VARLSTCNT(4) ERR_UNDEF, 2, end - buff, buff);
-	assert(FALSE);	/* should not come back from rts error */
-	return lv;		/* make some compilers happy */
 }

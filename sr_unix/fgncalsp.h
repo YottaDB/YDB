@@ -66,51 +66,52 @@ struct extcall_package_list
 	clnupfptr			package_clnup_rtn;
 };
 
-enum xc_types
+enum gtm_types
 {
-	xc_notfound,
-	xc_void,
-	xc_status,
-	xc_int,
-	xc_uint,
-	xc_long,
-	xc_ulong,
-	xc_float,
-	xc_double,
-	xc_int_star,
-	xc_uint_star,
-	xc_long_star,
-	xc_ulong_star,
-	xc_string_star,
-	xc_float_star,
-	xc_char_star,
-	xc_char_starstar,
-	xc_double_star,
-	xc_pointertofunc,
-	xc_pointertofunc_star
+	gtm_notfound,
+	gtm_void,
+	gtm_status,
+	gtm_int,
+	gtm_uint,
+	gtm_long,
+	gtm_ulong,
+	gtm_float,
+	gtm_double,
+	gtm_int_star,
+	gtm_uint_star,
+	gtm_long_star,
+	gtm_ulong_star,
+	gtm_string_star,
+	gtm_float_star,
+	gtm_char_star,
+	gtm_char_starstar,
+	gtm_double_star,
+	gtm_pointertofunc,
+	gtm_pointertofunc_star
 };
 
-enum callintogtm_fncs {
-	xc_hiber_start,
-	xc_hiber_start_any,
-	xc_start_timer,
-	xc_cancel_timer,
-	xc_gtm_malloc,
-	xc_gtm_free,
-	xc_unknown_function
+enum callintogtm_fncs
+{
+	gtmfunc_hiber_start,
+	gtmfunc_hiber_start_any,
+	gtmfunc_start_timer,
+	gtmfunc_cancel_timer,
+	gtmfunc_gtm_malloc,
+	gtmfunc_gtm_free,
+	gtmfunc_unknown_function
 };
 
 /* There is one of these for each external routine.  Each is owned by a package.  */
 struct extcall_entry_list
 {
 	struct extcall_entry_list	*next_entry;
-	enum xc_types			return_type;	/* function return value */
+	enum gtm_types			return_type;	/* function return value */
 	int				ret_pre_alloc_val; /* amount of space to be pre-allocated for the return type */
 	uint4				input_mask;	/* is it an input parameter lsb = 1st parm */
 	uint4				output_mask;	/* is it an output parameter lsb = 1st parm */
 	int				parmblk_size;	/* size in bytes of parameter block to be allocated for call*/
 	int				argcnt;		/* number of arguments */
-	enum xc_types			*parms;		/* pointer to parameter array */
+	enum gtm_types			*parms;		/* pointer to parameter array */
 	int				*param_pre_alloc_size; /* amount of space to be pre-allocated for the parameters */
 	fgnfnc				fcn;		/* address of runtime routine */
 	mstr				entry_name;	/* name of M entryref */
@@ -126,8 +127,8 @@ typedef struct callin_entry_list
 	uint4			input_mask;	/* input parameter? LSB = 1st parm */
 	uint4			output_mask;	/* output parameter? LSB = 1st parm */
 	unsigned short		argcnt;		/* number of arguments */
-	enum xc_types		return_type;
-	enum xc_types		*parms;		/* parameter types */
+	enum gtm_types		return_type;
+	enum gtm_types		*parms;		/* parameter types */
 	struct callin_entry_list	*next_entry;
 } callin_entry_list;
 

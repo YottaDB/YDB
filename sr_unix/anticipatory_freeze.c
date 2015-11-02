@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -162,8 +162,7 @@ boolean_t	is_anticipatory_freeze_needed(int msg_id)
 			assert(NULL != gv_cur_region);
 			assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs);
 			csa = &FILE_INFO(gv_cur_region)->s_addrs;
-			assert((NULL != csa) && (NULL != csa->hdr));
-			if (csa->hdr->freeze_on_fail)
+			if (csa && csa->hdr && csa->hdr->freeze_on_fail)
 				return TRUE;
 		}
 	}
@@ -339,5 +338,6 @@ boolean_t		init_anticipatory_freeze_errors()
 				save_errno);
 		return FALSE;
 	}
+	jnlpool_ctl->instfreeze_environ_inited = TRUE;
 	return TRUE;
 }

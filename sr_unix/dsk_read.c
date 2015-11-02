@@ -72,11 +72,11 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	 */
 	static sm_uc_ptr_t	read_reformat_buffer;
 	static int		read_reformat_buffer_len;
-	GTMCRYPT_ONLY(
-		int 		req_dec_blk_size;
-		int 		crypt_status;
-		boolean_t	is_encrypted;
-	)
+#	ifdef GTM_CRYPT
+	int			in_len, gtmcrypt_errno;
+	char			*in, *out;
+	boolean_t		is_encrypted;
+#	endif
 
 	/* Note: Even in snapshots, only INTEG requires dsk_read to read FREE blocks. The assert below should be modified
 	 * if we later introduce a scheme where we can figure out as to who started the snapshots and assert accordingly
@@ -137,10 +137,10 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	if (is_encrypted && (0 == save_errno))
 	{
 		bsiz = (int)((blk_hdr_ptr_t)enc_save_buff)->bsiz;
-		req_dec_blk_size = MIN(cs_data->blk_size, bsiz) - SIZEOF(blk_hdr);
+		in_len = MIN(cs_data->blk_size, bsiz) - SIZEOF(blk_hdr);
 		buff_is_modified_after_lseekread = TRUE;
 		/* Do not do encryption/decryption if block is FREE */
-		if (!blk_free && (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, req_dec_blk_size)))
+		if (!blk_free && (IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)enc_save_buff)->levl, in_len)))
 		{
 			/* The below assert cannot be moved before BLOCK_REQUIRE_ENCRYPTION check done above as tmp_ptr could
 			 * potentially point to a V4 block in which case the assert might fail when a V4 block is casted to
@@ -149,16 +149,10 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 			assert((bsiz <= cs_data->blk_size) && (bsiz >= SIZEOF(blk_hdr)));
 			ASSERT_ENCRYPTION_INITIALIZED;
 			memcpy(buff, enc_save_buff, SIZEOF(blk_hdr));
-			GTMCRYPT_DECODE_FAST(cs_addrs->encr_key_handle,
-					     (char *)enc_save_buff + SIZEOF(blk_hdr),
-					     req_dec_blk_size,
-					     (char *)buff + SIZEOF(blk_hdr),
-					     crypt_status);
-			if (0 != crypt_status)
-			{
-				GC_RTS_ERROR(crypt_status, gv_cur_region->dyn.addr->fname);
-				return crypt_status;
-			}
+			in = (char *)(enc_save_buff + SIZEOF(blk_hdr));
+			out = (char *)(buff + SIZEOF(blk_hdr));
+			GTMCRYPT_DECRYPT(cs_addrs, cs_addrs->encr_key_handle, in, in_len, out, gtmcrypt_errno);
+			save_errno = gtmcrypt_errno;
 		} else
 			memcpy(buff, enc_save_buff, size);
 	}

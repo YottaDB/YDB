@@ -104,11 +104,10 @@ unsigned char mu_cre_file(void)
 	unix_db_info	udi_struct, *udi;
 	char		*fgets_res;
 	gd_segment	*seg;
-	GTMCRYPT_ONLY(
+#	ifdef GTM_CRYPT
 	char		datfile_hash[GTMCRYPT_HASH_LEN];
-	int		init_status;
-	int		crypt_status;
-	)
+	int		gtmcrypt_errno;
+#	endif
 	ZOS_ONLY(int	realfiletag;)
 
 	assert((-(SIZEOF(uint4) * 2) & SIZEOF_FILE_HDR_DFLT) == SIZEOF_FILE_HDR_DFLT);
@@ -120,7 +119,7 @@ unsigned char mu_cre_file(void)
 	pblk.buff_size = MAX_FBUFF;
 	file.addr = (char*)gv_cur_region->dyn.addr->fname;
 	file.len = gv_cur_region->dyn.addr->fname_len;
-	strncpy(path,file.addr,file.len);
+	strncpy(path, file.addr, file.len);
 	*(path+file.len) = '\0';
 	if (is_raw_dev(path))
 	{	/* do not use a default extension for raw device files */
@@ -133,7 +132,7 @@ unsigned char mu_cre_file(void)
 	}
 	if (1 != (parse_file(&file, &pblk) & 1))
 	{
-		PRINTF("Error translating filename %s.\n", gv_cur_region->dyn.addr->fname);
+		PRINTF("Error translating filename %s.\n", file.addr);
 		return EXIT_ERR;
 	}
 	path[pblk.b_esl] = 0;
@@ -150,10 +149,10 @@ unsigned char mu_cre_file(void)
 	/* Check if this file is an encrypted database. If yes, do init */
 	if (gv_cur_region->dyn.addr->is_encrypted)
 	{
-		INIT_PROC_ENCRYPTION(init_status);
-		if (0 != init_status)
+		INIT_PROC_ENCRYPTION(cs_addrs, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
-			GC_GTM_PUTMSG(init_status, NULL);
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
 			return EXIT_ERR;
 		}
 	}
@@ -318,19 +317,19 @@ unsigned char mu_cre_file(void)
 	/* Check if this file is an encrypted database. If yes, do init */
 	if (gv_cur_region->dyn.addr->is_encrypted)
 	{
-		GTMCRYPT_HASH_GEN(path, STRLEN(path), datfile_hash, crypt_status);
-		if (0 != crypt_status)
+		GTMCRYPT_HASH_GEN(cs_addrs, path, STRLEN(path), datfile_hash, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
-			GC_GTM_PUTMSG(crypt_status, gv_cur_region->dyn.addr->fname);
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
 			CLEANUP(EXIT_ERR);
 			return EXIT_ERR;
 		}
 		memcpy(cs_data->encryption_hash, datfile_hash, GTMCRYPT_HASH_LEN);
 		cs_data->is_encrypted = TRUE; /* Mark this file as encrypted */
-		ALLOC_BUFF_GET_ENCR_KEY(cs_addrs, cs_data->encryption_hash, BLK_SIZE, crypt_status);
-		if (0 != crypt_status)
+		ALLOC_BUFF_GET_ENCR_KEY(cs_addrs, cs_data->encryption_hash, BLK_SIZE, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
-			GC_GTM_PUTMSG(crypt_status, (gv_cur_region->dyn.addr->fname));
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
 			CLEANUP(EXIT_ERR);
 			return EXIT_ERR;
 		}

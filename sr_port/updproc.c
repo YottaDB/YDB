@@ -99,7 +99,7 @@
 #include "error_trap.h"
 #include "tp_frame.h"
 #include "gvcst_jrt_null.h"	/* for gvcst_jrt_null prototype */
-#include "preemptive_ch.h"
+#include "preemptive_db_clnup.h"
 
 #define	MAX_IDLE_HARD_SPINS		1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
 #define	UPDPROC_WAIT_FOR_READJNLSEQNO	100	/* ms */
@@ -318,7 +318,7 @@ CONDITION_HANDLER(updproc_ch)
 #	ifdef UNIX
 	else if (ERR_REPLONLNRLBK == SIGNAL)
 	{
-		preemptive_ch(SEVERITY);
+		preemptive_db_clnup(SEVERITY);
 		assert(INVALID_GV_TARGET == reset_gv_target);
 		set_onln_rlbk_flg = TRUE;
 		UNWIND(NULL, NULL);

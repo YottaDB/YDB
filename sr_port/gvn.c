@@ -13,10 +13,12 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
-#include "subscript.h"
 #include "mdq.h"
 #include "advancewindow.h"
 #include "fullbool.h"
+#include "show_source_line.h"
+
+GBLREF	boolean_t	run_time;
 
 error_def(ERR_EXPR);
 error_def(ERR_EXTGBLDEL);
@@ -24,6 +26,7 @@ error_def(ERR_GBLNAME);
 error_def(ERR_GVNAKEDEXTNM);
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_RPARENMISSING);
+error_def(ERR_SIDEEFFECTEVAL);
 
 int gvn(void)
 {
@@ -31,7 +34,7 @@ int gvn(void)
 	char		x;
 	opctype		ox;
 	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS];
-	triple		*oldchain, *ref, *s, *t1, tmpchain, *triptr;
+	triple		*oldchain, *ref, *s, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -39,7 +42,8 @@ int gvn(void)
 	advancewindow();
 	sb1 = sb2 = subscripts;
 	ox = 0;
-	if (shifting = (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool) || !TREF(saw_side_effect))))
+	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (GTM_BOOL == TREF(gtm_fullbool)
+		&& (OLD_SE == TREF(side_effect_handling))))))
 	{	/* NOTE assignment above */
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
@@ -108,6 +112,7 @@ int gvn(void)
 		ox = OC_GVNAKED;
 	}
 	if (TK_LPAREN == TREF(window_token))
+	{
 		for (;;)
 		{
 			if (sb1 >= ARRAYTOP(subscripts))
@@ -142,23 +147,26 @@ int gvn(void)
 				return FALSE;
 			}
 		}
+	}
 	ref = newtriple(ox);
 	ref->operand[0] = put_ilit((mint)(sb1 - sb2));
-	for ( ; sb2 < sb1 ; sb2++)
-	{
-		t1 = newtriple(OC_PARAMETER);
-		ref->operand[1] = put_tref(t1);
-		ref = t1;
-		ref->operand[0] = *sb2;
-	}
+	SUBS_ARRAY_2_TRIPLES(ref, sb1, sb2, subscripts, 0);
 	if (shifting)
 	{
-		newtriple(OC_GVSAVTARG);
-		setcurtchain(oldchain);
-		dqadd(TREF(expr_start), &tmpchain, exorder);
-		TREF(expr_start) = tmpchain.exorder.bl;
-		triptr = newtriple(OC_GVRECTARG);
-		triptr->operand[0] = put_tref(TREF(expr_start));
+		if (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
+		{	/* saw a side effect in a subscript - time to stop shifting */
+			setcurtchain(oldchain);
+			triptr = (TREF(curtchain))->exorder.bl;
+			dqadd(triptr, &tmpchain, exorder);
+		} else
+		{
+			newtriple(OC_GVSAVTARG);
+			setcurtchain(oldchain);
+			dqadd(TREF(expr_start), &tmpchain, exorder);
+			TREF(expr_start) = tmpchain.exorder.bl;
+			triptr = newtriple(OC_GVRECTARG);
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		}
 	}
 	return TRUE;
 }

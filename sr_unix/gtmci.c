@@ -110,9 +110,9 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	uint4			inp_mask, out_mask, mask;
 	uint4			*lnr_entry;
 	mval			arg_mval, *arg_ptr;
-	enum xc_types		arg_type;
+	enum gtm_types		arg_type;
 	gtm_string_t		*mstr_parm;
-	char			*xc_char_ptr;
+	char			*gtm_char_ptr;
 	parmblk_struct 		param_blk;
 	void 			op_extcall(), op_extexfun(), flush_pio(void);
 	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
@@ -186,19 +186,20 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	 * header (on NON_USHBIN platforms).
 	 * On NON_USHBIN platforms -- 2nd argument to EXTCALL is this pointer
 	 * On USHBIN -- 2nd argument to EXTCALL is the pointer to this pointer (&lnr_entry)
+	 *
+	 * Assign the address for line number entry storage, so that the adjacent address holds has_parms value.
 	 */
-	/* Assign the address for line number entry storage, so that the adjacent address holds has_parms value. */
 	param_blk.labaddr = &(TREF(lab_proxy)).LABENT_LNR_OFFSET;
 	param_blk.argcnt = entry->argcnt;
 	if (MAX_ACTUALS < param_blk.argcnt)
 		rts_error(VARLSTCNT(1) ERR_MAXACTARG);
-	has_return = (xc_void == entry->return_type) ? 0 : 1;
+	has_return = (gtm_void == entry->return_type) ? 0 : 1;
 	if (has_return)
 	{	/* Create mval slot for return value */
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		va_arg(var, void *);	/* advance va_arg */
 	} else
-		param_blk.retaddr = 0;
+		param_blk.retaddr = NULL;
 	inp_mask = entry->input_mask;
 	out_mask = entry->output_mask;
 	for (i = 0, mask = ~inp_mask; i < entry->argcnt; ++i, mask >>= 1)
@@ -208,108 +209,108 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 */
 		arg_mval.mvtype = MV_XZERO;
 		if (mask & 1)
-		{ 	/* output-only(O) params : advance va_arg pointer */
+		{ 	/* Output-only(O) params : advance va_arg pointer */
 			switch (entry->parms[i])
 			{
-				case xc_int:
+				case gtm_int:
 					va_arg(var, gtm_int_t);
 					break;
-				case xc_uint:
+				case gtm_uint:
 					va_arg(var, gtm_uint_t);
 					break;
-				case xc_long:
+				case gtm_long:
 					va_arg(var, gtm_long_t);
 					break;
-				case xc_ulong:
+				case gtm_ulong:
 					va_arg(var, gtm_ulong_t);
 					break;
-				case xc_int_star:
+				case gtm_int_star:
 					va_arg(var, gtm_int_t *);
 					break;
-				case xc_uint_star:
+				case gtm_uint_star:
 					va_arg(var, gtm_uint_t *);
 					break;
-				case xc_long_star:
+				case gtm_long_star:
 					va_arg(var, gtm_long_t *);
 					break;
-				case xc_ulong_star:
+				case gtm_ulong_star:
 					va_arg(var, gtm_ulong_t *);
 					break;
-				case xc_float:
-				case xc_double:
+				case gtm_float:
+				case gtm_double:
 					va_arg(var, gtm_double_t);
 					break;
-				case xc_float_star:
+				case gtm_float_star:
 					va_arg(var, gtm_float_t *);
 					break;
-				case xc_double_star:
+				case gtm_double_star:
 					va_arg(var, gtm_double_t *);
 					break;
-				case xc_char_star:
+				case gtm_char_star:
 					va_arg(var, gtm_char_t *);
 					break;
-				case xc_string_star:
+				case gtm_string_star:
 					va_arg(var, gtm_string_t *);
 					break;
 				default:
 					va_end(var);
-					GTMASSERT;
+					assertpro(FALSE);
 			}
 		} else
 		{ 	/* I/IO params: create mval for each native type param */
 			switch (entry->parms[i])
 			{
-                                case xc_int:
+                                case gtm_int:
                                         i2mval(&arg_mval, va_arg(var, gtm_int_t));
                                         break;
-                                case xc_uint:
+                                case gtm_uint:
                                         i2usmval(&arg_mval, va_arg(var, gtm_uint_t));
                                         break;
-				case xc_long:
-#ifdef GTM64
+				case gtm_long:
+#					ifdef GTM64
 					l2mval(&arg_mval, (long)va_arg(var, gtm_long_t));
-#else
+#					else
 					i2mval(&arg_mval, (int)va_arg(var, gtm_long_t));
-#endif
+#					endif
 					break;
-				case xc_ulong:
-#ifdef GTM64
+				case gtm_ulong:
+#					ifdef GTM64
 					ul2mval(&arg_mval, (unsigned long)va_arg(var, gtm_ulong_t));
-#else
+#					else
 					i2usmval(&arg_mval, (int)va_arg(var, gtm_ulong_t));
-#endif
+#					endif
 					break;
-                                case xc_int_star:
+                                case gtm_int_star:
                                         i2mval(&arg_mval, *va_arg(var, gtm_int_t *));
                                         break;
-                                case xc_uint_star:
+                                case gtm_uint_star:
                                         i2usmval(&arg_mval, *va_arg(var, gtm_uint_t *));
                                         break;
-				case xc_long_star:
-#ifdef GTM64
+				case gtm_long_star:
+#					ifdef GTM64
 					l2mval(&arg_mval, (long)*va_arg(var, gtm_long_t *));
-#else
+#					else
 					i2mval(&arg_mval, (int)*va_arg(var, gtm_long_t *));
-#endif
+#					endif
 					break;
-				case xc_ulong_star:
-#ifdef GTM64
+				case gtm_ulong_star:
+#					ifdef GTM64
 					ul2mval(&arg_mval, (unsigned long)*va_arg(var, gtm_ulong_t *));
-#else
+#					else
 					i2usmval(&arg_mval, (int)*va_arg(var, gtm_ulong_t *));
-#endif
+#					endif
 					break;
-				case xc_float: /* fall through */
-				case xc_double:
+				case gtm_float: /* fall through */
+				case gtm_double:
 					double2mval(&arg_mval, va_arg(var, gtm_double_t));
 					break;
-				case xc_float_star:
+				case gtm_float_star:
 					double2mval(&arg_mval, *va_arg(var, gtm_float_t *));
 					break;
-				case xc_double_star:
+				case gtm_double_star:
 					double2mval(&arg_mval, *va_arg(var, gtm_double_t *));
 					break;
-				case xc_char_star:
+				case gtm_char_star:
 					arg_mval.mvtype = MV_STR;
 					arg_mval.str.addr = va_arg(var, gtm_char_t *);
 					arg_mval.str.len = STRLEN(arg_mval.str.addr);
@@ -320,7 +321,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					}
 					s2pool(&arg_mval.str);
 					break;
-				case xc_string_star:
+				case gtm_string_star:
 					mstr_parm = va_arg(var, gtm_string_t *);
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
@@ -334,7 +335,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					break;
 				default:
 					va_end(var);
-					GTMASSERT; /* should have been caught by citab_parse */
+					assertpro(FALSE); /* should have been caught by citab_parse */
 			}
 		}
 		param_blk.args[i] = push_lvval(&arg_mval);
@@ -344,9 +345,9 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0)
 		? (void (*)())CODE_ADDRESS_TYPE(op_extcall)
 		: (void (*)())CODE_ADDRESS_TYPE(op_extexfun);
-	/* the params block needs to be stored & restored across multiple
+	/* The params block needs to be stored & restored across multiple
 	 * gtm environments. So instead of storing explicitely, setting the
-	 * global param_list to point to local param_blk will do the job
+	 * global param_list to point to local param_blk will do the job.
 	 */
 	param_list = &param_blk;
 	old_intrpt_state = intrpt_ok_state;
@@ -366,15 +367,15 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	if (1 != mumps_status)
 	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
-		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit)
+		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	/* convert mval args passed by reference to C types */
+	/* Convert mval args passed by reference to C types */
 	for (i = 0; i <= entry->argcnt; ++i)
 	{
-		if (0 == i) /* special case for return value */
+		if (0 == i) /* Special case for return value */
 		{
 			if (!has_return)
 				continue;
@@ -395,79 +396,79 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		{
 			switch (arg_type)
 			{
-                                case xc_int_star:
+                                case gtm_int_star:
                                         va_arg(temp_var, gtm_int_t *);
 					break;
-                                case xc_uint_star:
+                                case gtm_uint_star:
                                         va_arg(temp_var, gtm_uint_t *);
 					break;
-				case xc_long_star:
+				case gtm_long_star:
 					va_arg(temp_var, gtm_long_t *);
 					break;
-				case xc_ulong_star:
+				case gtm_ulong_star:
 					va_arg(temp_var, gtm_ulong_t *);
 					break;
-				case xc_float_star:
+				case gtm_float_star:
 					va_arg(temp_var, gtm_float_t *);
 					break;
-				case xc_double_star:
+				case gtm_double_star:
 					va_arg(temp_var, gtm_double_t *);
 					break;
-				case xc_char_star:
+				case gtm_char_star:
 					va_arg(temp_var, gtm_char_t *);
 					break;
-				case xc_string_star:
+				case gtm_string_star:
 					va_arg(temp_var, gtm_string_t *);
 					break;
-                                case xc_int:
+                                case gtm_int:
                                         va_arg(temp_var, gtm_int_t);
 					break;
-                                case xc_uint:
+                                case gtm_uint:
                                         va_arg(temp_var, gtm_uint_t);
 					break;
- 				case xc_long:
+ 				case gtm_long:
 					va_arg(temp_var, gtm_long_t);
 					break;
-				case xc_ulong:
+				case gtm_ulong:
 					va_arg(temp_var, gtm_ulong_t);
 					break;
-				case xc_float:
-				case xc_double:
+				case gtm_float:
+				case gtm_double:
 					va_arg(temp_var, gtm_double_t);
 					break;
 				default:
 					va_end(temp_var);
-					GTMASSERT;
+					assertpro(FALSE);
 			}
 		} else
 		{	/* Process all output (O/IO) parameters modified by the M routine */
 			switch (arg_type)
 			{
-                                case xc_int_star:
+                                case gtm_int_star:
                                         *va_arg(temp_var, gtm_int_t *) = mval2i(arg_ptr);
 					break;
-                                case xc_uint_star:
+                                case gtm_uint_star:
                                         *va_arg(temp_var, gtm_uint_t *) = mval2ui(arg_ptr);
 					break;
-				case xc_long_star:
+				case gtm_long_star:
 					*va_arg(temp_var, gtm_long_t *) = mval2i(arg_ptr);
 					break;
-				case xc_ulong_star:
+				case gtm_ulong_star:
 					*va_arg(temp_var, gtm_ulong_t *) = mval2ui(arg_ptr);
 					break;
-				case xc_float_star:
+				case gtm_float_star:
 					*va_arg(temp_var, gtm_float_t *) = mval2double(arg_ptr);
 					break;
-				case xc_double_star:
+				case gtm_double_star:
 					*va_arg(temp_var, gtm_double_t *) = mval2double(arg_ptr);
 					break;
-				case xc_char_star:
-					xc_char_ptr = va_arg(temp_var, gtm_char_t *);
+				case gtm_char_star:
+					gtm_char_ptr = va_arg(temp_var, gtm_char_t *);
 					MV_FORCE_STR(arg_ptr);
-					memcpy(xc_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
-					xc_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
+					memcpy(gtm_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
+					gtm_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
 					break;
-				case xc_string_star:
+				case gtm_string_star:
 					mstr_parm = va_arg(temp_var, gtm_string_t *);
 					MV_FORCE_STR(arg_ptr);
 					mstr_parm->length = arg_ptr->str.len;
@@ -475,7 +476,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					break;
 				default:
 					va_end(temp_var);
-					GTMASSERT;
+					assertpro(FALSE);
 			}
 		}
 	}

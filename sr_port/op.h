@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,15 +62,15 @@ void	op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 void	op_fnfgncal(mval *dst, ...);
 #endif
 int4	op_fnfind(mval *src, mval *del, mint first, mval *dst);
-void	op_fnfnumber(mval *src, mval *fmt, mval *dst);
-void	op_fnget2(mval *dst, mval *src, mval *defval);
+void	op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *dst);
+void	op_fnget1(mval *src, mval *dst);
+void	op_fnget2(mval *src, mval *def, mval *dst);
 void	op_fngetdvi(mval *device, mval *keyword, mval *ret);
 void	op_fngetjpi(mint jpid, mval *kwd, mval *ret);
 void	op_fngetlki(mval *lkid_mval, mval *keyword, mval *ret);
 void	op_fngetsyi(mval *keyword, mval *node, mval *ret);
-void	op_fngvget(mval *v, mval *def);
-void	op_fngvget1(mval *v);
-int	op_fngvget2(mval *res, mval *val, mval *optional);
+void	op_fngvget(mval *dst);
+void	op_fngvget1(mval *dst);
 void	op_fnj2(mval *src, int len, mval *dst);
 void	op_fnj3(mval *src, int width, int fract, mval *dst);
 void	op_fnlength(mval *a1, mval *a0);
@@ -148,6 +148,7 @@ void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 #ifdef UNIX
 void	op_fnzwidth(mval *str, mval *dst);
 #endif
+void	op_fnzwrite(mval *str, mval *dst);
 int	op_forchk1();
 #ifdef UNIX
 int	op_forintrrpt();
@@ -177,26 +178,30 @@ void	op_hang(mval *num);
 void	op_hardret(void);
 void	op_horolog(mval *s);
 void	op_idiv(mval *u, mval *v, mval *q);
+mval	*op_igetdst(void);
 void	op_igetsrc(mval *v);
 int	op_incrlock(int timeout);
 void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms, mval *devpiopl);
 void	op_indfnname(mval *dst, mval *target, mval *value);
+void	op_indfnname2(mval *finaldst, mval *depthval, mval *prechomp);
 void	op_indfun(mval *v, mint argcode, mval *dst);
-void	op_indget(mval *dst, mval *target, mval *value);
+void	op_indget1(uint4 indx, mval *dst);					/* Used by [SET] */
+void	op_indget2(mval *dst, uint4 indx);
 void	op_indglvn(mval *v, mval *dst);
 void	op_indincr(mval *dst, mval *increment, mval *target);
 void	op_indlvadr(mval *target);
 void	op_indlvarg(mval *v, mval *dst);
 void	op_indlvnamadr(mval *target);
 void	op_indmerge(mval *glvn_mv, mval *arg1_or_arg2);
-void	op_indname(UNIX_ONLY_COMMA(int argcnt) mval *dst, ...);
-void	op_indo2(mval *dst, mval *target, mval *value);
+void	op_indmerge2(uint4 indx);
+void	op_indname(mval *dst, mval *target, mval *subs);
+void	op_indo2(mval *dst, uint4 indx, mval *value);
 void	op_indpat(mval *v, mval *dst);
 void	op_indrzshow(mval *s1, mval *s2);
 void	op_indset(mval *target, mval *value);
 void	op_indtext(mval *lab, mint offset, mval *rtn, mval *dst);
 void	op_iocontrol(UNIX_ONLY_COMMA(int4 n) mval *vparg, ...);
-void	op_iretmval(mval *v);
+void	op_iretmval(mval *v, mval *dst);
 int	op_job(UNIX_ONLY(int4 argcnt) VMS_ONLY(mval *label), ...);
 void	op_killaliasall(void);
 void	op_killall(void);

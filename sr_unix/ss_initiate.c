@@ -612,7 +612,6 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(reg));
 			util_out_print(NO_ONLINE_ERR_MSG, TRUE);
-			mu_int_errknt++;
 			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
 			return FALSE;

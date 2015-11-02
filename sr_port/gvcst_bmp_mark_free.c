@@ -45,9 +45,15 @@
 #include "gvcst_bmp_mark_free.h"
 #include "t_busy2free.h"
 #include "t_abort.h"
+#ifdef UNIX
+#include "db_snapshot.h"
+#endif
+#include "muextr.h"
+#include "mupip_reorg.h"
 
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	cw_set_element		cw_set[];
+GBLREF 	unsigned char    	cw_set_depth;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned char		rdfail_detail;
@@ -82,6 +88,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	cache_rec_ptr_t		cr;
 	enum db_ver		ondsk_blkver;
 	enum cdb_sc		status;
+	boolean_t		mark_level_as_special;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -157,6 +164,38 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					ret_tn = 0;
 					break;
 				}
+#				ifdef GTM_SNAPSHOT
+				/* if this is freeing a level-0 directory tree block, we need to transition the block to free
+				 * right away and write its before-image thereby enabling fast integ to avoid writing level-0
+				 * block before-images altogether. It is possible the fast integ hasn't started at this stage,
+				 * so we cannot use FASTINTEG_IN_PROG in the if condition, but fast integ may already start later
+				 * at bg/mm update stage, so we always need to prepare cw_set element
+				 */
+				if ((MUSWP_FREE_BLK == TREF(in_mu_swap_root_state)) && blk->level)
+				{ /* blk->level was set as 1 for level-0 DIR tree block in mu_swap_root */
+					/* for mu_swap_root, only one block is freed during bmp_mark_free */
+					assert(1 == ks->used);
+					ctn = cs_addrs->ti->curr_tn;
+					alt_hist.h[0].cse     = NULL;
+					alt_hist.h[0].tn      = ctn;
+					alt_hist.h[0].blk_num = blk->block;
+					alt_hist.h[1].blk_num = 0; /* this is to terminate history reading in t_end */
+					if (NULL == (alt_hist.h[0].buffaddr = t_qread(alt_hist.h[0].blk_num,
+								      (sm_int_ptr_t)&alt_hist.h[0].cycle,
+								      &alt_hist.h[0].cr)))
+					{
+						t_retry((enum cdb_sc)rdfail_detail);
+						continue;
+					}
+					t_busy2free(&alt_hist.h[0]);
+					/* The special level value will be used later in t_end to indicate
+					 * before_image of this block will be written to snapshot file
+					 */
+					cw_set[cw_set_depth-1].level = CSE_LEVEL_DRT_LVL0_FREE;
+					mark_level_as_special = TRUE;
+				} else
+					mark_level_as_special = FALSE;
+#				endif
 				bmphist.blk_num = bit_map;
 				if (NULL == (bmphist.buffaddr = t_qread(bmphist.blk_num, (sm_int_ptr_t)&bmphist.cycle,
 									&bmphist.cr)))
@@ -165,6 +204,15 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					continue;
 				}
 				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -(int4)(nextblk - blk));
+#				ifdef GTM_SNAPSHOT
+				if (mark_level_as_special)
+				{
+					/* The special level value will be used later in gvcst_map_build to set the block to be
+					 * freed as free rather than recycled
+					 */
+					cw_set[cw_set_depth-1].level = CSE_LEVEL_DRT_LVL0_FREE;
+				}
+#				endif
 				UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 				if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
 				{
@@ -280,6 +328,17 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				continue;
 			}
 			t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -1);
+#			ifdef GTM_SNAPSHOT
+			if ((MUSWP_FREE_BLK == TREF(in_mu_swap_root_state)) && blk->level)
+			{
+				assert(1 == ks->used);
+				cw_set[cw_set_depth-1].level = CSE_LEVEL_DRT_LVL0_FREE; /* special level for gvcst_map_build */
+				cw_set[cw_set_depth-2].level = CSE_LEVEL_DRT_LVL0_FREE; /* special level for t_end */
+				/* Here we do not need to do BIT_SET_DIR_TREE because later the block will be always written to
+				 * snapshot file without checking whether it belongs to DIR or GV tree
+				 */
+			}
+#			endif
 			UNIX_ONLY(DEBUG_ONLY(lcl_t_tries = t_tries));
 			if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL, TN_NOT_SPECIFIED)))
 			{
@@ -300,3 +359,4 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	TREF(in_gvcst_bmp_mark_free) = FALSE;
 	return ret_tn;
 }
+

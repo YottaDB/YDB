@@ -188,7 +188,7 @@ enum cdb_sc	op_tcommit(void)
 			}
 		)
 		save_cur_region = gv_cur_region;
-		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 		if (NULL != first_sgm_info)	/* if (database work in the transaction) */
 		{
 			for (temp_si = si = first_sgm_info; (cdb_sc_normal == status) && (NULL != si); si = si->next_sgm_info)
@@ -326,14 +326,15 @@ enum cdb_sc	op_tcommit(void)
 								GET_CDB_SC_CODE(new_blk, status); /* code is set in status */
 								break;	/* transaction must attempt restart */
 							} else
-								blk_used ? SET_NFREE(cse) : SET_FREE(cse);
+								blk_used ? BIT_CLEAR_FREE(cse->blk_prior_state)
+									 : BIT_SET_FREE(cse->blk_prior_state);
 							BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, new_blk,
 										before_image_needed);
 							if (!before_image_needed)
 								cse->old_block = NULL;
 							else
 							{
-								block_is_free = WAS_FREE(cse);
+								block_is_free = WAS_FREE(cse->blk_prior_state);
 								cse->old_block = t_qread(new_blk,
 										(sm_int_ptr_t)&cse->cycle, &cse->cr);
 								old_block = (blk_hdr_ptr_t)cse->old_block;
@@ -342,7 +343,7 @@ enum cdb_sc	op_tcommit(void)
 									status = (enum cdb_sc)rdfail_detail;
 									break;
 								}
-								if (!WAS_FREE(cse) && (NULL != jbp)
+								if (!WAS_FREE(cse->blk_prior_state) && (NULL != jbp)
 								    && (old_block->tn < jbp->epoch_tn))
 								{	/* Compute CHECKSUM for writing PBLK record before crit.
 									 * It is possible that we are reading a block that is
@@ -477,7 +478,7 @@ enum cdb_sc	op_tcommit(void)
 		tp_clean_up(FALSE);	/* Not the rollback type of cleanup */
 		gv_cur_region = save_cur_region;
 		TP_CHANGE_REG(gv_cur_region);
-		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 		/* Cancel or clear any pending TP timeout only if real commit (i.e. outermost commit) */
 		(*tp_timeout_clear_ptr)();
 	} else		/* an intermediate commit */

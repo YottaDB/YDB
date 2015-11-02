@@ -59,6 +59,9 @@ GBLREF	int4			outofband;
 GBLREF	int4			write_filter;
 LITREF	mstr			chset_names[];
 
+error_def(ERR_GTMEISDIR);
+
+
 bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mval *mspace)	/* timeout in seconds */
 {
 	uint4		status;
@@ -88,7 +91,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	int		fstat_res;
 
 	int		p_offset, len;
-	boolean_t	mknod_err , stat_err;
+	boolean_t	mknod_err , stat_err, dir_err;
 	int 		save_mknod_err, save_stat_err;
 
 	int		sockstat, sockoptval;
@@ -105,6 +108,7 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 	oflag = 0;
 	mknod_err = FALSE;
 	stat_err = FALSE;
+	dir_err = FALSE;
 	tn.len = tl->len;
 	if (tn.len > LOGNAME_LEN)
 		tn.len = LOGNAME_LEN;
@@ -239,8 +243,10 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 					case S_IFIFO:
 						tl->iod->type = ff;
 						break;
-					case S_IFREG:
 					case S_IFDIR:
+						dir_err = TRUE;			/* directories should not be opened */
+						/* no break in order to set iod->type value */
+					case S_IFREG:
 						tl->iod->type = rm;
 						break;
 					case S_IFSOCK:
@@ -373,6 +379,10 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 		/* Error from either stat() or fstat() function */
 		if (stat_err)
 			rts_error(VARLSTCNT(1) save_stat_err);
+		/* Error from trying to open a dir */
+		if (dir_err)
+			rts_error(VARLSTCNT(4) ERR_GTMEISDIR, 2, LEN_AND_STR(buf));
+
 
 		if (timed)
 			start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);

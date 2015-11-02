@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,7 @@
 #include "gtmimagename.h"
 #include "lke.h"
 #include "dpgbldir.h"
-#include "preemptive_ch.h"
+#include "preemptive_db_clnup.h"
 #include "util.h"
 
 GBLREF boolean_t		need_core;
@@ -83,7 +83,7 @@ CONDITION_HANDLER(util_base_ch)
 			}
 		}
 		if (IS_MUPIP_IMAGE)
-			preemptive_ch(SEVERITY);	/* for other utilities, preemptive_ch() is called from util_ch() */
+			preemptive_db_clnup(SEVERITY);	/* for other utilities, preemptive_db_clnup() is called from util_ch() */
 		UNIX_ONLY(
 			if ((DUMPABLE) && !SUPPRESS_DUMP)
 			{

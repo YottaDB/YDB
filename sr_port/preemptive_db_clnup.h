@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,18 +9,9 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-#include "op.h"
+#ifndef PREEMPTIVE_DB_CLNUP_INCLUDED
+#define PREEMPTIVE_DB_CLNUP_INCLUDED
 
-LITREF mval		literal_null;
+void preemptive_db_clnup(int preemptive_severe);
 
-int op_fngvget2(mval *res, mval *val, mval *optional)
-{
-	MV_FORCE_DEFINED(optional);
-	if (MV_DEFINED(val))
-		*res = *val;
-	else
-		*res = *optional;
-	assert(0 == (res->mvtype & MV_ALIASCONT));	/* Should be no alias container flag in this global */
-	return TRUE;
-}
+#endif /* PREEMPTIVE_DB_CLNUP_INCLUDED */

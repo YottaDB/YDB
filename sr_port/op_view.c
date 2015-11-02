@@ -723,6 +723,37 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					gtmDebugLevel &= (~GDL_SmDump);	/* Shut indicator back off */
 			}
 			break;
+		case VTK_LOGTPRESTART:
+			/* The TPRESTART logging frequency can be specified through environment variable or
+			 * through VIEW command. The default value for logging frequency is 1 if value is
+			 * not specified in the view command and env variable is not defined. There are 4
+			 * possible combinations which will determine the final value of logging frequency
+			 * depending upon whether value is specified in the VIEW command or env variables
+			 * is defined. These combinations are summarized in the following table.
+			 *
+			 *	value in	environment	Final
+			 *	VIEW command 	variable	value
+			 *	X		X		1
+			 *	X		A		A
+			 *	B		X		B
+			 *	B		C		B
+			 */
+			if (!numarg)
+			{
+				if (!TREF(tprestart_syslog_delta))
+					TREF(tprestart_syslog_delta) = 1;
+			}
+			else
+			{
+				TREF(tprestart_syslog_delta) = MV_FORCE_INT(parmblk.value);
+				if (0 > TREF(tprestart_syslog_delta))
+					TREF(tprestart_syslog_delta) = 0;
+			}
+			TREF(tp_restart_count) = 0;
+			break;
+		case VTK_NOLOGTPRESTART:
+			TREF(tprestart_syslog_delta) = 0;
+			break;
 #		ifdef DEBUG_ALIAS
 		case VTK_LVMONOUT:
 			als_lvmon_output();

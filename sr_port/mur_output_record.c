@@ -95,11 +95,10 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 	sgmnt_data_ptr_t	csd;
 	jnl_ctl_list		*jctl;
 	jnl_format_buffer	*ztworm_jfb;
-	GTMCRYPT_ONLY(
-		blk_hdr_ptr_t	aimg_blk_ptr;
-		int		req_dec_blk_size;
-		int		crypt_status;
-	)
+#	ifdef GTM_CRYPT
+	blk_hdr_ptr_t		aimg_blk_ptr;
+	int			in_len, gtmcrypt_errno ;
+#	endif
 
 	assert(mur_options.update);
 	rec = rctl->mur_desc->jnlrec;
@@ -327,22 +326,18 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			return SS_NORMAL;
 		write_after_image = TRUE;
 #		ifdef GTM_CRYPT
-		/* Decrypt AIMG records if applicable. */
 		aimg_blk_ptr = (blk_hdr_ptr_t)&rec->jrec_aimg.blk_contents[0];
 		if (csd->is_encrypted)
 		{
 			assert((aimg_blk_ptr->bsiz <= csd->blk_size) && (aimg_blk_ptr->bsiz >= SIZEOF(blk_hdr)));
-			req_dec_blk_size = MIN(csd->blk_size, aimg_blk_ptr->bsiz) - SIZEOF(blk_hdr);
+			in_len = MIN(csd->blk_size, aimg_blk_ptr->bsiz) - SIZEOF(blk_hdr);
 			ASSERT_ENCRYPTION_INITIALIZED;
-			if (IS_BLK_ENCRYPTED(aimg_blk_ptr->levl, req_dec_blk_size))
+			if (IS_BLK_ENCRYPTED(aimg_blk_ptr->levl, in_len))
 			{
-				GTMCRYPT_DECODE_FAST(jctl->encr_key_handle,
-						     (char *)(aimg_blk_ptr + 1),
-						     req_dec_blk_size,
-						     NULL,
-						     crypt_status);
-				if (0 != crypt_status)
-					GC_RTS_ERROR(crypt_status, NULL);
+				GTMCRYPT_DECRYPT(csa, jctl->encr_key_handle, (char *)(aimg_blk_ptr + 1), in_len, NULL,
+							gtmcrypt_errno)
+				if (0 != gtmcrypt_errno)
+					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, jctl->jnl_fn_len, jctl->jnl_fn);
 			}
 		}
 #		endif

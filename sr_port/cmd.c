@@ -208,6 +208,10 @@ LITDEF struct
 
 	SETUP_THREADGBL_ACCESS;
 	assert((SIZEOF(cmd_names) / SIZEOF(nametabent)) == cmd_index[26]);
+	while (TREF(expr_depth))
+		DECREMENT_EXPR_DEPTH;				/* in case of prior errors */
+	(TREF(side_effect_base))[0] = FALSE;
+	TREF(temp_subs) = FALSE;
 	CHKTCHAIN(TREF(curtchain));
 	TREF(pos_in_chain) = *TREF(curtchain);
 	if (TREF(window_token) != TK_IDENT)
@@ -241,6 +245,7 @@ LITDEF struct
 	{
 		assert((m_zinvcmd != cmd_data[x].fcn));
 		cr = NULL;
+		shifting = FALSE;
 	} else
 	{
 		advancewindow();

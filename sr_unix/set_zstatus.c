@@ -69,14 +69,14 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 	memcpy(zstatus_buff, val.str.addr, val.str.len);
 	zstatus_bptr = zstatus_buff + val.str.len;
 	*zstatus_bptr++ = ',';
-	if (0 != b_line)
+	if (NULL != b_line)
 	{
 		memcpy(zstatus_bptr, src->addr, src->len);
 		zstatus_bptr += src->len;
 		*zstatus_bptr++ = ',';
 	}
 	zstatus_iter = zstatus_bptr;
-	util_len = TREF(util_outptr)  - TREF(util_outbuff_ptr);
+	util_len = TREF(util_outptr) - TREF(util_outbuff_ptr);
 	if (trans_frame)
 	{	/* currently no inserted message (arg) needs arguments.  The following code needs
 		 * to be changed if any new parametered message is added.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,14 +11,16 @@
 
 /* The third column represents the opcodes for functions to be used by op_indfun().
  * The one parameter version of $name can probably be folded into op_indfun, but at a later time.
- * Note: *** Please add new entries to end of list so as not to cause execution problems for
- *           compilations from previous versions. Yes, they should have recompiled but we can
- *	     avoid exploding by simply adding entries to end of list. ***
+ * Note: ***	Please add new entries to end of list so as not to cause execution problems for
+ *		compilations from previous versions. Yes, they should have recompiled but we can
+ *		avoid exploding by simply adding entries to end of list. ***
+ * This comment and the preceeding empty lines put the first item at line 20, so adding 20 to an argcode
+ * places you on the line with its information or subtracting 20 from a line gives the corresponding argcode
  */
 INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_fnnext,		f_next,		OC_FNNEXT)
 ,INDIR(indir_fnorder1,		f_order1,	OC_FNORDER)
-,INDIR(indir_get,		f_get,		OC_FNGET)
+,INDIR(indir_get,		f_get1,		OC_FNGET)
 ,INDIR(indir_close,		m_close,	0)
 ,INDIR(indir_hang,		m_hang,		0)
 ,INDIR(indir_if,		m_if,		0)
@@ -62,7 +64,7 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_lvnamadr,		indirection,	0)
 ,INDIR(indir_zwithdraw,		m_zwithdraw,	0)
 ,INDIR(indir_tstart,		m_tstart,	0)
-,INDIR(indir_fnname,		f_name,		0)
+,INDIR(indir_fnname,		f_name,		0)		/* f_name is really a dummy */
 ,INDIR(indir_fnorder2,		f_order,	0)
 ,INDIR(indir_fnzqgblmod,	f_zqgblmod,	OC_FNZQGBLMOD)
 ,INDIR(indir_trollback,		m_trollback,	0)
@@ -79,3 +81,8 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_ztrigger,		m_ztrigger,	0)
 #endif
 ,INDIR(indir_zhalt,		m_zhalt,	0)
+,INDIR(indir_fnzwrite,		f_zwrite,	OC_FNZWRITE)
+,INDIR(indir_savglvn0,		indirection,	0)		/* this entry and the following use indirection as a dummy value */
+,INDIR(indir_savlvn,		indirection,	0)
+,INDIR(indir_savglvn1,		indirection,	0)		/* 0 and 1 (above) separate 2 variants of generated code */
+

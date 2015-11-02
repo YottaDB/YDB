@@ -82,94 +82,6 @@ unalias ls rm
 
 set comlist_start_directory = `pwd`
 
-switch ( $gtm_verno )
-
-
-case "V990":
-	#	V990 is designated "most recent on the main line of descent in CMS"
-	#	and should be protected from inadvertent change.
-	set comlist_chmod_protect = 1
-	breaksw
-
-case "V99*":
-	#	Other V9.9 releases are provided for the "private" use of developers to
-	#	modify as they see fit for test purposes and should allow modification.
-	set comlist_chmod_protect = 0
-	breaksw
-
-default:
-	#	Anything else should be a configured release (i.e., should correspond to
-	#	a CMS release class) and should be protected against inadvertent change.
-	set comlist_chmod_protect = 1
-	breaksw
-
-endsw
-
-set mach_type = `uname -m`
-
-if ( $comlist_chmod_protect == 1 ) then
-	#	Change the permissions on all of the source files to prevent inadvertent
-	#	modification by developers.
-	set comlist_chmod_conf = 755
-	set comlist_chmod_src = 444
-
-else
-	#	Change the permissions on all of the source files to allow modification by developers.
-	set comlist_chmod_conf = 775
-	set comlist_chmod_src = 664
-
-endif
-
-
-#	Change the permissions on the root directory for this version to allow
-#	others in this group (i.e., developers) to create new subdirectories.  This
-#	is usually done for running tests or creating readme.txt files, although
-#	there may be other reasons.
-chmod 775 $gtm_ver
-
-
-
-#	Change the permissions on the configured directories for this version to
-#	prevent inadvetent modification (creation / deletion of files) by developers
-#	or allow modification as appropriate.
-cd $gtm_ver
-chmod $comlist_chmod_conf bta dbg pro inc pct src tools gtmsrc.csh
-
-chmod 775 log
-
-
-
-#	Change permisions on all source files to prevent inadvertent modification of
-#	source files corresponding to configured releases and allowing modification
-#	for development and test releases.
-cd $gtm_inc
-chmod $comlist_chmod_src *
-
-
-cd $gtm_pct
-chmod $comlist_chmod_src *
-
-
-#	In $gtm_src, use xargs because this directory has so many files that the
-#	command line expansion overflows the command length limits on some Unix
-#	implementations.
-cd $gtm_src
-/bin/ls | xargs -n25 chmod $comlist_chmod_src
-
-cd $gtm_tools
-chmod $comlist_chmod_src *
-
-if ( $comlist_chmod_protect == 1 ) then
-	chmod 555 *sh	# make the shell scripts executable, but protect against inadvertent modification
-
-else
-	chmod 775 *sh	# make the shell scripts exectuable and allow modification
-
-endif
-
-#	Remove old error log.
-rm $gtm_log/error.`basename $gtm_exe`.log
-
 # Verify arguments:
 set p1 = "$1"
 set p2 = "$2"
@@ -225,6 +137,102 @@ if (0 != $comlist_status) then
 	echo "version command failed -- aborting build"
 	goto comlist.END
 endif
+
+switch ( $gtm_verno )
+
+case "V990":
+	#	V990 is designated "most recent on the main line of descent in CMS"
+	#	and should be protected from inadvertent change.
+	set comlist_chmod_protect = 1
+	breaksw
+
+case "V9*":
+	#	Other V9 releases are provided for the "private" use of developers to
+	#	modify as they see fit for test purposes and should allow modification.
+	set comlist_chmod_protect = 0
+	breaksw
+
+default:
+	#	Anything else should be a configured release (i.e., should correspond to
+	#	a CMS release class) and should be protected against inadvertent change.
+	set comlist_chmod_protect = 1
+	breaksw
+
+endsw
+
+set mach_type = `uname -m`
+
+if ( $comlist_chmod_protect == 1 ) then
+	#	Change the permissions on all of the source files to prevent inadvertent
+	#	modification by developers.
+	set comlist_chmod_conf = 755
+	set comlist_chmod_src = 444
+
+else
+	#	Change the permissions on all of the source files to allow modification by developers.
+	set comlist_chmod_conf = 775
+	set comlist_chmod_src = 664
+
+endif
+
+
+if !(-o $gtm_ver) then
+	echo "COMLIST-E-NOTOWNER. $USER is not owner of $gtm_ver cannot coninue"
+	goto comlist.END
+endif
+
+#	Change the permissions on the root directory for this version to allow
+#	others in this group (i.e., developers) to create new subdirectories.  This
+#	is usually done for running tests or creating readme.txt files, although
+#	there may be other reasons.
+chmod 775 $gtm_ver
+
+
+
+#	Change the permissions on the configured directories for this version to
+#	prevent inadvetent modification (creation / deletion of files) by developers
+#	or allow modification as appropriate.
+cd $gtm_ver
+chmod $comlist_chmod_conf inc pct src tools gtmsrc.csh
+
+chmod 775 log
+if !(-w $gtm_exe) then
+	echo "COMLIST-E-PERMISSON : There is no write permission to $gtm_exe. Exiting"
+	exit
+endif
+
+
+#	Change permisions on all source files to prevent inadvertent modification of
+#	source files corresponding to configured releases and allowing modification
+#	for development and test releases.
+cd $gtm_inc
+chmod $comlist_chmod_src *
+
+
+cd $gtm_pct
+chmod $comlist_chmod_src *
+
+
+#	In $gtm_src, use xargs because this directory has so many files that the
+#	command line expansion overflows the command length limits on some Unix
+#	implementations.
+cd $gtm_src
+/bin/ls | xargs -n25 chmod $comlist_chmod_src
+
+cd $gtm_tools
+chmod $comlist_chmod_src *
+
+if ( $comlist_chmod_protect == 1 ) then
+	chmod 555 *sh	# make the shell scripts executable, but protect against inadvertent modification
+
+else
+	chmod 775 *sh	# make the shell scripts exectuable and allow modification
+
+endif
+
+#	Remove old error log.
+rm $gtm_log/error.`basename $gtm_exe`.log
+
 
 echo ""
 echo "Assembler-related aliases:"
@@ -297,6 +305,7 @@ chmod +x {lowerc,gtminstall}*
 cp $gtm_tools/*.gtc .
 mv configure{.gtc,}
 
+cp $gtm_inc/gtm_common_defs.h .
 cp $gtm_inc/gtmxc_types.h .
 cp $gtm_inc/gtm_descript.h .
 cp $gtm_inc/gtm_sizeof.h .
@@ -657,7 +666,7 @@ else
 endif
 if ((0 != $status) || (! -e GTMDefinedTypesInit.m)) then
 	@ savestatus = $status
-	if (`expr $gtm_verno \>= V900`) @ comlist_status = $savestatus  # note no errors for development versions
+	if (`expr $gtm_verno \< V900`) @ comlist_status = $savestatus  # note no errors for development versions
 	echo "gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m - see log in $gtm_obj/gengtmdeftypes.log" >> \
 	$gtm_log/error.`basename $gtm_exe`.log
 endif
@@ -759,6 +768,12 @@ if (-e $gtm_exe/utf8) then	# would have been created by buildaux.csh while build
 	popd
 endif
 
+if ( $comlist_chmod_protect == 1 ) then
+	# If it is release build, protect it from inadvertent modification/rebuild etc
+	chmod -R a-w $gtm_inc $gtm_pct $gtm_src $gtm_tools $gtm_ver/gtmsrc.csh $gtm_exe $gtm_log
+	chmod ug+w $gtm_ver
+	chmod ug+w $gtm_log
+endif
 comlist.END:
 
 echo ""

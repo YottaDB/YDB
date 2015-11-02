@@ -31,7 +31,8 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	ptroff_t		n;
 
 	ctl = p->ctlptr;
-	assert((ctl->subtop - ctl->subfree) >= (MLK_PVTBLK_SHRSUB_SIZE(p, nshrs) - (val - p->value)) && ctl->blkcnt >= nshrs);
+	if ((ctl->subtop - ctl->subfree) < (MLK_PVTBLK_SHRSUB_SIZE(p, nshrs) - (val - p->value)) || ctl->blkcnt < nshrs)
+		return NULL; /* There is not enough substring or shared block space */
 	ret = (mlk_shrblk_ptr_t)R2A(ctl->blkfree);
 	ctl->blkcnt--;
 	if (ret->rsib == 0)
@@ -47,8 +48,6 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	if (ptr)
 		A2R(*ptr, ret);
 	n = (ptroff_t)ROUND_UP(OFFSETOF(mlk_shrsub, data[0]) + len, SIZEOF(ptroff_t));
-	if (ctl->subtop - ctl->subfree < n)
-		GTMASSERT;
 	subptr = (mlk_shrsub_ptr_t)R2A(ctl->subfree);
 	ctl->subfree += n;
 	A2R(ret->value, subptr);

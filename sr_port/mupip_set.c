@@ -32,7 +32,9 @@
 
 GBLDEF	bool		region;
 GBLREF	bool		error_mupip;
+#ifdef UNIX
 GBLREF	boolean_t	jnlpool_init_needed;
+#endif
 
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNODBNAME);
@@ -46,7 +48,7 @@ void mupip_set(void)
 	int 		cli_stat;
 	boolean_t	set_journal, set_replication;
 
-	jnlpool_init_needed = TRUE;
+	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	file = cli_present("FILE") == CLI_PRESENT;
 	region = cli_present("REGION") == CLI_PRESENT;
 	jnlfile = cli_present("JNLFILE") == CLI_PRESENT;

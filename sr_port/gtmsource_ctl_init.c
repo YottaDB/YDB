@@ -79,7 +79,7 @@ GBLREF gtmsource_state_t	gtmsource_state;
 GBLREF uint4			process_id;
 #endif
 
-error_def(ERR_JNLFILOPN);
+error_def(ERR_JNLFILRDOPN);
 error_def(ERR_JNLNOREPL);
 
 repl_buff_t *repl_buff_create(uint4 buffsize, uint4 jnl_fs_block_size);
@@ -132,7 +132,6 @@ int repl_open_jnl_file_by_name(repl_ctl_element *tmp_ctl, int jnl_fn_len, char *
 	if (0 > tmp_fd)
 	{
 		status = errno;
-		assert(FALSE);
 	}
 	if (SS_NORMAL == status)
 	{
@@ -187,9 +186,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	jnl_private_control	*jpc;
 	int			tmp_fd = NOJNL;
 	int			status;
-	GTMCRYPT_ONLY(
-		int 		crypt_status;
-	)
+	int 			gtmcrypt_errno;
 	uint4			jnl_status;
 	boolean_t		did_jnl_ensure_open = FALSE, was_crit;
 	int4			lcl_jnl_fn_len;
@@ -310,7 +307,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		assert(lcl_jnl_fn_len < ARRAYSIZE(lcl_jnl_fn));
 		memcpy(lcl_jnl_fn, tmp_ctl->jnl_fn, lcl_jnl_fn_len);
 		lcl_jnl_fn[lcl_jnl_fn_len] = '\0';
-		assert(!REPL_ALLOWED(tmp_jfh));
+		assert((NULL == tmp_jfh) || !REPL_ALLOWED(tmp_jfh));
 		free(tmp_ctl);
 		tmp_ctl = NULL;
 		if (NULL != tmp_jfh_base)
@@ -318,7 +315,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		tmp_jfh = NULL;
 		tmp_jfh_base = NULL;
 		if (SS_NORMAL != status)
-			rts_error(VARLSTCNT(7) ERR_JNLFILOPN, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg), status);
+			rts_error(VARLSTCNT(7) ERR_JNLFILRDOPN, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg), status);
 		else
 			rts_error(VARLSTCNT(6) ERR_JNLNOREPL, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg));
 	}
@@ -333,12 +330,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 #	ifdef GTM_CRYPT
 	if (tmp_jfh->is_encrypted)
 	{
-		INIT_PROC_ENCRYPTION(crypt_status);
-		/* If the encryption init failed in db_init, the below MACRO should return an error.
-		 * Depending on the error returned, report the error.*/
-		GTMCRYPT_GETKEY(tmp_jfh->encryption_hash, tmp_ctl->encr_key_handle, crypt_status);
-		if (0 != crypt_status)
-			GC_RTS_ERROR(crypt_status, tmp_ctl->jnl_fn);
+		ASSERT_ENCRYPTION_INITIALIZED;	/* should be done in db_init (gtmsource() -> gvcst_init() -> db_init()) */
+		GTMCRYPT_GETKEY(csa, tmp_jfh->encryption_hash, tmp_ctl->encr_key_handle, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, tmp_ctl->jnl_fn_len, tmp_ctl->jnl_fn);
 	}
 #	endif
 	if (did_jnl_ensure_open)
@@ -454,11 +449,14 @@ int gtmsource_ctl_close(void)
 							    the current head from the list; if there is an error path that returns
 							    us to this function before all elements were freed, we won't try to
 							    free elements that have been freed already */
-			DEBUG_ONLY(
-				csa = &FILE_INFO(ctl->reg)->s_addrs;
-				/* jpc->channel should never be set to a valid value outside of repl_ctl_create */
-				assert((NULL != csa->jnl) && (NOJNL == csa->jnl->channel));
-			)
+#			ifdef DEBUG
+			csa = &FILE_INFO(ctl->reg)->s_addrs;
+			/* jpc->channel should never be set to a valid value outside of repl_ctl_create. The only exception is if
+			 * we were interrupted in the middle of repl_ctl_create by an external signal in which case the process
+			 * better be exiting. Assert that.
+			 */
+			assert(((NULL != csa->jnl) && (NOJNL == csa->jnl->channel)) || process_exiting);
+#			endif
 			repl_ctl_close(ctl);
 		}
 		ctl = repl_ctl_list;

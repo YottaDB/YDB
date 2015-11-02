@@ -65,25 +65,10 @@ gt_cc_option_nooptimize=
 gt_cc_option_optimize=-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store
 gt_cc_options_common+= -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_XOPEN_SOURCE=600 -fsigned-char
 
-ifeq ($(gt_build_type),32)
-gt_cc_option_I=-I-
-endif
-
 ifeq ($(gt_machine_type), x86_64)
 ifeq ($(gt_build_type),32)
-# Do not lookup the source directory before include directories specified by -I.
-# gcc complains about -I- being obsolete, but using -iquote cause build errors for gcc and as - ABS 2008.12.09
-#
-# The -I- option is only needed for 32 bit builds on x86_64.  It provides a feature that is not present in
-# -iquote - namely -I- disables the ability to search the current directory for include files.  This is needed
-# when compiling something in sr_port which includes a file that is in both sr_port and the architecture specific
-# sr_386.  We don't want the sr_port version.  An example is sr_port/code_gen.c which includes emit_code.h.
-# emit_code.h is found in both sr_port and sr_i386.  Using -I- will find the sr_i386 version, but without it the
-# sr_port version is used. SLJ 2010.03.31
-
 # The /emul/ia32-linux/... directory doesn't exist on most machines, but when it's there we need it.  No problem
 # with always includeing it.
-
 gt_cc_option_I+= -I/emul/ia32-linux/usr/include/
 else
 gt_cc_option_I=

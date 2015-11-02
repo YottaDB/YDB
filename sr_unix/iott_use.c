@@ -407,9 +407,9 @@ void iott_use(io_desc *iod, mval *pp)
 				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
-		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status);
+		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 		if (0 != status)
-			rts_error(VARLSTCNT(3) ERR_TCSETATTR, tt_ptr->fildes, errno);
+			rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 		temp_ptr->term_ctrl = mask_in;
 		memcpy(&temp_ptr->mask_term, &mask_term, SIZEOF(io_termmask));
 		if (flush_input)

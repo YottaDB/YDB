@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,8 @@
 #define TK_EXPONENT 48
 #define TK_SORTS_AFTER 49
 #define TK_NSORTS_AFTER 50
-#define TK_SQLFIELDNAME 51
+#define TK_ATHASH 51
+#define TK_SQLFIELDNAME 52
 
 #define	NUM_ASCII_CHARS	128
 #define	NUM_CHARS	256	/* number of single-byte characters (includes ASCII and non-ASCII) */

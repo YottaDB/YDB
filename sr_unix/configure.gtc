@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2009, 2012 Fidelity Information Services, Inc #
+#	Copyright 2009, 2013 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -118,7 +118,7 @@ if [ "`./geteuid`" != "root" ] ; then
 fi
 
 $echo "                     GT.M Configuration Script"
-$echo "Copyright 2009, 2012 Fidelity Information Services, Inc. Use of this"
+$echo "Copyright 2009, 2013 Fidelity Information Services, Inc. Use of this"
 $echo "software is restricted by the provisions of your license agreement."
 $echo ""
 
@@ -510,17 +510,18 @@ gtmcryptbldfiles="install.sh build.sh"
 gtmcryptbinaries="maskpass"
 
 # Gtmcrypt shared library
-gtmcryptsharedlib="libgtmcrypt$ext"
+gtmcryptsharedlibs="libgtmcrypt_openssl_BLOWFISHCFB$ext libgtmcrypt_openssl_AES256CFB$ext"
+gtmcryptsharedlibs="$gtmcryptsharedlibs libgtmcrypt_gcrypt_AES256CFB$ext libgtmcrypt$ext"
 
 # Gtmcrypt scripts
 gtmcryptscripts="add_db_key.sh gen_sym_key.sh encrypt_sign_db_key.sh gen_keypair.sh pinentry-gtm.sh"
-gtmcryptscripts="$gtmcryptscripts import_and_sign_key.sh gen_sym_hash.sh"
+gtmcryptscripts="$gtmcryptscripts import_and_sign_key.sh gen_sym_hash.sh show_install_config.sh"
 
 # Gtmcrypt related M file
 gtmcryptmfile="pinentry.m"
 
 # Gtmcrypt source files
-gtmcryptsrcfiles="gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h gtmxc_types.h maskpass.c"
+gtmcryptsrcfiles="gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h maskpass.c"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_dbk_ref.c gtmcrypt_dbk_ref.h gtmcrypt_pk_ref.c gtmcrypt_pk_ref.h"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h $gtmcryptbldfiles $gtmcryptmfile"
 
@@ -569,26 +570,39 @@ if [ -d "$plugin_gtmcrypt" ]; then
 		fi
 	done
 
-	# Install the plugin shared library
-	if [ $arch = "sun" -o $arch = "linux" ]; then
-		install -g $binuser -o $owner -m 755 $plugin/$gtmcryptsharedlib $gtmdist/$plugin
-	elif [ $arch = "ibm" ]; then
-		/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G $binuser $plugin/$gtmcryptsharedlib
-	elif [ $arch = "zos" ]; then
-		cp $plugin/$gtmcryptsharedlib $gtmdist/$plugin
-		chmod 755 $gtmdist/$plugin/$gtmcryptsharedlib
-		chown $user:$binuser $gtmdist/$plugin/$gtmcryptsharedlib
-	elif [ -x /usr/sbin/install ]; then
-		/usr/sbin/install -f $gtmdist/$plugin -m 755 -u $owner -g $binuser $plugin/$gtmcryptsharedlib $gtmdist/$plugin
-	else
-		install -f $gtmdist/$plugin -m 755 -u $owner -g $binuser $plugin/$gtmcryptsharedlib $gtmdist/$plugin
+	# Install the different flavors of encryption plugin (OpenSSL and Gcrypt)
+	for i in $gtmcryptsharedlibs
+	do
+		# Install only files (and not symlinks) that exist
+		if [ ! -e $plugin/$i -o -L $plugin/$i ]; then
+			# CMake builds generate only one library - GCRYPT with AES256CFB
+			continue
+		elif [ $arch = "sun" -o $arch = "linux" ]; then
+			install -g $binuser -o $owner -m 755 $plugin/$i $gtmdist/$plugin
+		elif [ $arch = "ibm" ]; then
+			/usr/bin/install -f $gtmdist/$plugin -M 755 -O $owner -G $binuser $plugin/$i
+		elif [ $arch = "zos" ]; then
+			cp $plugin/$i $gtmdist/$plugin
+			chmod 755 $gtmdist/$plugin/$i
+			chown $user:$binuser $gtmdist/$plugin/$i
+		elif [ -x /usr/sbin/install ]; then
+			/usr/sbin/install -f $gtmdist/$plugin -m 755 -u $owner -g $binuser $plugin/$i $gtmdist/$plugin
+		else
+			install -f $gtmdist/$plugin -m 755 -u $owner -g $binuser $plugin/$i $gtmdist/$plugin
+		fi
+	done
+
+	# Install the Symbolic link only if one exists (tarball has it, CMake builds do not)
+	if [ -L $plugin/libgtmcrypt$ext ]; then
+		currentlink=`ls -l $plugin/libgtmcrypt$ext | awk '{print $NF}'`
+		ln -s $currentlink $gtmdist/$plugin/libgtmcrypt$ext
 	fi
 
-        # Install the plugin related M file
-        cp $plugin_gtmcrypt/$gtmcryptmfile $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-        chmod 0644 $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-        chown $owner $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
-        chgrp $binuser $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	# Install the plugin related M file
+	cp $plugin_gtmcrypt/$gtmcryptmfile $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	chmod 0644 $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	chown $owner $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
+	chgrp $binuser $gtmdist/$plugin_gtmcrypt/$gtmcryptmfile
 
 	# Install other plugin files
 	for i in $gtmcryptofiles

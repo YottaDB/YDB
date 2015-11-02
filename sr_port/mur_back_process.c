@@ -1,5 +1,5 @@
 /****************************************************************
- *
+ *								*
  *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
@@ -312,9 +312,9 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	uint4			max_blk_size, max_rec_size;
 	uint4			status, val_len;
 	unsigned short		max_key_size;
-	GTMCRYPT_ONLY(
-		int		crypt_status;
-	)
+#	ifdef GTM_CRYPT
+	int			gtmcrypt_errno;
+#	endif
 #	ifdef GTM_TRUNCATE
 	uint4			cur_total, old_total;
 #	endif
@@ -376,13 +376,13 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 #				ifdef GTM_CRYPT
 				if (jctl->jfh->is_encrypted)
 				{
-					DECODE_SET_KILL_ZKILL_ZTRIG(keystr, jnlrec->prefix.forwptr,
-								    jctl->encr_key_handle, crypt_status);
-					if (0 != crypt_status)
+					MUR_DECRYPT_LOGICAL_RECS(keystr, jnlrec->prefix.forwptr, jctl->encr_key_handle,
+									gtmcrypt_errno);
+					if (0 != gtmcrypt_errno)
 					{
-						GC_GTM_PUTMSG(crypt_status, NULL);
+						GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, jctl->jnl_fn_len, jctl->jnl_fn);
 						*jjctl = jctl;
-						return crypt_status;
+						return gtmcrypt_errno;
 					}
 				}
 #				endif

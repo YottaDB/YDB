@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,14 +20,6 @@ GBLDEF bool	    ctrlc_on;		/* whether ctrlc trap enabled*/
 void  term_setup(bool ctrlc_enable)
 
 {
-	if (io_std_device.in->type == tt)
-	{
-		outofband = 0;
-		ctrlc_on = ctrlc_enable ;
-	}
-	else
-	{
-		outofband = 0;
-		ctrlc_on = FALSE;
-	}
+	outofband = 0;
+	ctrlc_on = (io_std_device.in->type == tt) ? ctrlc_enable : FALSE;
 }

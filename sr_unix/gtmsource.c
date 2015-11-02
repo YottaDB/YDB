@@ -179,7 +179,7 @@ int gtmsource()
 	FORK_CLEAN(pid);
 	if (0 > pid)
 	{
-		save_errno = REPL_SEM_ERRNO;
+		save_errno = errno;
 		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0,
 			ERR_TEXT, 2, RTS_ERROR_LITERAL("Could not fork source server"), save_errno);
 	} else if (0 < pid)
@@ -314,9 +314,9 @@ int gtmsource()
 		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	/* Increment the source server count semaphore */
 	status = incr_sem(SOURCE, SRC_SERV_COUNT_SEM);
-	save_errno = REPL_SEM_ERRNO;
 	if (0 != status)
 	{
+		save_errno = errno;
 		rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Counter semaphore increment failure in child source server"), save_errno);
 	}

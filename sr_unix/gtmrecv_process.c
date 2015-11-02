@@ -25,6 +25,7 @@
 
 #include <sys/time.h>
 #include <errno.h>
+#include <netinet/tcp.h>
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 #include <sys/poll.h>
 #endif
@@ -117,6 +118,18 @@
 #define	ONLN_RLBK_CMD				"journal "
 #define ONLN_RLBK_VERBOSE			"-verbose "
 #define	ONLN_RLBK_QUALIFIERS			"-online -rollback -backward \"*\" -fetchresync=" /* port# will be filled later */
+
+#if defined(__hpux) && !defined(__hppa) || defined(_AIX)
+#define KEEPALIVE_PROTO_LEVEL IPPROTO_TCP
+#define KEEPALIVE_TIME		5
+#define KEEPALIVE_INTVL		5
+#define KEEPALIVE_PROBES	5
+#elif defined(__linux__)
+#define KEEPALIVE_PROTO_LEVEL SOL_TCP
+#define KEEPALIVE_TIME		5
+#define KEEPALIVE_INTVL		5
+#define KEEPALIVE_PROBES	5
+#endif
 
 GBLDEF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLDEF	int			gtmrecv_max_repl_msglen;
@@ -657,7 +670,10 @@ STATICFNDEF int gtmrecv_est_conn(void)
 	GTM_SOCKLEN_TYPE	primary_addr_len;
 	fd_set			input_fds;
 	int			status;
-	const   int     	disable_keepalive = 0;
+	boolean_t     		keepalive;
+	int			keepalive_opt;
+	int			optval;
+	GTM_SOCKLEN_TYPE	optlen;
 	struct  linger  	disable_linger = {0, 0};
 	struct  timeval 	save_gtmrecv_poll_interval, sel_timeout_val;
 	char			print_msg[1024];
@@ -798,17 +814,91 @@ STATICFNDEF int gtmrecv_est_conn(void)
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket disable linger : %s", STRERROR(status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
 	}
-
-#ifdef REPL_DISABLE_KEEPALIVE
-	if (-1 == setsockopt(gtmrecv_sock_fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&disable_keepalive,
-				SIZEOF(disable_keepalive)))
-	{ /* Till SIGPIPE is handled properly */
+#	ifdef REPL_DISABLE_KEEPALIVE
+	keepalive = FALSE;
+#	else
+	keepalive = TRUE;
+#	endif
+	if (-1 == setsockopt(gtmrecv_sock_fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&keepalive,
+					SIZEOF(keepalive)))
+	{
 		status = ERRNO;
-		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket disable keepalive : %s",
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket enabling keepalive: %s",
 				STRERROR(status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
 	}
-#endif
+	/* set up the keepalive parameters
+	 * TCP_KEEPCNT : overrides tcp_keepalive_probes
+	 * TCP_KEEPIDLE: overrides tcp_keepalive_time
+	 * TCP_KEEPINTVL: overrides tcp_keepalive_intvl
+	 */
+#	if defined(KEEPALIVE_PROTO_LEVEL)
+	keepalive_opt = KEEPALIVE_PROBES;
+	if (-1 == setsockopt(gtmrecv_sock_fd, KEEPALIVE_PROTO_LEVEL, TCP_KEEPCNT, (void*)&keepalive_opt, SIZEOF(keepalive_opt)))
+	{
+		status = ERRNO;
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket setting tcp_keepalive_probes : %s",
+			STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	}
+	keepalive_opt = KEEPALIVE_TIME;
+	if (-1 == setsockopt(gtmrecv_sock_fd, KEEPALIVE_PROTO_LEVEL, TCP_KEEPIDLE, (void*)&keepalive_opt, SIZEOF(keepalive_opt)))
+	{
+		status = ERRNO;
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket setting tcp_keepalive_time: %s",
+			STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	}
+	keepalive_opt = KEEPALIVE_INTVL;
+	if (-1 == setsockopt(gtmrecv_sock_fd, KEEPALIVE_PROTO_LEVEL, TCP_KEEPINTVL, (void*)&keepalive_opt, SIZEOF(keepalive_opt)))
+	{
+		status = ERRNO;
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket setting tcp_keepalive_intvl: %s",
+			STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	}
+#	endif
+	optlen = SIZEOF(optval);
+   	if ( -1 == getsockopt(gtmrecv_sock_fd, SOL_SOCKET, SO_KEEPALIVE, &optval, &optlen))
+	{
+		status = ERRNO;
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket checking keepalive enabled or not: %s",
+			STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	}
+#	if !defined(KEEPALIVE_PROTO_LEVEL)
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "SO_KEEPALIVE is %s\n", (optval ? "ON" : "OFF"));
+#	else
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "SO_KEEPALIVE is %s. ", (optval ? "ON" : "OFF"));
+	if (-1 == getsockopt(gtmrecv_sock_fd, KEEPALIVE_PROTO_LEVEL, TCP_KEEPCNT, &optval, &optlen))
+	{
+		status = ERRNO;
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket getting tcp_keepalive_probes: %s",
+			STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	}
+	if (optval)
+		repl_log(gtmrecv_log_fp, FALSE, TRUE, "TCP_KEEPCNT is %d, ", optval);
+
+	if (-1 == getsockopt(gtmrecv_sock_fd, KEEPALIVE_PROTO_LEVEL, TCP_KEEPIDLE, &optval, &optlen))
+	{
+		status = ERRNO;
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket getting tcp_keepalive_time: %s",
+			STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	}
+	if (optval)
+       		repl_log(gtmrecv_log_fp, FALSE, TRUE, "TCP_KEEPIDLE is %d, ", optval);
+	if (-1 == getsockopt(gtmrecv_sock_fd, KEEPALIVE_PROTO_LEVEL, TCP_KEEPINTVL, &optval, &optlen))
+	{
+		status = ERRNO;
+		SNPRINTF(print_msg, SIZEOF(print_msg), "Error with receiver server socket getting tcp_keepalive_intvl: %s",
+			STRERROR(status));
+		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+	}
+	if (optval)
+		repl_log(gtmrecv_log_fp, FALSE, TRUE, "TCP_KEEPINTVL is %d.\n", optval);
+#	endif
 	if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &send_buffsize)))
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error getting socket send buffsize : %s", STRERROR(status));
@@ -2968,12 +3058,13 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					{
 						assert(REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver);
 						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_LOSTTNCOMPLETE message\n");
-						if (SS_NORMAL != (status = repl_inst_reset_zqgblmod_seqno_and_tn()))
-						{	/* only reason we know currently for the above function to fail is due
+						status = repl_inst_reset_zqgblmod_seqno_and_tn();
+						assert(-1 == status || EXIT_ERR == status || SS_NORMAL == status);
+						if (-1 == status)
+						{	/* only reason we know currently for the above function to return -1 is due
 							 * to a concurrent online rollback. In this case, we cannot continue
 							 * and need to start afresh.
 							 */
-							assert(-1 == status);
 							gtmrecv_onln_rlbk_clnup();
 							if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 								return;
@@ -3370,11 +3461,12 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					remote_side->is_supplementary = start_msg->is_supplementary;
 					remote_side->trigger_supported = (recvd_start_flags & START_FLAG_TRIGGER_SUPPORT)
 														? TRUE : FALSE;
-					assert((remote_jnl_ver - JNL_VER_EARLIEST_REPL) < ARRAYSIZE(repl_filter_old2cur));
-					assert((remote_jnl_ver - JNL_VER_EARLIEST_REPL) < ARRAYSIZE(repl_filter_cur2old));
-					if ((this_side->jnl_ver > remote_jnl_ver)
-						&& (IF_NONE != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]))
+					if (this_side->jnl_ver > remote_jnl_ver)
 					{
+						assert(JNL_VER_EARLIEST_REPL <= remote_jnl_ver);
+						assert((remote_jnl_ver - JNL_VER_EARLIEST_REPL) < ARRAYSIZE(repl_filter_old2cur));
+						assert((remote_jnl_ver - JNL_VER_EARLIEST_REPL) < ARRAYSIZE(repl_filter_cur2old));
+						assert(IF_NONE != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 						assert(IF_INVALID != repl_filter_old2cur[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);
 						/* reverse transformation should exist */
 						assert(IF_INVALID != repl_filter_cur2old[remote_jnl_ver - JNL_VER_EARLIEST_REPL]);

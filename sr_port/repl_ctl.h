@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,13 +15,14 @@
 #ifdef	GTM_CRYPT
 #include "gtmcrypt.h" /* for gtmcrypt_key_t type used in repl_ctl_element */
 #endif
-enum
+typedef enum
 {
 	JNL_FILE_UNREAD,
 	JNL_FILE_OPEN,
 	JNL_FILE_CLOSED,
-	JNL_FILE_EMPTY
-}; /* jnl_file_state */
+	JNL_FILE_EMPTY,
+	JNL_FILE_STATES
+} jnl_file_state;
 
 typedef enum
 {

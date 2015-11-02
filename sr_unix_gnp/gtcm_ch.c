@@ -25,7 +25,7 @@
 #include "fao_parm.h"
 #include "gtm_fcntl.h"
 #include "cmi.h"
-#include "preemptive_ch.h"
+#include "preemptive_db_clnup.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "copy.h"
@@ -157,7 +157,7 @@ CONDITION_HANDLER(gtcm_ch)
 	}
 	if (WARNING == orig_severity || ERROR == orig_severity)
 	{
-		preemptive_ch(orig_severity);
+		preemptive_db_clnup(orig_severity);
 		UNWIND(x,y);
 	}
 	NEXTCH;

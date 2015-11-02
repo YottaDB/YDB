@@ -35,21 +35,22 @@ error_def(ERR_SPOREOL);
  * that's not short - OC_PASSTHRU is suppose to give it a clue but having two of those in a row
  * seems not to work.
  */
-#define	DEAL_WITH_DANGER(LVL, CNTL_VAR, VAL)								\
+#define	DEAL_WITH_DANGER(CNTRL_LVN, CNTL_VAR, VAL)							\
 {													\
-	triple *Ref;											\
+	triple *REF;											\
 													\
-	if ((TRUE_WITH_INDX == TAREF1(for_temps, for_stack_level)))					\
+	if (need_control_rfrsh)										\
 	{												\
-		Ref = newtriple(OC_RFRSHINDX); 								\
-		Ref->operand[0] = put_ilit(LVL); 							\
-		Ref->operand[1] = put_ilit(1);								\
-		CNTL_VAR = put_tref(Ref);								\
+		REF = newtriple(OC_RFRSHLVN); 								\
+		REF->operand[0] = CNTRL_LVN; 								\
+		REF->operand[1] = put_ilit(OC_PUTINDX);							\
+		CNTL_VAR = put_tref(REF);								\
+		newtriple(OC_PASSTHRU)->operand[0] = CNTRL_LVN;						\
 		newtriple(OC_PASSTHRU)->operand[0] = CNTL_VAR;	/* warn off optimizer */		\
 	}												\
-	Ref = newtriple(OC_STO);									\
-	Ref->operand[0] = CNTL_VAR;									\
-	Ref->operand[1] = VAL;										\
+	REF = newtriple(OC_STO);									\
+	REF->operand[0] = CNTL_VAR;									\
+	REF->operand[1] = VAL;										\
 }
 
 /* the macro below pushes the compiler FOR stack - the FOR_POP is in compiler.h 'cause stx_error uses it
@@ -66,7 +67,7 @@ error_def(ERR_SPOREOL);
 	{												\
 		assert(TREF(for_stack_ptr) > (oprtype **)TADR(for_stack));				\
 		*(TREF(for_stack_ptr)) = NULL;								\
-		TAREF1(for_temps, Level) = TAREF1(for_temps, Level - 1) ? TRUE : FALSE;			\
+		TAREF1(for_temps, Level) = TAREF1(for_temps, Level - 1);				\
 	} else												\
 	{												\
 		--(TREF(for_stack_ptr));								\
@@ -90,10 +91,11 @@ int m_for(void)
 {
 	unsigned int	arg_cnt, arg_index, for_stack_level;
 	oprtype		arg_eval_addr[MAX_FORARGS], increment[MAX_FORARGS], terminate[MAX_FORARGS],
-			arg_next_addr, arg_value, dummy, control_variable,
+			arg_next_addr, arg_value, dummy, control_variable, control_slot, v,
 			*iteration_start_addr, iteration_start_addr_indr, *not_even_once_addr;
-	triple		*eval_next_addr[MAX_FORARGS], *control_ref,
-			*forchk1opc, forpos_in_chain, *init_ref, *ref, *step_ref, *term_ref, *var_ref;
+	triple		*eval_next_addr[MAX_FORARGS], *control_ref, *forchk1opc, forpos_in_chain, *init_ref,
+			*push, *ref, *s, *sav, *share, *step_ref, *term_ref, *var_ref;
+	boolean_t	need_control_rfrsh = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -117,27 +119,40 @@ int m_for(void)
 		return TRUE;
 	}
 	for_stack_level = (TREF(for_stack_ptr) - TADR(for_stack));
-	init_ref = newtriple(OC_FORNESTLVL);
-	init_ref->operand[0] = put_ilit(for_stack_level);
 	if (TK_ATSIGN == TREF(window_token))
 	{
-		if (!indirection(&control_variable))
+		if (!indirection(&v))
 		{
 			FOR_POP(BLOWN_FOR);
 			return FALSE;
 		}
-		ref = newtriple(OC_INDLVADR);
-		ref->operand[0] = control_variable;
-		control_variable = put_tref(ref);
-		control_ref = NULL;
+		need_control_rfrsh = TRUE;
+		push = newtriple(OC_GLVNSLOT);
+		push->operand[0] = put_ilit(for_stack_level);
+		control_slot = put_tref(push);
+		sav = newtriple(OC_INDSAVLVN);
+		sav->operand[0] = v;
+		sav->operand[1] = control_slot;
 	} else
 	{
-		/* The following relies on the fact that lvn() always generates an OC_VAR triple first */
-		control_ref = (TREF(curtchain))->exorder.bl;
-		if (!lvn(&control_variable, OC_SAVPUTINDX, NULL))
+		DEBUG_ONLY(control_ref = (TREF(curtchain))->exorder.bl);
+		if (!lvn(&control_variable, OC_SAVLVN, NULL))
 		{
 			FOR_POP(BLOWN_FOR);
 			return FALSE;
+		}
+		s = control_variable.oprval.tref;
+		if (OC_SAVLVN == s->opcode)
+		{	/* Control variable has subscripts. If no subscripts, shouldn't need refreshing. */
+			need_control_rfrsh = TRUE;
+			push = maketriple(OC_GLVNSLOT);
+			push->operand[0] = put_ilit(for_stack_level);
+			control_slot = put_tref(push);
+			share = maketriple(OC_SHARESLOT);
+			share->operand[0] = put_tref(push);
+			share->operand[1] = put_ilit(OC_SAVLVN);
+			dqins(s->exorder.bl, exorder, share);
+			dqins(share->exorder.bl, exorder, push);
 		}
 		assert(OC_VAR == control_ref->exorder.fl->opcode);
 		assert(MVAR_REF == control_ref->exorder.fl->operand[0].oprclass);
@@ -148,16 +163,21 @@ int m_for(void)
 		FOR_POP(BLOWN_FOR);
 		return FALSE;
 	}
+	if (need_control_rfrsh)
+	{
+		ref = newtriple(OC_RFRSHLVN);
+		ref->operand[0] = control_slot;
+		ref->operand[1] = put_ilit(OC_PUTINDX);
+		control_variable = put_tref(ref);
+		TAREF1(for_temps, for_stack_level) = TRUE;
+		newtriple(OC_PASSTHRU)->operand[0] = control_slot;
+	}
 	newtriple(OC_PASSTHRU)->operand[0] = control_variable;	/* make sure optimizer doesn't ditch control_variable */
 	FOR_END_OF_SCOPE(1, dummy);
 	assert((0 < for_stack_level) && (MAX_FOR_STACK >= for_stack_level));
-	if ((OC_SAVPUTINDX == control_variable.oprval.tref->opcode) || (OC_INDLVADR == control_variable.oprval.tref->opcode))
-		TAREF1(for_temps, for_stack_level) = TRUE_WITH_INDX;	/* most uses treat this as a boolean, but some need more */
-	else
-		init_ref->opcode = OC_NOOP;
 	iteration_start_addr = (oprtype *)mcalloc(SIZEOF(oprtype));
 	iteration_start_addr_indr = put_indr(iteration_start_addr);
-	arg_next_addr.oprclass = NOCLASS;
+	arg_next_addr.oprclass = NO_REF;
 	not_even_once_addr = NULL;	/* used to skip processing where the initial control exceeds the termination */
 	for (arg_cnt = 0; ; ++arg_cnt)
 	{
@@ -183,8 +203,8 @@ int m_for(void)
 		assert(TRIP_REF == arg_value.oprclass);
 		if (TK_COLON != TREF(window_token))
 		{	/* list point value? */
-			increment[arg_cnt].oprclass = terminate[arg_cnt].oprclass = 0;
-			DEAL_WITH_DANGER(for_stack_level, control_variable, arg_value);
+			increment[arg_cnt].oprclass = terminate[arg_cnt].oprclass = NO_REF;
+			DEAL_WITH_DANGER(control_slot, control_variable, arg_value);
 		} else
 		{	/* stepping value */
 			init_ref = newtriple(OC_STOTEMP);		/* tuck it in a temp undisturbed by coming evals */
@@ -201,8 +221,7 @@ int m_for(void)
 			ref = increment[arg_cnt].oprval.tref;
 			if (OC_LIT != var_ref->exorder.fl->opcode)
 			{
-				if (!TAREF1(for_temps, for_stack_level))
-					TAREF1(for_temps, for_stack_level) = TRUE;
+				TAREF1(for_temps, for_stack_level) = TRUE;
 				if (OC_VAR == var_ref->exorder.fl->opcode)
 				{	/* The above relies on lvn() always generating an OC_VAR triple first - asserted earlier */
 					step_ref = newtriple(OC_STOTEMP);
@@ -212,8 +231,8 @@ int m_for(void)
 			}
 			if (TK_COLON != TREF(window_token))
 			{
-				DEAL_WITH_DANGER(for_stack_level, control_variable, put_tref(init_ref));
-				terminate[arg_cnt].oprclass = 0;	/* no termination on iteration for this arg */
+				DEAL_WITH_DANGER(control_slot, control_variable, put_tref(init_ref));
+				terminate[arg_cnt].oprclass = NO_REF;	/* no termination on iteration for this arg */
 			} else
 			{
 				advancewindow();	/* past the second colon */
@@ -227,8 +246,7 @@ int m_for(void)
 				ref = terminate[arg_cnt].oprval.tref;
 				if (OC_LIT != ref->opcode)
 				{
-					if (!TAREF1(for_temps, for_stack_level))
-						TAREF1(for_temps, for_stack_level) = TRUE;
+					TAREF1(for_temps, for_stack_level) = TRUE;
 					if (OC_VAR == var_ref->exorder.fl->opcode)
 					{	/* The above relies on lvn() always generating an OC_VAR triple first */
 						term_ref = newtriple(OC_STOTEMP);
@@ -236,7 +254,7 @@ int m_for(void)
 						terminate[arg_cnt] = put_tref(term_ref);
 					}
 				}
-				DEAL_WITH_DANGER(for_stack_level, control_variable, put_tref(init_ref));
+				DEAL_WITH_DANGER(control_slot, control_variable, put_tref(init_ref));
 				term_ref = newtriple(OC_PARAMETER);
 				term_ref->operand[0] = terminate[arg_cnt];
 				step_ref = newtriple(OC_PARAMETER);
@@ -250,9 +268,8 @@ int m_for(void)
 		}
 		if ((0 < arg_cnt) || (TK_COMMA == TREF(window_token)))
 		{
-			if (!TAREF1(for_temps, for_stack_level))
-				TAREF1(for_temps, for_stack_level) = TRUE;
-			if (NOCLASS == arg_next_addr.oprclass)
+			TAREF1(for_temps, for_stack_level) = TRUE;
+			if (NO_REF == arg_next_addr.oprclass)
 				arg_next_addr = put_tref(newtriple(OC_CDADDR));
 			(eval_next_addr[arg_cnt] = newtriple(OC_LDADDR))->destination = arg_next_addr;
 		}
@@ -285,19 +302,18 @@ int m_for(void)
 	{
 		if (0 < arg_cnt)
 			tnxtarg(eval_next_addr[arg_index]->operand);
-			if (TRUE_WITH_INDX == TAREF1(for_temps, for_stack_level))
-			{	/* since it might have moved, before touching the control variable get a fix on it */
-				ref = newtriple(OC_RFRSHINDX);
-				ref->operand[0] = put_ilit(for_stack_level);
-				ref->operand[1] = put_ilit((increment[arg_index].oprclass || terminate[arg_index].oprclass)
-					? FALSE : TRUE); /* if increment rather than new value, rfrsh w/ srchindx else putindx */
-				control_variable = put_tref(ref);
-			} else
-			{
-				assert(control_ref);
-				control_variable = put_mvar(&control_ref->exorder.fl->operand[0].oprval.vref->mvname);
-			}
-			newtriple(OC_PASSTHRU)->operand[0] = control_variable;	/* warn off optimizer */
+		if (need_control_rfrsh)
+		{	/* since it might have moved, before touching the control variable get a fix on it */
+			ref = newtriple(OC_RFRSHLVN);
+			ref->operand[0] = control_slot;
+			if (increment[arg_index].oprclass || terminate[arg_index].oprclass)
+				ref->operand[1] = put_ilit(OC_SRCHINDX);
+			else	/* if increment rather than new value, rfrsh w/ srchindx else putindx */
+				ref->operand[1] = put_ilit(OC_PUTINDX);
+			newtriple(OC_PASSTHRU)->operand[0] = control_slot;
+			control_variable = put_tref(ref);
+		}
+		newtriple(OC_PASSTHRU)->operand[0] = control_variable;	/* warn off optimizer */
 		if (terminate[arg_index].oprclass)
 		{
 			term_ref = newtriple(OC_PARAMETER);

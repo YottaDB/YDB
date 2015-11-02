@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2012 Fidelity Information Services, Inc	#
+#	Copyright 2012, 2013 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -15,14 +15,62 @@
 cmake_minimum_required(VERSION 2.8.5)
 project(GTM C ASM)
 
-set(version V6.0-000)
-if("${version}" EQUAL "")
-	set(version V9.9-0)
+# Max optimization level is -O2
+get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+foreach(lang ${languages})
+  get_property(flags CACHE CMAKE_${lang}_FLAGS_RELEASE PROPERTY VALUE)
+  if("${flags}" MATCHES "-O[3-9]")
+    string(REGEX REPLACE "-O[3-9]" "-O2" flags "${flags}")
+    set_property(CACHE CMAKE_${lang}_FLAGS_RELEASE PROPERTY VALUE "${flags}")
+  endif()
+endforeach()
+
+# Defaults
+set(version V6.0-001)
+if("${version}" STREQUAL "")
+        set(version V9.9-0)
 endif()
-if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
-  set(arch "x86")
+
+# If CMAKE_BUILD_TYPE is not defined make it a Release build
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# If it's a debug build make sure GT.M uses all of its debug options
+set(CMAKE_C_FLAGS_DEBUG -DDEBUG)
+
+set(install_permissions_script
+  OWNER_READ OWNER_EXECUTE OWNER_WRITE
+  GROUP_READ GROUP_EXECUTE
+  WORLD_READ WORLD_EXECUTE
+  )
+
+set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS_DEBUG DEBUG)
+
+# Only IA64 and x86_64 architectures use this option
+set(gen_xfer_desc 0)
+
+# Platform specific libs
+set(gtm_osarch_libs "")
+
+# Define these ahead of establishing platforms
+set(gt_src_list)
+set(sources_used "")
+set(is_encryption_supported 1)
+set(libmumpsrestoreregex "")
+message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
+# Establish platform
+# Except for Solaris, CMAKE_COMPILER_IS_GNUCC is true
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
+  include(sr_linux/platform.cmake)
+elseif("${CMAKE_SYSTEM_NAME}" MATCHES "HP-UX")
+  include(sr_hpux/platform.cmake)
+elseif("${CMAKE_SYSTEM_NAME}" MATCHES "AIX")
+  include(sr_aix/platform.cmake)
+elseif("${CMAKE_SYSTEM_NAME}" MATCHES "SunOS")
+  include(sr_sun/platform.cmake)
 else()
-  set(arch "x86_64")
+  message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
 # Choose where to get bootstrap sources.
@@ -48,41 +96,6 @@ if(NOT GTM_INSTALL_DIR)
   set(GTM_INSTALL_DIR .)
 endif()
 
-# Max optimization level is -O2
-get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
-foreach(lang ${languages})
-  get_property(flags CACHE CMAKE_${lang}_FLAGS_RELEASE PROPERTY VALUE)
-  if("${flags}" MATCHES "-O[3-9]")
-    string(REGEX REPLACE "-O[3-9]" "-O2" flags "${flags}")
-    set_property(CACHE CMAKE_${lang}_FLAGS_RELEASE PROPERTY VALUE "${flags}")
-  endif()
-endforeach()
-
-if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-endif()
-
-set(install_permissions_script
-  OWNER_READ OWNER_EXECUTE OWNER_WRITE
-  GROUP_READ GROUP_EXECUTE
-  WORLD_READ WORLD_EXECUTE
-  )
-
-set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
-set(CMAKE_C_FLAGS
-  # TODO: Use CMake 2.8.9 POSITION_INDEPENDENT_CODE abstraction for -fPIC in static libs
-  "${CMAKE_C_FLAGS} -ansi -fsigned-char -fPIC -Wmissing-prototypes")
-set(CMAKE_C_FLAGS_RELEASE
-  "${CMAKE_C_FLAGS_RELEASE} -fno-defer-pop -fno-strict-aliasing -ffloat-store")
-add_definitions(
-  #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR
-  -D_GNU_SOURCE
-  -D_FILE_OFFSET_BITS=64
-  -D_XOPEN_SOURCE=600
-  -D_LARGEFILE64_SOURCE
-  )
-set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS_DEBUG DEBUG)
-
 #-----------------------------------------------------------------------------
 
 # Source files are organized into subdirectories named by platform.
@@ -91,17 +104,6 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS_DEBUG DEBUG)
 # appear in multiple directories but only the instance found earliest
 # in the search path will be used.  Later instances of the same source
 # file name will be ignored.
-set(gt_src_list)
-set(gen_xfer_desc 0)
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
-  list(APPEND gt_src_list sr_linux)
-  if("${CMAKE_SIZEOF_VOID_P}" EQUAL 4)
-    list(APPEND gt_src_list sr_i386 sr_x86_regs sr_unix_nsb)
-  else()
-    list(APPEND gt_src_list sr_x86_64 sr_x86_regs)
-    set(gen_xfer_desc 1)
-  endif()
-endif()
 list(APPEND gt_src_list
   sr_unix_gnp
   sr_unix_cm
@@ -116,7 +118,7 @@ list(APPEND gt_src_list
 foreach(d ${gt_src_list})
   set(source_dir_${d} ${GTM_SOURCE_DIR}/${d})
   file(GLOB sources_${d} RELATIVE ${source_dir_${d}}
-    ${d}/*.c ${d}/*.s ${d}/*.si)
+	  ${d}/*.c ${d}/*.s ${d}/*.si)
 endforeach()
 if(gen_bootstrap)
   # Prefer generated sources over all other locations.
@@ -156,15 +158,20 @@ endfunction()
 # Macro to search directories ordered by 'gt_src_list' for a given
 # list of source file names, assign them to a target, and exclude the
 # source file names from inclusion in libmumps.
-set(sources_used "")
 macro(set_source_list target)
   foreach(name ${ARGN})
     set(src "")
     foreach(d ${gt_src_list})
       if(";${sources_${d}};" MATCHES ";(${name}\\.(c|s|si));")
-	set(src ${d}/${CMAKE_MATCH_1})
-	set("source_used_${CMAKE_MATCH_1}" 1)
-	list(APPEND sources_used ${source_dir_${d}}/${CMAKE_MATCH_1})
+      	set(fname ${CMAKE_MATCH_1})
+	set(src ${d}/${fname})
+	set("source_used_${fname}" 1)
+	list(APPEND sources_used ${source_dir_${d}}/${fname})
+	if(NOT "${libmumpsrestoreregex}" STREQUAL "")
+	  if(";${name};" MATCHES ";(${libmumpsrestoreregex});")
+	   set("source_used_${fname}" 0)
+          endif()
+        endif()
 	break()
       endif()
     endforeach()
@@ -195,6 +202,9 @@ load_source_list(libgtcm         sr_unix_cm/libgtcm.list)
 load_source_list(liblke          sr_unix/liblke.list)
 load_source_list(libmupip        sr_unix/libmupip.list)
 load_source_list(libstub         sr_unix/libstub.list)
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
+  load_source_list(libgtmrpc	sr_sun/libgtmrpc.list)
+endif()
 
 # Assign sources to executables.
 set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
@@ -216,6 +226,9 @@ set_source_list(maskpass         maskpass)
 set_source_list(mumps            gtm)
 set_source_list(mupip            mupip mupip_cmd)
 set_source_list(semstat2         semstat2)
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
+  set_source_list(gtm_svc  	gtm_svc gtm_rpc_init gtm_dal_svc)
+endif()
 
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
@@ -310,6 +323,7 @@ if(gen_xfer_desc)
             ${GTM_BINARY_DIR}/sources.list
     COMMAND ${CMAKE_COMMAND}
       -D CMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+      -D "arch=${arch}"
       -D "includes=${includes}"
       -P ${GTM_SOURCE_DIR}/sr_unix/gen_xfer_desc.cmake
     VERBATIM
@@ -367,61 +381,72 @@ foreach(lib
 endforeach()
 
 # TODO: find_package or find_library for system libs?
-target_link_libraries(libmumps -lelf -lncurses -lm -ldl -lpthread -lrt)
+include_directories ("/usr/local/include")
+target_link_libraries(libmumps		${libmumpslibs})
 
-add_executable(mumps ${mumps_SOURCES})
-target_link_libraries(mumps libmumps)
+add_executable(mumps			${mumps_SOURCES})
+target_link_libraries(mumps		libmumps)
 
-add_executable(dse ${dse_SOURCES})
-target_link_libraries(dse libdse libmumps libstub)
+add_executable(dse			${dse_SOURCES})
+target_link_libraries(dse		libdse libmumps libstub)
 list(APPEND with_export dse)
 
-add_executable(dbcertify ${dbcertify_SOURCES})
-target_link_libraries(dbcertify libdbcertify libmupip libmumps libstub)
+add_executable(dbcertify		${dbcertify_SOURCES})
+target_link_libraries(dbcertify		libdbcertify libmupip libmumps libstub)
 
-add_executable(geteuid ${geteuid_SOURCES})
+add_executable(geteuid			${geteuid_SOURCES})
 
-add_executable(gtmsecshr ${gtmsecshr_SOURCES})
-add_dependencies(gtmsecshr gen_gtm_threadgbl_deftypes)
+add_executable(gtmsecshr		${gtmsecshr_SOURCES})
+add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
 
-add_executable(gtmsecshr_real ${gtmsecshr_real_SOURCES})
+add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
 target_link_libraries(gtmsecshr_real libmumps)
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/gtmsecshrdir
   )
-add_dependencies(gtmsecshr_real gen_gtm_threadgbl_deftypes)
+add_dependencies(gtmsecshr_real		gen_gtm_threadgbl_deftypes)
 
-add_executable(mupip ${mupip_SOURCES})
-target_link_libraries(mupip libmupip libmumps libstub)
+add_executable(mupip			${mupip_SOURCES})
+target_link_libraries(mupip		libmupip libmumps libstub)
 list(APPEND with_export mupip)
 
-add_executable(lke ${lke_SOURCES})
-target_link_libraries(lke liblke libmumps libgnpclient libmumps libgnpclient libcmisockettcp)
+add_executable(lke			${lke_SOURCES})
+target_link_libraries(lke		liblke libmumps libgnpclient libmumps libgnpclient libcmisockettcp)
+list(APPEND with_export lke)
 
-add_executable(gtcm_server ${gtcm_server_SOURCES})
-target_link_libraries(gtcm_server libgtcm libmumps libstub)
+
+add_executable(gtcm_server		${gtcm_server_SOURCES})
+target_link_libraries(gtcm_server	libgtcm libmumps libstub)
 list(APPEND with_export gtcm_server)
-add_executable(gtcm_gnp_server ${gtcm_gnp_server_SOURCES})
-target_link_libraries(gtcm_gnp_server libgnpserver liblke libmumps libcmisockettcp libstub)
+
+add_executable(gtcm_gnp_server		${gtcm_gnp_server_SOURCES})
+target_link_libraries(gtcm_gnp_server	libgnpserver liblke libmumps libcmisockettcp libstub)
 list(APPEND with_export gtcm_gnp_server)
 
-add_executable(gtcm_play ${gtcm_play_SOURCES})
-target_link_libraries(gtcm_play libgtcm libmumps libstub)
+add_executable(gtcm_play		${gtcm_play_SOURCES})
+target_link_libraries(gtcm_play		libgtcm libmumps libstub)
 list(APPEND with_export gtcm_play)
 
-add_executable(gtcm_pkdisp ${gtcm_pkdisp_SOURCES})
-target_link_libraries(gtcm_pkdisp libgtcm libmumps libstub)
-add_executable(gtcm_shmclean ${gtcm_shmclean_SOURCES})
-target_link_libraries(gtcm_shmclean libgtcm libmumps libstub)
-add_executable(semstat2 ${semstat2_SOURCES})
-add_executable(ftok ${ftok_SOURCES})
-target_link_libraries(ftok libmumps libstub)
+add_executable(gtcm_pkdisp		${gtcm_pkdisp_SOURCES})
+target_link_libraries(gtcm_pkdisp	libgtcm libmumps libstub)
 
+add_executable(gtcm_shmclean 		${gtcm_shmclean_SOURCES})
+target_link_libraries(gtcm_shmclean	libgtcm libmumps libstub)
+
+add_executable(semstat2		 	${semstat2_SOURCES})
+
+add_executable(ftok 			${ftok_SOURCES})
+target_link_libraries(ftok 		libmumps libstub)
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
+  add_executable(gtm_svc		${gtm_svc_SOURCES})
+  target_link_libraries(gtm_svc		libmumps libcmisockettcp libgnpclient libgtmrpc)
+endif()
 foreach(t ${with_export})
   set_target_properties(${t} PROPERTIES
-    LINK_FLAGS "-Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmexe_symbols.export\""
-    LINK_DEPENDS "${GTM_BINARY_DIR}/gtmexe_symbols.export"
+    LINK_FLAGS "${gtm_link}"
+    LINK_DEPENDS "${gtm_dep}"
     )
   add_dependencies(${t} gen_export)
 endforeach()
@@ -430,68 +455,83 @@ add_library(libgtmshr MODULE ${libgtmshr_SOURCES})
 set_property(TARGET libgtmshr PROPERTY OUTPUT_NAME gtmshr)
 target_link_libraries(libgtmshr libmumps libgnpclient libcmisockettcp)
 set_target_properties(libgtmshr PROPERTIES
-  LINK_FLAGS "-Wl,-u,gtm_ci -Wl,-u,gtm_filename_to_id -Wl,--version-script,\"${GTM_BINARY_DIR}/gtmshr_symbols.export\""
-  LINK_DEPENDS "${GTM_BINARY_DIR}/gtmshr_symbols.export"
+  LINK_FLAGS "${libgtmshr_link}"
+  LINK_DEPENDS "${libgtmshr_dep}"
   )
 add_dependencies(libgtmshr gen_export)
 add_dependencies(mumps libgtmshr)
 
-add_library(libgtmcrypt MODULE ${libgtmcrypt_SOURCES})
-set_target_properties(libgtmcrypt PROPERTIES
-  OUTPUT_NAME gtmcrypt
-  COMPILE_DEFINITIONS USE_GCRYPT
-  LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
-  )
-target_link_libraries(libgtmcrypt gpg-error gpgme gcrypt)
-install(TARGETS libgtmcrypt DESTINATION ${GTM_INSTALL_DIR}/plugin)
+if(is_encryption_supported)
+  # Iterate over the list of GPG related libraries
+  foreach(gpglib gpg-error gpgme gcrypt)
+    # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
+    find_library(GPGLIB_${gpglib}
+      NAME ${gpglib}
+      PATHS ${CMAKE_LIBRARY_PATH} /usr/local/lib64 /usr/local/lib)
+    # Append the found library to the list
+    set(GPG_LIBRARIES ${GPG_LIBRARIES} ${GPGLIB_${gpglib}})
+  endforeach()
 
-add_executable(maskpass ${maskpass_SOURCES})
-target_link_libraries(maskpass gpg-error gpgme gcrypt)
-set_target_properties(maskpass PROPERTIES
-  COMPILE_DEFINITIONS USE_GCRYPT
-  RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
-  )
-install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
+  add_library(libgtmcrypt MODULE ${libgtmcrypt_SOURCES})
+  set_target_properties(libgtmcrypt PROPERTIES
+    OUTPUT_NAME gtmcrypt
+    COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
+    LIBRARY_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin
+    )
+  target_link_libraries(libgtmcrypt ${GPG_LIBRARIES})
+  install(TARGETS libgtmcrypt DESTINATION ${GTM_INSTALL_DIR}/plugin)
 
-foreach(f
-    add_db_key.sh
-    build.sh
-    encrypt_sign_db_key.sh
-    gen_keypair.sh
-    gen_sym_hash.sh
-    gen_sym_key.sh
-    gtmcrypt.tab
-    gtmcrypt_dbk_ref.c
-    gtmcrypt_dbk_ref.h
-    gtmcrypt_interface.h
-    gtmcrypt_pk_ref.c
-    gtmcrypt_pk_ref.h
-    gtmcrypt_ref.c
-    gtmcrypt_ref.h
-    gtmcrypt_sym_ref.h
-    gtmxc_types.h
-    import_and_sign_key.sh
-    install.sh
-    maskpass.c
-    pinentry-gtm.sh
-    pinentry.m
-    pinentry.m
+  add_executable(maskpass ${maskpass_SOURCES})
+  target_link_libraries(maskpass ${GPG_LIBRARIES})
+  set_target_properties(maskpass PROPERTIES
+    COMPILE_DEFINITIONS USE_GCRYPT
+    RUNTIME_OUTPUT_DIRECTORY ${GTM_BINARY_DIR}/plugin/gtmcrypt
     )
-  set(f_in "${GTM_SOURCE_DIR}/sr_unix/${f}")
-  set(f_out "${GTM_BINARY_DIR}/plugin/gtmcrypt/${f}")
-  add_custom_command(
-    OUTPUT "${f_out}"
-    DEPENDS "${f_in}"
-    COMMAND ${CMAKE_COMMAND} -E copy "${f_in}" "${f_out}"
-    )
-  if("${f}" MATCHES "\\.sh$")
-    set(permissions PERMISSIONS ${install_permissions_script})
-  else()
-    set(permissions "")
-  endif()
-  install(FILES "${f_out}" DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
-  list(APPEND files_to_place "${f_out}")
-endforeach()
+  install(TARGETS maskpass DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt)
+
+  foreach(f
+      add_db_key.sh
+      build.sh
+      encrypt_sign_db_key.sh
+      gen_keypair.sh
+      gen_sym_hash.sh
+      gen_sym_key.sh
+      gtmcrypt.tab
+      gtmcrypt_dbk_ref.c
+      gtmcrypt_dbk_ref.h
+      gtmcrypt_interface.h
+      gtmcrypt_pk_ref.c
+      gtmcrypt_pk_ref.h
+      gtmcrypt_dbk_ref.c
+      gtmcrypt_dbk_ref.h
+      gtmcrypt_ref.c
+      gtmcrypt_ref.h
+      gtmcrypt_sym_ref.h
+      gtmxc_types.h
+      import_and_sign_key.sh
+      install.sh
+      maskpass.c
+      pinentry-gtm.sh
+      pinentry.m
+      pinentry.m
+      show_install_config.sh
+      )
+    set(f_in "${GTM_SOURCE_DIR}/sr_unix/${f}")
+    set(f_out "${GTM_BINARY_DIR}/plugin/gtmcrypt/${f}")
+    add_custom_command(
+      OUTPUT "${f_out}"
+      DEPENDS "${f_in}"
+      COMMAND ${CMAKE_COMMAND} -E copy "${f_in}" "${f_out}"
+      )
+    if("${f}" MATCHES "\\.sh$")
+      set(permissions PERMISSIONS ${install_permissions_script})
+    else()
+      set(permissions "")
+    endif()
+    install(FILES "${f_out}" DESTINATION ${GTM_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
+    list(APPEND files_to_place "${f_out}")
+  endforeach()
+endif()
 
 install(TARGETS
   mumps
@@ -606,6 +646,7 @@ foreach(f
   lke.hlp
   mumps.hlp
   mupip.hlp
+  custom_errors_sample.txt
   )
   select_file(src ${f})
   list(APPEND files ${src})

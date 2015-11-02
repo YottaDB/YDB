@@ -168,6 +168,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			rctl->csa = cs_addrs;
 			cs_addrs->rctl = rctl;
 			rctl->csd = cs_data;
+			cs_addrs->mm_core_hdr = (sgmnt_data_ptr_t)&(rctl->csd);
 			rctl->sgm_info_ptr = cs_addrs->sgm_info_ptr;
 			assert(!reg->open || (NULL != cs_addrs->dir_tree));
 			gv_target = cs_addrs->dir_tree;

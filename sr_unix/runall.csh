@@ -130,6 +130,20 @@ endif
 
 cd $gtm_root/$RUNALL_VERSION/${RUNALL_IMAGE}/obj
 
+version $RUNALL_VERSION $RUNALL_IMAGE
+
+if ($?RUNALL_BYPASS_VERSION_CHECK == 0) then
+	if ($gtm_verno =~ V[4-8]* || $gtm_verno == "V990" ) then
+		echo ""
+		echo "-----------------------------------------------------------------------------------"
+		echo "RUNALL-E-WRONGVERSION : Cannot Runall a Non-Developemental Version  ---->   $gtm_verno"
+		echo "-----------------------------------------------------------------------------------"
+		echo ""
+		@ runall_status = 1	# to signal that the runall failed to do its job
+		goto cleanup
+	endif
+endif
+
 echo ""
 echo "Start of $gtm_tools/runall.csh"
 echo ""
@@ -155,7 +169,6 @@ endif
 
 set user=`id -u -n`
 
-version $RUNALL_VERSION $RUNALL_IMAGE
 
 rm -f $gtm_log/error.$RUNALL_IMAGE.log >& /dev/null
 
@@ -167,19 +180,6 @@ onintr cleanup
 
 set platform_name = `uname | sed 's/-//g' | sed 's,/,,' | tr '[A-Z]' '[a-z]'`
 set mach_type = `uname -m`
-
-if ($?RUNALL_BYPASS_VERSION_CHECK == 0) then
-	set temp_ver=`echo $gtm_verno | sed 's/./& /g'`
-	if ($temp_ver[2] != "9" || $temp_ver[3] == "9" && $temp_ver[4] == "0") then
-		echo ""
-		echo "-----------------------------------------------------------------------------------"
-		echo "RUNALL-E-WRONGVERSION : Cannot Runall a Non-Developemental Version  ---->   $gtm_verno"
-		echo "-----------------------------------------------------------------------------------"
-		echo ""
-		@ runall_status = 1	# to signal that the runall failed to do its job
-		goto cleanup
-	endif
-endif
 
 # ---- currently, dtgbldir isn't built into an executable. So a "dummy" executable is assigned to it.
 
@@ -504,9 +504,9 @@ if (! -z ${TMP_DIR}_src_files) then
 				if (0 != $status) @ runall_status = $status
 				setenv gtm_dist "$real_gtm_dist"
 				unset real_gtm_dist
-				mv ${file}_ctl.c $gtm_src/${file}_ctl.c
+				\mv -f ${file}_ctl.c $gtm_src/${file}_ctl.c
 				if ( -f ${file}_ansi.h ) then
-					mv -f ${file}_ansi.h $gtm_inc
+					\mv -f ${file}_ansi.h $gtm_inc
 				endif
 				runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/${file}_ctl.c
 				if (0 != $status) @ runall_status = $status

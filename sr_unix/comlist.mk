@@ -190,7 +190,7 @@ exe_list:=libgtmshr$(gt_ld_shl_suffix) $(exe_list) $(gt_svc_exe)
 # m file stuff.  These list builds go to great pain to insure that either
 # post cms_load forms and pre-cms load forms work.
 plugin_cfiles:= gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c maskpass.c
-plugin_hfiles:= gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h gtmxc_types.h main_pragma.h
+plugin_hfiles:= gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h
 plugin_sh_file:= build.sh install.sh add_db_key.sh encrypt_sign_db_key.sh gen_keypair.sh gen_sym_hash.sh gen_sym_key.sh import_and_sign_key.sh pinentry-gtm.sh
 plugin_mfile:=pinentry.m
 mfile_list:=$(filter-out _%.m, $(filter %.m, $(allfiles_list)))
@@ -214,7 +214,8 @@ list_files:=$(filter %.list, $(allfiles_list))
 msgfile_list:=$(filter %.msg, $(allfiles_list))
 plugin_ksh_file:=$(filter %.ksh, $(allfiles_list))
 
-hfile_list := gtm_stdio.h gtm_stdlib.h gtm_string.h gtm_strings.h gtmxc_types.h gtm_limits.h main_pragma.h $(hfile_list_sp)
+hfile_list := gtm_stdio.h gtm_stdlib.h gtm_string.h gtm_strings.h gtmxc_types.h gtm_limits.h gtm_common_defs.h	\
+		main_pragma.h $(hfile_list_sp)
 sh_targets:=$(basename $(sh_list))
 
 msgcfile_list=$(addsuffix _ctl.c,$(basename $(msgfile_list)))

@@ -23,6 +23,8 @@
 #if defined(DEBUG_TRIGR) && defined(GTM_TRIGGER)
 # define DBGTRIGR(x) DBGFPF(x)
 # define DBGTRIGR_ONLY(x) x
+# include "gtm_stdio.h"
+# include "gtmio.h"
 #else
 # define DBGTRIGR(x)
 # define DBGTRIGR_ONLY(x)

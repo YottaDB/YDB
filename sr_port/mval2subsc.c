@@ -146,7 +146,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 			*out_ptr++ = (!TREF(transform) || (0 == gv_cur_region->std_null_coll))
 				? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL;
 		}
-		goto FINI;
+		goto ALLDONE;
 	}
 	/* Its a number, is it an integer? But before this assert that we have enough allocated space in the key
 	 * to store the maximum possible numeric subscript and two terminating 0s at the end of the key */
@@ -163,7 +163,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		} else  if (0 == mt)
 		{
 			*out_ptr++ = SUBSCRIPT_ZERO;
-			goto FINI;
+			goto ALLDONE;
 		}
 		if (10 > mt)
 		{
@@ -290,7 +290,7 @@ LAST_LONGWORD:
 FINISH_NUMBER:
 	if (is_negative)
 		*out_ptr++ = NEG_MNTSSA_END;
-FINI:
+ALLDONE:
 	*out_ptr++ = KEY_DELIMITER;
 	*out_ptr = KEY_DELIMITER;
 	out_key->prev = out_key->end;

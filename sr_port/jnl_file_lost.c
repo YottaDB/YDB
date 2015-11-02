@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,12 +34,20 @@
 #include "send_msg.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#ifdef UNIX
+#include "anticipatory_freeze.h"
+#endif
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	volatile boolean_t	in_wcs_recover;
-GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
 GBLREF	int			process_exiting;
+#ifdef UNIX
+GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+#endif
+
+error_def(ERR_JNLCLOSED);
+error_def(ERR_REPLJNLCLOSED);
 
 static	const	unsigned short	zero_fid[3];
 
@@ -48,10 +56,8 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	unsigned int	status;
 	sgmnt_addrs	*csa;
 	seq_num		reg_seqno, jnlseqno;
-	bool		was_lockid = FALSE;
+	boolean_t	was_lockid = FALSE, instfreeze_environ;
 
-	error_def(ERR_REPLJNLCLOSED);
-	error_def(ERR_JNLCLOSED);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -64,22 +70,30 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	default:
 		GTMASSERT;
 	}
-#ifdef VMS
+#	ifdef VMS
 	/* The following assert has been removed as it could be FALSE if the caller is "jnl_file_extend"
 	 *	assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, SIZEOF(zero_fid)));
 	 */
-#endif
+#	endif
 	assert(csa->now_crit);
-	if (JNL_FILE_LOST_ERRORS == TREF(error_on_jnl_file_lost))
+	/* We issue an rts_error (instead of shutting off journaling) in the following cases :
+	 * 1) $gtm_error_on_jnl_file_lost is set to issue runtime error (if not already issued) in case of journaling issues.
+	 * 2) The process has $gtm_custom_errors set (indicative of anticipatory freeze setup) in which case the goal is to
+	 *    never shut-off journaling
+	 * 3) If $gtm_custom_errors is not set for this process, but the source server was started with $gtm_custom_errors
+	 *    set. This way, as long as the environment is configured for $gtm_custom_errors individual processes never turn
+	 *    off journaling.
+	 */
+	UNIX_ONLY(instfreeze_environ = (ANTICIPATORY_FREEZE_AVAILABLE
+						|| ((NULL != jnlpool_ctl) && jnlpool_ctl->instfreeze_environ_inited)));
+	VMS_ONLY(instfreeze_environ = FALSE);
+	if ((JNL_FILE_LOST_ERRORS == TREF(error_on_jnl_file_lost)) || instfreeze_environ)
 	{
-#ifdef VMS
-		assert(FALSE); /* Not fully implemented / supported on VMS. */
-#endif
-		if (!process_exiting || !csa->jnl->error_reported)
+		VMS_ONLY(assert(FALSE)); /* Not fully implemented / supported on VMS. */
+		if (!process_exiting || instfreeze_environ || !csa->jnl->error_reported)
 		{
 			csa->jnl->error_reported = TRUE;
 			in_wcs_recover = FALSE;	/* in case we're called in wcs_recover() */
-			DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE);
 			if (SS_NORMAL != jpc->status)
 				rts_error(VARLSTCNT(7) jnl_stat, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region), jpc->status);
 			else

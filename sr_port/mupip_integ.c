@@ -94,6 +94,7 @@
 GBLDEF unsigned char		mu_int_root_level;
 GBLDEF int4			mu_int_adj[MAX_BT_DEPTH + 1];
 GBLDEF uint4			mu_int_errknt;
+GBLDEF uint4			mu_int_skipreg_cnt=0;
 GBLDEF uint4			mu_int_blks[MAX_BT_DEPTH + 1];
 GBLDEF uint4			mu_int_offset[MAX_BT_DEPTH + 1];
 GBLDEF uint4			mu_int_recs[MAX_BT_DEPTH + 1];
@@ -162,6 +163,7 @@ error_def(ERR_DBTNRESET);
 error_def(ERR_INTEGERRS);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
+error_def(ERR_MUNOTALLINTEG);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_DBSPANGLOINCMP);
 error_def(ERR_DBSPANCHUNKORD);
@@ -272,9 +274,8 @@ void mupip_integ(void)
                 if (!grlist)
                 {
 			error_mupip = TRUE;
-			mu_int_errknt++;
-			mu_int_err(ERR_DBNOREGION, 0, 0, 0, 0, 0, 0, 0);
-                        mupip_exit(ERR_MUNOACTION);
+			gtm_putmsg(VARLSTCNT(1) ERR_DBNOREGION);
+			mupip_exit(ERR_MUNOACTION);
                 }
 		rptr = grlist;
 	} else
@@ -331,7 +332,7 @@ void mupip_integ(void)
 			assert(NULL != rptr);
 			if (!mupfndfil(rptr->reg, NULL))
 			{
-				mu_int_errknt++;
+				mu_int_skipreg_cnt++;
 				rptr = rptr->fPtr;
 				if (NULL == rptr)
 					break;
@@ -814,5 +815,7 @@ void mupip_integ(void)
 	}
 	if (0 != total_errors)
 		mupip_exit(ERR_INTEGERRS);
+	if (0 != mu_int_skipreg_cnt)
+		mupip_exit(ERR_MUNOTALLINTEG);
 	mupip_exit(SS_NORMAL);
 }

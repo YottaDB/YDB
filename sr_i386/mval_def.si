@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -94,6 +94,19 @@ top			=	8
         call    underr
         addl    $4,%esp
 	movl	%eax, \mval
+\label:
+.endm
+
+	.sbttl	mval_def.si    mv_force_defined_strict
+# ---------------------------------------
+#       mv_force_defined_strict(mval, label)
+# ---------------------------------------
+.macro  mv_force_defined_strict mval, label
+        testw   $(mval_m_str+mval_m_nm),mval_w_mvtype(\mval)
+        jne     \label
+	pushl   \mval
+        call    underr_strict
+        addl    $4,%esp
 \label:
 .endm
 

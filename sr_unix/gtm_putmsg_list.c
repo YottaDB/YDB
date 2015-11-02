@@ -41,13 +41,13 @@ GBLREF	boolean_t	donot_fflush_NULL;
 
 void gtm_putmsg_list(int arg_count, va_list var)
 {
-	int		i, msg_id, fao_actual, fao_count, dummy;
+	int		i, msg_id, fao_actual, fao_count, dummy, freeze_msg_id;
 	char		msg_buffer[1024];
 	mstr		msg_string;
 	boolean_t	first_error;
 	const err_msg	*msg;
 	const err_ctl	*ctl;
-	boolean_t	freeze_set = FALSE;
+	boolean_t	freeze_needed = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -68,7 +68,7 @@ void gtm_putmsg_list(int arg_count, va_list var)
 	for (; ; )
 	{
 		msg_id = va_arg(var, int);
-		SET_ANTICIPATORY_FREEZE_IF_NEEDED(msg_id, freeze_set);
+		CHECK_IF_FREEZE_ON_ERROR_NEEDED(msg_id, freeze_needed, freeze_msg_id);
 		--arg_count;
 		if (NULL == (ctl = err_check(msg_id)))
 			msg = NULL;
@@ -134,5 +134,5 @@ void gtm_putmsg_list(int arg_count, va_list var)
 		if (!IS_GTMSECSHR_IMAGE)
 			util_out_print("!/", NOFLUSH);
 	}
-	REPORT_INSTANCE_FROZEN(freeze_set);
+	FREEZE_INSTANCE_IF_NEEDED(freeze_needed, freeze_msg_id);
 }

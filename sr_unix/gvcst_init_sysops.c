@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,9 @@
 #include "gtm_string.h"
 #include "gtm_sem.h"
 #include "gtm_statvfs.h"
+#ifdef __linux__
+#include "hugetlbfs_overrides.h"
+#endif
 
 #include "gt_timer.h"
 #include "gdsroot.h"
@@ -186,26 +189,34 @@
 #ifdef GTM_CRYPT
 #define INIT_DB_ENCRYPTION_IF_NEEDED(DO_CRYPT_INIT, INIT_STATUS, REG, CSA, TSD)							\
 {																\
+	int			fn_len = 0;											\
+	char			*fn;												\
+																\
 	if (DO_CRYPT_INIT)													\
-	{	/* Do database specific encryption initialization. For all utilities other than GT.M, defer the error until	\
-		 * encryption invocation is actually necessary. This way, MUPIP/DSE can continue as long as the operation does	\
-		 * not involve encryption (for instance MUPIP JOURNAL -EXTRACT -SHOW=HEADER). For GT.M, issue error right away	\
-		 */														\
+	{															\
 		if (0 == INIT_STATUS)												\
-			INIT_DB_ENCRYPTION(REG->dyn.addr->fname, CSA, TSD, INIT_STATUS);					\
-		if ((0 != INIT_STATUS) && IS_GTM_IMAGE)										\
-			GC_RTS_ERROR(INIT_STATUS, REG->dyn.addr->fname);							\
-		CSA->encrypt_init_status = INIT_STATUS; /* defer error reporting */						\
+			INIT_DB_ENCRYPTION(CSA, TSD, INIT_STATUS);								\
+		if (0 != INIT_STATUS)												\
+		{														\
+			fn = (char *)(REG->dyn.addr->fname);									\
+			fn_len = REG->dyn.addr->fname_len;									\
+			if (IS_GTM_IMAGE)											\
+			{													\
+				GTMCRYPT_REPORT_ERROR(INIT_STATUS, rts_error, fn_len, fn);					\
+			} else													\
+				GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(INIT_STATUS), gtm_putmsg, fn_len, fn);			\
+			CSA->encr_key_handle = GTMCRYPT_INVALID_KEY_HANDLE;							\
+		}														\
 	}															\
 }
-#define INIT_PROC_ENCRYPTION_IF_NEEDED(DO_CRYPT_INIT, INIT_STATUS)								\
+#define INIT_PROC_ENCRYPTION_IF_NEEDED(CSA, DO_CRYPT_INIT, INIT_STATUS)								\
 {																\
 	if (DO_CRYPT_INIT)													\
-		INIT_PROC_ENCRYPTION(INIT_STATUS);										\
+		INIT_PROC_ENCRYPTION(CSA, INIT_STATUS);										\
 }
 #else
 #define INIT_DB_ENCRYPTION_IF_NEEDED(IS_ENCRYPTED, INIT_STATUS, REG, CSA, TSD)
-#define INIT_PROC_ENCRYPTION_IF_NEEDED(IS_ENCRYPTED, INIT_STATUS)
+#define INIT_PROC_ENCRYPTION_IF_NEEDED(CSA, IS_ENCRYPTED, INIT_STATUS)
 #endif
 
 #define READ_DB_FILE_HEADER(REG, TSD)			\
@@ -429,8 +440,14 @@ void dbsecspc(gd_region *reg, sgmnt_data_ptr_t csd, gtm_uint64_t *sec_size)
 		break;
 	case dba_bg:
 		assert(0 == CACHE_CONTROL_SIZE(csd) % OS_PAGE_SIZE);
+		/* If Huge Pages are supported align to Huge Pages */
+#		ifdef HUGETLB_SUPPORTED
+		*sec_size = ROUND_UP(NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd) \
+					 + CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + SHMPOOL_SECTION_SIZE, OS_HUGEPAGE_SIZE);
+#		else
 		*sec_size = ROUND_UP(NODE_LOCAL_SPACE + (LOCK_BLOCK(csd) * DISK_BLOCK_SIZE) + LOCK_SPACE_SIZE(csd) \
 					 + CACHE_CONTROL_SIZE(csd) + JNL_SHARE_SIZE(csd) + SHMPOOL_SECTION_SIZE, OS_PAGE_SIZE);
+#		endif
 		break;
 	default:
 		GTMASSERT;
@@ -506,7 +523,7 @@ void db_init(gd_region *reg)
 	if (!have_standalone_access)
 	{
 		do_crypt_init = (reg->dyn.addr->is_encrypted && !IS_LKE_IMAGE);
-		INIT_PROC_ENCRYPTION_IF_NEEDED(do_crypt_init, init_status); /* heavy-weight so needs to be done before ftok */
+		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, do_crypt_init, init_status); /* heavy-weight so needs to be done before ftok */
 		start_hrtbt_cntr = heartbeat_counter;
 		if (!ftok_sem_get2(reg, start_hrtbt_cntr, &retstat, &bypassed_ftok))
 			ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, "ftok");
@@ -530,7 +547,7 @@ void db_init(gd_region *reg)
 				 */
 				if (!ftok_sem_release(reg, TRUE, FALSE)) /* decrement counter so later increment is correct */
 					rts_error(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-				INIT_PROC_ENCRYPTION_IF_NEEDED(do_crypt_init, init_status); /* redo initialization */
+				INIT_PROC_ENCRYPTION_IF_NEEDED(csa, do_crypt_init, init_status); /* redo initialization */
 				start_hrtbt_cntr = heartbeat_counter; /* update to reflect time lost in encryption initialization */
 				if (!ftok_sem_get2(reg, start_hrtbt_cntr, &retstat, &bypassed_ftok))
 					ISSUE_SEMWAIT_ERROR((&retstat), reg, udi, "ftok");
@@ -727,7 +744,7 @@ void db_init(gd_region *reg)
 		 */
 		READ_DB_FILE_HEADER(reg, tsd); /* file already opened by dbfilopn() done from gvcst_init() */
 		do_crypt_init = (tsd->is_encrypted && !IS_LKE_IMAGE);
-		INIT_PROC_ENCRYPTION_IF_NEEDED(do_crypt_init, init_status);
+		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, do_crypt_init, init_status);
 		INIT_DB_ENCRYPTION_IF_NEEDED(do_crypt_init, init_status, reg, csa, tsd);
 		CSD2UDI(tsd, udi);
 		/* Make sure "mu_rndwn_file" has created semaphore for standalone access */

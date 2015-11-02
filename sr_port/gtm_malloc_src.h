@@ -10,27 +10,27 @@
  ****************************************************************/
 
 /* Storage manager for "smaller" pieces of storage. Uses power-of-two
-   "buddy" system as described by Knuth. Currently manages pieces of
-   size 2K - SIZEOF(header).
-
-   This include file is included in both gtm_malloc.c and gtm_malloc_dbg.c.
-   See the headers of those modules for explanations of how the storage
-   manager build is actually accomplished.
-
-   Debugging is controlled via the "gtmdbglvl" environment variable in
-   the Unix environment and the GTM$DBGLVL logical in the VMS environment.
-   If this variable is set to a non-zero value, the debugging environment
-   is enabled. The debugging features turned on will correspond to the bit
-   values defined gtmdbglvl.h. Note that this mechanism is versatile enough
-   that non-storage-managment debugging is also hooked in here. The
-   debugging desired is a mask for the features desired. For example, if the
-   value 4 is set, then tracing is enabled. If the value is set to 6, then
-   both tracing and statistics are enabled. Because the code is expanded
-   twice in a "Pro" build, these debugging features are available even
-   in a pro build and can thus be enabled in the field without the need for
-   a "debug" version to be installed in order to chase a corruption or other
-   problem.
-*/
+ * "buddy" system as described by Knuth. Currently manages pieces of
+ * size 2K - SIZEOF(header).
+ *
+ * This include file is included in both gtm_malloc.c and gtm_malloc_dbg.c.
+ * See the headers of those modules for explanations of how the storage
+ * manager build is actually accomplished.
+ *
+ * Debugging is controlled via the "gtmdbglvl" environment variable in
+ * the Unix environment and the GTM$DBGLVL logical in the VMS environment.
+ * If this variable is set to a non-zero value, the debugging environment
+ * is enabled. The debugging features turned on will correspond to the bit
+ * values defined gtmdbglvl.h. Note that this mechanism is versatile enough
+ * that non-storage-managment debugging is also hooked in here. The
+ * debugging desired is a mask for the features desired. For example, if the
+ * value 4 is set, then tracing is enabled. If the value is set to 6, then
+ * both tracing and statistics are enabled. Because the code is expanded
+ * twice in a "Pro" build, these debugging features are available even
+ * in a pro build and can thus be enabled in the field without the need for
+ * a "debug" version to be installed in order to chase a corruption or other
+ * problem.
+ */
 
 #include "mdef.h"
 /* If this is a pro build (meaning PRO_BUILD is defined), avoid the memcpy() override. That code is only
@@ -163,36 +163,11 @@
 #  define GMR_ONLY(statement)
 #  define NON_GMR_ONLY(statement) statement
 #endif
-
-#ifdef DEBUG
-/* States a storage element may be in. Debug version has values less likely to occur naturally
-   although the possibilities are limited with only one byte of information. */
-enum ElemState {Allocated = 0x42, Free = 0x24};
-#else
-enum ElemState {Allocated = 1, Free};	/* 0 is just "too commonly occurring" */
-#endif
-
-/* At the end of each block is this header which is used to track when all of the elements that
-   a block of real allocated storage was broken into have become free. At that point, we can return
-   the chunk to the OS.
-*/
-typedef struct storExtHdrStruct
-{
-	struct
-	{
-		struct storExtHdrStruct	*fl, *bl;	/* In case we need to visit the entire list */
-	} links;
-	unsigned char	*extentStart;			/* First byte of real extent (not aligned) */
-	storElem	*elemStart;			/* Start of array of MAXTWO elements */
-	int		elemsAllocd;			/* MAXTWO sized element count. When 0 this block is free */
-} storExtHdr;
-
 #define MAXTWO 2048
 /* How many "MAXTWO" elements to allocate at one time. This minimizes the waste since our subblocks must
-   be aligned on a suitable power of two boundary for the buddy-system to work properly
-*/
+ * be aligned on a suitable power of two boundary for the buddy-system to work properly.
+ */
 #define ELEMS_PER_EXTENT 16
-
 #define MAXDEFERQUEUES 10
 #ifdef DEBUG
 #  define STOR_EXTENTS_KEEP 1 /* Keep only one extent in debug for maximum testing */
@@ -207,32 +182,13 @@ typedef struct storExtHdrStruct
 #  define STE_FP(p) p->userStorage.links.fPtr
 #  define STE_BP(p) p->userStorage.links.bPtr
 #endif
-/* Our extent must be aligned on a MAXTWO byte boundary hence we allocate one more extent than
-   we actually want so we can be guarranteed usable storage. However if that allocation actually
-   starts on a MAXTWO boundary (on guarranteed 8 byte boundary), then we get an extra element.
-   Here we define our extent size and provide an initial sanity value for "extent_used". If the
-   allocator ever gets this extra block, this field will be increased by the size of one element
-   to compensate.
-*/
-#define EXTENT_SIZE ((MAXTWO * (ELEMS_PER_EXTENT + 1)) + SIZEOF(storExtHdr))
-static unsigned int extent_used = (MAXTWO * ELEMS_PER_EXTENT + SIZEOF(storExtHdr));
 /* Following are values used in queueIndex in a storage element. Note that both
-   values must be less than zero for the current code to function correctly. */
+ * values must be less than zero for the current code to function correctly.
+ */
 #define QUEUE_ANCHOR		-1
 #define REAL_MALLOC		-2
-
 /* Define number of malloc and free calls we will keep track of */
 #define MAXSMTRACE 128
-
-/* Structure where malloc and free call trace information is kept */
-typedef struct
-{
-	unsigned char	*smAddr;	/* Addr allocated or released */
-	unsigned char	*smCaller;	/* Who called malloc/free */
-	gtm_msize_t	smSize;		/* Size allocated or freed */
-	gtm_msize_t	smTn;		/* What transaction it was */
-} smTraceItem;
-
 #ifdef DEBUG
 #  define INCR_CNTR(x) ++x
 #  define INCR_SUM(x, y) x += y
@@ -265,17 +221,28 @@ typedef struct
 # else
 #  define DEBUGSM(x)
 #endif
+/* Macro to return an index into the TwoTable for a given size (round up to next power of two)
+ * Use the size2Index table to get the proper index. This table is indexed by the number of
+ * storage "blocks" being requested. A storage block is the size of the smallest power of two
+ * block we can allocate (size MINTWO).
+ */
+#ifdef DEBUG
+#  define GetSizeIndex(size) (size ? size2Index[(size - 1) / MINTWO] : assert(FALSE))
+#else
+#  define GetSizeIndex(size) (size2Index[(size - 1) / MINTWO])
+#endif
 /* Note we use unsigned char * instead of caddr_t for all references to caller_id so the caller id
-   is always 4 bytes. On Tru64, caddr_t is 8 bytes which will throw off the size of our
-   storage header in debug mode */
+ * is always 4 bytes. On Tru64, caddr_t is 8 bytes which will throw off the size of our
+ * storage header in debug mode.
+ */
 #ifdef GTM_MALLOC_DEBUG
 #  define CALLERID (smCallerId)
 #else
 #  define CALLERID ((unsigned char *)caller_id())
 #endif
-
 /* Define "routines" to enqueue and dequeue storage elements. Use define so we don't
-   have to depend on each implementation's compiler inlining to get efficient code here */
+ * have to depend on each implementation's compiler inlining to get efficient code here.
+ */
 #define ENQUEUE_STOR_ELEM(qtype, idx, elem)		\
 {							\
 	  storElem *qHdr, *fElem;			\
@@ -286,14 +253,12 @@ typedef struct
 	  INCR_CNTR(qtype##ElemCnt[idx]);		\
 	  SET_ELEM_MAX(qtype, idx);			\
 }
-
 #define DEQUEUE_STOR_ELEM(qtype, elem)			\
 { 							\
 	  STE_FP(STE_BP(elem)) = STE_FP(elem);		\
 	  STE_BP(STE_FP(elem)) = STE_BP(elem);		\
 	  DECR_CNTR(qtype##ElemCnt[elem->queueIndex]);	\
 }
-
 #define GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr) \
 {							\
 	qHdr = &freeStorElemQs[sizeIndex];		\
@@ -310,7 +275,6 @@ typedef struct
 		uStor = findStorElem(sizeIndex);	\
 	assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */ \
 }
-
 #ifdef INT8_SUPPORTED
 #  define ChunkSize 8
 #  define ChunkType gtm_int64_t
@@ -321,6 +285,39 @@ typedef struct
 #  define ChunkValue 0xdeadbeef
 #endif
 #define AddrMask (ChunkSize - 1)
+/* States that storage can be in (although the possibilities are limited with only one byte of information) */
+enum ElemState {Allocated = 0x42, Free = 0x24};
+/* At the end of each super-block is this header which is used to track when all of the elements that
+ * a block of real allocated storage was broken into have become free. At that point, we can return
+ * the chunk to the OS.
+ */
+typedef struct storExtHdrStruct
+{
+	struct
+	{
+		struct storExtHdrStruct	*fl, *bl;	/* In case we need to visit the entire list */
+	} links;
+	unsigned char	*extentStart;			/* First byte of real extent (not aligned) */
+	storElem	*elemStart;			/* Start of array of MAXTWO elements */
+	int		elemsAllocd;			/* MAXTWO sized element count. When 0 this block is free */
+} storExtHdr;
+/* Structure where malloc and free call trace information is kept */
+typedef struct
+{
+	unsigned char	*smAddr;	/* Addr allocated or released */
+	unsigned char	*smCaller;	/* Who called malloc/free */
+	gtm_msize_t	smSize;		/* Size allocated or freed */
+	gtm_msize_t	smTn;		/* What transaction it was */
+} smTraceItem;
+/* Our extent must be aligned on a MAXTWO byte boundary hence we allocate one more extent than
+ * we actually want so we can be guarranteed usable storage. However if that allocation actually
+ * starts on a MAXTWO boundary (on guarranteed 8 byte boundary), then we get an extra element.
+ * Here we define our extent size and provide an initial sanity value for "extent_used". If the
+ * allocator ever gets this extra block, this field will be increased by the size of one element
+ * to compensate.
+ */
+#define EXTENT_SIZE ((MAXTWO * (ELEMS_PER_EXTENT + 1)) + SIZEOF(storExtHdr))
+static unsigned int extent_used = ((MAXTWO * ELEMS_PER_EXTENT) + SIZEOF(storExtHdr));
 
 #ifdef DEBUG
 /* For debug builds, keep track of the last MAXSMTRACE mallocs and frees. */
@@ -331,9 +328,9 @@ GBLDEF smTraceItem smFrees[MAXSMTRACE];			/* Array of recent releasers */
 GBLDEF volatile unsigned int smTn;			/* Storage management (wrappable) transaction number */
 GBLDEF unsigned int outOfMemorySmTn;			/* smTN when ran out of memory */
 #endif
-
 GBLREF	uint4		gtmDebugLevel;			/* Debug level (0 = using default sm module so with
-							   a DEBUG build, even level 0 implies basic debugging) */
+							 * a DEBUG build, even level 0 implies basic debugging)
+							 */
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */
 GBLREF	volatile void	*outOfMemoryMitigation;		/* Reserve that we will freed to help cleanup if run out of memory */
@@ -347,9 +344,7 @@ UNIX_ONLY(GBLREF ch_ret_type (*stpgc_ch)();)		/* Function pointer to stp_gcol_ch
 /* This var allows us to call ourselves but still have callerid info */
 GBLREF	unsigned char	*smCallerId;			/* Caller of top level malloc/free */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
-
 OS_PAGE_SIZE_DECLARE
-
 #define SIZETABLEDIM MAXTWO/MINTWO
 STATICD int size2Index[SIZETABLEDIM];
 
@@ -365,20 +360,18 @@ GBLRDEF readonly struct
 	unsigned char nullTMark[4];
 } NullStruct
 #ifdef DEBUG
-        /* Note, tiz important the first 4 bytes of this are same as markerChar defined below as that is the value both nullHMark
-         * and nullTMark are asserted against to validate against corruption.
-         */
-        = {0xde, 0xad, 0xbe, 0xef, 0x00, 0xde, 0xad, 0xbe, 0xef}
+/* Note, tiz important the first 4 bytes of this are same as markerChar defined below as that is the value both nullHMark
+ * and nullTMark are asserted against to validate against corruption.
+ */
+= {0xde, 0xad, 0xbe, 0xef, 0x00, 0xde, 0xad, 0xbe, 0xef}
 #endif
-        ;
-
+;
 #ifdef DEBUG
 /* Arrays allocated with size of MAXINDEX + 2 are sized to hold an extra
  * entry for "real malloc" type allocations. Note that the arrays start with
  *  the next larger element with GTM64 due to increased overhead from the
  *  8 byte pointers.
  */
-
 STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {
 #  ifndef GTM64
 	64,
@@ -399,15 +392,14 @@ STATICD readonly uint4 TwoTable[MAXINDEX + 2] = {
 #endif
 
 STATICD storElem	freeStorElemQs[MAXINDEX + 1];	/* Need full element as queue anchor for dbl-linked
-							   list since ptrs not at top of element */
+							 * list since ptrs not at top of element.
+							 */
 STATICD storExtHdr	storExtHdrQ;			/* List of storage blocks we allocate here */
 STATICD uint4		curExtents;			/* Number of current extents */
-
 #ifdef GTM_MALLOC_REENT
 STATICD storElem *deferFreeQueues[MAXDEFERQUEUES];	/* Where deferred (nested) frees are queued for later processing */
 STATICD boolean_t deferFreeExists;			/* A deferred free is pending on a queue */
 #endif
-
 #ifdef DEBUG
 STATICD storElem allocStorElemQs[MAXINDEX + 2];		/* The extra element is for queueing "real" malloc'd entries */
 #  ifdef INT8_SUPPORTED
@@ -420,7 +412,6 @@ STATICD readonly unsigned char backfillMarkC[4] = {0xde, 0xad, 0xbe, 0xef};
 GBLREF	size_t	totalRmalloc;				/* Total storage currently (real) malloc'd (includes extent blocks) */
 GBLREF  size_t	totalAlloc;				/* Total allocated (includes allocation overhead but not free space */
 GBLREF  size_t	totalUsed;				/* Sum of user allocated portions (totalAlloc - overhead) */
-
 #ifdef DEBUG
 /* Define variables used to instrument how our algorithm works */
 STATICD	uint4	totalMallocs;				/* Total malloc requests */
@@ -447,16 +438,6 @@ UNIX_ONLY(error_def(ERR_SYSCALL);)
 VMS_ONLY(error_def(ERR_FREEMEMORY);)
 VMS_ONLY(error_def(ERR_VMSMEMORY);)
 
-/* Macro to return an index into the TwoTable for a given size (round up to next power of two)
-   Use the size2Index table to get the proper index. This table is indexed by the number of
-   storage "blocks" being requested. A storage block is the size of the smallest power of two
-   block we can allocate (size MINTWO) */
-#ifdef DEBUG
-#  define GetSizeIndex(size) (size ? size2Index[(size - 1) / MINTWO] : assert(FALSE))
-#else
-#  define GetSizeIndex(size) (size2Index[(size - 1) / MINTWO])
-#endif
-
 /* Internal prototypes */
 void gtmSmInit(void);
 storElem *findStorElem(int sizeIndex);
@@ -479,16 +460,16 @@ VMS_ONLY(error_def(ERR_VMSMEMORY);)
 UNIX_ONLY(error_def(ERR_SYSCALL);)
 
 /* Initialize the storage manangement system. Things to initialize:
-
-   - Initialize size2Index table. This table is used to convert a malloc request size
-     to a storage queue index.
-   - Initialize queue anchor fwd/bkwd pointers to point to queue anchors so we
-     build a circular queue. This allows elements to be added and removed without
-     end-of-queue special casing. The queue anchor element is easily recognized because
-     it's queue index size will be set to a special value.
-   - Initialize debug mode. See if gtm_debug_level environment variable is set and
-     retrieve it's value if yes.
-*/
+ *
+ * - Initialize size2Index table. This table is used to convert a malloc request size
+ *   to a storage queue index.
+ * - Initialize queue anchor fwd/bkwd pointers to point to queue anchors so we
+ *   build a circular queue. This allows elements to be added and removed without
+ *   end-of-queue special casing. The queue anchor element is easily recognized because
+ *   it's queue index size will be set to a special value.
+ * - Initialize debug mode. See if gtm_debug_level environment variable is set and
+ *   retrieve it's value if yes.
+ */
 void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_malloc_dbg.c */
 {
 	char		*ascNum;
@@ -496,10 +477,10 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	int		i, sizeIndex, testSize, blockSize, save_errno;
 
 	/* WARNING!! Since this is early initialization, the following asserts are not well behaved if they do
-	   indeed trip. The best that can be hoped for is they give a condition handler exhausted error on
-	   GTM startup. Unfortunately, more intelligent responses are somewhat elusive since no output devices
-	   are setup nor (potentially) most of the GTM runtime.
-	*/
+	 * indeed trip. The best that can be hoped for is they give a condition handler exhausted error on
+	 * GTM startup. Unfortunately, more intelligent responses are somewhat elusive since no output devices
+	 * are setup nor (potentially) most of the GTM runtime.
+	 */
 	assert(MINTWO == TwoTable[0]);
 #	if defined(__linux__) && !defined(__i386)
         /* This will make sure that all the memory allocated using 'malloc' will be in heap and no 'mmap' is used.
@@ -511,10 +492,9 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	mallopt(M_MMAP_MAX, 0);
 #	endif /* __linux__ && !__i386 */
 	/* Check that the storage queue offset in a storage element has sufficient reach
-	   to cover an extent.
-	*/
+	 * to cover an extent.
+	 */
 	assert(((extent_used - SIZEOF(storExtHdr)) <= ((1 << (SIZEOF(uStor->extHdrOffset) * 8)) - 1)));
-
 	/* Initialize size table used to get a storage queue index */
 	sizeIndex = 0;
 	testSize = blockSize = MINTWO;
@@ -524,7 +504,6 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 			++sizeIndex;
 		size2Index[i] = sizeIndex;
 	}
-
 	/* Need to initialize the fwd/bck ptrs in the anchors to point to themselves */
 	for (uStor = &freeStorElemQs[0], i = 0; i <= MAXINDEX; ++i, ++uStor)
 	{
@@ -541,12 +520,12 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	dqinit(&storExtHdrQ, links);
 
 	/* One last task before we consider ourselves initialized. Allocate the out-of-memory mitigation storage
-	   that we will hold onto but not use. If we get an out-of-memory error, this storage will be released back
-	   to the OS for it or GTM to use as necessary while we try to go about an orderly shutdown of our process.
-	   The term "release" here means a literal release. The thinking is we don't know whether GTM's small storage
-	   manager will make use of this storage (32K at a time) or if a larger malloc() will be done by libc for
-	   buffers or what not so we will just give this chunk back to the OS to use as it needs it.
-	*/
+	 * that we will hold onto but not use. If we get an out-of-memory error, this storage will be released back
+	 * to the OS for it or GTM to use as necessary while we try to go about an orderly shutdown of our process.
+	 * The term "release" here means a literal release. The thinking is we don't know whether GTM's small storage
+	 * manager will make use of this storage (32K at a time) or if a larger malloc() will be done by libc for
+	 * buffers or what not so we will just give this chunk back to the OS to use as it needs it.
+	 */
 	if (0 < outOfMemoryMitigateSize)
 	{
 		assert(NULL == outOfMemoryMitigation);
@@ -564,12 +543,13 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 }
 
 /* Recursive routine used to obtain an element on a given size queue. If no
-   elements of that size are available, we recursively call ourselves to get
-   an element of the next larger queue which we will then split in half to
-   get the one we need and place the remainder back on the free queue of its
-   new smaller size. If we run out of queues, we obtain a fresh new 'hunk' of
-   storage, carve it up into the largest block size we handle and process as
-   before. */
+ * elements of that size are available, we recursively call ourselves to get
+ * an element of the next larger queue which we will then split in half to
+ * get the one we need and place the remainder back on the free queue of its
+ * new smaller size. If we run out of queues, we obtain a fresh new 'hunk' of
+ * storage, carve it up into the largest block size we handle and process as
+ * before.
+ */
 storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when included in gtm_malloc_dbg.c */
 {
 	unsigned char	*uStorAlloc;
@@ -583,9 +563,9 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 	if (MAXINDEX >= sizeIndex)
 	{	/* We have more queues to search */
 	        GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr);
-
 		/* We have a larger than necessary element now so break it in half and put
-		   the second half on the queue one size smaller than us */
+		 * the second half on the queue one size smaller than us.
+		 */
 		INCR_CNTR(elemSplits[sizeIndex]);
 		--sizeIndex;					/* Dealing now with smaller element queue */
 		assert(sizeIndex >= 0 && sizeIndex < MAXINDEX);
@@ -606,8 +586,8 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 		SET_MAX(maxExtents, curExtents);
 		INCR_CNTR(totalExtents);
 		/* Allocate size for one more subblock than we want. This guarrantees us that we can put our subblocks
-		   on a power of two boundary necessary for buddy alignment
-		*/
+		 * on a power of two boundary necessary for buddy alignment.
+		 */
 		MALLOC(EXTENT_SIZE, uStorAlloc);
 		uStor2 = (storElem *)uStorAlloc;
 		/* Make addr "MAXTWO" byte aligned */
@@ -616,11 +596,10 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 		SET_MAX(rmallocMax, totalRmalloc);
 		sEHdr = (storExtHdr *)((char *)uStor + (ELEMS_PER_EXTENT * MAXTWO));
 		DEBUGSM(("debugsm: Allocating extent at 0x%08lx\n", uStor));
-
 		/* If the storage given to us was aligned, we have ELEMS_PER_EXTENT+1 blocks, else we have
-		   ELEMS_PER_EXTENT blocks. We won't put the first element on the queue since that block is
-		   being returned to be split.
-		*/
+		 * ELEMS_PER_EXTENT blocks. We won't put the first element on the queue since that block is
+		 * being returned to be split.
+		 */
 		if (uStor == uStor2)
 		{
 			i = 0;		/* The storage was suitably aligned, we get an extra block free */
@@ -673,11 +652,13 @@ void processDeferredFrees()	/* Note renamed to processDeferredFrees_dbg when inc
 	{
 		deferFreeExists = FALSE;
 		/* Run queue in reverse order so we can process the highest index queues first freeing them
-		   up that much sooner. This eliminates the problem of index creep. */
+		 * up that much sooner. This eliminates the problem of index creep.
+		 */
 		for (dqIndex = MAXDEFERQUEUES - 1; 0 <= dqIndex; --dqIndex)
 		{
 			/* Check if queue is empty or not once outside of the gtmMallocDepth lock 'cause
-			   we don't want to get the lock unless we really need to */
+			 * we don't want to get the lock unless we really need to.
+			 */
 			if (deferFreeQueues[dqIndex])
 			{
 				gtmMallocDepth = dqIndex + 2;
@@ -695,7 +676,6 @@ void processDeferredFrees()	/* Note renamed to processDeferredFrees_dbg when inc
 }
 #endif
 
-
 /* Note, if the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 /* Obtain free storage of the given size */
 void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in gtm_malloc_dbg.c */
@@ -710,14 +690,16 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
-	   If it has, we are in the wrong module Jack. This IF is structured so that
-	   if this is the normal (default/optimized) case we will fall into the code
-	   and handle the rerouting at the end. */
+	 * If it has, we are in the wrong module Jack. This IF is structured so that
+	 * if this is the normal (default/optimized) case we will fall into the code
+	 * and handle the rerouting at the end.
+	 */
 	if (GDL_None == gtmDebugLevel)
 	{
 #	endif
 		/* Note that this if is also structured for maximum fallthru. The else will
-		   be near the end of this entry point */
+		 * be near the end of this entry point.
+		 */
 		if (gtmSmInitialized)
 		{
 			hdrSize = OFFSETOF(storElem, userStorage);		/* Size of storElem header */
@@ -798,7 +780,8 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 					DEBUG_ONLY(sizeIndex = MAXINDEX + 1);	/* Just so the ENQUEUE below has a queue since
 										 * we use -1 as the "real" queueindex  for
 										 * malloc'd storage and we don't record allocated
-										 * storage in other than debug mode. */
+										 * storage in other than debug mode.
+										 */
 				}
 				totalUsed += DEBUG_ONLY(size) PRO_ONLY(tSize);
 				totalAlloc += tSize;
@@ -819,8 +802,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 					backfill(trailerMarker + SIZEOF(markerChar),
 						 (uStor->realLen - size - hdrSize - SIZEOF(markerChar)));
 				}
-
-				uStor->smTn = smTn;					/* transaction number */
+				uStor->smTn = smTn;					/* Transaction number */
 				GMR_ONLY(if (!reentered))
 				{
 					ENQUEUE_STOR_ELEM(alloc, sizeIndex, uStor);
@@ -849,7 +831,6 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 				smMallocs[smLastMallocIndex].smTn = smTn;
 			);
 			TRACE_MALLOC(retVal, size, smTn);
-
 			--gtmMallocDepth;
 			GMR_ONLY(
 				/* Check on deferred frees */
@@ -863,10 +844,10 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 		{
 			gtmSmInit();
 			/* Reinvoke gtm_malloc now that we are initialized. Note that this one time (the first
-			   call to malloc), we will not record the proper caller id in the storage header or in
-			   the traceback table. The caller will show up as gtm_malloc(). However, all subsequent
-			   calls will be correct.
-			*/
+			 * call to malloc), we will not record the proper caller id in the storage header or in
+			 * the traceback table. The caller will show up as gtm_malloc(). However, all subsequent
+			 * calls will be correct.
+			 */
 			return (void *)gtm_malloc(size);
 		}
 #	ifndef DEBUG
@@ -890,25 +871,27 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
-	   If it has, we are in the wrong module Jack. This IF is structured so that
-	   if this is the normal (optimized) case we will fall into the code and
-	   handle the rerouting at the end. */
+	 * If it has, we are in the wrong module Jack. This IF is structured so that
+	 * if this is the normal (optimized) case we will fall into the code and
+	 * handle the rerouting at the end.
+	 */
 	if (GDL_None == gtmDebugLevel)
 	{
 #	endif
 		if (!gtmSmInitialized)	/* Storage must be init'd before can free anything */
 			GTMASSERT;
 		/* If we are exiting, don't bother with frees. Process destruction can do it *UNLESS* we are handling an
-		   out of memory condition with the proviso that we can't return memory if we are already nested */
+		 * out of memory condition with the proviso that we can't return memory if we are already nested.
+		 */
 		if (process_exiting && (0 != gtmMallocDepth || error_condition != UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY)))
 			return;
 		NON_GMR_ONLY(++fast_lock_count);
 		++gtmMallocDepth;	/* Recursion indicator */
-
 #		ifdef GTM_MALLOC_REENT
 		/* If we are attempting to do a reentrant free, we will instead put the free on a queue to be released
-		   at a later time. Ironically, since we cannot be sure of any queues of available blocks, we have to
-		   malloc a small block to carry this info which we will free with the main storage */
+		 * at a later time. Ironically, since we cannot be sure of any queues of available blocks, we have to
+		 * malloc a small block to carry this info which we will free with the main storage.
+		 */
 		if (1 < gtmMallocDepth)
 		{
 			if ((unsigned char *)addr != &NullStruct.nullStr[0])
@@ -935,7 +918,6 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 		}
 #		endif
 		INCR_CNTR(smTn);	/* Bump the transaction number */
-
 		/* Validate null string not overwritten */
 		assert(0 == memcmp(&NullStruct.nullHMark[0], markerChar, SIZEOF(NullStruct.nullHMark)));
 		assert(0 == memcmp(&NullStruct.nullTMark[0], markerChar, SIZEOF(NullStruct.nullHMark)));
@@ -954,10 +936,10 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 			TRACE_FREE(addr, uStor->allocLen, smTn);
 			saveSize = uStor->allocLen;
 			/* Extra checking for debugging. Note that these sanity checks are only done in debug
-			   mode. The thinking is that we will bypass the checks in the general case for speed but
-			   if we really need to chase a storage related problem, we should switch to the debug version
-			   in the field to turn on these and other checks.
-			*/
+			 * mode. The thinking is that we will bypass the checks in the general case for speed but
+			 * if we really need to chase a storage related problem, we should switch to the debug version
+			 * in the field to turn on these and other checks.
+			 */
 			assert(Allocated == uStor->state);
 			assert(0 == memcmp(uStor->headMarker, markerChar, SIZEOF(uStor->headMarker)));
 			trailerMarker = (unsigned char *)&uStor->userStorage.userStart + uStor->allocLen;/* Where trailer was put */
@@ -967,7 +949,6 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 				assert(backfillChk(trailerMarker + SIZEOF(markerChar),
 						   (uStor->realLen - uStor->allocLen - hdrSize - SIZEOF(markerChar))));
 			}
-
 			/* Remove element from allocated queue unless element is from a reentered malloc call. In that case, just
 			 * manipulate the counters.
 			 */
@@ -977,7 +958,7 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 				{
 					DEQUEUE_STOR_ELEM(alloc, uStor);
 				} else
-				{	/* shenanigans so that counts are maintained properly in debug mode */
+				{	/* Shenanigans so that counts are maintained properly in debug mode */
 					saveIndex = uStor->queueIndex;
 					uStor->queueIndex = MAXINDEX + 1;
 					DEQUEUE_STOR_ELEM(alloc, uStor);
@@ -992,11 +973,13 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 				assert(0 == ((unsigned long)uStor & (TwoTable[sizeIndex] - 1)));	/* Verify alignment */
 				assert(sizeIndex >= 0 && sizeIndex <= MAXINDEX);
 				uStor->state = Free;
+				DEBUG_ONLY(uStor->smTn = smTn);		/* For freed blocks, set Tn when were freed */
 				INCR_CNTR(freeCnt[sizeIndex]);
 				assert(uStor->realLen == TwoTable[sizeIndex]);
 				totalAlloc -= TwoTable[sizeIndex];
 			        /* First, if there are larger queues than this one, see if it has a buddy that it can
-				   combine with */
+				 * combine with.
+				 */
 				while (sizeIndex < MAXINDEX)
 				{
 					buddyElem = (storElem *)((unsigned long)uStor ^ TwoTable[sizeIndex]);/* Address of buddy */
@@ -1028,11 +1011,11 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 					--sEHdr->elemsAllocd;
 					assert(0 <= sEHdr->elemsAllocd);
 					/* Check for an extent being ripe for return to the system. Requirements are:
-					     1) All subblocks must be free (elemsAllocd == 0).
-					     2) There must be more than STOR_EXTENTS_KEEP extents already allocated.
-					   If these conditions are met, we will dequeue each individual element from
-					   it's queue and release the entire extent in a (real) free.
-					*/
+					 *   1) All subblocks must be free (elemsAllocd == 0).
+					 *   2) There must be more than STOR_EXTENTS_KEEP extents already allocated.
+					 * If these conditions are met, we will dequeue each individual element from
+					 * it's queue and release the entire extent in a (real) free.
+					 */
 					if (STOR_EXTENTS_KEEP < curExtents && 0 == sEHdr->elemsAllocd)
 					{	/* Release this extent */
 						DEBUGSM(("debugsm: Extent being freed from 0x%08lx\n", sEHdr->elemStart));
@@ -1056,7 +1039,6 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 						assert(curExtents);
 					}
 				}
-
 			} else
 			{
 				assert(REAL_MALLOC == sizeIndex);		/* Better be a real malloc type block */
@@ -1092,8 +1074,8 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 #	ifndef DEBUG
 	} else
 	{	/* If not a debug module and debugging is enabled, reroute call to
-		   the debugging version.
-		*/
+		 * the debugging version.
+		 */
 		smCallerId = (unsigned char *)caller_id();
 		gtm_free_dbg(addr);
 	}
@@ -1101,10 +1083,9 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	DEFERRED_EXIT_HANDLING_CHECK;
 }
 
-
 /* When an out-of-storage type error is encountered, besides releasing our memory reserve, we also
-   want to release as much unused storage within various GTM queues that we can find.
-*/
+ * want to release as much unused storage within various GTM queues that we can find.
+ */
 void release_unused_storage(void)	/* Note renamed to release_unused_storage_dbg when included in gtm_malloc_dbg.c */
 {
 	mcalloc_hdr	*curhdr, *nxthdr;
@@ -1126,40 +1107,41 @@ void release_unused_storage(void)	/* Note renamed to release_unused_storage_dbg 
 		(*cache_table_relobjs)();	/* Release object code in indirect cache */
 }
 
-
 /* Raise ERR_MEMORY or ERR_VMSMEMORY. Separate routine since is called from hashtable logic in place of the
-   previous HTEXPFAIL error message. As such, it checks and properly deals with which flavor is running
-   (debug or non-debug).
-*/
+ * previous HTEXPFAIL error message. As such, it checks and properly deals with which flavor is running
+ * (debug or non-debug).
+ */
 void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg when included in gtm_malloc_dbg.c */
 {
 	void	*addr;
 
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
-	   If it has, we are in the wrong module Jack. This IF is structured so that
-	   if this is the normal (optimized) case we will fall into the code and
-	   handle the rerouting at the end.
-
-	   Note: The DEBUG expansion of this code in a pro build actually has a different
-	   entry point name (raise_gtmmeory_error_dbg) and if malloc debugging options are
-	   on in pro, we need to call that version, but since efficiency in pro trumps
-	   clarity, we put the redirecting call at the bottom of the if-else block to
-	   avoid disrupting the instruction pipeline.
-	*/
+	 * If it has, we are in the wrong module Jack. This IF is structured so that
+	 * if this is the normal (optimized) case we will fall into the code and
+	 * handle the rerouting at the end.
+	 *
+	 * Note: The DEBUG expansion of this code in a pro build actually has a different
+	 * entry point name (raise_gtmmeory_error_dbg) and if malloc debugging options are
+	 * on in pro, we need to call that version, but since efficiency in pro trumps
+	 * clarity, we put the redirecting call at the bottom of the if-else block to
+	 * avoid disrupting the instruction pipeline.
+	 */
         if (GDL_None == gtmDebugLevel)
         {
 #	endif
 		if (NULL != (addr = (void *)outOfMemoryMitigation)
 		    UNIX_ONLY(&& !(ht_rhash_ch == active_ch->ch || jbxm_dump_ch == active_ch->ch || stpgc_ch == active_ch->ch)))
-		{       /* Free our reserve only if not in certain condition handlers (on UNIX) since it is */
-			/* going to unwind this error and ignore it. On VMS the error will not be trapped   */
+		{       /* Free our reserve only if not in certain condition handlers (on UNIX) since it is
+			 * going to unwind this error and ignore it. On VMS the error will not be trapped.
+			 */
 			outOfMemoryMitigation = NULL;
 			UNIX_ONLY(free(addr));
 			VMS_ONLY(lib$free_vm(addr));
 			DEBUG_ONLY(if (0 == outOfMemorySmTn) outOfMemorySmTn = smTn);
-			/* Must decr gtmMallocDepth after release above but before the  */
-			/* call to release_unused_storage() below.                      */
+			/* Must decr gtmMallocDepth after release above but before the
+			 * call to release_unused_storage() below.
+			 */
 			--gtmMallocDepth;
 			release_unused_storage();
 		} else
@@ -1170,18 +1152,15 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
 		VMS_ONLY(rts_error(VARLSTCNT(4) ERR_VMSMEMORY, 2, gtmMallocErrorSize, gtmMallocErrorCallerid));
 #	ifndef DEBUG
 	} else
-               /* If not a debug module and debugging is enabled, reroute call to
-                   the debugging version.
-	       */
+		/* If not a debug module and debugging is enabled, reroute call to the debugging version. */
                 raise_gtmmemory_error_dbg();
 #	endif
 }
 
-
 /* Return the maximum size that would fully utilize a storage block given the input size. If the size will not
-   fit in one of the buddy list queue elems, it is returned unchanged. Otherwise, the size of the buddy list queue
-   element minus the overhead will be returned as the best fit size.
-*/
+ * fit in one of the buddy list queue elems, it is returned unchanged. Otherwise, the size of the buddy list queue
+ * element minus the overhead will be returned as the best fit size.
+ */
 size_t gtm_bestfitsize(size_t size)
 {
 	size_t	tSize;
@@ -1189,16 +1168,16 @@ size_t gtm_bestfitsize(size_t size)
 
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
-	   If it has, we are in the wrong module Jack. This IF is structured so that
-	   if this is the normal (optimized) case we will fall into the code and
-	   handle the rerouting at the end.
-
-	   Note: The DEBUG expansion of this code in a pro build actually has a different
-	   entry point name (gtm_bestfitsize_dbg) and if malloc debugging options are
-	   on in pro, we need to call that version, but since efficiency in pro trumps
-	   clarity, we put the redirecting call at the bottom of the if-else block to
-	   avoid disrupting the instruction pipeline.
-	*/
+	 * If it has, we are in the wrong module Jack. This IF is structured so that
+	 * if this is the normal (optimized) case we will fall into the code and
+	 * handle the rerouting at the end.
+	 *
+	 * Note: The DEBUG expansion of this code in a pro build actually has a different
+	 * entry point name (gtm_bestfitsize_dbg) and if malloc debugging options are
+	 * on in pro, we need to call that version, but since efficiency in pro trumps
+	 * clarity, we put the redirecting call at the bottom of the if-else block to
+	 * avoid disrupting the instruction pipeline.
+	 */
         if (GDL_None == gtmDebugLevel)
         {
 #	endif
@@ -1214,23 +1193,23 @@ size_t gtm_bestfitsize(size_t size)
 #	ifndef DEBUG
 	}
 	/* If not a debug module and debugging is enabled, reroute call to
-	   the debugging version.
-	*/
+	 * the debugging version.
+	 */
 	return gtm_bestfitsize_dbg(size);
 #	endif
 }
 
 
 /* Note that the DEBUG define takes on an additional meaning in this module. Not only are routines defined within
-   intended for DEBUG builds but they are also only generated ONCE rather than twice like most of the routines are
-   in this module.
-*/
+ * intended for DEBUG builds but they are also only generated ONCE rather than twice like most of the routines are
+ * in this module.
+ */
 #ifdef DEBUG
 /* Backfill the requested area with marker text. We do this by doing single byte
-   stores up to the point where we can do aligned stores of the native register
-   length. Then fill the area as much as possible and finish up potentially with
-   a few single byte unaligned bytes at the end.
-*/
+ * stores up to the point where we can do aligned stores of the native register
+ * length. Then fill the area as much as possible and finish up potentially with
+ * a few single byte unaligned bytes at the end.
+ */
 void backfill(unsigned char *ptr, gtm_msize_t len)
 {
 	unsigned char	*c;
@@ -1253,7 +1232,6 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 				--unalgnLen;
 			} while(unalgnLen);
 		}
-
 		/* Now, do aligned portion */
 		assert(0 == ((gtm_msize_t)ptr & AddrMask));	/* Verify aligned */
 		chunkCnt = len / ChunkSize;
@@ -1263,7 +1241,6 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 			*chunkPtr++ = ChunkValue;
 			len -= SIZEOF(ChunkType);
 		}
-
 		/* Do remaining unaligned portion if any */
 		if (len)
 		{
@@ -1280,9 +1257,10 @@ void backfill(unsigned char *ptr, gtm_msize_t len)
 
 /*  ** still under ifdef DEBUG ** */
 /* Check the given backfilled area that it was filled in exactly as
-   the above backfill routine would have filled it in. Again, do any
-   unaligned single chars first, then aligned native length areas,
-   then any stragler unaligned chars */
+ * the above backfill routine would have filled it in. Again, do any
+ * unaligned single chars first, then aligned native length areas,
+ * then any stragler unaligned chars.
+ */
 boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 {
 	unsigned char	*c;
@@ -1307,7 +1285,6 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 					return FALSE;
 			} while(unalgnLen);
 		}
-
 		/* Now, do aligned portion */
 		assert(0 == ((gtm_msize_t)ptr & AddrMask));	/* Verify aligned */
 		chunkCnt = len / ChunkSize;
@@ -1319,7 +1296,6 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 			else
 				return FALSE;
 		}
-
 		/* Do remaining unaligned portion if any */
 		if (len)
 		{
@@ -1336,7 +1312,6 @@ boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len)
 	}
 	return TRUE;
 }
-
 
 /*  ** still under ifdef DEBUG ** */
 /* Routine to run the free storage chains to verify that everything is in the correct place */
@@ -1360,13 +1335,11 @@ void verifyFreeStorage(void)
 			assert(0 == memcmp(uStor->headMarker, markerChar, SIZEOF(uStor->headMarker)));	/* Vfy metadata marker */
 			assert(MAXINDEX != i || extent_used > uStor->extHdrOffset);
 			if (GDL_SmChkFreeBackfill & gtmDebugLevel)
-			{	/* Use backfill check method for verifying freed storage is untouched */
+				/* Use backfill check method for verifying freed storage is untouched */
 				assert(backfillChk((unsigned char *)uStor + hdrSize, TwoTable[i] - hdrSize));
-			}
 		}
 	}
 }
-
 
 /*  ** still under ifdef DEBUG ** */
 /* Routine to run the allocated chains to verify that the markers are all still in place */
@@ -1394,21 +1367,19 @@ void verifyAllocatedStorage(void)
 			assert(0 == memcmp(trailerMarker, markerChar, SIZEOF(markerChar)));
 			assert(MAXINDEX != i || extent_used > uStor->extHdrOffset);
 			if (GDL_SmChkAllocBackfill & gtmDebugLevel)
-			{	/* Use backfill check method for after-allocation metadata */
+				/* Use backfill check method for after-allocation metadata */
 				assert(backfillChk(trailerMarker + SIZEOF(markerChar),
 					(uStor->realLen - uStor->allocLen - hdrSize - SIZEOF(markerChar))));
-			}
 		}
 	}
 }
 
-
 /*  ** still under ifdef DEBUG ** */
 /* Routine to print the end-of-process info -- either allocation statistics or malloc trace dump.
-   Note that the use of FPRINTF here instead of util_out_print is historical. The output was at one
-   time going to stdout and util_out_print goes to stderr. If necessary or desired, these could easily
-   be changed to use util_out_print instead of FPRINTF
-*/
+ * Note that the use of FPRINTF here instead of util_out_print is historical. The output was at one
+ * time going to stdout and util_out_print goes to stderr. If necessary or desired, these could easily
+ * be changed to use util_out_print instead of FPRINTF.
+ */
 void printMallocInfo(void)
 {
 	int 		i, j;
@@ -1474,10 +1445,10 @@ void printMallocInfo(void)
 	printMallocDump();
 }
 
-
+/*  ** still under ifdef DEBUG ** */
 /* Routine to print storage dump. This is called as part of print_malloc_info but is also potentially separately called from
-   op_view so is a separate routine.
-*/
+ * op_view so is a separate routine.
+ */
 void printMallocDump(void)
 {
 	storElem	*eHdr, *uStor;

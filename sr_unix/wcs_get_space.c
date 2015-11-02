@@ -110,6 +110,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	cnl = csa->nl;
 	is_mm = (dba_mm == csd->acc_meth);
 	assert(is_mm || (dba_bg == csd->acc_meth));
+	assert((0 == needed) || ((DB_CSH_RDPOOL_SZ <= needed) && (needed <= csd->n_bts)));
 	if (FALSE == csa->now_crit)
 	{
 		assert(0 != needed);	/* if needed == 0, then we should be in crit */

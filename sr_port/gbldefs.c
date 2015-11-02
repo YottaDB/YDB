@@ -113,6 +113,7 @@
 #endif
 
 #include "jnl_typedef.h"
+#include "repl_ctl.h"
 
 #ifdef VMS
 #include "gtm_logicals.h"	/* for GTM_MEMORY_NOACCESS_COUNT */
@@ -694,6 +695,13 @@ LITDEF	boolean_t	jrt_is_replicated[JRT_RECTYPES] =
 #include "jnl_rec_table.h"	/* BYPASSOK */
 #undef JNL_TABLE_ENTRY
 };
+LITDEF	char	*jnl_file_state_lit[JNL_FILE_STATES] =
+{
+	"JNL_FILE_UNREAD",
+	"JNL_FILE_OPEN",
+	"JNL_FILE_CLOSED",
+	"JNL_FILE_EMPTY"
+};
 /* Change the initialization if struct_jrec_tcom in jnl.h changes */
 GBLDEF	struct_jrec_tcom	tcom_record = {{JRT_TCOM, TCOM_RECLEN, 0, 0, 0, 0},
 					0, 0, 0, 0, "", {TCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
@@ -971,9 +979,10 @@ GBLDEF	zlib_uncmp_func_t	zlib_uncompress_fnptr;
 GBLDEF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
 
 #ifdef UNIX
-/* Initialized blockalrm and block_sigsent can be used by all */
+/* Initialized blockalrm, block_ttinout and block_sigsent can be used by all threads */
 GBLDEF	boolean_t	blocksig_initialized = FALSE;	/* set to TRUE when blockalrm and block_sigsent are initialized */
 GBLDEF	sigset_t	blockalrm;
+UNIX_ONLY(GBLDEF	sigset_t	block_ttinout;)
 GBLDEF	sigset_t	block_sigsent;	/* block all signals that can be sent externally
 					  (SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT) */
 GBLDEF  char            *gtm_core_file;
@@ -984,20 +993,20 @@ GBLDEF  char            *gtm_core_putenv;
 GBLDEF	char		*gtm_utf8_locale_object;
 GBLDEF	boolean_t	gtm_tag_utf8_as_ascii = TRUE;
 #endif
+
 #ifdef GTM_CRYPT
-GBLDEF	int4				gtmcrypt_init_state;            /* Represents the various states of encryption library */
-GBLDEF	int4				gbl_encryption_ecode;
-GBLDEF	char				dl_err[MAX_ERRSTR_LEN];
+LITDEF	char			gtmcrypt_repeat_msg[] = "Please look at prior messages related to encryption for more details";
+GBLDEF	boolean_t		gtmcrypt_initialized;	/* Set to TRUE if gtmcrypt_init() completes successfully */
+GBLDEF	char			dl_err[MAX_ERRSTR_LEN];
 
 GBLDEF	gtmcrypt_init_t			gtmcrypt_init_fnptr;
 GBLDEF  gtmcrypt_close_t        	gtmcrypt_close_fnptr;
 GBLDEF  gtmcrypt_hash_gen_t		gtmcrypt_hash_gen_fnptr;
-GBLDEF  gtmcrypt_encode_t		gtmcrypt_encode_fnptr;
-GBLDEF  gtmcrypt_decode_t		gtmcrypt_decode_fnptr;
+GBLDEF  gtmcrypt_encrypt_t		gtmcrypt_encrypt_fnptr;
+GBLDEF  gtmcrypt_decrypt_t		gtmcrypt_decrypt_fnptr;
 GBLDEF	gtmcrypt_getkey_by_hash_t	gtmcrypt_getkey_by_hash_fnptr;
 GBLDEF	gtmcrypt_getkey_by_name_t	gtmcrypt_getkey_by_name_fnptr;
 GBLDEF	gtmcrypt_strerror_t		gtmcrypt_strerror_fnptr;
-
 #endif /* GTM_CRYPT */
 
 #ifdef DEBUG
@@ -1142,8 +1151,11 @@ GBLDEF	boolean_t	donot_fflush_NULL = FALSE;	/* Set to TRUE whenever we dont want
 							 * As of Jan 2012, mu_rndwn_all is the only user of this functionality.
 							 */
 
-GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at database init time */
 #ifdef UNIX
+GBLDEF	boolean_t	jnlpool_init_needed;		/* TRUE if jnlpool_init should be done at database init time (eg., for
+							 * anticipatory freeze supported configurations). The variable is set
+							 * explicitly by interested commands (eg., MUPIP REORG).
+							 */
 GBLDEF	boolean_t	span_nodes_disallowed; 		/* Indicates whether spanning nodes are not allowed. For example,
 							 * they are not allowed for GT.CM OMI and GNP. */
 GBLDEF	boolean_t	argumentless_rundown;

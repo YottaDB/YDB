@@ -150,10 +150,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			 * gv_target in this TP transaction and if so we need to reset the out-of-date field.
 			 */
 			if (pTarg->read_local_tn != local_tn)
-			{
-				for (srch_status = &pTarg->hist.h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
-					srch_status->first_tp_srch_status = NULL;
-			}
+				GVT_CLEAR_FIRST_TP_SRCH_STATUS(pTarg);
 			/* TP & going to use clue. check if clue path contains a leaf block with a corresponding unbuilt
 			 * cse from the previous traversal. If so build it first before gvcst_search_blk/gvcst_search_tail.
 			 */

@@ -320,11 +320,11 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	node_local		*cnl;
 	sgmnt_data_ptr_t	csd;
 	jnl_record		*jnlrec;
-	GTMCRYPT_ONLY(
-		int		req_enc_blk_size;
-		int		crypt_status;
-		blk_hdr_ptr_t	bp;
-	)
+#	ifdef GTM_CRYPT
+	int			in_len, gtmcrypt_errno;
+	blk_hdr_ptr_t		bp;
+	gd_segment		*seg;
+#	endif
 	UNIX_ONLY(sigset_t	savemask;)
 
 	/* In case of a LOSTTNONLY rollback, it is still possible to reach here if one region has NOBEFORE_IMAGE
@@ -415,31 +415,32 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 		fbw_size = size;
 	db_ctl->op_buff = pblkcontents;
 	db_ctl->op_len = fbw_size;
-	/* During recovery process, the dat file is recreated by reading the PBLK records from the jnl file and applying them
-	 * to the dat file. In case the database is encrypted, the journal file would also have encrypted PBLK records so
-	 * as long as both the journal file and database file have the same encryption keys (usual case) we dont need to do
-	 * any encryption in this function. But if the keys are different, we need to decrypt the journal record using the
-	 * key from the journal file and re-encrypt it using the key from the database file before applying the PBLK record.
-	 */
 #	ifdef GTM_CRYPT
 	bp = (blk_hdr_ptr_t) pblkcontents;
-	req_enc_blk_size = MIN(csd->blk_size, bp->bsiz) - SIZEOF(*bp);
+	in_len = MIN(csd->blk_size, bp->bsiz) - SIZEOF(*bp);
 	jctl = rctl->jctl;
-	if (!jctl->is_same_hash_as_db && BLOCK_REQUIRE_ENCRYPTION(csd->is_encrypted, bp->levl, req_enc_blk_size))
-	{
+	if (!jctl->is_same_hash_as_db && BLOCK_REQUIRE_ENCRYPTION(csd->is_encrypted, bp->levl, in_len))
+	{	/* Database and Journals are setup with different encryption keys. So, decrypt the PBLK records with the journal's
+		 * encryption key and encrypt it with the database's encryption key before writing it to the database file.
+		 */
 		ASSERT_ENCRYPTION_INITIALIZED;
 		/* The below assert cannot be moved before BLOCK_REQUIRE_ENCRYPTION check done above as tmp_ptr could
 		 * potentially point to a V4 block in which case the assert might fail when a V4 block is casted to
 		 * a V5 block header.
 		 */
 		assert((bp->bsiz <= csd->blk_size) && (bp->bsiz >= SIZEOF(*bp)));
-		GTMCRYPT_DECODE_FAST(jctl->encr_key_handle, (char *)(bp + 1), req_enc_blk_size, NULL, crypt_status);
-		if (0 == crypt_status)
-			GTMCRYPT_ENCODE_FAST(csa->encr_key_handle, (char *)(bp + 1), req_enc_blk_size, NULL, crypt_status);
-		if (0 != crypt_status)
+		GTMCRYPT_DECRYPT(csa, jctl->encr_key_handle, (char *)(bp + 1), in_len, NULL, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
-			GC_GTM_PUTMSG(crypt_status, NULL);
-			return crypt_status;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, jctl->jnl_fn_len, jctl->jnl_fn);
+			return gtmcrypt_errno;
+		}
+		GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, (char *)(bp + 1), in_len, NULL, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+		{
+			seg = csa->region->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+			return gtmcrypt_errno;
 		}
 	}
 #	endif

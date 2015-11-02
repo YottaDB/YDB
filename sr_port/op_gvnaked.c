@@ -77,23 +77,23 @@ void op_gvnaked(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	UNIX_ONLY(count = count_arg;)	/* i386 assembler modules may depend on unchanged count */
 	if (0 >= count)
 		GTMASSERT;
-	gv_currkey->end = gv_currkey->prev;
 	is_null = FALSE;
-	assert(gv_currkey->end);
+	assert(gv_currkey->prev);
 	was_null = TREF(gv_some_subsc_null);
 	sbs_cnt = 0;
 	if (1 < count)
 	{
 		/* Use of naked reference can cause increase in number of subscripts.   So count the subscripts */
 		ptr = gv_currkey->base;
-		end_ptr = ptr + gv_currkey->end;
+		end_ptr = ptr + gv_currkey->prev;
 		while (ptr < end_ptr)
 			if (KEY_DELIMITER == *ptr++)
 				sbs_cnt++;
-		if (MAX_GVSUBSCRIPTS < count + sbs_cnt)
+		if (MAX_GVSUBSCRIPTS < (count + sbs_cnt))
 			rts_error(VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	}
 	/* else naked reference will not increase number of subscripts, so do not worry about exceeding the limit */
+	gv_currkey->end = gv_currkey->prev;
 	VAR_START(var, val_arg);
 	val = val_arg;
 	max_key = gv_cur_region->max_key_size;

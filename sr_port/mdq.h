@@ -12,8 +12,8 @@
 #ifndef MDQ_H_DEFINED
 #define HDQ_H_DEFINED
 
-/* Define basic working macros for doubly linked queue management. The  doubly-linked list is defined using
- * elements "n.fl" and "n.bl".
+/* Define basic working macros for queue management of doubly linked list is defined using elements "n.fl" and "n.bl".
+ * The DSRINS insert at tail rather than head and so work FIFO rather than LIFO with DQLOOP and associated macros
  */
 
 /* Loop through a linked list given any element as the start (q) and a var to use as loop incrementer */
@@ -29,10 +29,13 @@
 #define DQDELCHAIN(x, y, n) ((x)->n.fl = (y), (y)->n.bl = (x))
 
 /* Insert one element "x" in between "q" and "q->n.fl" */
-#define DQINS(q, n, x) ((x)->n.fl = (q)->n.fl, (x)->n.bl =(q), (q)->n.fl=(x), ((x)->n.fl)->n.bl=(x))
+#define DQINS(q, n, x) ((x)->n.fl = (q)->n.fl, (x)->n.bl = (q), (q)->n.fl = (x), ((x)->n.fl)->n.bl = (x))
+
+/* Insert one element "x" in between "q" and "q->n.bl" */
+#define DQRINS(q, n, x) ((x)->n.bl = (q)->n.bl, (x)->n.fl = (q), (q)->n.bl = (x), ((x)->n.bl)->n.fl = (x))
 
 /* Insert a doubly-linked list of elements from "n->q.fl" to "n->q.bl" in between "o" and "o->q.fl" */
-#define DQADD(o, n, q) ((o)->q.fl->q.bl=(n)->q.bl, (n)->q.bl->q.fl=(o)->q.fl, (o)->q.fl=(n)->q.fl, (n)->q.fl->q.bl=(o))
+#define DQADD(o, n, q) ((o)->q.fl->q.bl = (n)->q.bl, (n)->q.bl->q.fl = (o)->q.fl, (o)->q.fl = (n)->q.fl, (n)->q.fl->q.bl = (o))
 
 /* Define macros actually used which if #define DEBUG_TRIPLES, adds debugging information. Since these macros are
  * used in several different queue types and since these debugging macros only work for the exorder field in triples,
@@ -48,6 +51,7 @@
 #  define dqdel(x, n)		DQDEL(x, n)
 #  define dqdelchain(x, y, n)	DQDELCHAIN(x, y, n)
 #  define dqins(q, n, x)	DQINS(q, n, x)
+#  define dqrins(q, n, x)	DQRINS(q, n, x)
 #  define dqadd(o, n, q)	DQADD(o, n, q)
 #  define CHKTCHAIN(x)
 #else
@@ -69,6 +73,12 @@
 {					\
 	IFEXOCHN(n, CHKTCHAIN(q));	\
 	DQINS(q, n, x);			\
+	IFEXOCHN(n, CHKTCHAIN(q));	\
+}
+#  define dqrins(q, n, x)		\
+{					\
+	IFEXOCHN(n, CHKTCHAIN(q));	\
+	DQRINS(q, n, x);		\
 	IFEXOCHN(n, CHKTCHAIN(q));	\
 }
 #  define dqadd(o, n, q)		\

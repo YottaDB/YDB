@@ -96,6 +96,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
                 return FALSE;
 	}
 	LSEEKREAD(udi->fd, (off_t)0, csd, SGMNT_HDR_LEN, status);
+	csa->hdr = csd;			/* needed for DB_LSEEKWRITE when instance is frozen */
 	if (0 != status)
 	{
 		gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);

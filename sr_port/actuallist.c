@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,15 +13,23 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
+#include "mdq.h"
+#include "fullbool.h"
 #include "advancewindow.h"
+#include "show_source_line.h"
 
-error_def	(ERR_MAXACTARG);
-error_def	(ERR_NAMEEXPECTED);
-error_def	(ERR_COMMAORRPAREXP);
+GBLREF	boolean_t	run_time;
+
+error_def(ERR_COMMAORRPAREXP);
+error_def(ERR_MAXACTARG);
+error_def(ERR_NAMEEXPECTED);
+error_def(ERR_SIDEEFFECTEVAL);
 
 	int actuallist (oprtype *opr)
 {
-	int		mask, parmcount;
+	boolean_t	se_warn;
+	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
+	int		i, j, mask, parmcount;
 	oprtype		ot;
 	triple		*counttrip, *masktrip, *ref0, *ref1, *ref2;
 	DCL_THREADGBL_ACCESS;
@@ -95,6 +103,33 @@ error_def	(ERR_COMMAORRPAREXP);
 				return FALSE;
 			}
 			ref0 = ref1;
+		}
+		if ((1 < parmcount) && (TREF(side_effect_base))[TREF(expr_depth)])
+		{	/* at least two arguments and at least one side effect - look for lvns needing protection */
+			assert(OLD_SE != TREF(side_effect_handling));
+			se_warn = (!run_time && (SE_WARN == TREF(side_effect_handling)));
+			for (i = 0, j = parmcount, ref0 = counttrip->operand[1].oprval.tref; --j;
+				ref0 = ref0->operand[1].oprval.tref)
+			{	/* no need to do the last argument - can't have a side effect after it */
+				assert(OC_PARAMETER == ref0->opcode);
+				assert((TRIP_REF == ref0->operand[0].oprclass) && (TRIP_REF == ref0->operand[1].oprclass));
+				if (!((1 << i++) & mask) && (OC_VAR == ref0->operand[0].oprval.tref->opcode))
+				{	/* can only protect pass-by-value (not pass-by-reference) */
+					ref1 = maketriple(OC_STOTEMP);
+					ref1->operand[0] = put_tref(ref0->operand[0].oprval.tref);
+					ref0->operand[0].oprval.tref = ref1;
+					dqins(ref0, exorder, ref1); 	/* NOTE:this violates information hiding */
+					if (se_warn)
+					{
+						TREF(last_source_column) = ref0->src.column;
+						show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
+						dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);
+					}
+				}
+			}
+			/* the following asserts check we're getting only TRIP_REF or empty operands */
+			assert((NO_REF == ref0->operand[0].oprclass) || (TRIP_REF == ref0->operand[0].oprclass));
+			assert(((NO_REF == ref0->operand[0].oprclass) ? TRIP_REF : NO_REF) == ref0->operand[1].oprclass);
 		}
 	}
 	advancewindow();

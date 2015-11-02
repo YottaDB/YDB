@@ -182,4 +182,6 @@ typedef struct mlk_stats_struct
 	gtm_uint64_t	n_user_locks_fail;
 } mlk_stats_t;
 
+#define MLK_FAIRNESS_DISABLED	((uint4)-1)
+
 #endif

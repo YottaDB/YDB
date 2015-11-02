@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2011 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -94,6 +94,19 @@ top			=	16
 	movb	$0, REG8_ACCUM	#variable argument list
         call    underr
         movq    REG64_RET0, \mval
+\label:
+.endm
+
+        .sbttl  mval_def.si    mv_force_defined_strict
+# ---------------------------------------
+#       mv_force_defined_strict(mval, label)
+# ---------------------------------------
+.macro  mv_force_defined_strict mval, label
+	testw   $(mval_m_str+mval_m_nm),mval_w_mvtype(\mval)
+	jne     \label
+	movq    \mval, REG64_ARG0
+	movb	$0, REG8_ACCUM	#variable argument list
+	call    underr_strict
 \label:
 .endm
 

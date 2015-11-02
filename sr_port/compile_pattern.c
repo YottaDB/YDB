@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,29 +32,23 @@ int compile_pattern(oprtype *opr, boolean_t is_indirect)
 	ptstr		retstr;
 	mval		retmval;
 	mstr		instr;
-	triple		*oldchain, *ref, tmpchain, *triptr;
+	triple		*oldchain, *ref;
+	save_se		save_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (is_indirect)
 	{
-		TREF(saw_side_effect) = TREF(shift_side_effects);
-		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
+		if (SHIFT_SIDE_EFFECTS)
 		{
-			dqinit(&tmpchain, exorder);
-			oldchain = setcurtchain(&tmpchain);
+			START_GVBIND_CHAIN(&save_state, oldchain);
 			if (!indirection(opr))
 			{
 				setcurtchain(oldchain);
 				return FALSE;
 			}
 			ref = newtriple(OC_INDPAT);
-			newtriple(OC_GVSAVTARG);
-			setcurtchain(oldchain);
-			dqadd(TREF(expr_start), &tmpchain, exorder);
-			TREF(expr_start) = tmpchain.exorder.bl;
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(TREF(expr_start));
+			PLACE_GVBIND_CHAIN(&save_state, oldchain);
 		} else
 		{
 			if (!indirection(opr))

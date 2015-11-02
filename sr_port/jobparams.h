@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,9 @@
 
 	JPDEF (jp_eol,			jpdt_nul),
 	JPDEF (jp_account,		jpdt_nul),
+#ifdef 	UNIX
+	JPDEF (jp_cmdline,		jpdt_str),
+#endif
 	JPDEF (jp_default,		jpdt_str),
 	JPDEF (jp_detached,		jpdt_nul),
 	JPDEF (jp_error,		jpdt_str),

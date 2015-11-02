@@ -32,6 +32,8 @@
 #include "compiler.h"
 #include "parm_pool.h"
 #include "get_ret_targ.h"
+#include "opcode.h"
+#include "glvn_pool.h"
 
 GBLREF	void		(*unw_prof_frame_ptr)(void);
 GBLREF	stack_frame	*frame_pointer, *zyerr_frame;
@@ -159,6 +161,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	if (is_tracing_on)
 		(*unw_prof_frame_ptr)();
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
+	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "unw_retarg: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",

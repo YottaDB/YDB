@@ -469,6 +469,9 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			dst->str.len = gtmImageNames[image_type].imageNameLen;
 			dst->str.addr = gtmImageNames[image_type].imageName;
 			break;
+		case VTK_LOGTPRESTART:
+			n = TREF(tprestart_syslog_delta);
+			break;
 #ifndef VMS
 		case VTK_JNLERROR:
 			n = TREF(error_on_jnl_file_lost);

@@ -50,7 +50,6 @@ gtmcrypt_interface.h
 gtmcrypt_pk_ref.h
 gtmcrypt_ref.h
 gtmcrypt_sym_ref.h
-gtmxc_types.h
 install.sh
 ld_verbose.out
 libgtmcrypt.dll

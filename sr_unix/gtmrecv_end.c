@@ -64,7 +64,7 @@ GBLREF	boolean_t		pool_init;
 int gtmrecv_endupd(void)
 {
 	pid_t 		savepid;
-	int		exit_status;
+	int		exit_status, status, save_errno;
 	pid_t		waitpid_res;
 
 	repl_log(stdout, TRUE, TRUE, "Initiating shut down of Update Process\n");
@@ -90,12 +90,17 @@ int gtmrecv_endupd(void)
 	/* Wait for the Update Process to detach */
 	if (0 == grab_sem(RECV, UPD_PROC_COUNT_SEM))
 	{
-		if(0 != (errno = rel_sem(RECV, UPD_PROC_COUNT_SEM)))
-			repl_log(stderr, TRUE, TRUE, "Error releasing the Update Process Count semaphore : %s\n", REPL_SEM_ERROR);
+		if (0 != (status = rel_sem(RECV, UPD_PROC_COUNT_SEM)))
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Error releasing the Update Process Count semaphore : %s\n",
+					STRERROR(save_errno));
+		}
 		repl_log(stdout, TRUE, TRUE, "Update Process exited\n");
 	} else
 	{
-		repl_log(stderr, TRUE, TRUE, "Error in update proc count semaphore : %s\n", REPL_SEM_ERROR);
+		save_errno = errno;
+		repl_log(stderr, TRUE, TRUE, "Error in update proc count semaphore : %s\n", STRERROR(save_errno));
 		exit_status = ABNORMAL_SHUTDOWN;
 	}
 	return (exit_status);
@@ -118,7 +123,10 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	recvpool.gtmrecv_local->shutdown = exit_status;
 	recvpool.gtmrecv_local->recv_serv_pid = 0;
 	if (0 > SHMDT(recvpool.recvpool_ctl))
-		repl_log(stderr, TRUE, TRUE, "Error detaching from Receive Pool : %s\n", REPL_STR_ERROR);
+	{
+		save_errno = errno;
+		repl_log(stderr, TRUE, TRUE, "Error detaching from Receive Pool : %s\n", STRERROR(save_errno));
+	}
 	recvpool.recvpool_ctl = NULL;
 	assert((NULL != jnlpool_ctl) && (jnlpool_ctl == jnlpool.jnlpool_ctl));
 	if (NULL != jnlpool.jnlpool_ctl)

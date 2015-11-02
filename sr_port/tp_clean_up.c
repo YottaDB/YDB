@@ -34,7 +34,7 @@
 #include "min_max.h"
 #ifdef GTM_TRIGGER
 #include <rtnhdr.h>
-#include "gv_trigger.h"		/* for INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
+#include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
 #endif
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -161,7 +161,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 				/* Cleanup any block-split info (of created block #) in gvtarget histories */
 				TP_CLEANUP_GVNH_SPLIT_IF_NEEDED(gvnh, 0);
 			}
-			GTMTRIG_ONLY(INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, FALSE));
+			GTMTRIG_ONLY(TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, FALSE));
 #			ifdef DEBUG
 			if (!process_exiting)
 			{	/* Ensure that we did not miss out on resetting clue for any gvtarget.
@@ -182,9 +182,10 @@ void	tp_clean_up(boolean_t rollback_flag)
 			local_tn++;	/* to effectively invalidate first_tp_srch_status of all gv_targets */
 		} else
 		{
-			GTMTRIG_ONLY(INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, TRUE));
+			GTMTRIG_ONLY(TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED(FALSE, TRUE));
 		}
-		GTMTRIG_ONLY(ASSERT_ZTRIGGER_CYCLE_RESET;) /* for all regions, we better have csa->db_dztrigger_cycle = 0*/
+		GTMTRIG_ONLY(assert(!TREF(gvt_triggers_read_this_tn));)
+		GTMTRIG_ONLY(TP_ASSERT_ZTRIGGER_CYCLE_RESET;) /* for all regions, we better have csa->db_dztrigger_cycle = 0*/
 		for (si = first_sgm_info;  si != NULL;  si = next_si)
 		{
 			TP_TEND_CHANGE_REG(si);

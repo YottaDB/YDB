@@ -60,9 +60,8 @@ GBLREF	gd_addr		*gd_header;
 GBLREF	io_pair          io_curr_device;
 GBLREF	io_desc          *active_device;
 GBLREF	gv_namehead	*gv_target;
-#ifdef UNIX
 GBLREF	boolean_t	jnlpool_init_needed;
-#endif
+GBLREF	mstr		sys_output;
 
 error_def(ERR_EXTRACTCTRLY);
 error_def(ERR_EXTRACTFILERR);
@@ -73,6 +72,7 @@ error_def(ERR_MUPCLIERR);
 error_def(ERR_NOSELECT);
 error_def(ERR_NULLCOLLDIFF);
 error_def(ERR_RECORDSTAT);
+error_def(ERR_EXTRFILEXISTS);
 
 LITDEF mval	mu_bin_datefmt	= DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(BIN_HEADER_DATEFMT) - 1,
 						      BIN_HEADER_DATEFMT, 0, 0);
@@ -167,16 +167,16 @@ void mu_extract(void)
 	mval				val, curr_gbl_name, op_val, op_pars;
 	mstr				chset_mstr;
 	gtm_chset_t 			saved_out_set;
-	coll_hdr	extr_collhdr;
+	coll_hdr			extr_collhdr;
 	int				bin_header_size;
 	int	 			reg_no;
 	boolean_t			is_any_file_encrypted = FALSE;
-	GTMCRYPT_ONLY(
-		unsigned short		hash_buff_len;
-		sgmnt_data_ptr_t	csd;
-		sgmnt_addrs		*csa;
-		muext_hash_hdr_ptr_t	hash_array;
-	)
+#	ifdef GTM_CRYPT
+	unsigned short			hash_buff_len;
+	sgmnt_data_ptr_t		csd;
+	sgmnt_addrs			*csa;
+	muext_hash_hdr_ptr_t		hash_array;
+#	endif
 
 	/* Initialize all local character arrays to zero before using */
 	memset(cli_buff, 0, SIZEOF(cli_buff));
@@ -252,11 +252,11 @@ void mu_extract(void)
 	/* For binary format, check whether all regions have same null collation order */
 	if (MU_FMT_BINARY == format)
 	{
-		GTMCRYPT_ONLY(
-			hash_buff_len = (SIZEOF(muext_hash_hdr) * gd_header->n_regions);
-			hash_array = (muext_hash_hdr *)malloc(hash_buff_len);
-			memset(hash_array, 0, hash_buff_len);
-		)
+#		ifdef GTM_CRYPT
+		hash_buff_len = (SIZEOF(muext_hash_hdr) * gd_header->n_regions);
+		hash_array = (muext_hash_hdr *)malloc(hash_buff_len);
+		memset(hash_array, 0, hash_buff_len);
+#		endif
 		for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions,
 				reg_std_null_coll = -1, reg_no = 0;
 					reg < region_top ; reg++, reg_no++)
@@ -286,32 +286,33 @@ void mu_extract(void)
 	}
 	grand_total.recknt = grand_total.reclen = grand_total.keylen = grand_total.datalen = 0;
 	global_total.recknt = global_total.reclen = global_total.keylen = global_total.datalen = 0;
-
 	n_len = SIZEOF(outfilename);
-	if (FALSE == cli_get_str("FILE", outfilename, &n_len))
+	if (CLI_PRESENT == cli_present("STDOUT"))
+		/* Redirect to standard output */
+		op_val.str = sys_output;
+	else if (FALSE == cli_get_str("FILE", outfilename, &n_len))
 	{
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
 		mupip_exit(ERR_MUPCLIERR);
-	}
-	if (-1 == Stat((char *)outfilename, &statbuf))
-        {
+	} else if (-1 == Stat((char *)outfilename, &statbuf))
+	{	/* Redirect to file */
 		if (ENOENT != errno)
 		{
 			local_errno = errno;
-			perror("Error opening output file");
+			gtm_putmsg(VARLSTCNT(5) ERR_EXTRACTFILERR, 2, LEN_AND_STR(outfilename), local_errno);
 			mupip_exit(local_errno);
 		}
+		op_val.str.len = filename_len = n_len;
+		op_val.str.addr = (char *)outfilename;
 	} else
 	{
-		util_out_print("Error opening output file: !AD -- File exists", TRUE, n_len, outfilename);
+		gtm_putmsg(VARLSTCNT(4) ERR_EXTRFILEXISTS, 2, LEN_AND_STR(outfilename));
 		mupip_exit(ERR_MUNOACTION);
 	}
 	op_pars.mvtype = MV_STR;
 	op_pars.str.len = SIZEOF(open_params_list);
 	op_pars.str.addr = (char *)open_params_list;
 	op_val.mvtype = MV_STR;
-	op_val.str.len = filename_len = n_len;
-	op_val.str.addr = (char *)outfilename;
 	(*op_open_ptr)(&op_val, &op_pars, 0, 0);
 	ESTABLISH(mu_extract_handler);
 	op_pars.str.len = SIZEOF(no_param);

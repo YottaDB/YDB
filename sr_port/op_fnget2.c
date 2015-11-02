@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,12 +12,15 @@
 #include "mdef.h"
 #include "op.h"
 
-void op_fnget2(mval *dst, mval *src, mval *defval)
+LITREF mval		literal_null;
+
+/* This gets a src from op_fnget1 or op_fngvget1 which either contains the "gotten" value or is undefined, in which case this
+ * returns the specified default value; this slight of hand deals with order of evaluation issues.
+ */
+void op_fnget2(mval *src, mval *def, mval *dst)
 {
-	MV_FORCE_DEFINED(defval);
-	if (src && MV_DEFINED(src))
-		*dst = *src;
-	else
-		*dst = *defval;
-	dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
+	MV_FORCE_DEFINED(def);
+	*dst = MV_DEFINED(src) ? *src : *def;
+	assert(0 == (dst->mvtype & MV_ALIASCONT));	/* Should be no alias container flag */
+	return;
 }

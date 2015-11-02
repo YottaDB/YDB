@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +22,6 @@
 #include "mvalconv.h"	/* for i2mval prototype for the MV_FORCE_MVAL macro */
 #include "fullbool.h"
 
-error_def(ERR_INDMAXNEST);
 error_def(ERR_VAREXPECTED);
 
 void	op_indincr(mval *dst, mval *increment, mval *target)
@@ -30,20 +29,18 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 	icode_str	indir_src;
 	int		rval;
 	mstr		*obj, object;
-	oprtype		v;
+	oprtype		v, getdst;
 	triple		*s, *src, *oldchain, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((TREF(ind_source_sp) >= TREF(ind_source_top)) || (TREF(ind_result_sp) >= TREF(ind_result_top)))
-		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp & ind_source_sp */
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
 	indir_src.code = indir_increment;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		obj = &object;
-		comp_init(&target->str);
+		comp_init(&target->str, &getdst);
 		src = newtriple(OC_IGETSRC);
 		switch (TREF(window_token))
 		{
@@ -99,14 +96,14 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 			break;
 		}
 		v = put_tref(s);
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &v, target->str.len))
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &v, &getdst, target->str.len))
 			return;
 		indir_src.str.addr = target->str.addr;
 		cache_put(&indir_src, obj);
 		/* Fall into code activation below */
 	}
-	*(TREF(ind_result_sp))++ = dst;
-	*(TREF(ind_source_sp))++ = increment;
+	TREF(ind_result) = dst;
+	TREF(ind_source) = increment;
 	comp_indr(obj);
 	return;
 }

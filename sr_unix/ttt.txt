@@ -161,25 +161,25 @@ OC_FNFIND:	pushab	val.0
 		pushab	val.1
 		calls	#4,xfer.xf_fnfind
 OC_FNFNUMBER:	pushab	val.0
+		pushl	val.4
+		pushl	val.3
 		pushab	val.2
 		pushab	val.1
-		calls	#3,xfer.xf_fnfnumber
+		calls	#5,xfer.xf_fnfnumber
 OC_FNGET:	movab	val.1,r1
 		movab	val.0,r0
 		jsb	xfer.xf_fnget
-OC_FNGET2:	pushab	val.2
+OC_FNGET2:	pushab	val.0
+		pushab	val.2
 		pushab	val.1
-		pushab	val.0
 		calls	#3,xfer.xf_fnget2
-OC_FNGVGET:	pushab	val.1
-		pushab	val.0
-		calls	#2,xfer.xf_fngvget
+OC_FNGVGET:	pushab	val.0
+		calls	#1,xfer.xf_fngvget
 OC_FNGVGET1:	pushab	val.0
 		calls	#1,xfer.xf_fngvget1
-OC_FNGVGET2:	pushab	val.2
- 		pushab	val.1
- 		pushab	val.0
- 		calls	#3,xfer.xf_fngvget2
+OC_FNGET1:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_fnget1
 OC_FNINCR:	pushab	val.0		; result of $INCR
 		pushab	val.2		; r->operand[1] = increment
 		pushab	val.1		; r->operand[0] = local-variable to increment
@@ -558,18 +558,14 @@ OC_INDDEVPARMS:	pushab	val.0
 		pushl	val.2
 		pushab	val.1
 		jsb	xfer.xf_inddevparms
-OC_INDFNNAME:	pushab	val.2		; r->operand[1]
-		pushab	val.1		; r->operand[0]
-		pushab	val.0		; result of $NAME
+OC_INDFNNAME:	pushab	val.2		; r->operand[1] = depth
+		pushab	val.1		; r->operand[0]	= name
+		pushab	val.0		; r->dst
 		jsb	xfer.xf_indfnname
 OC_INDFUN:	pushab	val.0
 		pushl	val.2
 		pushab	val.1
 		jsb	xfer.xf_indfun
-OC_INDGET:	pushab	val.2
-		pushab	val.1
-		pushab	val.0
-		jsb	xfer.xf_indget
 OC_INDGLVN:	pushab	val.0
 		pushab	val.1
 		jsb	xfer.xf_indglvn
@@ -586,16 +582,17 @@ OC_INDLVARG:	pushab	val.0
 OC_INDMERGE:	pushab	val.1
 		pushab	val.2
 		jsb	xfer.xf_indmerge
-OC_INDNAME:	irepab	val.2
+OC_INDNAME:	pushab	val.2
+		pushab	val.1
 		pushab	val.0
-		calls	val.1,xfer.xf_indname
+		calls	#3,xfer.xf_indname
 OC_INDLVNAMADR:	pushab	val.1
 		jsb	xfer.xf_indlvnamadr
 		movl	r0,addr.0
 OC_INDO2:	pushab	val.2
 		pushab	val.1
 		pushab	val.0
-		jsb	xfer.xf_indo2
+		calls	#3,xfer.xf_indo2
 OC_INDPAT:	pushab	val.0
 		pushab	val.1
 		jsb	xfer.xf_indpat
@@ -615,7 +612,8 @@ OC_IOCONTROL:	jsb     xfer.xf_restartpc
 		calls	val.1,xfer.xf_iocontrol
 OC_IRETMVAD:	movab	val.1,r1
 		jsb	xfer.xf_iretmvad
-OC_IRETMVAL:	pushab	val.1
+OC_IRETMVAL:	pushab 	val.2
+		pushab	val.1
 		jsb	xfer.xf_iretmval
 OC_JMP-BYTE:	brb	jmp.1
 OC_JMP-LONG:	jmp	jmp.1
@@ -975,13 +973,49 @@ OC_ZTRIGGER:	calls	#0,xfer.xf_ztrigger
 OC_ZTSTART:	calls	#0,xfer.xf_ztstart
 OC_ZWRITESVN:   pushl   val.1
                 calls   #1,xfer.xf_zwritesvn
-OC_RFRSHINDX:	pushl	val.2
-		pushl	val.1
-		calls	#2,xfer.xf_rfrshindx
+OC_FNZWRITE:    pushab  val.0                   ; destination mval
+                pushab  val.1                   ; string
+                calls   #2,xfer.xf_fnzwrite
+OC_IGETDST:	calls	#0,xfer.xf_igetdst
+		movl    r0,addr.0
+OC_INDGET1:	pushab	val.0
+		pushab	val.1
+		calls	#2,xfer.xf_indget1
+OC_GLVNPOP:	pushab	val.1
+		calls	#1,xfer.xf_glvnpop
+OC_GLVNSLOT:	pushl	val.1
+		calls	#1,xfer.xf_glvnslot
 		movl	r0,addr.0
-OC_SAVPUTINDX:	irepab	val.2
-		calls	val.1,xfer.xf_savputindx
+OC_INDSAVGLVN:	pushl	val.3
+		pushab	val.2
+		pushab	val.1
+		jsb	xfer.xf_indsavglvn
+OC_INDSAVLVN:	pushab	val.2
+		pushab	val.1
+		jsb	xfer.xf_indsavlvn
+OC_RFRSHLVN:	pushl	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_rfrshlvn
 		movl	r0,addr.0
-OC_FORFREEINDX:	calls	#0,xfer.xf_forfreeindx
-OC_FORNESTLVL:	pushl	val.1
-		calls	#1,xfer.xf_fornestlvl
+OC_SAVGVN:	irepab	val.2
+		calls	val.1,xfer.xf_savgvn
+OC_SAVLVN:	irepab	val.2
+		calls	val.1,xfer.xf_savlvn
+OC_SHARESLOT:	pushl	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_shareslot
+OC_STOGLVN:	pushab	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_stoglvn
+OC_RFRSHGVN:	pushl	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_rfrshgvn
+OC_INDFNNAME2:	pushab	val.2
+		pushab	val.1
+		pushab	val.0
+		calls	#3,xfer.xf_indfnname2
+OC_INDGET2:	pushab	val.1
+		pushab	val.0
+		calls	#2,xfer.xf_indget2
+OC_INDMERGE2:	pushab	val.1
+		calls	#1,xfer.xf_indmerge2

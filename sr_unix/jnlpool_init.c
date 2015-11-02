@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +54,7 @@
 #include "anticipatory_freeze.h"
 #include "have_crit.h"
 #include "gtmsource_srv_latch.h"
+#include "util.h"			/* For OUT_BUFF_SIZE */
 
 GBLREF	jnlpool_addrs				jnlpool;
 GBLREF	recvpool_addrs				recvpool;
@@ -64,7 +65,6 @@ GBLREF	gd_region				*gv_cur_region;
 GBLREF	jnlpool_ctl_ptr_t			temp_jnlpool_ctl;
 GBLREF	gtmsource_options_t			gtmsource_options;
 GBLREF	boolean_t				pool_init;
-GBLREF	uint4					process_id;
 GBLREF	seq_num					seq_num_zero;
 GBLREF	enum gtmImageTypes			image_type;
 GBLREF	node_local_ptr_t			locknl;
@@ -77,6 +77,11 @@ GBLREF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLREF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLREF	err_ctl					merrors_ctl;
 GBLREF	jnl_gbls_t				jgbl;
+
+#ifdef DEBUG
+GBLREF		boolean_t	is_jnlpool_creator;
+GBLREF		boolean_t	is_updhelper;
+#endif
 
 LITREF	char			gtm_release_name[];
 LITREF	int4			gtm_release_name_len;
@@ -147,7 +152,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 {
 	boolean_t		new_ipc, is_src_srvr, slot_needs_init, reset_gtmsrclcl_info, hold_onto_ftok_sem, srv_alive;
 	boolean_t		skip_locks;
-	char			machine_name[MAX_MCNAMELEN], instfilename[MAX_FN_LEN + 1];
+	char			machine_name[MAX_MCNAMELEN], instfilename[MAX_FN_LEN + 1], scndry_msg[OUT_BUFF_SIZE];
 	gd_region		*r_save, *reg;
 	int			status, save_errno;
 	int4			index;
@@ -195,7 +200,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		 * "ftok_sem_get" done with either "jnlpool.jnlpool_dummy_reg" region or "recvpool.recvpool_dummy_reg" region
 		 * locks the same entity.
 		 */
-		assert(is_updproc);	/* Should have already attached to receive pool only in case of update process */
+		assert(is_updproc || ((GTMRELAXED == pool_user) && is_updhelper));
 		reg = jnlpool.jnlpool_dummy_reg = recvpool.recvpool_dummy_reg;
 	}
 	udi = FILE_INFO(reg);
@@ -244,7 +249,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		if (repl_instance.crash)
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(4) ERR_REPLREQROLLBACK, 2, full_len, udi->fn);
+			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has crash field set to TRUE");
+			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 		}
 		DEBUG_ONLY(sem_created = TRUE);
 		new_ipc = TRUE;
@@ -253,7 +259,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error creating journal pool semaphore"), REPL_SEM_ERRNO);
+				RTS_ERROR_LITERAL("Error creating journal pool semaphore"), errno);
 		}
 		/* Following will set semaphore SOURCE_ID_SEM value as GTM_ID. In case we have orphaned semaphore
 		 * for some reason, mupip rundown will be able to identify GTM semaphores checking the value and can remove.
@@ -288,12 +294,16 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		{
 			save_errno = errno;
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(5) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, save_errno);
+			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with semctl on Journal Pool SEMID (%d)",
+					repl_instance.jnlpool_semid);
+			rts_error(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+					ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 		} else if (semarg.buf->sem_ctime != repl_instance.jnlpool_semid_ctime)
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
-					ERR_TEXT, 2, RTS_ERROR_TEXT("jnlpool sem_ctime does not match"));
+			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Creation time for Journal Pool SEMID (%d) is %d; Expected %d",
+					repl_instance.jnlpool_semid, semarg.buf->sem_ctime, repl_instance.jnlpool_semid_ctime);
+			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 		}
 		udi->semid = repl_instance.jnlpool_semid;
 		udi->gt_sem_ctime = repl_instance.jnlpool_semid_ctime;
@@ -308,7 +318,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		{
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
 			rts_error(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error with journal pool access semaphore"), REPL_SEM_ERRNO);
+				RTS_ERROR_LITERAL("Error with journal pool access semaphore"), errno);
 		}
 		udi->grabbed_access_sem = TRUE;
 	}
@@ -337,7 +347,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		save_errno = errno;
 		REMOVE_OR_RELEASE_SEM(new_ipc, udi);
 		ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-		rts_error(VARLSTCNT(5) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, save_errno);
+		SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with semctl on Journal Pool SHMID (%d)", repl_instance.jnlpool_shmid);
+		rts_error(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 	} else if (shmstat.shm_ctime != repl_instance.jnlpool_shmid_ctime)
 	{	/* shared memory was possibly reused (causing shm_ctime and jnlpool_shmid_ctime to be different. We can't rely
 		 * on the shmid as it could be connected to a valid instance file in a different environment. Create new IPCs
@@ -370,8 +381,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		{
 			REMOVE_OR_RELEASE_SEM(new_ipc, udi);
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
-					ERR_TEXT, 2, LEN_AND_LIT("file_corrupt field in instance file header is set to TRUE"));
+			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to TRUE");
+			rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 		}
 	}
 	if (new_ipc)
@@ -459,15 +470,14 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	START_HEARTBEAT_IF_NEEDED;
 	if (new_ipc)
 	{
-		if (ANTICIPATORY_FREEZE_AVAILABLE)
-			if (!init_anticipatory_freeze_errors()) /* setup merrors_array from $gtm_custom_errors file */
-			{
-				DETACH_AND_REMOVE_SHM_AND_SEM;	/* remove any sem/shm we had created */
-				udi->grabbed_access_sem = FALSE;
-				ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
-				rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Error initializing custom errors"));
-			}
+		jnlpool_ctl->instfreeze_environ_inited = FALSE;
+		if (ANTICIPATORY_FREEZE_AVAILABLE && !init_anticipatory_freeze_errors())
+		{
+			DETACH_AND_REMOVE_SHM_AND_SEM;	/* remove any sem/shm we had created */
+			udi->grabbed_access_sem = FALSE;
+			ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, TRUE);
+			rts_error(VARLSTCNT(6) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2, LEN_AND_LIT("Error initializing custom errors"));
+		}
 		jnlpool_ctl->critical_off = (sm_uc_ptr_t)csa->critical - (sm_uc_ptr_t)jnlpool_ctl;
 		jnlpool_ctl->filehdr_off = (sm_uc_ptr_t)jnlpool.repl_inst_filehdr - (sm_uc_ptr_t)jnlpool_ctl;
 		jnlpool_ctl->srclcl_array_off = (sm_uc_ptr_t)jnlpool.gtmsrc_lcl_array - (sm_uc_ptr_t)jnlpool_ctl;
@@ -851,6 +861,9 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		csa->nl->glob_sec_init = TRUE;
 		assert(NULL != jnlpool_creator);
 		*jnlpool_creator = TRUE;
+#		ifdef DEBUG
+		is_jnlpool_creator = TRUE;
+#		endif
 	} else if (NULL != jnlpool_creator)
 		*jnlpool_creator = FALSE;
 	/* If this is a supplementary instance, initialize strm_index to a non-default value.
@@ -970,11 +983,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	if (!hold_onto_ftok_sem && !ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, FALSE))
 		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	pool_init = TRUE;
-	if (ANTICIPATORY_FREEZE_AVAILABLE)
-	{	/* Set anticipatory freeze function pointers to be used later (in send_msg and rts_error) */
-		is_anticipatory_freeze_needed_fnptr = &is_anticipatory_freeze_needed;
-		set_anticipatory_freeze_fnptr = &set_anticipatory_freeze;
-	}
+	ENABLE_FREEZE_ON_ERROR;
 	return;
 }
 

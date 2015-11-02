@@ -77,9 +77,10 @@ void t_write_map (
 	cs->blk_checksum = 0;
 	cs->blk = blkhist->blk_num;
 	assert((cs->blk < csa->ti->total_blks) GTM_TRUNCATE_ONLY(|| (CDB_STAGNATE > t_tries)));
-	cs->old_block = blkhist->buffaddr;
+		cs->old_block = blkhist->buffaddr;
 	/* t_write_map operates on BUSY blocks and hence cs->blk_prior_state's free_status is set to FALSE unconditionally */
-	SET_NFREE(cs);
+	BIT_CLEAR_FREE(cs->blk_prior_state);
+	BIT_CLEAR_RECYCLED(cs->blk_prior_state);
 	old_block = (blk_hdr_ptr_t)cs->old_block;
 	assert(NULL != old_block);
 	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;

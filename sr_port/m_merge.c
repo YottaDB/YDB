@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,7 @@
 #include "cmd.h"
 #include "mvalconv.h"
 #include "advancewindow.h"
+#include "glvn_pool.h"
 
 error_def(ERR_EQUAL);
 error_def(ERR_RPARENMISSING);
@@ -28,13 +29,16 @@ error_def(ERR_VAREXPECTED);
 int m_merge(void)
 {
 	int		type;
+	boolean_t	used_glvn_slot;
 	mval		mv;
 	opctype 	put_oc;
-	oprtype 	mopr;
-	triple		*obp, *ref,  *restart, *s1, *sub, tmpchain;
+	oprtype 	mopr, control_slot;
+	triple		*obp, *ref, *restart, *s1, *sub, tmpchain;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	used_glvn_slot = FALSE;
+	sub = NULL;
 	restart = newtriple(OC_RESTARTPC);	/* Here is where a restart should pick up */
 	dqinit(&tmpchain, exorder);
 	/* Left Hand Side of EQUAL sign */
@@ -45,6 +49,8 @@ int m_merge(void)
 			return FALSE;
 		if (OC_PUTINDX == mopr.oprval.tref->opcode)
 		{	/* we insert left hand side argument into tmpchain. */
+			sub = mopr.oprval.tref;
+			put_oc = OC_PUTINDX;
 			dqdel(mopr.oprval.tref, exorder);
 			dqins(tmpchain.exorder.bl, exorder, mopr.oprval.tref);
 		}
@@ -84,9 +90,18 @@ int m_merge(void)
 		type = MARG1_LCL | MARG1_GBL;
 		MV_FORCE_MVAL(&mv, type);
 		MV_FORCE_STRD(&mv);
-		ref = maketriple(OC_INDMERGE);
-		ref->operand[0] = put_lit(&mv);
-		ref->operand[1] = mopr;
+		if (TREF(side_effect_handling))
+		{	/* save and restore the variable lookup for true left-to-right evaluation */
+			used_glvn_slot = TRUE;
+			INSERT_INDSAVGLVN(control_slot, mopr, ANY_SLOT, 0);	/* 0 flag to defer global reference */
+			ref = maketriple(OC_INDMERGE2);
+			ref->operand[0] = control_slot;
+		} else
+		{	/* quick and dirty old way */
+			ref = maketriple(OC_INDMERGE);
+			ref->operand[0] = put_lit(&mv);
+			ref->operand[1] = mopr;
+		}
 		/* we insert left hand side argument into tmpchain. */
 		dqins(tmpchain.exorder.bl, exorder, ref);
 		break;
@@ -101,6 +116,7 @@ int m_merge(void)
 	}
 	advancewindow();
 	/* Right Hand Side of EQUAL sign */
+	TREF(temp_subs) = FALSE;
 	switch (TREF(window_token))
 	{
 	case TK_IDENT:
@@ -117,6 +133,7 @@ int m_merge(void)
 		ref->operand[0] = put_ilit(MARG2_GBL);
 		break;
 	case TK_ATSIGN:
+		TREF(temp_subs) = TRUE;
 		if (!indirection(&mopr))
 		{
 			stx_error(ERR_VAREXPECTED);
@@ -140,6 +157,14 @@ int m_merge(void)
 	 */
 	obp = (TREF(curtchain))->exorder.bl;
 	dqadd(obp, &tmpchain, exorder);
+	if (TREF(temp_subs) && TREF(side_effect_handling) && sub)
+		create_temporaries(sub, put_oc);
+	TREF(temp_subs) = FALSE;
+	if (used_glvn_slot)
+	{
+		ref = newtriple(OC_GLVNPOP);
+		ref->operand[0] = control_slot;
+	}
 	ref = newtriple(OC_MERGE);
 	return TRUE;
 }

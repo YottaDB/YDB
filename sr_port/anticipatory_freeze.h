@@ -37,6 +37,10 @@ typedef void		(*set_anticipatory_freeze_t)(int msg_id);
 GBLREF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLREF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLREF	boolean_t				pool_init;
+GBLREF	boolean_t				mupip_jnl_recover;
+#ifdef DEBUG
+GBLREF	uint4					lseekwrite_target;
+#endif
 
 error_def(ERR_MUINSTFROZEN);
 error_def(ERR_MUINSTUNFROZEN);
@@ -46,29 +50,40 @@ error_def(ERR_REPLINSTFREEZECOMMENT);
 error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_REPLINSTUNFROZEN);
 
-#define SET_ANTICIPATORY_FREEZE_IF_NEEDED(MSG_ID, FREEZE_SET)							\
+
+#define ENABLE_FREEZE_ON_ERROR											\
+{														\
+	if (ANTICIPATORY_FREEZE_AVAILABLE)									\
+	{	/* Set anticipatory freeze function pointers to be used later (in send_msg and rts_error) */	\
+		is_anticipatory_freeze_needed_fnptr = &is_anticipatory_freeze_needed;				\
+		set_anticipatory_freeze_fnptr = &set_anticipatory_freeze;					\
+	}													\
+}
+
+#define CHECK_IF_FREEZE_ON_ERROR_NEEDED(MSG_ID, FREEZE_NEEDED, FREEZE_MSG_ID)					\
 {														\
 	GBLREF	jnlpool_addrs		jnlpool;								\
 	DCL_THREADGBL_ACCESS;											\
 														\
 	SETUP_THREADGBL_ACCESS;											\
-	if (ANTICIPATORY_FREEZE_AVAILABLE && (NULL != is_anticipatory_freeze_needed_fnptr))			\
+	if (!FREEZE_NEEDED && ANTICIPATORY_FREEZE_AVAILABLE && (NULL != is_anticipatory_freeze_needed_fnptr))	\
 	{	/* NOT gtmsecshr */										\
-		assert(NULL != set_anticipatory_freeze_fnptr);							\
 		if (IS_REPL_INST_UNFROZEN && (*is_anticipatory_freeze_needed_fnptr)(MSG_ID))			\
 		{												\
-			(*set_anticipatory_freeze_fnptr)(MSG_ID);						\
-			FREEZE_SET = TRUE;									\
+			FREEZE_NEEDED = TRUE;									\
+			FREEZE_MSG_ID = MSG_ID;									\
 		}												\
 	}													\
 }
 
-#define REPORT_INSTANCE_FROZEN(FREEZE_SET)										\
+#define FREEZE_INSTANCE_IF_NEEDED(FREEZE_NEEDED, FREEZE_MSG_ID)								\
 {															\
 	GBLREF	jnlpool_addrs		jnlpool;									\
 															\
-	if (FREEZE_SET)													\
+	if (FREEZE_NEEDED)												\
 	{														\
+		assert(NULL != set_anticipatory_freeze_fnptr);								\
+		(*set_anticipatory_freeze_fnptr)(FREEZE_MSG_ID);							\
 		send_msg(VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool.repl_inst_filehdr->inst_info.this_instname);	\
 		send_msg(VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);		\
 	}														\
@@ -95,10 +110,12 @@ error_def(ERR_REPLINSTUNFROZEN);
 
 #define AFREEZE_MASK				0x01
 #define ANTICIPATORY_FREEZE_AVAILABLE		(0 != (TREF(gtm_custom_errors)).len)
-#define ANTICIPATORY_FREEZE_HONORED(CSA)	(DBG_ASSERT(NULL != CSA)				\
-							((NULL != jnlpool.jnlpool_ctl)			\
-							&& (REPL_ALLOWED(((sgmnt_addrs *)CSA)->hdr))))
-#define ANTICIPATORY_FREEZE_ENABLED(CSA)	(ANTICIPATORY_FREEZE_HONORED(CSA)			\
+#define INSTANCE_FREEZE_HONORED(CSA)		(DBG_ASSERT(NULL != CSA)							\
+							((NULL != jnlpool.jnlpool_ctl)						\
+								&& ((REPL_ALLOWED(((sgmnt_addrs *)CSA)->hdr))			\
+							    		|| mupip_jnl_recover	/* recover or rollback */	\
+									|| ((sgmnt_addrs *)CSA)->nl->onln_rlbk_pid )))
+#define ANTICIPATORY_FREEZE_ENABLED(CSA)	(INSTANCE_FREEZE_HONORED(CSA)				\
 							&& ANTICIPATORY_FREEZE_AVAILABLE		\
 							&& (((sgmnt_addrs *)CSA)->hdr->freeze_on_fail))
 #define IS_REPL_INST_FROZEN			((NULL != jnlpool.jnlpool_ctl) && jnlpool.jnlpool_ctl->freeze)
@@ -134,7 +151,7 @@ error_def(ERR_REPLINSTUNFROZEN);
 																\
 	SETUP_THREADGBL_ACCESS;													\
 	assert(NULL != CSA);													\
-	if (ANTICIPATORY_FREEZE_HONORED(CSA))											\
+	if (INSTANCE_FREEZE_HONORED(CSA))											\
 	{															\
 		reg = ((sgmnt_addrs *)CSA)->region;										\
 		if (!IS_GTM_IMAGE)												\
@@ -234,22 +251,47 @@ error_def(ERR_REPLINSTUNFROZEN);
 
 #define GTM_REPL_INST_FSYNC(FD, RC)	GTM_FSYNC(FD, RC)
 
-#define	DB_LSEEKWRITE(csa, db_fn, fd, new_eof, buff, size, status)							\
+#define	LSEEKWRITE_IS_TO_NONE		0
+#define	LSEEKWRITE_IS_TO_DB		1
+#define	LSEEKWRITE_IS_TO_JNL		2
+
+#ifdef DEBUG
+#define	FAKE_ENOSPC(CSA, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS)						\
 {															\
-	int	lcl_status;												\
-															\
-	if (NULL != csa)												\
-		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);									\
-	LSEEKWRITE(fd, new_eof, buff, size, lcl_status);								\
-	if (ENOSPC == lcl_status)											\
-		wait_for_disk_space(csa, (char *)db_fn, fd, (off_t)new_eof, (char *)buff, (size_t)size, &lcl_status);	\
-	status = lcl_status;												\
+	if (!IS_DSE_IMAGE) /*DSE does not freeze so let it work as normal */						\
+		if ((NULL != CSA) && (NULL != ((sgmnt_addrs *)CSA)->nl) && ((sgmnt_addrs *)CSA)->nl->FAKE_WHICH_ENOSPC) \
+		{													\
+			LCL_STATUS = ENOSPC;										\
+			lseekwrite_target = LSEEKWRITE_TARGET;								\
+		}													\
+}
+#else
+#define	FAKE_ENOSPC(CSA, FAKE_ENOSPC, LSEEKWRITE_TARGET, LCL_STATUS) {}
+#endif
+
+
+#define	DB_LSEEKWRITE(csa, db_fn, fd, new_eof, buff, size, status)							\
+	DO_LSEEKWRITE(csa, db_fn, fd, new_eof, buff, size, status, fake_db_enospc, LSEEKWRITE_IS_TO_DB)
+
+#define	JNL_LSEEKWRITE(csa, jnl_fn, fd, new_eof, buff, size, status)							\
+	DO_LSEEKWRITE(csa, jnl_fn, fd, new_eof, buff, size, status, fake_jnl_enospc, LSEEKWRITE_IS_TO_JNL)
+
+#define DO_LSEEKWRITE(csa, fnptr, fd, new_eof, buff, size, status, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET)			\
+{																\
+	int	lcl_status;													\
+																\
+	if (NULL != csa)													\
+		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);										\
+	LSEEKWRITE(fd, new_eof, buff, size, lcl_status);									\
+	FAKE_ENOSPC(csa, FAKE_WHICH_ENOSPC, LSEEKWRITE_TARGET, lcl_status);							\
+	if (ENOSPC == lcl_status)												\
+	{															\
+		wait_for_disk_space(csa, (char *)fnptr, fd, (off_t)new_eof, (char *)buff, (size_t)size, &lcl_status);		\
+		assert(!((sgmnt_addrs *)csa)->nl->FAKE_WHICH_ENOSPC || (ENOSPC != lcl_status));					\
+	}															\
+	status = lcl_status;													\
 }
 
-/* Currently, writes to journal files are treated the same way as database files.
- * But the macros are defined so we have the ability to easily change them in the future in case needed.
- */
-#define	JNL_LSEEKWRITE		DB_LSEEKWRITE
 
 /* Currently, writes to replication instance files do NOT trigger instance freeze behavior.
  * Neither does a pre-existing instance freeze affect replication instance file writes.

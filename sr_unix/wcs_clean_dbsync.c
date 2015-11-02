@@ -54,6 +54,7 @@ GBLREF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
 GBLREF	boolean_t	 	mupip_jnl_recover;
 #ifdef DEBUG
 GBLREF	unsigned int		t_tries;
+GBLREF	volatile boolean_t	timer_in_handler;
 #endif
 
 /* Sync the filehdr (and epoch in the journal file if before imaging). The goal is to sync the database,
@@ -74,6 +75,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 
 	SETUP_THREADGBL_ACCESS;
 	csa = *csaptr;
+	assert(timer_in_handler);
 	assert(csa->dbsync_timer);	/* to ensure no duplicate dbsync timers */
 	CANCEL_DBSYNC_TIMER(csa);	/* reset csa->dbsync_timer now that the dbsync timer has popped */
 	assert(!csa->dbsync_timer);
@@ -186,16 +188,38 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			 * does NO msyncs of the database file during normal operation but instead only at database rundown.
 			 * So no need to do wcs_flu in this case.
 			 */
-			if ((NULL != jpc) && JNL_HAS_EPOCH(jpc->jnl_buff)
+			/* Write idle/free epoch only if db curr_tn did not change since when the last dirty cache record was
+			 * written in wcs_wtstart to when the dbsync timer (5 seconds) popped. If the curr_tn changed it means
+			 * some other update happened in between and things are no longer idle so the previous idle dbsync
+			 * timer can be stopped. A new timer will be written when the later updates finish and leave the db
+			 * idle again. Note that there are some race conditions where we might not be accurate in writing idle
+			 * EPOCH only when necessary (since we dont hold crit at the time we record csa->dbsync_timer_tn). But
+			 * any error will always be on the side of caution so we might end up writing more idle EPOCHs than
+			 * necessary. Also, even if we dont write an idle EPOCH (for example because we found an update
+			 * happened later but that update turned out to be a duplicate SET which will not start an idle
+			 * EPOCH timer), journal recovery already knows to handle the case where an idle EPOCH did not get
+			 * written. So things will still work but it might just take a little longer than usual.
+			 */
+			if (csa->dbsync_timer_tn == csa->ti->curr_tn)
+			{	/* Note that it is possible in rare cases that an online rollback took csa->ti->curr_tn back
+				 * and the exact # of updates happened concurrently to take csa->ti->curr_tn back to where it
+				 * was to match csa->dbsync_timer_tn. In this case, we will be writing an epoch unnecessarily
+				 * but this is a very rare situation that is considered okay to write the epoch in that case
+				 * as it keeps the if check simple for the most frequent path.
+				 */
+				if ((NULL != jpc) && JNL_HAS_EPOCH(jpc->jnl_buff)
 					? (((NOJNL == jpc->channel) || !JNL_FILE_SWITCHED(jpc))
 							&& (jpc->jnl_buff->epoch_tn < csa->ti->curr_tn))
 					: !is_mm && (cnl->last_wcsflu_tn < csa->ti->curr_tn))
-			{
-				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_CLEAN_DBSYNC);
-				BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
-				/* If MM, file could have been remapped by wcs_flu above.  If so, cs_data needs to be reset */
-				if (is_mm && (save_csaddrs == cs_addrs) && (save_csdata != cs_data))
-					save_csdata = cs_addrs->hdr;
+				{
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_CLEAN_DBSYNC);
+					BG_TRACE_PRO_ANY(csa, n_dbsync_writes);
+					/* If MM, file could have been remapped by wcs_flu above.
+					 * If so, cs_data needs to be reset.
+					 */
+					if (is_mm && (save_csaddrs == cs_addrs) && (save_csdata != cs_data))
+						save_csdata = cs_addrs->hdr;
+				}
 			}
 			dbsync_defer_timer = FALSE;
 			assert(!csa->hold_onto_crit); /* this ensures we can safely do unconditional rel_crit */
@@ -209,6 +233,11 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	if (dbsync_defer_timer)
 	{
 		assert(SIZEOF(INTPTR_T) == SIZEOF(csa));
+		/* Adding a new dbsync timer should typically be done in a deferred zone to avoid duplicate timer additions for the
+		 * same TID. But, in this case, we are guaranteed that timers won't pop as we are already in a timer handler. As
+		 * for the external interrupts, they should be okay to interrupt at this point since, unlike timer interrupts,
+		 * control won't return to mainline code. So, in either case, we can safely add the new timer.
+		 */
 		if (!csa->dbsync_timer)
 			START_DBSYNC_TIMER(csa, TIM_DEFER_DBSYNC);
 	}

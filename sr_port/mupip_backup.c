@@ -140,12 +140,12 @@ GBLREF	char		*repl_state_lit[];
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	void            (*call_on_signal)();
 GBLREF	gd_addr		*gd_header;
-GBLREF	boolean_t	jnlpool_init_needed;
 #ifdef DEBUG
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 #endif
 
 #ifdef UNIX
+GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -159,6 +159,7 @@ LITREF int4             gtm_release_name_len;
 
 error_def(ERR_BACKUPCTRL);
 error_def(ERR_BACKUPKILLIP);
+error_def(ERR_BKUPRUNNING);
 error_def(ERR_DBCCERR);
 error_def(ERR_DBFILERR);
 error_def(ERR_DBRDONLY);
@@ -271,7 +272,7 @@ void mupip_backup(void)
 	struct stat		stat_buf;
 	int			fstat_res, fclose_res, tmpfd;
 	gd_segment		*seg;
-	char			instfilename[MAX_FN_LEN + 1], *errptr;
+	char			instfilename[MAX_FN_LEN + 1], *errptr, scndry_msg[OUT_BUFF_SIZE];
 	unsigned int		full_len;
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;
@@ -550,7 +551,7 @@ void mupip_backup(void)
 		tempdir_trans_len = tempdir_trans.len;
 	} else
 		tempdir_trans_len = 0;
-	jnlpool_init_needed = TRUE;
+	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 	{	/* restore the original length since we are looping thru regions */
 		tempdir_trans.len = tempdir_trans_len;
@@ -895,17 +896,20 @@ void mupip_backup(void)
 		{
 			assert(inst_hdr->crash);
 			semarg.buf = &semstat;
-			if (-1 == semctl(inst_hdr->jnlpool_semid, 0, IPC_STAT, semarg))
+			if (-1 == semctl(sem_id, 0, IPC_STAT, semarg))
 			{
 				save_errno = errno;
-				gtm_putmsg(VARLSTCNT(5) ERR_REPLREQROLLBACK, 2, full_len, udi->fn, save_errno);
+				SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Error with semctl on Journal Pool SEMID (%d)", sem_id);
+				gtm_putmsg(VARLSTCNT(9) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
+						ERR_TEXT, 2, LEN_AND_STR(scndry_msg), save_errno);
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done1;
 			} else if (semarg.buf->sem_ctime != inst_hdr->jnlpool_semid_ctime)
 			{
-				save_errno = errno;
+				SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Creation time for Journal Pool SEMID (%d) is %d; Expected %d",
+						sem_id, semarg.buf->sem_ctime, inst_hdr->jnlpool_semid_ctime);
 				gtm_putmsg(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
-						ERR_TEXT, 2, RTS_ERROR_TEXT("jnlpool sem_ctime does not match"));
+						ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done1;
 			}
@@ -915,7 +919,8 @@ void mupip_backup(void)
 			{
 				save_errno = errno;
 				gtm_putmsg(VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
-						RTS_ERROR_LITERAL("Error with journal pool access semaphore"), REPL_SEM_ERRNO);
+						RTS_ERROR_LITERAL("Error with journal pool access semaphore"),
+						UNIX_ONLY(save_errno) VMS_ONLY(REPL_SEM_ERRNO));
 				error_mupip = TRUE;
 				goto repl_inst_bkup_done1;
 			}
@@ -927,9 +932,9 @@ void mupip_backup(void)
 		assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] || (INVALID_SEMID == sem_id));
 		if (inst_hdr->file_corrupt)
 		{
-			save_errno = errno;
+			SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to TRUE");
 			gtm_putmsg(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, full_len, udi->fn,
-					ERR_TEXT, 2, LEN_AND_LIT("file_corrupt field in instance file header is set to TRUE"));
+					ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 			error_mupip = TRUE;
 		}
 	}
@@ -1282,7 +1287,7 @@ repl_inst_bkup_done2:
 					if (TRUE == is_proc_alive(sbufh_p->backup_pid, sbufh_p->backup_image_count))
 					{
 					    	/* someone else is doing the backup */
-						util_out_print("!/Process !UL is backing up region !AD now.", TRUE,
+						gtm_putmsg(VARLSTCNT(5) ERR_BKUPRUNNING, 3,
 								sbufh_p->backup_pid, REG_LEN_STR(rptr->reg));
 						rptr->not_this_time = give_up_after_create_tempfile;
 						/* Decerement counter so that inhibited KILLs can now proceed */
@@ -1476,6 +1481,14 @@ repl_inst_bkup_done2:
 				sbufh_p->dskaddr = 0;
 				sbufh_p->backup_errno = 0;
 				sbufh_p->failed = 0;
+#				ifdef DEBUG
+				/* Once the process register its pid as backup_pid, sleep for the 1 seconds, so that test
+				 * tests hits the scenario where BKUPRUNNING message is printed. Note that sleep of 1 sec
+				 * is fine because it is the box boxes which are failing to hit the concurrency scenario.
+				 */
+				if (gtm_white_box_test_case_enabled && (WBTEST_CONCBKUP_RUNNING == gtm_white_box_test_case_number))
+					LONG_SLEEP(1);
+#				endif
 				VMS_ONLY(sbufh_p->backup_image_count = image_count);
 				/* Make sure that the backup queue does not have any remnants on it. Note that we do not
 				   depend on the queue count here as it is imperative that, in the event that the count

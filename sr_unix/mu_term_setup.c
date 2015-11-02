@@ -59,26 +59,27 @@ void mu_get_term_characterstics(void)
 void mu_reset_term_characterstics(void)
 {
 	int tcsetattr_res;
+	int save_errno;
 
 	/* Do not use TCSAFLUSH as it drains all buffered (but yet unprocessed) input in the terminal
 	 * even if that was for the next command at the shell prompt. TCSANOW seems to do what we want
 	 * (which is to reset terminal characteristics right away).
 	 */
-	Tcsetattr(STDIN_FILENO, TCSANOW, &term_in, tcsetattr_res);
+	Tcsetattr(STDIN_FILENO, TCSANOW, &term_in, tcsetattr_res, save_errno);
 	if (get_stdin_charc_pass && (-1 == tcsetattr_res))
 	{
 		PERROR("tcsetattr :");
 		FPRINTF(stderr, "Unable to set terminal characterstics for standard in\n");
 	}
 
-	Tcsetattr(STDOUT_FILENO, TCSANOW, &term_out, tcsetattr_res);
+	Tcsetattr(STDOUT_FILENO, TCSANOW, &term_out, tcsetattr_res, save_errno);
 	if (get_stdout_charc_pass && (-1 == tcsetattr_res))
 	{
 		PERROR("tcsetattr :");
 		FPRINTF(stderr, "Unable to set terminal characterstics for standard out\n");
 	}
 
-	Tcsetattr(STDERR_FILENO, TCSANOW, &term_err, tcsetattr_res);
+	Tcsetattr(STDERR_FILENO, TCSANOW, &term_err, tcsetattr_res, save_errno);
 	if (get_stderr_charc_pass && (-1 == tcsetattr_res))
 	{
 		PERROR("tcsetattr :");

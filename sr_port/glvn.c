@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +20,9 @@ error_def(ERR_VAREXPECTED);
 
 int glvn(oprtype *a)
 {
-	triple *oldchain, *ref, tmpchain, *triptr;
-	oprtype x1;
+	triple		*oldchain, *ref;
+	oprtype		x1;
+	save_se		save_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -37,29 +38,24 @@ int glvn(oprtype *a)
 		*a = put_tref(newtriple(OC_GVGET));
 		return TRUE;
 	case TK_ATSIGN:
-		TREF(saw_side_effect) = TREF(shift_side_effects);
-		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
+		if (SHIFT_SIDE_EFFECTS)
 		{
-			dqinit(&tmpchain, exorder);
-			oldchain = setcurtchain(&tmpchain);
+			START_GVBIND_CHAIN(&save_state, oldchain);
 			if (!indirection(&x1))
 			{
 				setcurtchain(oldchain);
 				return FALSE;
 			}
 			ref = newtriple(OC_INDGLVN);
-			newtriple(OC_GVSAVTARG);
-			setcurtchain(oldchain);
-			dqadd(TREF(expr_start), &tmpchain, exorder);
-			TREF(expr_start) = tmpchain.exorder.bl;
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(TREF(expr_start));
+			PLACE_GVBIND_CHAIN(&save_state, oldchain);
 		} else
 		{
 			if (!indirection(&x1))
 				return FALSE;
 			ref = newtriple(OC_INDGLVN);
 		}
+		if (TREF(expr_depth))
+			(TREF(side_effect_base))[TREF(expr_depth)] = (OLD_SE != TREF(side_effect_handling));
 		ref->operand[0] = x1;
 		*a = put_tref(ref);
 		return TRUE;

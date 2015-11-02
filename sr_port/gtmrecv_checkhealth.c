@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,7 +76,7 @@ int is_recv_srv_alive(void)
 
 int gtmrecv_checkhealth(void)
 {
-	int			rcv_status, upd_status, helper_status;
+	int			rcv_status, upd_status, helper_status, save_errno;
 	uint4			gtmrecv_pid, updproc_pid, updproc_pid_prev, helper_pid;
 	boolean_t		helper_alive;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
@@ -87,8 +87,9 @@ int gtmrecv_checkhealth(void)
 
 	if (0 > grab_sem(RECV, RECV_SERV_OPTIONS_SEM))
 	{
+		UNIX_ONLY(save_errno = errno);
 		repl_log(stderr, FALSE, TRUE, "Error grabbing recvpool option write lock : %s. Could not check health of Receiver"
-			 "Server/Update Process\n", REPL_SEM_ERROR);
+			 "Server/Update Process\n", UNIX_ONLY(STRERROR(save_errno)) VMS_ONLY(REPL_SEM_ERROR));
 		return (((SRV_ERR << 2) | SRV_ERR) + NORMAL_SHUTDOWN);
 	}
 

@@ -56,10 +56,11 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 	int4			status;
 	file_control		*fc;
 	unsigned char		*tmp_ptr;
-	GTMCRYPT_ONLY(
-		int		req_dec_blk_size;
-		int		crypt_status;
-	)
+#	ifdef GTM_CRYPT
+	int			in_len, gtmcrypt_errno;
+	char			*in;
+	gd_segment		*seg;
+#	endif
 	boolean_t 		have_blk = FALSE;
 	sgmnt_addrs		*csa;
 	GTM_SNAPSHOT_ONLY(
@@ -122,8 +123,8 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 #		endif
 	}
 #	ifdef GTM_CRYPT
-	req_dec_blk_size = MIN(mu_int_data.blk_size, ((blk_hdr_ptr_t)tmp_ptr)->bsiz) - SIZEOF(blk_hdr);
-	if (BLOCK_REQUIRE_ENCRYPTION(mu_int_data.is_encrypted, (((blk_hdr_ptr_t)tmp_ptr)->levl), req_dec_blk_size))
+	in_len = MIN(mu_int_data.blk_size, ((blk_hdr_ptr_t)tmp_ptr)->bsiz) - SIZEOF(blk_hdr);
+	if (BLOCK_REQUIRE_ENCRYPTION(mu_int_data.is_encrypted, (((blk_hdr_ptr_t)tmp_ptr)->levl), in_len))
 	{
 		/* The below assert cannot be moved before BLOCK_REQUIRE_ENCRYPTION check done above as tmp_ptr could
 		 * potentially point to a V4 block in which case the assert might fail when a V4 block is casted to
@@ -131,13 +132,13 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver)
 		 */
 		assert(((blk_hdr_ptr_t)tmp_ptr)->bsiz <= mu_int_data.blk_size);
 		assert(((blk_hdr_ptr_t)tmp_ptr)->bsiz >= SIZEOF(blk_hdr));
-		GTMCRYPT_DECODE_FAST(mu_int_encrypt_key_handle,
-				    (char *)(tmp_ptr + SIZEOF(blk_hdr)),
-				    req_dec_blk_size,
-				    NULL,
-				    crypt_status);
-		if (0 != crypt_status)
-			GC_RTS_ERROR(crypt_status, gv_cur_region->dyn.addr->fname);
+		in = (char *)(tmp_ptr + SIZEOF(blk_hdr));
+		GTMCRYPT_DECRYPT(csa, mu_int_encrypt_key_handle, in, in_len, NULL, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+		{
+			seg = gv_cur_region->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+		}
 	}
 #	endif
 	GDS_BLK_UPGRADE_IF_NEEDED(blk, tmp_ptr, tmp_ptr, &mu_int_data, ondsk_blkver, status, mu_int_data.fully_upgraded);

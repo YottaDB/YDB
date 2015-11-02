@@ -73,6 +73,7 @@ GBLREF	uint4		max_cache_memsize;	/* Maximum bytes used for indirect cache object
 GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilations */
 GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for created blocks in TP */
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
+GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 
 void	gtm_env_init(void)
 {
@@ -105,6 +106,12 @@ void	gtm_env_init(void)
 		val.addr = GTM_BOOLEAN;
 		val.len = SIZEOF(GTM_BOOLEAN) - 1;
 		TREF(gtm_fullbool) = trans_numeric(&val, &is_defined, TRUE);
+		/* gtm_boolean environment/logical */
+		val.addr = GTM_SIDE_EFFECT;
+		val.len = SIZEOF(GTM_SIDE_EFFECT) - 1;
+		TREF(side_effect_handling) = trans_numeric(&val, &is_defined, TRUE);
+		if (!is_defined)	/* default to original behavior */
+			TREF(side_effect_handling) = OLD_SE;
 		/* NOUNDEF environment/logical */
 		val.addr = GTM_NOUNDEF;
 		val.len = SIZEOF(GTM_NOUNDEF) - 1;
@@ -277,11 +284,21 @@ void	gtm_env_init(void)
 				}
 			}
 		}
+#		ifdef	UNIX
+		/* Initialize jnl_extract_nocol */
+		val.addr = GTM_EXTRACT_NOCOL;
+		val.len = STR_LIT_LEN(GTM_EXTRACT_NOCOL);
+		TREF(jnl_extract_nocol) = trans_numeric(&val, &is_defined, TRUE);
+#		endif
 		/* Initialize dollar_zmaxtptime */
 		val.addr = GTM_ZMAXTPTIME;
 		val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
 		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
 			TREF(dollar_zmaxtptime) = status;	 /* NOTE assignment above */
+		/* See if $gtm_ztrap_new/GTM_ZTRAP_NEW has been specified */
+		val.addr = ZTRAP_NEW;
+		val.len = SIZEOF(ZTRAP_NEW) - 1;
+		ztrap_new = logical_truth_value(&val, FALSE, NULL);
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 		TREF(gtm_env_init_done) = TRUE;

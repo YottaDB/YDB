@@ -544,7 +544,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 								 * we assume the block is in directory tree so as to have
 								 * it written to the snapshot file
 			 					 */
-								SET_DIR_TREE(&cw_set[cw_set_depth-1]);
+								BIT_SET_DIR_TREE(cw_set[cw_set_depth-1].blk_prior_state);
 								/* reset update_trans in case previous retry had set it to 0 */
 								update_trans = UPDTRNS_DB_UPDATED_MASK;
 								if (BLK_RECYCLED == bml_status)
@@ -554,6 +554,11 @@ void	mu_reorg_upgrd_dwngrd(void)
 									 */
 									assert(cw_set[cw_set_depth-1].mode == gds_t_write);
 									cw_set[cw_set_depth-1].mode = gds_t_write_recycled;
+									/* we SET block as NOT RECYCLED, otherwise, the mm_update()
+									 * or bg_update_phase2 may skip writing it to snapshot file
+									 * when its level is 0
+									 */
+									BIT_CLEAR_RECYCLED(cw_set[cw_set_depth-1].blk_prior_state);
 								}
 							} else
 							{	/* Block got converted by another process since we did the dsk_read.

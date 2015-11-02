@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,16 +16,20 @@
 #include <fcntl.h>
 
 #ifndef GTM_FD_TRACE
-#	define	CREAT			creat
-#	define	OPEN			open
-#	define	OPEN3			open
+#	define	CREAT	creat
+#	define	OPEN	open
+#	define	OPEN3	open
 #else
-#	define	CREAT			gtm_creat
-#	define	OPEN			gtm_open
-#	define	OPEN3			gtm_open3
-#	undef	open		/* in case this is already defined by <fcntl.h> (at least AIX and HPUX seem to do this) */
+/* Note we no longer redefine open to gtm_open because of the problems it creates requiring includes to be specified in
+ * a specific order (anything that includes this include must come BEFORE gdsfhead to avoid errors). This ordering was
+ * nearly impossible when trace flags were specified in error.h or gtm_trigger_src.h. At the time of this removal (10/2012),
+ * a search was completed to verify no open() calls existed that needed this support but that does not prevent new calls from
+ * being added. Therefore, attentiveness is required.
+ */
+#	define	CREAT	gtm_creat
+#	define	OPEN	gtm_open
+#	define	OPEN3	gtm_open3
 #	undef	creat		/* in case this is already defined by <fcntl.h> (at least AIX and HPUX seem to do this) */
-#	define	open	gtm_open
 #	define	creat	gtm_creat
 #endif
 

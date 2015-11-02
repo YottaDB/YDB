@@ -12,8 +12,8 @@
 /* Define macros to do system calls and restart as appropriate
  *
  * FCNTL, FCNTL3	Loop until fcntl call succeeds or fails with other than EINTR.
- * TCFLUSH		Loop until tcflush call succeeds or fails with other than EINTR.
- * TCSETATTR		Loop until tcsetattr call succeeds or fails with other than EINTR.
+ * TCFLUSH			Loop until tcflush call succeeds or fails with other than EINTR.
+ * Tcsetattr		Loop until tcsetattr call succeeds or fails with other than EINTR.
  */
 
 #ifndef EINTR_WRP_Included
@@ -225,13 +225,21 @@
 	} while(-1 == RC && EINTR == errno);	\
 }
 
-#define Tcsetattr(FDESC, WHEN, TERMPTR, RC)	\
-{						\
-	do					\
-	{					\
-	   RC = tcsetattr(FDESC, WHEN, TERMPTR);\
-	} while(-1 == RC && EINTR == errno);	\
+#if defined(UNIX)
+#define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO)		\
+{								\
+	GBLREF sigset_t block_ttinout;				\
+	sigset_t oldset;					\
+	int rc;							\
+	SIGPROCMASK(SIG_BLOCK, &block_ttinout, &oldset, rc);	\
+	do							\
+	{							\
+	   RC = tcsetattr(FDESC, WHEN, TERMPTR);		\
+	} while(-1 == RC && EINTR == errno);			\
+	ERRNO = errno;						\
+	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);		\
 }
+#endif
 
 #define TRUNCATE_FILE(PATH, LENGTH, RC)		\
 {						\

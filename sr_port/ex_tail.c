@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +31,7 @@ void ex_tail(oprtype *opr)
 	if (w & OCT_EXPRLEAF)
 		return;
 	assert(TRIP_REF == t->operand[0].oprclass);
-	assert((TRIP_REF == t->operand[1].oprclass) || (NOCLASS == t->operand[1].oprclass));
+	assert((TRIP_REF == t->operand[1].oprclass) || (NO_REF == t->operand[1].oprclass));
 	if (!(w & OCT_BOOL))
 	{
 		for (i = t->operand; ARRAYTOP(t->operand) > i; i++)

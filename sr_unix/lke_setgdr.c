@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,8 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_addr		*gd_header;
 GBLREF mval		dollar_zgbldir;
 
+error_def(ERR_NOTALLDBRNDWN);
+
 void lke_setgdr(void)
 {
 	gd_region 	*r_top;
@@ -43,6 +45,7 @@ void lke_setgdr(void)
 	bool		def;
 	short		len;
 	char		buf[256];
+	int4		rundown_status = EXIT_NRM;			/* if gds_rundown went smoothly */
 	static readonly char init_gdr[] = "gtmgbldir";
 
 	gvcmy_rundown();
@@ -54,8 +57,11 @@ void lke_setgdr(void)
 	  gv_cur_region++)
 	{
 		tp_change_reg();
-		gds_rundown();
+		UNIX_ONLY(rundown_status |=) gds_rundown();
 	}
+
+	if (EXIT_NRM != rundown_status)
+		rts_error(VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 
 	if (cli_present("gld"))
 	{
@@ -68,7 +74,7 @@ void lke_setgdr(void)
 	else
 	{
 		reset.mvtype = MV_STR;
-		reset.str.len = sizeof (init_gdr) - 1;
+		reset.str.len = SIZEOF(init_gdr) - 1;
 		reset.str.addr = init_gdr;
 	}
 

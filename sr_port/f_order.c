@@ -21,275 +21,209 @@
 #include "advancewindow.h"
 #include "mvalconv.h"
 #include "fullbool.h"
+#include "glvn_pool.h"
+#include "show_source_line.h"
 
-/* The following are static triples used to pass information between functions "f_order" and "set_opcode" */
-STATICDEF triple	*gvo2_savtarg1;	/* Save gv_currkey after processing gvn1 in $ORDER(gvn1,expr) */
-STATICDEF triple	*gvo2_savtarg2;	/* Save gv_currkey after processing gvn1 and expr in $ORDER(gvn1,expr) but before executing
-					 * the runtime function for $ORDER (OC_GVO2) */
-STATICDEF triple	*gvo2_pre_srchindx_triple;	/* the end of the triple chain before OC_SRCHINDX got inserted */
+GBLREF	boolean_t	run_time;
+GBLREF	short int	source_column;
 
 error_def(ERR_ORDER2);
+error_def(ERR_SIDEEFFECTEVAL);
 error_def(ERR_VAREXPECTED);
 
-LITDEF	opctype order_opc[last_obj][last_dir] =
+LITDEF	opctype order_opc[LAST_OBJECT][LAST_DIRECTION] =
 {
-	/* forward	backward	undecided */
-	{ OC_GVORDER,	OC_ZPREVIOUS,	OC_GVO2		},	/* global */
-	{ OC_FNLVNAME,	OC_FNLVPRVNAME, OC_FNLVNAMEO2	},	/* local_name */
-	{ OC_FNORDER,	OC_FNZPREVIOUS, OC_FNO2		},	/* local_sub */
-	{ OC_INDFUN,	OC_INDFUN,	OC_INDO2	}	/* indir */
+	/* FORWARD	BACKWARD	TBD */
+	{ OC_GVORDER,	OC_ZPREVIOUS,	OC_GVO2		},	/* GLOBAL */
+	{ OC_FNORDER,	OC_FNZPREVIOUS, OC_FNO2		},	/* LOCAL */
+	{ OC_FNLVNAME,	OC_FNLVPRVNAME, OC_FNLVNAMEO2	},	/* LOCAL_NAME */
+	{ OC_INDFUN,	OC_INDFUN,	OC_INDO2	}	/* INDIRECT */
 };
-
-STATICFNDEF boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr, oprtype *second_opr, enum order_obj object)
-{
-	enum order_dir	direction;
-	int4		dummy_intval;
-	triple		*gvo2_post_srchindx_triple, *oldchain, *s, *t1, *t2, *tp, tmpchain, *tmptriple, *x;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	if (TK_COMMA == TREF(window_token))
-	{
-		advancewindow();
-		if (local_sub == object)
-			gvo2_post_srchindx_triple = (TREF(curtchain))->exorder.bl;
-		if (global == object)
-		{	/* Prepare for OC_GVSAVTARG/OC_GVRECTARG processing in case second argument has global references.
-			 * If the first argument to $ORDER is a global variable and the second argument is a literal,
-			 *	then the opcodes generated are (in that order)
-			 *
-			 *	OC_GVNAME, EXPR, OC_GVO2
-			 *
-			 * But if the first argument is a global variable and the second argument is an expression that is
-			 *	not a literal, then the opcodes generated are (in that order)
-			 *
-			 *	OC_GVNAME, OC_SAVTARG1, EXPR, OC_SAVTARG2, OC_RECTARG1, OC_GVO2, OC_RECTARG2
-			 *
-			 * Note that OC_SAVTARG1 and OC_SAVTARG2 are the same opcode OC_SAVTARG but are placeholder indicators.
-			 * Similarly OC_RECTARG1 and OC_RECTARG2.
-			 *
-			 * This opcode order ensures that OC_GVO2 is presented the right gv_currkey on entry into function
-			 * "op_gvo2" as well as ensure that after the $ORDER returns, the naked indicator is set correctly.
-			 */
-			dqinit(&tmpchain, exorder);
-			oldchain = setcurtchain(&tmpchain);
-		}
-		if (EXPR_FAIL == expr(result_ptr, MUMPS_EXPR))
-		{
-			if (global == object)
-				setcurtchain(oldchain);
-			return FALSE;
-		}
-		assert(TRIP_REF == result_ptr->oprclass);
-		s = result_ptr->oprval.tref;
-		if (OC_LIT == s->opcode)
-		{
-			if (MV_IS_TRUEINT(&s->operand[0].oprval.mlit->v, &dummy_intval)
-					&& ((MV_BIAS == s->operand[0].oprval.mlit->v.m[1])
-						||  (-MV_BIAS == s->operand[0].oprval.mlit->v.m[1])))
-				direction = (MV_BIAS == s->operand[0].oprval.mlit->v.m[1]) ? forward : backward;
-			else
-			{
-				if (global == object)
-					setcurtchain(oldchain);
-				stx_error(ERR_ORDER2);
-				return FALSE;
-			}
-			if (global == object)
-			{	/* No need for OC_GVSAVTARG/OC_GVRECTARG processing as expr is a constant (no global references) */
-				setcurtchain(oldchain);
-				tmptriple = (TREF(curtchain))->exorder.bl;
-				dqadd(tmptriple, &tmpchain, exorder);
-			}
-		} else
-		{
-			direction = undecided;
-			if (global == object)
-			{	/* Need to do OC_GVSAVTARG/OC_GVRECTARG processing as expr could contain global references */
-				assert(OC_GVO2 == order_opc[object][direction]);
-				setcurtchain(oldchain);
-				/* Note down the value of gv_currkey at this point */
-				newtriple(OC_GVSAVTARG);
-				/* Add second argument triples */
-				gvo2_savtarg1 = (TREF(curtchain))->exorder.bl;
-				tmptriple = (TREF(curtchain))->exorder.bl;
-				dqadd(tmptriple, &tmpchain, exorder);
-				/* Note down the value of gv_currkey at this point */
-				newtriple(OC_GVSAVTARG);
-				gvo2_savtarg2 = (TREF(curtchain))->exorder.bl;
-			}
-		}
-	} else
-		direction = forward;
-	switch (object)
-	{
-	case global:
-		if (direction == undecided)
-			*second_opr = *result;
-		break;
-	case local_name:
-		if (direction == undecided)
-			*second_opr = *result;
-		else if (direction == forward)
-		{	/* The op_fnlvname rtn needs an extra parm - insert it now */
-			assert(OC_FNLVNAME == order_opc[object][direction]);
-			*second_opr = put_ilit(0);	/* Flag not to return aliases with no value */
-		}
-		break;
-	case local_sub:
-		if (direction == undecided)
-		{	/* This is $ORDER(subscripted-local-variable, expr). The normal order of evaluation would be
-			 *
-			 * 1) Evaluate subscripts of local variable
-			 * 2) Do OC_SRCHINDX
-			 * 3) Evaluate expr
-			 * 4) Do OC_FNORDER
-			 *
-			 * But it is possible that the subscripted local-variable is defined only by an extrinsic function
-			 * that is part of "expr". In that case, we should NOT do the OC_SRCHINDX before "expr" gets
-			 * evaluated (as otherwise OC_SRCHINDX will not return the right lv_val structure). That is, the
-			 * order of evaluation should be
-			 *
-			 * 1) Evaluate subscripts of local variable
-			 * 2) Evaluate expr
-			 * 3) Do OC_SRCHINDX
-			 * 4) Do OC_FNORDER
-			 *
-			 * The triples need to be reordered accordingly to implement the above evaluation order.
-			 * This reordering of triples is implemented below by recording the end of the triple chain
-			 * just BEFORE (variable "gvo2_pre_srchindx_triple") and just AFTER (variable
-			 * "gvo2_post_srchindx_triple") parsing the subscripted-local-variable first argument to
-			 * $ORDER. This is done partly in the function "f_order" and partly in "set_opcode". Once these
-			 * are recorded, the second argument "expr" is parsed and the triples generated. After this, we
-			 * start from gvo2_post_srchindx_triple and go back the triple chain until we find the OC_SRCHINDX
-			 * opcode or gvo2_pre_srchindx_triple whichever is earlier (e.g. for unsubscripted names
-			 * OC_SRCHINDX triple is not generated). This portion of the triple chain (that does the
-			 * OC_SRCHINDX computation) is deleted and added at the end of the current triple chain. This
-			 * accomplishes the desired evaluation reordering. Note that the value of the naked indicator is
-			 * not affected by this reordering (since OC_SRCHINDX does not do global references).
-			 */
-			for (tmptriple = gvo2_post_srchindx_triple; (OC_SRCHINDX != tmptriple->opcode);
-			      tmptriple = tmptriple->exorder.bl)
-			{
-				if (tmptriple == gvo2_pre_srchindx_triple)
-					break;
-			}
-			if (OC_SRCHINDX == tmptriple->opcode)
-			{
-				t1 = tmptriple->exorder.bl;
-				t2 = gvo2_post_srchindx_triple->exorder.fl;
-				dqdelchain(t1,t2,exorder);
-				dqinit(&tmpchain, exorder);
-				tmpchain.exorder.fl = tmptriple;
-				tmpchain.exorder.bl = gvo2_post_srchindx_triple;
-				gvo2_post_srchindx_triple->exorder.fl = &tmpchain;
-				tmptriple->exorder.bl = &tmpchain;
-				tmptriple = (TREF(curtchain))->exorder.bl;
-				dqadd(tmptriple, &tmpchain, exorder);
-			}
-			s = newtriple(OC_PARAMETER);
-			s->operand[0] = *second_opr;
-			s->operand[1] = *result;
-			*second_opr = put_tref(s);
-		}
-		break;
-	case indir:
-		if (direction == forward)
-			*second_opr = put_ilit((mint)indir_fnorder1);
-		else
-			if (direction == backward)
-				*second_opr = put_ilit((mint)indir_fnzprevious);
-			else
-				*second_opr = *result;
-		break;
-	default:
-		assert(FALSE);
-	}
-	r->opcode = order_opc[object][direction];
-	return TRUE;
-}
 
 int f_order(oprtype *a, opctype op)
 {
+	boolean_t	ok, used_glvn_slot;
+	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
+	enum order_dir	direction;
 	enum order_obj	object;
-	oprtype		result, *result_ptr, *second_opr;
-	triple		*oldchain, *r, tmpchain, *triptr;
+	int4		dummy_intval;
+	opctype		gv_oc;
+	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
+	short int	column;
+	triple		*oldchain, *r, *sav_dirref, *sav_gv1, *sav_gvn, *sav_lvn, *sav_ref, *share, *triptr;
+	triple		*chain2, *obp, tmpchain2;
+	save_se		save_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	result_ptr = (oprtype *)mcalloc(SIZEOF(oprtype));
-	result = put_indr(result_ptr);
-	r = maketriple(OC_NOOP);	/* We'll fill in the opcode later, when we figure out what it is */
+	oldchain = sav_dirref = NULL;			/* default to no direction and no shifting indirection */
+	used_glvn_slot = FALSE;
+	sav_gv1 = TREF(curtchain);
+	r = maketriple(OC_NOOP);			/* We'll fill in the opcode later, when we figure out what it is */
 	switch (TREF(window_token))
 	{
 	case TK_IDENT:
 		if (TK_LPAREN == TREF(director_token))
-		{	/* See comment in "set_opcode" for why we maintain "gvo2_pre_srchindx_triple" here */
-			gvo2_pre_srchindx_triple = (TREF(curtchain))->exorder.bl;
-			if (!lvn(&r->operand[0], OC_SRCHINDX, r))
-				return FALSE;
-			object = local_sub;
+		{
+			object = LOCAL;
+			ok = lvn(&r->operand[0], OC_SRCHINDX, r);	/* 2nd arg causes us to mess below with return from lvn */
 		} else
 		{
+			object = LOCAL_NAME;
+			ok = TRUE;
 			r->operand[0] = put_str((TREF(window_ident)).addr, (TREF(window_ident)).len);
 			advancewindow();
-			object = local_name;
 		}
-			second_opr = &r->operand[1];
+		next_oprptr = &r->operand[1];
 		break;
 	case TK_CIRCUMFLEX:
-		if (!gvn())
-			return FALSE;
-		object = global;
-		second_opr = &r->operand[0];
+		object = GLOBAL;
+		ok = gvn();
+		sav_gvn = (TREF(curtchain))->exorder.bl;
+		next_oprptr = &r->operand[0];
 		break;
 	case TK_ATSIGN:
-		TREF(saw_side_effect) = TREF(shift_side_effects);
-		if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
-		{
-			dqinit(&tmpchain, exorder);
-			oldchain = setcurtchain(&tmpchain);
-			if (!indirection(&r->operand[0]))
-			{
-				setcurtchain(oldchain);
-				return FALSE;
-			}
-			if (!set_opcode(r, &result, result_ptr, &r->operand[1], indir))
-				return FALSE;
-			ins_triple(r);
-			newtriple(OC_GVSAVTARG);
-			setcurtchain(oldchain);
-			dqadd(TREF(expr_start), &tmpchain, exorder);
-			TREF(expr_start) = tmpchain.exorder.bl;
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(TREF(expr_start));
-			*a = put_tref(r);
-			return TRUE;
-		}
-		if (!indirection(&r->operand[0]))
-			return FALSE;
-		object = indir;
-		second_opr = &r->operand[1];
+		object = INDIRECT;
+		if (SHIFT_SIDE_EFFECTS)
+			START_GVBIND_CHAIN(&save_state, oldchain);
+		ok = indirection(&r->operand[0]);
+		next_oprptr = &r->operand[1];
 		break;
 	default:
-		stx_error(ERR_VAREXPECTED);
+		ok = FALSE;
+		break;
+	}
+	if (!ok)
+	{
+		if (NULL != oldchain)
+			setcurtchain(oldchain);
 		return FALSE;
 	}
-	if (set_opcode(r, &result, result_ptr, second_opr, object))
-	{	/* Restore gv_currkey of the first argument (in case the second expression contained a global reference).
-		 * This will ensure op_gvo2 has gv_currkey set properly on entry */
-		if (OC_GVO2 == r->opcode)
+	if (TK_COMMA != TREF(window_token))
+		direction = FORWARD;	/* default direction */
+	else
+	{	/* two argument form: ugly logic for direction */
+		advancewindow();
+		column = source_column;
+		dir_oprptr = (oprtype *)mcalloc(SIZEOF(oprtype));
+		dir_opr = put_indr(dir_oprptr);
+		sav_ref = newtriple(OC_GVSAVTARG);
+		DISABLE_SIDE_EFFECT_AT_DEPTH;		/* doing this here let's us know specifically if direction had SE threat */
+		if (EXPR_FAIL == expr(dir_oprptr, MUMPS_EXPR))
 		{
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(gvo2_savtarg1);
-			ins_triple(r);
-			/* Restore gv_currkey to what it was after evaluating the second argument (to preserved naked indicator) */
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(gvo2_savtarg2);
+			if (NULL != oldchain)
+				setcurtchain(oldchain);
+			return FALSE;
+		}
+		assert(TRIP_REF == dir_oprptr->oprclass);
+		triptr = dir_oprptr->oprval.tref;
+		if (OC_LIT == triptr->opcode)
+		{	/* if direction is a literal - pick it up and stop flailing about */
+			if (MV_IS_TRUEINT(&triptr->operand[0].oprval.mlit->v, &dummy_intval)
+					&& ((MV_BIAS == triptr->operand[0].oprval.mlit->v.m[1])
+					||  (-MV_BIAS == triptr->operand[0].oprval.mlit->v.m[1])))
+			{
+				direction = (MV_BIAS == triptr->operand[0].oprval.mlit->v.m[1]) ? FORWARD : BACKWARD;
+				sav_ref->opcode = OC_NOOP;
+				sav_ref = NULL;
+			} else
+			{	/* bad direction */
+				if (NULL != oldchain)
+					setcurtchain(oldchain);
+				stx_error(ERR_ORDER2);
+				return FALSE;
+			}
 		} else
+		{
+			direction = TBD;
+			sav_dirref = newtriple(OC_GVSAVTARG);		/* $R reflects direction eval even if we revisit 1st arg */
+			triptr = newtriple(OC_GVRECTARG);
+			triptr->operand[0] = put_tref(sav_ref);
+			switch (object)
+			{
+			case GLOBAL:		/* The direction may have had a side effect, so take copies of subscripts */
+				*next_oprptr = *dir_oprptr;
+				for (; sav_gvn != sav_gv1; sav_gvn = sav_gvn->exorder.bl)
+				{	/* hunt down the gv opcode */
+					gv_oc = sav_gvn->opcode;
+					if ((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc))
+						break;
+				}
+				assert((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc));
+				TREF(temp_subs) = TRUE;
+				create_temporaries(sav_gvn, gv_oc);
+				break;
+			case LOCAL:		/* Additionally need to move srchindx triple to after potential side effect */
+				triptr = newtriple(OC_PARAMETER);
+				triptr->operand[0] = *next_oprptr;
+				triptr->operand[1] = *(&dir_opr);
+				*next_oprptr = put_tref(triptr);
+				sav_lvn = r->operand[0].oprval.tref;
+				assert((OC_SRCHINDX == sav_lvn->opcode) || (OC_VAR == sav_lvn->opcode));
+				if (OC_SRCHINDX == sav_lvn->opcode)
+				{
+					dqdel(sav_lvn, exorder);
+					ins_triple(sav_lvn);
+					TREF(temp_subs) = TRUE;
+					create_temporaries(sav_lvn, OC_SRCHINDX);
+				}
+				assert(&r->operand[1] == next_oprptr);
+				assert(TRIP_REF == next_oprptr->oprclass);
+				assert(OC_PARAMETER == next_oprptr->oprval.tref->opcode);
+				assert(TRIP_REF == next_oprptr->oprval.tref->operand[0].oprclass);
+				sav_lvn = next_oprptr->oprval.tref->operand[0].oprval.tref;
+				if ((OC_VAR == sav_lvn->opcode) || (OC_GETINDX == sav_lvn->opcode))
+				{	/* lvn excludes the last subscript from srchindx and attaches it to the "parent"
+					 * now we find it is an lvn and needs protection too
+					 */
+					triptr = maketriple(OC_STOTEMP);
+					triptr->operand[0] = put_tref(sav_lvn);
+					dqins(sav_lvn, exorder, triptr);		/* NOTE: violation of info hiding */
+					next_oprptr->oprval.tref->operand[0].oprval.tref = triptr;
+				}
+				break;
+			case INDIRECT:		/* Save and restore the variable lookup for true left-to-right evaluation */
+				*next_oprptr = *dir_oprptr;
+				used_glvn_slot = TRUE;
+				dqinit(&tmpchain2, exorder);
+				chain2 = setcurtchain(&tmpchain2);
+				INSERT_INDSAVGLVN(control_slot, r->operand[0], ANY_SLOT, 1);
+				setcurtchain(chain2);
+				obp = sav_ref->exorder.bl;	/* insert before second arg */
+				dqadd(obp, &tmpchain2, exorder);
+				r->operand[0] = control_slot;
+				break;
+			case LOCAL_NAME:	/* left argument is a string - side effect can't screw it up */
+				*next_oprptr = *dir_oprptr;
+				break;
+			default:
+				assert(FALSE);
+			}
 			ins_triple(r);
-		*a = put_tref(r);
-		return TRUE;
+			if (used_glvn_slot)
+			{
+				triptr = newtriple(OC_GLVNPOP);
+				triptr->operand[0] = control_slot;
+			}
+			if (SE_WARN_ON && (TREF(side_effect_base))[TREF(expr_depth)])
+				ISSUE_SIDEEFFECTEVAL_WARNING(column - 1);
+			DISABLE_SIDE_EFFECT_AT_DEPTH;		/* usual side effect processing doesn't work for $ORDER() */
+		}
 	}
-	return FALSE;
+	if (TBD != direction)
+		ins_triple(r);
+	if (NULL != sav_dirref)
+	{
+		triptr = newtriple(OC_GVRECTARG);
+		triptr->operand[0] = put_tref(sav_dirref);
+	}
+	r->opcode = order_opc[object][direction];		/* finally - the op code */
+	if (NULL != oldchain)
+		PLACE_GVBIND_CHAIN(&save_state, oldchain); 	/* shift chain back to "expr_start" */
+	if (OC_FNLVNAME == r->opcode)
+		*next_oprptr = put_ilit(0);			/* Flag not to return aliases with no value */
+	if (OC_INDFUN == r->opcode)
+		*next_oprptr = put_ilit((mint)((FORWARD == direction) ? indir_fnorder1 : indir_fnzprevious));
+	*a = put_tref(r);
+	return TRUE;
 }

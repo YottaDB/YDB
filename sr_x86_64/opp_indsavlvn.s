@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -10,7 +10,7 @@
 #################################################################
 
 #	PAGE	,132
-	.title	opp_indo2.s
+	.title	opp_indsavlvn.s
 
 #	.386
 #	.MODEL	FLAT, C
@@ -18,22 +18,21 @@
 .include "linkage.si"
 	.INCLUDE	"g_msf.si"
 
-	.sbttl	opp_indo2
+	.sbttl	opp_indsavlvn
 #	PAGE	+
 	.DATA
 .extern	frame_pointer 	# /* :DWORD */
 
 	.text
-.extern	op_indo2
+.extern	op_indsavlvn
 
-# PUBLIC	opp_indo2
-ENTRY opp_indo2  	# /* PROC */
+# PUBLIC	opp_indsavlvn
+ENTRY opp_indsavlvn 	# /* PROC */
 	putframe
-	addl	$4,%esp
-	call	op_indo2
-	addl	$12,%esp
+	addq	$8,REG_SP   # burn return PC
+	call	op_indsavlvn
 	getframe
 	ret
-# opp_indo2 ENDP
+# opp_indsavlvn ENDP
 
 # END

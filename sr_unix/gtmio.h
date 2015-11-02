@@ -43,13 +43,15 @@
 #ifndef GTMIO_Included
 #define GTMIO_Included
 
-#include <sys/types.h>
-#include "gtm_stat.h"
-#include "gtm_unistd.h"
-#include "gtm_fcntl.h"
-#include "eintr_wrappers.h"
-#include "min_max.h"
-#include "wbox_test_init.h"
+#ifndef GTMIO_MINIMAL		/* Avoid pulling in includes that make gtm_icu.c uncompilable */
+# include <sys/types.h>
+# include "gtm_stat.h"
+# include "gtm_unistd.h"
+# include "gtm_fcntl.h"
+# include "eintr_wrappers.h"
+# include "min_max.h"
+# include "wbox_test_init.h"
+#endif
 
 #ifdef __linux__
 #include <sys/vfs.h>

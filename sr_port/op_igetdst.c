@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,18 +10,12 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include "gtm_string.h"
 #include "op.h"
-#include "lv_val.h"
-#include "stack_frame.h"
 
-GBLREF	stack_frame		*frame_pointer;
-
-/* free FOR saved indx pointers at the current M stack level */
-void op_forfreeindx(void)
+mval *op_igetdst(void)
 {
-	assert(NULL != frame_pointer->for_ctrl_stack);
-	FREE_SAVED_FOR_INDX(frame_pointer)
-	frame_pointer->for_ctrl_stack = NULL;
-	return;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	return TREF(ind_result);	/* see comment in comp_init.c */
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,9 +19,23 @@
 #include "op.h"
 #include "lv_val.h"
 
+#ifdef DEBUG	/* all of below is needed by the gv_target/cs_addrs assert */
+#include "gdsroot.h"
+#include "gdskill.h"
+#include "gdsblk.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#endif
+
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval           *curr_symval;
+#ifdef DEBUG
 GBLREF int		process_exiting;
+GBLREF gv_namehead	*gv_target;
+GBLREF sgmnt_addrs	*cs_addrs;
+#endif
 
 #ifdef UNIX
 void gtm_fetch(unsigned int cnt_arg, unsigned int indxarg, ...)
@@ -40,6 +54,11 @@ void gtm_fetch(unsigned int indxarg, ...)
 
 	SETUP_THREADGBL_ACCESS;
 	assert(!process_exiting);	/* Verify that no process unwound the exit frame and continued */
+	DEBUG_ONLY(DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);) /* surrounding DEBUG_ONLY needed because gdsfhead.h is
+									   * not included for pro builds and so the macro and its
+									   * parameters would be undefined in that case causing a
+									   * compile-time error.
+									   */
 	assert(!TREF(in_zwrite));	/* Verify in_zwrite was not left on */
 	VAR_START(var, indxarg);
 	VMS_ONLY(va_count(cnt);)

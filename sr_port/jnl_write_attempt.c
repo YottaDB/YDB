@@ -37,6 +37,8 @@
 #include "repl_msg.h"			/* needed for gtmsource.h */
 #include "gtmsource.h"			/* needed for jnlpool_addrs typedef */
 #include "gtmmsg.h"
+#include "io.h"                 /* needed by gtmsecshr.h */
+#include "gtmsecshr.h"          /* for continue_proc */
 #endif
 #include "gtm_c_stack_trace.h"
 
@@ -171,7 +173,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			{	/* no one home, clear the semaphore; */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				jnl_send_oper(jpc, ERR_JNLFLUSH);
-				send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, CURRENT_WRITER);
+				send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, writer);
 				send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Journal IO writer changed during wait"));
 				VMS_ONLY(jb->io_in_prog = 0);
 				UNIX_ONLY(COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0));
@@ -186,11 +188,12 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_stuck);
 			jpc->status = status;
 			jnl_send_oper(jpc, ERR_JNLFLUSH);
-			send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, CURRENT_WRITER);
+			send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, writer);
 			stuck_cnt++;
-			GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, CURRENT_WRITER, stuck_cnt);
+			GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, writer, stuck_cnt);
 			*lcnt = 1;	/* ??? is it necessary to limit this, and if so, how ??? */
 			status = ERR_JNLPROCSTUCK;
+			UNIX_ONLY(continue_proc(writer));
 			break;
 		}
 		break;
@@ -285,8 +288,9 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				FIX_NONZERO_FREE_UPDATE_PID(csa, jb);
 			} else
 			{
-				assert(gtm_white_box_test_case_enabled
-					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number));
+				assert((gtm_white_box_test_case_enabled
+					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))
+				       UNIX_ONLY(|| TREF(gtm_test_fake_enospc)));
 				if (JNL_ENABLED(csa->hdr))
 				{	/* We ignore the return value of jnl_file_lost() since we always want to report the journal
 					 * error, whatever its error handling method is.  Also, an operator log will be sent by some

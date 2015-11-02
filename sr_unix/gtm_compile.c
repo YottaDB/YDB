@@ -113,5 +113,5 @@ int	gtm_compile (void)
 	print_exit_stats();
 	SET_PROCESS_EXITING_TRUE;	/* needed by remove_rms($principal) to avoid closing that */
 	io_rundown(NORMAL_RUNDOWN);
-	return (SS_NORMAL == TREF(dollar_zcstatus)) ? SS_NORMAL : -1;
+	return (SS_NORMAL == TREF(dollar_zcstatus)) ? SS_NORMAL : 1;
 }

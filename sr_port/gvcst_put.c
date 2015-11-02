@@ -73,7 +73,7 @@
 #include "error.h"
 #include "gtmimagename.h" /* for spanning nodes */
 #ifdef UNIX
-#include "preemptive_ch.h"
+#include "preemptive_db_clnup.h"
 #endif
 
 #ifdef GTM_TRIGGER
@@ -151,37 +151,37 @@ error_def(ERR_UNIMPLOP);
 /* Before issuing an error, add GVT to the list of known gvts in this TP transaction in case it is not already done.
  * This GVT addition is usually done by "tp_hist" but that function has most likely not yet been invoked in gvcst_put.
  * Doing this addition will ensure we remember to reset any non-zero clue in dir_tree as part of tp_clean_up when a TROLLBACK
- * or TRESTART (implicit or explicit) occurs. Not doing so could cause transfer of control from the current gvcst_put action
- * to a user-defined error trap which if it does further database references, it could end up using invalid clues from GVT
- * and potentially incorrectly commit the transaction causing db integ errors as well.
+ * or TRESTART (implicit or explicit) occurs. Not doing so could means if an rts_error(ERR_REC2BIG) happens here, control will
+ * go to the error trap and if it does a TROLLBACK (which does a tp_clean_up) we would be left with a potentially out-of-date
+ * clue of GVT which if used for later global references could result in db integ errors.
  */
-#define	ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, GVT)								\
-{														\
-	if (dollar_tlevel)											\
-		ADD_TO_GVT_TP_LIST(GVT);	/* note: macro also updates read_local_tn if necessary */	\
-	if (VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +) value.len > gv_cur_region->max_rec_size)		\
-	{                                                                                                       \
-		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))			\
-			end = &buff[MAX_ZWR_KEY_SZ - 1];                                                        \
-		rts_error(VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +)	\
-			  value.len, (int4)gv_cur_region->max_rec_size,                                         \
-			  REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, end - buff, buff);				\
-	}                                                                                                       \
+#define	ENSURE_VALUE_WITHIN_MAX_REC_SIZE(value, GVT)										\
+{																\
+	if (dollar_tlevel)													\
+		ADD_TO_GVT_TP_LIST(GVT, RESET_FIRST_TP_SRCH_STATUS_FALSE); /* note: macro updates read_local_tn if necessary */	\
+	if (VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +) value.len > gv_cur_region->max_rec_size)				\
+	{															\
+		if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))					\
+			end = &buff[MAX_ZWR_KEY_SZ - 1];									\
+		rts_error(VARLSTCNT(10) ERR_REC2BIG, 4, VMS_ONLY(gv_currkey->end + 1 + SIZEOF(rec_hdr) +)			\
+			  value.len, (int4)gv_cur_region->max_rec_size,								\
+			  REG_LEN_STR(gv_cur_region), ERR_GVIS, 2, end - buff, buff);						\
+	}															\
 }
 
 /* See comment before ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro definition for why the ADD_TO_GVT_TP_LIST call below is necessary */
-#define	ISSUE_RSVDBYTE2HIGH_ERROR(GVT)										\
-{														\
-	if (dollar_tlevel)											\
-		ADD_TO_GVT_TP_LIST(GVT);	/* note: macro also updates read_local_tn if necessary */	\
-	/* The record that is newly inserted/updated does not fit by itself in a separate block			\
-	 * if the current reserved-bytes for this database is taken into account. Cannot go on.			\
-	 */													\
-	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))				\
-		end = &buff[MAX_ZWR_KEY_SZ - 1];								\
-	rts_error(VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,					\
-		REG_LEN_STR(gv_cur_region), blk_size, blk_reserved_bytes,					\
-		ERR_GVIS, 2, end - buff, buff);									\
+#define	ISSUE_RSVDBYTE2HIGH_ERROR(GVT)												\
+{																\
+	if (dollar_tlevel)													\
+		ADD_TO_GVT_TP_LIST(GVT, RESET_FIRST_TP_SRCH_STATUS_FALSE); /* note: macro updates read_local_tn if necessary */	\
+	/* The record that is newly inserted/updated does not fit by itself in a separate block					\
+	 * if the current reserved-bytes for this database is taken into account. Cannot go on.					\
+	 */															\
+	if (0 == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))						\
+		end = &buff[MAX_ZWR_KEY_SZ - 1];										\
+	rts_error(VARLSTCNT(11) ERR_RSVDBYTE2HIGH, 5, new_blk_size_single,							\
+		REG_LEN_STR(gv_cur_region), blk_size, blk_reserved_bytes,							\
+		ERR_GVIS, 2, end - buff, buff);											\
 }
 
 #define	RESTORE_ZERO_GVT_ROOT_ON_RETRY(LCL_ROOT, GV_TARGET, DIR_HIST, DIR_TREE)					\
@@ -321,13 +321,12 @@ void	gvcst_put(mval *val)
 			val = save_val;
 			GTMTRIG_ONLY(POP_MVALS_FROM_M_STACK_IF_NEEDED(parms.ztold_mval,
 					parms.save_msp, ((mv_stent *)parms.save_mv_chain)));
-			preemptive_ch(ERROR);	/* Bluff about SEVERITY, just so gv_target and reset_gv_target will be reset.
-						 * gv_target will be reset anyway in tp_restart, but reset_gv_target will not.
-						 * This matches the flow of a non-spanning-node tp_restart, which goes
-						 * through mdb_condition_handler/preemptive_ch.
-						 */
+			preemptive_db_clnup(ERROR); /* Bluff about SEVERITY to reset gv_target and reset_gv_target tp_restart resets
+						     * but not reset_gv_target This matches flow with non-spanning-node tp_restart,
+						     * which does preemptive_db_clnup in mdb_condition_handler
+						     */
 			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
-			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+			DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 			RESTORE_ZERO_GVT_ROOT_ON_RETRY(lcl_root, gv_target, &cs_addrs->dir_tree->hist, cs_addrs->dir_tree);
 			fits = RECORD_FITS_IN_A_BLOCK(val, gv_currkey, cs_data->blk_size, parms.blk_reserved_bytes);
 			if (cdb_sc_onln_rlbk2 == LAST_RESTART_CODE)
@@ -567,7 +566,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 		skip_hasht_read = FALSE;
 	)
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
-	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	/* this needs to be initialized before any code that does a "goto retry" since this gets used there */
 	save_targ = gv_target;
 	gbl_target_was_set = (INVALID_GV_TARGET != reset_gv_target);
@@ -879,7 +878,7 @@ tn_restart:
 				{
 					status = tp_hist(dir_hist);
 					if (NULL != dir_hist)
-						ADD_TO_GVT_TP_LIST(dir_tree);
+						ADD_TO_GVT_TP_LIST(dir_tree, RESET_FIRST_TP_SRCH_STATUS_FALSE);
 					if (cdb_sc_normal != status)
 						GOTO_RETRY;
 #					ifdef GTM_TRIGGER
@@ -1261,9 +1260,10 @@ tn_restart:
 				{
 					assert(dollar_tlevel);
 					if (is_dollar_incr)
-					{
-						ADD_TO_GVT_TP_LIST(gv_target); /* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE
-									  * macro definition for why this macro call is necessary */
+					{	/* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro
+						 * definition for why the below macro call is necessary.
+						 */
+						ADD_TO_GVT_TP_LIST(gv_target, RESET_FIRST_TP_SRCH_STATUS_FALSE);
 						rts_error(VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
 							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
 					}
@@ -2280,10 +2280,12 @@ tn_restart:
 		{	/* Note that although "tp_hist" processes the "dir_hist" history, it only adds "gv_target" to gvt_tp_list.
 			 * But csa->dir_tree might have had clue, blk-split related info etc. modified as part of this
 			 * gvcst_put invocation that might also need cleanup (just like any other gv_target) so add
-			 * csa->dir_tree to gvt_tp_list (if not already done).
+			 * csa->dir_tree to gvt_tp_list (if not already done). Therefore treat this as if tp_hist is doing
+			 * the ADD_TO_GVT_TP_LIST call for dir_tree.
 			 */
 			assert(dir_tree == csa->dir_tree);
-			ADD_TO_GVT_TP_LIST(dir_tree);	/* note: macro also updates read_local_tn if necessary */
+			ADD_TO_GVT_TP_LIST(dir_tree, RESET_FIRST_TP_SRCH_STATUS_FALSE);
+				/* note: above macro updates read_local_tn if necessary */
 		}
 		if (cdb_sc_normal != status)
 			GOTO_RETRY;
@@ -2530,7 +2532,7 @@ retry:
 	{	/* Need to restart. If directory tree was used in this transaction, nullify its clue as well (not normally
 		 * done by t_retry). The RESTORE_ZERO_GVT_ROOT_ON_RETRY macro call below takes care of that for us.
 		 */
-		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, DO_GVT_GVKEY_CHECK);
+		RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ, dollar_tlevel ? DO_GVT_GVKEY_CHECK_RESTART : DO_GVT_GVKEY_CHECK);
 		RESTORE_ZERO_GVT_ROOT_ON_RETRY(lcl_root, gv_target, dir_hist, dir_tree);
 		GTMTRIG_ONLY(POP_MVALS_FROM_M_STACK_IF_REALLY_NEEDED(lcl_span_status, ztold_mval, save_msp, save_mv_chain));
 		t_retry(status);
@@ -2555,7 +2557,7 @@ retry:
 #		endif
 		rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 		assert(0 == rc GTMTRIG_ONLY(&& TPRESTART_STATE_NORMAL == tprestart_state));
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC; /* finishs the check skipped above */
+		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE); /* finishs the check skipped above */
 		RESTORE_ZERO_GVT_ROOT_ON_RETRY(lcl_root, gv_target, dir_hist, dir_tree);
 	}
 #	ifdef GTM_TRIGGER

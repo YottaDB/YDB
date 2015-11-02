@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,18 +13,18 @@
 #define _FNORDER_H_INC_
 
 enum order_obj {
-	global = 0,
-	local_name,
-	local_sub,
-	indir,
-	last_obj
+	GLOBAL = 0,
+	LOCAL,
+	LOCAL_NAME,
+	INDIRECT,
+	LAST_OBJECT
 };
 
 enum order_dir {
-	forward = 0,
-	backward,
-	undecided,
-	last_dir
+	FORWARD = 0,
+	BACKWARD,
+	TBD,
+	LAST_DIRECTION
 };
 
 STATICFNDCL boolean_t set_opcode(triple *r, oprtype *result, oprtype *result_ptr, oprtype *second_opr, enum order_obj object);

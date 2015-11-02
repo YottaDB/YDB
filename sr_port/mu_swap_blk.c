@@ -407,7 +407,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			 * cse->was_free to TRUE so that in t_end, this condition can be used to read the before images of
 			 * the FREE blocks if needed.
 			 */
-			(BLK_FREE == x_blk_lmap) ? SET_FREE(tmpcse) : SET_NFREE(tmpcse);
+			(BLK_FREE == x_blk_lmap) ? BIT_SET_FREE(tmpcse->blk_prior_state) : BIT_CLEAR_FREE(tmpcse->blk_prior_state);
 			/* No need to write before-image in case the block is FREE. In case the database had never been fully
 			 * upgraded from V4 to V5 format (after the MUPIP UPGRADE), all RECYCLED blocks can basically be considered
 			 * FREE (i.e. no need to write before-images since backward journal recovery will never be expected

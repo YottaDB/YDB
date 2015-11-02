@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001,2012 Fidelity Information Services, Inc	*
+ *	Copyright 2001,2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -93,7 +93,7 @@ const static readonly int error_ansi[] = {
 	   7,	/* GVUNDEF */
 	   0,	/* TRANSNEST */
 	   0,	/* INDEXTRACHARS */
-	   0,	/* INDMAXNEST */
+	   0,	/* UNUSEDMSG260 */
 	   0,	/* INDRMAXLEN */
 	   0,	/* INSFFBCNT */
 	   0,	/* INTEGERRS */
@@ -1246,7 +1246,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NORESYNCUPDATERONLY */
 	   0,	/* NOSUPPLSUPPL */
 	   0,	/* REPL2OLD */
-	   0,	/* UNUSEDMSG1413 */
+	   0,	/* EXTRFILEXISTS */
 	   0,	/* UNUSEDMSG1414 */
 	   0,	/* SECNOTSUPPLEMENTARY */
 	   0,	/* SUPRCVRNEEDSSUPSRC */
@@ -1324,4 +1324,20 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUFILRNDWNFL2 */
 	   0,	/* MUINSTFROZEN */
 	   0,	/* MUINSTUNFROZEN */
+	   0,	/* GTMEISDIR */
+	   0,	/* SPCLZMSG */
+	   0,	/* MUNOTALLINTEG */
+	   0,	/* BKUPRUNNING */
+	   0,	/* MUSIZEINVARG */
+	   0,	/* MUSIZEFAIL */
+	   0,	/* SIDEEFFECTEVAL */
+	   0,	/* CRYPTINIT2 */
+	   0,	/* CRYPTDLNOOPEN2 */
+	   0,	/* CRYPTBADCONFIG */
+	   0,	/* DBCOLLREQ */
+	   0,	/* SETEXTRENV */
+	   0,	/* NOTALLDBRNDWN */
+	   0,	/* TPRESTNESTERR */
+	   0,	/* JNLFILRDOPN */
+	   0,	/* SEQNUMSEARCHTIMEOUT */
 	};

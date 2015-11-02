@@ -70,7 +70,6 @@
 #include "error_trap.h"			/* for ecode_init() prototype */
 #include "zyerror_init.h"
 #include "ztrap_form_init.h"
-#include "ztrap_new_init.h"
 #include "zdate_form_init.h"
 #include "dollar_system_init.h"
 #include "sig_init.h"
@@ -111,7 +110,6 @@ GBLREF unsigned char		*fgncal_stack;
 GBLREF mv_stent			*mv_chain;
 GBLREF xfer_entry_t		xfer_table[];
 GBLREF mval			dollar_system;
-GBLREF mval			dollar_ztrap;
 GBLREF mval			dollar_zstatus;
 GBLREF bool			compile_time;
 GBLREF spdesc			stringpool;
@@ -157,7 +155,6 @@ void gtm_startup(struct startup_vector *svec)
 {
 	unsigned char	*mstack_ptr;
 	void		gtm_ret_code();
-	static readonly unsigned char init_break[1] = {'B'};
 	int4		lct;
 	int		i;
 	static char 	other_mode_buf[] = "OTHER";
@@ -198,14 +195,6 @@ void gtm_startup(struct startup_vector *svec)
 	else if (svec->user_strpl_size > STP_MAXINITSIZE)
 		svec->user_strpl_size = STP_MAXINITSIZE;
 	stp_init(svec->user_strpl_size);
-	if (svec->user_indrcache_size > MAX_INDIRECTION_NESTING || svec->user_indrcache_size < MIN_INDIRECTION_NESTING)
-		svec->user_indrcache_size = MIN_INDIRECTION_NESTING;
-	TREF(ind_result_array) = (mval **)malloc(SIZEOF(mval *) * svec->user_indrcache_size);
-	TREF(ind_source_array) = (mval **)malloc(SIZEOF(mval *) * svec->user_indrcache_size);
-	TREF(ind_result_sp) = TREF(ind_result_array);
-	TREF(ind_result_top) = TREF(ind_result_sp) + svec->user_indrcache_size;
-	TREF(ind_source_sp) = TREF(ind_source_array);
-	TREF(ind_source_top) = TREF(ind_source_sp) + svec->user_indrcache_size;
 	rts_stringpool = stringpool;
 	TREF(compile_time) = FALSE;
 	/* assert that is_replicator and run_time is properly set by gtm_imagetype_init invoked at process entry */
@@ -260,11 +249,14 @@ void gtm_startup(struct startup_vector *svec)
 	LVVAL_INIT((TREF(zsearch_dir2)), curr_symval);
 	/* Initialize global pointer to control-C handler. Also used in iott_use */
 	ctrlc_handler_ptr = &ctrlc_handler;
-	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
 	if (!IS_MUPIP_IMAGE)
 	{
 		sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
 		atexit(gtm_exit_handler);
+	}
+	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
+	if (!IS_MUPIP_IMAGE)
+	{
 		cenable();	/* cenable unless the environment indicates otherwise - 2 steps because this can report errors */
 	}
 	jobinterrupt_init();
@@ -281,16 +273,12 @@ void gtm_startup(struct startup_vector *svec)
 		(TREF(dollar_zmode)).str.len = SIZEOF(other_mode_buf) -1;
 	}
 	svec->frm_ptr = (unsigned char *)frame_pointer;
-	dollar_ztrap.mvtype = MV_STR;
-	dollar_ztrap.str.len = SIZEOF(init_break);
-	dollar_ztrap.str.addr = (char *)init_break;
 	dollar_zstatus.mvtype = MV_STR;
 	dollar_zstatus.str.len = 0;
 	dollar_zstatus.str.addr = NULL;
 	ecode_init();
 	zyerror_init();
 	ztrap_form_init();
-	ztrap_new_init();
 	zdate_form_init(svec);
 	dollar_system_init(svec);
 	init_callin_functable();

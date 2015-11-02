@@ -21,7 +21,8 @@ error_def(ERR_VAREXPECTED);
 
 int f_query(oprtype *a, opctype op)
 {
-	triple	*oldchain, *r, *r0, *r1, tmpchain, *triptr;
+	triple		*oldchain, *r, *r0, *r1;
+	save_se		save_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -73,11 +74,9 @@ int f_query(oprtype *a, opctype op)
 			ins_triple(r);
 			break;
 		case TK_ATSIGN:
-			TREF(saw_side_effect) = TREF(shift_side_effects);
-			if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
+			if (SHIFT_SIDE_EFFECTS)
 			{
-				dqinit(&tmpchain, exorder);
-				oldchain = setcurtchain(&tmpchain);
+				START_GVBIND_CHAIN(&save_state, oldchain);
 				if (!indirection(&(r->operand[0])))
 				{
 					setcurtchain(oldchain);
@@ -85,12 +84,7 @@ int f_query(oprtype *a, opctype op)
 				}
 				r->operand[1] = put_ilit((mint)indir_fnquery);
 				ins_triple(r);
-				newtriple(OC_GVSAVTARG);
-				setcurtchain(oldchain);
-				dqadd(TREF(expr_start), &tmpchain, exorder);
-				TREF(expr_start) = tmpchain.exorder.bl;
-				triptr = newtriple(OC_GVRECTARG);
-				triptr->operand[0] = put_tref(TREF(expr_start));
+				PLACE_GVBIND_CHAIN(&save_state, oldchain);
 			} else
 			{
 				if (!indirection(&(r->operand[0])))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,10 +52,10 @@ int exfunc(oprtype *a, boolean_t alias_target)
 #		endif
 	} else
 	{
+		assert(TRIP_REF == calltrip->operand[1].oprclass);
 		calltrip_opr1_tref = calltrip->operand[1].oprval.tref;
 		if (OC_EXTEXFUN == calltrip->opcode)
 		{
-			assert(TRIP_REF == calltrip->operand[1].oprclass);
 			if (OC_CDLIT == calltrip_opr1_tref->opcode)
 				assert(CDLT_REF == calltrip_opr1_tref->operand[0].oprclass);
 			else
@@ -73,7 +73,7 @@ int exfunc(oprtype *a, boolean_t alias_target)
 					return FALSE;
 				}
 			}
-		} else		/* $$ @dlabel [actuallist] */
+		} else		/* indirect: $$@(glvn)[(actuallist)]; note disabiguating parens around glvn specifying dlabel*/
 		{
 			assert(OC_COMMARG == calltrip->opcode);
 			assert(TRIP_REF == calltrip->operand[1].oprclass);

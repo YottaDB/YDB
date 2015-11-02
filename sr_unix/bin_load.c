@@ -39,6 +39,7 @@
 #include "gtmmsg.h"
 #include "gtm_utf8.h"
 #ifdef GTM_CRYPT
+#include "io.h"
 #include "gtmcrypt.h"
 #endif
 #include <rtnhdr.h>
@@ -58,6 +59,9 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF int4		gv_keysize;
 GBLREF gd_region	*gv_cur_region;
+#ifdef GTM_CRYPT
+GBLREF io_pair		io_curr_device;
+#endif
 
 error_def(ERR_CORRUPT);
 error_def(ERR_GVIS);
@@ -76,86 +80,91 @@ error_def(ERR_LDSPANGLOINCMP);
 #define BIN_BIND	1
 #define ERR_COR		2
 #define BIN_KILL	3
+
 #ifdef GTM_CRYPT
-#define EMPTY_GTMCRYPT_HASH16	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-#define EMPTY_GTMCRYPT_HASH32	EMPTY_GTMCRYPT_HASH16 EMPTY_GTMCRYPT_HASH16
-#define EMPTY_GTMCRYPT_HASH	EMPTY_GTMCRYPT_HASH32 EMPTY_GTMCRYPT_HASH32
-#define GC_BIN_LOAD_ERR(crypt_status)			\
-{							\
-	if (0 != crypt_status)				\
-	{						\
-		GC_GTM_PUTMSG(crypt_status, NULL);	\
-		mupip_error_occurred = TRUE;		\
-		if (NULL != tmp_gvkey)			\
-		{					\
-			free(tmp_gvkey);		\
-			tmp_gvkey = NULL;		\
-		}					\
-		return;					\
-	}						\
+# define EMPTY_GTMCRYPT_HASH16	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+# define EMPTY_GTMCRYPT_HASH32	EMPTY_GTMCRYPT_HASH16 EMPTY_GTMCRYPT_HASH16
+# define EMPTY_GTMCRYPT_HASH	EMPTY_GTMCRYPT_HASH32 EMPTY_GTMCRYPT_HASH32
+
+# define GC_BIN_LOAD_ERR(GTMCRYPT_ERRNO)											\
+{																\
+	io_log_name		*io_log;											\
+																\
+	if (0 != GTMCRYPT_ERRNO)												\
+	{															\
+		io_log = io_curr_device.in->name;										\
+		GTMCRYPT_REPORT_ERROR(GTMCRYPT_ERRNO, gtm_putmsg, io_log->len, io_log->dollar_io);				\
+		mupip_error_occurred = TRUE;											\
+		if (NULL != tmp_gvkey)												\
+		{														\
+			free(tmp_gvkey);											\
+			tmp_gvkey = NULL;											\
+		}														\
+		return;														\
+	}															\
 }
 #endif
 
 #define	DEFAULT_SN_HOLD_BUFF_SIZE MAX_IO_BLOCK_SIZE
 
-#define KILL_INCMP_SN_IF_NEEDED				\
-{							\
-	if (!sn_incmp_gbl_already_killed)		\
-	{						\
-		COPY_KEY(sn_savekey,  gv_currkey);	\
-		COPY_KEY(gv_currkey, sn_gvkey);		\
-		bin_call_db(BIN_KILL, 0, 0);		\
-		COPY_KEY(gv_currkey, sn_savekey);	\
-		sn_incmp_gbl_already_killed = TRUE;	\
-	}						\
+#define KILL_INCMP_SN_IF_NEEDED													\
+{																\
+	if (!sn_incmp_gbl_already_killed)											\
+	{															\
+		COPY_KEY(sn_savekey,  gv_currkey);										\
+		COPY_KEY(gv_currkey, sn_gvkey);											\
+		bin_call_db(BIN_KILL, 0, 0);											\
+		COPY_KEY(gv_currkey, sn_savekey);										\
+		sn_incmp_gbl_already_killed = TRUE;										\
+	}															\
 }
 
-#define DISPLAY_INCMP_SN_MSG											\
-{														\
-	file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);					\
-	if (file_offset != last_sn_error_offset)								\
-	{													\
-		last_sn_error_offset = file_offset;								\
-		gtm_putmsg(VARLSTCNT(1) ERR_LDSPANGLOINCMP);							\
-		util_out_print("!_!_at File offset : [0x!XL]", TRUE, file_offset);				\
-		if (sn_gvkey->end && expected_sn_chunk_number)							\
-		{												\
-			sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, sn_gvkey, TRUE);	\
-			util_out_print("!_!_Expected Spanning Global variable : !AD", TRUE,			\
-					sn_key_str_end - &sn_key_str[0], sn_key_str);				\
-		} 												\
-		sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);		\
-		util_out_print("!_!_Global variable from record: !AD", TRUE,					\
-				sn_key_str_end - &sn_key_str[0], sn_key_str);					\
-	}													\
+#define DISPLAY_INCMP_SN_MSG													\
+{																\
+	file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);							\
+	if (file_offset != last_sn_error_offset)										\
+	{															\
+		last_sn_error_offset = file_offset;										\
+		gtm_putmsg(VARLSTCNT(1) ERR_LDSPANGLOINCMP);									\
+		util_out_print("!_!_at File offset : [0x!XL]", TRUE, file_offset);						\
+		if (sn_gvkey->end && expected_sn_chunk_number)									\
+		{														\
+			sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, sn_gvkey, TRUE);			\
+			util_out_print("!_!_Expected Spanning Global variable : !AD", TRUE,					\
+					sn_key_str_end - &sn_key_str[0], sn_key_str);						\
+		}														\
+		sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);				\
+		util_out_print("!_!_Global variable from record: !AD", TRUE,							\
+				sn_key_str_end - &sn_key_str[0], sn_key_str);							\
+	}															\
 }
 
-#define DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK								\
-{														\
-	util_out_print("!_!_File offset : [0x!XL]", TRUE, file_offset_base + ((unsigned char *)rp - ptr_base)); \
-	util_out_print("!_!_Rest of Block :", TRUE);								\
-	zwr_out_print((char *)rp, btop - (unsigned char *)rp);							\
-	util_out_print(0, TRUE);										\
+#define DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK										\
+{																\
+	util_out_print("!_!_File offset : [0x!XL]", TRUE, file_offset_base + ((unsigned char *)rp - ptr_base));			\
+	util_out_print("!_!_Rest of Block :", TRUE);										\
+	zwr_out_print((char *)rp, btop - (unsigned char *)rp);									\
+	util_out_print(0, TRUE);												\
 }
 
-#define DISPLAY_CURRKEY										\
-{												\
-	sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);	\
-	util_out_print("!_!_Key: !AD", TRUE, sn_key_str_end - &sn_key_str[0], sn_key_str);	\
+#define DISPLAY_CURRKEY														\
+{																\
+	sn_key_str_end = format_targ_key(&sn_key_str[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);					\
+	util_out_print("!_!_Key: !AD", TRUE, sn_key_str_end - &sn_key_str[0], sn_key_str);					\
 }
 
-#define DISPLAY_VALUE(STR)		 	\
-{						\
-	util_out_print(STR, TRUE);		\
-	zwr_out_print(v.str.addr, v.str.len);	\
-	util_out_print(0, TRUE);		\
+#define DISPLAY_VALUE(STR)													\
+{																\
+	util_out_print(STR, TRUE);												\
+	zwr_out_print(v.str.addr, v.str.len);											\
+	util_out_print(0, TRUE);												\
 }
 
-#define DISPLAY_PARTIAL_SN_HOLD_BUFF			\
-{							\
-	util_out_print("!_!_Partial Value :", TRUE);	\
-	zwr_out_print(sn_hold_buff, sn_hold_buff_pos);	\
-	util_out_print(0, TRUE);			\
+#define DISPLAY_PARTIAL_SN_HOLD_BUFF												\
+{																\
+	util_out_print("!_!_Partial Value :", TRUE);										\
+	zwr_out_print(sn_hold_buff, sn_hold_buff_pos);										\
+	util_out_print(0, TRUE);												\
 }
 
 static readonly unsigned char gt_lit[] = "LOAD TOTAL";
@@ -204,34 +213,34 @@ void zwr_out_print(char * buff, int bufflen)
 
 void bin_load(uint4 begin, uint4 end)
 {
-	unsigned char	*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr, *c, *ctop, *ptr_base;
-	unsigned char	hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
-			cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
-	unsigned char	*end_buff;
-	unsigned short	rec_len, next_cmpc, numsubs;
-	int		len;
-	int		current, last, length, max_blk_siz, max_key, status;
-	int		tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
-	uint4		iter, max_data_len, max_subsc_len, key_count, gblsize;
-	ssize_t		rec_count, global_key_count, subsc_len,extr_std_null_coll, last_sn_error_offset=0,
-				file_offset_base=0, file_offset=0;
-	boolean_t	need_xlation, new_gvn, utf8_extract;
-	boolean_t	is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
-	rec_hdr		*rp, *next_rp;
-	mval		v, tmp_mval;
-	mstr		mstr_src, mstr_dest;
-	collseq		*extr_collseq, *db_collseq, *save_gv_target_collseq;
-	coll_hdr	extr_collhdr, db_collhdr;
-	gv_key 		*tmp_gvkey = NULL;	/* null-initialize at start, will be malloced later */
-	gv_key		*sn_gvkey = NULL; /* null-initialize at start, will be malloced later */
-	gv_key		*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
-	char		std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp = NULL;
+	unsigned char		*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr, *c, *ctop, *ptr_base;
+	unsigned char		hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
+				cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
+	unsigned char		*end_buff;
+	unsigned short		rec_len, next_cmpc, numsubs;
+	int			len;
+	int			current, last, length, max_blk_siz, max_key, status;
+	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
+	uint4			iter, max_data_len, max_subsc_len, key_count, gblsize;
+	ssize_t			rec_count, global_key_count, subsc_len,extr_std_null_coll, last_sn_error_offset=0,
+					file_offset_base=0, file_offset=0;
+	boolean_t		need_xlation, new_gvn, utf8_extract;
+	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
+	rec_hdr			*rp, *next_rp;
+	mval			v, tmp_mval;
+	mstr			mstr_src, mstr_dest;
+	collseq			*extr_collseq, *db_collseq, *save_gv_target_collseq;
+	coll_hdr		extr_collhdr, db_collhdr;
+	gv_key			*tmp_gvkey = NULL;	/* null-initialize at start, will be malloced later */
+	gv_key			*sn_gvkey = NULL; /* null-initialize at start, will be malloced later */
+	gv_key			*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
+	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp = NULL;
 #	ifdef GTM_CRYPT
-	gtmcrypt_key_t			*encr_key_handles;
-	char				*inbuf;
-	int4				index;
-	int				req_dec_blk_size, init_status, crypt_status;
-	muext_hash_hdr_ptr_t		hash_array = NULL;
+	gtmcrypt_key_t		*encr_key_handles;
+	char			*inbuf;
+	int4			index;
+	int			in_len, gtmcrypt_errno;
+	muext_hash_hdr_ptr_t	hash_array = NULL;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -310,14 +319,14 @@ void bin_load(uint4 begin, uint4 end)
 		memcpy((char *)hash_array, ptr, len);
 		num_indexes = len / GTMCRYPT_HASH_LEN;
 		encr_key_handles = (gtmcrypt_key_t *)malloc(SIZEOF(gtmcrypt_key_t) * num_indexes);
-		INIT_PROC_ENCRYPTION(crypt_status);
-		GC_BIN_LOAD_ERR(crypt_status);
+		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+		GC_BIN_LOAD_ERR(gtmcrypt_errno);
 		for (index = 0; index < num_indexes; index++)
 		{
 			if (0 == memcmp(hash_array[index].gtmcrypt_hash, EMPTY_GTMCRYPT_HASH, GTMCRYPT_HASH_LEN))
 				continue;
-			GTMCRYPT_GETKEY(hash_array[index].gtmcrypt_hash, encr_key_handles[index], crypt_status);
-			GC_BIN_LOAD_ERR(crypt_status);
+			GTMCRYPT_GETKEY(NULL, hash_array[index].gtmcrypt_hash, encr_key_handles[index], gtmcrypt_errno);
+			GC_BIN_LOAD_ERR(gtmcrypt_errno);
 		}
 	}
 #	endif
@@ -398,10 +407,10 @@ void bin_load(uint4 begin, uint4 end)
 			GET_LONG(index, ptr);
 			if (-1 != index) /* Indicates that the record is encrypted. */
 			{
-				req_dec_blk_size = len - SIZEOF(int4);
+				in_len = len - SIZEOF(int4);
 				inbuf = (char *)(ptr + SIZEOF(int4));
-				GTMCRYPT_DECODE_FAST(encr_key_handles[index], inbuf, req_dec_blk_size, NULL, crypt_status);
-				GC_BIN_LOAD_ERR(crypt_status);
+				GTMCRYPT_DECRYPT(NULL, encr_key_handles[index], inbuf, in_len, NULL, gtmcrypt_errno);
+				GC_BIN_LOAD_ERR(gtmcrypt_errno);
 			}
 			rp = (rec_hdr*)(ptr + SIZEOF(int4));
 		}

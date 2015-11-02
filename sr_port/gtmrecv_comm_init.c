@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,17 +36,16 @@
 
 GBLDEF	int		gtmrecv_listen_sock_fd = FD_INVALID;
 
+error_def(ERR_REPLCOMM);
+error_def(ERR_TEXT);
+
 /* Initialize communication stuff */
 int gtmrecv_comm_init(in_port_t port)
 {
 	struct sockaddr_in	secondary_addr;
 	const	int	enable_reuseaddr = 1;
-	const   int    	disable_keepalive = 1;
 	struct  linger  disable_linger = {0, 0};
 	int		rc;
-
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
 
 	if (FD_INVALID != gtmrecv_listen_sock_fd) /* Initialization done already */
 		return (0);
@@ -62,17 +61,6 @@ int gtmrecv_comm_init(in_port_t port)
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), ERRNO);
-
-#ifdef REPL_DISABLE_KEEPALIVE
-	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&disable_keepalive,
-			SIZEOF(disable_keepalive)))
-	{
-		/* Till SIGPIPE is handled properly */
-		rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error with receiver server listen socket disable keepalive"), ERRNO);
-	}
-#endif
-
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&enable_reuseaddr,
 			SIZEOF(enable_reuseaddr)))
 	{

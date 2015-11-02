@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,13 +35,26 @@ const static readonly jp_type job_param_data[] =
 {
 #include "jobparamstrs.h"	/* BYPASSOK */
 };
-
+/* Index is the number of param strings before the character
+ * For instance index(D) = n(A) + n(B) + n(C) = 2 + 0 + 0 =2
+ */
+#ifdef UNIX
+const static readonly unsigned char job_param_index[27] =
+{
+      /* A(2)    B(0)   C(2)   D(4)   E(2)   F(0)  G(2)  H(0)  I(4)   J(0)  K(0)  L(2)  M(0) */
+	 0,	2,    	 2,     4,     8,    10,     10,   12,   12,    16,   16,   16,   18,
+      /* N(6)	O(2)	P(4)	Q(0)	R(0)	S(6)	T(0)   U(0)	V(0)	W(0)   X(0)	Y(0)	Z(0) */
+	18,	24,	26,	30,	30,	30,	36,	36,	36,	36,	36,	36,	36,
+	36
+};
+#else
 const static readonly unsigned char job_param_index[27] =
 {
 	 0,  2,  2,  2,  6,  8,  8, 10, 10, 14, 14, 14, 16,
 	16, 22, 24, 28, 28, 28, 34, 34, 34, 34, 34, 34, 34,
 	34
 };
+#endif
 
 #undef JPDEF
 #define JPDEF(a,b) b

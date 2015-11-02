@@ -122,6 +122,15 @@ LITREF	mval	*fndata_table[2][2];
 #endif
 LITREF	mval	literal_batch;
 
+#define SKIP_ASSERT_TRUE	TRUE
+#define SKIP_ASSERT_FALSE	FALSE
+
+#define	GOTO_RETRY(SKIP_ASSERT)					\
+{								\
+	assert((CDB_STAGNATE > t_tries) || SKIP_ASSERT);	\
+	goto retry;						\
+}
+
 DEFINE_NSB_CONDITION_HANDLER(gvcst_kill_ch)
 
 void	gvcst_kill(boolean_t do_subtree)
@@ -255,11 +264,11 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 		/* In case of non-TP explicit updates that invoke triggers the kills happen inside of TP. If those kills
 		 * dont cause any actual update, we need prev_update_trans set appropriately so update_trans can be reset.
 		 */
-		GTMTRIG_ONLY(prev_update_trans = 0;)
+		GTMTRIG_ONLY(prev_update_trans = 0);
 	} else
 		prev_update_trans = sgm_info_ptr->update_trans;
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
-	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);
 	assert(NULL != update_array);
 	assert(NULL != update_array_ptr);
@@ -289,7 +298,10 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 		{	/* gvcst_root_search invoked from REDO_ROOT_SEARCH_IF_NEEDED ended up with a restart situation but did not
 			 * actually invoke t_retry. Instead, it returned control back to us asking us to restart.
 			 */
-			goto retry;
+			GOTO_RETRY(SKIP_ASSERT_TRUE); /* cannot enable assert (which has an assert about t_tries < CDB_STAGNATE)
+						       * because it is possible for us to get cdb_sc_gvtrootmod2 restart when
+						       * t_tries == CDB_STAGNATE.
+						       */
 		}
 #		endif
 		/* Need to reinitialize gvt_hist & alt_hist for each try as it might have got set to a value in the previous
@@ -336,12 +348,12 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 					 * Needed as t_retry only resets clue of gv_target which is not the directory tree anymore.
 					 */
 					csa->dir_tree->clue.end = 0;
-					goto retry;
+					GOTO_RETRY(SKIP_ASSERT_FALSE);
 				}
 				if ((gv_altkey->end + 1) == dir_hist->h[0].curr_rec.match)
 				{	/* Case (2b) : GVT now exists for this global */
 					cdb_status = cdb_sc_gvtrootmod;
-					goto retry;
+					GOTO_RETRY(SKIP_ASSERT_FALSE);
 				} else
 				{	/* Case (2a) : GVT does not exist for this global */
 					gvt_hist = dir_hist;	/* validate directory tree history in t_end/tp_hist */
@@ -365,7 +377,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 			dlr_data = DG_DATAGET; /* tell dataget we want full info regarding descendants */
 			cdb_status = gvcst_dataget(&dlr_data, ztold_mval);
 			if (cdb_sc_normal != cdb_status)
-				goto retry;
+				GOTO_RETRY(SKIP_ASSERT_FALSE);
 			assert((11 >= dlr_data) && (1 >= (dlr_data % 10)));
 			/* Invoke triggers for KILL as long as $data is nonzero (1 or 10 or 11).
 			 * Invoke triggers for ZKILL only if $data is 1 or 11 (for 10 case, ZKILL is a no-op).
@@ -403,9 +415,9 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 					 * and then re-do the gvcst_kill logic.
 					 */
 					assert(lcl_implicit_tstart || *span_status);
-					assert(CDB_STAGNATE >= t_tries);
 					cdb_status = cdb_sc_normal;	/* signal "retry:" to avoid t_retry call */
-					goto retry;
+					assert(CDB_STAGNATE >= t_tries);
+					GOTO_RETRY(SKIP_ASSERT_TRUE);;	/* Cannot check assert because above assert is >= t_tries */
 				}
 				REMOVE_ZTWORM_JFB_IF_NEEDED(ztworm_jfb, jfb, sgm_info_ptr);
 			}
@@ -438,11 +450,14 @@ research:
 			if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVKILLFAIL == gtm_white_box_test_case_number))
 			{
 				cdb_status = cdb_sc_blknumerr;
-				goto retry;
+				/* Skip assert inside GOTO_RETRY macro as the WBTEST_ANTIFREEZE_GVKILLFAIL white-box testcase
+				 * intentionally triggers a GVKILLFAIL error.
+				 */
+				GOTO_RETRY(SKIP_ASSERT_TRUE);
 			}
 #endif
 			if (cdb_sc_normal != (cdb_status = gvcst_search(gv_currkey, NULL)))
-				goto retry;
+				GOTO_RETRY(SKIP_ASSERT_FALSE);
 			assert(gv_altkey->top == gv_currkey->top);
 			assert(gv_altkey->top == gv_keysize);
 			end = gv_currkey->end;
@@ -486,7 +501,7 @@ research:
 						{
 							cdb_status = tp_hist(NULL);
 							if (cdb_sc_normal != cdb_status)
-								goto retry;
+								GOTO_RETRY(SKIP_ASSERT_FALSE);
 							*span_status = TRUE;
 #							ifdef GTM_TRIGGER
 							if (lcl_implicit_tstart)
@@ -517,11 +532,11 @@ research:
 			}
 			gv_altkey->end = end;
 			if (cdb_sc_normal != (cdb_status = gvcst_search(gv_altkey, alt_hist)))
-				goto retry;
+				GOTO_RETRY(SKIP_ASSERT_FALSE);
 			if (alt_hist->depth != gvt_hist->depth)
 			{
 				cdb_status = cdb_sc_badlvl;
-				goto retry;
+				GOTO_RETRY(SKIP_ASSERT_FALSE);
 			}
 			right_extra = FALSE;
 			left_extra = TRUE;
@@ -549,7 +564,7 @@ research:
 						goto research;
 					}
 					if (cdb_sc_delete_parent != cdb_status)
-						goto retry;
+						GOTO_RETRY(SKIP_ASSERT_FALSE);
 					left_extra = right_extra
 						   = TRUE;
 				} else
@@ -576,7 +591,7 @@ research:
 						left_extra = TRUE;
 						cdb_status = cdb_sc_normal;
 					} else
-						goto retry;
+						GOTO_RETRY(SKIP_ASSERT_FALSE);
 					local_srch_rec.offset = local_srch_rec.match
 							      = 0;
 					cdb_status = gvcst_kill_blk(right, lev, gv_altkey, local_srch_rec, right->curr_rec,
@@ -592,7 +607,7 @@ research:
 						right_extra = TRUE;
 						cdb_status = cdb_sc_normal;
 					} else
-						goto retry;
+						GOTO_RETRY(SKIP_ASSERT_FALSE);
 				}
 			}
 		}
@@ -762,7 +777,7 @@ research:
                 {
                         cdb_status = tp_hist(alt_hist);
                         if (cdb_sc_normal != cdb_status)
-                                goto retry;
+				GOTO_RETRY(SKIP_ASSERT_FALSE);
                 }
 		/* Note down $tlevel (used later) before it is potentially changed by op_tcommit below */
 		lcl_dollar_tlevel = dollar_tlevel;
@@ -772,7 +787,7 @@ research:
 			assert(gvt_root);
 			GVTR_OP_TCOMMIT(cdb_status);
 			if (cdb_sc_normal != cdb_status)
-                                goto retry;
+				GOTO_RETRY(SKIP_ASSERT_FALSE);
 		}
 #		endif
 		if (!killing_chunks)

@@ -46,6 +46,9 @@
 #include "jnl.h"
 #include "replgbl.h"
 #include "gtm_semutils.h"
+#ifdef __linux__
+#include "hugetlbfs_overrides.h"
+#endif
 
 #define	DEFAULT_NON_BLOCKED_WRITE_RETRIES	10	/* default number of retries */
 #ifdef __MVS__
@@ -56,6 +59,8 @@
  * regresion test v53003/D9I10002703.
  */
 # define GTM_USESECSHR				"$gtm_usesecshr"
+/* GTM_TEST_FAKE_ENOSPC is used only in debug code so it does not have to go in gtm_logicals.h */
+# define GTM_TEST_FAKE_ENOSPC			"$gtm_test_fake_enospc"
 #endif
 #define DEFAULT_MUPIP_TRIGGER_ETRAP 		"IF $ZJOBEXAM()"
 
@@ -76,6 +81,8 @@ GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
 GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
+GBLREF	mval			dollar_etrap;
+GBLREF	mval			dollar_ztrap;
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
 GTMTRIG_ONLY(GBLREF	mval	gtm_trigger_etrap;)
@@ -92,13 +99,13 @@ static readonly nametabent editing_params[] =
 	{9, "NOEDITING"},
 	{8, "NOINSERT"}
 };
-
 static readonly unsigned char editing_index[27] =
 {
 	0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
 	2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
 	4, 4, 4
 };
+static readonly unsigned char init_break[1] = {'B'};
 
 void	gtm_env_init_sp(void)
 {	/* Unix only environment initializations */
@@ -111,6 +118,9 @@ void	gtm_env_init_sp(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+#	ifdef HUGETLB_SUPPORTED
+	libhugetlbfs_init();
+#	endif
 #	ifdef __MVS__
 	/* For now OS/390 only. Eventually, this will be added to all UNIX platforms along with the
 	 * capability to specify the desired directory to put a core file in.
@@ -289,6 +299,25 @@ void	gtm_env_init_sp(void)
 			((TREF(gtm_custom_errors)).addr)[trans.len] = '\0';
 		}
 	}
+	/* Initialize which ever error trap we are using (ignored in the utilities except the update process) */
+	val.addr = GTM_ETRAP;
+	val.len = SIZEOF(GTM_ETRAP) - 1;
+	if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+	{
+		if (MAX_SRCLINE >= trans.len)
+		{	/* Only set $ETRAP if the length is usable (may be NULL) */
+			dollar_etrap.str.addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
+			memcpy(dollar_etrap.str.addr, trans.addr, trans.len);
+			*(dollar_etrap.str.addr + trans.len + 1) = '\0';
+			dollar_etrap.str.len = trans.len;
+			dollar_etrap.mvtype = MV_STR;
+		}
+	} else if (0 == dollar_etrap.mvtype)
+	{	/* If didn't setup $ETRAP, set default $ZTRAP instead */
+		dollar_ztrap.mvtype = MV_STR;
+		dollar_ztrap.str.len = SIZEOF(init_break);
+		dollar_ztrap.str.addr = (char *)init_break;
+	}
 #	ifdef DEBUG
 	/* DEBUG-only option to bypass 'easy' methods of things and always use gtmsecshr for IPC cleanups, wakeups, file removal,
 	 * etc. Basically use gtmsecshr for anything where it is an option - helps with testing gtmsecshr for proper operation.
@@ -298,5 +327,11 @@ void	gtm_env_init_sp(void)
 	TREF(gtm_usesecshr) = logical_truth_value(&val, FALSE, &is_defined);
 	if (!is_defined)
 		TREF(gtm_usesecshr) = FALSE;
+	/* DEBUG-only option to enable/disable anticipatory freeze fake ENOSPC testing */
+	val.addr = GTM_TEST_FAKE_ENOSPC;
+	val.len = SIZEOF(GTM_TEST_FAKE_ENOSPC) - 1;
+	TREF(gtm_test_fake_enospc) = logical_truth_value(&val, FALSE, &is_defined);
+	if (!is_defined)
+		TREF(gtm_test_fake_enospc) = FALSE;
 #	endif
 }

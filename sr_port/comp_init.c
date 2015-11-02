@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +35,7 @@ GBLREF char cg_phase;
 
 error_def(ERR_INDRMAXLEN);
 
-void comp_init(mstr *src)
+void comp_init(mstr *src, oprtype *dst)
 {
 	DCL_THREADGBL_ACCESS;
 
@@ -64,5 +64,12 @@ void comp_init(mstr *src)
 	curr_fetch_trip = newtriple(OC_FETCH);
 	curr_fetch_count = 0;
 	start_fetches(OC_FETCH);
+	/* op_igetdst fetches the destination (ind_result) onto the M-stack at the start of execution so that if we end up doing
+	 * nested indirection, in which case ind_result could change, op_iretmval can put the result in the correct location.
+	 * op_igetsrc serves a very similar purpose, placing a copy of the source mval (ind_source) on the M-stack at the start
+	 * of execution.
+	 */
+	if (dst)
+		*dst = put_tref(newtriple(OC_IGETDST));
 	return;
 }

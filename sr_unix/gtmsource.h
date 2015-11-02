@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,8 +118,9 @@ typedef enum
 #define GTMSOURCE_FH_FLUSH_INTERVAL	60 /* seconds, if required, flush file header(s) every these many seconds */
 
 typedef struct
-{ /* IMPORTANT : all fields that are used by the source server reading from pool logic must be defined VOLATILE to avoid compiler
-   * optimization, forcing fresh load on every access */
+{ 	/* IMPORTANT : all fields that are used by the source server reading from pool logic must be defined VOLATILE to avoid
+	 * compiler optimization, forcing fresh load on every access.
+	 */
 	replpool_identifier	jnlpool_id;
 	sm_off_t		critical_off;		/* Offset from the start of this structure to "csa->critical" in jnlpool */
 	sm_off_t		filehdr_off;		/* Offset to "repl_inst_filehdr" section in jnlpool */
@@ -184,8 +185,11 @@ typedef struct
 	volatile uint4		onln_rlbk_cycle;	/* incremented everytime an ONLINE ROLLBACK ends */
 	boolean_t		freeze;			/* Freeze all regions in this instance. */
 	char			freeze_comment[MAX_FREEZE_COMMENT_LEN];	/* Text explaining reason for freeze */
+	boolean_t		instfreeze_environ_inited;
 	unsigned char		merrors_array[MERRORS_ARRAY_SZ];
-	unsigned char		filler_align_16[4];	/* for 16-byte alignment */
+	/* Note: while adding fields to this structure, keep in mind that it needs to be 16-byte aligned so add filler bytes
+	 * as necessary
+	 */
 } jnlpool_ctl_struct;
 
 #if defined(__osf__) && defined(__alpha)

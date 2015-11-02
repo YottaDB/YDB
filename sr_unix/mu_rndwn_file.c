@@ -209,7 +209,7 @@ error_def(ERR_SEMREMOVED);
 boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 {
 	int			status, save_errno, sopcnt, tsd_size, save_udi_semid = INVALID_SEMID, semop_res, stat_res, rc;
-	int			csd_size, init_status;
+	int			csd_size;
 	char                    now_running[MAX_REL_NAME];
 	boolean_t		rc_cpt_removed = FALSE, sem_created = FALSE, sem_incremented = FALSE, is_gtm_shm;
 	boolean_t		glob_sec_init, db_shm_in_sync, remove_shmid, no_shm_exists;
@@ -227,6 +227,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	uint4			status_msg, ss_pid;
 	shm_snapshot_t		*ss_shm_ptr;
 	gtm_uint64_t		sec_size;
+#	ifdef GTM_CRYPT
+	gd_segment		*seg;
+	int			gtmcrypt_errno;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -242,6 +246,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	fc->op = FC_OPEN;
 	status = dbfilop(fc);
 	udi = FILE_INFO(reg);
+	csa = &(udi->s_addrs);		/* Need valid cs_addrs in is_anticipatory_freeze_needed, which can be called */
+	cs_addrs = csa;			/* by gtm_putmsg(), so set it up here. */
 	if (SS_NORMAL != status)
 	{
 		gtm_putmsg(VARLSTCNT(5) status, 2, DB_LEN_STR(reg), errno);
@@ -274,31 +280,23 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		RNDWN_ERR("!AD -> Error reading from file.", reg);
 		CLNUP_AND_RETURN(reg, udi, tsd, sem_created, sem_incremented);
 	}
-	csa = &(udi->s_addrs);
 	csa->hdr = tsd;
 	csa->region = gv_cur_region;
 #	ifdef GTM_CRYPT
-	/* During rundown gvcst_init is not called and hence we need to do the encryption setup here. */
-	/* We do some basic encryption initializations here.
-	 * 1. Call hash check to figure out if the database file's hash matches with that of the db_key_file.
-	 * 2. if the database file is encrypted, then make a call to the encryption plugin with GTMCRYPT_GETKEY to obtain the
-	 *    symmetric key which can be used at later stages for encryption and decryption.
-	 * 3. malloc csa->encrypted_blk_contents to be used in jnl_write_aimg_rec and dsk_write_nocache
-	 */
 	if (tsd->is_encrypted)
 	{
 		csa = &(udi->s_addrs);
-		INIT_PROC_ENCRYPTION(init_status);
-		if (0 == init_status)
-			INIT_DB_ENCRYPTION(reg->dyn.addr->fname, csa, tsd, init_status);
-		if (0 != init_status)
+		INIT_PROC_ENCRYPTION(csa, gtmcrypt_errno);
+		if (0 == gtmcrypt_errno)
+			INIT_DB_ENCRYPTION(csa, tsd, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
-			GC_GTM_PUTMSG(init_status, (reg->dyn.addr->fname));
+			seg = reg->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
 			CLNUP_AND_RETURN(reg, udi, tsd, sem_created, sem_incremented);
 		}
 	}
 #	endif
-
 	CSD2UDI(tsd, udi);
 	semarg.buf = &semstat;
 	REMOVE_SEMID_IF_ORPHANED(reg, udi, tsd, sem_created, sem_incremented);

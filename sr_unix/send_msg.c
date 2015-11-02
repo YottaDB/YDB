@@ -50,13 +50,13 @@ static uint4		nesting_level = 0;
 void send_msg(int arg_count, ...)
 {
         va_list		var;
-        int		dummy, fao_actual, fao_count, i, msg_id;
+        int		dummy, fao_actual, fao_count, i, msg_id, freeze_msg_id;
         char    	msg_buffer[1024];
         mstr    	msg_string;
 	char		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE;
-	boolean_t	freeze_set = FALSE;
+	boolean_t	freeze_needed = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -78,7 +78,7 @@ void send_msg(int arg_count, ...)
         for (;;)
         {
                 msg_id = (int) va_arg(var, VA_ARG_TYPE);
-		SET_ANTICIPATORY_FREEZE_IF_NEEDED(msg_id, freeze_set);
+		CHECK_IF_FREEZE_ON_ERROR_NEEDED(msg_id, freeze_needed, freeze_msg_id);
                 --arg_count;
                 msg_string.addr = msg_buffer;
                 msg_string.len = SIZEOF(msg_buffer);
@@ -116,5 +116,5 @@ void send_msg(int arg_count, ...)
          * and conditionally enter a "forever" loop on wcs_sleep for unix debugging
          */
 	DEBUG_ONLY(nesting_level--;)
-	REPORT_INSTANCE_FROZEN(freeze_set);
+	FREEZE_INSTANCE_IF_NEEDED(freeze_needed, freeze_msg_id);
 }

@@ -90,8 +90,8 @@ typedef struct
 {														\
 	GBLREF	stack_frame	*error_frame;									\
 														\
-	error_frame = NULL;											\
 	DBGEHND((stderr, "%s: Nullifying previous error_frame (was 0x"lvaddr")\n", __FILE__, error_frame));	\
+	error_frame = NULL;											\
 }
 
 /* Set "error_frame" to point to "frame_pointer" and mark it as an error frame type. This is an indication that

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc #
+#	Copyright 2001, 2013 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -523,58 +523,86 @@ if ( $buildaux_dbcertify == 1 ) then
 	endif
 endif
 
-#create the plugin directory, copy the files and set it up so that buildplugin can build the needed libraries
-#Do these only for the below mentioned platforms. All the remaining platforms will run GT.M without encryption
+# Create the plugin directory, copy the files and set it up so that build.sh can build the needed libraries.
 if ($buildaux_gtmcrypt == 1) then
-	set encrypt_supported = `$gtm_tools/check_encrypt_support.sh`
-	if ("TRUE" == $encrypt_supported) then
+	set supported_list = `$gtm_tools/check_encrypt_support.sh mail`
+	if ("FALSE" != "$supported_list") then		# Do it only on the platforms where encryption is supported
 		set plugin_build_type=""
 		switch ($2)
-		case "[bB]*":
-			set plugin_build_type="p"
-			breaksw
-		case "[pP]*":
-			set plugin_build_type="p"
-			breaksw
-		default:
-			set plugin_build_type="d"
-			breaksw
+			case "[bB]*":
+				set plugin_build_type="p"
+				breaksw
+			case "[pP]*":
+				set plugin_build_type="p"
+				breaksw
+			default:
+				set plugin_build_type="d"
+				breaksw
 		endsw
 		rm -rf $gtm_dist/plugin/gtmcrypt
 		rm -rf $gtm_dist/plugin/
 		mkdir -p $gtm_dist/plugin/gtmcrypt >&! /dev/null
 		setenv gtm_dist_plugin $gtm_dist/plugin/gtmcrypt
 		cp -pf $gtm_src/gtmcrypt_*ref.c $gtm_src/maskpass.c $gtm_dist_plugin >&! /dev/null
-		cp -pf $gtm_inc/gtmcrypt_*ref.h $gtm_inc/gtmcrypt_interface.h $gtm_inc/gtmxc_types.h $gtm_dist_plugin >&! /dev/null
+		cp -pf $gtm_inc/gtmcrypt_*ref.h $gtm_inc/gtmcrypt_interface.h $gtm_dist_plugin >&! /dev/null
 		cp -pf $gtm_tools/build.sh $gtm_tools/install.sh $gtm_tools/add_db_key.sh $gtm_dist_plugin >&! /dev/null
 		cp -pf $gtm_tools/encrypt_sign_db_key.sh $gtm_tools/gen_keypair.sh $gtm_dist_plugin >&! /dev/null
 		cp -pf $gtm_tools/gen_sym_hash.sh $gtm_tools/gen_sym_key.sh $gtm_dist_plugin >&! /dev/null
 		cp -pf $gtm_tools/import_and_sign_key.sh $gtm_tools/pinentry-gtm.sh $gtm_dist_plugin >&! /dev/null
+		cp -pf $gtm_tools/show_install_config.sh $gtm_dist_plugin >&! /dev/null
 		cp -pf $gtm_pct/pinentry.m $gtm_dist_plugin >&! /dev/null
 		chmod +x $gtm_dist_plugin/*.sh
 		pushd $gtm_dist_plugin >&! /dev/null
-		set bstat = 0
-		if ( $HOSTOS == "AIX") then
-			#For AIX we will be building the encryption library with openssl support.
-			sh -x $gtm_dist_plugin/build.sh openssl $plugin_build_type >&! $gtm_map/gtmcryptbuild.map
-			set bstat = $status;
-		else
-			sh -x $gtm_dist_plugin/build.sh gcrypt $plugin_build_type >&! $gtm_map/gtmcryptbuild.map
-			set bstat = $status;
+		# For, non-AIX platforms, move the libgcrypt entry to the end of $supported_list. This way, build.sh will always
+		# build maskpass with libgcrypt dependency rather than libcrypto dependency on non-AIX platforms.
+		if ($HOSTOS != "AIX") then
+			set supported_list_reorder = `echo $supported_list | sed 's/gcrypt//;s/$/ gcrypt/'`
+			set supported_list = "$supported_list_reorder"
 		endif
-		cat $gtm_map/gtmcryptbuild.map
-		if (0 != $bstat || ! -x $gtm_dist_plugin/libgtmcrypt$gt_ld_shl_suffix || ! -x $gtm_dist_plugin/maskpass ) then
-			set buildaux_status = `expr $buildaux_status + 1`
-			echo "buildaux-E-libgtmcrypt, failed to build gtmcrypt and/or helper scripts \
-			(see ${dollar_sign}gtm_map/gtmcryptbuild.map)" >> $gtm_log/error.`basename $gtm_exe`.log
-		else
-			$gtm_dist_plugin/install.sh >&! $gtm_map/gtmcryptinstall.map
-			if (0 != $status) then
-				set buildaux_status = `expr $buildaux_status + 1`
-				echo "buildaux-E-libgtmcrypt, failed to install gtmcrypt and/or helper scripts \
-				(see ${dollar_sign}gtm_map/gtmcryptinstall.map)" >> $gtm_log/error.`basename $gtm_exe`.log
+		# Build all possible encryption libraries based on what encryption libraries are supported in this platform.
+		foreach supported_lib ($supported_list)
+			foreach algorithm ("AES256CFB" "BLOWFISHCFB")
+				if ("gcrypt" == "$supported_lib" && "BLOWFISHCFB" == "$algorithm") continue
+				echo "####### Building encryption plugin using $supported_lib with $algorithm algorithm #########"
+				sh -x $gtm_dist_plugin/build.sh $supported_lib $plugin_build_type $algorithm
+				set bstat = $status
+				echo ""
+				if (0 != $bstat) then
+					set buildaux_status = `expr $buildaux_status + 1`
+					echo "buildaux-E-libgtmcrypt, failed to build gtmcrypt and/or helper scripts. See 'map'	\
+						files in ${dollar_sign}gtm_dist/plugin/gtmcrypt for more details" 		\
+									>> $gtm_log/error.`basename $gtm_exe`.log
+				endif
+			end
+		end
+		if ($gtm_verno =~ V[4-8]*) then
+			# For production builds don't do any randomizations.
+			set algorithm = "AES256CFB"
+			if ($HOSTOS == "AIX") then
+				set encryption_lib = "openssl"
+			else
+				set encryption_lib = "gcrypt"
 			endif
-			cat $gtm_map/gtmcryptinstall.map
+		else
+			# Now that we've built "possibly" more than one encryption library, choose one configuration (based on
+			# third-party library and algorithm) randomly and install that.
+			set rand = `$gtm_dist/mumps -run %XCMD 'write 1+$random('$#supported_list')'`
+			set encryption_lib = $supported_list[$rand]
+			if (("gcrypt" == "$encryption_lib") || ("AIX" != $HOSTOS)) then
+				# Force AES as long as the plugin is linked against libgcrypt OR this is a non-AIX platform
+				set algorithm = "AES256CFB"
+			else
+				# OpenSSL, V9* build and AIX. Go ahead and randomize the algorithm
+				set algorithms = ("AES256CFB" "BLOWFISHCFB")
+				set rand = `$gtm_dist/mumps -run %XCMD 'write 1+$random(2)'`
+				set algorithm = $algorithms[$rand]
+			endif
+		endif
+		$gtm_dist_plugin/install.sh $encryption_lib $algorithm
+		if (0 != $status) then
+			set buildaux_status = `expr $buildaux_status + 1`
+			echo "buildaux-E-libgtmcrypt, failed to install libgtmcrypt and/or helper scripts"		\
+						>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
 		popd >&! /dev/null
 	endif

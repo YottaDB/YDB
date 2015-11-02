@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,106 +12,99 @@
 #ifndef GTMCRYPT_DBK_REF_H
 #define GTMCRYPT_DBK_REF_H
 
-typedef struct
+#define DATABASE_LINE_INFO			0
+#define SYMMETRIC_KEY_LINE_INFO			1
+#define DATABASE_LINE_INDICATOR			"dat "
+#define SYMMETRIC_KEY_LINE_INDICATOR		"key "
+#define DATABASE_LINE_INDICATOR_SIZE		(SIZEOF(DATABASE_LINE_INDICATOR) - 1)
+#define SYMMETRIC_KEY_LINE_INDICATOR_SIZE	(SIZEOF(SYMMETRIC_KEY_LINE_INDICATOR) - 1)
+#ifdef LINE_MAX
+#undef LINE_MAX
+#endif
+#define LINE_MAX				(GTM_PATH_MAX + DATABASE_LINE_INDICATOR_SIZE + 2) /* 2 is just for safety */
+
+
+typedef struct gtm_dbkeys_tbl_struct
 {
-	xc_string_t		db_name, key_filename;	/* name of the database and corresponding key found in the db key file */
-	xc_string_t		key_string, hash; /* plain text key and it's hash */
-	xc_fileid_ptr_t		fileid;		  /* if valid, unique file id representation of the database path */
-	int			fileid_dirty, sym_key_dirty; /* indicates if the db and the key file are valid accessible path */
-	int			index; 		  /* A positive integer (initialized to -1) indicating the ith entry in the db key
-						   * file. This value is returned to the caller and subsequently passed to the
-						   * plugin to get the key for the corresponding database. */
-	struct db_key_map 	*next;		  /* Pointer to the next entry in the linked list */
-	crypt_key_t		encr_key_handle, decr_key_handle; /* Pointer to the actual key handles typedef'ed to the underlying
-							       * encryption library. */
-}db_key_map;
+	struct gtm_dbkeys_tbl_struct 	*next;
+	int				fileid_dirty;
+	int				symmetric_key_dirty;
+	int				index;
+	int				database_fn_len;
+	char				database_fn[GTM_PATH_MAX + 1];
+	char				symmetric_key_fn[GTM_PATH_MAX + 1];
+	unsigned char			symmetric_key[SYMMETRIC_KEY_MAX + 1];
+	unsigned char			symmetric_key_hash[GTMCRYPT_HASH_LEN + 1];
+	xc_fileid_ptr_t			fileid;
+	crypt_key_t			encr_key_handle;
+	crypt_key_t			decr_key_handle;
+} gtm_dbkeys_tbl;
 
 
-void 				gc_dbk_scrub_entries(void);
-xc_status_t 			gc_dbk_is_db_key_file_modified(void);
-db_key_map* 			gc_dbk_get_entry_by_fileid(xc_fileid_ptr_t fileid);
-db_key_map* 			gc_dbk_get_entry_by_hash(xc_string_t *hash);
-dbkeyfile_line_type 		gc_dbk_get_line_info (char *buf, char *data);
-xc_status_t 			gc_dbk_load_gtm_dbkeys(FILE **gtm_dbkeys);
-xc_status_t 			gc_dbk_load_entries_from_file(void);
-xc_status_t 			gc_dbk_fill_sym_key_and_hash(xc_fileid_ptr_t req_fileid, char *req_hash);
-void	 			gc_dbk_get_hash(db_key_map *entry,  xc_string_t *hash);
+
+void					gc_dbk_scrub_entries(void);
+gtm_dbkeys_tbl*				gc_dbk_get_entry_by_fileid(xc_fileid_ptr_t fileid);
+gtm_dbkeys_tbl*				gc_dbk_get_entry_by_hash(xc_string_t *hash);
+xc_status_t				gc_dbk_fill_gtm_dbkeys_fname(char *fname);
+xc_status_t				gc_dbk_load_entries_from_file(void);
+xc_status_t				gc_dbk_fill_sym_key_and_hash(xc_fileid_ptr_t req_fileid, char *req_hash);
+void					gc_dbk_get_hash(gtm_dbkeys_tbl *entry,  xc_string_t *hash);
 
 
-#define GC_FREE_DB_KEY_MAP(X)				\
-{							\
-	GC_FREE((X)->db_name.address);			\
-	GC_FREE((X)->key_filename.address);		\
-	memset((X)->key_string.address, 0, GTM_KEY_MAX);\
-	GC_FREE((X)->key_string.address);		\
-	GC_FREE((X)->hash.address);			\
-	gtm_xcfileid_free_fptr((X)->fileid);		\
-	GC_FREE(X);					\
+#define GC_FREE_TBL_ENTRY(X)													\
+{																\
+	gtm_xcfileid_free_fptr((X)->fileid);											\
+	memset((X)->symmetric_key, 0, SYMMETRIC_KEY_MAX);									\
+	memset((X)->symmetric_key_hash, 0, GTMCRYPT_HASH_LEN);									\
+	GC_FREE(X);														\
 }
 
-#define GC_NEW_DB_KEYMAP(X)						\
-{									\
-	GC_MALLOC(X, SIZEOF(db_key_map), db_key_map);			\
-	memset(X, 0, SIZEOF(db_key_map));				\
-	GC_MALLOC(X->db_name.address, GTM_PATH_MAX, char);		\
-	memset((X)->db_name.address, 0, GTM_PATH_MAX);			\
-	GC_MALLOC(X->key_filename.address, GTM_PATH_MAX, char);		\
-	memset((X)->key_filename.address, 0, GTM_PATH_MAX);		\
-	GC_MALLOC(X->key_string.address, GTM_PATH_MAX, char);		\
-	memset((X)->key_string.address, 0, GTM_KEY_MAX);		\
-	GC_MALLOC(X->hash.address, GTMCRYPT_HASH_LEN, char);		\
-	memset((X)->hash.address, 0, GTMCRYPT_HASH_LEN);		\
-	(X)->fileid_dirty = TRUE;					\
-	(X)->sym_key_dirty = TRUE;					\
-	(X)->fileid = NULL;						\
-	(X)->index = 0;							\
+#define GC_ALLOCATE_TBL_ENTRY(X)												\
+{																\
+	GC_MALLOC((X), SIZEOF(gtm_dbkeys_tbl), gtm_dbkeys_tbl);									\
+	(X)->fileid_dirty = TRUE;												\
+	(X)->symmetric_key_dirty = TRUE;											\
+	(X)->fileid = NULL;													\
+	(X)->index = 0;														\
 }
 
-#define GC_DBK_LOAD_KEY_FILE				\
-{							\
-	if (0 != gc_dbk_load_entries_from_file())	\
-		return GC_FAILURE;			\
-}
-
-/* After the preliminary search, if we haven't found our entry in the in-memory linked list for the
- * given hash/fileid, we try reloading the db key file(if it has been changed since last time) and then
- * we re-organize our in-memory linked list and try to search again.
+/* After the preliminary search, if we haven't found our entry in the in-memory linked list for the given hash/fileid, we try
+ * reloading the db key file (just in case it has been changed since last time) and re-organize our in-memory linked list
  */
-#define GC_DBK_RELOAD_IF_NEEDED(entry, RC, fileid, req_hash)		\
-{									\
-	if (NULL == entry)						\
-	{								\
-		if (TRUE == gc_dbk_is_db_key_file_modified())		\
-			GC_DBK_LOAD_KEY_FILE;				\
-		RC = gc_dbk_fill_sym_key_and_hash(fileid, req_hash);	\
-	}								\
+#define GC_DBK_RELOAD_IF_NEEDED(entry, RC, fileid, req_hash)									\
+{																\
+	if (NULL == entry)													\
+	{															\
+		if (0 != gc_dbk_load_entries_from_file())									\
+			return GC_FAILURE;											\
+		RC = gc_dbk_fill_sym_key_and_hash(fileid, req_hash);								\
+	}															\
 }
 
-#define GC_DBK_GET_ENTRY_FROM_HANDLE(handle, entry, ret)				\
-{											\
-	int	idx;									\
-											\
-	idx = (int)handle;								\
-	if (idx < 0 || (idx > num_entries))						\
-	{										\
-		snprintf(err_string, ERR_STRLEN, "%s", "Encryption handle corrupted.");	\
-		entry = NULL;								\
-		return ret;								\
-	} else										\
-		entry = (db_key_map *)fast_lookup_entry[idx];				\
+#define GC_DBK_GET_ENTRY_FROM_HANDLE(handle, entry, ret)									\
+{																\
+	GBLREF int			num_entries;										\
+	GBLREF gtm_dbkeys_tbl	**fast_lookup_entry;										\
+																\
+	int				idx;											\
+																\
+	idx = (int)handle;													\
+	if (idx < 0 || (idx > num_entries))											\
+	{															\
+		UPDATE_ERROR_STRING("Encryption handle corrupted.");								\
+		entry = NULL;													\
+		return ret;													\
+	} else															\
+		entry = (gtm_dbkeys_tbl *)fast_lookup_entry[idx];								\
 }
 
-#define GC_DBK_FILENAME_TO_ID(filename, fileid)							\
-{												\
-	if (TRUE != gtm_filename_to_id_fptr(filename, &fileid))					\
-	{											\
-		snprintf(err_string, ERR_STRLEN, "database file %s not found", filename->address); 	\
-		return GC_FAILURE;								\
-	}											\
+#define GC_DBK_FILENAME_TO_ID(filename, fileid)											\
+{																\
+	if (TRUE != gtm_filename_to_id_fptr(filename, &fileid))									\
+	{															\
+		UPDATE_ERROR_STRING("Database file %s not found", filename->address);			 			\
+		return GC_FAILURE;												\
+	}															\
 }
-
-#define GC_DBK_SET_FIRST_ENTRY(cur)	db_map_root = (db_key_map *)cur
-#define GC_DBK_GET_FIRST_ENTRY()	db_map_root
-#define GC_DBK_GET_NEXT_ENTRY(cur)	(db_key_map *) cur->next
 
 #endif /* GTMCRYPT_DBK_REF_H */

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc	#
+#	Copyright 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -10,7 +10,7 @@
 #################################################################
 
 #	PAGE	,132
-	.title	opp_indo2.s
+	.title	opp_indsavglvn.s
 
 #	.386
 #	.MODEL	FLAT, C
@@ -18,21 +18,22 @@
 .include "linkage.si"
 	.INCLUDE	"g_msf.si"
 
-	.sbttl	opp_indo2
+	.sbttl	opp_indsavglvn
 #	PAGE	+
 	.DATA
 .extern	frame_pointer 	# /* :DWORD */
 
 	.text
-.extern	op_indo2
+.extern	op_indsavglvn
 
-# PUBLIC	opp_indo2
-ENTRY opp_indo2  	# /* PROC */
+# PUBLIC	opp_indsavglvn
+ENTRY opp_indsavglvn  	# /* PROC */
 	putframe
-	addq	$8,REG_SP   # burn return PC
-	call	op_indo2
+	addl	$4,%esp		# /* burn return pc */
+	call	op_indsavglvn
+	addl	$12,%esp	# /* burn three passed-in args */
 	getframe
 	ret
-# opp_indo2 ENDP
+# opp_indsavglvn ENDP
 
 # END

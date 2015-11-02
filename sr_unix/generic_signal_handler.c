@@ -298,7 +298,10 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			}
 			break;
 	} /* switch (sig) */
-	cancel_timer(0);	/* Don't want any interruptions */
+	/* Stop the timers but do not cancel them. This allows the timer structures to appear in the core where gtmpcat can
+	 * extract them allowing us to see what was going on.
+	 */
+	sys_canc_timer();
 	FFLUSH(stdout);
 	if (!dont_want_core)
 	{

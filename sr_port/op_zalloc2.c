@@ -220,14 +220,14 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 						gvcmz_clrlkreq();
 						remlkreq = FALSE;
 					}
-					if (outofband)
+					if (outofband  && !out_of_time)
 					{
-						if (timer_on && !out_of_time)
+						if (timer_on)
 						{
 							cancel_timer((TID)&timer_on);
 							timer_on = FALSE;
 						}
-						if (!out_of_time && (NO_M_TIMEOUT != timeout))
+						if (NO_M_TIMEOUT != timeout)
 						{	/* get remain = end_time - cur_time */
 							sys_get_curr_time(&cur_time);
 							remain_time = sub_abs_time(&end_time, &cur_time);
@@ -242,21 +242,26 @@ int	op_zalloc2(int4 timeout, UINTPTR_T auxown)	/* timeout in seconds */
 								timer_on = FALSE;	/* as if LOCK :0 */
 								break;
 							}
-							PUSH_MV_STENT(MVST_ZINTCMD);
-							mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
-							mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
-							mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
-							/* save current information from zintcmd_active */
-							mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior
-								= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last;
-							mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior
-								= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last;
-							TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last = restart_pc;
-							TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last = restart_ctxt;
-							TAREF1(zintcmd_active, ZINTCMD_LOCK).count++;
-							mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_LOCK;
+							if ((tptimeout != outofband) && (ctrlc != outofband))
+							{
+								PUSH_MV_STENT(MVST_ZINTCMD);
+								mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
+								/* save current information from zintcmd_active */
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior
+									= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last;
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior
+									= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last;
+								TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last = restart_pc;
+								TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last
+									= restart_ctxt;
+								TAREF1(zintcmd_active, ZINTCMD_LOCK).count++;
+								mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_LOCK;
+							}
 							outofband_action(FALSE);	/* no return */
-						}
+						} else
+							outofband_action(FALSE);	/* no return */
 					}
 					break;
 				}

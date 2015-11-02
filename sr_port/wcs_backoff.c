@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +12,13 @@
 #include "mdef.h"
 #include "sleep_cnt.h"
 
-#include <stdlib.h>
+#ifdef VMS
+# include <lib$routines.h>
+#endif
+#include "gtm_stdlib.h"
 #include "gt_timer.h"
 #ifdef UNIX
-#include "random.h"
+# include "random.h"
 #endif
 #include "wcs_backoff.h"
 
@@ -30,12 +33,10 @@ void wcs_backoff(unsigned int sleepfactor)
 	 *   if (count) wcs_backoff(count);
 	 */
 
-#if defined(VMS)
-	float           mth$random();
-	uint4           lib$day();
-	int4            day;
-#endif
-
+#	if defined(VMS)
+	int4		day;
+	double		randfloat;
+#	endif
 	static int4	seed = 0;
 	uint4		sleep_ms;
 
@@ -44,19 +45,25 @@ void wcs_backoff(unsigned int sleepfactor)
 		return;
 	if (sleepfactor > MAXSLPTIME)
 		sleepfactor = MAXSLPTIME;
-
-#ifdef UNIX
-	if (seed == 0)
+#	ifdef UNIX
+	if (0 == seed)
 	{
 		init_rand_table();
 		seed = 1;
 	}
 	sleep_ms = ((uint4)(get_rand_from_table() % sleepfactor));
-#else
-	if (seed == 0)				/* Seed random number generator */
+#	elif defined(VMS)
+	if (0 == seed)				/* Seed random number generator */
+	{
 		lib$day(&day, 0, &seed);
-	sleep_ms = ((uint4)(sleepfactor * mth$random(&seed)));
-#endif
+		seed *= process_id;
+		srandom(seed);
+	}
+	randfloat = ((double)random()) / RAND_MAX;
+ 	sleep_ms = ((uint4)(sleepfactor * randfloat));
+#	else
+#	error "Unsupported platform"
+#	endif
 	if (0 == sleep_ms)
 		return;				/* We have no wait this time */
 	if (1000 > sleep_ms)			/* Use simpler sleep for shorties */

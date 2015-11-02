@@ -60,7 +60,7 @@
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
-#ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
+#ifdef DEBUG
 #include "caller_id.h"
 #endif
 
@@ -583,15 +583,14 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 */
 		GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: Beginning state 0/1 processing (state %d)\n", tprestart_state)));
 		tp_unwind(newlevel, RESTART_INVOCATION, &tprestart_rc);
+		assert(dollar_tlevel == newlevel);	/* tp_unwind would have set this */
 		assert(tf == tp_pointer);	/* Needs to be true for now. Revisit when can restart to other than newlevel == 1 */
 		gd_header = tp_pointer->gd_header;
 		gv_target = tp_pointer->orig_gv_target;
 		gv_cur_region = tp_pointer->gd_reg;
 		TP_CHANGE_REG(gv_cur_region);
-		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
-		dollar_tlevel = newlevel;
 		COPY_KEY(gv_currkey, tp_pointer->orig_key);
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 #		ifdef GTM_TRIGGER
 		/* Maintenance of SFF_IMPLTSTART_CALLD stack frame flag:
 		 * - Set by gtm_trigger when trigger base frame is created. Purpose to prevent MUM_TSTART from restarting

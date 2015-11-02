@@ -144,7 +144,7 @@ unsigned char *mval2subsc(mval *v, gv_key *g)
 			*out_ptr++ = (!TREF(transform) || 0 == gv_cur_region->std_null_coll)
 				? STR_SUB_PREFIX : SUBSCRIPT_STDCOL_NULL;
 		}
-		goto FINI;
+		goto ALLDONE;
 	}
 	/* Its a number, is it an integer? */
 	if ( mvt & MV_INT )
@@ -159,7 +159,7 @@ unsigned char *mval2subsc(mval *v, gv_key *g)
 		} else if (0 == m)
 		{
 			*out_ptr++ = 0x80;
-			goto FINI;
+			goto ALLDONE;
 		}
 		if (10 > m)
 		{
@@ -285,7 +285,7 @@ LAST_LONGWORD:
 FINISH_NUMBER:
 	if (is_negative)
 		*out_ptr++ = 0xff;
-FINI:
+ALLDONE:
 	*out_ptr++ = 0 ; *out_ptr = 0 ;
 	g->prev = g->end ;
 	g->end  = out_ptr - g->base ;

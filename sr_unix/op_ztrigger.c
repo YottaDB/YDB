@@ -154,7 +154,7 @@ void op_ztrigger(void)
 	}
 	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl);
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
-	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVZTRIGFAIL);
 	lcl_implicit_tstart = FALSE;
 	assert(NULL != update_array);

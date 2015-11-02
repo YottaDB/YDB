@@ -46,6 +46,7 @@
 #include "gtmmsg.h"
 #include "mupip_recover.h"
 #include "wbox_test_init.h"
+#include "anticipatory_freeze.h"
 #ifdef GTM_TRIGGER
 #include "error_trap.h"
 #endif
@@ -85,6 +86,8 @@ GBLREF	dollar_ecode_type	dollar_ecode;		/* structure containing $ECODE related i
 
 error_def(ERR_ASSERT);
 error_def(ERR_BLKCNTEDITFAIL);
+error_def(ERR_DBCOLLREQ);
+error_def(ERR_SETEXTRENV);
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
@@ -205,8 +208,12 @@ void	mupip_recover(void)
 	repl_histinfo		local_histinfo;
 	seq_num			max_reg_seqno, replinst_seqno;
 	unix_db_info		*udi;
+	boolean_t		db_absent = FALSE;
+	reg_ctl_list		*db_absent_rctl;
 #endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(mupip_recover_ch);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mupip_recover_ch);
 	/* PHASE 1: Process user input, open journal files, create rctl for phase 2 */
@@ -218,9 +225,7 @@ void	mupip_recover(void)
 	jgbl.mur_extract = mur_options.extr[GOOD_TN]; /* journal extract process */
 	/*ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES);*/
 	if (!mur_open_files_status) /* mur_open_files already issued error */
-	{
 		mupip_exit(ERR_MUNOACTION);
-	}
 	VMS_ONLY(assert(!mur_options.rollback_losttnonly);)
 	UNIX_ONLY(assert(!mur_options.rollback_losttnonly || mur_options.rollback);)
 	murgbl.prc_vec = prc_vec;
@@ -238,6 +243,13 @@ void	mupip_recover(void)
 		rctl = &mur_ctl[regno];
 		jctl = rctl->jctl;
 		assert(NULL == jctl->next_gen);
+#		ifdef UNIX
+		if (!rctl->db_present)
+		{
+			db_absent = TRUE;
+			db_absent_rctl = rctl;
+		}
+#		endif
 		if (!jctl->properly_closed)
 			all_gen_properly_closed = FALSE;
 		if (jctl->jfh->recover_interrupted)
@@ -255,6 +267,24 @@ void	mupip_recover(void)
 		}
 	}
 #	ifdef UNIX
+	if (!mur_options.update && jgbl.mur_extract && (db_absent || IS_REPL_INST_FROZEN))
+	{
+		if (TREF(jnl_extract_nocol))
+		{
+			TREF(jnl_extract_nocol) = !mur_options.update && jgbl.mur_extract && TREF(jnl_extract_nocol);
+			if (db_absent)
+				gtm_putmsg(VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Mising Database file"),
+						DB_LEN_STR(db_absent_rctl->gd));
+			else
+				gtm_putmsg(VARLSTCNT(6) ERR_DBCOLLREQ, 4, LEN_AND_LIT("Instance is frozen."),
+						LEN_AND_LIT(""));
+		} else
+		{
+			gtm_putmsg(VARLSTCNT(1) ERR_SETEXTRENV);
+			mupip_exit(ERR_MUNOACTION);
+		}
+	} else
+		TREF(jnl_extract_nocol) = 0;
 	max_reg_seqno = 0;
 	for (regno = 0; regno < reg_total; regno++)
 	{

@@ -42,6 +42,9 @@
 #include "util.h"
 #include "t_abort.h"
 #include "gvcst_blk_build.h"	/* for the BUILD_AIMG_IF_JNL_ENABLED macro */
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#endif
 
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size;
@@ -79,8 +82,9 @@ void dse_chng_bhead(void)
 	sgmnt_data_ptr_t	csd;
 #	ifdef GTM_CRYPT
 	int			req_enc_blk_size;
-	int			crypt_status;
+	int			gtmcrypt_errno;
 	blk_hdr_ptr_t		bp, save_bp, save_old_block;
+	gd_segment		*seg;
 #	endif
 
         if (gv_cur_region->read_only)
@@ -237,10 +241,13 @@ void dse_chng_bhead(void)
 			{
 				ASSERT_ENCRYPTION_INITIALIZED;
 				memcpy(save_bp, bp, SIZEOF(blk_hdr));
-				GTMCRYPT_ENCODE_FAST(csa->encr_key_handle, (char *)(bp + 1), req_enc_blk_size,
-					(char *)(save_bp + 1), crypt_status);
-				if (0 != crypt_status)
-					GC_GTM_PUTMSG(crypt_status, gv_cur_region->dyn.addr->fname);
+				GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, (char *)(bp + 1), req_enc_blk_size,
+							(char *)(save_bp + 1), gtmcrypt_errno);
+				if (0 != gtmcrypt_errno)
+				{
+					seg = gv_cur_region->dyn.addr;
+					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+				}
 			} else
 				memcpy(save_bp, bp, bp->bsiz);
 		}

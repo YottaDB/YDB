@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,6 @@
 
 GBLREF	symval			*curr_symval;
 
-error_def(ERR_INDMAXNEST);
 error_def(ERR_VAREXPECTED);
 
 void	op_indset(mval *target, mval *value)
@@ -55,10 +54,8 @@ void	op_indset(mval *target, mval *value)
 			((lv_val *)tabent->value)->v = *value;
 			return;
 		}
-		if (TREF(ind_source_sp) >= TREF(ind_source_top))
-			rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_source_sp */
 		obj = &object;
-		comp_init(&target->str);
+		comp_init(&target->str, NULL);
 		src = maketriple(OC_IGETSRC);
 		ins_triple(src);
 		switch (TREF(window_token))
@@ -94,13 +91,12 @@ void	op_indset(mval *target, mval *value)
 			rval = EXPR_FAIL;
 			break;
 		}
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, 0, target->str.len))
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, NULL, NULL, target->str.len))
 			return;
 		indir_src.str.addr = target->str.addr;
 		cache_put(&indir_src, obj);
 		/* Fall into code activation below */
-	} else if (TREF(ind_source_sp) >= TREF(ind_source_top))
-		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_source_sp */
-	*(TREF(ind_source_sp))++ = value;
+	}
+	TREF(ind_source) = value;
 	comp_indr(obj);
 }

@@ -124,43 +124,40 @@ error_def(ERR_WCBLOCKED);
 	assert((ctn > csd->desired_db_format_tn) || ((ctn == csd->desired_db_format_tn) && (1 == ctn)));		\
 	cr->ondsk_blkver = csd->desired_db_format;									\
 }
-/* check for online backup - ATTN: this part of code is similar to that in mm_update */
-#define	BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, nontp_block_saved, tp_block_saved, ctn)\
-{															\
-	boolean_t		read_before_image;									\
-	trans_num		bkup_blktn;										\
-	shmpool_buff_hdr_ptr_t	sbufh_p;										\
-															\
-	DEBUG_ONLY(read_before_image = 											\
-		((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));)	\
-	assert(!read_before_image || (NULL == cs->old_block) || (backup_blk_ptr == cs->old_block));			\
-	assert(csd == cs_data);	/* backup_block uses cs_data hence this check */					\
-	if ((blkid >= cnl->nbb) && (NULL != cs->old_block))								\
-	{														\
-		sbufh_p = csa->shmpool_buffer;										\
-		if (0 == sbufh_p->failed)										\
-		{													\
-			bkup_blktn = ((blk_hdr_ptr_t)(backup_blk_ptr))->tn;						\
-			if ((bkup_blktn < sbufh_p->backup_tn) && (bkup_blktn >= sbufh_p->inc_backup_tn))		\
-			{												\
-				assert(backup_cr->blk == blkid);							\
-				assert(cs->old_block == backup_blk_ptr);						\
-				/* to write valid before-image, ensure buffer is protected against preemption */	\
-				assert(process_id == backup_cr->in_cw_set);						\
-				backup_block(csa, blkid, backup_cr, NULL);						\
-				if (!dollar_tlevel)									\
-					nontp_block_saved = TRUE;							\
-				else											\
-					tp_block_saved = TRUE;								\
-			}												\
-		}													\
-	}														\
-}
 
 #if defined(UNIX)
 #define MAX_CYCLES	2
 NOPIO_ONLY(GBLREF boolean_t	*lseekIoInProgress_flags;)
 void	wcs_stale(TID tid, int4 hd_len, gd_region **region);
+
+#define DO_FAST_INTEG_CHECK(old_block, cs_addrs, cs, lcl_ss_ctx, blkid, write_to_snapshot_file)					\
+{																\
+	/* For fast integ, do NOT write the data block in global variable tree to snapshot file */ 				\
+	blk_hdr			*blk_hdr_ptr;											\
+	boolean_t		is_in_gv_tree;											\
+	 /* level-0 block in DIR tree was already processed */									\
+	assert((CSE_LEVEL_DRT_LVL0_FREE != cs->level) || (gds_t_writemap == cs->mode));						\
+	blk_hdr_ptr = (blk_hdr_ptr_t)old_block;											\
+	if (WAS_FREE(cs->blk_prior_state))											\
+		write_to_snapshot_file = FALSE;											\
+	else if (WAS_RECYCLED(cs->blk_prior_state))										\
+		write_to_snapshot_file = (blk_hdr_ptr->levl > 0);								\
+	else															\
+	{															\
+		is_in_gv_tree = (IN_GV_TREE == (cs->blk_prior_state & KEEP_TREE_STATUS));					\
+		write_to_snapshot_file = !((0 == blk_hdr_ptr->levl) && is_in_gv_tree);						\
+	}															\
+	/* For recycled block: If we decide to write the before image to the snapshot file, we will mark the shadow bitmap 	\
+	 * right then. If we decide not to, we will still mark the shadow bitmap. This is so we prevent writing			\
+	 * the before-image to the snapshot file after the recycled block becomes a busy block.					\
+	 * For free block: Similar reason as above										\
+	 * For busy block: level-0 block in gv_tree may change level after swapping with another block, if it's not marked in	\
+	 * shadow bitmap, when it is updated again, it would be mistakenly required to be written to snapshot file		\
+	 */															\
+	if (!write_to_snapshot_file && (blkid < lcl_ss_ctx->total_blks)								\
+					&& !ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid))					\
+		ss_set_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid);								\
+}
 
 #elif defined(VMS)
 GBLREF	short			astq_dyn_avail;
@@ -390,11 +387,10 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	cw_set_element		*cs_ptr, *nxt;
 	off_chain		chain;
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
-	GTM_SNAPSHOT_ONLY(boolean_t		is_in_gv_tree;)
-	GTM_SNAPSHOT_ONLY(boolean_t 	fast_integ_write = TRUE;)
-	GTM_SNAPSHOT_ONLY(
-		snapshot_context_ptr_t	lcl_ss_ctx;
-	)
+#ifdef GTM_SNAPSHOT
+	boolean_t 		write_to_snapshot_file;
+	snapshot_context_ptr_t	lcl_ss_ctx;
+#endif
 #	if defined(VMS)
 	unsigned int		status;
 	io_status_block_disk	iosb;
@@ -421,7 +417,9 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 #		endif
 #	  endif
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(cs_addrs->now_crit);
 	assert((gds_t_committed > cs->mode) && (gds_t_noop < cs->mode));
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bgmm_updates, 1);
@@ -565,22 +563,34 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 			si->backup_block_saved = TRUE;
 	}
 #	ifdef GTM_SNAPSHOT
-	lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
-	is_in_gv_tree = (IN_GV_TREE == (cs->blk_prior_state & KEEP_TREE_STATUS));
-	/* For fast integ, do NOT write the data block in global variable tree to snapshot file for mmupdate
-         * Except in case the block was free or recycled
-         */
-	if (FASTINTEG_IN_PROG(lcl_ss_ctx))
-		fast_integ_write = !(0 == cs->level && is_in_gv_tree) || WAS_FREE(cs) || WAS_RECYCLED(cs);
-	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block) && fast_integ_write)
-		WRITE_SNAPSHOT_BLOCK(cs_addrs, NULL, db_addr[0], blkid, lcl_ss_ctx);
-	/* If snapshots are in progress then the current block better be before imaged in the snapshot file. The
-	 * only exception is when the current database transaction number is greater than the snapshot transaction
-	 * number in which case the block's before image is not expected to be written to the snapshot file
-	 */
-	assert(!SNAPSHOTS_IN_PROG(cs_addrs)
-		|| (cs_data->trans_hist.curr_tn > lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn)
-		|| (ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)));
+	if (SNAPSHOTS_IN_PROG(cs_addrs) && (NULL != cs->old_block))
+	{
+		lcl_ss_ctx = SS_CTX_CAST(cs_addrs->ss_ctx);
+		assert(lcl_ss_ctx);
+		if (FASTINTEG_IN_PROG(lcl_ss_ctx))
+		{
+			DO_FAST_INTEG_CHECK(db_addr[0], cs_addrs, cs, lcl_ss_ctx, blkid, write_to_snapshot_file);
+		} else
+			write_to_snapshot_file = TRUE;
+		if (write_to_snapshot_file)
+			WRITE_SNAPSHOT_BLOCK(cs_addrs, NULL, db_addr[0], blkid, lcl_ss_ctx);
+		/* If the block id is greater than the db size at the start of the snapshot, no before image is written by
+		 *   either fast or regular integ
+		 * If regular MUPIP INTEG is in progress then the current block better be before imaged in the snapshot file.
+	 	 *   Only exception is when the current block transaction number is greater than or equal to the snapshot
+		 *   transaction number in which case the before image will not be written to the snapshot file.
+		 * If fast MUPIP INTEG is in progress, we dont write before-image in various cases (e.g. data block in GV tree,
+		 *   or if block was free etc.) even if the block transaction number is less than the snapshot tn. But in those
+		 *   cases write_to_snapshot is set to FALSE. So we can still assert that as long as write_to_snapshot is true,
+		 *   the block must have been before-imaged to the snapshot file.
+	 	 */
+		assert((blkid >= lcl_ss_ctx->total_blks)
+		    || !FASTINTEG_IN_PROG(lcl_ss_ctx)
+			 && (((blk_hdr_ptr_t)db_addr[0])->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn)
+				 || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)
+		    || FASTINTEG_IN_PROG(lcl_ss_ctx)
+			&& (!write_to_snapshot_file || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)));
+	}
 #	endif
 	if (gds_t_writemap == cs->mode)
 	{
@@ -776,6 +786,9 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	sm_off_t		backup_cr_off;
 	uint4			in_cw_set;
 #	endif
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 
 	csa = cs_addrs;		/* Local access copies */
 	csd = csa->hdr;
@@ -1287,7 +1300,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 		backup_blk_ptr = (sm_uc_ptr_t)GDS_REL2ABS(backup_cr->buffaddr);
 		assert(gds_t_write_root != mode);
 	}
-	BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved, ctn);
+	BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved);
 	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
 	SET_ONDSK_BLKVER(cr, csd, ctn);
 #	endif
@@ -1329,16 +1342,17 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	node_local_ptr_t        cnl;
 	enum gds_t_mode		mode;
 	cache_que_heads_ptr_t	cache_state;
-	GTM_SNAPSHOT_ONLY(boolean_t		is_in_gv_tree;) /*whether the block is in global variable tree*/
-	GTM_SNAPSHOT_ONLY(boolean_t 	fast_integ_write = TRUE;)
+#ifdef GTM_SNAPSHOT
+	boolean_t 		write_to_snapshot_file;
+	snapshot_context_ptr_t	lcl_ss_ctx;
+#endif
 #	if defined(VMS)
 	gv_namehead		*targ;
 	srch_blk_status		*blk_hist;
 #	endif
-	GTM_SNAPSHOT_ONLY(
-		snapshot_context_ptr_t	lcl_ss_ctx = NULL;
-	)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	mode = cs->mode;
 	cr = cs->cr;
 	/* Make sure asserts that were valid before letting go of this cache-record in phase1 are still so */
@@ -1385,28 +1399,41 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	 */
 	backup_cr = cr;
 	backup_blk_ptr = blk_ptr;
-	if (!WAS_FREE(cs)) /* dont do before image write for backup for FREE blocks */
-		BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved, ctn);
+	if (!WAS_FREE(cs->blk_prior_state)) /* dont do before image write for backup for FREE blocks */
+		BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, block_saved, si->backup_block_saved);
 #	endif
 	/* Update cr->ondsk_blkver to reflect the current desired_db_format. */
 	SET_ONDSK_BLKVER(cr, csd, ctn);
 #	ifdef GTM_SNAPSHOT
-	lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
-	is_in_gv_tree = (IN_GV_TREE == (cs->blk_prior_state & KEEP_TREE_STATUS));
-	/* For fast integ, do NOT write the data block  in global variable tree to snapshot file for bgupdate,
-         * except in case the block was free or recycled
-         */
-	if (FASTINTEG_IN_PROG(lcl_ss_ctx))
-		fast_integ_write = !(0 == cs->level && is_in_gv_tree) || WAS_FREE(cs) || WAS_RECYCLED(cs);
-	if (SNAPSHOTS_IN_PROG(csa) && (NULL != cs->old_block) && fast_integ_write)
-		WRITE_SNAPSHOT_BLOCK(csa, cr, NULL, blkid, lcl_ss_ctx);
-	/* If snapshots are in progress then the current block better be before imaged in the snapshot file. The
-	 * only exception is when the current database transaction number is greater than the snapshot transaction
-	 * number in which case the block's before image is not expected to be written to the snapshot file
-	 */
-	assert(!SNAPSHOTS_IN_PROG(csa)
-		|| (csd->trans_hist.curr_tn > lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn)
-		|| (ss_chk_shdw_bitmap(csa, SS_CTX_CAST(csa->ss_ctx), cs->blk)));
+	if (SNAPSHOTS_IN_PROG(csa) && (NULL != cs->old_block))
+	{
+		lcl_ss_ctx = SS_CTX_CAST(csa->ss_ctx);
+		assert(lcl_ss_ctx);
+		if (FASTINTEG_IN_PROG(lcl_ss_ctx))
+		{
+			DO_FAST_INTEG_CHECK(blk_ptr, csa, cs, lcl_ss_ctx, blkid, write_to_snapshot_file);
+		} else
+			write_to_snapshot_file = TRUE;
+		if (write_to_snapshot_file)
+			WRITE_SNAPSHOT_BLOCK(csa, cr, NULL, blkid, lcl_ss_ctx);
+		/* If the block id is greater than the db size at the start of the snapshot, no before image is written by
+		 *   either fast or regular integ
+		 * If regular MUPIP INTEG is in progress then the current block better be before imaged in the snapshot file.
+	 	 *   Only exception is when the current block transaction number is greater than or equal to the snapshot
+		 *   transaction number in which case the before image will not be written to the snapshot file.
+		 * If fast MUPIP INTEG is in progress, we dont write before-image in various cases (e.g. data block in GV tree,
+		 *   or if block was free etc.) even if the block transaction number is less than the snapshot tn. But in those
+		 *   cases write_to_snapshot is set to FALSE. So we can still assert that as long as write_to_snapshot is true,
+		 *   the block must have been before-imaged to the snapshot file.
+	 	 */
+		assert((blkid >= lcl_ss_ctx->total_blks)
+		    || !FASTINTEG_IN_PROG(lcl_ss_ctx)
+			 && (((blk_hdr_ptr_t)blk_ptr)->tn >= lcl_ss_ctx->ss_shm_ptr->ss_info.snapshot_tn)
+				 || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)
+		    || FASTINTEG_IN_PROG(lcl_ss_ctx)
+			&& (!write_to_snapshot_file || ss_chk_shdw_bitmap(cs_addrs, lcl_ss_ctx, blkid)));
+	}
+
 #	endif
 	SET_DATA_INVALID(cr);	/* data_invalid should be set signaling intent to update contents of a valid block */
 	if (gds_t_writemap == mode)
@@ -1556,6 +1583,19 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			return cdb_sc_cacheprob;
 		}
 	}
+#	ifdef VMS
+	if (cr->backup_cr_off && (gds_t_write == mode))	/* update landed in a different cache-record (twin) */
+	{	/* If valid clue and this block is in it, need to update buffer address */
+		targ = (!dollar_tlevel ? gv_target : cs->blk_target);
+		if ((NULL != targ) && (0 != targ->clue.end))
+		{
+			blk_hist = &targ->hist.h[cs->level];
+			blk_hist->buffaddr = blk_ptr;
+			blk_hist->cr = cr;
+			blk_hist->cycle = cr->cycle;	/* must do this before unpinning the cache-record */
+		}
+	}
+#	endif
 	/* A concurrent process reading this block will wait for in_tend to become FALSE and then proceed with its
 	 * database operation. Later it will reach t_end/tp_tend doing validations at which point it will need to set in_cw_set.
 	 * It expects in_cw_set to be 0 at that point. Therefore in_cw_set needs to be reset to 0 BEFORE resetting in_tend.
@@ -1567,19 +1607,6 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	SHM_WRITE_MEMORY_BARRIER;
 	assert(process_id == cr->in_tend);	/* should still be valid */
 	cr->in_tend = 0;
-	VMS_ONLY(
-		if (cr->backup_cr_off && (gds_t_write == mode))	/* update landed in a different cache-record (twin) */
-		{	/* If valid clue and this block is in it, need to update buffer address */
-			targ = (!dollar_tlevel ? gv_target : cs->blk_target);
-			if ((NULL != targ) && (0 != targ->clue.end))
-			{
-				blk_hist = &targ->hist.h[cs->level];
-				blk_hist->buffaddr = blk_ptr;
-				blk_hist->cr = cr;
-				blk_hist->cycle = cr->cycle;
-			}
-		}
-	)
 	VERIFY_QUEUE_LOCK(&cache_state->cacheq_active, &cnl->db_latch);
 	cs->old_mode = -cs->old_mode;	/* negate it back to indicate phase2 is complete for this cse (used by secshr_db_clnup) */
 	assert(0 < cs->old_mode);

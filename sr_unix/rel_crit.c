@@ -83,5 +83,5 @@ void	rel_crit(gd_region *reg)
 	/* Now that crit for THIS region is released, check if deferred signal/exit handling can be done and if so do it */
 	DEFERRED_EXIT_HANDLING_CHECK;
 	if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)
-		suspend();
+		suspend(SIGSTOP);
 }

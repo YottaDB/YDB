@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +10,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"		/* needed by INCREMENT_EXPR_DEPTH */
 #include "compiler.h"
 #include "opcode.h"
 
@@ -19,17 +20,15 @@ int bool_expr(boolean_t op, oprtype *addr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (!(TREF(expr_depth))++)
-		TREF(expr_start) = TREF(expr_start_orig) = NULL;
+	INCREMENT_EXPR_DEPTH;
 	if (!eval_expr(&x))
 	{
-		TREF(expr_depth) = 0;
+		DECREMENT_EXPR_DEPTH;
 		return FALSE;
 	}
 	assert(TRIP_REF == x.oprclass);
 	coerce(&x, OCT_BOOL);
 	bx_tail(x.oprval.tref, op, addr);
-	if (!(--(TREF(expr_depth))))
-		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
+	DECREMENT_EXPR_DEPTH;
 	return TRUE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,27 +16,25 @@
 
 typedef GTM64_ONLY(gtm_uint8) NON_GTM64_ONLY(unsigned int) gtm_msize_t;
 
-/* Each allocated block has the following structure. The actual address
-   returned to the user for 'malloc' and supplied by the user for 'free'
-   is actually the storage beginning at the 'userStorage.userStart' area.
-   This holds true even for storage that is truely malloc'd. Note that true
-   allocated length is kept even in the pro header.
-*/
+/* Each allocated block has the following structure. The actual address returned to the user for 'malloc' and supplied by the
+ * user for 'free' is actually the storage beginning at the 'userStorage.userStart' area. This holds true even for storage
+ * that is truely malloc'd. Note that true allocated length is kept even in the pro header.
+ */
 typedef struct storElemStruct
-{	/* While the following chars and short are not the best for performance, they enable us
-	   to keep the header size to 8 bytes in a pro build. This is important since our minimum
-	   allocation size is 16 bytes leaving 8 bytes for data. Also I have not researched what
-	   they are, there are a bunch of 8 byte allocates in GT.M that if we were to go to a 16
-	   byte header would make the minimum block size 32 bytes thus doubling the storage
-	   requirements for these small blocks. SE 03/2002 [Note 16 byte header is the norm in 64 bit]
-	*/
+{	/* While the following chars and short are not the best for performance, they enable us to keep the header size to
+	 * 8 bytes in a pro build. This is important since our minimum allocation size is 16 bytes leaving 8 bytes for data.
+	 * Also I have not researched what they are, there are a bunch of 8 byte allocates in GT.M that if we were to go to
+	 * a 16 byte header would make the minimum block size 32 bytes thus doubling the storage requirements for these small
+	 * blocks. SE 03/2002 [Note 16 byte header is the norm in 64 bit]
+	 */
 	signed char	queueIndex;			/* Index into TwoTable for this size of element */
 	unsigned char	state;				/* State of this block */
 	unsigned short	extHdrOffset;			/* For MAXTWO sized elements: offset to the
-							   header that describes the extent */
+							 * header that describes the extent.
+							 */
 	GTM64_ONLY(char filler[4];) 			/* Explicit filler to align the length - may be repurposed */
 	gtm_msize_t	realLen;			/* Real (total) length of allocation */
-#ifdef DEBUG
+#	ifdef DEBUG
 	struct	storElemStruct	*fPtr;			/* Next storage element on free/allocated queue */
 	struct	storElemStruct	*bPtr;			/* Previous storage element on free/allocated queue */
 	unsigned char	*allocatedBy;			/* Who allocated storage */
@@ -48,7 +46,7 @@ typedef struct storElemStruct
 		struct storElemStruct *deferFreeNext;	/* Pointer to next deferred free block */
 		unsigned char	userStart;		/* First byte of user useable storage */
 	} userStorage;
-#else
+#	else
 	union						/* In production mode, the links are used only when element is free */
 	{
 		struct storElemStruct *deferFreeNext;	/* Pointer to next deferred free block */
@@ -59,7 +57,7 @@ typedef struct storElemStruct
 		} links;
 		unsigned char	userStart;		/* First byte of user useable storage */
 	} userStorage;
-#endif
+#	endif
 } storElem;
 
 size_t gtm_bestfitsize(size_t);

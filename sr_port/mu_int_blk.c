@@ -287,6 +287,15 @@ boolean_t mu_int_blk(
 			mu_int_errknt++;
 			trans_errors++;
 		}
+		/* Stop searching the sub-tree when TN in block is larger than integ_start_tn for fast_integ. The reason being,
+		 * fast_integ skips writing free blocks and level-0 block in GV tree to snapshot file. However, some blocks can be
+		 * mistakenly marked free or its level is messed-up as 0. After updating these blocks, thse blocks will have TN
+		 * larger than integ_start_tn. In this case, the child tree pointed to by one such updated block may result in
+		 * arbitrary error report. Since we already capture the core reason for the integ error, we should not proceed
+		 * searching its child tree; otherwise, we will have meaningless report content
+		 */
+		if (muint_fast)
+			return FALSE;
 		if (blk_tn > largest_tn)
 			largest_tn = blk_tn;
 	}

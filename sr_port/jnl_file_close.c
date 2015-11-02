@@ -59,10 +59,6 @@ GBLREF	short	astq_dyn_avail;
 static	const	unsigned short	zero_fid[3];
 #endif
 
-#ifdef DEBUG
-GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
-#endif
-
 GBLREF 	jnl_gbls_t	jgbl;
 
 error_def(ERR_JNLCLOSE);
@@ -192,7 +188,6 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	{
 		status = jpc->status;	/* jnl_send_oper resets jpc->status, so save it */
 		jnl_send_oper(jpc, ERR_JNLCLOSE);
-		DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE;)
 		rts_error(VARLSTCNT(5) ERR_JNLCLOSE, 2, JNL_LEN_STR(csd), status);
 	}
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,10 +17,7 @@ void op_igetsrc(mval *v)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	(TREF(ind_source_sp))--;
-	assert(TREF(ind_source_sp) < TREF(ind_source_top));
-	assert(TREF(ind_source_sp) >= TREF(ind_source_array));
-	*v = **(TREF(ind_source_sp));
+	*v = *(TREF(ind_source));	/* see comment in comp_init.c */
 	v->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 	return;
 }

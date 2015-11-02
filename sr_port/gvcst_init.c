@@ -456,14 +456,12 @@ void gvcst_init(gd_region *greg)
 #	ifdef UNIX
 	START_HEARTBEAT_IF_NEEDED;
 	if (!pool_init && jnlpool_init_needed && ANTICIPATORY_FREEZE_AVAILABLE && REPL_INST_AVAILABLE)
-	{
 		jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL);
-		/* Any LSEEKWRITEs hence forth will wait if the instance is frozen. To aid in printing the region information before
-		 * and after the wait, csa->region is referenced. Since it is NULL at this point, set it to greg. This is a safe
-		 * thing to do since csa->region is anyways set in db_common_init (few lines below).
-		 */
-		csa->region = greg;
-	}
+	/* Any LSEEKWRITEs hence forth will wait if the instance is frozen. To aid in printing the region information before
+	 * and after the wait, csa->region is referenced. Since it is NULL at this point, set it to greg. This is a safe
+	 * thing to do since csa->region is anyways set in db_common_init (few lines below).
+	 */
+	csa->region = greg;
 #	endif
 	/* Protect the db_init and the code below until we set greg->open to TRUE. This is needed as otherwise,
 	 * if a MUPIP STOP is issued to this process at a time-window when db_init is completed but greg->open

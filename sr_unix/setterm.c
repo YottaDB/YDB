@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,13 +22,14 @@
 #include "setterm.h"
 #include "gtm_isanlp.h"
 
+error_def(ERR_TCSETATTR);
+
 void setterm(io_desc *ioptr)
 {
 	int		status;
 	int		save_errno;
 	struct termios	t;
 	d_tt_struct	*tt_ptr;
-	error_def(ERR_TCSETATTR);
 
 	tt_ptr = (d_tt_struct *) ioptr->dev_sp;
 	t = *tt_ptr->ttio_struct;
@@ -41,10 +42,9 @@ void setterm(io_desc *ioptr)
 		t.c_cc[VMIN] = 1;
 	}
 	t.c_iflag &= ~(ICRNL);
-	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status);
+	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 	if (0 != status)
 	{
-		save_errno = errno;
 		if (gtm_isanlp(tt_ptr->fildes) == 0)
 			rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	}
@@ -64,9 +64,9 @@ void setterm(io_desc *ioptr)
 void iott_mterm(io_desc *ioptr)
 {
 	int		status;
+	int		save_errno;
 	struct termios	t;
 	d_tt_struct	*tt_ptr;
-	error_def(ERR_TCSETATTR);
 
 	tt_ptr = (d_tt_struct *) ioptr->dev_sp;
 	t = *tt_ptr->ttio_struct;
@@ -83,9 +83,9 @@ void iott_mterm(io_desc *ioptr)
 		t.c_cc[VMIN] = 0;
 	}
 	t.c_iflag &= ~(ICRNL);
-	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status);
+	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 	if (0 != status)
-		rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, errno);
+		rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	return;
 }
 
@@ -96,6 +96,7 @@ void iott_mterm(io_desc *ioptr)
 void iott_rterm(io_desc *ioptr)
 {
 	int		status;
+	int		save_errno;
 	struct termios	t;
 	d_tt_struct  	*tt_ptr;
 
@@ -110,8 +111,8 @@ void iott_rterm(io_desc *ioptr)
 		t.c_cc[VMIN] = 1;
 	}
 	t.c_iflag &= ~(ICRNL);
-	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status);
+	Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 	if (0 != status)
-		rts_error(VARLSTCNT(1) status);
+		rts_error(VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,9 +49,9 @@ void op_gvsavtarg(mval *v)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
-	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
-	v->mvtype = 0; /* so stp_gcol (if invoked below) can free up space currently occupied by this to-be-overwritten mval */
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+	v->mvtype = 0;	/* BYPASSOK */ /* so stp_gcol (if invoked below) can free up space currently
+					* occupied by this to-be-overwritten mval */
 	if (NULL == gv_currkey)
 	{	/* Simplest case, finish it off */
 		v->str.len = 0;

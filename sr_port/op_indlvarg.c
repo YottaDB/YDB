@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,6 @@
 #include "op.h"
 #include "valid_mname.h"
 
-error_def(ERR_INDMAXNEST);
 error_def(ERR_VAREXPECTED);
 
 void	op_indlvarg(mval *v, mval *dst)
@@ -27,13 +26,11 @@ void	op_indlvarg(mval *v, mval *dst)
 	icode_str	indir_src;
 	int		rval;
 	mstr		*obj, object;
-	oprtype		x;
+	oprtype		x, getdst;
 	triple		*ref;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (TREF(ind_result_sp) >= TREF(ind_result_top))
-		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
 	MV_FORCE_STR(v);
 	if (v->str.len < 1)
 		rts_error(VARLSTCNT(1) ERR_VAREXPECTED);
@@ -52,20 +49,20 @@ void	op_indlvarg(mval *v, mval *dst)
 		obj = &object;
 		obj->addr = v->str.addr;
 		obj->len  = v->str.len;
-		comp_init(obj);
+		comp_init(obj, &getdst);
 		if (EXPR_FAIL != (rval = indirection(&x)))	/* NOTE assignment */
 		{
 			ref = newtriple(OC_INDLVARG);
 			ref->operand[0] = x;
 			x = put_tref(ref);
 		}
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, obj->len))
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, &getdst, obj->len))
 			return;
 		indir_src.str.addr = v->str.addr;
 		cache_put(&indir_src, obj);
 		/* Fall into code activation below */
 	}
-	*(TREF(ind_result_sp))++ = dst;				/* Where to store return value */
+	TREF(ind_result) = dst;					/* Where to store return value */
 	comp_indr(obj);
 	return;
 }

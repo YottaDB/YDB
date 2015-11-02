@@ -420,6 +420,11 @@ typedef struct node_local_struct
 						   concurrent online rollback or too many MUMPS processes */
 	boolean_t	fastinteg_in_prog;	/* Tells GT.M if fast integrity is in progress */
 	uint4           wtstart_errcnt;
+	/* Note that although the below two fields are dbg-only, they are defined for pro since we want to keep the shared
+	 * memory layout the same for both pro and dbg. There is some code that relies on this assumption.
+	 */
+	boolean_t	fake_db_enospc;		/* used only by dbg versions to simulate ENOSPC scenarios in the database file */
+	boolean_t	fake_jnl_enospc;	/* used only by dbg versions to simulate ENOSPC scenarios in the journal  file */
 #	endif
 } node_local;
 

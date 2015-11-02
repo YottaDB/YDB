@@ -141,6 +141,7 @@ void mupip_rundown(void)
 				}
 				else
 					do_jnlpool_detach = (NULL != jnlpool_ctl);
+				ENABLE_FREEZE_ON_ERROR;
 			}
 		}
 		for ( ; NULL != rptr; rptr = rptr->fPtr)

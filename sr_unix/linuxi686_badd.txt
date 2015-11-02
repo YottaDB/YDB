@@ -13,7 +13,7 @@ pro:
 TTTGEN.m%-r--r----- README.txt
 dse%-r--r----- custom_errors_sample.txt
 gdehelp.dat%-r--r----- gdedefaults
-gtm_descript.h%-r-xr-x--- gtm
+gtm_common_defs.h%-r-xr-x--- gtm
 gtmcshrc.gtc%-r-xr-x--- gtmbase
 gtmhelp.dat%-r-xr-x--- gtmcshrc
 gtmsecshr%-r-xr-x--- gtmprofile

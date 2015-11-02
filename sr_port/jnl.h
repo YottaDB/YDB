@@ -1386,7 +1386,7 @@ typedef struct
 	assert((NULL == jnlpool_ctl) || (csd->reg_seqno <= (jnlpool_ctl->jnl_seqno + 1)));		\
 }
 #ifdef GTM_CRYPT
-#define DECODE_SET_KILL_ZKILL_ZTRIG(mumps_node_ptr, rec_size, key_handle, RC)				\
+# define MUR_DECRYPT_LOGICAL_RECS(MUMPS_NODE_PTR, REC_SIZE, KEY_HANDLE, RC)				\
 {													\
 	int span_length, fixed_prefix;									\
 													\
@@ -1394,11 +1394,10 @@ typedef struct
 	assert(FIXED_UPD_RECLEN == FIXED_ZTWORM_RECLEN);						\
 	fixed_prefix = FIXED_UPD_RECLEN;								\
 	ASSERT_ENCRYPTION_INITIALIZED;									\
-	span_length = rec_size - fixed_prefix - JREC_SUFFIX_SIZE;					\
-	GTMCRYPT_DECODE_FAST(key_handle, (char *)mumps_node_ptr, span_length, NULL, RC);		\
+	span_length = REC_SIZE - fixed_prefix - JREC_SUFFIX_SIZE;					\
+	GTMCRYPT_DECRYPT(NULL, KEY_HANDLE, (char *)MUMPS_NODE_PTR, span_length, NULL, RC);		\
 }
-
-#endif /* GTM_CRYPT */
+#endif
 
 /* The following define an appendix message, used along with JNLBUFFREGUPD and JNLBUFFDBUPD messages in
  * various places, as well as its length, allowing for six digits for both lower and upper journal buffer

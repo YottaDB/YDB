@@ -1360,7 +1360,8 @@ int gtmsource_process(void)
 			if (force_recv_check) /* we want to poll the incoming pipe for possible XOFF */
 				continue;
 			assert(pre_read_seqno == gtmsource_local->read_jnl_seqno);
-			grab_gtmsource_srv_latch(gtmsource_srv_latch, 2 * max_epoch_interval, HANDLE_CONCUR_ONLINE_ROLLBACK);
+			grab_gtmsource_srv_latch(gtmsource_srv_latch, 2 * gd_header->n_regions * max_epoch_interval,
+							HANDLE_CONCUR_ONLINE_ROLLBACK);
 			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 				break; /* the outerloop will continue */
 			tot_tr_len = gtmsource_get_jnlrecs(&gtmsource_msgp->msg[0], &data_len,

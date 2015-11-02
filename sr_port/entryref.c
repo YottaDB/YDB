@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 			rettrip->operand[0] =  put_mlab(&labname);
 			return rettrip;
 		}
-		label.oprclass = 0;
+		label.oprclass = NO_REF;
 		break;
 	case TK_ATSIGN:
 		if(!indirection(&label))
@@ -85,7 +85,7 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 		return NULL;
 	default:
 		labname.len = 0;
-		label.oprclass = 0;
+		label.oprclass = NO_REF;
 		break;
 	}
 	if (!labref && (TK_PLUS == TREF(window_token)))
@@ -94,7 +94,7 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 		if (EXPR_FAIL == expr(&offset, MUMPS_INT))
 			return NULL;
 	} else
-		offset.oprclass = 0;
+		offset.oprclass = NO_REF;
 	if (TK_CIRCUMFLEX == TREF(window_token))
 	{	/* Have a routine name specified */
 		advancewindow();

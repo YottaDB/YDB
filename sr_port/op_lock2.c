@@ -120,7 +120,7 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 	signed char	gotit;
 	unsigned short	locks_bckout, locks_done;
 	int4		msec_timeout;	/* timeout in milliseconds */
-	mlk_pvtblk	*pvt_ptr1, *pvt_ptr2, **prior;
+	mlk_pvtblk	*pvt_ptr1, *pvt_ptr2, **prior, *already_locked;
 	unsigned char	action;
 	ABS_TIME	cur_time, end_time, remain_time;
 	mv_stent	*mv_zintcmd;
@@ -181,6 +181,8 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 		}
 	}
 	lckclr();
+	TREF(mlk_yield_pid) = 0;
+	already_locked = NULL;
 	for (blocked = FALSE;  !blocked;)
 	{	/* if this is a request for a remote node */
 		if (remlkreq)
@@ -195,11 +197,15 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 				break;
 			}
 		}
+		/* If we gave up the fairness algorithm at least once during this invocation of op_lock2(), continue with that until
+		 * the end of op_lock2()
+		 */
 		for (pvt_ptr1 = mlk_pvt_root, locks_done = 0;  locks_done < lks_this_cmd;  pvt_ptr1 = pvt_ptr1->next, locks_done++)
 		{	/* Go thru the list of all locks to be obtained attempting to lock
 			 * each one. If any lock could not be obtained, break out of the loop
+			 * If the lock is already obtained, then skip that lock.
 			 */
-			if (!mlk_lock(pvt_ptr1, 0, TRUE))
+			if ((pvt_ptr1 == already_locked) || !mlk_lock(pvt_ptr1, 0, TRUE))
 			{	/* If lock is obtained */
 				pvt_ptr1->granted = TRUE;
 				switch (laflag)
@@ -267,14 +273,14 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 						gvcmz_clrlkreq();
 						remlkreq = FALSE;
 					}
-					if (outofband)
+					if (outofband  && !out_of_time)
 					{
-						if (timer_on && !out_of_time)
+						if (timer_on)
 						{
 							cancel_timer((TID)&timer_on);
 							timer_on = FALSE;
 						}
-						if (!out_of_time && (NO_M_TIMEOUT != timeout))
+						if (NO_M_TIMEOUT != timeout)
 						{	/* get remain = end_time - cur_time */
 							sys_get_curr_time(&cur_time);
 							remain_time = sub_abs_time(&end_time, &cur_time);
@@ -289,41 +295,59 @@ int	op_lock2(int4 timeout, unsigned char laflag)	/* timeout is in seconds */
 								timer_on = FALSE;	/* as if LOCK :0 */
 								break;
 							}
-							PUSH_MV_STENT(MVST_ZINTCMD);
-							mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = remain_time;
-							mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
-							mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
-							/* save current information from zintcmd_active */
-							mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior
-								= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last;
-							mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior
-								= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last;
-							TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last = restart_pc;
-							TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last = restart_ctxt;
-							TAREF1(zintcmd_active, ZINTCMD_LOCK).count++;
-							mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_LOCK;
+							if ((tptimeout != outofband) && (ctrlc != outofband))
+							{
+								PUSH_MV_STENT(MVST_ZINTCMD);
+								mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = remain_time;
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
+								/* save current information from zintcmd_active */
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior
+									= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last;
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior
+									= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last;
+								TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last = restart_pc;
+								TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last
+									= restart_ctxt;
+								TAREF1(zintcmd_active, ZINTCMD_LOCK).count++;
+								mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_LOCK;
+							}
 							outofband_action(FALSE);	/* no return */
-						}
+						} else
+							outofband_action(FALSE);	/* no return */
 					}
 					break;
 				}
 			}
+			/* Sleep first before reattempting a blocked lock. Note: this is used by the lock fairness algorithm
+			 * in mlk_shrblk_find. If mlk_lock is invoked for the second (or higher) time in op_lock2 for the
+			 * same lock resource, "mlk_shrblk_find" assumes a sleep has happened in between two locking attempts.
+			 */
+			hiber_start_wait_any(LOCK_SELF_WAKE);
+			/* Note that "TREF(mlk_yield_pid)" is not initialized here as we want to use any value inherited
+			 * from previous calls to mlk_lock for this lock.
+			 */
 			if (!mlk_lock(pvt_ptr1, 0, FALSE))
 			{	/* If we got the lock, break out of timer loop */
 				blocked = FALSE;
+				if (MLK_FAIRNESS_DISABLED != TREF(mlk_yield_pid))
+					TREF(mlk_yield_pid) = 0; /* Allow yielding for the other locks */
 				if (pvt_ptr1 != mlk_pvt_root)
 				{
 					rel_quant();		/* attempt to get a full timeslice for maximum chance to get all */
 					mlk_unlock(pvt_ptr1);
-				}
+					already_locked = NULL;
+				} else
+					already_locked = pvt_ptr1;
 				break;
 			}
 			if (pvt_ptr1->nodptr)
 				lk_check_own(pvt_ptr1);		/* clear an abandoned owner */
-			hiber_start_wait_any(LOCK_SELF_WAKE);
 		}
 		if (blocked && out_of_time)
 			break;
+		if (locks_bckout)
+			TREF(mlk_yield_pid) = MLK_FAIRNESS_DISABLED; /* Disable fairness to avoid livelocks */
 	}
 	if (remlkreq)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,9 +45,19 @@ void tripinit(void)
 	mcavailptr = mcavailbase;
 	mcavail = mcavailptr->size;
 	memset(&mcavailptr->data[0], 0, mcavail);
-	TREF(expr_depth) = 0;
 	TREF(expr_start) = TREF(expr_start_orig) = NULL;
 	TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
+	if (NULL == TREF(side_effect_base))
+	{
+		TREF(side_effect_depth) = INITIAL_SIDE_EFFECT_DEPTH;
+		TREF(side_effect_base) = malloc(SIZEOF(boolean_t) * INITIAL_SIDE_EFFECT_DEPTH);
+		memset((char *)TREF(side_effect_base), 0, SIZEOF(boolean_t) * INITIAL_SIDE_EFFECT_DEPTH);
+		TREF(expr_depth) = 0;
+	} else
+	{
+		while (TREF(expr_depth))
+			DECREMENT_EXPR_DEPTH;				/* in case of prior errors */
+	}
 	mlitmax = mlmax = mvmax = 0;
 	mlabtab = NULL;
 	mvartab = NULL;

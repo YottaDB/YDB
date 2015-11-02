@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2007, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -55,7 +55,7 @@ ENTRY op_forloop
 	enter	$0, $0			#rbp pushed on stack and then rbp = rsp
 	pushq	REG_XFER_TABLE
 	movq	indx(REG_FRAME_POINTER),REG64_ARG1
-	mv_force_defined REG64_ARG1, l0
+	mv_force_defined_strict REG64_ARG1, l0			# disregard NOUNDEF
 	movq	REG64_ARG1, indx(REG_FRAME_POINTER)
 	mv_force_num REG64_ARG1, l1
 	movq	indx(REG_FRAME_POINTER),REG64_ARG1

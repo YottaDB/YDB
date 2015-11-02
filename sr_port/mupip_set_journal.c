@@ -111,8 +111,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	int			curr_stat_res; 	/* gtm_file_stat() return value for current journal file name */
 	mu_set_rlist		*rptr, dummy_rlist, *next_rptr;
 	sgmnt_data_ptr_t	csd;
-	uint4			status,
-				exit_status = EXIT_NRM;
+	uint4			status,	exit_status = EXIT_NRM, gds_rundown_status = EXIT_NRM;
 	seq_num			max_reg_seqno;
 	unsigned int		fn_len;
 	unsigned char		tmp_full_jnl_fn[MAX_FN_LEN + 1], prev_jnl_fn[MAX_FN_LEN + 1];
@@ -229,7 +228,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		if (EXIT_NRM != (status = mupip_set_journal_newstate(&jnl_options, &jnl_info, rptr)))
 		{
 			exit_status |= status;
-			gds_rundown();
+			UNIX_ONLY(gds_rundown_status =) gds_rundown();
+			exit_status |= gds_rundown_status;
 			rptr->sd = NULL;
 			rptr->state = NONALLOCATED;	/* This means do not call gds_rundown() again for this region
 							 * and do not process this region anymore. */
@@ -258,7 +258,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			(repl_closed != repl_curr_state && repl_closed == rptr->repl_new_state) ||
 			(repl_closed == repl_curr_state && repl_open == rptr->repl_new_state))
 		{
-			gds_rundown(); /* Since we did gvcst_init() and now will call mu_rndwn_file() */
+			/* Since we did gvcst_init() and now will call mu_rndwn_file() */
+			UNIX_ONLY(gds_rundown_status =) gds_rundown();
+			exit_status |= gds_rundown_status;
 			rptr->state = NONALLOCATED;
 			rptr->sd = csd = NULL;
 			/* WARNING: The remaining code uses gv_cur_region and others
@@ -267,6 +269,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			assert(NULL != gv_cur_region->dyn.addr);
 			assert(NULL != gv_cur_region->dyn.addr->file_cntl);
 			assert(NULL != gv_cur_region->dyn.addr->file_cntl->file_info);
+			if (EXIT_NRM != gds_rundown_status)		/* skip mu_rndwn_file (STANDALONE) */
+				continue;
 			if (STANDALONE(gv_cur_region))
 			{
 				rptr->exclusive = TRUE;
@@ -810,7 +814,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	jgbl.dont_reset_gbl_jrec_time = FALSE;
 	/* Ensure jgbl.gbl_jrec_time did not get reset by any of the jnl writing functions */
 	assert(save_gbl_jrec_time == jgbl.gbl_jrec_time);
-	mupip_set_jnl_cleanup(TRUE);
+	REVERT;
+	mupip_set_jnl_cleanup();
 	if (EXIT_NRM == exit_status)
 		return (uint4)SS_NORMAL;
 	if (exit_status & EXIT_WRN)

@@ -33,10 +33,12 @@ error_def(ERR_FNOTONSYS);
 error_def(ERR_INVFCN);
 error_def(ERR_INVSVN);
 error_def(ERR_RPARENMISSING);
+error_def(ERR_SIDEEFFECTEVAL);
 error_def(ERR_VAREXPECTED);
 
 LITREF	toktabtype	tokentable[];
 LITREF	mval		literal_null;
+LITREF	octabstruct	oc_tab[];
 
 #ifndef UNICODE_SUPPORTED
 #define f_char f_zchar
@@ -58,8 +60,8 @@ LITDEF nametabent svn_names[] =
 	,{ 1, "P" }, { 8, "PRINCIPA*" }
 	,{ 1, "Q" }, { 4, "QUIT" }
 	,{ 1, "R" }, { 8, "REFERENC*" }
-	,{ 1, "S" }, { 7, "STORAGE" }
 	,{ 2, "ST" }, { 5, "STACK" }
+	,{ 1, "S" }, { 7, "STORAGE" }
 	,{ 2, "SY" }, { 6, "SYSTEM" }
 	,{ 1, "T" }, { 4, "TEST" }
 	,{ 2, "TL"}, { 6, "TLEVEL"}
@@ -138,8 +140,8 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_PRINCIPAL, FALSE, ALL_SYS }, { SV_PRINCIPAL, FALSE, ALL_SYS }
 	,{ SV_QUIT, FALSE, ALL_SYS }, { SV_QUIT, FALSE, ALL_SYS }
 	,{ SV_REFERENCE, FALSE, ALL_SYS }, { SV_REFERENCE, FALSE, ALL_SYS }
-	,{ SV_STORAGE, FALSE, ALL_SYS }, { SV_STORAGE, FALSE, ALL_SYS }
 	,{ SV_STACK, FALSE, ALL_SYS }, { SV_STACK, FALSE, ALL_SYS }
+	,{ SV_STORAGE, FALSE, ALL_SYS }, { SV_STORAGE, FALSE, ALL_SYS }
 	,{ SV_SYSTEM, FALSE, ALL_SYS }, { SV_SYSTEM, FALSE, ALL_SYS }
 	,{ SV_TEST, FALSE, ALL_SYS }, { SV_TEST, FALSE, ALL_SYS }
 	,{ SV_TLEVEL, FALSE, ALL_SYS }, { SV_TLEVEL, FALSE, ALL_SYS }
@@ -273,6 +275,7 @@ LITDEF nametabent fun_names[] =
 	,{4, "ZTRI"}, {8, "ZTRIGGER"}
 	,{7, "ZTRNLNM"}
 	,{2, "ZW"}, {6, "ZWIDTH"}
+	,{3, "ZWR"}, {6, "ZWRITE"}
 };
 
 /* Index into fun_names array where entries that start with each letter of the alphabet begin. */
@@ -280,7 +283,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 113	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 115	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -360,6 +363,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZTRIGGER, TRIGGER_OS }, { OC_FNZTRIGGER, TRIGGER_OS }
 	,{ OC_FNZTRNLNM, ALL_SYS }
 	,{ OC_FNZWIDTH, ALL_SYS }, { OC_FNZWIDTH, ALL_SYS }
+	,{ OC_FNZWRITE, ALL_SYS }, { OC_FNZWRITE, ALL_SYS }
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -434,16 +438,20 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_translate, f_translate,
 	f_ztrigger, f_ztrigger,
 	f_ztrnlnm,
-	f_zwidth, f_zwidth
+	f_zwidth, f_zwidth,
+	f_zwrite, f_zwrite
 };
 
 int expritem(oprtype *a)
 {
-	int 		i, index, sv_opcode;
-	triple 		*oldchain, *ref, tmpchain;
-	boolean_t	parse_warn;
-	oprtype 	x1;
-	unsigned char 	type;
+	boolean_t	parse_warn, saw_local, saw_se, se_warn;
+	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
+	oprtype 	*j, *k, x1;
+	int		i, index, sv_opcode;
+	tbp		argbp, *funcbp, *tripbp;
+	triple		*argtrip, *functrip, *ref, *t1, *t2, *t3;
+	unsigned char	type;
+	unsigned int	argcnt;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -494,10 +502,12 @@ int expritem(oprtype *a)
 		stx_error(ERR_RPARENMISSING);
 		return FALSE;
 	case TK_DOLLAR:
+		parse_warn = saw_se = FALSE;
 		if ((TK_DOLLAR == TREF(director_token)) || (TK_AMPERSAND == TREF(director_token)))
 		{
 			ENCOUNTERED_SIDE_EFFECT;
 			TREF(temp_subs) = TRUE;
+			saw_se = TRUE;
 			advancewindow();
 			if ((TK_DOLLAR == TREF(window_token)) ? (EXPR_FAIL == exfunc(a, FALSE))
 							      : (EXPR_FAIL == extern_func(a)))
@@ -510,7 +520,6 @@ int expritem(oprtype *a)
 				stx_error(ERR_FCNSVNEXPECTED);
 				return FALSE;
 			}
-			parse_warn = FALSE;
 			if (TK_LPAREN == TREF(director_token))
 			{
 				index = namelook(fun_index, fun_names, (TREF(window_ident)).addr, (TREF(window_ident)).len);
@@ -530,8 +539,9 @@ int expritem(oprtype *a)
 						 * and as input to the $INCR function on the right), we want an UNDEF
 						 * error to show up which means we need to set "temp_subs" to TRUE.
 						 */
-						TREF(temp_subs) = TRUE;
-						ENCOUNTERED_SIDE_EFFECT;
+						 ENCOUNTERED_SIDE_EFFECT;
+						 TREF(temp_subs) = TRUE;
+						 saw_se = TRUE;
 					}
 				}
 				advancewindow();
@@ -586,12 +596,136 @@ int expritem(oprtype *a)
 					}
 				} else
 					*a = put_lit((mval *)&literal_null);
+				return TRUE;
 			}
 		}
-		return TRUE;
+		if (saw_se && (OLD_SE != TREF(side_effect_handling)))
+		{
+			assert(0 < TREF(expr_depth));
+			assert(TREF(expr_depth) <= TREF(side_effect_depth));
+			(TREF(side_effect_base))[TREF(expr_depth)] = TRUE;
+		}
+		functrip = t1 = a->oprval.tref;
+		if (parse_warn || !(TREF(side_effect_base))[TREF(expr_depth)] || (NO_REF == functrip->operand[1].oprclass))
+			return TRUE;	/* 1 argument gets a pass */
+		assert(0 < TREF(expr_depth));
+		switch (functrip->opcode)
+		{
+			case OC_EXFUN:		/* relies on protection from actuallist */
+			case OC_EXTEXFUN:	/* relies on protection from actuallist */
+			case OC_FNFGNCAL:	/* relies on protection from actuallist */
+			case OC_FNGET:		/* $get() gets a pass because protects itself */
+			case OC_FNINCR:		/* $increment() gets a pass because its ordering needs no protection */
+			case OC_FNNEXT:		/* only has 1 arg, but uses 2 for lvn interface */
+			case OC_FNORDER:	/* may have 1 or 2 args, internally uses 1 extra for lvn arg, but protects itself */
+			case OC_FNZPREVIOUS:	/* only has 1 arg, but uses 2 for lvn interface */
+			case OC_INDINCR:	/* $increment() gets a pass because its ordering needs no protection */
+				return TRUE;
+		}	/* default falls through */
+		/* This block protects lvn evaluations in earlier arguments from changes caused by side effects in later
+		 * arguments by capturing the prechange value in a temporary; coerce or preexisting temporary might already
+		 * do the job and indirect local evaluations may already have shifted to occur earlier. This algorithm is similar
+		 * to one in eval_expr for concatenation, but it must deal with possible arguments in both operands for
+		 * both the initial triple and the last parameter triple, and the possibility of empty operand[0] in some
+		 * functions so they have not been combined. We should have least one side effect (see compiler.h) and two
+		 * arguments to bother - to know side effect, we have an array malloc'd and high water marked to avoid a limit
+		 * on expression nesting depth, anchored by TREF(side_effect_base) and indexed by TREF(expr_depth) so
+		 * ENCOUNTERED_SIDE_EFFECT can mark the prior level; f_select mallocs and free its own array
+		  */
+		assert(OLD_SE != TREF(side_effect_handling));
+		funcbp = &functrip->backptr;		/* borrow backptr to track args */
+		tripbp = &argbp;
+		dqinit(tripbp, que);
+		tripbp->bpt = NULL;
+		assert(NULL == funcbp->bpt);
+		assert((funcbp == funcbp->que.fl) && (funcbp == funcbp->que.bl));
+		saw_se = saw_local = FALSE;
+		for (argtrip = t1; ; argtrip = t1)
+		{	/* work functrip,oprval.tref arguments forward */
+			if (argtrip != functrip)
+				tripbp = &argtrip->backptr;
+			assert(NULL == tripbp->bpt);
+			for (j = argtrip->operand; j < ARRAYTOP(argtrip->operand); j++)
+			{	/* process all (two) operands */
+				t1 = j->oprval.tref;
+				if (NO_REF == j->oprclass)
+					continue;	/* some functions leave holes in their arguments */
+				if (((ARRAYTOP(argtrip->operand) - 1) == j) && (TRIP_REF == j->oprclass)
+						&& (OC_PARAMETER == t1->opcode))
+					break;		/* only need to deal with last operand[1] */
+				for (k = j; INDR_REF == k->oprclass; k = k->oprval.indr)
+					;	/* INDR_REFs used by e.g. extrinsics finally end up at a TRIP_REF */
+				if (TRIP_REF != k->oprclass)
+					continue;			/* something else - not to worry */
+				/* may need to step back past coerce of side effects */
+				t3 = k->oprval.tref;
+				t2 = (oc_tab[t3->opcode].octype & OCT_COERCE) ? t3->operand[0].oprval.tref : t3;
+				if ((OC_VAR == t2->opcode) || (OC_GETINDX == t2->opcode))
+				{	/* it's an lvn */
+					if ((t3 != t2) || ((ARRAYTOP(argtrip->operand) - 1) == (&(argtrip->operand[i]))))
+						continue;		/* but if it's the last or there's a coerce */
+					saw_local = TRUE;		/* left operand may need protection */
+				}
+				if (!saw_local)
+					continue;			/* no local yet to worry about */
+				saw_se = TRUE;
+				if (NULL != tripbp->bpt)
+				{	/* this one's already flagged */
+					assert((ARRAYTOP(argtrip->operand) - 1) == j);
+					continue;
+				}
+				/* chain stores args to manage later insert of temps to hold left values */
+				assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl));
+				tripbp->bpt = argtrip;
+				dqins(funcbp, que, tripbp);
+			}
+			if ((NULL == t1) || (OC_PARAMETER != t1->opcode))
+				break;					/* end of arg list */
+			assert(argtrip->operand[1].oprval.tref == t1);
+		}
+		if (!saw_se)						/* might have lucked out on ordering */
+			saw_local = FALSE;				/* just clear the backptrs - shut off other processing */
+		saw_se = FALSE;
+		se_warn = (!run_time && (SE_WARN == TREF(side_effect_handling)));
+		dqloop(funcbp, que, tripbp)
+		{	/* work chained arguments which are in reverse order */
+			argtrip = tripbp->bpt;
+			assert(NULL != argtrip);
+			dqdel(tripbp, que);
+			tripbp->bpt = NULL;
+			if (!saw_local)
+				continue;
+			/* found some need to insert temps */
+			for (j = &argtrip->operand[1]; j >= argtrip->operand; j--)
+			{	/* match to the operand - usually 0 but have to cover 1 as well */
+				for (k = j; INDR_REF == k->oprclass; k = k->oprval.indr)
+					;	/* INDR_REFs used by e.g. extrinsics finally end up at a TRIP_REF */
+				assert((TRIP_REF == k->oprclass) || (NO_REF == k->oprclass));
+				t1 = k->oprval.tref;
+				if ((NO_REF == k->oprclass) || (OC_PARAMETER == t1->opcode)
+						|| (oc_tab[t1->opcode].octype & OCT_COERCE))
+					continue;
+				if ((OC_VAR == t1->opcode) || (OC_GETINDX == t1->opcode))
+				{	/* have an operand that needs a temp because threat from some side effect */
+					ref = maketriple(OC_STOTEMP);
+					ref->operand[0] = put_tref(t1);
+					dqins(t1, exorder, ref); 	/* NOTE:this violates infomation hiding */
+					k->oprval.tref = ref;
+					if (se_warn)
+					{
+						TREF(last_source_column) = t1->src.column + 1;
+						show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
+						dec_err(VARLSTCNT(1) ERR_SIDEEFFECTEVAL);
+					}
+				} else
+					saw_se = TRUE;
+			}
+		}
+		assert((funcbp == funcbp->que.fl) && (funcbp == funcbp->que.bl) && (NULL == funcbp->bpt));
+		return TRUE;	/* end of order of evaluation processing for functions*/
 	case TK_COLON:
 		stx_error(ERR_EXPR);
 		return FALSE;
-	}
+	}	/* case default: intentionally omitted as it simply uses the below return FALSE */
 	return FALSE;
 }

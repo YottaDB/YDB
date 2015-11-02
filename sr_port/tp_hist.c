@@ -474,7 +474,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 #	endif
 	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
 	assert((cdb_sc_normal != status) || !TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
-	ADD_TO_GVT_TP_LIST(gvt);	/* updates gvt->read_local_tn & adds gvt to gvt_tp_list : both only if needed */
+	ADD_TO_GVT_TP_LIST(gvt, RESET_FIRST_TP_SRCH_STATUS_FALSE);	/* updates gvt->read_local_tn & adds gvt to gvt_tp_list
+									 * (all only if needed) */
 	CWS_RESET;
 	return status;
 }

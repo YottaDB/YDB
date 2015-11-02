@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +51,8 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 #ifdef BSD_TCP
 	GTM_SOCKLEN_TYPE			sln;
 	struct sockaddr_in	sin;
-	int			option, optsize;
+	int			optsize;
+	const boolean_t		keepalive = TRUE;
 
 	/*  Accept the connection from the network layer */
 	sln = SIZEOF(sin);
@@ -155,8 +156,7 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	)
 	OMI_DBG((omi_debug, "%s: connection %d from %s by user <%s> at %s", SRVR_NAME,
 		cptr->stats.id, gtcm_hname(&cptr->stats.sin), cptr->ag_name, GTM_CTIME(&cptr->stats.start)));
-	option = -1;
-	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&option, SIZEOF(option)) < 0)
+	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, SIZEOF(keepalive)) < 0)
 	{
 		PERROR("setsockopt:");
 		return -1;

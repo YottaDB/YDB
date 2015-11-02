@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #                                                               #
-#       Copyright 2010 Fidelity Information Services, Inc 	#
+#       Copyright 2010, 2012 Fidelity Information Services, Inc 	#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -25,13 +25,22 @@
 # please verify that UNIQ_ENC_PARAM_STRING in gtmcrypt_ref.h
 # and encr_param_string in this module match.
 
+if [ $# -lt 1 ]; then
+	$ECHO "Usage: $0 <encrypted symmetric key file>" ; exit 1
+fi
 hostos=`uname -s`
+basedir=`dirname $0`
 # try to get a predictable which
 if [ "OS/390" = "$hostos" ] ; then which=whence ;
 elif [ -x "/usr/bin/which" ] ; then which=/usr/bin/which
 else which=which
 fi
 
+if [ ! -x $basedir/show_install_config.sh ]; then
+	echo "Cannot find show_install_config.sh in $basedir. Exiting"
+	exit 1
+fi
+algorithm=`$basedir/show_install_config.sh | awk '/^ALGORITHM/ {print $NF}'`
 # temporary file
 if [ -x "`$which mktemp 2>&1`" ] ; then tmp_file=`mktemp`
 else tmp_file=/tmp/`basename $0`_$$.tmp ; fi
@@ -41,17 +50,11 @@ trap 'rm -rf $tmp_file ; stty sane ; exit 1' HUP INT QUIT TERM TRAP
 
 ECHO=/bin/echo
 ECHO_OPTIONS=""
-if [ "Linux" = $hostos ] ; then ECHO_OPTIONS="-e" ; encr_param_string="AES256CFB" ;
-elif [ "AIX" = "$hostos" ]; then encr_param_string="BLOWFISHCFB"
-else encr_param_string="AES256CFB"
-fi
+if [ "Linux" = $hostos ] ; then ECHO_OPTIONS="-e" ; fi;
 
-if [ $# -lt 1 ]; then
-	$ECHO "Usage: `basename $0` encrypted symmetric key file" ; exit 1
-fi
 encrypted_key_file="$1"
 
-$ECHO $ECHO_OPTIONS $encr_param_string\\c >$tmp_file
+$ECHO $ECHO_OPTIONS $algorithm\\c >$tmp_file
 
 # Identify GnuPG - it is required
 if [ -x "`$which gpg 2>&1`" ] ; then gpg=gpg

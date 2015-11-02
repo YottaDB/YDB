@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -124,6 +124,14 @@ int incr_sem(int set_index, int sem_num)
 	sop[0].sem_num = sem_num;
 	sop[0].sem_flg = SEM_UNDO;
 	SEMOP(sem_set_id[set_index], sop, 1, rc, NO_WAIT);
+	if (0 == rc)
+	{
+		/* decr_sem internally calls rel_sem directly which expects that the entry for hold_sem[SOURCE][SRC_SERV_COUNT_SEM]
+		 * is set to TRUE. But, incr_sem doesn't set this entry. This causes decr_sem (done below) to assert fail. to avoid
+		 * the assert, set the hold_sem array to TRUE even if this is an increment operation
+		 */
+		holds_sem[set_index][sem_num] = TRUE;
+	}
 	return rc;
 }
 

@@ -41,37 +41,46 @@
 #define	TABLEN			8
 #define	POINTER_SIZE		6
 
-static 	int	ext_source_line_num;
-static  int	ext_source_line_len;
-static  int	ext_source_column;
-static  char	ext_source_line[MAX_SRC_LINE];
-static  char	*ext_table_file_name;
-static  boolean_t star_found;
+STATICDEF int	ext_source_line_num;
+STATICDEF int	ext_source_line_len;
+STATICDEF int	ext_source_column;
+STATICDEF char	ext_source_line[MAX_SRC_LINE];
+STATICDEF char	*ext_table_file_name;
+STATICDEF boolean_t star_found;
 
-static  void 	ext_stx_error(int in_error, ...);
-static 	int 	scan_array_bound(char **b, int curr_type);
+STATICFNDCL void *get_memory(size_t n);
+STATICFNDCL char *exttab_scan_space(char *c);
+STATICFNDCL char *scan_ident(char *c);
+STATICFNDCL char *scan_labelref(char *c);
+STATICFNDCL enum gtm_types scan_keyword(char **c);
+STATICFNDCL int scan_array_bound(char **b,int curr_type);
+STATICFNDCL char *read_table(char *b, int l, FILE *f);
+STATICFNDCL void put_mstr(mstr *src, mstr *dst);
+STATICFNDCL uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n);
+STATICFNDCL void ext_stx_error(int in_error, ...);
+
 const int parm_space_needed[] =
 {
 	0,
 	0,
 	SIZEOF(void *),
-	SIZEOF(xc_int_t),
-	SIZEOF(xc_uint_t),
-	SIZEOF(xc_long_t),
-	SIZEOF(xc_ulong_t),
-	SIZEOF(xc_float_t),
-	SIZEOF(xc_double_t),
-	SIZEOF(xc_int_t *) + SIZEOF(xc_int_t),
-	SIZEOF(xc_uint_t *) + SIZEOF(xc_uint_t),
-	SIZEOF(xc_long_t *) + SIZEOF(xc_long_t),
-	SIZEOF(xc_ulong_t *) + SIZEOF(xc_ulong_t),
-	SIZEOF(xc_string_t *) + SIZEOF(xc_string_t),
-	SIZEOF(xc_float_t *) + SIZEOF(xc_float_t),
-	SIZEOF(xc_char_t *),
-	SIZEOF(xc_char_t **) + SIZEOF(xc_char_t *),
-	SIZEOF(xc_double_t *) + SIZEOF(xc_double_t),
-	SIZEOF(xc_pointertofunc_t),
-	SIZEOF(xc_pointertofunc_t *) + SIZEOF(xc_pointertofunc_t)
+	SIZEOF(gtm_int_t),
+	SIZEOF(gtm_uint_t),
+	SIZEOF(gtm_long_t),
+	SIZEOF(gtm_ulong_t),
+	SIZEOF(gtm_float_t),
+	SIZEOF(gtm_double_t),
+	SIZEOF(gtm_int_t *) + SIZEOF(gtm_int_t),
+	SIZEOF(gtm_uint_t *) + SIZEOF(gtm_uint_t),
+	SIZEOF(gtm_long_t *) + SIZEOF(gtm_long_t),
+	SIZEOF(gtm_ulong_t *) + SIZEOF(gtm_ulong_t),
+	SIZEOF(gtm_string_t *) + SIZEOF(gtm_string_t),
+	SIZEOF(gtm_float_t *) + SIZEOF(gtm_float_t),
+	SIZEOF(gtm_char_t *),
+	SIZEOF(gtm_char_t **) + SIZEOF(gtm_char_t *),
+	SIZEOF(gtm_double_t *) + SIZEOF(gtm_double_t),
+	SIZEOF(gtm_pointertofunc_t),
+	SIZEOF(gtm_pointertofunc_t *) + SIZEOF(gtm_pointertofunc_t)
 };
 
 error_def(ERR_CIDIRECTIVE);
@@ -111,8 +120,8 @@ error_def(ERR_ZCUNAVAIL);
 error_def(ERR_ZCUNTYPE);
 error_def(ERR_ZCUSRRTN);
 
-/* manage local get_memory'ed space (the space is never returned) */
-static void	*get_memory(size_t n)
+/* Manage local get_memory'ed space (the space is never returned) */
+STATICFNDEF void *get_memory(size_t n)
 {
 	void		*x;
 	static void	*heap_base = 0;
@@ -139,19 +148,19 @@ static void	*get_memory(size_t n)
 	return x;
 }
 
-/* skip white space */
-static char	*scan_space(char *c)
+/* Skip white space */
+STATICFNDEF char *exttab_scan_space(char *c)
 {
 	for ( ; ISSPACE_ASCII(*c); c++, ext_source_column++)
 		;
 	return c;
 }
 
-/* if this is an identifier (alphameric and underscore), then
-   return the address after the end of the identifier.
-   Otherwise, return zero
-  */
-static char	*scan_ident(char *c)
+/* If this is an identifier (alphameric and underscore), then
+ * return the address after the end of the identifier.
+ * Otherwise, return zero
+ */
+STATICFNDEF char *scan_ident(char *c)
 {
 	char	*b;
 
@@ -161,11 +170,11 @@ static char	*scan_ident(char *c)
 	return (b == c) ? 0 : b;
 }
 
-/* if this is a label (alphameric, underscore, caret, and percent (C9E12-002681)), then
-   return the address after the end of the label.
-   Otherwise, return zero
-  */
-static char	*scan_labelref(char *c)
+/* If this is a label (alphameric, underscore, caret, and percent (C9E12-002681)), then
+ * return the address after the end of the label.
+ * Otherwise, return zero.
+ */
+STATICFNDEF char *scan_labelref(char *c)
 {
 	char	*b = c;
 
@@ -174,65 +183,64 @@ static char	*scan_labelref(char *c)
 	return (b == c) ? 0 : b;
 }
 
-static enum xc_types	scan_keyword(char **c)
+STATICFNDEF enum gtm_types scan_keyword(char **c)
 {
 	const static struct
 	{
 		char		nam[MAX_NAM_LEN];
-		enum xc_types	typ[MAXIMUM_STARS + 1]; /* one entry for each level of indirection eg [1] is type* */
+		enum gtm_types	typ[MAXIMUM_STARS + 1]; /* One entry for each level of indirection eg [1] is type* */
 	} xctab[] =
 	{
 	/*	typename		type		type *		type **			*/
 
-		{"void",		xc_void,	xc_notfound,	xc_notfound		},
+		{"void",		gtm_void,	gtm_notfound,	gtm_notfound		},
 
-                {"gtm_int_t",           xc_int,         xc_int_star,    xc_notfound 		},
-                {"xc_int_t",            xc_int,         xc_int_star,    xc_notfound 		},
-                {"int",                 xc_int,         xc_int_star,    xc_notfound 		},
+                {"gtm_int_t",           gtm_int,        gtm_int_star,   gtm_notfound 		},
+                {"xc_int_t",            gtm_int,        gtm_int_star,   gtm_notfound 		},
+                {"int",                 gtm_int,        gtm_int_star,   gtm_notfound 		},
 
-                {"gtm_uint_t",          xc_uint,        xc_uint_star,   xc_notfound 		},
-                {"xc_uint_t",           xc_uint,        xc_uint_star,   xc_notfound 		},
-                {"uint",                xc_uint,        xc_uint_star,   xc_notfound 		},
+                {"gtm_uint_t",          gtm_uint,       gtm_uint_star,  gtm_notfound 		},
+                {"xc_uint_t",           gtm_uint,       gtm_uint_star,  gtm_notfound 		},
+                {"uint",                gtm_uint,       gtm_uint_star,  gtm_notfound 		},
 
-		{"gtm_long_t",		xc_long,	xc_long_star,	xc_notfound		},
-		{"xc_long_t",		xc_long,	xc_long_star,	xc_notfound		},
-		{"long",		xc_long,	xc_long_star,	xc_notfound		},
+		{"gtm_long_t",		gtm_long,	gtm_long_star,	gtm_notfound		},
+		{"xc_long_t",		gtm_long,	gtm_long_star,	gtm_notfound		},
+		{"long",		gtm_long,	gtm_long_star,	gtm_notfound		},
 
-		{"gtm_ulong_t",		xc_ulong,	xc_ulong_star,	xc_notfound		},
-		{"xc_ulong_t",		xc_ulong,	xc_ulong_star,	xc_notfound		},
-		{"ulong",		xc_ulong,	xc_ulong_star,	xc_notfound		},
+		{"gtm_ulong_t",		gtm_ulong,	gtm_ulong_star,	gtm_notfound		},
+		{"xc_ulong_t",		gtm_ulong,	gtm_ulong_star,	gtm_notfound		},
+		{"ulong",		gtm_ulong,	gtm_ulong_star,	gtm_notfound		},
 
-		{"gtm_status_t",	xc_status,	xc_notfound,	xc_notfound		},
-		{"xc_status_t",		xc_status,	xc_notfound,	xc_notfound		},
+		{"gtm_status_t",	gtm_status,	gtm_notfound,	gtm_notfound		},
+		{"xc_status_t",		gtm_status,	gtm_notfound,	gtm_notfound		},
 
-		{"gtm_char_t",		xc_notfound,	xc_char_star,	xc_char_starstar	},
-		{"xc_char_t",		xc_notfound,	xc_char_star,	xc_char_starstar	},
-		{"char",		xc_notfound,	xc_char_star,	xc_char_starstar	},
+		{"gtm_char_t",		gtm_notfound,	gtm_char_star,	gtm_char_starstar	},
+		{"xc_char_t",		gtm_notfound,	gtm_char_star,	gtm_char_starstar	},
+		{"char",		gtm_notfound,	gtm_char_star,	gtm_char_starstar	},
 
-		{"gtm_string_t",	xc_notfound,	xc_string_star,	xc_notfound		},
-		{"xc_string_t",		xc_notfound,	xc_string_star,	xc_notfound		},
-		{"string",		xc_notfound,	xc_string_star,	xc_notfound		},
+		{"gtm_string_t",	gtm_notfound,	gtm_string_star, gtm_notfound		},
+		{"xc_string_t",		gtm_notfound,	gtm_string_star, gtm_notfound		},
+		{"string",		gtm_notfound,	gtm_string_star, gtm_notfound		},
 
-		{"gtm_float_t",		xc_float,	xc_float_star,	xc_notfound		},
-		{"xc_float_t",		xc_float,	xc_float_star,	xc_notfound		},
-		{"float",		xc_float,	xc_float_star,	xc_notfound		},
+		{"gtm_float_t",		gtm_float,	gtm_float_star,	gtm_notfound		},
+		{"xc_float_t",		gtm_float,	gtm_float_star,	gtm_notfound		},
+		{"float",		gtm_float,	gtm_float_star,	gtm_notfound		},
 
-		{"gtm_double_t",	xc_double,	xc_double_star,	xc_notfound		},
-		{"xc_double_t",		xc_double,	xc_double_star,	xc_notfound		},
-		{"double",		xc_double,	xc_double_star,	xc_notfound		},
+		{"gtm_double_t",	gtm_double,	gtm_double_star, gtm_notfound		},
+		{"xc_double_t",		gtm_double,	gtm_double_star, gtm_notfound		},
+		{"double",		gtm_double,	gtm_double_star, gtm_notfound		},
 
-		{"gtm_pointertofunc_t", xc_pointertofunc, xc_pointertofunc_star, xc_notfound	},
-		{"xc_pointertofunc_t", 	xc_pointertofunc, xc_pointertofunc_star, xc_notfound	}
+		{"gtm_pointertofunc_t", gtm_pointertofunc, gtm_pointertofunc_star, gtm_notfound	},
+		{"xc_pointertofunc_t", 	gtm_pointertofunc, gtm_pointertofunc_star, gtm_notfound	}
 	};
-
 	char	*b = *c;
 	char	*d;
 	int	len, i, star_count;
 
-	b = scan_space(b);
+	b = exttab_scan_space(b);
 	d = scan_ident(b);
 	if (!d)
-		return xc_notfound;
+		return gtm_notfound;
 	len = (int)(d - b);
 	for (i = 0 ; i < SIZEOF(xctab) / SIZEOF(xctab[0]) ; i++)
 	{
@@ -242,20 +250,20 @@ static enum xc_types	scan_keyword(char **c)
 			/* scan stars */
 			for (star_count = 0; (MAXIMUM_STARS >= star_count); star_count++, d++)
 			{
-				d = scan_space(d);
+				d = exttab_scan_space(d);
 				if ('*' != *d)
 					break;
 				star_found = TRUE;
 			}
 			assert(star_count <= MAXIMUM_STARS);
-			*c = scan_space(d);
+			*c = exttab_scan_space(d);
 			return xctab[i].typ[star_count];
 		}
 	}
-	return xc_notfound;
+	return gtm_notfound;
 }
 
-static 	int scan_array_bound(char **b,int curr_type)
+STATICFNDEF int scan_array_bound(char **b,int curr_type)
 {
 	char 		number[MAX_DIGITS_IN_INT];
 	char		*c;
@@ -287,7 +295,7 @@ static 	int scan_array_bound(char **b,int curr_type)
 	};
 
 	c = *b;
-	/* already found '[' */
+	/* Already found '[' */
 	for (index=0, c++; ']' != *c; c++)
 	{
 		if ('\0' != *c)
@@ -299,7 +307,7 @@ static 	int scan_array_bound(char **b,int curr_type)
 		} else
 			ext_stx_error(ERR_ZCCSQRBR, ext_table_file_name);
 	}
-	c++; /* skip ']' */
+	c++; /* Skip ']' */
 	*b = c;
 	if (0 == index)
 		return default_pre_alloc_value[curr_type];
@@ -307,7 +315,7 @@ static 	int scan_array_bound(char **b,int curr_type)
 	return ATOI(number);
 }
 
-static char	*read_table(char *b, int l, FILE *f)
+STATICFNDEF char *read_table(char *b, int l, FILE *f)
 {
 	char	*t;
 
@@ -325,7 +333,7 @@ static char	*read_table(char *b, int l, FILE *f)
 			assert(feof(f) != 0);
 	} else
 	{
-		/* unfortunately, fgets does not strip the NL, we will do it for it */
+		/* Unfortunately, fgets does not strip the NL, we will do it for it */
 		for (ext_source_line_len = 0; *t ; t++)
 		{
 			ext_source_line[ext_source_line_len++] = *t;
@@ -340,11 +348,11 @@ static char	*read_table(char *b, int l, FILE *f)
 	return t;
 }
 
-/*  utility routine to store static mstr's which will remain for the duration of the process
- *   These mstr's will have a trailing null attached so that UNIX system routines can operate
- *   on them directly as const char *'s
+/* Utility routine to store static mstr's which will remain for the duration of the process
+ * These mstr's will have a trailing null attached so that UNIX system routines can operate
+ * on them directly as const char *'s
  */
-static void	put_mstr(mstr *src, mstr *dst)
+STATICFNDEF void put_mstr(mstr *src, mstr *dst)
 {
 	char	*cp;
 	ssize_t	n;
@@ -360,8 +368,8 @@ static void	put_mstr(mstr *src, mstr *dst)
 	return;
 }
 
-/* utility to convert an array of bool's to a bit mask */
-static uint4	array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
+/* Utility to convert an array of bool's to a bit mask */
+STATICFNDEF uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
 {
 	uint4	mask = 0;
 	int	i;
@@ -374,8 +382,8 @@ static uint4	array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
 	return mask;
 }
 
-/* Note: need condition handler to clean-up allocated structures and close intput file in the event of an error */
-struct extcall_package_list	*exttab_parse(mval *package)
+/* Note: Need condition handler to clean-up allocated structures and close intput file in the event of an error */
+struct extcall_package_list *exttab_parse(mval *package)
 {
 	int		parameter_alloc_values[MAX_ACTUALS], parameter_count, ret_pre_alloc_val, i, fclose_res;
 	int		len, keywordlen;
@@ -383,12 +391,13 @@ struct extcall_package_list	*exttab_parse(mval *package)
 	mstr		callnam, rtnnam, clnuprtn;
 	mstr 		val, trans;
 	void_ptr_t	pakhandle;
-	enum xc_types	ret_tok, parameter_types[MAX_ACTUALS], pr;
+	enum gtm_types	ret_tok, parameter_types[MAX_ACTUALS], pr;
 	char		str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	char		str_temp_buffer[MAX_TABLINE_LEN];
 	FILE		*ext_table_file_handle;
 	struct extcall_package_list	*pak;
 	struct extcall_entry_list	*entry_ptr;
+
 	/* First, construct package name environment variable */
 	memcpy(str_buffer, PACKAGE_ENV_PREFIX, SIZEOF(PACKAGE_ENV_PREFIX));
 	tbp = &str_buffer[SIZEOF(PACKAGE_ENV_PREFIX) - 1];
@@ -415,7 +424,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		rts_error(VARLSTCNT(4) ERR_ZCCTOPN, 2, LEN_AND_STR(ext_table_file_name));
 	}
 	ext_source_line_num = 0;
-	/* pick-up name of shareable library */
+	/* Pick-up name of shareable library */
 	tbp = read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle);
 	if (NULL == tbp)
 	{
@@ -450,17 +459,17 @@ struct extcall_package_list	*exttab_parse(mval *package)
 	pak->package_clnup_rtn = NULL;
 	len = STRLEN("GTMSHLIBEXIT");
 	/* At this point, we have a valid package, pointed to by pak */
-#ifdef DEBUG_EXTCALL
+#	ifdef DEBUG_EXTCALL
 	FPRINTF(stderr, "GT.M external call opened package name: %s\n", pak->package_name.addr);
-#endif
+#	endif
 	for (;;)
 	{
 		star_found = FALSE;
 		tbp = read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle);
 		if (NULL == tbp)
 			break;
-		tbp = scan_space(str_buffer);
-		/* empty line? */
+		tbp = exttab_scan_space(str_buffer);
+		/* Empty line? */
 		if (!*tbp)
 			continue;
 		/* No, must be entryref or keyword */
@@ -468,7 +477,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		if (!end)
 			ext_stx_error(ERR_ZCENTNAME, ext_table_file_name);
 		keywordlen = end - tbp;
-		end = scan_space(end);
+		end = exttab_scan_space(end);
 		if ('=' == *end)
 		{	/* Keyword before '=' has a string of size == STRLEN("GTMSHLIBEXIT") */
 			if (keywordlen == len)
@@ -476,7 +485,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 				if (0 == MEMCMP_LIT(tbp, "GTMSHLIBEXIT"))
 				{
 					/* Skip past the '=' char */
-					tbp = scan_space(end + 1);
+					tbp = exttab_scan_space(end + 1);
 					if (*tbp)
 					{	/* We have a cleanup routine name */
 						clnuprtn.addr = tbp;
@@ -501,37 +510,37 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		}
 		rtnnam.addr = tbp;
 		rtnnam.len = INTCAST(end - tbp);
-		tbp = scan_space(end);
+		tbp = exttab_scan_space(end);
 		if (':' != *tbp++)
 			ext_stx_error(ERR_ZCCOLON, ext_table_file_name);
-		/* get return type */
+		/* Get return type */
 		ret_tok = scan_keyword(&tbp);
-		/* check for legal return type */
+		/* Check for legal return type */
 		switch (ret_tok)
 		{
-			case xc_status:
-			case xc_void:
-			case xc_int:
-			case xc_uint:
-			case xc_long:
-			case xc_ulong:
-			case xc_char_star:
-			case xc_float_star:
-			case xc_string_star:
-			case xc_int_star:
-			case xc_uint_star:
-			case xc_long_star:
-			case xc_ulong_star:
-			case xc_double_star:
-			case xc_char_starstar:
-			case xc_pointertofunc:
-			case xc_pointertofunc_star:
+			case gtm_status:
+			case gtm_void:
+			case gtm_int:
+			case gtm_uint:
+			case gtm_long:
+			case gtm_ulong:
+			case gtm_char_star:
+			case gtm_float_star:
+			case gtm_string_star:
+			case gtm_int_star:
+			case gtm_uint_star:
+			case gtm_long_star:
+			case gtm_ulong_star:
+			case gtm_double_star:
+			case gtm_char_starstar:
+			case gtm_pointertofunc:
+			case gtm_pointertofunc_star:
 				break;
 			default:
 				ext_stx_error(ERR_ZCRTNTYP, ext_table_file_name);
 		}
-		got_status = (ret_tok == xc_status);
-		/*  get call name */
+		got_status = (ret_tok == gtm_status);
+		/* Get call name */
 		if ('[' == *tbp)
 		{
 			if (star_found)
@@ -539,7 +548,8 @@ struct extcall_package_list	*exttab_parse(mval *package)
 			else
 				ext_stx_error(ERR_ZCPREALLVALPAR, ext_table_file_name);
 			/* We should allow the pre-allocated value upto to the maximum string size (MAX_STRLEN) plus 1 for the
-			 * extra terminating NULL. Negative values would have been caught by scan_array_bound() above */
+			 * extra terminating NULL. Negative values would have been caught by scan_array_bound() above.
+			 */
 			if (ret_pre_alloc_val > MAX_STRLEN + 1)
 				ext_stx_error(ERR_ZCPREALLVALINV, ext_table_file_name);
 		} else
@@ -552,19 +562,19 @@ struct extcall_package_list	*exttab_parse(mval *package)
 			ext_stx_error(ERR_ZCRCALLNAME, ext_table_file_name);
 		callnam.addr = tbp;
 		callnam.len = INTCAST(end - tbp);
-		tbp = scan_space(end);
-		tbp = scan_space(tbp);
+		tbp = exttab_scan_space(end);
+		tbp = exttab_scan_space(tbp);
 		for (parameter_count = 0;(MAX_ACTUALS > parameter_count) && (')' != *tbp); parameter_count++)
 		{
 			star_found = FALSE;
-			/* must have comma if this is not the first parameter, otherwise '(' */
+			/* Must have comma if this is not the first parameter, otherwise '(' */
 			if (((0 == parameter_count)?'(':',') != *tbp++)
 				ext_stx_error(ERR_ZCRPARMNAME, ext_table_file_name);
-			tbp = scan_space(tbp);
-			/* special case: () is ok */
+			tbp = exttab_scan_space(tbp);
+			/* Special case: () is ok */
 			if ((0 == parameter_count) && (*tbp == ')'))
 				break;
-			/* looking for an I, an O or an IO */
+			/* Looking for an I, an O or an IO */
 			is_input[parameter_count] = is_output[parameter_count] = FALSE;
 			if ('I' == *tbp)
 			{
@@ -579,11 +589,11 @@ struct extcall_package_list	*exttab_parse(mval *package)
 			if (((FALSE == is_input[parameter_count]) && (FALSE == is_output[parameter_count]))
 			    ||(':' != *tbp++))
 				ext_stx_error(ERR_ZCRCALLNAME, ext_table_file_name);
-			/* scanned colon--now get type */
+			/* Scanned colon--now get type */
 			pr = scan_keyword(&tbp);
-			if (xc_notfound == pr)
+			if (gtm_notfound == pr)
 				ext_stx_error(ERR_ZCUNTYPE, ext_table_file_name);
-			if (xc_status == pr)
+			if (gtm_status == pr)
 			{
 				/* Only one type "status" allowed per call */
 				if (got_status)
@@ -599,12 +609,13 @@ struct extcall_package_list	*exttab_parse(mval *package)
 				else
 					ext_stx_error(ERR_ZCPREALLVALPAR, ext_table_file_name);
 				/* We should allow the pre-allocated value upto to the maximum string size (MAX_STRLEN) plus 1 for
-				 * the extra terminating NULL. Negative values would have been caught by scan_array_bound() above */
+				 * the extra terminating NULL. Negative values would have been caught by scan_array_bound() above.
+				 */
 				if (parameter_alloc_values[parameter_count] > MAX_STRLEN + 1)
 					ext_stx_error(ERR_ZCPREALLVALINV, ext_table_file_name);
 			} else
 				parameter_alloc_values[parameter_count] = -1;
-			tbp = scan_space(tbp);
+			tbp = exttab_scan_space(tbp);
 		}
 		entry_ptr = get_memory(SIZEOF(*entry_ptr));
 		entry_ptr->next_entry = pak->first_entry;
@@ -626,28 +637,29 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		put_mstr(&rtnnam, &entry_ptr->entry_name);
 		put_mstr(&callnam, &entry_ptr->call_name);
 
-		/* the reason for passing INFO severity is that PROFILE has several routines listed in
+		/* The reason for passing INFO severity is that PROFILE has several routines listed in
 		 * the external call table that are not in the shared library. PROFILE folks would
 		 * rather see info/warning messages for such routines at shared library open time,
 		 * than error out. These unimplemented routines, they say were not being called from
 		 * the application and wouldn't cause any application failures. If we fail to open
 		 * the shared libary, or we fail to locate a routine that is called from the
-		 * application, we issue rts_error message (in extab_parse.c) */
+		 * application, we issue rts_error message (in extab_parse.c).
+		 */
 		entry_ptr->fcn = fgn_getrtn(pak->package_handle, &entry_ptr->call_name, INFO);
-#ifdef DEBUG_EXTCALL
+#		ifdef DEBUG_EXTCALL
 		FPRINTF(stderr, "   package entry point: %s, address: %x\n", entry_ptr->entry_name.addr, entry_ptr->fcn);
-#endif
+#		endif
 	}
 	FCLOSE(ext_table_file_handle, fclose_res);
 	return pak;
 }
 
-callin_entry_list*	citab_parse (void)
+callin_entry_list* citab_parse (void)
 {
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
 	mstr			labref, callnam;
-	enum xc_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
+	enum gtm_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
 	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr, *save_entry_ptr = 0;
@@ -663,27 +675,27 @@ callin_entry_list*	citab_parse (void)
 	ext_source_line_num = 0;
 	while (read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle))
 	{
-		if (!*(tbp = scan_space(str_buffer)))
+		if (!*(tbp = exttab_scan_space(str_buffer)))
 			continue;
 		if (!(end = scan_ident(tbp)))
 			ext_stx_error(ERR_CIRCALLNAME, ext_table_file_name);
 		callnam.addr = tbp;
 		callnam.len = INTCAST(end - tbp);
-		tbp = scan_space(end);
+		tbp = exttab_scan_space(end);
 		if (':' != *tbp++)
 			ext_stx_error(ERR_COLON, ext_table_file_name);
 		ret_tok = scan_keyword(&tbp); /* return type */
 		switch (ret_tok) /* return type valid ? */
 		{
-			case xc_void:
-			case xc_char_star:
-			case xc_int_star:
-			case xc_uint_star:
-			case xc_long_star:
-			case xc_ulong_star:
-			case xc_float_star:
-			case xc_double_star:
-			case xc_string_star:
+			case gtm_void:
+			case gtm_char_star:
+			case gtm_int_star:
+			case gtm_uint_star:
+			case gtm_long_star:
+			case gtm_ulong_star:
+			case gtm_float_star:
+			case gtm_double_star:
+			case gtm_string_star:
 				break;
 			default:
 				ext_stx_error(ERR_CIRTNTYP, ext_table_file_name);
@@ -693,7 +705,7 @@ callin_entry_list*	citab_parse (void)
 			labref.len = INTCAST(end - tbp);
 		else
 			ext_stx_error(ERR_CIENTNAME, ext_table_file_name);
-		tbp = scan_space(end);
+		tbp = exttab_scan_space(end);
 		inp_mask = out_mask = 0;
 		for (parameter_count = 0; (*tbp && ')' != *tbp); parameter_count++)
 		{
@@ -702,7 +714,7 @@ callin_entry_list*	citab_parse (void)
 			/* must have comma if this is not the first parameter, otherwise '(' */
 			if (((0 == parameter_count)?'(':',') != *tbp++)
 				ext_stx_error(ERR_CIRPARMNAME, ext_table_file_name);
-			tbp = scan_space(tbp);
+			tbp = exttab_scan_space(tbp);
 			if ((0 == parameter_count) && (*tbp == ')')) /* special case () */
 				break;
 			/* looking for an I, a O or an IO */
@@ -713,29 +725,29 @@ callin_entry_list*	citab_parse (void)
 				ext_stx_error(ERR_CIDIRECTIVE, ext_table_file_name);
 			switch ((pr = scan_keyword(&tbp))) /* valid param type? */
 			{
-				case xc_int:
-				case xc_uint:
-				case xc_long:
-				case xc_ulong:
-				case xc_float:
-				case xc_double:
+				case gtm_int:
+				case gtm_uint:
+				case gtm_long:
+				case gtm_ulong:
+				case gtm_float:
+				case gtm_double:
 					if (out_mask & mask)
 						ext_stx_error(ERR_CIPARTYPE, ext_table_file_name);
 					/* fall-thru */
-				case xc_char_star:
-				case xc_int_star:
-				case xc_uint_star:
-				case xc_long_star:
-				case xc_ulong_star:
-				case xc_float_star:
-				case xc_double_star:
-				case xc_string_star:
+				case gtm_char_star:
+				case gtm_int_star:
+				case gtm_uint_star:
+				case gtm_long_star:
+				case gtm_ulong_star:
+				case gtm_float_star:
+				case gtm_double_star:
+				case gtm_string_star:
 					break;
 				default:
 					ext_stx_error(ERR_CIUNTYPE, ext_table_file_name);
 			}
 			parameter_types[parameter_count] = pr;
-			tbp = scan_space(tbp);
+			tbp = exttab_scan_space(tbp);
 		}
 		if (!*tbp)
 			ext_stx_error(ERR_CIRPARMNAME, ext_table_file_name);
@@ -756,7 +768,7 @@ callin_entry_list*	citab_parse (void)
 	return entry_ptr;
 }
 
-static void ext_stx_error(int in_error, ...)
+STATICFNDEF void ext_stx_error(int in_error, ...)
 {
 	va_list	args;
 	char	*ext_table_name;

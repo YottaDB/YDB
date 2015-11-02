@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,74 +13,76 @@
 #ifndef GTMXC_TYPES_H
 #define GTMXC_TYPES_H
 
+#include <sys/types.h>	/* For intptr_t */
+#include "inttypes.h"	/* .. ditto (defined different places in different platforms) .. */
+
 #ifdef __osf__
 /* Ensure 32-bit pointers for compatibility with GT.M internal representations.  */
 #pragma pointer_size (save)
 #pragma pointer_size (short)
 #endif
-
-typedef int		xc_status_t;
-typedef	int		xc_int_t;
-typedef unsigned int 	xc_uint_t;
-
+typedef int		gtm_status_t;
+typedef	int		gtm_int_t;
+typedef unsigned int 	gtm_uint_t;
 #if defined(__osf__)
-typedef	int		xc_long_t;
-typedef unsigned int 	xc_ulong_t;
+typedef	int		gtm_long_t;
+typedef unsigned int 	gtm_ulong_t;
 #else
-typedef	long		xc_long_t;
-typedef unsigned long 	xc_ulong_t;
+typedef	long		gtm_long_t;
+typedef unsigned long 	gtm_ulong_t;
 #endif
-
-typedef	float		xc_float_t;
-
-typedef	double		xc_double_t;
-
-typedef	char		xc_char_t;
-
-typedef int		(*xc_pointertofunc_t)();
-
+typedef	float		gtm_float_t;
+typedef	double		gtm_double_t;
+typedef	char		gtm_char_t;
+typedef int		(*gtm_pointertofunc_t)();
 typedef struct
 {
-	xc_long_t	length;
-	xc_char_t	*address;
-}	xc_string_t;
-
+	gtm_long_t	length;
+	gtm_char_t	*address;
+}	gtm_string_t;
+typedef	int	gtmcrypt_key_t;
 #ifdef __osf__
 #pragma pointer_size (restore)
 #endif
 
-/* new types for external/call-in user - xc_* types still valid for backward compatibility */
-typedef xc_status_t	gtm_status_t;
-typedef xc_int_t	gtm_int_t;
-typedef xc_uint_t	gtm_uint_t;
-typedef xc_long_t	gtm_long_t;
-typedef xc_ulong_t	gtm_ulong_t;
-typedef xc_float_t	gtm_float_t;
-typedef xc_double_t	gtm_double_t;
-typedef xc_char_t	gtm_char_t;
-typedef xc_string_t	gtm_string_t;
-typedef xc_pointertofunc_t	gtm_pointertofunc_t;
+#if !defined(__alpha)
+typedef intptr_t	gtm_tid_t;
+#else
+typedef int		gtm_tid_t;
+#endif
 
+typedef void		*gtm_fileid_ptr_t;
 typedef struct
 {
-        gtm_string_t rtn_name;
-        void* handle;
+        gtm_string_t	rtn_name;
+        void*		handle;
 } ci_name_descriptor;
-
+/* Define deprecated types for backward compatibility */
+typedef gtm_status_t	xc_status_t;
+typedef gtm_int_t	xc_int_t;
+typedef gtm_uint_t	xc_uint_t;
+typedef gtm_long_t	xc_long_t;
+typedef gtm_ulong_t	xc_ulong_t;
+typedef gtm_float_t	xc_float_t;
+typedef gtm_double_t	xc_double_t;
+typedef gtm_char_t	xc_char_t;
+typedef gtm_string_t	xc_string_t;
+typedef gtm_pointertofunc_t	xc_pointertofunc_t;
+typedef gtm_fileid_ptr_t	xc_fileid_ptr_t;
 /* call-in interface */
-xc_status_t 	gtm_ci(const char *c_rtn_name, ...);
-xc_status_t 	gtm_cip(ci_name_descriptor *ci_info, ...);
-xc_status_t 	gtm_init(void);
-xc_status_t 	gtm_exit(void);
+gtm_status_t 	gtm_ci(const char *c_rtn_name, ...);
+gtm_status_t 	gtm_cip(ci_name_descriptor *ci_info, ...);
+gtm_status_t 	gtm_init(void);
+gtm_status_t 	gtm_exit(void);
 void 		gtm_zstatus(char* msg, int len);
-
-typedef	int	gtmcrypt_key_t;
-
-typedef void	*xc_fileid_ptr_t;
-xc_status_t	gtm_filename_to_id(xc_string_t *filename, xc_fileid_ptr_t *fileid);
-xc_status_t	gtm_is_file_identical(xc_fileid_ptr_t fileid1, xc_fileid_ptr_t fileid2);
-void		gtm_xcfileid_free(xc_fileid_ptr_t fileid);
-
+/* Other entry points accessable in libgtmshr */
+gtm_status_t	gtm_filename_to_id(gtm_string_t *filename, gtm_fileid_ptr_t *fileid);
+void		gtm_hiber_start(gtm_uint_t mssleep);
+void		gtm_hiber_start_wait_any(gtm_uint_t mssleep);
+void		gtm_start_timer(gtm_tid_t tid, gtm_int_t time_to_expir, void (*handler)(), gtm_int_t hdata_len, void *hdata);
+void		gtm_cancel_timer(gtm_tid_t tid);
+gtm_status_t	gtm_is_file_identical(gtm_fileid_ptr_t fileid1, gtm_fileid_ptr_t fileid2);
+void		gtm_xcfileid_free(gtm_fileid_ptr_t fileid);
 void 		*gtm_malloc(size_t);
 void 		gtm_free(void *);
 

@@ -227,7 +227,7 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MVST_ZINTR	11	/* Environmental save for $zinterrupt */
 #define MVST_ZINTDEV	12	/* In I/O when ZINTR, mstr input to now protected */
 #define	MVST_STCK_SP	13	/* same as the MVST_STCK type except that it needs special handling in flush_jmp.c
-				 * (see comment there)
+				 * (see comment in mtables.c where mvs_save is defined).
 				 */
 #define MVST_LVAL	14	/* Same as MVST_MVAL except we are pushing an lv_val instead of an mval */
 #define MVST_TRIGR	15	/* Used to save the base environment for Trigger execution */
@@ -247,16 +247,17 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define PUSH_MV_STENT(T) (((msp -= mvs_size[T]) <= stackwarn) ?							\
 	((msp <= stacktop) ? (msp += mvs_size[T]/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) :	\
 	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) :								\
-	(((mv_stent *) msp)->mv_st_type = T ,									\
-	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),				\
-	mv_chain = (mv_stent *) msp)
+	(((mv_stent *)msp)->mv_st_type = T ,									\
+	((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),				\
+	mv_chain = (mv_stent *)msp)
 
-#define PUSH_MV_STCK(size, st_type) (((msp -= (mvs_size[st_type] + (size))) <= stackwarn) ?					\
-	((msp <= stacktop) ? (msp += (mvs_size[st_type] + (size))/* fix stack */, rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) :	\
-	 rts_error(VARLSTCNT(1) ERR_STACKCRIT)) :										\
-	(((mv_stent *) msp)->mv_st_type = st_type,										\
-	((mv_stent *) msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),						\
-	mv_chain = (mv_stent *) msp)
+#define PUSH_MV_STCK(size, st_type) (((msp -= ROUND_UP(mvs_size[st_type] + (size), SIZEOF(char *))) <= stackwarn) ?	\
+	((msp <= stacktop) ? (msp += ROUND_UP(mvs_size[st_type] + (size), SIZEOF(char *)) /* fix stack */,		\
+        rts_error(VARLSTCNT(1) ERR_STACKOFLOW)) :									\
+	rts_error(VARLSTCNT(1) ERR_STACKCRIT)) :									\
+	(((mv_stent *)msp)->mv_st_type = st_type,									\
+	((mv_stent *)msp)->mv_st_next = (int)((unsigned char *) mv_chain - msp)),					\
+	mv_chain = (mv_stent *)msp)
 
 #ifdef DEBUG
 #define POP_MV_STENT() (assert(msp == (unsigned char *) mv_chain),		\

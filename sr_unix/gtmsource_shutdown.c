@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,21 +16,12 @@
 #include "gtm_inet.h"
 #include "gtm_fcntl.h"
 #include "gtm_socket.h"
-
 #include <sys/mman.h>
-#if !(defined(__MVS__)) && !(defined(VMS))
 #include <sys/param.h>
-#endif
 #include <sys/time.h>
 #include <errno.h>
-#ifdef UNIX
 #include <sys/sem.h>
 #include "repl_instance.h"
-#endif
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
-
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"
@@ -47,12 +38,14 @@
 #include "is_proc_alive.h"
 #include "repl_comm.h"
 #include "repl_log.h"
-#ifdef UNIX
 #include "ftok_sems.h"
-#endif
 #include "gtm_c_stack_trace.h"
-
-#define	GTMSOURCE_WAIT_FOR_SHUTDOWN	(1000 - 1) /* ms, almost 1 s */
+#ifdef DEBUG
+#include "wbox_test_init.h"
+#include "gtmio.h"
+#include "anticipatory_freeze.h"
+#include "gtm_threadgbl.h"
+#endif
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
@@ -72,13 +65,17 @@ error_def(ERR_TEXT);
 
 int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 {
-	boolean_t		all_dead, first_time, regrab_lock;
+	boolean_t		all_dead, first_time, sem_incremented, regrab_lock;
 	uint4			savepid[NUM_GTMSRC_LCL];
-	int			status, shutdown_status;
+	int			status, shutdown_status, save_errno;
 	int4			index, maxindex, lcnt, num_src_servers_running;
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
+#ifdef DEBUG
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+#endif
 	/* Significance of shutdown field in gtmsource_local:
 	 * This field is initially set to NO_SHUTDOWN. When a command to shut down the source server is issued,
 	 * the process initiating the shutdown sets this field to SHUTDOWN. The Source Server on sensing
@@ -120,14 +117,38 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 				}
 			}
 		}
-		/* Wait for source server(s) to die. But release ftok semaphore and jnlpool access control semaphore before
-		 * waiting as the concurrently running source server(s) might need these (e.g. if it is about to call the
-		 * function "gtmsource_set_next_histinfo_seqno").
+		/* Wait for source server(s) to die. But before that release ftok semaphore and jnlpool access control semaphore.
+		 * This way, other processes (either in this environment or a different one) don't encounter startup issues.
+		 * However, to ensure that a concurrent argument-less rundown doesn't remove these semaphores (in case they
+		 * are orphaned), increment the counter semaphore.
 		 */
+		if (0 != incr_sem(SOURCE, SRC_SERV_COUNT_SEM))
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Could not increment Journal Pool counter semaphore : %s. "
+							"Shutdown did not complete\n", STRERROR(save_errno));
+			/* Even though we hold the FTOK and JNL_POOL_ACCESS_SEM before entering this function (as ensured by
+			 * asserts above), it is safe to release them in case of a premature error (like this one). The caller
+			 * doesn't rely on the semaphores being held and this function is designed to release these semaphores
+			 * eventually anyways (after gtmsource_ipc_cleanup())
+			 */
+			repl_inst_ftok_sem_release();
+			status = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM);
+			assert(0 == status);
+			return ABNORMAL_SHUTDOWN;
+		}
 		if (0 != rel_sem(SOURCE, JNL_POOL_ACCESS_SEM))
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in source server shutdown rel_sem"),
-				REPL_SEM_ERRNO);
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Could not release Journal Pool access control semaphore : %s. "
+							"Shutdown did not complete\n", STRERROR(save_errno));
+			repl_inst_ftok_sem_release(); /* see comment above for why this is okay */
+			status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM);
+			assert(0 == status);
+			return ABNORMAL_SHUTDOWN;
+		}
 		repl_inst_ftok_sem_release();
+		regrab_lock = sem_incremented = TRUE;
 		gvinit();	/* Get the gd header*/
 		/* Wait for ONE particular or ALL source servers to die */
 		repl_log(stdout, TRUE, TRUE, "Waiting for upto [%d] seconds for the source server to shutdown\n",
@@ -148,7 +169,15 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			}
 			if (!all_dead)
 			{
+#				if defined(DEBUG)
+				if (ANTICIPATORY_FREEZE_AVAILABLE && TREF(gtm_test_fake_enospc))
+					/* Check every 5 seconds just in case ENOSPC test for instance freeze is active */
+					LONG_SLEEP(5);
+				else
+					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_SHUTDOWN);
+#				else
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_SHUTDOWN);
+#				endif
 			} else
 				break;
 		}
@@ -177,25 +206,24 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 			}
 			repl_log(stderr, FALSE, TRUE, "Shutdown cannot proceed. Stop the above processes and reissue "
 					"the shutdown command.\n");
-			assert (FALSE);
-			return (ABNORMAL_SHUTDOWN);
+			status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM);
+			assert(0 == status);
+			assert(FALSE);
+			return ABNORMAL_SHUTDOWN;
 		}
-		/* At this point, the source server process is dead. The call to "gtmsource_ipc_cleanup" below relies on this. */
-		regrab_lock = TRUE;
 	} else
 	{
+		sem_incremented = FALSE;
 		if (gtmsource_srv_count)
 		{
 			repl_log(stdout, TRUE, TRUE, "Initiating shut down\n");
-			if (udi->grabbed_ftok_sem)
-			{	/* Possible if we were holding the ftok semaphore and the journal pool lock "grab_lock" and
-				 * got a SIG-15 before we did the "rel_lock" (while still holding the ftok semaphore). The
-				 * "rel_lock" would have invoked "deferred_signal_handler" which would have in turn recognized
-				 * the signal and triggered shutdown processing all the while holding the ftok semaphore.
-				 * Release the ftok semaphore and grab it again.
-				 */
-				repl_inst_ftok_sem_release();
-			}
+			/* A non-zero gtmsource_srv_count indicates we are the spawned off child source server. That means we
+			 * are not holding any semaphores. More importantly, none of the source server's mainline code holds
+			 * the ftok or the access control semaphore anymore. So, even if we reach here due to an external signal
+			 * we are guaranteed that we don't hold any semaphores. Assert that.
+			 */
+			assert(!udi->grabbed_ftok_sem);
+			assert(!holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);
 			regrab_lock = TRUE;
 		} else
 		{
@@ -211,14 +239,40 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 		}
 	}
 	if (regrab_lock)
-	{	/* (Re)Grab the ftok semaphore and jnlpool access control semaphore IN THAT ORDER (to avoid deadlocks) */
+	{	/* Now that the source servers are shutdown, regrab the FTOK and access control semaphore (IN THAT ORDER to avoid
+		 * deadlocks)
+		 */
 		repl_inst_ftok_sem_lock();
-		status = grab_sem(SOURCE, JNL_POOL_ACCESS_SEM);
-		if (0 > status)
+#		ifdef DEBUG
+		/* Sleep for a few seconds to test for concurrent argument-less RUNDOWN to ensure that the latter doesn't remove
+		 * the JNL_POOL_ACCESS_SEM under the assumption that it is orphaned.
+		 */
+		if (gtm_white_box_test_case_enabled && (WBTEST_LONGSLEEP_IN_REPL_SHUTDOWN == gtm_white_box_test_case_number))
 		{
-			repl_log(stderr, TRUE, TRUE,
-				"Error grabbing jnlpool access control semaphore : %s. Shutdown not complete\n", REPL_SEM_ERROR);
-			return (ABNORMAL_SHUTDOWN);
+			DBGFPF((stderr, "GTMSOURCE_SHUTDOWN is about to start long sleep\n"));
+			LONG_SLEEP(10);
+		}
+#		endif
+		if (0 > (status = grab_sem(SOURCE, JNL_POOL_ACCESS_SEM)))
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Could not acquire Journal Pool access control semaphore : %s. "
+								"Shutdown not complete\n", STRERROR(save_errno));
+			repl_inst_ftok_sem_release();
+			status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM);
+			assert(0 == status);
+			return ABNORMAL_SHUTDOWN;
+		}
+		/* Now that the locks are re-acquired, decrease the counter sempahore */
+		if (sem_incremented && (0 > (status = decr_sem(SOURCE, SRC_SERV_COUNT_SEM))))
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Could not decrement Journal Pool counter semaphore : %s."
+								"Shutdown not complete\n", STRERROR(save_errno));
+			repl_inst_ftok_sem_release();
+			status = rel_sem(SOURCE, JNL_POOL_ACCESS_SEM);
+			assert(0 == status);
+			return ABNORMAL_SHUTDOWN;
 		}
 	}
 	if (!auto_shutdown)
@@ -259,8 +313,11 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	 */
 	if (FALSE == gtmsource_ipc_cleanup(auto_shutdown, &exit_status, &num_src_servers_running))
 		rel_sem_immediate(SOURCE, JNL_POOL_ACCESS_SEM);
-	else if (NORMAL_SHUTDOWN == exit_status)
+	else
+	{	/* Journal Pool and Access Control Semaphores removed. Invalidate corresponding fields in file header */
+		assert(NORMAL_SHUTDOWN == exit_status);
 		repl_inst_jnlpool_reset();
+	}
 	if (!ftok_sem_release(jnlpool.jnlpool_dummy_reg, TRUE, FALSE))
 		rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	assert(!num_src_servers_running || (ABNORMAL_SHUTDOWN == exit_status));
@@ -271,7 +328,7 @@ void gtmsource_stop(boolean_t exit)
 {
 	int	status;
 
-	assert(gtmsource_srv_count);	/* This is a source server process */
+	assert(gtmsource_srv_count || is_src_server);
 	status = gtmsource_end1(TRUE);
 	status = gtmsource_shutdown(TRUE, status) - NORMAL_SHUTDOWN;
 	if (exit)

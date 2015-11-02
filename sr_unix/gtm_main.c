@@ -74,6 +74,12 @@ GBLREF	boolean_t			skip_dbtriggers;
 # pragma pointer_size (long)
 #endif
 GBLDEF char 		**gtmenvp;
+#ifdef GTM_CRYPT
+error_def(ERR_CRYPTDLNOOPEN);
+error_def(ERR_CRYPTDLNOOPEN2);
+error_def(ERR_CRYPTINIT);
+error_def(ERR_CRYPTINIT2);
+#endif
 int gtm_main (int argc, char **argv, char **envp)
 #ifdef __osf__
 # pragma pointer_size (restore)
@@ -81,10 +87,11 @@ int gtm_main (int argc, char **argv, char **envp)
 {
 	char			*ptr;
 	int             	eof, parse_ret;
-	GTMCRYPT_ONLY(
-		char		*gtm_passwd;
-		int		init_status;
-	)
+#	ifdef GTM_CRYPT
+	char			*gtm_passwd;
+	const char		*gtmcrypt_errlit = "during GT.M startup";
+	int			gtmcrypt_errno;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
@@ -139,9 +146,19 @@ int gtm_main (int argc, char **argv, char **envp)
 	    && (NULL != (gtm_passwd = (char *)getenv(GTM_PASSWD)))
 	    && (0 == strlen(gtm_passwd)))
 	{
-		INIT_PROC_ENCRYPTION(init_status);
-		if (0 != init_status)
-			GC_RTS_ERROR(init_status, NULL);
+		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+		{
+			CLEAR_CRYPTERR_MASK(gtmcrypt_errno);
+			assert(!IS_REPEAT_MSG_MASK(gtmcrypt_errno));
+			assert((ERR_CRYPTDLNOOPEN == gtmcrypt_errno) || (ERR_CRYPTINIT == gtmcrypt_errno));
+			if (ERR_CRYPTDLNOOPEN == gtmcrypt_errno)
+				gtmcrypt_errno = ERR_CRYPTDLNOOPEN2;
+			else if (ERR_CRYPTINIT == gtmcrypt_errno)
+				gtmcrypt_errno = ERR_CRYPTINIT2;
+			gtmcrypt_errno = SET_CRYPTERR_MASK(gtmcrypt_errno);
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, STRLEN(gtmcrypt_errlit), gtmcrypt_errlit);
+		}
 	}
 #	endif
 	dm_start();

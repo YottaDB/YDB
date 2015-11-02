@@ -90,6 +90,7 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 #include "mdefsa.h"
 #include <mdefsp.h>
 #include "gtm_sizeof.h"
+#include "gtm_common_defs.h"
 #include "gtm_threadgbl.h"
 /* Anchor for thread-global structure rather than individual global vars */
 GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */
@@ -127,22 +128,12 @@ error_def(ERR_ASSERT);
 #	define	FD_INVALID_NONPOSIX	 0	/* fd of 0 is invalid in VMS if using RMS sys$open calls (non-posix interface) */
 #endif
 
-/* Now that mdefsp.h is included, GBLDEF should have been #defined. Use it to define STATICDEF for variables
- * and STATICFNDEF, STATICFNDCL for functions. Define STATICDEF to "GBLDEF". This way we know such usages are intended
- * to be "static" but yet can effectively debug these variables since they are externally visible.
- * For functions, do not use the "static" keyword to make them externally visible.
- * Note that a STATICREF for variables does not make sense since statics are supposed to be used only within one module.
- */
-#define	STATICDEF	GBLDEF
-#define	STATICFNDCL	extern
-#define	STATICFNDEF
-
 /* INTPTR_T is an integer that has the same length as a pointer on each platform.  Its basic use is for arithmetic
-   or generic parameters.  For all platforms except Tru64/VMS (alpha platforms), the [U]INTPTR_T types will be
-   equivalenced to [u]intptr_t.  But since this type is used for alignment and other checking, and since Tru64/VMS
-   (implemented as a 32 bit platform) unconditionally sets this type to its 8 char variant, on Tru64/VMS we will
-   explicitly make [U]INTPTR_T a 4 byte creature.
-*/
+ * or generic parameters.  For all platforms except Tru64/VMS (alpha platforms), the [U]INTPTR_T types will be
+ * equivalenced to [u]intptr_t.  But since this type is used for alignment and other checking, and since Tru64/VMS
+ * (implemented as a 32 bit platform) unconditionally sets this type to its 8 char variant, on Tru64/VMS we will
+ * explicitly make [U]INTPTR_T a 4 byte creature.
+ */
 #if !defined(__alpha)
 typedef intptr_t INTPTR_T;
 typedef uintptr_t UINTPTR_T;
@@ -223,20 +214,6 @@ typedef UINTPTR_T uintszofptr_t;
 #	define	IA64_DEBUG_ONLY(X)
 #endif/* __ia64 */
 
-#if defined(__ia64) || defined(__MVS__)
-#	define INTCAST(X) ((int)(X))
-#	define UINTCAST(X) ((uint4)(X))
-#	define STRLEN(X) ((int)(strlen(X)))
-#	define USTRLEN(X) ((unsigned int)(strlen(X)))
-#	define OFFSETOF(X,Y) ((int)(offsetof(X,Y)))
-#else
-#	define  INTCAST(X) X
-#	define  UINTCAST(X) X
-#	define 	STRLEN(X) strlen(X)
-#	define 	USTRLEN(X) strlen(X)
-#	define	OFFSETOF(X,Y) offsetof(X,Y)
-#endif
-
 /* macro to check that the OFFSET & SIZE of TYPE1.MEMBER1 is identical to that of TYPE2.MEMBER2 */
 #define	IS_OFFSET_AND_SIZE_MATCH(TYPE1, MEMBER1, TYPE2, MEMBER2)		\
 	(SIZEOF(((TYPE1 *)NULL)->MEMBER1) == SIZEOF(((TYPE2 *)NULL)->MEMBER2))	\
@@ -244,10 +221,6 @@ typedef UINTPTR_T uintszofptr_t;
 
 #define	IS_OFFSET_MATCH(TYPE1, MEMBER1, TYPE2, MEMBER2)	(OFFSETOF(TYPE1, MEMBER1) == OFFSETOF(TYPE2, MEMBER2))
 
-#define	ARRAYSIZE(arr)	SIZEOF(arr)/SIZEOF(arr[0])	/* # of elements defined in the array */
-#define	ARRAYTOP(arr)	(&arr[0] + ARRAYSIZE(arr))	/* address of the TOP of the array (first byte AFTER array limits).
-							 * use &arr[0] + size instead of &arr[size] to avoid compiler warning.
-							 */
 #ifdef __x86_64__
 #define X86_64_ONLY(x)		x
 #define NON_X86_64_ONLY(x)
@@ -384,15 +357,6 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define MV_BIAS_PWR	 3
 
 #define NR_REG		16
-#ifndef TRUE
-#	define TRUE		 1
-#endif
-#ifndef FALSE
-#	define FALSE		 0
-#endif
-#ifndef NULL
-#	define NULL		((void *) 0)
-#endif
 #define NUL		 0x00
 #define SP		 0x20
 #define DEL		 0x7f
@@ -453,6 +417,7 @@ GBLREF	boolean_t		gtm_utf8_mode;
 unsigned char *n2s(mval *mv_ptr);
 char *s2n(mval *u);
 mval *underr (mval *start, ...);
+mval *underr_strict(mval *start, ...);
 
 #ifdef DEBUG
 #	define	DBG_ASSERT(X)	assert(X),
@@ -563,11 +528,6 @@ mval *underr (mval *start, ...);
 #define DISK_BLOCK_SIZE		512
 #define LOG2_DISK_BLOCK_SIZE	9
 
-#define DIVIDE_ROUND_UP(VALUE, MODULUS)		(((VALUE) + ((MODULUS) - 1)) / (MODULUS))
-#define DIVIDE_ROUND_DOWN(VALUE, MODULUS)	((VALUE) / (MODULUS))
-#define ROUND_UP(VALUE, MODULUS)		(DIVIDE_ROUND_UP(VALUE, MODULUS) * (MODULUS))
-#define ROUND_DOWN(VALUE, MODULUS)		(DIVIDE_ROUND_DOWN(VALUE, MODULUS) * (MODULUS))
-
 #ifdef DEBUG
 #  define CHECKPOT(MODULUS)			((MODULUS) & ((MODULUS) - 1)) ? GTMASSERT, 0 :
 #  define BREAK_IN_PRO__CONTINUE_IN_DBG		continue
@@ -643,63 +603,11 @@ int4 timeout2msec(int4 timeout);
 #define	RTS_ERROR_LITERAL(LITERAL)	LENGTH_AND_LITERAL(LITERAL)
 #define	RTS_ERROR_STRING(STRING)	LENGTH_AND_STRING(STRING)
 
-/* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
-#define	STR_LIT_LEN(LITERAL)		(SIZEOF(LITERAL) - 1)
-#define	LITERAL_AND_LENGTH(LITERAL)	(LITERAL), (SIZEOF(LITERAL) - 1)
-#define	LENGTH_AND_LITERAL(LITERAL)	(SIZEOF(LITERAL) - 1), (LITERAL)
-#define	STRING_AND_LENGTH(STRING)	(STRING), (STRLEN((char *)(STRING)))
-#define	LENGTH_AND_STRING(STRING)	(strlen((char *)(STRING))), (STRING)
-
-#define	LEN_AND_LIT(LITERAL)		LENGTH_AND_LITERAL(LITERAL)
-#define	LIT_AND_LEN(LITERAL)		LITERAL_AND_LENGTH(LITERAL)
-#define	STR_AND_LEN(STRING)		STRING_AND_LENGTH(STRING)
-#define	LEN_AND_STR(STRING)		LENGTH_AND_STRING(STRING)
-
-#define	MEMCMP_LIT(SOURCE, LITERAL)	memcmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)
-#define MEMCPY_LIT(TARGET, LITERAL)	memcpy(TARGET, LITERAL, SIZEOF(LITERAL) - 1)
-
 #define	SET_PROCESS_EXITING_TRUE				\
 {								\
 	GBLREF	int		process_exiting;		\
 								\
 	process_exiting = TRUE;					\
-}
-
-/* Macro to copy a source string to a malloced area that is set to the destination pointer.
- * Since it is possible that DST might have multiple pointer dereferences in its usage, we
- * use a local pointer variable and finally assign it to DST thereby avoiding duplication of
- * those pointer dereferences (one for the malloc and one for the strcpy).
- * There are two macros depending on whether a string or literal is passed.
- */
-#define	MALLOC_CPY_STR(DST, SRC)		\
-{						\
-	char	*mcs_ptr;			\
-	int	mcs_len;			\
-						\
-	mcs_len = STRLEN(SRC) + 1;		\
-	mcs_ptr = malloc(mcs_len);		\
-	memcpy(mcs_ptr, SRC, mcs_len);		\
-	DST = mcs_ptr;				\
-}
-
-#define	MALLOC_CPY_LIT(DST, SRC)		\
-{						\
-	char	*mcs_ptr;			\
-	int	mcs_len;			\
-						\
-	mcs_len = SIZEOF(SRC);			\
-	mcs_ptr = malloc(mcs_len);		\
-	memcpy(mcs_ptr, SRC, mcs_len);		\
-	DST = mcs_ptr;				\
-}
-
-#define MALLOC_INIT(DST, SIZ)			\
-{						\
-	void	*lcl_ptr;			\
-						\
-	lcl_ptr = malloc(SIZ);			\
-	memset(lcl_ptr, 0, SIZ);		\
-	DST = lcl_ptr;				\
 }
 
 /* *********************************************************************************************************** */
@@ -1316,11 +1224,11 @@ typedef INTPTR_T  ptroff_t;
 #  define CACHELINE_PAD_COND(fieldSize, fillnum)
 #endif
 
-#define MEMCP(dst,src,start,count,limit){ \
-	if (start+count > limit) \
+#define MEMCP(dst,src,start,count,limit){ 		\
+	if (start+count > limit) 			\
 		rts_error(VARLSTCNT(1) ERR_CPBEYALLOC); \
-	else	\
-		memcpy(dst+start,src,count); \
+	else						\
+		memcpy(dst+start,src,count); 		\
 }
 
 #ifndef USING_ICONV
@@ -1429,7 +1337,7 @@ int val_iscan(mval *v);
 void mcfree(void);
 int4 getprime(int4 n);
 void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...);
-void suspend(void);
+UNIX_ONLY(void suspend(int sig);)
 mval *push_mval(mval *arg1);
 void mval_lex(mval *v, mstr *output);
 
@@ -1872,7 +1780,7 @@ enum
 #if defined(DEBUG) && defined(UNIX)
 #define OPERATOR_LOG_MSG											\
 {														\
-	error_def(ERR_TEXT);											\
+	error_def(ERR_TEXT);	/* BYPASSOK */									\
 	if (gtm_white_box_test_case_enabled && (WBTEST_OPER_LOG_MSG == gtm_white_box_test_case_number))		\
 	{													\
 		send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Send message to operator log"));		\

@@ -54,6 +54,8 @@
 #include "alias.h"
 #include "gtmimagename.h"
 #include "srcline.h"
+#include "opcode.h"
+#include "glvn_pool.h"
 
 #ifndef STP_MOVE
 GBLDEF int	indr_stp_low_reclaim_passes = 0;
@@ -471,6 +473,8 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 	tp_var			*restore_ent;
 	boolean_t		non_mandatory_expansion, exp_gt_spc_needed, first_expansion_try;
 	routine_source		*rsptr;
+	glvn_pool_entry		*slot, *top;
+	int			i, n;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -577,6 +581,7 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 			mv_parse_tree_collect((mvar *)mlabtab);
 		MVAL_STPG_ADD(&(TREF(director_mval)));
 		MVAL_STPG_ADD(&(TREF(window_mval)));
+		MVAL_STPG_ADD(&(TREF(indirection_mval)));
 #		endif
 	} else
 	{
@@ -791,25 +796,6 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 #				endif
 					break;
 			}
-			if (NULL != sf->for_ctrl_stack)
-			{
-				mm = (mval **)sf->for_ctrl_stack->saved_for_indx;
-				for (mmtop = (mval **)((char *)mm + (MAX_FOR_STACK * SIZEOF(mval *))); ++mm < mmtop;)
-				{
-					if (NULL != *mm)
-					{
-						m = (mval *)((char *)mm + SIZEOF(mval)
-						    + SIZEOF(mname_entry) + SIZEOF(mident_fixed));
-						lv_subs = *(intszofptr_t *)m;
-						for (m = (mval *)((char *)m + SIZEOF(intszofptr_t) + SIZEOF(lv_val));
-							0 < --lv_subs; m++)
-						{
-							assert(MV_DEFINED(m));
-							MVAL_STPG_ADD(m);
-						}
-					}
-				}
-			}
 			assert(sf->temps_ptr);
 			if (sf->temps_ptr >= (unsigned char *)sf)
 				continue;
@@ -821,6 +807,12 @@ void stp_gcol(int space_asked)	/* BYPASSOK */
 				assert(!(sf->type & SFT_DM) || !MV_DEFINED(m));
 				MVAL_STPG_ADD(m);
 			}
+		}
+		if (NULL != TREF(glvn_pool_ptr))
+		{	/* Protect everything in the glvn pool. */
+			m = (TREF(glvn_pool_ptr))->mval_stack;
+			for (mtop = m + (TREF(glvn_pool_ptr))->mval_top; m < mtop; m++)
+				MVAL_STPG_ADD(m);
 		}
 		if (NULL != alias_retarg)
 		{	/* An alias return value is in-flight - process it */

@@ -112,6 +112,9 @@ GBLREF	boolean_t		dse_running;
 GBLREF	int			num_additional_processors;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	int			process_exiting;
+#ifdef DEBUG
+GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
+#endif
 
 LITREF  char                    gtm_release_name[];
 LITREF  int4                    gtm_release_name_len;
@@ -137,7 +140,7 @@ error_def(ERR_TEXT);
 error_def(ERR_WCBLOCKED);
 error_def(ERR_STACKOFLOW);
 
-void gds_rundown(void)
+int4 gds_rundown(void)
 {
 	boolean_t		cancelled_dbsync_timer, cancelled_timer, have_standalone_access, ipc_deleted;
 	boolean_t		is_cur_process_ss_initiator, remove_shm, vermismatch, we_are_last_user, we_are_last_writer, is_mm;
@@ -158,16 +161,13 @@ void gds_rundown(void)
 	jnl_buffer_ptr_t	jbp;
 	shm_snapshot_t		*ss_shm_ptr;
 	uint4			ss_pid, onln_rlbk_pid, holder_pid;
-	uint4			proc_factor; /* How many times the processor of processes do we need to activate bypass */
 	boolean_t		was_crit;
 	boolean_t		safe_mode; /* Do not flush or take down shared memory. */
-	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE, may_bypass_ftok;
+	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE, may_bypass_ftok, inst_is_frozen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	jnl_status = 0;
-	proc_factor = 20;
-	DEBUG_ONLY(proc_factor = 2);
 	reg = gv_cur_region;			/* Local copy */
 
 	/* early out for cluster regions
@@ -180,7 +180,7 @@ void gds_rundown(void)
 	 *	and should be done eventually.
 	 */
 	if (dba_cm == reg->dyn.addr->acc_meth)
-		return;
+		return EXIT_NRM;
 
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
@@ -190,9 +190,9 @@ void gds_rundown(void)
 	{
 		change_reg();
 		gvusr_rundown();
-		return;
+		return EXIT_NRM;
 	}
-	ESTABLISH(gds_rundown_ch);
+	ESTABLISH_RET(gds_rundown_ch, EXIT_ERR);
 	assert(reg->open);			/* if we failed to open, dbinit_ch should have taken care of proper clean up */
 	assert(!reg->opening);			/* see comment above */
 	switch(csd->acc_meth)
@@ -206,8 +206,7 @@ void gds_rundown(void)
 		case dba_usr:
 			assert(FALSE);
 		default:
-			REVERT;
-			return;
+			GTMASSERT;
 	}
 	assert(!csa->hold_onto_crit || (csa->now_crit && jgbl.onlnrlbk));
 	/* If we are online rollback, we should already be holding crit and should release it only at the end of this module. This
@@ -222,6 +221,7 @@ void gds_rundown(void)
 	cancelled_dbsync_timer = FALSE;
 	CANCEL_DB_TIMERS(reg, csa, cancelled_timer, cancelled_dbsync_timer);
 	we_are_last_user = FALSE;
+	inst_is_frozen = IS_REPL_INST_FROZEN && REPL_ALLOWED(csa->hdr);
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE, FALSE);
 	if (!was_crit)
@@ -258,9 +258,7 @@ void gds_rundown(void)
 				  RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get ftok_semval"), CALLFROM, errno);
 		}
 		/* If csa->timer was true, this process may flush buffers, so it must follow regular protocol.*/
-		may_bypass_ftok = ((IS_GTM_IMAGE && csd->mumps_can_bypass) && !cancelled_timer
-				   && (proc_factor * (num_additional_processors + 1) < ftok_semval))
-				   || ((2 < ftok_semval) && (IS_LKE_IMAGE || IS_DSE_IMAGE)); /* Do we need a blocking wait? */
+		may_bypass_ftok = CAN_BYPASS(ftok_semval, cancelled_timer, inst_is_frozen); /* Do we need a blocking wait? */
 		/* We need to guarantee that no one else access database file header when semid/shmid fields are reset.
 		 * We already have created ftok semaphore in db_init or mu_rndwn_file and did not remove it.  So just
 		 * lock it.
@@ -269,7 +267,6 @@ void gds_rundown(void)
 		{
 			if (may_bypass_ftok)
 			{
-				assert(IS_GTM_IMAGE || IS_LKE_IMAGE || IS_DSE_IMAGE);
 				/* We did a non-blocking wait. It's ok to proceed without locking */
 				bypassed_ftok = TRUE;
 				holder_pid = semctl(udi->ftok_semid, 0, GETPID);
@@ -302,10 +299,7 @@ void gds_rundown(void)
 				rts_error(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 					  RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, errno);
 			/* If csa->timer was true, this process may flush buffers so it must follow regular protocol.*/
-			bypassed_access = ((IS_GTM_IMAGE && csd->mumps_can_bypass) && !cancelled_timer
-					   && (proc_factor * (num_additional_processors + 1) < semval))
-					   || ((2 < semval) && (IS_LKE_IMAGE || IS_DSE_IMAGE))
-					   || onln_rlbk_pid || csd->file_corrupt;
+			bypassed_access = CAN_BYPASS(semval, cancelled_timer, inst_is_frozen) || onln_rlbk_pid || csd->file_corrupt;
 			/* Before attempting again in the blocking mode, see if the holding process is an online rollback.
 			 * If so, it is likely we won't get the access control semaphore anytime soon. In that case, we
 			 * are better off skipping rundown and continuing with sanity cleanup and exit.
@@ -321,7 +315,8 @@ void gds_rundown(void)
 					send_msg(VARLSTCNT(5) MAKE_MSG_INFO(ERR_CRITSEMFAIL), 2, DB_LEN_STR(reg), ERR_RNDWNSEMFAIL);
 					REVERT;
 					ENABLE_INTERRUPTS(INTRPT_IN_GDS_RUNDOWN);
-					return;			/* Already in rundown for this region */
+					assert(FALSE);
+					return EXIT_ERR;
 				}
 				if (EAGAIN != save_errno)
 				{
@@ -337,7 +332,6 @@ void gds_rundown(void)
 						  RTS_ERROR_TEXT("gds_rundown SEMOP on access control semaphore"), CALLFROM, errno);
 			} else if (!IS_GTM_IMAGE)
 			{
-				assert(IS_LKE_IMAGE || IS_DSE_IMAGE || (IS_MUPIP_IMAGE && (onln_rlbk_pid || csd->file_corrupt)));
 				send_msg(VARLSTCNT(12) ERR_RESRCINTRLCKBYPAS, 10, LEN_AND_STR(gtmImageNames[image_type].imageName),
 					 process_id, LEN_AND_LIT("access control"), REG_LEN_STR(reg), DB_LEN_STR(reg), holder_pid);
 				send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Access control bypassed at rundown"));
@@ -352,7 +346,7 @@ void gds_rundown(void)
 	 * Also, if the replication instance is frozen and this db has replication turned on (which means
 	 * no flushes of dirty buffers to this db can happen while the instance is frozen) activate safe mode.
 	 */
-	safe_mode = (bypassed_access || bypassed_ftok || (IS_REPL_INST_FROZEN && REPL_ALLOWED(csa->hdr)));
+	safe_mode = bypassed_access || bypassed_ftok || inst_is_frozen;
 	/* At this point we are guaranteed no one else is doing a db_init/rundown as we hold the access control semaphore */
 	assert(csa->ref_cnt);	/* decrement private ref_cnt before shared ref_cnt decrement. */
 	csa->ref_cnt--;		/* Currently journaling logic in gds_rundown() in VMS relies on this order to detect last writer */
@@ -372,7 +366,8 @@ void gds_rundown(void)
 			  CALLFROM, save_errno);
 	} else
 		we_are_last_user =  (1 == shm_buf.shm_nattch) && !vermismatch && !safe_mode;
-	assert(!have_standalone_access || we_are_last_user || jgbl.onlnrlbk); /* recover => one user except ONLINE ROLLBACK */
+	/* recover => one user except ONLINE ROLLBACK, or standalone with frozen instance */
+	assert(!have_standalone_access || we_are_last_user || jgbl.onlnrlbk || inst_is_frozen);
 	if (-1 == (semval = semctl(udi->semid, 1, GETVAL)))
 		rts_error(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 			  RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, errno);
@@ -381,8 +376,9 @@ void gds_rundown(void)
 	we_are_last_writer = (1 == semval) && (FALSE == reg->read_only) && !vermismatch && !safe_mode;
 	assert(!we_are_last_writer || !safe_mode);
 	assert(!we_are_last_user || !safe_mode);
-	assert(!(have_standalone_access && !reg->read_only) || we_are_last_writer
-			|| jgbl.onlnrlbk); /* recover + R/W region => one writer except ONLINE ROLLBACK */
+	/* recover + R/W region => one writer except ONLINE ROLLBACK, or standalone with frozen instance, leading to safe_mode */
+	assert(!(have_standalone_access && !reg->read_only) || we_are_last_writer || jgbl.onlnrlbk
+	       || inst_is_frozen);
 	GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_JNLCLOSE, we_are_last_writer, 1); /* Assume we are the last writer to invoke wcs_flu */
 	if (!have_standalone_access && (-1 == (ftok_semval = semctl(udi->ftok_semid, 1, GETVAL))))
 		rts_error(VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
@@ -729,8 +725,8 @@ void gds_rundown(void)
 		}
 	} else
 	{
-		assert(!have_standalone_access || jgbl.onlnrlbk);
-		if (!jgbl.onlnrlbk)
+		assert(!have_standalone_access || jgbl.onlnrlbk || safe_mode);
+		if (!jgbl.onlnrlbk && !have_standalone_access)
 		{ 	/* If we were writing, get rid of our writer access count semaphore */
 			if (!reg->read_only)
 				if (0 != (save_errno = do_semop(udi->semid, 1, -1, SEM_UNDO)))
@@ -782,6 +778,7 @@ void gds_rundown(void)
 		}
 	}
 	REVERT;
+	return EXIT_NRM;
 }
 
 CONDITION_HANDLER(gds_rundown_ch)
@@ -835,5 +832,6 @@ CONDITION_HANDLER(gds_rundown_ch)
 	REMOVE_CSA_FROM_CSADDRSLIST(csa); /* remove "csa" from list of open regions (cs_addrs_list) */
 	PRN_ERROR;
 	gtm_putmsg(VARLSTCNT(4) ERR_DBRNDWN, 2, REG_LEN_STR(gv_cur_region));
+	DEBUG_ONLY(ok_to_UNWIND_in_exit_handling = TRUE;)
 	UNWIND(NULL, NULL);
 }

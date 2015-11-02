@@ -43,13 +43,16 @@ boolean_t t_recycled2free(srch_blk_status *blkhist)
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	assert(cw_set_depth < CDB_CW_SET_SIZE);
+	assert(dba_bg == csa->hdr->acc_meth);
 	cse = &cw_set[cw_set_depth];
 	cse->mode = gds_t_recycled2free;
 	cse->blk = blkhist->blk_num;
 	cse->old_block = blkhist->buffaddr;
 	old_block = (blk_hdr_ptr_t)cse->old_block;
 	/* t_recycled2free operates on RECYCLED blocks and hence cse->blk_prior_state's free_status is set to FALSE */
-	SET_NFREE(cse);
+	BIT_CLEAR_FREE(cse->blk_prior_state);
+	BIT_SET_RECYCLED(cse->blk_prior_state); /* set recycled bit as this is relied upon to write to snapshot file */
+	cse->level = old_block->levl; /* maintain level information so only level>0 will be written to snapshot file */
 	cse->cr = blkhist->cr;
 	cse->cycle = blkhist->cycle;
 	cse->blk_checksum = 0;
@@ -68,6 +71,7 @@ boolean_t t_recycled2free(srch_blk_status *blkhist)
 	cse->upd_addr = NULL;
 	cse->jnl_freeaddr = 0;      /* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->done = FALSE;
+	cse->new_buff = NULL;
 	blkhist->cse = cse;
 	cw_set_depth++;
 	return TRUE;

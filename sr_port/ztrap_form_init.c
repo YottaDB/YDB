@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,14 +25,17 @@
 
 GBLREF	int	ztrap_form;
 
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_TRNLOGFAIL);
+
+/* Initialize ztrap_form appropriately. Note this routine is not resident in gtm_env_init() because it raises errors
+ * and error handling is not set up yet in gtm_env_init().
+ */
 void ztrap_form_init(void)
 {
 	int4		status;
 	mstr		val, tn;
 	char		buf[1024], *buf_ptr = &buf[0];
-
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_TRNLOGFAIL);
 
 	ztrap_form = ZTRAP_CODE;	/* default */
 	val.addr = ZTRAP_FORM;

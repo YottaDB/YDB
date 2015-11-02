@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,14 +81,17 @@ GBLREF	FILE			*gtmsource_log_fp;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	uint4			process_id;
 
+LITREF char *jnl_file_state_lit[];
+
 error_def(ERR_JNLBADRECFMT);
 error_def(ERR_JNLEMPTY);
-error_def(ERR_JNLFILOPN);
+error_def(ERR_JNLFILRDOPN);
 error_def(ERR_JNLRECINCMPL);
 error_def(ERR_NOPREVLINK);
 error_def(ERR_REPLBRKNTRANS);
 error_def(ERR_REPLCOMM);
 error_def(ERR_REPLFILIOERR);
+error_def(ERR_SEQNUMSEARCHTIMEOUT);
 error_def(ERR_TEXT);
 
 static	int4			num_tcom = -1;
@@ -199,16 +202,18 @@ static	int repl_next(repl_buff_t *rb)
 	uint4			maxreclen;
 	int			status, sav_buffremaining;
 	char			err_string[BUFSIZ];
-	GTMCRYPT_ONLY(
-		int				crypt_status;
-		enum jnl_record_type		rectype;
-		jnl_record			*rec;
-		jnl_string			*keystr;
-	)
+	repl_ctl_element	*backctl;
+#	ifdef GTM_CRYPT
+	int			gtmcrypt_errno;
+	enum jnl_record_type	rectype;
+	jnl_record		*rec;
+	jnl_string		*keystr;
+#	endif
 
 	b = &rb->buff[rb->buffindex];
 	b->recbuff += b->reclen; /* The next record */
 	b->recaddr += b->reclen;
+	backctl = rb->backctl;
 	if (b->recaddr == b->readaddr && b->buffremaining == 0)
 	{
 		/* Everything in this buffer processed */
@@ -217,7 +222,7 @@ static	int repl_next(repl_buff_t *rb)
 		b->buffremaining = REPL_BLKSIZE(rb);
 	}
 	if (b->recaddr == b->readaddr || b->reclen == 0 ||
-		(rb->backctl->eof_addr_final && (b->readaddr != REAL_END_OF_DATA(rb->fc)) && b->buffremaining))
+		(backctl->eof_addr_final && (b->readaddr != REAL_END_OF_DATA(rb->fc)) && b->buffremaining))
 	{
 		sav_buffremaining = b->buffremaining;
 		if ((status = repl_read_file(rb)) == SS_NORMAL)
@@ -240,7 +245,7 @@ static	int repl_next(repl_buff_t *rb)
 				MEMCPY_LIT(err_string, READ_ERR_STR);
 			else
 				MEMCPY_LIT(err_string, UNKNOWN_ERR_STR);
-			rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, rb->backctl->jnl_fn_len, rb->backctl->jnl_fn,
+			rts_error(VARLSTCNT(9) ERR_REPLFILIOERR, 2, backctl->jnl_fn_len, backctl->jnl_fn,
 			  	  ERR_TEXT, 2, LEN_AND_STR(err_string), status);
 		}
 	}
@@ -261,10 +266,9 @@ static	int repl_next(repl_buff_t *rb)
 				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
 				/* Assert that ZTWORMHOLE type record too has same layout as KILL/SET */
 				assert((sm_uc_ptr_t)keystr == (sm_uc_ptr_t)&rec->jrec_ztworm.ztworm_str);
-				DECODE_SET_KILL_ZKILL_ZTRIG(keystr, rec->prefix.forwptr, rb->backctl->encr_key_handle,
-							    crypt_status);
-				if (0 != crypt_status)
-					GC_RTS_ERROR(crypt_status, rb->backctl->jnl_fn);
+				MUR_DECRYPT_LOGICAL_RECS(keystr, rec->prefix.forwptr, backctl->encr_key_handle, gtmcrypt_errno);
+				if (0 != gtmcrypt_errno)
+					GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, backctl->jnl_fn_len, backctl->jnl_fn);
 			}
 		}
 #		endif
@@ -1294,7 +1298,10 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 	unsigned char		*seq_num_ptr, seq_num_str[32]; /* INT8_PRINT */
 	repl_ctl_element	*ctl;
 	int			wait_for_jnlopen_log_num = -1;
+	sgmnt_addrs		*csa;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	trans_read = FALSE;
 	num_tcom = -1;
 	tot_tcom_len = 0;
@@ -1310,25 +1317,38 @@ static	int read_and_merge(unsigned char *buff, int maxbufflen, seq_num read_jnl_
 		ctl->read_complete = FALSE;
 	for (pass = 1; !trans_read; pass++)
 	{
-		if (pass > 1)
+		if (1 < pass)
 		{
 			gtmsource_poll_actions(TRUE);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_JNLOPEN);
-			if ((total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN) % LOG_WAIT_FOR_JNLOPEN_PERIOD == 0)
+			if (0 == ((total_wait_for_jnlopen += GTMSOURCE_WAIT_FOR_JNLOPEN) % LOG_WAIT_FOR_JNLOPEN_PERIOD))
 			{
-			    if(++wait_for_jnlopen_log_num < LOG_WAIT_FOR_JNLOPEN_TIMES)
+			    if (LOG_WAIT_FOR_JNLOPEN_TIMES > ++wait_for_jnlopen_log_num)
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL_WARN : Source server waited %dms for journal file(s) "
 					 "to be opened, or updated while attempting to read seqno %llu [0x%llx]. Check for "
 					 "problems with journaling\n", total_wait_for_jnlopen, read_jnl_seqno, read_jnl_seqno);
-			    else if (wait_for_jnlopen_log_num == LOG_WAIT_FOR_JNLOPEN_TIMES)
+			    else
 			    {
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "Timeout waiting for journal files to be opened."
-					 " Check log file for file details. Source server exits. \n");
-				for (ctl = repl_ctl_list->next; ctl != NULL; ctl = ctl->next)
-					if (ctl->file_state == JNL_FILE_CLOSED)
-						gtm_putmsg(VARLSTCNT(6) ERR_JNLFILOPN, 4, ctl->jnl_fn_len,
-							   ctl->jnl_fn, DB_LEN_STR(ctl->reg));
-				exit(ERR_JNLFILOPN);
+				for (ctl = repl_ctl_list->next; NULL != ctl; ctl = ctl->next)
+				{
+					repl_log(gtmsource_log_fp, FALSE, FALSE, "DGB_INFO: Journal File: %s for Database File: %s;"
+						 " State: %s.", ctl->jnl_fn, ctl->reg->dyn.addr->fname,
+								  jnl_file_state_lit[ctl->file_state]);
+					if (JNL_FILE_OPEN == ctl->file_state)
+					{
+						csa = &FILE_INFO(ctl->reg)->s_addrs;
+						repl_log(gtmsource_log_fp, FALSE, FALSE, " "
+							"ctl->seqno = %llu [0x%llx]. [dskaddr = 0x%x,freeaddr = 0x%x]. "
+							"ctl->read_complete = %d\n",
+							ctl->seqno, ctl->seqno, csa->jnl->jnl_buff->dskaddr,
+							csa->jnl->jnl_buff->freeaddr, ctl->read_complete);
+					} else
+						repl_log(gtmsource_log_fp, FALSE, TRUE, "\n");
+				}
+				if (TREF(gtm_environment_init)
+					DEBUG_ONLY(&& (WBTEST_CLOSE_JNLFILE != gtm_white_box_test_case_number)))
+						gtm_fork_n_core();
+				rts_error(VARLSTCNT(4) ERR_SEQNUMSEARCHTIMEOUT, 2, &read_jnl_seqno, &read_jnl_seqno);
 			    }
 			}
 		}

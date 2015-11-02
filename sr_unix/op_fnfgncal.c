@@ -118,67 +118,68 @@ error_def(ERR_ZCVECTORINDX);
 
 STATICDEF int			call_table_initialized = 0;
 
-STATICFNDCL void extarg2mval(void *src, enum xc_types typ, mval *dst);
-STATICFNDCL int extarg_getsize(void *src, enum xc_types typ, mval *dst);
+STATICFNDCL void extarg2mval(void *src, enum gtm_types typ, mval *dst);
+STATICFNDCL int extarg_getsize(void *src, enum gtm_types typ, mval *dst);
 
-/* routine to convert external return values to mval's */
-STATICFNDEF void extarg2mval(void *src, enum xc_types typ, mval *dst)
+/* Routine to convert external return values to mval's */
+STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst)
 {
-	xc_long_t		str_len;
-	xc_int_t		s_int_num;
-	xc_uint_t		uns_int_num;
-	xc_long_t		s_long_num;
-	xc_ulong_t		uns_long_num;
+	gtm_long_t		str_len;
+	gtm_int_t		s_int_num;
+	gtm_uint_t		uns_int_num;
+	gtm_long_t		s_long_num;
+	gtm_ulong_t		uns_long_num;
 	char			*cp;
 	struct extcall_string	*sp;
 
 	switch(typ)
 	{
-		case xc_notfound:
+		case gtm_notfound:
 			break;
-		case xc_void:
+		case gtm_void:
 			break;
-		case xc_status:
+		case gtm_status:
 			/* Note: reason for double cast is to first turn ptr to same sized int, then big int to little int
-			   (on 64 bit platforms). This avoids a warning msg with newer 64 bit gcc compilers */
-			s_int_num = (xc_int_t)(intszofptr_t)src;
+			 * (on 64 bit platforms). This avoids a warning msg with newer 64 bit gcc compilers.
+			 */
+			s_int_num = (gtm_int_t)(intszofptr_t)src;
 			if (0 != s_int_num)
 				dec_err(VARLSTCNT(1) ERR_ZCSTATUSRET, 0, s_int_num);
 			MV_FORCE_MVAL(dst, s_int_num);
 			break;
-		case xc_int:
-			s_int_num = (xc_int_t)(intszofptr_t)src;
+		case gtm_int:
+			s_int_num = (gtm_int_t)(intszofptr_t)src;
 			MV_FORCE_MVAL(dst, s_int_num);
 			break;
-		case xc_uint:
-			uns_int_num = (xc_uint_t)(intszofptr_t)src;
+		case gtm_uint:
+			uns_int_num = (gtm_uint_t)(intszofptr_t)src;
 			MV_FORCE_UMVAL(dst, uns_int_num);
 			break;
-		case xc_int_star:
-			s_int_num = *((xc_int_t *)src);
+		case gtm_int_star:
+			s_int_num = *((gtm_int_t *)src);
 			MV_FORCE_MVAL(dst, s_int_num);
 			break;
-		case xc_uint_star:
-			uns_int_num = *((xc_uint_t *)src);
+		case gtm_uint_star:
+			uns_int_num = *((gtm_uint_t *)src);
 			MV_FORCE_UMVAL(dst, uns_int_num);
 			break;
-		case xc_long:
-			s_long_num = (xc_long_t)src;
+		case gtm_long:
+			s_long_num = (gtm_long_t)src;
 			MV_FORCE_LMVAL(dst, s_long_num);
 			break;
-		case xc_ulong:
-			uns_long_num = (xc_ulong_t)src;
+		case gtm_ulong:
+			uns_long_num = (gtm_ulong_t)src;
 			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
-		case xc_long_star:
-			s_long_num = *((xc_long_t *)src);
+		case gtm_long_star:
+			s_long_num = *((gtm_long_t *)src);
 			MV_FORCE_LMVAL(dst, s_long_num);
 			break;
-		case xc_ulong_star:
-			uns_long_num = *((xc_ulong_t *)src);
+		case gtm_ulong_star:
+			uns_long_num = *((gtm_ulong_t *)src);
 			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
-		case xc_string_star:
+		case gtm_string_star:
 			sp = (struct extcall_string *)src;
 			dst->mvtype = MV_STR;
 			if (sp->len > MAX_STRLEN)
@@ -190,10 +191,10 @@ STATICFNDEF void extarg2mval(void *src, enum xc_types typ, mval *dst)
 				s2pool(&dst->str);
 			}
 			break;
-		case xc_float_star:
+		case gtm_float_star:
 			double2mval(dst, (double)*((float *)src));
 			break;
-		case xc_char_star:
+		case gtm_char_star:
 			cp = (char *)src;
 			assert(((INTPTR_T)cp < (INTPTR_T)stringpool.base) || ((INTPTR_T)cp > (INTPTR_T)stringpool.top));
 			dst->mvtype = MV_STR;
@@ -204,13 +205,13 @@ STATICFNDEF void extarg2mval(void *src, enum xc_types typ, mval *dst)
 			dst->str.addr = cp;
 			s2pool(&dst->str);
 			break;
-		case xc_char_starstar:
+		case gtm_char_starstar:
 			if (!src)
 				dst->mvtype = 0;
 			else
-				extarg2mval(*((char **)src), xc_char_star, dst);
+				extarg2mval(*((char **)src), gtm_char_star, dst);
 			break;
-		case xc_double_star:
+		case gtm_double_star:
 			double2mval(dst, *((double *)src));
 			break;
 		default:
@@ -220,8 +221,8 @@ STATICFNDEF void extarg2mval(void *src, enum xc_types typ, mval *dst)
 	return;
 }
 
-/* subroutine to calculate stringpool requirements for an external argument */
-STATICFNDEF int extarg_getsize(void *src, enum xc_types typ, mval *dst)
+/* Subroutine to calculate stringpool requirements for an external argument */
+STATICFNDEF int extarg_getsize(void *src, enum gtm_types typ, mval *dst)
 {
 	int4			n;
 	char			*cp, **cpp;
@@ -231,39 +232,39 @@ STATICFNDEF int extarg_getsize(void *src, enum xc_types typ, mval *dst)
 		return 0;
 	switch(typ)
 	{
-		/* the following group of cases either return nothing or use the numeric part of the mval */
-		case xc_notfound:
-		case xc_void:
-		case xc_double_star:
-		case xc_status:
-		case xc_int:
-		case xc_uint:
-		case xc_long:
-		case xc_ulong:
-		case xc_float_star:
-		case xc_int_star:
-		case xc_uint_star:
-		case xc_long_star:
-		case xc_ulong_star:
+		/* The following group of cases either return nothing or use the numeric part of the mval */
+		case gtm_notfound:
+		case gtm_void:
+		case gtm_double_star:
+		case gtm_status:
+		case gtm_int:
+		case gtm_uint:
+		case gtm_long:
+		case gtm_ulong:
+		case gtm_float_star:
+		case gtm_int_star:
+		case gtm_uint_star:
+		case gtm_long_star:
+		case gtm_ulong_star:
 			return 0;
-		case xc_char_starstar:
+		case gtm_char_starstar:
 			cpp = (char **)src;
 			if (*cpp)
 				return STRLEN(*cpp);
 			else
 				return 0;
-		case xc_char_star:
+		case gtm_char_star:
 			cp = (char *)src;
 			return STRLEN(cp);
-		case xc_string_star:
+		case gtm_string_star:
 			sp = (struct extcall_string *)src;
 			if ((0 < sp->len)
 			    && ((INTPTR_T)sp->addr < (INTPTR_T)stringpool.free)
 			    && ((INTPTR_T)sp->addr >= (INTPTR_T)stringpool.base))
-			{	/* the stuff is already in the stringpool */
+			{	/* The stuff is already in the stringpool */
 				assert(dst->str.addr == sp->addr);
 				dst->str.addr = sp->addr;
-				sp->addr = NULL;	/* prevent subsequent s2pool */
+				sp->addr = NULL;	/* Prevent subsequent s2pool */
 				return 0;
 			} else  if (NULL == sp->addr)
 				sp->len = 0;
@@ -284,7 +285,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	int4 		callintogtm_vectorindex;
 	mval		*arg, *v;
 	int4		n;
-	xc_long_t	*free_space_pointer;
+	gtm_long_t	*free_space_pointer;
 	uint4		m1;
 	INTPTR_T	status;
 	char		*cp, *free_string_pointer, *free_string_pointer_start;
@@ -299,12 +300,12 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 
 	SETUP_THREADGBL_ACCESS;
 	assert(n_mvals == argcnt + 5);
-	assert(MV_IS_STRING(package));	/* package and routine are literal strings */
+	assert(MV_IS_STRING(package));	/* Package and routine are literal strings */
 	assert(MV_IS_STRING(extref));
 	if (MAX_ACTUALS < argcnt)
 		rts_error(VARLSTCNT(1) ERR_ZCMAXPARAM);
-	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state); /* interrupts should be enabled for external calls */
-	/* find package */
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state); /* Interrupts should be enabled for external calls */
+	/* Find package */
 	for (package_ptr = TREF(extcall_package_root); package_ptr; package_ptr = package_ptr->next_package)
 	{
 		MSTR_CMP(package_ptr->package_name, package->str, rslt);
@@ -334,34 +335,33 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 		call_table_initialized = TRUE;
 		init_callin_functable();
 	}
-	/* entry not found */
+	/* Entry not found */
 	if ((NULL == entry_ptr) || (NULL == entry_ptr->fcn))
 		rts_error(VARLSTCNT(4) ERR_ZCRTENOTF, 2, extref->str.len, extref->str.addr);
 	/* It is an error to have more actual parameters than formal parameters */
 	if (argcnt > entry_ptr->argcnt)
 		rts_error(VARLSTCNT(4) ERR_ZCARGMSMTCH, 2, argcnt, entry_ptr->argcnt);
 	VAR_START(var, argcnt);
-	/* compute size of parameter block */
+	/* Compute size of parameter block */
 	n = entry_ptr->parmblk_size;	/* This is enough for the parameters and the fixed length entries */
 	/* Now, add enough for the char *'s and the char **'s and string *'s */
 	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
-		/* if it is an input value of char* or char **, add the length */
-		/* also a good time to force it into string form */
+		/* If it is an input value of char* or char **, add the length. Also a good time to force it into string form */
 		switch(entry_ptr->parms[i])
 		{
-			case xc_char_star:
+			case gtm_char_star:
 				n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
 				/* Caution fall through */
-			case xc_char_starstar:
+			case gtm_char_starstar:
 				if (m1 & 1)
 				{
 					MV_FORCE_STR(v);
 					n += v->str.len + 1;
 				}
 				break;
-			case xc_string_star:
+			case gtm_string_star:
 				if (m1 & 1)
 				{
 					MV_FORCE_STR(v);
@@ -369,7 +369,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				} else
 					n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
 				break;
-			case xc_double_star:
+			case gtm_double_star:
 				n += SIZEOF(double);
 				if (m1 & 1)
 					MV_FORCE_DEFINED(v);
@@ -383,45 +383,45 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	va_end(var);
         /* Double the size, to take care of any alignments in the middle  */
 	param_list = (gparam_list *)malloc(n * 2);
-	free_space_pointer = (xc_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
+	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
-	/* load-up the parameter list */
+	/* Load-up the parameter list */
 	VAR_START(var, argcnt);
 	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		/* Note that even in this second pass at these mvals, we need to do the MV_FORCE processing because
-		   in a NOUNDEF environment, undefiend mvals were NOT modified in the first pass and thus reamin undefined
-		   in this pass.
-		*/
-		if (xc_char_star != entry_ptr->parms[i] && (m1 & 1))
+		 * in a NOUNDEF environment, undefiend mvals were NOT modified in the first pass and thus reamin undefined
+		 * in this pass.
+		 */
+		if (gtm_char_star != entry_ptr->parms[i] && (m1 & 1))
 			MV_FORCE_DEFINED(v);	/* Redefine undef'd mvals */
 		/* Verify that all input values are defined */
 		pre_alloc_size = entry_ptr->param_pre_alloc_size[i];
 		switch(entry_ptr->parms[i])
 		{	/* Note the int/long types are handled separately here in anticipation of correct handling
-			   of "long" types on 64 bit hardware in the future. For the time being however, they are
-			   using the same mval2i interface routine so are both restricted to 32 bits.
-			*/
-			case xc_uint:
+			 * of "long" types on 64 bit hardware in the future. For the time being however, they are
+			 * using the same mval2i interface routine so are both restricted to 32 bits.
+			 */
+			case gtm_uint:
 				if (m1 & 1)
-					param_list->arg[i] = (void *)(xc_long_t)mval2ui(v);
-				/* Note: output xc_int and xc_uint is an error (only "star" flavor can be modified) */
+					param_list->arg[i] = (void *)(gtm_long_t)mval2ui(v);
+				/* Note: output gtm_int and gtm_uint is an error (only "star" flavor can be modified) */
 				break;
-			case xc_int:
+			case gtm_int:
 				if (m1 & 1)
-					param_list->arg[i] = (void *)(xc_long_t)mval2i(v);
+					param_list->arg[i] = (void *)(gtm_long_t)mval2i(v);
 				break;
-			case xc_ulong:
+			case gtm_ulong:
 				if (m1 & 1)
-					param_list->arg[i] = (void *)(xc_long_t)mval2ui(v);
-				/* Note: output xc_long and xc_ulong is an error as described above */
+					param_list->arg[i] = (void *)(gtm_long_t)mval2ui(v);
+				/* Note: output gtm_long and gtm_ulong is an error as described above */
 				break;
-			case xc_long:
+			case gtm_long:
 				if (m1 & 1)
-					param_list->arg[i] = (void *)(xc_ulong_t)mval2i(v);
+					param_list->arg[i] = (void *)(gtm_ulong_t)mval2i(v);
 				break;
-			case xc_char_star:
+			case gtm_char_star:
 				param_list->arg[i] = free_string_pointer;
 				if (m1 & 1)
 				{
@@ -434,7 +434,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				else /* Output and no pre-allocation specified */
 				{
 					if (0 == package->str.len)
-						/* default package - do not display package name */
+						/* Default package - do not display package name */
 						rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, RTS_ERROR_LITERAL("<DEFAULT>"),
 							  extref->str.len, extref->str.addr);
 					else
@@ -442,7 +442,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 							  package->str.addr, extref->str.len, extref->str.addr);
 				}
 				break;
-			case xc_char_starstar:
+			case gtm_char_starstar:
 				param_list->arg[i] = free_space_pointer;
 				if (m1 & 1)
 				{
@@ -455,29 +455,29 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 					*(char **)free_space_pointer = free_string_pointer++;
 				free_space_pointer++;
 				break;
-			case xc_int_star:
+			case gtm_int_star:
 				param_list->arg[i] = free_space_pointer;
-				*((xc_int_t *)free_space_pointer) = (m1 & 1) ? (xc_int_t)mval2i(v) : 0;
+				*((gtm_int_t *)free_space_pointer) = (m1 & 1) ? (gtm_int_t)mval2i(v) : 0;
 				free_space_pointer++;
 				break;
-			case xc_uint_star:
+			case gtm_uint_star:
 				param_list->arg[i] = free_space_pointer;
-				*((xc_uint_t *)free_space_pointer) = (m1 & 1) ? (xc_uint_t)mval2ui(v) : 0;
+				*((gtm_uint_t *)free_space_pointer) = (m1 & 1) ? (gtm_uint_t)mval2ui(v) : 0;
 				free_space_pointer++;
 				break;
-			case xc_long_star:
+			case gtm_long_star:
 				param_list->arg[i] = free_space_pointer;
-				*((xc_long_t *)free_space_pointer) = (m1 & 1) ? (xc_long_t)mval2i(v) : 0;
+				*((gtm_long_t *)free_space_pointer) = (m1 & 1) ? (gtm_long_t)mval2i(v) : 0;
 				free_space_pointer++;
 				break;
-			case xc_ulong_star:
+			case gtm_ulong_star:
 				param_list->arg[i] = free_space_pointer;
-				*((xc_ulong_t *)free_space_pointer) = (m1 & 1) ? (xc_ulong_t)mval2ui(v) : 0;
+				*((gtm_ulong_t *)free_space_pointer) = (m1 & 1) ? (gtm_ulong_t)mval2ui(v) : 0;
 				free_space_pointer++;
 				break;
-			case xc_string_star:
+			case gtm_string_star:
 				param_list->arg[i] = free_space_pointer;
-				*free_space_pointer++ = (xc_long_t)v->str.len;
+				*free_space_pointer++ = (gtm_long_t)v->str.len;
 				*(char **)free_space_pointer = (char *)free_string_pointer;
 				free_space_pointer++;
 				if (m1 & 1)
@@ -490,7 +490,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				else /* Output and no pre-allocation specified */
 				{
 					if (0 == package->str.len)
-						/* default package - do not display package name */
+						/* Default package - do not display package name */
 						rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i + 1,
 							  RTS_ERROR_LITERAL("<DEFAULT>"),
 							  extref->str.len, extref->str.addr);
@@ -500,23 +500,23 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 							  extref->str.len, extref->str.addr);
 				}
 				break;
-			case xc_float_star:
+			case gtm_float_star:
 				param_list->arg[i] = free_space_pointer;
 				*((float *)free_space_pointer) = (m1 & 1) ? (float)mval2double(v) : (float)0.0;
 				free_space_pointer++;
 				break;
-			case xc_double_star:
+			case gtm_double_star:
 				/* Only need to do this rounding on non-64 it platforms because this one type has a 64 bit
-				   alignment requirement on those platforms.
-				*/
-				NON_GTM64_ONLY(free_space_pointer = (xc_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),
+				 * alignment requirement on those platforms.
+				 */
+				NON_GTM64_ONLY(free_space_pointer = (gtm_long_t *)(ROUND_UP2(((INTPTR_T)free_space_pointer),
 											    SIZEOF(double))));
 				param_list->arg[i] = free_space_pointer;
 				*((double *)free_space_pointer) = (m1 & 1) ? (double)mval2double(v) : (double)0.0;
-				free_space_pointer = (xc_long_t *)((char *)free_space_pointer + SIZEOF(double));
+				free_space_pointer = (gtm_long_t *)((char *)free_space_pointer + SIZEOF(double));
 				break;
-			case xc_pointertofunc:
-				if (((callintogtm_vectorindex = (int4)mval2i(v)) >= xc_unknown_function)
+			case gtm_pointertofunc:
+				if (((callintogtm_vectorindex = (int4)mval2i(v)) >= gtmfunc_unknown_function)
 				    || (callintogtm_vectorindex < 0))
 				{
 					rts_error(VARLSTCNT(7) ERR_ZCVECTORINDX, 1, callintogtm_vectorindex, ERR_TEXT, 2,
@@ -525,9 +525,9 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				} else
 					param_list->arg[i] = (void *)callintogtm_vectortable[callintogtm_vectorindex];
 				break;
-			case xc_pointertofunc_star:
-				/* cannot pass in a function address to be modified by the user program */
-				free_space_pointer = (xc_long_t *)ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(INTPTR_T));
+			case gtm_pointertofunc_star:
+				/* Cannot pass in a function address to be modified by the user program */
+				free_space_pointer = (gtm_long_t *)ROUND_UP2(((INTPTR_T)free_space_pointer), SIZEOF(INTPTR_T));
 				param_list->arg[i] = free_space_pointer;
 				*((INTPTR_T *)free_space_pointer) = 0;
 				free_space_pointer++;
@@ -541,18 +541,18 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	assert((char *)free_space_pointer <= free_string_pointer_start);
 	va_end(var);
 	param_list->n = argcnt;
-	save_mumps_status = mumps_status; /* save mumps_status as a callin from external call may change it */
+	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	mumps_status = save_mumps_status;
 
 	/* Exit from the residual call-in environment(SFF_CI and base frames) which might
 	 * still exist on M stack when the externally called function in turn called
-	 * into an M routine */
+	 * into an M routine.
+	 */
 	if (frame_pointer->flags & SFF_CI)
 		ci_ret_code_quit();
-
 	/* NOTE: ADD RETURN STATUS CALCUATIONS HERE */
-	/* compute space requirement for return values */
+	/* Compute space requirement for return values */
 	n = 0;
 	VAR_START(var, argcnt);
 	for (i = 0, m1 = mask & entry_ptr->output_mask; i < argcnt; i++, m1 = m1 >> 1)
@@ -563,9 +563,9 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	}
 	va_end(var);
 	if (dst)
-		n += extarg_getsize((void *)&status, xc_status, dst);
+		n += extarg_getsize((void *)&status, gtm_status, dst);
 	ENSURE_STP_FREE_SPACE(n);
-	/* convert return values */
+	/* Convert return values */
 	VAR_START(var, argcnt);
 	for (i = 0, m1 = mask & entry_ptr->output_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
@@ -576,7 +576,7 @@ void op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	va_end(var);
 	if (dst)
 	{
-		if (entry_ptr->return_type != xc_void)
+		if (entry_ptr->return_type != gtm_void)
 			extarg2mval((void *)status, entry_ptr->return_type, dst);
 		else
 		{

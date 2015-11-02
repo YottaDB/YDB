@@ -59,6 +59,9 @@ typedef enum
 	INTRPT_IN_FFLUSH,		/* Deferring interrupts during fflush */
 	INTRPT_IN_SHMDT,		/* Deferring interrupts during SHMDT */
 	INTRPT_IN_WAIT_FOR_DISK_SPACE,	/* Deferring interrupts during wait_for_disk_space.c */
+	INTRPT_IN_WCS_WTSTART,		/* Deferring interrupts until cnl->intent_wtstart is decremented and dbsync timer is
+					 * started */
+	INTRPT_IN_REFORMAT_BUFFER_USE,	/* Deferring interrupts until buffer is reformatted */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum */
 } intrpt_state_t;
 

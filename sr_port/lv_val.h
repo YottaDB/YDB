@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -410,8 +410,6 @@ void	lv_var_clone(lv_val *clone_var, lv_val *base_lv);
 void	lvzwr_var(lv_val *lv, int4 n);
 
 void	op_clralsvars(lv_val *dst);
-void	op_forfreeindx(void);
-void	op_fornestlvl(uint4 level);
 void	op_fndata(lv_val *x, mval *y);
 void	op_fnzdata(lv_val *x, mval *y);
 void	op_fnincr(lv_val *local_var, mval *increment, mval *result);
@@ -433,8 +431,6 @@ void	op_zshow(mval *func, int type, lv_val *lvn);
 
 lv_val   *op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
 lv_val   *op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
-lv_val   *op_rfrshindx(uint4 level, boolean_t put);
-lv_val   *op_savputindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...);
 lv_val   *op_srchindx(UNIX_ONLY_COMMA(int argcnt_arg) lv_val *lv, ...);
 lv_val   *op_m_srchindx(UNIX_ONLY_COMMA(int4 count) lv_val *lvarg, ...);
 

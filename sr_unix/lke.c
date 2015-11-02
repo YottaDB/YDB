@@ -110,6 +110,7 @@ int main (int argc, char *argv[])
 	getjobname();
 	INVOKE_INIT_SECSHR_ADDRS;
 	getzdir();
+	gtm_chk_dist(argv[0]);
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
 	initialize_pattern_table();
@@ -119,7 +120,6 @@ int main (int argc, char *argv[])
 
 	cli_lex_setup(argc, argv);
 	/*      this should be after cli_lex_setup() due to S390 A/E conversion    */
-	gtm_chk_dist(argv[0]);
 	OPERATOR_LOG_MSG;
 	while (1)
 	{

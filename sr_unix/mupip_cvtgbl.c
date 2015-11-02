@@ -38,6 +38,7 @@ GBLREF	boolean_t	is_replicator;
 GBLREF	boolean_t	skip_dbtriggers;
 GBLREF	mstr		sys_input;
 
+error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_LOADEDBG);
 error_def(ERR_LOADBGSZ);
@@ -146,12 +147,5 @@ void mupip_cvtgbl(void)
 		}
 	} else
 		go_load(begin, end);
-
-	if (mupip_error_occurred)
-	{
-	        util_out_print("Error occurred during loading",TRUE);
-		exit(-1);
-	}
-	else
-		mupip_exit(SS_NORMAL);
+	mupip_exit(mupip_error_occurred ? ERR_MUNOFINISH : SS_NORMAL);
 }

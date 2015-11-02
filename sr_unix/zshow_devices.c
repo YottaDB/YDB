@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,13 +35,6 @@
 #include <_Ccsid.h>
 #endif
 
-LITREF mstr		chset_names[];
-LITREF nametabent	dev_param_names[];
-LITREF unsigned char	dev_param_index[];
-LITREF zshow_index	zshow_param_index[];
-
-static readonly char	space_text[] = {' '};
-
 #define ZS_ONE_OUT(V,TEXT) ((V)->str.len = 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
 #define ZS_STR_OUT(V,TEXT) ((V)->str.len = SIZEOF((TEXT)) - 1, (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
 #define ZS_VAR_STR_OUT(V,TEXT) ((V)->str.len = STRLEN((TEXT)), (V)->str.addr = (TEXT), zshow_output(output,&(V)->str))
@@ -54,6 +47,12 @@ static readonly char	space_text[] = {' '};
 			(V)->str.addr = (char *)dev_param_names[dev_param_index[zshow_param_index[(TEXT)].letter] + \
 			zshow_param_index[(TEXT)].offset ].name, zshow_output(output,&(V)->str), ZS_ONE_OUT((V),equal_text))
 
+static readonly char	space_text[] = {' '};
+
+LITREF mstr		chset_names[];
+LITREF nametabent	dev_param_names[];
+LITREF unsigned char	dev_param_index[];
+LITREF zshow_index	zshow_param_index[];
 GBLREF bool		ctrlc_on;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_pair		*io_std_device;

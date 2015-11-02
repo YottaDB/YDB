@@ -45,10 +45,12 @@ void	t_busy2free(srch_blk_status *blkhist)
 	cse->blk = blkhist->blk_num;
 	cse->old_block = blkhist->buffaddr;
 	old_block = (blk_hdr_ptr_t)cse->old_block;
-	/* t_busy2free operates on BUSY blocks and hence cse->blk_prior_state's free status is set to FALSE unconditionally */
-	SET_NFREE(cse);
+	/* t_busy2free operates on BUSY blocks and hence cse->blk_prior_state's free and recycled status is always set to FALSE */
+	BIT_CLEAR_FREE(cse->blk_prior_state);
+	BIT_CLEAR_RECYCLED(cse->blk_prior_state);
 	cse->blk_checksum = 0;
 	csa = cs_addrs;
+	assert(dba_bg == csa->hdr->acc_meth);
 	assert(NULL != old_block);
 	jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 	if ((NULL != jbbp) && (old_block->tn < jbbp->epoch_tn))

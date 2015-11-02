@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +36,7 @@ void	op_indlvnamadr(mval *target)
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		obj = &object;
-		comp_init(&target->str);
+		comp_init(&target->str, NULL);
 		switch (TREF(window_token))
 		{
 		case TK_IDENT:
@@ -56,7 +56,7 @@ void	op_indlvnamadr(mval *target)
 			rval = EXPR_FAIL;
 			break;
 		}
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAD, &v, target->str.len))
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAD, &v, NULL, target->str.len))
 			return;
 		indir_src.str.addr = target->str.addr;
 		cache_put(&indir_src, obj);

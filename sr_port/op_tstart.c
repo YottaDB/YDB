@@ -401,7 +401,7 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 	{	/* In case of forward phase of journal recovery, gv_currkey is set by caller (mur_forward) only
 		 * after the call to op_tstart so avoid doing gv_currkey check.
 		 */
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	}
 #	endif
 	/* If the TP structures have not yet been initialized, do that now. */

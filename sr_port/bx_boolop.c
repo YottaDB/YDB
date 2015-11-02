@@ -36,13 +36,13 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		*p = put_tjmp(t);
 	} else
 		p = addr;
-	if (GTM_BOOL == TREF(gtm_fullbool) || !TREF(saw_side_effect))
+	if (!TREF(saw_side_effect) || ((OLD_SE == TREF(side_effect_handling)) && (GTM_BOOL == TREF(gtm_fullbool))))
 	{	/* nice simple short circuit */
 		assert(NULL == TREF(boolchain_ptr));
 		bx_tail(t->operand[0].oprval.tref, jmp_type_one, p);
 		bx_tail(t->operand[1].oprval.tref, sense, addr);
 		t->opcode = OC_NOOP;
-		t->operand[0].oprclass = t->operand[1].oprclass = NOCLASS;
+		t->operand[0].oprclass = t->operand[1].oprclass = NO_REF;
 		return;
 	}
 	/* got a side effect and don't want them short circuited */
@@ -123,7 +123,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 						default:			/* else no temporary if it's mval */
 							ref0->operand[0] = put_tref(t1->operand[0].oprval.tref);
 							t1->opcode = OC_NOOP;
-							t1->operand[0].oprclass = NOCLASS;
+							t1->operand[0].oprclass = NO_REF;
 					}
 				} else
 				{						/* make it an mval instead of COBOOL now */
@@ -134,7 +134,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				ref0 = maketriple(t1->opcode);			/* create new jmp on result of coerce */
 				ref0->operand[0] = t1->operand[0];
 				t1->opcode = OC_NOOP;				/* wipe out original jmp */
-				t1->operand[0].oprclass = NOCLASS;
+				t1->operand[0].oprclass = NO_REF;
 				break;
 			case OC_CONTAIN:
 			case OC_EQU:
@@ -168,10 +168,10 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				{						/* no need for a temporary unless it's a VAR */
 					ref0->operand[1] = put_tref(ref1->operand[1].oprval.tref);
 					t1->opcode = OC_NOOP;
-					t1->operand[0].oprclass = NOCLASS;
+					t1->operand[0].oprclass = NO_REF;
 				}
 				if (OC_NOOP == ref1->opcode)			/* does op[0] need cleanup? */
-					ref1->operand[0].oprclass = ref1->operand[1].oprclass = NOCLASS;
+					ref1->operand[0].oprclass = ref1->operand[1].oprclass = NO_REF;
 				ref0 = ref2;
 				break;
 			case OC_JMPTSET:
@@ -181,7 +181,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				ref2 = maketriple(OC_NOOP);			/* insert a NOOP in new chain inplace of COBOOL */
 				dqins(ref1, exorder, ref2);
 				t1->opcode = OC_NOOP;				/* wipe out original jmp */
-				t1->operand[0].oprclass = NOCLASS;
+				t1->operand[0].oprclass = NO_REF;
 				break;
 			default:
 				assertpro(FALSE);
@@ -193,7 +193,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 	}
 	assert(oc_tab[t->opcode].octype & OCT_BOOL);
 	t->opcode = OC_NOOP;							/* wipe out the original boolean op */
-	t->operand[0].oprclass = t->operand[1].oprclass = NOCLASS;
+	t->operand[0].oprclass = t->operand[1].oprclass = NO_REF;
 	tripbp = &t->jmplist;							/* borrow jmplist to track jmp targets */
 	assert(NULL == tripbp->bpt);
 	assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl));

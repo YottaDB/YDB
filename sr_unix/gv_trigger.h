@@ -235,13 +235,20 @@ typedef struct gvtr_invoke_parms_struct
 			IS_TPWRAP = TRUE;											\
 			assert(!CSA->sgm_info_ptr->tp_set_sgm_done && !CSA->sgm_info_ptr->update_trans);			\
 			tp_set_sgm();												\
-			/* tp_set_sgm above will update CSA->db_trigger_cycle (from CSD->db_trigger_cycle). Set local variable 	\
-			 * cycle to match CSA->db_trigger_cycle so as to pass the updated value to gvtr_init. 			\
+			/* tp_set_sgm above could modify CSA->db_trigger_cycle (from CSD->db_trigger_cycle). Set local variable	\
+			 * cycle to match CSA->db_trigger_cycle so as to pass the updated value to gvtr_init. Also in that	\
+			 * case recompute cycle_mismatch (and related variables) now that CSA->db_trigger_cycle changed.	\
 			 */													\
-			cycle = CSA->db_trigger_cycle;										\
-			/* Assert that if db_trigger_cycle mismatch was TRUE above, it better be TRUE after 'cycle' update 	\
-			 * as well */												\
-			assert(!db_trigger_cycle_mismatch || (GVT->db_trigger_cycle != cycle));					\
+			if (cycle != CSA->db_trigger_cycle)									\
+			{													\
+				cycle = CSA->db_trigger_cycle;									\
+				/* Assert that if db_trigger_cycle mismatch was TRUE above,					\
+				 * it better be TRUE after 'cycle' update as well.						\
+				 */												\
+				assert(!db_trigger_cycle_mismatch || (GVT->db_trigger_cycle != cycle));				\
+				db_trigger_cycle_mismatch = (GVT->db_trigger_cycle != cycle);					\
+				cycle_mismatch = (db_trigger_cycle_mismatch || ztrig_cycle_mismatch);				\
+			}													\
 			/* An implicit TP wrap is created for an explicit TP update. tp_set_sgm call done above will initalize	\
 			 * sgm_info_ptr for this TP transaction and will have sgm_info_ptr->update_trans set to zero. If the 	\
 			 * op_tstart done above is for ^#t read, then set_upd_trans_t_err set to TRUE just after gvtr_init will \

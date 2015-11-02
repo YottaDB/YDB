@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2013 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,19 +76,18 @@ void process_deferred_stale(void)
 				 *     So, assert that is indeed the case. Also, have a much stricter assert to ensure that
 				 *     gv_target->root = DIR_ROOT (indicating we are in gvcst_root_search). Also, since we want to
 				 *     avoid flushing buffers if already holding crit, continue to the next region.
+				 * (c) In case of DSE commands (like DSE MAPS -RESTORE), we could come here with csa->hold_onto_crit
+				 *     being TRUE (see t_begin_crit which DSE invokes).
 				 */
-				assert(!T_IN_CRIT_OR_COMMIT_OR_WRITE(csa) || csa->hold_onto_crit);
-				assert(!T_IN_CRIT_OR_COMMIT_OR_WRITE(csa)
+				assert(!T_IN_CRIT_OR_COMMIT_OR_WRITE(csa) || csa->hold_onto_crit
 					UNIX_ONLY(|| jgbl.onlnrlbk || (NULL == gv_target) || (DIR_ROOT == gv_target->root)));
-#				ifdef UNIX
-				if (!jgbl.onlnrlbk && csa->now_crit)
+				if (UNIX_ONLY(!jgbl.onlnrlbk && )csa->now_crit)
 					continue;
-#				endif
 				if (csa->stale_defer)
 				{
 					gv_cur_region = r_cur;
 					tp_change_reg();
-#if defined(UNIX) && defined(UNTARGETED_MSYNC)
+#					if defined(UNIX) && defined(UNTARGETED_MSYNC)
 					if (csa->ti->last_mm_sync != csa->ti->curr_tn)
 					{
 						boolean_t    was_crit;
@@ -104,9 +103,9 @@ void process_deferred_stale(void)
 						if (FALSE == was_crit)
 							rel_crit(r_cur);
 					}
-#else
+#					else
 					DCLAST_WCS_WTSTART(r_cur, 0, status);
-#endif
+#					endif
 					csa->stale_defer = FALSE;
 					BG_TRACE_ANY(csa, stale_defer_processed);
 				}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,8 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF short		crash_count;
 GBLREF mval		dollar_zgbldir;
 GBLREF gd_addr		*original_header;
+GBLREF gv_namehead	*gv_target;
+GBLREF gv_key		*gv_currkey;
 
 void dse_f_reg(void)
 {
@@ -62,19 +64,19 @@ void dse_f_reg(void)
 		gd_header = temp_gdaddr;
 		 return;
 	}
-	assert (rn[0]);
-
-		found = FALSE;
-		for (i=0, ptr = gd_header->regions; i < gd_header->n_regions ;i++, ptr++)
-			if (found = !memcmp(&ptr->rname[0],&rn[0],MAX_RN_LEN))
-				break;
-		if (!found)
-		{
-			util_out_print("Error:  region not found.",TRUE);
-			gd_header = temp_gdaddr;
-			return;
-		}
-
+	assert(rn[0]);
+	found = FALSE;
+	for (i=0, ptr = gd_header->regions; i < gd_header->n_regions ;i++, ptr++)
+	{
+		if (found = !memcmp(&ptr->rname[0],&rn[0],MAX_RN_LEN))
+			break;
+	}
+	if (!found)
+	{
+		util_out_print("Error:  region not found.",TRUE);
+		gd_header = temp_gdaddr;
+		return;
+	}
 	if (ptr == gv_cur_region)
 	{
 		util_out_print("Error:  already in region: !AD",TRUE,REG_LEN_STR(gv_cur_region));
@@ -99,12 +101,17 @@ void dse_f_reg(void)
 		gd_header = temp_gdaddr;
 		return;
 	}
-
-	if (cs_addrs->now_crit == TRUE)
+	if (TRUE == cs_addrs->now_crit)
+	{
 		util_out_print("Warning:  now leaving region in critical section: !AD",TRUE, gv_cur_region->rname_len,
 				gv_cur_region->rname);
-
+	}
 	gv_cur_region = ptr;
+	gv_target = NULL;	/* to prevent out-of-sync situations between gv_target and cs_addrs */
+	gv_currkey->base[0] = '\0';	/* prevent fast-path from op_gvname from being taken as region has been switched
+					 * and gv_target has been reset to NULL.
+					 */
+	gv_currkey->end = 0;	/* clear end so it is in sync with base[0] */
 	switch (gv_cur_region->dyn.addr->acc_meth)
 	{
 	case dba_mm:
@@ -115,13 +122,10 @@ void dse_f_reg(void)
 	default:
 		GTMASSERT;
 	}
-
 	if (cs_addrs && cs_addrs->critical)
-	{		crash_count = cs_addrs->critical->crashcnt;
-	}
+		crash_count = cs_addrs->critical->crashcnt;
 	util_out_print("!/File  !_!AD",TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/",TRUE, REG_LEN_STR(gv_cur_region));
-
 	patch_curr_blk = get_dir_root();
 	gv_init_reg(gv_cur_region);
 	GET_SAVED_GDADDR(gd_header, temp_gdaddr, map, gv_cur_region);

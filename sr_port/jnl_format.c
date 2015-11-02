@@ -109,7 +109,10 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	DEBUG_ONLY(
 		static boolean_t	dbg_in_jnl_format = FALSE;
 	)
-	GTMCRYPT_ONLY(int	crypt_status;)
+#	ifdef GTM_CRYPT
+	int			gtmcrypt_errno;
+	gd_segment		*seg;
+#	endif
 #	ifdef GTM_TRIGGER
 	boolean_t		ztworm_matched, match_possible;
 	mstr			prev_str, *cur_str;
@@ -306,22 +309,24 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	assert(REPL_ALLOWED(csa) || !is_ztworm_rec || jgbl.forw_phase_recovery);
 	if (csd->is_encrypted)
 	{
-		/* At this place we have all the components of the *SET or *KILL or *ZTWORM records filled.
-		 * Before the variable part of the journal record gets encrypted, we make sure we copy the buff
-		 * into alt_buff to be used in it's original form in jnl_write.
-		 */
+		/* At this point we have all the components of *SET, *KILL, *ZTWORM and *ZTRIG records filled. */
 		if (REPL_ALLOWED(csa))
 		{
+			/* Before encrypting the journal record, copy the unencrypted buffer to an alternate buffer
+			 * that eventually gets copied to the journal pool (in jnl_write). This way, the replication
+			 * stream sends unencrypted data.
+			 */
 			memcpy(jfb->alt_buff, rec, jrec_size);
 			SET_PREV_ZTWORM_JFB_IF_NEEDED(is_ztworm_rec, (jfb->alt_buff + FIXED_UPD_RECLEN));
 		}
-		/* With the fixed length computed above as FIXED_UPD_RECLEN + JREC_SUFFIX_SIZE, we encode
-		 * the remaining buffer which consists of the *SET or *KILL or *ZTWORM components.
-		 */
 		ASSERT_ENCRYPTION_INITIALIZED;
-		GTMCRYPT_ENCODE_FAST(csa->encr_key_handle, mumps_node_ptr, update_length, NULL, crypt_status);
-		if (0 != crypt_status)
-			GC_RTS_ERROR(crypt_status, gv_cur_region->dyn.addr->fname);
+		/* Encrypt the logical portion of the record which eventually gets written to the journal buffer/file */
+		GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, mumps_node_ptr, update_length, NULL, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+		{
+			seg = gv_cur_region->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+		}
 	} else
 #	endif
 	{

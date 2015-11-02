@@ -37,6 +37,7 @@
 #endif
 #ifdef GTM_SNAPSHOT
 #include "db_snapshot.h"
+#include "gt_timer.h"
 #endif
 #include "mupint.h"
 #include "wbox_test_init.h"
@@ -47,14 +48,16 @@ GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_data		mu_int_data;
 GBLREF unsigned char		*mu_int_master;
 GBLREF uint4			mu_int_errknt;
+GBLREF uint4			mu_int_skipreg_cnt;
 GBLREF sgmnt_data_ptr_t		cs_data;
 GBLREF pid_t			process_id;
 GBLREF boolean_t		ointeg_this_reg;
-GBLREF boolean_t		jnlpool_init_needed;
 #ifdef GTM_CRYPT
-GBLREF gtmcrypt_key_t	mu_int_encrypt_key_handle;
+GBLREF gtmcrypt_key_t		mu_int_encrypt_key_handle;
+GBLREF sgmnt_addrs		*cs_addrs;
 #endif
-#ifdef GTM_SNAPSHOT
+#ifdef UNIX
+GBLREF boolean_t		jnlpool_init_needed;
 GBLREF util_snapshot_ptr_t	util_ss_ptr;
 GBLREF boolean_t		preserve_snapshot;
 GBLREF boolean_t		online_specified;
@@ -70,28 +73,29 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 {
 	sgmnt_addrs     	*csa;
 	freeze_status		status;
-	GTMCRYPT_ONLY(
-		int		crypt_status;
-	)
 	node_local_ptr_t	cnl;
 	boolean_t		need_to_wait = FALSE, read_only, was_crit;
 	int			trynum;
 	uint4			curr_wbox_seq_num;
+#	ifdef GTM_CRYPT
+	int			gtmcrypt_errno;
+	gd_segment		*seg;
+#	endif
 
 	*return_value = FALSE;
-	jnlpool_init_needed = TRUE;
+	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	ESTABLISH(mu_int_reg_ch);
 	if (dba_usr == reg->dyn.addr->acc_meth)
 	{
 		util_out_print("!/Can't integ region !AD; not GDS format", TRUE,  REG_LEN_STR(reg));
-		mu_int_errknt++;
+		mu_int_skipreg_cnt++;
 		return;
 	}
 	gv_cur_region = reg;
 	if (reg_cmcheck(reg))
 	{
 		util_out_print("!/Can't integ region across network", TRUE);
-		mu_int_errknt++;
+		mu_int_skipreg_cnt++;
 		return;
 	}
 	gvcst_init(gv_cur_region);
@@ -105,17 +109,15 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 	cnl = csa->nl;
 	read_only = gv_cur_region->read_only;
 #	ifdef GTM_CRYPT
-	/* Initialize mu_int_encrypt_key_handle to be used in mu_int_read */
 	if (cs_data->is_encrypted)
-	{
-		/* Encryption init should have happened in db_init. */
-		ASSERT_ENCRYPTION_INITIALIZED;
-		/* If the encryption init failed in db_init, the below MACRO should return an error.
-		 * Depending on the error returned, report the error.*/
-		GTMCRYPT_GETKEY(cs_data->encryption_hash, mu_int_encrypt_key_handle, crypt_status);
-		if (0 != crypt_status)
+	{ 	/* Initialize mu_int_encrypt_key_handle to be used in mu_int_read */
+		ASSERT_ENCRYPTION_INITIALIZED;	/* should have happened in db_init() */
+		GTMCRYPT_GETKEY(cs_addrs, cs_data->encryption_hash, mu_int_encrypt_key_handle, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
-			GC_GTM_PUTMSG(crypt_status, (gv_cur_region->dyn.addr->fname));
+			seg = gv_cur_region->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+			mu_int_skipreg_cnt++;
 			return;
 		}
 	}
@@ -124,7 +126,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 	{
 		util_out_print("!/MM database is read only. MM database cannot be frozen without write access.", TRUE);
 		gtm_putmsg(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-		mu_int_errknt++;
+		mu_int_skipreg_cnt++;
 		return;
 	}
 	assert(NULL != mu_int_master);
@@ -142,7 +144,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_SSV4NOALLOW, 2, DB_LEN_STR(gv_cur_region));
 			util_out_print(NO_ONLINE_ERR_MSG, TRUE);
-			mu_int_errknt++;
+			mu_int_skipreg_cnt++;
 			return;
 		}
 	}
@@ -155,7 +157,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 			case REG_ALREADY_FROZEN:
 				util_out_print("!/Database for region !AD is already frozen, not integing",
 					TRUE, REG_LEN_STR(gv_cur_region));
-				mu_int_errknt++;
+				mu_int_skipreg_cnt++;
 				return;
 			case REG_HAS_KIP:
 				/* We have already waited for KIP to reset. This time do not wait for KIP */
@@ -164,7 +166,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 				{
 					util_out_print("!/Database for region !AD is already frozen, not integing",
 						TRUE, REG_LEN_STR(gv_cur_region));
-					mu_int_errknt++;
+					mu_int_skipreg_cnt++;
 					return;
 				}
 				break;
@@ -175,7 +177,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		}
 		if (read_only && !mu_int_wait_rdonly(csa, MUPIP_INTEG))
 		{
-			mu_int_errknt++;
+			mu_int_skipreg_cnt++;
 			return;
 		}
 	}
@@ -184,7 +186,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		if (!read_only && !wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH))
 		{
 			gtm_putmsg(VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_LIT(MUPIP_INTEG), DB_LEN_STR(gv_cur_region));
-			mu_int_errknt++;
+			mu_int_skipreg_cnt++;
 			return;
 		}
 		/* Take a copy of the file-header. To ensure it is consistent, do it while holding crit. */
@@ -200,7 +202,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 #		ifdef GTM_SNAPSHOT
 		if (!ss_initiate(gv_cur_region, util_ss_ptr, &csa->ss_ctx, preserve_snapshot, MUPIP_INTEG))
 		{
-			mu_int_errknt++;
+			mu_int_skipreg_cnt++;
 			assert(NULL != csa->ss_ctx);
 			ss_release(&csa->ss_ctx);
 			ointeg_this_reg = FALSE; /* Turn off ONLINE INTEG for this region */
@@ -218,7 +220,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		{
 			trynum = 30; /* given 30 cycles to tell you to go */
 			while ((curr_wbox_seq_num == cnl->wbox_test_seq_num) && trynum--)
-				sleep(1);
+				LONG_SLEEP(1);
 			cnl->wbox_test_seq_num++; /* let them know we took the next step */
 			assert(trynum);
 		}

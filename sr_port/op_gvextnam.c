@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +63,8 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 	MV_FORCE_STR(val1);
 	val1 = gtm_env_translate(val1, val2, &val_xlated);
 	assert(!TREF(gv_extname_size) || (NULL != extnam_str.addr));
+	if (!gd_header)
+		gvinit();
 	if (val1->str.len)
 	{
 		tmp_mstr_ptr = &val1->str;
@@ -70,8 +72,6 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 	} else
 	{
 		tmp_mstr_ptr = &dollar_zgbldir.str;
-		if (!gd_header)
-			gvinit();
 		TREF(gd_targ_addr) = gd_header;
 	}
 	extnam_str.len = tmp_mstr_ptr->len;
@@ -83,11 +83,7 @@ void op_gvextnam(UNIX_ONLY_COMMA(int4 count) mval *val1, ...)
 		extnam_str.addr = (char *)malloc(TREF(gv_extname_size));
 	}
 	memcpy(extnam_str.addr, tmp_mstr_ptr->addr, tmp_mstr_ptr->len);
-	if (gv_target)
-	{
-		assert(INVALID_GV_TARGET != gv_target);
-		gv_target->clue.end = 0;
-	}
+	assert((NULL == gv_target) || (INVALID_GV_TARGET != gv_target));
 	val = va_arg(var, mval *);
 	if (!MV_IS_STRING(val))
 		GTMASSERT;

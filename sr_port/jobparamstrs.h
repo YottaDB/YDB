@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,9 @@
 
 
 JPSDEF ( 3,  "ACC",	jp_account),		JPSDEF ( 8, "ACCOUNTI*",	jp_account),
+#ifdef UNIX
+JPSDEF ( 3,  "CMD",	jp_cmdline),		JPSDEF ( 7,  "CMDLINE",		jp_cmdline),
+#endif
 JPSDEF ( 3,  "DEF",	jp_default),		JPSDEF ( 7,  "DEFAULT",		jp_default),
 JPSDEF ( 3,  "DET",	jp_detached),		JPSDEF ( 8,  "DETACHED",	jp_detached),
 JPSDEF ( 3,  "ERR",	jp_error),		JPSDEF ( 5,  "ERROR",		jp_error),

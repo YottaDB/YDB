@@ -405,8 +405,7 @@ boolean_t	tp_tend()
 			 * We will repeat this check later in crit but it will hopefully have little or nothing to do.
 			 * bypass 1st check if already in crit -- check later
 			 */
-			if (!csa->now_crit && !is_mm && (cnl->wc_in_free < si->cw_set_depth + 1)
-					&& !wcs_get_space(gv_cur_region, si->cw_set_depth + 1, NULL))
+			if (!csa->now_crit && !is_mm && !WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL))
 				assert(FALSE);	/* wcs_get_space should have returned TRUE unconditionally in this case */
 			if (JNL_ENABLED(csa))
 			{	/* compute the total journal record size requirements before grab_crit.
@@ -697,19 +696,16 @@ boolean_t	tp_tend()
 				{	/* in crit, ensure cache-space is available.
 					 * the out-of-crit check done above might not be enough
 					 */
-					if (cnl->wc_in_free < si->cw_set_depth + 1)
+					if (!WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL))
 					{
-						if (!wcs_get_space(gv_cur_region, si->cw_set_depth + 1, NULL))
-						{
-							assert(cnl->wc_blocked);	/* only reason we currently know
-											 * why wcs_get_space could fail */
-							assert(gtm_white_box_test_case_enabled);
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
-							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
-							SET_CACHE_FAIL_STATUS(status, csd);
-							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
-							goto failed;
-						}
+						assert(cnl->wc_blocked);	/* only reason we currently know
+										 * why wcs_get_space could fail */
+						assert(gtm_white_box_test_case_enabled);
+						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
+						SET_CACHE_FAIL_STATUS(status, csd);
+						TP_TRACE_HIST(CR_BLKEMPTY, NULL);
+						goto failed;
 					}
 					VMS_ONLY(
 						if (csd->clustered && !CCP_SEGMENT_STATE(cnl, CCST_MASK_HAVE_DIRTY_BUFFERS))
@@ -1139,7 +1135,8 @@ boolean_t	tp_tend()
 						assert((cse->cr != cr) || (cse->old_block == (sm_uc_ptr_t)old_block));
 						old_block_tn = old_block->tn;
 						/* Need checksums if before imaging and if a PBLK record is going to be written. */
-						cksum_needed = (!WAS_FREE(cse) && (NULL != jbp) && (old_block_tn < jbp->epoch_tn));
+						cksum_needed = (!WAS_FREE(cse->blk_prior_state) && (NULL != jbp)
+									 && (old_block_tn < jbp->epoch_tn));
 						if ((cse->cr != cr) || (cse->cycle != cr->cycle))
 						{	/* Block has relocated in the cache. Adjust pointers to new location. */
 							cse->cr = cr;
@@ -1238,6 +1235,8 @@ boolean_t	tp_tend()
 		WAIT_FOR_REGION_TO_UNFREEZE(csa, csd);
 		assert(CDB_STAGNATE > t_tries);
 	}	/* for (;;) */
+	/* At this point, we are done with validation and so we need to assert that donot_commit is set to FALSE */
+	assert(!TREF(donot_commit));	/* We should never commit a transaction that was determined restartable */
 	/* Validate the correctness of the calculation of # of replication/journaled regions inside & outside of crit */
 	assert(tmp_jnl_participants == jnl_participants);
 	assert(cdb_sc_normal == status);
@@ -1316,7 +1315,6 @@ boolean_t	tp_tend()
 	/* the following section writes journal records in all regions */
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	DEBUG_ONLY(tmp_jnl_participants = 0;)
-	assert(!TREF(donot_commit));	/* We should never commit a transaction that was determined restartable */
 #	ifdef DEBUG
 	/* Check that upd_num in jnl records got set in increasing order (not necessarily contiguous) within each region.
 	 * This is true for GT.M and journal recovery. Take the chance to also check that jnl_head & update_trans are in sync.
@@ -1438,7 +1436,7 @@ boolean_t	tp_tend()
 				for (cse = si->first_cw_set;  NULL != cse;  cse = cse->next_cw_set)
 				{	/* Write out before-update journal image records */
 					TRAVERSE_TO_LATEST_CSE(cse);
-					if (WAS_FREE(cse))
+					if (WAS_FREE(cse->blk_prior_state))
 						continue;
 					old_block = (blk_hdr_ptr_t)cse->old_block;
 					ASSERT_IS_WITHIN_SHM_BOUNDS((sm_uc_ptr_t)old_block, csa);
@@ -2189,7 +2187,7 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 	 * not on cse->new_buff. Therefore we need to PIN the corresponding cache-record in tp_tend. So reset cse->new_buff.
 	 */
 	cse->new_buff = NULL;
-	if (!WAS_FREE(cse) && (NULL != cse->old_block) && JNL_ENABLED(csa) && csa->jnl_before_image)
+	if (!WAS_FREE(cse->blk_prior_state) && (NULL != cse->old_block) && JNL_ENABLED(csa) && csa->jnl_before_image)
 	{
 		old_block = (blk_hdr_ptr_t)cse->old_block;
 		assert(old_block->bsiz <= csa->hdr->blk_size);
@@ -2263,7 +2261,8 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 			return FALSE;
 		cse->blk = bml + free_bit;
 		assert(cse->blk < total_blks);
-		blk_used ? SET_RECYCLED(cse) : SET_NRECYCLED(cse);
+		blk_used ? BIT_SET_RECYCLED_AND_CLEAR_FREE(cse->blk_prior_state)
+			 : BIT_CLEAR_RECYCLED_AND_SET_FREE(cse->blk_prior_state);
 		/* re-point before-images into cse->old_block if necessary; if not available restart by returning FALSE */
 		BEFORE_IMAGE_NEEDED(read_before_image, cse, csa, csd, cse->blk, before_image_needed);
 		if (!before_image_needed)
@@ -2288,7 +2287,7 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 				cse->cycle = cr->cycle;
 				cse->old_block = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 				old_block = (blk_hdr_ptr_t)cse->old_block;
-				if (!WAS_FREE(cse) && (NULL != jbp))
+				if (!WAS_FREE(cse->blk_prior_state) && (NULL != jbp))
 				{
 					assert(old_block->bsiz <= csd->blk_size);
 					if (old_block->tn < jbp->epoch_tn)
@@ -2329,7 +2328,7 @@ boolean_t	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 		/* since bitmap block got modified, copy latest "ondsk_blkver" status from cache-record to bml_cse */
 		assert((NULL != bml_cse->cr) || is_mm);
 		old_block = (blk_hdr_ptr_t)bml_cse->old_block;
-		assert(!WAS_FREE(bml_cse));	/* Bitmap blocks are never of type gds_t_acquired or gds_t_create */
+		assert(!WAS_FREE(bml_cse->blk_prior_state));	/* Bitmap blocks are never of type gds_t_acquired or gds_t_create */
 		if (NULL != jbp)
 		{	/* recompute CHECKSUM for the modified bitmap block before-image */
 			if (old_block->tn < jbp->epoch_tn)

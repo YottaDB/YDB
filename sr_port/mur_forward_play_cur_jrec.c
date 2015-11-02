@@ -57,9 +57,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	uint4			dollar_tlevel;
-#ifdef DEBUG
 GBLREF 	jnl_gbls_t		jgbl;
-#endif
 
 error_def(ERR_DUPTN);
 error_def(ERR_JNLTPNEST);
@@ -91,13 +89,16 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	ht_ent_mname		*tabent;
 	mname_entry	 	gvent;
 	gvnh_reg_t		*gvnh_reg;
-	GTMCRYPT_ONLY(
-		int4		crypt_status;
-	)
+#	ifdef GTM_CRYPT
+	int4			gtmcrypt_errno;
+#	endif
 	forw_multi_struct	*forw_multi;
 #	if (defined(DEBUG) && defined(UNIX))
 	int4			strm_idx;
 #	endif
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	assert(!rctl->forw_eof_seen);
 	jctl = rctl->jctl;
 	/* Ensure we never DOUBLE process the same journal record in the forward phase */
@@ -119,11 +120,11 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 #		ifdef GTM_CRYPT
 		if (jctl->jfh->is_encrypted)
 		{
-			DECODE_SET_KILL_ZKILL_ZTRIG(keystr, rec->prefix.forwptr, jctl->encr_key_handle, crypt_status);
-			if (0 != crypt_status)
+			MUR_DECRYPT_LOGICAL_RECS(keystr, rec->prefix.forwptr, jctl->encr_key_handle, gtmcrypt_errno);
+			if (0 != gtmcrypt_errno)
 			{
-				GC_GTM_PUTMSG(crypt_status, NULL);
-				return crypt_status;
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, jctl->jnl_fn_len, jctl->jnl_fn);
+				return gtmcrypt_errno;
 			}
 		}
 #		endif
@@ -249,7 +250,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			return status;	/* "mur_pini_state" failed due to bad pini_addr */
 		++jctl->jnlrec_cnt[rectype];	/* for -show=STATISTICS */
 	}
-	if (!mur_options.update && !mur_options.extr[GOOD_TN])
+	if (!mur_options.update && !jgbl.mur_extract)
 		return SS_NORMAL;
 	if (murgbl.ok_to_update_db && IS_TUPD(rectype) && (GOOD_TN == recstat))
 	{	/* Even for FENCE_NONE we apply fences. Otherwise a TUPD becomes UPD etc.
@@ -323,7 +324,8 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 					assert(added);
 				}
 			}
-			GVCST_ROOT_SEARCH;
+			if (!TREF(jnl_extract_nocol))
+				GVCST_ROOT_SEARCH;
 		}
 	}
 	if (GOOD_TN == recstat)
@@ -362,7 +364,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			assert(!mur_options.rollback || (murgbl.consist_jnl_seqno <= murgbl.losttn_seqno));
 		}
 	}
-	if (GOOD_TN != recstat || mur_options.extr[GOOD_TN])
+	if (GOOD_TN != recstat || jgbl.mur_extract)
 	{
 		if (murgbl.extr_file_create[recstat])
 		{

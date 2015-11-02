@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,9 +29,9 @@
 # PUBLIC	opp_iretmval
 ENTRY opp_iretmval 	# /* PROC */
 	putframe
-	addl	$4,%esp
+	addl	$4,%esp		# /* burn return pc */
 	call	op_iretmval
-	addl	$4,%esp
+	addl	$8,%esp		# /* burn two passed-in args */
 	getframe
 	ret
 # opp_iretmval ENDP

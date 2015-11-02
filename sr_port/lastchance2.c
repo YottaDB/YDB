@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ CONDITION_HANDLER(lastchance2)
 {
 	int4		actual_exi_condition;
 
-	actual_exi_condition = exi_condition;
+	actual_exi_condition = (EXIT_NRM != exi_condition ? exi_condition : EXIT_ERR);
 	PRN_ERROR;
 	dec_err(VARLSTCNT(1) ERR_GVRUNDOWN);
 	ESTABLISH(lastchance3);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,6 +90,9 @@ STATICDEF int repl_recv_trace_buff_pos = 0;
 STATICDEF unsigned char * repl_recv_trace_buff = 0;
 STATICDEF int repl_recv_size_trace_pos = 0;
 STATICDEF int repl_recv_size_trace[REPL_RECV_SIZE_TRACE_SIZE];
+
+error_def(ERR_GETSOCKNAMERR);
+error_def(ERR_TEXT);
 
 int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pipe_ready_check, struct timeval *max_pipe_ready_wait)
 { /* On entry, *send_len is the number of bytes to be sent
@@ -374,12 +377,19 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 				repl_recv_trace_buff_pos = (repl_recv_trace_buff_pos + bytes_recvd) %
 						REPL_RECV_TRACE_BUFF_SIZE;
 			}
-			return (SS_NORMAL);
+			return (SS_NORMAL); /* always process the received buffer before dealing with any errno */
 		}
-		if (0 == bytes_recvd)
-		{ /* Connection reset */
+		if (0 == bytes_recvd) /* Connection reset */
 			errno = ECONNRESET;
-		} else if (EWOULDBLOCK == errno)
+#ifdef UNIX
+		else if (ETIMEDOUT == errno)
+		{
+			repl_log(stderr, TRUE, TRUE, "Communication subsystem warning: network may be down;"
+						" socket recv() returned ETIMEDOUT\n");
+			errno = ETIMEDOUT;
+		}
+#endif
+		else if (EWOULDBLOCK == errno)
 		{ /* NOTE: Although we use non blocking sockets, it is possible to get EWOULDBLOCK error status if receive
 		   * timeout has been set and the timeout expired before data was received (from man recv on RH 8 Linux). Some
 		   * systems return ETIMEDOUT for the timeout condition. */
@@ -455,8 +465,6 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
         size_t			errlen;
 	char			*errptr, local_ip[16], remote_ip[16];
 	in_port_t		local_port, remote_port;
-	error_def(ERR_GETSOCKNAMERR);
-	error_def(ERR_TEXT);
 
 	len = SIZEOF(local);
 	if (0 == getsockname(sock_fd, (struct sockaddr *)&local, (GTM_SOCKLEN_TYPE *)&len))

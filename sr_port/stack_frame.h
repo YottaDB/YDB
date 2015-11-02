@@ -28,11 +28,6 @@
 
 #include "hashtab_mname.h"
 
-typedef struct saved_for_indx_array_struct
-{
-	mval	*saved_for_indx[1];
-} saved_for_indx;
-
 typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 {
 	struct rhead_struct *rvector;	/* routine header */
@@ -76,7 +71,8 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 	unsigned short	type;
 	unsigned char	flags;
 	bool		dollar_test;
-	saved_for_indx	*for_ctrl_stack;	/* anchor for array of FOR control variable indices */
+	/*uint4		glvn_indx;*/	/* state of glvn pool at frame creation time. For use when gtmpcat is changed. */
+	unsigned char	*for_ctrl_stack;/* NOTE: temporarily using this field for glvn_indx so that gtmpcat works */
 	mval		*ret_value;
 } stack_frame;
 
@@ -133,50 +129,6 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 		assert(error_frame >= frame_pointer);		\
 		error_frame = fptr;				\
 	}							\
-}
-
-/* the following macro ensures there's an array of FOR pointers and frees any old entry that's about to get overlaid */
-#define MANAGE_FOR_INDX(FPTR, LEVEL, NEW_INDX)									\
-{														\
-	assert(NULL != NEW_INDX);										\
-	if (NULL == FPTR->for_ctrl_stack)									\
-	{													\
-		FPTR->for_ctrl_stack = (saved_for_indx *)malloc(SIZEOF(mval *) * MAX_FOR_STACK);		\
-		memset(FPTR->for_ctrl_stack, 0, SIZEOF(mval *) * MAX_FOR_STACK);				\
-	} else													\
-		FREE_INDX_AND_CLR_SIBS(FPTR, LEVEL, NEW_INDX);							\
-	assert(NULL == FPTR->for_ctrl_stack->saved_for_indx[LEVEL]);						\
-	FPTR->for_ctrl_stack->saved_for_indx[LEVEL] = NEW_INDX;							\
-}
-
-/* the following macro runs the FOR pointer array, freeing anything it finds before freeing the array
- * in theory it could work down the array, but since the above macro needs FREE_INDX_AND_CLR_SIBS to work up, this does too
- */
-#define	FREE_SAVED_FOR_INDX(FPTR)								\
-{												\
-	uint4 Level;										\
-												\
-	assert(NULL != FPTR->for_ctrl_stack);							\
-	for (Level = 1; Level < MAX_FOR_STACK; Level++)	/* level 0 never holds a pointer */	\
-		FREE_INDX_AND_CLR_SIBS(FPTR, Level, NULL);					\
-	free((char *)FPTR->for_ctrl_stack);							\
-}
-
-/* the following macro, currentl only used by the above 2 macros,
- * deals with the possibility of the same control variable at multiple nesting levels and clears higher nesting levels
- */
-#define	FREE_INDX_AND_CLR_SIBS(FPTR, LEVEL, NEW_INDX)									\
-{															\
-	uint4	Lvl;													\
-	mval	*Ptr;													\
-															\
-	if (NULL != (Ptr = FPTR->for_ctrl_stack->saved_for_indx[LEVEL])) /* NOTE assignment */				\
-	{														\
-		free((char *)Ptr);											\
-		for (Lvl = 1; Lvl < MAX_FOR_STACK; Lvl++)	/* level 0 never holds a pointer */			\
-			if (Ptr == FPTR->for_ctrl_stack->saved_for_indx[Lvl])						\
-				FPTR->for_ctrl_stack->saved_for_indx[Lvl] = (mval *)(Lvl < LEVEL ? NEW_INDX : NULL);	\
-	}														\
 }
 
 void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);

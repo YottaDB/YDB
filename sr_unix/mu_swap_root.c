@@ -87,6 +87,7 @@ error_def(ERR_DBRDONLY);
 error_def(ERR_GBLNOEXIST);
 error_def(ERR_MAXBTLEVEL);
 error_def(ERR_MUREORGFAIL);
+error_def(ERR_MUTRUNCNOTBG);
 
 #define RETRY_SWAP		(0)
 #define ABORT_SWAP		(1)
@@ -128,8 +129,7 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 	{	/* Initialize ^#t global for this region. */
 		SETUP_TRIGGER_GLOBAL;
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
-		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	} else
 #	endif	/* Initialization for current global */
 		op_gvname(VARLSTCNT(1) (gn));
@@ -138,6 +138,11 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 		gtm_putmsg(VARLSTCNT(4) ERR_GBLNOEXIST, 2, gn->str.len, gn->str.addr);
 		return TRUE;
 	}
+	if (dba_mm == csd->acc_meth)
+		/* return for now without doing any swapping operation because later mu_truncate
+		 * is going to issue the MUTRUNCNOTBG message.
+		 */
+		return TRUE;
 	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;		/* set up gv_altkey to be just the gblname */
 	/* ------------ Swap root block of global variable tree --------- */
 	t_begin(ERR_MUREORGFAIL, UPDTRNS_DB_UPDATED_MASK);
@@ -185,11 +190,11 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 		if (!csa->now_crit)
 			WAIT_ON_INHIBIT_KILLS(cnl, MAXWAIT2KILL);
 		DEBUG_ONLY(lcl_t_tries = t_tries);
-		TREF(in_mu_swap_root) = TRUE;
+		TREF(in_mu_swap_root_state) = MUSWP_INCR_ROOT_CYCLE;
 		assert(!TREF(in_gvcst_redo_root_search));
 		if ((trans_num)0 == (ret_tn = t_end(gvt_hist_ptr, dir_hist_ptr, TN_NOT_SPECIFIED)))
 		{
-			TREF(in_mu_swap_root) = FALSE;
+			TREF(in_mu_swap_root_state) = MUSWP_NONE;
 			need_kip_incr = FALSE;
 			assert(NULL == kip_csa);
 			ABORT_TRANS_IF_GBL_EXIST_NOMORE(lcl_t_tries, tn_aborted);
@@ -200,7 +205,7 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 			}
 			continue;
 		}
-		TREF(in_mu_swap_root) = FALSE;
+		TREF(in_mu_swap_root_state) = MUSWP_NONE;
 		/* Note that this particular process's csa->root_search_cycle is now behind cnl->root_search_cycle.
 		 * This forces a cdb_sc_gvtrootmod2 restart in gvcst_bmp_mark_free below.
 		 */
@@ -241,6 +246,12 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 			assert(csa->dir_tree->root != child_blk_id);
 			free_blk_id = swap_root_or_directory_block(level + 1, level, dir_hist_ptr, child_blk_id,
 					child_blk_ptr, &kill_set_list, curr_tn);
+			if (level == 0)
+				/* set level as 1 to mark this kill set is for level-0 block in directory tree.
+				 * The kill-set level later will be used in gvcst_bmp_markfree to assign a special value to
+				 * cw_set_element, which will be eventually used by t_end to write the block to snapshot
+				 */
+				kill_set_list.blk[kill_set_list.used - 1].level = 1;
 			if (RETRY_SWAP == free_blk_id)
 				continue;
 			else if (ABORT_SWAP == free_blk_id)
@@ -259,8 +270,10 @@ boolean_t mu_swap_root(mval *gn, int *root_swap_statistic_ptr)
 				continue;
 			}
 			gvcst_kill_sort(&kill_set_list);
+			TREF(in_mu_swap_root_state) = MUSWP_FREE_BLK;
 			GVCST_BMP_MARK_FREE(&kill_set_list, ret_tn, inctn_mu_reorg, inctn_bmp_mark_free_mu_reorg,
 					inctn_opcode, csa);
+			TREF(in_mu_swap_root_state) = MUSWP_NONE;
 			DECR_KIP(csd, csa, kip_csa);
 			break;
 		}
@@ -355,7 +368,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		return RETRY_SWAP;
 	}
 	tmpcse = &cw_set[cw_set_depth];
-	(free_blk_recycled) ? SET_NFREE(tmpcse) : SET_FREE(tmpcse);
+	(free_blk_recycled) ? BIT_SET_RECYCLED_AND_CLEAR_FREE(tmpcse->blk_prior_state)
+			    : BIT_CLEAR_RECYCLED_AND_SET_FREE(tmpcse->blk_prior_state);
 	t_create(free_blk_id, (unsigned char *)bs1, 0, 0, child_blk_lvl);
 	tmpcse->mode = gds_t_acquired;
 	if (!free_blk_recycled || !cs_data->db_got_to_v5_once)
@@ -408,6 +422,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		return RETRY_SWAP;
 	}
 	t_write(&dir_hist_ptr->h[parent_blk_lvl], (unsigned char *)bs1, 0, 0, parent_blk_lvl, FALSE, TRUE, GDS_WRITE_KILLTN);
+	/* To indicate later snapshot file writing process during fast_integ not to skip writing the block to snapshot file */
+	BIT_SET_DIR_TREE(cw_set[cw_set_depth-1].blk_prior_state);
 	/* 3. Free block's corresponding bitmap reflects above change. */
 	PUT_LONG(update_array_ptr, free_bit);
 	save_cw_set_depth = cw_set_depth; /* Bit maps go on end of cw_set (more fake acquired) */

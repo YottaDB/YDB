@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,19 +26,15 @@ static readonly opctype indir_opcode[] = {
 };
 #undef INDIR
 
-error_def(ERR_INDMAXNEST);
-
 void op_indfun(mval *v, mint argcode, mval *dst)
 {
 	icode_str	indir_src;
 	int		rval;
 	mstr		*obj, object;
-	oprtype		x;
+	oprtype		x, getdst;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (TREF(ind_result_sp) >= TREF(ind_result_top))
-		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
 	assert((SIZEOF(indir_opcode)/SIZEOF(indir_opcode[0])) > argcode);
 	assert(indir_opcode[argcode]);
 	MV_FORCE_STR(v);
@@ -47,15 +43,15 @@ void op_indfun(mval *v, mint argcode, mval *dst)
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		obj = &object;
-		comp_init(&v->str);
+		comp_init(&v->str, &getdst);
 		rval = (*indir_fcn[argcode])(&x, indir_opcode[argcode]);
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, v->str.len))
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, &getdst, v->str.len))
 			return;
 		indir_src.str.addr = v->str.addr;
 		cache_put(&indir_src, obj);
 		/* Fall into code activation below */
 	}
-	*(TREF(ind_result_sp))++ = dst;				/* Where to store return value */
+	TREF(ind_result) = dst;			/* Where to store return value */
 	comp_indr(obj);
 	return;
 }

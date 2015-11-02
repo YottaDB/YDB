@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,15 +13,20 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
-#include "subscript.h"
 #include "fnname.h"
+#include "fullbool.h"
+#include "mdq.h"
 #include "advancewindow.h"
+#include "show_source_line.h"
+
+GBLREF	boolean_t	run_time;
 
 error_def(ERR_COMMA);
 error_def(ERR_EXTGBLDEL);
 error_def(ERR_GBLNAME);
 error_def(ERR_GVNAKEDEXTNM);
 error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_SIDEEFFECTEVAL);
 
 int name_glvn(boolean_t gblvn, oprtype *a)
 {
@@ -30,15 +35,16 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 	int		fnname_type;
 	/* Note:  MAX_LVSUBSCRIPTS and MAX_GVSUBSCRIPTS are currently equal.  Should that change,
 			this should also change */
-	oprtype subscripts[MAX_LVSUBSCRIPTS + 1], *sb1, *sb2;
-	triple 	*ref, *t1, *t2;
+	oprtype		subscripts[MAX_LVSUBSCRIPTS + 1], *sb1, *sb2;
+	triple 		*ref, *root;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	sb1 = sb2 = subscripts;
 	sb1++;						/* save room for type indicator */
 	if (gblvn)
-	{	fnname_type = FNGBL;
+	{
+		fnname_type = FNGBL;
 		if ((TK_LBRACKET == TREF(window_token)) || (TK_VBAR == TREF(window_token)))
 		{
 			vbar = (TK_VBAR == TREF(window_token));
@@ -85,8 +91,10 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 		advancewindow();
 	}
 	if (TK_LPAREN == TREF(window_token))
-	{	for (;;)
-		{	if (sb1 - sb2 > MAX_GVSUBSCRIPTS)
+	{
+		for (;;)
+		{
+			if (sb1 - sb2 > MAX_GVSUBSCRIPTS)
 			{
 				stx_error(ERR_MAXNRSUBSCRIPTS);
 				return FALSE;
@@ -108,15 +116,9 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 		}
 	}
 	subscripts[0] = put_ilit(fnname_type);
-	ref = t1 = newtriple(OC_PARAMETER);
-	ref->operand[0] = put_ilit((mint)(sb1 - sb2 + 2)); /* # of subscripts + dst + depth argument (determine at f_name) */
-	for ( ; sb2 < sb1 ; sb2++)
-	{
-		t2 = newtriple(OC_PARAMETER);
-		t1->operand[1] = put_tref(t2);
-		t1 = t2;
-		t1->operand[0] = *sb2;
-	}
-	*a = put_tref(ref);
+	root = ref = newtriple(OC_PARAMETER);
+	ref->operand[0] = put_ilit((mint)(sb1 - sb2 + 2));	/* # of subscripts + dst + depth argument (determine at f_name) */
+	SUBS_ARRAY_2_TRIPLES(ref, sb1, sb2, subscripts, 1);	/* last argument (1) accounts for fnname_type in the 1st slot */
+	*a = put_tref(root);
 	return TRUE;
 }

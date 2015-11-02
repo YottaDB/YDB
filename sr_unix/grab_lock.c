@@ -29,6 +29,7 @@
 #include "jnl.h"
 #include "gtmimagename.h"	/* for IS_GTCM_GNP_SERVER_IMAGE */
 #include "anticipatory_freeze.h"
+#include "util.h"		/* for OUT_BUFF_SIZE */
 
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4			process_id;
@@ -54,6 +55,8 @@ void	grab_lock(gd_region *reg, uint4 onln_rlbk_action)
 	sgmnt_addrs  		*csa;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
+	char			scndry_msg[OUT_BUFF_SIZE];
+
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
@@ -100,9 +103,9 @@ void	grab_lock(gd_region *reg, uint4 onln_rlbk_action)
 	{	/* Journal pool indicates an abnormally terminated online rollback. Cannot continue until the rollback command is
 		 * re-run to bring the journal pool/file and instance file to a consistent state.
 		 */
+		SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to TRUE");
 		/* No need to do rel_lock before rts_error (mupip_exit_handler will do it for us) */
-		rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
-				ERR_TEXT, 2, LEN_AND_LIT("file_corrupt field in instance file header is set to TRUE"));
+		rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn), ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 	}
 	/* If ASSERT_NO_ONLINE_ROLLBACK, then no concurrent online rollbacks can happen at this point. So, the jnlpool should be in
 	 * in sync. There are two exceptions. If this is GT.CM GNP Server and the last client disconnected, the server invokes

@@ -35,9 +35,6 @@ GBLREF	io_desc		*active_device;
 GBLREF	boolean_t	ztrap_explicit_null;
 
 error_def(ERR_STACKCRIT);
-error_def(ERR_ERRWZTRAP);
-error_def(ERR_ERRWETRAP);
-error_def(ERR_ERRWIOEXC);
 
 void trans_code_cleanup(void)
 {
@@ -106,6 +103,7 @@ void trans_code_cleanup(void)
 			} else if ((ERR_ERRWZBRK == errmsg) || (ERR_ERRWEXC == errmsg))
 			{	/* For typical exceptions in ZBREAK and ZSTEP, get back to direct mode */
 				dm_setup();
+				fp = frame_pointer;	/* Let code at end see direct mode is current frame */
 				break;
 			} else
 			{	/* The only known way to be here is if the command is a command given in direct mode as
@@ -138,6 +136,14 @@ void trans_code_cleanup(void)
 				       frame_pointer)));
 	}
 	TREF(transform) = TRUE;
+	/* Only put error on console if frame we unwind to is a direct mode frame */
 	if (0 != errmsg)
-		dec_err(VARLSTCNT(1) errmsg);
+	{
+		ecode_set(errmsg);			/* Add error with trap indicator to $ECODE */
+		UNIX_ONLY(if (fp->type & SFT_DM))	/* Bypass check for VMS and just push error out */
+		{
+			UNIX_ONLY(PRN_ERROR);		/* Can only appear in condition handler in VMS */
+			dec_err(VARLSTCNT(1) errmsg);
+		}
+	}
 }

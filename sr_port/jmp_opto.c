@@ -225,7 +225,7 @@ void jmp_opto(void)
 			{
 				COMPDBG(PRINTF("jmp_opto: NOOPing OC_GVRECTARG opcode at triple addres 0x"lvaddr"\n", next_trip););
 				next_trip->opcode = OC_NOOP;
-				next_trip->operand[0].oprclass = next_trip->operand[1].oprclass = 0;
+				next_trip->operand[0].oprclass = next_trip->operand[1].oprclass = NO_REF;
 				cur_trip = cur_trip->exorder.bl;	/* in case there are more than one in a row */
 			}
 			continue;
@@ -242,7 +242,7 @@ void jmp_opto(void)
 			{
 				COMPDBG(PRINTF("jmp_opto: NOOPing OC_GVRECTARG opcode at triple addres 0x"lvaddr"\n", next_trip););
 				next_trip->opcode = OC_NOOP;
-				next_trip->operand[0].oprclass = next_trip->operand[1].oprclass = 0;
+				next_trip->operand[0].oprclass = next_trip->operand[1].oprclass = NO_REF;
 				cur_trip = cur_trip->exorder.bl;	/* in case there are more than one in a row */
 			}
 			continue;

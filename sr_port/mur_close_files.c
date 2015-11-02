@@ -115,6 +115,7 @@ error_def(ERR_PREMATEOF);
 error_def(ERR_RENAMEFAIL);
 error_def(ERR_REPLPOOLINST);
 error_def(ERR_REPLSTATE);
+error_def(ERR_NOTALLDBRNDWN);
 UNIX_ONLY(error_def(ERR_REPLFTOKSEM);)
 UNIX_ONLY(error_def(ERR_RLBKSTRMSEQ);)
 VMS_ONLY(error_def(ERR_SETREG2RESYNC);)
@@ -131,6 +132,7 @@ void	mur_close_files(void)
 	sgmnt_data		*csd, csd_temp;
 	uint4			ustatus;
 	int4			status;
+	int4			rundown_status = EXIT_NRM;		/* if gds_rundown went smoothly */
 #	if defined(VMS)
 	boolean_t		set_resync_to_region = FALSE;
 #	elif defined(UNIX)
@@ -248,7 +250,12 @@ void	mur_close_files(void)
 			if (mur_options.update && (murgbl.clean_exit || !rctl->db_updated) && (NULL != csa->nl))
 				csa->nl->donotflush_dbjnl = FALSE;	/* shared memory is now clean for dbjnl flushing */
 			if (UNIX_ONLY(mur_options.forward) VMS_ONLY(TRUE))
-				gds_rundown();
+				UNIX_ONLY(rundown_status =) gds_rundown();
+			if (EXIT_NRM != rundown_status)
+			{
+				wrn_count++;
+				continue;
+			}
 #			ifdef UNIX
 			assert(!jgbl.onlnrlbk || (csa->now_crit && csa->hold_onto_crit)
 					|| (!murgbl.clean_exit && !rctl->db_updated));
@@ -548,6 +555,7 @@ void	mur_close_files(void)
 		assert(NULL == rctl->mur_desc);
 #		endif
 	}
+
 #	ifdef UNIX
 	/* If rollback, we better have the standalone lock. The only exception is if we could not get standalone access
 	 * (due to some other process still accessing the instance file and/or db/jnl). In that case "clean_exit" should be FALSE.
@@ -700,7 +708,9 @@ void	mur_close_files(void)
 			assert(!jgbl.onlnrlbk || (cs_addrs->now_crit && cs_addrs->hold_onto_crit) || !murgbl.clean_exit);
 			DEBUG_ONLY(udi = FILE_INFO(reg));
 			assert(!rctl->standalone || (1 == (semval = semctl(udi->semid, 0, GETVAL))));
-			gds_rundown(); /* does the final rel_crit */
+			UNIX_ONLY(rundown_status =) gds_rundown(); /* does the final rel_crit */
+			if (EXIT_NRM != rundown_status)
+				wrn_count++;
 			assert(!rctl->standalone || (1 == (semval = semctl(udi->semid, 0, GETVAL))));
 			assert(!cs_addrs->now_crit && !cs_addrs->hold_onto_crit);
 		}
@@ -717,6 +727,7 @@ void	mur_close_files(void)
 			mur_rctl_desc_free(rctl); /* free them up now */
 		assert(NULL == rctl->mur_desc);
 	}
+
 	if (mur_options.rollback && murgbl.repl_standalone)
 	{
 		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
@@ -767,6 +778,13 @@ void	mur_close_files(void)
 							"shmdt()");
 				assert(FALSE);
 			}
+			/* Since journal pool is no longer attached, null out fields to indicate it is invalid. */
+			jnlpool.jnlpool_ctl = NULL;
+			jnlpool_ctl = NULL;
+			jnlpool.gtmsrc_lcl_array = NULL;
+			jnlpool.gtmsource_local_array = NULL;
+			jnlpool.jnldata_base = NULL;
+			jnlpool.repl_inst_filehdr = NULL;
 			if (1 == shm_buf.shm_nattch)
 			{	/* We are the only one attached. Go ahead and remove the shared memory ID and invalidate it in the
 				 * instance file header as well.
@@ -787,12 +805,6 @@ void	mur_close_files(void)
 				repl_instance.jnlpool_shmid = INVALID_SHMID;
 				repl_instance.jnlpool_shmid_ctime = 0;
 				repl_instance.crash = FALSE;	/* reset crash bit as the journal pool no longer exists */
-				jnlpool.jnlpool_ctl = NULL;
-				jnlpool_ctl = NULL;
-				jnlpool.gtmsrc_lcl_array = NULL;
-				jnlpool.gtmsource_local_array = NULL;
-				jnlpool.jnldata_base = NULL;
-				jnlpool.repl_inst_filehdr = NULL;
 			}
 			inst_hdr = &repl_instance; /* now that shared memory is gone, re-point inst_hdr to the one read from file */
 		}
@@ -804,7 +816,14 @@ void	mur_close_files(void)
 		 */
 		repl_inst_write(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		got_ftok = ftok_sem_lock(jnlpool.jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */
-		mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, got_ftok);
+		/* Note: The decision to remove the Journal Pool Access Control Semaphores should be based on two things:
+		 * 1. If we have the ftok on the instance file
+		 * 			AND
+		 * 2. If the instance is NOT crashed indicating that Journal Pool is rundown as well. This condition ensures that
+		 *    we don't cause a situation where the Journal Pool is left-around but the semaphores are removed which is an
+		 *    out-of-design situation.
+		 */
+		mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, got_ftok && !repl_instance.crash);
 		mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, got_ftok);
 		if (got_ftok)
 			ftok_sem_release(jnlpool.jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */

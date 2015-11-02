@@ -23,8 +23,6 @@
 #include "alloc_reg.h"
 #include "cdbg_dump.h"
 
-#define MAX_TEMP_COUNT		128
-
 GBLDEF int4			sa_temps[VALUED_REF_TYPES];
 GBLDEF int4			sa_temps_offset[VALUED_REF_TYPES];
 
@@ -43,6 +41,8 @@ LITDEF int4 sa_class_sizes[VALUED_REF_TYPES] =
 	,SIZEOF(char*)	/* TCAD_REF */
 };
 LITREF octabstruct 		oc_tab[];
+
+#define MAX_TEMP_COUNT		128	/* bad things, which need investigation, happen if we raise this above 1024 */
 
 error_def(ERR_TMPSTOREMAX);
 
@@ -94,14 +94,22 @@ void alloc_reg(void)
 					COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 2) **\n"););
 					continue;	/* continue, because 'normal' NOOP continues from this switch */
 				}
+#				ifndef DEBUG
 				break;
+#				endif
 			case OC_LINEFETCH:
+#				ifdef DEBUG
+				for (c = temphigh[TVAL_REF]; 0 <= c; c--)
+					assert(0 == tempcont[TVAL_REF][c]);	/* check against leaking TVAL temps */
+					if (OC_LINESTART == opc)
+					break;
+#				endif
 			case OC_FETCH:
 				assert((TRIP_REF == x->operand[0].oprclass) && (OC_ILIT == x->operand[0].oprval.tref->opcode));
 				if (x->operand[0].oprval.tref->operand[0].oprval.ilit == mvmax)
 				{
 					x->operand[0].oprval.tref->operand[0].oprval.ilit = 0;
-					x->operand[1].oprclass = 0;
+					x->operand[1].oprclass = NO_REF;
 				}
 				break;
 			case OC_STO:
@@ -121,12 +129,12 @@ void alloc_reg(void)
 				    && (0 == x->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len))
 				{
 					x->operand[0] = x->operand[1];
-					x->operand[1].oprclass = 0;
+					x->operand[1].oprclass = NO_REF;
 					opc = x->opcode = OC_EQUNUL;
 				} else if ((TRIP_REF == x->operand[1].oprclass) && (OC_LIT == x->operand[1].oprval.tref->opcode)
 					   && (0 == x->operand[1].oprval.tref->operand[0].oprval.mlit->v.str.len))
 				{
-					x->operand[1].oprclass = 0;
+					x->operand[1].oprclass = NO_REF;
 					opc = x->opcode = OC_EQUNUL;
 				}
 				break;
@@ -175,7 +183,7 @@ void alloc_reg(void)
 				{
 					x->destination = y->operand[0];
 					y->opcode = OC_NOOP;
-					y->operand[0].oprclass = y->operand[1].oprclass = 0;
+					y->operand[0].oprclass = y->operand[1].oprclass = NO_REF;
 				} else
 				{
 					oct &= OCT_VALUE | OCT_MVADDR;
@@ -208,7 +216,7 @@ void alloc_reg(void)
 	size = sa_temps[TVAL_REF] * sa_class_sizes[TVAL_REF];
 	sa_temps_offset[TVAL_REF] = size;
 	/* Since we need to align the temp region to the largest types, align even int temps to SIZEOF(char*) */
-	size += ROUND_UP2(sa_temps[TINT_REF] * sa_class_sizes[TINT_REF], SIZEOF(char *));
+	size += ROUND_UP2(sa_temps[TINT_REF] *sa_class_sizes[TINT_REF], SIZEOF(char *));
 	sa_temps_offset[TINT_REF] = size;
 	size += sa_temps[TVAD_REF] * sa_class_sizes[TVAD_REF];
 	sa_temps_offset[TVAD_REF] = size;

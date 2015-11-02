@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +20,6 @@
 #include "op.h"
 
 error_def(ERR_VAREXPECTED);
-error_def(ERR_INDMAXNEST);
 
 void op_indrzshow(mval *s1, mval *s2)
 {
@@ -32,15 +31,13 @@ void op_indrzshow(mval *s1, mval *s2)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (TREF(ind_source_sp) >= TREF(ind_source_top))
-		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_source_sp */
 	MV_FORCE_STR(s2);
 	indir_src.str = s2->str;
 	indir_src.code = indir_zshow;
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		obj = &object;
-		comp_init(&s2->str);
+		comp_init(&s2->str, NULL);
 		src = maketriple(OC_IGETSRC);
 		ins_triple(src);
 		switch(TREF(window_token))
@@ -83,14 +80,14 @@ void op_indrzshow(mval *s1, mval *s2)
 			rval = EXPR_FAIL;
 			break;
 		}
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, 0, s2->str.len))
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, NULL, NULL, s2->str.len))
 			return;
 		indir_src.str = s2->str;
 		indir_src.code = indir_zshow;
 		cache_put(&indir_src, obj);
 		/* Fall into code activation below */
 	}
-	*(TREF(ind_source_sp))++ = s1;				/* Where to store return value */
+	TREF(ind_source) = s1;
 	comp_indr(obj);
 	return;
 }

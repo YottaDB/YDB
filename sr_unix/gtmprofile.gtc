@@ -239,6 +239,9 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
 
     # Other useful environment variables
     # System administrators - add, delete or modify GT.M environment variables here as appropriate for your installation
+    if [ -z "$gtm_etrap" ] ; then
+        gtm_etrap='Write:(0=$STACK) "Error occurred: ",$ZStatus,!' ; export gtm_etrap
+    fi
     if [ -z "$gtm_principal_editing" ] ; then
         gtm_principal_editing="EDITING" ; export gtm_principal_editing
     fi

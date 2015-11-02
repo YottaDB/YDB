@@ -69,7 +69,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 
 	mstr	upd_proc_log_cmd, upd_proc_trans_cmd;
 	char	upd_proc_cmd[UPDPROC_CMD_MAXLEN];
-	int	status;
+	int	status, save_errno;
 	int	upd_status, save_upd_status;
 #ifdef UNIX
 	pid_t	upd_pid, waitpid_res;
@@ -80,11 +80,11 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 #endif
 
 	/* Check if the update process is alive */
-
 	if ((upd_status = is_updproc_alive()) == SRV_ERR)
 	{
+		save_errno = errno;	/* errno from get_sem_info() called from is_updproc_alive() */
 		gtm_putmsg(VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
-			   RTS_ERROR_LITERAL("Receive pool semctl failure"), REPL_SEM_ERRNO);
+			   RTS_ERROR_LITERAL("Receive pool semctl failure"), UNIX_ONLY(save_errno) VMS_ONLY(REPL_SEM_ERRNO));
 		repl_errno = EREPL_UPDSTART_SEMCTL;
 		return(UPDPROC_START_ERR);
 	} else if (upd_status == SRV_ALIVE && !fresh_start)

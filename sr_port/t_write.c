@@ -203,9 +203,10 @@ cw_set_element *t_write (
 		/* For uninitialized gv_target, initialize the in_tree status as IN_DIR_TREE */
 		assert (NULL != gv_target || dse_running || jgbl.forw_phase_recovery);
 		if (NULL == gv_target || 0 == gv_target->root)
-			SET_DIR_TREE(cse);
+			BIT_SET_DIR_TREE(cse->blk_prior_state);
 		else
-			(DIR_ROOT == gv_target->root)? SET_DIR_TREE(cse) : SET_GV_TREE(cse);
+			(DIR_ROOT == gv_target->root)? BIT_SET_DIR_TREE(cse->blk_prior_state) :
+						       BIT_SET_GV_TREE(cse->blk_prior_state);
 	} else
 	{	/* we did not create a new cse. assert the integrity of few fields filled in when this cse was created */
 		assert(cse->blk == blk);
@@ -228,7 +229,8 @@ cw_set_element *t_write (
 	cse->reference_cnt = 0;
 	cse->level = level;
 	/* t_write operates on BUSY blocks and hence cse->blk_prior_state's free_status is set to FALSE unconditionally */
-	SET_NFREE(cse);
+	BIT_CLEAR_FREE(cse->blk_prior_state);
+	BIT_CLEAR_RECYCLED(cse->blk_prior_state);
 	if (horiz_growth)
 		cse->first_copy = TRUE;
 	else

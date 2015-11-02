@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 	assert((1 & sense) == sense);
 	assert(oc_tab[t->opcode].octype & OCT_BOOL);
 	assert(TRIP_REF == t->operand[0].oprclass);
-	assert((TRIP_REF == t->operand[1].oprclass) || (NOCLASS == t->operand[1].oprclass));
+	assert((TRIP_REF == t->operand[1].oprclass) || (NO_REF == t->operand[1].oprclass));
 	switch (t->opcode)
 	{
 	case OC_COBOOL:
@@ -64,7 +64,7 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 	case OC_COM:
 		bx_tail(t->operand[0].oprval.tref, !sense, addr);
 		t->opcode = OC_NOOP;
-		t->operand[0].oprclass = 0;
+		t->operand[0].oprclass = NO_REF;
 		return;
 	case OC_NEQU:
 		sense = !sense;

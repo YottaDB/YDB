@@ -146,6 +146,7 @@ GBLREF 	mur_gbls_t		murgbl;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	gd_addr			*gd_header;
+GBLREF	sgmnt_data		*cs_data;
 #ifdef UNIX
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -153,7 +154,6 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	int4			strm_index;
 GBLREF	uint4			process_id;
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	sgmnt_data		*cs_data;
 GBLREF	boolean_t		jnlpool_init_needed;
 #endif
 
@@ -273,11 +273,8 @@ boolean_t mur_open_files()
 	/* We assume recovery will be done only on current global directory.
 	 * That is, journal file names specified must be from current global directory.
 	 */
-	if (star_specified || mur_options.update && !mur_options.redirect)
-	{	/* "*" is specified or it is -recover or -rollback. We require gtmgbldir to be set in all these cases.
-		 * The only exception is "-redirect" in which case the target database is obtained from -redirect
-		 * instead of from the global directory.
-		 */
+	if (star_specified || mur_options.update)
+	{	/* "*" is specified or it is -recover or -rollback. We require gtmgbldir to be set in all these cases */
 		assert(NULL == gd_header);
 		gvinit();	/* read in current global directory */
 		assert(NULL != gd_header);
@@ -306,8 +303,7 @@ boolean_t mur_open_files()
 		assert(NUM_SRC_SEMS == NUM_RECV_SEMS);
 		ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
 		assert(NULL == jnlpool.repl_inst_filehdr);
-		UNIX_ONLY(if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE, &jnlpool_sem_created)))
-		VMS_ONLY(if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE)))
+		if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE, &jnlpool_sem_created))
 			return FALSE;	/* mu_rndwn_repl_instance will have printed appropriate message in case of error */
 		assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
 		assert(jgbl.onlnrlbk || ANTICIPATORY_FREEZE_AVAILABLE || (NULL == jnlpool_ctl));
@@ -325,6 +321,7 @@ boolean_t mur_open_files()
 			assert((INVALID_SUPPL_STRM == strm_index) || (0 == strm_index));
 			strm_index = 0;
 		}
+		ENABLE_FREEZE_ON_ERROR;
 #		elif defined(VMS)
 		gbldir_mstr.addr = GTM_GBLDIR;
 		gbldir_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
@@ -416,11 +413,11 @@ boolean_t mur_open_files()
 			rctl->db_present = TRUE;
 			if (mur_options.update)
 			{
-				gv_cur_region = rctl->gd;	/* mu_rndwn_file() assumes gv_cur_region is set in VMS */
 #				ifdef UNIX
 				if (!jgbl.onlnrlbk)
 				{
 #				endif
+					VMS_ONLY(gv_cur_region = rctl->gd); /* VMS mu_rndwn_file() assumes gv_cur_region is set */
 					if (!STANDALONE(rctl->gd))	/* STANDALONE macro calls mu_rndwn_file() */
 					{
 						gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(rctl->gd));
@@ -434,10 +431,10 @@ boolean_t mur_open_files()
 			if (mur_options.update || mur_options.extr[GOOD_TN])
 			{
 	        		gvcst_init(rctl->gd);
+				TP_CHANGE_REG(rctl->gd);
 #				ifdef UNIX
 				if (jgbl.onlnrlbk)
 				{
-					TP_CHANGE_REG(rctl->gd);
 					if (!cs_data->fully_upgraded)
 					{
 						gtm_putmsg(VARLSTCNT(6) ERR_ORLBKNOV4BLK, 4, REG_LEN_STR(gv_cur_region),
@@ -648,6 +645,7 @@ boolean_t mur_open_files()
 			if (mur_options.update || mur_options.extr[GOOD_TN])
 			{	/* NOTE: Only for collation info extract needs database access */
 				DEFER_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES); /* temporarily disable MUPIP STOP/signal handling. */
+				TP_CHANGE_REG(rctl->gd);
 
 				csa = rctl->csa = &FILE_INFO(rctl->gd)->s_addrs;
 				csd = rctl->csd = rctl->csa->hdr;

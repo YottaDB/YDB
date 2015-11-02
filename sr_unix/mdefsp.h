@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *    Copyright 2001, 2012 Fidelity Information Services, Inc   *
+ *    Copyright 2001, 2013 Fidelity Information Services, Inc   *
  *                                                              *
  *    This source code contains the intellectual property       *
  *    of its copyright holder(s), and is made available         *
@@ -42,13 +42,6 @@ typedef uint2 mach_inst;
 	short term so define them here */
 #define DEBUG_LEAVE_SM
 #define DEBUG_NOMSYNC
-
-#define readonly
-#define GBLDEF
-#define GBLREF extern
-#define LITDEF const
-#define LITREF extern const
-#define error_def(x) LITREF int x
 
 #define UNIX 1
 #undef VMS
@@ -222,6 +215,13 @@ typedef struct
 
 #define malloc gtm_malloc
 #define free gtm_free
+/* gtm_shmget calls either the native shmget or libhugetlbfs's shmget which uses Huge Pages
+ * to back the shared segment if possible. This is a Linux only library.
+ */
+#if defined(__linux__) && (defined(__x86_64__) || defined(__i386__))
+#	define shmget	gtm_shmget
+	extern int gtm_shmget(key_t , size_t , int);
+#endif
 
 #ifndef __ia64
 #define CODE_ADDRESS(func)	(unsigned char *)func

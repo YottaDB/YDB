@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,10 +45,13 @@
 GBLREF	mu_set_rlist	*grlist;
 GBLREF	gd_region	*gv_cur_region;
 
-void mupip_set_jnl_cleanup(boolean_t clean_exit)
+error_def(ERR_NOTALLDBRNDWN);
+
+void mupip_set_jnl_cleanup(void)
 {
 	mu_set_rlist		*rptr;
 	file_control		*fc;
+	int4			rundown_status = EXIT_NRM;		/* if gds_rundown went smoothly */
 	VMS_ONLY(
 		GDS_INFO	*gds_info;
 		uint4		status;
@@ -93,10 +96,13 @@ void mupip_set_jnl_cleanup(boolean_t clean_exit)
  			tp_change_reg();
 			assert(NULL != gv_cur_region->dyn.addr->file_cntl && NULL != rptr->sd);
 			if (NULL != gv_cur_region->dyn.addr->file_cntl && NULL != rptr->sd)
-				gds_rundown();
+				UNIX_ONLY(rundown_status |=) gds_rundown();
 			/* Note: We did not allocate, so we do not deallocate rptr->sd */
 			rptr->sd = NULL;
 		}
 		rptr->state = DEALLOCATED;
 	}
+
+	if (EXIT_NRM != rundown_status)
+		rts_error(VARLSTCNT(1) ERR_NOTALLDBRNDWN);
 }

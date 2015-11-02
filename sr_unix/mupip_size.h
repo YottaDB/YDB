@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,15 @@
  *								*
  ****************************************************************/
 
-#ifndef PREEMPTIVE_CH_INCLUDED
-#define PREEMPTIVE_CH_INCLUDED
+#ifndef __MUPIP_SIZE_H__
+#define __MUPIP_SIZE_H__
 
-void preemptive_ch(int preemptive_severe);
+#include "cdb_sc.h"
 
-#endif /* PREEMPTIVE_CH_INCLUDED */
+void mupip_size(void);
+int4 mu_size_arsample(mval *gn, uint M, boolean_t ar, int seed);
+int4 mu_size_impsample(mval *gn, int4 M, int4 seed);
+int4 mu_size_scan(mval *gn, int4 level);
+enum cdb_sc rand_traverse(double *r);
+
+#endif

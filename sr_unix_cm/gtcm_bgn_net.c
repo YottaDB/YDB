@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +52,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 #endif /* defined(NET_TCP) */
 #ifdef BSD_TCP
 	struct sockaddr_in	sin;
-	int			on = 1;
+	const  boolean_t	reuseaddr = TRUE;
 #else /* defined(BSD_TCP) */
 #ifdef SYSV_TCP
 	struct t_bind		*bind;
@@ -104,17 +104,9 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 		return save_errno;
 	}
 	/*  Reuse a specified address */
-	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&on, SIZEOF(on)) < 0)
+	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&reuseaddr, SIZEOF(reuseaddr)) < 0)
 	{
 		save_errno = errno;
-		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
-		return save_errno;
-	}
-	/* the system should periodically check to see if the connections are live */
-	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (void *)&on, SIZEOF(on)) < 0)
-	{
-		save_errno = errno;
-		perror("setsockopt:");
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}

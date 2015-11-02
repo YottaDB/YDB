@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include <signal.h>
 #include "error.h"
-#include "preemptive_ch.h"
+#include "preemptive_db_clnup.h"
 #include "util.h"
 
 GBLREF VSIG_ATOMIC_T	util_interrupt;
@@ -36,7 +36,7 @@ CONDITION_HANDLER(util_ch)
 	PRN_ERROR;
 	if (SIGNAL == ERR_CTRLC)
 	{
-		preemptive_ch(ERROR);	/* bluff about SEVERITY, just so gv_target will be reset in preemptive_ch */
+		preemptive_db_clnup(ERROR);	/* bluff about SEVERITY, just so gv_target will be reset in preemptive_db_clnup */
 		assert(util_interrupt);
 		util_interrupt = 0;
 		UNWIND(NULL, NULL);
@@ -45,7 +45,7 @@ CONDITION_HANDLER(util_ch)
 		CONTINUE;
 	} else
 	{
-		preemptive_ch(SEVERITY);
+		preemptive_db_clnup(SEVERITY);
 		UNWIND(NULL, NULL);
 	}
 }

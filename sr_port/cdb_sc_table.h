@@ -116,3 +116,4 @@ CDB_SC_LCHAR_ENTRY(cdb_sc_gvtrootmod,       FALSE, 'r') /* 'r'  gvcst_kill found
 CDB_SC_LCHAR_ENTRY(cdb_sc_instancefreeze,   FALSE, 's') /* 's'  instance freeze detected in t_end/tp_tend, requires retry */
 CDB_SC_LCHAR_ENTRY(cdb_sc_gvtrootmod2,      FALSE, 't') /* 't'  t_end/tp_tend detected root blocks moved by reorg */
 CDB_SC_LCHAR_ENTRY(cdb_sc_spansize,         FALSE, 'u') /* 'u'  chunks of spanning node don't add up */
+CDB_SC_LCHAR_ENTRY(cdb_sc_restarted,        FALSE, 'v') /* 'v'  return value indicating t_retry has already happened */

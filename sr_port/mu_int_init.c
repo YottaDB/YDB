@@ -37,12 +37,13 @@
 #endif
 #define MSGBUF_SIZE 256
 
-GBLREF gd_region		*gv_cur_region;
-GBLREF sgmnt_data		mu_int_data;
-GBLREF unsigned char		*mu_int_master;
-GTMCRYPT_ONLY(
-GBLREF gtmcrypt_key_t		mu_int_encrypt_key_handle;
-)
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_data		mu_int_data;
+GBLREF	unsigned char		*mu_int_master;
+GBLREF	int			mu_int_skipreg_cnt;
+#ifdef GTM_CRYPT
+GBLREF	gtmcrypt_key_t		mu_int_encrypt_key_handle;
+#endif
 
 error_def(ERR_DBFSTHEAD);
 error_def(ERR_MUNODBNAME);
@@ -50,14 +51,15 @@ error_def(ERR_MUSTANDALONE);
 
 boolean_t mu_int_init(void)
 {
-	unsigned int	status;
-	gtm_uint64_t	native_size;
-	file_control	*fc;
-	boolean_t	standalone;
-	char		msgbuff[MSGBUF_SIZE], *msgptr;
-	GTMCRYPT_ONLY(
-		int	crypt_status;
-	)
+	unsigned int		status;
+	gtm_uint64_t		native_size;
+	file_control		*fc;
+	boolean_t		standalone;
+	char			msgbuff[MSGBUF_SIZE], *msgptr;
+#	ifdef GTM_CRYPT
+	int			gtmcrypt_errno;
+	gd_segment		*seg;
+#	endif
 
 	mu_gv_cur_reg_init();
 	/* get filename */
@@ -67,6 +69,7 @@ boolean_t mu_int_init(void)
 	if (!STANDALONE(gv_cur_region))
 	{
 		gtm_putmsg(VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
+		mu_int_skipreg_cnt++;
 		return (FALSE);
 	}
 	fc = gv_cur_region->dyn.addr->file_cntl;
@@ -76,6 +79,7 @@ boolean_t mu_int_init(void)
 	if (SS_NORMAL != status)
 	{
 		gtm_putmsg(VARLSTCNT(1) status);
+		mu_int_skipreg_cnt++;
 		return FALSE;
 	}
 	native_size = gds_file_size(fc);
@@ -97,18 +101,15 @@ boolean_t mu_int_init(void)
 		return FALSE;
 	}
 #	ifdef GTM_CRYPT
-	/* Initialize encryption and the key information for the current segment to be used in mu_int_read.
-	 * Note that this is done here and will be called only if mupip integ is called with -file option.
-	 * In other case where mupip integ is called with -reg option, the following initialization will be done
-	 * in db_init. */
 	if (mu_int_data.is_encrypted)
-	{
-		INIT_PROC_ENCRYPTION(crypt_status);
-		if (0 == crypt_status)
-			GTMCRYPT_GETKEY(mu_int_data.encryption_hash, mu_int_encrypt_key_handle, crypt_status);
-		if (0 != crypt_status)
+	{ 	/* Initialize encryption and the key information for the current segment to be used in mu_int_read. */
+		ASSERT_ENCRYPTION_INITIALIZED;	/* should have been done in mu_rndwn_file called from STANDALONE macro */
+		GTMCRYPT_GETKEY(NULL, mu_int_data.encryption_hash, mu_int_encrypt_key_handle, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
-			GC_GTM_PUTMSG(crypt_status, (gv_cur_region->dyn.addr->fname));
+			seg = gv_cur_region->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+			mu_int_skipreg_cnt++;
 			return FALSE;
 		}
 	}

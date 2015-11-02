@@ -45,10 +45,12 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 	jnl_private_control	*jpc;
 	sgmnt_data_ptr_t	csd;
 	uint4			cursum;
-#ifdef GTM_CRYPT
-	char			*buff;
-	int			req_enc_blk_size, init_status, crypt_status;
-#endif
+#	ifdef GTM_CRYPT
+	char			*in, *out;
+	int			in_len, gtmcrypt_errno;
+	gd_segment		*seg;
+#	endif
+
 	csd = csa->hdr;
 	assert(csa->now_crit);
 	jpc = csa->jnl;
@@ -79,18 +81,19 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
 	save_buffer = buffer;
 #	ifdef GTM_CRYPT
-	req_enc_blk_size = aimg_record.bsiz - SIZEOF(*buffer);
-	if (BLOCK_REQUIRE_ENCRYPTION(csd->is_encrypted, buffer->levl, req_enc_blk_size))
+	in_len = aimg_record.bsiz - SIZEOF(*buffer);
+	if (BLOCK_REQUIRE_ENCRYPTION(csd->is_encrypted, buffer->levl, in_len))
 	{
 		ASSERT_ENCRYPTION_INITIALIZED;
 		memcpy(csa->encrypted_blk_contents, buffer, SIZEOF(*buffer));
-		GTMCRYPT_ENCODE_FAST(csa->encr_key_handle,
-				     (char *)(buffer + 1),
-				     req_enc_blk_size,
-				     (csa->encrypted_blk_contents + SIZEOF(*buffer)),
-				     crypt_status);
-		if (0 != crypt_status)
-			GC_RTS_ERROR(crypt_status, NULL);
+		in = (char *)(buffer + 1);
+		out = csa->encrypted_blk_contents + SIZEOF(blk_hdr);
+		GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, in, in_len, out, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+		{
+			seg = csa->region->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+		}
 		buffer = (blk_hdr_ptr_t)csa->encrypted_blk_contents;
 	}
 #	endif

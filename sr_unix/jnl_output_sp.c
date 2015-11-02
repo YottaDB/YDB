@@ -41,7 +41,6 @@
 
 GBLREF	volatile int4	db_fsync_in_prog;
 GBLREF	volatile int4	jnl_qio_in_prog;
-GBLREF	boolean_t	ok_to_UNWIND_in_exit_handling;
 GBLREF	uint4		process_id;
 
 error_def(ERR_DBFSYNCERR);
@@ -92,6 +91,10 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		assert(0 <= jnl_qio_in_prog);
 		return ERR_JNLWRTDEFER;
 	}
+#	ifdef DEBUG
+	if (gtm_white_box_test_case_enabled && (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number))
+		kill(process_id, SIGTSTP);
+#	endif
 	if (jb->dsk != (jb->dskaddr % jb->size))
 	{
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
@@ -119,7 +122,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	{
 		DB_FSYNC(reg, udi, csa, db_fsync_in_prog, save_errno);
 		GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_DBFSYNCERR, save_errno, EIO);
-		GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_DBFSYNCERR, ok_to_UNWIND_in_exit_handling, TRUE);
 		if (0 != save_errno)
 		{
 			RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
@@ -224,9 +226,13 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 			else
 				jb->enospc_errcnt = 0;
 
-			jnl_send_oper(jpc, ERR_JNLACCESS);
-			jpc->status = status;	/* set jpc->status back to original error as jnl_send_oper resets jpc->status
-						 * to SS_NORMAL. We need it in callers of this function (e.g. jnl_write_attempt). */
+			if (ERR_ENOSPCQIODEFER != status)
+			{
+				jnl_send_oper(jpc, ERR_JNLACCESS);
+				jpc->status = status;	/* set jpc->status back to original error as jnl_send_oper resets
+							 * jpc->status to SS_NORMAL. We need it in callers of this function
+							 * (e.g. jnl_write_attempt). */
+			}
 #			ifdef GTM_FD_TRACE
 			if ((EBADF == status) || (ESPIPE == status))
 			{	/* likely case of D9I11-002714. check if fd is valid */
@@ -242,7 +248,10 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 				 */
 			}
 #			endif
-			status = ERR_JNLACCESS;
+			if (ERR_ENOSPCQIODEFER == status)
+				status = ERR_JNLWRTDEFER;
+			else
+				status = ERR_JNLACCESS;
 		}
 	}
 	RELEASE_SWAPLOCK(&jb->io_in_prog_latch);

@@ -26,6 +26,8 @@
  *   4. There are no other runtime dependencies on this order. The order of fields can be switched around
  *      any way desired with just a rebuild.
  *   5. It is important for ANY DEBUG_ONLY fields to go at the VERY END. Failure to do this breaks gtmpcat.
+ *   6. If a DEBUG_ONLY array is declared whose dimension is a macro, then it is necessary, for gtmpcat to work,
+ *      that the macro shouldn't be defined as DEBUG_ONLY.
  */
 
 /* Priority access fields - commonly used fields in performance situations */
@@ -48,22 +50,22 @@ THREADGBLDEF(expr_depth,			unsigned int)			/* expression nesting level */
 THREADGBLDEF(expr_start,			triple *)			/* chain anchor for side effect early evaluation */
 THREADGBLDEF(expr_start_orig,			triple *)			/* anchor used to test if there's anything hung on
 										 * expr_start */
-THREADGBLDEF(for_nest_level,			uint4)				/* kludge feeds extra (non-lvn) arg to FOR rt ops */
 THREADGBLDEF(for_stack_ptr,			oprtype **)			/* part of FOR compilation nesting mechanism */
 THREADGBLDEF(gtm_fullbool,			unsigned int)			/* controls boolean side-effect behavior defaults
 										 * to 0 (GTM_BOOL) */
-THREADGBLDEF(ind_result_array,			mval **)			/* base of array holding indirection returns */
-THREADGBLDEF(ind_result_sp,			mval **)			/* pointer into array holding indirection returns */
-THREADGBLDEF(ind_result_top,			mval **)			/* top of array holding indirection returns */
-THREADGBLDEF(ind_source_array,			mval **)			/* base of array holding indirection values */
-THREADGBLDEF(ind_source_sp,			mval **)			/* pointer into array holding indirection values */
-THREADGBLDEF(ind_source_top,			mval **)			/* top of array holding indirection values */
+THREADGBLDEF(ind_result,			mval *)				/* pointer to indirection return location */
+THREADGBLDEF(ind_source,			mval *)				/* pointer to indirection source location */
+THREADGBLDEF(indirection_mval,			mval)				/* used for parsing subscripted indirection */
 THREADGBLDEF(last_source_column,		short int)			/* parser tracker */
 THREADGBLDEF(pos_in_chain,			triple)				/* anchor used to restart after a parsing error */
 THREADGBLDEF(s2n_intlit, 			boolean_t)			/* type info from s2n for advancewindow */
 THREADGBLDEF(saw_side_effect,			boolean_t)			/* need side effect handling other than naked */
 THREADGBLDEF(shift_side_effects, 		int)				/* flag shifting of side-effects ahead of boolean
 										 * evalation */
+THREADGBLDEF(side_effect_base,			boolean_t *)			/* anchor side effect array: bin ops & func args */
+THREADGBLDEF(side_effect_depth,			uint4)				/* current high water of side effect expr array */
+THREADGBLDEF(side_effect_handling,		int)				/* side effect handling in actuallists, function
+										 * args & non-boolean binary operator operands */
 THREADGBLDEF(source_error_found,		int4)				/* flag to partially defer compiler error */
 THREADGBLDEF(temp_subs,				boolean_t)			/* flag temp storing of subscripts to preserve
 										 * current evaluation */
@@ -124,9 +126,6 @@ THREADGBLDEF(tp_restart_entryref,		mval)				/* tp_restart position for reporting
 THREADGBLDEF(tp_restart_failhist_indx,		int4)				/* tp_restart dbg restart history index */
 THREADGBLDEF(tprestart_syslog_delta,		int4)				/* defines every n-th restart to be logged */
 THREADGBLDEF(tprestart_syslog_limit,		int4)				/* # of TP restarts logged unconditionally */
-#ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
-THREADGBLDEF(trans_restart_hist_index,		uint4)
-#endif
 THREADGBLDEF(transform,				boolean_t)			/* flag collation transform eligible */
 THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever invoked in this
 										 * process. */
@@ -170,6 +169,7 @@ THREADGBLDEF(fnzsearch_lv_vars,			lv_val *)			/* UNIX op_fnzsearch lv tree ancho
 THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* UNIX op_fnzsearch subscript constuctor */
 THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* UNIX op_fnzsearch temp for null subs control */
 #endif
+THREADGBLDEF(glvn_pool_ptr,			glvn_pool *)			/* Pointer to the glvn pool */
 THREADGBLDEF(gtm_env_init_done,			boolean_t)			/* gtm_env_init flag for completion */
 THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() function pointer */
 THREADGBLDEF(gtm_environment_init,		boolean_t)			/* indicates GT.M development environment rather
@@ -253,9 +253,6 @@ THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size
 										 * accommodate 10 Unicode characters in a prompt */
 THREADGBLDEF(rt_name_tbl,			hash_table_mname)		/* Routine hash table for finding $TEXT() info */
 THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
-#ifdef ENABLE_EXTENDED_RESTART_TRACE_HIST
-THREADGBLAR1DEF(trans_restart_hist_array,	trans_restart_hist_t, TRANS_RESTART_HIST_ARRAY_SZ) /* See tp.h for usage */
-#endif
 #ifdef UNIX
 THREADGBLDEF(user_id,				uint4)				/* USERID number */
 #endif
@@ -282,21 +279,56 @@ THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of cal
 THREADGBLDEF(want_empty_gvts,			boolean_t)			/* set to TRUE by MUPIP REORG when it is selecting
 										 * globals to be reorged. Need to be able to select
 										 * killed globals for effective truncate. */
-THREADGBLDEF(in_mu_swap_root,			boolean_t)			/* set to TRUE by MUPIP REORG when it is moving
-										 * GVT root blocks in mu_swap_root. */
+THREADGBLDEF(in_mu_swap_root_state,		unsigned int)			/* Three states:
+										 * MUSWP_INCR_ROOT_CYCLE: MUPIP REORG moves GVT
+										 *		    root blocks in mu_swap_root.
+										 * MUSWP_FREE_BLK: MUPIP REORG frees blocks
+										 * MUSWP_NONE
+										 */
 THREADGBLDEF(prev_t_tries,			unsigned int)			/* t_tries - 1, before t_retry/tp_restart */
 THREADGBLDEF(rlbk_during_redo_root,		boolean_t)			/* set to TRUE if an online rollback which takes
 										 * the db to a different logical state occurs
 										 * during gvcst_redo_root_search in t_retry */
+THREADGBLDEF(mlk_yield_pid,			uint4)				/* if non-zero, indicates the process id for which
+										 * we yielded a chance to get this lock. We keep
+										 * yielding as long as the process-id that is the
+										 * first in the wait queue ("d->pending") changes.
+										 * If the pid stays the same, we stop yielding.
+										 * if -1, indicates we disabled fairness mechanism
+										 * in order to avoid livelocks.
+										 */
+THREADGBLDEF(jnl_extract_nocol,			uint4)				/* If non-zero, MUPIP JOURNAL EXTRACT will skip
+										 * reading the directory tree to find the
+										 * collation information for each global. Note
+										 * that this might result in garbled subscripts
+										 * in the extract if globals do use alternative
+										 * collation.
+										 */
+#ifdef GTM_TRIGGER
+THREADGBLDEF(gvt_triggers_read_this_tn,		boolean_t)			/* if non-zero, indicates triggers were read for
+										 * at least one gv_target in this transaction.
+										 * A complete list of all gv_targets who had
+										 * triggers read in this transaction can be found
+										 * by going through the gvt_tp_list and checking
+										 * if gvt->trig_read_tn matches local_tn. This is
+										 * useful to invalidate all those triggers in case
+										 * of a transaction restart or rollback.
+										 */
+#endif
 
 /* Debug values */
 #ifdef DEBUG
 THREADGBLDEF(continue_proc_cnt,			int)				/* Used by whitebox secshr test to count time
 										 * process was continued. */
+THREADGBLDEF(gtm_test_fake_enospc,		boolean_t)			/*  DEBUG-only option to enable/disable anticipatory
+										 *  freeze fake ENOSPC testing
+										 */
 THREADGBLDEF(gtm_usesecshr,			boolean_t)			/* Bypass easy methods of dealing with IPCs, files,
 										 * wakeups, etc and always use gtmsecshr (testing).
 										 */
 THREADGBLDEF(rts_error_unusable,		boolean_t)			/* Denotes the window in which an rts_error is
 										 * unusable */
 THREADGBLDEF(rts_error_unusable_seen,		boolean_t)
+THREADGBLAR1DEF(trans_restart_hist_array,	trans_restart_hist_t, TRANS_RESTART_HIST_ARRAY_SZ) /* See tp.h for usage */
+THREADGBLDEF(trans_restart_hist_index,		uint4)
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ struct startup_vector
 	unsigned char	*gtm_main_inaddr;
 	int4		user_stack_size;
 	int4            user_spawn_flag;
-	int4		user_indrcache_size;
+	int4		user_indrcache_size;	/* defunct */
 	int4		user_strpl_size;
 	int4		user_io_timer;
 	int4		user_write_filter;

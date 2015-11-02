@@ -18,6 +18,7 @@
 #include "stack_frame.h"
 #include "mprof.h"
 #include "error.h"
+#include "glvn_pool.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF unsigned char	*msp, *stackbase, *stackwarn, *stacktop;
@@ -58,7 +59,7 @@ void exfun_frame (void)
 	sf->temps_ptr = msp;
 	assert(msp < stackbase);
 	memset(msp, 0, sf->rvector->temp_size);
-	sf->for_ctrl_stack = NULL;
+	SET_GLVN_INDX(sf, GLVN_POOL_UNTOUCHED);
 	sf->ret_value = NULL;
 	sf->dollar_test = -1;
 	sf->old_frame_pointer = frame_pointer;

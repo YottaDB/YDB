@@ -108,11 +108,11 @@ int main (int argc, char **argv)
 	in_backup = FALSE;
 	op_open_ptr = mu_op_open;
 	mu_get_term_characterstics();
+	gtm_chk_dist(argv[0]);
 	cli_lex_setup(argc,argv);
 	if (argc < 2)			/* Interactive mode */
 		display_prompt();
 	/*      this call should be after cli_lex_setup() due to S390 A/E conversion    */
-	gtm_chk_dist(argv[0]);
 	INIT_GBL_ROOT(); /* Needed for GVT initialization */
 	init_gtm();
 	while (TRUE)

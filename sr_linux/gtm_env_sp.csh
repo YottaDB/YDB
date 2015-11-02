@@ -182,11 +182,12 @@ if ( $?gtm_version_change == "1" ) then
 	# -fno-defer-pop to prevent problems with assembly/generated code with optimization
 	# -fno-strict-aliasing since we don't comply with the rules
 	# -ffloat-store for consistent results avoiding rounding differences
+	# -fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
 	if ( "ia64" != $mach_type ) then
 		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store"
 		if ( "32" == $gt_build_type ) then
 			# applies to 32bit x86_64, ia32 and cygwin
-			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -march=i686"
+			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -fno-omit-frame-pointer -march=i686"
 		endif
 	endif
 	# -g	generate debugging information for dbx (no longer overrides -O)

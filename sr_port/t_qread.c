@@ -48,16 +48,14 @@
 #include "wbox_test_init.h"
 #include "memcoherency.h"
 #include "wcs_flu.h"		/* for SET_CACHE_FAIL_STATUS macro */
-
 #ifdef UNIX
+# ifdef GTM_CRYPT
+#  include "gtmcrypt.h"
+# endif
 #include "io.h"			/* needed by gtmsecshr.h */
 #include "gtmsecshr.h"		/* for continue_proc */
 #endif
 #include "wcs_phase2_commit_wait.h"
-
-#ifdef GTM_CRYPT
-#include "gtmcrypt.h"
-#endif
 #include "gtm_c_stack_trace.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
@@ -98,6 +96,7 @@ GBLREF	boolean_t		mupip_jnl_recover;
 	(first_tp_srch_status)->buffaddr = (sm_uc_ptr_t)GDS_REL2ABS((newcr)->buffaddr);
 
 error_def(ERR_BUFOWNERSTUCK);
+error_def(ERR_CRYPTBADCONFIG);
 error_def(ERR_DBFILERR);
 error_def(ERR_DYNUPGRDFAIL);
 error_def(ERR_GVPUTFAIL);
@@ -116,7 +115,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	register sgmnt_addrs	*csa;
 	register sgmnt_data_ptr_t	csd;
 	enum db_ver		ondsk_blkver;
-	int4			dummy_errno;
+	int4			dummy_errno, gtmcrypt_errno;
 	boolean_t		already_built, is_mm, reset_first_tp_srch_status, set_wc_blocked, sleep_invoked;
 	ht_ent_int4		*tabent;
 	srch_blk_status		*blkhist;
@@ -125,6 +124,9 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	uint4			stuck_cnt = 0;
 	boolean_t		lcl_blk_free;
 	node_local_ptr_t	cnl;
+#	ifdef GTM_CRYPT
+	gd_segment		*seg;
+#	endif
 
 	lcl_blk_free = block_is_free;
 	block_is_free = FALSE;	/* Reset to FALSE so that if t_qread fails below, we don't have an incorrect state of this var */
@@ -286,14 +288,17 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		return (sm_uc_ptr_t)(mm_read(blk));
 	}
 #	ifdef GTM_CRYPT
-	/* If database is encrypted, check if encryption initialization went fine for this database. If not,
-	 * do not let process proceed as it could now potentially get a peek at the desired data from the
-	 * decrypted shared memory global buffers (read in from disk by other processes) without having to go to disk.
-	 * If DSE, allow for a special case where it is trying to dump a local bitmap block. In this case, DSE
-	 * can continue to run fine (even if encryption initialization failed) since bitmap blocks are unencrypted.
-	 */
-	if (csa->encrypt_init_status && (!dse_running || !IS_BITMAP_BLK(blk)))
-		GC_RTS_ERROR(csa->encrypt_init_status, gv_cur_region->dyn.addr->fname);
+	if ((GTMCRYPT_INVALID_KEY_HANDLE == csa->encr_key_handle) && !IS_BITMAP_BLK(blk))
+	{	/* A non-GT.M process is attempting to read a non-bitmap block but doesn't have a valid encryption key handle. This
+		 * is an indication that the process encountered an error during db_init and reported it with a -W- severity. But,
+		 * since the block it is attempting to read can be in the unencrypted shared memory, we cannot let it access it
+		 * without a valid handle. So, issue an rts_error
+		 */
+		assert(!IS_GTM_IMAGE);	/* GT.M would have error'ed out in db_init */
+		gtmcrypt_errno = SET_REPEAT_MSG_MASK(SET_CRYPTERR_MASK(ERR_CRYPTBADCONFIG));
+		seg = gv_cur_region->dyn.addr;
+		GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+	}
 #	endif
 	assert(dba_bg == csd->acc_meth);
 	assert(!first_tp_srch_status || !first_tp_srch_status->cr
@@ -394,7 +399,15 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						/* restart */
 						rdfail_detail = cdb_sc_truncate;
 						return (sm_uc_ptr_t)NULL;
-					} else
+					}
+#					ifdef GTM_CRYPT
+					else if (IS_CRYPTERR_MASK(status))
+					{
+						seg = gv_cur_region->dyn.addr;
+						GTMCRYPT_REPORT_ERROR(status, rts_error, seg->fname_len, seg->fname);
+					}
+#					endif
+					else
 						rts_error(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(gv_cur_region), status);
 				}
 				disk_blk_read = TRUE;
@@ -562,7 +575,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				} else if (cr->read_in_progress >= 0)
 				{
 					BG_TRACE_PRO(t_qread_buf_owner_stuck);
-					if (0 != (blocking_pid = cr->r_epid))
+					blocking_pid = cr->r_epid;
+					if ((0 != blocking_pid) && (process_id != blocking_pid))
 					{
 						if (FALSE == is_proc_alive(blocking_pid, cr->image_count))
 						{	/* process gone: release that process's lock */
@@ -589,13 +603,17 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							stuck_cnt++;
 							GET_C_STACK_FROM_SCRIPT("BUFOWNERSTUCK", process_id, blocking_pid,
 										stuck_cnt);
-							if (MAX_TQREAD_WAIT <= lcnt)	/* max wait of 4 mins */
-								GTMASSERT;
 							/* Kickstart the process taking a long time in case it was suspended */
 							UNIX_ONLY(continue_proc(blocking_pid));
 						}
 					} else
-					{	/* process stopped before could set r_epid */
+					{	/* process stopped before could set r_epid OR
+						 * Process is waiting on the lock held by itself.
+						 * Process waiting on the lock held by itself is an out-of-design
+						 * situation that we dont how it can occur hence the following assert
+						 * but know how to handle so we dont have to gtmassert in pro.
+						 */
+						assert(process_id != blocking_pid);
 						assert(0 == cr->bt_index);
 						if (cr->bt_index)
 						{
@@ -606,7 +624,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						}
 						cr->cycle++;	/* increment cycle for blk number changes (for tp_hist) */
 						cr->blk = CR_BLKEMPTY;
-						RELEASE_BUFF_READ_LOCK(cr);	/* cr->r_epid already zero - no need to set */
+						cr->r_epid = 0; /* If the process itself is lock holder, r_epid is non-zero */
+						RELEASE_BUFF_READ_LOCK(cr);
 						if (cr->read_in_progress < -1)	/* race: process released since if r_epid */
 							LOCK_BUFF_FOR_READ(cr, dummy);
 					}

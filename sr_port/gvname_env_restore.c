@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +53,8 @@ void gvname_env_restore(gvname_info *curr_gvname_info)
 	gv_currkey->prev = curr_gvname_info->s_gv_currkey->prev;
 	memcpy(gv_currkey->base, curr_gvname_info->s_gv_currkey->base, curr_gvname_info->s_gv_currkey->end + 1);
 	sgm_info_ptr = curr_gvname_info->s_sgm_info_ptr;
-	assert((is_bg_or_mm && ((dollar_tlevel && sgm_info_ptr) || (!dollar_tlevel && !sgm_info_ptr))) ||
-	       dba_cm == gv_cur_region->dyn.addr->acc_meth || dba_usr == gv_cur_region->dyn.addr->acc_meth);
+	assert((is_bg_or_mm && ((dollar_tlevel && sgm_info_ptr) || (!dollar_tlevel && !sgm_info_ptr)))
+		|| (dba_cm == gv_cur_region->dyn.addr->acc_meth) || (dba_usr == gv_cur_region->dyn.addr->acc_meth));
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 
 }

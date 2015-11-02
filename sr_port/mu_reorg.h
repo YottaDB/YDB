@@ -25,6 +25,9 @@
 #define DATA_FILL_TOLERANCE 10
 #define INDEX_FILL_TOLERANCE 10
 
+/* On UNIX, keys with hidden subscripts are allowed in the database. */
+#define REORG_KEY_SZ_LIMIT	(gv_cur_region->max_key_size UNIX_ONLY( + SPAN_SUBS_LEN + 1))
+
 /*********************************************************************
 	block_number is used for swap
  *********************************************************************/
@@ -97,7 +100,7 @@
 #define INVALID_RECORD(LEVEL, REC_SIZE, KEYLEN, KEYCMPC) 		\
 	(( ((0 == (LEVEL)) && (2 >= (KEYLEN)) )	||			\
 	(BSTAR_REC_SIZE > ((REC_SIZE) + (0 == (LEVEL) ? 1 : 0)) ) || 	\
-	(gv_cur_region->max_key_size + 4 < ((int)(KEYLEN) + (KEYCMPC))) )	\
+	(REORG_KEY_SZ_LIMIT < ((int)(KEYLEN) + (KEYCMPC))) )		\
 		? TRUE:FALSE )
 
 /*************************************************************************
@@ -118,7 +121,7 @@
 												\
 	GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)(REC_BASE))->rsiz));				\
 	REC_SIZE = temp_ushort;									\
-	KEY_CMPC = EVAL_CMPC((rec_hdr_ptr_t)(REC_BASE));						\
+	KEY_CMPC = EVAL_CMPC((rec_hdr_ptr_t)(REC_BASE));					\
 	if (0 != (LEVEL) && BSTAR_REC_SIZE == (REC_SIZE))					\
 	{											\
 		KEY_LEN = 0;									\
@@ -127,15 +130,15 @@
 	else											\
 	{											\
 		for (rPtr1 = (KEY) + KEY_CMPC, rPtr2 = (REC_BASE) + SIZEOF(rec_hdr);		\
-			gv_cur_region->max_key_size + 3 > (rPtr2 - (REC_BASE) - SIZEOF(rec_hdr)) && \
-			gv_cur_region->max_key_size + 3 > (rPtr1 - (KEY)) ;)	\
+			(REORG_KEY_SZ_LIMIT - 1) > (rPtr2 - (REC_BASE) - SIZEOF(rec_hdr)) && 	\
+			(REORG_KEY_SZ_LIMIT - 1) > (rPtr1 - (KEY)) ;)				\
 		{										\
 			if ((0 == (*rPtr1++ = *rPtr2++)) && (0 == *rPtr2))			\
 				break;								\
 		}										\
 		*rPtr1++ = *rPtr2++;								\
-		KEY_LEN = (int)(rPtr2 - (REC_BASE) - SIZEOF(rec_hdr));					\
-		if ((gv_cur_region->max_key_size + 4 < ((int)(KEY_LEN)+ (KEY_CMPC))) ||		\
+		KEY_LEN = (int)(rPtr2 - (REC_BASE) - SIZEOF(rec_hdr));				\
+		if ((REORG_KEY_SZ_LIMIT < ((int)(KEY_LEN)+ (KEY_CMPC))) ||			\
 			(BSTAR_REC_SIZE > ((REC_SIZE) + ((0 == (LEVEL)) ? 1 : 0))) ||		\
 			(2 >= (KEY_LEN)) || (0 != *(rPtr1 - 1) || 0 != *(rPtr1 - 2)))		\
 			STATUS = cdb_sc_blkmod;							\

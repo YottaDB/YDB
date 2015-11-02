@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,7 @@ void gvname_env_save(gvname_info *  curr_gvname_info)
 	assert((is_bg_or_mm && cs_addrs->hdr == cs_data) || dba_cm == gv_cur_region->dyn.addr->acc_meth ||
 		dba_usr == gv_cur_region->dyn.addr->acc_meth);
 	curr_gvname_info->s_cs_addrs = cs_addrs;
-	DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	assert(gv_currkey->top <= curr_gvname_info->s_gv_currkey->top);
 	curr_gvname_info->s_gv_currkey->end = gv_currkey->end;
 	curr_gvname_info->s_gv_currkey->prev = gv_currkey->prev;

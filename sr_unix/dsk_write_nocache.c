@@ -53,7 +53,9 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		save_buff;
 #	ifdef GTM_CRYPT
-	int			req_enc_blk_size, this_blk_size, crypt_status;
+	int			in_len, this_blk_size, gtmcrypt_errno;
+	char			*in, *out;
+	gd_segment		*seg;
 #	endif
 
 	udi = (unix_db_info *)(reg->dyn.addr->file_cntl->file_info);
@@ -107,19 +109,20 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	{
 		this_blk_size = ((blk_hdr_ptr_t)buff)->bsiz;
 		assert((this_blk_size <= csd->blk_size) && (this_blk_size >= SIZEOF(blk_hdr)));
-		req_enc_blk_size = MIN(csd->blk_size, this_blk_size) - SIZEOF(blk_hdr);
-		if (BLK_NEEDS_ENCRYPTION(((blk_hdr_ptr_t)buff)->levl, req_enc_blk_size))
+		in_len = MIN(csd->blk_size, this_blk_size) - SIZEOF(blk_hdr);
+		if (BLK_NEEDS_ENCRYPTION(((blk_hdr_ptr_t)buff)->levl, in_len))
 		{
 			ASSERT_ENCRYPTION_INITIALIZED;
 			assert(csa->encrypted_blk_contents);
 			memcpy(csa->encrypted_blk_contents, buff, SIZEOF(blk_hdr));
-			GTMCRYPT_ENCODE_FAST(csa->encr_key_handle,
-					     (char *)(buff + SIZEOF(blk_hdr)),
-					     req_enc_blk_size,
-					     (csa->encrypted_blk_contents + SIZEOF(blk_hdr)),
-					     crypt_status);
-			if (0 != crypt_status)
-				GC_RTS_ERROR(crypt_status, reg->dyn.addr->fname);
+			out = csa->encrypted_blk_contents + SIZEOF(blk_hdr);
+			in = (char *)(buff + SIZEOF(blk_hdr));
+			GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, in, in_len, out, gtmcrypt_errno);
+			if (0 != gtmcrypt_errno)
+			{
+				seg = reg->dyn.addr;
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
+			}
 			buff = (unsigned char *)csa->encrypted_blk_contents;
 		}
 	}

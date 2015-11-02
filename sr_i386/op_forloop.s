@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -53,7 +53,7 @@ ENTRY op_forloop
 	pushl	%esi
 	pushl	%ebx
 	movl	indx(%ebp),%esi
-	mv_force_defined %esi, l0
+	mv_force_defined_strict %esi, l0		# disregard NOUNDEF
 	movl	%esi, indx(%ebp)
 	mv_force_num %esi, l1
 	movl	indx(%ebp),%esi

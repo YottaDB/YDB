@@ -79,9 +79,13 @@ GBLREF	boolean_t	*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gt
 GBLREF	uint4		process_id;
 GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
-GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
-GBLREF	volatile int4	fast_lock_count;
-GBLREF	int		process_exiting;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	sgmnt_data	*cs_data;
+#ifdef DEBUG
+GBLREF	volatile int	reformat_buffer_in_use;
+GBLREF	volatile int4	gtmMallocDepth;
+#endif
 /* In case of a disk-full situation, we want to print a message every 1 minute. We maintain two global variables to that effect.
  * dskspace_msg_counter and save_dskspace_msg_counter. If we encounter a disk-full situation and both those variables are different
  * we start a timer dskspace_msg_timer() that pops after a minute and increments one of the variables dskspace_msg_counter.
@@ -92,10 +96,11 @@ GBLDEF	volatile uint4		dskspace_msg_counter = 1;	/* not static since used in dsk
 
 error_def(ERR_DBFILERR);
 error_def(ERR_DBIOERR);
+error_def(ERR_ENOSPCQIODEFER);
+error_def(ERR_GBLOFLOW);
 error_def(ERR_JNLFSYNCERR);
 error_def(ERR_JNLWRTDEFER);
 error_def(ERR_JNLWRTNOWWRTR);
-error_def(ERR_GBLOFLOW);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
@@ -123,14 +128,20 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	boolean_t		is_mm;
 	uint4			curr_wbox_seq_num;
 	int			try_sleep, rc;
-	GTMCRYPT_ONLY(
-		int		req_enc_blk_size;
-		int4		crypt_status = 0;
-		char		*inbuf;
-		boolean_t	is_encrypted;
-		blk_hdr_ptr_t	enc_bp;
-	)
+	gd_region		*sav_cur_region;
+	sgmnt_addrs		*sav_cs_addrs;
+	sgmnt_data		*sav_cs_data;
+#	ifdef GTM_CRYPT
+	char			*in, *out;
+	int			in_len;
+	int4			gtmcrypt_errno = 0;
+	gd_segment		*seg;
+#	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	if (ANTICIPATORY_FREEZE_AVAILABLE)
+		PUSH_GV_CUR_REGION(region, sav_cur_region, sav_cs_addrs, sav_cs_data)
 	udi = FILE_INFO(region);
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
@@ -147,6 +158,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	if (csa->in_wtstart)
 	{
 		BG_TRACE_ANY(csa, wrt_busy);
+		if (ANTICIPATORY_FREEZE_AVAILABLE)
+			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data)
 		return err_status;			/* Already here, get out */
 	}
 	cnl = csa->nl;
@@ -157,6 +170,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	{
 		DECR_INTENT_WTSTART(cnl);
 		BG_TRACE_ANY(csa, wrt_blocked);
+		if (ANTICIPATORY_FREEZE_AVAILABLE)
+			POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data)
 		return err_status;
 	}
 	csa->in_wtstart = TRUE;				/* Tell ourselves we're here and make the csa->in_wtstart (private copy) */
@@ -304,14 +319,10 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				assert(((blk_hdr_ptr_t)bp)->bver);	/* GDSV4 (0) version uses this field as a block length so
 									   should always be > 0 */
 				if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
-				{	/* Need to downgrade/reformat this block back to a previous format. */
-					assert(0 <= fast_lock_count);
-					++fast_lock_count; /* do not allow interrupts to use reformat buffer until we are done */
-					/* reformat_buffer_in_use should always be incremented only AFTER incrementing
-					 * fast_lock_count as it is the latter that prevents interrupts from using the
-					 * reformat buffer. Similarly the decrement of fast_lock_count should be done
-					 * AFTER decrementing reformat_buffer_in_use.
+				{	/* Need to downgrade/reformat this block back to a previous format. But, first defer timer
+					 * or external interrupts from using the reformat buffer while we are modifying it.
 					 */
+					DEFER_INTERRUPTS(INTRPT_IN_REFORMAT_BUFFER_USE);
 					assert(0 == reformat_buffer_in_use);
 					DEBUG_ONLY(reformat_buffer_in_use++;)
 					DEBUG_DYNGRD_ONLY(PRINTF("WCS_WTSTART: Block %d being dynamically downgraded on write\n", \
@@ -320,7 +331,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					{	/* Buffer not big enough (or does not exist) .. get a new one releasing
 						 * old if it exists
 						 */
-						assert(1 == fast_lock_count);	/* should not be in a nested free/malloc */
+						assert(0 == gtmMallocDepth);	/* should not be in a nested free/malloc */
 						if (reformat_buffer)
 							free(reformat_buffer);	/* Different blksized databases in use
 										   .. keep only largest one */
@@ -347,33 +358,32 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					save_bp = (blk_hdr_ptr_t) GDS_ANY_ENCRYPTGLOBUF(bp, csa);
 					DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)save_bp);
 					assert((bp->bsiz <= csd->blk_size) && (bp->bsiz >= SIZEOF(*bp)));
-					req_enc_blk_size = MIN(csd->blk_size, bp->bsiz) - SIZEOF(*bp);
-					if (BLK_NEEDS_ENCRYPTION(bp->levl, req_enc_blk_size))
+					in_len = MIN(csd->blk_size, bp->bsiz) - SIZEOF(*bp);
+					if (BLK_NEEDS_ENCRYPTION(bp->levl, in_len))
 					{
 						ASSERT_ENCRYPTION_INITIALIZED;
 						memcpy(save_bp, bp, SIZEOF(blk_hdr));
-						GTMCRYPT_ENCODE_FAST(csa->encr_key_handle,
-								     (char *)(bp + 1),
-								     req_enc_blk_size,
-								     (char *)(save_bp + 1),
-								     crypt_status);
-						if (0 != crypt_status)
-							save_errno = crypt_status;
+						in = (char *)(bp + 1);
+						out = (char *)(save_bp + 1);
+						GTMCRYPT_ENCRYPT(csa, csa->encr_key_handle, in, in_len, out, gtmcrypt_errno);
+						save_errno = gtmcrypt_errno;
 					} else
 						memcpy(save_bp, bp, bp->bsiz);
 				}
 #				endif
 				if (0 == save_errno)
-				{	/* Do db write without timer protect (no need since wtstart not reenterable in one task) */
+				{	/* Due to csa->in_wtstart protection (at the beginning of this module), we are guaranteed
+					 * that the write below won't be interrupted by another nested wcs_wtstart
+					 */
 					DB_LSEEKWRITE(csa, udi->fn, udi->fd, offset, save_bp, size, save_errno);
-					if ((blk_hdr_ptr_t)reformat_buffer == bp)
-					{
-						DEBUG_ONLY(reformat_buffer_in_use--;)
-						assert(0 == reformat_buffer_in_use);
-						/* allow interrupts now that we are done using the reformat buffer */
-						--fast_lock_count;
-						assert(0 <= fast_lock_count);
-					}
+				}
+				if ((blk_hdr_ptr_t)reformat_buffer == bp)
+				{
+					assert(INTRPT_OK_TO_INTERRUPT != intrpt_ok_state);
+					DEBUG_ONLY(reformat_buffer_in_use--;)
+					assert(0 == reformat_buffer_in_use);
+					/* allow interrupts now that we are done using the reformat buffer */
+					ENABLE_INTERRUPTS(INTRPT_IN_REFORMAT_BUFFER_USE);
 				}
 			} else
 			{
@@ -406,15 +416,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 #				endif
 			}
 #			ifdef DEBUG
-			if (!process_exiting)
-			{	/* Trigger I/O error if white box test case is turned on and if not in gds_rundown (the latter
-				 * is to avoid unnecessary asserts during rundown)
-				 */
-				GTM_WHITE_BOX_TEST(WBTEST_WCS_WTSTART_IOERR, save_errno, ENOENT);
-			}
+			/* Trigger I/O error if white box test case is turned on */
+			GTM_WHITE_BOX_TEST(WBTEST_WCS_WTSTART_IOERR, save_errno, ENOENT);
 #			endif
 			if (0 != save_errno)
 			{
+				assert(ERR_ENOSPCQIODEFER != save_errno || !csa->now_crit);
 				if (!is_mm)	/* before releasing update lock, clear epid as well in case of bg */
 					csr->epid = 0;
 				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
@@ -444,7 +451,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 						start_timer((TID)&dskspace_msg_timer, DSKSPACE_MSG_INTERVAL, dskspace_msg_timer, 0,
 								NULL);
 					}
-				} else
+				} else if(ERR_ENOSPCQIODEFER != save_errno)
 				{
 					cnl->wtstart_errcnt++;
 					if (1 == (cnl->wtstart_errcnt % DBIOERR_LOGGING_PERIOD))
@@ -458,6 +465,11 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 								save_errno);
 					}
 				}
+				/* if (ERR_ENOSPCQIODEFER == save_errno): DB_LSEEKWRITE above encountered ENOSPC but couldn't
+				 * trigger a freeze as it did not hold crit. It is okay to return as this is not a critical
+				 * write. Eventually, some crit holding process will trigger a freeze and wait for space to be freed
+				 * up.
+				 */
 				err_status = save_errno;
 				break;
 			}
@@ -500,23 +512,23 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	}
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
 	CLEAR_WTSTART_PID(cnl, index);
-	/* do not allow interrupts (particularly dbsync timer) in this two-line window (C9J06-003139) */
-	assert(0 <= fast_lock_count);
-	++fast_lock_count;
+	/* Defer interrupts to protect the decrement of cnl->intent_wtstart and potential addition of a new dbsync timer */
+	DEFER_INTERRUPTS(INTRPT_IN_WCS_WTSTART);
 	csa->in_wtstart = FALSE;			/* This process can write again */
 	DECR_INTENT_WTSTART(cnl);
-	--fast_lock_count;
-	assert(0 <= fast_lock_count);
-	GTMCRYPT_ONLY(
-		if (0 != crypt_status)
-		{	/* Now that we have done all cleanup (reinserted the cache-record that failed the write and cleared
-			 * cnl->in_wtstart and cnl->intent_wtstart, go ahead and issue the error.
-			 */
-			GC_RTS_ERROR(crypt_status, region->dyn.addr->fname);
-		}
-	)
-	DEFERRED_EXIT_HANDLING_CHECK; /* now that in_wtstart is FALSE, check if deferred signal/exit handling needs to be done */
 	if (queue_empty)			/* Active queue has become empty. */
 		wcs_clean_dbsync_timer(csa);	/* Start a timer to flush-filehdr (and write epoch if before-imaging) */
+	ENABLE_INTERRUPTS(INTRPT_IN_WCS_WTSTART);
+#	ifdef GTM_CRYPT
+	if (0 != gtmcrypt_errno)
+	{	/* Now that we have done all cleanup (reinserted the cache-record that failed the write and cleared cnl->in_wtstart
+		 * and cnl->intent_wtstart, go ahead and issue the error.
+		 */
+		seg = region->dyn.addr;
+		GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, seg->fname_len, seg->fname);
+	}
+#	endif
+	if (ANTICIPATORY_FREEZE_AVAILABLE)
+		POP_GV_CUR_REGION(sav_cur_region, sav_cs_addrs, sav_cs_data)
 	return err_status;
 }

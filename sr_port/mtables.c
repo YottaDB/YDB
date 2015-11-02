@@ -130,7 +130,8 @@ LITDEF toktabtype tokentable[] =
 	tokdef("TK_VBAR", 0, 0, 0),
 	tokdef("TK_EXPONENT", OC_EXP, 0, OCT_MVAL),
 	tokdef("TK_SORTS_AFTER", OC_SORTS_AFTER, 0, OCT_MVAL),
-	tokdef("TK_NSORTS_AFTER", OC_NSORTS_AFTER, 0, OCT_MVAL)
+	tokdef("TK_NSORTS_AFTER", OC_NSORTS_AFTER, 0, OCT_MVAL),
+	tokdef("TK_ATHASH", 0, 0, 0)
 };
 
 GBLREF mv_stent *mv_chain;	/* Needed for MV_SIZE macro */
@@ -158,8 +159,8 @@ LITDEF unsigned char mvs_size[] =
 };
 
 /* All mv_stent types that need to be preserved are indicated by the mvs_save[] array.
- * MVST_STCK_SP (which is the same as the MVST_STCK type everywhere else is handled specially here.
- * This entry is created by mdb_condition_handler to stack the "stackwarn" global variable.
+ * MVST_STCK_SP (which is the same as the MVST_STCK type everywhere else) is handled specially here.
+ * The MVST_STCK_SP entry is created by mdb_condition_handler to stack the "stackwarn" global variable.
  * This one needs to be preserved since our encountering this type in flush_jmp.c indicates that we are currently
  * in the error-handler of a STACKCRIT error which in turn has "GOTO ..." in the $ZTRAP/$ETRAP that is
  * causing us to mutate the current frame we are executing in with the contents pointed to by the GOTO.
@@ -189,16 +190,16 @@ LITDEF boolean_t mvs_save[] =
 	FALSE	/* MVST_MRGZWRSV */
 };
 
-static readonly unsigned char localpool[7] = {'1', '1' , '1' , '0', '1', '0', '0'};
+static readonly unsigned char localpool[7] = {'1', '1', '1', '0', '1', '0', '0'};
 LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_UTF_LEN, 0, 0, 0, 0, 0, 0);
-LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[3], 0,      0 );
-LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[0], 0,   1000 );
-LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[2], 0,  10000 );
-LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  11000 );
-LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[4], 0, 100000 );
-LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 101000 );
-LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 110000 );
-LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[0], 0, 111000 );
+LITDEF mval literal_zero	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[3], 0,   0);
+LITDEF mval literal_one 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 1, (char *)&localpool[0], 0,   1 * MV_BIAS);
+LITDEF mval literal_ten 	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[2], 0,  10 * MV_BIAS);
+LITDEF mval literal_eleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 2, (char *)&localpool[0], 0,  11 * MV_BIAS);
+LITDEF mval literal_oneohoh	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[4], 0, 100 * MV_BIAS);
+LITDEF mval literal_oneohone	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[2], 0, 101 * MV_BIAS);
+LITDEF mval literal_oneten	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[1], 0, 110 * MV_BIAS);
+LITDEF mval literal_oneeleven	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 0, 3, (char *)&localpool[0], 0, 111 * MV_BIAS);
 
 /* --------------------------------------------------------------------------------------------------------------------------
  * All string mvals defined in this module using LITDEF need to have MV_NUM_APPROX bit set. This is because these mval

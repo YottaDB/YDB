@@ -10,6 +10,9 @@
  ****************************************************************/
 
 #ifndef MUPIP_REORG_DEFINED
+#define MUSWP_NONE		0
+#define MUSWP_INCR_ROOT_CYCLE 	1
+#define MUSWP_FREE_BLK		2
 
 /* prototypes */
 

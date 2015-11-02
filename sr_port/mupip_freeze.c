@@ -51,7 +51,9 @@ GBLREF	tp_region	*grlist;
 GBLREF	bool		in_mupip_freeze;
 GBLREF	bool		error_mupip;
 GBLREF	boolean_t	debug_mupip;
+#ifdef UNIX
 GBLREF	boolean_t	jnlpool_init_needed;
+#endif
 
 #define INTERRUPTED	(mu_ctrly_occurred || mu_ctrlc_occurred)
 #define PRINT_FREEZEERR 											\
@@ -85,7 +87,7 @@ void	mupip_freeze(void)
 
 	status = SS_NORMAL;
 	in_mupip_freeze = TRUE;
-	jnlpool_init_needed = TRUE;
+	UNIX_ONLY(jnlpool_init_needed = TRUE);
 	mu_outofband_setup();
 	gvinit();
 	freeze = (CLI_PRESENT == cli_present("ON"));

@@ -41,6 +41,10 @@
 #include "gtmmsg.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
+#ifdef DEBUG
+#include "wbox_test_init.h"
+#include "gtmio.h"
+#endif
 
 #define GTMRECV_WAIT_FOR_SHUTDOWN	(1000 - 1) /* ms, almost 1s */
 
@@ -61,7 +65,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 {
 	uint4           savepid;
 	boolean_t       shut_upd_too = FALSE, was_crit;
-	int             status;
+	int             status, save_errno;
 	unix_db_info	*udi;
 
 	udi = (unix_db_info *)FILE_INFO(recvpool.recvpool_dummy_reg);
@@ -75,9 +79,11 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		status = grab_sem(RECV, RECV_POOL_ACCESS_SEM);
 		if (0 > status)
 		{
-			repl_log(stderr, TRUE, TRUE,
-				"Error grabbing receive pool control semaphore : %s. Shutdown not complete\n", REPL_SEM_ERROR);
-			return (ABNORMAL_SHUTDOWN);
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Error grabbing receive pool control semaphore : %s. "
+					"Shutdown not complete\n", STRERROR(save_errno));
+			repl_inst_ftok_sem_release();
+			return ABNORMAL_SHUTDOWN;
 		}
 	} else
 	{	/* ftok semaphore and recvpool access semaphore should already be held from the previous call to "recvpool_init" */
@@ -86,28 +92,41 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		/* We do not want to hold the options semaphore to avoid deadlocks with receiver server startup (C9F12-002766) */
 		assert(!holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);
 		recvpool.gtmrecv_local->shutdown = SHUTDOWN;
-		/* Wait for receiver server to die. But release ftok semaphore and recvpool access control semaphore before
-		 * waiting as the concurrently running receiver server might need these (e.g. if it is about to call the
-		 * function "repl_inst_was_rootprimary").
+		/* Wait for receiver server to die. But before that release ftok semaphore and receive pool access control
+		 * semaphore. This way, other processes (either in this environment or a different one) don't encounter startup
+		 * issues. However, to ensure that a concurrent argument-less rundown doesn't remove these semaphores (in case they
+		 * are orphaned), increment the counter semaphore.
 		 */
-		if (0 != rel_sem(RECV, RECV_POOL_ACCESS_SEM))
-			gtm_putmsg(VARLSTCNT(7) ERR_TEXT, 2, RTS_ERROR_LITERAL("Error in receiver server shutdown rel_sem"),
-				REPL_SEM_ERRNO);
+		if (0 != (status = grab_sem(RECV, RECV_SERV_COUNT_SEM)))
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Could not acquire Receive Pool counter semaphore : %s. "
+							"Shutdown did not complete\n", STRERROR(save_errno));
+			/* Even though we hold the FTOK and RECV_POOL_ACCESS_SEM before entering this function (as ensured by
+			 * asserts above), it is safe to release them in case of a premature error (like this one). The caller
+			 * doesn't rely on the semaphores being held and this function is designed to release these semaphores
+			 * eventually anyways (after gtmrecv_ipc_cleanup())
+			 */
+			repl_inst_ftok_sem_release();
+			status = rel_sem(RECV, RECV_POOL_ACCESS_SEM);
+			assert(0 == status);
+			return ABNORMAL_SHUTDOWN;
+		}
+		if (0 != (status = rel_sem(RECV, RECV_POOL_ACCESS_SEM)))
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Could not release Receive Pool access control semaphore : %s. "
+							"Shutdown did not complete\n", STRERROR(save_errno));
+			repl_inst_ftok_sem_release(); /* see comment above for why this is okay */
+			status = rel_sem(RECV, RECV_SERV_COUNT_SEM);
+			assert(0 == status);
+			return ABNORMAL_SHUTDOWN;
+		}
 		repl_inst_ftok_sem_release();
-		/* Wait for receiver server to shut down */
 		while((SHUTDOWN == recvpool.gtmrecv_local->shutdown)
 				&& (0 < (savepid = recvpool.gtmrecv_local->recv_serv_pid))
 				&& is_proc_alive(savepid, 0))
 			SHORT_SLEEP(GTMRECV_WAIT_FOR_SHUTDOWN);
-		/* (Re)Grab the ftok semaphore and recvpool access control semaphore IN THAT ORDER (to avoid deadlocks) */
-		repl_inst_ftok_sem_lock();
-		status = grab_sem(RECV, RECV_POOL_ACCESS_SEM);
-		if (0 > status)
-		{
-			repl_log(stderr, TRUE, TRUE,
-				"Error regrabbing receive pool control semaphore : %s. Shutdown not complete\n", REPL_SEM_ERROR);
-			return (ABNORMAL_SHUTDOWN);
-		}
 		exit_status = recvpool.gtmrecv_local->shutdown;
 		if (SHUTDOWN == exit_status)
 		{
@@ -120,6 +139,39 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 				shut_upd_too = TRUE;
 			}
 		}
+		/* (Re)Grab the ftok semaphore and recvpool access control semaphore IN THAT ORDER (to avoid deadlocks) */
+		repl_inst_ftok_sem_lock();
+#		ifdef DEBUG
+		/* Sleep for a few seconds to test for concurrent argument-less RUNDOWN to ensure that the latter doesn't remove
+		 * the RECV_POOL_ACCESS_SEM under the assumption that it is orphaned.
+		 */
+		if (gtm_white_box_test_case_enabled && (WBTEST_LONGSLEEP_IN_REPL_SHUTDOWN == gtm_white_box_test_case_number))
+		{
+			DBGFPF((stderr, "GTMRECV_SHUTDOWN is about to start long sleep\n"));
+			LONG_SLEEP(10);
+		}
+#		endif
+		if (0 != (status = grab_sem(RECV, RECV_POOL_ACCESS_SEM)))
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Could not acquire Receive Pool access control semaphore : %s. "
+							"Shutdown did not complete\n", STRERROR(save_errno));
+			repl_inst_ftok_sem_release();
+			status = rel_sem(RECV, RECV_SERV_COUNT_SEM);
+			assert(0 == status);
+			return ABNORMAL_SHUTDOWN;
+		}
+		/* Now that semaphores are acquired, decrement the counter semaphore */
+		if (0 != (status = rel_sem(RECV, RECV_SERV_COUNT_SEM)))
+		{
+			save_errno = errno;
+			repl_log(stderr, TRUE, TRUE, "Could not release Receive Pool counter semaphore : %s. "
+							"Shutdown did not complete\n", STRERROR(save_errno));
+			repl_inst_ftok_sem_release();
+			status = rel_sem(RECV, RECV_POOL_ACCESS_SEM);
+			assert(0 == status);
+			return ABNORMAL_SHUTDOWN;
+		}
 	}
 	if (shut_upd_too)
 		gtmrecv_endupd();
@@ -130,12 +182,12 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 	{	/* Release all semaphores */
 		if (!auto_shutdown)
 		{
-			rel_sem_immediate( RECV, UPD_PROC_COUNT_SEM);
-			rel_sem_immediate( RECV, RECV_SERV_COUNT_SEM);
+			rel_sem_immediate(RECV, UPD_PROC_COUNT_SEM);
+			rel_sem_immediate(RECV, RECV_SERV_COUNT_SEM);
 		}
 		rel_sem_immediate( RECV, RECV_POOL_ACCESS_SEM);
-	} else if (NORMAL_SHUTDOWN == exit_status)
-	{
+	} else
+	{	/* Receive Pool and Access Control Semaphores removed. Invalidate corresponding fields in file header */
 		assert(!udi->s_addrs.hold_onto_crit);
 		was_crit = udi->s_addrs.now_crit;
 		/* repl_inst_recvpool_reset inturn invokes repl_inst_flush_filehdr which expects the caller to grab journal pool

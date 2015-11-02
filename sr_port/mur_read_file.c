@@ -48,13 +48,17 @@
 #include "gtmmsg.h"
 #include "mur_validate_checksum.h"
 #include "repl_sp.h"		/* for F_CLOSE (used by JNL_FD_CLOSE) */
+#ifdef GTM_CRYPT
+#include "gtmcrypt.h"
+#include "error.h"
+#endif
 
 error_def(ERR_BEGSEQGTENDSEQ);
 error_def(ERR_BOVTNGTEOVTN);
 error_def(ERR_GTMASSERT);
 error_def(ERR_JNLBADRECFMT);
 error_def(ERR_JNLFILECLOSERR);
-error_def(ERR_JNLFILOPN);
+error_def(ERR_JNLFILRDOPN);
 error_def(ERR_JNLINVALID);
 error_def(ERR_JNLNOBIJBACK);
 error_def(ERR_JNLREAD);
@@ -151,7 +155,7 @@ uint4 mur_prev_rec(jnl_ctl_list **jjctl)
 			return	ERR_NOPREVLINK;
 		}
 		if (!mur_insert_prev(&jctl))
-			return ERR_JNLFILOPN;
+			return ERR_JNLFILRDOPN;
 	}
 	jctl->rec_offset = jctl->lvrec_off; /* lvrec_off was set in fread_eof that was called when we opened the file(s) */
 	*jjctl = jctl;
@@ -933,9 +937,9 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 	char		jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN];
 	jnl_record	*jrec;
 	int		cre_jnl_rec_size;
-	GTMCRYPT_ONLY(
-		int	crypt_status;
-	)
+#	ifdef GTM_CRYPT
+	int		gtmcrypt_errno;
+#	endif
 
 	if (!mur_fopen_sp(jctl))
 		return FALSE;
@@ -1051,16 +1055,13 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		murgbl.max_extr_record_length = ZWR_EXP_RATIO(jctl->jfh->max_jrec_len);
 #	ifdef GTM_CRYPT
 	jctl->is_same_hash_as_db = TRUE;
-	if (FALSE == process_exiting && jfh->is_encrypted)
+	if (!process_exiting && jfh->is_encrypted)
 	{
-		/* Encryption initialization will not happen in db_init for all cases.
-		 * Eg: MUPIP JOURNAL -BACKWARD -SHOW -NOVERIFY */
-		INIT_PROC_ENCRYPTION(crypt_status);
-		/* If the encryption init failed in db_init, the below MACRO should return an error.
-		 * But, since this will be called for those operations that might not actually require encryption/decryption,
-		 * we don't report the error immediately. Instead wait for the first encryption/decryption task and report
-		 * accordingly. */
-		GTMCRYPT_GETKEY(jfh->encryption_hash, jctl->encr_key_handle, crypt_status);
+		INIT_PROC_ENCRYPTION(cs_addrs, gtmcrypt_errno);
+		if (0 == gtmcrypt_errno)
+			GTMCRYPT_GETKEY(cs_addrs, jfh->encryption_hash, jctl->encr_key_handle, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
+			GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(gtmcrypt_errno), gtm_putmsg, jctl->jnl_fn_len, jctl->jnl_fn);
 		if (NULL != mur_ctl->csd && (0 != memcmp(mur_ctl->csd->encryption_hash, jfh->encryption_hash, GTMCRYPT_HASH_LEN)))
 			jctl->is_same_hash_as_db = FALSE;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,6 @@ int f_incr(oprtype *a, opctype op)
 	r = maketriple(op);
 	/* may need to evaluate the increment (2nd arg) early and use result later: prepare to juggle triple chains */
 	dqinit(&targchain, exorder);	/* a place for the operation and the target */
-	dqinit(&incrchain, exorder);	/* a place for the increment */
 	dqinit(&tmpexpr, exorder);	/* a place to juggle the shifted chain in case it's active */
 	triptr = TREF(expr_start);
 	savptr = TREF(expr_start_orig);	/* but make sure expr_start_orig == expr_start since this is a new chain */
@@ -67,24 +66,24 @@ int f_incr(oprtype *a, opctype op)
 		setcurtchain(oldchain);
 		return FALSE;
 	}
-	assert(TREF(expr_start) == tmpexpr.exorder.bl);	/* maks sure nothing else did something fancy */
 	TREF(expr_start) = triptr;				/* restore original shift chain */
 	TREF(expr_start_orig) = savptr;
 	increment = &r->operand[1];
-	setcurtchain(&incrchain);	/* now to the increment expr, which must evaluate before the glvn in $INCR(glvn,expr) */
 	if (TK_COMMA != TREF(window_token))
 		*increment = put_ilit(1);	/* default optional increment to 1 */
 	else
 	{
+		dqinit(&incrchain, exorder);	/* a place for the increment */
+		setcurtchain(&incrchain);	/* increment expr must evaluate before the glvn in $INCR(glvn,expr) */
 		advancewindow();
 		if (EXPR_FAIL == expr(increment, MUMPS_NUM))
 		{
 			setcurtchain(oldchain);
 			return FALSE;
 		}
+		dqadd(&targchain, &incrchain, exorder);	/* dir before targ - this is a violation of info hiding */
+		setcurtchain(&targchain);
 	}
-	triptr = incrchain.exorder.bl;			/* prepare to park the target after the increment */
-	dqadd(triptr, &targchain, exorder);		/* this is a violation of info hiding */
 	coerce(increment, OCT_MVAL);
 	ins_triple(r);
 	if (&tmpexpr != tmpexpr.exorder.bl)
@@ -92,6 +91,7 @@ int f_incr(oprtype *a, opctype op)
 		assert(TREF(shift_side_effects));
 		dqadd(TREF(expr_start), &tmpexpr, exorder);	/* this is a violation of info hiding */
 		TREF(expr_start) = tmpexpr.exorder.bl;
+		assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
 		triptr = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
 		triptr->operand[0] = put_tref(TREF(expr_start));
 	}
@@ -99,17 +99,18 @@ int f_incr(oprtype *a, opctype op)
 	{	/* put it on the end of the main chain as there's no reason to play more with the ordering */
 		setcurtchain(oldchain);
 		triptr = (TREF(curtchain))->exorder.bl;
-		dqadd(triptr, &incrchain, exorder);	/* this is a violation of info hiding */
+		dqadd(triptr, &targchain, exorder);	/* this is a violation of info hiding */
 	} else	/* need full side effects or indirect 1st argument so put everything on the shift chain */
 	{	/* add the chain after "expr_start" which may be much before "curtchain" */
 		newtriple(OC_GVSAVTARG);
 		setcurtchain(oldchain);
 		assert(NULL != TREF(expr_start));
-		dqadd(TREF(expr_start), &incrchain, exorder);	/* this is a violation of info hiding */
-		TREF(expr_start) = incrchain.exorder.bl;
+		dqadd(TREF(expr_start), &targchain, exorder);	/* this is a violation of info hiding */
+		TREF(expr_start) = targchain.exorder.bl;
 		triptr = newtriple(OC_GVRECTARG);
 		triptr->operand[0] = put_tref(TREF(expr_start));
 	}
+	/* $increment() args need to avoid side effect processing but that's handled in expritem so eval_expr gets $i()'s SE flag */
 	*a = put_tref(r);
 	return TRUE;
 }

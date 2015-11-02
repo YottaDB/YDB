@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
+#include "glvn_pool.h"
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
 #endif
@@ -91,7 +92,6 @@ LITREF fun_data_type	fun_data[];
 	return FALSE;						\
 }
 
-void	m_set_create_temporaries(triple *sub, opctype put_oc);
 void	allow_dzwrtac_as_mident(void);
 
 int m_set(void)
@@ -125,12 +125,14 @@ int m_set(void)
 	boolean_t	parse_warn;	/* set to TRUE in case of an invalid SVN etc. */
 	boolean_t	curtchain_switched;	/* set to TRUE if a setcurtchain was done */
 	boolean_t	temp_subs_was_FALSE;
+	boolean_t	used_glvn_slot;
 	int		delimlen, first_val_lit, index, last_val_lit, nakedzalias, setop;
 	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
 	opctype		put_oc;
-	oprtype		delimval, firstval, lastval, resptr, *result, v;
+	oprtype		delimval, firstval, lastval, resptr, *result, v, control_slot, first_control_slot;
 	triple		*curtargchain, *delimiter, discardcurtchain, *first, *get, *jmptrp1, *jmptrp2, *last, *obp, *put;
 	triple		*s, *s0, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
+	triple		*ref;
 	mint		delimlit;
 	mval		*delim_mval;
 	mvar		*mvarptr;
@@ -143,6 +145,7 @@ int m_set(void)
 
 	SETUP_THREADGBL_ACCESS;
 	TREF(temp_subs) = FALSE;
+	used_glvn_slot = FALSE;
 	dqinit(&targchain, exorder);
 	result = (oprtype *)mcalloc(SIZEOF(oprtype));
 	resptr = put_indr(result);
@@ -189,9 +192,9 @@ int m_set(void)
 	 *	D - Triple that does OC_GVPUT of the new value into ^A(x,y)
 	 *	This is the point where the conditional check triples will branch around to if they chose to.
 	 *
-	 *	A - triples that evaluates the arguments/subscripts in the left-hand-side of the SET command
+	 *	A - triples that evaluate the arguments/subscripts in the left-hand-side of the SET command
 	 *		These triples are built in "curtchain"
-	 *	B - triples that evaluates the arguments/subscripts in the right-hand-side of the SET command
+	 *	B - triples that evaluate the arguments/subscripts in the right-hand-side of the SET command
 	 *		These triples are built in "curtchain"
 	 *	C - triples that do conditional check for any $PIECE/$EXTRACT in the left side of the SET command.
 	 *		These triples are built in "curtargchain"
@@ -266,7 +269,7 @@ int m_set(void)
 					sub = v.oprval.tref;
 					put_oc = OC_PUTINDX;
 					if (TREF(temp_subs))
-						m_set_create_temporaries(sub, put_oc);
+						create_temporaries(sub, put_oc);
 				}
 			} else
 			{	/* Have alias variable. Argument is index into var table rather than pointer to var */
@@ -302,7 +305,7 @@ int m_set(void)
 			dqdel(sub, exorder);
 			dqins(targchain.exorder.bl, exorder, sub);
 			if (TREF(temp_subs))
-				m_set_create_temporaries(sub, put_oc);
+				create_temporaries(sub, put_oc);
 			put = maketriple(OC_GVPUT);
 			put->operand[0] = resptr;
 			dqins(targchain.exorder.bl, exorder, put);
@@ -320,8 +323,21 @@ int m_set(void)
 				put->operand[1] = put_ilit(indir_set);
 				return TRUE;
 			}
-			put = maketriple(OC_INDSET);
-			put->operand[0] = v;
+			if (TREF(side_effect_handling))
+			{	/* save and restore the variable lookup for true left-to-right evaluation */
+				INSERT_INDSAVGLVN(control_slot, v, ANY_SLOT, 0);	/* 0 flag to defer global reference */
+				if (!used_glvn_slot)
+				{
+					used_glvn_slot = TRUE;
+					first_control_slot = control_slot;
+				}
+				put = maketriple(OC_STOGLVN);
+				put->operand[0] = control_slot;
+			} else
+			{	/* quick and dirty old way */
+				put = maketriple(OC_INDSET);
+				put->operand[0] = v;
+			}
 			put->operand[1] = resptr;
 			dqins(targchain.exorder.bl, exorder, put);
 			break;
@@ -439,7 +455,7 @@ int m_set(void)
 						sub = v.oprval.tref;
 						put_oc = OC_PUTINDX;
 						if (TREF(temp_subs))
-							m_set_create_temporaries(sub, put_oc);
+							create_temporaries(sub, put_oc);
 					}
 					get = maketriple(OC_FNGET);
 					get->operand[0] = v;
@@ -450,11 +466,16 @@ int m_set(void)
 				case TK_ATSIGN:
 					if (!indirection(&v))
 						SYNTAX_ERROR(ERR_VAREXPECTED);
-					get = maketriple(OC_INDGET);
-					get->operand[0] = v;
-					get->operand[1] = put_str(0, 0);
-					put = maketriple(OC_INDSET);
-					put->operand[0] = v;
+					INSERT_INDSAVGLVN(control_slot, v, ANY_SLOT, 0);
+					if (!used_glvn_slot)
+					{
+						used_glvn_slot = TRUE;
+						first_control_slot = control_slot;
+					}
+					get = maketriple(OC_INDGET1);
+					get->operand[0] = control_slot;
+					put = maketriple(OC_STOGLVN);
+					put->operand[0] = control_slot;
 					put->operand[1] = put_tref(s);
 					break;
 				case TK_CIRCUMFLEX:
@@ -471,7 +492,7 @@ int m_set(void)
 					dqdel(sub, exorder);
 					dqins(targchain.exorder.bl, exorder, sub);
 					if (TREF(temp_subs))
-						m_set_create_temporaries(sub, put_oc);
+						create_temporaries(sub, put_oc);
 					get = maketriple(OC_FNGVGET);
 					get->operand[0] = put_str(0, 0);
 					put = maketriple(OC_GVPUT);
@@ -797,96 +818,14 @@ int m_set(void)
 	 * (for example, if rhs had $$ or $& or $INCR usages). If so need to create temporaries.
 	 */
 	if (TREF(temp_subs) && temp_subs_was_FALSE && (NULL != sub))
-		m_set_create_temporaries(sub, put_oc);
+		create_temporaries(sub, put_oc);
 	TREF(temp_subs) = FALSE;
+	if (used_glvn_slot)
+	{	/* Free up slots we're done with. */
+		ref = newtriple(OC_GLVNPOP);
+		ref->operand[0] = first_control_slot;
+	}
 	return TRUE;
-}
-
-/* This function adds triples to the execution chain to store the values of subscripts (in glvns in compound SETs)
- * in temporaries (using OC_STOTEMP opcode). This function is only invoked when
- * 	a) The SET is a compound SET (i.e. there are multiple targets specified on the left side of the SET command).
- *	b) Subscripts are specified in glvns which are targets of the SET.
- *	e.g. set a=0,(a,array(a))=1
- * The expected result of the above command as per the M-standard is that array(0) (not array(1)) gets set to 1.
- * That is, the value of the subscript "a" should be evaluated at the start of the compound SET before any sets happen
- * and should be used in any subscripts that refer to the name "a".
- * In the above example, since it is a compound SET and "a" is used in a subscript, we need to store the value of "a"
- *	before the start of the compound SET (i.e.a=0) in a temporary and use that as the subscript for "array".
- * If in the above example the compound set was instead specified as set a=1,array(a)=1, the value of 1 gets substituted
- *	when used in "array(a)".
- * This is where the compound set acts differently from a sequence of multiple sets. This is per the M-standard.
- * In the above example, the subscript used was also a target within the compound SET. It is possible that the
- *	subscript is not also an individual target within the same compound SET. Even in that case, this function
- *	will be called to store the subscript in temporaries (as we dont know at compile time if a particular
- *	subscript is also used as a target within a compound SET).
- */
-void	m_set_create_temporaries(triple *sub, opctype put_oc)
-{
-	oprtype	*sb1;
-	triple	*s0, *s1;
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	assert(TREF(temp_subs));
-	assert(NULL != sub);
-	sb1 = &sub->operand[1];
-	if ((OC_GVNAME == put_oc) || (OC_PUTINDX == put_oc))
-	{
-		sub = sb1->oprval.tref;		/* global name */
-		assert(OC_PARAMETER == sub->opcode);
-		sb1 = &sub->operand[1];
-	} else if (OC_GVEXTNAM == put_oc)
-	{
-		sub = sb1->oprval.tref;		/* first env */
-		assert(OC_PARAMETER == sub->opcode);
-		sb1 = &sub->operand[0];
-		assert(TRIP_REF == sb1->oprclass);
-		s0 = sb1->oprval.tref;
-		if ((OC_GETINDX == s0->opcode) || (OC_VAR == s0->opcode))
-		{
-			s1 = maketriple(OC_STOTEMP);
-			s1->operand[0] = *sb1;
-			*sb1 = put_tref(s1);
-			s0 = s0->exorder.fl;
-			dqins(s0->exorder.bl, exorder, s1);
-		}
-		sb1 = &sub->operand[1];
-		sub = sb1->oprval.tref;		/* second env */
-		assert(OC_PARAMETER == sub->opcode);
-		sb1 = &sub->operand[0];
-		assert(TRIP_REF == sb1->oprclass);
-		s0 = sb1->oprval.tref;
-		if ((OC_GETINDX == s0->opcode) || (OC_VAR == s0->opcode))
-		{
-			s1 = maketriple(OC_STOTEMP);
-			s1->operand[0] = *sb1;
-			*sb1 = put_tref(s1);
-			s0 = s0->exorder.fl;
-			dqins(s0->exorder.bl, exorder, s1);
-		}
-		sb1 = &sub->operand[1];
-		sub = sb1->oprval.tref;		/* global name */
-		assert(OC_PARAMETER == sub->opcode);
-		sb1 = &sub->operand[1];
-	}
-	while (sb1->oprclass)
-	{
-		assert(TRIP_REF == sb1->oprclass);
-		sub = sb1->oprval.tref;
-		assert(OC_PARAMETER == sub->opcode);
-		sb1 = &sub->operand[0];
-		assert(TRIP_REF == sb1->oprclass);
-		s0 = sb1->oprval.tref;
-		if ((OC_GETINDX == s0->opcode) || (OC_VAR == s0->opcode))
-		{
-			s1 = maketriple(OC_STOTEMP);
-			s1->operand[0] = *sb1;
-			*sb1 = put_tref(s1);
-			s0 = s0->exorder.fl;
-			dqins(s0->exorder.bl, exorder, s1);
-		}
-		sb1 = &sub->operand[1];
-	}
 }
 
 /* Prior to Alias support, the ZWRITE command was able to dump the entire local variable environment such that it could be

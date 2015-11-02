@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,17 +43,15 @@
 GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
 GBLREF	jnlpool_addrs		jnlpool;
 
+error_def(ERR_REPLCOMM);
+error_def(ERR_TEXT);
+
 int gtmsource_comm_init(void)
 {
 	/* Initialize communication stuff */
-
-	const	int	disable_keepalive = 0;
 	struct	linger	disable_linger = {0, 0};
 	char	error_string[1024];
 	int	err_status;
-
-	error_def(ERR_REPLCOMM);
-	error_def(ERR_TEXT);
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
@@ -68,7 +66,6 @@ int gtmsource_comm_init(void)
 	}
 
 	/* A connection breakage should get rid of the socket */
-
 	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 	{
 		err_status = ERRNO;
@@ -76,16 +73,5 @@ int gtmsource_comm_init(void)
 				STRERROR(err_status));
 		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 	}
-
-#ifdef REPL_DISABLE_KEEPALIVE
-	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_KEEPALIVE, (const void *)&disable_keepalive,
-		SIZEOF(disable_keepalive)))
-	{ /* Till SIGPIPE is handled properly */
-		err_status = ERRNO;
-		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable keepalive : %s",
-				STRERROR(err_status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
-	}
-#endif
 	return(0);
 }

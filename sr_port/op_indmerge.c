@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,6 @@
 #include "hashtab_objcode.h"
 #include "stringpool.h"
 
-error_def(ERR_INDMAXNEST);
 error_def(ERR_VAREXPECTED);
 
 void op_indmerge(mval *glvn_mv, mval *arg1_or_arg2)
@@ -58,7 +57,7 @@ void op_indmerge(mval *glvn_mv, mval *arg1_or_arg2)
 	if (NULL == (obj = cache_get(&indir_src)))
 	{
 		obj = &object;
-		comp_init(&glvn_mv->str);
+		comp_init(&glvn_mv->str, NULL);
 		switch (TREF(window_token))
 		{
 		case TK_IDENT:
@@ -93,7 +92,7 @@ void op_indmerge(mval *glvn_mv, mval *arg1_or_arg2)
 			rval = EXPR_FAIL;
 			break;
 		}
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, 0, glvn_mv->str.len))
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, NULL, NULL, glvn_mv->str.len))
 			return;
 		indir_src.str.addr = glvn_mv->str.addr;
 		cache_put(&indir_src, obj);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,6 +73,39 @@ typedef struct backup_reg_list_struct
 #define END_MSG "END OF SAVED BLOCKS"
 #define HDR_MSG "END OF FILE HEADER"
 #define MAP_MSG "END OF MASTER MAP"
+
+/* check for online backup - ATTN: this part of code is similar to that in mm_update */
+#define	BG_BACKUP_BLOCK(csa, csd, cnl, cr, cs, blkid, backup_cr, backup_blk_ptr, nontp_block_saved, tp_block_saved)	\
+{															\
+	boolean_t		read_before_image;									\
+	trans_num		bkup_blktn;										\
+	shmpool_buff_hdr_ptr_t	sbufh_p;										\
+															\
+	DEBUG_ONLY(read_before_image = 											\
+		((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));)	\
+	assert(!read_before_image || (NULL == cs->old_block) || (backup_blk_ptr == cs->old_block));			\
+	assert(csd == cs_data);	/* backup_block uses cs_data hence this check */					\
+	if ((blkid >= cnl->nbb) && (NULL != cs->old_block))								\
+	{														\
+		sbufh_p = csa->shmpool_buffer;										\
+		if (0 == sbufh_p->failed)										\
+		{													\
+			bkup_blktn = ((blk_hdr_ptr_t)(backup_blk_ptr))->tn;						\
+			if ((bkup_blktn < sbufh_p->backup_tn) && (bkup_blktn >= sbufh_p->inc_backup_tn))		\
+			{												\
+				assert(backup_cr->blk == blkid);							\
+				assert(cs->old_block == backup_blk_ptr);						\
+				/* to write valid before-image, ensure buffer is protected against preemption */	\
+				assert(process_id == backup_cr->in_cw_set);						\
+				backup_block(csa, blkid, backup_cr, NULL);						\
+				if (!dollar_tlevel)									\
+					nontp_block_saved = TRUE;							\
+				else											\
+					tp_block_saved = TRUE;								\
+			}												\
+		}													\
+	}														\
+}
 
 LITREF  mval            	mu_bin_datefmt;
 

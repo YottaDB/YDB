@@ -50,6 +50,10 @@ GBLREF sgm_info		*sgm_info_ptr;
 GBLREF uint4		dollar_tlevel;
 GBLREF mstr		extnam_str;
 
+#ifdef DEBUG
+GBLDEF	boolean_t	dbg_opgvname_fast_path;
+#endif
+
 void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 {
 	int		count;
@@ -61,19 +65,20 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	extnam_str.len = 0;
 	if (!gd_header)
 		gvinit();
 	TREF(gd_targ_addr) = gd_header;
 	VAR_START(var, val_arg);
 	VMS_ONLY(va_count(count));
-	UNIX_ONLY(count = count_arg;)	/* need to preserve stack copy for i386 */
+	UNIX_ONLY(count = count_arg);	/* need to preserve stack copy for i386 */
 	count--;
 	val = val_arg;
 	if ((gd_header->maps == gd_map) && gv_currkey && (0 == gv_currkey->base[val->str.len]) &&
 			(0 == memcmp(gv_currkey->base, val->str.addr, val->str.len)))
 	{
+		DEBUG_ONLY(dbg_opgvname_fast_path = TRUE);
 		gv_currkey->end = val->str.len + 1;
 		gv_currkey->base[gv_currkey->end] = 0;
 		gv_currkey->prev = 0;
@@ -85,8 +90,15 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 			assert(INVALID_GV_TARGET != gv_target);
 			GVCST_ROOT_SEARCH;
 		}
+		/* IF gv_target and cs_addrs are out of sync at this point, we could end up in database damage.
+		 * Hence the assertpro. In the else block, we do a GV_BIND_NAME which ensures they are in sync
+		 * (asserted by the DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC check later) hence this assertpro check
+		 * is not done in that case.
+		 */
+		assertpro(gv_target->gd_csa == cs_addrs);
 	} else
 	{
+		DEBUG_ONLY(dbg_opgvname_fast_path = FALSE);
 		GV_BIND_NAME_AND_ROOT_SEARCH(gd_header, &(val->str));
 		DEBUG_ONLY(
 			bgormm = ((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth)));
@@ -94,8 +106,12 @@ void op_gvname(UNIX_ONLY_COMMA(int count_arg) mval *val_arg, ...)
 	assert(!bgormm || (gv_cur_region && &FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data));
 	assert(bgormm || !dollar_tlevel);
 	assert(!dollar_tlevel || sgm_info_ptr && (sgm_info_ptr->tp_csa == cs_addrs));
-	assert(gv_target->gd_csa == cs_addrs);
-	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+	assert(NULL != gv_target);
+	assert(gv_currkey->end);
+	assert('\0' != gv_currkey->base[0]);	/* ensure the below DBG_CHECK_... assert does a proper check (which it wont
+						 * if it finds gv_currkey->base[0] is '\0'
+						 */
+	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	assert(TREF(gd_targ_addr) == gd_header);
 	was_null = is_null = FALSE;
 	max_key = gv_cur_region->max_key_size;

@@ -56,7 +56,7 @@ error_def(ERR_SRCSRVNOTEXIST);
 int gtmsource_checkhealth(void)
 {
 	uint4			gtmsource_pid;
-	int			status, semval;
+	int			status, semval, save_errno;
 	boolean_t		srv_alive, all_files_open;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 	int4			index, num_servers;
@@ -112,8 +112,9 @@ int gtmsource_checkhealth(void)
 		semval = get_sem_info(SOURCE, SRC_SERV_COUNT_SEM, SEM_INFO_VAL);
 		if (-1 == semval)
 		{
+			save_errno = errno;
 			repl_log(stderr, FALSE, TRUE,
-				"Error fetching source server count semaphore value : %s\n", REPL_SEM_ERROR);
+				"Error fetching source server count semaphore value : %s\n", STRERROR(save_errno));
 			status |= SRV_ERR;
 		} else if (semval != num_servers)
 		{

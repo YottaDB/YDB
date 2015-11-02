@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,7 +54,7 @@ void	op_commarg(mval *v, unsigned char argcode)
 		    (frame_pointer->type & SFT_COUNT) && v->str.len && (MAX_MIDENT_LEN > v->str.len) &&
 		    !proc_act_type && do_indir_do(v, argcode))
 			return;
-		comp_init(&v->str);
+		comp_init(&v->str, NULL);
 		for (;;)
 		{
 			if (EXPR_FAIL == (rval = (*indir_fcn[argcode])()))	/* NOTE assignment */
@@ -72,7 +72,7 @@ void	op_commarg(mval *v, unsigned char argcode)
 				rts_error(VARLSTCNT(1) ERR_INDEXTRACHARS);
 			}
 		}
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, 0, v->str.len))
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_RET, NULL, NULL, v->str.len))
 			return;
 		indir_src.str.addr = v->str.addr;	/* reassign because stp_gcol might have changed v->str.addr */
 		cache_put(&indir_src, obj);

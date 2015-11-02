@@ -30,13 +30,14 @@
 #include "db_snapshot.h"
 #endif
 
-GBLDEF unsigned char		*mu_int_locals;
-GBLDEF int4			mu_int_ovrhd;
+GBLDEF	unsigned char		*mu_int_locals;
+GBLDEF	int4			mu_int_ovrhd;
 
-GBLREF gd_region		*gv_cur_region;
-GBLREF sgmnt_data		mu_int_data;
-GBLREF uint4			mu_int_errknt;
-GBLREF boolean_t		tn_reset_specified;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_data		mu_int_data;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	uint4			mu_int_errknt;
+GBLREF	boolean_t		tn_reset_specified;
 
 error_def(ERR_DBNOTDB);
 error_def(ERR_DBINCRVER);
@@ -65,7 +66,7 @@ error_def(ERR_MUKILLIP);
 error_def(ERR_MUTNWARN);
 
 #ifdef GTM_SNAPSHOT
-# define GET_NATIVE_SIZE(native_size)									\
+# define SET_NATIVE_SIZE(native_size)									\
 {													\
 	GBLREF util_snapshot_ptr_t	util_ss_ptr;							\
 	GBLREF boolean_t		ointeg_this_reg;						\
@@ -75,20 +76,22 @@ error_def(ERR_MUTNWARN);
 		native_size = util_ss_ptr->native_size;							\
 		assert(0 != native_size); /* Ensure native_size is updated properly in ss_initiate */	\
 	} else												\
-		native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);				\
+		native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);			\
 }
 #else
-# define GET_NATIVE_SIZE(native_size)	\
-	native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
+# define SET_NATIVE_SIZE(native_size)	native_size = gds_file_size(gv_cur_region->dyn.addr->file_cntl);
 #endif
 boolean_t mu_int_fhead(void)
 {
-	unsigned char	*p1;
-	unsigned int	maps, block_factor;
-	gtm_uint64_t	size, native_size;
-	trans_num	temp_tn, max_tn_warn;
-	sgmnt_data_ptr_t mu_data;
-	GTMCRYPT_ONLY(int	crypt_status;)
+	unsigned char		*p1;
+	unsigned int		maps, block_factor;
+	gtm_uint64_t		size, native_size;
+	trans_num		temp_tn, max_tn_warn;
+	sgmnt_data_ptr_t	mu_data;
+#	ifdef GTM_CRYPT
+	gd_segment		*seg;
+	int			gtmcrypt_errno;
+#	endif
 
 	mu_data = &mu_int_data;
 	if (MEMCMP_LIT(mu_data->label, GDS_LABEL))
@@ -169,12 +172,11 @@ boolean_t mu_int_fhead(void)
 #	ifdef GTM_CRYPT
 	if (mu_data->is_encrypted)
 	{
-		/* Encryption init should have happened in db_init. */
-		ASSERT_ENCRYPTION_INITIALIZED;
-		GTMCRYPT_HASH_CHK(mu_data->encryption_hash, crypt_status);
-		if (0 != crypt_status)
+		GTMCRYPT_HASH_CHK(cs_addrs, mu_data->encryption_hash, gtmcrypt_errno);
+		if (0 != gtmcrypt_errno)
 		{
-			GC_GTM_PUTMSG(crypt_status, (gv_cur_region->dyn.addr->fname));
+			seg = gv_cur_region->dyn.addr;
+			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, seg->fname_len, seg->fname);
 			return FALSE;
 		}
 	}
@@ -201,8 +203,8 @@ boolean_t mu_int_fhead(void)
 		default:
 			mu_int_err(ERR_DBUNDACCMT, 0, 0, 0, 0, 0, 0, 0);
 		/*** WARNING: Drop thru ***/
-#ifdef VMS
-#ifdef GT_CX_DEF
+#		ifdef VMS
+#		 ifdef GT_CX_DEF
 		case dba_bg:	/* necessary to do calculation in this manner to prevent double rounding causing an error */
 			if (mu_data->unbacked_cache)
 				mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space +
@@ -214,22 +216,22 @@ boolean_t mu_int_fhead(void)
 		case dba_mm:
 			mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 			break;
-#else
+#		 else
 		case dba_bg:
 		/*** WARNING: Drop thru ***/
 		case dba_mm:
 			mu_int_ovrhd = DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 		break;
-#endif
+#		 endif
 
-#elif defined(UNIX)
+#		elif defined(UNIX)
 		case dba_bg:
 		/*** WARNING: Drop thru ***/
 		case dba_mm:
 			mu_int_ovrhd = (int4)DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
-#else
-#error unsupported platform
-#endif
+#		else
+#		 error unsupported platform
+#		endif
 	}
 	assert(mu_data->blk_size == ROUND_UP(mu_data->blk_size, DISK_BLOCK_SIZE));
  	block_factor =  mu_data->blk_size / DISK_BLOCK_SIZE;
@@ -241,7 +243,7 @@ boolean_t mu_int_fhead(void)
 	}
 	size = mu_int_ovrhd + (off_t)block_factor * mu_data->trans_hist.total_blks;
 	/* If ONLINE INTEG for this region is in progress, then native_size would have been calculated in ss_initiate. */
-	GET_NATIVE_SIZE(native_size);
+	SET_NATIVE_SIZE(native_size);
 	/* In the following tests, the EOF block should always be 1 greater
 	 * than the actual size of the file.  This is due to the GDS being
 	 * allocated in even DISK_BLOCK_SIZE-byte blocks. */

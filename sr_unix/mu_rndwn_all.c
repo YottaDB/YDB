@@ -403,7 +403,7 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
  */
 boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t replpool_id, int *exit_stat)
 {
-	boolean_t		remove_shmid;
+	boolean_t		remove_shmid, jnlpool_segment;
 	int			fd;
 	repl_inst_hdr		repl_instance;
 	sm_uc_ptr_t		start_addr;
@@ -454,6 +454,7 @@ boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t re
 		shmdt((void *)start_addr);
 		return FALSE;
 	}
+	jnlpool_segment = (JNLPOOL_SEGMENT == replpool_id->pool_type);
 	if (-1 == shmctl(shmid, IPC_STAT, &shmstat))
 	{
 		save_errno = errno;
@@ -510,10 +511,12 @@ boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t re
 			shmdt((void *)start_addr);
 			return FALSE;
 		}
-		if (repl_instance.jnlpool_shmid != shmid)
+		if ((jnlpool_segment && (repl_instance.jnlpool_shmid != shmid))
+			|| (!jnlpool_segment && (repl_instance.recvpool_shmid != shmid)))
 		{
-			SNPRINTF(msgbuff, OUT_BUFF_SIZE, "Shared memory ID (%d) in the instance file header does not match with the"
-					" one reported by \"ipcs\" command (%d)", repl_instance.jnlpool_shmid, shmid);
+			SNPRINTF(msgbuff, OUT_BUFF_SIZE, "%s SHMID (%d) in the instance file header does not match with the"
+					" one reported by \"ipcs\" command (%d)", jnlpool_segment ? "Journal Pool" : "Receive Pool",
+					jnlpool_segment ? repl_instance.jnlpool_shmid : repl_instance.recvpool_shmid, shmid);
 			if (1 < shmstat.shm_nattch)
 			{
 				PRINT_AND_SEND_REPLPOOL_FAILURE_MSG(msgbuff, replpool_id, shmid);

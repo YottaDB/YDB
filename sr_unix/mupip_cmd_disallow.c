@@ -505,3 +505,37 @@ boolean_t cli_disallow_mupip_trigger(void)
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
+
+/*
+ * Disallows multiple heuristics, both region and filename, and invalid matching of heuristic parameter with the heuristic.
+ */
+boolean_t cli_disallow_mupip_size(void)
+{
+	boolean_t	disallow_return_value = FALSE;
+	int4		heur_cnt = 0;
+
+	heur_cnt += (d_c_cli_present("HEURISTIC.ARSAMPLE") ? 1 : 0);
+	heur_cnt += (d_c_cli_present("HEURISTIC.IMPSAMPLE") ? 1 : 0);
+	heur_cnt += (d_c_cli_present("HEURISTIC.SCAN") ? 1 : 0);
+	disallow_return_value = heur_cnt > 1;
+	CLI_DIS_CHECK_N_RESET;
+
+	disallow_return_value = ! (
+			/* SAMPLES is param for AR and IMP. So:	SAMPLES => (AR || IMP) */
+			(d_c_cli_present("HEURISTIC.ARSAMPLE") || d_c_cli_present("HEURISTIC.IMPSAMPLE") ||
+			 					  !d_c_cli_present("HEURISTIC.SAMPLES"))
+			&&
+			/* LEVEL is param for SCAN	So:	LEVEL  => SCAN */
+			(d_c_cli_present("HEURISTIC.SCAN") || !d_c_cli_present("HEURISTIC.LEVEL"))
+				  );
+	CLI_DIS_CHECK_N_RESET;
+
+	disallow_return_value = ! (
+			/* SEED is param for AR and IMP. So:	SAMPLES => (AR || IMP) */
+			(d_c_cli_present("HEURISTIC.ARSAMPLE") || d_c_cli_present("HEURISTIC.IMPSAMPLE") ||
+			!d_c_cli_present("HEURISTIC.SEED"))
+				);
+	CLI_DIS_CHECK_N_RESET;
+
+	return disallow_return_value;
+}

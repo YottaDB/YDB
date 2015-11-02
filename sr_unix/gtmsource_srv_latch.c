@@ -31,6 +31,7 @@
 #include "gtmsource.h"
 #include "repl_instance.h"
 #include "have_crit.h"
+#include "util.h"		/* For OUT_BUFF_SIZE */
 
 GBLREF	int4			process_id;
 GBLREF	int			num_additional_processors;
@@ -55,6 +56,7 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 	unix_db_info		*udi;
 	sgmnt_addrs		*repl_csa;
 	boolean_t		cycle_mismatch;
+	char			scndry_msg[OUT_BUFF_SIZE];
 
 	assert(!have_crit(CRIT_HAVE_ANY_REG));
 	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
@@ -77,10 +79,11 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 					 * the rollback command is re-run to bring the journal pool/file and instance file to a
 					 * consistent state.
 					 */
+					SNPRINTF(scndry_msg, OUT_BUFF_SIZE, "Instance file header has file_corrupt field set to "
+							"TRUE");
 					/* No need to release the latch before rts_error (mupip_exit_handler will do it for us) */
 					rts_error(VARLSTCNT(8) ERR_REPLREQROLLBACK, 2, LEN_AND_STR(udi->fn),
-						ERR_TEXT, 2, LEN_AND_LIT("file_corrupt field in instance file header is set to"
-										" TRUE"));
+						ERR_TEXT, 2, LEN_AND_STR(scndry_msg));
 				}
 				cycle_mismatch = (repl_csa->onln_rlbk_cycle != jnlpool.jnlpool_ctl->onln_rlbk_cycle);
 				assert((ASSERT_NO_ONLINE_ROLLBACK != onln_rlbk_action) || !cycle_mismatch);

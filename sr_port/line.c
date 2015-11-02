@@ -51,6 +51,8 @@ boolean_t line(uint4 *lnc)
 	curlin = (mline *)mcalloc(SIZEOF(*curlin));
 	curlin->line_number = 0;
 	curlin->table = FALSE;
+	assert(0 == TREF(expr_depth));
+	(TREF(side_effect_base))[0] = FALSE;
 	TREF(last_source_column) = 0;
 	if (TK_INTLIT == TREF(window_token))
 		int_label();
@@ -101,7 +103,7 @@ boolean_t line(uint4 *lnc)
 					{
 						assert(TRIP_REF == r->operand[0].oprclass);
 						assert(ILIT_REF == r->operand[0].oprval.tref->operand[0].oprclass);
-						assert((TRIP_REF == r->operand[1].oprclass) || (0 == r->operand[1].oprclass));
+						assert((TRIP_REF == r->operand[1].oprclass) || (NO_REF == r->operand[1].oprclass));
 						if (r->operand[0].oprval.tref->operand[0].oprval.ilit == varnum)
 						{
 							stx_error(ERR_MULTFORMPARM);

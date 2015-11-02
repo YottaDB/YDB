@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,8 +86,7 @@ void	ind_code(mstr *obj)
 							/* SIZEOF(INTPTR_T) is used for alignment reasons */
 		+ GTM64_ONLY((SECTION_ALIGN_BOUNDARY - 1))	/* extra padding to align the beginning of the code address */
 		+ code_size				/* code already aligned at SECTION_ALIGN_BOUNDARY boundary */
-		+ mvmax * SIZEOF(var_tabent))		/* variable table ents */
-		+ SIZEOF(mval) + SIZEOF(mname_entry) + SIZEOF(mident_fixed) + (SIZEOF(uint4) * 2); /* in case of/see op_indlvadr */
+		+ mvmax * SIZEOF(var_tabent));		/* variable table ents */
 	ENSURE_STP_FREE_SPACE(indir_code_size);
 	/* Align the beginning of the indirect object so that ihdtyp fields can be accessed normally */
 	stringpool.free = (unsigned char *)ROUND_UP2((UINTPTR_T)stringpool.free, SECTION_ALIGN_BOUNDARY);

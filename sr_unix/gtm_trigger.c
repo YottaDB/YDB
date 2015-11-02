@@ -542,7 +542,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	{	/* Create new trigger base frame first that back-stops stack unrolling and return to us */
 		if (GTM_TRIGGER_DEPTH_MAX < (gtm_trigger_depth + 1))	/* Verify we won't nest too deep */
 			rts_error(VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
-		DBGTRIGR((stderr, "gtm_trigger: PUSH: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n", frame_pointer, ctxt));
+		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
+			  frame_pointer, ctxt));
 		/* Protect against interrupts while we have only a trigger base frame on the stack */
 		DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND);
 		/* The current frame invoked a trigger. We cannot return to it for a TP restart or other reason unless
@@ -818,8 +819,8 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 	/* Unwind the trigger base frame */
 	op_unwind();
 	/* restore frame_pointer stored at msp (see base_frame.c) */
-	frame_pointer = *(stack_frame**)msp;
-	msp += SIZEOF(stack_frame *);		/* Remove frame save pointer from stack */
+        frame_pointer = *(stack_frame**)msp;
+	msp += SIZEOF(stack_frame *);           /* Remove frame save pointer from stack */
 	if (!forced_unwind)
 	{	/* Remove the "do not return to me" flag only on non-error unwinds. Note this flag may have already been
 		 * turned off by an earlier tp_restart if this is not an implicit_tstart situation.
@@ -847,7 +848,8 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 				OP_TROLLBACK(-1); /* We just unrolled the implicitly started TSTART so unroll what it did */
 		}
 	}
-	DBGTRIGR((stderr, "gtm_trigger: POP: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n", frame_pointer, ctxt));
+	DBGTRIGR((stderr, "gtm_trigger: Unwound to trigger invoking frame: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
+		  frame_pointer, ctxt));
 	/* Re-allow interruptions now that our base frame is gone */
 	if (forced_unwind)
 	{	/* Since we are being force-unwound, we don't know the state of things except that it it should be either

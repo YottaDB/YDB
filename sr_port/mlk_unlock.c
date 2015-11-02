@@ -56,11 +56,11 @@ void mlk_unlock(mlk_pvtblk *p)
 		d = p->nodptr;
 		if (csa->critical)
 			crash_count = csa->critical->crashcnt;
-		if (dollar_tlevel && !((t_tries < CDB_STAGNATE) || csa->now_crit)) /* Final retry and region not locked down */
-		{	/* make sure this region is in the list in case we end up retrying */
+		if (dollar_tlevel)
+		{
+			assert((CDB_STAGNATE > t_tries) || csa->now_crit);
+			/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
-			/* insert_region() will additionally attempt CRIT on the region and restart if not possible */
-			assert(csa->now_crit);
 		}
 		if (FALSE == (was_crit = csa->now_crit))
 			grab_crit(p->region);

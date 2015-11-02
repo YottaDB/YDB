@@ -10,28 +10,27 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"		/* needed by INCREMENT_EXPR_DEPTH */
 #include "compiler.h"
 #include "opcode.h"
 #include "fullbool.h"
 
 int expr(oprtype *a, int m_type)
 {
-	int	rval;
+	int		rval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (!(TREF(expr_depth))++)
-		TREF(expr_start) = TREF(expr_start_orig) = NULL;
+	INCREMENT_EXPR_DEPTH;
 	if (EXPR_FAIL == (rval = eval_expr(a)))		/* NOTE assignment */
 	{
-		TREF(expr_depth) = 0;
+		DECREMENT_EXPR_DEPTH;
 		return FALSE;
 	}
 	coerce(a, (MUMPS_INT == m_type) ? OCT_MINT : OCT_MVAL);
 	ex_tail(a);
 	if (TREF(expr_start) != TREF(expr_start_orig) && (OC_NOOP != (TREF(expr_start))->opcode))
 	{
-		assert(TREF(shift_side_effects));
 		assert((OC_GVSAVTARG == (TREF(expr_start))->opcode));
 		if ((OC_GVSAVTARG == (TREF(expr_start))->opcode) && ((GTM_BOOL == TREF(gtm_fullbool)) || !TREF(saw_side_effect)))
 		{
@@ -40,7 +39,6 @@ int expr(oprtype *a, int m_type)
 					newtriple(OC_GVRECTARG)->operand[0] = put_tref(TREF(expr_start));
 		}
 	}
-	if (!(--(TREF(expr_depth))))
-		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;
+	DECREMENT_EXPR_DEPTH;
 	return rval;
 }

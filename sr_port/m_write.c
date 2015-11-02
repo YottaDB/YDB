@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,7 @@ int m_write(void)
 				ref->operand[0].oprval.tref->opcode = OC_NOOP;
 				ref->opcode = OC_NOOP;
 				ref->operand[0].oprval.tref->operand[0].oprclass = OC_NOOP;
-				ref->operand[0].oprclass = 0;
+				ref->operand[0].oprclass = NO_REF;
 			}
 			ptx--;
 			stringpool.free = (unsigned char *) cp;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_string.h"		/* needed by INCREMENT_EXPR_DEPTH */
 #include "lv_val.h"
 #include "compiler.h"
 #include "opcode.h"
@@ -25,7 +26,6 @@ GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;
 LITREF	mval			literal_null;
 
-error_def(ERR_INDMAXNEST);
 error_def(ERR_UNDEF);
 
 void	op_indglvn(mval *v,mval *dst)
@@ -34,7 +34,7 @@ void	op_indglvn(mval *v,mval *dst)
 	icode_str	indir_src;
 	int		rval;
 	mstr		*obj, object;
-	oprtype		x;
+	oprtype		x, getdst;
 	var_tabent	targ_key;
 	DCL_THREADGBL_ACCESS;
 
@@ -63,19 +63,18 @@ void	op_indglvn(mval *v,mval *dst)
 			dst->mvtype &= ~MV_ALIASCONT;	/* Make sure alias container property does not pass */
 			return;
 		}
-		if (TREF(ind_result_sp) >= TREF(ind_result_top))
-			rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
 		obj = &object;
-		comp_init(&v->str);
+		comp_init(&v->str, &getdst);
+		INCREMENT_EXPR_DEPTH;
 		rval = glvn(&x);
-		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, v->str.len))
+		DECREMENT_EXPR_DEPTH;
+		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &x, &getdst, v->str.len))
 			return;
 		indir_src.str.addr = v->str.addr;
 		cache_put(&indir_src, obj);
 		/* Fall into code activation below */
-	} else if (TREF(ind_result_sp) >= TREF(ind_result_top))
-		rts_error(VARLSTCNT(1) ERR_INDMAXNEST); /* mdbcondition_handler resets ind_result_sp */
-	*(TREF(ind_result_sp))++ = dst;
+	}
+	TREF(ind_result) = dst;
 	comp_indr(obj);
 	return;
 }

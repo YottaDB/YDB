@@ -19,9 +19,9 @@ GBLREF	boolean_t		is_replicator;
 GBLREF	boolean_t		run_time;
 GBLREF	boolean_t		write_after_image;
 GBLREF	boolean_t		dse_running;
-GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	enum gtmImageTypes	image_type;
 #ifdef UNIX
+GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t 		span_nodes_disallowed;
 #endif
 

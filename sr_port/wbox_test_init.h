@@ -99,20 +99,30 @@ typedef enum {
 	WBTEST_HOLD_CRIT_TILL_LCKALERT,		/* 66 : Grab and hold crit until 15 seconds past what triggers a lock alert message
 						 *      which should invoke a mutex salvage */
 	WBTEST_OPER_LOG_MSG,			/* 67 : send message to operator log */
-	WBTEST_ANTIFREEZE_DSKNOSPCAVAIL,	/* 68 : */
-	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 : */
-	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 : */
-	WBTEST_ANTIFREEZE_DBDANGER,		/* 71 : */
-	WBTEST_ANTIFREEZE_DBFSYNCERR,		/* 72 :	*/
-	WBTEST_ANTIFREEZE_GVDATAFAIL,		/* 73 : */
-	WBTEST_ANTIFREEZE_GVGETFAIL,		/* 74 : */
-	WBTEST_ANTIFREEZE_GVINCRPUTFAIL,	/* 75 : */
-	WBTEST_ANTIFREEZE_GVKILLFAIL,		/* 76 : */
-	WBTEST_ANTIFREEZE_GVORDERFAIL,		/* 77 : */
-	WBTEST_ANTIFREEZE_GVQUERYFAIL,		/* 78 : */
-	WBTEST_ANTIFREEZE_GVQUERYGETFAIL,	/* 79 : */
-	WBTEST_ANTIFREEZE_GVZTRIGFAIL,		/* 80 : */
-	WBTEST_ANTIFREEZE_OUTOFSPACE		/* 81 : */
+	/* Begin ANTIFREEZE related white box test cases */
+	WBTEST_ANTIFREEZE_DSKNOSPCAVAIL,	/* 68 :  */
+	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 :  */
+	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 :  */
+	WBTEST_ANTIFREEZE_DBDANGER,		/* 71 :  */
+	WBTEST_ANTIFREEZE_DBFSYNCERR,		/* 72 :	 */
+	WBTEST_ANTIFREEZE_GVDATAFAIL,		/* 73 :  */
+	WBTEST_ANTIFREEZE_GVGETFAIL,		/* 74 :  */
+	WBTEST_ANTIFREEZE_GVINCRPUTFAIL,	/* 75 :  */
+	WBTEST_ANTIFREEZE_GVKILLFAIL,		/* 76 :  */
+	WBTEST_ANTIFREEZE_GVORDERFAIL,		/* 77 :  */
+	WBTEST_ANTIFREEZE_GVQUERYFAIL,		/* 78 :  */
+	WBTEST_ANTIFREEZE_GVQUERYGETFAIL,	/* 79 :  */
+	WBTEST_ANTIFREEZE_GVZTRIGFAIL,		/* 80 :  */
+	WBTEST_ANTIFREEZE_OUTOFSPACE,		/* 81 :  */
+	/* End ANTIFREEZE related white box test cases */
+	WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP,	/* 82 : Send SIGTSTP to self if wcs_timers is 0 */
+	WBTEST_CONCBKUP_RUNNING,		/* 83 : Sleep in mupip_backup to test concurrent BACKUPs */
+	WBTEST_LONGSLEEP_IN_REPL_SHUTDOWN,	/* 84 : Sleep in Source/Receiver shutdown logic to ensure sem/shm is not removed */
+	WBTEST_FORCE_WCS_GET_SPACE,		/* 85 : Simulate state in which nearly all global buffers are dirty, forcing
+						 *      wcs_get_space to be called before committing an update */
+	/* HugeTLB tests */
+	WBTEST_HUGETLB_DLOPEN,			/* 86 : Fail dlopen(libhugetlbfs.so) */
+	WBTEST_HUGETLB_DLSYM			/* 87 : Fail dlsym(shmget) */
 } wbtest_code_t;
 
 #ifdef DEBUG

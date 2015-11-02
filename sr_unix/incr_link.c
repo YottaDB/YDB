@@ -119,7 +119,7 @@ bool incr_link (int file_desc, zro_ent *zro_entry)
 	lab_tabent	*curlbe, *lbetop;
 	var_tabent	*curvar, *vartop;
 	char		name_buf[PATH_MAX+1];
-	int		name_buf_len;
+	int		name_buf_len, alloc_len;
 	char		marker[SIZEOF(JSB_MARKER) - 1];
 
 	AIX_ONLY(
@@ -353,10 +353,12 @@ bool incr_link (int file_desc, zro_ent *zro_entry)
 	RELOCATE(hdr->vartab_adr, var_tabent *, rel_base);
 	/* Also read-write releasable is the linkage section which had no initial value and was thus
 	 * not resident in the object. The values in this section will be setup later by addr_fix()
-	 * and/or auto-zlink.
+	 * and/or auto-zlink. Note we always allocate at least one element here just so we don't get
+	 * the potentially unaligned "null string" address provided by gtm_malloc() when a zero
+	 * length is requested.
 	 */
-	/* Allocate 1 extra, to align linkage_adr */
-	hdr->linkage_adr = (lnk_tabent *)malloc((hdr->linkage_len * SIZEOF(lnk_tabent)) + SIZEOF(lnk_tabent));
+	alloc_len = hdr->linkage_len * SIZEOF(lnk_tabent);
+	hdr->linkage_adr = (lnk_tabent *)malloc((0 != alloc_len) ? alloc_len : SIZEOF(lnk_tabent));
 	assert(PADLEN(hdr->linkage_adr, SIZEOF(lnk_tabent) == 0));
 	assert(((UINTPTR_T)hdr->linkage_adr % SIZEOF(lnk_tabent)) == 0);
 	memset((char *)hdr->linkage_adr, 0, (hdr->linkage_len * SIZEOF(lnk_tabent)));

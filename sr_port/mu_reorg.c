@@ -253,8 +253,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 	{	/* Initialize ^#t global for this region. Maintain reorg_restart_key as usual since this exists per region. */
 		SETUP_TRIGGER_GLOBAL;
 		INITIAL_HASHT_ROOT_SEARCH_IF_NEEDED;
-		DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
-		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC;
+		DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
 	} else
 #	endif	/* Initialization for current global */
 		op_gvname(VARLSTCNT(1) gn);

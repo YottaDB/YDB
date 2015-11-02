@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc 	*
+ *	Copyright 2009, 2012 Fidelity Information Services, Inc 	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,12 +11,12 @@
 
 #define _FILE_OFFSET_BITS	64	/* Needed to compile gpgme client progs also with large file support */
 
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
+#include <stdio.h>			/* BYPASSOK -- Plugin doesn't have access to gtm_* header files */
+#include <string.h>			/* BYPASSOK -- see above */
+#include <unistd.h>			/* BYPASSOK -- see above */
+#include <stdlib.h>			/* BYPASSOK -- see above */
+#include <sys/stat.h>			/* BYPASSOK -- see above */
 #include <assert.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -27,15 +27,13 @@
 #include "gtmxc_types.h"		/* xc_string, xc_status_t and other callin interfaces xc_fileid */
 #include "gtmcrypt_interface.h"		/* Function prototypes for gtmcrypt*.* functions */
 #include "gtmcrypt_ref.h"
-#include "gtmcrypt_pk_ref.h"
 #include "gtmcrypt_sym_ref.h"
+#include "gtmcrypt_pk_ref.h"
 
-static char	*gtm_passwd;
-static char	*gtm_passwd_env;
-int		can_prompt_passwd;
-gpgme_ctx_t	pk_crypt_ctx;
-
-extern char	err_string[ERR_STRLEN];
+STATICDEF	char		*gtm_passwd;
+STATICDEF	char		*gtm_passwd_env;
+GBLDEF		int		can_prompt_passwd;
+GBLDEF		gpgme_ctx_t	pk_crypt_ctx;
 
 #ifdef __sparc /* for some reason sun does not provide a prototype */
 int setenv(const char* name, const char *value, int overwrite);
@@ -61,74 +59,66 @@ int setenv(const char* name, const char *value, int overwrite);
 
 int gc_pk_mask_unmask_passwd(char *in, char *out, int len)
 {
-	char		*ptr;
 	char		tmp[GTM_PASSPHRASE_MAX], mumps_ex[GTM_PATH_MAX], tobehashed[GTM_PASSPHRASE_MAX], hash[GTMCRYPT_HASH_LEN];
-	int		passwd_len, ilen, status, i;
+	char 		*ptr, *mmap_addrs;
+	int		passwd_len, ilen, status, i, save_errno, fd, have_hash;
 	struct stat	stat_info;
-	int 		fd;
-	char 		*p;
-	int 		have_hash;
 
 	have_hash = FALSE;
 	passwd_len = len < GTM_PASSPHRASE_MAX ? len : GTM_PASSPHRASE_MAX;
 
-	GC_GETENV(ptr, "gtm_obfuscation_key", status);
-	if (GC_SUCCESS == status)
+	if (ptr = getenv(GTM_OBFUSCATION_KEY))
 	{
 		fd = open(ptr, O_RDONLY);
-		if (fd != -1)
-			if (fstat(fd, &stat_info) != -1)
-				if (S_ISREG(stat_info.st_mode))
-				{
-					p = mmap(0,stat_info.st_size, PROT_READ, MAP_SHARED, fd, 0);
-					if (p != MAP_FAILED)
-					{
-#						ifdef USE_OPENSSL
-						EVP_Digest(p, stat_info.st_size, (unsigned char *)hash, NULL, EVP_sha512(), NULL);
-#						elif defined USE_GCRYPT
-						GC_SYM_INIT;
-						gcry_md_hash_buffer(GCRY_MD_SHA512, hash, p, stat_info.st_size );
-#						endif
-						have_hash = TRUE;
-						munmap(p, stat_info.st_size);
-					}
-				}
-		close(fd);
+		if ((-1 != fd) && (-1 != fstat(fd, &stat_info)) && S_ISREG(stat_info.st_mode))
+		{	/* File pointed by $gtm_obfuscation_key exists and is a regular file */
+			mmap_addrs = mmap(0,stat_info.st_size, PROT_READ, MAP_SHARED, fd, 0);
+			if (MAP_FAILED != mmap_addrs)
+			{
+#				ifdef USE_OPENSSL
+				EVP_Digest(mmap_addrs, stat_info.st_size, (unsigned char *)hash, NULL, EVP_sha512(), NULL);
+#				elif defined USE_GCRYPT
+				GC_SYM_INIT;
+				gcry_md_hash_buffer(GCRY_MD_SHA512, hash, mmap_addrs, stat_info.st_size );
+#				endif
+				have_hash = TRUE;
+				munmap(mmap_addrs, stat_info.st_size);
+			}
+			close(fd);
+		}
 	}
-
 	if (!have_hash)
 	{
 		memset(tobehashed, 0, passwd_len);
 		memset(mumps_ex, 0, GTM_PATH_MAX);
-		GC_GETENV(ptr, "USER", status);
-		if (GC_SUCCESS != status)
+		if (!(ptr = getenv(USER)))
 		{
-			GC_ENV_UNSET_ERROR("USER");
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, USER);
 			return GC_FAILURE;
 		}
 		else
 		{
 			strncpy(tobehashed, ptr, passwd_len);
-			GC_GETENV(ptr, "gtm_dist", status);
-			if (GC_SUCCESS != status)
+			if (!(ptr = getenv(GTM_DIST)))
 			{
-				GC_ENV_UNSET_ERROR("gtm_dist");
+				UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, GTM_DIST);
 				return GC_FAILURE;
 			}
 			else
 			{
-				sprintf(mumps_ex, "%s/%s", ptr, "mumps");
+				SNPRINTF(mumps_ex, GTM_PATH_MAX, "%s/%s", ptr, "mumps");
 				if (0 == stat(mumps_ex, &stat_info))
 				{
-					sprintf(tmp, "%ld", (long) stat_info.st_ino);
-					ilen = (int)strlen(tmp);
+					SNPRINTF(tmp, GTM_PASSPHRASE_MAX, "%ld", (long) stat_info.st_ino);
+					ilen = (int)STRLEN(tmp);
 					if (ilen < passwd_len)
 						strncpy(tobehashed + (passwd_len - ilen), tmp, ilen);
 					else
 						strncpy(tobehashed, tmp, passwd_len);
 				} else
 				{
-					sprintf(err_string, "Cannot find MUMPS executable in %s", ptr);
+					save_errno = errno;
+					UPDATE_ERROR_STRING("Cannot find MUMPS executable in %s - %s", ptr, strerror(save_errno));
 					return GC_FAILURE;
 				}
 #				ifdef USE_OPENSSL
@@ -160,7 +150,7 @@ int gc_pk_mask_unmask_passwd_interlude(int nparm, gtm_string_t *in, gtm_string_t
 void gc_pk_scrub_passwd()
 {
 	/* Nullify the key strings, so that any generated cores will not contain the unencrypted keys */
-	memset(gtm_passwd, 0, strlen(gtm_passwd));
+	memset(gtm_passwd, 0, STRLEN(gtm_passwd));
 	/* Free gtm_passwd and gtm_passwd_env variables */
 	if (NULL != gtm_passwd)
 		GC_FREE(gtm_passwd);
@@ -181,11 +171,11 @@ void gc_pk_crypt_load_gtmci_env()
 	const char	*gtmcrypt_tab_file = "gtmcrypt.tab"; /* Name of the tab file */
 	static char	gtmcrypt_tab_path[TAB_NAME_MAX];  /* Needs to be in scope always */
 
-	gtm_dist_value = getenv("gtm_dist");
+	gtm_dist_value = getenv(GTM_DIST);
 	assert(NULL != gtm_dist_value);
-	assert(0 != strlen(gtm_dist_value));
+	assert(0 != STRLEN(gtm_dist_value));
 
-	sprintf(gtmcrypt_tab_path, "%s/%s/%s", gtm_dist_value, "plugin/gtmcrypt", gtmcrypt_tab_file);
+	SNPRINTF(gtmcrypt_tab_path, TAB_NAME_MAX, "%s/%s/%s", gtm_dist_value, "plugin/gtmcrypt", gtmcrypt_tab_file);
 	setenv(GTMCI, gtmcrypt_tab_path, TRUE);
 }
 
@@ -196,30 +186,25 @@ void gc_pk_crypt_load_gtmci_env()
 
 xc_status_t gc_pk_crypt_prompt_passwd_if_needed(int prompt_passwd)
 {
-			/* Name of the mumps password routine that will be called. */
-	const char	*password_routine = "getpass";
-			/* Points to the value that was held in GTMCI prior to modification. */
-	char		*save_gtmci, tgtm_passwd[GTM_PASSPHRASE_MAX];
-	char		*lgtm_passwd;
+	const char	*password_routine = "getpass";	/* Name of the mumps password routine that will be called. */
+	char		*save_gtmci;			/* Points to the value that was held in GTMCI prior to modification. */
+	char		*lgtm_passwd, tgtm_passwd[GTM_PASSPHRASE_MAX];
 	int		status, len;
 	gtm_int_t	pass_len = GTM_PASSPHRASE_MAX;
 
 	can_prompt_passwd = prompt_passwd;
-	GC_GETENV(lgtm_passwd, GTM_PASSWD, status);
-	/* This is an error condition. We have hit a encrypted database but the env doesn't have gtm_passwd set. */
-	if (0 != status)
+	if (!(lgtm_passwd = getenv(GTM_PASSWD)))
 	{
-		GC_ENV_UNSET_ERROR(GTM_PASSWD);
+		UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, GTM_PASSWD);
 		return GC_FAILURE;
 	}
-
 	/* If the masked password in the environment is same as we have in memory then it means that the password
 	 * has not been changed and so the actual value in the gtm_passwd is still good to use. */
 	if (NULL != gtm_passwd_env && (0 == strcmp(gtm_passwd_env, lgtm_passwd)))
 		return GC_SUCCESS;
 	/* If the password is set to an appropriate value, then we know for sure it's in it's masked form. So, we unmask it
 	 * and set it in the global variable and return to the caller. */
-	if (0 < (len = (int)strlen(lgtm_passwd)))
+	if (0 < (len = (int)STRLEN(lgtm_passwd)))
 	{
 		if (gtm_passwd)
 			GC_FREE(gtm_passwd);
@@ -236,7 +221,7 @@ xc_status_t gc_pk_crypt_prompt_passwd_if_needed(int prompt_passwd)
 			 * the one in the memory */
 			if (NULL != gtm_passwd_env)
 				GC_FREE(gtm_passwd_env);
-			GC_MALLOC(gtm_passwd_env, strlen(lgtm_passwd) + 1, char);
+			GC_MALLOC(gtm_passwd_env, STRLEN(lgtm_passwd) + 1, char);
 			strcpy(gtm_passwd_env, lgtm_passwd);
 		}
 		return status;
@@ -245,10 +230,9 @@ xc_status_t gc_pk_crypt_prompt_passwd_if_needed(int prompt_passwd)
 		/* If we are here, it means that the caller of the plugin library was not MUMPS (may be MUPIP, DSE and LKE).
 		 * For the utility programs, we expect the password to be set in the environment to an appropriate masked
 		 * form. If not, it's an error and we return the appropriate error message. */
-		strcpy(err_string, PASSWD_EMPTY);
+		UPDATE_ERROR_STRING(ENV_EMPTY_ERROR ". %s", GTM_PASSWD, "Password prompting not allowed for utilities");
 		return GC_FAILURE;
 	}
-
 	/* Only if the gtm_passwd is set to empty string, we prompt the user for password */
 	GC_MALLOC(gtm_passwd, GTM_PASSPHRASE_MAX, char);
 	memset(gtm_passwd, 0, GTM_PASSPHRASE_MAX);
@@ -257,7 +241,7 @@ xc_status_t gc_pk_crypt_prompt_passwd_if_needed(int prompt_passwd)
 	status = gtm_ci_fptr(password_routine, gtm_passwd, pass_len);
 	if (0 != status)
 	{
-		gtm_zstatus_fptr(err_string, ERR_STRLEN);
+		gtm_zstatus_fptr(gtmcrypt_err_string, MAX_GTMCRYPT_ERR_STRLEN);
 		return GC_FAILURE;
 	}
 	/* Restore the GTMCI variable */
@@ -265,10 +249,10 @@ xc_status_t gc_pk_crypt_prompt_passwd_if_needed(int prompt_passwd)
 		setenv(GTMCI, save_gtmci, 1);
 
 	/* After applying a minimal encryption, we set it to the environment variable */
-	GC_MALLOC(lgtm_passwd, strlen(gtm_passwd) * 2 + 1, char);
-	gc_pk_mask_unmask_passwd(gtm_passwd, tgtm_passwd, (int)strlen(gtm_passwd));
-	GC_HEX(tgtm_passwd, lgtm_passwd, strlen(gtm_passwd) * 2);
-	setenv("gtm_passwd", lgtm_passwd, TRUE); /* Note that we currently do not free 'gtm_passwd', even if it was
+	GC_MALLOC(lgtm_passwd, STRLEN(gtm_passwd) * 2 + 1, char);
+	gc_pk_mask_unmask_passwd(gtm_passwd, tgtm_passwd, (int)STRLEN(gtm_passwd));
+	GC_HEX(tgtm_passwd, lgtm_passwd, STRLEN(gtm_passwd) * 2);
+	setenv(GTM_PASSWD, lgtm_passwd, TRUE); /* Note that we currently do not free 'gtm_passwd', even if it was
 					       * allocated above, as it needs to be in the env buffer
 					       */
 	return GC_SUCCESS;
@@ -276,7 +260,6 @@ xc_status_t gc_pk_crypt_prompt_passwd_if_needed(int prompt_passwd)
 
 /* This function is called whenever gpg needs the passphrase with which the secret key is encrypted. In this case, the passphrase
  * is obtained from the ENVIRONMENT VARIABLE - $gtm_passwd or by invoking the mumps engine during the "gtmcrypt_init()".
- * In either ways, it's guaranteed that when this function is called, the passphrase is already set in the global variable.
  * In either ways, it's guaranteed that when this function is called, the passphrase is already set in the global variable.
  */
 int gc_pk_crypt_passphrase_callback(void *opaque, const char *uid_hint,
@@ -289,9 +272,9 @@ int gc_pk_crypt_passphrase_callback(void *opaque, const char *uid_hint,
 	/* This is just being cautious. We would have thrown the appropriate error message
 	 * if gtm_passwd have been zero length'ed one.
 	 */
-	assert(0 != strlen(gtm_passwd));
-	write_ret = write(fd, gtm_passwd, strlen(gtm_passwd));
-	if (strlen(gtm_passwd) == write_ret)
+	assert(0 != STRLEN(gtm_passwd));
+	write_ret = write(fd, gtm_passwd, STRLEN(gtm_passwd));
+	if (STRLEN(gtm_passwd) == write_ret)
 	{
 		write_ret = write(fd, "\n", 1);
 		if (1 == write_ret)
@@ -305,17 +288,16 @@ int gc_pk_crypt_passphrase_callback(void *opaque, const char *uid_hint,
  * also return the number of bytes actually read from the structure.
  */
 
-int gc_pk_crypt_retrieve_plain_text(gpgme_data_t plain_data, char *plain_text)
+int gc_pk_crypt_retrieve_plain_text(gpgme_data_t plain_data, unsigned char *plain_text)
 {
 	int	ret;
 
 	assert(NULL != plain_text);
 
 	/* Clear the temporary buffer */
-	memset(plain_text, 0, GTM_KEY_MAX);
-
+	memset(plain_text, 0, SYMMETRIC_KEY_MAX);
 	gpgme_data_seek(plain_data, 0, SEEK_SET);
-	ret = (int)gpgme_data_read(plain_data, plain_text, GTM_KEY_MAX);
+	ret = (int)gpgme_data_read(plain_data, plain_text, SYMMETRIC_KEY_MAX);
 	return ret;
 }
 
@@ -336,18 +318,18 @@ int gc_pk_scrub_plaintext_keys_from_c_stack()
  * should contain the fully qualified path of the encrypted database key file. Also, plain text is supposed to be allocated with
  * sufficient space to hold the decrypted text.
  */
-gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, char *plain_text, int *plain_text_length)
+gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, unsigned char *plain_text, int *plain_text_length)
 {
 	gpgme_error_t	err;
 	gpgme_data_t	cipher_data = NULL, plain_data = NULL;
 	xc_status_t	ret_status;
 	gpg_err_code_t	ecode;
-	char		null_buffer[GTM_KEY_MAX];
+	char		null_buffer[SYMMETRIC_KEY_MAX];
 
 	assert(NULL != cipher_file);
 	assert(NULL != plain_text);
 	assert(NULL != pk_crypt_ctx);
-	assert(0 != strlen(cipher_file));
+	assert(0 != STRLEN(cipher_file));
 
 	/* Convert the cipher content in the cipher file into
 	 * in-memory content. This in-memory content is stored
@@ -372,21 +354,21 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, char *plain_text,
 		switch(ecode)
 		{
 			case GPG_ERR_BAD_PASSPHRASE:
-				snprintf(err_string, ERR_STRLEN, "%s", "Incorrect password");
+				UPDATE_ERROR_STRING("Incorrect password or error while obtaining password");
 				break;
 			case GPG_ERR_ENOENT:
-				snprintf(err_string, ERR_STRLEN, "encryption key file %s not found", cipher_file);
+				UPDATE_ERROR_STRING("Encryption key file %s not found", cipher_file);
 				break;
 			default:
-				snprintf(err_string, ERR_STRLEN, "%s", gpgme_strerror(err));
+				UPDATE_ERROR_STRING("%s", gpgme_strerror(err));
 				break;
 		}
 	}
 	if (NULL != plain_data)
 	{	/* scrub plaintext data before releasing it */
-		assert(GTM_KEY_MAX == SIZEOF(null_buffer));
-		memset(null_buffer, 0, GTM_KEY_MAX);
-		gpgme_data_write(plain_data, null_buffer, GTM_KEY_MAX);
+		assert(SYMMETRIC_KEY_MAX == SIZEOF(null_buffer));
+		memset(null_buffer, 0, SYMMETRIC_KEY_MAX);
+		gpgme_data_write(plain_data, null_buffer, SYMMETRIC_KEY_MAX);
 		gpgme_data_release(plain_data);
 	}
 	if (NULL != cipher_data)
@@ -396,45 +378,34 @@ gpgme_error_t gc_pk_get_decrypted_key(const char *cipher_file, char *plain_text,
 
 int gc_pk_gpghome_has_permissions()
 {
-	char	filename[GTM_PATH_MAX], *tmp_ptr = NULL;
-	int	gnupghome_set, status, fd;
+	char		pathname[GTM_PATH_MAX], *ptr;
+	int		gnupghome_set, perms;
 
 	/* See if GNUPGHOME is set in the environment */
-	GC_GETENV(tmp_ptr, GNUPGHOME, status);
-	if (GC_SUCCESS != status)
-	{
+	if (!(ptr = getenv(GNUPGHOME)))
+	{	/* $GNUPGHOME is not set, use $HOME/.gnupg as the GPG home directory */
 		gnupghome_set = FALSE;
-		GC_GETENV(tmp_ptr, "HOME", status);
-		if (GC_SUCCESS != status)
+		if (!(ptr = getenv(HOME)))
 		{
-			GC_ENV_UNSET_ERROR("HOME");
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, HOME);
 			return GC_FAILURE;
 		}
-		/* If GNUPGHOME is not set, we choose the filename as $HOME/.gnupg */
-		snprintf(filename, GTM_PATH_MAX, "%s/%s", tmp_ptr, DOT_GNUPG);
+		SNPRINTF(pathname, GTM_PATH_MAX, "%s/%s", ptr, DOT_GNUPG);
 	} else
 	{
 		gnupghome_set = TRUE;
-		/* If GNUPGHOME is set, then we choose the path pointed by GNUPGHOME as the
-		 * directory containing the public keys and private keys whose permissions we are
-		 * interested in. */
-		strcpy(filename, tmp_ptr);
+		strcpy(pathname, ptr);
 	}
-	/* At this point, we are sure that the filename is pointing to the appropriate directory containing the public/private
-	 * keys. If not, then we had encountered an error and would have returned back to the caller. */
-	if (-1 != (fd = open(filename, O_RDONLY)))
-	{
-		close(fd);
+	if (-1 != (perms = access(pathname, R_OK | X_OK)))
 		return GC_SUCCESS;
-	}
-	/* If we don't have appropriate read permissions then we report the error accordingly. */
-	if (EACCES == errno)
+	else if (EACCES == errno)
 	{
 		if (gnupghome_set)
-			snprintf(err_string, ERR_STRLEN, "%s", "No read permissions on $GNUPGHOME");
-		else
-			snprintf(err_string, ERR_STRLEN, "%s", "No read permissions on $HOME/.gnupg");
-	}
-	close(fd);
+		{
+			UPDATE_ERROR_STRING("No read permissions on $%s", GNUPGHOME);
+		} else
+			UPDATE_ERROR_STRING("No read permissions on $%s/%s", HOME, DOT_GNUPG);
+	} else	/* some other error */
+		UPDATE_ERROR_STRING("Cannot stat on %s - %d", pathname, errno);
 	return GC_FAILURE;
 }

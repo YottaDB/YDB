@@ -12,9 +12,8 @@
 #include "mdef.h"
 
 #ifdef UNIX
-#include "io.h"
+# include "io.h"
 #endif
-
 #include "error.h"
 #include "indir_enum.h"
 #include <rtnhdr.h>
@@ -39,8 +38,8 @@
 #include "gdskill.h"
 #include "jnl.h"
 #ifdef GTM_TRIGGER
-#include "gv_trigger.h"
-#include "gtm_trigger.h"
+# include "gv_trigger.h"
+# include "gtm_trigger.h"
 #endif
 
 #define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
@@ -132,13 +131,13 @@ CONDITION_HANDLER(trans_code_ch)
 
 	START_CH;
 	/* Treat $ZTRAP (and DEVICE exception action) as the target entryref for an implicit GOTO */
-	if (DUMPABLE || /* fatal error; we test for STACKOFLOW as part of DUMPABLE test */
-	    (int)ERR_STACKCRIT == SIGNAL || /* successfully compiled ${Z,E}TRAP code but encountered STACK error while attempting
-					     * to push new frame, OR, STACK error while executing $ZTRAP entryref
-					     */
-	    !(ztrap_form & ZTRAP_ENTRYREF) || /* user doesn't want ENTRYREF form for $ZTRAP */
-	    !(ztrap_form & ZTRAP_CODE) || /* error during $ZTRAP ENTRYREF processing */
-	    IS_ETRAP) /* error compiling $ETRAP code */
+	if (DUMPABLE 				/* fatal error; we test for STACKOFLOW as part of DUMPABLE test */
+	    || (int)ERR_STACKCRIT == SIGNAL 	/* Successfully compiled ${Z,E}TRAP code but encountered STACK error while
+						 * attempting to push new frame, OR, STACK error while executing $ZTRAP entryref
+						 */
+	    || !(ztrap_form & ZTRAP_ENTRYREF)	/* User doesn't want ENTRYREF form for $ZTRAP */
+	    || !(ztrap_form & ZTRAP_CODE)	/* Error during $ZTRAP ENTRYREF processing */
+	    || IS_ETRAP)			/* Error compiling $ETRAP code */
 	{
 		NEXTCH;
 	}
@@ -170,10 +169,10 @@ CONDITION_HANDLER(trans_code_ch)
 			assert(gtm_err_dev->state != dev_open);
 			iosocket_destroy(gtm_err_dev);
 		}
-#ifdef 	UNIX
+#		ifdef UNIX
 		if (gtmsocket != gtm_err_dev->type)
 			remove_rms(gtm_err_dev);
-#endif
+#		endif
 		gtm_err_dev = NULL;
 	}
 	trans_code_finish();
@@ -210,7 +209,6 @@ void trans_code(void)
 	dummy.mvtype = MV_STR;
 	dummy.str = *err_act;
 	TREF(trans_code_pop) = push_mval(&dummy);
-
 	ESTABLISH(trans_code_ch);
 	op_commarg(TREF(trans_code_pop), ((ztrap_form & ZTRAP_CODE) || IS_ETRAP) ? indir_linetail : indir_goto);
 	REVERT;

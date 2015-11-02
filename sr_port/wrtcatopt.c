@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@ void wrtcatopt(triple *r, triple ***lpx, triple **lptop)
 	assert(r->operand[1].oprclass == TRIP_REF);
 	assert(r->operand[0].oprval.tref->opcode == OC_ILIT);
 	ref = r->operand[1].oprval.tref;
-	r->operand[0].oprclass = r->operand[1].oprclass = 0;
+	r->operand[0].oprclass = r->operand[1].oprclass = NO_REF;
 	r->opcode = OC_NOOP;
 	for (;;)
 	{
@@ -39,13 +39,13 @@ void wrtcatopt(triple *r, triple ***lpx, triple **lptop)
 		else
 		{
 			wrtcatopt(ref->operand[0].oprval.tref, lpx, lptop);
-			ref->operand[0].oprclass = 0;
+			ref->operand[0].oprclass = NO_REF;
 			ref->opcode = OC_NOOP;
 		}
 		if (ref->operand[1].oprclass == 0)
 			break;
 		assert(ref->operand[1].oprclass == TRIP_REF);
-		ref->operand[1].oprclass = 0;
+		ref->operand[1].oprclass = NO_REF;
 		ref = ref->operand[1].oprval.tref;
 		}
 }

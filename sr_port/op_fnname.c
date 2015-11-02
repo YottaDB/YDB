@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +32,12 @@ GBLREF gv_key		*gv_currkey;
 GBLREF spdesc		stringpool;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
+
+error_def(ERR_MAXSTRLEN);
+error_def(ERR_GVNAKED);
+error_def(ERR_FNNAMENEG);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
 
 #ifdef  TEST_DOLLAR_NAME_GCOL
 #define TEST_FAKE_STRINGPOOL_FULL	stringpool.free = stringpool.top /* force gcol at various stages of $NAME processing */
@@ -85,6 +91,9 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 		dst->str.len++;								\
 	}
 
+/* Implementation note: $NAME does not edit check the result, such as if the key size exceeds the maximum for a global.
+* So, the result if used in other operations (such as SET, KILL) may generate run time errors (GVSUBOFLOW, etc)
+*/
 void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 {
 	int		space_needed;
@@ -95,15 +104,6 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	va_list		var;
 	unsigned char	*sptr, *key_ptr, *key_top;
 
-	error_def(ERR_MAXSTRLEN);
-	error_def(ERR_GVNAKED);
-	error_def(ERR_FNNAMENEG);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
-
-	/* Implementation note: $NAME does not edit check the result, such as if the key size exceeds the maximum for a global.
-	 * So, the result if used in other operations (such as SET, KILL) may generate run time errors (GVSUBOFLOW, etc) */
-
 	VAR_START(var, finaldst);
 	VMS_ONLY(va_count(sub_count);)
 	assert(3 <= sub_count);
@@ -111,13 +111,11 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 	depth = va_arg(var, mval *); /* if second arg to $NAME not specified, compiler sets depth_count to MAXPOSINT4 */
 	depth_count = MV_FORCE_INT(depth);
 	sub_count -=3;
-
 	if (depth_count < 0)
 	{
 		va_end(var);
 		rts_error(VARLSTCNT(1) ERR_FNNAMENEG);
 	}
-
 	/* Note about garbage collection : *dst and all possible *arg's in this function are anchored in the stringpool chains
 	 * and preserved during garbage collection (run time argument mvals provided by compiler). So, if we maintain dst->str.len
 	 * as we copy stuff to the stringpool, we are protected from mval_lex->stp_gcol shuffling strings around. Since the
@@ -141,7 +139,8 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			rts_error(VARLSTCNT(1) ERR_GVNAKED);
 		}
 		/* Reserve enough space for naked reference. Include space for ^() and a maximum of sub_count ',' separators for
-		 * subscripts specified as arguments to $NAME() in addition to those in the naked reference */
+		 * subscripts specified as arguments to $NAME() in addition to those in the naked reference
+		 */
 		space_needed = (int)((STR_LIT_LEN("^()") + ZWR_EXP_RATIO(MAX_KEY_SZ) + sub_count));
 		TEST_FAKE_STRINGPOOL_FULL;
 		ENSURE_STP_FREE_SPACE(space_needed);

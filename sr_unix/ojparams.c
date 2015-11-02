@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,7 @@ MSTR_CONST(deferrext, ".mje");
 
 LITREF jp_datatype	job_param_datatypes[];
 
+error_def		(ERR_PARFILSPC);
 
 /*
  * ------------------------------------------------
@@ -47,7 +48,6 @@ void ojparams (char *p, job_params_type *job_params)
 	unsigned char		ch;
 	int4			status;
 
-	error_def		(ERR_PARFILSPC);
 
 		/* Initializations */
 	job_params->baspri = 0;
@@ -60,6 +60,8 @@ void ojparams (char *p, job_params_type *job_params)
 	job_params->logfile.len = 0;
 	job_params->directory.len = 0;
 	job_params->directory.addr = 0;
+	job_params->cmdline.len = 0;
+	job_params->cmdline.addr = 0;
 
 		/* Process parameter list */
 	while (*p != jp_eol)
@@ -126,6 +128,14 @@ void ojparams (char *p, job_params_type *job_params)
 			}
 			break;
 
+		case jp_cmdline:
+			if(*p != 0)
+			{
+				job_params->cmdline.len = *p;
+				job_params->cmdline.addr = p + 1;
+			}
+			break;
+
 		case jp_account:
 		case jp_detached:
 		case jp_image:
@@ -146,7 +156,7 @@ void ojparams (char *p, job_params_type *job_params)
 			break;
 
 		case jpdt_num:
-			p += sizeof (int4);
+			p += SIZEOF(int4);
 			break;
 
 		case jpdt_str:

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2012 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,7 @@
 #include <errno.h>
 #endif
 
+#define GTMIO_MINIMAL		/* If gtmio.h is pulled in for tracing, don't include stuff that causes redefined errors */
 #include "error.h"
 #include "io.h"
 #include "iosp.h"
@@ -87,7 +88,7 @@ typedef uint8_t UVersionInfo[MAX_ICU_VERSION_LENGTH];
 /* Declare enumerators for all functions */
 #define ICU_DEF(x) x##_,
 enum {
-#include "gtm_icu.h"
+#include "gtm_icu.h"	/* BYPASSOK */
 icu_func_n		/* total number of ICU functions used */
 };
 #undef ICU_DEF
@@ -96,7 +97,7 @@ icu_func_n		/* total number of ICU functions used */
 #define ICU_DEF(x) #x,
 LITDEF char* icu_fname[] =
 {
-#include "gtm_icu.h"
+#include "gtm_icu.h"	/* BYPASSOK */
 NULL
 };
 #undef ICU_DEF
@@ -109,7 +110,7 @@ NULL
 #define ICU_DEF(x) &x##_ptr,
 GBLDEF icu_func_t *icu_fptr[] =
 {
-#include "gtm_icu.h"
+#include "gtm_icu.h"	/* BYPASSOK */
 NULL
 };
 #undef ICU_DEF
