@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +38,7 @@ int	iosocket_rdone(mint *v, int4 timeout)
 			switch(ichset)
 			{
 				case CHSET_M:
-					codepoint = tmp.str.addr[0];
+					codepoint = (unsigned char)tmp.str.addr[0];
 					break;
 				case CHSET_UTF8:
 					UTF8_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);

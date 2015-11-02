@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -249,9 +249,6 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				UNIX_ONLY(
 					if (gtm_environment_init)
 					{
-						/* We do this, because we often do not check syslogs */
-						gtm_putmsg(VARLSTCNT(8) ERR_JNLFLUSHNOPROG, 2, JNL_LEN_STR(csa->hdr), ERR_TEXT, 2,
-							LEN_AND_LIT("Progress prevented by a process stuck flushing journal data"));
 						proc_stuck_cnt = 0;
 						continue;
 					}
