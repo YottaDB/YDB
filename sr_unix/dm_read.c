@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,11 @@ GBLREF io_pair		io_std_device;
 GBLREF bool		prin_in_dev_failure;
 GBLREF io_desc		*active_device;
 GBLREF spdesc 		stringpool;
-GBLREF int4		outofband;
+GBLREF volatile int4	outofband;
+GBLREF mv_stent		*mv_chain;
+GBLREF stack_frame	*frame_pointer;
+GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
+GBLREF boolean_t	dollar_zininterrupt;
 GBLREF mstr		*comline_base;
 GBLDEF int		recall_num;
 GBLDEF int		comline_index;
@@ -149,7 +153,7 @@ void	dm_read (mval *v)
 {
 	int		up, down, right, left;
 	int		backspace, delete, insert_key, keypad_len;
-	boolean_t	insert_mode, utf8_active, terminator_seen;
+	boolean_t	insert_mode, utf8_active, terminator_seen, zint_restart, buffer_moved;
 	int		cl, index, msk_num, msk_in, selstat, status, utf8_more;
 	uint4		mask;
 	unsigned char	inbyte, *outptr, *outtop;
@@ -174,13 +178,20 @@ void	dm_read (mval *v)
 	unsigned short	escape_length = 0;
 	unsigned char	*ptr, *ptrnext, *ptrtop;
 	wint_t		codepoint;
+	mv_stent	*mvc, *mv_zintdev;
 
 	d_tt_struct 	*tt_ptr;
 	fd_set		input_fd;
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
+	tt_interrupt	*tt_state;
 
 	struct timeval	input_timeval;
+
+	error_def(ERR_ZINTRECURSEIO);
+	error_def(ERR_ZINTDIRECT);
+	error_def(ERR_STACKOFLOW);
+	error_def(ERR_STACKCRIT);
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
@@ -197,7 +208,6 @@ void	dm_read (mval *v)
 	if (tt == io_curr_device.out->type)
 		iott_flush(io_curr_device.out);
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
-	utf8_more = 0;
 
 	/* -----------------------------
 	 * for possible escape sequence
@@ -206,30 +216,94 @@ void	dm_read (mval *v)
 
 	length = tt_ptr->in_buf_sz + ESC_LEN;
 	exp_length = utf8_active ? ((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t)) : length;
-	if (stringpool.free + exp_length > stringpool.top)
-		stp_gcol (exp_length);
-
-	instr = outlen = 0;
-	buffer_start = current_ptr = stringpool.free;
-	if (utf8_active)
+	zint_restart = FALSE;
+	if (tt_ptr->mupintr)
+	{	/* restore state to before job interrupt */
+		tt_state = &tt_ptr->tt_state_save;
+		if (ttwhichinvalid == tt_state->who_saved)
+			GTMASSERT;
+		if (dollar_zininterrupt)
+		{
+			tt_ptr->mupintr = FALSE;
+			tt_state->who_saved = ttwhichinvalid;
+			rts_error(VARLSTCNT(1) ERR_ZINTDIRECT);
+		}
+		assert(length == tt_state->length);
+		if (dmread != tt_state->who_saved)
+			GTMASSERT;	/* ZINTRECURSEIO should have caught */
+		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
+		if (mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
+		{
+			buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
+			current_ptr = buffer_start;
+			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+			if (mv_chain == mv_zintdev)
+				POP_MV_STENT();		/* pop if top of stack */
+			buffer_moved = (buffer_start != tt_state->buffer_start);
+			if (utf8_active)
+			{	/* need to properly align U32 buffer */
+				assert(exp_length == tt_state->exp_length);
+				buffer_32_start = (wint_t *)ROUND_UP2((int4)(buffer_start + (GTM_MB_LEN_MAX * length)),
+							sizeof(gtm_int64_t));
+				if (buffer_moved && (((int)buffer_32_start & 0x7) != ((int)tt_state->buffer_32_start & 0x7)))
+					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
+						- tt_state->buffer_start), (sizeof(wint_t) * length));
+				current_32_ptr = buffer_32_start;
+				utf8_more = tt_state->utf8_more;
+				more_ptr = tt_state->more_ptr;
+				memcpy(more_buf, tt_state->more_buf, sizeof(more_buf));
+			}
+			instr = tt_state->instr;
+			outlen = tt_state->outlen;
+			dx = tt_state->dx;
+			dx_start = tt_state->dx_start;
+			dx_instr = tt_state->dx_instr;
+			dx_outlen = tt_state->dx_outlen;
+			index = tt_state->index;
+			cl = tt_state->cl;
+			escape_length = tt_state->escape_length;
+			memcpy(escape_sequence, tt_state->escape_sequence, ESC_LEN);
+			tt_state->who_saved = ttwhichinvalid;
+			tt_ptr->mupintr = FALSE;
+			zint_restart = TRUE;
+		}
+	}
+	if (!zint_restart)
 	{
-		current_32_ptr = (wint_t *)ROUND_UP2((int4)(stringpool.free + (GTM_MB_LEN_MAX * length)), sizeof(gtm_int64_t));
-		buffer_32_start = current_32_ptr;
+		if (stringpool.free + exp_length > stringpool.top)
+			stp_gcol(exp_length);
+		buffer_start = current_ptr = stringpool.free;
+		if (utf8_active)
+		{
+			buffer_32_start = (wint_t *)ROUND_UP2((int4)(stringpool.free + (GTM_MB_LEN_MAX * length)),
+					sizeof(gtm_int64_t));
+			current_32_ptr = buffer_32_start;
+		}
+		instr = outlen = 0;
+		dx_instr = dx_outlen = 0;
+		utf8_more = 0;
+		io_ptr->esc_state = START;
+		io_ptr->dollar.za = 0;
+		io_ptr->dollar.zeof = FALSE;
+		dx_start = (int)io_ptr->dollar.x;
+		index = 0;
+		cl = clmod(comline_index - index);
 	}
 	mask = tt_ptr->term_ctrl;
 	mask_term = tt_ptr->mask_term;
 	mask_term.mask[ESC / NUM_BITS_IN_INT4] &= ~(1 << ESC);
 	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);
 	ioptr_width = io_ptr->width;
-	DOWRITE_A(tt_ptr->fildes, &cr, 1);
-	WRITE_GTM_PROMPT;
-	dx_instr = dx_outlen = 0;
-	index = 0;
-	cl = clmod(comline_index - index);
+	if (!zint_restart)
+	{
+		DOWRITE_A(tt_ptr->fildes, &cr, 1);
+		WRITE_GTM_PROMPT;
+	}
 
 	/* to turn keypad on if possible */
 #ifndef __MVS__
-	if (NULL != KEYPAD_XMIT && (keypad_len = strlen(KEYPAD_XMIT)))	/* embedded assignment */
+	if (!zint_restart && NULL != KEYPAD_XMIT && (keypad_len = strlen(KEYPAD_XMIT)))	/* embedded assignment */
 		DOWRITE(tt_ptr->fildes, KEYPAD_XMIT, keypad_len);
 #endif
 
@@ -237,7 +311,40 @@ void	dm_read (mval *v)
 	{
 		if (outofband)
 		{
-			instr = 0;
+			if (jobinterrupt == outofband)
+			{	/* save state if jobinterrupt */
+				tt_state = &tt_ptr->tt_state_save;
+				tt_state->who_saved = dmread;
+				tt_state->length = length;
+				tt_state->buffer_start = buffer_start;
+				PUSH_MV_STENT(MVST_ZINTDEV);
+				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)buffer_start;
+				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = exp_length;
+				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
+				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
+				if (utf8_active)
+				{
+					tt_state->exp_length = exp_length;
+					tt_state->buffer_32_start = buffer_32_start;
+					tt_state->utf8_more = utf8_more;
+					tt_state->more_ptr = more_ptr;
+					memcpy(tt_state->more_buf, more_buf, sizeof(more_buf));
+				}
+				if (buffer_start == stringpool.free)
+					stringpool.free += exp_length;	/* reserve space */
+				tt_state->instr = instr;
+				tt_state->outlen = outlen;
+				tt_state->dx = dx;
+				tt_state->dx_start = dx_start;
+				tt_state->dx_instr = dx_instr;
+				tt_state->dx_outlen = dx_outlen;
+				tt_state->index = index;
+				tt_state->cl = cl;
+				tt_state->escape_length = escape_length;
+				memcpy(tt_state->escape_sequence, escape_sequence, ESC_LEN);
+				tt_ptr->mupintr = TRUE;
+			} else
+				instr = 0;
 			outofband_action(FALSE);
 			break;
 		}
@@ -266,10 +373,13 @@ void	dm_read (mval *v)
 		 * -------------------------------------------------------------------
 		 */
 
-		SELECT(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL,
-			&input_timeval, selstat);
+		selstat = select(tt_ptr->fildes + 1, (void *)&input_fd, (void *)NULL, (void *)NULL,
+			&input_timeval);
 		if (0 > selstat)
-			rts_error(VARLSTCNT(1) errno);
+			if (EINTR != errno)
+				rts_error(VARLSTCNT(1) errno);
+			else
+				continue;
 		else if (0 == selstat)
 		{
 			/* ---------------------------------------------------
@@ -291,10 +401,8 @@ void	dm_read (mval *v)
 			 */
 
 			/*
-			 * If error was EINTR, this
-			 * code does not retry, so
-			 * no EINTR wrapper macro for
-			 * the read is necessary.
+			 * If error was EINTR, go to the top of the loop
+			 * to check for outofband.
 			 */
 
 			if (errno != EINTR)
@@ -302,7 +410,8 @@ void	dm_read (mval *v)
 				tt_ptr->discard_lf = FALSE;
 				io_ptr->dollar.za = 9;
 				rts_error(VARLSTCNT(1) errno);
-			}
+			} else
+				continue;
 		} else if (status == 0)
 		{
 			/* ----------------------------------------------------
@@ -476,8 +585,8 @@ void	dm_read (mval *v)
 					if (outlen <= match_length)
 						argv[1] = NULL;		/* nothing after RECALL */
 					else
-						argv[1] = (char *)stringpool.free;
-					for (outptr = stringpool.free ; outlen > match_length; match_length++)
+						argv[1] = (char *)buffer_start;
+					for (outptr = buffer_start ; outlen > match_length; match_length++)
 					{
 						inchar = GET_OFF(match_length);
 						outptr = UTF8_WCTOMB(inchar, outptr);
@@ -489,14 +598,14 @@ void	dm_read (mval *v)
 				} else
 				{
 #endif
-					match_length = strcspn((const char *)stringpool.free, delimiter_string);
+					match_length = strcspn((const char *)buffer_start, delimiter_string);
 
 					/* only "rec" and "recall" should be accepted */
 
 					if (   ((match_length == strlen(REC)) || (match_length == strlen(RECALL)))
-				    		&& strncmp((const char *)stringpool.free, RECALL, match_length) == 0)
+				    		&& strncmp((const char *)buffer_start, RECALL, match_length) == 0)
 					{
-						strtok((char *)stringpool.free, delimiter_string);
+						strtok((char *)buffer_start, delimiter_string);
 						argv[1] = strtok(NULL, "");
 					} else
 						break;		/* not RECALL so end of line */
@@ -607,7 +716,7 @@ void	dm_read (mval *v)
 						} else
 						{	/* using memcpy since areas definitely dont overlap. */
 #endif
-							memcpy(stringpool.free, comline_base[recall_index].addr,
+							memcpy(buffer_start, comline_base[recall_index].addr,
 								comline_base[recall_index].len);
 							instr = outlen = comline_base[recall_index].len;
 							dx_instr = dx_outlen = instr;
@@ -916,28 +1025,29 @@ void	dm_read (mval *v)
 	if (utf8_active)
 	{
 		int	i;
-		outptr = stringpool.free;
+		outptr = buffer_start;
 		outtop = ((unsigned char *)buffer_32_start);
 		current_32_ptr = buffer_32_start;
 		for (i = 0; i < outlen && outptr < outtop; i++, current_32_ptr++)
 			outptr = UTF8_WCTOMB(*current_32_ptr, outptr);
-		v->str.len = outptr - stringpool.free;
+		v->str.len = outptr - buffer_start;
 	} else
 #endif
 		v->str.len = outlen;
-	v->str.addr = (char *)stringpool.free;
+	v->str.addr = (char *)buffer_start;
 
 	if (v->str.len != 0)
 	{
 		cl = clmod (comline_index - 1);
-		if (v->str.len != comline_base[cl].len  ||  memcmp(comline_base[cl].addr, stringpool.free, v->str.len))
+		if (v->str.len != comline_base[cl].len  ||  memcmp(comline_base[cl].addr, buffer_start, v->str.len))
 		{
 			comline_base[comline_index] = v->str;
 			comline_index = clmod (comline_index + 1);
 			if (recall_num != MAX_RECALL)
 				recall_num ++;
 		}
-		stringpool.free += v->str.len;
+		if (buffer_start == stringpool.free)
+			stringpool.free += v->str.len;	/* otherwise using space from before interrupt */
 	}
 
 	if (!(mask & TRM_NOECHO))

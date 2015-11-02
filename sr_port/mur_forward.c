@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -413,6 +413,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		}
 		if (SS_NORMAL != status && ERR_JNLREADEOF != status)
 			return status;
+		jgbl.mur_plst = NULL;	/* No more simulation of GT.M activity for this region. */
 		if (mur_options.update && SS_NORMAL != mur_block_count_correct())
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_BLKCNTEDITFAIL, 2, DB_LEN_STR(gv_cur_region));

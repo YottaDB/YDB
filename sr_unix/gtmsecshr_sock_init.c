@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +49,9 @@ static char hex_table[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','
 unsigned char		*mypid2ascx(unsigned char *, pid_t);
 
 #ifndef SUN_LEN
-#define SUN_LEN(x)	sizeof(*x)
+#  define SUN_LEN(x)	sizeof(*x)
+#else
+#  define EXACT_SIZE_SOCKNAME
 #endif
 
 int4 gtmsecshr_pathname_init(int caller)
@@ -75,8 +77,7 @@ int4 gtmsecshr_pathname_init(int caller)
 		ret_status = INVLOGNAME;
 		strcpy(gtmsecshr_sockpath, DEFAULT_GTMSECSHR_SOCK_DIR);
 		gtmsecshr_sockpath_len = sizeof(DEFAULT_GTMSECSHR_SOCK_DIR) - 1;
-	}
-	else
+	} else
 		gtmsecshr_sockpath_len = secshrsock_transnam.len;
 
 	if ((-1 == Stat(gtmsecshr_sockpath, &buf)) || !S_ISDIR(buf.st_mode) )
@@ -217,16 +218,17 @@ int4 gtmsecshr_sock_init(int caller)
 				{
 					if (!suffix)
 					{
-					    suffix = 'a';
-					    gtmsecshr_cli_sockpath_end = strlen(gtmsecshr_cli_sock_name.sun_path);
-					    gtmsecshr_cli_sock_name.sun_path[gtmsecshr_cli_sockpath_end + 1] = '\0';
-					}
-					else
-				  	    suffix++;
+						suffix = 'a';
+						gtmsecshr_cli_sockpath_end = strlen(gtmsecshr_cli_sock_name.sun_path);
+						gtmsecshr_cli_sock_name.sun_path[gtmsecshr_cli_sockpath_end + 1] = '\0';
+#ifdef EXACT_SIZE_SOCKNAME
+						gtmsecshr_cli_sockpath_len++; /* Account for socket name growth (suffix) */
+#endif
+					} else
+						suffix++;
 					gtmsecshr_cli_sock_name.sun_path[gtmsecshr_cli_sockpath_end] = suffix;
 					continue;
-				}
-				else if (ENOENT != errno)
+				} else if (ENOENT != errno)
 				{
 					save_errno = errno;
 					send_msg(VARLSTCNT(10) ERR_GTMSECSHRSOCKET, 3,
@@ -234,11 +236,9 @@ int4 gtmsecshr_sock_init(int caller)
 						 ERR_TEXT, 2, RTS_ERROR_LITERAL("Error unlinking leftover gtmsecshr_cli socket"),
 						save_errno);
 					ret_status = UNLINKERR;
-				}
-				else
+				} else
 					break;
-			}
-			else
+			} else
 				break;
 		}
 
@@ -257,8 +257,7 @@ int4 gtmsecshr_sock_init(int caller)
 					  RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
 					  ERR_TEXT, 2, RTS_ERROR_LITERAL("Error with gtmsecshr_cli socket bind"), errno);
 				ret_status = BINDERR;
-			}
-			else if ('\0' != suffix)
+			} else if ('\0' != suffix)
 				ret_status = ONETIMESOCKET;
 		}
 	}

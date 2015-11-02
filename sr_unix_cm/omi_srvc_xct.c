@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -206,7 +206,7 @@ int	omi_srvc_xact (omi_conn *cptr)
  */
 #endif /* defined(DEBUG) */
 
-/*	This is set to indiacte a fatal error in a bunch */
+/*	This is set to indicate a fatal error in a bunch */
 	fatal = 0;
 /*	This is set to indicate we processed an xblk */
 	xblk  = 0;
@@ -216,7 +216,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 	{
 		OMI_LI_READ(&nxact, cptr->xptr);
 		bptr = buff + OMI_VI_SIZ + OMI_LI_SIZ;
-		if (nxact.value * (OMI_RH_SIZ + 1) > mlen.value  ||  nxact.value < 0)
+		if (nxact.value * (OMI_RH_SIZ + 1) > mlen.value) /* || nxact.value < 0 */ /* is commented as it is always FALSE */
 		{
 			char	msg[256];
 

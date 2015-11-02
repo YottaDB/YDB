@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@ int	op_rdone(mval *v, int4 timeout);
 int	op_readfl(mval *v, int4 length, int4 timeout);
 int	op_read(mval *v, int4 timeout);
 int	op_zallocate(int timeout);		/***type int added***/
-int	op_fngvget1(mval *v);
+void	op_fngvget1(mval *v);
 int	op_zalloc2(int4 timeout, uint4 auxown);
 int	op_zallocate(int timeout);
 void	op_unwind(void);
@@ -191,9 +191,6 @@ void	op_fngetlki(mval *lkid_mval, mval *keyword, mval *ret);
 int	op_fngvget2(mval *res, mval *val, mval *optional);
 UNIX_ONLY(void	op_fnp1(mval *src, int del, int trgpcidx, mval *dst);)
 VMS_ONLY( void	op_fnp1(mval *src, int del, int trgpcidx, mval *dst, boolean_t srcisliteral);)
-#ifdef DEBUG
-void	print_fnpc_stats(void);
-#endif
 void	op_fntranslate(mval *src,mval *in_str,mval *out_str,mval *dst);
 void	op_fnzbitfind(mval *dst, mval *bitstr, int truthval, int pos);
 void	op_fnzbitnot(mval *dst, mval *bitstr);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,12 +34,21 @@
 #include "iosocketdef.h"
 #include "min_max.h"
 #include "outofband.h"
+#include "rtnhdr.h"
+#include "stack_frame.h"
+#include "mv_stent.h"
 
 #define	CONNECTED	"CONNECT"
 #define READ	"READ"
+
 GBLREF tcp_library_struct	tcp_routines;
 GBLREF volatile int4		outofband;
 GBLREF int4			gtm_max_sockets;
+GBLREF int			socketus_interruptus;
+GBLREF boolean_t		dollar_zininterrupt;
+GBLREF stack_frame  	        *frame_pointer;
+GBLREF unsigned char            *stackbase, *stacktop, *msp, *stackwarn;
+GBLREF mv_stent			*mv_chain;
 
 boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 {
@@ -49,19 +58,63 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
         fd_set    		tcp_fd;
         d_socket_struct 	*dsocketptr;
         socket_struct   	*socketptr, *newsocketptr;
+	socket_interrupt	*sockintr;
         char            	*errptr;
         int4            	errlen, ii, msec_timeout;
-	int			rv, size, max_fd;
-	short			len;
+	int			rv, size, max_fd, len;
+	boolean_t		zint_restart;
+	mv_stent		*mv_zintdev;
 
         error_def(ERR_SOCKACPT);
         error_def(ERR_SOCKWAIT);
         error_def(ERR_TEXT);
 	error_def(ERR_SOCKMAX);
+	error_def(ERR_ZINTRECURSEIO);
+        error_def(ERR_STACKCRIT);
+        error_def(ERR_STACKOFLOW);
 
 	/* check for validity */
         assert(iod->type == gtmsocket);
         dsocketptr = (d_socket_struct *)iod->dev_sp;
+	sockintr = &dsocketptr->sock_save_state;
+
+	/* Check for restart */
+        if (!dsocketptr->mupintr)
+                /* Simple path, no worries*/
+                zint_restart = FALSE;
+        else
+        {       /* We have a pending wait restart of some sort - check we aren't recursing on this device */
+                if (sockwhich_invalid == sockintr->who_saved)
+                        GTMASSERT;	/* Interrupt should never have an invalid save state */
+                if (dollar_zininterrupt)
+                        rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+                if (sockwhich_wait != sockintr->who_saved)
+                        GTMASSERT;      /* ZINTRECURSEIO should have caught */
+                SOCKET_DEBUG(PRINTF("socwait: *#*#*#*#*#*#*#  Restarted interrupted wait\n"); DEBUGSOCKFLUSH);
+                mv_zintdev = io_find_mvstent(iod, FALSE);
+                if (mv_zintdev)
+                {
+                        if (sockintr->end_time_valid)
+                                /* Restore end_time for timeout */
+                                end_time = sockintr->end_time;
+
+                        /* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
+                        if (mv_chain == mv_zintdev)
+                                POP_MV_STENT();         /* pop if top of stack */
+                        else
+                        {       /* else mark it unused */
+                                mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+                                mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+                        }
+			zint_restart = TRUE;
+			SOCKET_DEBUG(PRINTF("socwait: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec);
+				     DEBUGSOCKFLUSH);
+                } else
+			SOCKET_DEBUG(PRINTF("socwait: no mv_stent found !!\n"); DEBUGSOCKFLUSH);
+                dsocketptr->mupintr = FALSE;
+		sockintr->who_saved = sockwhich_invalid;
+        }
+
 	/* check for events */
 	max_fd = 0;
 	FD_ZERO(&tcp_fd);
@@ -78,17 +131,52 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	utimeout.tv_usec = 0;
 	msec_timeout = timeout2msec(timepar);
 	sys_get_curr_time(&cur_time);
-	add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+	if (!zint_restart || !sockintr->end_time_valid)
+		add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+	else
+	{       /* end_time taken from restart data. Compute what msec_timeout should be so timeout timer
+                                   gets set correctly below.
+		*/
+		SOCKET_DEBUG(PRINTF("socwait: Taking timeout end time from wait restart data\n"));
+		cur_time = sub_abs_time(&end_time, &cur_time);
+		if (0 > cur_time.at_sec)
+		{
+			msec_timeout = -1;
+			utimeout.tv_sec = 0;
+			utimeout.tv_usec = 0;
+		} else
+		{
+			msec_timeout = cur_time.at_sec * 1000 + cur_time.at_usec / 1000;
+			utimeout.tv_sec = cur_time.at_sec;
+			utimeout.tv_usec = cur_time.at_usec;
+		}
+	}
+	sockintr->end_time_valid = FALSE;
+
 	for ( ; ; )
 	{
-		rv = tcp_routines.aa_select(max_fd + 1, (void *)&tcp_fd, (void *)0, (void *)0,
-			(timepar == NO_M_TIMEOUT ? (struct timeval *)0 : &utimeout));
+		rv = select(max_fd + 1, (void *)&tcp_fd, (void *)0, (void *)0,
+			    (timepar == NO_M_TIMEOUT ? (struct timeval *)0 : &utimeout));
 		if (0 > rv && EINTR == errno)
 		{
-			if (OUTOFBANDNOW(outofband))
+			if (0 != outofband)
 			{
-				rv = 0;		/* treat as time out */
-				break;
+				SOCKET_DEBUG(PRINTF("socwait: outofband interrupt received (%d) -- "
+						    "queueing mv_stent for wait intr\n", outofband); DEBUGSOCKFLUSH);
+				PUSH_MV_STENT(MVST_ZINTDEV);
+				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
+				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+				sockintr->who_saved = sockwhich_wait;
+				sockintr->end_time = end_time;
+				sockintr->end_time_valid = TRUE;
+				dsocketptr->mupintr = TRUE;
+				socketus_interruptus++;
+				SOCKET_DEBUG(PRINTF("socwait: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
+						    end_time.at_sec, end_time.at_usec, socketus_interruptus);
+					     DEBUGSOCKFLUSH);
+				outofband_action(FALSE);
+				GTMASSERT;      /* Should *never* return from outofband_action */
+				return FALSE;   /* For the compiler.. */
 			}
 			sys_get_curr_time(&cur_time);
 			cur_time = sub_abs_time(&end_time, &cur_time);

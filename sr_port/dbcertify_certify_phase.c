@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -80,7 +80,7 @@ GBLREF	VSIG_ATOMIC_T		forced_exit;			/* Signal came in while we were in critical
 GBLREF	int4			exi_condition;
 GBLREF	phase_static_area	*psa_gbl;
 
-boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, v15_trans_num tn, int blk_levl);
+boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_type blk_type, v15_trans_num tn, int blk_levl);
 void dbc_flush_fhead(phase_static_area *psa);
 void dbc_read_p1out(phase_static_area *psa, void *obuf, int olen);
 
@@ -103,10 +103,10 @@ error_def(ERR_MUPCLIERR);
 /* The final certify phase of certification process */
 void dbcertify_certify_phase(void)
 {
-	int		save_errno, len, rc, restart_cnt;
+	int		save_errno, len, rc, restart_cnt, maxkeystructsize;
 	uint4		rec_num;
 	char_ptr_t	errmsg;
-	boolean_t	restart_transaction;
+	boolean_t	restart_transaction, p1rec_read;
 	unsigned short	buff_len;
 	char		ans[2];
 	unsigned char	dbfn[MAX_FN_LEN + 1];
@@ -143,20 +143,20 @@ void dbcertify_certify_phase(void)
 	{
 		save_errno = errno;
 		if (save_errno == ENOENT)
-			rts_error(VARLSTCNT(4) ERR_FILENOTFND, 2, RTS_ERROR_TEXT((char_ptr_t)psa->outfn));
+			rts_error(VARLSTCNT(4) ERR_FILENOTFND, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
 		else
 		{
 			errmsg = STRERROR(save_errno);
-			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_TEXT((char_ptr_t)psa->outfn),
-				  ERR_TEXT, 2, RTS_ERROR_TEXT(errmsg));
+			rts_error(VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn),
+				  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 		}
 	}
 	dbc_read_p1out(psa, &psa->ofhdr, sizeof(p1hdr));		/* Read phase 1 output file header */
 	if (0 != memcmp(psa->ofhdr.p1hdr_tag, P1HDR_TAG, sizeof(psa->ofhdr.p1hdr_tag)))
-		rts_error(VARLSTCNT(4) ERR_DBCBADFILE, 2, RTS_ERROR_TEXT((char_ptr_t)psa->outfn));
+		rts_error(VARLSTCNT(4) ERR_DBCBADFILE, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
 	if (0 == psa->ofhdr.tot_blocks)
 		/* Sanity check that the output file was finished and completed */
-		rts_error(VARLSTCNT(4) ERR_DBCSCNNOTCMPLT, 2, RTS_ERROR_TEXT((char_ptr_t)psa->outfn));
+		rts_error(VARLSTCNT(4) ERR_DBCSCNNOTCMPLT, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn));
 	assert(0 != psa->ofhdr.tn);
 
 	/* Check if region name still associates to the same file */
@@ -165,7 +165,7 @@ void dbcertify_certify_phase(void)
 	/* Notify user this is a critical change and give them the opportunity to abort */
 	util_out_print("--------------------------------------------------------------------------------", FLUSH);
 	util_out_print("You must have a backup of database !AD before you proceed!!", FLUSH,
-		       RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn));
+		       RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 	util_out_print("An abnormal termination can damage the database while doing the certification !!", FLUSH);
 	util_out_print("Proceeding will also turn off replication and/or journaling if enabled", FLUSH);
 	util_out_print("--------------------------------------------------------------------------------", FLUSH);
@@ -176,7 +176,7 @@ void dbcertify_certify_phase(void)
 		util_out_print("Certification phase aborted\n", FLUSH);
 		return;
 	}
-	util_out_print("Certification phase for database !AD beginning", FLUSH, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn));
+	util_out_print("Certification phase for database !AD beginning", FLUSH, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 
 	/* Build database structures */
 	psa->dbc_gv_cur_region = malloc(sizeof(gd_region));
@@ -209,6 +209,16 @@ void dbcertify_certify_phase(void)
 		rts_error(VARLSTCNT(1) ERR_DBCNOTSAMEDB);
 	psa->max_blk_len = psa->dbc_cs_data->blk_size - psa->dbc_cs_data->reserved_bytes;
 
+	/* Initialize maximum key we may need later if we encounter gvtroot blocks */
+	maxkeystructsize = sizeof(dbc_gv_key) + MAX_DBC_KEY_SZ - 1;
+	psa->max_key = malloc(maxkeystructsize);
+	memset(psa->max_key, 0, maxkeystructsize);
+	psa->max_key->top = maxkeystructsize;
+	psa->max_key->gvn_len = 1;
+	*psa->max_key->base = (unsigned char)0xFF;
+	/* Key format: 0xFF, 0x00, 0x00 : This is higher than any valid key would be */
+	psa->max_key->end = MAX_DBC_KEY_SZ - 1;
+
 	/* Allocate update array based on fileheader values */
 	psa->dbc_cs_data->max_update_array_size = psa->dbc_cs_data->max_non_bm_update_array_size =
 					ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(psa->dbc_cs_data), UPDATE_ARRAY_ALIGN_SIZE);
@@ -220,27 +230,43 @@ void dbcertify_certify_phase(void)
 	   to be split (concurrent updates may have "fixed" some blocks).
 	*/
 	psa->hint_blk = psa->hint_lcl = 1;
-	restart_transaction = FALSE;
+	restart_transaction = p1rec_read = FALSE;
 	restart_cnt = 0;
-	for (rec_num = 0; rec_num < psa->ofhdr.blk_count; ++rec_num)
+	for (rec_num = 0; rec_num < psa->ofhdr.blk_count || 0 < psa->gvtroot_rchildren_cnt;)
 	{	/* There is the possibility that we are restarting the processing of a given record. In
 		   that case we will not read the next record in but process what is already in the buffer.
 		   This can occur if we have extended the database. */
 		if (!restart_transaction)
-		{
-			if (rec_num == psa->blocks_to_process)
-			{	/* Maximum records processed */
-				DBC_DEBUG(("DBC_DEBUG: Maximum records to process limit reached - premature exit to main loop\n"));
-				break;
-			}
-			DBC_DEBUG(("DBC_DEBUG: ****************** Reading new p1out record (%d) *****************\n", \
-				   (rec_num + 1)));
-			dbc_read_p1out(psa, &psa->rhdr, sizeof(p1rec));
-			if (0 != psa->rhdr.akey_len)
-			{	/* This module does not need the ascii key so just bypass it if it exists */
-				if (0 != psa->rhdr.blk_levl || sizeof(psa->rslt_buff) < psa->rhdr.akey_len )
-					GTMASSERT;		/* Must be corrupted file? */
-				dbc_read_p1out(psa, (char_ptr_t)psa->rslt_buff, psa->rhdr.akey_len);
+		{	/* First to check is if we have any queued gvtroot_rchildren to process (described elsewhere). If we have
+			   these, we process them now without bumping the record count.
+			*/
+			p1rec_read = FALSE;	/* Assume we did NOT read from the file */
+			if (0 < psa->gvtroot_rchildren_cnt)
+			{
+				psa->gvtroot_rchildren_cnt--;
+				memcpy((char *)&psa->rhdr, (char *)&psa->gvtroot_rchildren[psa->gvtroot_rchildren_cnt],
+				       sizeof(p1rec));
+				psa->gvtrchildren++;	/* counter */
+				DBC_DEBUG(("DBC_DEBUG: Pulling p1rec from queued gvtroot_rchildren array (%d)\n",
+					   psa->gvtroot_rchildren_cnt));
+			} else
+			{	/* Normal processing - read record from phase one file */
+				if (rec_num == psa->blocks_to_process)
+				{	/* Maximum records processed */
+					DBC_DEBUG(("DBC_DEBUG: Maximum records to process limit reached "
+						   "- premature exit to main loop\n"));
+					break;
+				}
+				DBC_DEBUG(("DBC_DEBUG: ****************** Reading new p1out record (%d) *****************\n", \
+					   (rec_num + 1)));
+				dbc_read_p1out(psa, &psa->rhdr, sizeof(p1rec));
+				if (0 != psa->rhdr.akey_len)
+				{	/* This module does not need the ascii key so just bypass it if it exists */
+					if (0 != psa->rhdr.blk_levl || sizeof(psa->rslt_buff) < psa->rhdr.akey_len )
+						GTMASSERT;		/* Must be corrupted file? */
+					dbc_read_p1out(psa, (char_ptr_t)psa->rslt_buff, psa->rhdr.akey_len);
+				}
+				p1rec_read = TRUE;	/* Note, not reset by restarted transaction */
 			}
 			/* Don't want to reset the high water mark on a restarted transaction */
 			if (psa->block_depth > psa->block_depth_hwm)
@@ -253,17 +279,16 @@ void dbcertify_certify_phase(void)
 				GTMASSERT;			/* No idea what could cause this.. */
 			DBC_DEBUG(("DBC_DEBUG: ****************** Restarted transaction (%d) *****************\n", \
 				   (rec_num + 1)));
-			restart_transaction = FALSE;		/* Read block next time through */
+			/* "restart_transaction" is either set or cleared by dbc_split_blk() below */
 		}
 		assert(psa->rhdr.blk_type);
 		/* Note assignment in "if" below */
 		if (restart_transaction = dbc_split_blk(psa, psa->rhdr.blk_num, psa->rhdr.blk_type,
 							psa->rhdr.tn, psa->rhdr.blk_levl))
-		{
 			psa->block_depth_hwm = -1;	/* Zaps cache so all blocks are re-read */
-			rec_num--;
-		}
-	} /* for each record in phase-1 output file */
+		else if (p1rec_read)			/* If rec processed was from scan phase, bump record counter */
+			rec_num++;
+	} /* for each record in phase-1 output file or each restart or each queued rh child */
 
 	/* Reaching this point, the database has been updated, with no errors. We can now certify
 	   this database as ready for the current version of GT.M
@@ -275,27 +300,28 @@ void dbcertify_certify_phase(void)
 		{
 			((sgmnt_data_ptr_t)psa->dbc_cs_data)->certified_for_upgrade_to = GDSV5;
 			psa->dbc_fhdr_dirty = TRUE;
-			gtm_putmsg(VARLSTCNT(6) ERR_DBCDBCERTIFIED, 4, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
+			gtm_putmsg(VARLSTCNT(6) ERR_DBCDBCERTIFIED, 4, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 				   RTS_ERROR_LITERAL("GT.M V5"));
 		} else
 		{
 			DBC_DEBUG(("DBC_DEBUG: Database certification bypassed due to records to process limit being reached\n"));
 		}
 	} else
-		gtm_putmsg(VARLSTCNT(4) ERR_DBCDBNOCERTIFY, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn));
+		gtm_putmsg(VARLSTCNT(4) ERR_DBCDBNOCERTIFY, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 
 	dbc_flush_fhead(psa);
 	dbc_close_db(psa);
 	CLOSEFILE(psa->outfd, rc);
 
 	PRINTF("\n");
-	PRINTF("Total blocks in scan phase file -   %12d [0x%08x]\n", psa->ofhdr.blk_count, psa->ofhdr.blk_count);
-	PRINTF("Blocks bypassed -----------------   %12d [0x%08x]\n", psa->blks_bypassed, psa->blks_bypassed);
-	PRINTF("Blocks processed ----------------   %12d [0x%08x]\n", psa->blks_processed, psa->blks_processed);
-	PRINTF("Blocks read ---------------------   %12d [0x%08x]\n", psa->blks_read, psa->blks_read);
-	PRINTF("Blocks read from cache ----------   %12d [0x%08x]\n", psa->blks_cached, psa->blks_cached);
-	PRINTF("Blocks updated ------------------   %12d [0x%08x]\n", psa->blks_updated, psa->blks_updated);
-	PRINTF("Blocks created ------------------   %12d [0x%08x]\n", psa->blks_created, psa->blks_created);
+	PRINTF("Total blocks in scan phase file --   %12d [0x%08x]\n", psa->ofhdr.blk_count, psa->ofhdr.blk_count);
+	PRINTF("Blocks bypassed ------------------   %12d [0x%08x]\n", psa->blks_bypassed, psa->blks_bypassed);
+	PRINTF("Blocks processed -----------------   %12d [0x%08x]\n", psa->blks_processed, psa->blks_processed);
+	PRINTF("Blocks read ----------------------   %12d [0x%08x]\n", psa->blks_read, psa->blks_read);
+	PRINTF("Blocks read from cache -----------   %12d [0x%08x]\n", psa->blks_cached, psa->blks_cached);
+	PRINTF("Blocks updated -------------------   %12d [0x%08x]\n", psa->blks_updated, psa->blks_updated);
+	PRINTF("Blocks created -------------------   %12d [0x%08x]\n", psa->blks_created, psa->blks_created);
+	PRINTF("GVTROOT right children processed -   %12d [0x%08x]\n", psa->gvtrchildren, psa->gvtrchildren);
 
 	/* Release resources */
 	free(update_array);
@@ -380,9 +406,9 @@ void dbcertify_certify_phase(void)
    in mid-stream, the database is toast.
 
 */
-boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, v15_trans_num tn, int blk_levl)
+boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_type blk_type, v15_trans_num tn, int blk_levl)
 {
-	int		blk_len, blk_size, restart_cnt;
+	int		blk_len, blk_size, restart_cnt, save_block_depth;
 	int		gvtblk_index, dtblk_index, blk_index, bottom_tree_index, bottom_created_index;
 	int		curr_blk_len, curr_blk_levl, curr_rec_len, ins_key_len, ins_rec_len;
 	int		curr_rec_shrink, curr_rec_offset, blks_this_lmap;
@@ -422,26 +448,19 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 	blk_p = psa->blk_set[0].old_buff;
 	assert(blk_p);
 	blk_len = psa->blk_set[0].blk_len;
-	if (UNIX_ONLY(8) VMS_ONLY(9) <= blk_size - blk_len)
-	{	/* This block has room now - no longer need to split it */
-		DBC_DEBUG(("DBC_DEBUG: Block not processed as it now has sufficient room\n"));
-		psa->blks_bypassed++;
-		psa->blks_read++;
-		if (psa->blk_set[0].found_in_cache)
-			psa->blks_cached++;
-		return FALSE;	/* No restart needed */
-	}
 
-	/* The block is still too large. Sanity check on TN at phase 1 and now. Note that it is
+	/* If the block is still too large, sanity check on TN at phase 1 and now. Note that it is
 	   possible in an index block for the TN to have changed yet the block is otherwise unmodified
 	   if (1) this is an index block and (2) a record is being inserted before the first record in
 	   the block. In this case, the new record is put into the new (LH) sibling and the entire existing
 	   block is put unmodified into the RH side in the existing block. The net result is that only
 	   the TN changes in this block and if the block is too full it is not split. This will never
-	   happen for a created block though. It can only hapen for existing index blocks.
+	   happen for a created block though. It can only hapen for existing index blocks. Note if the
+	   block is not (still) too full that we cannot yet say this block has nothing to happen to it
+	   because if it is a gvtroot block, we need to record its right side children further down.
 	*/
 	GET_ULONG(curr_tn, &((v15_blk_hdr_ptr_t)blk_p)->tn);
-	if ((curr_tn != tn) && (0 == blk_levl))
+	if ((UNIX_ONLY(8) VMS_ONLY(9) > blk_size - blk_len) && (curr_tn != tn) && (gdsblk_gvtleaf == blk_type))
 	{
 		/* Block has been modified: Three possible reasons it is not fixed:
 		   1) The user was playing with reserved bytes and set it too low allowing some
@@ -467,10 +486,11 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 	   as a parameter. If (2), we pass -1 as the block level we are searching for as we need a complete
 	   search of the leaf level DT in order to find the GVN.
 
-	   If (1) the lookup is complete and verification and block splitting can begin. If (2), we need to
+	   If (1) then the lookup is complete and verification and (later) block splitting can begin. If (2), we need to
 	   take the pointer from the found DT record which points to the GVT root block and start our search again
-	   from there using the level from the original block as a stopping point. We know the level is unchanged
-	   as we have already checked its TN and size and they are the same.
+	   from there using the level from the original block as a stopping point. One special case here is if our
+	   target block was a gvtroot block, we don't need to traverse the GVT tree to find it. We get it from the
+	   directory tree and stop our search there.
 	*/
 	switch(blk_type)
 	{
@@ -482,9 +502,9 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 			if (0 > blk_index)
 			{	/* Integrity error encountered or record not found. We cannot proceed */
 				assert(FALSE);
-				rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
+				rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 					  ERR_TEXT, 2,
-					  RTS_ERROR_TEXT("Unable to find index (DT) record for an existing global"));
+					  RTS_ERROR_LITERAL("Unable to find index (DT) record for an existing global"));
 			}
 			break;
 		case gdsblk_gvtindex:
@@ -494,7 +514,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 			if (0 > dtblk_index)
 			{	/* Integrity error encountered or record not found. We cannot proceed */
 				assert(FALSE);
-				rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
+				rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 					  ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to locate DT leaf (root) block"));
 			}
 			assert(0 == ((v15_blk_hdr_ptr_t)psa->blk_set[dtblk_index].old_buff)->levl);
@@ -506,37 +526,48 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 					    - ((rec_hdr *)psa->blk_set[dtblk_index].curr_rec)->cmpc));
 			gvtblk_index = dbc_read_dbblk(psa, blk_ptr, gdsblk_gvtroot);
 			assert(-1 != gvtblk_index);
-			blk_index = dbc_find_record(psa, psa->first_rec_key, gvtblk_index, blk_levl, gdsblk_gvtroot);
-			if (0 > blk_index)
+			/* If our target block was not the gvtroot block we just read in then we keep scanning for our
+			   target record. Otherwise, the scan stops here.
+			*/
+			if (0 != gvtblk_index)
 			{
-				if (-1 == blk_index)
-				{	/* Integrity error encountered. We cannot proceed */
-					assert(FALSE);
-					rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
-						  ERR_TEXT, 2,
-						  RTS_ERROR_TEXT("Unable to find index record for an existing global"));
-				} else if (-2 == blk_index)
-				{	/* Record was not found. Record has been deleted since we last
-					   found it. Elicits a warning message in DEBUG mode but is otherwise ignored.
-					*/
-					assert(FALSE);
-					DBC_DEBUG(("DBC_DEBUG: Block split of blk 0x%x bypassed because its "
-						   "key could not be located in the GVT\n", blk_num));
-					psa->blks_bypassed++;
-					psa->blks_read += psa->block_depth;
-					/* Only way to properly update the count of cached records is to run the list
-					   and check them.
-					*/
-					for (blk_index = psa->block_depth, blk_set_p = &psa->blk_set[blk_index];
-					     0 <= blk_index;
-					     --blk_index, --blk_set_p)
-					{	/* Check each block we read */
-						if (gdsblk_create != blk_set_p->usage && blk_set_p->found_in_cache)
-							psa->blks_cached++;
-					}
-					return FALSE;	/* No restart necessary */
-				} else
-					GTMASSERT;
+				blk_index = dbc_find_record(psa, psa->first_rec_key, gvtblk_index, blk_levl, gdsblk_gvtroot, FALSE);
+				if (0 > blk_index)
+				{
+					if (-1 == blk_index)
+					{	/* Integrity error encountered. We cannot proceed */
+						assert(FALSE);
+						rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2,
+							  RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
+							  ERR_TEXT, 2,
+							  RTS_ERROR_LITERAL("Unable to find index record for an existing global"));
+					} else if (-2 == blk_index)
+					{	/* Record was not found. Record has been deleted since we last
+						   found it. Elicits a warning message in DEBUG mode but is otherwise ignored.
+						*/
+						assert(FALSE);
+						DBC_DEBUG(("DBC_DEBUG: Block split of blk 0x%x bypassed because its "
+							   "key could not be located in the GVT\n", blk_num));
+						psa->blks_bypassed++;
+						psa->blks_read += psa->block_depth;
+						/* Only way to properly update the count of cached records is to run the list
+						   and check them.
+						*/
+						for (blk_index = psa->block_depth, blk_set_p = &psa->blk_set[blk_index];
+						     0 <= blk_index;
+						     --blk_index, --blk_set_p)
+						{	/* Check each block we read */
+							if (gdsblk_create != blk_set_p->usage && blk_set_p->found_in_cache)
+								psa->blks_cached++;
+						}
+						return FALSE;	/* No restart necessary */
+					} else
+						GTMASSERT;
+				}
+			} else
+			{	/* This is a gvtroot block and is the subject of our search */
+				blk_index = gvtblk_index;
+				assert(gdsblk_gvtroot == psa->blk_set[0].blk_type);
 			}
 			break;
 		default:
@@ -549,9 +580,70 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 	if (0 != blk_index)
 	{	/* Integrity error encountered. We cannot proceed */
 		assert(FALSE);
-		rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
+		rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 			  ERR_TEXT, 2,
-			  RTS_ERROR_TEXT("Did not locate record in same block as we started searching for"));
+			  RTS_ERROR_LITERAL("Did not locate record in same block as we started searching for"));
+	}
+
+	/* If this is a gvtroot type block, we have some extra processing to do. Following is a description of
+	   the issue we are addressing here. If a gvtroot block is "too large" and was too large at the time
+	   the scan was run, it will of course be identified by the scan as too large. Prior to running the scan,
+	   the reserved bytes field was set so no more too-full blocks can be created. But if a gvtroot block is
+	   identified by the scan and subsequently has to be split by normal GTM processing before the certify
+	   can be done, the too-full part of the block can (in totality) end up in the right hand child of the
+	   gvtroot block (not obeying the reserved bytes rule). But the gvtroot block is the only one that was
+	   identified by the scan and certify may now miss the too-full block in the right child. Theoretically,
+	   the entire right child chain of the gvtroot block can be too full. Our purpose here is that when we
+	   have identified a gvtblock as being too full, we pause here to read the right child chain coming off
+	   of that block all the way down to (but not including) block level 0. Each of these blocks will be
+	   processed to check for being too full. The way we do this is to run the chain and build p1rec entries
+	   in the gvtroot_rchildren[] array. When we are at the top of the processing loop, we will take these
+	   array entries over records from the phase one input file. We only load up the array if it is empty.
+	   Otherwise, the assumption is that we are re-processing and the issue has already been handled.
+	*/
+	blk_set_p = &psa->blk_set[0];
+	if (gdsblk_gvtroot == blk_set_p->blk_type && 0 == psa->gvtroot_rchildren_cnt)
+	{
+		DBC_DEBUG(("DBC_DEBUG: Encountered gvtroot block (block %d [0x%08x]), finding/queueing children\n",
+			   blk_set_p->blk_num, blk_set_p->blk_num));
+		save_block_depth = psa->block_depth;	/* These reads are temporary and should not remain in cache so
+							   we will restore block_depth after we are done.
+							*/
+		/* Attempting to locate the maximum possible key for this database should read the list of right
+		   children into the cache. Pretty much any returncode from dbc_find_record is possible. We usually
+		   aren't going to find the global which may come up as not found or an integrity error or it could
+		   possibly even be found. Just go with what it gives us. Not much verification we can do on it.
+		*/
+		blk_index = dbc_find_record(psa, psa->max_key, 0, 0, gdsblk_gvtroot, TRUE);
+		/* Pull children (if any) out of cache and put into queue for later processing */
+		for (blk_index = save_block_depth + 1;
+		     blk_index <= psa->block_depth && gdsblk_gvtleaf != psa->blk_set[blk_index].blk_type;
+		     ++blk_index, ++psa->gvtroot_rchildren_cnt)
+		{	/* Fill in p1rec type entry in gvtroot_rchildren[] for later */
+			DBC_DEBUG(("DBC_DEBUG: Right child block: blk_index: %d  blk_num: %d [0x%08x]  blk_levl: %d\n",
+				   blk_index, psa->blk_set[blk_index].blk_num, psa->blk_set[blk_index].blk_num,
+				   psa->blk_set[blk_index].blk_levl));
+			psa->gvtroot_rchildren[psa->gvtroot_rchildren_cnt].tn = psa->blk_set[blk_index].tn;
+			psa->gvtroot_rchildren[psa->gvtroot_rchildren_cnt].blk_num = psa->blk_set[blk_index].blk_num;
+			psa->gvtroot_rchildren[psa->gvtroot_rchildren_cnt].blk_type = psa->blk_set[blk_index].blk_type;
+			psa->gvtroot_rchildren[psa->gvtroot_rchildren_cnt].blk_levl = psa->blk_set[blk_index].blk_levl;
+			psa->gvtroot_rchildren[psa->gvtroot_rchildren_cnt].akey_len = 0;
+		}
+		psa->block_depth = save_block_depth;
+		blk_index = 0;	/* reset to start *our* work in the very first block */
+	}
+
+	/* Now we have done the gvtroot check if we were going to. If this particular block has sufficient room in it
+	   we don't need to split it of course.
+	*/
+	if (UNIX_ONLY(8) VMS_ONLY(9) <= blk_size - blk_len)
+	{	/* This block has room now - no longer need to split it */
+		DBC_DEBUG(("DBC_DEBUG: Block not processed as it now has sufficient room\n"));
+		psa->blks_bypassed++;
+		psa->blks_read++;
+		if (psa->blk_set[0].found_in_cache)
+			psa->blks_cached++;
+		return FALSE;	/* No restart needed */
 	}
 
 	/* Beginning of block update/split logic. We need to process the blocks in the reverse order from the
@@ -567,16 +659,15 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 	   need splitting.
 	*/
 	rec_p = blk_p + sizeof(v15_blk_hdr);
-	psa->blk_set[0].curr_rec = rec_p;
-	dbc_find_key(psa, psa->blk_set[0].curr_blk_key, rec_p, psa->blk_set[0].blk_levl);
+	blk_set_p->curr_rec = rec_p;
+	dbc_find_key(psa, blk_set_p->curr_blk_key, rec_p, blk_set_p->blk_levl);
 	GET_USHORT(us_rec_len, &((rec_hdr *)rec_p)->rsiz);
 	curr_rec_len = us_rec_len;
 	next_rec_p = rec_p + curr_rec_len;
-	psa->blk_set[0].curr_match = 0;		/* First record of block always cmpc 0 */
+	blk_set_p->curr_match = 0;		/* First record of block always cmpc 0 */
 	blk_len = ((v15_blk_hdr_ptr_t)blk_p)->bsiz;
 	blk_endp = blk_p + blk_len;
 	mid_point = blk_p + blk_size / 2;
-	blk_set_p = &psa->blk_set[0];
 	do
 	{	/* Keep scanning the next record until you find the split point which is the first record that straddles the
 		 * mid-point of the block. This loop makes sure the prev_key and curr_key fields are correctly set when we
@@ -959,7 +1050,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 					if (curr_blk_len <= psa->max_blk_len)
 						/* Well, that wasn't the problem, something else is wrong */
 						rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2,
-							  RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
+							  RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 							  ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to split block appropriately"));
 					/* If we do have to restart, we won't be able to reinvoke dbc_split_blk() with the
 					   parms taken from the current blk_set_p as that array will be overwritten by the
@@ -1159,7 +1250,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 		*/
 		dbc_init_db(psa);
 		if (created_blocks > psa->dbc_cs_data->trans_hist.free_blocks)
-			rts_error(VARLSTCNT(4) ERR_DBCNOEXTND, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn));
+			rts_error(VARLSTCNT(4) ERR_DBCNOEXTND, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 		/* Database is now extended -- safest bet is to restart this particular update so that it is certain
 		   nothing else got in besides the extention.
 		*/
@@ -1193,7 +1284,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 			if (NO_FREE_SPACE == lclmap_not_full)
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(5) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
+				rts_error(VARLSTCNT(5) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 					  ERR_BITMAPSBAD);
 			}
 			if (ROUND_DOWN2(psa->hint_blk, psa->dbc_cs_data->bplmap) != lclmap_not_full)
@@ -1215,7 +1306,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, int blk_type, 
 			if (NO_FREE_SPACE == lcl_blk)
 			{
 				assert(FALSE);
-				rts_error(VARLSTCNT(5) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
+				rts_error(VARLSTCNT(5) ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn),
 					  ERR_BITMAPSBAD);
 			}
 			/* Found a free block, mark it busy. Note that bitmap blocks are treated somewhat differently
@@ -1355,8 +1446,9 @@ void dbc_read_p1out(phase_static_area *psa, void *obuf, int olen)
 	{
 		save_errno = errno;
 		errmsg = STRERROR(save_errno);
-		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("read()"), CALLFROM,
-			  ERR_TEXT, 2, RTS_ERROR_TEXT(errmsg));
+		assert(FALSE);
+		rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("read()"), CALLFROM,
+			  ERR_TEXT, 2, RTS_ERROR_STRING(errmsg));
 	}
 }
 

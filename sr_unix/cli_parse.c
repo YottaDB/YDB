@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -561,7 +561,6 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		{
 			len_str=strlen(ptr_next_val);
 			strncpy(tmp_str, ptr_next_val, len_str);
-			cli_strupper(tmp_str);
 			tmp_str[len_str] = 0;
 			tmp_str_ptr = tmp_str;
 			ptr_next_comma = strchr(tmp_str_ptr, ',');
@@ -574,6 +573,12 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				*ptr_equal = 0;
 			else
 				ptr_equal = NULL;
+			/* Convert just the qualifier to upper case (e.g. in "enable,on,file=x.mjl" --> "ENABLE,ON,FILE=x.mjl")
+			 * Do not convert the values of parameters to upper case as that might result in incorrect translation
+			 * if UTF8 characters are present in the command line. The logic below anyways needs only the qualifiers
+			 * to be translated.
+			 */
+			cli_strupper(tmp_str);
 			/* -------------------------
 			 * See if option is negated
 			 * -------------------------

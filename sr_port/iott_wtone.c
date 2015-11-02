@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ void iott_wtone(int v)
 	{
 		up = UTF8_WCTOMB(v, utf_buf);
 		temp.len = up - utf_buf;
-		temp.addr = (char *)&utf_buf;
+		temp.addr = (char *)&utf_buf[0];
 	} else
 		rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, chset_names[io_curr_device.out->ochset].len,
 				chset_names[io_curr_device.out->ochset].addr);

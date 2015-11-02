@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #include "cli_parse.h"
 #include "invocation_mode.h"
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
+#include "gtm_main.h"		/* for "gtm_main" prototype */
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"

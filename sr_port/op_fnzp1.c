@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,6 @@
 #include "mdef.h"
 
 #include "fnpc.h"
-#include "gtm_stdio.h"
 #include "min_max.h"
 #include "op.h"
 
@@ -196,27 +195,3 @@ void op_fnzp1(mval *src, int delim, int trgpcidx, mval *dst)
 	*dst = ldst;
 	return;
 }
-
-#ifdef DEBUG
-void print_fnpc_stats(void)
-{
-	fprintf(stderr, "process id:          %d\n", process_id);
-	fprintf(stderr, "fnpc cache clears:   %d\n", c_clear);
-	fprintf(stderr, "Reference Piece:\n");
-	fprintf(stderr, "  fnpc cache miss:     %d\n", c_miss);
-	fprintf(stderr, "  fnpc cache hit:      %d\n", c_hit);
-	fprintf(stderr, "  fnpc pieces skipped: %d\n", c_pskip);
-	fprintf(stderr, "  fnpc pieces scanned: %d\n", c_pscan);
-	fprintf(stderr, "  fnpc partial scans:  %d\n", c_parscan);
-	fprintf(stderr, "  small string scans:  %d\n", c_small);
-	fprintf(stderr, "  small str pcs scnd:  %d\n", c_small_pcs);
-	fprintf(stderr, "Set Piece:\n");
-	fprintf(stderr, "  fnpc cache miss:     %d\n", cs_miss);
-	fprintf(stderr, "  fnpc cache hit:      %d\n", cs_hit);
-	fprintf(stderr, "  fnpc pieces skipped: %d\n", cs_pskip);
-	fprintf(stderr, "  fnpc pieces scanned: %d\n", cs_pscan);
-	fprintf(stderr, "  fnpc partial scans:  %d\n", cs_parscan);
-	fprintf(stderr, "  small string scans:  %d\n", cs_small);
-	fprintf(stderr, "  small str pcs scnd:  %d\n", cs_small_pcs);
-}
-#endif

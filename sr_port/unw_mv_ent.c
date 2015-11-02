@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +30,12 @@
 #include "dpgbldir_sysops.h"
 #include "error_trap.h"		/* for STACK_ZTRAP_EXPLICIT_NULL macro */
 #include "op.h"
+#include "iotcpdef.h"
+#include "gt_timer.h"
+#include "iosocketdef.h"
+#ifdef UNIX
+#include "iottdef.h"
+#endif
 
 GBLREF symval			*curr_symval;
 GBLREF sbs_blk			*sbs_blk_hdr;
@@ -51,6 +57,9 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 	symval		*symval_ptr;
 	mval		*ret_value;
 	ht_ent_mname	*hte;
+	d_socket_struct	*dsocketptr;
+	socket_interrupt *sockintr;
+	UNIX_ONLY(d_tt_struct	*tt_ptr;)
 
 	active_lv = (lv_val *)0; /* if we get here, subscript set was successful, clear active_lv to avoid later cleanup problems */
 	switch (mv_st_ent->mv_st_type)
@@ -182,6 +191,41 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 				free(mv_st_ent->mv_st_cont.mvs_zintr.savextref.addr);
 			}
 			return 0;
+		case MVST_ZINTDEV:
+			/* Since the interrupted device frame is popping off, there is no way that the READ
+			   that was interrupted will be resumed (if it already hasn't been). We don't bother
+			   to check if it is or isn't. We just reset the device.
+			*/
+			if (NULL == mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
+				return 0;	/* already processed */
+			switch(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->type)
+			{
+#ifdef UNIX
+				case tt:
+					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
+					{	/* This mv_stent has not been processed yet */
+						tt_ptr = (d_tt_struct *)(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->dev_sp);
+						tt_ptr->mupintr = FALSE;
+						tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
+						mv_st_ent->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+						mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+					}
+					return 0;
+#endif
+				case gtmsocket:
+					if (NULL != mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr)
+					{	/* This mv_stent has not been processed yet */
+						dsocketptr = (d_socket_struct *)(mv_st_ent->mv_st_cont.mvs_zintdev.io_ptr->dev_sp);
+						sockintr = &dsocketptr->sock_save_state;
+						sockintr->end_time_valid = FALSE;
+						sockintr->who_saved = sockwhich_invalid;
+						dsocketptr->mupintr = FALSE;
+					}
+					return 0;
+				default:
+					GTMASSERT;	/* No other device should be here */
+			}
+			break;
 		default:
 			GTMASSERT;
 			return 0;

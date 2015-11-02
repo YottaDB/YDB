@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@ GBLREF io_pair		io_std_device;
 GBLREF io_pair		io_curr_device;
 GBLREF bool		prin_out_dev_failure;
 GBLREF void 		(*ctrlc_handler_ptr)();
+GBLREF	boolean_t	dollar_zininterrupt;
 
 LITREF unsigned char	io_params_size[];
 
@@ -83,6 +84,7 @@ void iott_use(io_desc *iod, mval *pp)
 	error_def(ERR_TCSETATTR);
 	error_def(ERR_TTINVFILTER);
 	error_def(ERR_WIDTHTOOSMALL);
+	error_def(ERR_ZINTRECURSEIO);
 
 	p_offset = 0;
 	assert(iod->state == dev_open);
@@ -90,6 +92,15 @@ void iott_use(io_desc *iod, mval *pp)
 	tt_ptr = (d_tt_struct *)iod->dev_sp;
 	if (*(pp->str.addr + p_offset) != iop_eol)
 	{
+		if (tt_ptr->mupintr)
+			if (dollar_zininterrupt)
+				rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			else
+			{	/* The interrupted read was not properly resumed so clear it now */
+				tt_ptr->mupintr = FALSE;
+				tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
+				io_find_mvstent(iod, TRUE);
+			}
 		status = tcgetattr(tt_ptr->fildes, &t);
 		if (0 != status)
 		{
@@ -408,6 +419,11 @@ void iott_use(io_desc *iod, mval *pp)
 				rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),
 					CALLFROM, errno);
 		}
+	} else if (tt_ptr->mupintr && !dollar_zininterrupt)
+	{	/* The interrupted read was not properly resumed so clear it now */
+		tt_ptr->mupintr = FALSE;
+		tt_ptr->tt_state_save.who_saved = ttwhichinvalid;
+		io_find_mvstent(iod, TRUE);	/* clear mv stack entry */
 	}
 	return;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,7 +92,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 			len = str->len;
 			strptr = str->addr;
 			char_len = UNICODE_ONLY((gtm_utf8_mode) ? UTF8_LEN_STRICT(strptr, len) :) len;
-			disp_len = UNICODE_ONLY((gtm_utf8_mode) ? gtm_wcswidth(strptr, len, FALSE, 1) :) len;
+			disp_len = UNICODE_ONLY((gtm_utf8_mode) ? gtm_wcswidth((unsigned char *)strptr, len, FALSE, 1) :) len;
 			str_processed = 0;
 		}
 		device_width = io_curr_device.out->width;
@@ -119,7 +119,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 					cumul_width = out->displen;
 					for (chcnt = 0; chcnt < char_len; ++chcnt)
 					{
-						strnext = UTF8_MBTOWC(strptr, strtop, codepoint);
+						strnext = (char *)UTF8_MBTOWC((unsigned char *)strptr,	\
+										(unsigned char *)strtop, codepoint);
 						GTM_IO_WCWIDTH(codepoint, inchar_width);
 						if ((cumul_width + inchar_width) > device_width)
 							break;

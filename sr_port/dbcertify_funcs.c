@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -670,7 +670,7 @@ int dbc_find_dtblk(phase_static_area *psa, dbc_gv_key *key, int min_levl)
 	memcpy(psa->gvn_key, key, sizeof(dbc_gv_key) + key->gvn_len);	/* Make key with GVN only (including trailing null) */
 	psa->gvn_key->end = key->gvn_len;
 	/* Look up GVN in directory tree */
-	blk_index = dbc_find_record(psa, psa->gvn_key, (psa->phase_one ? 0 : 1), min_levl, gdsblk_dtroot);
+	blk_index = dbc_find_record(psa, psa->gvn_key, (psa->phase_one ? 0 : 1), min_levl, gdsblk_dtroot, FALSE);
 	return blk_index;
 }
 
@@ -678,12 +678,16 @@ int dbc_find_dtblk(phase_static_area *psa, dbc_gv_key *key, int min_levl)
    rc = -1   : integrity error detected
       = -2   : record not found
       = else : the index of the block in the cache where record was found (curr_blk_key is set for matching record).
+   Note since this routine is used in certify phase to lookup all the right hand siblings of a gvtroot block given a
+   maximum key, this flag tells us that failure is ok .. we just wanted to populate the cache with siblings.
 */
-int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int min_levl, enum gdsblk_type newblk_type)
+int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int min_levl, enum gdsblk_type newblk_type,
+		    boolean_t fail_ok)
 {
 	uchar_ptr_t	rec_p, blk_p, blk_top, key1, key2;
 	unsigned short	us_rec_len;
-	int		blk_ptr, blk_levl, blk_type, key_len, key_len1, key_len2, rec_len;
+	int		blk_ptr, blk_levl, key_len, key_len1, key_len2, rec_len;
+	enum gdsblk_type blk_type;
 	block_info	*blk_set_p;
 
 	DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Beginning scan of block index %d\n", blk_index));
@@ -738,7 +742,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 			GET_ULONG(blk_ptr, rec_p + VMS_ONLY(3) UNIX_ONLY(4));
 			blk_index = dbc_read_dbblk(psa, blk_ptr, blk_type);
 			/* Keep looking next level down */
-			return dbc_find_record(psa, key, blk_index, min_levl, blk_type);
+			return dbc_find_record(psa, key, blk_index, min_levl, blk_type, fail_ok);
 		}
 		/* Determine key for this record */
 		dbc_find_key(psa, blk_set_p->curr_blk_key, rec_p, blk_set_p->blk_levl);
@@ -761,7 +765,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 			GET_ULONG(blk_ptr, (rec_p + sizeof(rec_hdr) + blk_set_p->curr_blk_key->end
 					   - ((rec_hdr *)rec_p)->cmpc + 1));
 			blk_index = dbc_read_dbblk(psa, blk_ptr, blk_type);
-			return dbc_find_record(psa, key, blk_index, min_levl, blk_type);
+			return dbc_find_record(psa, key, blk_index, min_levl, blk_type, fail_ok);
 		}
 		/* We want to be able to find the previous record */
 		blk_set_p->prev_rec = rec_p;
@@ -779,11 +783,16 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 		return -2;
 	}
 	/* Else we should have found the record or a star key. Globals are NOT removed once created so we
-	   should always be able to find an appropriate record if this is not a GVT leaf block.
+	   should always be able to find an appropriate record if this is not a GVT leaf block. Exception to this
+	   is when we are just wanting to populate the right siblings of a gvtroot block in the cache.
 	*/
-	assert(FALSE);
-	rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
-		  ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to find index record for an existing global"));
+	if (!fail_ok)
+	{
+		assert(FALSE);
+		rts_error(VARLSTCNT(8) ERR_DBCINTEGERR, 2, RTS_ERROR_TEXT((char_ptr_t)psa->ofhdr.dbfn),
+			  ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to find index record for an existing global"));
+	}
+	return -1;
 }
 
 /* Compare two keys. If key1 is logically greater than or equal to key2, return TRUE, else FALSE.

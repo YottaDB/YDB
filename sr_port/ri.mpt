@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1985, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 1985, 2007 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -40,7 +40,7 @@ noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
 	r !,"Output directory : ",dir,!!
 	i dir="^" c:%ZD'=$p %ZD u $p:(ctrap="":exc="") q
 	s (l,r)=0
-	f  u %ZD w:$P=%ZD !,"Routine: " r x q:'$l(x)  i $l(x),$e(x)?1a!($e(x)="%"),$e(x,2,99)?.an d
+	f  u %ZD w:$P=%ZD !,"Routine: " r x q:'$l(x)  s x=$p(x,"^") i $l(x),$e(x)?1a!($e(x)="%"),$e(x,2,99)?.an d
 	. w:$P=%ZD !,"Enter routine "
 	. ;warning - loop terminated by exception
 	. u $p w:$x>70 ! w x,?$x\10+1*10

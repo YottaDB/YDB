@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,6 +52,10 @@ void op_zprevious(mval *v)
 	{	/* With standard null collation, we still want the same behavior,
 		 * so replace 0x01 in gv_currkey->base[gv_currkey->prev] with 0xFF
 		 */
+		assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
+		assert(!gv_cur_region->std_null_coll || (SUBSCRIPT_STDCOL_NULL == gv_currkey->base[gv_currkey->prev]));
+		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
+		assert(gv_currkey->end == gv_currkey->prev + 2);
 		gv_currkey->base[gv_currkey->prev] = 0xFF;	/* redundant assignment for when !gv_cur_region->std_null_coll;
 								 * done to avoid pipeline break should we introduce an if */
 		gv_currkey->base[gv_currkey->prev + 1] = 0xFF;
@@ -76,8 +80,8 @@ void op_zprevious(mval *v)
 			gv_altkey->prev = gv_currkey->prev;
 			if (stringpool.top - stringpool.free < MAX_KEY_SZ)
 			{
-				if (0xFF != gv_altkey->base[gv_altkey->prev] &&
-					SUBSCRIPT_STDCOL_NULL != gv_altkey->base[gv_altkey->prev])
+				if ((0xFF != gv_altkey->base[gv_altkey->prev])
+						&& (SUBSCRIPT_STDCOL_NULL != gv_altkey->base[gv_altkey->prev]))
 					n = MAX_FORM_NUM_SUBLEN;
 				else
 				{
@@ -95,6 +99,15 @@ void op_zprevious(mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
+		/* Reset gv_currkey from next possible key value to what is was at function entry time */
+		if (gv_curr_subsc_null)
+		{
+			gv_currkey->base[gv_currkey->prev + 1] = KEY_DELIMITER;
+			if (gv_cur_region->std_null_coll)
+				gv_currkey->base[gv_currkey->prev] = SUBSCRIPT_STDCOL_NULL;
+			assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
+			gv_currkey->end--;
+		}
 	} else
 	{	/* the following section is for $ZPREVIOUS(^gname) */
 		assert(2 <= gv_currkey->end);
@@ -174,6 +187,7 @@ void op_zprevious(mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
+		/* No need to reset gv_currkey (to what it was at function entry) as it is already set to NULL */
 	}
 	return;
 }

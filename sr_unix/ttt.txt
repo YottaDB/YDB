@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2006 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2007 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -165,8 +165,7 @@ OC_FNGVGET:	pushab	val.1
 		pushab	val.0
 		calls	#2,xfer.xf_fngvget
 OC_FNGVGET1:	pushab	val.0
- 		jsb	xfer.xf_fngvget1
- 		tstl	r0
+		calls	#1,xfer.xf_fngvget1
 OC_FNGVGET2:	pushab	val.2
  		pushab	val.1
  		pushab	val.0
@@ -591,7 +590,8 @@ OC_INDTEXT:	pushab	val.0
 		pushl	val.2
 		pushab	val.1
 		jsb	xfer.xf_indtext
-OC_IOCONTROL:	irepab	val.2
+OC_IOCONTROL:	jsb     xfer.xf_restartpc
+		irepab	val.2
 		calls	val.1,xfer.xf_iocontrol
 OC_IRETMVAD:	movab	val.1,r1
 		jsb	xfer.xf_iretmvad
@@ -707,8 +707,6 @@ OC_MUL:		pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_mul
-OC_NAMECHK:	movab	val.1,r0
-		jsb	xfer.xf_namechk
 OC_NEG:		movab	val.0,r0
 		movab	val.1,r1
 		jsb	xfer.xf_neg

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +26,9 @@
 #include "jnl.h"
 #include "indir_enum.h"
 #include "io.h"
+#ifdef UNIX
+#include "iottdef.h"
+#endif
 #include "iotimer.h"
 #include "rtnhdr.h"
 #include "stack_frame.h"
@@ -39,6 +42,7 @@
 #include "dm_read.h"
 #include "tp_change_reg.h"
 #include "getzposition.h"
+#include "have_crit.h"
 
 #define	DIRECTMODESTR	"Entering DIRECT MODE"
 
@@ -64,6 +68,7 @@ void	op_dmode(void)
 #ifdef UNIX
 	static int	loop_cnt = 0;
 	static int	old_errno = 0;
+	d_tt_struct	*tt_ptr;
 #endif
 	static bool	kill = FALSE;
 
@@ -110,12 +115,17 @@ void	op_dmode(void)
 
 	*((int4 **)&restart_pc) = (int4 *)CODE_ADDRESS(call_dm);
 	*((int4 **)&restart_ctxt) = (int4 *)GTM_CONTEXT(call_dm);
-	op_wteol(1);
-
 #ifdef UNIX
 	loop_cnt = 0;
 	old_errno = 0;
+	if (tt == io_curr_device.in->type)
+		tt_ptr = (d_tt_struct *)io_curr_device.in->dev_sp;
+	else
+		tt_ptr = NULL;
+	if (!tt_ptr || !tt_ptr->mupintr)
 #endif
+		op_wteol(1);
+
 	if (0 < dollar_tlevel)
 	{	/* Note the existence of similar code in op_zsystem.c and mdb_condition_handler.c.
 		 * Any changes here should be reflected there too. We don't have a macro for this because
@@ -143,7 +153,7 @@ void	op_dmode(void)
 			gtm_putmsg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(DIRECTMODESTR), zpos.str.len, zpos.str.addr);
 			send_msg(VARLSTCNT(6) ERR_TPNOTACID, 4, LEN_AND_LIT(DIRECTMODESTR), zpos.str.len, zpos.str.addr);
 		}
-	} else  if (cs_addrs && cs_addrs->now_crit)
+	} else if (have_crit(CRIT_HAVE_ANY_REG))
 		GTMASSERT;
 	if (io_curr_device.in->type == tt)
 		dm_read(input_line);

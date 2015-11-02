@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -704,7 +704,13 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 			else
 			{
 				GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_DIRTYSTUCK1, lcnt, (2 * BUF_OWNER_STUCK));
-				if (BUF_OWNER_STUCK < lcnt)
+				/* We have noticed the below assert to fail occasionally on some platforms
+				 * We suspect it is because of waiting for another writer that is in jnl_fsync
+				 * (as part of flushing a global buffer) which takes more than a minute to finish.
+				 * To avoid false failures (where the other writer finishes its job in a little over
+				 * a minute) we wait for twice the time in the debug version.
+				 */
+				if (BUF_OWNER_STUCK DEBUG_ONLY( * 2) < lcnt)
 				{	/* sick of waiting */
 					if (0 == cr->dirty)
 					{	/* someone dropped something; assume it was the writer and go on */
@@ -795,7 +801,13 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 			} else
 			{
 				GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_DIRTYSTUCK2, lcnt, (2 * BUF_OWNER_STUCK));
-				if (BUF_OWNER_STUCK < lcnt)
+				/* We have noticed the below assert to fail occasionally on some platforms
+				 * We suspect it is because of waiting for another writer that is in jnl_fsync
+				 * (as part of flushing a global buffer) which takes more than a minute to finish.
+				 * To avoid false failures (where the other writer finishes its job in a little over
+				 * a minute) we wait for twice the time in the debug version.
+				 */
+				if (BUF_OWNER_STUCK DEBUG_ONLY( * 2) < lcnt)
 				{	/* sick of waiting */
 					if (0 == cr->dirty)
 					{	/* someone dropped something; assume it was the writer and go on */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,20 +14,22 @@
 
 #include "gtmdbglvl.h"
 #include "print_exit_stats.h"
-#include "op.h"
+#include "fnpc.h"
 #include "cache.h"
+#include "sockint_stats.h"
 
 GBLREF	uint4		gtmDebugLevel;		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
-
 void print_exit_stats(void)
 {
 	if ((GDL_SmStats | GDL_SmDumpTrace | GDL_SmDump) & gtmDebugLevel)
 		printMallocInfo();
-#if !defined(__vax) && defined(DEBUG)
+#ifdef DEBUG
 	if (GDL_PrintPieceStats & gtmDebugLevel)
-		print_fnpc_stats();
+		fnpc_stats();
 #endif
 	if (GDL_PrintIndCacheStats & gtmDebugLevel)
 		cache_stats();
+	if (GDL_PrintSockIntStats & gtmDebugLevel)
+		sockint_stats();
 }

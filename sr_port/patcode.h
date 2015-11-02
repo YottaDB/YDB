@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,7 +98,7 @@
 #define FST	0
 #define LST	1
 
-#define MAX_DFA_STRLEN 8	/* needs to be > PAT_BASIC_CLASSES */
+#define MAX_DFA_STRLEN 64	/* needs to be > PAT_BASIC_CLASSES */
 #define MAX_DFA_REP    10
 
 /* The macro to perform 64-bit multiplication without losing precision due to overflow with 32-bit

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,10 @@ void t_write_map (
 	if (dollar_tlevel == 0)
 	{
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
-		cs = &cw_set[cw_set_depth++];
+		cs = &cw_set[cw_set_depth];
+		cs->mode = gds_t_noop;	/* initialize it to a value that is not "gds_t_committed" before incrementing
+					 * cw_set_depth as secshr_db_clnup relies on it */
+		cw_set_depth++;
 	} else
 	{
 		tp_cw_list(&cs);

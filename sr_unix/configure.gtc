@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc #
+#	Copyright 2001, 2007 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -37,7 +37,7 @@ else
 	deliver_gtcm_gnp="no"
 fi
 
-# Native shared library extention.
+# Native shared library extension.
 if [ $arch = "hp" ]; then
 	ext=".sl"
 else
@@ -86,9 +86,9 @@ if [ "`./geteuid`" != "root" ] ; then
 	exit
 fi
 
-$echo "                     MUMPS Configuration Script"
-$echo "c. 1993-2005 Fidelity Information Services, Inc. Use of this software"
-$echo "is restricted by the provisions of your software license agreement."
+$echo "                     GT.M Configuration Script"
+$echo "Copyright "`date '+%Y'`" Fidelity National Information Services, Inc. Use of this"
+$echo "software is restricted by the provisions of your license agreement."
 $echo ""
 
 $echo "What account should own the files? (bin) \c"
@@ -152,6 +152,39 @@ $echo ""
 $echo "Installing GT.M...."
 $echo ""
 
+# Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
+
+if [ -e "utf8" ]; then
+	# If package has utf8 directory, see if system has libicu and locale
+	# Setup library path (in prep for looking for libicu)
+	if [ $arch = "ibm" ] ; then
+		library_path="/usr/local/lib"
+	else
+		library_path="/usr/local/lib /usr/lib"
+	fi
+	# Look for libicu
+	for libpath in $library_path
+	do
+		if [ -e $libpath ]; then
+			found_icu=`\ls -1 $libpath |grep "libicu.*36.*" | wc -l`
+			if [ "$found_icu" -ne 0 ] ; then
+				break
+			fi
+		fi
+	done
+	# Look for locale
+	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
+	# If both libicu and locale are on system then install UTF-8 support
+	if [ \( "$found_icu" -ne 0 \)  -a \( "$utflocale" != "" \) ] ; then
+		doutf8=1
+	else
+		doutf8=0
+	fi
+else
+	# If utf8 dir does not exist in package, can't install UTF-8 support
+	doutf8=0
+fi
+
 # Modify the scripts as necessary for target configuration
 cat << SEDSCRIPT > sedin$$
 s|ARCH|$arch|g
@@ -163,7 +196,7 @@ for i in $pathmods
 do
 	dest=`basename $i .gtc`
 	sed -f sedin$$ $i > $dest
-	if [ -e "utf8" ]; then
+	if [ "$doutf8" -ne 0 ]; then
 		cd utf8
 		ln -s ../$dest $dest
 		cd ..
@@ -171,8 +204,7 @@ do
 done
 rm sedin$$
 
-# Create $gtmdist/utf8 if this platform can support "UTF-8" mode.
-if [ -e "utf8" ]; then
+if [ "$doutf8" -ne 0 ]; then
 	if [ ! -e $gtmdist/utf8 ]; then
 		mkdir $gtmdist/utf8
 	fi
@@ -182,7 +214,7 @@ fi
 file=COPYING
 if [ -e $file ]; then
 	cp $file $gtmdist
-	if [ -e "utf8" ]; then
+	if [ "$doutf8" -ne 0 ]; then
 		ln -s ../$file $gtmdist/utf8/$file
 	fi
 fi
@@ -251,7 +283,7 @@ fi
 cp *.o *.m $gtmdist
 
 # Install a mirror image (using soft links) of $gtmdist under $gtmdist/utf8 if this platform can support "UTF-8" mode.
-if [ -e "utf8" ]; then
+if [ "$doutf8" -ne 0 ]; then
 	cd utf8
 	for file in *
 	do
@@ -268,7 +300,9 @@ if [ -e "utf8" ]; then
 			if [ -e $gtmdist/utf8/$file ]; then
 				rm -f $gtmdist/utf8/$file
 			fi
-			ln -s ../$file $gtmdist/utf8/$file
+			if [ -e $gtmdist/$file ]; then
+				ln -s ../$file $gtmdist/utf8/$file
+			fi
 		fi
 	done
 	cd ..
@@ -286,7 +320,7 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	$echo ""
 	$echo "Creating lowercase versions of the MUMPS routines."
 	(cd $gtmdist; ./lowerc_cp *.m)
-	if [ -e $gtmdist/utf8 ]; then
+	if [ "$doutf8" -ne 0 ]; then
 		(cd $gtmdist/utf8; ./lowerc_cp *.m)
 	fi
 fi
@@ -306,7 +340,7 @@ $echo ""
 gtm_chset="M"
 export gtm_chset
 (cd $gtmdist; ./mumps -nowarning *.m)
-if [ -e $gtmdist/utf8 ]; then
+if [ "$doutf8" -ne 0 ]; then
 	# Ensure we ARE in UTF-8 mode
 	utflocale=`locale -a | grep -i en_us | grep -i utf | grep '8$'`
 	if [ $utflocale = "" ]; then
@@ -320,7 +354,7 @@ if [ -e $gtmdist/utf8 ]; then
 	if [ $arch = "ibm" ]; then
 		export LIBPATH=/usr/local/lib/
 	else
-		export LD_LIBRARY_PATH=/usr/local/lib/
+		export LD_LIBRARY_PATH=/usr/local/lib/:/usr/lib
 	fi
 	(export gtm_dist=$gtmdist/utf8; cd $gtm_dist; ./mumps -nowarning *.m)
 	gtm_chset="M"
@@ -334,13 +368,13 @@ chown $owner $gtmdist/*.o
 chgrp bin $gtmdist/*.m
 chgrp bin $gtmdist/*.o
 
-if [ -e $gtmdist/utf8 ]; then
-	chmod 0644 $gtmdist/*.m
-	chmod 0644 $gtmdist/*.o
-	chown $owner $gtmdist/*.m
-	chown $owner $gtmdist/*.o
-	chgrp bin $gtmdist/*.m
-	chgrp bin $gtmdist/*.o
+if [ "$doutf8" -ne 0 ]; then
+	chmod 0644 $gtmdist/utf8/*.m
+	chmod 0644 $gtmdist/utf8/*.o
+	chown $owner $gtmdist/utf8/*.m
+	chown $owner $gtmdist/utf8/*.o
+	chgrp bin $gtmdist/utf8/*.m
+	chgrp bin $gtmdist/utf8/*.o
 fi
 
 gtm_dist=$gtmdist
@@ -349,7 +383,7 @@ export gtm_dist
 gtmroutines=$gtmdist
 export gtmroutines
 
-# Create the global diretories for the help databases.
+# Create the global directories for the help databases.
 
 gtmgbldir=$gtmdist/gtmhelp.gld
 export gtmgbldir

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -92,6 +92,7 @@ void zshow_devices(zshow_out *output)
 	static readonly char rb_text[] = {']'};
 	static readonly char devop[] = "OPEN ";
 	static readonly char devcl[] = "CLOSED ";
+	static readonly char interrupt_text[] = "ZINTERRUPT ";
 
 	/* gtmsocket specific */
 	static readonly char at_text[] = {'@'};
@@ -120,6 +121,7 @@ void zshow_devices(zshow_out *output)
 					        ,"BOUND"
 					        ,"CREATED"
 					};
+	static readonly char morereadtime_text[] = "MOREREADTIME=";
 
 	v.mvtype = MV_STR;
 	for (l = io_root_log_name;  l != 0;  prev = l, l = l->next)
@@ -286,6 +288,8 @@ void zshow_devices(zshow_out *output)
 						default:
 							GTMASSERT;
 					}
+					if (tt_ptr->mupintr)
+						ZS_STR_OUT(&v, interrupt_text);
 					break;
 				case rm:
 					ZS_STR_OUT(&v,rmsfile_text);
@@ -420,6 +424,9 @@ void zshow_devices(zshow_out *output)
 					ZS_STR_OUT(&v, current_text);
 					MV_FORCE_MVAL(&m, (int)dsocketptr->current_socket);
 					mval_write(output, &m, FALSE);
+/* smw need new iosocketdef.h					if (dsocketptr->mupintr)
+						ZS_STR_OUT(&v, interrupt_text);
+*/
 					output->flush = TRUE;
 					zshow_output(output, 0);
 					for(ii = 0; ii < dsocketptr->n_socket; ii++)
@@ -578,8 +585,14 @@ void zshow_devices(zshow_out *output)
 						{
 							ZS_STR_OUT(&v, nodelimiter_text);
 						}
-					output->flush = TRUE;
-					zshow_output(output, 0);
+		/* readmoretime */		if (DEFAULT_MOREREAD_TIMEOUT != socketptr->moreread_timeout)
+		                                {
+							ZS_STR_OUT(&v, morereadtime_text);
+							MV_FORCE_MVAL(&m, socketptr->moreread_timeout);
+							mval_write(output, &m, FALSE);
+						}
+						output->flush = TRUE;
+						zshow_output(output, 0);
 					}
 				default:
 					v.str.len = 0;

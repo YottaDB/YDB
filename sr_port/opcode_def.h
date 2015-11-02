@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -243,7 +243,6 @@ OPCODE_DEF(OC_INDINCR, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNNAME, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_INDFNNAME, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNLVPRVNAME, (OCT_MVAL | OCT_EXPRLEAF))
-OPCODE_DEF(OC_NAMECHK, (OCT_NULL))
 OPCODE_DEF(OC_GVO2, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNLVNAMEO2, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNO2, (OCT_MVAL | OCT_EXPRLEAF))

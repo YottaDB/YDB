@@ -50,7 +50,8 @@ int op_readfl(mval *v, int4 length, int4 timeout)
 	v->str.len = 0;
 	active_device = io_curr_device.in;
 	stat = (io_curr_device.in->disp_ptr->readfl)(v, length, timeout);
-	stringpool.free += v->str.len;
+	if (stringpool.free == (unsigned char *)v->str.addr)
+		stringpool.free += v->str.len;	/* see UNIX iott_readfl */
 	assert((int4)v->str.len <= b_length);
 	assert(stringpool.free <= stringpool.top);
 
@@ -59,7 +60,6 @@ int op_readfl(mval *v, int4 length, int4 timeout)
 	{
 		cnt = insize = outsize = v->str.len;
 		assert(stringpool.free >= stringpool.base);
-		assert(stringpool.free <= stringpool.top);
 		if (cnt > stringpool.top - stringpool.free)
 			stp_gcol(cnt);
 		temp_ch = stringpool.free;

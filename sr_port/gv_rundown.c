@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,15 +11,13 @@
 
 #include "mdef.h"
 
-#include <netinet/in.h>	/* Required for gtmsource.h */
-
 #include <errno.h>
 #ifdef VMS
 #include <descrip.h>	/* Required for gtmsource.h */
 #include <nam.h>	/* Required for the nam$l_esa members */
 #endif
 
-#include "gtm_inet.h"
+#include "gtm_inet.h"	/* Required for gtmsource.h */
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -159,7 +157,7 @@ void gv_rundown(void)
 	}
 	rc_close_section();
 	gv_cur_region = r_save;		/* Restore value for dumps but this region is now closed and is otherwise defunct */
-
+	cs_addrs = NULL;
 #ifdef UNIX
 	gtmsecshr_sock_cleanup(CLIENT);
 #ifndef MUTEX_MSEM_WAKE

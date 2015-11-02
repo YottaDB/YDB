@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,15 +27,15 @@ GBLREF triple *curtchain;
 
 int m_read(void)
 {
-	oprtype x, *timeout, *sb1;
-	opctype read_oc, put_oc;
-	triple *ref, tmpchain, *sub, *s0, *s1, *put;
-	bool local;
+	oprtype		x, *timeout;
+	opctype		read_oc, put_oc;
+	triple		*ref, tmpchain, *s1, *sub, *put;
+	boolean_t	local;
+
 	error_def(ERR_RWARG);
 
 	temp_subs = FALSE;
 	local = TRUE;
-	sub = (triple *)0;
 	dqinit(&tmpchain, exorder);
 	switch(window_token)
 	{
@@ -186,70 +186,5 @@ int m_read(void)
 	ref = curtchain->exorder.bl;
 	dqadd(ref, &tmpchain, exorder);		/*this is a violation of info hiding*/
 
-	if (sub)
-	{
-		sb1 = &sub->operand[1];
-		if ((OC_GVNAME == put_oc) || (OC_PUTINDX == put_oc))
-		{
-			sub = sb1->oprval.tref;		/* global name */
-			assert(OC_PARAMETER == sub->opcode);
-			sb1 = &sub->operand[1];
-		} else  if (OC_GVEXTNAM == put_oc)
-		{
-			sub = sb1->oprval.tref;		/* first env */
-			assert(OC_PARAMETER == sub->opcode);
-			sb1 = &sub->operand[0];
-			assert(TRIP_REF == sb1->oprclass);
-			s0 = sb1->oprval.tref;
-			if ((temp_subs && (OC_GETINDX == s0->opcode)) || (OC_VAR == s0->opcode))
-			{
-				s1 = maketriple(OC_STOTEMP);
-				s1->operand[0] = *sb1;
-				*sb1 = put_tref(s1);
-				dqins(s0->exorder.bl, exorder, s1);
-			}
-			sb1 = &sub->operand[1];
-			sub = sb1->oprval.tref;		/* second env */
-			assert(OC_PARAMETER == sub->opcode);
-			sb1 = &sub->operand[0];
-			assert(TRIP_REF == sb1->oprclass);
-			s0 = sb1->oprval.tref;
-			if ((temp_subs && (OC_GETINDX == s0->opcode)) || (OC_VAR == s0->opcode))
-			{
-				s1 = maketriple(OC_STOTEMP);
-				s1->operand[0] = *sb1;
-				*sb1 = put_tref(s1);
-				dqins(s0->exorder.bl, exorder, s1);
-			}
-			sb1 = &sub->operand[1];
-			sub = sb1->oprval.tref;		/* global name */
-			assert(OC_PARAMETER == sub->opcode);
-			sb1 = &sub->operand[1];
-		}
-		while(sb1->oprclass)
-		{
-			assert(TRIP_REF == sb1->oprclass);
-			sub = sb1->oprval.tref;
-			assert(OC_PARAMETER == sub->opcode);
-			sb1 = &sub->operand[0];
-			assert(TRIP_REF == sb1->oprclass);
-			s0 = sb1->oprval.tref;
-			if (temp_subs && ((OC_GETINDX == s0->opcode) || (OC_VAR == s0->opcode)))
-			{
-				s1 = maketriple(OC_STOTEMP);
-				s1->operand[0] = *sb1;
-				*sb1 = put_tref(s1);
-				s0 = s0->exorder.fl;
-				dqins(s0->exorder.bl, exorder, s1);
-			} else  if (OC_VAR == s0->opcode)
-			{
-				s1 = maketriple(OC_NAMECHK);
-				s1->operand[0] = *sb1;
-				s0 = s0->exorder.fl;
-				dqins(s0->exorder.bl, exorder, s1);
-			}
-			sb1 = &sub->operand[1];
-		}
-	}
 	return TRUE;
 }

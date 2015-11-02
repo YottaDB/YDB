@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,6 +109,7 @@ error_def(ERR_ZCUSRRTN);
 error_def(ERR_ZCARGMSMTCH);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_ZCMAXPARAM);
+error_def(ERR_ZCNOPREALLOUTPAR);
 
 static	int			call_table_initialized = 0;
 
@@ -309,7 +310,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	VAR_START(var, argcnt);
 	/* compute size of parameter block */
 	n = entry_ptr->parmblk_size;	/* This is enough for the parameters and the fixed length entries */
-	/* Now, add enough for the char *'s and the char **'s */
+	/* Now, add enough for the char *'s and the char **'s and string *'s */
 	for (i = 0, m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
@@ -318,7 +319,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			switch(entry_ptr->parms[i])
 			{
 			case xc_char_star:
-				n += (-1 != entry_ptr->param_pre_alloc_size[i])?entry_ptr->param_pre_alloc_size[i] : 0;
+				n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
 				/* Caution fall through */
 			case xc_char_starstar:
 				if (m1 & 1)
@@ -329,7 +330,12 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 				break;
 			case xc_string_star:
 				if (m1 & 1)
+				{
 					MV_FORCE_STR(v);
+					n += v->str.len + 1;
+				}
+				else
+					n += (-1 != entry_ptr->param_pre_alloc_size[i]) ? entry_ptr->param_pre_alloc_size[i] : 0;
 				break;
 			case xc_double_star:
 				n += sizeof(double);
@@ -376,7 +382,13 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			else if (-1 != pre_alloc_size)
 				free_string_pointer += pre_alloc_size;
 			else /* Output and no pre-allocation specified */
-				*free_string_pointer++ = 0;
+				if (0 == package->str.len)
+					/* default package - do not display package name */
+					rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, RTS_ERROR_LITERAL("<DEFAULT>"),
+						extref->str.len, extref->str.addr);
+				else
+					rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, package->str.len, package->str.addr,
+						extref->str.len, extref->str.addr);
 			break;
 		case xc_char_starstar:
 			param_list->arg[i] = free_space_pointer;
@@ -403,11 +415,25 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 			free_space_pointer++;
 			break;
 		case xc_string_star:
-			/* Nothing to be done for pre-allocation */
 			param_list->arg[i] = free_space_pointer;
-			/* pass the mstr out even it it's output only */
 			*(int *)free_space_pointer++ = v->str.len;
-			*free_space_pointer++ = (int4)v->str.addr;
+			*free_space_pointer++ = (int4)free_string_pointer;
+			if (m1 & 1)
+			{
+				if (v->str.len)
+					memcpy(free_string_pointer, v->str.addr, v->str.len);
+				free_string_pointer += v->str.len;
+			}
+			else if (-1 != pre_alloc_size)
+				free_string_pointer += pre_alloc_size;
+			else /* Output and no pre-allocation specified */
+				if (0 == package->str.len)
+					/* default package - do not display package name */
+					rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, RTS_ERROR_LITERAL("<DEFAULT>"),
+						extref->str.len, extref->str.addr);
+				else
+					rts_error(VARLSTCNT(7) ERR_ZCNOPREALLOUTPAR, 5, i+1, package->str.len, package->str.addr,
+						extref->str.len, extref->str.addr);
 			break;
 		case xc_float_star:
 			param_list->arg[i] = free_space_pointer;

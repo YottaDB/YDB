@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
-int4 iosocket_handle(char *handle, short *len, boolean_t newhandle, d_socket_struct *dsocketptr)
+int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struct *dsocketptr)
 {
 	boolean_t	unique;
 	int4 		ii, counter = 0, loop_flag = 1;

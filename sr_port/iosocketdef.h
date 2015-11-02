@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,11 +25,21 @@
 #include "gtm_utf8.h"
 #endif
 
+/* Debugging notes: Some debuging calls as as below. Others are for SOCKET_DEBUG2 which is *always*
+   disabled. As parts of the code work, the SOCKET_DEBUG calls are changed to SOCKET_DEBUG2 to get
+   them out of the way without removing them (they may be useful in the future).
+
+   The macro DEBUGSOCKFLUSH can be set or not depending on if flushing after every write is desired
+*/
+/*#define DEBUG_SOCKET*/
 #ifdef DEBUG_SOCKET
 # define SOCKET_DEBUG(X) X
 #else
 # define SOCKET_DEBUG(X)
 #endif
+/*#define DEBUGSOCKFLUSH fflush(stdout)*/
+#define DEBUGSOCKFLUSH
+#define SOCKET_DEBUG2(X)
 
 /* About the length of the delimiter string. While we are allocating lots of space here for the maximum representation
    of 64 delimiters each of 64 chars MB chars, the fact is that the iop option processing actually limits the string
@@ -48,6 +58,14 @@
 #define	DEFAULT_SOCKET_BUFFER_SIZE	0x400
 #define	MAX_SOCKET_BUFFER_SIZE		0x100000
 #define	MAX_INTERNAL_SOCBUF_SIZE	0x100000
+/* Next two fields relate to the time that a variable length unterminated read will wait to see
+   if there is more input coming in before it gives up and returns what it has to the user. This
+   time is specified in milliseconds. This value used to be 200ms but that was deemed too long on
+   modern systems yet now the user can change it if they wish to. Tradeoffs are longer waits for
+   variable reads versus potential CPU burner if the value gets too low.
+ */
+#define DEFAULT_MOREREAD_TIMEOUT	10
+#define MAX_MOREREAD_TIMEOUT		999
 
 #define	ONE_COMMA			"1,"
 
@@ -79,6 +97,14 @@ enum socket_protocol
 	n_socket_protocol
 };
 
+enum socket_which		/* which module saved the interrupted info */
+{
+	sockwhich_invalid,
+	sockwhich_readfl,
+	sockwhich_wait,
+	sockwhich_connect
+};
+
 typedef struct socket_address_type
 {
 	struct sockaddr_in      	sin;     /* accurate one */
@@ -89,23 +115,24 @@ typedef struct socket_address_type
 
 typedef struct socket_struct_type
 {
-	int 				sd; 	/* socket descriptor */
-	struct 	d_socket_struct_type	*dev; 	/* point back to the driver */
-	bool				passive,
+	int 				sd; 		/* socket descriptor */
+	struct 	d_socket_struct_type	*dev; 		/* point back to the driver */
+	boolean_t			passive,
 					ioerror,
-					urgent;
+					urgent,
+	                                delim0containsLF;
 	enum socket_state		state;
 	enum socket_protocol		protocol;
 	socket_address			local,
 					remote;
-	unsigned char			lastop;
+	uint4				lastop;
+	uint4				moreread_timeout;		/* timeout to see if more data available (ms) */
         char                            handle[MAX_HANDLE_LEN];
-        short                           handle_len;
-	int				bufsiz;	/* OS internal buffer size */
-        int4                            n_delimiter;
+        int                             handle_len;
+	int				bufsiz;				/* OS internal buffer size */
+        int	  	                n_delimiter;
         mstr                            delimiter[MAX_N_DELIMITER];
         mstr                            idelimiter[MAX_N_DELIMITER];
-	boolean_t			delim0containsLF;
 	mstr				odelimiter0;
 	size_t				buffer_size;			/* size of the buffer for this socket */
 	size_t				buffered_length;		/* length of stuff buffered for this socket */
@@ -117,12 +144,25 @@ typedef struct socket_struct_type
 	mstr				zff;
 } socket_struct;
 
+typedef struct socket_interrupt_type
+{
+	ABS_TIME			end_time;
+	enum socket_which		who_saved;
+	int				max_bufflen;
+	int				bytes_read;
+	int				chars_read;
+	boolean_t                       end_time_valid;
+} socket_interrupt;
+
 typedef struct d_socket_struct_type
 {
+	socket_interrupt		sock_save_state;		/* Saved state of interrupted IO */
+	boolean_t                     	mupintr;			/* We were mupip interrupted */
 	int4				current_socket;			/* current socket index */
 	int4				n_socket;			/* number of sockets	*/
         char                            dollar_device[DD_BUFLEN];
 	char				dollar_key[DD_BUFLEN];
+	struct io_desc_struct		*iod;				/* Point back to main IO descriptor block */
 	struct socket_struct_type 	*socket[1];			/* Array size determined by gtm_max_sockets */
 }d_socket_struct;
 
@@ -131,8 +171,8 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len, socket_struct *socketptr, boolean_t rm);
 void iosocket_delim_conv(socket_struct *socketptr, gtm_chset_t to_chset);
 void iosocket_delimiter_copy(socket_struct *from, socket_struct *to);
-boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from, d_socket_struct *to);
-int4 iosocket_handle(char *handle, short *len, boolean_t newhandle, d_socket_struct *dsocketptr);
+boolean_t iosocket_switch(char *handle, int handle_len, d_socket_struct *from, d_socket_struct *to);
+int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struct *dsocketptr);
 socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des);
 ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, int flags, ABS_TIME *time_for_read);
 void iosocket_unsnr(socket_struct *socketptr, unsigned char *buffer, size_t len);

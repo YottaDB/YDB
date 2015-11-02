@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -901,3 +901,4 @@ GBLDEF	uint4			gtm_max_sockets;	/* Maximum sockets per socket device supported b
 GBLDEF	d_socket_struct		*newdsocket;		/* Commonly used temp socket area */
 
 GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
+GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */

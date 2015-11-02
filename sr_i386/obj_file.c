@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -420,7 +420,7 @@ void output_symbol(void)
 	sym = symbols;
 	while (sym)
 	{
-		emit_immed(&sym->name[0], sym->name_len);
+		emit_immed((char *)&sym->name[0], sym->name_len);
 		sym = sym->next;
 	}
 }
@@ -442,7 +442,7 @@ void emit_literals(void)
 
 	set_psect(GTM_LITERALS, 0);
 	offset = stringpool.free - stringpool.base;
-	emit_immed(stringpool.base, offset);
+	emit_immed((char *)stringpool.base, offset);
 	/* comp_lits aligns the start of source path on a NATIVE_WSIZE boundary.*/
 	padsize = PADLEN(offset, NATIVE_WSIZE);
 	if (padsize)

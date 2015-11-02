@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,10 +64,13 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 			memset((unsigned char*)&pini_record.process_vector[ORIG_JPV], 0, sizeof(jnl_process_vector));
 	} else
 	{
-		/* assert(NULL != jgbl.mur_plst); This is not true for gdsfilext.c done during mur_forward */
 		if (NULL != jgbl.mur_plst)
 			memcpy((unsigned char*)&pini_record.process_vector[ORIG_JPV],
 					(unsigned char *)&jgbl.mur_plst->origjpv, sizeof(jnl_process_vector));
+		else
+		{	/* gdsfilext done during "mur_block_count_correct" */
+			memset((unsigned char*)&pini_record.process_vector[ORIG_JPV], 0, sizeof(jnl_process_vector));
+		}
 	}
 	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
 	jnl_write(csa->jnl, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL);

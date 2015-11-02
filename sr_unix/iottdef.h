@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,39 @@
 #define TT_EDITING		0x1000
 #define TT_NOINSERT		0x2000
 
+enum	tt_which
+{
+	ttwhichinvalid,
+	dmread,
+	ttread,
+	ttrdone
+};
+
+typedef struct
+{
+	enum tt_which	who_saved;
+	unsigned char	*buffer_start;		/* initial stringpool.free */
+	wint_t		*buffer_32_start;
+	int		utf8_more;
+	int		dx;
+	int		dx_start;
+	int		dx_instr;
+	int		dx_outlen;
+	int		instr;
+	int		outlen;
+	int		index;				/* dm_read only */
+	int		cl;				/* dm_read only */
+	int		length;
+	int		exp_length;
+	ABS_TIME	end_time;
+	unsigned char	*more_ptr;
+	unsigned char	*zb_ptr;
+	unsigned char	*zb_top;
+	unsigned short	escape_length;			/* dm_read only */
+	unsigned char	escape_sequence[ESC_LEN];	/* dm_read only */
+	unsigned char	more_buf[GTM_MB_LEN_MAX + 1];
+} tt_interrupt;
+
 typedef struct
 {
 	uint4	mask[8];
@@ -62,6 +95,8 @@ typedef struct
 	io_termmask	mask_term;
 	int		fildes;
 	struct termios  *ttio_struct;
+	tt_interrupt	tt_state_save;		/* in case job interrupt */
+	boolean_t	mupintr;		/* read was interrupted */
 	char		*ttybuff;		/* buffer for tty */
 	volatile char	*tbuffp;		/* next open space in buffer */
 	volatile boolean_t	timer_set;	/* text flush timer is set */
@@ -79,5 +114,5 @@ void iott_flush_buffer(io_desc *ioptr, boolean_t new_write_flag);
 void iott_mterm(io_desc *ioptr);
 void iott_rterm(io_desc *ioptr);
 void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
-			 int delimlen, unsigned char *delimptr, unsigned char *strend);
+			 int delimlen, unsigned char *delimptr, unsigned char *strend, unsigned char *buffer_start);
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,9 +42,7 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgm_info	*first_sgm_info;
 GBLREF	short		dollar_tlevel;
 GBLREF	bool		gv_curr_subsc_null;
-
-
-
+GBLREF	bool		gv_prev_subsc_null;
 
 void op_gvrectarg (mval *v)
 {
@@ -67,7 +65,7 @@ void op_gvrectarg (mval *v)
 	if (!MV_IS_STRING(v))
 		GTMASSERT;
 
-	n = len = v->str.len - sizeof(short) - sizeof(gd_targ_addr);
+	n = len = v->str.len - sizeof(short) - sizeof(gd_targ_addr) - sizeof(gv_curr_subsc_null) - sizeof(gv_prev_subsc_null);
 	if (len <= 0)
 	{
 		if (gv_currkey)
@@ -80,7 +78,8 @@ void op_gvrectarg (mval *v)
 	if (!gv_currkey)
 		GTMASSERT;
 
-	c = (unsigned char *) (v->str.addr + sizeof(short) + sizeof(gd_targ_addr));
+	c = (unsigned char *) (v->str.addr + sizeof(short) + sizeof(gd_targ_addr)
+				+ sizeof(gv_curr_subsc_null) + sizeof(gv_prev_subsc_null));
 	temp.addr = (char *)c;
 	while (*c++)
 	{	n--;
@@ -89,8 +88,8 @@ void op_gvrectarg (mval *v)
 	}
 
 	temp.len = (char *)c - temp.addr - 1;
-	if (   (gd_header != 0  &&  gd_header->maps == gd_map)
-	    && (gv_currkey->base[temp.len] == 0  &&  memcmp(gv_currkey->base, temp.addr, temp.len) == 0)  )
+	if ((NULL != gd_header) && (gd_header->maps == gd_map)
+		&& (0 == gv_currkey->base[temp.len]) && (0 == memcmp(gv_currkey->base, temp.addr, temp.len)))
 	{
 		gv_currkey->end = temp.len + 1;
 		gv_currkey->prev = 0;
@@ -102,8 +101,7 @@ void op_gvrectarg (mval *v)
 			if (gv_target->root == 0 || gv_target->root == DIR_ROOT)
 				gvcst_root_search();
 		}
-	}
-	else
+	} else
 	{
 		memcpy(&gd_targ_addr, v->str.addr + sizeof(short), sizeof(gd_targ_addr));
 		gv_bind_name(gd_targ_addr, &(temp));
@@ -111,10 +109,12 @@ void op_gvrectarg (mval *v)
 	c = (unsigned char *)v->str.addr;
 	GET_SHORT(gv_currkey->prev,c);
 	c += sizeof(short) + sizeof(gd_targ_addr);
+	memcpy(&gv_curr_subsc_null, c, sizeof(gv_curr_subsc_null));
+	c += sizeof(gv_curr_subsc_null);
+	memcpy(&gv_prev_subsc_null, c, sizeof(gv_prev_subsc_null));
+	c += sizeof(gv_prev_subsc_null);
 	gv_currkey->end  = len;
 	memcpy(gv_currkey->base, c, len);
 	gv_currkey->base[len] = 0;
-	c = &gv_currkey->base [ gv_currkey->prev ];
-	gv_curr_subsc_null = ( *c++ == 255 && *c == 0);
 	return;
 }

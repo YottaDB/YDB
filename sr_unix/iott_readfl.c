@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,10 +21,10 @@
 #include "io.h"
 #include "trmdef.h"
 #include "iotimer.h"
+#include "gt_timer.h"
 #include "iottdef.h"
 #include "iott_edit.h"
 #include "stringpool.h"
-#include "gt_timer.h"
 #include "gtmio.h"
 #include "eintr_wrappers.h"
 #include "send_msg.h"
@@ -46,7 +46,11 @@ GBLREF	io_pair		io_curr_device;
 GBLREF	io_pair		io_std_device;
 GBLREF	bool		prin_in_dev_failure;
 GBLREF	spdesc		stringpool;
-GBLREF	int4		outofband;
+GBLREF	volatile int4	outofband;
+GBLREF	mv_stent	*mv_chain;
+GBLREF	stack_frame	*frame_pointer;
+GBLREF	unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
+GBLREF	boolean_t	dollar_zininterrupt;
 GBLREF	int4		ctrap_action_is;
 GBLREF	boolean_t	gtm_utf8_mode;
 
@@ -80,7 +84,7 @@ static readonly unsigned char	eraser[3] = { NATIVE_BS, NATIVE_SP, NATIVE_BS };
 
 /* Maintenance of $ZB on a badchar error and returning partial data (if any) */
 void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
-			 int delimlen, unsigned char *delimptr, unsigned char *strend)
+			 int delimlen, unsigned char *delimptr, unsigned char *strend, unsigned char *buffer_start)
 {
         int             i, tmplen, len;
         unsigned char   *delimend, *outptr, *outtop;
@@ -91,16 +95,17 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
         {       /* Return how much input we got */
 		if (gtm_utf8_mode)
 		{
-			outptr = stringpool.free;
+			outptr = buffer_start;
 			outtop = ((unsigned char *)dataptr32);
 			curptr32 = dataptr32;
 			for (i = 0; i < datalen && outptr < outtop; i++, curptr32++)
 				outptr = UTF8_WCTOMB(*curptr32, outptr);
-			vmvalptr->str.len = outptr - stringpool.free;
+			vmvalptr->str.len = outptr - buffer_start;
 		} else
 			vmvalptr->str.len = datalen;
-		vmvalptr->str.addr = (char *)stringpool.free;
-		stringpool.free += vmvalptr->str.len;	/* The BADCHAR error after this won't do this for us */
+		vmvalptr->str.addr = (char *)buffer_start;
+		if (buffer_start == stringpool.free)
+			stringpool.free += vmvalptr->str.len;	/* The BADCHAR error after this won't do this for us */
         }
         if (NULL != strend && NULL != delimptr)
         {       /* First find the end of the delimiter (max of 4 bytes) */
@@ -124,7 +129,7 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 
 int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 {
-	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode, utf8_active;
+	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode, utf8_active, zint_restart, buffer_moved;
 	uint4		mask;
 	wint_t		inchar, *current_32_ptr, *buffer_32_start, switch_char;
 	unsigned char	inbyte, *outptr, *outtop;
@@ -152,6 +157,8 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	d_tt_struct	*tt_ptr;
 	io_terminator	outofbands;
 	io_termmask	mask_term;
+	tt_interrupt	*tt_state;
+	mv_stent	*mvc, *mv_zintdev;
 	unsigned char	*zb_ptr, *zb_top;
 	ABS_TIME	cur_time, end_time;
 	fd_set		input_fd;
@@ -161,6 +168,9 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	error_def(ERR_CTRAP);
 	error_def(ERR_IOEOF);
 	error_def(ERR_NOPRINCIO);
+	error_def(ERR_ZINTRECURSEIO);
+	error_def(ERR_STACKOFLOW);
+	error_def(ERR_STACKCRIT);
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
@@ -172,45 +182,105 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	/* if utf8_active, need room for multi byte characters plus wint_t buffer */
 	exp_length = utf8_active ? ((sizeof(wint_t) * length) + (GTM_MB_LEN_MAX * length) + sizeof(gtm_int64_t)) : length;
-	if (stringpool.free + exp_length > stringpool.top)
-		stp_gcol (exp_length);
-	instr = outlen = 0;
-	utf8_more = 0;
-	/* ---------------------------------------------------------
-	 * zb_ptr is be used to fill-in the value of $zb as we go
-	 * If we drop-out with error or otherwise permaturely,
-	 * consider $zb to be null.
-	 * ---------------------------------------------------------
-	 */
-	zb_ptr = io_ptr->dollar.zb;
-	zb_top = zb_ptr + sizeof(io_ptr->dollar.zb) - 1;
-	*zb_ptr = 0;
-	io_ptr->esc_state = START;
-	io_ptr->dollar.za = 0;
-	io_ptr->dollar.zeof = FALSE;
-	v->str.len = 0;
-	dx_start = (int)io_ptr->dollar.x;
-	ret = TRUE;
-	buffer_start = current_ptr = stringpool.free;
-	if (utf8_active)
-	{
-		current_32_ptr = (wint_t *)ROUND_UP2((int4)(stringpool.free + (GTM_MB_LEN_MAX * length)), sizeof(gtm_int64_t));
-		buffer_32_start = current_32_ptr;
+	zint_restart = FALSE;
+	if (tt_ptr->mupintr)
+	{	/* restore state to before job interrupt */
+		tt_state = &tt_ptr->tt_state_save;
+		if (ttwhichinvalid == tt_state->who_saved)
+			GTMASSERT;
+		if (dollar_zininterrupt)
+		{
+			tt_ptr->mupintr = FALSE;
+			tt_state->who_saved = ttwhichinvalid;
+			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		}
+		assert(length == tt_state->length);
+		if (ttread != tt_state->who_saved)
+			GTMASSERT;	/* ZINTRECURSEIO should have caught */
+		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
+		if (NULL != mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
+		{	/* looks good so use it */
+			buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
+			current_ptr = buffer_start;
+			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+			if (mv_chain == mv_zintdev)
+				POP_MV_STENT();		/* pop if top of stack */
+			buffer_moved = (buffer_start != tt_state->buffer_start);
+			if (utf8_active)
+			{	/* need to properly align U32 buffer */
+				assert(exp_length == tt_state->exp_length);
+				buffer_32_start = (wint_t *)ROUND_UP2((int4)(buffer_start + (GTM_MB_LEN_MAX * length)),
+							sizeof(gtm_int64_t));
+				if (buffer_moved && (((int)buffer_32_start & 0x7) != ((int)tt_state->buffer_32_start & 0x7)))
+					memmove(buffer_32_start, buffer_start + ((unsigned char *)tt_state->buffer_32_start
+						- tt_state->buffer_start), (sizeof(wint_t) * length));
+				current_32_ptr = buffer_32_start;
+				utf8_more = tt_state->utf8_more;
+				more_ptr = tt_state->more_ptr;
+				memcpy(more_buf, tt_state->more_buf, sizeof(more_buf));
+			}
+			instr = tt_state->instr;
+			outlen = tt_state->outlen;
+			dx = tt_state->dx;
+			dx_start = tt_state->dx_start;
+			dx_instr = tt_state->dx_instr;
+			dx_outlen = tt_state->dx_outlen;
+			end_time = tt_state->end_time;
+			zb_ptr = tt_state->zb_ptr;
+			zb_top = tt_state->zb_top;
+			tt_state->who_saved = ttwhichinvalid;
+			tt_ptr->mupintr = FALSE;
+			zint_restart = TRUE;
+		}
 	}
+	if (!zint_restart)
+	{
+		if (stringpool.free + exp_length > stringpool.top)
+			stp_gcol(exp_length);
+		buffer_start = current_ptr = stringpool.free;
+		if (utf8_active)
+		{
+			buffer_32_start = (wint_t *)ROUND_UP2((int4)(stringpool.free + (GTM_MB_LEN_MAX * length)),
+					sizeof(gtm_int64_t));
+			current_32_ptr = buffer_32_start;
+		}
+		instr = outlen = 0;
+		dx_instr = dx_outlen = 0;
+		utf8_more = 0;
+		/* ---------------------------------------------------------
+		 * zb_ptr is used to fill-in the value of $zb as we go
+		 * If we drop-out with error or otherwise permaturely,
+		 * consider $zb to be null.
+		 * ---------------------------------------------------------
+		 */
+		zb_ptr = io_ptr->dollar.zb;
+		zb_top = zb_ptr + sizeof(io_ptr->dollar.zb) - 1;
+		*zb_ptr = 0;
+		io_ptr->esc_state = START;
+		io_ptr->dollar.za = 0;
+		io_ptr->dollar.zeof = FALSE;
+		dx_start = (int)io_ptr->dollar.x;
+	}
+	v->str.len = 0;
+	ret = TRUE;
 	mask = tt_ptr->term_ctrl;
 	mask_term = tt_ptr->mask_term;
 	/* keep test in next line in sync with test in iott_rdone.c */
 	edit_mode = (0 != (TT_EDITING & tt_ptr->ext_cap) && !((TRM_NOECHO|TRM_PASTHRU) & mask));
 	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);	/* get initial mode */
-	if (mask & TRM_NOTYPEAHD)
-		TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
-	if (mask & TRM_READSYNC)
+	if (!zint_restart)
 	{
-		DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
-		if (0 != status)
+		if (mask & TRM_NOTYPEAHD)
+			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
+		if (mask & TRM_READSYNC)
 		{
-			io_ptr->dollar.za = 9;
-			rts_error(VARLSTCNT(1) status);
+			DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
+			if (0 != status)
+			{
+				io_ptr->dollar.za = 9;
+				rts_error(VARLSTCNT(1) status);
+			}
 		}
 	}
 	if (edit_mode)
@@ -223,22 +293,25 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		mask_term.mask[EDIT_LEFT / NUM_BITS_IN_INT4] &= ~(1 << EDIT_LEFT);
 		mask_term.mask[EDIT_RIGHT / NUM_BITS_IN_INT4] &= ~(1 << EDIT_RIGHT);
 		mask_term.mask[EDIT_ERASE / NUM_BITS_IN_INT4] &= ~(1 << EDIT_ERASE);
-		/* to turn keypad on if possible */
-#ifndef __MVS__
-		if (NULL != KEYPAD_XMIT && (keypad_len = strlen(KEYPAD_XMIT)))	/* embedded assignment */
+		if (!zint_restart)
 		{
-			DOWRITERC(tt_ptr->fildes, KEYPAD_XMIT, keypad_len, status);
-			if (0 != status)
+			/* to turn keypad on if possible */
+#ifndef __MVS__
+			if (NULL != KEYPAD_XMIT && (keypad_len = strlen(KEYPAD_XMIT)))	/* embedded assignment */
 			{
-				io_ptr->dollar.za = 9;
-				rts_error(VARLSTCNT(1) status);
+				DOWRITERC(tt_ptr->fildes, KEYPAD_XMIT, keypad_len, status);
+				if (0 != status)
+				{
+					io_ptr->dollar.za = 9;
+					rts_error(VARLSTCNT(1) status);
+				}
 			}
-		}
 #endif
-		dx_start = (dx_start + ioptr_width) % ioptr_width;	/* normalize within width */
+			dx_start = (dx_start + ioptr_width) % ioptr_width;	/* normalize within width */
+		}
 	}
-	dx = dx_start;
-	dx_instr = dx_outlen = 0;
+	if (!zint_restart)
+		dx = dx_start;
 	nonzerotimeout = FALSE;
 	if (NO_M_TIMEOUT == timeout)
 	{
@@ -251,12 +324,15 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		input_timeval.tv_sec = timeout;
 		msec_timeout = timeout2msec(timeout);
 		if (!msec_timeout)
-			iott_mterm(io_ptr);
-		else
+		{
+			if (!zint_restart)
+				iott_mterm(io_ptr);
+		} else
 		{
 			nonzerotimeout = TRUE;
    			sys_get_curr_time(&cur_time);
-			add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+			if (!zint_restart)
+				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 		}
 	}
 	input_timeval.tv_usec = 0;
@@ -264,10 +340,44 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	{
 		if (outofband)
 		{
-			instr = outlen = 0;
-			SEND_KEYPAD_LOCAL
-			if (!msec_timeout)
-				iott_rterm(io_ptr);
+			if (jobinterrupt == outofband)
+			{	/* save state if jobinterrupt */
+				tt_state = &tt_ptr->tt_state_save;
+				tt_state->who_saved = ttread;
+				tt_state->length = length;
+				tt_state->buffer_start = buffer_start;
+				PUSH_MV_STENT(MVST_ZINTDEV);
+				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)buffer_start;
+				mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = exp_length;
+				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
+				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
+				if (utf8_active)
+				{
+					tt_state->exp_length = exp_length;
+					tt_state->buffer_32_start = buffer_32_start;
+					tt_state->utf8_more = utf8_more;
+					tt_state->more_ptr = more_ptr;
+					memcpy(tt_state->more_buf, more_buf, sizeof(more_buf));
+				}
+				if (buffer_start == stringpool.free)
+					stringpool.free += exp_length;	/* reserve space */
+				tt_state->instr = instr;
+				tt_state->outlen = outlen;
+				tt_state->dx = dx;
+				tt_state->dx_start = dx_start;
+				tt_state->dx_instr = dx_instr;
+				tt_state->dx_outlen = dx_outlen;
+				tt_state->end_time = end_time;
+				tt_state->zb_ptr = zb_ptr;
+				tt_state->zb_top = zb_top;
+				tt_ptr->mupintr = TRUE;
+			} else
+			{
+				instr = outlen = 0;
+				SEND_KEYPAD_LOCAL
+				if (!msec_timeout)
+					iott_rterm(io_ptr);
+			}
 			outofband_action(FALSE);
 			break;
 		}
@@ -342,7 +452,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					{	/* invalid char */
 						io_ptr->dollar.za = 9;
 						iott_readfl_badchar(v, buffer_32_start, outlen,
-								    (more_ptr - more_buf), more_buf, more_ptr);
+								    (more_ptr - more_buf), more_buf, more_ptr, buffer_start);
 						utf8_badchar(more_ptr - more_buf, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
 						break;
 					}
@@ -353,14 +463,16 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					{	/* invalid character */
 						io_ptr->dollar.za = 9;
 						*more_ptr++ = inbyte;
-						iott_readfl_badchar(v, buffer_32_start, outlen, 1, more_buf, more_ptr);
+						iott_readfl_badchar(v, buffer_32_start, outlen,
+								1, more_buf, more_ptr, buffer_start);
 						utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
 						break;
 					} else if (GTM_MB_LEN_MAX < utf8_more)
 					{	/* too big to be valid */
 						io_ptr->dollar.za = 9;
 						*more_ptr++ = inbyte;
-						iott_readfl_badchar(v, buffer_32_start, outlen, 1, more_buf, more_ptr);
+						iott_readfl_badchar(v, buffer_32_start, outlen,
+								1, more_buf, more_ptr, buffer_start);
 						utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
 						break;
 					} else
@@ -376,7 +488,8 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 					if (WEOF == inchar)
 					{	/* invalid char */
 						io_ptr->dollar.za = 9;
-						iott_readfl_badchar(v, buffer_32_start, outlen, 1, more_buf, more_ptr);
+						iott_readfl_badchar(v, buffer_32_start, outlen,
+								1, more_buf, more_ptr, buffer_start);
 						utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
 						break;
 					}
@@ -1001,7 +1114,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 		}
 	}
 	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
-	if (outofband)
+	if (outofband && jobinterrupt != outofband)
 	{
 		v->str.len = 0;
 		io_ptr->dollar.za = 9;
@@ -1010,16 +1123,16 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 #ifdef UNICODE_SUPPORTED
 	if (utf8_active)
 	{
-		outptr = stringpool.free;
+		outptr = buffer_start;
 		outtop = ((unsigned char *)buffer_32_start);
 		current_32_ptr = buffer_32_start;
 		for (i = 0; i < outlen && outptr < outtop; i++, current_32_ptr++)
 			outptr = UTF8_WCTOMB(*current_32_ptr, outptr);
-		v->str.len = outptr - stringpool.free;
+		v->str.len = outptr - buffer_start;
 	} else
 #endif
 		v->str.len = outlen;
-	v->str.addr = (char *)stringpool.free;
+	v->str.addr = (char *)buffer_start;
 	if (edit_mode)
 	{	/* store in recall buffer */
 		if ((BUFF_CHAR_SIZE * outlen) > tt_ptr->recall_size)

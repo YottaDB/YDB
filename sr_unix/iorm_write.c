@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,7 +132,7 @@ void iorm_write_utf(mstr *v)
 			if (CHSET_UTF16 == iod->ochset)
 			{	/* Write BOM but do not count it towards the bytes in the current record */
 				memcpy(outptr, UTF16BE_BOM, UTF16BE_BOM_LEN);
-				rm_ptr->out_bytes = outbytes = UTF16BE_BOM_LEN;
+				outbytes = UTF16BE_BOM_LEN;
 				outptr += UTF16BE_BOM_LEN;
 				DOWRITERC(rm_ptr->fildes, outstart, outbytes, status);
 				outptr = outstart;

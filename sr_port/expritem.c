@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,7 @@ GBLREF	mval	window_mval;
 GBLREF	mident	window_ident;
 GBLREF	bool	temp_subs;
 GBLREF	bool	devctlexp;
+GBLREF	triple	*curtchain;
 
 LITREF	toktabtype	tokentable[];
 
@@ -413,6 +414,7 @@ int expritem(oprtype *a)
 	short int 	i;
 	triple 		*ref;
 	oprtype 	x1;
+	boolean_t	parse_warn;
 
 	error_def(ERR_EXPR);
 	error_def(ERR_FCNSVNEXPECTED);
@@ -491,25 +493,38 @@ int expritem(oprtype *a)
 				stx_error(ERR_FCNSVNEXPECTED);
 				return FALSE;
 			}
+			parse_warn = FALSE;
 			if (director_token == TK_LPAREN)
 			{
 				index = namelook(fun_index, fun_names, window_ident.addr, window_ident.len);
 				if (index < 0)
 				{
-					stx_error(ERR_INVFCN);
-					return FALSE;
-				}
-				assert(sizeof(fun_names)/sizeof(fun_data_type) > index);
-				if (! VALID_FUN(index) )
+					STX_ERROR_WARN(ERR_INVFCN);	/* sets "parse_warn" to TRUE */
+				} else
 				{
-				    	stx_error(ERR_FNOTONSYS);
-					return FALSE;
-		                }
+					assert(sizeof(fun_names)/sizeof(fun_data_type) > index);
+					if (! VALID_FUN(index) )
+					{
+						STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
+					}
+				}
 				advancewindow();
 				advancewindow();
-				assert(OPCODE_COUNT > fun_data[index].opcode);
-				if (!(bool)((*fun_parse[index])(a, fun_data[index].opcode)))
-					return FALSE;
+				if (!parse_warn)
+				{
+					assert(OPCODE_COUNT > fun_data[index].opcode);
+					if (!(bool)((*fun_parse[index])(a, fun_data[index].opcode)))
+						return FALSE;
+				} else
+				{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
+					 * (invoked by stx_error). Get the reference to it.
+					 */
+					ref = curtchain->exorder.bl;	/* corresponds to put_ilit(FALSE) in ins_errtriple */
+					*a = put_tref(ref);
+					assert(OC_RTERROR == ref->exorder.bl->exorder.bl->opcode);
+					/* Parse the remaining arguments until the corresponding RIGHT-PAREN/SPACE/EOL is reached */
+					parse_until_rparen_or_space();
+				}
 				if (window_token != TK_RPAREN)
 				{
 					stx_error(ERR_RPARENMISSING);
@@ -519,29 +534,39 @@ int expritem(oprtype *a)
 			} else
 			{
 				index = namelook(svn_index, svn_names, window_ident.addr, window_ident.len);
-				if (index < 0)
+				if (0 > index)
 				{
-					stx_error(ERR_INVSVN);
-					return FALSE;
+					STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
+				} else
+				{
+					assert(sizeof(svn_names)/sizeof(svn_data_type) > index);
+					if (!VALID_SVN(index))
+					{
+						STX_ERROR_WARN(ERR_FNOTONSYS);	/* sets "parse_warn" to TRUE */
+					}
 				}
-				assert(sizeof(svn_names)/sizeof(svn_data_type) > index);
-				if (!VALID_SVN(index))
-				{
-				        stx_error(ERR_FNOTONSYS);
-					return FALSE;
-		                }
 				advancewindow();
-				sv_opcode = svn_data[index].opcode;
-				assert(SV_NUM_SV > sv_opcode);
-				if (sv_opcode == SV_TEST)
-					*a = put_tref(newtriple(OC_GETTRUTH));
-				else
+				if (!parse_warn)
 				{
-					if (sv_opcode == SV_X || sv_opcode == SV_Y)
-						devctlexp = TRUE;
-					ref = newtriple(OC_SVGET);
-					ref->operand[0] = put_ilit(sv_opcode);
+					sv_opcode = svn_data[index].opcode;
+					assert(SV_NUM_SV > sv_opcode);
+					if (sv_opcode == SV_TEST)
+						*a = put_tref(newtriple(OC_GETTRUTH));
+					else
+					{
+						if (sv_opcode == SV_X || sv_opcode == SV_Y)
+							devctlexp = TRUE;
+						ref = newtriple(OC_SVGET);
+						ref->operand[0] = put_ilit(sv_opcode);
+						*a = put_tref(ref);
+					}
+				} else
+				{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
+					 * (invoked by stx_error). Get the reference to it.
+					 */
+					ref = curtchain->exorder.bl;	/* corresponds to put_ilit(FALSE) in ins_errtriple */
 					*a = put_tref(ref);
+					assert(OC_RTERROR == ref->exorder.bl->exorder.bl->opcode);
 				}
 			}
 		}

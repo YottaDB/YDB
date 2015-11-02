@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -286,7 +286,10 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				if (GTM_PROBE(sizeof(cw_set_element), si->first_cw_set, READ))
 				{	/* Note that SECSHR_PROBE_REGION does a "continue" if any probes fail. */
 					SECSHR_PROBE_REGION(si->gv_cur_region);	/* sets csa */
-					if (csa->t_commit_crit || gds_t_committed == si->first_cw_set->mode)
+					/* Set update_underway to TRUE only if we have crit on this region. */
+					if (csa->now_crit
+						&& (csa->t_commit_crit
+							|| (si->cw_set_depth && (gds_t_committed == si->first_cw_set->mode))))
 					{
 						tp_update_underway = TRUE;
 						update_underway = TRUE;
@@ -294,7 +297,9 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					break;
 				} else if (si->update_trans)
 				{	/* case of duplicate set not creating any cw-sets but updating db curr_tn++ */
-					if (T_COMMIT_STARTED == si->update_trans)
+					SECSHR_PROBE_REGION(si->gv_cur_region);	/* sets csa */
+					/* Set update_underway to TRUE only if we have crit on this region. */
+					if (csa->now_crit && (T_COMMIT_STARTED == si->update_trans))
 					{
 						tp_update_underway = TRUE;
 						update_underway = TRUE;
@@ -502,7 +507,14 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					SECSHR_ACCOUNTING(__LINE__);
 				}
 			} else if (csa->t_commit_crit)
-			{
+			{	/* We better have held crit on this region. GTMASSERT only in Unix as this module runs
+				 * in kernel mode in VMS and no IO is allowed in that mode.
+				 */
+				if (!csa->now_crit)
+				{
+					UNIX_ONLY(GTMASSERT;)
+					VMS_ONLY(assert(FALSE);)
+				}
 				if (!GTM_PROBE(sizeof(unsigned char), cw_depth_addrs, READ))
 				{
 					SECSHR_ACCOUNTING(3);
@@ -529,6 +541,15 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			if (NULL != first_cw_set)
 			{
 				assert(non_tp_update_underway || tp_update_underway);
+				/* Now that we have decided this region has a few cw-set-elements to be rolled forward,
+				 * we better have held crit on this region. GTMASSERT only in Unix as this module runs
+				 * in kernel mode in VMS and no IO is allowed in that mode.
+				 */
+				if (!csa->now_crit)
+				{
+					UNIX_ONLY(GTMASSERT;)
+					VMS_ONLY(assert(FALSE);)
+				}
 				if (is_bg)
 				{
 					clru = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csa->nl->cur_lru_cache_rec_off);

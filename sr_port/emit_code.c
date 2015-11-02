@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,11 +11,10 @@
 
 #include "mdef.h"
 
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
-
+#include "gtm_fcntl.h"
+#include "gtm_stat.h"
 #include "gtm_stdio.h"
 
 #include "compiler.h"
@@ -368,10 +367,11 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					inst++;
 
 #ifdef TRUTH_IN_REG
-					reg = gtm_reg(*inst++);
+					reg = GTM_REG_CODEGEN_TEMP;
+					GEN_LOAD_WORD(reg, gtm_reg(*inst++), 0);
 #else
-				/* For platforms, where the $TRUTH value is not carried in a register and
-				   must be fetched from a global variable by subroutine call. */
+					/* For platforms, where the $TRUTH value is not carried in a register and
+					   must be fetched from a global variable by subroutine call. */
 					assert(*inst == 0x5a);		/* VAX r10 or $TEST register */
 					inst++;
 					emit_call_xfer(4 * xf_dt_get);
@@ -619,7 +619,13 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 								inst++;
 
 #ifdef TRUTH_IN_REG
-								GEN_MOVE_REG(gtm_reg(*inst), MOVL_RETVAL_REG);
+								if (*inst == 0x5a)	/* to VAX r10 or $TEST */
+								{
+									GEN_STORE_WORD(MOVL_RETVAL_REG, GTM_REG_DOLLAR_TRUTH, 0);
+								} else
+								{
+									GEN_MOVE_REG(gtm_reg(*inst), MOVL_RETVAL_REG);
+								}
 #else
 								if (*inst == 0x5a)	/* to VAX r10 or $TEST */
 								{

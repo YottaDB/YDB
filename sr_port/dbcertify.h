@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,12 @@
 #define TMPFILEPFX	"dbcmdx"
 #define TMPRSLTFILSFX	".out"
 #define MAX_IEB_CNT	10
+
+/* The "maximum" key that we use to search for righthand children of gvtroot blocks
+   is simply 0xFF, 0x00, 0x00. So we don't need much here..
+*/
+#define MAX_DBC_KEY_SZ 3
+
 /* A restart is triggered when, in the processing of a given block, we discover that
    some other block in its path needs to be dealt with first. Since the splitting of
    the higher (tree) level block will take care of anything else higher in the tree
@@ -189,11 +195,13 @@ typedef struct
 	int		blks_cached;		/* Counter - block reads satisfied from cache */
 	int		blks_updated;		/* Counter - blocks we updated during processing */
 	int		blks_created;		/* Counter - blocks we created during processing */
-	int		dtlvl0;			/* Counter -- Directory tree level 0 blocks */
-	int		dtlvln0;		/* Counter -- Directory tree not level 0 blocks */
-	int		gvtlvl0;		/* Counter -- Global variable tree level 0 blocks */
-	int		gvtlvln0;		/* Counter -- Global variable tree not level 0 blocks */
-	int		blk_process_errors;	/* Counter -- Errors encountered which keep us from certifying DB */
+	int		dtlvl0;			/* Counter - Directory tree level 0 blocks */
+	int		dtlvln0;		/* Counter - Directory tree not level 0 blocks */
+	int		gvtlvl0;		/* Counter - Global variable tree level 0 blocks */
+	int		gvtlvln0;		/* Counter - Global variable tree not level 0 blocks */
+	int		gvtrchildren;		/* Counter - Right sibling children of gvtroot processed */
+	int		blk_process_errors;	/* Counter - Errors encountered which keep us from certifying DB */
+	int		gvtroot_rchildren_cnt;	/* Count of the inhabitants of gvtroot_rchildren[] */
 	int		local_bit_map_cnt;	/* Total local bit maps in database */
 	uint4		blocks_to_process;	/* Number of blocks (records) phase two will process */
 	int		tmpcmdfile_len;		/* Length of tmpcmdfile */
@@ -222,14 +230,16 @@ typedef struct
 	block_id	hint_blk;		/* Hint where to start search for next free block */
 	p1hdr		ofhdr;			/* Phase-1 output file header (phase-2 input file) */
 	p1rec		rhdr;			/* Record in output file */
+	p1rec		gvtroot_rchildren[MAX_BT_DEPTH + 1];	/* List of right hand children for a GVT root block to process */
 	gd_region	*dbc_gv_cur_region;	/* our version of gv_cur_region */
 	v15_sgmnt_data_ptr_t	dbc_cs_data;	/* our version of cs_data */
 	dbc_gv_key	*first_rec_key;		/* Statically allocazted key buffer used for initial search */
 	file_control	*fc;
 	integ_error_blk_list *iebl;		/* Chain of blocks describing integ errors we encountered in 1st pass */
 	dbc_gv_key	*gvn_key;		/* Used to look up GVN in directory tree */
-	unsigned char	outfn[MAX_FN_LEN + 1];	/* File name argument (may be db or outfile depending on phase) */
-	unsigned char	regname[MAX_RN_LEN + 1]; /* Buffer for region name */
+	dbc_gv_key      *max_key;		/* Maximum possible key value */
+	unsigned char	outfn[MAX_FN_LEN + 1];		/* File name argument (may be db or outfile depending on phase) */
+	unsigned char	regname[MAX_RN_LEN + 1]; 	/* Buffer for region name */
 	unsigned char	rslt_buff[MAX_ZWR_KEY_SZ + 1];	/* Buffer for reading from result file */
 	unsigned char	tmpcmdfile[MAX_FN_LEN + 1];	/* Temporary command file name */
 	unsigned char	tmprsltfile[MAX_FN_LEN + 1];	/* Temporary command result file name */
@@ -331,7 +341,8 @@ void dbc_init_key(phase_static_area *psa, dbc_gv_key **key);
 void dbc_find_key(phase_static_area *psa, dbc_gv_key *key, uchar_ptr_t rec_p, int blk_levl);
 boolean_t dbc_match_key(dbc_gv_key *key1, int blk_levl1, dbc_gv_key *key2, unsigned int *matchc);
 int dbc_find_dtblk(phase_static_area *psa, dbc_gv_key *key, int min_levl);
-int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int min_levl, enum gdsblk_type newblk_type);
+int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int min_levl, enum gdsblk_type newblk_type,
+		    boolean_t fail_ok);
 void dbc_init_blk(phase_static_area *psa, block_info *blk_set_p, int blk_num, enum gdsblk_usage blk_usage, int blk_len,
 		  int blk_levl);
 void dbc_init_db(phase_static_area *psa);

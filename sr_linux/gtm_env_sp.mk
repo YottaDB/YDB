@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -48,7 +48,7 @@ gt_cc_option_nooptimize=
 # -fno-defer-pop to prevent problems with assembly/generated code with optimization
 # -fno-strict-aliasing since we don't comply with the rules
 # -ffloat-store for consistent results avoiding rounding differences
-gt_cc_option_optimize=-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store
+gt_cc_option_optimize=-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store -march=i686
 # autodepend option
 gt_cc_dep_option=-w
 # -g	generate debugging information for dbx (no longer overrides -O)

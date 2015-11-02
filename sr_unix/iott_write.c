@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -110,6 +110,7 @@ void iott_write(mstr *v)
 	boolean_t	utf8_active = FALSE;
 	wint_t		codepoint;
 	error_def(ERR_TERMWRITE);
+	error_def(ERR_ZINTRECURSEIO);
 
 	str_len = v->len;
 	if (0 != str_len)
@@ -117,6 +118,8 @@ void iott_write(mstr *v)
 		str = v->addr;
 		io_ptr = io_curr_device.out;
 		tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
+		if (tt_ptr->mupintr)
+			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		UNICODE_ONLY(utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ochset) : FALSE;)
 		for (;  ;)
 		{

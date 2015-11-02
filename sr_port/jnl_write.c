@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include "jnl_write.h"
 #include "copy.h"
 #include "jnl_get_checksum.h"
+#include "memcoherency.h"
 
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 DEBUG_ONLY( GBLREF bool		run_time;)
@@ -367,6 +368,14 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	 */
 	jpc->free_update_inprog = TRUE; /* The following assignments must be protected against termination */
 	jb->freeaddr = jpc->new_freeaddr;
+	/* Write memory barrier here to enforce the fact that freeaddr *must* be seen to be updated before
+	   free is is updated. It is less important if free is stale so we do not require a 2nd barrier for that
+	   and will let the lock release (crit lock required since clustering not currently supported) do the
+	   2nd memory barrier for us. This barrier takes care of this process's responsibility to broadcast
+	   cache changes. It is up to readers to also specify a read memory barrier if necessary to receive
+	   this broadcast.
+	*/
+	SHM_WRITE_MEMORY_BARRIER;
 	jb->free = jpc->temp_free;
 	jpc->free_update_inprog = FALSE;
 	VMS_ONLY(

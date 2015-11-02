@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@ GBLREF unsigned char	*stackbase,*stacktop,*msp,*stackwarn;
 GBLREF stack_frame	*frame_pointer;
 GBLREF symval		*curr_symval;
 LITDEF bool 		mvs_save[] = { TRUE, FALSE, TRUE, FALSE,
-					TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE };
+					TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE };
 
 void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr)
 {

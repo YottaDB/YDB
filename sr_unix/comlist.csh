@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Infromation Services, Inc #
+#	Copyright 2001, 2007 Fidelity Infromation Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -35,6 +35,40 @@ echo "Built on $HOST"
 echo ""
 
 echo "arguments: '$1' '$2' '$3' '$4'"
+echo ""
+
+echo "-------------------------"
+echo "locale output at start"
+echo "-------------------------"
+locale
+echo ""
+
+echo "Setting locale and LANG to C unconditionally"
+unsetenv gtm_chset
+setenv LC_ALL C
+setenv LANG C
+
+echo "-------------------------"
+echo "locale output after reset"
+echo "-------------------------"
+locale
+echo ""
+
+echo "--------------------------------------------"
+echo "Value at start : gtm_dist=$gtm_dist"
+echo "Value at start : gtmroutines=""$gtmroutines"""
+echo "--------------------------------------------"
+echo ""
+
+echo "Setting gtm_dist and gtmroutines to non-UTF8 unconditionally"
+setenv gtm_dist $gtm_exe
+setenv gtmroutines ". $gtm_exe"
+echo ""
+
+echo "--------------------------------------------"
+echo "Value after reset : gtm_dist=$gtm_dist"
+echo "Value after reset : gtmroutines=""$gtmroutines"""
+echo "--------------------------------------------"
 echo ""
 
 set comlist_status = 0
@@ -346,10 +380,10 @@ endif
 #############################################################
 
 if (-e $gs[1]/omi_sx_play.c) then
-	chmod +w $gs[1]/omi_sx_play.c
+	chmod a+w $gs[1]/omi_sx_play.c
 endif
 cp $gs[1]/omi_srvc_xct.c $gs[1]/omi_sx_play.c
-chmod -w $gs[1]/omi_sx_play.c
+chmod a-w $gs[1]/omi_sx_play.c
 
 #############################################################
 #

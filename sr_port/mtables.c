@@ -126,7 +126,8 @@ LITDEF unsigned char mvs_size[] =
 		MV_SIZE(mvs_nval),
 		MV_SIZE(mvs_tval),
 		MV_SIZE(mvs_tp_holder),
-		MV_SIZE(mvs_zintr)
+		MV_SIZE(mvs_zintr),
+		MV_SIZE(mvs_zintdev)
 	};
 
 static readonly unsigned char localpool[3] = {'1' , '1' , '0'};

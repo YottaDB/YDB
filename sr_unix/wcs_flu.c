@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,8 +59,13 @@ if (cnl->in_wtstart)												\
 	do													\
 	{													\
 		DEBUG_ONLY(in_wtstart = cnl->in_wtstart;)							\
-		if (MAXGETSPACEWAIT == ++lcnt)									\
-		{												\
+		if (MAXGETSPACEWAIT DEBUG_ONLY( * 2) == ++lcnt)							\
+		{	/* We have noticed the below assert to fail occasionally on some platforms (mostly	\
+			 * AIX and Linux). We suspect it is because of waiting for another writer that is 	\
+			 * in jnl_fsync (as part of flushing a global buffer) which takes more than a minute	\
+			 * to finish. To avoid false failures (where the other writer finishes its job in	\
+			 * a little over a minute) we wait for twice the time in the debug version.		\
+			 */											\
 			assert(FALSE);										\
 			cnl->wcsflu_pid = 0;									\
 			csd->wc_blocked = FALSE;								\

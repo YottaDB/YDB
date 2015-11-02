@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,17 +10,17 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #ifndef MUTEX_MSEM_WAKE
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include "gtm_socket.h"
 #include <sys/un.h>
 #include <sys/time.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include "gtm_fcntl.h"
+#include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
-#include "gtm_unistd.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -97,7 +97,7 @@ void mutex_sock_init(void)
 	mutex_wake_this_proc_prefix_len = mutex_sock_path_len;
 	/* Extend mutex_sock_path with pid */
 	strcpy(mutex_sock_path + mutex_sock_path_len, (char *)pid2ascx(pid_str, process_id));
-	mutex_sock_path_len += strlen(pid_str);
+	mutex_sock_path_len += strlen((char *)pid_str);
 
 	if (mutex_sock_path_len > sizeof(mutex_sock_address.sun_path))
 		rts_error(VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("Mutex socket path too long"));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,9 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#ifdef UNIX
+#include "error.h"
+#endif
 #include "io.h"
 #include "iottdef.h"
 
@@ -20,8 +23,17 @@ void iott_wteol(int4 val, io_desc *io_ptr)
 {
 	mstr	eol;
 	int	eol_cnt;
+	UNIX_ONLY(d_tt_struct	*tt_ptr;)
+	
+	UNIX_ONLY(error_def(ERR_ZINTRECURSEIO);)
 
 	assert(val);
+
+#ifdef UNIX
+	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
+	if (tt_ptr->mupintr)
+		rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+#endif
 	io_ptr->esc_state = START;
 	eol.len = strlen(NATIVE_TTEOL);
 	eol.addr = (char *)NATIVE_TTEOL;

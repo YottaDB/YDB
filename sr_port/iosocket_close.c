@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 {
 	boolean_t	socket_specified = FALSE;
 	unsigned char	ch;
-	short		handle_len;
+	int		handle_len;
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
 	char		sock_handle[MAX_HANDLE_LEN];

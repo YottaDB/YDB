@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -108,7 +108,7 @@ void gv_init_reg (gd_region *reg)
 				g = csa->dir_tree;
 				g->clue.end = 0;
 				assert(g->gd_reg == reg);
-				assert(g->root = DIR_ROOT);
+				assert(DIR_ROOT == g->root);
 			}
 		}
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,9 @@
 #include "cvtparm.h"
 #include "deviceparameters.h"
 
-GBLREF char 	window_token;
-GBLREF mident 	window_ident;
+GBLREF	char 	window_token;
+GBLREF	mident 	window_ident;
+GBLREF	triple	*curtchain;
 
 LITREF unsigned char io_params_size[];
 LITREF dev_ctl_struct dev_param_control[];
@@ -98,6 +99,7 @@ LITDEF nametabent dev_param_names[] =
 	,{3,"LOW*"}
 
 	,{1,"M"}
+        ,{8,"MOREREAD*"}
 	,{3,"MOU*"}
 
 	,{2,"NA*"}
@@ -251,9 +253,9 @@ LITDEF nametabent dev_param_names[] =
 LITDEF	unsigned char dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
-	0,   5,   9,   24,  30,  43,  55,  57,  61,  65,  65,  65,  73,  75,
+	0,   5,   9,   24,  30,  43,  55,  57,  61,  65,  65,  65,  73,  76,
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	135, 140, 157, 158, 171, 183, 192, 198, 199, 214, 215, 216, 230
+	136, 141, 158, 159, 172, 184, 193, 199, 200, 215, 216, 217, 231
 };
 /* Offset of string within letter in dev_param_names */
 /* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
@@ -283,6 +285,7 @@ int deviceparameters(oprtype *c, char who_calls)
 	char		parstr[MAXDEVPARLEN];
 	char		*parptr;
 	boolean_t	is_parm_list;
+	boolean_t	parse_warn;
 
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_DEVPARUNK);
@@ -358,6 +361,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_lowercase
 
 		,iop_m
+		,iop_morereadtime
 		,iop_mount
 
 		,iop_name
@@ -514,27 +518,29 @@ int deviceparameters(oprtype *c, char who_calls)
 		advancewindow();
 	cat_cnt = 0;
 	parptr = parstr;
+	parse_warn = FALSE;
 	for (;;)
 	{
-		if((window_token != TK_IDENT)
+		if ((window_token != TK_IDENT)
 			|| ((n = namelook(dev_param_index, dev_param_names, window_ident.addr, window_ident.len)) < 0))
 		{
-			stx_error(ERR_DEVPARUNK);
-			return FALSE;
+			STX_ERROR_WARN(ERR_DEVPARUNK);	/* sets "parse_warn" to TRUE */
+			break;
 		}
 		n = dev_param_data[n];
-		if(!(dev_param_control[n].valid_with & who_calls)) {
-			stx_error(ERR_DEVPARINAP);
-			return FALSE;
+		if (!(dev_param_control[n].valid_with & who_calls))
+		{
+			STX_ERROR_WARN(ERR_DEVPARINAP);	/* sets "parse_warn" to TRUE */
+			break;
 		}
 		advancewindow();
 		*parptr++ = n;
 		if (io_params_size[n])
 		{
-			if(window_token != TK_EQUAL)
+			if (window_token != TK_EQUAL)
 			{
-				stx_error(ERR_DEVPARVALREQ);
-				return FALSE;
+				STX_ERROR_WARN(ERR_DEVPARVALREQ);	/* sets "parse_warn" to TRUE */
+				break;
 			}
 			advancewindow();
 			if (!expr(&x))
@@ -587,6 +593,12 @@ int deviceparameters(oprtype *c, char who_calls)
 		}
 		stx_error(ERR_RPARENMISSING);
 		return FALSE;
+	}
+	if (parse_warn)
+	{	/* Parse the remaining arguments until the corresponding RIGHT-PAREN or SPACE or EOL is reached */
+		parse_until_rparen_or_space();
+		if (window_token == TK_RPAREN)
+			advancewindow();
 	}
 	*parptr++ = iop_eol;
 	cat_list[cat_cnt++] = put_str(parstr,parptr - parstr);

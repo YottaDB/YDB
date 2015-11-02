@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,8 +67,17 @@ void stx_error(int in_error, ...)
 	va_start(args, in_error);
 	shift_gvrefs = FALSE;
 	if (run_time)
-	{
-		if (in_error == ERR_BADCHAR)
+	{	/* If the current error is of type STX_WARN then do not issue an error at compile time. Insert 
+		 * triple to issue the error at runtime. If and when this codepath is reached at runtime (M command
+		 * could have a postconditional that bypasses this code) issue the rts_error.
+		 * See IS_STX_WARN macro definition for details.
+		 */
+		if ((cg_phase == CGP_PARSE) && IS_STX_WARN(in_error))
+		{
+			ins_errtriple(in_error);
+			return;
+		}
+		if (ERR_BADCHAR == in_error)
 		{
 			cnt = va_arg(args, int);
 			assert(cnt == 4);
@@ -78,13 +87,12 @@ void stx_error(int in_error, ...)
 			arg4 = va_arg(args, int);
 			va_end(args);
 			rts_error(VARLSTCNT(6) in_error, cnt, arg1, arg2, arg3, arg4);
-		} else if (in_error == ERR_LABELMISSING ||
-		    in_error == ERR_FMLLSTPRESENT ||
-		    in_error == ERR_FMLLSTMISSING ||
-		    in_error == ERR_ACTLSTTOOLONG ||
-		    in_error == ERR_BADCHSET ||
-		    in_error == ERR_BADCASECODE
-		    )
+		} else if ((ERR_LABELMISSING == in_error)
+				|| (ERR_FMLLSTPRESENT == in_error)
+				|| (ERR_FMLLSTMISSING == in_error)
+				|| (ERR_ACTLSTTOOLONG == in_error)
+				|| (ERR_BADCHSET == in_error)
+				|| (ERR_BADCASECODE == in_error))
 		{
 			cnt = va_arg(args, int);
 			assert(cnt == 2);
@@ -92,8 +100,7 @@ void stx_error(int in_error, ...)
 			arg2 = va_arg(args, int);
 			va_end(args);
 			rts_error(VARLSTCNT(4) in_error, cnt, arg1, arg2);
-		} else if (in_error == ERR_CEUSRERROR ||
-			in_error == ERR_INVDLRCVAL)
+		} else if ((ERR_CEUSRERROR == in_error) || (ERR_INVDLRCVAL == in_error))
 		{
 			cnt = va_arg(args, int);
 			assert(cnt == 1);
@@ -105,9 +112,9 @@ void stx_error(int in_error, ...)
 			va_end(args);
 			rts_error(VARLSTCNT(1) in_error);
 		}
-		GTMASSERT;
 	} else if (cg_phase == CGP_PARSE)
 		ins_errtriple(in_error);
+	assert(!run_time);	/* From here on down, should never go ahead with printing compile-error while in run_time */
 	if (source_error_found)
 	{
 		va_end(args);
@@ -128,10 +135,8 @@ void stx_error(int in_error, ...)
 		va_end(args);
 		return;
 	}
-
 	if (list && io_curr_device.out == io_std_device.out)
 		warn = FALSE;		/* if listing is going to $P, don't double output */
-
 	if (in_error == ERR_BADCHAR)
 	{
 		memset(buf, ' ', LISTTAB);
@@ -150,12 +155,23 @@ void stx_error(int in_error, ...)
 		if (list)
 			list_line(buf);
 		arg1 = arg2 = arg3 = arg4 = 0;
-	} else if (in_error != ERR_LABELMISSING &&
-	    in_error != ERR_FMLLSTPRESENT &&
-	    in_error != ERR_FMLLSTMISSING &&
-	    in_error != ERR_ACTLSTTOOLONG &&
-	    in_error != ERR_BADCHSET &&
-	    in_error != ERR_BADCASECODE)
+	} else if ((in_error == ERR_LABELMISSING)
+			|| (ERR_FMLLSTPRESENT == in_error)
+			|| (ERR_FMLLSTMISSING == in_error)
+			|| (ERR_ACTLSTTOOLONG == in_error)
+			|| (ERR_BADCHSET == in_error)
+			|| (ERR_BADCASECODE == in_error))
+	{
+		cnt = va_arg(args, int);
+		assert(cnt == 2);
+		arg1 = va_arg(args, int);
+		arg2 = va_arg(args, int);
+		if (warn)
+		{
+			dec_err(VARLSTCNT(4) in_error, 2, arg1, arg2);
+			dec_err(VARLSTCNT(4) ERR_SRCNAM, 2, source_name_len, source_file_name);
+		}
+	} else
 	{
 		memset(buf, ' ', LISTTAB);
 		show_source_line(&buf[LISTTAB], warn);
@@ -174,17 +190,6 @@ void stx_error(int in_error, ...)
 		if (list)
 			list_line(buf);
 		arg1 = arg2 = 0;
-	} else
-	{
-		cnt = va_arg(args, int);
-		assert(cnt == 2);
-		arg1 = va_arg(args, int);
-		arg2 = va_arg(args, int);
-		if (warn)
-		{
-			dec_err(VARLSTCNT(4) in_error, 2, arg1, arg2);
-			dec_err(VARLSTCNT(4) ERR_SRCNAM, 2, source_name_len, source_file_name);
-		}
 	}
 	va_end(args);
 	if (list)

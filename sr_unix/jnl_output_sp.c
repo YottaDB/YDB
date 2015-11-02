@@ -1,6 +1,6 @@
-/****************************************************************
+/***************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +34,7 @@
 #include "dpgbldir.h"
 #include "rel_quant.h"
 #include "repl_sp.h"	/* F_CLOSE */
+#include "memcoherency.h"
 
 GBLREF	volatile int4	db_fsync_in_prog;
 GBLREF	volatile int4	jnl_qio_in_prog;
@@ -106,6 +107,14 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		jb->need_db_fsync = FALSE;
 	}
 	free = jb->free;
+        /* The following barrier is to make sure that for the value of "free" that we extract (which may be
+           slightly stale but that is not a correctness issue) we make sure we dont write out a stale version of
+           the journal buffer contents. While it is possible that we see journal buffer contents that are more
+           uptodate than "free", this would only mean writing out a less than optimal number of bytes but again,
+           not a correctness issue. Secondary effect is that it also enforces a corresponding non-stale value of
+           freeaddr is read and this is relied upon by asserts below.
+	*/
+	SHM_READ_MEMORY_BARRIER;
 	was_wrapped = free < jb->dsk;
 	if (aligned_write)
 		free = ROUND_DOWN(free, IO_BLOCK_SIZE);
@@ -114,7 +123,6 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	if ((aligned_write && !was_wrapped && free <= jb->dsk) || (NOJNL == jpc->channel))
 		tsz = 0;
 	assert(0 <= tsz);
-	/* Note that this assert relies on the fact that freeaddr is updated before free in jnl_write() [jnl_output.c] */
 	assert(jb->dskaddr + tsz <= jb->freeaddr);
 	if (tsz)
 	{	/* ensure that dsk and free are never equal and we have left space for JNL_WRT_START_MASK */
@@ -207,9 +215,19 @@ uint4 jnl_qio_start(jnl_private_control *jpc)
 	{	/* yield() until someone has finished your job or no one else is active on the jnl file */
 		old_freeaddr = jb->freeaddr;
 		rel_quant();
+		/* Purpose of this memory barrier is to get a current view of asyncrhonously changed fields
+		   like whether the jnl file was switched, the write position in the journal file and the
+		   write address in the journal buffer for all the remaining statements in this loop because
+		   the rel_quant call above allows any and all of them to change and we aren't under any
+		   locks while in this loop. This is not a correctness issue as we would either eventually
+		   see the updates or it means we are writing what has already been written. It is a performance
+		   issue keeping more current with state changes done by other processes on other processors.
+		*/
+		SHM_READ_MEMORY_BARRIER;
 		if (JNL_FILE_SWITCHED(jpc))
 			return SS_NORMAL;
-		assert(old_freeaddr <= jb->freeaddr);
+		/* assert(old_freeaddr <= jb->freeaddr) ** Potential race condition with jnl file switch could
+		   make this assert fail so it is removed */
 		if (old_freeaddr == jb->freeaddr || target_freeaddr <= jb->dskaddr)
 			break;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@ GBLREF	spdesc			stringpool;
 GBLREF	UConverter  		*chset_desc[];
 GBLREF	int4			gtm_max_sockets;
 GBLREF	d_socket_struct		*newdsocket;
+GBLREF	boolean_t		dollar_zininterrupt;
 
 LITREF	nametabent		filter_names[];
 LITREF	unsigned char		filter_index[27];
@@ -54,27 +55,28 @@ LITREF 	unsigned char		io_params_size[];
 void	iosocket_use(io_desc *iod, mval *pp)
 {
 	unsigned char	ch, len;
-	short		handled_len, handlea_len, handles_len;
+	int		handled_len, handlea_len, handles_len;
 	int4		length, width, new_len;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr, newsocket;
 	char		handlea[MAX_HANDLE_LEN], handles[MAX_HANDLE_LEN], handled[MAX_HANDLE_LEN];
  	char            addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
-     			temp_addr[SA_MAXLITLEN], ioerror;
+		        temp_addr[SA_MAXLITLEN], ioerror;
 	unsigned char	delimiter_buffer[MAX_N_DELIMITER * (MAX_DELIM_LEN + 1)];
 	unsigned char	zff_buffer[MAX_ZFF_LEN];
 	boolean_t	attach_specified = FALSE,
-			detach_specified = FALSE,
-			connect_specified = FALSE,
-			ioerror_specified = FALSE,
-			listen_specified = FALSE,
-			socket_specified = FALSE,
-			delay_specified = FALSE,
-			nodelay_specified = FALSE,
-			bfsize_specified = FALSE,
-			ibfsize_specified = FALSE,
-			create_new_socket;
-	int4 		index, n_specified, zff_len, delimiter_len;
+         		detach_specified = FALSE,
+		        connect_specified = FALSE,
+		        ioerror_specified = FALSE,
+		        listen_specified = FALSE,
+		        socket_specified = FALSE,
+		        delay_specified = FALSE,
+		        nodelay_specified = FALSE,
+		        bfsize_specified = FALSE,
+		        ibfsize_specified = FALSE,
+		        moreread_specified = FALSE,
+		        create_new_socket;
+	int4 		index, n_specified, zff_len, delimiter_len, moreread_timeout;
 	int		fil_type, nodelay, p_offset = 0;
 	uint4		bfsize = DEFAULT_SOCKET_BUFFER_SIZE, ibfsize;
 	char		*tab;
@@ -97,184 +99,217 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	error_def(ERR_ZFF2MANY);
 	error_def(ERR_DEVPARMNEG);
 	error_def(ERR_DELIMWIDTH);
+	error_def(ERR_ZINTRECURSEIO);
+	error_def(ERR_MRTMAXEXCEEDED);
 
         assert(iod->state == dev_open);
         assert(iod->type == gtmsocket);
+        dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	/* ---------------------------------- parse the command line ------------------------------------ */
 	n_specified = 0;
 	zff_len = -1; /* indicates neither ZFF nor ZNOFF specified */
 	delimiter_len = -1; /* indicates neither DELIM nor NODELIM specified */
+
+	/* A read or wait was interrupted for this device. Allow only parmless use in $zinterrupt code for
+	   and interrupted device.
+	*/
+	if (iop_eol != *(pp->str.addr + p_offset))
+	{	/* Parameters were specified */
+		if (dsocketptr->mupintr)
+		{	/* And if we are in $zinterrupt code this is not allowed */
+			if (dollar_zininterrupt)
+				rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+			/* We are not in $zinterrupt code and this device was not resumed properly
+			   so clear its restartability.
+			*/
+			io_find_mvstent(iod, TRUE);
+		}
+	}
+
 	while (iop_eol != (ch = *(pp->str.addr + p_offset++)))
 	{
 		assert((params)ch < (params)n_iops);
 		switch (ch)
 		{
-		case iop_exception:
-			iod->error_handler.len = *(pp->str.addr + p_offset);
-			iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-			s2pool(&iod->error_handler);
-			break;
-		case iop_filter:
-			len = *(pp->str.addr + p_offset);
-			tab = pp->str.addr + p_offset + 1;
-			if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
-			{
-				rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
-				return;
-			}
-			switch (fil_type)
-			{
-				case 0:
-					iod->write_filter |= CHAR_FILTER;
-					break;
-				case 1:
-					iod->write_filter |= ESC1;
-					break;
-				case 2:
-					iod->write_filter &= ~CHAR_FILTER;
-					break;
-				case 3:
-					iod->write_filter &= ~ESC1;
-					break;
-			}
-			break;
-		case iop_nofilter:
-			iod->write_filter = 0;
-			break;
-		case iop_attach:
-			n_specified++;
-			attach_specified = TRUE;
-			handlea_len = (short)(*(pp->str.addr + p_offset));
-			memcpy(handlea, (char *)(pp->str.addr + p_offset + 1), handlea_len);
-			break;
-		case iop_detach:
-			n_specified++;
-			detach_specified = TRUE;
-			handled_len = (short)(*(pp->str.addr + p_offset));
-			memcpy(handled, (char *)(pp->str.addr + p_offset + 1), handled_len);
-			break;
-		case iop_connect:
-			n_specified++;
-			connect_specified = TRUE;
-			len = *(pp->str.addr + p_offset);
-                        if (len < SA_MAXLITLEN)
-                        {
-				memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
-				sockaddr[len] = '\0';
-                        } else
-				rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
-                        break;
-		case iop_delimiter:
-			n_specified++;
-			delimiter_len = (int4)(unsigned char)*(pp->str.addr + p_offset);
-                        if (((MAX_DELIM_LEN + 1) * MAX_N_DELIMITER) >= delimiter_len)
-				memcpy(delimiter_buffer, (pp->str.addr + p_offset + 1), delimiter_len);
-			else
-				rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
-			break;
-		case	iop_nodelimiter:
-			delimiter_len = 0;
-			break;
-		case	iop_zdelay:
-			delay_specified = TRUE;
-			break;
-		case	iop_znodelay:
-			nodelay_specified = TRUE;
-			break;
-		case	iop_zbfsize:
-			bfsize_specified = TRUE;
-			GET_ULONG(bfsize, pp->str.addr + p_offset);
-			if ((0 == bfsize) || (MAX_SOCKET_BUFFER_SIZE < bfsize))
-				rts_error(VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
-			break;
-		case	iop_zibfsize:
-			ibfsize_specified = TRUE;
-			GET_ULONG(ibfsize, pp->str.addr + p_offset);
-			if ((0 == ibfsize) || (MAX_INTERNAL_SOCBUF_SIZE < ibfsize))
-				rts_error(VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, ibfsize);
-			break;
-		case iop_ioerror:
-			n_specified++;
-			ioerror_specified = TRUE;
-			ioerror = *(char *)(pp->str.addr + p_offset + 1);
-			break;
-		case iop_zlisten:
-			n_specified++;
-			listen_specified = TRUE;
-			len = *(pp->str.addr + p_offset);
-                        if (len < SA_MAXLITLEN)
-                        {
-				memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
-				sockaddr[len] = '\0';
-                        } else
-				rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG, 4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
-                        break;
-		case iop_socket:
-			n_specified++;
-			socket_specified = TRUE;
-			handles_len = (short)(*(pp->str.addr + p_offset));
-			memcpy(handles, (char *)(pp->str.addr + p_offset + 1), handles_len);
-			break;
-		case iop_ipchset:
+			case iop_exception:
+				iod->error_handler.len = *(pp->str.addr + p_offset);
+				iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
+				s2pool(&iod->error_handler);
+				break;
+			case iop_filter:
+				len = *(pp->str.addr + p_offset);
+				tab = pp->str.addr + p_offset + 1;
+				if ((fil_type = namelook(filter_index, filter_names, tab, len)) < 0)
+				{
+					rts_error(VARLSTCNT(1) ERR_TTINVFILTER);
+					return;
+				}
+				switch (fil_type)
+				{
+					case 0:
+						iod->write_filter |= CHAR_FILTER;
+						break;
+					case 1:
+						iod->write_filter |= ESC1;
+						break;
+					case 2:
+						iod->write_filter &= ~CHAR_FILTER;
+						break;
+					case 3:
+						iod->write_filter &= ~ESC1;
+						break;
+				}
+				break;
+			case iop_nofilter:
+				iod->write_filter = 0;
+				break;
+			case iop_attach:
+				n_specified++;
+				attach_specified = TRUE;
+				handlea_len = (int)(*(pp->str.addr + p_offset));
+				memcpy(handlea, (char *)(pp->str.addr + p_offset + 1), handlea_len);
+				break;
+			case iop_detach:
+				n_specified++;
+				detach_specified = TRUE;
+				handled_len = (int)(*(pp->str.addr + p_offset));
+				memcpy(handled, (char *)(pp->str.addr + p_offset + 1), handled_len);
+				break;
+			case iop_connect:
+				n_specified++;
+				connect_specified = TRUE;
+				len = *(pp->str.addr + p_offset);
+				if (len < SA_MAXLITLEN)
+				{
+					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
+					sockaddr[len] = '\0';
+				} else
+					rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG,
+						  4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
+				break;
+			case iop_delimiter:
+				n_specified++;
+				delimiter_len = (int4)(unsigned char)*(pp->str.addr + p_offset);
+				if (((MAX_DELIM_LEN + 1) * MAX_N_DELIMITER) >= delimiter_len)
+					memcpy(delimiter_buffer, (pp->str.addr + p_offset + 1), delimiter_len);
+				else
+					rts_error(VARLSTCNT(1) ERR_DELIMSIZNA);
+				break;
+			case	iop_nodelimiter:
+				delimiter_len = 0;
+				break;
+			case	iop_zdelay:
+				delay_specified = TRUE;
+				break;
+			case	iop_znodelay:
+				nodelay_specified = TRUE;
+				break;
+			case	iop_zbfsize:
+				bfsize_specified = TRUE;
+				GET_ULONG(bfsize, pp->str.addr + p_offset);
+				if ((0 == bfsize) || (MAX_SOCKET_BUFFER_SIZE < bfsize))
+					rts_error(VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, bfsize);
+				break;
+			case	iop_zibfsize:
+				ibfsize_specified = TRUE;
+				GET_ULONG(ibfsize, pp->str.addr + p_offset);
+				if ((0 == ibfsize) || (MAX_INTERNAL_SOCBUF_SIZE < ibfsize))
+					rts_error(VARLSTCNT(3) ERR_ILLESOCKBFSIZE, 1, ibfsize);
+				break;
+			case iop_ioerror:
+				n_specified++;
+				ioerror_specified = TRUE;
+				ioerror = *(char *)(pp->str.addr + p_offset + 1);
+				break;
+			case iop_zlisten:
+				n_specified++;
+				listen_specified = TRUE;
+				len = *(pp->str.addr + p_offset);
+				if (len < SA_MAXLITLEN)
+				{
+					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), len);
+					sockaddr[len] = '\0';
+				} else
+					rts_error(VARLSTCNT(6) ERR_ADDRTOOLONG,
+						  4, len, pp->str.addr + p_offset + 1, len, SA_MAXLITLEN);
+				break;
+			case iop_socket:
+				n_specified++;
+				socket_specified = TRUE;
+				handles_len = (int)(*(pp->str.addr + p_offset));
+				memcpy(handles, (char *)(pp->str.addr + p_offset + 1), handles_len);
+				break;
+			case iop_ipchset:
 #if defined(KEEP_zOS_EBCDIC) || defined(VMS)
-			if ((iconv_t)0 != iod->input_conv_cd)
-				ICONV_CLOSE_CD(iod->input_conv_cd);
-			SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
-			if (DEFAULT_CODE_SET != iod->in_code_set)
-				ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
+				if ((iconv_t)0 != iod->input_conv_cd)
+					ICONV_CLOSE_CD(iod->input_conv_cd);
+				SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
+				if (DEFAULT_CODE_SET != iod->in_code_set)
+					ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
 #endif
-                       	break;
-                case iop_opchset:
+				break;
+			case iop_opchset:
 #if defined(KEEP_zOS_EBCDIC) || defined(VMS)
-			if ((iconv_t)0 != iod->output_conv_cd)
-				ICONV_CLOSE_CD(iod->output_conv_cd);
-			SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
-			if (DEFAULT_CODE_SET != iod->out_code_set)
-				ICONV_OPEN_CD(iod->output_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
+				if ((iconv_t)0 != iod->output_conv_cd)
+					ICONV_CLOSE_CD(iod->output_conv_cd);
+				SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
+				if (DEFAULT_CODE_SET != iod->out_code_set)
+					ICONV_OPEN_CD(iod->output_conv_cd, (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
 #endif
-                       	break;
-		case iop_zff:
-			if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
-				memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
-			else
-				rts_error(VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
-			break;
-		case iop_znoff:
-			zff_len = 0;
-			break;
-		case iop_length:
-			GET_LONG(length, pp->str.addr + p_offset);
-			if (length < 0)
-				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
-			iod->length = length;
-			break;
-		case iop_width:
-			/* SOCKET WIDTH is handled the same way as TERMINAL WIDTH */
-			GET_LONG(width, pp->str.addr + p_offset);
-			if (width < 0)
-				rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
-			if (0 == width)
-			{
-				iod->width = TCPDEF_WIDTH;
-				iod->wrap = FALSE;
-			} else
-			{
-				iod->width = width;
+				break;
+			case iop_zff:
+				if (MAX_ZFF_LEN >= (zff_len = (int4)(unsigned char)*(pp->str.addr + p_offset)))
+					memcpy(zff_buffer, (char *)(pp->str.addr + p_offset + 1), zff_len);
+				else
+					rts_error(VARLSTCNT(4) ERR_ZFF2MANY, 2, zff_len, MAX_ZFF_LEN);
+				break;
+			case iop_znoff:
+				zff_len = 0;
+				break;
+			case iop_length:
+				GET_LONG(length, pp->str.addr + p_offset);
+				if (length < 0)
+					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+				iod->length = length;
+				break;
+			case iop_width:
+				/* SOCKET WIDTH is handled the same way as TERMINAL WIDTH */
+				GET_LONG(width, pp->str.addr + p_offset);
+				if (width < 0)
+					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+				if (0 == width)
+				{
+					iod->width = TCPDEF_WIDTH;
+					iod->wrap = FALSE;
+				} else
+				{
+					iod->width = width;
+					iod->wrap = TRUE;
+				}
+				break;
+			case iop_wrap:
 				iod->wrap = TRUE;
-			}
-			break;
-		case iop_wrap:
-			iod->wrap = TRUE;
-			break;
-		case iop_nowrap:
-			iod->wrap = FALSE;
-			break;
-		default:
-			/* ignore deviceparm */
-			break;
+				break;
+			case iop_nowrap:
+				iod->wrap = FALSE;
+				break;
+                        case iop_morereadtime:
+                                /* Time in milliseconds socket read will wait for more data before returning */
+                                GET_LONG(moreread_timeout, pp->str.addr + p_offset);
+				if (-1 == moreread_timeout)
+					moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
+				else if (-1 > moreread_timeout)
+					rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+				else if (MAX_MOREREAD_TIMEOUT < moreread_timeout)
+					rts_error(VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1, MAX_MOREREAD_TIMEOUT);
+                                moreread_specified = TRUE;
+                                break;
+			default:
+				/* ignore deviceparm */
+				break;
 		}
 		p_offset += ((io_params_size[ch] == IOP_VAR_SIZE) ?
-				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+			     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 	}
 	/* ------ return immediately if no flag, worth a check because it is mostly true ------------ */
 	if (1 == p_offset)
@@ -296,7 +331,6 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		return;
 	}
 	/* ------------------ make a local copy of device structure to play with -------------------- */
-        dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	d_socket_struct_len = sizeof(d_socket_struct) + (sizeof(socket_struct) * (gtm_max_sockets - 1));
 	memcpy(newdsocket, dsocketptr, d_socket_struct_len);
 	/* --------------- handle the two special cases attach/detach first ------------------------- */
@@ -380,22 +414,22 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		/* The delimiter has changed. The iosocket_readfl/write routine won't notice so we have to do
 		   the UTF16xx conversion since we changed it.
 		*/
-		SOCKET_DEBUG(PRINTF("socuse: Delimiter(s) replaced - num delims: %d  delimiter_len: %d  ichset: %d  ochset: %d\n",
-				    newsocket.n_delimiter, delimiter_len, iod->ichset, iod->ochset); fflush(stdout));
+		SOCKET_DEBUG2(PRINTF("socuse: Delimiter(s) replaced - num delims: %d  delimiter_len: %d  ichset: %d  ochset: %d\n",
+				     newsocket.n_delimiter, delimiter_len, iod->ichset, iod->ochset); DEBUGSOCKFLUSH);
 		if  (0 < delimiter_len)
 		{
 			if (!newsocket.first_read && (CHSET_UTF16BE == iod->ichset || CHSET_UTF16LE == iod->ichset))
 			{	/* We have been reading with this socket so convert this new delimiter set */
-				SOCKET_DEBUG(PRINTF("socuse: Converting new delimiters for input\n"); fflush(stdout));
+				SOCKET_DEBUG2(PRINTF("socuse: Converting new delimiters for input\n"); DEBUGSOCKFLUSH);
 				iosocket_delim_conv(&newsocket, iod->ichset);
 			}
 			if (!newsocket.first_write && (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset))
 			{	/* We have been writing with this socket so convert the new default output delimiter */
-				SOCKET_DEBUG(PRINTF("socuse: Converting new delimiters for output\n"); fflush(stdout));
+				SOCKET_DEBUG2(PRINTF("socuse: Converting new delimiters for output\n"); DEBUGSOCKFLUSH);
 				if (newsocket.first_read || (CHSET_UTF16BE != iod->ichset && CHSET_UTF16LE != iod->ichset))
 				{	/* Need to do conversion as iosocket_delim_conv above didn't do it for us */
-					SOCKET_DEBUG(PRINTF("socuse: running convert for write since input didn't do it\n");
-						     fflush(stdout));
+					SOCKET_DEBUG2(PRINTF("socuse: running convert for write since input didn't do it\n");
+						      DEBUGSOCKFLUSH);
 					new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset],
 							   &newsocket.delimiter[0], NULL, NULL);
 					if (MAX_DELIM_LEN < new_len)
@@ -405,8 +439,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 					}
 				} else
 				{
-					SOCKET_DEBUG(PRINTF("socuse: using previous length from read conversion\n");
-						     fflush(stdout));
+					SOCKET_DEBUG2(PRINTF("socuse: using previous length from read conversion\n");
+						      DEBUGSOCKFLUSH);
 					new_len = newsocket.idelimiter[0].len;
 				}
                                 newsocket.odelimiter0.len = new_len;
@@ -425,7 +459,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 	{	/* ZFF="non-zero-len-string" specified */
                 if (CHSET_UTF16BE == iod->ochset || CHSET_UTF16LE == iod->ochset) /* need conversion of ZFF */
 		{
-			SOCKET_DEBUG(PRINTF("socuse: Converting zff\n"); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socuse: Converting zff\n"); DEBUGSOCKFLUSH);
 			lcl_zff.addr = (char *)zff_buffer;
 			lcl_zff.len = zff_len;
 			new_len = gtm_conv(chset_desc[CHSET_UTF8], chset_desc[iod->ochset], &lcl_zff, NULL, NULL);
@@ -457,6 +491,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		newsocket.nodelay = nodelay_specified;	/* defaults to DELAY */
 	if (ibfsize_specified)
 		newsocket.bufsiz = ibfsize;
+	if (moreread_specified)
+		newsocket.moreread_timeout = moreread_timeout;
 	if (!create_new_socket)
 	{
 		/* these changes apply to only pre-existing sockets */
@@ -465,8 +501,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 #ifdef TCP_NODELAY
 		nodelay = newsocket.nodelay ? 1 : 0;
 		if ((socketptr->nodelay != newsocket.nodelay) &&
-				(-1 == tcp_routines.aa_setsockopt(newsocket.sd, IPPROTO_TCP,
-						TCP_NODELAY, &nodelay, sizeof(nodelay))))
+		    (-1 == tcp_routines.aa_setsockopt(newsocket.sd, IPPROTO_TCP,
+						      TCP_NODELAY, &nodelay, sizeof(nodelay))))
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
@@ -475,8 +511,8 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		}
 #endif
 		if ((socketptr->bufsiz != newsocket.bufsiz) &&
-				(-1 == tcp_routines.aa_setsockopt(newsocket.sd, SOL_SOCKET,
-						SO_RCVBUF, &newsocket.bufsiz, sizeof(newsocket.bufsiz))))
+		    (-1 == tcp_routines.aa_setsockopt(newsocket.sd, SOL_SOCKET,
+						      SO_RCVBUF, &newsocket.bufsiz, sizeof(newsocket.bufsiz))))
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
@@ -491,14 +527,14 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			if (0 < socketptr->buffered_length)
 			{
 				memcpy(newsocket.buffer, socketptr->buffer + socketptr->buffered_offset,
-						socketptr->buffered_length);
+				       socketptr->buffered_length);
 				newsocket.buffered_offset = 0;
 			}
 		}
 	}
         /* -------------------------------------- action -------------------------------------------- */
         if ((listen_specified && (!iosocket_bind(&newsocket, NO_M_TIMEOUT, ibfsize_specified))) ||
-                (connect_specified && (!iosocket_connect(&newsocket, 0, ibfsize_specified))))
+	    (connect_specified && (!iosocket_connect(&newsocket, 0, ibfsize_specified))))
         {	/* error message should be printed from bind/connect */
                 if (socketptr->sd > 0)
                         (void)tcp_routines.aa_close(socketptr->sd);

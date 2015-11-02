@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -208,7 +208,6 @@ XFER(xf_indget, opp_indget),
 XFER(xf_fnname, op_fnname),
 XFER(xf_indfnname, opp_indfnname),
 XFER(xf_fnlvprvname, op_fnlvprvname),
-XFER(xf_namechk, op_namechk),
 XFER(xf_gvo2, op_gvo2),
 XFER(xf_fnlvnameo2, op_fnlvnameo2),
 XFER(xf_fno2, op_fno2),
@@ -231,11 +230,7 @@ XFER(xf_fnzbitxor, op_fnzbitxor),
 XFER(xf_fgnlookup, op_fgnlookup),
 XFER(xf_sorts_after, op_sorts_after),
 XFER(xf_fnzqgblmod, op_fnzqgblmod),
-#if defined(__sparc) || defined(__i386__)
-XFER(xf_fngvget1, opp_fngvget1),
-#else
 XFER(xf_fngvget1, op_fngvget1),
-#endif
 XFER(xf_fngvget2, op_fngvget2),
 XFER(xf_setp1, op_setp1),
 XFER(xf_setextract, op_setextract),

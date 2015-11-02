@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,6 +84,8 @@ uint4 mur_block_count_correct(void)
 	{
 		total_blks = (dba_mm == mu_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
 		JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* jnl_write_inctn_rec needs it */
+		if (JNL_ENABLED(cs_addrs))
+			cs_addrs->jnl->pini_addr = 0; /* Stop simulation of GTM process journal record writing (if any active)*/
 		if (SS_NORMAL != (status = gdsfilext(mu_data->extension_size, total_blks)))
 			return (status);
 		DEBUG_ONLY(

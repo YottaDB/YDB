@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,7 @@ typedef struct
 
 #define MAXPOSINT4		((int4)0x7fffffff)
 #define	MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in an integer */
+#define	MAX_DIGITS_IN_EXP	2	/* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
 
 #ifndef _AIX
@@ -902,34 +903,21 @@ unsigned int asc_hex2i(char *p, int len);
 		num = -1;											\
 }
 
-/* double conversion */
-void double2s(double *dp, mval *v);
+void	double2s(double *dp, mval *v);	/* double conversion */
 
-int skpc(char c, int length, char *string);
-
-void *gtm_malloc(size_t size);
-void gtm_free(void *addr);
-int gtm_memcmp (const void *, const void *, size_t);
-#ifdef DEBUG
-void printMallocInfo(void);
-#endif
-int is_equ(mval *u, mval *v);
-char is_ident(mstr *v);
-
-int nm_iscan(mval *v);
-
-void mcfree(void);
-
-int4 getprime(int4 n);
-
-void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...);
-void suspend(void);
-mval *push_mval(mval *arg1);
-void mval_lex(mval *v, mstr *output);
-
-#ifdef VAX
-char *i2s(int4 *i);
-#endif
+int	skpc(char c, int length, char *string);
+void	*gtm_malloc(size_t size);
+void	gtm_free(void *addr);
+int	gtm_memcmp (const void *, const void *, size_t);
+int	is_equ(mval *u, mval *v);
+char	is_ident(mstr *v);
+int	nm_iscan(mval *v);
+void	mcfree(void);
+int4	getprime(int4 n);
+void	push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...);
+void	suspend(void);
+mval	*push_mval(mval *arg1);
+void	mval_lex(mval *v, mstr *output);
 
 #define ZTRAP_CODE	0x00000001
 #define ZTRAP_ENTRYREF	0x00000002

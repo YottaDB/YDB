@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -90,7 +90,10 @@ cw_set_element *t_write (
 	{
 		if (blk >= csa->ti->total_blks)
 			GTMASSERT;
-		cse = &cw_set[cw_set_depth++];
+		cse = &cw_set[cw_set_depth];
+		cse->mode = gds_t_noop;	/* initialize it to a value that is not "gds_t_committed" before incrementing
+					 * cw_set_depth as secshr_db_clnup relies on it */
+		cw_set_depth++;
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
 		assert(index < (int)cw_set_depth);
 		new_cse = TRUE;

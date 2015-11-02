@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2006 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2007 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -14,7 +14,7 @@ genout	;output the results
 	s knt=0
 	w "/****************************************************************",!
 	w " *",$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),"*",!
-	w " *",$c(9),"Copyright 2001, 2006 Fidelity Information Services, Inc",$c(9),"*",!
+	w " *",$c(9),"Copyright 2001, ",$Zdate($H,"YEAR")," Fidelity Information Services, Inc",$c(9),"*",!
 	w " *",$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),$c(9),"*",!
 	w " *",$c(9),"This source code contains the intellectual property",$c(9),"*",!
 	w " *",$c(9),"of its copyright holder(s), and is made available",$c(9),"*",!

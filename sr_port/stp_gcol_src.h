@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -520,6 +520,14 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 			case MVST_ZINTR:
 				m = &mvs->mv_st_cont.mvs_zintr.savtarg;
 				break;
+			case MVST_ZINTDEV:
+				if (mvs->mv_st_cont.mvs_zintdev.buffer_valid)
+				{
+					x = (mstr *)STR_STPG_GET(&mvs->mv_st_cont.mvs_zintdev.curr_sp_buffer);
+					if (x)
+						MV_STPG_PUT(x);
+				}
+				continue;
 			default:
 				GTMASSERT;
 			}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,8 +50,8 @@ void op_gvorder (mval *v)
 	boolean_t		gbl_target_was_set;
 	gv_namehead		*save_targ;
 
-
-	if (!gv_curr_subsc_null || gv_cur_region->std_null_coll )
+	/* Modify gv_currkey to reflect the next possible key value in collating order */
+	if (!gv_curr_subsc_null || gv_cur_region->std_null_coll)
 	{
 		*(&gv_currkey->base[0] + gv_currkey->end - 1) = 1;
 		*(&gv_currkey->base[0] + gv_currkey->end + 1) = 0;
@@ -60,9 +60,11 @@ void op_gvorder (mval *v)
 		*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
 
 	if (gv_currkey->prev)
-	{	acc_meth = gv_cur_region->dyn.addr->acc_meth;
+	{
+		acc_meth = gv_cur_region->dyn.addr->acc_meth;
 		if (acc_meth == dba_bg || acc_meth == dba_mm)
-		{	if (gv_target->root == 0)	/* global does not exist */
+		{
+			if (gv_target->root == 0)	/* global does not exist */
 				found = FALSE;
 			else
 				found = gvcst_order();
@@ -93,6 +95,16 @@ void op_gvorder (mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
+		/* Reset gv_currkey from next possible key value to what is was at function entry time */
+		if (!gv_curr_subsc_null || gv_cur_region->std_null_coll)
+		{
+			assert(1 == gv_currkey->base[gv_currkey->end - 2]);
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end-1]);
+			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
+			gv_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;
+			gv_currkey->end--;
+		} else
+			*(&gv_currkey->base[0] + gv_currkey->prev) = 01;
 	} else	/* the following section is for $O(^gname) */
 	{	assert (2 < gv_currkey->end);
 		assert (gv_currkey->end < (MAX_MIDENT_LEN + 3));	/* until names are not in midents */
@@ -173,9 +185,7 @@ void op_gvorder (mval *v)
 		{	if (stringpool.free + name.len + 1 > stringpool.top)
 				stp_gcol (name.len + 1);
 #ifdef mips
-			/* the following line works around a tandem compiler
-			 * bug.
-			 */
+			/* the following line works around a tandem compiler bug. */
 			v->str.addr = (char *)0;
 #endif
 			v->str.addr = (char *)stringpool.free;
@@ -188,6 +198,7 @@ void op_gvorder (mval *v)
 				v->str.addr + v->str.len >= (char *)stringpool.base);
 		} else
 			v->str.len = 0;
+		/* No need to reset gv_currkey (to what it was at function entry) as it is already set to NULL */
 	}
 	return;
 }

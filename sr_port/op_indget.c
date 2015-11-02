@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,8 +84,10 @@ void	op_indget(mval *dst, mval *target, mval *value)
 		case TK_CIRCUMFLEX:
 			if (rval = gvn())
 			{
-				s = newtriple(OC_FNGVGET);
-				s->operand[0] = put_tref(src);
+				r = newtriple(OC_FNGVGET1);
+				s = newtriple(OC_FNGVGET2);
+				s->operand[0] = put_tref(r);
+				s->operand[1] = put_tref(src);
 			}
 			break;
 		case TK_ATSIGN:

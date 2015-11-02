@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@ typedef int4   	block_index;
 
 enum gds_t_mode
 {
+	gds_t_noop = 0,		/* there is code that initializes stuff to 0 relying on it being equal to gds_t_noop */
 	gds_t_create,
 	gds_t_write,
 	gds_t_write_root,

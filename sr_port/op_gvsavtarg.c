@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,9 +21,11 @@
 #include "stringpool.h"
 #include "op.h"
 
-GBLREF gd_addr		*gd_targ_addr;
-GBLREF gv_key		*gv_currkey;
-GBLREF spdesc		stringpool;
+GBLREF	gd_addr		*gd_targ_addr;
+GBLREF	gv_key		*gv_currkey;
+GBLREF	spdesc		stringpool;
+GBLREF	bool		gv_curr_subsc_null;
+GBLREF	bool		gv_prev_subsc_null;
 
 void op_gvsavtarg(mval *v)
 {
@@ -34,7 +36,8 @@ void op_gvsavtarg(mval *v)
 	if (gv_currkey)
 	{
 		assert (gd_targ_addr != 0);
-		len = gv_currkey->end + sizeof(short) + sizeof(gd_targ_addr);
+		len = gv_currkey->end + sizeof(short) + sizeof(gd_targ_addr)
+			+ sizeof(gv_curr_subsc_null) + sizeof(gv_prev_subsc_null);
 	} else
 		len = sizeof(short);
 	if (stringpool.top - stringpool.free < len)
@@ -49,7 +52,11 @@ void op_gvsavtarg(mval *v)
 		c += sizeof(short);
 		memcpy(c, &gd_targ_addr, sizeof(gd_targ_addr));
 		c += sizeof(gd_targ_addr);
-		len = len - sizeof(short) - sizeof(gd_targ_addr);
+		memcpy(c, &gv_curr_subsc_null, sizeof(gv_curr_subsc_null));
+		c += sizeof(gv_curr_subsc_null);
+		memcpy(c, &gv_prev_subsc_null, sizeof(gv_prev_subsc_null));
+		c += sizeof(gv_prev_subsc_null);
+		len = len - sizeof(short) - sizeof(gd_targ_addr) - sizeof(gv_curr_subsc_null) - sizeof(gv_prev_subsc_null);
 		assert(gv_currkey->end == len);
 		if (0 < len)
 		{

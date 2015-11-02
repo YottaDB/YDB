@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +26,7 @@
 
 rhdtyp *auto_zlink (unsigned char *pc, int4 *line)
 {
-	unsigned char	*adj_pc;	/* address of PEA rtnref offset */
+	char		*adj_pc;	/* address of PEA rtnref offset */
 	mstr		rname;
 	mident_fixed	rname_local;
 	urx_rtnref	*rtnurx;
@@ -56,12 +56,12 @@ rhdtyp *auto_zlink (unsigned char *pc, int4 *line)
 	if (*(pc - XFER_BYTE_SZ) == I386_INS_Grp5_Prefix  &&  *(pc - XFER_BYTE_SZ + 1) == modrm_byte_byte.byte)
 	{
 		assert (*(pc - XFER_BYTE_SZ - PEA_SZ) == I386_INS_PUSH_Iv);
-		adj_pc = pc - XFER_BYTE_SZ - PEA_SZ;
+		adj_pc = (char *)pc - XFER_BYTE_SZ - PEA_SZ;
 	}
 	else if (*(pc - XFER_LONG_SZ) == I386_INS_Grp5_Prefix  &&  *(pc - XFER_LONG_SZ + 1) == modrm_byte_long.byte)
 	{
 		assert (*(pc - XFER_LONG_SZ - PEA_SZ) == I386_INS_PUSH_Iv);
-		adj_pc = pc - XFER_LONG_SZ - PEA_SZ;
+		adj_pc = (char *)pc - XFER_LONG_SZ - PEA_SZ;
 	}
 	else
 		GTMASSERT;

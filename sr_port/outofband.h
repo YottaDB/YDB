@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,11 +28,6 @@ enum outofbands
 	tptimeout,
 	jobinterrupt
 };
-
-/* jobinterrupt is supposed to be safe so long running commands should
-   delay recognizing it.  If new outofband conditions are defined which
-   should also be delayed, add them to the test below */
-#define OUTOFBANDNOW(X) (X ? X != jobinterrupt : FALSE)
 
 /* ------------------------------------------------------------------
  *  Old-style declarations (and uses) of this function abound.

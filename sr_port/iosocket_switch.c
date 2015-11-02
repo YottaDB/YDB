@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@
 
 GBLREF  int4	gtm_max_sockets;
 
-boolean_t iosocket_switch(char *handle, short handle_len, d_socket_struct *from, d_socket_struct *to)
+boolean_t iosocket_switch(char *handle, int handle_len, d_socket_struct *from, d_socket_struct *to)
 {
 	int4 		index, ii;
 	socket_struct	*socketptr;

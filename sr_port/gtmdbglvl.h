@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,4 +37,5 @@
 #define GDL_DebugCompiler	0x00004000	/* (16384) Turn on compiler debugging */
 #define GDL_SmDump		0x00008000	/* (32768) Do full blown storage dump -- only useful in debug mode */
 #define GDL_PrintEntryPoints	0x00010000	/* (65536) Print address of entry points when they are loaded/resolved */
+#define GDL_PrintSockIntStats	0x00020000	/* (131072) Print Socket interrupt stats on exit */
 #endif

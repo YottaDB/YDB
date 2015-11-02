@@ -186,8 +186,10 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 												files we finished processing */
 						mur_jctl->next_gen = NULL; /* Since we do not want to process them again */
 					}
-					if (JRT_INCTN == rectype)
+					if ((JRT_INCTN == rectype) && mur_jctl->jfh->recover_interrupted)
+					{
 						MUR_INCTN_BLKS_TO_UPGRD_ADJUST(rctl, mur_rab);
+					}
 				}
 				if (JRT_EPOCH == rectype)
 				{

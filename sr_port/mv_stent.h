@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,11 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef MV_STENT_H
+#define MV_STENT_H
+
+#include "io.h"
 
 typedef struct
 {
@@ -50,6 +55,13 @@ typedef struct
 	mstr		savextref;	/* Current extended reference name component (if any) */
 } mvs_zintr_struct;
 
+typedef struct
+{
+	struct io_desc_struct	*io_ptr;	/* associated device structure */
+	boolean_t	buffer_valid;	/* if TRUE, need to update curr_sp_buffer during stp_gcol */
+	mstr		curr_sp_buffer;	/* buffer space in stringpool */
+} mvs_zintdev_struct;
+
 typedef struct mv_stent_struct
 {
 	unsigned int mv_st_type : 4;
@@ -71,6 +83,7 @@ typedef struct mv_stent_struct
 		mvs_ntab_struct mvs_ntab;
 		mvs_parm_struct mvs_parm;
 		mvs_zintr_struct mvs_zintr;
+		mvs_zintdev_struct mvs_zintdev;
 		mvs_pval_struct mvs_pval;
 		mvs_nval_struct mvs_nval;
 		struct {
@@ -101,6 +114,7 @@ void push_stck(void* val, int val_size, void** addr);
 #define MVST_TVAL 9	/* Saved value of $T, to be restored upon QUITing */
 #define MVST_TPHOLD 10	/* Place holder for MUMPS stack pertaining to TSTART */
 #define MVST_ZINTR  11  /* Environmental save for $zinterrupt */
+#define MVST_ZINTDEV 12	/* In I/O when ZINTR, mstr input to now protected */
 
 #define MV_SIZE(X) (sizeof(*mv_chain) - sizeof(mv_chain->mv_st_cont) + sizeof(mv_chain->mv_st_cont.X))
 
@@ -127,4 +141,6 @@ LITREF unsigned char mvs_size[];
 #else
 #define POP_MV_STENT() (msp += mvs_size[mv_chain->mv_st_type], \
 	mv_chain = (mv_stent *)((char *) mv_chain + mv_chain->mv_st_next))
+#endif
+
 #endif

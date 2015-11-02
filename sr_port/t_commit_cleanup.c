@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -106,6 +106,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 
 	/* see comments in secshr_db_clnup for the commit logic flow as a sequence of steps in t_end and tp_tend and how
 	 * t_commit_cleanup() and secshr_db_clnup() complement each other (one does the rollback and one the roll forward)
+	 * update_underway is set to TRUE to indicate the commit is beyond rollback. It is set only if we hold crit on the region.
 	 */
 	update_underway = FALSE;
 	if (dollar_tlevel > 0)
@@ -117,13 +118,15 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			first_cse = si->first_cw_set;
 			TRAVERSE_TO_LATEST_CSE(first_cse);
 			if (NULL != first_cse)
-			{
-				if (cs_addrs->t_commit_crit || gds_t_committed == first_cse->mode)
+			{	/* Set update_underway to TRUE only if we have crit on this region. */
+				if (cs_addrs->now_crit
+					&& (cs_addrs->t_commit_crit
+						|| (si->cw_set_depth && (gds_t_committed == first_cse->mode))))
 					update_underway = TRUE;
 				break;
 			} else if (si->update_trans)
 			{	/* case of duplicate set not creating any cw-sets but updating db curr_tn++ */
-				if (T_COMMIT_STARTED == si->update_trans)
+				if (cs_addrs->now_crit && (T_COMMIT_STARTED == si->update_trans))
 					update_underway = TRUE;
 				break;
 			}
@@ -131,9 +134,9 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	} else
 	{
 		trstr = "NON-TP";
-		update_underway = (cs_addrs->t_commit_crit
+		update_underway = (cs_addrs->now_crit && (cs_addrs->t_commit_crit
 					|| (cw_set_depth && (gds_t_committed == cw_set[0].mode))
-					|| (T_COMMIT_STARTED == update_trans));
+					|| (T_COMMIT_STARTED == update_trans)));
 		if (NULL != gv_target)	/* gv_target can be NULL in case of DSE MAPS command etc. */
 			gv_target->clue.end = 0; /* in case t_end() had set history's tn to be "valid_thru++", undo it */
 	}

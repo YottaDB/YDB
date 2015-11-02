@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,8 @@ static int tok_string_extract(void)
 	in_next = CLI_GET_CHAR(in_sp, bufend, ch);
 	for ( ; ;)
 	{
-		while (ch && !CLI_ISSPACE(ch) && ch != '-')
+		/* '-' is not a token separator */
+		while (ch && !CLI_ISSPACE(ch))
 		{
 			last_in_next = in_next;
 			if (ch == '"')
@@ -181,18 +182,17 @@ void cli_str_setup(int length, char *addr)
 }
 
 /*
- * ----------------------------
- * Convert string to upper case
- * ----------------------------
+ * ---------------------------------------------------------------
+ * Convert string to upper case. Do it only for ascii characters.
+ * ---------------------------------------------------------------
  */
 void cli_strupper(char *sp)
 {
 	int c;
 
 	while (c = *sp)
-		*sp++ = TOUPPER(c);
+		*sp++ = IS_ASCII(c) ? TOUPPER(c) : c;
 }
-
 
 /*
  * -------------------------------------------------------
@@ -218,7 +218,6 @@ int cli_is_hex(char *p)
 
 	return ((*p) ? FALSE : TRUE);
 }
-
 
 /*
  * -------------------------------------------------------
@@ -326,10 +325,9 @@ static int	tok_extract (void)
 		token_len = 1;
 	} else if (ch)				/* only if something there */
 	{
-		/* smw to fix embedded -, need to know token type */
 		/* smw if quotable, need to unicode isspace */
+		/* '-' is not a token separator */
 		while(ch && !CLI_ISSPACE(ch)
-		  && ch != '-'
 		  && ch != '=')
 		{
 			out_sp = CLI_PUT_CHAR(out_sp, ch);

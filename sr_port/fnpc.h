@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,8 +24,8 @@
 */
 typedef union
 {
-		int		unichar_val;
-		unsigned char	unibytes_val[4];
+	int		unichar_val;
+	unsigned char	unibytes_val[4];
 } delimfmt;
 
 typedef struct fnpc_struct
@@ -45,5 +45,10 @@ typedef struct
 	fnpc		*fnpcmax;			/* (use addrs to avoid array indexing) */
 	fnpc		fnpcs[FNPC_MAX];
 } fnpc_area;
+
+#ifdef DEBUG
+void	fnpc_stats(void);
+#endif
+
 
 #endif

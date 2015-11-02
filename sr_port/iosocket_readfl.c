@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,19 +36,26 @@
 #include "wake_alarm.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
+#include "rtnhdr.h"
+#include "stack_frame.h"
+#include "mv_stent.h"
 
-#define	TIMEOUT_INTERVAL	200000
-
+GBLREF	stack_frame      	*frame_pointer;
+GBLREF	unsigned char    	*stackbase, *stacktop, *msp, *stackwarn;
+GBLREF	mv_stent         	*mv_chain;
 GBLREF	io_pair 		io_curr_device;
 GBLREF	bool			out_of_time;
 GBLREF	spdesc 			stringpool;
 GBLREF	volatile int4		outofband;
 GBLREF	mstr			chset_names[];
 GBLREF	UConverter		*chset_desc[];
+GBLREF  boolean_t       	dollar_zininterrupt;
+GBLREF	int			socketus_interruptus;
 
 #ifdef UNICODE_SUPPORTED
 /* Maintenance of $KEY, $DEVICE and $ZB on a badchar error */
-void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend)
+void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr,
+			     unsigned char *strend)
 {
 	int		tmplen, len;
 	unsigned char	*delimend;
@@ -62,7 +69,7 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 	{	/* Return how much input we got */
                 if (CHSET_M != iod->ichset && CHSET_UTF8 != iod->ichset)
                 {
-                        SOCKET_DEBUG(PRINTF("socrflbc: Converting UTF16xx data back to UTF8 for internal use\n"); fflush(stdout));
+                        SOCKET_DEBUG(PRINTF("socrflbc: Converting UTF16xx data back to UTF8 for internal use\n"); DEBUGSOCKFLUSH);
                         vmvalptr->str.len = gtm_conv(chset_desc[iod->ichset], chset_desc[CHSET_UTF8], &vmvalptr->str, NULL, NULL);
                         vmvalptr->str.addr = (char *)stringpool.free;
                 }
@@ -99,9 +106,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					/* timeout in seconds */
 {
 	int		ret;
-	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done;
-	int		flags, len, real_errno, save_errno, fcntl_res, errlen, charlen;
-	int		bytes_read, orig_bytes_read, ii, max_bufflen, bufflen_init, bufflen, chars_read, mb_len, match_delim;
+	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done, zint_restart, outofband_terminate;
+	int		flags, len, real_errno, save_errno, fcntl_res, errlen, charlen, stp_need;
+	int		bytes_read, orig_bytes_read, ii, max_bufflen, bufflen, chars_read, mb_len, match_delim;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
@@ -109,9 +116,11 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	TID		timer_id;
 	ABS_TIME	cur_time, end_time, time_for_read, zero;
 	char		*errptr;
-	unsigned char	*buffptr, *c_ptr, *c_top, *inv_beg;
+	unsigned char	*buffptr, *c_ptr, *c_top, *inv_beg, *buffer_start;
 	ssize_t		status;
 	gtm_chset_t	ichset;
+	mv_stent	*mv_zintdev;
+	socket_interrupt *sockintr;
 
 	error_def(ERR_IOEOF);
 	error_def(ERR_TEXT);
@@ -121,6 +130,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	error_def(ERR_SETSOCKOPTERR);
 	error_def(ERR_MAXSTRLEN);
 	error_def(ERR_BOMMISMATCH);
+	error_def(ERR_ZINTRECURSEIO);
+	error_def(ERR_STACKCRIT);
+	error_def(ERR_STACKOFLOW);
 
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
@@ -142,6 +154,92 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)(iod->dev_sp);
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
+	sockintr = &dsocketptr->sock_save_state;
+	outofband_terminate = FALSE;
+
+	/* Check if new or resumed read */
+	if (!dsocketptr->mupintr)
+		/* Simple path, no worries*/
+		zint_restart = FALSE;
+	else
+	{	/* We have a pending read restart of some sort */
+		if (sockwhich_invalid == sockintr->who_saved)
+			GTMASSERT;      /* Interrupt should never have an invalid save state */
+		/* check we aren't recursing on this device */
+		if (dollar_zininterrupt)
+			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+                if (sockwhich_readfl != sockintr->who_saved)
+                        GTMASSERT;      /* ZINTRECURSEIO should have caught */
+		SOCKET_DEBUG(PRINTF("socrfl: *#*#*#*#*#*#*#  Restarted interrupted read\n"); DEBUGSOCKFLUSH);
+		mv_zintdev = io_find_mvstent(iod, FALSE);
+		if (mv_zintdev && mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid)
+		{
+			if (sockintr->end_time_valid)
+				/* Restore end_time for timeout */
+				end_time = sockintr->end_time;
+			max_bufflen = sockintr->max_bufflen;
+			bytes_read = sockintr->bytes_read;
+			chars_read = sockintr->chars_read;
+
+                        buffer_start = (unsigned char *)mv_zintdev->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr;
+			/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
+			if (mv_chain == mv_zintdev)
+				POP_MV_STENT();         /* pop if top of stack */
+			else
+			{	/* else mark it unused */
+				mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+				mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+			}
+			SOCKET_DEBUG2(PRINTF("socrfl: .. mv_stent found - bytes_read: %d  chars_read: %d  max_bufflen: %d"
+					    "  interrupts: %d\n", bytes_read, chars_read, max_bufflen, socketus_interruptus);
+				     DEBUGSOCKFLUSH);
+			SOCKET_DEBUG(PRINTF("socrfl: .. timeout: %d\n", timeout); DEBUGSOCKFLUSH);
+                        SOCKET_DEBUG(if (sockintr->end_time_valid) PRINTF("socrfl: .. endtime: %d/%d\n", end_time.at_sec,
+									  end_time.at_usec); DEBUGSOCKFLUSH);
+			SOCKET_DEBUG2(PRINTF("socrfl: .. buffer address: 0x%08lx  stringpool: 0x%08lx\n",
+					    buffer_start, stringpool.free); DEBUGSOCKFLUSH);
+			if (stringpool.free != (buffer_start + bytes_read))
+			{
+				/* End of stringpool not open for expansion, must move what we got. First
+				   see if we need to expand stringpool.
+				*/
+				SOCKET_DEBUG2(PRINTF("socrfl: .. Stuff put on string pool after our buffer\n"); DEBUGSOCKFLUSH);
+				if ((stringpool.free + max_bufflen) > stringpool.top)
+				{
+					v->str.addr = (char *)buffer_start;	/* Protect buffer from reclaim */
+					v->str.len = bytes_read;
+					stp_gcol(max_bufflen);
+					buffer_start = (unsigned char *)v->str.addr;
+					SOCKET_DEBUG2(PRINTF("socrfl: .. garbage collection done\n"); DEBUGSOCKFLUSH);
+				}
+				memcpy(stringpool.free, buffer_start, bytes_read);
+			} else
+			{	/* Previously read buffer piece is still last thing in stringpool. Make sure the rest of the
+				   space we need (sized to max_bufflen) is available. If not, make it available.
+				*/
+				SOCKET_DEBUG2(PRINTF("socrfl: .. Our buffer did not move in the stringpool\n"); DEBUGSOCKFLUSH);
+				stp_need = max_bufflen - bytes_read;
+				if ((stringpool.free + stp_need) > stringpool.top)
+				{
+					v->str.addr = (char *)buffer_start;     /* Protect buffer from reclaim */
+					v->str.len = bytes_read;		/* stringpool.free already covers these bytes */
+					stp_gcol(stp_need);
+					SOCKET_DEBUG2(PRINTF("socrfl: .. garbage collection done in no movement case\n");
+						     DEBUGSOCKFLUSH);
+				}
+				stringpool.free = buffer_start;
+			}
+			v->str.len = 0;		/* Clear incase interrupt or error -- don't want to hold this buffer */
+			/* At this point, our previous buffer is sitting at stringpool.free and can be
+			   expanded if necessary. This is what the rest of the code is expecting.
+			*/
+			zint_restart = TRUE;
+		} else
+                        SOCKET_DEBUG2(PRINTF("socrfl: no mv_stent found !!\n"); DEBUGSOCKFLUSH);
+		dsocketptr->mupintr = FALSE;
+		sockintr->who_saved = sockwhich_invalid;
+	}
+
 	if (0 >= dsocketptr->n_socket)
 	{
 		iod->dollar.za = 9;
@@ -164,28 +262,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 	ret = TRUE;
 	has_delimiter = (0 < socketptr->n_delimiter);
 	time_for_read.at_sec  = 0;
-	time_for_read.at_usec = ((0 == timeout) ? 0 : TIMEOUT_INTERVAL);
-	/* ATTN: the 200000 above is mystery. This should be machine dependent 	*/
-	/*       When setting it, following aspects needed to be considered	*/
-	/*	 1. Not too long to let users at direct mode feel uncomfortable */
-	/*		i.e. r x  will wait for this long to return		*/
-	/*		     	even when there is something to read from the 	*/
-	/*			socket 						*/
-	/*	 2. Not too short so that when it is waiting for something 	*/
-	/* 	    from a socket, it won't load up the CPU. This shall be able */
-	/*	    to be omited when the next item is considered.		*/
-	/*	 3. Not too short so that it won't cut one message into pieces	*/
-	/*	    when the read is issued first.				*/
-	/*		for w "abcd", 10 us will do it				*/
-	/* 		for w "ab",!,"cd",!,"ef"  it will have to be larger     */
-	/*			than 50000 us on beowulf.			*/
-	/* This is gonna be a headache.						*/
+	time_for_read.at_usec = ((0 == timeout) ? 0 : (socketptr->moreread_timeout * 1000));
 	timer_id = (TID)iosocket_readfl;
 	out_of_time = FALSE;
 	if (NO_M_TIMEOUT == timeout)
 	{
 		timed = FALSE;
 		msec_timeout = NO_M_TIMEOUT;
+		assert(!sockintr->end_time_valid);
 	} else
 	{
 		timed = TRUE;
@@ -214,48 +298,73 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			}
 #endif
 			sys_get_curr_time(&cur_time);
-			add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
-			start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
+			if (!zint_restart || !sockintr->end_time_valid)
+				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+			else
+			{	/* end_time taken from restart data. Compute what msec_timeout should be so timeout timer
+				   gets set correctly below.
+				*/
+                                cur_time = sub_abs_time(&end_time, &cur_time);
+                                if (0 > cur_time.at_sec)
+                                {
+					msec_timeout = -1;
+                                        out_of_time = TRUE;
+                                } else
+					msec_timeout = cur_time.at_sec * 1000 + cur_time.at_usec / 1000;
+				SOCKET_DEBUG(PRINTF("socrfl: Taking timeout end time from read restart data - "
+						    "computed msec_timeout: %d\n", msec_timeout); DEBUGSOCKFLUSH);
+			}
+			if (0 < msec_timeout)
+				start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
 		} else
+		{
 			out_of_time = TRUE;
+			SOCKET_DEBUG(PRINTF("socrfl: No timeout specified, assuming out_of_time\n"));
+		}
 	}
+	sockintr->end_time_valid = FALSE;
 	dsocketptr->dollar_key[0] = '\0';
 	iod->dollar.zb[0] = '\0';
 	more_data = TRUE;
 
-	bufflen_init = MAX_STRBUFF_INIT;
 	/* compute the worst case byte requirement knowing that width is in chars */
-	max_bufflen = (vari) ? bufflen_init : ((MAX_STRLEN > (width * 4)) ? (width * 4) : MAX_STRLEN);
-	if (stringpool.free + max_bufflen > stringpool.top)
-		stp_gcol(max_bufflen);
+	if (!zint_restart)
+	{
+		max_bufflen = (vari) ? MAX_STRBUFF_INIT : ((MAX_STRLEN > (width * 4)) ? (width * 4) : MAX_STRLEN);
+		if (stringpool.free + max_bufflen > stringpool.top)
+			stp_gcol(max_bufflen);
+		bytes_read = 0;
+		chars_read = 0;
+	}
 	real_errno = 0;
 	requeue_done = FALSE;
-	SOCKET_DEBUG(PRINTF("socrfl: ############################### Entering read loop ################################\n");
-		     fflush(stdout));
-	for (bytes_read = 0, chars_read = 0, status = 0;  status >= 0;)
+	SOCKET_DEBUG(PRINTF("socrfl: ##################### Entering read loop ######################\n");
+		      DEBUGSOCKFLUSH);
+	for (status = 0;  status >= 0;)
 	{
-		SOCKET_DEBUG(PRINTF("socrfl: *************** Top of read loop - bytes_read: %d  chars_read: %d  "
-				    "buffered_length: %d\n", bytes_read, chars_read, socketptr->buffered_length); fflush(stdout));
-		SOCKET_DEBUG(PRINTF("socrfl: *************** read-width: %d  vari: %d  status: %d\n", width, vari, status);
-			     fflush(stdout));
+		SOCKET_DEBUG2(PRINTF("socrfl: ********* Top of read loop - bytes_read: %d  chars_read: %d  "
+				     "buffered_length: %d\n", bytes_read, chars_read, socketptr->buffered_length); DEBUGSOCKFLUSH);
+		SOCKET_DEBUG2(PRINTF("socrfl: ********* read-width: %d  vari: %d  status: %d\n", width, vari, status);
+			      DEBUGSOCKFLUSH);
 		if (bytes_read >= max_bufflen)
 		{	/* more buffer needed. Extend the stringpool buffer by doubling the size as much as we
 			   extended previously */
-			SOCKET_DEBUG(PRINTF("socrfl: Buffer expand1 bytes_read(%d) max_bufflen(%d) -- bufflen_init(%d)\n",
-					    bytes_read, max_bufflen, bufflen_init); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socrfl: Buffer expand1 bytes_read(%d) max_bufflen(%d)\n",
+					     bytes_read, max_bufflen); DEBUGSOCKFLUSH);
 			assert(vari);
-			bufflen_init += bufflen_init;
-			assert(bufflen_init <= MAX_STRLEN);
-			if (stringpool.free + bytes_read + bufflen_init > stringpool.top)
+			max_bufflen += max_bufflen;
+			if (MAX_STRLEN < max_bufflen)
+				max_bufflen = MAX_STRLEN;
+			if (stringpool.free + bytes_read + max_bufflen > stringpool.top)
 			{
 				v->str.len = bytes_read; /* to keep the data read so far from being garbage collected */
 				v->str.addr = (char *)stringpool.free;
 				stringpool.free += v->str.len;
 				assert(stringpool.free <= stringpool.top);
-				stp_gcol(bufflen_init);
+				stp_gcol(max_bufflen);
 				memcpy(stringpool.free, v->str.addr, v->str.len);
+				v->str.len = 0; /* If interrupted, don't hold onto old space */
 			}
-			max_bufflen = bufflen_init;
 		}
 		if (has_delimiter || requeue_done || (socketptr->first_read && CHSET_M != ichset))
 		{	/* Delimiter scanning needs one char at a time. Question is how big is a char?
@@ -268,9 +377,9 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			*/
 			requeue_done = FALSE;	/* housekeeping -- We don't want to come back here for this reason
 						   until it happens again */
-			SOCKET_DEBUG(if (socketptr->first_read && CHSET_M != ichset)
-				             PRINTF("socrfl: Prebuffering because ichset = UTF16\n");
-				     else PRINTF("socrfl: Prebuffering because we have delimiter or requeue\n"); fflush(stdout));
+			SOCKET_DEBUG2(if (socketptr->first_read && CHSET_M != ichset)
+				              PRINTF("socrfl: Prebuffering because ichset = UTF16\n");
+				      else PRINTF("socrfl: Prebuffering because we have delimiter or requeue\n"); DEBUGSOCKFLUSH);
 			if (CHSET_M == iod->ichset)
 				bufflen = 1;		/* M mode, 1 char == 1 byte */
 			else
@@ -285,29 +394,31 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				*/
 				charlen = iosocket_snr_utf_prebuffer(iod, socketptr, 0, &time_for_read,
 								     (!vari || has_delimiter || 0 == chars_read));
-				SOCKET_DEBUG(PRINTF("socrfl: charlen from iosocket_snr_utf_prebuffer = %d\n", charlen);
-					     fflush(stdout));
+				SOCKET_DEBUG2(PRINTF("socrfl: charlen from iosocket_snr_utf_prebuffer = %d\n", charlen);
+					     DEBUGSOCKFLUSH);
 				if (0 < charlen)
 				{	/* We know how long the next char is. If it will fit in our buffer, then it is
 					   the correct bufflen. If it won't, our buffer is full and we need to expand.
 					*/
 					if ((max_bufflen - bytes_read) < charlen)
 					{
-						SOCKET_DEBUG(PRINTF("socrfl: Buffer expand2 - max_bufflen(%d) "
-								    "bytes_read(%d) bufflen_init(%d)\n",
-								    max_bufflen, bytes_read, bufflen_init); fflush(stdout));
+						SOCKET_DEBUG2(PRINTF("socrfl: Buffer expand2 - max_bufflen(%d) "
+								    "bytes_read(%d)\n",
+								    max_bufflen, bytes_read); DEBUGSOCKFLUSH);
 						assert(vari);
-						bufflen_init += bufflen_init;
-						assert(bufflen_init <= MAX_STRLEN);
-						if (stringpool.free + bytes_read + bufflen_init > stringpool.top)
+						max_bufflen += max_bufflen;
+						if (MAX_STRLEN < max_bufflen)
+							max_bufflen = MAX_STRLEN;
+						if (stringpool.free + bytes_read + max_bufflen > stringpool.top)
 						{
 							v->str.len = bytes_read; /* to keep the data read so far from
 										    being garbage collected */
 							v->str.addr = (char *)stringpool.free;
-							stringpool.free += v->str.len;
+							stringpool.free += bytes_read;
 							assert(stringpool.free <= stringpool.top);
-							stp_gcol(bufflen_init);
+							stp_gcol(max_bufflen);
 							memcpy(stringpool.free, v->str.addr, v->str.len);
+							v->str.len = 0; /* If interrupted, don't hold onto old space */
 						}
 					}
 					bufflen = charlen;
@@ -316,13 +427,13 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 					   so that we end up bypassing the call to iosocket_snr below which was to
 					   do the actual IO. No need to repeat our lack of IO issue.
 					*/
-					SOCKET_DEBUG(PRINTF("socrfl: Timeout or end of data stream\n"); fflush(stdout));
+					SOCKET_DEBUG(PRINTF("socrfl: Timeout or end of data stream\n"); DEBUGSOCKFLUSH);
 					status = -3;		/* To differentiate from status=0 if prebuffer bypassed */
 					DEBUG_ONLY(bufflen = 0);  /* Triggers assert in iosocket_snr if we end up there anyway */
 				} else
 				{	/* Something bad happened. Feed the error to the lower levels for proper handling */
-					SOCKET_DEBUG(PRINTF("socrfl: Read error: status: %d  errno: %d\n", charlen, errno);
-						     fflush(stdout));
+					SOCKET_DEBUG2(PRINTF("socrfl: Read error: status: %d  errno: %d\n", charlen, errno);
+						     DEBUGSOCKFLUSH);
 					status = charlen;
                                         DEBUG_ONLY(bufflen = 0);  /* Triggers assert in iosocket_snr if we end up there anyway */
 				}
@@ -330,7 +441,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		} else
 		{
 			bufflen = max_bufflen - bytes_read;
-			SOCKET_DEBUG(PRINTF("socrfl: Regular read .. bufflen = %d\n", bufflen); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socrfl: Regular read .. bufflen = %d\n", bufflen); DEBUGSOCKFLUSH);
 			status = 0;
 		}
 		buffptr = (stringpool.free + bytes_read);
@@ -340,16 +451,16 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			status = iosocket_snr(socketptr, buffptr, bufflen, 0, &time_for_read);
 		else
 		{
-			SOCKET_DEBUG(PRINTF("socrfl: Data read bypassed - status: %d\n", status); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socrfl: Data read bypassed - status: %d\n", status); DEBUGSOCKFLUSH);
 		}
 		if (0 == status || -3 == status)	/* -3 status can happen on EOB from prebuffering */
 		{
-			SOCKET_DEBUG(PRINTF("socrfl: No more data available\n"); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socrfl: No more data available\n"); DEBUGSOCKFLUSH);
 			more_data = FALSE;
 			status = 0;			/* Consistent treatment of no more data */
 		} else if (0 < status)
 		{
-			SOCKET_DEBUG(PRINTF("socrfl: Bytes read: %d\n", status); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socrfl: Bytes read: %d\n", status); DEBUGSOCKFLUSH);
 			bytes_read += status;
 			if (socketptr->first_read && CHSET_M != ichset) /* May have a BOM to defuse */
 			{
@@ -375,8 +486,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							{
 								iod->ichset = ichset = CHSET_UTF16BE;
 								bytes_read -= UTF16BE_BOM_LEN;	/* Throw way BOM */
-								SOCKET_DEBUG(PRINTF("socrfl: UTF16BE BOM detected\n");
-									     fflush(stdout));
+								SOCKET_DEBUG2(PRINTF("socrfl: UTF16BE BOM detected\n");
+									     DEBUGSOCKFLUSH);
 							}
 						} else if (0 == memcmp(buffptr, UTF16LE_BOM, UTF16LE_BOM_LEN))
                                                 {
@@ -392,8 +503,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							{
                                                                 iod->ichset = ichset = CHSET_UTF16LE;
 								bytes_read -= UTF16BE_BOM_LEN;	/* Throw away BOM */
-                                                                SOCKET_DEBUG(PRINTF("socrfl: UTF16LE BOM detected\n");
-                                                                             fflush(stdout));
+                                                                SOCKET_DEBUG2(PRINTF("socrfl: UTF16LE BOM detected\n");
+                                                                             DEBUGSOCKFLUSH);
                                                         }
 						} else
 						{	/* No BOM specified. If UTF16, default BOM to UTF16BE per Unicode
@@ -401,8 +512,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 							*/
 							if (CHSET_UTF16 == ichset)
 							{
-								SOCKET_DEBUG(PRINTF("socrfl: UTF16BE BOM assumed\n");
-									     fflush(stdout));
+								SOCKET_DEBUG2(PRINTF("socrfl: UTF16BE BOM assumed\n");
+									     DEBUGSOCKFLUSH);
 								iod->ichset = ichset = CHSET_UTF16BE;
 							}
 						}
@@ -412,8 +523,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						*/
 						if (CHSET_UTF16 == ichset)
 						{
-							SOCKET_DEBUG(PRINTF("socrfl: UTF16BE BOM assumed\n");
-								     fflush(stdout));
+							SOCKET_DEBUG2(PRINTF("socrfl: UTF16BE BOM assumed\n");
+								     DEBUGSOCKFLUSH);
 							iod->ichset = ichset = CHSET_UTF16BE;
 						}
 					}
@@ -422,8 +533,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
                                         if (UTF8_BOM_LEN <= bytes_read && (0 == memcmp(buffptr, UTF8_BOM, UTF8_BOM_LEN)))
 					{
 						bytes_read -= UTF8_BOM_LEN;        /* Throw way BOM */
-						SOCKET_DEBUG(PRINTF("socrfl: UTF8 BOM detected/ignored\n");
-							     fflush(stdout));
+						SOCKET_DEBUG2(PRINTF("socrfl: UTF8 BOM detected/ignored\n");
+							     DEBUGSOCKFLUSH);
 					}
 				}
 			}
@@ -439,7 +550,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			}
 			if (bytes_read && has_delimiter)
 			{ /* ------- check to see if it is a delimiter -------- */
-				SOCKET_DEBUG(PRINTF("socrfl: Searching for delimiter\n"); fflush(stdout));
+				SOCKET_DEBUG2(PRINTF("socrfl: Searching for delimiter\n"); DEBUGSOCKFLUSH);
 				for (ii = 0; ii < socketptr->n_delimiter; ii++)
 				{
 					if (bytes_read < socketptr->idelimiter[ii].len)
@@ -459,12 +570,12 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 						break;
 					}
 				}
-				SOCKET_DEBUG(
+				SOCKET_DEBUG2(
 				if (terminator)
 					PRINTF("socrfl: Delimiter found - match_delim: %d\n", match_delim);
 				else
 				        PRINTF("socrfl: Delimiter not found\n");
-				fflush(stdout);
+				DEBUGSOCKFLUSH;
 				);
 			}
 			if (!terminator)
@@ -486,8 +597,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		orig_bytes_read = bytes_read;
 		if (0 != bytes_read)
 		{	/* find n chars read from [buffptr, buffptr + bytes_read) */
-			SOCKET_DEBUG(PRINTF("socrfl: Start char scan - c_ptr: 0x%08lx  c_top: 0x%08lx\n",
-					    buffptr, (buffptr + status)); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socrfl: Start char scan - c_ptr: 0x%08lx  c_top: 0x%08lx\n",
+					     buffptr, (buffptr + status)); DEBUGSOCKFLUSH);
 			for (c_ptr = buffptr, c_top = buffptr + status;
 			     c_ptr < c_top && chars_read < width;
 			     c_ptr += mb_len, chars_read++)
@@ -531,15 +642,15 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				if (c_ptr + mb_len > c_top)	/* Verify entire char is in buffer */
 					break;
 			}
-                        SOCKET_DEBUG(PRINTF("socrfl: End char scan - c_ptr: 0x%08lx  c_top: 0x%08lx\n",
-                                            c_ptr, c_top); fflush(stdout));
+                        SOCKET_DEBUG2(PRINTF("socrfl: End char scan - c_ptr: 0x%08lx  c_top: 0x%08lx\n",
+                                            c_ptr, c_top); DEBUGSOCKFLUSH);
 			if (c_ptr < c_top) /* width size READ completed OR partial last char, push back bytes into input buffer */
 			{
 				iosocket_unsnr(socketptr, c_ptr, c_top - c_ptr);
 				bytes_read -= c_top - c_ptr;	/* We will be re-reading these bytes */
 				requeue_done = TRUE;		/* Force single (full) char read next time through */
-				SOCKET_DEBUG(PRINTF("socrfl: Requeue of %d bytes done - adjusted bytes_read: %d\n",
-						    (c_top - c_ptr), bytes_read); fflush(stdout));
+				SOCKET_DEBUG2(PRINTF("socrfl: Requeue of %d bytes done - adjusted bytes_read: %d\n",
+						    (c_top - c_ptr), bytes_read); DEBUGSOCKFLUSH);
 			}
 		}
 		if (terminator)
@@ -549,20 +660,26 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			c_ptr -= socketptr->idelimiter[match_delim].len;
 			UNICODE_ONLY(chars_read -= socketptr->idelimiter[match_delim].char_len);
 			NON_UNICODE_ONLY(chars_read = bytes_read);
-			SOCKET_DEBUG(PRINTF("socrfl: Terminator found - bytes_read reduced by %d bytes to %d\n",
-					    socketptr->idelimiter[match_delim].len, bytes_read); fflush(stdout));
-			SOCKET_DEBUG(PRINTF("socrfl: .. c_ptr also reduced to 0x%08lx\n", c_ptr); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socrfl: Terminator found - bytes_read reduced by %d bytes to %d\n",
+					     socketptr->idelimiter[match_delim].len, bytes_read); DEBUGSOCKFLUSH);
+			SOCKET_DEBUG2(PRINTF("socrfl: .. c_ptr also reduced to 0x%08lx\n", c_ptr); DEBUGSOCKFLUSH);
 		}
 		/* If we read as much as we needed or if the buffer was totally full (last char or 3 might be part of an
 		   incomplete character than can never be completed in this buffer) or if variable length, no delim with
-		   chars available and no more data or outofband or have data including a terminator, we are then done.
+		   chars available and no more data or outofband or have data including a terminator, we are then done. Note
+		   that we are explicitly not handling jobinterrupt outofband here because it is handled above where it needs
+		   to be done to be able to cleanly requeue any input (before delimiter procesing).
 		*/
 		if ((chars_read >= width) ||
 		    (MAX_STRLEN <= orig_bytes_read) ||
 		    (vari && !has_delimiter && 0 != chars_read && !more_data) ||
-		    (OUTOFBANDNOW(outofband)) ||
 		    (status > 0 && terminator))
 			break;
+		if (0 != outofband)
+		{
+			outofband_terminate = TRUE;
+			break;
+		}
 		if (timed)
 		{
 			if (msec_timeout > 0)
@@ -573,6 +690,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 				{
 					out_of_time = TRUE;
 					cancel_timer(timer_id);
+					SOCKET_DEBUG(PRINTF("socrfl: Out of time detected and set\n"));
 					break;
 				}
 			} else if (!more_data)
@@ -597,20 +715,64 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 			}
 #endif
 			if (out_of_time)
+			{
 				ret = FALSE;
-			else
+				SOCKET_DEBUG(PRINTF("socrfl: Out of time to be returned (1)\n"));
+			} else
 				cancel_timer(timer_id);
 		} else if ((chars_read < width) && !(has_delimiter && terminator))
+		{
 			ret = FALSE;
+			SOCKET_DEBUG(PRINTF("socrfl: Out of time to be returned (2)\n"));
+		}
+	}
+	/* If we terminated due to outofband, set up restart info. We may or may not restart (any outofband is capable of
+	   restart) but set it up for at least the more common reasons (^C and job interrupt).
+
+	   Some restart info is kept in our iodesc block, but the buffer address information is kept in an mv_stent so if
+	   the stack is garbage collected during the interrupt we don't lose track of where our stuff is saved away.
+	*/
+	if (outofband_terminate)
+	{
+		SOCKET_DEBUG(PRINTF("socrfl: outofband interrupt received (%d) -- queueing mv_stent for read intr\n", outofband);
+			     DEBUGSOCKFLUSH);
+		PUSH_MV_STENT(MVST_ZINTDEV);
+		mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
+		mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
+		mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
+		mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = bytes_read;
+		sockintr->who_saved = sockwhich_readfl;
+		if (0 < msec_timeout && NO_M_TIMEOUT != msec_timeout)
+		{
+			sockintr->end_time = end_time;
+			sockintr->end_time_valid = TRUE;
+			cancel_timer(timer_id);		/* Worry about timer if/when we come back */
+		}
+		sockintr->max_bufflen = max_bufflen;
+		sockintr->bytes_read = bytes_read;
+		sockintr->chars_read = chars_read;
+		dsocketptr->mupintr = TRUE;
+		stringpool.free += bytes_read;	/* Don't step on our parade in the interrupt */
+		socketus_interruptus++;
+		SOCKET_DEBUG2(PRINTF("socrfl: .. mv_stent: bytes_read: %d  chars_read: %d  max_bufflen: %d  "
+				    "interrupts: %d  buffer_start: 0x%08lx\n",
+				    bytes_read, chars_read, max_bufflen, socketus_interruptus, stringpool.free); DEBUGSOCKFLUSH);
+		SOCKET_DEBUG(if (sockintr->end_time_valid) PRINTF("socrfl: .. endtime: %d/%d  timeout: %d  msec_timeout: %d\n",
+								  end_time.at_sec, end_time.at_usec, timeout, msec_timeout);
+			     DEBUGSOCKFLUSH);
+		outofband_action(FALSE);
+		GTMASSERT;	/* Should *never* return from outofband_action */
+		return FALSE;	/* For the compiler.. */
 	}
 	if (chars_read > 0)
 	{	/* there's something to return */
 		v->str.len = c_ptr - stringpool.free;
 		v->str.addr = (char *)stringpool.free;
 		UNICODE_ONLY(v->str.char_len = chars_read);
-		SOCKET_DEBUG(PRINTF("socrfl: String to return bytelen: %d  charlen: %d  iod-width: %d  wrap: %d",
-				    v->str.len, chars_read, iod->width, iod->wrap); fflush(stdout));
-		SOCKET_DEBUG(PRINTF("socrfl:   x: %d  y: %d\n", iod->dollar.x, iod->dollar.y); fflush(stdout));
+		assert(v->str.len == bytes_read);
+		SOCKET_DEBUG(PRINTF("socrfl: String to return bytelen: %d  charlen: %d  iod-width: %d  wrap: %d\n",
+				    v->str.len, chars_read, iod->width, iod->wrap); DEBUGSOCKFLUSH);
+		SOCKET_DEBUG2(PRINTF("socrfl:   x: %d  y: %d\n", iod->dollar.x, iod->dollar.y); DEBUGSOCKFLUSH);
 		if (((iod->dollar.x += chars_read) >= iod->width) && iod->wrap)
 		{
 			iod->dollar.y += (iod->dollar.x / iod->width);
@@ -620,7 +782,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		}
 		if (CHSET_M != ichset && CHSET_UTF8 != ichset)
 		{
-			SOCKET_DEBUG(PRINTF("socrfl: Converting UTF16xx data back to UTF8 for internal use\n"); fflush(stdout));
+			SOCKET_DEBUG2(PRINTF("socrfl: Converting UTF16xx data back to UTF8 for internal use\n"); DEBUGSOCKFLUSH);
 			v->str.len = gtm_conv(chset_desc[ichset], chset_desc[CHSET_UTF8], &v->str, NULL, NULL);
 			v->str.addr = (char *)stringpool.free;
 			stringpool.free += v->str.len;
@@ -638,7 +800,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 timeout)
 		memcpy(dsocketptr->dollar_device, "0", sizeof("0"));
 	} else
 	{	/* there's a significant problem */
-		SOCKET_DEBUG(PRINTF("socrfl: Error handling triggered - status: %d\n", status); fflush(stdout));
+		SOCKET_DEBUG(PRINTF("socrfl: Error handling triggered - status: %d\n", status); DEBUGSOCKFLUSH);
 		if (0 == chars_read)
 			iod->dollar.x = 0;
 		iod->dollar.za = 9;

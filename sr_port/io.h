@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,11 @@
 #include <sys/types.h>
 #endif
 #endif
+
+#include "gt_timer.h"
+#include "rtnhdr.h"
+#include "stack_frame.h"
+#include "mv_stent.h"
 
 #define INSERT			TRUE
 #define NO_INSERT		FALSE
@@ -124,7 +129,7 @@ typedef struct io_desc_struct
 	gtm_chset_t			ichset;
 	gtm_chset_t			ochset;
 	int4				write_filter;
-}io_desc;
+} io_desc;
 
 /*
  * ICHSET: UTF-16
@@ -183,6 +188,7 @@ void io_rundown(int rundown_type);
 void io_init(bool term_ctrl);
 bool io_is_rm(mstr *name);
 bool io_is_sn(mstr *tn);
+struct mv_stent_struct *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent);
 #ifdef UNIX
 bool io_is_tt(char *name);
 #endif

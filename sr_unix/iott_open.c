@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	error_def(ERR_NOTERMINFODB);
 	error_def(ERR_TCGETATTR);
 	error_def(ERR_BADCHSET);
+	error_def(ERR_ZINTRECURSEIO);
 
 	ioptr = dev_name->iod;
 	if (ioptr->state == dev_never_opened)
@@ -66,6 +67,8 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		ioptr->ichset = ioptr->ochset = gtm_utf8_mode ? CHSET_UTF8 : CHSET_M;	/* default */
 	}
 	tt_ptr = (d_tt_struct *)dev_name->iod->dev_sp;
+	if (tt_ptr->mupintr)
+		rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
 	p_offset = 0;
 	while (*(pp->str.addr + p_offset) != iop_eol)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,14 @@
 #include "iosocketdef.h"
 #include "min_max.h"
 #include "gtm_caseconv.h"
+
+#ifdef __osf__
+/* Tru64 does not have the prototype for "hstrerror" even though the function is available in the library.
+ * Until we revamp the TCP communications setup stuff to use the new(er) POSIX definitions, we cannot move
+ * away from "hstrerror". Declare prototype for this function in Tru64 manually until then.
+ */
+const char *hstrerror(int err);
+#endif
 
 GBLREF	tcp_library_struct	tcp_routines;
 
@@ -151,5 +159,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 	socketptr->buffer_size = bfsize;
 	socketptr->buffered_length = socketptr->buffered_offset = 0;
 	socketptr->passive = passive;
+	socketptr->moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
 	return socketptr;
 }

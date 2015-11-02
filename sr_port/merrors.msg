@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2006 Fidelity Information Services, Inc	!
+!	Copyright 2001, 2007 Fidelity Information Services, Inc	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -1274,6 +1274,12 @@ BOMMISMATCH	<!AD Byte Order Marker found when !AD character set specified>/error
 WIDTHTOOSMALL	<WIDTH should be at least 2 when device ICHSET or OCHSET is UTF-8 or UTF-16>/error/fao=0!/ansi=0
 SOCKMAX		<Attempt to exceed maximum sockets (!UL) for the SOCKET device>/error/fao=1!/ansi=80
 PADCHARINVALID	<PAD deviceparameter cannot be greater than 127>/error/fao=0!/ansi=0
+ZCNOPREALLOUTPAR	<Parameter !UL in external call !AD.!AD is an output only parameter requiring pre-allocation>/error/fao=5!/ansi=0
+SVNEXPECTED	<Special variable expected in this context>/error/fao=0!/ansi=0
+SVNONEW		<Cannot NEW this special variable>/error/fao=0!/ansi=0
+ZINTDIRECT	<Attempt to enter direct mode from $ZINTERRUPT>/error/fao=0!/ansi=0
+ZINTRECURSEIO	<Attempt to do IO to the active device in $ZINTERRUPT>/error/fao=0!/ansi=0
+MRTMAXEXCEEDED	<Maximum value of !UL for SOCKET device parameter MOREREADTIME exceeded>/error/fao=1!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

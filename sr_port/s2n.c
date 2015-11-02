@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +25,7 @@ LITREF int4 ten_pwr[] ;
 char *s2n (mval *u)
 {	error_def (ERR_NUMOFLOW) ;
 	char	*c, *d, *w, *eos ;
-	int	i, j, k, x, y, z, sign, zero ;
+	int	i, j, k, x, y, z, sign, zero, expdigits ;
 	bool	digit, dot, exp, exneg, tail ;
 
 	i = 0;
@@ -119,26 +119,29 @@ char *s2n (mval *u)
 		c++ ; z++ ;
 	}
 	digit = z!=0 || y!=0 || zero!=0 ;
-	x = 0 ; exp = ( *c=='E' && digit ) ;
-	if ( exp && c+1 < eos )
+	x = 0;
+	exp = ('E' == *c) && digit ;
+	if (exp && (c+1 < eos))
 	{
-		c++ ;
-		exneg = *c == '-' ;
-		if ( exneg || *c == '+' )
+		c++;
+		exneg = ('-' == *c);
+		if (exneg || ('+' == *c))
+			c++;
+		for ( ; (c < eos) && ('0' == *c); c++)
+			;	/* Do not count leading 0s towards MAX_DIGITS_IN_EXP */
+		for (expdigits = 0; (c < eos) && DIGIT(*c); c++)
 		{
-			c++ ;
+			if ((MAX_DIGITS_IN_EXP + 1) > expdigits)
+			{
+				x = x * 10 + (*c - '0') ;
+				expdigits++;
+			}
 		}
-		while ( c < eos && DIGIT(*c) )
-		{
-			x = x * 10 + (*c++ - '0') ;
-		}
-		if ( exneg )
-		{
+		if (exneg)
 			x = -x ;
-		}
 	}
 	s2n_intlit = sign!=0 || dot || exp ;
-	if ( digit )
+	if (digit)
 	{
 		x += ( dot ? y : z ) ;
 		j = x+k-6 ; i += j ;

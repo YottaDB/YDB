@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,16 +29,21 @@ GBLREF mident 		window_ident;
 LITREF svn_data_type 	svn_data[];
 GBLREF oprtype		*for_stack[], **for_stack_ptr;
 GBLREF triple 		*curr_fetch_trip, *curr_fetch_opr;
+GBLREF triple		*curtchain;
 GBLREF int4 		curr_fetch_count;
 
 int m_new(void)
 {
-	oprtype tmparg;
-	triple *ref, *next, *org, *tmp, *s, *fetch;
-	int n;
-	int count;
-	mvar *var;
+	oprtype		tmparg;
+	triple		*ref, *next, *org, *tmp, *s, *fetch;
+	int		n;
+	int		count;
+	mvar		*var;
+	boolean_t	parse_warn;
+
 	error_def(ERR_INVSVN);
+	error_def(ERR_SVNONEW);
+	error_def(ERR_SVNEXPECTED);
 	error_def(ERR_RPARENMISSING);
 	error_def(ERR_VAREXPECTED);
 
@@ -72,9 +77,10 @@ int m_new(void)
 		case TK_DOLLAR:
 			advancewindow();
 			if (window_token == TK_IDENT)
+			{
+				parse_warn = FALSE;
 				if ((n = namelook(svn_index, svn_names, window_ident.addr, window_ident.len)) >= 0)
 				{
-					tmp = maketriple(OC_NEWINTRINSIC);
 					switch(svn_data[n].opcode)
 					{
 						case SV_ZTRAP:
@@ -82,17 +88,28 @@ int m_new(void)
 						case SV_ESTACK:
 						case SV_ZYERROR:
 						case SV_ZGBLDIR:
+							tmp = maketriple(OC_NEWINTRINSIC);
 							tmp->operand[0] = put_ilit(svn_data[n].opcode);
 							break;
 						default:
-							stx_error(ERR_INVSVN);
-							return FALSE;
+							STX_ERROR_WARN(ERR_SVNONEW);	/* sets "parse_warn" to TRUE */
 					}
-					advancewindow();
-					ins_triple(tmp);
-					return TRUE;
+				} else
+				{
+					STX_ERROR_WARN(ERR_INVSVN);	/* sets "parse_warn" to TRUE */
 				}
-			stx_error(ERR_INVSVN);
+				advancewindow();
+				if (!parse_warn)
+					ins_triple(tmp);
+				else
+				{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
+					 * (invoked by stx_error). No need to do anything else.
+					 */
+					assert(OC_RTERROR == curtchain->exorder.bl->exorder.bl->exorder.bl->opcode);
+				}
+				return TRUE;
+			}
+			stx_error(ERR_SVNEXPECTED);
 			return FALSE;
 		case TK_EOL:
 		case TK_SPACE:

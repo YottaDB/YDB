@@ -37,14 +37,14 @@ int op_read(mval *v, int4 timeout)
 	v->mvtype = MV_STR;
 	v->str.len = 0;
 	stat = (io_curr_device.in->disp_ptr->read)(v, timeout);
-	stringpool.free += v->str.len;
+	if (stringpool.free == (unsigned char *)v->str.addr)
+		stringpool.free += v->str.len;	/* see UNIX iott_readfl */
 	assert(stringpool.free <= stringpool.top);
 #ifdef KEEP_zOS_EBCDIC
 	if (DEFAULT_CODE_SET != io_curr_device.in->in_code_set)
 	{
 		cnt = insize = outsize = v->str.len;
 		assert(stringpool.free >= stringpool.base);
-		assert(stringpool.free <= stringpool.top);
 		if (cnt > stringpool.top - stringpool.free)
 			stp_gcol(cnt);
 		temp_ch = stringpool.free;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,8 +79,13 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
 	 * 	(ii) also, the current comparison relies on kwd->str.len which means a C would imply CPUTIM instead of CSTIME
 	 * 		or CUTIME this ambiguity should probably be removed by asking for an exact match of the full keyword
 	 */
-	while (0 != memcmp(upcase, key[keywd_indx], kwd->str.len))
+	while ((0 != memcmp(upcase, key[keywd_indx], kwd->str.len)) && keywd_indx < MAX_KEY)
 		keywd_indx++;
+
+	if( keywd_indx == MAX_KEY )
+        {
+                 rts_error(VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
+        }
 
 	if ((kw_isprocalive != keywd_indx) && (-1 == times(&proc_times)))
 	{

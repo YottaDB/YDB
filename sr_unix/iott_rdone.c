@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +37,11 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF	int4		outofband;
+GBLREF	volatile int4	outofband;
+GBLREF	boolean_t	dollar_zininterrupt;
+GBLREF	mv_stent	*mv_chain;
+GBLREF	stack_frame	*frame_pointer;
+GBLREF	unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF	io_pair		io_curr_device;
 GBLREF	io_pair		io_std_device;
 GBLREF	bool		prin_in_dev_failure;
@@ -49,7 +53,7 @@ LITREF	unsigned char	lower_to_upper_table[];
 
 int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 {
-	boolean_t	ret = FALSE, timed, utf8_active;
+	boolean_t	ret = FALSE, timed, utf8_active, zint_restart;
 	unsigned char	inbyte;
 	wint_t		inchar;
 #ifdef __MVS__
@@ -59,6 +63,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	short int	i;
 	io_desc		*io_ptr;
 	d_tt_struct	*tt_ptr;
+	tt_interrupt	*tt_state;
 	TID		timer_id;
 	int		rdlen, selstat, status, utf8_more, inchar_width;
 	int4		msec_timeout;		/* timeout in milliseconds */
@@ -70,10 +75,14 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	struct timeval	input_timeval;
 	struct timeval	save_input_timeval;
 	ABS_TIME	cur_time, end_time;
+	mv_stent	*mv_zintdev;
 
 	error_def(ERR_CTRAP);
 	error_def(ERR_IOEOF);
 	error_def(ERR_NOPRINCIO);
+	error_def(ERR_ZINTRECURSEIO);
+	error_def(ERR_STACKOFLOW);
+	error_def(ERR_STACKCRIT);
 
 	io_ptr = io_curr_device.in;
 	assert (io_ptr->state == dev_open);
@@ -85,32 +94,66 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	dc3 = (char) 19;
 	mask = tt_ptr->term_ctrl;
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
-	utf8_more = 0;
-
-	/* ---------------------------------------------------------
-	 * zb_ptr will be used to fill-in the value of $zb as we go
-	 * ---------------------------------------------------------
-	 */
-
-	zb_ptr = io_ptr->dollar.zb;
-	zb_top = zb_ptr + sizeof(io_ptr->dollar.zb) - 1;
-	/* ----------------------------------------------------
-	 * If we drop-out with error or otherwise permaturely,
-	 * consider $zb to be null.
-	 * ----------------------------------------------------
-	 */
-	*zb_ptr = 0;
-	io_ptr->esc_state = START;
-	io_ptr->dollar.za = 0;
-	if (mask & TRM_NOTYPEAHD)
-		TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
-	if (mask & TRM_READSYNC)
-	{
-		DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
-		if (0 != status)
+	zint_restart = FALSE;
+	if (tt_ptr->mupintr)
+	{	/* restore state to before job interrupt */
+		tt_state = &tt_ptr->tt_state_save;
+		if (ttwhichinvalid == tt_state->who_saved)
+			GTMASSERT;
+		if (dollar_zininterrupt)
 		{
-			io_ptr->dollar.za = 9;
-			rts_error(VARLSTCNT(1) status);
+			tt_ptr->mupintr = FALSE;
+			tt_state->who_saved = ttwhichinvalid;
+			rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+		}
+		if (ttrdone != tt_state->who_saved)
+			GTMASSERT;	/* ZINTRECURSEIO should have caught */
+		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
+		if (NULL != mv_zintdev)
+		{
+			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+			if (mv_chain == mv_zintdev)
+				POP_MV_STENT();         /* pop if top of stack */
+			end_time = tt_state->end_time;
+			if (utf8_active)
+			{
+				utf8_more = tt_state->utf8_more;
+				more_ptr = tt_state->more_ptr;
+				memcpy(more_buf, tt_state->more_buf, sizeof(more_buf));
+			}
+			zb_ptr = tt_state->zb_ptr;
+			zb_top = tt_state->zb_top;
+			tt_state->who_saved = ttwhichinvalid;
+			tt_ptr->mupintr = FALSE;
+			zint_restart = TRUE;
+		}
+	}
+	if (!zint_restart)
+	{
+		utf8_more = 0;
+		/* ---------------------------------------------------------
+		 * zb_ptr is used to fill-in the value of $zb as we go
+		 * If we drop-out with error or otherwise permaturely,
+		 * consider $zb to be null.
+		 * ---------------------------------------------------------
+		 */
+		zb_ptr = io_ptr->dollar.zb;
+		zb_top = zb_ptr + sizeof(io_ptr->dollar.zb) - 1;
+		*zb_ptr = 0;
+		io_ptr->esc_state = START;
+		io_ptr->dollar.za = 0;
+		io_ptr->dollar.zeof = FALSE;
+		if (mask & TRM_NOTYPEAHD)
+			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
+		if (mask & TRM_READSYNC)
+		{
+			DOWRITERC(tt_ptr->fildes, &dc1, 1, status);
+			if (0 != status)
+			{
+				io_ptr->dollar.za = 9;
+				rts_error(VARLSTCNT(1) status);
+			}
 		}
 	}
 	out_of_time = FALSE;
@@ -125,11 +168,14 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		input_timeval.tv_sec  = timeout;
 		msec_timeout = timeout2msec(timeout);
 		if (0 == msec_timeout)
-			iott_mterm(io_ptr);
-		else
+		{
+			if (!zint_restart)
+				iott_mterm(io_ptr);
+		} else
 		{
    			sys_get_curr_time(&cur_time);
-			add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+			if (!zint_restart)
+				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 		}
 	}
 	input_timeval.tv_usec = 0;
@@ -137,8 +183,29 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 	{
 		if (outofband)
 		{
-			if (timed && (0 == msec_timeout))
-				iott_rterm(io_ptr);
+			if (jobinterrupt == outofband)
+			{	/* save state if jobinterrupt */
+				tt_state = &tt_ptr->tt_state_save;
+				tt_state->exp_length = 0;
+				tt_state->who_saved = ttrdone;
+				tt_state->end_time = end_time;
+				if (utf8_active)
+				{
+					tt_state->utf8_more = utf8_more;
+					tt_state->more_ptr = more_ptr;
+					memcpy(tt_state->more_buf, more_buf, sizeof(more_buf));
+				}
+				tt_state->zb_ptr = zb_ptr;
+				tt_state->zb_top = zb_top;
+                                PUSH_MV_STENT(MVST_ZINTDEV);	/* used as a flag only */
+				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
+				tt_ptr->mupintr = TRUE;
+			} else
+			{
+				if (timed && (0 == msec_timeout))
+					iott_rterm(io_ptr);
+			}
 			outofband_action(FALSE);
 			break;
 		}
@@ -200,7 +267,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 						io_ptr->dollar.za = 9;
 						/* No data to return */
 						iott_readfl_badchar(NULL, NULL, 0,
-								    (more_ptr- more_buf), more_buf, more_ptr);
+								    (more_ptr- more_buf), more_buf, more_ptr, NULL);
 						utf8_badchar(more_ptr - more_buf, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
 						break;
 					}
@@ -209,21 +276,13 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 					more_ptr = more_buf;
 					if (0 < (utf8_more = UTF8_MBFOLLOW(&inbyte)))	/* assignment */
 					{
-						if (0 > utf8_more)
+						if ((0 > utf8_more) || (GTM_MB_LEN_MAX < utf8_more))
 						{	/* invalid character */
 							io_ptr->dollar.za = 9;
 							*more_ptr++ = inbyte;
 							 /* No data to return */
-							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr);
+							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr, NULL);
 							utf8_badchar(1, more_buf, more_ptr, 0, NULL);	/* ERR_BADCHAR */
-							break;
-						} else if (GTM_MB_LEN_MAX < utf8_more)
-						{	/* too big to be valid */
-							io_ptr->dollar.za = 9;
-							*more_ptr++ = inbyte;
-							 /* No data to return */
-							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr);
-							utf8_badchar(1, more_buf, more_ptr, 0, NULL);   /* ERR_BADCHAR */
 							break;
 						} else
 						{
@@ -238,7 +297,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 						{	/* invalid char */
 							io_ptr->dollar.za = 9;
 							 /* No data to return */
-							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr);
+							iott_readfl_badchar(NULL, NULL, 0, 1, more_buf, more_ptr, NULL);
 							utf8_badchar(1, more_buf, more_ptr, 0, NULL);   /* ERR_BADCHAR */
 							break;
 						}
@@ -307,7 +366,8 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 						io_ptr->dollar.za = 2;
 						break;
 					}
-					DOREADRL(tt_ptr->fildes, &inchar, 1, rdlen);
+					DOREADRL(tt_ptr->fildes, &inbyte, 1, rdlen);
+					inchar = inbyte;
 					GETASCII(asc_inchar, inchar);
 				} while (1 == rdlen);
 
@@ -424,7 +484,7 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		}
         }
 
-	if (outofband)
+	if (outofband && jobinterrupt != outofband)
 	{
 		io_ptr->dollar.za = 9;
 		return FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +47,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	char			addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
 		                temp_addr[SA_MAXLITLEN], dev_type[MAX_DEV_TYPE_LEN];
 	unsigned char		ch, len, *c, *next, *top;
-	short			handle_len;
+	int			handle_len, moreread_timeout;
 	unsigned short		port;
 	int4			errlen, msec_timeout, real_errno, p_offset = 0, zff_len, delimiter_len;
 	int			ii, rv, size, on = 1, temp_1 = -2, d_socket_struct_len;
@@ -66,6 +66,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		                delay_specified = FALSE,
 		                nodelay_specified = FALSE,
 		                ibfsize_specified = FALSE,
+		                moreread_specified = FALSE,
 		                is_principal = FALSE,	/* called from inetd */
 		                ichset_specified,
 		                ochset_specified;
@@ -78,10 +79,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	error_def(ERR_SOCKETEXIST);
 	error_def(ERR_ABNCOMPTINC);
 	error_def(ERR_DEVPARINAP);
+	error_def(ERR_DEVPARMNEG);
 	error_def(ERR_ILLESOCKBFSIZE);
 	error_def(ERR_ZFF2MANY);
 	error_def(ERR_DELIMWIDTH);
 	error_def(ERR_SOCKMAX);
+	error_def(ERR_ZINTRECURSEIO);
+	error_def(ERR_MRTMAXEXCEEDED);
 
 	ioptr = dev->iod;
 	assert((params) *(pp->str.addr + p_offset) < (unsigned char)n_iops);
@@ -101,10 +105,14 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	d_socket_struct_len = sizeof(d_socket_struct) + (sizeof(socket_struct) * (gtm_max_sockets - 1));
 	if (ioptr->state == dev_never_opened)
 	{
-		ioptr->dev_sp = (void *)malloc(d_socket_struct_len);
-		memset(ioptr->dev_sp, 0, d_socket_struct_len);
-	}
-	dsocketptr = (d_socket_struct *)ioptr->dev_sp;
+		dsocketptr = ioptr->dev_sp = (void *)malloc(d_socket_struct_len);
+		memset(dsocketptr, 0, d_socket_struct_len);
+		dsocketptr->iod = ioptr;
+	} else
+		dsocketptr = (d_socket_struct *)ioptr->dev_sp;
+        if (dsocketptr->mupintr)
+                rts_error(VARLSTCNT(1) ERR_ZINTRECURSEIO);
+
 	if (ioptr->state == dev_never_opened)
 	{
 		ioptr->state	= dev_closed;
@@ -283,6 +291,17 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			case iop_nowrap:
 				ioptr->wrap = FALSE;
 				break;
+                        case iop_morereadtime:
+				/* Time in milliseconds socket read will wait for more data before returning */
+                                GET_LONG(moreread_timeout, pp->str.addr + p_offset);
+                                if (-1 == moreread_timeout)
+                                        moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
+                                else if (-1 > moreread_timeout)
+                                        rts_error(VARLSTCNT(1) ERR_DEVPARMNEG);
+                                else if (MAX_MOREREAD_TIMEOUT < moreread_timeout)
+                                        rts_error(VARLSTCNT(3) ERR_MRTMAXEXCEEDED, 1, MAX_MOREREAD_TIMEOUT);
+				moreread_specified = TRUE;
+                                break;
 			default:
 				break;
 		}
@@ -317,6 +336,8 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		socketptr->nodelay = nodelay_specified;		/* defaults to DELAY */
 		if (ibfsize_specified)
 			socketptr->bufsiz = ibfsize;
+		if (moreread_specified)
+			socketptr->moreread_timeout = moreread_timeout;
                 /* socket handle -- also check for duplication */
 		if (attach_specified)
 		{

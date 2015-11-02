@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -363,9 +363,9 @@ if (! -z ${TMP_DIR}_src_files) then
 				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
 				runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/$file.c
 				if ($file == "omi_srvc_xct") then
-					chmod +w $gtm_src/omi_sx_play.c
+					chmod a+w $gtm_src/omi_sx_play.c
 					\cp $gtm_src/omi_srvc_xct.c $gtm_src/omi_sx_play.c
-					chmod -w $gtm_src/omi_sx_play.c
+					chmod a-w $gtm_src/omi_sx_play.c
 					echo "$gtm_src/omi_sx_play.c   ---->  $gtm_obj/omi_sx_play.o"
 					runall_cc -DFILE_TCP $RUNALL_EXTRA_CC_FLAGS $gtm_src/omi_sx_play.c
 				endif

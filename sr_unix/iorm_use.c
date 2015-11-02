@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -153,9 +153,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 					rts_error(VARLSTCNT(1) ERR_RMWIDTHPOS);
 				else if (MAX_STRLEN < recordsize)
 					rts_error(VARLSTCNT(1) ERR_RMWIDTHTOOBIG);
-				/* If ICHSET or OCHSET is of type UTF-16, check that RECORDSIZE is even */
-				if ((IS_UTF16_CHSET(iod->ichset) || IS_UTF16_CHSET(iod->ochset)) && (recordsize % 2 != 0))
-					rts_error(VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, recordsize);
 				rm_ptr->recordsize = recordsize;
 				rm_ptr->def_recsize = FALSE;
 			}
@@ -271,15 +268,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 					chset_mstr.len = *(pp->str.addr + p_offset);
 					SET_ENCODING(iod->ichset, &chset_mstr);
 					ichset_specified = TRUE;
-					if (IS_UTF16_CHSET(iod->ichset))
-					{
-						if (DEF_RM_RECORDSIZE == rm_ptr->recordsize)
-						{	/* DEF_RM_RECORDSIZE is currently an odd number (32K-1). Round it down
-							 * to be a multiple of 4 bytes since a UTF-16 char can be 2 or 4 bytes */
-							rm_ptr->recordsize = ROUND_DOWN(rm_ptr->recordsize, 4);
-						} else if (0 != rm_ptr->recordsize % 2)
-							rts_error(VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
-					}
 				}
                         break;
 			}
@@ -301,15 +289,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 					chset_mstr.len = *(pp->str.addr + p_offset);
 					SET_ENCODING(iod->ochset, &chset_mstr);
 					ochset_specified = TRUE;
-					if (IS_UTF16_CHSET(iod->ochset))
-					{
-						if (DEF_RM_RECORDSIZE == rm_ptr->recordsize)
-						{	/* DEF_RM_RECORDSIZE is currently an odd number (32K-1). Round it down
-							 * to be a multiple of 4 bytes since a UTF-16 char can be 2 or 4 bytes */
-							rm_ptr->recordsize = ROUND_DOWN(rm_ptr->recordsize, 4);
-						} else if (0 != rm_ptr->recordsize % 2)
-							rts_error(VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
-					}
 					if (!IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
 						rts_error(VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 				}
@@ -322,15 +301,6 @@ void	iorm_use(io_desc *iod, mval *pp)
 					chset_mstr.addr = (char *)(pp->str.addr + p_offset + 1);
 					chset_mstr.len = *(pp->str.addr + p_offset);
 					SET_ENCODING(iod->ochset, &chset_mstr);
-					if (IS_UTF16_CHSET(iod->ochset))
-					{
-						if (DEF_RM_RECORDSIZE == rm_ptr->recordsize)
-						{	/* DEF_RM_RECORDSIZE is currently an odd number (32K-1). Round it down
-							 * to be a multiple of 4 bytes since a UTF-16 char can be 2 or 4 bytes */
-							rm_ptr->recordsize = ROUND_DOWN(rm_ptr->recordsize, 4);
-						} else if (0 != rm_ptr->recordsize % 2)
-							rts_error(VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
-					}
 					if (!IS_PADCHAR_VALID(iod->ochset, rm_ptr->padchar))
 						rts_error(VARLSTCNT(2) ERR_PADCHARINVALID, 0);
 					iod->ichset = iod->ochset;
@@ -369,6 +339,17 @@ void	iorm_use(io_desc *iod, mval *pp)
 			get_chset_desc(&chset_names[iod->ichset]);
 		if (CHSET_M != iod->ochset && CHSET_UTF16 != iod->ochset)
 			get_chset_desc(&chset_names[iod->ochset]);
+		/* If ICHSET or OCHSET is of type UTF-16, check that RECORDSIZE is even */
+		if (gtm_utf8_mode && (IS_UTF16_CHSET(iod->ichset) || IS_UTF16_CHSET(iod->ochset)))
+		{
+			if (rm_ptr->def_recsize)
+			{	/* DEF_RM_RECORDSIZE is currently an odd number (32K-1). Round it down
+				 * to be a multiple of 4 bytes since a UTF-16 char can be 2 or 4 bytes */
+				assert(DEF_RM_RECORDSIZE == 32767);
+				rm_ptr->recordsize = ROUND_DOWN(rm_ptr->recordsize, 4);
+			} else if (0 != rm_ptr->recordsize % 2)
+				rts_error(VARLSTCNT(3) ERR_RECSIZENOTEVEN, 1, rm_ptr->recordsize);
+		}
 	}
 	if (fstat_done && mode != mode1)
 	{	/* if the mode has been changed by the qualifiers, reset it */

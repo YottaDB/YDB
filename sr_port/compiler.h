@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -187,6 +187,38 @@ typedef struct
 #  define chktchain(x)
 #endif
 
+/* Some errors should not cause stx_error to issue an rts_error. These are the errors related to
+ * 	a) Invalid Intrinsic Special Variables
+ *	b) Invalid Intrinsic Function Names
+ *	c) Invalid Deviceparameters for IO commands
+ * These should cause an error at runtime if and only if that codepath is reached.
+ * PostConditionals can cause this path to be avoided in which case we do not want to issue an error at compile time.
+ * Therefore issue only a warning at compile-time and proceed with compilation as if this codepath will not be reached at runtime.
+ */
+error_def(ERR_FNOTONSYS);
+error_def(ERR_INVFCN);
+error_def(ERR_INVSVN);
+error_def(ERR_SVNONEW);
+error_def(ERR_SVNOSET);
+error_def(ERR_DEVPARUNK);
+error_def(ERR_DEVPARINAP);
+error_def(ERR_DEVPARVALREQ);
+
+#define	IS_STX_WARN(errcode)											\
+	((ERR_INVFCN == errcode) || (ERR_FNOTONSYS == errcode) || (ERR_INVSVN == errcode)			\
+		|| (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode)						\
+		|| (ERR_DEVPARUNK == errcode) || (ERR_DEVPARINAP == errcode) || (ERR_DEVPARVALREQ == errcode))
+
+/* This macro does an "stx_error" of the input errcode but before that it asserts that the input errcode is one
+ * of the known error codes that are to be handled as a compile-time warning (instead of an error). It also set
+ * the variable "parse_warn" to TRUE which is relied upon by the functions that invoke this macro.
+ */
+#define	STX_ERROR_WARN(errcode)						\
+{									\
+	parse_warn = TRUE;						\
+	assert(IS_STX_WARN(errcode));					\
+	stx_error(errcode);						\
+}
 
 #define MAX_SRCLINE	2048	/* maximum length of a program source or indirection line */
 
@@ -202,6 +234,8 @@ typedef struct
 
 #define	NO_FORMALLIST	(-1)
 #define	MAX_ACTUALS	32
+
+void	parse_until_rparen_or_space(void);
 
 triple *maketriple(opctype op);
 triple *newtriple(opctype op);

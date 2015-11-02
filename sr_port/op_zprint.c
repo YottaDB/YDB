@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,7 +85,7 @@ void op_zprint(mval *rtn,mval *start_label,int start_int_exp,mval *end_label,int
 	for ( ; src1 <= src2 ; src1++)
 	{
 		if (outofband)
-			outofband_action(TRUE);
+			outofband_action(FALSE);
 		print_line.str.addr = src1->addr;
 		print_line.str.len = src1->len;
 		op_write(&print_line);

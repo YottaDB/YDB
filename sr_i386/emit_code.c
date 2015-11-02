@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -149,7 +149,7 @@ void trip_gen(triple *ct)
 	of the opcode will be followed by a jmp with 32 bit offset while
 	the -BYTE variants will be followed by a BRB with an 8 bit offset.
 */
-			tsp = &ttt[ttt[tp]];
+			tsp = (short *)&ttt[ttt[tp]];
 			if (-128 <= tsp[CALL_4LCLDO_XFER] && 127 >= tsp[CALL_4LCLDO_XFER])
 				off = jmp_offset - XFER_BYTE_INST_SIZE;
 			else
@@ -159,14 +159,14 @@ void trip_gen(triple *ct)
 			else
 			{
 			    call_4lcldo_variant = JMP_LONG_INST_SIZE;	/* used by emit_jmp */
-			    tsp = &ttt[ttt[tp + 1]];
+			    tsp = (short *)&ttt[ttt[tp + 1]];
 			    if (-128 <= tsp[CALL_4LCLDO_XFER] && 127 >= tsp[CALL_4LCLDO_XFER])
 			        off = jmp_offset - XFER_BYTE_INST_SIZE;
 			    else
 				off = jmp_offset - XFER_LONG_INST_SIZE;
 			    if (-32768 > (off - JMP_LONG_INST_SIZE) &&
 				  32767 < (off - JMP_LONG_INST_SIZE))
-				tsp = &ttt[ttt[tp + 2]];
+				tsp = (short *)&ttt[ttt[tp + 2]];
 			}
 			break;
 		case OC_JMP:
@@ -180,7 +180,7 @@ void trip_gen(triple *ct)
 		case OC_JMPTCLR:
 		case OC_LDADDR:
 		case OC_FORLOOP:
-			tsp = &ttt[ttt[tp]];
+			tsp = (short *)&ttt[ttt[tp]];
 			break;
 		default:
 			GTMASSERT;
@@ -204,10 +204,10 @@ void trip_gen(triple *ct)
 			GTMASSERT;
 			break;
 		}
-		tsp = &ttt[tp];
+		tsp = (short *)&ttt[tp];
 	}
 	else
-		tsp = &ttt[tp];
+		tsp = (short *)&ttt[tp];
 
 	for (; *tsp != VXT_END; )
 	{
@@ -610,7 +610,7 @@ short *emit_vax_inst(short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	}
 	assert (code_idx < BUFFERED_CODE_SIZE);
 	if (cg_phase == CGP_MACHINE)
-		emit_immed ( &code_buf[0], sizeof(unsigned char) * code_idx);
+		emit_immed ((char *)&code_buf[0], sizeof(unsigned char) * code_idx);
 	else if (cg_phase != CGP_ASSEMBLY)
 		curr_addr += sizeof(unsigned char) * code_idx;
 	code_reference += sizeof(unsigned char) * code_idx;
@@ -968,7 +968,7 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			case OC_CDLIT:
 				emit_op_alit(op, use_reg);
 				emit_reference(code_reference + (code_idx * sizeof(unsigned char)),
-					ct->operand[0].oprval.cdlt, (int4 *)&code_buf[code_idx]);
+					ct->operand[0].oprval.cdlt, (uint4 *)&code_buf[code_idx]);
 				code_idx += sizeof(int4);
 				break;
 			case OC_ILIT:

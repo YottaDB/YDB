@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2006 Fidelity Information Services, Inc #
+#	Copyright 2001, 2007 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -165,7 +165,7 @@ if ( $buildaux_gde == 1 ) then
 		set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
 		if (! -e utf8) then
 			foreach libpath ($library_path)
-				set found_icu = (0 != `\ls -1 $libpath/* | grep "libicu.*36.*" | wc -l`)
+				set found_icu = `ls -1 $libpath | grep "libicu.*36.*" | wc -l`
 				if ($found_icu) then
 					break
 				endif

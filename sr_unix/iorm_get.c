@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -140,7 +140,7 @@ int	iorm_get(io_desc *io_ptr)
 {
 	boolean_t	ret;
 	char		inchar, *temp;
-	unsigned char	*pad_ptr, *nextmb, padchar;
+	unsigned char	*pad_ptr, *nextmb, padchar, padcharray[2];
 	int		flags;
 	int		fcntl_res, save_errno;
 	int4		msec_timeout;	/* timeout in milliseconds */
@@ -191,22 +191,21 @@ int	iorm_get(io_desc *io_ptr)
 	{
 		bytes_read += status;
 		padchar = rm_ptr->padchar;
-		if (CHSET_UTF16LE == chset)
-		{	/* strip 2-byte PADCHAR in UTF-16LE from tail of line */
+		if ((CHSET_UTF16LE == chset) || (CHSET_UTF16BE == chset))
+		{	/* strip 2-byte PADCHAR in UTF-16LE or UTF-16BE from tail of line */
 			assert(bytes_read >= 2);
-			for (pad_ptr = rm_ptr->inbuf + bytes_read - 2; 0 < bytes_read && rm_ptr->inbuf <= pad_ptr; pad_ptr-=2)
+			if (CHSET_UTF16LE == chset)
 			{
-				if ((padchar == pad_ptr[0]) && ('\0' == pad_ptr[1]))
-					bytes_read -= 2;
-				else
-					break;
+				padcharray[0] = padchar;
+				padcharray[1] = '\0';
+			} else
+			{
+				padcharray[0] = '\0';
+				padcharray[1] = padchar;
 			}
-		} else if (CHSET_UTF16BE == chset)
-		{	/* strip 2-byte PADCHAR in UTF-16BE */
-			assert(bytes_read >= 2);
 			for (pad_ptr = rm_ptr->inbuf + bytes_read - 2; 0 < bytes_read && rm_ptr->inbuf <= pad_ptr; pad_ptr-=2)
 			{
-				if ((padchar == pad_ptr[1]) && ('\0' == pad_ptr[0]))
+				if ((padcharray[0] == pad_ptr[0]) && (padcharray[1] == pad_ptr[1]))
 					bytes_read -= 2;
 				else
 					break;

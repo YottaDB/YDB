@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -147,8 +147,8 @@ rc_srvc_xact(cptr, xend)
 		if (eptr)
 			qhdr->a.erc.value = RC_NETREQIGN;
 	/*	Do we do this yet? */
-		else if ((qhdr->r.typ.value < 0)
-			 || (qhdr->r.typ.value > RC_OP_MAX )
+		else if (	/* (qhdr->r.typ.value < 0) || */ /* this is commented out as it always evaluates to FALSE */
+			(qhdr->r.typ.value > RC_OP_MAX )
 			 || (!rc_dispatch_table[qhdr->r.typ.value]))
 		{
 #ifdef DEBUG

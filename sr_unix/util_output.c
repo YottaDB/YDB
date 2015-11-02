@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -269,18 +269,30 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, int4 size, int f
 				}
 				for (i = 0, ctop = c + length;  (i < cwidth && outptr < outtop  - 1);  c += chlen)
 				{
+#ifdef UNICODE_SUPPORTED
 					if (!gtm_utf8_mode)
 					{
+#endif
 						ch = *c;
 						chlen = 1;
 						chwidth = (ch < ' '  ||  ch > '~') ? -1 : 1;
+						isprintable = (-1 != chwidth); /* Ignored in M mode for FAO !AD */
+#ifdef UNICODE_SUPPORTED
 					} else
 					{
 						chlen = (caddr_t)UTF8_MBTOWC(c, ctop, ch) - c;
 						chwidth = (GTMSECSHR_IMAGE != image_type) ? UTF8_WCWIDTH(ch): chlen;
+						/* Assume printability for GTMSECSHR */
+						isprintable = (-1 != chwidth) ||
+							((GTMSECSHR_IMAGE != image_type) ? U_ISSPACE(ch): TRUE);
 					}
-					if (type2 == 'F'  &&  -1 == chwidth) /* not printable */
-					{
+#endif
+					if (!isprintable && ('F' == type2 UNICODE_ONLY(|| ('D' == type2 && gtm_utf8_mode))))
+					{	/* Since HPUX stops printing lines (via fprintf) when it
+						   encounters a bad character, all platforms in utf8 mode
+						   will behave as if !AF were specified and put a "." in place
+						   of non-printable characters. SE 01/2007
+						*/
 						*outptr++ = '.';
 						++i;
 					} else if ('\0' != ch && chlen <= outtop - outptr - 1)

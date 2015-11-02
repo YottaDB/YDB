@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -272,7 +272,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	int4			tupd_num; /* the number of tset/tkill/tzkill records encountered */
 	int4			tcom_num; /* the number of tcom records encountered */
 	seq_num			jnl_seqno, tmpseqno; /* the current jnl_seq no of the Update process */
-	bool			is_valid_hist();
 	int			key_len, rec_len, backptr;
 	char			fn[MAX_FN_LEN];
 	sm_uc_ptr_t		readaddrs;	/* start of current rec in pool */

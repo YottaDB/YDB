@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,9 +59,10 @@ void gvcst_root_search(void)
 	unsigned short	rlen, hdr_len;
 	uchar_ptr_t	subrec_ptr;
 	enum cdb_sc	status;
-	bool		is_valid_hist();
 	boolean_t	gbl_target_was_set;
 	gv_namehead	*save_targ;
+	mname_entry	*gvent;
+	int		altkeylen;
 
 	assert((dba_bg == gv_cur_region->dyn.addr->acc_meth) || (dba_mm == gv_cur_region->dyn.addr->acc_meth));
 	assert(gv_altkey->top == gv_currkey->top);
@@ -75,6 +76,14 @@ void gvcst_root_search(void)
 	assert(gv_altkey->end < gv_altkey->top);
 	assert(gv_target != cs_addrs->dir_tree);
 	save_targ = gv_target;
+	/* Check if "gv_target->gvname" matches "gv_altkey->base". If not, there is a name mismatch (out-of-design situation).
+	 * This check is temporary until we catch the situation that caused D9H02-002641 */
+	/* --- Check BEGIN --- */
+	gvent = &save_targ->gvname;
+	altkeylen = gv_altkey->end - 1;
+	if (!altkeylen || (altkeylen != gvent->var_name.len) || memcmp(gv_altkey->base, gvent->var_name.addr, gvent->var_name.len))
+		GTMASSERT;
+	/* --- Check END   --- */
 	if (INVALID_GV_TARGET != reset_gv_target)
 		gbl_target_was_set = TRUE;
 	else

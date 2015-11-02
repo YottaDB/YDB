@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2005 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -274,7 +274,7 @@ endef
 	$(compile-help)
 
 mcompiles:
-	cd ..;gtm_dist=$(dir $(CURDIR));export gtm_dist;gtmgbldir=$(notdir $@);export gtmgbldir; ./mumps *.m
+	cd ..;gtm_dist=$(dir $(CURDIR));export gtm_dist;gtmgbldir=$(notdir $@);export gtmgbldir; ./mumps *.m ; tcsh ../sr_unix/mkutf8dir.csh
 
 dotcsh: $(csh_files)
 	cp -f $^ ..
