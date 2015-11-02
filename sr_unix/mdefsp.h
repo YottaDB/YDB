@@ -107,7 +107,7 @@ error_def(ERR_ASSERT);
 typedef uint4 mach_inst;	/* machine instruction */
 #endif /* __hpux */
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__CYGWIN__)
 #define OFF_T_LONG
 #ifdef NeedInAddrPort
 typedef unsigned short	in_port_t;
@@ -120,8 +120,20 @@ typedef unsigned short	in_port_t;
 #define Linux390
 #endif
 #define INO_T_LONG			    /* see gdsfhead.h, actually for dev_t == 8 on Linux390 2.2.15 */
-#endif
+#endif /* __s390__ */
 #endif /* __linux__ */
+
+#ifdef __linux__
+#define SYS_ERRLIST_INCLUDE   "gtm_stdio.h"
+#endif
+
+#ifdef __CYGWIN__
+#ifdef UNICODE_SUPPORTED_OBEYED
+#undef UNICODE_SUPPORTED
+#endif
+#define KEY_T_LONG                    /* 8 bytes */
+#define SYS_ERRLIST_INCLUDE   <errno.h>
+#endif
 
 #ifdef __s390__
 #define CACHELINE_SIZE        256

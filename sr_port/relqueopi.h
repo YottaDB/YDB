@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,8 +27,8 @@
 
 int             insqhi2(que_ent_ptr_t new, que_head_ptr_t base);
 int             insqti2(que_ent_ptr_t new, que_head_ptr_t base);
-que_ent_ptr_t   remqhi1(que_head_ptr_t base);
-que_ent_ptr_t   remqti1(que_head_ptr_t base);
+void_ptr_t	remqhi1(que_head_ptr_t base);
+void_ptr_t	remqti1(que_head_ptr_t base);
 
 #define INSQHI(N,B) insqhi2((que_ent_ptr_t)(N), (que_head_ptr_t)(B))
 #define INSQTI(N,B) insqti2((que_ent_ptr_t)(N), (que_head_ptr_t)(B))
@@ -41,8 +41,8 @@ que_ent_ptr_t   remqti1(que_head_ptr_t base);
 int		insqhi(que_ent_ptr_t, que_head_ptr_t);
 int		insqti(que_ent_ptr_t, que_head_ptr_t);
 # endif
-que_ent_ptr_t	remqhi(que_head_ptr_t base);
-que_ent_ptr_t	remqti(que_head_ptr_t base);
+void_ptr_t	remqhi(que_head_ptr_t base);
+void_ptr_t	remqti(que_head_ptr_t base);
 
 #define INSQHI(N,B) insqhi((que_ent_ptr_t)(N), (que_head_ptr_t)(B))
 #define INSQTI(N,B) insqti((que_ent_ptr_t)(N), (que_head_ptr_t)(B))

@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include <sys/types.h>
+#include "gtm_string.h"
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_stat.h"
@@ -33,7 +34,7 @@
 #include "xfer_enum.h"
 #endif
 
-#define MVAL_INT4_SIZE DIVIDE_ROUND_UP(sizeof(mval), sizeof(int4))
+#define MVAL_INT_SIZE DIVIDE_ROUND_UP(sizeof(mval), sizeof(UINTPTR_T))
 
 #ifdef DEBUG
 #include "vdatsize.h"
@@ -48,6 +49,7 @@ static const char       vdat_r11[VDAT_R11_SIZE + 1] =   "(R11)";
 static const char       vdat_gtmliteral[VDAT_GTMLITERAL_SIZE + 1] =     "GTM$LITERAL";
 static const char       vdat_def[VDAT_DEF_SIZE + 1] =   "@";
 
+IA64_ONLY(GBLDEF char	asm_mode = 0; /* 0 - disassembly mode. 1 - decode mode */)
 GBLDEF unsigned char    *obpt;          /* output buffer index */
 GBLDEF unsigned char    outbuf[ASM_OUT_BUFF];    /* assembly language output buffer */
 static int              vaxi_cnt = 1;   /* Vax instruction count */
@@ -66,8 +68,13 @@ GBLREF int		sa_temps_offset[];
 GBLREF int		sa_temps[];
 LITREF int		sa_class_sizes[];
 
-GBLDEF UINTPTR_T	code_buf[NUM_BUFFERRED_INSTRUCTIONS];
+NON_IA64_ONLY(GBLDEF UINTPTR_T	code_buf[NUM_BUFFERRED_INSTRUCTIONS];)
+IA64_ONLY(GBLDEF ia64_bundle	code_buf[NUM_BUFFERRED_INSTRUCTIONS];)
 GBLDEF int		code_idx;
+#ifdef DEBUG
+GBLDEF struct inst_count generated_details[MAX_CODE_COUNT], calculated_details[MAX_CODE_COUNT];
+GBLDEF int4 generated_count, calculated_count;
+#endif /* DEBUG */
 GBLDEF int		calculated_code_size, generated_code_size;
 GBLDEF int		jmp_offset;	/* Offset to jump target */
 GBLDEF int		code_reference;	/* Offset from pgm start to current loc */
@@ -177,7 +184,7 @@ void trip_gen (triple *ct)
 			case OC_CALL:
 			case OC_FORLCLDO:
 			case OC_CALLSP:
-				off = (jmp_offset - CALL_INST_SIZE)/4;	/* [kmk] */
+				off = (jmp_offset - CALL_INST_SIZE)/INST_SIZE;	/* [kmk] */
 				if (off >= -128 && off <= 127)
 					tsp = &ttt[ttt[tp]];
 				else if (off >= -32768 && off <= 32767)
@@ -280,7 +287,7 @@ void emit_asmlist(triple *ct)
 	if (!opcode_emitted)
 	{
 		opcode_emitted = TRUE;
-		offset = &outbuf[0] + 60 - obpt;
+		offset = (int)(&outbuf[0] + 60 - obpt);
 		if (offset >= 1)
 		{	/* tab to position 60 */
 			memset(obpt, ' ', offset);
@@ -300,9 +307,11 @@ void emit_asmlist(triple *ct)
 
 void	emit_eoi (void)
 {
-	*obpt++ = '\0';
-	list_tab();
-	list_line((char *)outbuf);
+	IA64_ONLY(if (asm_mode == 0) {)
+		*obpt++ = '\0';
+		list_tab();
+		list_line((char *)outbuf);
+	IA64_ONLY(})
 	return;
 }
 #endif
@@ -369,7 +378,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 
 #ifdef TRUTH_IN_REG
 					reg = GTM_REG_CODEGEN_TEMP;
-					GEN_LOAD_WORD(reg, gtm_reg(*inst++), 0);
+					NON_IA64_ONLY(GEN_LOAD_WORD(reg, gtm_reg(*inst++), 0);)
+					IA64_ONLY(  GEN_LOAD_WORD_4(reg, gtm_reg(*inst++), 0);)
 #else
 					/* For platforms, where the $TRUTH value is not carried in a register and
 					   must be fetched from a global variable by subroutine call. */
@@ -464,11 +474,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							assert(ct->opcode == OC_ILIT);
 							cnt = ct->operand[0].oprval.ilit;
 							reg = get_arg_reg();
-#ifdef __ia64
-							LOAD_IMM14(reg, cnt);
-#else /* !__ia64 */
-							GEN_LOAD_IMMED(reg, cnt);
-#endif /* __ia64 */
+							IA64_ONLY(LOAD_IMM14(reg, cnt);)
+							NON_IA64_ONLY(GEN_LOAD_IMMED(reg, cnt);)
 							cnt++;
 							inst++;
 						} else
@@ -542,7 +549,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					{
 						inst += 2;
 						emit_pcrel();
-						code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(GTM_REG_ACCUM);
+						NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(GTM_REG_ACCUM);)
+						IA64_ONLY(IGEN_LOAD_ADDR_REG(GTM_REG_ACCUM))
 						assert(*inst == VXT_ADDR);
 						inst++;
 						emit_trip(*(fst_opr + *inst++), FALSE, GENERIC_OPCODE_STL, GTM_REG_ACCUM);
@@ -580,19 +588,23 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					inst++;
 					emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, MOVC3_TRG_REG);
 
-					for (words_to_move = MVAL_INT4_SIZE, reg_offset = 0; words_to_move;)
+					for (words_to_move = MVAL_INT_SIZE, reg_offset = 0; words_to_move;)
 					{
 						reg = MACHINE_FIRST_ARG_REG;
 						save_reg_offset = reg_offset;
 						for (cnt = 0, cnttop = MIN(words_to_move, MACHINE_REG_ARGS) ;  cnt < cnttop;
-						     cnt++, reg_offset += sizeof(int))
+						     cnt++, reg_offset += sizeof(UINTPTR_T))
 						{
-							GEN_LOAD_WORD((reg + cnt), MOVC3_SRC_REG, reg_offset);
+							NON_IA64_ONLY(GEN_LOAD_WORD((reg + cnt), MOVC3_SRC_REG, reg_offset);)
+							IA64_ONLY(  GEN_LOAD_WORD_8((reg + cnt), MOVC3_SRC_REG, reg_offset);)
 						}
 						reg = MACHINE_FIRST_ARG_REG;
-						for (cnt = 0; cnt < cnttop; cnt++, save_reg_offset += sizeof(int), words_to_move--)
+						for (cnt = 0;
+						     cnt < cnttop;
+						     cnt++, save_reg_offset += sizeof(UINTPTR_T), words_to_move--)
 						{
-							GEN_STORE_WORD((reg + cnt), MOVC3_TRG_REG, save_reg_offset);
+							NON_IA64_ONLY(GEN_STORE_WORD((reg + cnt), MOVC3_TRG_REG, save_reg_offset);)
+							IA64_ONLY(  GEN_STORE_WORD_8((reg + cnt), MOVC3_TRG_REG, save_reg_offset);)
 						}
 					}
 					break;
@@ -603,7 +615,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						if (*inst > 0x5f)	/* OC_CURRHD:  any mode >= 6 (deferred), any register */
 						{
 							inst++;
-							GEN_LOAD_WORD(GTM_REG_ACCUM, GTM_REG_FRAME_POINTER, 0);
+							NON_IA64_ONLY(GEN_LOAD_WORD(GTM_REG_ACCUM, GTM_REG_FRAME_POINTER, 0);)
+							IA64_ONLY(  GEN_LOAD_WORD_8(GTM_REG_ACCUM, GTM_REG_FRAME_POINTER, 0);)
 							assert(*inst == VXT_ADDR);
 							inst++;
 							emit_trip(*(fst_opr + *inst++), FALSE, GENERIC_OPCODE_STL, GTM_REG_ACCUM);
@@ -626,7 +639,10 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 #ifdef TRUTH_IN_REG
 								if (*inst == 0x5a)	/* to VAX r10 or $TEST */
 								{
-									GEN_STORE_WORD(MOVL_RETVAL_REG, GTM_REG_DOLLAR_TRUTH, 0);
+									NON_IA64_ONLY(GEN_STORE_WORD(MOVL_RETVAL_REG,
+												     GTM_REG_DOLLAR_TRUTH, 0);)
+									IA64_ONLY(GEN_STORE_WORD_4(MOVL_RETVAL_REG,
+												   GTM_REG_DOLLAR_TRUTH, 0);)
 								} else
 								{
 									GEN_MOVE_REG(gtm_reg(*inst), MOVL_RETVAL_REG);
@@ -672,7 +688,8 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					{
 						inst += 2;
 						emit_pcrel();
-						code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(reg);
+						NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(reg);)
+						IA64_ONLY(IGEN_LOAD_ADDR_REG(reg))
 					} else if (*inst == VXT_VAL  ||  *inst == VXT_GREF)
 					{
 						inst++;
@@ -734,18 +751,32 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	if (cg_phase == CGP_MACHINE)
 	{
 	   generated_code_size += code_idx;
-	   emit_immed ((char *)&code_buf[0], sizeof(UINTPTR_T) * code_idx);
+#ifdef DEBUG
+	   if(generated_count < MAX_CODE_COUNT)
+	   {
+	     generated_details[generated_count].size = code_idx;
+	     generated_details[generated_count++].sav_in = sav_in;
+	   }
+#endif /* DEBUG */
+	   emit_immed ((char *)&code_buf[0], (uint4)(INST_SIZE * code_idx));
 	}
 	else if (cg_phase != CGP_ASSEMBLY)
 	{
 	   if (cg_phase == CGP_APPROX_ADDR)
 	   {
                calculated_code_size += code_idx;
+#ifdef DEBUG
+	       if(calculated_count < MAX_CODE_COUNT)
+	       {
+		 calculated_details[calculated_count].size = code_idx;
+		 calculated_details[calculated_count++].sav_in = sav_in;
+	       }
+#endif /* DEBUG */
 	   }
-	   curr_addr += sizeof(UINTPTR_T) * code_idx;
+	   curr_addr += (INST_SIZE * code_idx);
 	}
-	code_reference += sizeof(UINTPTR_T) * code_idx;
-	jmp_offset -= sizeof(UINTPTR_T) * code_idx;
+	code_reference += (INST_SIZE * code_idx);
+	jmp_offset -= (INST_SIZE * code_idx);
 	last_vax_inst = sav_in;
 	return inst;
 }
@@ -755,6 +786,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 	uint4 	branchop_opposite;
 	int	src_reg;
 	int	skip_idx;
+	IA64_ONLY(int tmp_code_idx;)
 	int	branch_offset;
 
 	/* assert(jmp_offset != 0); */
@@ -837,13 +869,26 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 							GTMASSERT;
 							break;
 					}
-					skip_idx = code_idx++; /* Save index of branch inst. Set target offset later */
-					code_buf[skip_idx] = IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0);
-					branch_offset--;
 #ifdef DELAYED_BRANCH
-					code_buf[code_idx++] = GENERIC_OPCODE_NOP;
-					branch_offset--;
+					NON_IA64_ONLY(
+						skip_idx = code_idx++; /* Save index of branch inst. Set target offset later */
+						code_buf[skip_idx] = IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0);
+						branch_offset--;
+						code_buf[code_idx++] = GENERIC_OPCODE_NOP;
+						branch_offset--;
+					)
+#else
+					NON_IA64_ONLY(
+						skip_idx = code_idx++; /* Save index of branch inst. Set target offset later */
+						code_buf[skip_idx] = IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0);
+						branch_offset--;
+					)
 #endif
+					IA64_ONLY(
+						skip_idx = code_idx; /* Save index of branch inst. Set target offset later */
+						IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0)
+						branch_offset -= 2;
+					)
 				}
 				if (EMIT_JMP_LONG_CODE_CHECK)
 				{ /* This is more common unconditional branch generation and should be mutually
@@ -851,10 +896,17 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 				     branch generation up top be more common but that form does not cover unconditional
 				     jumps (Examples: AIX and HP-UX) */
 					assert(!(EMIT_JMP_OPPOSITE_BR_CHECK));
-					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
 #ifdef DELAYED_BRANCH
+					NON_IA64_ONLY(
+					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
 					code_buf[code_idx++] = GENERIC_OPCODE_NOP;
+					)
+#else
+					NON_IA64_ONLY(
+					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
+					)
 #endif
+					IA64_ONLY(IGEN_UCOND_BRANCH_REG_OFFSET(branchop, branch_offset))
 				} else
 				{
 					if (EMIT_JMP_OPPOSITE_BR_CHECK)
@@ -865,15 +917,25 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 					}
 					GEN_PCREL;
 					emit_base_offset(GTM_REG_CODEGEN_TEMP, (INST_SIZE * branch_offset));
-					code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP);
-					GEN_JUMP_REG(GTM_REG_CODEGEN_TEMP);
+					NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP);)
+					NON_IA64_ONLY(GEN_JUMP_REG(GTM_REG_CODEGEN_TEMP);)
+
+					IA64_ONLY(IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP))
+					IA64_ONLY(GEN_JUMP_REG(GTM_REG_CODEGEN_TEMP))
 				}
 				if (skip_idx != -1)
 				{	/* Fill in the offset from our opposite jump instruction to here .. the
 					   place to bypass the jump.
 					*/
 					branch_offset = BRANCH_OFFSET_FROM_IDX(skip_idx, code_idx);
-					code_buf[skip_idx] |= IGEN_COND_BRANCH_OFFSET(branch_offset);
+					NON_IA64_ONLY(code_buf[skip_idx] |= IGEN_COND_BRANCH_OFFSET(branch_offset);)
+
+					IA64_ONLY(
+						tmp_code_idx = code_idx;
+						code_idx = skip_idx;
+						IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, branch_offset)
+						code_idx = tmp_code_idx;
+					)
 				}
 			}
 			break;
@@ -929,6 +991,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 	int		upper_idx, lower_idx;
 	triple		*ct;
 	int		low, extra, high;
+	IA64_ONLY(int	next_ptr_offset = 8;)
 
 	error_def(ERR_SRCNAM);
 
@@ -966,20 +1029,22 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							} else
 								/* Gross expansion ok first time through */
 								emit_base_offset(1, LONG_JUMP_OFFSET); /* Non-0 base reg for AIX */
-#if defined(__ia64)
-							code_idx += 2;
-#else
 							code_idx++;
-#endif /* __ia64 */
 							inst_emitted = TRUE;
 							break;
 						case OC_CDLIT:
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
-							code_idx++;
-							if (GENERIC_OPCODE_LDA == generic_inst)
+							if (GENERIC_OPCODE_LDA == generic_inst) {
+								NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
+								IA64_ONLY(IGEN_LOAD_LINKAGE(trg_reg))
 								inst_emitted = TRUE;
-							else
+							}
+							else {
+								NON_IA64_ONLY(code_buf[code_idx++]
+									      |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+								IA64_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP))
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
+							}
 							break;
 						case OC_ILIT:
 							assert(GENERIC_OPCODE_LDL == generic_inst);
@@ -1011,6 +1076,10 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					assert(val_output);
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
+					IA64_ONLY(
+					if ( sa_class_sizes[opr->oprclass] == 4 )
+						next_ptr_offset = 4;
+					)
 					if (offset < 0  ||  offset > MAX_OFFSET)
 						GTMASSERT;
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
@@ -1021,6 +1090,10 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 				case TVAR_REF:
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
+					IA64_ONLY(
+					if ( sa_class_sizes[opr->oprclass] == 4 )
+						next_ptr_offset = 4;
+					)
 					if (offset < 0  ||  offset > MAX_OFFSET)
 						GTMASSERT;
 					if (opr->oprclass == TVAR_REF)
@@ -1030,9 +1103,18 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					emit_base_offset(reg, offset);
 					if (val_output)
 					{
-						code_idx++;
 						if (GENERIC_OPCODE_LDA == generic_inst)
+						{
+							NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(trg_reg);)
+							IA64_ONLY(IGEN_LOAD_WORD_REG_8(trg_reg))
 							inst_emitted = TRUE;
+						} else
+						{
+							NON_IA64_ONLY(code_buf[code_idx++]
+								      |= IGEN_LOAD_WORD_REG(GTM_REG_CODEGEN_TEMP);)
+							IA64_ONLY(IGEN_LOAD_WORD_REG_8(GTM_REG_CODEGEN_TEMP))
+							emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
+						}
 					}
 					break;
 
@@ -1060,8 +1142,10 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					ocnt_ref_opr = opr;
 					break;
 			}
-			if (!inst_emitted)
-				code_idx++;
+			if (!inst_emitted) {
+				NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg);)
+				IA64_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg))
+			}
 			break;
 #ifdef DEBUG
 		case CGP_ASSEMBLY:
@@ -1089,11 +1173,8 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							else
 								reg = GTM_REG_LITERAL_BASE;
 							emit_base_offset(reg, offset);
-#if defined(__ia64)
-							GEN_LOAD_ADDR_FROM_BUF(trg_reg);
-#else
-							code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(trg_reg);
-#endif /* __ia64 */
+							NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(trg_reg);)
+							IA64_ONLY(IGEN_LOAD_ADDR_REG(trg_reg))
 							inst_emitted = TRUE;
 							break;
 						case OC_CDLIT:
@@ -1108,11 +1189,14 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
 							if (GENERIC_OPCODE_LDA == generic_inst)
 							{
-								code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);
+								NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
+								IA64_ONLY(IGEN_LOAD_LINKAGE(trg_reg))
 								inst_emitted = TRUE;
 							} else
 							{
-								code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);
+								NON_IA64_ONLY(code_buf[code_idx++]
+									      |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+								IA64_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP))
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
 							break;
@@ -1200,11 +1284,14 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					{
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
-							code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(trg_reg);
+							NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(trg_reg);)
+							IA64_ONLY(IGEN_LOAD_WORD_REG_8(trg_reg))
 							inst_emitted = TRUE;
 						} else
 						{
-							code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(GTM_REG_CODEGEN_TEMP);
+							NON_IA64_ONLY(code_buf[code_idx++]
+								      |= IGEN_LOAD_WORD_REG(GTM_REG_CODEGEN_TEMP);)
+							IA64_ONLY(IGEN_LOAD_WORD_REG_8(GTM_REG_CODEGEN_TEMP))
 							emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 						}
 					}
@@ -1224,8 +1311,10 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					GTMASSERT;
 					break;
 			}
-			if (!inst_emitted)
-				code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg);
+			if (!inst_emitted) {
+				NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg);)
+				IA64_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg))
+			}
 			*obpt++ = ',';
 			*obpt++ = ' ';
 			break;
@@ -1246,22 +1335,22 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							else
 								reg = GTM_REG_LITERAL_BASE;
 							emit_base_offset(reg, offset);
-#if defined(__ia64)
-							GEN_LOAD_ADDR_FROM_BUF(trg_reg);
-#else
-							code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(trg_reg);
-#endif /* __ia64 */
+							NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(trg_reg);)
+							IA64_ONLY(IGEN_LOAD_ADDR_REG(trg_reg);)
 							inst_emitted = TRUE;
 							break;
 						case OC_CDLIT:
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
 							if (GENERIC_OPCODE_LDA == generic_inst)
 							{
-								code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);
+								NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
+								IA64_ONLY(IGEN_LOAD_LINKAGE(trg_reg))
 								inst_emitted = TRUE;
 							} else
 							{
-								code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);
+	 							NON_IA64_ONLY(code_buf[code_idx++]
+									      |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+								IA64_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP))
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
 							break;
@@ -1289,6 +1378,10 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					assert(val_output);
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
+					IA64_ONLY(
+					if ( sa_class_sizes[opr->oprclass] == 4 )
+						next_ptr_offset = 4;
+					)
 					if (offset < 0  ||  offset > MAX_OFFSET)
 						GTMASSERT;
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
@@ -1310,11 +1403,14 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					{
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
-							code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(trg_reg);
+							NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(trg_reg);)
+							IA64_ONLY(IGEN_LOAD_WORD_REG_8(trg_reg))
 							inst_emitted = TRUE;
 						} else
 						{
-							code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(GTM_REG_CODEGEN_TEMP);
+							NON_IA64_ONLY(code_buf[code_idx++]
+								      |= IGEN_LOAD_WORD_REG(GTM_REG_CODEGEN_TEMP);)
+							IA64_ONLY(IGEN_LOAD_WORD_REG_8(GTM_REG_CODEGEN_TEMP))
 							emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 						}
 					}
@@ -1335,8 +1431,10 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					break;
 			}
 			/* If we haven't emitted a finished instruction already, finish it now */
-			if (!inst_emitted)
-				code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg);
+			if (!inst_emitted) {
+				NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg);)
+				IA64_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg))
+			}
 			break;
 		default:
 			GTMASSERT;
@@ -1468,7 +1566,14 @@ void	emit_push(int reg)
 		case CGP_APPROX_ADDR:
 		case CGP_ADDR_OPT:
 			if (vax_pushes_seen >= MACHINE_REG_ARGS)
-				code_idx++;	/* for STORE instruction */
+			{
+				NON_IA64_ONLY(code_idx++;)	/* for STORE instruction */
+				IA64_ONLY(
+					assert(reg == GTM_REG_ACCUM);
+					stack_offset = STACK_ARG_OFFSET((vax_number_of_arguments - MACHINE_REG_ARGS - 1));
+					GEN_STORE_ARG(reg, stack_offset);	/* Store arg on stack */
+				)
+			}
 			break;
 
 		case CGP_ASSEMBLY:
@@ -1478,7 +1583,7 @@ void	emit_push(int reg)
 			else
 			{
 				assert(reg == GTM_REG_ACCUM);
-				stack_offset = STACK_ARG_OFFSET(vax_number_of_arguments - MACHINE_REG_ARGS - 1);
+				stack_offset = STACK_ARG_OFFSET((vax_number_of_arguments - MACHINE_REG_ARGS - 1));
 				GEN_STORE_ARG(reg, stack_offset);	/* Store arg on stack */
 			}
 			break;
@@ -1588,7 +1693,7 @@ void	emit_call_xfer(int xfer)
 			memcpy(obpt, &vdat_wdisp[0], VDAT_WDISP_SIZE);
 			obpt += VDAT_WDISP_SIZE;
 		}
-		offset = xfer / sizeof(char *);
+		offset = (int)(xfer / sizeof(char *));
 		for (c = (unsigned char *)xfer_name[offset]; *c ; )
 			*obpt++ = *c++;
 		memcpy(obpt, &vdat_r11[0], VDAT_R11_SIZE);
@@ -1620,7 +1725,7 @@ void	emit_call_xfer(int xfer)
 	*/
 	assert(OC_CALL == current_triple->opcode || OC_CALLSP == current_triple->opcode ||
 	       OC_FORLCLDO == current_triple->opcode);
-	offset = current_triple->exorder.fl->rtaddr - (code_reference + code_idx * sizeof(int4));
+	offset = current_triple->exorder.fl->rtaddr - (code_reference + (code_idx * INST_SIZE));
 	/* If in assembly or machine (final) phases, make sure have reasonable offset. The offset may be
 	   negative in the early phases so don't check during them. For other phases, put a govenor on
 	   the values so we don't affect the codegen sizes which can mess up shrink_trips. During the

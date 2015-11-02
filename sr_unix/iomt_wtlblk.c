@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@
 
 uint4 iomt_wtlblk (uint4 channel, uint4 mask, iosb *stat_blk, void *buff, int size)
 {
-	uint4   status;
+	int4   status;
 
 #ifdef DP
 	FPRINTF(stderr, "-> Writing %d bytes.\n", size);
@@ -49,5 +49,5 @@ uint4 iomt_wtlblk (uint4 channel, uint4 mask, iosb *stat_blk, void *buff, int si
 		stat_blk->status = SS_NORMAL;
 		status = SS_NORMAL;
 	}
-	return status;
+	return (uint4)status;
 }

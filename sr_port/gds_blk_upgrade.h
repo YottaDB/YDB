@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +21,13 @@ int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 bsiz
 GBLREF	uint4		gtm_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
 GBLREF	boolean_t	dse_running;
 
-/* See if block needs to be converted to current version. Assume buffer is at least short aligned */
-#define GDS_BLK_UPGRADE_IF_NEEDED(blknum, srcbuffptr, trgbuffptr, curcsd, ondskblkver, upgrdstatus)				\
+/* See if block needs to be converted to current version. Assume buffer is at least short aligned.
+ * Note: csd->fully_upgraded is not derived within the macro but instead passed in as a parameter to ensure whichever
+ * function (dsk_read currently) references this does that once and copies the value into a local variable that is used
+ * in all further usages. This way multiple usages are guaranteed to see the same value. Using csd->fully_upgraded in
+ * each of those cases could cause different values to be seen (since csd can be concurrently updated).
+ */
+#define GDS_BLK_UPGRADE_IF_NEEDED(blknum, srcbuffptr, trgbuffptr, curcsd, ondskblkver, upgrdstatus, fully_upgraded)		\
 {																\
 	/* In order to detect if a block needs to be upgraded or not, we do the following series of tests.			\
 	 * If DSE, the variable "gtm_blkupgrade_flag" controls whether upgrade is attempted or not.				\
@@ -65,7 +70,7 @@ GBLREF	boolean_t	dse_running;
 	 */															\
 	if (!dse_running || (UPGRADE_IF_NEEDED == gtm_blkupgrade_flag))								\
 	{															\
-		if ((curcsd)->fully_upgraded || (sizeof(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)(srcbuffptr))->bsiz))		\
+		if ((fully_upgraded) || (sizeof(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)(srcbuffptr))->bsiz))			\
 		{														\
 			upgrdstatus = SS_NORMAL;										\
 			if (NULL != (ondskblkver))										\
@@ -91,6 +96,35 @@ GBLREF	boolean_t	dse_running;
                 if (srcbuffptr != trgbuffptr)											\
                         srcbuffptr = NULL;											\
 	}															\
+}
+
+/* This macro is invoked by dsk_read.c when we know for sure we are reading a valid block. This checks that the block
+ * we read from disk contains a valid block header. It also checks that we CANNOT have read a V4 format reused block
+ * if the database has been fully upgraded. It uses checks similar to those used in the GDS_BLK_UPGRADE_IF_NEEDED
+ * macro to determine if it is a V4 or V5 format block header.
+ * Note: csd->fully_upgraded is not derived within the macro but instead passed in as a parameter to ensure whichever
+ * function (dsk_read currently) references this does that once and copies the value into a local variable that is used
+ * in all further usages. This way multiple usages are guaranteed to see the same value. Using csd->fully_upgraded in
+ * each of those cases could cause different values to be seen (since csd can be concurrently updated).
+ */
+#define	GDS_BLK_HDR_CHECK(csd, v5_blk_hdr, fully_upgraded)								\
+{															\
+	v15_blk_hdr_ptr_t	v4_blk_hdr;										\
+															\
+	v4_blk_hdr = (v15_blk_hdr_ptr_t)v5_blk_hdr;									\
+	if (!(fully_upgraded) || (sizeof(v15_blk_hdr) > v4_blk_hdr->bsiz))						\
+	{	/* V5 formatted buffer in shared memory (even though might be V4 format in disk) */			\
+		assert((unsigned)GDSVLAST > (unsigned)v5_blk_hdr->bver);						\
+		assert((LCL_MAP_LEVL == v5_blk_hdr->levl) || ((unsigned)MAX_BT_DEPTH > (unsigned)v5_blk_hdr->levl));	\
+		assert((unsigned)size >= (unsigned)v5_blk_hdr->bsiz);							\
+		assert(csd->trans_hist.curr_tn >= v5_blk_hdr->tn);							\
+	} else														\
+	{	/* V4 formatted buffer in shared memory (not converted because fully_upgraded is TRUE).			\
+		 * Possible if we are reading a recycled block that is in V4 format from a fully upgraded database.	\
+		 * But all recycled blocks are now upgraded by MUPIP REORG UPGRADE so this should be impossible.	\
+		 */													\
+		assert(FALSE);												\
+	}														\
 }
 
 #endif

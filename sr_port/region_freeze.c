@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +44,7 @@ GBLREF	uint4		user_id;
 #define FREEZE_MATCH	process_id
 #define OWNERSHIP	(in_mupip_freeze ? (csd->freeze == freeze_id) : (csd->image_count == FREEZE_MATCH))
 #elif defined VMS
-GBLREF	int4		image_count;
+GBLREF	uint4		image_count;
 #define FREEZE_ID	process_id
 #define FREEZE_MATCH	image_count
 #define OWNERSHIP	((csd->freeze == process_id) && (in_mupip_freeze || (csd->image_count == FREEZE_MATCH)))

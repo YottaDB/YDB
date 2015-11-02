@@ -55,7 +55,7 @@ boolean_t	mur_select_rec()
 
 	assert(mur_options.selection);
 	rec = (jnl_record *)mur_rab.jnlrec;
-	rectype = rec->prefix.jrec_type;
+	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 	pini_addr = rec->prefix.pini_addr;
 	key = NULL;
 	if (JRT_NULL == rectype || JRT_ALIGN == rectype)

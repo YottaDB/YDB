@@ -41,7 +41,10 @@ void op_gvsavtarg(mval *v)
 	} else
 		len = sizeof(short);
 	if (stringpool.top - stringpool.free < len)
+	{
+		v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
 		stp_gcol(len);
+	}
 	v->str.len = len;
 	v->str.addr = (char *)stringpool.free;
 	c = stringpool.free;

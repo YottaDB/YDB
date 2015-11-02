@@ -111,7 +111,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		assert((found && n >= 1) || (n == 0));
 		/* first two words are the status code and the number of entries */
 		src_tbl = (uint4 *)malloc(n * sizeof(mstr) + sizeof(uint4) * 2);
-		base = (mstr *)(src_tbl + 2);
+		base = RECAST(mstr *)(src_tbl + 2);
 		*(src_tbl + 1) = n;
 		badfmt = FALSE;
 		checksum = 0;
@@ -197,7 +197,7 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret)
 		else if (n >= rtn_vector->lnrtab_len)
 			srcstat |= AFTERLASTLINE;
 		else	/* successfully located line */
-			*srcret = ((mstr *) (src_tbl + 2)) + n;
+			*srcret = (RECAST(mstr *)(src_tbl + 2)) + n;
 	}
 	return srcstat;
 }

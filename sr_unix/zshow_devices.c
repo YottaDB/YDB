@@ -392,7 +392,7 @@ void zshow_devices(zshow_out *output)
 					if (mb_ptr->maxmsg != DEF_MB_MAXMSG)
 					{
 						ZS_PARM_EQU(&v,zshow_bloc);
-						MV_FORCE_MVAL(&m,mb_ptr->maxmsg) ;
+						MV_FORCE_MVAL(&m,(int)mb_ptr->maxmsg) ;
 						mval_write(output, &m, FALSE);
 						ZS_ONE_OUT(&v,space_text);
 					}
@@ -587,7 +587,7 @@ void zshow_devices(zshow_out *output)
 		/* readmoretime */		if (DEFAULT_MOREREAD_TIMEOUT != socketptr->moreread_timeout)
 		                                {
 							ZS_STR_OUT(&v, morereadtime_text);
-							MV_FORCE_MVAL(&m, socketptr->moreread_timeout);
+							MV_FORCE_MVAL(&m, (int)socketptr->moreread_timeout);
 							mval_write(output, &m, FALSE);
 						}
 						output->flush = TRUE;

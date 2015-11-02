@@ -281,7 +281,7 @@ void dbcertify_certify_phase(void)
 				   (rec_num + 1)));
 			/* "restart_transaction" is either set or cleared by dbc_split_blk() below */
 		}
-		assert(psa->rhdr.blk_type);
+		assert((int)psa->rhdr.blk_type);
 		/* Note assignment in "if" below */
 		if (restart_transaction = dbc_split_blk(psa, psa->rhdr.blk_num, psa->rhdr.blk_type,
 							psa->rhdr.tn, psa->rhdr.blk_levl))

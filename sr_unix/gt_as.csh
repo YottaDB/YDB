@@ -41,9 +41,9 @@ if ( "ia64" == $mach_type && "linux" == $platform_name ) then
     set lfile = `basename $1`:r
     set file = $lfile:r
 
-    gt_cpp -E $1 > ${gtm_src}/${file}_cpp.s
-    gt_as_local ${gtm_src}/${file}_cpp.s -o ${gtm_obj}/${file}.o
-    \rm ${gtm_src}/${file}_cpp.s
+    gt_cpp -E $1 > ${gtm_obj}/${file}_cpp.s
+    gt_as_local ${gtm_obj}/${file}_cpp.s -o ${gtm_obj}/${file}.o
+    \rm ${gtm_obj}/${file}_cpp.s
 else
     gt_as_local $1
 endif

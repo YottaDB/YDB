@@ -178,7 +178,6 @@ void	gvcst_put(mval *val)
 	do
 	{
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVPUTFAIL);
-		lcl_root = gv_target->root;
 		while(!gvcst_put_blk(val, &extra_block_split_req))
 			;
 	}
@@ -256,25 +255,27 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 	temp_key = gv_currkey;
 	dir_hist = NULL;
 	ins_chain_index = 0;
-	gv_target->root = lcl_root;
+	lcl_root = gv_target->root;
 	tp_root = lcl_root;
 	if (0 == dollar_tlevel)
-		update_array_ptr = update_array;
-	else
+	{
+		CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
+	} else
 	{
 		segment_update_array_size = UA_NON_BM_SIZE(cs_data);
 		ENSURE_UPDATE_ARRAY_SPACE(segment_update_array_size);
-		curr_chain = *(off_chain *)&gv_target->root;
+		curr_chain = *(off_chain *)&lcl_root;
 		if (curr_chain.flag == 1)
 		{
 			tp_get_cw(sgm_info_ptr->first_cw_set, (int)curr_chain.cw_index, &cse);
 			tp_root = cse->blk;
 		}
 	}
-	/* the below "if (0 == tp_root)" check seems unnecessary given a similar if check following it --- nars -- 2004/05/26 */
 	if (0 == tp_root)
-	{	/* the process may have just killed the global; that action creates a new root and zeroes gv_target->root,
-		 * so search the GVT for a new root to cover that case */
+	{	/* Global does not exist as far as we know. Creating a new one requires validating the directory tree path which
+		 * led us to this conclusion. So scan the directory tree here and validate its history at the end of this function.
+		 * If we decide to restart due to a concurrency conflict, remember to reset gv_target->root to 0 before restarting.
+		 */
 		gv_target = cs_addrs->dir_tree;
 		for (cp1 = temp_key->base, cp2 = gv_altkey->base;  0 != *cp1;)
 			*cp2++ = *cp1++;
@@ -610,7 +611,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				goto retry;
 			}
 			assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
-			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh->level, FALSE, FALSE);
+			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh->level,
+				FALSE, FALSE, GDS_WRITE_PLAIN);
 			assert(!dollar_tlevel || !cse->high_tlevel);
 			bh->ptr = cse;	/* used only in TP */
 			if ((0 != ins_chain_offset) && (NULL != cse) && (0 != cse->first_off))
@@ -1226,7 +1228,8 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			{	/* Not root;  write blocks and continue */
 				if (cdb_sc_normal != (status = gvcst_search_blk(temp_key, bq)))
 					goto retry;
-				cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh->level, TRUE, FALSE);
+				cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset,
+					ins_chain_index, bh->level, TRUE, FALSE, GDS_WRITE_PLAIN);
 				assert(!dollar_tlevel || !cse->high_tlevel);
 				if (cse)
 				{
@@ -1310,7 +1313,11 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				ins_off2 = (block_offset)(sizeof(blk_hdr) + (2 * sizeof(rec_hdr)) + sizeof(block_id) +
 							  target_key_size);
 				assert(ins_off1 < ins_off2);
-				cse = t_write(bh, (unsigned char *)bs1, ins_off1, next_blk_index, bh->level + 1, TRUE, FALSE);
+				/* Since a new root block is not created but two new children are created, this update to the
+				 * root block should disable the "indexmod" optimization (C9B11-001813).
+				 */
+				cse = t_write(bh, (unsigned char *)bs1, ins_off1, next_blk_index,
+							bh->level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
 				if (make_it_null)
 					cse->new_buff = NULL;
 				assert(!dollar_tlevel || !cse->high_tlevel);
@@ -1452,6 +1459,14 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 	return succeeded;
 retry:
 	RESET_GV_TARGET_LCL_AND_CLR_GBL(save_targ);
+	if (!lcl_root && (lcl_root != gv_target->root))
+	{	/* We had reset the root block from zero to a non-zero value within this function, but since we are restarting,
+		 * we can no longer be sure of the validity of the root block. Reset it to 0 so it will be re-determined in
+		 * the next global reference.
+		 */
+		assert(tp_root == gv_target->root);
+		gv_target->root = 0;
+	}
 	t_retry(status);
 	assert(0 == dollar_tlevel);
 	return FALSE;

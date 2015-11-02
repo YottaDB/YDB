@@ -128,6 +128,7 @@ void mupip_endiancvt(void)
 	int			rc;
 	uint4			swap_uint4;
 	enum db_ver		swap_dbver;
+	enum mdb_ver		swap_mdbver;
 	trans_num		curr_tn;
 	block_id		blk_num;
 	uint4			cli_status;
@@ -203,14 +204,14 @@ void mupip_endiancvt(void)
 		endian_native = FALSE;		/* nobody can be using the db */
 		/* do checks after swapping fields */
 		assert(sizeof(int4) == sizeof(old_data->desired_db_format));
-		swap_dbver = GTM_BYTESWAP_32(old_data->desired_db_format);
+		swap_dbver = (enum db_ver)GTM_BYTESWAP_32(old_data->desired_db_format);
 		if (GDSVCURR != swap_dbver)
 		{
 			check_error = NOTCURRDBFORMAT;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
 		}
-		swap_dbver = GTM_BYTESWAP_32(old_data->minor_dbver);
-		if (GDSMVCURR != swap_dbver)
+		swap_mdbver = (enum mdb_ver)GTM_BYTESWAP_32(old_data->minor_dbver);
+		if (GDSMVCURR != swap_mdbver)
 		{
 			check_error = NOTCURRMDBFORMAT;
 			gtm_putmsg(VARLSTCNT(6) ERR_NOENDIANCVT, 4, n_len, db_name, LEN_AND_STR(check_error));
@@ -572,18 +573,20 @@ void mupip_endiancvt(void)
 }
 
 #define SWAP_SD4(FIELD)	new->FIELD = GTM_BYTESWAP_32(old->FIELD)
+#define SWAP_SD4_CAST(FIELD, castType)	new->FIELD = (castType)GTM_BYTESWAP_32(old->FIELD)
 #define SWAP_SD8(FIELD)	new->FIELD = GTM_BYTESWAP_64(old->FIELD)
 
 void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 {
-	int n;
+	int	n;
+	time_t	ctime;
 
 	SWAP_SD4(blk_size);
 	SWAP_SD4(master_map_len);
 	SWAP_SD4(bplmap);
 	SWAP_SD4(start_vbn);
 	assert(sizeof(int4) == sizeof(old->acc_meth));		/* enum */
-	SWAP_SD4(acc_meth);
+	SWAP_SD4_CAST(acc_meth, enum db_acc_method);
 	SWAP_SD4(max_bts);
 	SWAP_SD4(n_bts);
 	SWAP_SD4(bt_buckets);
@@ -605,13 +608,15 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(max_non_bm_update_array_size);
 	/* SWAP_SD4(file_corrupt); is set in main routine	*/
 	assert(sizeof(int4) == sizeof(old->minor_dbver));	/* enum */
-	SWAP_SD4(minor_dbver);
+	SWAP_SD4_CAST(minor_dbver, enum mdb_ver);
 	SWAP_SD4(jnl_checksum);
 	/* SWAP_SD4(createinprogress);	checked above as FALSE so no need */
-	assert(sizeof(int4) == sizeof(old->creation.ctime));
-	time(&new->creation.ctime);
+	assert(sizeof(int4) == sizeof(old->creation_time4));
+	time(&ctime);
+	assert(sizeof(ctime) >= sizeof(int4));
+	new->creation_time4 = (int4)ctime;/* Take only lower order 4-bytes of current time */
 	if (!new_is_native)
-		SWAP_SD4(creation.ctime);
+		SWAP_SD4(creation_time4);
 	assert(sizeof(gtm_int64_t) == sizeof(old->max_tn));	/* trans_num */
 	SWAP_SD8(max_tn);
 	SWAP_SD8(max_tn_warn);
@@ -634,8 +639,13 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(blks_to_upgrd);
 	SWAP_SD4(blks_to_upgrd_subzero_error);
 	assert(sizeof(int4) == sizeof(old->desired_db_format));	/* enum */
-	SWAP_SD4(desired_db_format);
+	SWAP_SD4_CAST(desired_db_format, enum db_ver);
 	SWAP_SD4(fully_upgraded);	/* should be TRUE */
+	assert(new->fully_upgraded);
+	/* Since the source database is fully upgraded and since all RECYCLED blocks will be marked as FREE, we are guaranteed
+	 * there are NO V4 format block that is too full to be upgraded to V5 format (i.e. will cause DYNUPGRDFAIL error).
+	 */
+	new->db_got_to_v5_once = TRUE;	/* should be TRUE */
 	SWAP_SD8(trans_hist.curr_tn);
 	SWAP_SD8(trans_hist.early_tn);
 	SWAP_SD8(trans_hist.last_mm_sync);
@@ -741,11 +751,9 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 #define TAB_DB_CSH_ACCT_REC(A,B,C)	new->A.cumul_count = new->A.curr_count = 0;
 #include "tab_db_csh_acct_rec.h"
 #undef TAB_DB_CSH_ACCT_REC
-	SWAP_SD4(creation_db_ver);
-	SWAP_SD4(creation_mdb_ver);
-	SWAP_SD4(certified_for_upgrade_to);
-	/* secshr_ops_index secshr_ops_array[255]	index should be zero if !wc_blocked */
-	new->secshr_ops_index = 0;
+	SWAP_SD4_CAST(creation_db_ver, enum db_ver);
+	SWAP_SD4_CAST(creation_mdb_ver, enum mdb_ver);
+	SWAP_SD4_CAST(certified_for_upgrade_to, enum db_ver);
 	/* next_upgrd_warn	isn't valid since the database is fully_upgraded
 	   and the latch values differ by platform and since we don't know where
 	   the db will be used, we will ignore it.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,7 +77,8 @@ int utf8_len_strict(unsigned char* ptr, int len)
  */
 int gtm_wcswidth(unsigned char* ptr, int len, boolean_t strict, int nonprintwidth)
 {
-	int		ch, strwidth, cwidth;
+	int		strwidth, cwidth;
+	uint4		ch;
 	unsigned char	*ptrtop, *ptrnext;
 
 	assert(gtm_utf8_mode);

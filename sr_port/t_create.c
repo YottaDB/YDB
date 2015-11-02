@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,7 +88,7 @@ block_index t_create (
 	cse->t_level = dollar_tlevel;
 	cse->low_tlevel = NULL;
 	cse->high_tlevel = NULL;
-	cse->ondsk_blkver = GDSVCURR;
+	cse->ondsk_blkver = (enum db_ver)GDSVCURR;
 	if (dollar_tlevel == 0)
 		return(cw_set_depth++);
 	else

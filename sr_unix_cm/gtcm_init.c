@@ -74,14 +74,8 @@ GBLREF pattern			mumps_pattern;
 GBLREF uint4			*pattern_typemask;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF spdesc			rts_stringpool, stringpool;
-GBLREF unsigned char		cw_set_depth;
-GBLREF cw_set_element		cw_set[];
-GBLREF uint4			process_id;
-GBLREF jnlpool_addrs		jnlpool;
 GBLREF bool			certify_all_blocks;
 GBLREF boolean_t		is_replicator;
-GBLREF inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF short			dollar_tlevel;
 
 void	gtcm_fail(int sig);
 
@@ -96,7 +90,6 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	char			*ptr;
 	struct sigaction 	ignore, act;
 	void			get_page_size();
-	gd_addr 		*get_next_gdr();
 	int		  	pid;
 	char			msg[256];
 	int			save_errno, maxfds;
@@ -191,8 +184,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	rts_stringpool = stringpool;
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask;
-	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-		&jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
+	INVOKE_INIT_SECSHR_ADDRS;
 	initialize_pattern_table();
 
 	 /* Preallocate some timer blocks. */

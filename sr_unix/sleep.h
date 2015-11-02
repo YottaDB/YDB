@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,8 +25,10 @@ int m_nsleep(int nseconds);
 
 #ifdef UNIX
 
-# if !defined(_AIX) && !defined(__osf__) && !defined(__hpux) && !defined(__sparc) && !defined(_UWIN) && !defined(__linux__) && !defined(__MVS__)
-#  error "Unsure of support for sleep functions on this platform"
+# if !defined(_AIX) && !defined(__osf__) && !defined(__hpux) && !defined(__sparc) && !defined(_UWIN) && !defined(__linux__)
+#   if !defined(__MVS__) && !defined(__CYGWIN__)
+#      error "Unsure of support for sleep functions on this platform"
+#   endif
 # endif
 
 # ifdef _AIX
@@ -34,17 +36,7 @@ int m_nsleep(int nseconds);
 #  define nanosleep_func nsleep
 # endif
 
-# ifdef __sparc
-   typedef struct timespec m_time_t;
-#  define nanosleep_func nanosleep
-# endif
-
-# ifdef __hpux
-   typedef struct timespec m_time_t;
-#  define nanosleep_func nanosleep
-# endif
-
-# ifdef __osf__
+# if defined(__sparc) || defined(__hpux) || defined(__osf__) || defined (__linux__) || defined (__CYGWIN__)
    typedef struct timespec m_time_t;
 #  define nanosleep_func nanosleep
 # endif
@@ -52,11 +44,6 @@ int m_nsleep(int nseconds);
 # ifdef _UWIN
 # include "iotcp_select.h"
 # define usleep_func gtm_usleep
-# endif
-
-# ifdef __linux__
-   typedef struct timespec m_time_t;
-#  define nanosleep_func nanosleep
 # endif
 
 # ifdef __MVS__

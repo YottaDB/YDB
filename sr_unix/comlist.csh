@@ -102,6 +102,7 @@ default:
 
 endsw
 
+set mach_type = `uname -m`
 
 if ( $comlist_chmod_protect == 1 ) then
 	#	Change the permissions on all of the source files to prevent inadvertent
@@ -405,6 +406,16 @@ end
 
 # C compilations first:
 
+# For ia64, the file - xfer_desc.i - needs to be generated.
+if ( "ia64" == $mach_type ) then
+        pushd $gtm_src
+        tcsh $gtm_tools/gen_xfer_desc.csh
+        popd
+endif
+
+echo ""
+echo "Start of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.csh relies on this to detect warnings.
+echo ""
 
 /bin/ls $gs[1] | egrep '\.c$'   | xargs -n25 $shell $gtm_tools/gt_cc.csh
 
@@ -413,6 +424,10 @@ set comlist_gt_cc_bak = "$comlist_gt_cc"
 setenv comlist_gt_cc "$comlist_gt_cc -DFILE_TCP"
 $shell $gtm_tools/gt_cc.csh omi_sx_play.c
 setenv comlist_gt_cc "$comlist_gt_cc_bak"
+
+echo ""
+echo "End of C Compilation"	# Do not change this string. $gtm_tools/buildwarn.csh relies on this to detect warnings.
+echo ""
 
 if ( $?gt_xargs_insert == 0 ) setenv gt_xargs_insert "-i"
 
@@ -445,7 +460,14 @@ else
 	cp -p $gtm_vrt/$gt_as_use_prebuilt/*.o .
 endif
 
-############################################## Compilations and Assemblies ###################################################
+if ( $HOSTOS =~ "CYGWIN*" ) then
+	echo "Prefixing _ to .o in $gtm_exe to match Cygwin/Windows naming rules"
+	foreach x(`/bin/ls $gs[1]/*.s`)
+		objcopy --prefix-symbols="_" $gtm_exe/obj/$x:r:t.o
+	end
+endif
+
+############################################## Archiving object files ###################################################
 
 
 pushd $gtm_tools >& /dev/null

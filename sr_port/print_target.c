@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ void print_target(unsigned char *c)
 {
 	unsigned char	ctemp, *p, *ptop, *ptop1, *ptr, *ptr1, *top, *p_next;
 	unsigned char	buff[MAX_ZWR_KEY_SZ + sizeof("?.0")];
-	int4		ch;
+	uint4		ch;
 	boolean_t	bad_sub = FALSE;
 	boolean_t	is_string;
 

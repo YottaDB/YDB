@@ -12,8 +12,8 @@
 /*  get socket routines address */
 #include "mdef.h"
 
-#include <netdb.h>
-#include <unistd.h>
+#include "gtm_netdb.h"
+#include "gtm_unistd.h"
 #include <errno.h>
 #include "gtm_socket.h"
 #include "gtm_inet.h"
@@ -63,7 +63,7 @@ int	gtm_accept(int socket, struct sockaddr *address, sssize_t *address_len)
 
 	do
 	{
-		res = accept(socket, address, address_len);
+		res = accept(socket, address, (GTM_SOCKLEN_TYPE *)address_len);
 	} while (-1 == res && EINTR == errno);
 
 	return(res);

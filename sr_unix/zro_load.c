@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,7 @@ void zro_load (mstr *str)
 	error_def		(ERR_NOLBRSRC);
 	error_def		(ERR_INVZROENT);
 
+	memset(array, 0, sizeof(array));
 	lp = str->addr;
 	top = lp + str->len;
 	while (lp < top && *lp == ZRO_DEL)

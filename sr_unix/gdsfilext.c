@@ -17,8 +17,7 @@
 #include <errno.h>
 #include "gtm_unistd.h"
 #include <signal.h>
-#include "gtm_stat.h"
-#include "gtm_statvfs.h"
+#include "gtm_statvfs.h"	/* for GTM_BAVAIL_TYPE */
 
 #include "buddy_list.h"
 #include "gdskill.h"
@@ -83,8 +82,6 @@ GBLREF	sm_uc_ptr_t	next_smseg;
 
 uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 {
-	struct stat		fstat_buf;
-	struct statvfs		fstatvfs_buf;
 	sm_uc_ptr_t		old_base[2];
 	boolean_t		was_crit, need_to_restore_mask = FALSE;
 	char			*buff;
@@ -99,6 +96,8 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	sigset_t		savemask;
 	inctn_opcode_t		save_inctn_opcode;
 	int4			prev_extend_blks_to_upgrd;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 
 	error_def(ERR_DBFILERR);
 	error_def(ERR_DBFILEXT);
@@ -194,6 +193,15 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	}
 	if (JNL_ENABLED(cs_data))
 	{
+		if (!jgbl.dont_reset_gbl_jrec_time)
+			SET_GBL_JREC_TIME;	/* needed before jnl_ensure_open as that can write jnl records */
+		jpc = cs_addrs->jnl;
+		jbp = jpc->jnl_buff;
+		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
+		 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write
+		 * journal records (if it decides to switch to a new journal file).
+		 */
+		ADJUST_GBL_JREC_TIME(jgbl, jbp);
 		jnl_status = jnl_ensure_open();
 		if (jnl_status)
 		{
@@ -306,9 +314,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			inctn_opcode = inctn_gdsfilext_mu_reorg;
 		else
 			inctn_opcode = inctn_gdsfilext_gtm;
-		if (!jgbl.forw_phase_recovery)
-			JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
-		if (0 == cs_addrs->jnl->pini_addr)
+		if (0 == jpc->pini_addr)
 			jnl_put_jrt_pini(cs_addrs);
 		jnl_write_inctn_rec(cs_addrs);
 		inctn_opcode = save_inctn_opcode;

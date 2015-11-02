@@ -67,10 +67,15 @@ char 	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char *ext_buff)
 	return ext_buff;
 }
 
+/* This was earlier declared as a local variable, but was moved up, because the HPIA compiler for some reason seems to
+ * optimize things, and thus not update the buffer correctly. Problem shows up only in optimized builds. Moving it to
+ * global status fixed the issue
+ */
+GBLDEF char key_buff[sizeof(gv_key) + MAX_KEY_SZ + 7];
 
 char	*jnl2ext(char *jnl_buff, char *ext_buff)
 {
-	char		*curr, *val_ptr, *ptr, rectype, key_buff[sizeof(gv_key) + MAX_KEY_SZ + 7];
+  	char		*curr, *val_ptr, *ptr, rectype;
 	jnl_record	*rec;
 	gv_key		*key;
 	jnl_string	*keystr;

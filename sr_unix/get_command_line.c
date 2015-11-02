@@ -60,7 +60,10 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 		return;
 	}
 	if (stringpool.free + len > stringpool.top)
+	{
+		result->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
 		stp_gcol(len);
+	}
 	cp = stringpool.free;
 	stringpool.free += len;
 	result->str.addr = (char *)cp;

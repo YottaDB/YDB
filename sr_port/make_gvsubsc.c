@@ -29,7 +29,7 @@ oprtype make_gvsubsc(mval *v)
 	if (stringpool.top - stringpool.free < MAX_SRCLINE + sizeof(gv_key))
 	{	stp_gcol(MAX_SRCLINE + sizeof(gv_key));
 	}
-	if ((int)stringpool.free & 1)
+	if ((INTPTR_T)stringpool.free & 1)
 		stringpool.free++;	/* word align key for structure refs */
 	gp = (gv_key *) stringpool.free;
 	gp->top = MAX_SRCLINE;

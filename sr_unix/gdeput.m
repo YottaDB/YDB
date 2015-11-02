@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2007 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -26,18 +26,28 @@ GDEPUT()
 	s x=x+(csegcnt*SIZEOF("gd_segment"))
 	s rec=""
 ; contents
-	s rec=rec_$c(0,0,0,0)									; not used
+	i (gtm64="true") s rec=rec_$c(0,0,0,0,0,0,0,0)				       		; not used
+	e  s rec=rec_$c(0,0,0,0)								; not used
 	s rec=rec_$$num2bin(4,maxrecsize)							; max rec size
 	s filesize=SIZEOF("gd_contents")
 	s rec=rec_$$num2bin(2,mapcnt)_$$num2bin(2,cregcnt)_$$num2bin(2,csegcnt)_$$num2bin(2,0)	; maps,regs,segs,filler
-	s rec=rec_$$num2bin(4,filesize)								; mapptr
+	i (gtm64="true") d
+	. s rec=rec_$$num2bin(4,0) 								; padding
+	. s rec=rec_$$num2bin(8,filesize)							; mapptr
+	e  s rec=rec_$$num2bin(4,filesize)							; mapptr
 	s filesize=filesize+(mapcnt*SIZEOF("gd_map"))
-	s rec=rec_$$num2bin(4,filesize)								; regionptr
+	i (gtm64="true") s rec=rec_$$num2bin(8,filesize)					; regionptr
+	e  s rec=rec_$$num2bin(4,filesize)							; regionptr
 	s filesize=filesize+(cregcnt*SIZEOF("gd_region"))
-	s rec=rec_$$num2bin(4,filesize)								; segmentptr
+	i (gtm64="true") s rec=rec_$$num2bin(8,filesize)					; segmentptr
+	e  s rec=rec_$$num2bin(4,filesize)							; segmentptr
 	s filesize=filesize+(csegcnt*SIZEOF("gd_segment")),base=filesize
-	s rec=rec_$tr($j("",12)," ",ZERO)							; reserved
-	s rec=rec_$$num2bin(4,filesize)								; end
+	i (gtm64="true") d
+	. s rec=rec_$tr($j("",24)," ",ZERO)							; reserved
+	. s rec=rec_$$num2bin(8,filesize)							; end
+	e  d
+	. s rec=rec_$tr($j("",12)," ",ZERO)							; reserved
+	. s rec=rec_$$num2bin(4,filesize)							; end
 	s rec=hdrlab_$$num2bin(4,$l(hdrlab)+4+filesize)_rec
 	i create zm gdeerr("GDCREATE"):file
 	e  s:$ZVersion["VMS" $p(file,";",2)=$p(file,";",2)+1  zm gdeerr("GDUPDATE"):file
@@ -80,7 +90,8 @@ fdatum:
 map:
 	d writerec
 	i $zl(s)'=SIZEOF("mident") d error1
-	s rec=rec_s_$$num2bin(4,cregs(map(s),"offset"))
+	i (gtm64="true") s rec=rec_s_$$num2bin(4,cregs(map(s),"offset"))_$$num2bin(4,0) ; add padding
+	e  s rec=rec_s_$$num2bin(4,cregs(map(s),"offset"))
 	q
 cregion:
 	d writerec
@@ -88,8 +99,12 @@ cregion:
 	s rec=rec_s_$tr($j("",MAXREGLN-$l(s))," ",ZERO)
 	s rec=rec_$$num2bin(2,regs(s,"KEY_SIZE"))
 	s rec=rec_$$num2bin(4,regs(s,"RECORD_SIZE"))
-	s rec=rec_$$num2bin(4,csegs(regs(s,"DYNAMIC_SEGMENT"),"offset"))
-	s rec=rec_$$num2bin(4,0)
+	i (gtm64="true") d
+	. s rec=rec_$$num2bin(4,csegs(regs(s,"DYNAMIC_SEGMENT"),"offset"))_$$num2bin(4,0) ; padding
+	. s rec=rec_$$num2bin(8,0)
+	e  d
+	. s rec=rec_$$num2bin(4,csegs(regs(s,"DYNAMIC_SEGMENT"),"offset"))
+	. s rec=rec_$$num2bin(4,0)
 	s rec=rec_ZERO										; OPEN state
 	s rec=rec_ZERO										; LOCK_WRITE
 	s rec=rec_$c(regs(s,"NULL_SUBSCRIPTS"))
@@ -103,7 +118,8 @@ cregion:
 	s rec=rec_$$num2bin(1,regs(s,"STDNULLCOLL"))
 	s rec=rec_$$num2bin(1,$zl(regs(s,"FILE_NAME")))
 	s rec=rec_regs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(regs(s,"FILE_NAME")))," ",ZERO)
-	s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
+	i (gtm64="true") s rec=rec_$tr($j("",12)," ",ZERO)					; reserved + padding
+	e  s rec=rec_$tr($j("",8)," ",ZERO)							; reserved
 	q
 csegment:
 	d writerec
@@ -116,7 +132,8 @@ csegment:
 	s rec=rec_$$num2bin(2,segs(s,"BLOCK_SIZE"))
 	s rec=rec_$$num2bin(2,segs(s,"EXTENSION_COUNT"))
 	s rec=rec_$$num2bin(4,segs(s,"ALLOCATION"))
-	s rec=rec_$tr($j("",4)," ",ZERO)								;reserved for clb
+	i (gtm64="true") s rec=rec_$tr($j("",12)," ",ZERO)						;reserved for clb + padding
+	e  s rec=rec_$tr($j("",4)," ",ZERO)								;reserved for clb
 	s rec=rec_".DAT"
 	s rec=rec_$c(+segs(s,"DEFER"))
 	s rec=rec_ZERO											;DYNAMIC segment
@@ -128,14 +145,19 @@ csegment:
 	s x=$s(am="BG":1,am="MM":2,am="USER":4,1:-1)
 	i x=-1 d error1
 	s rec=rec_$$num2bin(4,x)
-	s rec=rec_$$num2bin(4,0)		; file_cntl ptr
-	s rec=rec_$$num2bin(4,0)		; repl_list ptr
+	i (gtm64="true") d
+	. s rec=rec_$$num2bin(8,0)		; file_cntl ptr
+	. s rec=rec_$$num2bin(8,0)		; repl_list ptr
+	e  d
+	. s rec=rec_$$num2bin(4,0)		; file_cntl ptr
+	. s rec=rec_$$num2bin(4,0)		; repl_list ptr
 	q
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
 
 num2bin:(l,n)
-	q $s(l=1:$$num2tiny(+n),l=2:$$num2shrt(+n),l=4:$$num2long(+n),1:$$num2error)
+	i (gtm64="true") q $s(l=1:$$num2tiny(+n),l=2:$$num2shrt(+n),l=4:$$num2int(+n),l=8:$$num2long(+n),1:$$num2error)
+	e  q $s(l=1:$$num2tiny(+n),l=2:$$num2shrt(+n),l=4:$$num2int(+n),1:$$num2error)
 	;
 num2tiny:(num)
 	i (num<0)!(num'<256) d error1
@@ -146,11 +168,18 @@ num2shrt:(num)
 	i endian=TRUE q $zch(num\256,num#256)
 	e  q $zch(num#256,num\256)
 	;
-num2long:(num)
+num2int:(num)
 	i (num<0)!(num'<TWO(32)) d error1
-	i endian=TRUE q $zch(num/16777216,num/65536#256,num/256#256,num#256)
-	e  q $zch(num#256,num/256#256,num/65536#256,num/16777216)
-
+	i endian=TRUE q $zch(num\TWO(24),num\TWO(16)#256,num\TWO(8)#256,num#256)
+	e  q $zch(num#256,num\TWO(8)#256,num\TWO(16)#256,num\TWO(24))
+	;
+num2long:(num)
+	n t8,t16,t24,t32,t40,t48,t56
+	s t8=TWO(8),t16=TWO(16),t24=TWO(24),t32=TWO(32),t40=TWO(40),t48=TWO(48),t56=TWO(56)
+	i (num<0)!(num'<TWO(64)) d error1
+	i endian=TRUE q $zch(num\t56,num\t48#256,num\t40#256,num\t32#256,num\t24#256,num\t16#256,num\t8#256,num#256)
+	e  q $zch(num#256,num\t8#256,num\t16#256,num\t24#256,num\t32#256,num\t40#256,num\t48#256,num\t56)
+	;
 num2error:()
 	d error1
 	q 0

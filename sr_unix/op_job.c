@@ -38,7 +38,9 @@ GBLREF  uint4		dollar_zjob;
 GBLREF	int4		outofband;
 GBLREF	int		dollar_truth;
 GBLREF	boolean_t	job_try_again;
-#if !defined(__MVS__) && !defined(__linux__)
+
+#ifndef SYS_ERRLIST_INCLUDE
+/* needed by TIMEOUT_ERROR in jobsp.h */
 GBLREF	int		sys_nerr;
 #endif
 

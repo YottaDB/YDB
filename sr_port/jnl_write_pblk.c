@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,17 +40,16 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
 	jnl_format_buffer 	blk_trailer;
 	char			local_buff[JNL_REC_START_BNDRY + JREC_SUFFIX_SIZE];
 	jrec_suffix		*suffix;
+	jnl_private_control	*jpc;
 
-	assert(0 != csa->jnl->pini_addr);
 	assert(csa->now_crit);
+	jpc = csa->jnl;
+	assert(0 != jpc->pini_addr);
 	pblk_record.prefix.jrec_type = JRT_PBLK;
-	pblk_record.prefix.pini_addr = (0 == csa->jnl->pini_addr) ? JNL_HDR_LEN : csa->jnl->pini_addr;
+	pblk_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 	pblk_record.prefix.tn = csa->ti->curr_tn;
+	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
-	if (!jgbl.gbl_jrec_time)
-	{	/* no idea how this is possible, but just to be safe */
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
-	}
 	pblk_record.prefix.time = jgbl.gbl_jrec_time;
 	pblk_record.prefix.checksum = cse->blk_checksum;
 	pblk_record.blknum = cse->blk;
@@ -59,8 +58,7 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
 	 */
 	assert(buffer->bsiz <= csa->hdr->blk_size || dse_running);
 	pblk_record.bsiz = MIN(csa->hdr->blk_size, buffer->bsiz);
-	assert((pblk_record.bsiz == buffer->bsiz)
-		|| (cse->blk_checksum == jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4 *)buffer, pblk_record.bsiz)));
+	assert((pblk_record.bsiz == buffer->bsiz) || (cse->blk_checksum == jnl_get_checksum((uint4 *)buffer, pblk_record.bsiz)));
 	assert(pblk_record.bsiz >= sizeof(blk_hdr) || dse_running);
 	pblk_record.ondsk_blkver = cse->ondsk_blkver;
 	tmp_jrec_size = FIXED_PBLK_RECLEN + pblk_record.bsiz + JREC_SUFFIX_SIZE;
@@ -73,5 +71,5 @@ void	jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer)
 	pblk_record.prefix.forwptr = suffix->backptr = jrec_size;
 	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
 	assert(sizeof(uint4) == sizeof(jrec_suffix));
-	jnl_write(csa->jnl, JRT_PBLK, (jnl_record *)&pblk_record, buffer, &blk_trailer);
+	jnl_write(jpc, JRT_PBLK, (jnl_record *)&pblk_record, buffer, &blk_trailer);
 }

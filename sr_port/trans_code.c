@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@ GBLREF bool 		compile_time;
 GBLREF mval		dollar_etrap;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF mv_stent		*mv_chain;
+GBLREF bool		transform;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMCHECK);
@@ -118,6 +119,10 @@ CONDITION_HANDLER(trans_code_ch)
 	{
 		NEXTCH;
 	}
+	assert(!compile_time || (FALSE == transform));
+	assert(compile_time || (TRUE == transform));
+	/* This is for when stack gets unwound in op_commarg before comp_fini gets called*/
+	transform = TRUE;
 	compile_time = FALSE;
 	assert(SFT_ZTRAP == proc_act_type || SFT_DEV_ACT == proc_act_type); /* are trans_code and this function in sync? */
 	assert(NULL != indr_stringpool.base); /* indr_stringpool must have been initialized by now */

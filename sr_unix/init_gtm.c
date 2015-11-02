@@ -11,7 +11,6 @@
 
 #include "mdef.h"
 
-
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "startup.h"
@@ -54,13 +53,17 @@ void init_gtm(void)
 	assert(sizeof(int) == 4);
 	assert(sizeof(int4) == 4);
 	assert(sizeof(short) == 2);
-#if defined(OFF_T_LONG) || defined(__MVS__)
+#ifdef OFF_T_LONG
 	assert(sizeof(off_t) == 8);
 #else
 	assert(sizeof(off_t) == 4);
 #endif
 	assert(sizeof(sgmnt_data) == ROUND_UP(sizeof(sgmnt_data), DISK_BLOCK_SIZE));
+#ifdef KEY_T_LONG
+	assert(8 == sizeof(key_t));
+#else
 	assert(sizeof(key_t) == sizeof(int4));
+#endif
 	assert(sizeof(boolean_t) == 4); /* generated code passes 4 byte arguments, run time rtn might be expecting boolean_t arg */
 	assert(BITS_PER_UCHAR == 8);
 	assert(sizeof(enum db_ver) == sizeof(int4));

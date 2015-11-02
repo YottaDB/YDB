@@ -102,8 +102,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	blk_hdr_ptr_t	blk_hdr_ptr;
 
 	blk_size = cs_data->blk_size;
-	assert(update_array != NULL);
-	update_array_ptr = update_array;
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 
 	BLK_ADDR(star_rec_hdr, sizeof(rec_hdr), rec_hdr);
 	star_rec_hdr->rsiz = BSTAR_REC_SIZE;
@@ -111,18 +110,17 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	level = cur_level;
 	max_fill = (0 == level)? d_max_fill : i_max_fill;
 
-	/*
-	-------------------
-	Split working block.
-	-------------------
-	new_blk1_last_key = last key of the new working block after split
-	new_blk1_last_keysz = size of new_blk1_last_key
-	old_blk1_last_rec_size = last record size of the new working block after split (for old block)
-	new_blk2_frec_base = base of first record of right block created after split
-	newblk2_first_key = first key of new block created after split
-	newblk2_first_keysz = size of newblk2_first_key
-	new_blk2_rem = pointer to new block to be created after split exclude 1st record header + key
-	*/
+	/*  -------------------
+	 *  Split working block.
+	 *  -------------------
+	 *  new_blk1_last_key = last key of the new working block after split
+	 *  new_blk1_last_keysz = size of new_blk1_last_key
+	 *  old_blk1_last_rec_size = last record size of the new working block after split (for old block)
+	 *  new_blk2_frec_base = base of first record of right block created after split
+	 *  newblk2_first_key = first key of new block created after split
+	 *  newblk2_first_keysz = size of newblk2_first_key
+	 *  new_blk2_rem = pointer to new block to be created after split exclude 1st record header + key
+	 */
 	blk_hdr_ptr = (blk_hdr_ptr_t)(gv_target->hist.h[level].buffaddr);
 	old_blk1_base = (sm_uc_ptr_t)blk_hdr_ptr;
 	old_blk1_sz = blk_hdr_ptr->bsiz;
@@ -134,8 +132,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		return cdb_sc_blkmod;
 	}
 	if (new_leftblk_top_off + BSTAR_REC_SIZE >= old_blk1_sz)
-		/* Avoid split to create a small right sibling.
-		Note this should not happen often when tolerance is high */
+		/* Avoid split to create a small right sibling. Note this should not happen often when tolerance is high */
 		return cdb_sc_oprnotneeded;
 	old_right_piece_len = old_blk1_sz - new_leftblk_top_off;
 	new_blk2_frec_base = old_blk1_base + new_leftblk_top_off;
@@ -178,7 +175,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
-	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE);
+	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, GDS_WRITE_PLAIN);
 
 	/* Create new split piece, we already know that this will not be *-rec only */
 	BLK_INIT(bs_ptr2, bs_ptr1);
@@ -427,7 +424,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				return cdb_sc_blkmod;
 			}
 			t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, right_index,
-				level, first_copy, FALSE);
+				level, first_copy, FALSE, GDS_WRITE_PLAIN);
 			break;
 		}
 		/* if SPLIT REQUIRED */
@@ -483,7 +480,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, ins_off, right_index, level);
 			else
 				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, right_index,
-					level, first_copy, FALSE);
+					level, first_copy, FALSE, GDS_WRITE_PLAIN);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (new_rtblk_star_only)
@@ -539,7 +536,8 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 			if (create_root)
 				left_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
 			else
-				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level, TRUE, TRUE);
+				t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0,
+					level, TRUE, TRUE, GDS_WRITE_PLAIN);
 			/* RIGHT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (new_leftblk_top_off < gv_target->hist.h[level].curr_rec.offset)
@@ -606,8 +604,11 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				assert(t_tries < CDB_STAGNATE);
 				return cdb_sc_blkmod;
 			}
+			/* Since a new root block is not created but two new children are created, this update to the
+			 * root block should disable the "indexmod" optimization (C9B11-001813).
+			 */
 			cse = t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, ins_off, left_index,
-				level + 1, TRUE, FALSE);
+				level + 1, TRUE, FALSE, GDS_WRITE_KILLTN);
 			t_write_root(ins_off2, right_index);	/* create a sibling cw-set-element to store ins_off2/right_index */
 			(*lvls_increased)++;
 			break;

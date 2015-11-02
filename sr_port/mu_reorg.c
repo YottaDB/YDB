@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -325,11 +325,6 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						reorg_finish(dest_blk_id, blks_processed, blks_killed, blks_reused,
 							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
 						return FALSE;
-					} else if (cdb_sc_oprnotneeded != status && cdb_sc_normal != status)
-					{
-						assert(CDB_STAGNATE > t_tries);
-						t_retry(status);
-						continue;
 					} else if (cdb_sc_normal == status)
 					{
 						if ((trans_num)0 == (ret_tn = t_end(&(gv_target->hist), 0)))
@@ -343,10 +338,18 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						lvls_reduced -= cnt2;
 						blks_split++;
 						break;
+					} else if (cdb_sc_oprnotneeded == status)
+					{	/* undo any update_array/cw_set changes and DROP THRU to mu_clsce */
+						cw_set_depth = 0;
+						CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
+						assert(0 == cw_map_depth); /* mu_swap_blk (that changes cw_map_depth) comes later */
+					} else
+					{
+						assert(CDB_STAGNATE > t_tries);
+						t_retry(status);
+						continue;
 					}
-					/* else cdb_sc_oprnotneeded == status  <*** DROP THRU ***> */
 				} /* end if SPLIT BLOCK */
-
 				/* We are here because, mu_split() was not called or, split was not done or, not required */
 				rtsib_hist = gv_target->alt_hist;
 				status = gvcst_rtsib(rtsib_hist, level);
@@ -369,12 +372,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 				{
 					/* histories are sent in &gv_target->hist and gv_target->alt_hist */
 					status = mu_clsce(level, i_max_fill, d_max_fill, &kill_set_list, &complete_merge);
-					if (cdb_sc_normal != status && cdb_sc_oprnotneeded != status)
-					{
-						assert(CDB_STAGNATE > t_tries);
-						t_retry(status);
-						continue;
-					} else if (cdb_sc_normal == status)
+					if (cdb_sc_normal == status)
 					{
 						if (level) /* delete lower elements of array, t_end might confuse */
 						{
@@ -417,8 +415,17 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 						}
 						blks_coalesced++;
 						break;
+					} else if (cdb_sc_oprnotneeded == status)
+					{	/* undo any update_array/cw_set changes and DROP THRU to t_end */
+						cw_set_depth = 0;
+						CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
+						assert(0 == cw_map_depth); /* mu_swap_blk (that changes cw_map_depth) comes later */
+					} else
+					{
+						assert(CDB_STAGNATE > t_tries);
+						t_retry(status);
+						continue;
 					}
-					/* else cdb_sc_oprnotneeded == status <*** DROP THRU ***> */
 				} /* end if try coalesce */
 				if (0 == level)
 				{
@@ -527,12 +534,7 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 							file_extended, lvls_reduced, blks_coalesced, blks_split, blks_swapped);
 						return TRUE;
 					}
-				} else if (cdb_sc_normal != status)
-				{
-					assert(CDB_STAGNATE > t_tries);
-					t_retry(status);
-					continue;
-				} else
+				} else if (cdb_sc_normal == status)
 				{
 					if (0 < kill_set_list.used)
 					{
@@ -575,9 +577,13 @@ boolean_t mu_reorg(mval *gn, glist *exclude_glist_ptr, boolean_t *resume, int in
 					if (reorg_op & SWAPHIST)
 						util_out_print("Dest !SL From !SL", TRUE, dest_blk_id,
 							gv_target->hist.h[level].blk_num);
+				} else
+				{
+					assert(CDB_STAGNATE > t_tries);
+					t_retry(status);
+					continue;
 				}
 				break;
-
 			}	/* === END OF SWAP LOOP === */
 			t_abort(gv_cur_region, cs_addrs);	/* do crit and other cleanup */
 		}

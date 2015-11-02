@@ -18,7 +18,6 @@
 #include "gtm_stdio.h"
 
 #include <sys/types.h>
-#include <sys/ipc.h>
 #include <sys/mman.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
@@ -503,9 +502,9 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	 * ignore the temporary storage and use the shared section from here on
 	 */
 	cs_addrs->critical = (mutex_struct_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SIZE);
-        assert(((int)cs_addrs->critical & 0xf) == 0);                        /* critical should be 16-byte aligned */
+        assert(((INTPTR_T)cs_addrs->critical & 0xf) == 0);                        /* critical should be 16-byte aligned */
 #ifdef CACHELINE_SIZE
-	assert(0 == ((int)cs_addrs->critical & (CACHELINE_SIZE - 1)));
+	assert(0 == ((INTPTR_T)cs_addrs->critical & (CACHELINE_SIZE - 1)));
 #endif
 	JNL_INIT(cs_addrs, reg, tsd);
 	cs_addrs->shmpool_buffer = (shmpool_buff_hdr_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
@@ -590,7 +589,6 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 			 * So, a new process will switch the journal file and cut the journal file link,
 			 * though it might be a good journal without an EOF
 			 */
-			JNL_SHORT_TIME(jgbl.gbl_jrec_time); /* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
 			wcs_flu(WCSFLU_NONE);
 		}
 		jpc = cs_addrs->jnl;

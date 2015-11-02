@@ -16,7 +16,7 @@
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
 
-#include <time.h>
+#include "gtm_time.h"
 
 #include "gtcm_sysenv.h"
 #include "gtcm.h"
@@ -36,7 +36,7 @@ char *gtcm_hname(struct sockaddr_in *sin)
     static char name[256];
 
 #ifndef SUNOS
-    if ((he = gethostbyaddr(&sin->sin_addr.s_addr,
+    if ((he = gethostbyaddr((void *)&sin->sin_addr.s_addr,
 			    sizeof(struct in_addr), AF_INET)))
 	sprintf(name,"%s (%d.%d.%d.%d)",he->h_name,
 		   sin->sin_addr.s_addr >> 24,

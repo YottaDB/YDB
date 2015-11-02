@@ -62,6 +62,7 @@
 #include "gtmmsg.h"
 #include "print_exit_stats.h"
 #include "gtm_logicals.h"
+#include "gtm_malloc.h"
 
 /* To debug this routine effectively, normally static routines are turned into
    GBLDEFs. Also, for vars that need one copy, define GBLRDEF to GBLDEF for
@@ -113,20 +114,32 @@
 #else
 /* These routines for Unix are NOT thread-safe */
 
-#  if defined(__linux__)
-#    define ACTUAL_MALLOC(size, addr) 							\
-	if (force_text_alloc) 								\
-	{ 										\
-		addr = (void *)memalign(sysconf(_SC_PAGESIZE), size);			\
-		if (-1 == mprotect(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC))	\
-                        addr = NULL; /* Signal no-storage error */			\
-	} else 										\
+#  if defined(__linux__) && defined(__ia64)
+#    define ACTUAL_MALLOC(size, addr) 											\
+	if (force_text_alloc) 												\
+	{ 														\
+                void   *alignaddr;	/* posix_memalign writes to *alignaddr so use temp to keep 'addr' in reg */     \
+	        size_t rsize;												\
+		int    rc;												\
+	        rsize = ROUND_UP2(size, gtm_os_page_size);								\
+		rc = posix_memalign(&alignaddr, gtm_os_page_size, rsize);						\
+		if (0 == rc)												\
+                        rc = (-1 == mprotect(alignaddr, rsize, PROT_READ | PROT_WRITE | PROT_EXEC)) ? errno : 0;	\
+                if (0 != rc)												\
+                {													\
+			--gtmMallocDepth;                                               				\
+			--fast_lock_count;                                              				\
+			assert(FALSE);                                                  				\
+		        rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("posix_memalign/memprotect"), CALLFROM, rc);	\
+                }													\
+                addr = alignaddr;											\
+	} else 														\
 		addr = (void *)malloc(size);
 
 #  else /* !(ia64 && linux) */
 #    define ACTUAL_MALLOC(size, addr)						\
- 	addr = malloc(size);
-#  endif  /* linux */
+ 	addr = (void *)malloc(size);
+#  endif  /* linux && ia64 */
 
 #  define MALLOC(size, addr) 							\
 {										\
@@ -154,54 +167,6 @@ enum ElemState {Allocated = 0x42, Free = 0x24};
 #else
 enum ElemState {Allocated, Free};
 #endif
-
-/* Each allocated block has the following structure. The actual address
-   returned to the user for 'malloc' and supplied by the user for 'free'
-   is actually the storage beginning at the 'userStorage.userStart' area.
-   This holds true even for storage that is truely malloc'd. Note that true
-   allocated length is kept even in the pro header.
-*/
-typedef struct storElemStruct
-{	/* While the following chars and short are not the best for performance, they enable us
-	   to keep the header size to 8 bytes in a pro build. This is important since our minimum
-	   allocation size is 16 bytes leaving 8 bytes for data. Also I have not researched what
-	   they are, there are a bunch of 8 byte allocates in GT.M that if we were to go to a 16
-	   byte header would make the minimum block size 32 bytes thus doubling the storage
-	   requirements for these small blocks. SE 03/2002
-	*/
-	signed char	queueIndex;			/* Index into TwoTable for this size of element */
-	unsigned char	state;				/* State of this block */
-	unsigned short	extHdrOffset;			/* For MAXTWO sized elements: offset to the
-							   header that describes the extent */
-	int		realLen;			/* Real (total) length of allocation */
-#ifdef DEBUG
-	struct	storElemStruct	*fPtr;			/* Next storage element on free/allocated queue */
-	struct	storElemStruct	*bPtr;			/* Previous storage element on free/allocated queue */
-	unsigned char	*allocatedBy;			/* Who allocated storage */
-	int		allocLen;			/* Requested length of allocation */
-	unsigned int	smTn;				/* Storage management transaction number allocated at */
-	unsigned char	headMarker[4];			/* Header that should not be modified during usage */
-	union
-	{
-		struct storElemStruct *deferFreeNext;	/* Pointer to next deferred free block */
-		unsigned char	userStart;		/* First byte of user useable storage */
-	} userStorage;
-#else
-#ifdef GTM64
-	char             filler[8];                      /* For 64 bit systems, the user area needs to be 16 byte aligned */
-#endif /* GTM64 */
-	union						/* In production mode, the links are used only when element is free */
-	{
-		struct storElemStruct *deferFreeNext;	/* Pointer to next deferred free block */
-		struct					/* Free block information */
-		{
-			struct	storElemStruct	*fPtr;	/* Next storage element on free queue */
-			struct	storElemStruct	*bPtr;	/* Previous storage element on free queue */
-		} links;
-		unsigned char	userStart;		/* First byte of user useable storage */
-	} userStorage;
-#endif
-} storElem;
 
 /* At the end of each block is this header which is used to track when all of the elements that
    a block of real allocated storage was broken into have become free. At that point, we can return
@@ -272,9 +237,9 @@ typedef struct
 #  define SET_MAX(max, tst) {max = MAX(max, tst);}
 #  define SET_ELEM_MAX(qtype, idx) SET_MAX(qtype##ElemMax[idx], qtype##ElemCnt[idx])
 #  define TRACE_MALLOC(addr,len) {if (GDL_SmTrace & gtmDebugLevel) \
-                                          FPRINTF(stderr,"Malloc at %x of %d bytes from %lx\n", addr, len, CALLERID);}
-#  define TRACE_FREE(addr,len)       {if (GDL_SmTrace & gtmDebugLevel) \
-                                          FPRINTF(stderr,"Free at %x of %d bytes from %lx\n", addr, len, CALLERID);}
+                        	       	    FPRINTF(stderr,"Malloc at %lx of %ld bytes from %lx\n", addr, len, CALLERID);}
+#  define TRACE_FREE(addr,len)   {if (GDL_SmTrace & gtmDebugLevel) \
+                        		    FPRINTF(stderr,"Free at %lx of %d bytes from %lx\n", addr, len, CALLERID);}
 #else
 #  define INCR_CNTR(x)
 #  define INCR_SUM(x, y)
@@ -367,11 +332,13 @@ GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it ge
 GBLREF	unsigned char	*smCallerId;			/* Caller of top level malloc/free */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
 
+OS_PAGE_SIZE_DECLARE
+
 STATICD	boolean_t	gtmSmInitialized;		/* Initialized indicator */
 
-#ifdef __linux__
+#if defined(__linux__) && defined(__ia64)
 GBLREF boolean_t 	force_text_alloc;		/* Explicitly turn on PROT_EXEC permission for allocated blocks */
-#endif /* __ia64 */
+#endif /* __linux__ && __ia64 */
 
 #define SIZETABLEDIM MAXTWO/MINTWO
 STATICD int size2Index[SIZETABLEDIM];
@@ -449,7 +416,6 @@ GMR_ONLY(STATICD	int	deferFreePending;)	/* Total number of frees that were defer
 STATICR void gtmSmInit(void);
 storElem *findStorElem(int sizeIndex);
 #ifdef DEBUG
-#include "gtm_malloc.h"
 void backfill(unsigned char *ptr, ssize_t len);
 boolean_t backfillChk(unsigned char *ptr, ssize_t len);
 #else
@@ -544,11 +510,12 @@ storElem *findStorElem(int sizeIndex)
 
 	VMS_ONLY(error_def(ERR_VMSMEMORY);)
 	UNIX_ONLY(error_def(ERR_MEMORY);)
+	UNIX_ONLY(error_def(ERR_SYSCALL);)
 
 	++sizeIndex;
 	if (MAXINDEX >= sizeIndex)
 	{	/* We have more queues to search */
-		GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr);
+	        GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr, sEHdr);
 
 		/* We have a larger than necessary element now so break it in half and put
 		   the second half on the queue one size smaller than us */
@@ -577,7 +544,8 @@ storElem *findStorElem(int sizeIndex)
 		*/
 		MALLOC(EXTENT_SIZE, uStorAlloc);
 		uStor2 = (storElem *)uStorAlloc;
-		uStor = (storElem *)(((unsigned long)(uStor2) + MAXTWO - 1) & -MAXTWO); /* Make addr "MAXTWO" byte aligned */
+		/* Make addr "MAXTWO" byte aligned */
+		uStor = (storElem *)(((unsigned long)(uStor2) + MAXTWO - 1) & (unsigned long) -MAXTWO);
 		totalRmalloc += EXTENT_SIZE;
 		SET_MAX(rmallocMax, totalRmalloc);
 		sEHdr = (storExtHdr *)((char *)uStor + (ELEMS_PER_EXTENT * MAXTWO));
@@ -678,6 +646,7 @@ void *gtm_malloc(size_t size)
 
 	VMS_ONLY(error_def(ERR_VMSMEMORY);)
 	UNIX_ONLY(error_def(ERR_MEMORY);)
+	UNIX_ONLY(error_def(ERR_SYSCALL);)
 	error_def(ERR_MEMORYRECURSIVE);
 
 #ifndef DEBUG
@@ -754,7 +723,7 @@ void *gtm_malloc(size_t size)
 				 * DEBUG) but that is better than maintaining an incorrect value (possible if it is incremented
 				 * by one amount during MALLOC and decremented by another amount during FREE).
 				 */
-				if (LINUX_ONLY(!force_text_alloc &&) MAXTWO >= tSize GMR_ONLY(&& !reentered))
+				if (LINUX_ONLY(IA64_ONLY(!force_text_alloc &&)) MAXTWO >= tSize GMR_ONLY(&& !reentered))
 				{	/* Use our memory manager for smaller pieces */
 					sizeIndex = GetSizeIndex(tSize);		/* Get index to size we need */
 					assert(sizeIndex >= 0 && sizeIndex <= MAXINDEX);
@@ -860,8 +829,8 @@ void *gtm_malloc(size_t size)
 #endif
 }
 
-#ifdef __linux__
-/* Forces use of memalign to allcoate storage instead of malloc */
+#if defined(__linux__) && defined(__ia64)
+/* Forces use of posix_memalign to allocate storage instead of malloc so we can set execute permissions for the storage */
 void *gtm_text_malloc(size_t size)
 {
   	void *addr;
@@ -871,7 +840,7 @@ void *gtm_text_malloc(size_t size)
 	force_text_alloc = 0;
 	return addr;
 }
-#endif /* __linux__ */
+#endif /* __linux__ && __ia64 */
 
 /* Release the free storage at the given address */
 void gtm_free(void *addr)
@@ -1315,7 +1284,7 @@ void printMallocInfo(void)
 			if (0 > j)					   /* Wrap as necessary */
 				j = MAXSMTRACE - 1;
 			if (0 != smMallocs[j].smTn)
-				FPRINTF(stderr,"%9d    0x%08lx  %10d   0x%08lx\n", smMallocs[j].smTn, smMallocs[j].smAddr,
+				FPRINTF(stderr,"%9d    0x%08lx  %10ld   0x%08lx\n", smMallocs[j].smTn, smMallocs[j].smAddr,
 					smMallocs[j].smSize, smMallocs[j].smCaller);
 		}
 		FPRINTF(stderr,"\n\nFree Storage Traceback:\n");
@@ -1325,7 +1294,7 @@ void printMallocInfo(void)
 			if (0 > j)					  /* Wrap as necessary */
 				j = MAXSMTRACE - 1;
 			if (0 != smFrees[j].smTn)
-				FPRINTF(stderr,"%9d    0x%08lx  %10d   0x%08lx\n", smFrees[j].smTn, smFrees[j].smAddr,
+				FPRINTF(stderr,"%9d    0x%08lx  %10ld   0x%08lx\n", smFrees[j].smTn, smFrees[j].smAddr,
 					smFrees[j].smSize, smFrees[j].smCaller);
 		}
 		FPRINTF(stderr,"\n");

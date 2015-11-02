@@ -21,8 +21,7 @@ static char *encode_os(void);
 
 LITDEF	gtcm_proto_cpu_info_t	gtcm_proto_cpu_info[] =
 {
-	LIT_AND_LEN("IA64/B"),			"IA64/B",
-	LIT_AND_LEN("IA64/L"),			"IA64/L",
+	LIT_AND_LEN("IA64"),			"IA64",
 	LIT_AND_LEN("RS6000"),			"PPC",
 	LIT_AND_LEN("AXP"),			"AXP",
 	LIT_AND_LEN("HP-PA"),			"PAR",

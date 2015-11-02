@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,8 @@ error_def(ERR_TEXT);
  ***************************************************************************************************/
 void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 {
-	int		index, src_ustr_len, src_chlen, dst_chlen, ulen, dstlen = 0;
+	int		index;
+	int32_t		src_ustr_len, src_chlen, dst_chlen, ulen, dstlen = 0;
 	UErrorCode	status;
 	char		*dstbase;
 	UChar		src_ustr[MAX_ZCONVBUFF], dst_ustr[MAX_ZCONVBUFF], *src_ustr_ptr, *dst_ustr_ptr;

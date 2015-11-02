@@ -13,7 +13,6 @@
  *	Accept a client connection.
  */
 
-
 #include "mdef.h"
 
 #include "gtm_fcntl.h"
@@ -25,28 +24,14 @@
 #include "rc_oflow.h"
 #include <errno.h>
 #include "eintr_wrappers.h"
+#include "gtm_socket.h"
 
 #ifdef BSD_TCP
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #endif /* defined(BSD_TCP) */
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
-#endif
-
-#ifndef __linux__
-
-#	ifdef __osf__
-#	pragma pointer_size (save)
-#	pragma pointer_size (long)
-#	endif
-
-extern char	*sys_errlist[];
-
-#	ifdef __osf__
-#	pragma pointer_size (restore)
-#	endif
-
 #endif
 
 GBLREF	char	*omi_pklog;
@@ -60,13 +45,13 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	omi_fd		fd;
 
 #ifdef BSD_TCP
-	size_t			sln;
+	GTM_SOCKLEN_TYPE			sln;
 	struct sockaddr_in	sin;
 	int			option, optsize;
 
 	/*  Accept the connection from the network layer */
 	sln = sizeof(sin);
-	if ((fd = accept(cll->nve, (struct sockaddr *)&sin, (size_t *)&sln)) < 0)
+	if ((fd = accept(cll->nve, (struct sockaddr *)&sin, (GTM_SOCKLEN_TYPE *)&sln)) < 0)
 		return -1;
 #endif				/* defined(BSD_TCP) */
 
@@ -151,14 +136,16 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 	DEBUG_ONLY(
 		if (omi_pklog)
 		{
+			int		errno_save;
 			char		pklog[1024];
 
 			(void) sprintf(pklog, "%s.%04d", omi_pklog, cptr->stats.id);
 			if (INV_FD_P((cptr->pklog = open(pklog, O_WRONLY|O_CREAT|O_APPEND|O_TRUNC, 0644))))
 			{
+				errno_save = errno;
 				OMI_DBG_STMP;
 				OMI_DBG((omi_debug, "%s: unable to open packet log \"%s\"\n\t%s\n",
-					SRVR_NAME, pklog, sys_errlist[errno]));
+					SRVR_NAME, pklog, STRERROR(errno_save)));
 			}
 		}
 	)

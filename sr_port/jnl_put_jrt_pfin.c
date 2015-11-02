@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,21 +28,19 @@ GBLREF 	jnl_gbls_t		jgbl;
 void	jnl_put_jrt_pfin(sgmnt_addrs *csa)
 {
 	struct_jrec_pfin	pfin_record;
+	jnl_private_control	*jpc;
 
 	assert(csa->now_crit);
-	assert(0 != csa->jnl->pini_addr);
+	jpc = csa->jnl;
+	assert(0 != jpc->pini_addr);
 	pfin_record.prefix.jrec_type = JRT_PFIN;
 	pfin_record.prefix.forwptr = pfin_record.suffix.backptr = PFIN_RECLEN;
 	pfin_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-	pfin_record.prefix.pini_addr  = (0 == csa->jnl->pini_addr) ? JNL_HDR_LEN : csa->jnl->pini_addr;
+	pfin_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 	pfin_record.prefix.tn = csa->ti->curr_tn;
 	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
-	if (!jgbl.gbl_jrec_time)
-	{	/* no idea how this is possible, but just to be safe */
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
-	}
 	pfin_record.prefix.time = jgbl.gbl_jrec_time;
 	pfin_record.prefix.checksum = INIT_CHECKSUM_SEED;
-	jnl_write(csa->jnl, JRT_PFIN, (jnl_record *)&pfin_record, NULL, NULL);
+	jnl_write(jpc, JRT_PFIN, (jnl_record *)&pfin_record, NULL, NULL);
 }

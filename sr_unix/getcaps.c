@@ -12,7 +12,7 @@
 /* ------------------------------------------------------
  * mdef.h not included because the definition of bool
  * conflicts with that in curses.h in the AIX platform
- * also mdef.h is not required here except for the GBLDEF
+ * also mdef.h is not required here except for the GBLDEF and assert
  * ------------------------------------------------------
  */
 
@@ -21,7 +21,9 @@
 #include "gtm_term.h"
 #include "getcaps.h"
 
-#define assert
+#ifndef assert
+#define assert(x)
+#endif
 
 #define GBLDEF
 

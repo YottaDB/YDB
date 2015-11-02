@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -303,7 +303,7 @@ boolean_t updproc_preread(void)
 		RELEASE_SWAPLOCK(&upd_helper_ctl->pre_read_lock);
 		if (good_record)
 		{
-			rectype = rec->prefix.jrec_type;
+			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 			if (IS_SET_KILL_ZKILL(rectype))
 			{
 				was_wrapped = recvpool_ctl->wrapped;

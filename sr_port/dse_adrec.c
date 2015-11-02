@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,10 +74,7 @@ void dse_adrec(void)
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-	assert(update_array);
-	/* reset new block mechanism */
-	update_array_ptr = update_array;
-
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
 		if(!cli_get_hex("BLOCK", (uint4 *)&blk))
@@ -249,7 +246,7 @@ void dse_adrec(void)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE);
+	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 	BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 	t_end(&dummy_hist, 0);
 

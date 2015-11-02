@@ -232,10 +232,15 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, bool is_mm)
 			if (cs->blk > csa->nl->highest_lbm_blk_changed)
 				csa->nl->highest_lbm_blk_changed = cs->blk;	    /* Retain high-water mark */
 		}
+		assert((inctn_bmp_mark_free_gtm == inctn_opcode) || (inctn_bmp_mark_free_mu_reorg == inctn_opcode)
+				|| (inctn_blkmarkfree == inctn_opcode) || dse_running);
 		if ((inctn_bmp_mark_free_gtm == inctn_opcode) || (inctn_bmp_mark_free_mu_reorg == inctn_opcode))
 		{	/* coming in from gvcst_bmp_mark_free. adjust "csd->blks_to_upgrd" if necessary */
 			assert(0 == dollar_tlevel);	/* gvcst_bmp_mark_free runs in non-TP */
-			assert(1 == cw_set_depth);	/* bitmap block should be the only block updated in this transaction */
+			/* Bitmap block should be the only block updated in this transaction. The only exception is if the
+			 * previous cw-set-element is of type gds_t_busy2free (which does not go through bg_update) */
+			assert((1 == cw_set_depth)
+				|| (2 == cw_set_depth) && (gds_t_busy2free == (cs-1)->old_mode));
 			if (0 != inctn_detail.blknum)
 				DECR_BLKS_TO_UPGRD(csa, csd, 1);
 		}
@@ -243,7 +248,6 @@ void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, bool is_mm)
 	/* else cs->reference_cnt is 0, this means no free/busy state change in non-bitmap blocks, hence no mastermap change */
 	return;
 }
-
 
 enum cdb_sc	mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn, trans_num effective_tn, sgm_info *si)
 {
@@ -259,6 +263,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 	error_def(ERR_DBFILERR);
 	error_def(ERR_TEXT);
 
+	assert((gds_t_committed > cs->mode) && (gds_t_noop < cs->mode));
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bg_updates, 1);
 	assert((0 <= cs->blk) && (cs->blk < cs_addrs->ti->total_blks));
 	db_addr[0] = cs_addrs->acc_meth.mm.base_addr + (sm_off_t)cs_data->blk_size * (cs->blk);
@@ -554,11 +559,8 @@ enum cdb_sc	mm_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 		}
 	}
 #endif
-
 	return cdb_sc_normal;
 }
-
-
 
 /* update buffered global database */
 enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn, trans_num effective_tn, sgm_info *si)
@@ -585,6 +587,7 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 	csd = csa->hdr;
 	cnl = csa->nl;
 	assert(csd == cs_data);
+	assert((gds_t_committed > cs->mode) && (gds_t_noop < cs->mode));
 	assert(csa->now_crit);
 	assert((0 < dollar_tlevel) || (cs->blk < csa->ti->total_blks));
 	assert(0 <= cs->blk);
@@ -593,9 +596,9 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_BTPUTNULL, bt, NULL);
 	if (NULL == bt)
 		return cdb_sc_cacheprob;
-	if (cs->write_type & GDS_WRITE_KILL)
+	if (cs->write_type & GDS_WRITE_KILLTN)
 		bt->killtn = ctn;
-	cr = (cache_rec_ptr_t)bt->cache_index;
+	cr = (cache_rec_ptr_t)(INTPTR_T)bt->cache_index;
 	recycled = FALSE;
 	DEBUG_ONLY(read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog);)
 	if ((cache_rec_ptr_t)CR_NOTVALID == cr)
@@ -1007,6 +1010,8 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 	assert(!(JNL_ENABLED(csa) && csa->jnl_before_image) || !mu_reorg_nosafejnl
 		|| (inctn_blkupgrd != inctn_opcode) || (cr->ondsk_blkver == csd->desired_db_format));
 	assert(!mu_reorg_upgrd_dwngrd_in_prog || (gds_t_acquired != cs->mode));
+	/* RECYCLED blocks could be converted by MUPIP REORG UPGRADE/DOWNGRADE. In this case do NOT update blks_to_upgrd */
+	assert((gds_t_write_recycled != cs->mode) || mu_reorg_upgrd_dwngrd_in_prog);
 	if (gds_t_acquired == cs->mode)
 	{	/* It is a created block. It should inherit the desired db format. If that format is V4, increase blks_to_upgrd. */
 		if (GDSV4 == csd->desired_db_format)
@@ -1020,12 +1025,14 @@ enum cdb_sc	bg_update(cw_set_element *cs, cw_set_element *cs_top, trans_num ctn,
 		{
 			case GDSV5:
 				/* V4 -> V5 transition */
-				DECR_BLKS_TO_UPGRD(csa, csd, 1);
+				if (gds_t_write_recycled != cs->mode)
+					DECR_BLKS_TO_UPGRD(csa, csd, 1);
 				cr->ondsk_blkver = GDSV5;
 				break;
 			case GDSV4:
 				/* V5 -> V4 transition */
-				INCR_BLKS_TO_UPGRD(csa, csd, 1);
+				if (gds_t_write_recycled != cs->mode)
+					INCR_BLKS_TO_UPGRD(csa, csd, 1);
 				cr->ondsk_blkver = GDSV4;
 				break;
 			default:
@@ -1139,8 +1146,8 @@ uint4	jnl_ensure_open(void)
 	)
 
 	assert(cs_addrs->now_crit);
-	assert(NULL != cs_addrs->jnl);
 	jpc = cs_addrs->jnl;
+	assert(NULL != jpc);
 	/* The goal is to change the code below to do only one JNL_FILE_SWITCHED(jpc) check instead of the two including
 	 * the additional (NOJNL == jpc->channel) check done below. The assert below ensures that the NOJNL check can indeed
 	 * be subsumed by the JNL_FILE_SWITCHED check (with the exception of the source-server which has a special case that

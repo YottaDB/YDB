@@ -17,7 +17,8 @@
 #include "inst_flush.h"
 #include "private_code_copy.h"
 #include "stack_frame.h"
-#include <string.h>
+#include "gtm_malloc.h"
+#include "gtm_string.h"
 
 CONDITION_HANDLER(cre_priv_ch)
 {
@@ -43,7 +44,7 @@ uint4 cre_private_code_copy(rhdtyp *rtn)
 		assert(NULL == rtn->shared_ptext_adr); /* if already private, we shouldn't be calling this routine */
 		code_size = (int)(rtn->ptext_end_adr - rtn->ptext_adr) ;
 		ESTABLISH_RET(cre_priv_ch, UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
-		new_ptext = malloc(code_size);
+		new_ptext = GTM_TEXT_MALLOC(code_size);
 		REVERT;
 		memcpy(new_ptext, rtn->ptext_adr, code_size);
 		adjust_frames(rtn->ptext_adr, rtn->ptext_end_adr, new_ptext);

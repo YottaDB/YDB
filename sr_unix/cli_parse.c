@@ -658,7 +658,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				ptr_next_val = strchr(ptr_next_val, ',')+ 1;
 				if (!*ptr_next_val)
 				{
-					SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option expected", tmp_str_ptr);
+					SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option expected");
 					cli_lex_in_ptr->tp = 0;
 					return FALSE;
 

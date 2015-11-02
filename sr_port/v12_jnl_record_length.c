@@ -42,7 +42,7 @@ int4	v12_jnl_record_length(jnl_record *rec, int4 top)  /* top is maximum length 
 	unsigned char		lcl_jrec_type;
 	mstr_len_t		mstr_len;
 
-	if ((rectype = REF_CHAR(&rec->jrec_type)) <= JRT_BAD  ||  rectype >= JRT_RECTYPES)
+	if ((rectype = (enum jnl_record_type)REF_CHAR(&rec->jrec_type)) <= JRT_BAD  ||  rectype >= JRT_RECTYPES)
 	{
 		return -1;
 	}

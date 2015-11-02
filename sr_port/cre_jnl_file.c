@@ -266,7 +266,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	memcpy(jnlfile_id.did, &nam.nam$w_did, sizeof(jnlfile_id.did));
 	memcpy(jnlfile_id.fid, &nam.nam$w_fid, sizeof(jnlfile_id.fid));
 #endif
-	info->checksum = jnl_get_checksum_entire(INIT_CHECKSUM_SEED, (uint4 *)&jnlfile_id, sizeof(gd_id));
+	info->checksum = jnl_get_checksum_entire((uint4 *)&jnlfile_id, sizeof(gd_id));
 	/* We have already saved previous journal file name in info */
 	jfh_from_jnl_info(info, &header);
 	header.recover_interrupted = mupip_jnl_recover;

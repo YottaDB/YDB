@@ -38,9 +38,32 @@
 #include <netinet/ip_icmp.h>
 #include "omi.h"
 
-#ifdef BSD_TCP
-#include <arpa/inet.h>
-#endif /* defined(BSD_TCP) */
+#if defined(__CYGWIN__) && !defined(ICMP_ECHO)
+/* Note that we may actually need to use Windows sockets for icmp for now */
+
+struct icmp
+{
+   u_char icmp_type;
+   u_char icmp_code;
+   u_char icmp_cksum;
+   u_char icmp_id;
+   u_char icmp_seq;
+   u_char icmp_data[1];
+};
+
+#ifndef ICMP_ECHOREPLY
+#define ICMP_ECHOREPLY 0
+#endif
+
+#ifndef ICMP_ECHO
+#define ICMP_ECHO 8
+#endif
+
+#ifndef ICMP_MINLEN
+#define ICMP_MINLEN 8
+#endif
+
+#endif /* __CYGWIN__ */
 
 static int pingsock = -1, ident;
 static char pingrcv[IP_MAXPACKET], pingsend[256];
@@ -80,7 +103,7 @@ int icmp_ping(int conn)
 {
 	fd_set			fdmask;
 	struct sockaddr_in	paddr;
-	size_t			paddr_len = sizeof(struct sockaddr_in);
+	GTM_SOCKLEN_TYPE	paddr_len = sizeof(struct sockaddr_in);
 	struct icmp		*icp;
 	struct ip		*ip;
 	struct timeval		timeout;
@@ -91,7 +114,7 @@ int icmp_ping(int conn)
 		fprintf(stderr,"icmp_ping:  no ping socket.\n");
 		exit(1);
 	}
-	if (getpeername(conn, (struct sockaddr *)&paddr, (size_t *)&paddr_len) < 0)
+	if (getpeername(conn, (struct sockaddr *)&paddr, (GTM_SOCKLEN_TYPE *)&paddr_len) < 0)
 	{
 		perror("getpeername");
 		return -1;	/* to denote error return */
@@ -103,9 +126,9 @@ int icmp_ping(int conn)
 	icp->icmp_seq = conn;
 	icp->icmp_id = ident;				/* ID */
 	{
-	  time_t time_val;
-	  time(&time_val);
-	  *((int *)(&pingsend[ICMP_MINLEN])) = (int) time_val;  	/* time stamp */
+		time_t time_val;
+		time(&time_val);
+		*((int *)(&pingsend[ICMP_MINLEN])) = (int) time_val;	/* time stamp */
 	}
 	/* compute ICMP checksum here */
 	icp->icmp_cksum = in_cksum((u_short *)icp, ICMP_MINLEN + sizeof(int));
@@ -136,7 +159,7 @@ int icmp_ping(int conn)
 		OMI_DBG((omi_debug, "ping: send to %s\n",host));
 	}
 #endif
-	return 1; /* No Error. Added to make compiler happy */
+	return 1;	/* No Error. Added to make compiler happy */
 }
 
 /* get_ping_rsp
@@ -149,7 +172,7 @@ int get_ping_rsp(void)
 {
 	struct sockaddr_in from;
 	register int cc;
-	size_t fromlen;
+	GTM_SOCKLEN_TYPE fromlen;
 	struct icmp *icp;
 	struct ip *ip;
 
@@ -159,7 +182,8 @@ int get_ping_rsp(void)
 		exit(1);
 	}
 	fromlen = sizeof(from);
-	while ((cc = (int)(recvfrom(pingsock, (char *)pingrcv, IP_MAXPACKET, 0, (struct sockaddr *)&from, (size_t *)&fromlen))) < 0)
+	while ((cc = (int)(recvfrom(pingsock, (char *)pingrcv, IP_MAXPACKET, 0, (struct sockaddr *)&from,
+					(GTM_SOCKLEN_TYPE *)&fromlen))) < 0)
 	{
 		if (errno == EINTR)
 			continue;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +9,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GDSROOT_H__
-#define __GDSROOT_H__
+#ifndef GDSROOT_H
+#define GDSROOT_H
 
 #include <sys/types.h>
 
@@ -58,7 +58,7 @@ typedef struct
 				       but must be less than or equal to gds_file_id */
 	{	ino_t	inode;
 		dev_t	device;
-#if defined(__hpux) || defined(__linux__) || defined(_UWIN)
+#if defined(__hpux) || defined(__linux__) || defined (__CYGWIN__) ||defined(_UWIN)
 		unsigned int st_gen;
 #elif defined(_AIX)
 		ulong_t st_gen;

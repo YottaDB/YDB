@@ -18,13 +18,14 @@
 #include "mvalconv.h"
 
 GBLREF int4 process_id;
-double          drand48();
-void            srand48();
+double          drand48(void);
+void            srand48(long int);
 
 void op_fnrandom (int4 interval, mval *ret)
 {
 	static int4	seed = 0;
 	error_def	(ERR_RANDARGNEG);
+	int4		random;
 
 	if (interval < 1)
 	{
@@ -35,5 +36,7 @@ void op_fnrandom (int4 interval, mval *ret)
 		seed = (int4)(time(0) * process_id);
 		srand48(seed);
 	}
-	MV_FORCE_MVAL(ret, ((uint4)(interval * drand48())));
+	random	= (int4)(interval * drand48());
+	random	= random & 0x7fffffff;  /* to make sure that the sign bit(msb) is off*/
+	MV_FORCE_MVAL(ret, random);
 }

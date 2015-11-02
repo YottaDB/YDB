@@ -81,7 +81,7 @@ void op_newvar(uint4 arg1)
 		else
 			ptab->lst_addr = NULL;
 		frame_pointer->l_symtab[arg1] = (mval *)new;
-		assert(arg1 >= 0);
+		assert((int)arg1 >= 0);
 	} else
 	{	/* Current (youngest) frame IS an indirect frame.
 		   The situation is more complex because this is not a true stackframe.

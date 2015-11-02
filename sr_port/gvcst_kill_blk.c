@@ -196,7 +196,8 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_mkblk;
 		}
-		cse = t_write(blkhist, (unsigned char *)bs1, sizeof(blk_hdr) + sizeof(rec_hdr), new_block_index, 1, TRUE, FALSE);
+		cse = t_write(blkhist, (unsigned char *)bs1, sizeof(blk_hdr) + sizeof(rec_hdr), new_block_index, 1,
+			TRUE, FALSE, GDS_WRITE_KILLTN);
 		assert(!dollar_tlevel || !cse->high_tlevel);
 		*cseptr = cse;
 		if (NULL != cse)
@@ -290,7 +291,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_mkblk;
 	}
-	cse = t_write(blkhist, (unsigned char *)bs1, 0, 0, level, first_copy, TRUE);
+	cse = t_write(blkhist, (unsigned char *)bs1, 0, 0, level, first_copy, TRUE, GDS_WRITE_KILLTN);
 	assert(!dollar_tlevel || !cse->high_tlevel);
 	*cseptr = cse;
 	if (horiz_growth)

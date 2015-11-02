@@ -51,12 +51,12 @@ int jnl_v15tov17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	cb = conv_buff;
 	status = SS_NORMAL;
 	jlen = *jnl_len;
-	assert(0 == ((uint4)jb % sizeof(uint4)));
+	assert(0 == ((UINTPTR_T)jb % sizeof(uint4)));
    	while (sizeof(v15_jrec_prefix) <= jlen)
 	{
-		assert(0 == ((uint4)jb % sizeof(uint4)));
+		assert(0 == ((UINTPTR_T)jb % sizeof(uint4)));
 		v15_jrec_prefix_ptr = (v15_jrec_prefix *)jb;
-		rectype = v15_jrec_prefix_ptr->jrec_type;
+		rectype = (enum	jnl_record_type)v15_jrec_prefix_ptr->jrec_type;
 		cstart = cb;
 		jstart = jb;
    		if (0 != (reclen = v15_jrec_prefix_ptr->forwptr))

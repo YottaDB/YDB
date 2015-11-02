@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,25 +71,27 @@ GBLREF jnl_gbls_t	jgbl;
 
 void dse_maps(void)
 {
-        block_id        blk, bml_blk;
-        blk_segment     *bs1, *bs_ptr;
-	cw_set_element  *cse;
-        int4            blk_seg_cnt, blk_size;		/* needed for BLK_INIT, BLK_SEG and BLK_FINI macros */
-        sgm_info        *dummysi = NULL;
-        sm_uc_ptr_t     bp;
-        char            util_buff[MAX_UTIL_LEN];
-        int4            bml_size, bml_list_size, blk_index, bml_index;
-        int4            total_blks;
-        int4            bplmap, dummy_int;
-        bool            dummy_bool;
-        unsigned char   *bml_list;
-        cache_rec_ptr_t cr, dummy_cr;
-        bt_rec_ptr_t    btr;
-        int             util_len;
-        uchar_ptr_t     blk_ptr;
-        bool            was_crit;
-	uint4		jnl_status;
-	srch_blk_status	blkhist;
+	block_id		blk, bml_blk;
+	blk_segment		*bs1, *bs_ptr;
+	cw_set_element		*cse;
+	int4			blk_seg_cnt, blk_size;		/* needed for BLK_INIT, BLK_SEG and BLK_FINI macros */
+	sgm_info		*dummysi = NULL;
+	sm_uc_ptr_t		bp;
+	char			util_buff[MAX_UTIL_LEN];
+	int4			bml_size, bml_list_size, blk_index, bml_index;
+	int4			total_blks;
+	int4			bplmap, dummy_int;
+	bool			dummy_bool;
+	unsigned char		*bml_list;
+	cache_rec_ptr_t		cr, dummy_cr;
+	bt_rec_ptr_t		btr;
+	int			util_len;
+	uchar_ptr_t		blk_ptr;
+	bool			was_crit;
+	uint4			jnl_status;
+	srch_blk_status		blkhist;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 
         error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DBRDONLY);
@@ -100,9 +102,7 @@ void dse_maps(void)
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
         }
-        assert(update_array);
-        /* reset new block mechanism */
-        update_array_ptr = update_array;
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
         assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs);
         was_crit = cs_addrs->now_crit;
         if (cs_addrs->critical)
@@ -219,8 +219,7 @@ void dse_maps(void)
                 {
 			CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			CWS_RESET;
-                        cw_set_depth = 0;
-                        update_array_ptr = update_array;
+			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
                         assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
                         cs_addrs->ti->early_tn++;
                         blk_ptr = bml_list + bml_index * bml_size;
@@ -230,12 +229,19 @@ void dse_maps(void)
                         BLK_INIT(bs_ptr, bs1);
                         BLK_SEG(bs_ptr, blk_ptr + sizeof(blk_hdr), bml_size - sizeof(blk_hdr));
                         BLK_FINI(bs_ptr, bs1);
-                        t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE);
+                        t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
 			cr_array_index = 0;
 			block_saved = FALSE;
 			if (JNL_ENABLED(cs_data))
 			{
-				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_aimg_rec() */
+				SET_GBL_JREC_TIME;	/* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_aimg_rec */
+				jpc = cs_addrs->jnl;
+				jbp = jpc->jnl_buff;
+				/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl
+				 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+				 * (if it decides to switch to a new journal file)
+				 */
+				ADJUST_GBL_JREC_TIME(jgbl, jbp);
 				jnl_status = jnl_ensure_open();
 				if (0 == jnl_status)
 				{
@@ -243,7 +249,7 @@ void dse_maps(void)
 					cse->new_buff = non_tp_jfb_buff_ptr;
 					gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, cs_addrs->ti->curr_tn);
 					cse->done = TRUE;
-					if (0 == cs_addrs->jnl->pini_addr)
+					if (0 == jpc->pini_addr)
 						jnl_put_jrt_pini(cs_addrs);
 					jnl_write_aimg_rec(cs_addrs, cse);
 				} else
@@ -254,11 +260,12 @@ void dse_maps(void)
                         else
                                 mm_update(cw_set, cw_set + cw_set_depth, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
                         INCREMENT_CURR_TN(cs_data);
-			while (cr_array_index)
+			while (cr_array_index)	/* could have been incremented by bg_update/mm_update */
 				cr_array[--cr_array_index]->in_cw_set = FALSE;
 			if (block_saved)
 				backup_buffer_flush(gv_cur_region);
 			wcs_timer_start(gv_cur_region, TRUE);
+			cw_set_depth = 0;	/* signal end of active transaction to secshr_db_clnup/t_commit_clnup */
                 }
                 /* Fill in master map */
                 for (blk_index = 0, bml_index = 0;  blk_index < cs_addrs->ti->total_blks;

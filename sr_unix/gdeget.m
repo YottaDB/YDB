@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2006 Fidelity Information Services, Inc	;
+;	Copyright 2006, 2007 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -33,19 +33,31 @@ LOAD
 	s filesize=$$bin2num($ze(rec,13,16))
 	s abs=abs+SIZEOF("gd_header")
 ; contents
-	i $ze(rec,abs,abs+3)'=$c(0,0,0,0) zm gdeerr("INPINTEG")						; filler
-	s abs=abs+4
+	i (gtm64="true") d
+	. i $ze(rec,abs,abs+7)'=$c(0,0,0,0,0,0,0,0) zm gdeerr("INPINTEG")						; filler
+	. s abs=abs+8
+	e  d
+	. i $ze(rec,abs,abs+3)'=$c(0,0,0,0) zm gdeerr("INPINTEG")						; filler
+	. s abs=abs+4
 	s contents("maxrecsize")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
 	s contents("mapcnt")=$$bin2num($ze(rec,abs,abs+1)),abs=abs+2
 	s contents("regioncnt")=$$bin2num($ze(rec,abs,abs+1)),abs=abs+2
 	s contents("segmentcnt")=$$bin2num($ze(rec,abs,abs+1)),abs=abs+2
 	i $ze(rec,abs,abs+1)'=$tr($j("",2)," ",ZERO) zm gdeerr("INPINTEG")				; filler
-	s abs=abs+2
-	s contents("maps")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
-	s contents("regions")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
-	s contents("segments")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
-	s abs=abs+12								;skip link, tab_ptr and id pointers
-	s contents("end")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
+	i (gtm64="true") d
+	. s abs=abs+6											; including padding
+	. s contents("maps")=$$bin2num($ze(rec,abs,abs+7)),abs=abs+8
+	. s contents("regions")=$$bin2num($ze(rec,abs,abs+7)),abs=abs+8
+	. s contents("segments")=$$bin2num($ze(rec,abs,abs+7)),abs=abs+8
+	. s abs=abs+24								;skip link, tab_ptr and id pointers
+	. s contents("end")=$$bin2num($ze(rec,abs,abs+7)),abs=abs+8
+	e  d
+	. s abs=abs+2
+	. s contents("maps")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
+	. s contents("regions")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
+	. s contents("segments")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
+	. s abs=abs+12								;skip link, tab_ptr and id pointers
+	. s contents("end")=$$bin2num($ze(rec,abs,abs+3)),abs=abs+4
 	i contents("regioncnt")'=contents("segmentcnt") zm gdeerr("INPINTEG")
 	i contents("regioncnt")-1>contents("mapcnt") zm gdeerr("INPINTEG")
 ; verify offsets
@@ -125,7 +137,8 @@ map:
 	s s=$ze(rec,rel,rel+SIZEOF("mident")-1),rel=rel+SIZEOF("mident")
 	s x=$zf(s,$c(0))-2 i x=-2 s x=SIZEOF("mident")
 	s s=$ze(s,1,x)
-	s x=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	i (gtm64="true") s x=$$bin2num($ze(rec,rel,rel+3)),rel=rel+8 ; read 4 bytes, but skip 8 bytes
+	e  s x=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	s map(s)=x
 	s reglist(x)="",x=x-contents("regions")
 	i x#SIZEOF("gd_region") zm gdeerr("INPINTEG")
@@ -139,12 +152,17 @@ region:
 	s s=$ze(rec,rel,rel+l-1),rel=rel+MAXREGLN,xregs(abs-1-SIZEOF("gd_header"))=s
 	s regs(s,"KEY_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s regs(s,"RECORD_SIZE")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
-	s regs(s,"DYNAMIC_SEGMENT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+	i (gtm64="true") s regs(s,"DYNAMIC_SEGMENT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+8  ; read 4 bytes, but skip 8
+	e  s regs(s,"DYNAMIC_SEGMENT")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	s x=regs(s,"DYNAMIC_SEGMENT")-contents("segments")
 	i x#(SIZEOF("gd_segment")-v30) zm gdeerr("INPINTEG")						; autoconvert
 	i x\(SIZEOF("gd_segment")-v30)'<contents("segmentcnt") zm gdeerr("INPINTEG")			; autoconvert
-	i $ze(rec,rel,rel+3)'=$c(0,0,0,0) zm gdeerr("INPINTEG")						; static segment
-	s rel=rel+4
+	i (gtm64="true") d
+	. i $ze(rec,rel,rel+7)'=$c(0,0,0,0,0,0,0,0) zm gdeerr("INPINTEG")				; static segment
+	. s rel=rel+8
+	e  d
+	. i $ze(rec,rel,rel+3)'=$c(0,0,0,0) zm gdeerr("INPINTEG")					; static segment
+	. s rel=rel+4
 	i $ze(rec,rel)'=ZERO zm gdeerr("INPINTEG")							; OPEN state
 	s rel=rel+1
 	i $ze(rec,rel)'=ZERO zm gdeerr("INPINTEG")							; lock_write
@@ -167,7 +185,8 @@ region:
 	s l=$$bin2num($ze(rec,rel)),rel=rel+1 ;jnl_file_len
 	s regs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
 	i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")				; reserved
-	s rel=rel+8
+	i (gtm64="true") s rel=rel+12
+	e  s rel=rel+8
 	s abs=abs+SIZEOF("gd_region")
 	q
 segment:
@@ -184,8 +203,12 @@ segment:
 	s segs(s,"BLOCK_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"EXTENSION_COUNT")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
-	i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")			; reserved for clb
-	s rel=rel+4
+	i (gtm64="true") d
+	. i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")			; reserved for clb
+	. s rel=rel+12						; padding
+	e  d
+	. i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")			; reserved for clb
+	. s rel=rel+4
 	i $ze(rec,rel,rel+3)'=".DAT" zm gdeerr("INPINTEG")
 	s rel=rel+4
 	s segs(s,"DEFER")=$$bin2num($ze(rec,rel))
@@ -202,10 +225,16 @@ segment:
 	i 'v30 s segs(s,"RESERVED_BYTES")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4		;autoconvert
 	e  s segs(s,"RESERVED_BYTES")=0
 	s rel=rel+4										; access method already processed
-	i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")			; file_cntl pointer
-	s rel=rel+4
-	i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")			; repl_list pointer
-	s rel=rel+4
+	i (gtm64="true") d
+	. i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")			; file_cntl pointer
+	. s rel=rel+8
+	. i $ze(rec,rel,rel+7)'=$tr($j("",8)," ",ZERO) zm gdeerr("INPINTEG")			; repl_list pointer
+	. s rel=rel+8
+	e  d
+	. i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")			; file_cntl pointer
+	. s rel=rel+4
+	. i $ze(rec,rel,rel+3)'=$tr($j("",4)," ",ZERO) zm gdeerr("INPINTEG")			; repl_list pointer
+	. s rel=rel+4
 	s abs=abs+SIZEOF("gd_segment")-v30
 	q
 gderead:(max)

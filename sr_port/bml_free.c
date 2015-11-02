@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,18 +17,18 @@
 
 /* Include prototypes */
 #include "bit_set.h"
+#include "bit_clear.h"
+
+GBLREF	boolean_t		dse_running;
 
 uint4 bml_free(uint4 setfree, sm_uc_ptr_t map)
 {
-	uint4 wasfree, ret;
+	uint4	ret, ret1;
 
 	setfree *= BML_BITS_PER_BLK;
-	wasfree = 0;
-
 	ret = bit_set(setfree, map);
-	if (!ret)
-		wasfree = bit_set(setfree + 1, map);
-
-	assert(!wasfree);	/* until 10 becomes a legal bm value, this must be false */
+	ret1 = bit_clear(setfree + 1, map);
+	/* Assert that only a BUSY or RECYCLED block gets marked as FREE (dse is an exception) */
+	assert((!ret && !ret1) || (ret && ret1) || dse_running);
 	return ret;
 }

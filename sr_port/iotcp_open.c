@@ -59,7 +59,8 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 	int4			length, width;
 	unsigned short		port;
 	int4			errlen, msec_timeout;
-	int			ii, status, size,
+	GTM_SOCKLEN_TYPE	size;
+	int			ii, status,
 				on = 1,
 				p_offset = 0,
 				temp_1 = -2;

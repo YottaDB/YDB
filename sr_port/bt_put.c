@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,14 +24,15 @@
 #include "relqop.h"
 #include "wcs_recover.h"
 #include "wcs_get_space.h"
+#include "jnl.h"
 
 #ifdef DEBUG
 static	int4		entry_count = 0;
 #endif
 
 GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
-
 GBLREF	uint4			process_id;
+GBLREF 	jnl_gbls_t		jgbl;
 
 bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 {
@@ -93,7 +94,21 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 			break;
 		}
 		if (p->blk == block)
-		{
+		{	/* bt_put should never be called twice for the same block with the same lcl_tn. This is because
+			 * t_end/tp_tend update every block only once as part of each update transaction. Assert this.
+			 * The two exceptions are
+			 *   a) Forward journal recovery which simulates a 2-phase M-kill where the same block
+			 *	could get updated in both phases (example bitmap block gets updated for blocks created
+			 *	within the TP transaction as well as for blocks that are freed up in the 2nd phase of
+			 *	the M-kill) with the same transaction number. This is because although GT.M would have
+			 *	updated the same block with different transaction numbers in the two phases, forward
+			 *	recovery will update it with the same tn and instead increment the db tn on seeing the
+			 *	following INCTN journal record(s).
+			 *   b) Cache recovery (wcs_recover). It could call bt_put more than once for the same block
+			 *	and potentially with the same tn. This is because the state of the queues is questionable
+			 *	and there could be more than one cache record for a given block number.
+			 */
+			assert(in_wcs_recover || (p->tn < lcl_tn) || (jgbl.forw_phase_recovery && !JNL_ENABLED(csa)));
 			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)p + p->tnque.fl);
 			th = (th_rec_ptr_t)remqt((que_ent_ptr_t)((sm_uc_ptr_t)q0 + sizeof(th->tnque)));
 			if (EMPTY_QUEUE == (sm_long_t)th)

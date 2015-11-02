@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +19,7 @@
 #include "i386.h"
 #include "inst_flush.h"
 #include "gtmci.h"
+#include "gtm_malloc.h"
 
 #define CALL_SIZE	5
 #define CODE_SIZE	(3 * CALL_SIZE)
@@ -47,7 +48,7 @@ rhdtyp *make_cimode(void)
 
 	if (NULL != base_address)
 		return base_address;
-	base_address = (rhdtyp *)malloc(sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
+	base_address = (rhdtyp *)GTM_TEXT_MALLOC(sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
 	memset(base_address,0,sizeof(rhdtyp) + CODE_SIZE + sizeof(lab_tabent) + CODE_LINES * sizeof(int4));
 	base_address->routine_name.len = STR_LIT_LEN(GTM_CIMOD);
 	base_address->routine_name.addr = GTM_CIMOD;

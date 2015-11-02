@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,10 +23,10 @@
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_inet.h"
+#include "gtm_stdio.h"
 
 #include <signal.h>
 
-#include "gtm_stdio.h"
 #include "error.h"
 #include "gtmsiginfo.h"
 #include "gtmimagename.h"
@@ -49,17 +49,12 @@
  */
 GBLDEF siginfo_t	exi_siginfo;
 
-#if defined(__osf__) || defined(_AIX) || defined(Linux390)
-GBLDEF struct sigcontext exi_context;
-#else
-GBLDEF ucontext_t	exi_context;
-#endif
+GBLDEF gtm_sigcontext_t	exi_context;
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;
 GBLREF	enum gtmImageTypes	image_type;
-GBLREF	int4			exi_condition;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
@@ -74,6 +69,7 @@ GBLREF	phase_static_area	*psa_gbl;
 void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	boolean_t	exit_now;
+	gtm_sigcontext_t	*context_ptr;
 	void		(*signal_routine)();
 
 	error_def(ERR_KRNLKILL);
@@ -82,6 +78,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 	error_def(ERR_KILLBYSIGUINFO);
 	error_def(ERR_KILLBYSIGSINFO1);
 	error_def(ERR_KILLBYSIGSINFO2);
+	error_def(ERR_KILLBYSIGSINFO3);
 
 	/* Save parameter value in global variables for easy access in core */
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
@@ -91,15 +88,16 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 		exi_siginfo = *info;
 	else
 		memset(&exi_siginfo, 0, sizeof(*info));
-	if (NULL != context)
-	{
-#if defined(__osf__) || defined(_AIX) || defined(Linux390)
-		exi_context = *(struct sigcontext *)context;
+#if defined(__ia64) && defined(__hpux)
+        context_ptr = (gtm_sigcontext_t *)context;      /* no way to make a copy of the context */
+	memset(&exi_context, 0, sizeof(exi_context));
 #else
-		exi_context = *(ucontext_t *)context;
-#endif
-	} else
+	if (NULL != context)
+		exi_context = *(gtm_sigcontext_t *)context;
+	else
 		memset(&exi_context, 0, sizeof(exi_context));
+	context_ptr = &exi_context;
+#endif
 	/* Check if we are fielding nested immediate shutdown signals */
 	if (EXIT_IMMED <= exit_state)
 	{
@@ -145,7 +143,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
 			dont_want_core = TRUE;
-			extract_signal_info(sig, &exi_siginfo, &exi_context, &signal_info);
+			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
@@ -159,6 +157,9 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 					break;
 				case GTMSIGINFO_ILOC:
 					forced_exit_err = ERR_KILLBYSIGSINFO2;
+					break;
+				case GTMSIGINFO_BADR:
+					forced_exit_err = ERR_KILLBYSIGSINFO3;
 					break;
 				default:
 					exit_state = EXIT_IMMED;
@@ -196,6 +197,12 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 					gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.int_iadr);
 					break;
+				case GTMSIGINFO_BADR:
+					send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+							process_id, sig, signal_info.bad_vadr);
+					gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+							process_id, sig, signal_info.bad_vadr);
+					break;
 			}
 			break;
 #ifdef _AIX
@@ -215,7 +222,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			break;
 #endif
 		default:
-			extract_signal_info(sig, &exi_siginfo, &exi_context, &signal_info);
+			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
@@ -254,6 +261,13 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 							process_id, sig, signal_info.int_iadr);
 					gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
 							process_id, sig, signal_info.int_iadr);
+					break;
+				case GTMSIGINFO_BADR:
+					exit_state = EXIT_IMMED;
+					send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+							process_id, sig, signal_info.bad_vadr);
+					gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+							process_id, sig, signal_info.bad_vadr);
 					break;
 				default:
 					exit_state = EXIT_IMMED;

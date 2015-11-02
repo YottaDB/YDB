@@ -48,7 +48,8 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 	size_t		in_len;
 	char		*retptr;
 #ifdef UNICODE_SUPPORTED
-	int		mbc_len, mbc_dest_len, u16_off, non_space_off;
+	int		mbc_len, u16_off, non_space_off;
+	int32_t		mbc_dest_len;
 	boolean_t	found_non_space = FALSE;
 	UFILE		*u_fp;
 	UChar		*uc_fgets_ret, ufgets_Ubuffer[MAX_LINE];

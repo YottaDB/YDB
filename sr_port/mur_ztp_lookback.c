@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,7 +68,7 @@ boolean_t mur_ztp_lookback(void)
 			if (SS_NORMAL != status)
 				break;
 			jrec = mur_rab.jnlrec;
-			rectype = mur_rab.jnlrec->prefix.jrec_type;
+			rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
 			if (mur_options.lookback_time_specified && jrec->prefix.time <= mur_options.lookback_time)
 				break;
 			if (mur_options.lookback_opers_specified)

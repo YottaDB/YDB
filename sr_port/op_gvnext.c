@@ -37,7 +37,7 @@ GBLREF bool		gv_curr_subsc_null;
 void op_gvnext(mval *v)
 {
 	register char		*c;
-	bool			found;
+	boolean_t		found;
  	int4			n;
 	enum db_acc_method 	acc_meth;
 
@@ -61,8 +61,7 @@ void op_gvnext(mval *v)
 			*(char *)(&gv_currkey->base[0] + gv_currkey->prev + 3) = 0;
 			gv_currkey->end --;
 		}
-	}
-	else
+	} else
 	{
 		if (!gv_curr_subsc_null || gv_cur_region->std_null_coll )
 		{
@@ -76,41 +75,42 @@ void op_gvnext(mval *v)
 	if (acc_meth == dba_bg || acc_meth == dba_mm)
 	{
 		if (gv_target->root)
-		{	found = gvcst_order();
-		}else
+			found = gvcst_order();
+		else
 			found = FALSE;		/* global does not exist */
-	}else if (acc_meth == dba_cm)
-	{	found = gvcmx_order();
-	}else
-	{	found = gvusr_order();
-	}
+	} else if (acc_meth == dba_cm)
+		found = gvcmx_order();
+	else
+		found = gvusr_order();
 
 	v->mvtype = MV_STR;
 	if (!found)
 	{
 		if (stringpool.top - stringpool.free < 2)
+		{
+			v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval */
 			stp_gcol(2);
+		}
 		c = v->str.addr = (char *) stringpool.free;
 		*c++ = '-';
 		*c = '1';
 	 	v->str.len = 2;
  		stringpool.free += 2;
-	}
-	else
+	} else
 	{
 		gv_altkey->prev = gv_currkey->prev;
 
  		if (stringpool.top - stringpool.free < MAX_SUBSC_LEN)
-		{	if (*(&gv_altkey->base[0] + gv_altkey->prev) != 0xFF)
-			{	n = MAX_NUM_SLEN;
-			}
+		{
+			if (*(&gv_altkey->base[0] + gv_altkey->prev) != 0xFF)
+				n = MAX_NUM_SLEN;
 			else
-			{ 	n = gv_altkey->top - gv_altkey->prev;
+			{
+				n = gv_altkey->top - gv_altkey->prev;
 				assert (n > 0);
 			}
 			if (stringpool.top - stringpool.free < n)
-			{	stp_gcol (n);
-			}
+				stp_gcol (n);
 		}
 		v->str.addr = (char *) stringpool.free;
 		c = (char *)(&gv_altkey->base[0] + gv_altkey->prev);

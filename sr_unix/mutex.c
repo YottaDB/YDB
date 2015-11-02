@@ -23,7 +23,7 @@
 #include <errno.h>
 #include <sys/un.h>
 #include <iotcp_select.h>
-#if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__)
+#if defined(__sparc) || defined(__hpux) || defined(__MVS__) || defined(__linux__) || defined(__CYGWIN__)
 #include "gtm_limits.h"
 #else
 #include <sys/limits.h>
@@ -39,6 +39,7 @@
 #include "interlock.h"
 #include "filestruct.h"
 #include "io.h"
+#include "jnl.h"
 #include "gdsbgtr.h"
 #include "mutex.h"
 #include "relqueopi.h"
@@ -235,7 +236,7 @@ static	void	crash_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 		next_entry = (mutex_que_entry_ptr_t)((sm_uc_ptr_t)next_entry + next_entry->que.fl);
 		if (next_entry <= (mutex_que_entry_ptr_t)&addr->prochead ||
 		    next_entry >= (mutex_que_entry_ptr_t)&addr->prochead + n + 1 ||
-		    (0 != ((int)next_entry & (sizeof(mutex_que_entry) - 1))))
+		    (0 != ((INTPTR_T)next_entry & (sizeof(mutex_que_entry) - 1))))
 		{
 			/*
 			 * next_entry == &addr->prochead => loop is done;
@@ -268,7 +269,7 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 	struct timeval		timeout;
 	int			timeout_threshold;
 	struct sockaddr_un	mutex_woke_me_proc;
-	size_t			mutex_woke_me_proc_len;
+	GTM_SOCKLEN_TYPE	mutex_woke_me_proc_len;
 	mutex_wake_msg_t	mutex_wake_msg[2];
 	int			sel_stat;
 	int			nbrecvd;
@@ -378,7 +379,8 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, mutex_lock_t mutex_
 			{
 				mutex_woke_me_proc_len = sizeof(struct sockaddr_un);
 				RECVFROM_SOCK(mutex_sock_fd, (void *)&mutex_wake_msg[0], sizeof(mutex_wake_msg), 0,
-					(struct sockaddr *)&mutex_woke_me_proc, (sssize_t *)&mutex_woke_me_proc_len, nbrecvd);
+					(struct sockaddr *)&mutex_woke_me_proc,
+					(GTM_SOCKLEN_TYPE *)&mutex_woke_me_proc_len, nbrecvd);
 				if (sizeof(mutex_wake_msg) == nbrecvd) /* Drained out both old and new wake messages */
 				{
 					MUTEX_TRACE_CNTR(mutex_trc_slp_wkup);
@@ -847,7 +849,7 @@ void mutex_cleanup(gd_region *reg)
 	   the lock, go ahead and release it.
 	*/
 	csa = &FILE_INFO(reg)->s_addrs;
-	if (COMPSWAP(&csa->critical->semaphore, process_id, image_count, LOCK_AVAILABLE, 0))
+	if (COMPSWAP_UNLOCK(&csa->critical->semaphore, process_id, image_count, LOCK_AVAILABLE, 0))
 	{
 		MUTEX_DPRINT2("%d  mutex_cleanup : released lock\n", process_id);
 	}
@@ -890,8 +892,11 @@ void mutex_salvage(gd_region *reg)
 			 */
 			send_msg(VARLSTCNT(5) ERR_MUTEXFRCDTERM, 3, holder_pid, REG_LEN_STR(reg));
 			csa->nl->in_crit = 0;
-			COMPSWAP(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
+			COMPSWAP_UNLOCK(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 			mutex_salvaged = TRUE;
+			/* Reset jb->blocked as well if the holder_pid had it set */
+			if ((NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff) && (csa->jnl->jnl_buff->blocked == holder_pid))
+				csa->jnl->jnl_buff->blocked = 0;
 			MUTEX_DPRINT3("%d : mutex salvaged, culprit was %d\n", process_id, holder_pid);
 		} else if (FALSE == disable_sigcont)
 		{

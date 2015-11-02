@@ -121,7 +121,8 @@ bool	mubinccpy (backup_reg_list *list)
 	char_ptr_t		outptr, data_ptr;
 	char 			*c, addr[SA_MAXLEN + 1];
 	sgmnt_data_ptr_t	header;
-	uint4			status, total_blks, bplmap, gds_ratio, save_blks;
+	uint4			total_blks, bplmap, gds_ratio, save_blks;
+	int4			status;
 	int4			size1, bsize, bm_num, hint, lmsize, rsize, timeout, outsize,
 				blks_per_buff, counter, i, write_size, read_size, match;
 	size_t			copysize;

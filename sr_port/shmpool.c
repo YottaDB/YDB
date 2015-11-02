@@ -80,7 +80,7 @@ void shmpool_buff_init(gd_region *reg)
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	sbufh_p = csa->shmpool_buffer;
-	assert(0 == ((int)sbufh_p & (OS_PAGE_SIZE - 1)));	/* Locks and such optimally aligned */
+	assert(0 == ((INTPTR_T)sbufh_p & (OS_PAGE_SIZE - 1)));	/* Locks and such optimally aligned */
 	memset(sbufh_p, 0, sizeof(shmpool_buff_hdr));
 	SET_LATCH_GLOBAL(&sbufh_p->shmpool_crit_latch, LOCK_AVAILABLE);
 	len = SHMPOOL_BUFFER_SIZE - sizeof(shmpool_buff_hdr);	/* Length to build buffers with */

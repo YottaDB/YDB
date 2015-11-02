@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ boolean_t repl_tr_good(uchar_ptr_t tr, int tr_len, seq_num seqno)
 	     tr_len > 0;
 	     tr_len -= reclen, jrec = (jnl_record *)((uchar_ptr_t)jrec + reclen))
 	{
-		rectype = jrec->prefix.jrec_type;
+		rectype = (enum jnl_record_type)jrec->prefix.jrec_type;
 		reclen  = jrec->prefix.forwptr;
 		if (  !IS_VALID_RECTYPE(jrec)
 		    || !IS_REPLICATED(rectype)

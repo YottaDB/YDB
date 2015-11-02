@@ -543,12 +543,12 @@ int	iott_rdone (mint *v, int4 timeout)	/* timeout in seconds */
 		{
 			if ((io_ptr->dollar.x += inchar_width) >= io_ptr->width && io_ptr->wrap)
 			{
-				io_ptr->dollar.y = ++(io_ptr->dollar.y);
+				++(io_ptr->dollar.y);
 				if (io_ptr->length)
 					io_ptr->dollar.y %= io_ptr->length;
 				io_ptr->dollar.x %= io_ptr->width;
 				if (io_ptr->dollar.x == 0)
-					DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
+                                        DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, strlen(NATIVE_TTEOL));
 			}
 		}
 	}

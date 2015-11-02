@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -117,7 +117,6 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			newblk2_first_keylen;
 	int		rec_size, piece_len, tkeylen, old_levelp_rec_offset;
 	int		blk_seg_cnt, blk_size;
-	uint4		save_t_err;
 	enum cdb_sc	status;
 	sm_uc_ptr_t 	oldblk1_last_key, old_levelp_cur_next_key,
 			newblk1_last_key, newblk2_first_key, new_blk2_ances_first_key; /* shared memory keys */
@@ -129,11 +128,10 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			blk2_ances_hdr, new_levelp_cur_hdr, new_levelp_cur_next_hdr;
 	blk_segment	*bs_ptr1, *bs_ptr2;
 	srch_hist	*blk1ptr, *blk2ptr; /* blk2ptr is for right sibling's hist from a minimum sub-tree containing both blocks */
-	error_def(ERR_GVKILLFAIL);
+	uint4		write_type;
 
 	blk_size = cs_data->blk_size;
-	assert(update_array != NULL);
-	update_array_ptr = update_array;
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 
 	blk1ptr = &(gv_target->hist);
 	blk2ptr = gv_target->alt_hist;
@@ -614,14 +612,8 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
-	if (complete_merge)
-	{
-		save_t_err = t_err;
-		t_err = ERR_GVKILLFAIL;
-	}
-	t_write(&blk1ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE);
-	if (complete_merge)
-		t_err = save_t_err;
+	write_type = (complete_merge ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN);
+	t_write(&blk1ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, write_type);
 	/* -----------------
 	 * The right sibling
 	 * -----------------
@@ -645,7 +637,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			assert(t_tries < CDB_STAGNATE);
 			return cdb_sc_blkmod;
 		}
-		t_write(&blk2ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, TRUE, TRUE);
+		t_write(&blk2ptr->h[level], (unsigned char *)bs_ptr1, 0, 0, level, TRUE, TRUE, GDS_WRITE_PLAIN);
 	} else
 	{
 		kill_set_ptr->blk[kill_set_ptr->used].flag = 0;
@@ -728,14 +720,8 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
-	if (complete_merge)
-	{
-		save_t_err = t_err;
-		t_err = ERR_GVKILLFAIL;
-	}
-	t_write(&blk1ptr->h[levelp], (unsigned char *)bs_ptr1, 0, 0, levelp, FALSE, forward_process);
-	if (complete_merge)
-		t_err = save_t_err;
+	assert(write_type == (complete_merge ? GDS_WRITE_KILLTN : GDS_WRITE_PLAIN));
+	t_write(&blk1ptr->h[levelp], (unsigned char *)bs_ptr1, 0, 0, levelp, FALSE, forward_process, write_type);
 	/* ---------------------------------------------------------------------------
 	 * if delete_all_blk2_ances and level+1 <= level2 < levelp,
 	 * 	if blk2ptr->h[level2].blk_num are *-record blocks
@@ -763,10 +749,8 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			assert(t_tries < CDB_STAGNATE);
 			return cdb_sc_blkmod;
 		}
-		save_t_err = t_err;
-		t_err = ERR_GVKILLFAIL;
-		t_write(&blk2ptr->h[level2], (unsigned char *)bs_ptr1, 0, 0, level2, TRUE, TRUE);
-		t_err = save_t_err;
+		assert(GDS_WRITE_KILLTN == write_type);	/* since "complete_merge" should be TRUE */
+		t_write(&blk2ptr->h[level2], (unsigned char *)bs_ptr1, 0, 0, level2, TRUE, TRUE, GDS_WRITE_KILLTN);
 	}
 	/* else do not need to change blk2ptr->h[level2].blk_num.
 	 * Because, for level+1 == levelp this is the same as levelp ancestor block (blk1ptr->h[levelp].blk_num).

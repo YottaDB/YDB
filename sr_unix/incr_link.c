@@ -12,7 +12,7 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <string.h>
+#include "gtm_string.h"
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 
@@ -87,6 +87,7 @@ void		res_free(res_list *root);
 boolean_t	addr_fix(int file, unsigned char *shdr, urx_rtnref *urx_lcl);
 void		zl_error(int4 file, zro_ent *zroe, int4 err, int4 len, char *addr, int4 len2, char *addr2);
 void		zl_error_hskpng(int4 file);
+int		cacheflush (void *addr, long nbytes, int cache_select);
 
 bool	incr_link (int file_desc, zro_ent *zro_entry)
 {
@@ -99,7 +100,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	pre_v5_mident	*pre_v5_routine_name;
 	urx_rtnref	urx_lcl_anchor;
 	int		order;
-	unsigned int	offset_correction;
+	size_t		offset_correction;
 	unsigned char	*shdr, *rel_base;
 	mval		*curlit, *littop;
 	lab_tabent	*curlbe, *lbetop;
@@ -182,9 +183,10 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 					;
 				zl_error(0, zro_entry, ERR_DLLVERSION, len, &(pre_v5_routine_name->c[0]),
 				 	zro_entry->str.len, zro_entry->str.addr);
-			} else
-			{	/* Note: routine_name field has not been relocated yet, so compute its absolute
-				   address in the shared library and use it */
+			}
+			else
+			{ /* Note: routine_name field has not been relocated yet, so compute its absolute
+			     address in the shared library and use it */
 				zl_error(0, zro_entry, ERR_DLLVERSION, hdr->routine_name.len, (char *)shdr +
 					(UINTPTR_T)hdr->literal_text_adr + (UINTPTR_T)hdr->routine_name.addr,
 				 	zro_entry->str.len, zro_entry->str.addr);
@@ -231,7 +233,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		sect_ro_rel_size = (unsigned int)((INTPTR_T) hdr->literal_adr - (INTPTR_T) hdr->ptext_adr);
 		sect_ro_rel = GTM_TEXT_MALLOC(sect_ro_rel_size);
 		/* It should be aligned well at this point but make a debug level check to verify */
-		assert((int)sect_ro_rel == ((int)sect_ro_rel & ~(LINKAGE_PSECT_BOUNDARY - 1)));
+		assert((INTPTR_T)sect_ro_rel == ((INTPTR_T)sect_ro_rel & ~(LINKAGE_PSECT_BOUNDARY - 1)));
 		DOREADRC(file_desc, sect_ro_rel, sect_ro_rel_size, status);
 		if (0 != status)
 			zl_error(file_desc, zro_entry, ERR_INVOBJ, 0, 0, 0, 0);
@@ -257,7 +259,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 		   the areas in block B. In this case, block A is the routine header, block B is the read-only
 		   releasable section. Case one is when the input is from a shared library, case 2 when from a file.
 		*/
-		offset_correction = (unsigned int)hdr->ptext_adr;
+		offset_correction = (size_t)hdr->ptext_adr;
 		rel_base = sect_ro_rel - offset_correction;
 	}
 	RELOCATE(hdr->ptext_adr, unsigned char *, rel_base);
@@ -269,14 +271,14 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	sect_rw_rel_size = (int)((INTPTR_T)hdr->labtab_adr - (INTPTR_T)hdr->literal_adr);
 	sect_rw_rel = malloc(sect_rw_rel_size);
 	if (shlib)
-		memcpy(sect_rw_rel, shdr + (int)hdr->literal_adr, sect_rw_rel_size);
+		memcpy(sect_rw_rel, shdr + (INTPTR_T)hdr->literal_adr, sect_rw_rel_size);
 	else
 	{
 		DOREADRC(file_desc, sect_rw_rel, sect_rw_rel_size, status);
 		if (0 != status)
 			zl_error(file_desc, zro_entry, ERR_INVOBJ, 0, 0, 0, 0);
 	}
-	offset_correction = (int)hdr->literal_adr;
+	offset_correction = (size_t)hdr->literal_adr;
 	rel_base = sect_rw_rel - offset_correction;
 	RELOCATE(hdr->literal_adr, mval *, rel_base);
 	RELOCATE(hdr->vartab_adr, var_tabent *, rel_base);
@@ -320,7 +322,7 @@ bool	incr_link (int file_desc, zro_ent *zro_entry)
 	sect_rw_nonrel_size = hdr->labtab_len * sizeof(lab_tabent);
 	sect_rw_nonrel = malloc(sect_rw_nonrel_size);
 	if (shlib)
-		memcpy(sect_rw_nonrel, shdr + (int)hdr->labtab_adr, sect_rw_nonrel_size);
+		memcpy(sect_rw_nonrel, shdr + (INTPTR_T)hdr->labtab_adr, sect_rw_nonrel_size);
 	else
 	{
 		DOREADRC(file_desc, sect_rw_nonrel, sect_rw_nonrel_size, status);

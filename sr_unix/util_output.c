@@ -40,6 +40,7 @@ GBLREF	io_pair			io_std_device;
 GBLREF	enum gtmImageTypes	image_type;
 GBLDEF	char		*util_outptr, util_outbuff[OUT_BUFF_SIZE];
 GBLDEF	va_list		last_va_list_ptr;
+GBLREF  sigset_t	block_sigsent;
 static	boolean_t	first_syslog = TRUE;
 
 /*
@@ -111,9 +112,10 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	unsigned char	uchar;
 	short		sshort, *s;
 	unsigned short	ushort;
-	int		i, length, field_width, repeat_count, int_val, ch, chwidth, cwidth;
+	int		i, length, field_width, repeat_count, int_val, chwidth, cwidth;
+	unsigned int	ch;
 	UINTPTR_T	addr_val;
-        ssize_t		chlen ;
+	ssize_t		chlen ;
 	boolean_t	indirect;
 	qw_num_ptr_t	val_ptr;
 	unsigned char	numa[22];
@@ -479,12 +481,22 @@ void	util_out_send_oper(char *addr, unsigned int len)
 /* 1st arg: address of system log message */
 /* 2nd arg: length of system long message (not used in Unix implementation) */
 {
+	sigset_t		savemask;
+
 	if (first_syslog)
 	{
 		first_syslog = FALSE;
 		(void)OPENLOG("GTM", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
 	}
+	/*
+	 * When syslog is processing and a signal occurs, the signal processing might eventually lead to another syslog
+	 * call.  But in libc the first syslog has grabbed a lock (syslog_lock), and now the other syslog call will
+	 * block waiting for that lock which can't be released since the first syslog was interrupted by the signal.
+	 * A work around is to temporarily block external signals and then restore them after the syslog returns.
+	 */
+	sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);
 	(void)SYSLOG(LOG_USER | LOG_INFO, addr);
+	sigprocmask(SIG_SETMASK, &savemask, NULL);
 }
 
 

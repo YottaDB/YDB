@@ -50,6 +50,8 @@ static int			emit_buff_used;		/* number of chars in emit_buff */
 static struct rel_table		*link_rel, *link_rel_end; /* Linkage relocation entries.  */
 static struct linkage_entry	*linkage_first, *linkage_last;
 static struct sym_table		*symbols;
+void	emit_link_reference(int4 refoffset, mstr *name);
+int	output_symbol_size(void);
 
 void	drop_object_file(void)
 {
@@ -355,7 +357,7 @@ void	emit_literals(void)
 			p->v.str.addr = (char *)(p->v.str.addr - (char *)stringpool.base); /* Initial offset */
 		else
 			p->v.str.addr = NULL;
-		p->v.fnpc_indx = -1;
+		p->v.fnpc_indx = (unsigned char)-1;
 		emit_immed((char *)&p->v, sizeof(p->v));
 		offset += sizeof(p->v);
 	}
@@ -407,7 +409,7 @@ int4	find_linkage(mstr* name)
 int	literal_offset(UINTPTR_T offset)
 {
 	/* If we have no offset assigned yet, assume a really big offset. */
-	if (-1 == offset)
+	if ((unsigned int)-1 == offset)
 		offset = MAXPOSINT4;
 	return (int)((run_time ? (offset - (UINTPTR_T)runtime_base) : offset));
 }

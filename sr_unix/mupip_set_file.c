@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,7 +73,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	char			acc_spec[MAX_ACC_METH_LEN], ver_spec[MAX_DB_VER_LEN], exit_stat, *fn;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
 	int			fd, fn_len;
-	uint4			status;
+	int4			status;
 	int4			status1;
 	int			glbl_buff_status, defer_status, rsrvd_bytes_status,
 				extn_count_status, lock_space_status, disk_wait_status;

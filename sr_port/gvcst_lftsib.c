@@ -91,7 +91,7 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 		new->tn = cs_addrs->ti->curr_tn;
 		new->ptr = NULL;
 		if (NULL == (buffer_address = t_qread(blk, &new->cycle, &new->cr)))
-			return(rdfail_detail);
+			return((enum cdb_sc)rdfail_detail);
 		new->first_tp_srch_status = first_tp_srch_status;
 		assert(new->level == old->level);
 		assert(new->blk_target == old->blk_target);

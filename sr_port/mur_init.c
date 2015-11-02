@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +67,7 @@ void mur_init(void)
 	mur_desc.random_buff.read_in_progress = FALSE;
 	mur_desc.seq_buff[0].read_in_progress = FALSE;
 	mur_desc.seq_buff[1].read_in_progress = FALSE;
-#if defined(UNIX)
+#if defined(UNIX) && defined(MUR_USE_AIO)
 	mur_desc.seq_buff[0].aiocbp = (struct aiocb *)malloc(sizeof(struct aiocb));
 	mur_desc.seq_buff[1].aiocbp = (struct aiocb *)malloc(sizeof(struct aiocb));
 	memset((char *)mur_desc.seq_buff[0].aiocbp, 0, sizeof(struct aiocb));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,6 +64,8 @@ boolean_t sem_set_exists(int which_set)
 
 int init_sem_set_source(sem_key_t key, int nsems, permissions_t sem_flags)
 {
+	assert(IPC_PRIVATE == (key_t)key);
+	assert(sizeof(key_t) >= sizeof(sem_key_t));
 	sem_set_id[SOURCE] = semget(key, nsems, sem_flags);
 	holds_sem[SOURCE][JNL_POOL_ACCESS_SEM] = FALSE;
 	holds_sem[SOURCE][SRC_SERV_COUNT_SEM] = FALSE;
@@ -77,6 +79,8 @@ void set_sem_set_src(int semid)
 }
 int init_sem_set_recvr(sem_key_t key, int nsems, permissions_t sem_flags)
 {
+	assert(IPC_PRIVATE == (key_t)key);
+	assert(sizeof(key_t) >= sizeof(sem_key_t));
 	sem_set_id[RECV] = semget(key, nsems, sem_flags);
 	holds_sem[RECV][RECV_POOL_ACCESS_SEM] = FALSE;
 	holds_sem[RECV][RECV_SERV_COUNT_SEM] = FALSE;

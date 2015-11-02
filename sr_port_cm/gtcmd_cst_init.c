@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,9 +43,9 @@ void gtcmd_cst_init(cm_region_head *ptr)
 	else
 		rts_error(VARLSTCNT(1) CMERR_CMEXCDASTLM);
 	VMS_ONLY(gtcm_ast_avail--);
-	if (((ptr->reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (-4)) > gv_keysize)
+	if (((ptr->reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (uint4)(-4)) > gv_keysize)
 	{
-		gv_keysize = (ptr->reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (-4);
+		gv_keysize = (ptr->reg->max_rec_size + MAX_NUM_SUBSC_LEN + 4) & (uint4)(-4);
 		temp_key = (gv_key*)malloc(sizeof(gv_key) - 1 + gv_keysize);
 		if (gv_currkey)
 		{

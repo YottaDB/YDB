@@ -477,7 +477,7 @@ typedef struct
 	struct_jrec_inctn	*inctn_rec;								\
 													\
 	inctn_rec = &(mur_rab).jnlrec->jrec_inctn;							\
-	opcode = inctn_rec->opcode;									\
+	opcode = (inctn_opcode_t)inctn_rec->opcode;									\
 	if ((inctn_gdsfilext_gtm == opcode) || (inctn_gdsfilext_mu_reorg == opcode))			\
 	{	/* Note down the number of bitmaps that were created during this file extension		\
 		 * in V4 format. At the turn around point, blks_to_upgrd counter has to be 		\

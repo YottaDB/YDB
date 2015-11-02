@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,7 +70,7 @@ uint4 mur_process_intrpt_recov()
 #if defined(VMS)
 	io_status_block_disk	iosb;
 #endif
-	boolean_t		jfh_changed, first_time;
+	boolean_t		jfh_changed;
 
 	error_def(ERR_PREMATEOF); /* for DO_FILE_WRITE */
 	error_def(ERR_JNLCREATERR);
@@ -185,7 +185,6 @@ uint4 mur_process_intrpt_recov()
 		jctl->jfh->turn_around_offset = jctl->turn_around_offset;	/* save progress in file header for 	*/
 		jctl->jfh->turn_around_time = jctl->turn_around_time;		/* possible re-issue of recover 	*/
 		jfh_changed = TRUE;
-		DEBUG_ONLY(first_time = TRUE;)
 		for ( ; NULL != jctl; jctl = jctl->next_gen)
 		{	/* setup the next_jnl links. note that in the case of interrupted recovery, next_jnl links
 			 * would have been already set starting from the turn-around point journal file of the
@@ -201,18 +200,17 @@ uint4 mur_process_intrpt_recov()
 			} else
 				assert(0 == jctl->jfh->next_jnl_file_name_length); /* null link from latest generation */
 			if (jctl->jfh->turn_around_offset && (jctl != rctl->jctl_turn_around))
-			{	/* it is possible that the current recovery has a turn-around-point much before the
-				 * previously interrupted recovery. if it happens to be a previous generation journal
+			{	/* It is possible that the current recovery has a turn-around-point much before the
+				 * previously interrupted recovery. If it happens to be a previous generation journal
 				 * file then we have to reset the original turn-around-point to be zero in the journal
 				 * file header in order to ensure if this recovery gets interrupted we do interrupted
 				 * recovery processing until the new turn-around-point instead of stopping incorrectly
-				 * at the original turn-around-point itself.
+				 * at the original turn-around-point itself. Note that there could be more than one
+				 * journal file with a non-zero turn_around_offset (depending on how many previous
+				 * recoveries got interrupted in this loop) that need to be reset.
 				 */
 				assert(!jctl->turn_around_offset);
 				assert(rctl->recov_interrupted);	/* rctl->jfh_recov_interrupted can fail */
-				assert(first_time);	/* there can't be two journal files after the current
-							 * turn-around-point with a non-zero turn-around-point */
-				DEBUG_ONLY(first_time = FALSE;)
 				jctl->jfh->turn_around_offset = 0;
 				jctl->jfh->turn_around_time = 0;
 				jfh_changed = TRUE;

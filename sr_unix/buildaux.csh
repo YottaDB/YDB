@@ -141,11 +141,17 @@ set echo
 if ( $buildaux_gde == 1 ) then
 	pushd $gtm_exe
 		chmod 664 *.m *.o
-		rm *.m *.o
+
+		\rm -f *.m *.o	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
 		cp $gtm_pct/*.m .
 
 		# GDE and the % routines should all be in upper-case.
-		ls -1 *.m | awk '{printf "mv %s %s\n", $1, toupper($1);}' | sed 's/.M$/.m/g' | sh
+		if ( `uname` !~ "CYGWIN*") then
+			ls -1 *.m | awk '{printf "mv %s %s\n", $1, toupper($1);}' | sed 's/.M$/.m/g' | sh
+		else
+			# unless the mount is "managed", Cygwin is case insensitive but preserving
+			ls -1 *.m | awk '{printf "mv %s %s.tmp;mv %s.tmp %s\n", $1, $1, $1, toupper($1);}' | sed 's/.M$/.m/g' | sh
+		endif
 
 		# Compile all of the *.m files once so the $gtm_dist directory can remain protected.
 		mumps *.m
@@ -155,30 +161,13 @@ if ( $buildaux_gde == 1 ) then
 				>> $gtm_log/error.`basename $gtm_exe`.log
 		endif
 
-		if (`uname` == "AIX") then
-			setenv LIBPATH /usr/local/lib
-			set library_path = "$LIBPATH"
-		else
-			setenv LD_LIBRARY_PATH "/usr/local/lib:/usr/lib"
-			set library_path = `echo $LD_LIBRARY_PATH | sed 's/:/ /g'`
-		endif
-		set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
-		if (! -e utf8) then
-			foreach libpath ($library_path)
-				set found_icu = `ls -1 $libpath | grep "libicu.*36.*" | wc -l`
-				if ($found_icu) then
-					break
-				endif
-			end
-			if ($found_icu && $utflocale != "") then
-				mkdir utf8
-			endif
-		endif
-		if (-e utf8) then
+		source $gtm_tools/check_unicode_support.csh
+		if ("TRUE" == "$is_unicode_support") then
+			if (! -e utf8) mkdir utf8
 			setenv LC_CTYPE $utflocale
 			unsetenv LC_ALL
 			setenv gtm_chset UTF-8	# switch to "UTF-8" mode
-			rm -f utf8/*.m
+			\rm -f utf8/*.m	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
 			cp *.m utf8
 			cd utf8
 			../mumps *.m
@@ -194,9 +183,9 @@ if ( $buildaux_gde == 1 ) then
 
 		# Don't deliver the GDE sources except with a dbg release.
 		if ( "$gtm_exe" != "$gtm_dbg" ) then
-			rm GDE*.m
+			\rm -f GDE*.m	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
 			if (-e utf8) then
-				rm utf8/GDE*.m
+				\rm -f utf8/GDE*.m # use \rm to avoid rm from asking for confirmation (if it has been aliased so)
 			endif
 		endif
 	popd

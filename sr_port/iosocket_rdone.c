@@ -25,7 +25,8 @@ GBLREF io_pair	io_curr_device;
 int	iosocket_rdone(mint *v, int4 timeout)
 {
 	mval		tmp;
-	int		ret, codepoint;
+	int		ret;
+	uint4		codepoint;
 	io_desc		*iod;
 	gtm_chset_t	ichset;
 
@@ -56,7 +57,7 @@ int	iosocket_rdone(mint *v, int4 timeout)
 		} else
 			/* Null length string returns 0 */
 			codepoint = 0;
-		*v = codepoint;
+		*v = (mint)(codepoint);
 	} else
 		*v = -1;
 	return ret;

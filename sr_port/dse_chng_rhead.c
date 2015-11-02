@@ -67,10 +67,7 @@ void dse_chng_rhead(void)
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-	assert(update_array);
-	/* reset new block mechanism */
-	update_array_ptr = update_array;
-
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
 		if(!cli_get_hex("BLOCK", (uint4 *)&blk))
@@ -160,7 +157,7 @@ void dse_chng_rhead(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE);
+		t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 		BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 		t_end(&dummy_hist, 0);
 	}

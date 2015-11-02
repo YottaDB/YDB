@@ -251,12 +251,14 @@ bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mva
 							"PER 3252: fix problems starting up mumps from an ""rsh"" or ""remsh"""
 						*/
 						sockoptlen = SIZEOF(sockoptval);
-						sockstat = getsockopt(file_des, SOL_SOCKET, SO_TYPE, &sockoptval, &sockoptlen);
+						sockstat = getsockopt(file_des, SOL_SOCKET, SO_TYPE, &sockoptval,
+								      (GTM_SOCKLEN_TYPE *)&sockoptlen);
 						if (!sockstat && SOCK_STREAM == sockoptval)
 						{
 							socknamelen = sizeof(sockname);
 							sockstat = getsockname(file_des,
-									       (struct sockaddr *)&sockname, &socknamelen);
+									       (struct sockaddr *)&sockname,
+									       (GTM_SOCKLEN_TYPE *)&socknamelen);
 							if (!sockstat && AF_INET == sockname.sin_family)
 							{
 								sockport = ntohs(sockname.sin_port);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +9,7 @@
  *								*
  ****************************************************************/
 
-/* mu_reduce_level.c:
-	Reduce level overwriting root with it's start-record-only child block.
-*/
+/* mu_reduce_level.c: Reduce level overwriting root with it's star-record-only child block.  */
 
 #include "mdef.h"
 
@@ -44,9 +42,6 @@ GBLREF char		*update_array, *update_array_ptr;
 GBLREF unsigned int     t_tries;
 GBLREF uint4		t_err;
 
-
-
-
 /**************************************************************************************
 	Input Parameters:
 		(GBL_DEF) gv_target: For reference block's history
@@ -58,11 +53,8 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
 	int		level;
 	int		old_blk_sz;
 	int		blk_seg_cnt, blk_size;
-	uint4		save_t_err;
 	blk_segment	*bs_ptr1, *bs_ptr2;
 	sm_uc_ptr_t 	old_blk_base, save_blk;
-
-	error_def(ERR_GVKILLFAIL);
 
 	level = gv_target->hist.depth;
 	if (1 == level)
@@ -71,8 +63,7 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
  	blk_size = cs_data->blk_size;
 	kill_set_ptr->used = 0;
 	memset(kill_set_ptr, 0, sizeof(kill_set));
-	assert(update_array != NULL);
-	update_array_ptr = update_array;
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	old_blk_base = gv_target->hist.h[level].buffaddr;
 	old_blk_sz = ((blk_hdr_ptr_t)(old_blk_base))->bsiz;
 	if (sizeof(blk_hdr) + BSTAR_REC_SIZE != old_blk_sz)
@@ -88,10 +79,7 @@ enum cdb_sc mu_reduce_level(kill_set *kill_set_ptr)
 		assert(t_tries < CDB_STAGNATE);
 		return cdb_sc_blkmod;
 	}
-	save_t_err = t_err;
-	t_err = ERR_GVKILLFAIL;
-	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level - 1, TRUE, TRUE);
-	t_err = save_t_err;
+	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level - 1, TRUE, TRUE, GDS_WRITE_KILLTN);
 	kill_set_ptr->blk[kill_set_ptr->used].flag = 0;
 	kill_set_ptr->blk[kill_set_ptr->used].level = 0;
 	kill_set_ptr->blk[kill_set_ptr->used++].block = gv_target->hist.h[level-1].blk_num;

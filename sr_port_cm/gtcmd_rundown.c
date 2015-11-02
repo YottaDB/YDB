@@ -27,38 +27,60 @@
 #include "dpgbldir.h"
 #include "wcs_timer_start.h"
 #include "gtcmd.h"
+#include "send_msg.h"
 
-GBLREF cm_region_head		*reglist;
-GBLREF gd_region		*gv_cur_region;
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF sgmnt_data_ptr_t		cs_data;
+#include "gtm_time.h"
+
+GBLREF	cm_region_head		*reglist;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	jnl_gbls_t		jgbl;
+
 #ifdef VMS
 GBLREF short		gtcm_ast_avail;
 #endif
 
 void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 {
-	int4		link;
-	cm_region_list	*ptr, *last, *que_next, *que_last;
-	cm_region_head	*region;
+	int4			link;
+	cm_region_list		*ptr, *last, *que_next, *que_last;
+	cm_region_head		*region;
+	uint4			jnl_status;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 
 	for (ptr = cnx->region_root;  ptr;)
 	{
 		region = ptr->reghead;
 		TP_CHANGE_REG(region->reg);
-		if (ptr->pini_addr && clean_exit && JNL_ENABLED(cs_addrs->hdr) && (NOJNL != cs_addrs->jnl->channel))
+		jpc = cs_addrs->jnl;
+		if (ptr->pini_addr && clean_exit && JNL_ENABLED(cs_data) && (NOJNL != jpc->channel))
 		{
-			cs_addrs->jnl->pini_addr = ptr->pini_addr;
+			jpc->pini_addr = ptr->pini_addr;
 			grab_crit(gv_cur_region);
-			jnl_put_jrt_pfin(cs_addrs);
+			SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_put_jrt_pfin needs this to be set */
+			jbp = jpc->jnl_buff;
+			/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl records.
+			 * This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+			 * (if it decides to switch to a new journal file)
+			 */
+			ADJUST_GBL_JREC_TIME(jgbl, jbp);
+			jnl_status = jnl_ensure_open();
+			if (0 == jnl_status)
+			{
+				if (0 != jpc->pini_addr)
+					jnl_put_jrt_pfin(cs_addrs);
+			} else
+				send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 			rel_crit(gv_cur_region);
 		}
 		if (0 == --region->refcnt)
 		{	/* free up only as little as needed to facilitate structure reuse when the region is opened again */
 			assert(region->head.fl == region->head.bl);
 			VMS_ONLY(gtcm_ast_avail++);
-			if (JNL_ALLOWED(cs_addrs->hdr))
-				cs_addrs->jnl->pini_addr = 0;
+			if (JNL_ALLOWED(cs_data))
+				jpc->pini_addr = 0;
 			gds_rundown();
 			gd_ht_kill(region->reg_hash, TRUE);	/* TRUE to free up the table and the gv_targets it holds too */
 			free(FILE_INFO(gv_cur_region)->s_addrs.dir_tree->alt_hist);

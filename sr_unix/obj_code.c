@@ -14,8 +14,9 @@
 #include "gtm_fcntl.h"
 #include "gtm_stdio.h"
 #include <errno.h>
-#include <sys/stat.h>
+#include "gtm_stat.h"
 #include <sys/types.h>
+#include "gtm_stdlib.h"
 #include "gtm_unistd.h"
 
 #include "compiler.h"
@@ -95,6 +96,8 @@ GBLREF spdesc		stringpool;
  */
 
 void	cg_lab (mlabel *mlbl, char *do_emit);
+int	output_symbol_size(void);
+
 
 void	obj_code (uint4 src_lines, uint4 checksum)
 {
@@ -160,7 +163,7 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	/* Executable code offset setup */
 	IA64_ONLY(assert(!(PTEXT_OFFSET % SECTION_ALIGN_BOUNDARY));)
 	rhead.ptext_adr = (unsigned char *)PTEXT_OFFSET;
-	rhead.ptext_end_adr = (unsigned char *)code_size;
+	rhead.ptext_end_adr = (unsigned char *)(size_t)code_size;
 	/* Line number table offset setup */
 	rhead.lnrtab_adr = (lnr_tabent *)rhead.ptext_end_adr;
 	rhead.lnrtab_len = src_lines;
@@ -168,26 +171,26 @@ void	obj_code (uint4 src_lines, uint4 checksum)
 	lnr_pad_size = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);
 	code_size += lnr_pad_size;
 	/* Literal text section offset setup */
-	rhead.literal_text_adr = (unsigned char *)code_size;
+	rhead.literal_text_adr = (unsigned char *)(size_t)code_size;
 	rhead.literal_text_len = lits_text_size;
 	code_size += lits_text_size;
 	assert(0 == PADLEN(code_size, NATIVE_WSIZE));
 	/* Literal mval section offset setup */
-	rhead.literal_adr = (mval *)code_size;
+	rhead.literal_adr = (mval *)(size_t)code_size;
 	rhead.literal_len = lits_mval_size / SIZEOF(mval);
 	code_size += lits_mval_size;
 	/* Padding so variable table starts on proper boundary */
 	lits_pad_size = PADLEN(code_size, SECTION_ALIGN_BOUNDARY);
 	code_size += lits_pad_size;
 	/* Variable table offset setup */
-	rhead.vartab_adr = (var_tabent *)code_size;
+	rhead.vartab_adr = (var_tabent *)(size_t)code_size;
 	rhead.vartab_len = mvmax;
 	code_size += mvmax * sizeof(var_tabent);
 	/* Linkage section setup. No table in object but need its length. */
 	rhead.linkage_adr = NULL;
 	rhead.linkage_len = linkage_size / SIZEOF(lnk_tabent);
 	/* Label table offset setup */
-	rhead.labtab_adr = (lab_tabent *)code_size;
+	rhead.labtab_adr = (lab_tabent *)(size_t)code_size;
 	rhead.labtab_len = mlmax;
 	code_size += mlmax * sizeof(lab_tabent);
 	if (mlabtab)

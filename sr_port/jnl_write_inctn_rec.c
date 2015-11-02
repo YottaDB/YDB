@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,19 +38,18 @@ GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl r
 void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 {
 	struct_jrec_inctn	inctn_record;
+	jnl_private_control	*jpc;
 
-	assert(0 != csa->jnl->pini_addr);
 	assert(csa->now_crit);
+	jpc = csa->jnl;
+	assert(0 != jpc->pini_addr);
 	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
 	inctn_record.prefix.jrec_type = JRT_INCTN;
 	inctn_record.prefix.forwptr = inctn_record.suffix.backptr = INCTN_RECLEN;
 	inctn_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-	inctn_record.prefix.pini_addr = (0 == csa->jnl->pini_addr) ? JNL_HDR_LEN : csa->jnl->pini_addr;
+	inctn_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
+	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
-	if (!jgbl.gbl_jrec_time)
-	{	/* no idea how this is possible, but just to be safe */
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
-	}
 	inctn_record.prefix.time = jgbl.gbl_jrec_time;
 	inctn_record.prefix.tn = csa->ti->curr_tn;
 	inctn_record.prefix.checksum = INIT_CHECKSUM_SEED;
@@ -64,6 +63,7 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 		case inctn_blkdwngrd:
 		case inctn_blkupgrd_fmtchng:
 		case inctn_blkdwngrd_fmtchng:
+		case inctn_blkmarkfree:
 			inctn_record.detail.blknum = inctn_detail.blknum;
 			break;
 		case inctn_gdsfilext_gtm:
@@ -73,5 +73,5 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 		default:
 			break;
 	}
-	jnl_write(csa->jnl, JRT_INCTN, (jnl_record *)&inctn_record, NULL, NULL);
+	jnl_write(jpc, JRT_INCTN, (jnl_record *)&inctn_record, NULL, NULL);
 }

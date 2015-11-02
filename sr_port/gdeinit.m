@@ -15,30 +15,35 @@ GDEINIT
 	s renpref=""
 	s log=0,logfile="GDELOG.LOG",BOL=""
 	s ZERO=$c(0),ONE=$c(1),TRUE=ONE,FALSE=ZERO,TAB=$c(9)
-	s endian("VAX")=FALSE,glo("VMS")=1024
-	s endian("AXP")=FALSE,glo("VMS")=1024,glo("OSF1")=1024
-	s endian("x86")=FALSE,glo("SCO")=384,glo("UWIN")=1024,glo("Linux")=1024
-	s endian("SEQUOIA_SERIES_400")=TRUE,glo("VAX")=1024
-	s endian("HP-PA")=TRUE,glo("HP-UX")=1024
-	s endian("IA64")=TRUE,glo("HP-UX")=1024,glo("Linux")=1024
-	s endian("SPARC")=TRUE,glo("SUN/OS_V4.x")=800,glo("Solaris")=1024
-	s endian("MIPS")=TRUE,glo("A25")=1024
-	s endian("B30")=TRUE,glo("NONSTOP-UX")=1024
-	s endian("B32")=TRUE,glo("NONSTOP-UX")=1024
-	s endian("MC-680x0")=TRUE,glo("SYS_V/68_R3V6")=1024,glo("TOPIX")=1024
-	s endian("RS6000")=TRUE,glo("AIX")=1024
-	s endian("S390")=TRUE,glo("OS390")=1024
+	s endian("VAX","VMS")=FALSE,glo("VMS")=1024
+	s endian("AXP","VMS")=FALSE,endian("AXP","OSF1")=FALSE,glo("VMS")=1024,glo("OSF1")=1024
+	s endian("x86","SCO")=FALSE,endian("x86","UWIN")=FALSE,endian("x86","Linux")=FALSE,endian("x86","CYGWIN")=FALSE
+	s glo("SCO")=384,glo("UWIN")=1024,glo("Linux")=1024,glo("CYGWIN")=1024
+	s endian("SEQUOIA_SERIES_400","VAX")=TRUE,glo("VAX")=1024
+	s endian("HP-PA","HP-UX")=TRUE,glo("HP-UX")=1024
+	s endian("IA64","HP-UX")=TRUE,glo("HP-UX")=1024
+	s endian("IA64","Linux")=FALSE,glo("Linux")=1024
+	s endian("SPARC","SUN/OS_V4.x")=TRUE,endian("SPARC","Solaris")=TRUE,glo("SUN/OS_V4.x")=800,glo("Solaris")=1024
+	s endian("MIPS","A25")=TRUE,glo("A25")=1024
+	s endian("B30","NONSTOP-UX")=TRUE,glo("NONSTOP-UX")=1024
+	s endian("B32","NONSTOP-UX")=TRUE,glo("NONSTOP-UX")=1024
+	s endian("MC-680x0","SYS_V/68_R3V6")=TRUE,endian("MC-680x0","TOPIX")=TRUE,glo("SYS_V/68_R3V6")=1024,glo("TOPIX")=1024
+	s endian("RS6000","AIX")=TRUE,glo("AIX")=1024
+	s endian("S390","OS390")=TRUE,endian("S390","Linux")=TRUE,glo("OS390")=1024
 	; The following line is for support of AIX V3.2.5 only and can (and should)
 	; be removed (along with this comment) as soon as we drop support for
 	; AIX V3.2.5.  This change is needed to correspond to the change in
 	; release_name.h.  C9801-000344
 	s glo("AIX325")=glo("AIX")
 	s HEX(0)=1
-	f x=1:1:8 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
+	s gtm64="false"
+	i ($p($zver," ",4)="IA64") s gtm64="true"
+	i (gtm64="true") f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
+	e  f x=1:1:8 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
 	s TWO(26)=TWO(24)*4
 	s TWO(31)=TWO(32)*.5
 	s lower="abcdefghijklmnopqrstuvwxyz",upper="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	s endian=endian($p($zver," ",4))
+	s endian=endian($p($zver," ",4),$p($zver," ",3))
 	s ver=$p($zver," ",3)
 	s defglo=glo(ver)
 	s comline=$zcmdline
@@ -47,15 +52,26 @@ GDEINIT
 	d VMS:ver="VMS"
 	d syntabi
 ;
-	s SIZEOF("am_offset")=324
-	s SIZEOF("file_spec")=256
-	s SIZEOF("gd_header")=16
-	s SIZEOF("gd_contents")=44
-	s SIZEOF("gd_map")=36
-	s SIZEOF("gd_region")=332
-	s SIZEOF("gd_segment")=336
-	s SIZEOF("mident")=32
-	s SIZEOF("blk_hdr")=16
+	i (gtm64="false") d
+	. s SIZEOF("am_offset")=324
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_contents")=44
+	. s SIZEOF("gd_map")=36
+	. s SIZEOF("gd_region")=332
+	. s SIZEOF("gd_segment")=336
+	. s SIZEOF("mident")=32
+	. s SIZEOF("blk_hdr")=16
+	e  d
+	. s SIZEOF("am_offset")=332
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_contents")=80
+	. s SIZEOF("gd_map")=40
+	. s SIZEOF("gd_region")=344
+	. s SIZEOF("gd_segment")=352
+	. s SIZEOF("mident")=32
+	. s SIZEOF("blk_hdr")=16
 	s SIZEOF("rec_hdr")=3
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=32767

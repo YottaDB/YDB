@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,7 @@ void gtcm_init_ast(struct CLB *c)
 	cs = UNIX_ONLY(c->usr;) /* for Unix, allocated already -- setup now */
 	     VMS_ONLY((connection_struct *)malloc(sizeof(connection_struct));)
 	memset(cs, 0, sizeof(*cs));
-	UNIX_ONLY(gettimeofday((struct timeval *)&cs->connect[0], NULL);)
+	UNIX_ONLY(gettimeofday(RECAST(struct timeval *)&cs->connect[0], NULL);)
 	VMS_ONLY(
 		sys$gettim(&cs->connect[0]);
 		c->usr = cs;

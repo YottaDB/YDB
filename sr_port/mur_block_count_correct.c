@@ -76,18 +76,27 @@ uint4 mur_block_count_correct(void)
 	assert(mu_int_ovrhd == mu_data->start_vbn);
 	size = mu_int_ovrhd + (mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;
 	native_size = mu_file_size(gv_cur_region->dyn.addr->file_cntl);
-	/* In the following tests, the EOF block should always be 1 greater
-	 * than the actual size of the file.  This is due to the GDS being
-	 * allocated in even DISK_BLOCK_SIZE-byte blocks. */
-
+	/* In the following tests, the EOF block should always be 1 greater than the actual size of the file.
+	 * This is due to the GDS being allocated in even DISK_BLOCK_SIZE-byte blocks.
+	 */
 	if (native_size && (size < native_size))
 	{
 		total_blks = (dba_mm == mu_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* jnl_write_inctn_rec needs it */
 		if (JNL_ENABLED(cs_addrs))
 			cs_addrs->jnl->pini_addr = 0; /* Stop simulation of GTM process journal record writing (if any active)*/
+		/* If journaling, gdsfilext will need to write an inctn record. The timestamp of that journal record will
+		 * need to be adjusted to the current system time to reflect that it is recovery itself writing that record
+		 * instead of simulating GT.M activity. Since the variable jgbl.dont_reset_gbl_jrec_time is still set, gdsfilext
+		 * will NOT modify jgbl.gbl_jrec_time. Temporarily reset it to allow for adjustments to gbl_jrec_time.
+		 */
+		assert(jgbl.dont_reset_gbl_jrec_time);
+		jgbl.dont_reset_gbl_jrec_time = FALSE;
 		if (SS_NORMAL != (status = gdsfilext(mu_data->extension_size, total_blks)))
+		{
+			jgbl.dont_reset_gbl_jrec_time = TRUE;
 			return (status);
+		}
+		jgbl.dont_reset_gbl_jrec_time = TRUE;
 		DEBUG_ONLY(
 			/* Check that the filesize and blockcount in the fileheader match now after the extend */
 			size = mu_int_ovrhd + (mu_data->blk_size / DISK_BLOCK_SIZE) * mu_data->trans_hist.total_blks;

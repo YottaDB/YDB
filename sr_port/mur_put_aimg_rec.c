@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,9 +65,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 	 * making the cache-record become dirty in case of BG and some others to do in case of MM.
 	 * Therefore, it is best to call t_end().
 	 */
-	assert(update_array);
-	/* reset new block mechanism */
-	update_array_ptr = update_array;
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	assert(!cs_addrs->now_crit);
 
 	t_begin_crit(ERR_MURAIMGFAIL);
@@ -84,7 +82,7 @@ void mur_put_aimg_rec(jnl_record *rec)
 		t_abort(gv_cur_region, cs_addrs);
 		return;
 	}
-	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)aimg_blk_ptr)->levl, TRUE, FALSE);
+	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)aimg_blk_ptr)->levl, TRUE, FALSE, GDS_WRITE_PLAIN);
 	if (JNL_ENABLED(cs_data))
 	{
 		cse = (cw_set_element *)(&cw_set[0]);

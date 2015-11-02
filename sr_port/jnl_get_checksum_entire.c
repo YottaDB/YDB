@@ -13,22 +13,21 @@
 
 /*
  * Input :
- *	checksum : Current checksum value.
- *	buff   	 : Pointer to the input buffer whose checksum needs to be computed and adjusted with the input checksum.
+ *	buff   	 : Pointer to the input buffer whose checksum needs to be computed.
  *	bufflen  : Buffer size in bytes
  *
  * Returns:
- *	Adjusted checksum.
+ *	Computed checksum.
  *
  * Algorithm:
- *	It is different from "jnl_get_checksum()" in the sense this calculates checksum of entire length passed.
+ *	It is different from the function "jnl_get_checksum" in the sense this calculates checksum of entire length passed.
  * 	If bufflen is not divisible by 4, it is ROUNDED DOWN to the nearest 4-byte (uint4) multiple.
  */
-uint4 jnl_get_checksum_entire(uint4 checksum, uint4 *buff, int bufflen)
+uint4 jnl_get_checksum_entire(uint4 *buff, int bufflen)
 {
-	uint4		*blk_top, blen;
+	uint4		*blk_top, blen, checksum;
 
-	assert(checksum);
+	checksum = INIT_CHECKSUM_SEED;
 	for (blen = bufflen / USIZEOF(*buff), blk_top = buff + blen ; buff < blk_top; buff++)
 		checksum = ADJUST_CHECKSUM(checksum, *buff);
 	assert(checksum);

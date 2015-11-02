@@ -26,6 +26,9 @@
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
 #include "gtm_string.h"
+#if defined(SYS_ERRLIST_INCLUDE) && !defined(__CYGWIN__)
+#include SYS_ERRLIST_INCLUDE
+#endif
 
 #include "job.h"
 #include "error.h"
@@ -63,7 +66,9 @@ GBLREF	volatile boolean_t    	ojtimeout;
 GBLREF	boolean_t    		job_try_again;
 GBLREF	uint4			process_id;
 GBLREF	int			mutex_sock_fd;
-#if !defined(__MVS__) && !defined(__linux__)
+#ifndef SYS_ERRLIST_INCLUDE
+/* currently either stdio.h or errno.h both of which are included above */
+/*	needed by TIMEOUT_ERROR in jobsp.h */
 GBLREF	int			sys_nerr;
 #endif
 

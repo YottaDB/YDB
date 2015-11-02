@@ -78,7 +78,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 	ext_stop = ptr + strlen(ptr) + 1;
 	temp_rec = rec;
 
-	exttype = MUEXTRACT_TYPE(ptr);
+	exttype = (muextract_type)MUEXTRACT_TYPE(ptr);
 	assert((exttype >= 0) && (exttype < MUEXT_MAX_TYPES));
 
 	switch(exttype)
@@ -156,7 +156,7 @@ char	*ext2jnl(char *ptr, jnl_record *rec)
 		return (char *)rec;
 		break;
 	}
-	rectype = rec->prefix.jrec_type;
+	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 	ptr = strtok(ptr, "\\");		/* get the rec-type field */
 	assert(NULL != ptr);
 	ptr = strtok(NULL, "\\");		/* get the time field */

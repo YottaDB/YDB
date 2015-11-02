@@ -56,11 +56,14 @@ GBLREF uint4			process_id;
 GBLREF jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
 GBLREF gv_namehead		*gv_target;
 GBLREF int4			update_trans;
+GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 
-#define CACHE_REC_CLEANUP(cr)			\
+#define CACHE_REC_CLEANUP(csa, cr)		\
 {						\
 	assert(!cr->in_tend);			\
 	assert(!cr->data_invalid);		\
+	assert(csa->now_crit);			\
+	assert(cr->in_cw_set);			\
 	cr->in_cw_set = FALSE;			\
 }
 
@@ -93,7 +96,6 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 {
 	boolean_t	update_underway, reg_seqno_reset = FALSE;
 	cache_rec_ptr_t	cr;
-	cw_set_element	*first_cse;
 	sgm_info	*si;
 	sgmnt_addrs	*csa, *jpl_csa = NULL;
 	char		*trstr;
@@ -112,31 +114,39 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	if (dollar_tlevel > 0)
 	{
 		trstr = "TP";
-		for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
+		/* Regions are committed in the ftok order using "first_tp_si_by_ftok". Also crit is released on each region
+		 * as the commit completes. Take that into account while determining if update is underway. Note that this
+		 * update_underway determining logic is shared by secshr_db_clnup as well so any changes here need to be made there.
+		 */
+		for (si = first_tp_si_by_ftok;  (NULL != si);  si = si->next_tp_si_by_ftok)
 		{
-			TP_CHANGE_REG(si->gv_cur_region);
-			first_cse = si->first_cw_set;
-			TRAVERSE_TO_LATEST_CSE(first_cse);
-			if (NULL != first_cse)
-			{	/* Set update_underway to TRUE only if we have crit on this region. */
-				if (cs_addrs->now_crit
-					&& (cs_addrs->t_commit_crit
-						|| (si->cw_set_depth && (gds_t_committed == first_cse->mode))))
-					update_underway = TRUE;
+			if (T_COMMIT_STARTED == si->update_trans)
+			{	/* Two possibilities.
+				 *	(a) case of duplicate set not creating any cw-sets but updating db curr_tn++.
+				 *	(b) Have completed commit for this region and have released crit on this region.
+				 *		(in a potentially multi-region TP transaction).
+				 * In either case, update is underway and the transaction cannot be rolled back.
+				 */
+				update_underway = TRUE;
 				break;
-			} else if (si->update_trans)
-			{	/* case of duplicate set not creating any cw-sets but updating db curr_tn++ */
-				if (cs_addrs->now_crit && (T_COMMIT_STARTED == si->update_trans))
+			}
+			if (NULL != si->first_cw_set)
+			{
+				csa = &FILE_INFO(si->gv_cur_region)->s_addrs;
+				/* Assert that if we are in the midst of commit in a region, we better hold crit */
+				assert(!csa->t_commit_crit || csa->now_crit);
+				/* Just to be safe, set update_underway to TRUE only if we have crit on this region. */
+				if (csa->now_crit && csa->t_commit_crit)
+				{
 					update_underway = TRUE;
-				break;
+					break;
+				}
 			}
 		}
 	} else
 	{
 		trstr = "NON-TP";
-		update_underway = (cs_addrs->now_crit && (cs_addrs->t_commit_crit
-					|| (cw_set_depth && (gds_t_committed == cw_set[0].mode))
-					|| (T_COMMIT_STARTED == update_trans)));
+		update_underway = (cs_addrs->now_crit && (cs_addrs->t_commit_crit || (T_COMMIT_STARTED == update_trans)));
 		if (NULL != gv_target)	/* gv_target can be NULL in case of DSE MAPS command etc. */
 			gv_target->clue.end = 0; /* in case t_end() had set history's tn to be "valid_thru++", undo it */
 	}
@@ -160,41 +170,50 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			}
 		}
 		if (dollar_tlevel > 0)
-		{
+		{	/* At this point we know a TP update is NOT underway. In this case, use "first_sgm_info" and not
+			 * "first_tp_si_by_ftok" as the latter might be NULL even though we have gotten crit on all the
+			 * regions and are in the final retry. In this case using "first_sgm_info" will guarantee that
+			 * we release crit on all the regions.
+			 */
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 			{
 				TP_CHANGE_REG(si->gv_cur_region);
+				csa = cs_addrs;
 				while (si->cr_array_index > 0)
 				{
 					cr = si->cr_array[--si->cr_array_index];
-					CACHE_REC_CLEANUP(cr);
+					CACHE_REC_CLEANUP(csa, cr);
 				}
-				csa = cs_addrs;
-				RESET_EARLY_TN_IF_NEEDED(csa);		/* step (4) of the commit logic is undone here */
-				RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa);/* step (5) of the commit logic is undone here */
+				if (si->update_trans)
+				{
+					RESET_EARLY_TN_IF_NEEDED(csa);		/* step (4) of the commit logic is undone here */
+					RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa);/* step (5) of the commit logic is undone here */
+				}
+				assert(!csa->t_commit_crit);
+				assert(!csa->now_crit || csa->ti->curr_tn == csa->ti->early_tn);
+				ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between
+											  * seqno of filehdr and jnlpool */
+				/* Do not release crit on the region until reg_seqno has been reset above */
+				rel_crit(gv_cur_region); /* step (1) of the commit logic is iteratively undone here */
 			}
-			/* Do not release crit on jnlpool or the regions until reg_seqno has been reset above */
+			/* Do not release crit on jnlpool until reg_seqno has been reset above */
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
-			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
-			{
-				TP_CHANGE_REG(si->gv_cur_region);
-				if (t_tries < CDB_STAGNATE)
-					rel_crit(gv_cur_region); /* step (1) of the commit logic is undone here */
-			}
 		} else
 		{
+			csa = cs_addrs;
 			while (cr_array_index > 0)
 			{
 				cr = cr_array[--cr_array_index];
-				CACHE_REC_CLEANUP(cr);
+				CACHE_REC_CLEANUP(csa, cr);
 			}
-			csa = cs_addrs;
-			RESET_EARLY_TN_IF_NEEDED(csa);		/* step (4) of the commit logic is undone here */
-			RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa);/* step (5) of the commit logic is undone here */
-			/* Do not release crit on jnlpool or the regions until reg_seqno has been reset above */
+			if (update_trans)
+			{
+				RESET_EARLY_TN_IF_NEEDED(csa);		/* step (4) of the commit logic is undone here */
+				RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa);/* step (5) of the commit logic is undone here */
+			}
+			/* Do not release crit on jnlpool or the region until reg_seqno has been reset above */
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
-			if (t_tries < CDB_STAGNATE)
-				rel_crit(gv_cur_region);	/* step (1) of the commit logic is undone here */
+			rel_crit(gv_cur_region);	/* step (1) of the commit logic is undone here */
 		}
 		if ((t_tries < CDB_STAGNATE) && unhandled_stale_timer_pop)
 			process_deferred_stale();

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -262,7 +262,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	nBlkId = pTarg->root;
 	tn = cs_addrs->ti->curr_tn;
 	if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&cycle, &cr)))
-		return rdfail_detail;
+		return (enum cdb_sc)rdfail_detail;
 	nLevl = ((blk_hdr_ptr_t)pBlkBase)->levl;
 	if (MAX_BT_DEPTH < (int)nLevl)
 	{
@@ -321,7 +321,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		pCurr--;
 		pCurr->tn = cs_addrs->ti->curr_tn;
 		if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&pCurr->cycle, &pCurr->cr)))
-			return rdfail_detail;
+			return (enum cdb_sc)rdfail_detail;
 		pCurr->first_tp_srch_status = first_tp_srch_status;
 		if (((blk_hdr_ptr_t)pBlkBase)->levl != --nLevl)
 		{

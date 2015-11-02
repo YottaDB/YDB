@@ -81,7 +81,7 @@ void t_write_map (
 		 * access the buffer more than the db blk_size.
 		 */
 		bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
-		cs->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4*)old_block, bsiz);
+		cs->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
 	}
 	cs->cycle = blkhist->cycle;
 	cr = blkhist->cr;
@@ -92,7 +92,7 @@ void t_write_map (
 	 * thankfully, in MM, we do not allow GDSV4 type blocks, so we can safely assign GDSV5 (or GDSVCURR) to this field.
 	 */
 	assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-	cs->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
+	cs->ondsk_blkver = (NULL == cr) ? (enum db_ver)GDSVCURR : cr->ondsk_blkver;
 	cs->ins_off = 0;
 	cs->index = 0;
 	cs->reference_cnt = 0;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +10,26 @@
  ****************************************************************/
 #ifndef GTM_AIO_H
 #define GTM_AIO_H
+
+#ifndef __CYGWIN__
 #include <aio.h>
+#endif
+
+#if defined(__CYGWIN__) && !defined(AIO_CANCELED)
+
+/* minimal just to satisfy mur_init.c and mur_read_file.h.
+ * More would be needed if MUR_USE_AIO were defined */
+
+struct aiocb {
+    int			aio_fildes;
+    volatile void	*aio_buf;
+    size_t		aio_nbytes;
+    off_t		aio_offset;
+    size_t		aio_bytesread;
+    int			aio_errno;
+};
+
+#endif /* __CYGWIN__ empty aio.h */
 
 #define	AIO_POLL_SLEEP_TIME	10	/* 10 msec */
 
@@ -72,4 +91,3 @@
 }
 
 #endif
-

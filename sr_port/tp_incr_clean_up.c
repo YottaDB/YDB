@@ -75,7 +75,7 @@ void tp_incr_clean_up(short newlevel)
 	ht_ent_int4		*tabent;
 
 	assert(newlevel > 0);
-	if ((sgmnt_addrs *)-1L != jnl_fence_ctl.fence_list)	/* currently global_tlvl_info struct holds only jnl related info */
+	if (JNL_FENCE_LIST_END != jnl_fence_ctl.fence_list)	/* currently global_tlvl_info struct holds only jnl related info */
 		rollbk_gbl_tlvl_info(newlevel);
 	tmp_gv_cur_region = gv_cur_region;	/* save region and associated pointers to restore them later */
 	for (si = first_sgm_info;  si != NULL;  si = si->next_sgm_info)
@@ -241,7 +241,7 @@ void rollbk_gbl_tlvl_info(short newlevel)
 	if (gtli && newlevel + 1 == gtli->t_level)
 		jnl_fence_ctl.fence_list = gtli->global_tlvl_fence_info;
 	else
-		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
+		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 
 	FREE_GBL_TLVL_INFO(gtli);
 	if (prev_gtli)

@@ -21,7 +21,6 @@
  *              Opens the object file and waits till it gets a lock(shr/excl).
  *              Sets default perms if it creates a new file.
  * CLOSE_OBJECT_FILE - close the object file after releasing the lock on it.
- * POLL_OBJECT_FILE - polls to open a non-empty object file for reading.
  * CLOSEFILE	Loop until close succeeds for fails with other than EINTR.
  * LSEEKREAD	Performs either pread() or an lseek()/ read() combination. In
  *		the latter case, sets global variable to warn off async IO routines.
@@ -40,8 +39,10 @@
 #define GTMIO_Included
 
 #include <sys/types.h>
+#include "gtm_stat.h"
 #include "gtm_unistd.h"
 #include "gtm_fcntl.h"
+#include "eintr_wrappers.h"
 
 #ifdef __linux__
 #include <sys/vfs.h>
@@ -148,29 +149,7 @@
 #define OPENFILE_SYNC(FNAME, FFLAGS, FDESC)	OPENFILE(FNAME, FFLAGS | O_DSYNC, FDESC);
 #endif
 
-
-#if !defined(__linux__)
-#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC) \
-{ \
-	int status; \
-	struct flock lock;    /* arg to lock the file thru fnctl */   \
-	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)    \
-	;  \
-	if (-1 != FDESC)  {  \
-		do { \
-			lock.l_type = ((O_WRONLY == ((FFLAG) & O_ACCMODE)) || (O_RDWR == ((FFLAG) & O_ACCMODE))) ? F_WRLCK \
-														 : F_RDLCK;\
-			lock.l_whence = SEEK_SET; /*locking offsets from file beginning*/ \
-			lock.l_start = lock.l_len = 0; /* lock the whole file */\
-			lock.l_pid = getpid(); \
-		} while (-1 == (status = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno); \
-		if (-1 == status) { \
-			CLOSEFILE(FDESC, status); /* can never fail - no writes & no writes-behind */ \
-			FDESC = -1; \
-		} \
-	} \
-}
-#elif defined (Linux390)
+#if defined (Linux390)
 /* fcntl on Linux390 2.2.16 sometimes returns EINVAL */
 #define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC) \
 { \
@@ -180,37 +159,83 @@
 	;  \
 }
 #else
+#if defined( __linux__)
 /* A special handling was needed for linux due to its inability to lock
-   over NFS.  The only difference in code is an added check for NFS file
-   thru fstatfs */
-
-/* should ideally include <linux/nfs_fs.h> for NFS_SUPER_MAGIC.
-   However this header file doesn't seem to be standard and gives lots of
-   compilation errors and hence defining again here.  The constant value
-   seems to be portable across all linuxes (courtesy 'statfs' man pages) */
+ * over NFS.  The only difference in code is an added check for NFS file
+ * thru fstatfs
+ *
+ * This should ideally include <linux/nfs_fs.h> for NFS_SUPER_MAGIC.
+ * However, this header file doesn't seem to be standard and gives lots of
+ * compilation errors and hence defining again here.  The constant value
+ * seems to be portable across all linuxes (courtesy 'statfs' man pages)
+ */
 #define NFS_SUPER_MAGIC 0x6969
-#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC) \
-{ \
-	struct statfs buf; \
-	int status; \
-	struct flock lock;    /* arg to lock the file thru fnctl */   \
-	while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)    \
-	;  \
-	if (-1 != FDESC)  {  \
-		if (-1 != fstatfs(FDESC, &buf) && NFS_SUPER_MAGIC != buf.f_type) /*is not on NFS?*/\
-		{ \
-			do { \
-				lock.l_type = (((FFLAG) & O_WRONLY) || ((FFLAG) & O_RDWR)) ? F_WRLCK : F_RDLCK;\
-				lock.l_whence = SEEK_SET; /*locking offsets from file beginning*/ \
-				lock.l_start = lock.l_len = 0; /* lock the whole file */\
-				lock.l_pid = getpid(); \
-			} while (-1 == (status = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno); \
-			if (-1 == status) { \
-				CLOSEFILE(FDESC, status); /* can never fail - no writes & no writes-behind */ \
-				FDESC = -1; \
-			} \
-		} \
-	} \
+#define LOCK_IS_ALLOWED(FDESC, STATUS)								\
+{												\
+	struct statfs buf;									\
+	STATUS = ((-1 != fstatfs(FDESC, &buf)) && (NFS_SUPER_MAGIC != buf.f_type)) ? 0 : -1;	\
+}
+#else
+#define LOCK_IS_ALLOWED(FDESC, STATUS)	STATUS = 0
+#endif
+/* The for loop is the workaround for a glitch in read locking in zlink.  The primary steps to acquire a
+ * read-lock are 1. open the file, and 2. read lock it.  If a process creates the initial, empty version
+ * of the file (with the OPEN3), but has not yet write-locked it, and meanwhile, another process does its
+ * open and gets a read-lock, then a later read within incr_link() will end up reading an empty file. To
+ * avoid that problem, readers have to poll for a non-empty object file before reading.  If the read lock
+ * is obtained, but the file is empty, then release the read lock, sleep for a while, and retry the file open.
+ */
+#define OPEN_OBJECT_FILE(FNAME, FFLAG, FDESC)									\
+{														\
+	int		status;											\
+	struct flock	lock;    /* arg to lock the file thru fnctl */						\
+	int		cntr;											\
+	struct stat	stat_buf;										\
+	pid_t		l_pid;											\
+														\
+	l_pid = getpid();											\
+	for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)							\
+	{													\
+		while (-1 == (FDESC = OPEN3(FNAME, FFLAG, 0666)) && EINTR == errno)				\
+			;											\
+		if (-1 != FDESC)										\
+		{												\
+			LOCK_IS_ALLOWED(FDESC, status);								\
+			if (-1 != status)									\
+			{											\
+				do {										\
+					lock.l_type = (((FFLAG) & O_WRONLY) || ((FFLAG) & O_RDWR))		\
+						? F_WRLCK : F_RDLCK;						\
+					lock.l_whence = SEEK_SET;	/*locking offsets from file beginning*/	\
+					lock.l_start = lock.l_len = 0;	/* lock the whole file */ 		\
+					lock.l_pid = l_pid;							\
+				} while (-1 == (status = fcntl(FDESC, F_SETLKW, &lock)) && EINTR == errno); 	\
+				if (-1 != status)								\
+				{										\
+					if ((FFLAG) & O_CREAT)							\
+					{									\
+						FTRUNCATE(FDESC, 0, status);					\
+					} else									\
+					{									\
+						FSTAT_FILE(FDESC, &stat_buf, status);				\
+						if (status || (0 == stat_buf.st_size))				\
+						{								\
+							CLOSE_OBJECT_FILE(FDESC, status); 			\
+							FDESC = -1;						\
+							SHORT_SLEEP(WAIT_FOR_FILE_TIME); 			\
+							continue;						\
+						}								\
+					}									\
+				}										\
+			}											\
+			if (-1 == status)									\
+			{											\
+				CLOSEFILE(FDESC, status);/* can't fail - no writes, no writes-behind */ 	\
+				FDESC = -1;									\
+			}											\
+		}												\
+		break;												\
+	}													\
 }
 #endif
 
@@ -233,26 +258,6 @@
 	}
 #endif
 
-/* This is the workaround for a glitch in read locking in zlink:
- * OPEN_OBJECT_FILE -> 1. open the file, and 2. read lock it.
- * If some other process newly created the file and not yet write-locked it and
- * this process got read lock (step 2), then later incr_link will end up reading
- * an empty file. So here, polling for a non-empty object file before reading.
- */
-#define POLL_OBJECT_FILE(FNAME, FDESC)			\
-for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
-{							\
-	OPEN_OBJECT_FILE(FNAME, O_RDONLY, FDESC);	\
-	if (-1 == FDESC)				\
-		break;					\
-	FSTAT_FILE(FDESC, &stat_buf, status);		\
-	if (!status && 0 < stat_buf.st_size)		\
-		break;					\
-	CLOSE_OBJECT_FILE(FDESC, status);		\
-	FDESC = -1;					\
-	SHORT_SLEEP(WAIT_FOR_FILE_TIME);		\
-}
-
 #define CLOSEFILE(FDESC, RC)					\
 {								\
 	do							\
@@ -263,7 +268,7 @@ for (cntr = 0; cntr < MAX_FILE_OPEN_TRIES; cntr++)	\
 		RC = errno;					\
 }
 
-#if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux)
+#if defined(__osf__) || defined(_AIX) || defined(__sparc) || defined(__linux__) || defined(__hpux) || defined(__CYGWIN__)
 /* These platforms are known to support pread/pwrite. MVS is unknown and so gets the old support.
 
    Note !! pread and pwrite do NOT (on most platforms) set the file pointer like lseek/read/write would

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ void dse_dmp_fhead (void)
 	dse_all_dump = FALSE;
 	csa = cs_addrs;
 	csd = csa->hdr;
-        jnl_state = (uint4)csd->jnl_state;
+        jnl_state = (enum jnl_state_codes)csd->jnl_state;
 	VMS_ONLY(
 		memset(&zero_fid, 0, sizeof(zero_fid));
 		jnl_buff_open = (0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid.fid, sizeof(zero_fid.fid)));
@@ -419,6 +419,8 @@ void dse_dmp_fhead (void)
 		util_out_print(0, TRUE);
 		util_out_print("  Database is Fully Upgraded                : !AD",
 			TRUE, 5, (csd->fully_upgraded ? " TRUE" : "FALSE"));
+		util_out_print("  Database WAS ONCE Fully Upgraded from V4  : !AD",
+			TRUE, 5, (csd->db_got_to_v5_once ? " TRUE" : "FALSE"));
 		util_out_print("  Blocks to Upgrade subzero(negative) error : 0x!8XL", TRUE, csd->blks_to_upgrd_subzero_error);
 		util_out_print("  TN when Blocks to Upgrade last became 0   : 0x!16@XJ", TRUE, &csd->tn_upgrd_blks_0);
 		util_out_print("  TN when Desired DB Format last changed    : 0x!16@XJ", TRUE, &csd->desired_db_format_tn);

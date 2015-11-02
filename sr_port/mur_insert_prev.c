@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,20 @@ boolean_t mur_insert_prev(void)
 			return FALSE;
 		}
 		if (new_jctl->jfh->turn_around_offset && cur_jctl->jfh->turn_around_offset)
-			GTMASSERT; /* out of design situation */
+		{
+			if (rctl->jfh_recov_interrupted)
+			{	/* Possible if a first recovery with a turn-around-point (T2) got interrupted and a second
+				 * recovery with a new turn-around-point (T1 which is in a previous generation journal file)
+				 * was re-interrupted while in the middle of mur_process_intrpt_recov just after it had
+				 * recorded the new turn-around-point (T1) but before it had erased the former one (T2).
+				 * In this case, erase the turn-around-point T2 so this recovery goes back to T1. Here we
+				 * erase the value only in memory. The value on disk is reset later in mur_process_intrpt_recov.
+				 */
+				cur_jctl->jfh->turn_around_offset = 0;
+				cur_jctl->jfh->turn_around_time = 0;
+			} else
+				GTMASSERT; /* out of design situation */
+		}
 	}
 	new_jctl->prev_gen = NULL;
 	new_jctl->next_gen = jctl;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ typedef struct jnl_process_vector_struct	/* name needed since this is used in cm
 #define JNL_ALLOC_MIN		10
 
 /*	JNL_BUFFER_MIN	database block size / 512 + 1	*/
-#define JNL_BUFFER_MAX		2000
+#define JNL_BUFFER_MAX		2016
 
 /*	JNL_EXTEND_DEF	allocation size / 10		*/
 #define JNL_EXTEND_DEF_PERC	0.1

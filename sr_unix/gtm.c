@@ -31,6 +31,39 @@
 #ifndef NOLIBGTMSHR
 /* for bta builds we link gtm_main() statically so we do not need to open the shared library */
 typedef int (*gtm_main_t)(int argc, char **argv, char **envp);
+#ifdef __CYGWIN__
+/* private copy of gtm_getenv needed since real one is in libgtmshr */
+#include "gtm_unistd.h"
+
+#ifdef GETENV
+#undef GETENV
+#endif
+#define GETENV private_getenv
+
+extern char **environ;		/* array of pointers, last has NULL */
+
+char *private_getenv(const char *varname);
+
+char *private_getenv(const char *varname)
+{
+	char	*eq, **p;
+	size_t	len;
+
+	if (NULL == environ || NULL == varname)
+		return NULL;
+	len = strlen(varname);
+	for (p = environ; *p; p++)
+	{
+		eq = strchr(*p, '=');
+		if (eq && (*p + len) == eq)
+		{
+			if (!strncasecmp(varname, *p, len))	/* gdb upcases names */
+				return (eq + 1);
+		}
+	}
+	return NULL;
+}
+#endif /* __CYGWIN__ */
 #endif
 
 int main (int argc, char **argv, char **envp)
@@ -60,7 +93,7 @@ int main (int argc, char **argv, char **envp)
 	dir_len = STRLEN(fptr);
 	if (PATH_MAX <= dir_len + STR_LIT_LEN(GTMSHR_IMAGE_NAME) + 1)
 	{
-		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, $gtm_dist path is greater than maximum (%u)\n",
+		FPRINTF(stderr, "%%GTM-E-DISTPATHMAX, $gtm_dist path is greater than maximum (%lu)\n",
 				(PATH_MAX - STR_LIT_LEN(GTMSHR_IMAGE_NAME) - 2));
 		return ERR_DISTPATHMAX;
 	}

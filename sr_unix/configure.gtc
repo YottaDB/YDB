@@ -160,7 +160,7 @@ if [ -e "utf8" ]; then
 	if [ $arch = "ibm" ] ; then
 		library_path="/usr/local/lib"
 	else
-		library_path="/usr/local/lib /usr/lib"
+		library_path="/usr/local/lib /usr/lib /usr/lib32"
 	fi
 	# Look for libicu
 	for libpath in $library_path
@@ -277,6 +277,13 @@ do
 done
 if [ $arch = "sun" ]; then
 	ranlib -t $gtmdist/libgtmrpc.a
+fi
+
+# For linux systems, attempt to execute the chcon command to allow use of the libgtmshr shared library. This
+# command is required on many modern SELinux based systems but depends on the filesystem in use (requires context
+# support). For that reason, we attempt the command and if it works, great. If it doesn't, oh well we tried.
+if [ -e /usr/bin/chcon ]; then
+	chcon -t texrel_shlib_t $gtmdist/libgtmshr$ext > /dev/null 2>&1
 fi
 
 # Install GDE, GTMHELP, and all the percent routines

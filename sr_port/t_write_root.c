@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,6 @@ GBLREF short		dollar_tlevel;
 
 /* Create a sibling cw-set-element to store ins_off and index for new root's right child */
 
-error_def(ERR_GVKILLFAIL);
 void	t_write_root (
 			 block_offset 	ins_off,	/*  Offset to the position in the buffer of the previous cw_set-element
 							 *  that is to receive a block number when one is created. */

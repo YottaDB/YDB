@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -118,7 +118,7 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 					&(hist_ptr->h[cur_level].cr) )))
 				{
 					assert(t_tries < CDB_STAGNATE);
-					return rdfail_detail;
+					return (enum cdb_sc)rdfail_detail;
 				}
 				if (((blk_hdr_ptr_t)blk_base)->levl != cur_level)
 				{
@@ -144,7 +144,7 @@ enum cdb_sc gvcst_expand_any_key (sm_uc_ptr_t blk_base, sm_uc_ptr_t rec_top, sm_
 			}
 			memcpy(expanded_key, expanded_star_key, star_keylen + star_keycmpc);
 			*keylen = star_keylen + star_keycmpc - *keycmpc;
-			*rec_size  = *keylen + *keycmpc + BSTAR_REC_SIZE;
+			*rec_size = *keylen + *keycmpc + BSTAR_REC_SIZE;
 			return cdb_sc_normal;
 		} /* end else if *-record */
 	}/* end of "while" loop */

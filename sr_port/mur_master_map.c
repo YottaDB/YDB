@@ -66,7 +66,8 @@ void	mur_master_map()
 		db_ctl->op_len = bml_size;
 		db_ctl->op_pos = cs_data->start_vbn + cs_data->blk_size / DISK_BLOCK_SIZE * blk_index;
 		dbfilop(db_ctl);	/* No return if error */
-		GDS_BLK_UPGRADE_IF_NEEDED(blk_index, db_ctl->op_buff, db_ctl->op_buff, cs_data, &dummy_ondskblkver, status);
+		GDS_BLK_UPGRADE_IF_NEEDED(blk_index, db_ctl->op_buff, db_ctl->op_buff,
+			cs_data, &dummy_ondskblkver, status, cs_data->fully_upgraded);
 		if (SS_NORMAL != status)
 			if (ERR_DYNUPGRDFAIL == status)
 				rts_error(VARLSTCNT(5) status, 3, blk_index, DB_LEN_STR(gv_cur_region));

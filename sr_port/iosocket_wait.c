@@ -61,7 +61,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	socket_interrupt	*sockintr;
         char            	*errptr;
         int4            	errlen, ii, msec_timeout;
-	int			rv, size, max_fd, len;
+	int			rv, max_fd, len;
+	GTM_SOCKLEN_TYPE	size;
 	boolean_t		zint_restart;
 	mv_stent		*mv_zintdev;
 

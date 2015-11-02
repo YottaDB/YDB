@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,6 @@
 #ifndef GETSTORAGE_INCLUDED
 #define GETSTORAGE_INCLUDED
 
-int4 getstorage(void);
+ssize_t getstorage(void);
 
 #endif /* GETSTORAGE_INCLUDED */

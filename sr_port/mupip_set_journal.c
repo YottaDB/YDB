@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,6 +89,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	enum repl_state_codes	repl_curr_state;
 	mstr 			jnlfile, jnldef, tmpjnlfile;
 	uint4			align_autoswitch;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
+	jnl_tm_t		save_gbl_jrec_time;
 
 	error_def(ERR_DBPRIVERR);
 	error_def(ERR_DBOPNERR);
@@ -146,6 +149,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		grlist = &dummy_rlist;
 	}
 	ESTABLISH_RET(mupip_set_jnl_ch, (uint4)ERR_MUNOFINISH);
+	SET_GBL_JREC_TIME; /* set_jnl_file_close/cre_jnl_file/wcs_flu need gbl_jrec_time initialized */
 	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
 	{
 		rptr->exclusive = FALSE;
@@ -211,8 +215,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 							 * and do not process this region anymore. */
 			continue;
 		}
-		jnl_curr_state = csd->jnl_state;
-		repl_curr_state = csd->repl_state;
+		jnl_curr_state = (enum jnl_state_codes)csd->jnl_state;
+		repl_curr_state = (enum repl_state_codes)csd->repl_state;
 
 		/* Following is the transition table for replication states:
 		 *
@@ -279,11 +283,27 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				exit_status |= EXIT_ERR;
 				continue;
 			}
+		} else
+		{
+			/* Now that we have crit, check if this region is actively journaled and if gbl_jrec_time needs to be
+			 * adjusted (to ensure time ordering of journal records within this region's journal file).
+			 * This needs to be done BEFORE writing any journal records for this region. The value of
+			 * jgbl.gbl_jrec_time at the end of this loop will be used to write journal records for ALL
+			 * regions so all regions will have same eov/bov timestamps.
+			 */
+			if (JNL_ENABLED(cs_data)
+				UNIX_ONLY( && (0 != cs_addrs->nl->jnl_file.u.inode))
+				VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))))
+			{
+				jpc = cs_addrs->jnl;
+				jbp = jpc->jnl_buff;
+				ADJUST_GBL_JREC_TIME(jgbl, jbp);
+			}
 		}
 		if (max_reg_seqno < csd->reg_seqno)
 			max_reg_seqno = csd->reg_seqno;
 	}
-	JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* set_jnl_file_close & cre_jnl_file need it. Note we already have crit */
+	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	jgbl.dont_reset_gbl_jrec_time = TRUE;
 	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
 	{
@@ -295,8 +315,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		assert(NULL != csd || NONALLOCATED == rptr->state);
 		if (NULL == csd)	/* Just to be safe. May be this is not necessary. */
 			continue;
-		jnl_curr_state = csd->jnl_state;
-		repl_curr_state = csd->repl_state;
+		jnl_curr_state = (enum jnl_state_codes)csd->jnl_state;
+		repl_curr_state = (enum repl_state_codes)csd->repl_state;
 		jnl_info.before_images = rptr->before_images;
 		jnl_info.repl_state = rptr->repl_new_state;
 		jnl_info.jnl_state = csd->jnl_state;
@@ -507,7 +527,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 						}
 					}
 				} else if ((jnl_closed == jnl_curr_state) && (jnl_open == rptr->jnl_new_state))
-				{ /* sync db for closed->open transition. for VMS WCSFLU_FSYNC_DB is ignored */
+				{	/* sync db for closed->open transition. for VMS WCSFLU_FSYNC_DB is ignored */
 					wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR);
 				}
 			}
@@ -613,6 +633,8 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		}
 	}
 	jgbl.dont_reset_gbl_jrec_time = FALSE;
+	/* Ensure jgbl.gbl_jrec_time did not get reset by any of the jnl writing functions */
+	assert(save_gbl_jrec_time == jgbl.gbl_jrec_time);
 	mupip_set_jnl_cleanup(TRUE);
 	if (EXIT_NRM == exit_status)
 		return (uint4)SS_NORMAL;

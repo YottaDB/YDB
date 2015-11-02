@@ -26,11 +26,10 @@
 
 #if defined(__ia64) && defined(__hpux)
 #include <sys/uc_access.h>
-#include <sys/types.h>
 #include <machine/sys/reg_struct.h>
 #endif /* __ia64 */
-#include <signal.h>
 
+#include <signal.h>
 
 #include "gtmsiginfo.h"
 
@@ -40,11 +39,7 @@
 #  define SI_USER 0
 #endif
 
-#if defined(__osf__) || defined(_AIX) || defined(Linux390)
-void extract_signal_info(int sig, siginfo_t *info, struct sigcontext *context, gtmsiginfo_t *gtmsi)
-#else
-void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsiginfo_t *gtmsi)
-#endif
+void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gtmsiginfo_t *gtmsi)
 {
 	error_def(ERR_SIGILLOPC);
 	error_def(ERR_SIGILLOPN);
@@ -69,7 +64,7 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 
 	memset(gtmsi, 0, sizeof(*gtmsi));
 	gtmsi->signal = sig;
-#if defined(__osf__) || defined (__hpux) || defined(__sparc) || defined(__MVS__) || (defined(__linux__) && defined(__ia64))
+#if !(defined(_AIX) || defined(Linux390))
 	if (NULL != info)
 	{
 		switch(info->si_code)
@@ -113,6 +108,25 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 					gtmsi->infotype |= GTMSIGINFO_ILOC;
 				}
 				break;
+#  elif defined(__linux__)
+				gtmsi->subcode = info->si_code;
+				gtmsi->bad_vadr = info->si_addr;
+				gtmsi->infotype |= GTMSIGINFO_BADR;
+				if (NULL != context)
+				{
+#    ifdef __ia64
+					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.sc_ip;
+#    elif defined(__i386)
+#      ifndef REG_EIP
+#        define REG_EIP EIP
+#      endif
+					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_EIP];
+#    else
+#      error "Unsupported Linux Platform"
+#    endif
+					gtmsi->infotype |= GTMSIGINFO_ILOC;
+				}
+				break;
 #  elif defined(__sparc)
 				gtmsi->subcode = info->si_code;
 				gtmsi->bad_vadr = info->si_addr;
@@ -123,10 +137,17 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 					gtmsi->infotype |= GTMSIGINFO_ILOC;
 				}
 				break;
-#  else /* MVS -- not much info available */
+#  elif defined(__CYGWIN__)
+				gtmsi->subcode = info->si_code;
+				gtmsi->bad_vadr = info->si_addr;
+				gtmsi->infotype |= GTMSIGINFO_BADR;
+				break;
+#  elif defined(__MVS__)	/* not much info available */
 				gtmsi->int_iadr = info->si_addr;
 				gtmsi->infotype |= GTMSIGINFO_ILOC;
 				break;
+#  else
+#  error "Unsupported Platform"
 #  endif
 		}
 
@@ -211,33 +232,17 @@ void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsigin
 		if (NULL != gtmsi->bad_vadr)
 			gtmsi->infotype |= GTMSIGINFO_BADR;
 	}
-#elif defined(__linux__)
-	/* Linux does not yet (intel RedHat 6.1) support returning signal information properly so
-	   we will pull what information we can out of the context blocks. */
+#elif defined(Linux390)
+	/* Linux as of when the Linux390 port was done did not yet support returning signal information properly
+	   so we will pull what information we can out of the context blocks.
+	   When it is revived, investigate what information is available. */
 	if (NULL != context)
 	{
-#  ifdef Linux390
 		if (NULL != context->sregs)
 		{
                 	gtmsi->int_iadr = (caddr_t)context->sregs->regs.psw.addr;
                 	gtmsi->infotype |= GTMSIGINFO_ILOC;
 		}
-
-#  elif defined(__ia64)
-		gtmsi->subcode = info->si_code;
-		gtmsi->bad_vadr = info->si_addr;
-		gtmsi->infotype |= GTMSIGINFO_BADR;
-		gtmsi->int_addr = (caddr_t)(context->_mc.sc_ip);
-		gtmsi->infotype |= GTMSIGINFO_ILOC;
-#  elif defined(__i386)
-#    ifndef REG_EIP
-#      define REG_EIP EIP
-#    endif
-		gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_EIP];
-		gtmsi->infotype = GTMSIGINFO_ILOC;
-		if (NULL != (gtmsi->bad_vadr = (caddr_t)context->uc_mcontext.cr2))
-			gtmsi->infotype |= GTMSIGINFO_BADR;
-#  endif
 	}
 #else
 #  error "Unsupported Platform"

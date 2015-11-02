@@ -154,7 +154,7 @@ typedef int	 omi_fd;
 
 /* defined(SUNOS) */
 
-#elif (defined(__hpux) || defined(__linux__) || defined(__osf__)) || defined(__MVS__)
+#elif defined(__hpux) || defined(__linux__) || defined(__osf__) || defined(__MVS__) || defined(__CYGWIN__)
 
 #define OMI
 
@@ -166,7 +166,7 @@ typedef int	 omi_fd;
 #define BSD_LOG
 #define BSD_MFD
 
-#if (defined(__linux__) || defined(__osf__)) && !defined(__s390__)
+#if (defined(__linux__) && !defined(__s390__)) || defined(__osf__) || defined(__CYGWIN__)
 #define LTL_END
 #else /* defined(__hpux__)  or Linux390  or zOS */
 #define BIG_END
@@ -185,7 +185,7 @@ typedef int	 omi_fd;
 #include <sys/time.h>
 #include <syslog.h>
 
-/* defined(__hpux || __linux__ || __osf__ || __MVS__) */
+/* defined(__hpux || __linux__ || __osf__ || __MVS__ || __CYGWIN__) */
 
 #elif defined(_AIX)
 

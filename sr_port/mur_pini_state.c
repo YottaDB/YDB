@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,6 @@ uint4		mur_pini_state(uint4 pini_addr, int state)
 		return status;
 	if (BROKEN_PROC == plst->state)
 		return SS_NORMAL;
-	plst->state = state;
+	plst->state = (enum pini_rec_stat)state;
 	return SS_NORMAL;
 }

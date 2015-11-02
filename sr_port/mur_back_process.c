@@ -327,7 +327,7 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 		status = mur_prev(mur_jctl->rec_offset);
 		if (!mur_options.forward && FENCE_NONE != mur_options.fences)
 		{ 	/* This is for the latest generation only */
-			rectype = mur_rab.jnlrec->prefix.jrec_type;
+			rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
 			if (JRT_EOF != rectype)
 			{ 	/* When a region is inactive but not closed, that is, no logical updates are done for some
 				 * period of time (8 second), then EPOCH is written by periodic timer. However, for some
@@ -344,7 +344,7 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 							mur_jctl->rec_offset -= mur_rab.jreclen;
 							assert(mur_jctl->rec_offset >= mur_desc.cur_buff->dskaddr);
 							assert(JNL_HDR_LEN <= mur_jctl->rec_offset);
-							rectype = mur_rab.jnlrec->prefix.jrec_type;
+							rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
 						} else
 							break;
 					} else
@@ -373,7 +373,7 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 			mur_jctl->after_end_of_data = mur_jctl->after_end_of_data &&
 					(mur_jctl->rec_offset >= mur_jctl->jfh->end_of_data);
 			assert(0 == mur_jctl->turn_around_offset);
-			rectype = mur_rab.jnlrec->prefix.jrec_type;
+			rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
 			if (!mur_validate_checksum())
 				MUR_BACK_PROCESS_ERROR("Checksum validation failed");
 			if (mur_rab.jnlrec->prefix.tn != rec_tn && mur_rab.jnlrec->prefix.tn != rec_tn - 1)
@@ -596,7 +596,7 @@ uint4 mur_back_processing(boolean_t apply_pblk, seq_num *pre_resolve_seqno, jnl_
 						status = mur_prev(mur_jctl->rec_offset);
 						if (SS_NORMAL != status)
 							return status;
-						rectype = mur_rab.jnlrec->prefix.jrec_type;
+						rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
 						rec_time = mur_rab.jnlrec->prefix.time;
 						rec_token_seq = GET_JNL_SEQNO(mur_rab.jnlrec);
 						assert(JRT_EPOCH == rectype);

@@ -286,8 +286,8 @@ void verify_queue(que_head_ptr_t qhdr);
 	sm_uc_ptr_t		bufstart;									\
 	GBLREF	boolean_t	dse_running, write_after_image;							\
 														\
-	assert(gds_t_write != cse->mode && gds_t_writemap != cse->mode || cse->old_block); 			\
-									/* don't miss writing a PBLK */		\
+	assert((gds_t_write != cse->mode) && (gds_t_write_recycled != cse->mode) && gds_t_writemap != cse->mode	\
+		|| (NULL != cse->old_block));	/* don't miss writing a PBLK */					\
 	if (NULL != cse->old_block)										\
 	{													\
 		if (!is_mm)											\
@@ -369,6 +369,19 @@ void verify_queue(que_head_ptr_t qhdr);
 		}										\
 	}											\
 	assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data);	\
+}
+
+/* The TP_TEND_CHANGE_REG macro is a special macro used in tp_tend.c to optimize out the unnecessary checks in
+ * the TP_CHANGE_REG_IF_NEEDED macro. Also it sets cs_addrs and cs_data to precomputed values instead of recomputing
+ * them from the region by dereferencing through a multitude of pointers. It does not check if gv_cur_region is
+ * different from the input region. It assumes it is different enough % of times that the cost of the if check
+ * is not worth the additional unconditional sets.
+ */
+#define	TP_TEND_CHANGE_REG(si)				\
+{							\
+	gv_cur_region = si->gv_cur_region;		\
+	cs_addrs = si->tpcsa;				\
+	cs_data = si->tpcsd;				\
 }
 
 #define	GTCM_CHANGE_REG(reghead)										\
@@ -660,7 +673,8 @@ typedef struct sgmnt_data_struct
 	/************* FIELDS SET AT CREATION TIME ********************************/
 	char		filler_created[52];	/* Now unused .. was "file_info created" */
 	boolean_t	createinprogress;	/* TRUE only if MUPIP CREATE is in progress. FALSE otherwise */
-	gtm_time8	creation;		/* time when the database file was created */
+	int4		creation_time4;		/* Lower order 4-bytes of time when the database file was created */
+	int4		creation_filler_8byte;
 
 	/************* FIELDS USED BY TN WARN PROCESSING *************************/
 	trans_num	max_tn;			/* Hardstop TN for this database */
@@ -694,14 +708,27 @@ typedef struct sgmnt_data_struct
 	int4		blks_to_upgrd;			/* Blocks not at current block version level */
 	int4		blks_to_upgrd_subzero_error;	/* number of times "blks_to_upgrd" potentially became negative */
 	enum db_ver	desired_db_format;	/* Output version for database blocks (normally current version) */
-	boolean_t	fully_upgraded;		/* Set to TRUE by MUPIP REORG UPGRADE/INTEG/MUPIP CREATE when blks_to_upgrd is 0;
+	boolean_t	fully_upgraded;		/* Set to TRUE by MUPIP REORG UPGRADE when ALL blocks (including RECYCLED blocks)
+						 * have been examined and upgraded (if necessary) and blks_to_upgrd is set to 0;
 						 * If set to TRUE, this guarantees all blocks in the database are upgraded.
 						 * "blks_to_upgrd" being 0 does not necessarily guarantee the same since the
 						 *	counter might have become incorrect (due to presently unknown reasons).
 						 * set to FALSE whenever desired_db_format changes or the database is
 						 *	updated with V4 format blocks (by MUPIP JOURNAL).
 						 */
-	char		filler_384[20];
+	boolean_t	db_got_to_v5_once;	/* Set to TRUE by the FIRST MUPIP REORG UPGRADE (since MUPIP UPGRADE was run
+						 * to upgrade the file header to V5 format) when it completes successfully.
+						 * The FIRST reorg upgrade marks all RECYCLED blocks as FREE. Successive reorg
+						 * upgrades keep RECYCLED blocks as they are while still trying to upgrade them.
+						 * This is because ONLY the FIRST reorg upgrade could see RECYCLED blocks in V4
+						 * format that are too full (lack the additional space needed by the V5 block
+						 * header) to be upgraded to V5 format. Once these are marked FREE, all future
+						 * block updates happen in V5 format in the database buffers so even if they
+						 * are written in V4 format to disk, they are guaranteed to be upgradeable.
+						 * This field marks that transition in the db and is never updated thereafter.
+						 */
+	boolean_t	opened_by_gtmv53;	/* Set to TRUE the first time this database is opened by GT.M V5.3-000 and higher */
+	char		filler_384[12];
 	/************* FIELDS RELATED TO DB TRANSACTION HISTORY *****************************/
 	th_index	trans_hist;		/* transaction history - if moved from 1st filehdr block, change TH_BLOCK */
 	char		filler_trans_hist[8];
@@ -840,9 +867,9 @@ typedef struct sgmnt_data_struct
 	enum mdb_ver	creation_mdb_ver;		/* Minor DB version at time of creation */
 	enum db_ver	certified_for_upgrade_to;	/* Version the database is certified for upgrade to */
 	int		filler_5K;
-   	/************* SECSHR_DB_CLNUP RELATED FIELDS ***********/
-   	int4		secshr_ops_index;
-   	int4		secshr_ops_array[255];	/* taking up 1K */
+   	/************* SECSHR_DB_CLNUP RELATED FIELDS (now moved to node_local) ***********/
+   	int4		secshr_ops_index_filler;
+   	int4		secshr_ops_array_filler[255];	/* taking up 1K */
    	/********************************************************/
 	compswap_time_field next_upgrd_warn;	/* Time when we can send the next upgrade warning to the operator log */
 	char		filler_7k[1000];
@@ -1367,6 +1394,7 @@ typedef enum
 					 */
 	inctn_blkdwngrd,		/* similar to inctn_blkupgrd except that this is for DOWNGRADE */
 	inctn_blkdwngrd_fmtchng,	/* similar to inctn_blkupgrd_fmtchng except that this is for DOWNGRADE */
+	inctn_blkmarkfree,		/* a RECYCLED block being marked free by MUPIP REORG UPGRADE/DOWNGRADE */
         inctn_opcode_total
 } inctn_opcode_t;
 

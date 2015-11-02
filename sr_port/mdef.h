@@ -68,10 +68,11 @@ typedef uintptr_t UINTPTR_T;
 typedef int INTPTR_T;
 typedef unsigned int UINTPTR_T;
 #endif
-/* The int_fill_t type is defined to be basically the same size as an address on the platforms it runs on. So it
-   is the same size as intptr_t without the connotation of being a pointer. This is used in places where size_t
+/* The intszofptr_t type is defined to be basically the same size as an address on the platforms it runs on. So it
+   is the same size as INTPTR_T without the connotation of being a pointer. This is used in places where size_t
    or ssize_t would normally be used except they can't be used because they are the wrong size on Alpha systems.
-   Classic usage is in places where need constant integer and pointer sized elements.
+   Classic usage is in places where need consistant integer and pointer sized elements like constructed parameter
+   lists or other arrays.
 */
 typedef INTPTR_T intszofptr_t;
 typedef UINTPTR_T uintszofptr_t;
@@ -89,6 +90,12 @@ typedef UINTPTR_T uintszofptr_t;
 #	define VA_ARG_TYPE int
 #	define VA_ARG_TYPE_BOOL int
 #endif /* GTM64 */
+
+#ifdef __CYGWIN__
+#	define CYGWIN_ONLY(X) X
+#else
+#	define CYGWIN_ONLY(X)
+#endif
 
 #ifdef __linux__
 #	define LINUX_ONLY(X) X
@@ -134,6 +141,7 @@ typedef UINTPTR_T uintszofptr_t;
 #define	MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in an integer */
 #define MAX_DIGITS_IN_EXP       2       /* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
+#define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
 
 #ifndef _AIX
 #	ifndef __sparc
@@ -274,8 +282,8 @@ char *s2n(mval *u);
 #define MV_FORCE_STR(X)		((0 == ((X)->mvtype & MV_STR)) ? n2s(X) : NULL)
 #define MV_FORCE_NUM(X)		((0 == ((X)->mvtype & MV_NM )) ? s2n(X) : NULL)
 #define MV_FORCE_BOOL(X)	(MV_FORCE_NUM(X), (X)->m[1] ? TRUE : FALSE)
-#define MV_FORCE_INT(M)		( (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M) )
-#define MV_FORCE_ULONG_MVAL(M,I)   (((I) >= 1000000) ? i2usmval((M),(I)) : \
+#define MV_FORCE_INT(M)		((M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M))
+#define MV_FORCE_UMVAL(M,I)     (((I) >= 1000000) ? i2usmval((M),(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (I)*MV_BIAS ))
 #define MV_FORCE_MVAL(M,I)	(((I) >= 1000000 || (I) <= -1000000) ? i2mval((M),(I)) : \
 				(void)( (M)->mvtype = MV_NM | MV_INT , (M)->m[1] = (I)*MV_BIAS ))
@@ -743,6 +751,12 @@ typedef que_head *	que_head_ptr_t;
 #endif
 
 #define	MAX_SEQNO	((seq_num)-1)	/* actually 0xFFFFFFFFFFFFFFFF (max possible seqno) */
+
+
+/* The HPUX Itanium compiler is giving warnings whenever a cast is being done and there is a potential alignment change */
+/* The RECAST macro will eliminate these warnings by first casting to (void *) before the doing the ultimate cast */
+
+#define RECAST(type)	(type)(void_ptr_t)
 
 /* Define some basic types for shared memory (sm) access depending on whether the platform we are    */
 /* using is capable of supporting 32 or 64 bit pointers or not.					     */

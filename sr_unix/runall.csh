@@ -143,6 +143,9 @@ rm -f ${TMP_DIR}_* >& /dev/null
 
 onintr cleanup
 
+set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
+set mach_type = `uname -m`
+
 if ($?RUNALL_BYPASS_VERSION_CHECK == 0) then
 	set temp_ver=`echo $gtm_verno | sed 's/./& /g'`
 	if ($temp_ver[2] != "9" || $temp_ver[3] == "9" && $temp_ver[4] == "0") then
@@ -299,6 +302,13 @@ if (!(-z ${TMP_DIR}_inc_files)) then
 	popd >& /dev/null
 endif
 
+# For ia64, the file - xfer_desc.i - needs to be generated.
+if ( "ia64" == $mach_type ) then
+        pushd $gtm_src
+        tcsh $gtm_tools/gen_xfer_desc.csh
+        popd
+endif
+
 if (!(-z ${TMP_DIR}_src_files)) then
 	sort -u ${TMP_DIR}_src_files >&! ${TMP_DIR}_src_files_sorted
 	mv ${TMP_DIR}_src_files_sorted ${TMP_DIR}_src_files
@@ -358,7 +368,16 @@ if (! -z ${TMP_DIR}_src_files) then
 		if ($linkonly == 0) then
 			if ($ext == "s") then
 				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
-				runall_as $gtm_src/$file.s
+				if ( "ia64" == $mach_type && "linux" == $platform_name ) then
+				    # assembler differences in HPUX on Linux. Send preprocessed assembly file on Linux.
+				    set lfile = `basename ${file}`
+				    set lfile = $lfile:r
+				    gt_cpp -E ${gtm_src}/${file}.s > ${gtm_src}/${lfile}_cpp.s
+				    runall_as ${gtm_src}/${lfile}_cpp.s  -o ${lfile}.o
+				    \rm ${gtm_src}/${lfile}_cpp.s
+				else
+				    runall_as $gtm_src/${file}.s
+				endif
 			else if ($ext == "c") then
 				echo "$gtm_src/$file.$ext   ---->  $gtm_obj/$file.o"
 				runall_cc $RUNALL_EXTRA_CC_FLAGS $gtm_src/$file.c

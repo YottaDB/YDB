@@ -245,7 +245,7 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, stack_text);
 		mval_write(output, &var, TRUE);
 	/* SV_STORAGE */
-		i2mval(&var, getstorage());
+		double2mval(&var, getstorage());
 		ZS_VAR_EQU(&x, storage_text);
 		mval_write(output, &var, TRUE);
 	/* SV_SYSTEM */
@@ -376,7 +376,7 @@ void zshow_svn(zshow_out *output)
 		ZS_VAR_EQU(&x, zio_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZJOB */
-		MV_FORCE_ULONG_MVAL(&var, dollar_zjob);
+		MV_FORCE_UMVAL(&var, dollar_zjob);
 		ZS_VAR_EQU(&x, zjob_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZLEVEL */

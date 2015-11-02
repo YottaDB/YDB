@@ -49,7 +49,6 @@
 #include "compiler.h"
 #include "patcode.h"
 #include "lke.h"
-#include "dpgbldir.h"
 #include "get_page_size.h"
 #include "gtm_startup_chk.h"
 #include "generic_signal_handler.h"
@@ -86,16 +85,9 @@ GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF global_latch_t		defer_latch;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF VSIG_ATOMIC_T		util_interrupt;
-GBLREF sgm_info			*first_sgm_info;
-GBLREF cw_set_element		cw_set[];
-GBLREF unsigned char		cw_set_depth;
-GBLREF uint4			process_id;
-GBLREF jnlpool_addrs		jnlpool;
 GBLREF char			cli_err_str[];
 GBLREF boolean_t		write_after_image;
 GBLREF boolean_t		gtm_utf8_mode;
-GBLREF inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF short			dollar_tlevel;
 
 static bool	dse_process(int argc);
 static void display_prompt(void);
@@ -123,8 +115,7 @@ int main(int argc, char *argv[])
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	getjobname();
-	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-			  &jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
+	INVOKE_INIT_SECSHR_ADDRS;
 	getzdir();
 	prealloc_gt_timers();
 	initialize_pattern_table();

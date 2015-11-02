@@ -47,7 +47,8 @@ GBLREF mval             curr_gbl_root;
 GBLREF int              patch_is_fdmp;
 GBLREF int              patch_fdmp_recs;
 
-#define MAX_UTIL_LEN 80
+#define MAX_UTIL_LEN		80
+#define	NUM_BYTES_PER_LINE	20
 
 sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_t b_top)
 {
@@ -56,10 +57,12 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	char		*prefix_str, *space_str, *dot_str, *format_str;
 	unsigned char	cc;
 	short int	size;
-	int4		util_len, head, ch;
+	int4		util_len, head;
+	uint4 		ch;
 	int		buf_len, field_width,fastate, chwidth = 0;
         ssize_t   	chlen;
 	block_id	blk_id;
+	boolean_t	rechdr_displayed = FALSE;
 
 	if (rp >= b_top)
 		return NULL;
@@ -161,7 +164,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 				field_width = 3;
 			}
 			fastate = 0;
-			for (cptr0 = rp;  cptr0 < r_top;  cptr0 += 20)
+			for (cptr0 = rp;  cptr0 < r_top;  cptr0 += NUM_BYTES_PER_LINE)
 			{
 				if (util_interrupt)
 				{ /* return, rather than signal ERR_CTRLC so that the calling routine
@@ -174,7 +177,8 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 				util_len += sizeof(" : |") - 1;
 				util_buff[util_len] = 0;
 				util_out_print(util_buff, FALSE);
-				for (cptr1 = cptr0;  cptr1 < (cptr0 + 20);  cptr1++)
+				/* Dump hexadecimal byte values */
+				for (cptr1 = cptr0;  cptr1 < (cptr0 + NUM_BYTES_PER_LINE);  cptr1++)
 				{
 					if (cptr1 < r_top)
 					{
@@ -186,15 +190,20 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 				}
 				util_out_print("|", TRUE);
 				util_out_print(prefix_str, FALSE);
-				for (cptr1 = cptr0, cptr_top = cptr0 + 20;  cptr1 < cptr_top;  cptr1++)
+				/* Display character/wide-character glyphs */
+				for (cptr1 = cptr0, cptr_top = cptr0 + NUM_BYTES_PER_LINE;  cptr1 < cptr_top;  cptr1++)
 				{
+					if (!rechdr_displayed && (cptr1 == (rp + sizeof(rec_hdr))))
+						rechdr_displayed = TRUE;
+					assert(rechdr_displayed || (cptr1 < (rp + sizeof(rec_hdr))));
+					assert(!rechdr_displayed || (cptr1 >= (rp + sizeof(rec_hdr))));
 					switch (fastate)
 					{
 					case 0: /* prints single-byte characters or intepret
 						   multi-byte characters */
 						if (cptr1 >= r_top)
 							util_out_print(space_str, FALSE);
-						else if (!gtm_utf8_mode || IS_ASCII(*cptr1))
+						else if (!gtm_utf8_mode || IS_ASCII(*cptr1) || !rechdr_displayed)
 						{ /* single-byte characters */
 							if (PRINTABLE(*(sm_uc_ptr_t)cptr1))
 								util_out_print(format_str, FALSE, 1, cptr1);

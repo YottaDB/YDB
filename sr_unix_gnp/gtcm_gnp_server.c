@@ -56,7 +56,6 @@
 #include "gtcml.h"
 #include "getjobnum.h"
 #include "gtmmsg.h"
-#include "dpgbldir.h"
 #include "sig_init.h"
 #include "patcode.h"
 #include "copy.h"
@@ -117,24 +116,19 @@ GBLREF bool			certify_all_blocks;
 GBLREF bool			licensed;
 GBLREF bool			run_time;
 GBLREF boolean_t		gtcm_connection;
-GBLREF unsigned char		cw_set_depth;
 GBLREF uint4			process_id;
 GBLREF cm_lckblkreg		*blkdlist;
-GBLREF cw_set_element		cw_set[];
 GBLREF gd_region		*gv_cur_region;
 GBLREF sgmnt_addrs		*cs_addrs;
 GBLREF sgmnt_data_ptr_t		cs_data;
 GBLREF gv_namehead		*gv_target;
 GBLREF struct NTD		*ntd_root;
-GBLREF jnlpool_addrs		jnlpool;
 GBLREF spdesc			rts_stringpool, stringpool;
 GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF boolean_t		is_replicator;
 GBLREF boolean_t		gtm_utf8_mode;
-GBLREF inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF short			dollar_tlevel;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -485,8 +479,7 @@ int main(int argc, char **argv, char **envp)
 		exit(status);
 	}
 	atexit(gtcm_exi_handler);
-	init_secshr_addrs(get_next_gdr, cw_set, NULL, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-		&jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
+	INVOKE_INIT_SECSHR_ADDRS;
 	initialize_pattern_table();
 
 	/* Pre-allocate some timer blocks. */

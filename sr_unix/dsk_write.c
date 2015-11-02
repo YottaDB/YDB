@@ -35,6 +35,7 @@ GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
 GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	int		fast_lock_count;
+GBLREF	boolean_t	dse_running;
 
 int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 {
@@ -55,11 +56,15 @@ int	dsk_write(gd_region *reg, block_id blk, cache_rec_ptr_t cr)
 	assert(cr->buffaddr);
 	buff = GDS_ANY_REL2ABS(csa, cr->buffaddr);
 	DEBUG_ONLY(
-		blk_hdr = (blk_hdr_ptr_t)buff;
-		assert((unsigned)GDSVLAST > (unsigned)blk_hdr->bver);
-		assert((LCL_MAP_LEVL == blk_hdr->levl) || ((unsigned)MAX_BT_DEPTH > (unsigned)blk_hdr->levl));
-		assert((unsigned)csd->blk_size >= (unsigned)blk_hdr->bsiz);
-		assert((unsigned)csd->trans_hist.curr_tn >= (unsigned)blk_hdr->tn);
+		/* Check GDS block that is about to be written. Dont do this for DSE as it may intentionally create bad blocks */
+		if (!dse_running)
+		{
+			blk_hdr = (blk_hdr_ptr_t)buff;
+			assert((unsigned)GDSVLAST > (unsigned)blk_hdr->bver);
+			assert((LCL_MAP_LEVL == blk_hdr->levl) || ((unsigned)MAX_BT_DEPTH > (unsigned)blk_hdr->levl));
+			assert((unsigned)csd->blk_size >= (unsigned)blk_hdr->bsiz);
+			assert(csd->trans_hist.curr_tn >= blk_hdr->tn);
+		}
 	)
 	assert(((blk_hdr_ptr_t)buff)->bver);	/* GDSV4 (0) version uses this field as a block length so should always be > 0 */
 	assert(0 == fast_lock_count); /* ensure the static reformat buffer is not being used currently */

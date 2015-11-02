@@ -26,22 +26,25 @@
 #include "tp.h"
 #include "tp_change_reg.h"
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
+#include "gdsblkops.h"		/* for RESET_UPDATE_ARRAY macro */
 
 GBLREF	jnl_fence_control	jnl_fence_ctl;
 GBLREF	sgm_info		*sgm_info_ptr, *first_sgm_info;
+GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 GBLREF	ua_list			*curr_ua, *first_ua;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	int			tp_allocation_clue;
 GBLREF	uint4			update_array_size, cumul_update_array_size;
-GBLREF  gd_region		*gv_cur_region;
+GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gv_namehead		*gv_target_list;
 GBLREF	trans_num		local_tn;
-GBLREF  sgmnt_data_ptr_t        cs_data;
-GBLREF  short			dollar_tlevel;
-GBLREF  buddy_list		*global_tlvl_info_list;
-GBLREF  global_tlvl_info	*global_tlvl_info_head;
-GBLREF jnl_gbls_t		jgbl;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	short			dollar_tlevel;
+GBLREF	buddy_list		*global_tlvl_info_list;
+GBLREF	global_tlvl_info	*global_tlvl_info_head;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	int			process_exiting;
 
 void	tp_clean_up(boolean_t rollback_flag)
 {
@@ -108,11 +111,9 @@ void	tp_clean_up(boolean_t rollback_flag)
 				curr_ua = first_ua = tmp_ua; /* set first_ua to non-NULL value once all mallocs are successful */
 			}
 		}
-		update_array_ptr = update_array;
+		RESET_UPDATE_ARRAY; /* do not use CHECK_AND_RESET_UPDATE_ARRAY since we are in TP and will fail the check there */
 		if (rollback_flag) 		/* Rollback invalidates clues in all targets used by this transaction */
 		{
-			DEBUG_ONLY(csa = &FILE_INFO(first_sgm_info->gv_cur_region)->s_addrs;)
-			assert(NULL != first_sgm_info->next_sgm_info || csa->dir_tree->root == 1);
 			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
 			{
 				if (gvnh->read_local_tn != local_tn)
@@ -121,7 +122,8 @@ void	tp_clean_up(boolean_t rollback_flag)
 				chain1 = *(off_chain *)&gvnh->root;
 				if (chain1.flag)
 				{
-					assert(NULL != first_sgm_info->next_sgm_info || csa->dir_tree != gvnh);
+					DEBUG_ONLY(csa = &FILE_INFO(gvnh->gd_reg)->s_addrs;)
+					assert(csa->dir_tree != gvnh);
 					gvnh->root = 0;
 				}
 			}
@@ -132,8 +134,12 @@ void	tp_clean_up(boolean_t rollback_flag)
 			gv_cur_region = si->gv_cur_region;
 			tp_change_reg();
 			if (si->num_of_blks)
-			{
-				assert(si->num_of_blks == si->blks_in_use->count);
+			{	/* Check that it is the same as the # of used entries in the hashtable.
+				 * The only exception is if we got interrupted by a signal right after updating one
+				 * but before updating the other which triggered exit handling for this process.
+				 */
+				assert(si->num_of_blks == si->blks_in_use->count
+					|| process_exiting && (si->num_of_blks == (si->blks_in_use->count - 1)));
 				reinitialize_hashtab_int4(si->blks_in_use);
 				si->num_of_blks = 0;
 			}
@@ -242,8 +248,21 @@ void	tp_clean_up(boolean_t rollback_flag)
 			si->tlvl_info_head = NULL;
 			next_si = si->next_sgm_info;
 			si->next_sgm_info = NULL;
-			jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
+			jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		}	/* for (all segments in the transaction) */
+		DEBUG_ONLY(
+			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+			{	/* check that we did not miss out on clearing any gv_target->root which had chain.flag bit set */
+				chain1 = *(off_chain *)&gvnh->root;
+				assert(!chain1.flag);
+				if (gvnh->root)
+				{	/* check that gv_target->root falls within total blocks range */
+					assert(gvnh->gd_reg->open);
+					csa = &FILE_INFO(gvnh->gd_reg)->s_addrs;
+					assert(gvnh->root < csa->ti->total_blks);
+				}
+			}
+		)
 		jgbl.cumul_jnl_rec_len = 0;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		global_tlvl_info_head = NULL;
@@ -254,4 +273,5 @@ void	tp_clean_up(boolean_t rollback_flag)
 	tp_allocation_clue = MASTER_MAP_SIZE_MAX * BLKS_PER_LMAP + 1;
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;
+	assert((NULL == first_tp_si_by_ftok) || process_exiting);
 }

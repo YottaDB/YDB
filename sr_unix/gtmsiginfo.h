@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,6 +8,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef GTM_SIGNAL_INFO_H
+#define GTM_SIGNAL_INFO_H
 
 /* Define signal information structures and routines */
 
@@ -19,8 +22,6 @@
 #  include <ucontext.h>
 #endif
 
-#ifndef GTM_SIGNAL_INFO_H
-#define GTM_SIGNAL_INFO_H
 typedef struct
 {
 	caddr_t	int_iadr;		/* Interrupted instruction address */
@@ -40,10 +41,14 @@ typedef struct
 #define GTMSIGINFO_USER		0x4	/* User information is available */
 
 #if defined(__osf__) || defined(_AIX) || defined(Linux390)
-void extract_signal_info(int sig, siginfo_t *info, struct sigcontext *context, gtmsiginfo_t *gtmsi);
+typedef	struct sigcontext	gtm_sigcontext_t;
+#elif defined(__CYGWIN__)
+typedef	struct ucontext		gtm_sigcontext_t;
 #else
-void extract_signal_info(int sig, siginfo_t *info, ucontext_t *context, gtmsiginfo_t *gtmsi);
+typedef	ucontext_t		gtm_sigcontext_t;
 #endif
+
+void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gtmsiginfo_t *gtmsi);
 
 #define NO_SUSPEND		0	/* Suspend not pending */
 #define DEFER_SUSPEND		1	/* Suspend deferred */

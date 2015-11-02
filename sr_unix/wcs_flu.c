@@ -46,6 +46,7 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	volatile int4	db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF 	bool		in_backup;
+GBLREF	boolean_t	mu_rndwn_file_dbjnl_flush;
 
 #define	WAIT_FOR_CONCURRENT_WRITERS_TO_FINISH(fix_in_wtstart)							\
 if (cnl->in_wtstart)												\
@@ -174,6 +175,15 @@ bool wcs_flu(bool options)
 	{
 		jpc = csa->jnl;
 		jb = jpc->jnl_buff;
+		/* Assert that we never flush the cache in the midst of a database commit. The only exception is MUPIP RUNDOWN */
+		assert((csa->ti->curr_tn == csa->ti->early_tn) || mu_rndwn_file_dbjnl_flush);
+		if (!jgbl.dont_reset_gbl_jrec_time)
+			SET_GBL_JREC_TIME;	/* needed before jnl_ensure_open */
+		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time (if needed) to maintain time order of jnl
+		 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+		 * (if it decides to switch to a new journal file)
+		 */
+		ADJUST_GBL_JREC_TIME(jgbl, jb);
 		assert(csa == cs_addrs);	/* for jnl_ensure_open */
 		jnl_status = jnl_ensure_open();
 		if (SS_NORMAL != jnl_status)
@@ -314,10 +324,8 @@ bool wcs_flu(bool options)
 		jb->need_db_fsync = TRUE;	/* for comments on need_db_fsync, see jnl_output_sp.c */
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		assert(!(JNL_FILE_SWITCHED(jpc)));
-		if (!jgbl.dont_reset_gbl_jrec_time && (csa->ti->curr_tn == csa->ti->early_tn))
-			JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_epoch_rec() */
 		assert(jgbl.gbl_jrec_time);
-		if (0 == csa->jnl->pini_addr)
+		if (0 == jpc->pini_addr)
 			jnl_put_jrt_pini(csa);
 		jnl_write_epoch_rec(csa);
 	}

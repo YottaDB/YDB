@@ -1126,7 +1126,7 @@ int gtmsource_process(void)
 								(post_read_seqno - pre_read_seqno) * REPL_MSG_HDRLEN;
 					log_seqno = post_read_seqno - 1; /* post_read_seqno is the "next" seqno to be sent,
 									      * not the last one we sent */
-					if (gtmsource_logstats || (log_seqno - lastlog_seqno >= log_interval));
+					if (gtmsource_logstats || (log_seqno - lastlog_seqno >= log_interval))
 					{	/* print always when STATSLOG is ON, or when the log interval has passed */
 						trans_sent_cnt += (log_seqno - lastlog_seqno);
 						/* jctl->jnl_seqno >= post_read_seqno is the most common case;

@@ -277,13 +277,10 @@ int repl_close(int *sock_fd)
 static int get_sock_buff_size(int sockfd, int *buffsize, int which_buf)
 {
 	int	status;
-#if !defined(sun) && !defined(__ia64)
-	size_t	optlen;
-#else
-	int	optlen;
-#endif
+	GTM_SOCKLEN_TYPE optlen;
+
 	optlen = sizeof(*buffsize);
-        status = getsockopt(sockfd, SOL_SOCKET, which_buf, (void *)buffsize, &optlen);
+        status = getsockopt(sockfd, SOL_SOCKET, which_buf, (void *)buffsize, (GTM_SOCKLEN_TYPE *)&optlen);
 	return (0 == status) ? 0 : ERRNO;
 }
 
@@ -332,7 +329,7 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
 	error_def(ERR_TEXT);
 
 	len = SIZEOF(local);
-	if (0 == getsockname(sock_fd, (struct sockaddr *)&local, &len))
+	if (0 == getsockname(sock_fd, (struct sockaddr *)&local, (GTM_SOCKLEN_TYPE *)&len))
 	{
 		local_port = ntohs(local.sin_port);
 		strcpy(local_ip, inet_ntoa(local.sin_addr));
@@ -344,11 +341,11 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
 		gtm_putmsg(VARLSTCNT(9) ERR_GETSOCKNAMERR, 3, save_errno, errlen, errptr, ERR_TEXT, 2,
 				LIT_AND_LEN("LOCAL"));
 
-		local_port = -1;
+		local_port = (unsigned short)-1;
 		strcpy(local_ip, "*UNKNOWN*");
 	}
 	len = SIZEOF(remote);
-	if (0 == getpeername(sock_fd, (struct sockaddr *)&remote, &len))
+	if (0 == getpeername(sock_fd, (struct sockaddr *)&remote, (GTM_SOCKLEN_TYPE *)&len))
 	{
 		remote_port = ntohs(remote.sin_port);
 		strcpy(remote_ip, inet_ntoa(remote.sin_addr));
@@ -359,7 +356,7 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
 		errlen = strlen(errptr);
 		gtm_putmsg(VARLSTCNT(9) ERR_GETSOCKNAMERR, 3, save_errno, errlen, errptr, ERR_TEXT, 2,
 				LIT_AND_LEN("REMOTE"));
-		remote_port = -1;
+		remote_port = (unsigned short)-1;
 		strcpy(remote_ip, "*UNKNOWN*");
 	}
 	repl_log(log_fp, TRUE, TRUE, "Connection information:: Local: %s:%d Remote: %s:%d\n", local_ip, local_port,

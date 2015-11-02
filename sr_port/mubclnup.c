@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,13 +75,12 @@ void mubclnup(backup_reg_list *curr_ptr, clnup_stage stage)
 	switch(stage)
 	{
 	case need_to_rel_crit:
-		if (online)
-			for (ptr = (backup_reg_list *)grlist; ptr != NULL && ptr != curr_ptr && ptr != (backup_reg_list *)halt_ptr;)
-			{
-				if (keep_going == ptr->not_this_time)
-					rel_crit(ptr->reg);
-				ptr = ptr->fPtr;
-			}
+		for (ptr = (backup_reg_list *)grlist; ptr != NULL && ptr != curr_ptr && ptr != (backup_reg_list *)halt_ptr;)
+		{
+			if (keep_going == ptr->not_this_time)
+				rel_crit(ptr->reg);
+			ptr = ptr->fPtr;
+		}
 		curr_ptr = (backup_reg_list *)halt_ptr;
 		/* Intentional Fall Through */
 	case need_to_del_tempfile:

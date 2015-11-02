@@ -12,7 +12,7 @@
 #include "mdef.h"
 #include "min_max.h"
 #include "gtm_fcntl.h"
-#include <unistd.h>
+#include "gtm_unistd.h"
 #include "gtm_stat.h"
 #include "gtm_string.h"
 #include "eintr_wrappers.h"
@@ -39,6 +39,8 @@ GBLREF	mur_read_desc_t	mur_desc;
 GBLREF	jnl_ctl_list	*mur_jctl;
 GBLREF	mur_opt_struct	mur_options;
 GBLREF 	mur_gbls_t	murgbl;
+
+#ifdef MUR_USE_AIO
 
 /****************************************************************************************
  * Function Name: mur_fread_start
@@ -121,6 +123,8 @@ uint4 mur_fread_cancel(void)
 	return (mur_jctl->status = ((0 == save_err) ? SS_NORMAL : save_err));
 }
 
+#endif /* MUR_USE_AIO */
+
 boolean_t mur_fopen_sp(jnl_ctl_list *jctl)
 {
 	struct stat		stat_buf;
@@ -145,7 +149,7 @@ boolean_t mur_fopen_sp(jnl_ctl_list *jctl)
 		FSTAT_FILE(jctl->channel, &stat_buf, status);
 		if (-1 != status)
 		{
-			jctl->os_filesize = (off_jnl_t) stat_buf.st_size;
+			jctl->os_filesize = (off_jnl_t)stat_buf.st_size;
 			return TRUE;
 		}
 		jctl->status = errno;

@@ -89,7 +89,7 @@ uint4	mur_output_record()
 
 	assert(mur_options.update);
 	rec = mur_rab.jnlrec;
-	rectype = rec->prefix.jrec_type;
+	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 	if (JRT_ALIGN == rectype || JRT_EOF == rectype || JRT_EPOCH == rectype || JRT_PBLK == rectype || JRT_PINI == rectype)
 		return SS_NORMAL;
 	jgbl.gbl_jrec_time = rec->prefix.time;
@@ -132,7 +132,7 @@ uint4	mur_output_record()
 				jnl_fence_ctl.level = 1;
 				if (jnl_enabled)
 				{
-					jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
+					jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 					cs_addrs->next_fenced = NULL;
 				}
 			} else if (IS_GUPD(rectype))
@@ -141,7 +141,7 @@ uint4	mur_output_record()
 				if (jnl_enabled)
 				{
 					jnl_fence_ctl.fence_list = cs_addrs;
-					cs_addrs->next_fenced = (sgmnt_addrs *)-1L;
+					cs_addrs->next_fenced = JNL_FENCE_LIST_END;
 				}
 			} else if (IS_TP(rectype))
 				tp_set_sgm();
@@ -166,12 +166,11 @@ uint4	mur_output_record()
 		}
 		if (IS_ZTP(rectype))
 		{	/* Even for FENCE_NONE we apply fences. Otherwise an FUPD/GUPD becomes UPD etc. */
-			assert(jnl_enabled ||
-				((sgmnt_addrs *)-1L == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
+			assert(jnl_enabled || (JNL_FENCE_LIST_END == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
 			jnl_fence_ctl.level = 0;
 			if (jnl_enabled)
 			{
-				jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
+				jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 				cs_addrs->next_fenced = NULL;
 			}
 		}
@@ -200,13 +199,12 @@ uint4	mur_output_record()
 		if (jnl_enabled)
 		{
 			jnl_fence_ctl.fence_list = cs_addrs;
-			cs_addrs->next_fenced = (sgmnt_addrs *)-1L;
+			cs_addrs->next_fenced = JNL_FENCE_LIST_END;
 		}
 		op_ztcommit(1);
-		assert(jnl_enabled ||
-			((sgmnt_addrs *)-1L == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
+		assert(jnl_enabled || (JNL_FENCE_LIST_END == jnl_fence_ctl.fence_list && NULL == cs_addrs->next_fenced));
 		jnl_fence_ctl.level = 0;
-		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
+		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		cs_addrs->next_fenced = NULL;
 		break;
 	case JRT_INCTN:

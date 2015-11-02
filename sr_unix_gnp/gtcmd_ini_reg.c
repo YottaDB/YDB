@@ -61,7 +61,7 @@ cm_region_head *gtcmd_ini_reg(connection_struct *cnx)
 	buff[len] = 0;
 	memcpy(buff, fname, len);
 	STAT_FILE((char *)buff, &stat_buf, status);
-	if (-1 == status)
+	if ((uint4)-1 == status)
 		rts_error(VARLSTCNT(5) ERR_DBOPNERR, 2, len, fname, errno);
 	last = reglist;
 	for (ptr = reglist ; ptr ; ptr = ptr->next)

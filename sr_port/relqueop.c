@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,33 +53,33 @@ void	insqt (que_ent_ptr_t new, que_ent_ptr_t base)
 }
 
 
-que_ent_ptr_t remqh (que_ent_ptr_t base)
+void_ptr_t remqh (que_ent_ptr_t base)
 {
 	que_ent_ptr_t	ret;
 
-	ret = (que_ent_ptr_t)base->fl;			/* Will be 0 or offset to element */
+	ret = (que_ent_ptr_t)(INTPTR_T)base->fl;			/* Will be 0 or offset to element */
 	if ((que_ent_ptr_t)0 != ret)
 	{
-		ret = (que_ent_ptr_t)((uchar_ptr_t)base + (int)ret);
+		ret = (que_ent_ptr_t)((uchar_ptr_t)base + (INTPTR_T)ret);
 		base->fl += ret->fl;
 		((que_ent_ptr_t)((uchar_ptr_t)base + base->fl))->bl += ret->bl;
 	}
 
-	return ret;
+	return (void_ptr_t)ret;
 }
 
 
-que_ent_ptr_t remqt (que_ent_ptr_t base)
+void_ptr_t remqt (que_ent_ptr_t base)
 {
 	que_ent_ptr_t	ret;
 
-	ret = (que_ent_ptr_t)base->bl;			/* Will be 0 or offset to element */
+	ret = (que_ent_ptr_t)(INTPTR_T)base->bl;			/* Will be 0 or offset to element */
 	if ((que_ent_ptr_t)0 != ret)
 	{
-		ret = (que_ent_ptr_t)((uchar_ptr_t)base + (int)ret);
+		ret = (que_ent_ptr_t)((uchar_ptr_t)base + (INTPTR_T)ret);
 		base->bl += ret->bl;
 		((que_ent_ptr_t)((uchar_ptr_t)base + base->bl))->fl += ret->fl;
 	}
 
-	return ret;
+	return (void_ptr_t)ret;
 }

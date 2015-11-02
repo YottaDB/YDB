@@ -76,6 +76,13 @@ if ($platform_name == "hpux") then
 	endif
 endif
 
+set machine_name = `hostname`
+if ($machine_name == "hanuman" || $machine_name == "saktiman" || $machine_name == "spiderman" || $machine_name == "batman") then
+	set s7_env = true
+else
+	set s7_env = false
+endif
+
 cd $dst_top_dir
 if (-e $dst_ver) then
 	foreach image (pro bta dbg)
@@ -96,20 +103,26 @@ if (-e $dst_ver) then
 		# But, this is better than not checking at all.
 		echo "Following processes are still using $dst_ver; not deleting $dst_top_dir/$dst_ver"
 		/bin/ps $psopt | grep "$dst_top_dir/$dst_ver/" | grep -vE "grep|$0"
-		exit 1
+		if ($s7_env == "false") then
+			exit 1
+		endif
 	endif
 	if ($dst_ver =~ V3* || $dst_ver =~ V4* || $dst_ver =~ V5* || $dst_ver == "V990") then
-		set move_args = "compulsory"
+		if ($s7_env == "false") then
+			set move_args = "compulsory"
+		endif
 	endif
 	if ($?move_args)  then
 		set save_ver = `ls -ld ${gtm_root}/$dst_ver | awk '{if (length($7)==1) $7="0"_$7; time=$6"_"$7"_"$8; print toupper(time)}' | sed 's/://g'`
 		echo "Renaming ${gtm_root}/${dst_ver} to ${gtm_root}/${dst_ver}_${save_ver}"
 		mv ${gtm_root}/$dst_ver ${gtm_root}/${dst_ver}_${save_ver}
 	else if (! $mods_only) then
-		echo "Deleting existing $dst_dir directory structure"
-		rm -rf $dst_ver
-		if ($status != 0) then
-			exit $status
+		if ($s7_env == "false") then
+			echo "Deleting existing $dst_dir directory structure"
+			rm -rf $dst_ver
+			if ($status != 0) then
+				exit $status
+			endif
 		endif
 	else
 		echo "Updating $dst_dir directory structure"
@@ -118,9 +131,9 @@ endif
 
 ############## Create $dst_dir and subdirectories ##################
 
-if (! -e $dst_ver) then
+if ($s7_env == "true" || ! -e $dst_ver) then
 	echo "Creating -------> $dst_dir Directory Structure ..."
-	mkdir $dst_ver
+	mkdir -p $dst_ver
 	if ($status != 0) then
 		exit $status
 	endif
@@ -128,6 +141,9 @@ if (! -e $dst_ver) then
 	set gtm_ver = `pwd`
 	if ($status != 0) then
 		exit $status
+	endif
+	if ($s7_env == "true") then
+        	rm -rf $dir_structure
 	endif
 	mkdir $dir_structure {`echo $build_types | sed 's/ /,/g'`}/{`echo $build_dirs | sed 's/ /,/g'`}
 	if ($status != 0) then
@@ -153,18 +169,18 @@ set gtm_s_linuxia = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_g
 
 set platform_library = "$platform_name"
 if ( "s390" == $MACHTYPE && "linux" == $platform_library ) then
-        set platform_library = "l390"
+	set platform_library = "l390"
 endif
 if ( "z/OS" == $MACHTYPE ) then
-        set platform_library = "os390"
+	set platform_library = "os390"
 endif
 
 set mach_type = `uname -m`
 if ( "ia64" == $mach_type && "hpux" == $platform_library ) then
-        set platform_library = "hpia"
+	set platform_library = "hpia"
 endif
 if ( "ia64" == $mach_type && "linux" == $platform_library ) then
-        set platform_library = "linuxia"
+	set platform_library = "linuxia"
 endif
 
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############
@@ -182,7 +198,11 @@ foreach ref_library ( $ref_libs )
 			if ($nfiles != 0) then
 				if ($mods_only == 0) then
 					echo "Copying $nfiles files of type .$ftype from $ref_library to ${gtm_ver}/${dir}"
-					\ls -1 | grep "\.$ftype"'$' | xargs -i cp -f $preserve_time {} $gtm_ver/${dir}
+					if ($s7_env == "false") then
+						\ls -1 | grep "\.$ftype"'$' | xargs -i cp -f $preserve_time {} $gtm_ver/${dir}
+					else
+						\ls -1 | grep "\.$ftype"'$' | xargs -i ln -f -s "$PWD/{}" $gtm_ver/${dir}
+					endif
 				else
 					# @ n_modfiles=0
 					foreach srcfile (*.$ftype)
@@ -211,7 +231,11 @@ foreach ref_library ( $ref_libs )
 						endif
 						if (! { cmp -s ${srcfile} ${gtm_ver}/${dir}/${dstfile} } ) then
 							echo "Copying differing $srcfile from $ref_library to $gtm_ver/${dir}"
-							cp -f $preserve_time $srcfile $gtm_ver/${dir}
+							if ($s7_env == "false") then
+								cp -f $preserve_time $srcfile $gtm_ver/${dir}
+							else
+								ln -s -f ${PWD}/$srcfile $gtm_ver/${dir}
+							endif
 							# @ n_modfiles++
 						endif
 					end
@@ -223,9 +247,15 @@ foreach ref_library ( $ref_libs )
 			set nfiles=`ls -1 *.${ftype}nix | wc -l | sed 's/^[ ]*//g'`
 			if ($nfiles != 0) then
 				echo "Restoring $nfiles NIXed files of type .$ftype in directory ${gtm_ver}/${dir}"
-				ls -1 *.${ftype}nix |\
-					awk '{printf "cp -f $preserve_time %s %s/%s\n", $1, '\"${gtm_ver}/${dir}\"', $1}' |\
-					sed 's/nix$//g' | sh
+				if ($s7_env == "false") then
+				    ls -1 *.${ftype}nix |\
+						awk '{printf "cp -f $preserve_time %s %s/%s\n", $1, '\"${gtm_ver}/${dir}\"', $1}' |\
+						sed 's/nix$//g' | sh
+				else
+				    ls -1 *.${ftype}nix |\
+						awk '{printf "ln -s -f ${PWD}/%s %s/%s\n", $1, '\"${gtm_ver}/${dir}\"', $1}' |\
+						sed 's/nix$//g' | sh
+				endif
 			endif
 		end
 	end

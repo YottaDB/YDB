@@ -107,8 +107,8 @@ void gtcm_loop(omi_conn_ll *cll)
 		break;
 
 /*	Block in the system waiting for network events */
-	if ((nfds = select(++nfds, &r_fds, (fd_set *)0, (fd_set *)0,
-			   tp)) < 0)
+	nfds++;
+	if ((nfds = select(nfds, &r_fds, (fd_set *)0, (fd_set *)0, tp)) < 0)
 	{
 	    if (errno == EINTR) {
 		if (!omi_exitp)

@@ -138,7 +138,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			if (opr->oprval.vref)
 			{
 				PRINTF("%s   LS vref: 0x%08lx  RS vref: 0x%08lx  index: %d  varname: %s  last triple: 0x%08lx\n",
-				       cdbg_indent(indent), opr->oprval.vref->lson, opr->oprval.vref->rson, opr->oprval.vref->mvidx,
+				       cdbg_indent(indent),opr->oprval.vref->lson, opr->oprval.vref->rson, opr->oprval.vref->mvidx,
 				       cdbg_makstr(opr->oprval.vref->mvname.addr, &buff, opr->oprval.vref->mvname.len),
 				       opr->oprval.vref->last_fetch);
 				free(buff);
@@ -150,10 +150,12 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		case TVAL_REF:
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			PRINTF("%s   temp index: %d  offset: 0x%08lx\n", cdbg_indent(indent), opr->oprval.temp, offset);
+			IA64_ONLY(PRINTF("%s   temp index: %d  offset: 0x%08x\n", cdbg_indent(indent), opr->oprval.temp, offset));
+			NON_IA64_ONLY(PRINTF("%s   temp index: %d  offset: 0x%08lx\n",
+					     cdbg_indent(indent), opr->oprval.temp, offset));
 			break;
 		case ILIT_REF:
-			PRINTF("%s   ilit value: %d [0x%08lx]\n", cdbg_indent(indent), opr->oprval.ilit, opr->oprval.ilit);
+			PRINTF("%s   ilit value: %d [0x%08x]\n", cdbg_indent(indent), opr->oprval.ilit, opr->oprval.ilit);
 			break;
 		case MLIT_REF:
 			if (opr->oprval.mlit)

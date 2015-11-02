@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,7 +141,7 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 }
 
 
-que_ent_ptr_t remqhi1(que_head_ptr_t base)
+void_ptr_t remqhi1(que_head_ptr_t base)
 {
 	int		retries, spins, maxspins;
 	que_ent_ptr_t	ret;
@@ -164,7 +164,7 @@ que_ent_ptr_t remqhi1(que_head_ptr_t base)
                                 RELEASE_SWAPLOCK(&base->latch);
 				--fast_lock_count;
 				assert(0 <= fast_lock_count);
-				return ret;
+				return (void_ptr_t)ret;
 			}
 		}
 		if (retries & 0x3)
@@ -184,11 +184,11 @@ que_ent_ptr_t remqhi1(que_head_ptr_t base)
 	--fast_lock_count;
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
-	return (que_ent_ptr_t)INTERLOCK_FAIL;
+	return (void_ptr_t)INTERLOCK_FAIL;
 }
 
 
-que_ent_ptr_t remqti1(que_head_ptr_t base)
+void_ptr_t remqti1(que_head_ptr_t base)
 {
 	int		retries, spins, maxspins;
 	que_ent_ptr_t	ret;
@@ -211,7 +211,7 @@ que_ent_ptr_t remqti1(que_head_ptr_t base)
                                 RELEASE_SWAPLOCK(&base->latch);
 				--fast_lock_count;
 				assert(0 <= fast_lock_count);
-				return ret;
+				return (void_ptr_t)ret;
 			}
 		}
 		if (retries & 0x3)
@@ -231,6 +231,6 @@ que_ent_ptr_t remqti1(que_head_ptr_t base)
 	--fast_lock_count;
 	assert(0 <= fast_lock_count);
 	assert(FALSE);
-	return (que_ent_ptr_t)INTERLOCK_FAIL;
+	return (void_ptr_t)INTERLOCK_FAIL;
 }
 #endif

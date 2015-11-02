@@ -373,7 +373,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 	chset_idx = verify_chset(CHSET_MSTR);											\
 		;														\
 	if (0 <= chset_idx)													\
-		(CHSET) = chset_idx;												\
+		(CHSET) = (gtm_chset_t)chset_idx;										\
 	else															\
 		rts_error(VARLSTCNT(4) ERR_BADCHSET, 2, (CHSET_MSTR)->len, (CHSET_MSTR)->addr);					\
 }

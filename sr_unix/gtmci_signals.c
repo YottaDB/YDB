@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,11 +27,7 @@
 /* info of the last signal handled by generic_signal_handler */
 GBLREF int4 		exi_condition;
 GBLREF siginfo_t        exi_siginfo;
-#if defined(__osf__) || defined(_AIX)
-GBLDEF struct sigcontext exi_context;
-#else
-GBLDEF ucontext_t       exi_context;
-#endif
+GBLDEF gtm_sigcontext_t exi_context;
 
 static struct sigaction *gtm_sig_h; 	/* storage for GT.M handlers */
 static struct sigaction *ext_sig_h; 	/* handlers defined in external application */
@@ -92,7 +88,8 @@ void 	gtmci_exit_handler(void)
 	static boolean_t 	handler_active = FALSE;
 	struct sigaction 	*act, ignore;
 
-	if ((0 >= exi_condition && NSIG < exi_condition) || !(MUMPS_CALLIN & invocation_mode) || !(MUMPS_GTMCI & invocation_mode) || handler_active)
+	if ((0 >= exi_condition && NSIG < exi_condition) || !(MUMPS_CALLIN & invocation_mode) ||
+			!(MUMPS_GTMCI & invocation_mode) || handler_active)
 		return;
 	handler_active = TRUE;
 	sig_switch_ext();

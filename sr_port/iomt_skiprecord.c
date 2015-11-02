@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,11 +33,11 @@ iomt_skiprecord (io_desc *dev, int count)
 		if (mt_ptr->cap.req_extra_filemark)
 		{
 		    iomt_eof (dev);
-		    iomt_qio (dev, IO_SKIPFILE, -2);
+		    iomt_qio (dev, IO_SKIPFILE, (unsigned int)-2);
 		}
 		else
 #endif
-		    iomt_qio (dev, IO_SKIPFILE, -1);
+		    iomt_qio (dev, IO_SKIPFILE, (unsigned int)-1);
 
 	} else if (mt_ptr->last_op == mt_eof)
 	{
@@ -48,7 +48,7 @@ iomt_skiprecord (io_desc *dev, int count)
 		if (mt_ptr->cap.req_extra_filemark)
 		{
 		    iomt_eof (dev);
-		    iomt_qio (dev, IO_SKIPFILE, -1);
+		    iomt_qio (dev, IO_SKIPFILE, (unsigned int)-1);
 		}
 #endif
 	} else if (mt_ptr->last_op == mt_eof2 && count > 0)

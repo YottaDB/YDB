@@ -25,7 +25,7 @@
 #define GTM_SOCKLEN_TYPE size_t
 #elif defined(VMS)
 #define GTM_SOCKLEN_TYPE size_t
-#elif (defined(__sparc) || defined (__ia64))
+#elif defined(__sparc)
 #define GTM_SOCKLEN_TYPE int
 #else
 #define GTM_SOCKLEN_TYPE socklen_t

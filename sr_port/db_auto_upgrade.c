@@ -62,19 +62,38 @@ void db_auto_upgrade(gd_region *reg)
 	*/
 	if (csd->minor_dbver < GDSMVCURR)
 	{	/* In general, the method for adding new versions is:
-		   1) If the top case is for the most previous version (and has a break in it), the break is no longer appropriate
-		      since at minimum, the minor_dbver value needs updating.
+		   1) If there are no automatic updates for this version, it is optional to add the version to the switch
+		      statement below. Those there are more for example at this time (through V53000).
 		   2) Update (or add) a case for the previous version to update any necessary fields.
 		*/
+		if (!csd->opened_by_gtmv53 && !csd->db_got_to_v5_once)
+		{
+			csd->opened_by_gtmv53 = TRUE;
+			/* This is a case of a database that has been used by a pre-V53 version of GT.M that did not contain
+			 * the fix (C9H07-002873). At this point, the database might contain RECYCLED blocks that are a mix of
+			 *	a) Those blocks that were RECYCLED at the time of the MUPIP UPGRADE from V4 to V5.
+			 *	b) Those blocks that became RECYCLED due to M-kills in V5.
+			 * It is only (a) that we have to mark as FREE as it might contain too-full v4 format blocks. But there
+			 * is no way to distinguish the two. So we mark both (a) and (b) as FREE. This will mean no PBLKs written
+			 * for (b) and hence no backward journal recovery possible to a point before the start of the REORG UPGRADE.
+			 * We force a MUPIP REORG UPGRADE rerun (to mark RECYCLED blocks FREE) by setting fully_upgraded to FALSE.
+			 */
+			csd->fully_upgraded = FALSE;
+			csd->reorg_upgrd_dwngrd_restart_block = 0;	/* reorg upgrade should restart from block 0 */
+			/* Ensure reorg_db_fmt_start_tn and desired_db_format_tn are set to different values so fresh reorg
+			 * upgrade can set fully_upgraded to TRUE once it is done.
+			 */
+			csd->reorg_db_fmt_start_tn = 0;
+			csd->desired_db_format_tn = 1;
+		}
 		switch(csd->minor_dbver)
 		{
 			case GDSMV51000:		/* Multi-site replication available */
 			case GDSMV52000:		/* Unicode */
 			case GDSMV53000:		/* M-Itanium release.*/
 				break;			/* Nothing to do for this version */
-			default:
-				csd->minor_dbver = GDSMVCURR;
 		}
+		csd->minor_dbver = (enum mdb_ver)GDSMVCURR;
 	}
 	return;
 }

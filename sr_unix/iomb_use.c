@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +46,7 @@ void iomb_use(io_desc *iod, mval *pp)
 			{
 				close(mb_ptr->channel);
 				path = iod->trans_name->dollar_io;
-				if ((status = UNLINK(path)) == -1)
+				if ((status = UNLINK(path)) == (unsigned int)-1)
 				rts_error(VARLSTCNT(1) errno);
 			}
 			break;

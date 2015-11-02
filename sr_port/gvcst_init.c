@@ -163,6 +163,7 @@ void gvcst_init (gd_region *greg)
 	ua_list			*tmp_ua;
 	time_t			curr_time;
 	uint4			curr_time_uint4, next_warn_uint4;
+	unsigned int            minus1 = (unsigned)-1;
 
 	error_def(ERR_DBFLCORRP);
 	error_def(ERR_DBCREINCOMP);
@@ -201,7 +202,7 @@ void gvcst_init (gd_region *greg)
 		 * The following assert checks that we always have space in the "block" member
 		 * to represent a GDS block number.
 		 */
-		tmp_blk.block = -1;
+		tmp_blk.block = minus1;
 		assert(MAXTOTALBLKS_MAX - 1 <= tmp_blk.block);
 	)
 	/* TH_BLOCK is currently a hardcoded constant as basing it on the offsetof macro does not work with the VMS compiler.
@@ -399,7 +400,7 @@ void gvcst_init (gd_region *greg)
 	curr_time_uint4 = (uint4)curr_time;
 	next_warn_uint4 = csd->next_upgrd_warn.cas_time;
 	if (!csd->fully_upgraded && curr_time_uint4 > next_warn_uint4
-	    && COMPSWAP(&csd->next_upgrd_warn.time_latch, next_warn_uint4, 0, (curr_time_uint4 + UPGRD_WARN_INTERVAL), 0))
+	    && COMPSWAP_LOCK(&csd->next_upgrd_warn.time_latch, next_warn_uint4, 0, (curr_time_uint4 + UPGRD_WARN_INTERVAL), 0))
 	{	/* The msg is due and we have successfully updated the next time interval */
 		if (GDSVCURR != csd->desired_db_format)
 			send_msg(VARLSTCNT(4) ERR_DBVERPERFWARN1, 2, DB_LEN_STR(greg));

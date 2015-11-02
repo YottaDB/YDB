@@ -2,7 +2,7 @@
 #
 #################################################################
 #								#
-#	Copyright 2004 Sanchez Computer Associates, Inc.	#
+#	Copyright 2004, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -59,9 +59,6 @@ endif
 
 version $1 $2
 
-set platform = `uname | sed 's/-/_/g' | tr '[A-Z]' '[a-z]'`
-set host     = $HOST:r:r
-
 pushd $gtm_ver/log
 
 if (! -e comlist.$image.log) then
@@ -74,27 +71,5 @@ endif
 set buildlog = comlist.$image.log
 set warnlog  = warn.$image.log
 
-switch ($platform)
-	case "aix":
-	case "sunos":
-	case "osf1":
-		if (-e $gtm_tools/buildwarn_$platform.awk) then
-			awk -v gtm_src="$gtm_src" -f $gtm_tools/buildwarn_$platform.awk $buildlog > $warnlog
-		else
-			echo "buildwarn-E-awknotexist, $gtm_tools/buildwarn_$platform.awk does not exist. Exiting..."
-			exit -1
-		endif
-		breaksw;
-	case "linux":
-		grep ":" $buildlog | grep "`echo $gtm_src`" > $warnlog
-		breaksw;
-	case "hp_ux":
-		grep "cc:" $buildlog > $warnlog
-		breaksw;
-	default:
-		echo "buildwarn-E-unsupport, Platform `uname` is unsupported currently. Exiting..."
-		exit -1
-		breaksw;
-endsw
-
+awk -v gtm_src="$gtm_src" -f $gtm_tools/buildwarn.awk $buildlog > $warnlog
 exit $status

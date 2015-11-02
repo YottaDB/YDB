@@ -25,7 +25,8 @@ GBLREF io_pair	io_curr_device;
 int	iorm_rdone(mint *v, int4 timeout)
 {
 	mval		tmp;
-	int		ret, codepoint;
+	int		ret;
+        uint4		codepoint;
 	gtm_chset_t	ichset;
 
 	*v = -1;
@@ -54,8 +55,8 @@ int	iorm_rdone(mint *v, int4 timeout)
 			}
 			UNICODE_ONLY(assert(WEOF != codepoint);)
 		} else
-			codepoint = -1;			/* zero length is end of file */
-		*v = codepoint;
+			codepoint = (uint4)-1;			/* zero length is end of file */
+		*v = (mint)(codepoint);
 	}
 	return ret;
 }

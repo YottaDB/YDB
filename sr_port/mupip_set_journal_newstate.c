@@ -41,8 +41,8 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 	error_def(ERR_REPLJNLCNFLCT);
 	error_def(ERR_JNLDISABLE);
 
-	jnl_curr_state = rptr->sd->jnl_state;
-	repl_curr_state = rptr->sd->repl_state;
+	jnl_curr_state = (enum jnl_state_codes)rptr->sd->jnl_state;
+	repl_curr_state = (enum repl_state_codes)rptr->sd->repl_state;
 	current_image = rptr->sd->jnl_before_image;
 	if (CLI_ABSENT == jnl_options->cli_journal)
 		rptr->jnl_new_state = jnl_curr_state;

@@ -152,7 +152,7 @@ struct NTD
 
 #include "iosp.h"
 
-#define RELQUE2PTR(X) (que_ent_ptr_t)(((unsigned char *) &(X)) + ((int4) (X)))
+#define RELQUE2PTR(X) (void_ptr_t)(((unsigned char *) &(X)) + ((int4) (X)))
 
 #define CMI_ERROR(s)		((s) != SS_NORMAL)
 #define CMI_CLB_IOSTATUS(c)	((c)->deferred_status)

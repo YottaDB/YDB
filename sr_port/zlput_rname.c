@@ -20,6 +20,7 @@
 #include "urx.h"
 #include "min_max.h"
 #include "hashtab.h"
+#include "stringpool.h"
 
 #define S_CUTOFF 		7
 #define FREE_RTNTBL_SPACE 	17
@@ -118,7 +119,8 @@ bool zlput_rname (rhdtyp *hdr)
 			if (!old_rhead->shlib_handle)
 		        { /* Migrate text literals pointing into text area we are about to throw away into the stringpool.
 			     We also can release the read-only releasable segment as it is no longer needed. */
-				stp_move(old_rhead->literal_text_adr, old_rhead->literal_text_adr + old_rhead->literal_text_len);
+				stp_move((char *)old_rhead->literal_text_adr,
+					 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
 				zlmov_lnames(old_rhead); /* copy the label names from literal pool to malloc'd area */
 				free(old_rhead->ptext_adr);
 				/* Reset the routine header pointers to the sections we just freed up.
@@ -151,7 +153,7 @@ bool zlput_rname (rhdtyp *hdr)
 				   we end up freeing the storage for line 0/1 twice since they have the
 				   same pointers.
 				*/
-				for (curline = (mstr *)(src_tbl + 2) + 1; 0 != entries; --entries, ++curline)
+				for (curline = RECAST(mstr *)(src_tbl + 2) + 1; 0 != entries; --entries, ++curline)
 				{
 					assert(curline->len);
 					free(curline->addr);

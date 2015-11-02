@@ -43,8 +43,8 @@
 #include "gvusr.h"
 
 #ifdef VMS
-	GBLREF int4 image_count;
-	GBLREF int4 login_time[2];
+	GBLREF uint4	image_count;
+	GBLREF int4	login_time[2];
 #endif
 
 GBLREF	int4		process_id;

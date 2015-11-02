@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +59,6 @@ void gtmsource_flush_fh(seq_num resync_seqno)
 	gtmsource_last_flush_time = gtmsource_now;
 	if (jnlpool.gtmsource_local->last_flush_resync_seqno == resync_seqno)
 		return;
-	repl_log(gtmsource_log_fp, TRUE, FALSE, "Periodic flush of replication instance file header\n");
 	/* need to flush resync_seqno to instance file. get the ftok semaphore lock before flushing */
 	repl_inst_ftok_sem_lock();
 	if (REPL_PROTO_VER_DUALSITE == jnlpool.gtmsource_local->remote_proto_ver)

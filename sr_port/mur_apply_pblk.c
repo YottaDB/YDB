@@ -176,7 +176,7 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 			for (status = mur_prev(mur_jctl->rec_offset), mur_jctl->after_end_of_data = TRUE;
 								SS_NORMAL == status; status = mur_prev_rec())
 			{
-				rectype = mur_rab.jnlrec->prefix.jrec_type;
+				rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
 				mur_jctl->after_end_of_data = mur_jctl->after_end_of_data &&
 					(mur_jctl->rec_offset >= mur_jctl->jfh->end_of_data);
 				if (apply_intrpt_pblk)

@@ -219,7 +219,8 @@ GBLDEF	boolean_t	dollar_zininterrupt;
 GBLDEF	boolean_t	dollar_ztexit_bool; /* Truth value of dollar_ztexit when coerced to boolean */
 
 GBLDEF	mv_stent	*mv_chain;
-GBLDEF	sgm_info	*first_sgm_info;
+GBLDEF	sgm_info	*first_sgm_info;	/* List of participating regions in the TP transaction with NO ftok ordering */
+GBLDEF	sgm_info	*first_tp_si_by_ftok;	/* List of participating regions in the TP transaction sorted on ftok order */
 GBLDEF	spdesc		indr_stringpool,
 			rts_stringpool,
 			stringpool;
@@ -904,3 +905,7 @@ GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */
 
 GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
+
+GBLDEF	uint4	process_id;
+GBLDEF	uint4	image_count;	/* not used in UNIX but defined to preserve VMS compatibility */
+

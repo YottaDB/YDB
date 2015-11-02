@@ -64,13 +64,13 @@ int gtcm_dmpstat(int sig)
     OMI_DBG((omi_debug, "%s", GTM_CTIME(&t)));
     FPRINTF(fp, "%d\n", omi_pid);
     OMI_DBG((omi_debug, "%d\n", omi_pid));
-    FPRINTF(fp, "Up time:  %d:%.2d:%.2d\n",uphours,upmins,upsecs);
-    OMI_DBG((omi_debug, "Up time:  %d:%.2d:%.2d\n",uphours,upmins,upsecs));
+    FPRINTF(fp, "Up time:  %ld:%.2ld:%.2ld\n",uphours,upmins,upsecs);
+    OMI_DBG((omi_debug, "Up time:  %ld:%.2ld:%.2ld\n",uphours,upmins,upsecs));
     if (uptime != itime)
     {
-	FPRINTF(fp, "Time since last stat dump:  %d:%.2d:%.2d\n",ihours,imins,
+	FPRINTF(fp, "Time since last stat dump:  %ld:%.2ld:%.2ld\n",ihours,imins,
 		isecs);
-	OMI_DBG((omi_debug, "Time since last stat dump:  %d:%.2d:%.2d\n",
+	OMI_DBG((omi_debug, "Time since last stat dump:  %ld:%.2ld:%.2ld\n",
 		 ihours,imins,isecs));
     }
     FPRINTF(fp, "Good connections: %d\n", omi_conns->stats.conn);
@@ -83,8 +83,10 @@ int gtcm_dmpstat(int sig)
 	     omi_conns->stats.disc - omi_conns->stats.clos));
     FPRINTF(fp, "Bad disconnects: %d\n", omi_conns->stats.clos);
     OMI_DBG((omi_debug, "Bad disconnects: %d\n", omi_conns->stats.clos));
-    FPRINTF(fp, "Number of transactions: %ld\n", omi_nxact);
-    OMI_DBG((omi_debug, "Number of transactions: %ld\n", omi_nxact));
+    NON_IA64_ONLY(FPRINTF(fp, "Number of transactions: %ld\n", omi_nxact));
+    IA64_ONLY(FPRINTF(fp, "Number of transactions: %d\n", omi_nxact));
+    NON_IA64_ONLY(OMI_DBG((omi_debug, "Number of transactions: %ld\n", omi_nxact)));
+    IA64_ONLY(OMI_DBG((omi_debug, "Number of transactions: %d\n", omi_nxact)));
     if (uptime)
     {
 	FPRINTF(fp, "Avg. transactions/sec: %ld\n", omi_nxact/uptime);
@@ -92,9 +94,12 @@ int gtcm_dmpstat(int sig)
     }
     if (gtcm_stime)
     {
-	FPRINTF(fp, "transactions since last stat dump: %ld\n", omi_nxact2);
-	OMI_DBG((omi_debug, "transactions since last stat dump: %ld\n",
-		 omi_nxact2));
+	NON_IA64_ONLY(FPRINTF(fp, "transactions since last stat dump: %ld\n", omi_nxact2));
+	IA64_ONLY(FPRINTF(fp, "transactions since last stat dump: %d\n", omi_nxact2));
+	NON_IA64_ONLY(OMI_DBG((omi_debug, "transactions since last stat dump: %ld\n",
+		 omi_nxact2)));
+	IA64_ONLY(OMI_DBG((omi_debug, "transactions since last stat dump: %d\n",
+		 omi_nxact2)));
 	if (itime)
 	{
 	    FPRINTF(fp, "Avg. transactions/sec since last stat dump: %ld\n",
@@ -104,12 +109,18 @@ int gtcm_dmpstat(int sig)
 		     omi_nxact2/itime));
 	}
     }
-    FPRINTF(fp, "Number of errors: %ld\n", omi_nerrs);
-    OMI_DBG((omi_debug, "Number of errors: %ld\n", omi_nerrs));
-    FPRINTF(fp, "Number of bytes received: %ld\n", omi_brecv);
-    OMI_DBG((omi_debug, "Number of bytes received: %ld\n", omi_brecv));
-    FPRINTF(fp, "Number of bytes sent: %ld\n", omi_bsent);
-    OMI_DBG((omi_debug, "Number of bytes sent: %ld\n", omi_bsent));
+    NON_IA64_ONLY(FPRINTF(fp, "Number of errors: %ld\n", omi_nerrs));
+    IA64_ONLY(FPRINTF(fp, "Number of errors: %d\n", omi_nerrs));
+    NON_IA64_ONLY(OMI_DBG((omi_debug, "Number of errors: %ld\n", omi_nerrs)));
+    IA64_ONLY(OMI_DBG((omi_debug, "Number of errors: %d\n", omi_nerrs)));
+    NON_IA64_ONLY(FPRINTF(fp, "Number of bytes received: %ld\n", omi_brecv));
+    IA64_ONLY(FPRINTF(fp, "Number of bytes received: %d\n", omi_brecv));
+    NON_IA64_ONLY(OMI_DBG((omi_debug, "Number of bytes received: %ld\n", omi_brecv)));
+    IA64_ONLY(OMI_DBG((omi_debug, "Number of bytes received: %d\n", omi_brecv)));
+    NON_IA64_ONLY(FPRINTF(fp, "Number of bytes sent: %ld\n", omi_bsent));
+    IA64_ONLY(FPRINTF(fp, "Number of bytes sent: %d\n", omi_bsent));
+    NON_IA64_ONLY(OMI_DBG((omi_debug, "Number of bytes sent: %ld\n", omi_bsent)));
+    IA64_ONLY(OMI_DBG((omi_debug, "Number of bytes sent: %d\n", omi_bsent)));
     FPRINTF(fp, "\n");
 
     gtcm_ltime = (int4)t;

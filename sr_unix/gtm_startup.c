@@ -53,9 +53,8 @@
 #include "op.h"
 #include "gt_timer.h"
 #include "io.h"
-#include "dpgbldir.h"
 #include "gtmio.h"
-#include "dpgbldir_sysops.h"
+#include "dpgbldir_sysops.h"	/* for dpzgbini prototype */
 #include "comp_esc.h"
 #include "ctrlc_handler.h"
 #include "get_page_size.h"
@@ -96,6 +95,8 @@
 #define MIN_INDIRECTION_NESTING 32
 #define MAX_INDIRECTION_NESTING 256
 
+static int init_xfer_table(void);
+
 GBLDEF void		(*restart)() = &mum_tstart;
 
 GBLREF mval 		**ind_result_array, **ind_result_sp, **ind_result_top;
@@ -125,13 +126,8 @@ GBLREF pattern          mumps_pattern;
 GBLREF uint4    	*pattern_typemask;
 GBLREF bool		transform;
 GBLREF fnpc_area	fnpca;
-GBLREF sgm_info         *first_sgm_info;
-GBLREF cw_set_element   cw_set[];
-GBLREF unsigned char    cw_set_depth;
-GBLREF uint4		process_id;
 GBLREF int4		exi_condition;
 GBLREF global_latch_t 	defer_latch;
-GBLREF jnlpool_addrs	jnlpool;
 GBLREF boolean_t	is_replicator;
 GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF boolean_t	mstr_native_align;
@@ -140,8 +136,6 @@ GBLREF boolean_t	utf8_patnumeric;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF casemap_t	casemaps[];
-GBLREF inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF short		dollar_tlevel;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -205,8 +199,7 @@ void gtm_startup(struct startup_vector *svec)
 
 	is_replicator = TRUE;	/* as GT.M goes through t_end() and can write jnl records to the jnlpool for replicated db */
 	getjobname();
-	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-			  &jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
+	INVOKE_INIT_SECSHR_ADDRS;
 	getzprocess();
 	getzmode();
 	geteditor();
@@ -311,7 +304,6 @@ void gtm_startup(struct startup_vector *svec)
 GBLDEF char *xfer_text[] = {
 #include "xfer.h"
 };
-
 #include "xfer_desc.i"
 
 /* On IA64, we want to use CODE_ADDRESS() macro, to dereference all the function pointers, before storing them in
@@ -320,16 +312,16 @@ GBLDEF char *xfer_text[] = {
    uses it, this function is called right at the beginning of gtm_startup
 */
 
-int init_xfer_table()
+static int init_xfer_table()
 {
 	int i;
 
 	for (i = 0; i < (sizeof(xfer_text) / sizeof(char *)); i++)
 	{
 		if (ASM == function_type(xfer_text[i]))
-			xfer_table[i] = CODE_ADDRESS_ASM(xfer_table[i]);
+			xfer_table[i] = (int (*)())CODE_ADDRESS_ASM(xfer_table[i]);
 		else
-			xfer_table[i] = CODE_ADDRESS_C(xfer_table[i]);
+			xfer_table[i] = (int (*)())CODE_ADDRESS_C(xfer_table[i]);
 	}
 
 	return 0;

@@ -39,15 +39,21 @@ GBLREF  short                   dollar_tlevel;
 GBLREF	seq_num			seq_num_zero;
 GBLREF 	jnl_gbls_t		jgbl;
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	sgmnt_addrs		*cs_addrs;
 
 void    op_ztcommit(int4 n)
 {
 	boolean_t			replication, yes_jnl_no_repl;
 	uint4				jnl_status;
-        sgmnt_addrs             	*csa, *next_csa;
+        sgmnt_addrs			*csa, *csa_next, *new_fence_list, *tcsa, **tcsa_insert;
 	gd_region			*save_gv_cur_region;
+	jnl_private_control		*jpc;
+	jnl_buffer_ptr_t		jbp;
+	jnl_tm_t			save_gbl_jrec_time;
+	int4				prev_index;
         static struct_jrec_ztcom	ztcom_record = {{JRT_ZTCOM, ZTCOM_RECLEN, 0, 0, 0},
 						0, 0, 0, {ZTCOM_RECLEN, JNL_REC_SUFFIX_CODE}};
+
 	error_def(ERR_TRANSMINUS);
 	error_def(ERR_TRANSNOSTART);
 	error_def(ERR_REPLOFFJNLON);
@@ -68,21 +74,22 @@ void    op_ztcommit(int4 n)
 		return;
 	if (!jgbl.forw_phase_recovery)
 	{
-		JNL_SHORT_TIME(ztcom_record.prefix.time);
+		SET_GBL_JREC_TIME;
 		QWASSIGN(ztcom_record.token, jnl_fence_ctl.token); /* token was computed in the first call to
 								      jnl_write_ztp_logical after op_ztstart */
 		ztcom_record.participants = 0;
-		for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *)-1L;  csa = csa->next_fenced)
+		for (csa = jnl_fence_ctl.fence_list; JNL_FENCE_LIST_END != csa; csa = csa->next_fenced)
 			ztcom_record.participants++;
 	} else
 	{
-		ztcom_record.prefix.time = jgbl.gbl_jrec_time;
 		QWASSIGN(ztcom_record.token, jgbl.mur_jrec_token_seq.token);
 		QWASSIGN(ztcom_record.jnl_seqno, jgbl.mur_jrec_seqno);
 		ztcom_record.participants = jgbl.mur_jrec_participants;
 	}
 	replication = yes_jnl_no_repl = FALSE;
-	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *)-1L;  csa = csa->next_fenced)
+	new_fence_list = JNL_FENCE_LIST_END;
+	/* Sort journaled regions based on ftok order and grab crit. Do this BEFORE grabbing jnlpool lock to avoid deadlock */
+	for (csa = jnl_fence_ctl.fence_list; JNL_FENCE_LIST_END != csa; csa = csa_next)
 	{
 		if (REPL_ALLOWED(csa))
 		{
@@ -93,50 +100,79 @@ void    op_ztcommit(int4 n)
 			yes_jnl_no_repl = TRUE;
 			save_gv_cur_region = csa->region;
 		}
+		csa_next = csa->next_fenced;
+		tcsa_insert = &new_fence_list;
+		for (tcsa = *tcsa_insert; JNL_FENCE_LIST_END != tcsa; tcsa_insert = &tcsa->next_fenced, tcsa = *tcsa_insert)
+		{
+			assert(csa->fid_index != tcsa->fid_index);
+			if (csa->fid_index < tcsa->fid_index)
+				break;
+		}
+		csa->next_fenced = tcsa;
+		*tcsa_insert = csa;
 	}
-	if (replication) /* instance is replicated */
-	{
-		if (yes_jnl_no_repl) /* journal is ON for a region in the replicated instance */
-			rts_error(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
-		grab_lock(jnlpool.jnlpool_dummy_reg);
-	}
-
+	save_gv_cur_region = gv_cur_region; /* we change gv_cur_region in the loop below, so save for later restore */
+	DEBUG_ONLY(prev_index = 0;)
+	jnl_fence_ctl.fence_list = new_fence_list;
 	/* Note that only those regions that are actively journaling will appear in the following list: */
-	save_gv_cur_region = gv_cur_region; /* we change gv_cur_region in the loop, so save for later restore */
-	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *)-1L;  csa = csa->next_fenced)
+	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa->next_fenced)
 	{
-		gv_cur_region = csa->jnl->region;
-		tp_change_reg();
+		assert(prev_index < csa->fid_index);
+		DEBUG_ONLY(prev_index = csa->fid_index;)
+		jpc = csa->jnl;
+		gv_cur_region = jpc->region;	/* needed for jnl_ensure_open */
+		tp_change_reg();		/* needed for jnl_ensure_open */
+		assert(csa == cs_addrs);
 		grab_crit(gv_cur_region);
+		jbp = jpc->jnl_buff;
+		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl
+		 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+		 * (if it decides to switch to a new journal file)
+		 */
+		ADJUST_GBL_JREC_TIME(jgbl, jbp);
 		jnl_status = jnl_ensure_open();
 		if (jnl_status)
 			rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(gv_cur_region));
-		if (0 == csa->jnl->pini_addr)
-			jnl_put_jrt_pini(csa);
-		if (!jgbl.forw_phase_recovery)
-		{
-			if (REPL_ALLOWED(csa))
-				QWASSIGN(ztcom_record.jnl_seqno, temp_jnlpool_ctl->jnl_seqno);
-			else
-				QWASSIGN(ztcom_record.jnl_seqno, seq_num_zero);
-		}
-		ztcom_record.prefix.pini_addr = csa->jnl->pini_addr;
-		ztcom_record.prefix.tn = csa->ti->curr_tn;
-		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
-		JNL_WRITE_APPROPRIATE(csa, csa->jnl, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
-		rel_crit(gv_cur_region);
-		if (!jgbl.forw_phase_recovery)
-			wcs_timer_start(gv_cur_region, TRUE);
 	}
 	gv_cur_region = save_gv_cur_region; /* restore original */
 	tp_change_reg(); /* bring cs_* in sync with gv_cur_region */
+	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
+	if (replication) /* instance is replicated */
+	{
+		if (yes_jnl_no_repl) /* journal is ON but replication is OFF for a region in the replicated instance */
+			rts_error(VARLSTCNT(4) ERR_REPLOFFJNLON, 2, DB_LEN_STR(save_gv_cur_region));
+		grab_lock(jnlpool.jnlpool_dummy_reg);
+	}
+	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa->next_fenced)
+	{
+		jpc = csa->jnl;
+		assert(csa->now_crit);
+		if (0 == jpc->pini_addr)
+			jnl_put_jrt_pini(csa);
+		if (!jgbl.forw_phase_recovery)
+			ztcom_record.jnl_seqno = REPL_ALLOWED(csa) ? temp_jnlpool_ctl->jnl_seqno : seq_num_zero;
+		ztcom_record.prefix.pini_addr = jpc->pini_addr;
+		ztcom_record.prefix.tn = csa->ti->curr_tn;
+		ztcom_record.prefix.checksum = INIT_CHECKSUM_SEED;
+		ztcom_record.prefix.time = jgbl.gbl_jrec_time;
+		JNL_WRITE_APPROPRIATE(csa, jpc, JRT_ZTCOM, (jnl_record *)&ztcom_record, NULL, NULL);
+		rel_crit(jpc->region);
+	}
+	/* Ensure jgbl.gbl_jrec_time did not get reset by any of the jnl writing functions. This is necessary to ensure that
+	 * the same timestamp is written in the ZTCOM record for ALL regions (which is currently required by journal recovery).
+	 */
+	assert(save_gbl_jrec_time == jgbl.gbl_jrec_time);
 	if (replication)
 		rel_lock(jnlpool.jnlpool_dummy_reg);
-	for (csa = jnl_fence_ctl.fence_list;  csa != (sgmnt_addrs *)-1L;  csa = next_csa)
+	for (csa = new_fence_list; JNL_FENCE_LIST_END != csa; csa = csa_next)
 	{       /* do the waits in a separate loop to prevent spreading out the transaction */
 		if (!jgbl.forw_phase_recovery)
-			jnl_wait(csa->jnl->region);
-		next_csa = csa->next_fenced;
+		{
+			jpc = csa->jnl;
+			wcs_timer_start(jpc->region, TRUE);
+			jnl_wait(jpc->region);
+		}
+		csa_next = csa->next_fenced;
 		csa->next_fenced = NULL;
 	}
 }

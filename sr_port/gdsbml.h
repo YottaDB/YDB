@@ -67,13 +67,13 @@
 #define	GET_CDB_SC_CODE(gdsfilext_code, status)		\
 {							\
 	if (MAP_RD_FAIL == gdsfilext_code)		\
-		status = rdfail_detail;			\
+		status = (enum cdb_sc)rdfail_detail;			\
 	else if (EXTEND_SUSPECT == gdsfilext_code)	\
-		status = cdb_sc_extend;			\
+		status = (enum cdb_sc)cdb_sc_extend;			\
 	else if (NO_FREE_SPACE == gdsfilext_code)	\
 		status = cdb_sc_gbloflow;		\
 	else if (EXTEND_UNFREEZECRIT == gdsfilext_code)	\
-		status = cdb_sc_unfreeze_getcrit;	\
+		status = (enum cdb_sc)cdb_sc_unfreeze_getcrit;	\
 }
 
 #define MAXHARDCRITS		31
@@ -104,4 +104,5 @@ int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits, bool *used
 int4 bml_init(block_id bml);
 uint4 bml_busy(uint4 setbusy, sm_uc_ptr_t map);
 uint4 bml_free(uint4 setfree, sm_uc_ptr_t map);
+uint4 bml_recycled(uint4 setfree, sm_uc_ptr_t map);
 

@@ -32,6 +32,7 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "memcoherency.h"
+#include "gdsblkops.h"	/* for CHECK_AND_RESET_UPDATE_ARRAY macro */
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -42,6 +43,7 @@
 #include "mm_read.h"
 #include "add_inter.h"
 #include "gvcst_bmp_mark_free.h"
+#include "t_busy2free.h"
 
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	cw_set_element		cw_set[];
@@ -86,7 +88,8 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 	blk = &ks->blk[0];
 	blk_top = &ks->blk[ks->used];
 	if (!visit_blks)
-	{	/* database has been completely upgraded. free all blocks in one bitmap as part of one transaction */
+	{	/* Database has been completely upgraded. Free all blocks in one bitmap as part of one transaction. */
+		assert(cs_data->db_got_to_v5_once); /* assert all V4 fmt blocks (including RECYCLED) have space for V5 upgrade */
 		inctn_detail.blknum = 0; /* to indicate no adjustment to "blks_to_upgrd" necessary */
 		for ( ; blk < blk_top;  blk = nextblk)
 		{
@@ -104,7 +107,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				(0 == nextblk->flag) && (nextblk < blk_top) && ((block_id)nextblk->block < next_bm);
 				++nextblk)
 				;
-			update_array_ptr = update_array;
+			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 			len = (unsigned int)((char *)nextblk - (char *)blk);
 			memcpy(update_array_ptr, blk, len);
 			update_array_ptr += len;
@@ -131,7 +134,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				if (NULL == (bmphist.buffaddr = t_qread(bmphist.blk_num, (sm_int_ptr_t)&bmphist.cycle,
 									&bmphist.cr)))
 				{
-					t_retry(rdfail_detail);
+					t_retry((enum cdb_sc)rdfail_detail);
 					continue;
 				}
 				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn);
@@ -170,7 +173,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		 */
 		alt_hist.h[0].level = 0;	/* Initialize for loop below */
 		alt_hist.h[1].blk_num = 0;
-		update_array_ptr = update_array;
+		CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 		*((blk_ident *)update_array_ptr) = *blk;
 		update_array_ptr += sizeof(blk_ident);
 		/* the following assumes sizeof(blk_ident) == sizeof(int) */
@@ -186,9 +189,27 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 								      (sm_int_ptr_t)&alt_hist.h[0].cycle,
 								      &alt_hist.h[0].cr)))
 			{
-				t_retry(rdfail_detail);
+				t_retry((enum cdb_sc)rdfail_detail);
 				continue;
 			}
+			/* IF csd->db_got_to_v5_once is FALSE
+			 *	a) mark the block as FREE (not RECYCLED to avoid confusing MUPIP REORG UPGRADE with a
+			 *		block that was RECYCLED right at the time of MUPIP UPGRADE from a V4 to V5 version).
+			 *		MUPIP REORG UPGRADE will mark all existing RECYCLED blocks as FREE.
+			 *	b) need to write PBLK
+			 * ELSE
+			 *	a) mark this block as RECYCLED
+			 *	b) no need to write PBLK (it will be written when the block later gets reused).
+			 * ENDIF
+			 *
+			 * Create a cw-set-element with mode gds_t_busy2free that will cause a PBLK to be written in t_end
+			 * (the value csd->db_got_to_v5_once will be checked while holding crit) only in the IF case above.
+			 * At the same time bg_update will NOT be invoked for this cw-set-element so this block will not be
+			 * touched. But the corresponding bitmap block will be updated as part of the same transaction (see
+			 * t_write_map below) to mark this block as FREE or RECYCLED depending on whether csd->db_got_to_v5_once
+			 * is FALSE or TRUE (actual check done in gvcst_map_build and sec_shr_map_build).
+			 */
+			t_busy2free(&alt_hist.h[0]);
 			cr = alt_hist.h[0].cr;
 			assert((GDSV5 == cr->ondsk_blkver) || (GDSV4 == cr->ondsk_blkver));
 			if (GDSVCURR != cr->ondsk_blkver)
@@ -199,7 +220,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			if (NULL == (bmphist.buffaddr = t_qread(bmphist.blk_num, (sm_int_ptr_t)&bmphist.cycle,
 								&bmphist.cr)))
 			{
-				t_retry(rdfail_detail);
+				t_retry((enum cdb_sc)rdfail_detail);
 				continue;
 			}
 			t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn);

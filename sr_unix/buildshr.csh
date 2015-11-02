@@ -24,6 +24,8 @@
 set buildshr_status = 0
 
 set dollar_sign = \$
+set mach_type = `uname -m`
+set platform_name = `uname | sed 's/-//g' | tr '[A-Z]' '[a-z]'`
 
 if ( $1 == "" ) then
 	set buildshr_status = `expr $buildshr_status + 1`
@@ -98,6 +100,11 @@ if ($nolibgtmshr == "no") then	# do not build libgtmshr.so for bta builds
 		set buildshr_status = `expr $buildshr_status + 1`
 		echo "buildshr-E-linkgtmshr, Failed to link gtmshr (see ${dollar_sign}gtm_map/libgtmshr.map)" \
 			>> $gtm_log/error.`basename $gtm_exe`.log
+	else if ( ($HOSTOS == "Linux") && (-e /usr/bin/chcon) ) then
+		# Successful build -- for Linux builds use chcon to enable usage of executable (later SELinux platforms)
+		# Note that this command only works on filesystems that support context info so because it may fail,
+		# (and if it does, it is irrelevent) we merrily ignore the output. It either works or it doesn't.
+		chcon -t texrel_shlib_t $3/libgtmshr$gt_ld_shl_suffix >& /dev/null
 	endif
 	set gt_ld_linklib_options = ""	# do not link in mumps whatever is already linked in libgtmshr.so
 endif
@@ -115,6 +122,14 @@ if ( $status != 0  ||  ! -x $3/mumps ) then
 	set buildshr_status = `expr $buildshr_status + 1`
 	echo "buildshr-E-linkmumps, Failed to link mumps (see ${dollar_sign}gtm_map/mumps.map)" \
 		>> $gtm_log/error.`basename $gtm_exe`.log
+else if ( "dbg" == $gt_image && "ia64" == $mach_type && "hpux" == $platform_name ) then
+		# For successful debug builds on HPUX, enable debug attributes permits attaching to running process
+		chatr +dbg enable $3/mumps
+endif
+
+#  Temporary workaround SELinux issues on RH5 and other newer distros. 9/2007 SE
+if ( ($HOSTOS == "Linux") && (-e /usr/local/bin/execstack) ) then
+    /usr/local/bin/execstack -s $3/mumps
 endif
 
 # Note: gtm_svc should link with gtm_dal_svc.o before gtm_mumps_call_clnt.o(libgtmrpc.a) to

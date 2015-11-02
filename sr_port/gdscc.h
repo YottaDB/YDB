@@ -34,8 +34,36 @@
 #define CDB_T_WRITE 1
 #define CDB_T_WRITE_ROOT 2
 
+/* The following defines the write_type for a block that is going to be updated.
+ * GDS_WRITE_PLAIN is the default type for most updates.
+ * GDS_WRITE_BLOCK_SPLIT is set in case of a block update due to a block split. It is currently not used anywhere in the code.
+ * GDS_WRITE_KILLTN requires a little more explanation.
+ *
+ * The TP commit logic ("tp_tend") makes use of an optimization referred to as the "indexmod" optimization.
+ * This optimization tries to avoid a restart in the case where a TP transaction does a SET to a data block and later finds
+ * at TCOMMIT time that the index block which was part of the SET had been updated by a concurrent SET (or a REORG split
+ * operation) to a different data block (that also had the same index block as an ancestor) which resulted in a block split
+ * causing the index block to be updated. In this case there is no reason to restart. The index block could have been
+ * modified by other operations as well (e.g. M-kill, REORG coalesce or swap operations or any DSE command or a block split
+ * operation that caused the height of the global variable tree to increase [C9B11-001813]). In these cases, we dont want
+ * this optimization to take effect as we cant be sure everything that was relied upon for the TP transaction was still valid.
+ * These disallowed operations are generically referred to as "kill" type of operations. This optimization is implemented by
+ * having a field "killtn" (name derived from "kill" type of operations) in the bt (block-table) structure for each block.
+ * This field is assigned the same value as the "tn" whenever an index block gets updated due to one of the disallowed operations.
+ * Otherwise it stays untouched (i.e. killtn <= tn at all times). It is the "killtn" (and not "tn") that is used in the
+ * cdb_sc_blkmod validation check in tp_tend if we are validating a index block. Since KILLs, MUPIP REORG and/or DSE operations
+ * are usually rare compared to SET activity, most of the cases we expect the indexmod optimization to be in effect and
+ * therefore help reduce the # of TP restarts due to index block changes. Note that each SET/GET/KILL operation in TP goes
+ * through an intermediate validation routine tp_hist which does the cdb_sc_blkmod validation using "tn" (not "killtn").
+ * Only if that passed, do we relax the commit time validation for index blocks.
+ *
+ * The operations that are not allowed to use this optimization (M-kill, REORG or DSE) are supposed to make sure they
+ * set the write_type of the cw-set-element to GDS_WRITE_KILLTN. Failing to do so cause "killtn" in the bt to NOT be uptodate
+ * which in turn can cause false validation passes (in the cdb_sc_blkmod check) causing GT.M processes to incorrectly commit
+ * when they should not. This can lead to GT.M/application level data integrity errors.
+ */
 #define	GDS_WRITE_PLAIN		0
-#define	GDS_WRITE_KILL		1
+#define	GDS_WRITE_KILLTN	1
 #define	GDS_WRITE_BLOCK_SPLIT	2
 
 /* macro to traverse to the end of an horizontal cw_set_element list */
@@ -56,13 +84,15 @@ enum gds_t_mode
 	gds_t_noop = 0,		/* there is code that initializes stuff to 0 relying on it being equal to gds_t_noop */
 	gds_t_create,
 	gds_t_write,
-	gds_t_write_root,
+	gds_t_write_recycled,	/* modify a recycled block (currently only done by MUPIP REORG UPGRADE/DOWNGRADE) */
 	gds_t_acquired,
-	gds_t_committed,
 	gds_t_writemap,
-	n_gds_t_op,		/* tp_tend() depends on this order of placement of n_gds_t_op */
-	kill_t_create,
-	kill_t_write
+	gds_t_committed,	/* t_end   relies on this particular placement */
+	gds_t_write_root,	/* t_end   relies on this being AFTER gds_t_committed */
+	gds_t_busy2free,	/* t_end   relies on this being AFTER gds_t_committed */
+	n_gds_t_op,		/* tp_tend and other routines rely on this being BEFORE kill_t* modes and AFTER all gds_t_* modes */
+	kill_t_create,		/* tp_tend relies on this being AFTER n_gds_t_op */
+	kill_t_write,		/* tp_tend relies on this being AFTER n_gds_t_op */
 };
 
 typedef struct key_value_struct
@@ -90,7 +120,7 @@ typedef struct cw_set_element_struct
 							 * different transaction levels. Latest cw_set_elements (for a given block)
 							 * are inserted at the beginning of the horizontal list	*/
 	off_jnl_t	jnl_freeaddr;			/* journal update address */
-	uint4		write_type;			/* can be either 0 or GDS_WRITE_KILL or GDS_WRITE_BLOCK_SPLIT
+	uint4		write_type;			/* can be GDS_WRITE_PLAIN or GDS_WRITE_KILLTN or GDS_WRITE_BLOCK_SPLIT
 							 * or bit-wise-or of both */
 	key_cum_value	*recompute_list_head;		/* pointer to a list of keys (with values) that need to be recomputed */
 	key_cum_value	*recompute_list_tail;		/* pointer to a list of keys (with values) that need to be recomputed */

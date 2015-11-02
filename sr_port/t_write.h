@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +29,8 @@ cw_set_element *t_write (
 							 * 	buffer at the location specified by ins_off. */
 			char		level,		/* Level of the block in the tree */
 			boolean_t	first_copy,	/* Is first copy needed if overlaying same buffer? */
-			boolean_t	forward);	/* Is forward processing required? */
+			boolean_t	forward,	/* Is forward processing required? */
+			uint4		write_type);	/* Whether "killtn" of the bt needs to be simultaneously updated or not */
 
 #define T_WRITE_DEFINED
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +24,7 @@
 
 #include <errno.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
+#include "gtm_ipc.h"
 #include <sys/sem.h>
 #include "gtm_sem.h"
 #include "gtm_stdlib.h"
@@ -75,7 +75,7 @@ int main (int argc, char *argv[])
 			PERROR(s);
 			continue;
 		}
-		PRINTF("semid %d: %hu semaphores in the set\n", sem, semarg.buf->sem_nsems);
+		PRINTF("semid %d: %hu semaphores in the set\n", sem, (unsigned short int)semarg.buf->sem_nsems);
 		for(j=0; j < semarg.buf->sem_nsems; j++)
 		{
 

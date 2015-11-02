@@ -70,7 +70,7 @@ void	mur_extract_set(fi_type *fi, jnl_record *rec, pini_list_struct *plst)
 	if (mur_options.detail)
 		SPRINTF(murgbl.extr_buff, "0x%08x [0x%04x] :: ", mur_jctl->rec_offset, mur_rab.jreclen);
 	extract_len = (mur_options.detail ? STRLEN(murgbl.extr_buff) : 0);
-	rectype = rec->prefix.jrec_type;
+	rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 	if (IS_FUPD_TUPD(rectype))
 	{
 		if (!mur_options.detail)

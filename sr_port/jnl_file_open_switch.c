@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,8 +57,9 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	set_jnl_info(reg, &create);
 	create.no_prev_link = TRUE;
 	create.no_rename = FALSE;
-	if (!jgbl.forw_phase_recovery)
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for cre_jnl_file() */
+	assert(!jgbl.forw_phase_recovery);
+	if (!jgbl.dont_reset_gbl_jrec_time)
+		SET_GBL_JREC_TIME;	/* needed for cre_jnl_file() */
 	/* else mur_output_record() would have already set jgbl.gbl_jrec_time */
 	assert(jgbl.gbl_jrec_time);
 	if (EXIT_NRM != cre_jnl_file(&create))

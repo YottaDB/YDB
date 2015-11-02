@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,7 @@ void dbcertify_deferred_signal_handler(void)
 	error_def(ERR_KILLBYSIGUINFO);
 	error_def(ERR_KILLBYSIGSINFO1);
 	error_def(ERR_KILLBYSIGSINFO2);
+	error_def(ERR_KILLBYSIGSINFO3);
 
 	/* To avoid nested calls to this routine, we set forced_exit to FALSE at the very beginning */
 	forced_exit = FALSE;
@@ -86,6 +87,12 @@ void dbcertify_deferred_signal_handler(void)
 			 process_id, signal_info.signal, signal_info.int_iadr);
 		gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO2, 5, GTMIMAGENAMETXT(image_type),
 			   process_id, signal_info.signal, signal_info.int_iadr);
+	} else if (ERR_KILLBYSIGSINFO3 == forced_exit_err)
+	{
+		send_msg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+			 process_id, signal_info.signal, signal_info.bad_vadr);
+		gtm_putmsg(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),
+			   process_id, signal_info.signal, signal_info.bad_vadr);
 	} else
 	{
 		send_msg(VARLSTCNT(1) forced_exit_err);

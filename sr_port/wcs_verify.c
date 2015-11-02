@@ -64,7 +64,6 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	boolean_t		blkque_array[WC_MAX_BUFFS]; /* TRUE indicates we saw the cr or bt of that array index */
 	int4			i, n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
 	trans_num		dummy_tn;
-	int                     max_size;
 
 	error_def(ERR_DBFHEADERR);
 	error_def(ERR_DBADDRANGE);
@@ -445,22 +444,21 @@ bool wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs
 	/* print info. that secshr_db_clnup stored */
 	if (0 != csa->nl->secshr_ops_index)
 	{
-		max_size = sizeof(csa->nl->secshr_ops_array)/sizeof(csa->nl->secshr_ops_array[0]);
 		assert(expect_damage);
-		if (max_size < csa->nl->secshr_ops_index)
+		if (SECSHR_OPS_ARRAY_SIZE < csa->nl->secshr_ops_index)
 		{
 			SPRINTF(secshr_string, "secshr_max_index exceeded. max_index = %d [0x%08x] : ops_index = %d [0x%08x]",
-					max_size, max_size,
+					SECSHR_OPS_ARRAY_SIZE, SECSHR_OPS_ARRAY_SIZE,
 					csa->nl->secshr_ops_index, csa->nl->secshr_ops_index);
 			send_msg(VARLSTCNT(6) ERR_DBCLNUPINFO, 4, DB_LEN_STR(reg), RTS_ERROR_TEXT(secshr_string));
-			csa->nl->secshr_ops_index = max_size;
+			csa->nl->secshr_ops_index = SECSHR_OPS_ARRAY_SIZE;
 		}
 		for (i = 0; (i + 1) < csa->nl->secshr_ops_index; i += csa->nl->secshr_ops_array[i])
 		{
-			SPRINTF(secshr_string, "Line %3d ", csa->nl->secshr_ops_array[i + 1]);
+			SPRINTF(secshr_string, "Line %3ld ", csa->nl->secshr_ops_array[i + 1]);
 			for (lcnt = i + 2; lcnt < MIN(csa->nl->secshr_ops_index, i + csa->nl->secshr_ops_array[i]); lcnt++)
 			{
-				SPRINTF(secshr_string_delta, " : [0x%08x]", csa->nl->secshr_ops_array[lcnt]);
+				SPRINTF(secshr_string_delta, " : [0x%08lx]", csa->nl->secshr_ops_array[lcnt]);
 				strcat(secshr_string, secshr_string_delta);
 			}
 			send_msg(VARLSTCNT(6) ERR_DBCLNUPINFO, 4, DB_LEN_STR(reg), RTS_ERROR_TEXT(secshr_string));

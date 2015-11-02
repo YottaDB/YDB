@@ -37,7 +37,7 @@ void	op_ztstart(void)
 	if (jnl_fence_ctl.level == 0)
 	{
 		jnl_fence_ctl.token = 0;
-		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
+		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 	}
 	++jnl_fence_ctl.level;
 }

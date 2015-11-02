@@ -43,8 +43,6 @@ GBLREF unsigned int	t_tries;
 GBLREF boolean_t	horiz_growth;
 GBLREF int4		prev_first_off, prev_next_off;
 
-error_def(ERR_GVKILLFAIL);
-
 cw_set_element *t_write (
 			srch_blk_status	*blkhist,	/* Search History of the block to be written. Currently the
 							 *	following members in this structure are used by "t_write"
@@ -61,7 +59,8 @@ cw_set_element *t_write (
 							 * 	buffer at the location specified by ins_off. */
 			char		level,		/* Level of the block in the tree */
 			boolean_t	first_copy,	/* Is first copy needed if overlaying same buffer? */
-			boolean_t	forward)	/* Is forward processing required? */
+			boolean_t	forward,	/* Is forward processing required? */
+			uint4		write_type)	/* Whether "killtn" of the bt needs to be simultaneously updated or not */
 {
 	cw_set_element		*cse, *tp_cse, *old_cse;
 	off_chain		chain;
@@ -190,7 +189,7 @@ cw_set_element *t_write (
 			 * access the buffer more than the db blk_size.
 			 */
 			bsiz = MIN(old_block->bsiz, csa->hdr->blk_size);
-			cse->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4*)old_block, bsiz);
+			cse->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
 		}
 		/* the buffer in shared memory holding the GDS block contents currently does not have in its block header the
 		 * on-disk format of that block. if it had, we could have easily copied that over to the cw-set-element.
@@ -199,7 +198,7 @@ cw_set_element *t_write (
 		 */
 		cr = blkhist->cr;
 		assert((NULL != cr) || (dba_mm == csa->hdr->acc_meth));
-		cse->ondsk_blkver = (NULL == cr) ? GDSVCURR : cr->ondsk_blkver;
+		cse->ondsk_blkver = (NULL == cr) ? (enum db_ver)GDSVCURR : cr->ondsk_blkver;
 	} else
 	{	/* we did not create a new cse. assert the integrity of few fields filled in when this cse was created */
 		assert(cse->blk == blk);
@@ -230,9 +229,9 @@ cw_set_element *t_write (
 	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->t_level = dollar_tlevel;
 	if (dollar_tlevel)
-		cse->write_type |= (ERR_GVKILLFAIL == t_err) ? GDS_WRITE_KILL : GDS_WRITE_PLAIN;
+		cse->write_type |= write_type;
 	else
-		cse->write_type = (ERR_GVKILLFAIL == t_err) ? GDS_WRITE_KILL : GDS_WRITE_PLAIN;
+		cse->write_type = write_type;
 	prev_first_off = prev_next_off = PREV_OFF_INVALID;
 	return tp_cse;
 }

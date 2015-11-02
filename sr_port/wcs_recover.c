@@ -111,6 +111,8 @@ void wcs_recover(gd_region *reg)
 	blk_hdr_ptr_t		blk_ptr;
 	INTPTR_T		bp_lo, bp_top, old_block;
 	boolean_t		backup_block_saved, change_bmm;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 
 	error_def(ERR_BUFRDTIMEOUT);
 	error_def(ERR_DBADDRALIGN);
@@ -380,8 +382,6 @@ void wcs_recover(gd_region *reg)
 		assert(!cr->stopped || CR_BLKEMPTY != cr->blk);
 		if (cr->stopped && (CR_BLKEMPTY != cr->blk))
 		{	/* cache record attached to a buffer built by secshr_db_clnup: finish work; clearest case: do it 1st */
-			if (certify_all_blocks)
-				cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, TRUE); /* GTMASSERT on error */
 			assert(LATCH_CLEAR == WRITE_LATCH_VAL(cr));
 			if ((cr->blk / bplmap) * bplmap == cr->blk)
 			{	/* it's a bitmap */
@@ -404,6 +404,8 @@ void wcs_recover(gd_region *reg)
 					change_bmm = TRUE;
 				}
 			}	/* end of bitmap processing */
+			if (certify_all_blocks)
+				cert_blk(reg, cr->blk, (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr), 0, TRUE); /* GTMASSERT on error */
 			bt = bt_put(reg, cr->blk);
 			if (NULL == bt)		/* NULL value is only possible if wcs_get_space in bt_put fails */
 				GTMASSERT;	/* That is impossible here since we have called bt_refresh above */
@@ -428,8 +430,8 @@ void wcs_recover(gd_region *reg)
 					if ((cr_alt < cr) && cr_alt->state_que.fl)
 					{	/* cr_alt has already been processed and is in the state_que. hence remove it */
 						wq = (cache_que_head_ptr_t)((sm_uc_ptr_t)&cr_alt->state_que + cr_alt->state_que.fl);
-						assert(0 == (((unsigned int)wq) % sizeof(que_ent)));
-						assert((unsigned int)wq + wq->bl == (unsigned int)&cr_alt->state_que);
+						assert(0 == (((UINTPTR_T)wq) % sizeof(que_ent)));
+						assert((UINTPTR_T)wq + wq->bl == (UINTPTR_T)&cr_alt->state_que);
 						back_link = (que_ent_ptr_t)remqt((que_ent_ptr_t)wq);
 						assert(EMPTY_QUEUE != back_link);
 						SUB_ENT_FROM_ACTIVE_QUE_CNT(&csa->nl->wcs_active_lvl, &csa->nl->wc_var_lock);
@@ -651,24 +653,31 @@ void wcs_recover(gd_region *reg)
 	}
 	if (FALSE == wcs_verify(reg, FALSE, TRUE))	/* expect_damage is FALSE, in_wcs_recover is TRUE */
 		GTMASSERT;
-	assert(csd->trans_hist.curr_tn == csd->trans_hist.early_tn || MUPIP_IMAGE == image_type);
 	/* skip INCTN processing in case called from mu_rndwn_file().
 	 * if called from mu_rndwn_file(), we have standalone access to shared memory so no need to increment db curr_tn
 	 * or write inctn (since no concurrent GT.M process is present in order to restart because of this curr_tn change)
 	 */
 	if (!mu_rndwn_file_dbjnl_flush)
 	{
-		if (JNL_ENABLED(csd) && (NULL != csa->jnl) && (NULL != csa->jnl->jnl_buff))
+		jpc = csa->jnl;
+		if (JNL_ENABLED(csd) && (NULL != jpc) && (NULL != jpc->jnl_buff))
 		{
-			assert(csa->jnl->region == reg);
-			csa->jnl->region = reg;	/* Make sure that in pro we make jnl_ensure happy if it's not initialized */
-			if (!jgbl.forw_phase_recovery && (csd->trans_hist.curr_tn == csd->trans_hist.early_tn))
-				JNL_SHORT_TIME(jgbl.gbl_jrec_time); /* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
+			assert(jpc->region == reg);
+			if (!jgbl.dont_reset_gbl_jrec_time)
+			{
+				SET_GBL_JREC_TIME; /* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_inctn_rec */
+			}
 			assert(jgbl.gbl_jrec_time);
+			jbp = jpc->jnl_buff;
+			/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
+			 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write
+			 * journal records (if it decides to switch to a new journal file).
+			 */
+			ADJUST_GBL_JREC_TIME(jgbl, jbp);
 			jnl_status = jnl_ensure_open();
 			if (0 == jnl_status)
 			{
-				if (0 == csa->jnl->pini_addr)
+				if (0 == jpc->pini_addr)
 					jnl_put_jrt_pini(csa);
 				save_inctn_opcode = inctn_opcode; /* in case caller does not expect inctn_opcode
 												to be changed here */
@@ -676,7 +685,7 @@ void wcs_recover(gd_region *reg)
 				jnl_write_inctn_rec(csa);
 				inctn_opcode = save_inctn_opcode;
 			} else
-				jnl_file_lost(csa->jnl, jnl_status);
+				jnl_file_lost(jpc, jnl_status);
 		}
 		csd->trans_hist.early_tn = csd->trans_hist.curr_tn + 1;
 		INCREMENT_CURR_TN(csd);

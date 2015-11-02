@@ -87,7 +87,7 @@ void op_fngetjpi(mint jpid, mval *kwd, mval *ret)
                  rts_error(VARLSTCNT(4) ERR_BADJPIPARAM, 2, kwd->str.len, kwd->str.addr);
         }
 
-	if ((kw_isprocalive != keywd_indx) && (-1 == times(&proc_times)))
+	if ((kw_isprocalive != keywd_indx) && ((unsigned int)-1 == times(&proc_times)))
 	{
 		rts_error(VARLSTCNT(1) errno);	/* need a more specific GTM error message in addition to errno */
 		return;

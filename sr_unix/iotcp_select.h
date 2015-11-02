@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,7 @@
 
 /*	iotcp_select.h - include Unix system header files needed by select().  */
 
-
-#if	defined(_AIX) || defined(_UWIN)
+#if	defined(_AIX) || defined(__CYGWIN__) || defined(_UWIN)
 #include <sys/select.h>
 
 #elif	defined(__hpux)

@@ -130,7 +130,11 @@ void	mur_close_files(void)
 				 * just in case we came here because of an interrupt (e.g. SIGTERM) while a malloc was in progress.
 				 */
 	csd = &csd_temp;
-	JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* For jnl_write* routines we need this */
+	/* If journaling, gds_rundown will need to write PINI/PFIN records. The timestamp of that journal record will
+	 * need to be adjusted to the current system time to reflect that it is recovery itself writing that record
+	 * instead of simulating GT.M activity. Reset jgbl.dont_reset_gbl_jrec_time to allow for adjustments to gbl_jrec_time.
+	 */
+	jgbl.dont_reset_gbl_jrec_time = FALSE;
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_full_total; rctl < rctl_top; rctl++)
 	{
 		if (NULL != rctl->csa)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,7 @@ void op_fnstack1(int level, mval *result)
 		{
 			MV_FORCE_MVAL(result, cur_zlevel - 1);
 		} else if ((1 < dollar_ecode.index) || (error_frame != dollar_ecode.first_ecode_error_frame))
-			MV_FORCE_MVAL(result, dollar_stack.index - 1);
+			MV_FORCE_MVAL(result, (int)dollar_stack.index - 1);
 		else
 		{	/* we are in first ECODE error-handler */
 			if (cur_zlevel > dollar_stack.index)
@@ -58,7 +58,7 @@ void op_fnstack1(int level, mval *result)
 				MV_FORCE_MVAL(result, cur_zlevel - 1);
 			} else
 			{
-				MV_FORCE_MVAL(result, dollar_stack.index - 1);
+				MV_FORCE_MVAL(result, (int)dollar_stack.index - 1);
 			}
 		}
 	} else if (0 > level)

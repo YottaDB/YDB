@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,8 +65,10 @@ gtcm_end_net(cll)
 	     cll->stats.clos));
     OMI_DBG((omi_debug, "gtcm_server:\tNumber of seconds (conn time): %ld\n",
 	     cll->st_cn.start));
-    OMI_DBG((omi_debug, "gtcm_server:\tNumber of transactions: %ld\n",
-	     omi_nxact));
+    NON_IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server:\tNumber of transactions: %ld\n",
+	     omi_nxact)));
+    IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server:\tNumber of transactions: %d\n",
+	     omi_nxact)));
     for (i = 0, nxact = 0; i < OMI_OP_MAX; i++) {
 	nxact += cll->st_cn.xact[i];
 	if (cll->st_cn.xact[i])
@@ -74,10 +76,12 @@ gtcm_end_net(cll)
 		     ((omi_oprlist[i]) ? omi_oprlist[i] : "unknown")));
     }
     if (nxact != omi_nxact)
-	OMI_DBG((omi_debug,"gtcm_server:\tNumber of transactions (sum): %ld\n",
+	OMI_DBG((omi_debug,"gtcm_server:\tNumber of transactions (sum): %d\n",
 		 nxact));
-    OMI_DBG((omi_debug, "gtcm_server:\tNumber of errors: %ld\n",
-	     omi_nerrs));
+    NON_IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server:\tNumber of errors: %ld\n",
+	     omi_nerrs)));
+    IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server:\tNumber of errors: %d\n",
+	     omi_nerrs)));
     for (i = 0, nerrs = 0; i < OMI_ER_MAX; i++) {
 	nerrs += cll->st_cn.errs[i];
 	if (cll->st_cn.errs[i])
@@ -85,12 +89,18 @@ gtcm_end_net(cll)
 		     ((omi_errlist[i]) ? omi_errlist[i] : "unknown")));
     }
     if (nerrs != omi_nerrs)
-	OMI_DBG((omi_debug,"gtcm_server:\tNumber of errors (sum): %ld\n",
-		 nerrs));
-    OMI_DBG((omi_debug, "gtcm_server:\tNumber of bytes received: %ld\n",
-	     omi_brecv));
-    OMI_DBG((omi_debug, "gtcm_server:\tNumber of bytes sent: %ld\n",
-	     omi_bsent));
+	NON_IA64_ONLY(OMI_DBG((omi_debug,"gtcm_server:\tNumber of errors (sum): %ld\n",
+		 nerrs)));
+	IA64_ONLY(OMI_DBG((omi_debug,"gtcm_server:\tNumber of errors (sum): %d\n",
+		 nerrs)));
+    NON_IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server:\tNumber of bytes received: %ld\n",
+	     omi_brecv)));
+    IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server:\tNumber of bytes received: %d\n",
+	     omi_brecv)));
+    NON_IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server:\tNumber of bytes sent: %ld\n",
+	     omi_bsent)));
+    IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server:\tNumber of bytes sent: %d\n",
+	     omi_bsent)));
 
     return;
 

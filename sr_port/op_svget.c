@@ -162,7 +162,7 @@ void op_svget(int varnum, mval *v)
 			*v = dollar_system;
 			break;
 		case SV_STORAGE:
-			i2usmval(v, getstorage());
+			double2mval(v, getstorage());
 			break;
 		case SV_TLEVEL:
 			count = (int)dollar_tlevel;
@@ -340,7 +340,7 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, dollar_zininterrupt);
 			break;
 		case SV_ZJOB:
-			MV_FORCE_ULONG_MVAL(v, dollar_zjob);
+			MV_FORCE_UMVAL(v, dollar_zjob);
 			break;
 		case SV_ZDATE_FORM:
 			MV_FORCE_MVAL(v, zdate_form);

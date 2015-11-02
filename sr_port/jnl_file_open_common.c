@@ -56,6 +56,7 @@
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	boolean_t		pool_init;
 GBLREF  jnl_process_vector      *prc_vec;
+GBLREF	jnl_gbls_t		jgbl;
 
 error_def(ERR_FILEIDMATCH);
 error_def(ERR_JNLBADLABEL);
@@ -160,14 +161,14 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	assert(0 == jb->size % IO_BLOCK_SIZE);
 	jb->free = jb->dsk = header.end_of_data % jb->size;
 	UNIX_ONLY(
-	SET_LATCH_GLOBAL(&jb->fsync_in_prog_latch, LOCK_AVAILABLE);
-	SET_LATCH_GLOBAL(&jb->io_in_prog_latch, LOCK_AVAILABLE);
+		SET_LATCH_GLOBAL(&jb->fsync_in_prog_latch, LOCK_AVAILABLE);
+		SET_LATCH_GLOBAL(&jb->io_in_prog_latch, LOCK_AVAILABLE);
 	)
 	VMS_ONLY(
-	assert(0 == jb->now_writer);
-	bci(&jb->io_in_prog);
-        jb->now_writer = 0;
-	assert((jb->free % DISK_BLOCK_SIZE) == adjust);
+		assert(0 == jb->now_writer);
+		bci(&jb->io_in_prog);
+		jb->now_writer = 0;
+		assert((jb->free % DISK_BLOCK_SIZE) == adjust);
 	)
 	assert(JNL_WRT_START_MODULUS == DISK_BLOCK_SIZE);
 	if (adjust)
@@ -203,6 +204,13 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	DO_FILE_WRITE(jpc->channel, 0, &header, JNL_HDR_LEN, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
 		return ERR_JNLWRERR;
+	if (!jb->prev_jrec_time || !header.prev_jnl_file_name_length)
+	{	/* This is the first time a journal file for this database is being opened OR the previous link is NULL.
+		 * In both these cases, we dont know or care about the timestamp of the last written journal record.
+		 * Set it to the current time as we know it.
+		 */
+		jb->prev_jrec_time = jgbl.gbl_jrec_time;
+	}
 	jb->end_of_data = 0;
 	jb->eov_tn = 0;
 	jb->eov_timestamp = 0;

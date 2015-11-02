@@ -349,12 +349,13 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 		{
 			/* Determine endianness of other system by seeing if the msg.len is greater than
 			 * expected. If it is, convert it and see if it is now what we expect. If it is,
-			 * then the other system is of opposite endianness. 
-			 * Note: We would normally use msg.type since is is effectively an enum and we 
+			 * then the other system is of opposite endianness.
+			 * Note: We would normally use msg.type since is is effectively an enum and we
 			 * control by adding new messages. But, REPL_START_JNL_SEQNO is lucky number zero
 			 * which means it is identical on systems of either endianness.
 			 */
-			if (((unsigned)MIN_REPL_MSGLEN < (unsigned)msg.len) && (MIN_REPL_MSGLEN == GTM_BYTESWAP_32(msg.len)))
+			if (((unsigned)MIN_REPL_MSGLEN < (unsigned)msg.len)
+					&& ((unsigned)MIN_REPL_MSGLEN == GTM_BYTESWAP_32((unsigned)msg.len)))
 				rcv_node_same_endianness = FALSE;
 			else
 				rcv_node_same_endianness = TRUE;
@@ -371,16 +372,12 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			if (REPL_START_JNL_SEQNO == msg.type)
 			{
 				if (!rcv_node_same_endianness)
-				{
 					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
-				}
 				repl_log(gtmsource_log_fp, TRUE, FALSE, "Received REPL_START_JNL_SEQNO message with SEQNO "
 					INT8_FMT"\n", INT8_PRINT(*recvd_jnl_seqno));
-				if ( !rcv_node_same_endianness )
-				{
-					((repl_start_msg_ptr_t)&msg)->start_flags = 
+				if (!rcv_node_same_endianness)
+					((repl_start_msg_ptr_t)&msg)->start_flags =
 						GTM_BYTESWAP_32(((repl_start_msg_ptr_t)&msg)->start_flags);
-				}
 				*start_flags = ((repl_start_msg_ptr_t)&msg)->start_flags;
 				if (*start_flags & START_FLAG_STOPSRCFILTER)
 				{
@@ -420,24 +417,20 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				 * Take care to set the flush parameter in repl_log calls below to FALSE until at least the
 				 * first message gets sent back. This is so the fetchresync rollback on the other side does
 				 * not timeout before receiving a response. */
+				jnlpool.gtmsource_local->remote_proto_ver = (RECAST(repl_resync_msg_ptr_t)&msg)->proto_ver;
 				if (!rcv_node_same_endianness)
-				{
 					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
-				}
-				jnlpool.gtmsource_local->remote_proto_ver = ((repl_resync_msg_ptr_t)&msg)->proto_ver;
 				repl_log(gtmsource_log_fp, TRUE, FALSE, "Received REPL_FETCH_RESYNC message with SEQNO "
 					INT8_FMT"\n", INT8_PRINT(*recvd_jnl_seqno));
 				return (SS_NORMAL);
 			} else if (REPL_XOFF_ACK_ME == msg.type)
 			{
-				if (!rcv_node_same_endianness)
-				{
-					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
-				}
 				repl_log(gtmsource_log_fp, TRUE, FALSE, "Received REPL_XOFF_ACK_ME message. "
 									"Possible crash/shutdown of update process\n");
 				/* Send XOFF_ACK */
 				xoff_ack.type = REPL_XOFF_ACK;
+				if (!rcv_node_same_endianness)
+					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
 				QWASSIGN(*(seq_num *)&xoff_ack.msg[0], *recvd_jnl_seqno);
 				xoff_ack.len = MIN_REPL_MSGLEN;
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sending REPL_XOFF_ACK message\n");
@@ -1165,7 +1158,7 @@ seq_num	gtmsource_find_resync_seqno(
 		assert(local_triple->start_seqno < max_start_seqno);
 		assert(remote_triple->start_seqno < max_start_seqno);
 	} while (!gtmsource_is_triple_identical(remote_triple, local_triple, max_start_seqno - 1));
-	repl_log(gtmsource_log_fp, TRUE, FALSE, "Resync Seqno determined is %d [0x%x]\n",  max_start_seqno, max_start_seqno);
+	repl_log(gtmsource_log_fp, TRUE, FALSE, "Resync Seqno determined is %llu [0x%llx]\n",  max_start_seqno, max_start_seqno);
 	/* "max_start_seqno-1" has same triple info in both primary and secondary. Hence "max_start_seqno" is the resync seqno. */
 	return max_start_seqno;
 }

@@ -598,10 +598,6 @@ void mupip_integ(void)
 				{
 					if (mu_int_blks_to_upgrd != cs_addrs->hdr->blks_to_upgrd)
 						cs_addrs->hdr->blks_to_upgrd = mu_int_blks_to_upgrd;
-					if (0 == mu_int_blks_to_upgrd)
-						cs_addrs->hdr->fully_upgraded = TRUE;
-					else
-						cs_addrs->hdr->fully_upgraded = FALSE;
 				}
 				region_freeze(gv_cur_region, FALSE, FALSE);
 				fc = gv_cur_region->dyn.addr->file_cntl;
@@ -633,12 +629,10 @@ void mupip_integ(void)
 				if (!mu_int_errknt && !muint_fast)
 				{
 					if (mu_int_blks_to_upgrd != mu_int_data.blks_to_upgrd)
+					{
 						mu_int_data.blks_to_upgrd = mu_int_blks_to_upgrd;
-					if (0 == mu_int_blks_to_upgrd)
-						mu_int_data.fully_upgraded = TRUE;
-					else
-						mu_int_data.fully_upgraded = FALSE;
-					update_filehdr = TRUE;
+						update_filehdr = TRUE;
+					}
 				}
 			}
 			if (update_header_tn)

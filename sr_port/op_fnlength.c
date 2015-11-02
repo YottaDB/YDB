@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@ void op_fnlength(mval *src, mval *dest)
 {
 	MV_FORCE_STR(src);
 	MV_FORCE_LEN(src);
-	MV_FORCE_MVAL(dest, src->str.char_len);
+	MV_FORCE_MVAL(dest, (int)src->str.char_len);
 }
 #endif
 

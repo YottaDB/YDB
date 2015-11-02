@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ void iorm_close(io_desc *iod, mval *pp)
 				STAT_FILE(path, &statbuf, stat_res);
 				if (-1 == stat_res)
 					rts_error(VARLSTCNT(1) errno);
-				if (fstatbuf.st_ino == statbuf.st_ino)
+				if (CYGWIN_ONLY(rm_ptr->fifo ||) fstatbuf.st_ino == statbuf.st_ino)
 					if (UNLINK(path) == -1)
 						rts_error(VARLSTCNT(1) errno);
 				break;
@@ -70,7 +70,7 @@ void iorm_close(io_desc *iod, mval *pp)
 				STAT_FILE(path, &statbuf, stat_res);
 				if (-1 == stat_res)
 					rts_error(VARLSTCNT(1) errno);
-				if (fstatbuf.st_ino == statbuf.st_ino)
+				if (CYGWIN_ONLY(rm_ptr->fifo ||) fstatbuf.st_ino == statbuf.st_ino)
 				{	if (LINK(path, path2) == -1)
 						rts_error(VARLSTCNT(1) errno);
 					if (UNLINK(path) == -1)

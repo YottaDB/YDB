@@ -44,7 +44,7 @@ void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 		dsub = (mlk_shrsub_ptr_t)R2A(b->value);
 		memcpy(temp, dsub->data, dsub->length);
 		temp[dsub->length] = '\0';
-		PRINTF("%s%s : [shrblk] %x : [shrsub] %x\n", prefix, temp, b, dsub);
+		PRINTF("%s%s : [shrblk] %lx : [shrsub] %lx\n", prefix, temp, b, dsub);
 		if (b->children)
 			lke_show_memory((mlk_shrblk_ptr_t)R2A(b->children), new_prefix);
 		bnext = (mlk_shrblk_ptr_t)R2A(b->rsib);

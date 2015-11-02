@@ -25,7 +25,8 @@ GBLREF bool		dec_nofac, run_time;
 void show_source_line(char* buf, boolean_t warn)
 {
 	char 	*b, *c, *c_top;
-	int	ch, chlen, chwidth;
+	int	chlen, chwidth;
+	unsigned int ch;
 	error_def(ERR_SRCLIN);
 	error_def(ERR_SRCLOC);
 

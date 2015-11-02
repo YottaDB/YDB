@@ -28,23 +28,16 @@
 #endif
 #include "sec_shr_blk_build.h"
 
-#define		SECSHR_ACCOUNTING(value)						\
-{											\
-	if (csa->read_write || is_bg)							\
-	{										\
-		if (csa->nl->secshr_ops_index < sizeof(csa->nl->secshr_ops_array))		\
-			csa->nl->secshr_ops_array[csa->nl->secshr_ops_index] = (INTPTR_T)(value);	\
-		csa->nl->secshr_ops_index++;						\
-	}										\
-}
-
 int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 			cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
 	blk_segment	*seg, *stop_ptr, *array;
 	unsigned char	*ptr;
+	boolean_t	do_accounting;
 
 	array = (blk_segment *)cse->upd_addr;
+	assert(csa->now_crit && csa->read_write);
+	do_accounting = TRUE;	/* used by SECSHR_ACCOUNTING macro */
 	if (!(GTM_PROBE(sizeof(blk_segment), array, READ)))
 	{
 		SECSHR_ACCOUNTING(4);

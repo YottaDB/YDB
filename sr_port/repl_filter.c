@@ -288,6 +288,8 @@ static int repl_filter_send(seq_num tr_num, unsigned char *tr, int tr_len)
 	return(SS_NORMAL);
 }
 
+#if 0 /* Not used for now - Defed out for fixing compiler warnings. This was never used earlier too */
+
 static void wait_for_filter_input(void)
 {
 	fd_set	filter_input_fd;
@@ -302,6 +304,8 @@ static void wait_for_filter_input(void)
 
 	return;
 }
+
+#endif /* 0 */
 
 static int repl_filter_recv_line(char *line, int *line_len, int max_line_len)
 { /* buffer input read from repl_filter_srv_fd[READ_END], return one line at a time; line separator is '\n' */

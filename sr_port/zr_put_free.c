@@ -31,7 +31,9 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 {
 	mstr		rtn_str;
 	rhdtyp		*routine;
+#ifdef DEBUG
 	boolean_t	deleted;
+#endif /* DEBUG */
 
 	assert(zrecs->beg  <= zrecs->free);
 	assert(zrecs->free < zrecs->end);
@@ -45,7 +47,11 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 		{
 			if (0 == z_ptr->action->refcnt)
 			{
+#ifdef DEBUG
 				deleted = delete_hashtab_objcode(&cache_table, &z_ptr->action->src);
+#else
+				delete_hashtab_objcode(&cache_table, &z_ptr->action->src);
+#endif /* DEBUG */
 				assert(deleted);
 				free(z_ptr->action);
 			}

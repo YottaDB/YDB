@@ -32,16 +32,20 @@
 #include "global_map.h"
 #include "gtmmsg.h"
 #include "wcs_flu.h"
+#ifdef GTM64
+#include "hashtab_int8.h"
+#else
 #include "hashtab_int4.h"
+#endif /* GTM64 */
 #include "hashtab.h"
 
+#define	MAX_GMAP_ENTRIES_PER_ITER	2 /* maximum increase (could even be negative) in gmap array size per call to global_map */
 
 GBLREF bool		mu_ctrlc_occurred;
 GBLREF bool		mu_ctrly_occurred;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF sgmnt_addrs      *cs_addrs;
-
 
 static readonly unsigned char	percent_lit = '%';
 static readonly unsigned char	tilde_lit = '~';
@@ -50,13 +54,18 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	int *reg_max_rec, int *reg_max_key, int *reg_max_blk)
 {
 	bool				stashed = FALSE;
-	int				num_quote, len;
+	int				num_quote, len, gmap_size, new_gmap_size, estimated_entries, count;
 	char				*ptr, *ptr1, *c;
-	mstr				gmap[256], *gmap_ptr, gmap_beg, gmap_end;
+	mstr				gmap[512], *gmap_ptr, *gmap_ptr_base, gmap_beg, gmap_end;
 	mval				val, curr_gbl_name;
 	glist				*gl_tail, *gl_ptr;
+#ifdef GTM64
+	hash_table_int8	        	ext_hash;
+	ht_ent_int8                   	*tabent;
+#else
 	hash_table_int4	        	ext_hash;
 	ht_ent_int4                   	*tabent;
+#endif /* GTM64 */
 
 	error_def(ERR_FREEZE);
 	error_def(ERR_DBRDONLY);
@@ -65,6 +74,10 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 	error_def(ERR_MUNOACTION);
 
 	memset(gmap, 0, sizeof(gmap));
+	gmap_size = sizeof(gmap) / sizeof(gmap[0]);
+	gmap_ptr_base = &gmap[0];
+	/* "estimated_entries" is a conservative estimate of the # of entries that could be used up in the gmap array */
+	estimated_entries = 1;	/* take into account the NULL gmap entry at the end of the array */
 	for (ptr = cli_buff; *ptr; ptr = ptr1)
 	{
 		for (ptr1 = ptr; ; ptr1++)
@@ -74,8 +87,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 				len = (int)(ptr1 - ptr);
 				ptr1++;
 				break;
-			}
-			else if (!*ptr1)
+			} else if (!*ptr1)
 			{
 				len = (int)(ptr1 - ptr);
 				break;
@@ -102,8 +114,7 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			{
 				c++;
 				len--;
-			}
-			else
+			} else
 			{
 				gtm_putmsg(VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
 				mupip_exit(ERR_MUNOACTION);
@@ -128,19 +139,16 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			gmap_beg.len = sizeof(percent_lit);
 			gmap_end.addr =  (char*)&tilde_lit;
 			gmap_end.len = sizeof(tilde_lit);
-		}
-		else if (1 == len && '*' == *c)
+		} else if (1 == len && '*' == *c)
 		{
 			gmap_end = gmap_beg;
 			gmap_beg.len--;
 			*c = '~';
-		}
-		else if (':' != *c)
+		} else if (':' != *c)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_SELECTSYNTAX, 2, LEN_AND_STR(opname));
 			mupip_exit(ERR_MUNOACTION);
-		}
-		else
+		} else
 		{
 			gmap_beg.len = INTCAST(c - gmap_beg.addr);
 			c++;
@@ -158,17 +166,41 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 				mupip_exit(ERR_MUNOACTION);
 			}
 		}
-		global_map(gmap, &gmap_beg, &gmap_end);
+		/* "estimated_entries" is the maximum number of entries that could be used up in the gmap array including the
+		 * next global_map call. The actual number of used entries could be much lower than this.
+		 * But since determining the actual number would mean scanning the gmap array for the first NULL pointer (a
+		 * performance overhead), we do an approximate check instead.
+		 */
+		estimated_entries += MAX_GMAP_ENTRIES_PER_ITER;
+		if (estimated_entries >= gmap_size)
+		{	/* Current gmap array does not have enough space. Double size before calling global_map */
+			new_gmap_size = gmap_size * 2;	/* double size of gmap array */
+			gmap_ptr = (mstr *)malloc(sizeof(mstr) * new_gmap_size);
+			memcpy(gmap_ptr, gmap_ptr_base, sizeof(mstr) * gmap_size);
+			if (gmap_ptr_base != &gmap[0])
+				free(gmap_ptr_base);
+			gmap_size = new_gmap_size;
+			gmap_ptr_base = gmap_ptr;
+		}
+		global_map(gmap_ptr_base, &gmap_beg, &gmap_end);
+		DEBUG_ONLY(
+			count = 1;
+			for (gmap_ptr = gmap_ptr_base; gmap_ptr->addr; gmap_ptr++)
+				count++;
+			assert(count < gmap_size);
+		)
 	}
-
 	if (freeze)
-		init_hashtab_int4(&ext_hash, 0);
+	{
+		GTM64_ONLY(init_hashtab_int8(&ext_hash, 0);)
+		NON_GTM64_ONLY(init_hashtab_int4(&ext_hash, 0);)
+	}
 	gl_head->next = NULL;
 	gl_tail = gl_head;
 	*reg_max_rec = 0;
         *reg_max_key = 0;
         *reg_max_blk = 0;
-	for (gmap_ptr = gmap; gmap_ptr->addr ; gmap_ptr++)
+	for (gmap_ptr = gmap_ptr_base; gmap_ptr->addr ; gmap_ptr++)
 	{
 		curr_gbl_name.mvtype = MV_STR;
 		curr_gbl_name.str = *gmap_ptr++;
@@ -205,7 +237,9 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
                         {
 				/* Note: We cannot use int4 hash when we will have 64-bit address.
 				 * In that case we may choose to hash the region name or use int8 hash */
-				if (add_hashtab_int4(&ext_hash, (uint4 *)&gv_cur_region, HT_VALUE_DUMMY, &tabent))
+
+			        GTM64_ONLY(if(add_hashtab_int8(&ext_hash,(gtm_uint64_t *)&gv_cur_region, HT_VALUE_DUMMY, &tabent)))
+			        NON_GTM64_ONLY(if (add_hashtab_int4(&ext_hash, (uint4 *)&gv_cur_region, HT_VALUE_DUMMY, &tabent)))
                                 {
                                         if (cs_addrs->hdr->freeze)
                                         {
@@ -250,4 +284,6 @@ void gv_select(char *cli_buff, int n_len, boolean_t freeze, char opname[], glist
 			curr_gbl_name.str.len--;
 		}
 	}
+	if (gmap_ptr_base != &gmap[0])
+		free(gmap_ptr_base);
 }

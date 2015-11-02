@@ -9,6 +9,9 @@
  *								*
  ****************************************************************/
 
+#ifndef __GDSBLK_OPS_H__
+#define __GDSBLK_OPS_H__
+
 /* Block segment array holds the list of memcpys needed to build the updated block.  The first entry in the array holds the
 	length of the updated block and the address of the last entry in the array that holds valid data.
 	The arrays are processed at t_end time, and the copies are done starting with the last element in the array
@@ -88,6 +91,29 @@ typedef struct
 	}															\
 }
 
+/* The following macro resets update_array_ptr to point to update_array.
+ * This needs to be done before using any BLK_* macros as part of a non-TP transaction.
+ */
+#define	RESET_UPDATE_ARRAY					\
+{								\
+	GBLREF	char	*update_array, *update_array_ptr;	\
+								\
+	assert(NULL != update_array);				\
+	/* reset update_array to the start */			\
+	update_array_ptr = update_array;			\
+}
+
+GBLREF	short			dollar_tlevel;
+GBLREF	unsigned char		cw_set_depth;
+
+/* the following macro does what RESET_UPDATE_ARRAY does and additionally does some integrity checks */
+#define	CHECK_AND_RESET_UPDATE_ARRAY								\
+{												\
+	assert(0 == dollar_tlevel);	/* TP should never use this update_array */		\
+	assert(0 == cw_set_depth);	/* ensure we never reset an active update_array */	\
+	RESET_UPDATE_ARRAY;									\
+}
+
 /* ***************************************************************************
  *	BLK_INIT(BNUM, ARRAY) allocates:
  *		blk_segment ARRAY[BLK_SEG_ARRAY_SIZE]
@@ -95,14 +121,16 @@ typedef struct
  *		BNUM = &ARRAY[1]
  */
 
-#define BLK_INIT(BNUM, ARRAY) 									\
-{												\
+#define BLK_INIT(BNUM, ARRAY)										\
+{													\
+	GBLREF	char	*update_array, *update_array_ptr;						\
+													\
 	update_array_ptr = (char*)ROUND_UP2((INTPTR_T)update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE);	\
-	(ARRAY) = (blk_segment*)update_array_ptr; 						\
-	update_array_ptr += BLK_SEG_ARRAY_SIZE*sizeof(blk_segment); 				\
-	assert((update_array + update_array_size) - update_array_ptr >= 0); 			\
-	(BNUM) = (ARRAY + 1); 									\
-	blk_seg_cnt = sizeof(blk_hdr);								\
+	(ARRAY) = (blk_segment*)update_array_ptr;							\
+	update_array_ptr += BLK_SEG_ARRAY_SIZE*sizeof(blk_segment);					\
+	assert((update_array + update_array_size) - update_array_ptr >= 0);				\
+	(BNUM) = (ARRAY + 1);										\
+	blk_seg_cnt = sizeof(blk_hdr);									\
 }
 
 /* ***************************************************************************
@@ -145,14 +173,16 @@ typedef struct
 #ifdef DEBUG
 #define BLK_ADDR(X,Y,Z)                                                                 \
 (                                                                                       \
-        update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),                   \
+        update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),              \
         assert((update_array + update_array_size - Y) - update_array_ptr >= 0),         \
-        (X) = (Z*)update_array_ptr, update_array_ptr += Y                               \
+        (X) = (Z*)update_array_ptr, update_array_ptr += (INTPTR_T)Y                       \
 )
 #else
 #define BLK_ADDR(X,Y,Z)                                                                 \
 (                                                                                       \
-        update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),                   \
-        (X) = (Z*)update_array_ptr, update_array_ptr += Y                               \
+        update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),              \
+        (X) = (Z*)update_array_ptr, update_array_ptr += (INTPTR_T)Y                       \
 )
+#endif
+
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,12 +41,12 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 GBLREF int4		gv_keysize;
 GBLREF short		dollar_tlevel;
-GBLREF int4		gv_keysize;
 GBLREF unsigned int	t_tries;
 
 bool gvcst_zprevious(void)
 {
 	static gv_key	*temp_key;
+	static int4	temp_keysize = 0;
 	blk_hdr_ptr_t	bp;
 	bool		found, two_histories;
 	enum cdb_sc	status;
@@ -97,9 +97,16 @@ bool gvcst_zprevious(void)
 				c1 = gv_altkey->base;
 				memcpy(c1, gv_currkey->base, bh->prev_rec.match);
 				c1 += bh->prev_rec.match;
-				if (NULL == temp_key)
+				assert(temp_keysize <= gv_keysize);
+				if (temp_keysize < gv_keysize)
+				{
+					if (NULL != temp_key)
+						free(temp_key);
 					temp_key = (gv_key *)malloc(sizeof(gv_key) + gv_keysize);
-				temp_key->top = gv_currkey->top;
+					temp_key->top = gv_keysize;
+					temp_keysize = gv_keysize;
+				}
+				assert(temp_key->top >= gv_currkey->top);
 				if (cdb_sc_normal != (status = gvcst_expand_key((blk_hdr_ptr_t)bh->buffaddr, bh->prev_rec.offset,
 									temp_key)))
 				{

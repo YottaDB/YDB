@@ -38,13 +38,11 @@ void obj_init(void);
 #ifdef DEBUG
 #define MAX_CODE_COUNT 10000
 /* This structure holds the size of the code generated for every triple */
-IA64_ONLY(
-	struct inst_count
-	{
-		int size;
-		int sav_in;
-	};
-)
+struct inst_count
+{
+	int size;
+	int sav_in;
+};
 #endif /* DEBUG */
 
 #endif /* OBJ_FILE_INCLUDED */

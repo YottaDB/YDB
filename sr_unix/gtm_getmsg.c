@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,34 +11,35 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
-#ifdef __linux__
-#include <stdio.h>
+#ifdef SYS_ERRLIST_INCLUDE
+#include SYS_ERRLIST_INCLUDE
 #endif
 #include "error.h"
 #include "gtmmsg.h"
 
 GBLREF bool	dec_nofac;
+#ifndef SYS_ERRLIST_INCLUDE
 /* sys_nerr and sys_errlist defined in stdio for linux */
-#if !defined(__MVS__) && !defined(__linux__)
 GBLREF int	sys_nerr;
 #endif
 LITREF char	*sys_errnolist[];
 LITREF int	sys_nerrno;
 
 
+#ifndef SYS_ERRLIST_INCLUDE
+
 #ifdef	__osf__
 #pragma pointer_size (save)
 #pragma pointer_size (long)
 #endif
 
-#if !defined(__MVS__) && !defined(__linux__)
 extern char	*sys_errlist[];
-#endif
 
 #ifdef	__osf__
 #pragma pointer_size (restore)
 #endif
 
+#endif
 
 void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 {

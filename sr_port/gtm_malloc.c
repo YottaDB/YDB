@@ -33,9 +33,8 @@
 */
 
 #include "caller_id.h"
-#include "gtm_malloc.h"
 #include "gtm_malloc_src.h"
 
-#ifdef __linux__
+#if defined(__linux__) && defined(__ia64)
 GBLDEF boolean_t        force_text_alloc;
 #endif /* __linux__ */

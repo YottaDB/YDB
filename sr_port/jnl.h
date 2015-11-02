@@ -34,7 +34,7 @@
 #define JNL_ALLOC_MIN		10
 
 /*	JNL_BUFFER_MIN	database block size / 512 + 1	*/
-#define JNL_BUFFER_MAX		2000
+#define JNL_BUFFER_MAX		32768	/* # of 512-byte blocks = 16Mb journal buffer size */
 
 /*	JNL_EXTEND_DEF	allocation size / 10
 #define JNL_EXTEND_DEF_PERC	0.1
@@ -76,7 +76,7 @@
 #define	WCSFLU_FSYNC_DB		8	/* Currently used only in Unix wcs_flu() */
 
 /* EPOCHs are written unconditionally in Unix (assuming jnl is ON) while they are written only for BEFORE_IMAGE in VMS */
-#define	JNL_HAS_EPOCH(jnlfile)	UNIX_ONLY(TRUE) VMS_ONLY(jnlfile->before_images)
+#define JNL_HAS_EPOCH(jnlfile)  UNIX_ONLY(TRUE) VMS_ONLY(jnlfile->before_images)
 
 #ifdef DEBUG
 #define	DEFAULT_EPOCH_INTERVAL_IN_SECONDS	30 /* exercise epoch-syncing code relatively more often in DBG */
@@ -127,6 +127,26 @@
 #define THREE_LOW_BYTES(x)	((uchar_ptr_t)(&x))
 #endif
 #define EXTTIME(S)					extract_len = exttime(S, murgbl.extr_buff, extract_len)
+
+/* This macro should be used to initialize jgbl.gbl_jrec_time to the system time. The reason is that it does additional checks. */
+#define	SET_GBL_JREC_TIME				\
+{							\
+	assert(!jgbl.dont_reset_gbl_jrec_time);		\
+	JNL_SHORT_TIME(jgbl.gbl_jrec_time);		\
+}
+
+/* This macro ensures that journal records are written in non-decreasing time order in each journal file.
+ * It is passed the time field to adjust and a pointer to the journal buffer of the region.
+ * The journal buffer holds the timestamp of the most recently written journal record.
+ */
+#define	ADJUST_GBL_JREC_TIME(jgbl, jbp)				\
+{								\
+	if (jgbl.gbl_jrec_time < jbp->prev_jrec_time)		\
+	{							\
+		assert(!jgbl.dont_reset_gbl_jrec_time);		\
+		jgbl.gbl_jrec_time = jbp->prev_jrec_time;	\
+	}							\
+}
 
 /* Token generation used in non-replicated journaled environment. Note the assumption here
    that sizeof(token_split_t) == sizeof(token_build) which will be asserted in gvcst_init().
@@ -254,6 +274,8 @@ typedef struct
 	/* Note the above filler will fail if JRT_RECTYPES grows beyond 29 elements and give compiler warning in VMS
 	 * if JRT_RECTYPES equals 29. In that case, change the start num to the next odd number above JRT_RECTYPES.
 	 */
+	volatile jnl_tm_t	prev_jrec_time;		/* to ensure that time never decreases across successive jnl records */
+	volatile int4		free_update_pid;	/* pid that is updating jb->free and jb->freeaddr */
 	volatile uint4		next_epoch_time;	/* Time when next epoch is to be written (in epoch-seconds) */
 	volatile boolean_t	need_db_fsync;          /* need an fsync of the db file */
 	volatile int4		io_in_prog;		/* VMS only: write in progress indicator (NOTE: must manipulate
@@ -274,6 +296,19 @@ typedef struct
 	/**********************************************************************************************/
 	unsigned char		buff[1];		/* Actually buff[size] */
 } jnl_buffer;
+
+#define	FIX_NONZERO_FREE_UPDATE_PID(jbp)										\
+{															\
+	assert(jbp->free_update_pid);											\
+	UNIX_ONLY(assert(!is_proc_alive(jbp->free_update_pid, 0));)							\
+	VMS_ONLY(assert(FALSE);) /* secshr_db_clnup should have cleaned up this field even in case of STOP/ID */	\
+	if ((jbp->freeaddr % jbp->size) != jbp->free)									\
+	{	/* Previous process in jnl_write got killed after incrementing freeaddr but before incrementing		\
+		 * free. Recalculate jbp->free based on current value of jbp->freeaddr. */				\
+		jbp->free = jbp->freeaddr % jbp->size;									\
+		jbp->free_update_pid = 0;										\
+	}														\
+}
 
 #ifdef DB64
 # ifdef __osf__
@@ -301,14 +336,13 @@ typedef struct jnl_private_control_struct
 				old_channel;		/* VMS only - for dealing with deferred deassign */
 	gd_id			fileid;			/* currently initialized and used only by source-server */
 	vms_lock_sb		*jnllsb;		/* VMS only */
-	boolean_t		free_update_inprog;	/* M VMS only */
 	uint4			pini_addr,		/* virtual on-disk address for JRT_PINI record, if journaling */
 				new_freeaddr;
 	int4			temp_free;		/* M Temp copy of free relative index until full write done */
 	double			filler_q0;		/* reset QUAD end mainline */
 	int4			new_dsk;		/* A VMS only */
-	uint4			new_dskaddr,		/* A VMS only */
-				status;			/* A for error reporting */
+	uint4			new_dskaddr;		/* A VMS only */
+	int4			status;			/* A for error reporting */
 	volatile boolean_t	dsk_update_inprog;	/* A VMS only */
 	volatile boolean_t	qio_active;		/* jnl buffer write in progress in THIS process (recursion indicator) */
 	boolean_t		fd_mismatch;		/* TRUE when jpc->channel does not point to the active journal */
@@ -348,6 +382,8 @@ typedef struct
 	jnl_action_code		operation;
 	gv_key			*key;
 } jnl_action;
+
+#define	JNL_FENCE_LIST_END	((sgmnt_addrs *)-1L)
 
 typedef struct
 {
@@ -858,19 +894,19 @@ DEBUG_ONLY(
 #define	ASSERT_JNLFILEID_NOT_NULL(csa) assert(0 != memcmp(csa->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)));
 #define NULLIFY_JNL_FILE_ID(csa) memset(&csa->nl->jnl_file.jnl_file_id, 0, sizeof(gds_file_id))
 #endif
-#define JNL_INIT(csa, reg, csd)								\
-{											\
-	csa->jnl_state = csd->jnl_state;						\
-	csa->jnl_before_image = csd->jnl_before_image;					\
-	csa->repl_state = csd->repl_state;						\
-	if JNL_ALLOWED(csa)								\
-	{										\
-		JPC_ALLOC(csa);								\
-		csa->jnl->region = reg;							\
-		csa->jnl->jnl_buff = (jnl_buffer_ptr_t)((sm_uc_ptr_t)(csa->nl) + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE);\
-		csa->jnl->channel = NOJNL;						\
-	} else										\
-		csa->jnl = NULL;							\
+#define JNL_INIT(csa, reg, csd)												\
+{															\
+	csa->jnl_state = csd->jnl_state;										\
+	csa->jnl_before_image = csd->jnl_before_image;									\
+	csa->repl_state = csd->repl_state;										\
+	if JNL_ALLOWED(csa)												\
+	{														\
+		JPC_ALLOC(csa);												\
+		csa->jnl->region = reg;											\
+		csa->jnl->jnl_buff = (jnl_buffer_ptr_t)((sm_uc_ptr_t)(csa->nl) + NODE_LOCAL_SPACE + JNL_NAME_EXP_SIZE);	\
+		csa->jnl->channel = NOJNL;										\
+	} else														\
+		csa->jnl = NULL;											\
 }
 #define MAX_EPOCH_DELAY		30
 #define EXT_NEW 		"_new"
@@ -892,6 +928,14 @@ DEBUG_ONLY(
 	(JINFO)->max_logi_reclen = ROUND_UP2(FIXED_ZTP_UPD_RECLEN + ((CSD)->blk_size - USIZEOF(blk_hdr) - USIZEOF(rec_hdr)) +	\
 			                     USIZEOF(jnl_str_len_t) + USIZEOF(mstr_len_t) + JREC_SUFFIX_SIZE, JNL_REC_START_BNDRY);\
 	assert((JINFO)->max_phys_reclen >= (JINFO)->max_logi_reclen);								\
+}
+
+/* Macro that checks that the region seqno in the filehdr is never more than the seqno in the journal pool */
+#define	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csd, jnlpool_ctl)						\
+{	/* The seqno in the file header should be at most 1 greater than that in the journal pool.	\
+	 * See step (5) of of commit logic flow in secshr_db_clnup.c for why. Assert that.		\
+	 */												\
+	assert((NULL == jnlpool_ctl) || (csd->reg_seqno <= (jnlpool_ctl->jnl_seqno + 1)));		\
 }
 
 /* jnl_ prototypes */

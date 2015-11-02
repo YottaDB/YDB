@@ -39,17 +39,17 @@ boolean_t mur_validate_checksum(void)
 	unsigned char		*start_ptr, *end_ptr;
 
 	rec_checksum = INIT_CHECKSUM_SEED;
-	rectype = mur_rab.jnlrec->prefix.jrec_type;
+	rectype = (enum jnl_record_type)mur_rab.jnlrec->prefix.jrec_type;
 	if (IS_SET_KILL_ZKILL(rectype))	/* TUPD/UUPD/FUPD/GUPD */
 	{
 		start_ptr = (IS_ZTP(rectype)) ? (unsigned char *)&mur_rab.jnlrec->jrec_fkill.mumps_node :
 				 		 (unsigned char *)&mur_rab.jnlrec->jrec_kill.mumps_node;
 		end_ptr =  (unsigned char *)(mur_rab.jnlrec) + mur_rab.jreclen - JREC_SUFFIX_SIZE;
-		rec_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4 *)start_ptr, (int)(end_ptr - start_ptr));
+		rec_checksum = jnl_get_checksum((uint4 *)start_ptr, (int)(end_ptr - start_ptr));
 	} else if (JRT_PBLK == rectype)
 	{
 		start_ptr = (unsigned char *)mur_rab.jnlrec->jrec_pblk.blk_contents;
-		rec_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4 *)start_ptr, mur_rab.jnlrec->jrec_pblk.bsiz);
+		rec_checksum = jnl_get_checksum((uint4 *)start_ptr, mur_rab.jnlrec->jrec_pblk.bsiz);
 	}
 	rec_checksum = ADJUST_CHECKSUM(rec_checksum, mur_jctl->rec_offset);
 	rec_checksum = ADJUST_CHECKSUM(rec_checksum, mur_jctl->jfh->checksum);

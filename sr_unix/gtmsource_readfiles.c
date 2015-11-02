@@ -113,7 +113,9 @@ static	int			read_regions(
 
 static	int			first_read(repl_ctl_element*);
 static	int			update_max_seqno_info(repl_ctl_element *ctl);
+#if 0 /* Not used for now */
 static	int			scavenge_closed_jnl_files(seq_num ack_seqno);
+#endif /* 0 */
 static	int			update_eof_addr(repl_ctl_element *ctl, int *eof_change);
 
 static	int repl_read_file(repl_buff_t *rb)
@@ -479,7 +481,7 @@ static	int force_file_read(repl_ctl_element *ctl)
 		return (SS_NORMAL);
 	}
 	/* b->recbuff points to valid record */
-	rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+	rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 	assert(rectype > JRT_BAD && rectype <= JRT_RECTYPES);
 	if (rectype != JRT_EOF) /* Can't be stale */
 		return (SS_NORMAL);
@@ -568,7 +570,7 @@ static	int update_max_seqno_info(repl_ctl_element *ctl)
 		{
 			if ((status = repl_next(rb)) == SS_NORMAL)
 			{
-				rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+				rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 				if (IS_REPLICATED(rectype))
 				{
 					QWASSIGN(max_seqno, GET_JNL_SEQNO(b->recbuff));
@@ -659,7 +661,7 @@ static	int first_read(repl_ctl_element *ctl)
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
 		{
-			rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+			rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 			if (IS_REPLICATED(rectype))
 			{
 				QWASSIGN(ctl->min_seqno, GET_JNL_SEQNO(b->recbuff));
@@ -760,7 +762,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	readlen += b->reclen;
 	assert(readlen % JNL_WRT_END_MODULUS == 0);
 	*bufsiz -= b->reclen;
-	rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+	rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 	assert(IS_REPLICATED(rectype));
 	rec_jnl_seqno = GET_REPL_JNL_SEQNO(b->recbuff);
 	assert(QWEQ(rec_jnl_seqno, ctl->seqno));
@@ -786,7 +788,7 @@ static	int read_transaction(repl_ctl_element *ctl, unsigned char **buff, int *bu
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
 		{
-			rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+			rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 			if (IS_REPLICATED(rectype))
 			{
 				if (b->reclen > *bufsiz)
@@ -892,7 +894,7 @@ static	tr_search_state_t do_linear_search(repl_ctl_element *ctl, uint4 lo_addr, 
 	{
 		if ((status = repl_next(rb)) == SS_NORMAL)
 		{
-			rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+			rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 			if (IS_REPLICATED(rectype))
 			{
 				rec_jnl_seqno = GET_JNL_SEQNO(b->recbuff);
@@ -973,7 +975,7 @@ static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, 
 		switch (found)
 		{
 			case TR_FOUND:
-				rectype = ((jrec_prefix *)b->recbuff)->jrec_type;
+				rectype = (enum jnl_record_type)((jrec_prefix *)b->recbuff)->jrec_type;
 				if (!IS_FENCED(rectype) || IS_TUPD(rectype) || IS_FUPD(rectype) || JRT_NULL == rectype)
 				{
 					REPL_DPRINT4("do_binary_search: found %llu at %u in %s\n", read_seqno, b->recaddr,
@@ -1173,7 +1175,7 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 				assert(lo_addr == b->recaddr);
 				assert(MIN_JNLREC_SIZE <= b->reclen);
 				DEBUG_ONLY(jrec = (jnl_record *)b->recbuff;)
-				DEBUG_ONLY(rectype = jrec->prefix.jrec_type;)
+				DEBUG_ONLY(rectype = (enum jnl_record_type)jrec->prefix.jrec_type;)
 				assert(b->reclen == jrec->prefix.forwptr);
 				assert(IS_VALID_JNLREC(jrec, rb->fc->jfh));
 				assert(IS_REPLICATED(rectype));
@@ -1624,7 +1626,9 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	return (tot_tr_len);
 }
 
-static	int scavenge_closed_jnl_files(seq_num ack_seqno)	/* currently  not used */
+#if 0 /* currently  not used  - Defed out to fix compiler warnings */
+
+static	int scavenge_closed_jnl_files(seq_num ack_seqno)
 {	/* Run thru the repl_ctl_list and scavenge for those journal files which are no longer required for
 	 * replication (the receiver side has acknowledged that it has successfully processed journal recs upto
 	 * and including those with JNL_SEQNO ack_seqno). Close these journal files and report to the operator
@@ -1683,6 +1687,7 @@ static	int scavenge_closed_jnl_files(seq_num ack_seqno)	/* currently  not used *
 	}
 	return 0;
 }
+#endif /* 0 */
 
 /* This function resets "zqgblmod_seqno" and "zqgblmod_tn" in all replicated database file headers to correspond to the
  * "resync_seqno" passed in as input. This shares some of its code with the function "repl_inst_reset_zqgblmod_seqno_and_tn".

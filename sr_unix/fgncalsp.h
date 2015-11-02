@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,11 @@ typedef int4	(*fgnfnc)();
 
 struct extcall_string
 {
+#ifdef __osf__
 	int	len;
+#else
+	long	len;
+#endif
 	char	*addr;
 };
 
@@ -58,10 +62,14 @@ enum xc_types
 	xc_notfound,
 	xc_void,
 	xc_status,
+	xc_int,
+	xc_uint,
 	xc_long,
 	xc_ulong,
 	xc_float,
 	xc_double,
+	xc_int_star,
+	xc_uint_star,
 	xc_long_star,
 	xc_ulong_star,
 	xc_string_star,

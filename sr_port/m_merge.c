@@ -45,9 +45,8 @@ int m_merge(void)
         case TK_IDENT:
                 if (!lvn(&mopr, OC_PUTINDX, 0))
                         return FALSE;
-		if (OC_PUTINDX == mopr.oprval.tref->opcode);
-		{
-			/* we insert left hand side argument into tmpchain. */
+		if (OC_PUTINDX == mopr.oprval.tref->opcode)
+		{	/* we insert left hand side argument into tmpchain. */
 			dqdel(mopr.oprval.tref, exorder);
 			dqins(tmpchain.exorder.bl, exorder, mopr.oprval.tref);
 		}

@@ -16,7 +16,7 @@
 #define BSD_COMP
 #endif
 #include <sys/ioctl.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #include <errno.h>
 #include "gtmio.h"
 #include "relqop.h"
@@ -29,7 +29,7 @@ void cmj_incoming_call(struct NTD *tsk)
 	GTM_SOCKLEN_TYPE sz = SIZEOF(in);
 	cmi_status_t status;
 
-	while ((-1 == (rval = accept(tsk->listen_fd, (struct sockaddr *)&in, &sz))) && EINTR == errno)
+	while ((-1 == (rval = accept(tsk->listen_fd, (struct sockaddr *)&in, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
 		;
 	while (rval >= 0)
 	{
@@ -66,7 +66,7 @@ void cmj_incoming_call(struct NTD *tsk)
 		/* setup for callback processing */
 		lnk->deferred_event = TRUE;
 		lnk->deferred_reason = CMI_REASON_CONNECT;
-		while ((-1 == (rval = accept(tsk->listen_fd, (struct sockaddr *)&in, &sz))) && EINTR == errno)
+		while ((-1 == (rval = accept(tsk->listen_fd, (struct sockaddr *)&in, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
 			;
 	}
 }

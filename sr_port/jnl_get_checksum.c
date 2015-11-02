@@ -13,12 +13,11 @@
 
 /*
  * Input :
- *	checksum : Current checksum value.
- *	buff   	 : Pointer to the input buffer whose checksum needs to be computed and adjusted with the input checksum.
+ *	buff   	 : Pointer to the input buffer whose checksum needs to be computed.
  *	bufflen  : Buffer size in bytes
  *
  * Returns:
- *	Adjusted checksum.
+ *	Computed checksum.
  *
  * Algorithm:
  * 	For every 512 (DISK_BLOCK_SIZE) byte block of the input buffer, the first 16 and last 16 bytes are considered for checksum.
@@ -31,11 +30,11 @@
  *	And so on until the input buffer length is exceeded.
  * 	If bufflen is not divisible by 4, it is ROUNDED DOWN to the nearest 4-byte (uint4) multiple.
  */
-uint4 jnl_get_checksum(uint4 checksum, uint4 *buff, int bufflen)
+uint4 jnl_get_checksum(uint4 *buff, int bufflen)
 {
-	uint4 	*top, *blk_base, *blk_top, blen;
+	uint4 	*top, *blk_base, *blk_top, blen, checksum;
 
-	assert(checksum);
+	checksum = INIT_CHECKSUM_SEED;
 	for (blen = bufflen / USIZEOF(*buff), top = buff + blen, blk_top = buff + CHKSUM_SEGLEN4 / 2; buff < top ;)
 	{
 		if (blk_top > top)
@@ -45,9 +44,8 @@ uint4 jnl_get_checksum(uint4 checksum, uint4 *buff, int bufflen)
 		blk_top = (uint4 *)((sm_uc_ptr_t)buff + DISK_BLOCK_SIZE);
 		buff = blk_top - CHKSUM_SEGLEN4;
 	}
-	assert(checksum);
-	/* It is theoretically possible that the computed checksum turns out to be 0. In order to differentiate this
-	 * with the fact that the checksum was never computed, we returns INIT_CHECKSUM_SEED in the former case.
+	/* It is theoretically possible the computed checksum calculates to 0. Since we use a 0 to imply checksum
+	 * was never computed, we need to return a non-zero value so in this case return INIT_CHECKSUM_SEED
 	 */
 	if (!checksum)
 		checksum = INIT_CHECKSUM_SEED;

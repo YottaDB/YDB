@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,7 @@ void tp_set_sgm(void)
 			si->crash_count = cs_addrs->critical->crashcnt;
 		insert_region(gv_cur_region, &tp_reg_list, &tp_reg_free_list, sizeof(tp_region));
 		si->fresh_start = FALSE;
+		assert(FALSE == si->update_trans);
 	}
 	sgm_info_ptr = si;
 	crash_count = si->crash_count;

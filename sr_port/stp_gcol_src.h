@@ -51,10 +51,8 @@
 #include "hashtab_objcode.h"
 #include "hashtab.h"
 
-/* Undefine memmove since the Vax shortcut defines a 64K max move which we can
-   easily exceed with the stringpool moves */
-#ifdef __vax
-#undef memmove
+#ifndef STP_MOVE
+GBLDEF symval		*first_symval;
 #endif
 
 GBLREF mvar 		*mvartab;
@@ -84,9 +82,7 @@ GBLREF mval		last_fnquery_return_varname;			/* Return value of last $QUERY (on s
 GBLREF mval		last_fnquery_return_sub[MAX_LVSUBSCRIPTS];	/* .. (subscripts) */
 GBLREF int		last_fnquery_return_subcnt;			/* .. (count of subscripts) */
 GBLREF boolean_t	mstr_native_align;
-#ifndef __vax
 GBLREF fnpc_area	fnpca;
-#endif
 OS_PAGE_SIZE_DECLARE
 
 static mstr		**topstr, **array, **arraytop;
@@ -116,10 +112,14 @@ static mstr		**topstr, **array, **arraytop;
 
 #endif /* end if STP_MOVE ... else ... */
 
-#define MV_STPG_PUT(X) \
-	(*topstr++ = (X), topstr >= arraytop ?  \
-         (stp_put_int = (int)(topstr - array), stp_expand_array(), array = stp_array,\
-        topstr = array + stp_put_int, arraytop = array + stp_array_size) : 0)
+#if defined(DEBUG) && !defined(STP_MOVE)
+#  define MV_STPG_PUT(X) stp_gcol_mv_stpg_put(X) /* STP_GCOL only -- only updates statics in stp_gcol() */
+#else
+#  define MV_STPG_PUT(X) \
+	  (*topstr++ = (X), topstr >= arraytop ?  \
+           (stp_put_int = (int)(topstr - array), stp_expand_array(), array = stp_array, \
+           topstr = array + stp_put_int, arraytop = array + stp_array_size) : 0)
+#endif
 
 #define PROCESS_CACHE_ENTRY(cp)								\
         if (cp->src.str.len)	/* entry is used */					\
@@ -197,7 +197,57 @@ static void expand_stp(unsigned int new_size)
 }
 
 
+DEBUG_ONLY(mstr **stp_gcol_mv_stpg_put(mstr *X);)
 #ifndef STP_MOVE
+#ifdef DEBUG
+/* MV_STP_PUT macro expansion as routine so we can add asserts without issues (and see vars in core easier) */
+mstr **stp_gcol_mv_stpg_put(mstr *X)
+{
+	int	stp_put_int;
+
+	assert(0 < (X)->len); /* It would be nice to test for maxlen here but that causes some usages of stringpool
+				 to fail as other types of stuff are built into the stringppool besides strings. */
+	*topstr++ = (X);
+	return (topstr >= arraytop ? (stp_put_int = (int)(topstr - array), stp_expand_array(), array = stp_array,
+				      topstr = array + stp_put_int, arraytop = array + stp_array_size) : 0);
+}
+
+/* Verify the saved symbol table that we will be processing later in stp_gcol(). This version is callable from anywhere
+   and is a great debuging tool for corrupted mstrs in local variable trees. Uncomment the call near the top of stp_gcol to
+   verify it will catch what you want it to catch and sprinkle calls around other places as necessary. Be warned, this can
+   *really* slow things down so use judiciously. SE 10/2007
+*/
+void stp_vfy_mval(void)
+{
+	lv_blk			*lv_blk_ptr;
+	lv_val			*lvp, *lvlimit;
+	mstr			*x;
+
+	if (!first_symval)
+	{	/* Must be setting up first symbol table now */
+		first_symval = (symval *)1;	/* Only allow first time, else this will cause sig-10/11 next time through */
+		return;
+	}
+	for (lv_blk_ptr = &first_symval->first_block;
+	     lv_blk_ptr;
+	     lv_blk_ptr = lv_blk_ptr->next)
+	{
+		for (lvp = lv_blk_ptr->lv_base, lvlimit = lv_blk_ptr->lv_free;
+		     lvp < lvlimit;  lvp++)
+		{
+			if (lvp->v.mvtype != MV_SBS)
+			{
+				x = MV_STPG_GET(&(lvp->v));
+				if (x)
+				{
+					assert(0 < (x)->len);
+				}
+			}
+		}
+	}
+}
+#endif  /* DEBUG */
+
 void mv_parse_tree_collect(mvar *node);
 void mv_parse_tree_collect(mvar *node)
 {
@@ -212,10 +262,10 @@ void mv_parse_tree_collect(mvar *node)
 	if (node->rson)
 		mv_parse_tree_collect(node->rson);
 }
-#endif
+#endif /* #ifndef STP_MOVE */
+
 
 #ifdef STP_MOVE
-
 void stp_move(char *from, char *to) /* garbage collect and move range (from,to] to stringpool adjusting all mvals/mstrs pointing
 				     * in this range */
 #else
@@ -226,8 +276,9 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	int			space_asked = 0, move_count = 0;
 #endif
 	unsigned char		*strpool_base, *straddr, *tmpaddr, *begaddr, *endaddr;
-	int			index, space_needed, stp_put_int, fixup_cnt, tmplen, totspace;
+	int			index, space_needed, fixup_cnt, tmplen, totspace;
 	long			space_before_compact, space_after_compact, blklen, delta, space_reclaim, padlen;
+	int			stp_put_int;
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
 	lv_sbs_tbl		*tbl;
@@ -273,10 +324,12 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 	assert(from < to); /* why did we call with zero length range, or a bad range? */
 	assert((from <  (char *)stringpool.base && to <  (char *)stringpool.base) || /* range to be moved should not intersect */
 	       (from >= (char *)stringpool.top  && to >= (char *)stringpool.top));   /* with stringpool range */
+#else
+	/* stp_vfy_mval(); / * uncomment to debug lv corruption issues.. */
 #endif
 
 	space_needed = ROUND_UP2(space_asked, NATIVE_WSIZE);
-	assert(0 == (uint4)stringpool.base % NATIVE_WSIZE);
+	assert(0 == (INTPTR_T)stringpool.base % NATIVE_WSIZE);
 	if (stringpool.base == rts_stringpool.base)
 	{
 		low_reclaim_passes = &rts_stp_low_reclaim_passes;
@@ -574,12 +627,16 @@ void stp_gcol(int space_asked) /* garbage collect and create enough space for sp
 		stpg_sort(array, topstr - 1);
 		for (totspace = 0, cstr = array, straddr = (unsigned char *)(*cstr)->addr; (cstr < topstr); cstr++ )
 		{
-			assert(cstr == array || (*cstr)->addr >= ((*(cstr-1))->addr));
+			assert(cstr == array || (*cstr)->addr >= ((*(cstr - 1))->addr));
 			tmpaddr = (unsigned char *)(*cstr)->addr;
 			tmplen = (*cstr)->len;
+			assert(0 < tmplen);
 			if (tmpaddr + tmplen > straddr) /* if it is not a proper substring of previous one */
 			{
-				totspace += ((tmpaddr >= straddr) ? tmplen : (tmpaddr + tmplen - straddr));
+				int tmplen2;
+				tmplen2 = ((tmpaddr >= straddr) ? tmplen : (tmpaddr + tmplen - straddr));
+				assert(0 < tmplen2);
+				totspace += tmplen2;
 				if (mstr_native_align)
 					totspace += PADLEN(totspace, NATIVE_WSIZE);
 				straddr = tmpaddr + tmplen;

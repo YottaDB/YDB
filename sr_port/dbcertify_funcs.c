@@ -737,7 +737,7 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 					   " key record\n"));
 				return blk_index;
 			}
-			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via star key record at offset 0x%x\n", \
+			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via star key record at offset 0x%lx\n", \
 				   (rec_p - blk_p)));
 			GET_ULONG(blk_ptr, rec_p + VMS_ONLY(3) UNIX_ONLY(4));
 			blk_index = dbc_read_dbblk(psa, blk_ptr, blk_type);
@@ -753,14 +753,14 @@ int dbc_find_record(phase_static_area *psa, dbc_gv_key *key, int blk_index, int 
 			if (gdsblk_gvtleaf == blk_set_p->blk_type || min_levl == blk_levl)
 			{	/* This is a terminal block. It is the end of the road */
 				DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Reached minimum block level (or leaf level) -- matching" \
-					   " scan was a normal keyed record at offset 0x%x\n", (rec_p - blk_p)));
+					   " scan was a normal keyed record at offset 0x%lx\n", (rec_p - blk_p)));
 				return blk_index;
 			}
 			/* We already know that the current block is not the one we are interested in and therefore
 			   this record is known to contain a pointer to another block. Read the block in and
 			   recurse to continue the search for the key.
 			*/
-			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via keyed index record at offset 0x%x\n", \
+			DBC_DEBUG(("DBC_DEBUG: dbc_find_record: Recursing down a level via keyed index record at offset 0x%lx\n", \
 				   (rec_p - blk_p)));
 			GET_ULONG(blk_ptr, (rec_p + sizeof(rec_hdr) + blk_set_p->curr_blk_key->end
 					   - ((rec_hdr *)rec_p)->cmpc + 1));

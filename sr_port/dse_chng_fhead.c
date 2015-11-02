@@ -45,11 +45,11 @@
 #include "send_msg.h"
 #include "dse.h"
 
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gd_region	*gv_cur_region;
-GBLREF uint4		process_id;
-GBLREF int4             image_count;
-LITREF char		*gtm_dbversion_table[];
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	uint4		process_id;
+GBLREF	uint4		image_count;
+LITREF	char		*gtm_dbversion_table[];
 
 #define	CLNUP_CRIT					\
 {							\
@@ -291,7 +291,7 @@ void dse_chng_fhead(void)
 			for (index_x=0; index_x < GDSVLAST ; index_x++)
 				if (0 == STRCMP(buf, gtm_dbversion_table[index_x]))
 				{
-					cs_addrs->hdr->certified_for_upgrade_to = index_x;
+					cs_addrs->hdr->certified_for_upgrade_to = (enum db_ver)index_x;
 					break;
 				}
 			if (GDSVLAST <= index_x)
@@ -307,7 +307,7 @@ void dse_chng_fhead(void)
 			for (index_x=0; index_x < GDSVLAST ; index_x++)
 				if (0 == STRCMP(buf, gtm_dbversion_table[index_x]))
 				{
-					cs_addrs->hdr->desired_db_format = index_x;
+					cs_addrs->hdr->desired_db_format = (enum db_ver)index_x;
 					cs_addrs->hdr->fully_upgraded = FALSE;
 					break;
 				}
@@ -548,7 +548,7 @@ void dse_chng_fhead(void)
 					if (0 == x)
 						x = -2;
 				}
-				if ((x < -1) || (x > BACKUP_NOT_IN_PROGRESS))
+				if (x < -1)
 					util_out_print("Invalid value for online_nbb qualifier", TRUE);
 				else
 					cs_addrs->nl->nbb = x;

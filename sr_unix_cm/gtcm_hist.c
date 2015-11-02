@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -122,7 +122,7 @@ void dump_omi_rq(void)
     if (omi_hist_num < 0)   /* no history? */
 	return;
     SPRINTF(msg,
-	    "OMI Rq dump: %d / %s Lg size %d conn %d",
+	    "OMI Rq dump: %ld / %s Lg size %d conn %d",
 	    omi_hist[omi_hist_num].timestamp, then,
 	    omi_hist[omi_hist_num].req_len, omi_hist[omi_hist_num].conn);
     gtcm_pktdmp(omi_hist[omi_hist_num].req, 0, msg);
@@ -147,12 +147,12 @@ void dump_rc_hist(void)
 			if (rc_hist[i].toobigflag)
 			{
 				SPRINTF(msg,
-				"RC Rq history: %d / %s Lg size %d conn %d",
+				"RC Rq history: %ld / %s Lg size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].req_len, rc_hist[i].conn);
 				gtcm_pktdmp(rc_hist[i].req, 0, msg);
 				SPRINTF(msg,
-				"RC Aq history: %d / %s Lg size %d conn %d",
+				"RC Aq history: %ld / %s Lg size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].rsp_len, rc_hist[i].conn);
 				gtcm_pktdmp(rc_hist[i].rsp, 0, msg);
@@ -160,14 +160,14 @@ void dump_rc_hist(void)
 			else
 			{
 				SPRINTF(msg,
-				"RC Rq history: %d / %s size %d conn %d",
+				"RC Rq history: %ld / %s size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].req_len, rc_hist[i].conn);
 				gtcm_pktdmp(rc_hist[i].req,
 					    rc_hist[i].req_len,
 					    msg);
 				SPRINTF(msg,
-				"RC Aq history: %d / %s size %d conn %d",
+				"RC Aq history: %ld / %s size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].rsp_len, rc_hist[i].conn);
 				gtcm_pktdmp(rc_hist[i].rsp,

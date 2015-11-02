@@ -97,47 +97,48 @@ typedef struct global_tlvl_info_struct
  */
 typedef struct sgm_info_struct
 {
-	struct sgm_info_struct
-			*next_sgm_info;
-	srch_blk_status	*first_tp_hist,
-			*last_tp_hist;
-	hash_table_int4	*blks_in_use;
-	trans_num	start_tn;
-	gd_region	*gv_cur_region;
-	int4		update_trans;	/* was this region updated; usually TRUE if cw_set_depth is non-zero, but additionally
-					 * TRUE in case of a duplicate set in gvcst_put.c (cw_set_depth is zero in that case) */
-	cw_set_element	*first_cw_set,
-			*last_cw_set,
-			*first_cw_bitmap;
-	buddy_list	*cw_set_list;		/* list(buddy) of cw_set_elements for this region */
-	buddy_list	*tlvl_cw_set_list;	/* list(buddy) of horizontal cw_set_elements for this region */
-						/* first link in each of these horizontal lists is maintained in
-						 * cw_set_list buddy list */
-	buddy_list	*new_buff_list;		/* to hold the new_buff for the cw_set elements */
-	buddy_list	*recompute_list;	/* to hold the list of to-be-recomputed keys and values */
-	buddy_list	*tlvl_info_list;	/* to hold the list of tlvl_info structures */
-	cache_rec_ptr_ptr_t
-			cr_array;
-	kill_set	*kill_set_head,
-			*kill_set_tail;
-	tlevel_info	*tlvl_info_head;
+	struct sgm_info_struct	*next_sgm_info,
+				*next_tp_si_by_ftok;	 /* List of ALL     regions in the TP transaction sorted on ftok order */
+	srch_blk_status		*first_tp_hist,
+				*last_tp_hist;
+	hash_table_int4		*blks_in_use;
+	trans_num		start_tn;
+	gd_region		*gv_cur_region;
+	int4			update_trans;	/* was this region updated; TRUE if cw_set_depth is non-zero, but additionally
+						 * TRUE in case of a duplicate set (cw_set_depth is zero in that case) */
+	cw_set_element		*first_cw_set,
+				*last_cw_set,
+				*first_cw_bitmap;
+	buddy_list		*cw_set_list;		/* list(buddy) of cw_set_elements for this region */
+	buddy_list		*tlvl_cw_set_list;	/* list(buddy) of horizontal cw_set_elements for this region */
+							/* first link in each of these horizontal lists is maintained in
+							 * cw_set_list buddy list */
+	buddy_list		*new_buff_list;		/* to hold the new_buff for the cw_set elements */
+	buddy_list		*recompute_list;	/* to hold the list of to-be-recomputed keys and values */
+	buddy_list		*tlvl_info_list;	/* to hold the list of tlvl_info structures */
+	cache_rec_ptr_ptr_t	cr_array;
+	sgmnt_data_ptr_t	tpcsd;
+	sgmnt_addrs		*tpcsa;
+	kill_set		*kill_set_head,
+				*kill_set_tail;
+	tlevel_info		*tlvl_info_head;
 	jnl_format_buffer	*jnl_head,
 				**jnl_tail;
-	buddy_list	*format_buff_list;
-	buddy_list	*jnl_list;
-	int		cw_set_depth,
-			cr_array_index,
-			num_of_blks,
-			tp_hist_size,
-			cur_tp_hist_size,
-			total_jnl_rec_size,
-			cr_array_size;
-	boolean_t	fresh_start;
-	int4		crash_count;
-	boolean_t	backup_block_saved;
-	boolean_t	kip_incremented;
-	int		tmp_cw_set_depth;	/* used only #ifdef DEBUG. see comments for tmp_cw_set_depth in tp_tend() */
-	uint4		tot_jrec_size;		/* maximum journal space needs for this transaction */
+	buddy_list		*format_buff_list;
+	buddy_list		*jnl_list;
+	int			cw_set_depth,
+				cr_array_index,
+				num_of_blks,
+				tp_hist_size,
+				cur_tp_hist_size,
+				total_jnl_rec_size,
+				cr_array_size;
+	boolean_t		fresh_start;
+	int4			crash_count;
+	boolean_t		backup_block_saved;
+	boolean_t		kip_incremented;
+	int			tmp_cw_set_depth;	/* used only #ifdef DEBUG. see comments for tmp_cw_set_depth in "tp_tend" */
+	uint4			tot_jrec_size;		/* maximum journal space needs for this transaction */
 } sgm_info;
 
 typedef struct
@@ -278,7 +279,7 @@ GBLREF	short	dollar_trestart;
 
 #define TOTAL_TPJNL_REC_SIZE(total_jnl_rec_size, si, csa)							\
 {														\
-	DEBUG_ONLY(si->tmp_cw_set_depth = si->cw_set_depth;)	/* save a copy to check later in tp_tend() */	\
+	DEBUG_ONLY(si->tmp_cw_set_depth = si->cw_set_depth;)	/* save a copy to check later in "tp_tend" */	\
 	total_jnl_rec_size = si->total_jnl_rec_size;								\
 	if (csa->jnl_before_image)										\
 		total_jnl_rec_size += (si->cw_set_depth * csa->pblk_align_jrecsize);				\
@@ -425,6 +426,7 @@ void tp_clear_timeout_dummy(void);
 void tp_timeout_action_dummy(void);
 
 tp_region	*insert_region(gd_region *reg, tp_region **reg_list, tp_region **reg_free_list, int4 size);
-boolean_t	tp_tend(boolean_t crit_only);
+boolean_t	tp_tend(void);
+boolean_t	tp_crit_all_regions(void);
 
 #endif

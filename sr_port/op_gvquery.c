@@ -97,7 +97,10 @@ void op_gvquery (mval *v)
 		/* Account for ^ in both cases - extnam and no extnam */
 		maxlen = size + ((0 == extnam_str.len) ? 1 : ((extnam_str.len * 2) + (int)(STR_LIT_LEN(extnamdelim))));
 		if ((stringpool.top - stringpool.free) < maxlen)
+		{
+			v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
 			stp_gcol(maxlen);
+		}
 		extnamdst = stringpool.free;
 		*extnamdst++ = extnamdelim[0];
 		if (extnam_str.len > 0)

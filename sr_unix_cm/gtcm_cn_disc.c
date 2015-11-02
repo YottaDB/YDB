@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc *
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ void gtcm_cn_disc(omi_conn *cptr, omi_conn_ll *cll)
 	OMI_DBG_STMP;
 	OMI_DBG((omi_debug, "%s: connection %d to %s closed\n",
 	SRVR_NAME, cptr->stats.id, gtcm_hname(&cptr->stats.sin)));
-	OMI_DBG((omi_debug, "%s:\t%d seconds connect time\n", SRVR_NAME, end - cptr->stats.start));
+	OMI_DBG((omi_debug, "%s:\t%ld seconds connect time\n", SRVR_NAME, end - cptr->stats.start));
 	OMI_DBG((omi_debug, "%s:\t%d transactions\n", SRVR_NAME, nxact));
 	OMI_DBG((omi_debug, "%s:\t%d errors\n", SRVR_NAME, nerrs));
 	OMI_DBG((omi_debug, "%s:\t%d bytes recv'd\n", SRVR_NAME, cptr->stats.bytes_recv));

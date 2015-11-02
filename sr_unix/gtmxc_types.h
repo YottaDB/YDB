@@ -17,12 +17,11 @@
 #pragma pointer_size (short)
 #endif
 
-
 typedef int		xc_status_t;
 typedef	int		xc_int_t;
 typedef unsigned int 	xc_uint_t;
 
-#if defined(__osf__) || defined(__ia64)
+#if defined(__osf__)
 typedef	int		xc_long_t;
 typedef unsigned int 	xc_ulong_t;
 #else
@@ -40,7 +39,7 @@ typedef int		(*xc_pointertofunc_t)();
 
 typedef struct
 {
-	int		length;
+	xc_long_t	length;
 	xc_char_t	*address;
 }	xc_string_t;
 
@@ -50,6 +49,8 @@ typedef struct
 
 /* new types for external/call-in user - xc_* types still valid for backward compatibility */
 typedef xc_status_t	gtm_status_t;
+typedef xc_int_t	gtm_int_t;
+typedef xc_uint_t	gtm_uint_t;
 typedef xc_long_t	gtm_long_t;
 typedef xc_ulong_t	gtm_ulong_t;
 typedef xc_float_t	gtm_float_t;

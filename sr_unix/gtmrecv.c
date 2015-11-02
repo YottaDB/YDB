@@ -62,7 +62,6 @@
 #ifdef UNIX
 #include "ftok_sems.h"
 #endif
-#include "dpgbldir.h"		/* for "get_next_gdr" */
 #include "init_secshr_addrs.h"
 #include "mutex.h"
 
@@ -72,9 +71,6 @@ GBLDEF	int			gtmrecv_filter = NO_FILTER;
 
 GBLREF	void			(*call_on_signal)();
 GBLREF	uint4			process_id;
-GBLREF	cw_set_element		cw_set[];
-GBLREF	unsigned char		cw_set_depth;
-GBLREF	sgm_info		*first_sgm_info;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			recvpool_shmid;
 GBLREF	gtmrecv_options_t	gtmrecv_options;
@@ -87,8 +83,6 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
-GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF	short			dollar_tlevel;
 
 int gtmrecv(void)
 {
@@ -251,8 +245,7 @@ int gtmrecv(void)
 	is_rcvr_server = TRUE;
 	process_id = getpid();
 	/* Reinvoke secshr related initialization with the child's pid */
-	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-		  &jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
+	INVOKE_INIT_SECSHR_ADDRS;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
 	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
 	 * redo the initialization with the child process id.

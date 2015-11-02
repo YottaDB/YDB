@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +21,7 @@
 /* #define JNL_ALLOC_MAX		16777216  moved to jnlsp.h */
 #define JNL_BUFFER_DEF		128
 /*	JNL_BUFFER_MIN	database block size / 512 + 1	*/
-#define JNL_BUFFER_MAX		2000
+#define JNL_BUFFER_MAX		2016
 /*	JNL_EXTEND_DEF	allocation size / 10		*/
 #define JNL_EXTEND_DEF_PERC	0.1
 #define JNL_EXTEND_MIN		0

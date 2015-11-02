@@ -1168,7 +1168,7 @@ STARFILE	<Star(*) argument cannot be specified with !AD>/error/fao=2!/ansi=0
 NOSTARFILE	<Only star(*) argument can be specified with !AD>/error/fao=2!/ansi=0
 MUJNLSTAT	<!AD at !AD>/info/fao=4!/ansi=0
 JNLTPNEST	<Mupip journal command found nested TP transactions for journal file !AD at offset 0x!XL at transaction number 0x!16@XJ>/error/fao=4!/ansi=0
-REPLOFFJNLON	<Replication state for database file !AD is OFF but journaling state is enabled>/fatal/fao=2!/ansi=0
+REPLOFFJNLON	<Replication state for database file !AD is OFF but journaling state is enabled>/error/fao=2!/ansi=0
 FILEDELFAIL	<Deletion of file !AD failed>/warning/fao=2!/ansi=0
 INVQUALTIME	<Invalid time qualifier value.  Specify as !AD=delta_or_absolute_time.>/error/fao=2!/ansi=0
 NOTPOSITIVE	<!AD qualifier must be given a value greater than zero>/error/fao=2!/ansi=0
@@ -1284,6 +1284,7 @@ JNLCLOSED	<Journaling closed for database file !AD at transaction number 0x!16@X
 RLBKNOBIMG	<ROLLBACK cannot proceed as database !AD has NOBEFORE_IMAGE journaling>/error/fao=2!/ansi=0
 RLBKJNLNOBIMG	<Journal file !AD has NOBEFORE_IMAGE journaling>/info/fao=2!/ansi=0
 RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and journal files will not be modified)>/info/fao=0!/ansi=0
+KILLBYSIGSINFO3	<!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XL>/fatal/fao=5!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

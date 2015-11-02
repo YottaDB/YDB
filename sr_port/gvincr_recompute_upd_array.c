@@ -125,8 +125,8 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	/* since cw_set_depth is guaranteed to be 1 (by the above assert), we can be sure that the only update array space we would
 	 * have used is for the current (and only) cw_set_element "cse" and hence can reuse the space by resetting update_array_ptr
 	 */
-	assert(ROUND_UP2((int)update_array, UPDATE_ELEMENT_ALIGN_SIZE) == (int)cse->upd_addr);
-	update_array_ptr = update_array;
+	assert(ROUND_UP2((INTPTR_T)update_array, UPDATE_ELEMENT_ALIGN_SIZE) == (INTPTR_T)cse->upd_addr);
+	RESET_UPDATE_ARRAY; /* do not use CHECK_AND_RESET_UPDATE_ARRAY since we are knowingly resetting an active update array */
 	BLK_INIT(bs_ptr, bs1);
 	BLK_SEG(bs_ptr, buffaddr + sizeof(blk_hdr), bh->curr_rec.offset - sizeof(blk_hdr));
 	BLK_ADDR(curr_rec_hdr, sizeof(rec_hdr), rec_hdr);
@@ -184,7 +184,7 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 		{
 			old_block = (blk_hdr_ptr_t)cse->old_block;
 			if (old_block->tn < csa->jnl->jnl_buff->epoch_tn)
-				cse->blk_checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4 *)old_block, old_block->bsiz);
+				cse->blk_checksum = jnl_get_checksum((uint4 *)old_block, old_block->bsiz);
 			else
 				cse->blk_checksum = 0;
 		}

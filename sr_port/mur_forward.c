@@ -99,7 +99,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	error_def(ERR_JNLTPNEST);
 
 	murgbl.extr_buff = (char *)malloc(murgbl.max_extr_record_length);
-	for (recstat = 0; recstat < TOT_EXTR_TYPES; recstat++)
+	for (recstat = (enum broken_type)0; recstat < TOT_EXTR_TYPES; recstat++)
 		extr_file_create[recstat] = TRUE;
 	jgbl.dont_reset_gbl_jrec_time = jgbl.forw_phase_recovery = TRUE;
 	jgbl.mur_pini_addr_reset_fnptr = (pini_addr_reset_fnptr)mur_pini_addr_reset;
@@ -124,7 +124,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			assert(NULL == rctl->jctl_turn_around);
 			mur_jctl = rctl->jctl = rctl->jctl_head;
 			mur_jctl->rec_offset = JNL_HDR_LEN;
-			jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L; /* initialized to reflect journaling is not enabled */
+			jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END; /* initialized to reflect journaling is not enabled */
 		} else
 		{
 			mur_jctl = rctl->jctl = (NULL == rctl->jctl_turn_around) ? rctl->jctl_head : rctl->jctl_turn_around;
@@ -160,7 +160,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 							SS_NORMAL == status; status = mur_next_rec())
 		{
 			rec = mur_rab.jnlrec;
-			rectype = rec->prefix.jrec_type;
+			rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 			rec_time = rec->prefix.time;
 			if (rec_time > mur_options.before_time)
 				/* Even they do not go to losttrans or brkntrans files */

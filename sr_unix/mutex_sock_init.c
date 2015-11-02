@@ -21,6 +21,7 @@
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
+#include "gtm_string.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"

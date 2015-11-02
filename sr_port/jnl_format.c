@@ -135,8 +135,8 @@ void	jnl_format(jnl_format_buffer *jfb)
 		memset(local_buffer, 0, align_fill_size);
 		local_buffer += align_fill_size;
 	}
-	jfb->checksum = jnl_get_checksum(INIT_CHECKSUM_SEED, (uint4 *)mumps_node_ptr, (int)(local_buffer - mumps_node_ptr));
-	assert(0 == ((uint4)local_buffer % sizeof(jrec_suffix)));
+	jfb->checksum = jnl_get_checksum((uint4 *)mumps_node_ptr, (int)(local_buffer - mumps_node_ptr));
+	assert(0 == ((UINTPTR_T)local_buffer % sizeof(jrec_suffix)));
 	/* SUFFIX */
 	((jrec_suffix *)local_buffer)->backptr = jrec_size;
 	((jrec_suffix *)local_buffer)->suffix_code = JNL_REC_SUFFIX_CODE;

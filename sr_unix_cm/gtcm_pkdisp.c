@@ -34,22 +34,6 @@ GBLREF char	*omi_oprlist[];
  */
 int main(int argc, char_ptr_t argv[])
 {
-
-#ifndef __linux__
-
-#ifdef __osf__
-#pragma pointer_size (save)
-#pragma pointer_size (long)
-#endif
-
-	extern char	 *sys_errlist[];
-
-#ifdef __osf__
-#pragma pointer_size (restore)
-#endif
-
-#endif
-
 	omi_fd	  	fd;
 	char		buff[OMI_BUFSIZ], *bptr, *xptr, *end, *chr;
 	int		cc, blen, bunches, i, n, len, buf[5], j, rdmr;
@@ -63,13 +47,13 @@ int main(int argc, char_ptr_t argv[])
 	{
 		if (argv[1][0] != '-' || argv[1][1] != 'b' || argv[1][2] != '\0')
 		{
-			printf("%s: bad command line arguments\n\t%s [ -b ] filename\n",
+			PRINTF("%s: bad command line arguments\n\t%s [ -b ] filename\n",
 				argv[0], argv[0]);
 			exit(-1);
 		} else if (INV_FD_P((fd = open(argv[argc - 1], O_RDONLY))))
 		{
-			printf("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
-				sys_errlist[errno]);
+			PRINTF("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
+				STRERROR(errno));
 			exit(-1);
 		}
 	} else if (argc == 2)
@@ -78,8 +62,8 @@ int main(int argc, char_ptr_t argv[])
 			fd = fileno(stdin);
 		else if (INV_FD_P((fd = open(argv[argc - 1], O_RDONLY))))
 		{
-			printf("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
-				sys_errlist[errno]);
+			PRINTF("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
+				STRERROR(errno));
 			exit(-1);
 		}
 	}
@@ -87,7 +71,7 @@ int main(int argc, char_ptr_t argv[])
 		fd = fileno(stdin);
 	else
 	{
-		printf("%s: bad command line arguments\n\t%s [ -b ] [ filename ]\n", argv[0], argv[0]);
+		PRINTF("%s: bad command line arguments\n\t%s [ -b ] [ filename ]\n", argv[0], argv[0]);
 		exit(-1);
 	}
 	for (blen = 0, bptr = buff, n = 1, rdmr = 1; ; )
@@ -97,7 +81,7 @@ int main(int argc, char_ptr_t argv[])
 			cc = (int)(&buff[sizeof(buff)] - &bptr[blen]);
 			if ((cc = (int)(read(fd, &bptr[blen], cc))) < 0)
 			{
-				printf("%s: read(): %s", argv[0], sys_errlist[errno]);
+				PRINTF("%s: read(): %s", argv[0], STRERROR(errno));
 				exit(-1);
 			} else if (cc == 0)
 				break;
@@ -125,11 +109,11 @@ int main(int argc, char_ptr_t argv[])
 			continue;
 		}
 		rdmr = 0;
-		printf("Message %d, %d bytes", n, mlen.value);
+		PRINTF("Message %d, %d bytes", n, mlen.value);
 		if (argc == 3 && bunches)
 		{
 			OMI_LI_READ(&nx, xptr);
-			printf(", %d transactions in bunch", nx.value);
+			PRINTF(", %d transactions in bunch", nx.value);
 			bptr += OMI_VI_SIZ + OMI_LI_SIZ;
 			blen -= OMI_VI_SIZ + OMI_LI_SIZ;
 		} else
@@ -154,13 +138,13 @@ int main(int argc, char_ptr_t argv[])
 			OMI_LI_READ(&rh.ref, xptr);
 			if (rh.op_class.value == 1)
 			{
-				printf("    %s (%d bytes)", (omi_oprlist[rh.op_type.value])
+				PRINTF("    %s (%d bytes)", (omi_oprlist[rh.op_type.value])
 				       ? omi_oprlist[rh.op_type.value] : "unknown",xlen.value);
 				if (argc == 3 && bunches)
-				    printf(", transaction #%d in bunch", i);
+				    PRINTF(", transaction #%d in bunch", i);
 				puts("");
 			} else
-				printf("    (%d bytes)\n", xlen.value);
+				PRINTF("    (%d bytes)\n", xlen.value);
 			chr  = (char *)buf;
 			while (xptr < end)
 			{
@@ -172,7 +156,7 @@ int main(int argc, char_ptr_t argv[])
 				for (j = len; j < 20; j++)
 					chr[j] = '\0';
 				for (j = 0; j < 5; j++)
-					printf("%08x ", buf[j]);
+					PRINTF("%08x ", buf[j]);
 				for (j = 0; j < 20; j++)
 				{
 					if (j >= len)
@@ -180,7 +164,7 @@ int main(int argc, char_ptr_t argv[])
 					else if (chr[j] < 32 || chr[j] > 126)
 						chr[j] = '.';
 				}
-				printf("%20s\n", chr);
+				PRINTF("%20s\n", chr);
 			}
 			bptr += xlen.value + 4;
 			blen -= xlen.value + 4;

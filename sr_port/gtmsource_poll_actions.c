@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	char			*time_ptr;
 	char			time_str[CTIME_BEFORE_NL + 1];
 	char			print_msg[1024], msg_str[1024];
+	boolean_t 		log_switched = FALSE;
 	int			status;
 	error_def(ERR_REPLWARN);
 
@@ -123,6 +124,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		}
 		if (gtmsource_local->changelog & REPLIC_CHANGE_LOGFILE)
 		{
+			log_switched = TRUE;
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "Changing log file to %s\n", gtmsource_local->log_file);
 #ifdef UNIX
 			repl_log_init(REPL_GENERAL_LOG, &gtmsource_log_fd, NULL, gtmsource_local->log_file, NULL);
@@ -134,6 +136,8 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 #endif
 		}
 		gtmsource_local->changelog = 0;
+	        if ( log_switched == TRUE )
+        	        repl_log(gtmsource_log_fp, TRUE, TRUE, "Change log to %s successful\n", gtmsource_local->log_file);
 	}
 	if (!gtmsource_logstats && gtmsource_local->statslog)
 	{

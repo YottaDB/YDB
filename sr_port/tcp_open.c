@@ -30,12 +30,9 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <time.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#ifdef UNIX
+#include "gtm_time.h"
+#include "gtm_socket.h"
 #include "gtm_inet.h"
-#endif
 #include "gtm_string.h"
 #include "gtm_ctype.h"
 #include "gtm_stdio.h"
@@ -61,7 +58,8 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	boolean_t		no_time_left = FALSE, error_given = FALSE;
 	char			temp_addr[SA_MAXLEN + 1], addr[SA_MAXLEN + 1];
 	char 			*from, *to, *errptr, *temp_ch;
-	int			match, sock, sendbufsize, size, ii, on = 1, temp_1 = -2;
+	int			match, sock, sendbufsize, ii, on = 1, temp_1 = -2;
+	GTM_SOCKLEN_TYPE	size;
 	int4                    rv, msec_timeout;
 	struct	sockaddr_in	sin;
 	in_addr_t		temp_sin_addr;
@@ -89,7 +87,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		else
 			SPRINTF(addr, "%s", host);
 
-		if (-1 == (temp_sin_addr = tcp_routines.aa_inet_addr(addr)))
+		if ((unsigned int)-1 == (temp_sin_addr = tcp_routines.aa_inet_addr(addr)))
 		{
 			gtm_getmsg(ERR_INVADDRSPEC, &msg_string);
 			util_out_print(msg_string.addr, TRUE, ERR_INVADDRSPEC);

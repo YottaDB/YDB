@@ -433,7 +433,7 @@ void rc_delete_cpt(void)
 	} else
 	{
 		rc_cpt->server_count--;
-		sop[0].sem_num;
+		sop[0].sem_num = 0;
 		sop[0].sem_op = -1;
 		sop[0].sem_flg = SEM_UNDO;
 		SEMOP(rc_sem, sop, 1, semop_rv);
@@ -513,7 +513,7 @@ int rc_create_cpt(void)
 		return old_errno;
 	}
 	rc_cpt->server_count++;
-	sop[0].sem_num;
+	sop[0].sem_num = 0;
 	sop[0].sem_op = -1;
 	sop[0].sem_flg = SEM_UNDO;
 	SEMOP(rc_sem, sop, 1, semop_rv);

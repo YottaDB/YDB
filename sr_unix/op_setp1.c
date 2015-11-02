@@ -332,6 +332,6 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 		memcpy(&cfnpc->pstart[0], &pfnpc->pstart[0], (cfnpc->npcs + 1) * sizeof(unsigned int));
 	} else
 	{	/* No cache available -- just reset index pointer to get fastest cache validation failure */
-		dst->fnpc_indx = -1;
+		dst->fnpc_indx = (unsigned char)-1;
 	}
 }

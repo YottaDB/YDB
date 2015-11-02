@@ -197,7 +197,9 @@ void mupip_backup(void)
 	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
-
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
+	jnl_tm_t		save_gbl_jrec_time;
 #if defined(VMS)
 	struct FAB		temp_fab;
 	struct NAM		temp_nam;
@@ -760,16 +762,17 @@ void mupip_backup(void)
 				rts_error(VARLSTCNT(1) ERR_JNLPOOLSETUP);
 		}
 	)
-	if (online)
+	SET_GBL_JREC_TIME;	/* routines that write jnl records (e.g. wcs_flu) require this to be initialized */
+	for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 	{
-		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
+		if (rptr->not_this_time <= keep_going)
 		{
-			if (rptr->not_this_time <= keep_going)
+			TP_CHANGE_REG(rptr->reg);
+			if (online)
 			{
 				crit_counter = 1;
 				do
 				{
-					TP_CHANGE_REG(rptr->reg);
 					grab_crit(gv_cur_region);
 					if (0 == cs_addrs->hdr->kill_in_prog)
 						break;
@@ -781,19 +784,35 @@ void mupip_backup(void)
 					mubclnup(rptr, need_to_rel_crit);
 					mupip_exit(ERR_BACKUP2MANYKILL);
 				}
+			} else if (JNL_ENABLED(cs_data))
+			{	/* For the non-online case, we want to get crit on ALL regions to ensure we write the
+				 * same timestamp in journal records across ALL regions (in wcs_flu below). We will
+				 * release crit as soon as the wcs_flu across all regions is done.
+				 */
+				grab_crit(gv_cur_region);
+			}
+			/* Now that we have crit, check if this region is actively journaled and if gbl_jrec_time needs to be
+			 * adjusted (to ensure time ordering of journal records within this region's journal file).
+			 * This needs to be done BEFORE writing any journal records for this region. The value of
+			 * jgbl.gbl_jrec_time at the end of this loop will be used to write journal records for ALL
+			 * regions so all regions will have same eov/bov timestamps.
+			 */
+			if (JNL_ENABLED(cs_data)
+				UNIX_ONLY( && (0 != cs_addrs->nl->jnl_file.u.inode))
+				VMS_ONLY( && (0 != memcmp(cs_addrs->nl->jnl_file.jnl_file_id.fid, zero_fid, sizeof(zero_fid)))))
+			{
+				jpc = cs_addrs->jnl;
+				jbp = jpc->jnl_buff;
+				ADJUST_GBL_JREC_TIME(jgbl, jbp);
 			}
 		}
 	}
-
+	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	/* ========================== STEP 4. Flush cache, calculate tn for incremental, and do backup =========== */
 
 	if ((FALSE == mu_ctrly_occurred) && (FALSE == mu_ctrlc_occurred))
 	{
 		mup_bak_pause(); /* ? save some crit time? */
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* set_jnl_file_close & cre_jnl_file need it. Note we already have crit.
-							 * This is done once outside region loop so all regions have same eov/bov
-							 * timestamps in the journal files. This reduces the probability of
-							 * occurrence of D9D12-002410 --- nars -- 2004/01/02 */
 		backup_started = TRUE;
 #ifdef UNIX
 		if (NULL != mu_repl_inst_reg_list)
@@ -1164,9 +1183,12 @@ repl_inst_bkup_done:
 				 */
 				cs_addrs->nl->nbb = -1; /* start */
 				rel_crit(rptr->reg);
-			}
+			} else
+				rel_crit(rptr->reg);
 		}
 		jgbl.dont_reset_gbl_jrec_time = FALSE;
+		/* Ensure jgbl.gbl_jrec_time did not get reset by any of the jnl writing functions */
+		assert(save_gbl_jrec_time == jgbl.gbl_jrec_time);
 		for (rptr = (backup_reg_list *)(grlist);  NULL != rptr;  rptr = rptr->fPtr)
 		{
 			if (rptr->not_this_time > keep_going)

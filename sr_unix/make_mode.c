@@ -29,6 +29,21 @@
 
 #include "make_mode.h"
 
+#ifdef __ia64
+
+#if defined(__linux__)
+
+void dmode_table_init() __attribute__((constructor));
+
+#else /* __hpux */
+
+#pragma INIT "dmode_table_init"
+
+#endif /* __linux__ */
+
+void dmode_table_init(void);
+
+#endif /* __ia64 */
 
 /* This routine is called to create (currently two different) dynamic routines that
    can be executed. One is a direct mode frame, the other is a callin base frame. They
@@ -66,16 +81,6 @@ static dyn_modes our_modes[2] =
 
 #if defined(__ia64)
 
-#if defined(__linux__)
-
-void dmode_table_init() __attribute__((constructor));
-
-#else /* __hpux */
-
-#pragma INIT "dmode_table_init"
-
-#endif /* __linux__ */
-
 /* On IA64, we want to use CODE_ADDRESS() macro, to dereference all the function pointers, before storing them in
    global array. Now doing a dereference operation, as part of initialization, is not allowed by linux/gcc (HP'a aCC
    was more tolerant towards this). So to make sure that the xfer_table is initialized correctly, before anyone
@@ -84,20 +89,19 @@ void dmode_table_init() __attribute__((constructor));
    mechanism to do this
 */
 
-
 void dmode_table_init()
 {
 	/* Note that we assume the order of the function pointers. If the above our_modes table initialization
 	 * changes, this also needs to be revisited
 	 */
 
-	our_modes[0].func_ptr1 = CODE_ADDRESS_C(our_modes[0].func_ptr1);
-	our_modes[0].func_ptr2 = CODE_ADDRESS_ASM(our_modes[0].func_ptr2);
-	our_modes[0].func_ptr3 = CODE_ADDRESS_ASM(our_modes[0].func_ptr3);
+	our_modes[0].func_ptr1 = (void (*)())CODE_ADDRESS_C(our_modes[0].func_ptr1);
+	our_modes[0].func_ptr2 = (void (*)())CODE_ADDRESS_ASM(our_modes[0].func_ptr2);
+	our_modes[0].func_ptr3 = (int (*)())CODE_ADDRESS_ASM(our_modes[0].func_ptr3);
 
-	our_modes[1].func_ptr1 = CODE_ADDRESS_ASM(our_modes[1].func_ptr1);
-	our_modes[1].func_ptr2 = CODE_ADDRESS_C(our_modes[1].func_ptr2);
-	our_modes[1].func_ptr3 = CODE_ADDRESS_ASM(our_modes[1].func_ptr3);
+	our_modes[1].func_ptr1 = (void (*)())CODE_ADDRESS_ASM(our_modes[1].func_ptr1);
+	our_modes[1].func_ptr2 = (void (*)())CODE_ADDRESS_C(our_modes[1].func_ptr2);
+	our_modes[1].func_ptr3 = (int (*)())CODE_ADDRESS_ASM(our_modes[1].func_ptr3);
 }
 
 #endif /* __ia64 */

@@ -58,7 +58,7 @@ error_def(ERR_STACKCRIT);
 void mval_write(zshow_out *output, mval *v, bool flush)
 {
         sm_uc_ptr_t	cp;
-	int4		ch;
+	uint4		ch;
 	int		fastate = 0, ncommas, src_len, src_cnt, strstart, chlen;
 	boolean_t	isctl, isill;
 	char		*strnext;

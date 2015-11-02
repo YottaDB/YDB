@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,7 +94,9 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 #  ifndef __linux__
 	sigaction(SIGEMT, &act, 0);
 #  endif
+#ifndef __CYGWIN__
 	sigaction(SIGIOT, &act, 0);
+#endif
 #endif
 	sigaction(SIGILL, &act, 0);
 	sigaction(SIGQUIT, &act, 0);

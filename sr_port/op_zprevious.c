@@ -89,7 +89,10 @@ void op_zprevious(mval *v)
 					assert(n > 0);
 				}
 				if (stringpool.top - stringpool.free < n)
+				{
+                                        v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
 					stp_gcol(n);
+				}
 			}
 			v->str.addr = (char *)stringpool.free;
 			stringpool.free = gvsub2str(&gv_altkey->base[gv_altkey->prev], stringpool.free, FALSE);
@@ -176,7 +179,10 @@ void op_zprevious(mval *v)
 		if (found)
 		{
 			if (stringpool.free + name.len + 1 > stringpool.top)
+			{
+				v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
 				stp_gcol(name.len + 1);
+			}
 			v->str.addr = (char *)stringpool.free;
 			*stringpool.free++ = '^';
 			memcpy(stringpool.free, name.addr, name.len);

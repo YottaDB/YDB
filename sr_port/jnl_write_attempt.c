@@ -137,7 +137,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			{	/* no one home, clear the semaphore; */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				VMS_ONLY(jb->io_in_prog = 0);
-				UNIX_ONLY(COMPSWAP(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0));
+				UNIX_ONLY(COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0));
 				if (FALSE == was_crit)
 					rel_crit(jpc->region);
 				*lcnt = 1;
@@ -212,7 +212,6 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 		}
 		if ((ERR_JNLCNTRL == status) || (ERR_JNLMEMDSK == status))
 		{
-			assert(FALSE);
 			/* Take a DUMP for debugging */
 			/********************** Disable till gtm_fork_n_core doesn't mess with signals in the parent
 			UNIX_ONLY(
@@ -226,9 +225,13 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			else
 				grab_crit(jpc->region);	/* ??? is this subject to any possible deadlocks ??? */
 			jnlfile_lost = FALSE;
-			if (jb->dskaddr > jb->freeaddr || threshold > jb->freeaddr || jb->free != (jb->freeaddr % jb->size))
+			if (jb->free_update_pid)
+			{
+				FIX_NONZERO_FREE_UPDATE_PID(jb);
+			} else if (jb->dskaddr > jb->freeaddr || threshold > jb->freeaddr || jb->free != (jb->freeaddr % jb->size))
 			{ /* if it's possible to recover from JNLCNTRL, or JNLMEMDSK errors, do it here.
 			   * jnl_file_lost is disruptive - Vinaya, June 05, 2001 */
+				assert(FALSE);
 				jnlfile_lost = TRUE;
 				jnl_file_lost(jpc, status);
 			}

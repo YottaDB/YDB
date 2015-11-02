@@ -252,7 +252,8 @@ int send_mesg2gtmsecshr (unsigned int code, unsigned int id, char *path, int pat
 		SETUP_FOR_RECV;
 		for (save_errno = 0, recv_complete = FALSE; !recv_complete;)
 		{
-			num_chars_recvd = recvfrom(gtmsecshr_sockfd, recv_ptr, MAX_MESG, 0, (struct sockaddr *)0, (sssize_t *)0);
+			num_chars_recvd = recvfrom(gtmsecshr_sockfd, recv_ptr, MAX_MESG, 0, (struct sockaddr *)0,
+						   (GTM_SOCKLEN_TYPE *)0);
 			if (0 <= num_chars_recvd)
 			{
 				recd += num_chars_recvd;

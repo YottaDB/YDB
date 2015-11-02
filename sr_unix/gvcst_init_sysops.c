@@ -447,9 +447,9 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			DB_LEN_STR(reg), gtm_release_name_len, gtm_release_name, LEN_AND_STR(now_running));
 	}
 	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
-	assert(((int)csa->critical & 0xf) == 0); 			/* critical should be 16-byte aligned */
+	assert(((INTPTR_T)csa->critical & 0xf) == 0); 			/* critical should be 16-byte aligned */
 #ifdef CACHELINE_SIZE
-	assert(0 == ((int)csa->critical & (CACHELINE_SIZE - 1)));
+	assert(0 == ((INTPTR_T)csa->critical & (CACHELINE_SIZE - 1)));
 #endif
 	/* Note: Here we check jnl_sate from database file and its value cannot change without standalone access.
 	 * The jnl_buff buffer should be initialized irrespective of read/write process */
@@ -535,7 +535,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			assert(full_len);
 			memcpy(csa->nl->replinstfilename, instfilename, full_len);
 		}
-		csa->nl->creation_date_time.ctime = csd->creation.ctime;
+		csa->nl->creation_date_time4 = csd->creation_time4;
 		csa->nl->highest_lbm_blk_changed = -1;
 		csa->nl->wcs_timers = -1;
 		csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
@@ -623,7 +623,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 */
 		assert(csa->nl->fname[MAX_FN_LEN] == '\0');	/* Note: the first '\0' in csa->nl->fname can be much earlier */
 		if (FALSE == is_gdid_gdid_identical(&FILE_INFO(reg)->fileid, &csa->nl->unique_id.uid) ||
-						csa->nl->creation_date_time.ctime != csd->creation.ctime)
+						csa->nl->creation_date_time4 != csd->creation_time4)
 		{
 			send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, csa->nl->fname, DB_LEN_STR(reg), udi->shmid,
 				ERR_TEXT, 2, LEN_AND_LIT("Fileid of database file doesn't match fileid in shared memory"));

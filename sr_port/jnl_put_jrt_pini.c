@@ -34,21 +34,22 @@ GBLREF 	jnl_gbls_t		jgbl;
 void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 {
 	struct_jrec_pini	pini_record;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 
 	assert(csa->now_crit);
+	jpc = csa->jnl;
+	jbp = jpc->jnl_buff;
 	assert(prc_vec);
 	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
 	pini_record.prefix.jrec_type = JRT_PINI;
 	pini_record.prefix.forwptr = pini_record.suffix.backptr = PINI_RECLEN;
 	pini_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-	pini_record.prefix.pini_addr = csa->jnl->jnl_buff->freeaddr;
+	pini_record.prefix.pini_addr = jbp->freeaddr;
 	/* in case an ALIGN record is written before the PINI record in jnl_write(), pini_addr above is updated appropriately. */
 	pini_record.prefix.tn = csa->ti->curr_tn;
-	assert(jgbl.gbl_jrec_time);	/* the caller should have set it */
-	if (!jgbl.gbl_jrec_time)
-	{	/* no idea how this is possible, but just to be safe */
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
-	}
+	/* At this point jgbl.gbl_jrec_time should be set by the caller */
+	assert(jgbl.gbl_jrec_time);
 	pini_record.prefix.time = jgbl.gbl_jrec_time;
 	JNL_WHOLE_FROM_SHORT_TIME(prc_vec->jpv_time, jgbl.gbl_jrec_time);
 	pini_record.prefix.checksum = INIT_CHECKSUM_SEED;
@@ -73,9 +74,9 @@ void	jnl_put_jrt_pini(sgmnt_addrs *csa)
 		}
 	}
 	memcpy((unsigned char*)&pini_record.process_vector[CURR_JPV], (unsigned char*)prc_vec, sizeof(jnl_process_vector));
-	jnl_write(csa->jnl, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL);
-	/* Note : csa->jnl->pini_addr should not be updated until PINI record is written [C9D08-002376] */
-	csa->jnl->pini_addr = csa->jnl->jnl_buff->freeaddr - PINI_RECLEN;
+	jnl_write(jpc, JRT_PINI, (jnl_record *)&pini_record, NULL, NULL);
+	/* Note : jpc->pini_addr should not be updated until PINI record is written [C9D08-002376] */
+	jpc->pini_addr = jbp->freeaddr - PINI_RECLEN;
 	if (jgbl.forw_phase_recovery && (NULL != jgbl.mur_plst))
-		jgbl.mur_plst->new_pini_addr = csa->jnl->pini_addr;/* note down for future forward play logical record processing */
+		jgbl.mur_plst->new_pini_addr = jpc->pini_addr;/* note down for future forward play logical record processing */
 }

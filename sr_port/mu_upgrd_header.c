@@ -42,6 +42,8 @@ LITREF  int4                    gtm_release_name_len;
 /* Update header from v4.x to v5.0-000 */
 void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 {
+	time_t	ctime;
+
 	error_def(ERR_MUINFOUINT8);
 
 	memset(csd, 0, sizeof(sgmnt_data));
@@ -70,9 +72,11 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->max_update_array_size = v15_csd->max_update_array_size;			/* New from V4.0-001G */
 	csd->max_non_bm_update_array_size = v15_csd->max_non_bm_update_array_size;	/* New from V4.0-001G */
 	csd->file_corrupt = v15_csd->file_corrupt;
-	csd->minor_dbver = GDSMVCURR;		/* New in V5.0-000 */
+	csd->minor_dbver = (enum mdb_ver)GDSMVCURR;		/* New in V5.0-000 */
 	csd->createinprogress = v15_csd->createinprogress;
-	time(&csd->creation.ctime);		/* No need to propagate previous value */
+	time(&ctime);
+	assert(sizeof(ctime) >= sizeof(int4));
+	csd->creation_time4 = (int4)ctime;/* No need to propagate previous value. Take only lower order 4-bytes of current time */
 	csd->last_inc_backup = v15_csd->last_inc_backup;
 	csd->last_com_backup = v15_csd->last_com_backup;
 	csd->last_rec_backup = v15_csd->last_rec_backup;
@@ -85,7 +89,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	assert(csd->blks_to_upgrd);
 	csd->tn_upgrd_blks_0 = 0;								/* New in V5.0-000 */
 	csd->fully_upgraded = FALSE;								/* New in V5.0-000 */
-	csd->desired_db_format = GDSVCURR;							/* New in V5.0-000 */
+	csd->desired_db_format = (enum db_ver)GDSVCURR;							/* New in V5.0-000 */
 	csd->desired_db_format_tn = v15_csd->trans_hist.curr_tn;				/* New in V5.0-000 */
 	csd->reorg_db_fmt_start_tn = 0;								/* New in V5.0-000 */
 	csd->certified_for_upgrade_to = v15_csd->certified_for_upgrade_to;			/* New in V5.0-000 */

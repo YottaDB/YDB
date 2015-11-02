@@ -25,7 +25,7 @@ static char rcsid[] = "$Header:$";
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include <crypt.h> /* for crypt() */
-#include <unistd.h> /* for crypt() */
+#include "gtm_unistd.h" /* for crypt() */
 
 #include "gtcm.h"
 #include "omi.h"
@@ -162,8 +162,8 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     ag_pass[ss_len.value] = '\0';
     cptr->xptr += ss_len.value;
 
-/* No support for authentication on SCO and Linux at the moment...*/
-#if !(defined(SCO) || defined(__linux__))
+/* No support for authentication on SCO, Linux, or Cygwin at the moment...*/
+#if !(defined(SCO) || defined(__linux__) || defined(__CYGWIN__))
     if (authenticate)  /* verify password and user name */
     {
 #ifdef SHADOWPW
@@ -196,7 +196,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 		}
 		syspw = spass->sp_pwdp;
 	    }
-	    else if ((pass= getpwnam(ag_name)) == NULL)
+	    else if ((pass = getpwnam(ag_name)) == NULL)
 	    {
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			     SRVR_NAME, ag_name));
@@ -208,7 +208,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 
 #else    /* ndef SHADOWPW */
-	    if ((pass= getpwnam(ag_name)) == NULL) {
+	    if ((pass = getpwnam(ag_name)) == NULL) {
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			     SRVR_NAME, ag_name));
 		    return -OMI_ER_DB_USERNOAUTH;
@@ -226,7 +226,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 		    return -OMI_ER_DB_USERNOAUTH;
 	    }
     }
-#endif  /* SCO */
+#endif  /* SCO or linux or cygwin */
 
 
 /*  Server name (in) */

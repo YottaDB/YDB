@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +13,8 @@
 
 #include "rtnhdr.h"
 #include "private_code_copy.h"
+
+void adjust_frames(unsigned char *old_ptext_beg, unsigned char *old_ptext_end, unsigned char *new_ptext_beg);
 
 void release_private_code_copy(rhdtyp *rtn)
 {

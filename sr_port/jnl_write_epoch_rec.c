@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,30 +58,27 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	error_def		(ERR_PREMATEOF);
 
 	assert(csa->now_crit);
-	assert(0 != csa->jnl->pini_addr);
+	jpc = csa->jnl;
+	assert(0 != jpc->pini_addr);
 	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
 	csd = csa->hdr;
 	epoch_record.prefix.jrec_type = JRT_EPOCH;
 	epoch_record.prefix.forwptr = epoch_record.suffix.backptr = EPOCH_RECLEN;
 	epoch_record.blks_to_upgrd = csd->blks_to_upgrd;
 	epoch_record.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-	/* in case csa->jnl->pini_addr turns out to be zero (not clear how), we use the pini_addr field of the
+	/* in case jpc->pini_addr turns out to be zero (not clear how), we use the pini_addr field of the
 	 * first PINI journal record in the journal file which is nothing but JNL_HDR_LEN.
 	 */
-	epoch_record.prefix.pini_addr = (0 == csa->jnl->pini_addr) ? JNL_HDR_LEN : csa->jnl->pini_addr;
-	jpc = csa->jnl;
+	epoch_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
 	jb = jpc->jnl_buff;
 	jb->epoch_tn = epoch_record.prefix.tn = csa->ti->curr_tn;
+	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
-	if (!jgbl.gbl_jrec_time)
-	{	/* no idea how this is possible, but just to be safe */
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);
-	}
 	epoch_record.prefix.time = jgbl.gbl_jrec_time;
 	/* we need to write epochs if jgbl.forw_phase_recovery so future recovers will have a closer turnaround point */
 	jb->next_epoch_time =  epoch_record.prefix.time + jb->epoch_interval;
 	epoch_record.prefix.checksum = INIT_CHECKSUM_SEED;
-	assert(NULL == jnlpool_ctl  ||  QWLE(csd->reg_seqno, jnlpool_ctl->jnl_seqno));
+	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csd, jnlpool_ctl);	/* debug-only sanity check between seqno of filehdr and jnlpool */
 	if (jgbl.forw_phase_recovery)
 		/* As the file header is not flushed too often and recover/rollback doesn't update reg_seqno */
 		QWASSIGN(epoch_record.jnl_seqno, jgbl.mur_jrec_seqno);
@@ -108,5 +105,5 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	jb->eov_tn = csa->ti->curr_tn;
 	jb->eov_timestamp = jgbl.gbl_jrec_time;
 	jb->end_seqno = epoch_record.jnl_seqno;
-	jnl_write(csa->jnl, JRT_EPOCH, (jnl_record *)&epoch_record, NULL, NULL);
+	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL, NULL);
 }

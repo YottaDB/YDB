@@ -55,7 +55,6 @@
 #include "repl_instance.h"
 #include "ftok_sems.h"
 #include "gt_timer.h"		/* for LONG_SLEEP macro (hiber_start function prototype) */
-#include "dpgbldir.h"		/* for "get_next_gdr" */
 #include "init_secshr_addrs.h"
 #include "mutex.h"
 
@@ -68,9 +67,6 @@ GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	boolean_t		is_src_server;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	uint4			process_id;
-GBLREF	cw_set_element		cw_set[];
-GBLREF	unsigned char		cw_set_depth;
-GBLREF	sgm_info		*first_sgm_info;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	int			gtmsource_log_fd;
 GBLREF	FILE			*gtmsource_log_fp;
@@ -93,8 +89,6 @@ GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
-GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF	short			dollar_tlevel;
 
 int gtmsource()
 {
@@ -229,8 +223,7 @@ int gtmsource()
 	is_src_server = TRUE;
 	process_id = getpid();
 	/* Reinvoke secshr related initialization with the child's pid */
-	init_secshr_addrs(get_next_gdr, cw_set, &first_sgm_info, &cw_set_depth, process_id, 0, OS_PAGE_SIZE,
-		  &jnlpool.jnlpool_dummy_reg, &inctn_detail, &dollar_tlevel);
+	INVOKE_INIT_SECSHR_ADDRS;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool. */
 	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
 	if (!mutex_per_process_init_pid)
@@ -364,7 +357,12 @@ int gtmsource()
 		gtmsource_poll_actions(FALSE);
 		if (GTMSOURCE_CHANGING_MODE == gtmsource_state)
 			continue;
-		SPRINTF(tmpmsg, "GTM Replication Source Server now in ACTIVE mode using port %ld", gtmsource_local->secondary_port);
+		NON_IA64_ONLY(SPRINTF(tmpmsg,
+				      "GTM Replication Source Server now in ACTIVE mode using port %ld",
+				      gtmsource_local->secondary_port));
+		IA64_ONLY(SPRINTF(tmpmsg,
+				  "GTM Replication Source Server now in ACTIVE mode using port %d",
+				  gtmsource_local->secondary_port));
 		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);

@@ -35,7 +35,6 @@
 #include "sleep_cnt.h"
 #include "jnl_write.h"
 #include "copy.h"
-#include "jnl_get_checksum.h"
 
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 DEBUG_ONLY( GBLREF bool		run_time;)
@@ -67,7 +66,7 @@ void	jnl_write_poolonly(jnl_private_control *jpc, enum jnl_record_type rectype, 
 	jrec_suffix		suffix;
 	boolean_t		nowrap;
 	struct_jrec_blk		*jrec_blk;
-	uint4			checksum, jnlpool_size;
+	uint4			jnlpool_size;
 	uchar_ptr_t		jnlrecptr;
 	DEBUG_ONLY(uint4	lcl_dskaddr;)
 

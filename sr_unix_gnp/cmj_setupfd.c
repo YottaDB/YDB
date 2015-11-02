@@ -16,7 +16,7 @@
 #define BSD_COMP
 #endif
 #include <sys/ioctl.h>
-#include <netinet/in.h>
+#include "gtm_inet.h"
 #ifndef __MVS__
 #include <netinet/tcp.h>
 #endif
@@ -63,8 +63,8 @@ cmi_status_t cmj_setupfd(int fd)
 #endif
 #ifndef GTCM_KEEP_DEFAULT_BUFLEN /* if you want to test with system allocated default buflen, define this and rebuild */
 	optlen = SIZEOF(buflen);
-	if (-1 == (rval = getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (void *)&snd_buflen, &optlen)) ||
-	    -1 == (rval = getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void *)&rcv_buflen, &optlen)))
+	if (-1 == (rval = getsockopt(fd, SOL_SOCKET, SO_SNDBUF, (void *)&snd_buflen, (GTM_SOCKLEN_TYPE *)&optlen)) ||
+	    -1 == (rval = getsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void *)&rcv_buflen, (GTM_SOCKLEN_TYPE *)&optlen)))
 		return (cmi_status_t)errno;
 	CMI_DPRINT(("Current buffer sizes for fd %d are send : %d, recv : %d\n", fd, snd_buflen, rcv_buflen));
 	if (GTCM_MIN_TCP_SNDBUFLEN > snd_buflen)

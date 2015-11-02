@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,9 @@
 #define PERROR				perror
 #define	POPEN				popen
 #define TEMPNAM				tempnam
+#ifndef P_tmpdir
+#define P_tmpdir			"/tmp"
+#endif
 #define RENAME				rename
 #define SETVBUF				setvbuf
 #define FPRINTF         		fprintf

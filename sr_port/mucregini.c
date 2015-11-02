@@ -55,6 +55,7 @@ void mucregini(int4 blk_init_size)
 	collseq			*csp;
 	uint4			ustatus;
 	mstr 			jnlfile, jnldef, tmpjnlfile;
+	time_t			ctime;
 
 	error_def(ERR_COLLATIONUNDEF);
 	error_def(ERR_COLLTYPVERSION);
@@ -65,12 +66,13 @@ void mucregini(int4 blk_init_size)
 	error_def(ERR_FILEPARSE);
 
 	MEMCPY_LIT(cs_data->label, GDS_LABEL);
-	cs_data->desired_db_format = GDSVCURR;
+	cs_data->desired_db_format = (enum db_ver)GDSVCURR;
 	cs_data->fully_upgraded = TRUE;
-	cs_data->minor_dbver = GDSMVCURR;
-	cs_data->certified_for_upgrade_to = GDSVCURR;
-	cs_data->creation_db_ver = GDSVCURR;
-	cs_data->creation_mdb_ver = GDSMVCURR;
+	cs_data->db_got_to_v5_once = TRUE;	/* no V4 format blocks that are non-upgradeable */
+	cs_data->minor_dbver = (enum mdb_ver)GDSMVCURR;
+	cs_data->certified_for_upgrade_to = (enum db_ver)GDSVCURR;
+	cs_data->creation_db_ver = (enum db_ver)GDSVCURR;
+	cs_data->creation_mdb_ver = (enum mdb_ver)GDSMVCURR;
 	cs_data->master_map_len = MASTER_MAP_SIZE_DFLT;
 	cs_data->bplmap = BLKS_PER_LMAP;
 	assert(BLK_SIZE <= MAX_DB_BLK_SIZE);
@@ -200,7 +202,9 @@ void mucregini(int4 blk_init_size)
 	cs_data->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
-	time(&cs_data->creation.ctime);
+	time(&ctime);
+	assert(sizeof(ctime) >= sizeof(int4));
+	cs_data->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */
 	cs_addrs->bmm = MM_ADDR(cs_data);
 	bmm_init();
 	for (i = 0; i < blk_init_size ; i += cs_data->bplmap)

@@ -101,7 +101,8 @@ static	bool set_opcode(triple *r, oprtype *result, oprtype *result_ptr, oprtype 
 			if (global == object)
 			{	/* No need for OC_GVSAVTARG/OC_GVRECTARG processing as expr is a constant (no global references) */
 				setcurtchain(oldchain);
-				dqadd(curtchain, &tmpchain, exorder);
+				tmptriple = curtchain->exorder.bl;
+				dqadd(tmptriple, &tmpchain, exorder);
 			}
 		} else
 		{

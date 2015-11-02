@@ -36,21 +36,6 @@ static char rcsid[] = "$Header:$";
 
 void omi_dump_pkt(omi_conn *cptr)
 {
-#ifndef __linux__
-
-#ifdef __osf__
-#pragma pointer_size (save)
-#pragma pointer_size (long)
-#endif
-
-    extern char	*sys_errlist[];
-
-#ifdef __osf__
-#pragma pointer_size (restore)
-#endif
-
-#endif
-
     char	*ptr, *end, *chr;
     omi_vi	 vi, mlen, xlen;
     omi_li	 li, nx;
@@ -61,7 +46,7 @@ void omi_dump_pkt(omi_conn *cptr)
 	return;
 
     if (write(cptr->pklog, cptr->bptr, cptr->blen) < 0)
-	OMI_DBG((omi_debug, "gtcm_server: write(): %s\n", sys_errlist[errno]));
+	OMI_DBG((omi_debug, "gtcm_server: write(): %s\n", STRERROR(errno)));
 
     if (!omi_pkdbg)
 	return;

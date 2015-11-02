@@ -92,7 +92,7 @@ int mu_op_open(mval *v, mval *p, int t, mval *mspace)
 		case SS_NORMAL:
 			tl = get_log_name(&tn, INSERT);
 			break;
-		case SS_NOLOGNAM:
+		case (unsigned int)SS_NOLOGNAM:
 			tl = naml;
 			break;
 		default:

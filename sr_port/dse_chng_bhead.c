@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,21 +68,23 @@ GBLREF jnl_gbls_t	jgbl;
 
 void dse_chng_bhead(void)
 {
-	block_id	blk;
-	block_id	*blkid_ptr;
-	sgm_info	*dummysi = NULL;
-	int4		x;
-	trans_num	tn;
-	cache_rec_ptr_t	cr;
-	blk_hdr		new_hdr;
-	blk_segment	*bs1, *bs_ptr;
-	cw_set_element  *cse;
-	int4		blk_seg_cnt, blk_size;	/* needed for BLK_INIT,BLK_SEG and BLK_FINI macros */
-	boolean_t	ismap;
-	boolean_t	chng_blk;
-	uint4		mapsize;
-	uint4           jnl_status;
-	srch_blk_status	blkhist;
+	block_id		blk;
+	block_id		*blkid_ptr;
+	sgm_info		*dummysi = NULL;
+	int4			x;
+	trans_num		tn;
+	cache_rec_ptr_t		cr;
+	blk_hdr			new_hdr;
+	blk_segment		*bs1, *bs_ptr;
+	cw_set_element		*cse;
+	int4			blk_seg_cnt, blk_size;	/* needed for BLK_INIT,BLK_SEG and BLK_FINI macros */
+	boolean_t		ismap;
+	boolean_t		chng_blk;
+	uint4			mapsize;
+	uint4			jnl_status;
+	srch_blk_status		blkhist;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 
 	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DSEFAIL);
@@ -90,9 +92,7 @@ void dse_chng_bhead(void)
 
         if (gv_cur_region->read_only)
                 rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-	assert(update_array);
-	/* reset new block mechanism */
-	update_array_ptr = update_array;
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	chng_blk = FALSE;
 	if (cli_present("BLOCK") == CLI_PRESENT)
 	{
@@ -175,7 +175,7 @@ void dse_chng_bhead(void)
 			t_abort(gv_cur_region, cs_addrs);
 			return;
 		}
-		t_write(&blkhist, (unsigned char *)bs1, 0, 0, new_hdr.levl, TRUE, FALSE);
+		t_write(&blkhist, (unsigned char *)bs1, 0, 0, new_hdr.levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 		BUILD_AIMG_IF_JNL_ENABLED(cs_addrs, cs_data, non_tp_jfb_buff_ptr, cse);
 		t_end(&dummy_hist, 0);
 	}
@@ -211,12 +211,20 @@ void dse_chng_bhead(void)
 			BLK_INIT(bs_ptr, bs1);
 			BLK_SEG(bs_ptr, blkhist.buffaddr + sizeof(new_hdr), new_hdr.bsiz - sizeof(new_hdr));
 			BLK_FINI(bs_ptr, bs1);
-			t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)blkhist.buffaddr)->levl, TRUE, FALSE);
+			t_write(&blkhist, (unsigned char *)bs1, 0, 0,
+				((blk_hdr_ptr_t)blkhist.buffaddr)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 			cr_array_index = 0;
 			block_saved = FALSE;
 			if (JNL_ENABLED(cs_data))
 			{
-				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_aimg_rec() */
+				SET_GBL_JREC_TIME;	/* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_aimg_rec */
+				jpc = cs_addrs->jnl;
+				jbp = jpc->jnl_buff;
+				/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl
+				 * records. This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+				 * (if it decides to switch to a new journal file)
+				 */
+				ADJUST_GBL_JREC_TIME(jgbl, jbp);
 				jnl_status = jnl_ensure_open();
 				if (0 == jnl_status)
 				{
@@ -224,7 +232,7 @@ void dse_chng_bhead(void)
 					cse->new_buff = non_tp_jfb_buff_ptr;
 					gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, tn);
 					cse->done = TRUE;
-					if (0 == cs_addrs->jnl->pini_addr)
+					if (0 == jpc->pini_addr)
 						jnl_put_jrt_pini(cs_addrs);
 					jnl_write_aimg_rec(cs_addrs, cse);
 				} else
@@ -241,6 +249,7 @@ void dse_chng_bhead(void)
 		while (cr_array_index)
 			cr_array[--cr_array_index]->in_cw_set = FALSE;
 		rel_crit(gv_cur_region);
+		cw_set_depth = 0;	/* signal end of active transaction to secshr_db_clnup/t_commit_clnup */
 		if (block_saved)
 			backup_buffer_flush(gv_cur_region);
 		if (unhandled_stale_timer_pop)

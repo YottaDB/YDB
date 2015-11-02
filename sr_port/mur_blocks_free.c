@@ -60,7 +60,7 @@ int4 mur_blocks_free()
 	maps = (cs_data->trans_hist.total_blks + cs_data->bplmap - 1) / cs_data->bplmap;
 	map_blk_size = BM_SIZE(cs_data->bplmap);
 	m_ptr = (unsigned char*)malloc(cs_data->blk_size + 8);
-	disk = (unsigned char *)(((UINTPTR_T)m_ptr) + 7 & -8);
+	disk = (unsigned char *)(((UINTPTR_T)m_ptr) + 7 & (UINTPTR_T)(-8L));
 	db_ctl->op_buff = (uchar_ptr_t)disk;
 	db_ctl->op_len = cs_data->blk_size;
 	for (i = 0; i != maps; i++)
@@ -71,7 +71,7 @@ int4 mur_blocks_free()
 		status = dbfilop(db_ctl);
 		if (SYSCALL_ERROR(status))
 			rts_error(VARLSTCNT(5) ERR_DBRDERR, 2, DB_LEN_STR(gv_cur_region), status);
-		GDS_BLK_UPGRADE_IF_NEEDED(bnum, disk, disk, cs_data, &dummy_ondskblkver, status);
+		GDS_BLK_UPGRADE_IF_NEEDED(bnum, disk, disk, cs_data, &dummy_ondskblkver, status, cs_data->fully_upgraded);
 		if (SS_NORMAL != status)
 			if (ERR_DYNUPGRDFAIL == status)
 				rts_error(VARLSTCNT(5) status, 3, bnum, DB_LEN_STR(gv_cur_region));

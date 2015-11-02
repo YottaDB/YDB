@@ -69,6 +69,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLREF	boolean_t		mu_reorg_nosafejnl;		/* TRUE if NOSAFEJNL explicitly specified */
 GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block processed by REORG UP/DOWNGRADE */
 GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
@@ -88,7 +89,7 @@ GBLDEF	trans_num		mu_reorg_upgrd_dwngrd_start_tn;
 typedef struct
 {
 	int4	blks_read_from_disk_bmp;
-	int4	blks_skipped_free_recycled;
+	int4	blks_skipped_free;
 	int4	blks_read_from_disk_nonbmp;
 	int4	blks_skipped_newfmtindisk;
 	int4	blks_skipped_newfmtincache;
@@ -103,7 +104,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	block_id		*blkid_ptr, curblk, curbmp, start_blk, stop_blk, start_bmp, last_bmp;
 	block_id		startblk_input, stopblk_input;
 	boolean_t		upgrade, downgrade, safejnl, nosafejnl, region, first_reorg_in_this_db_fmt, reorg_entiredb;
-	boolean_t		startblk_specified, stopblk_specified, set_fully_upgraded;
+	boolean_t		startblk_specified, stopblk_specified, set_fully_upgraded, db_got_to_v5_once, mark_blk_free;
 	cache_rec_ptr_t		cr;
 	char			*bml_lcl_buff = NULL, *command, *reorg_command;
 	sm_uc_ptr_t		bptr = NULL;
@@ -124,6 +125,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	tp_region		*rptr;
 	trans_num		curr_tn;
 	unsigned char    	save_cw_set_depth;
+	int4			lcl_update_trans;
 
 	error_def(ERR_BUFFLUFAILED);
 	error_def(ERR_DBBTUWRNG);
@@ -374,6 +376,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			mapsize = (curbmp == last_bmp) ? (stop_blk - curbmp) : BLKS_PER_LMAP;
 			assert(0 != mapsize);
 			assert(mapsize <= BLKS_PER_LMAP);
+			db_got_to_v5_once = csd->db_got_to_v5_once;
 			for (lcnt = curblk - curbmp; lcnt < mapsize; lcnt++, curblk++)
 			{
 				if (mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -383,70 +386,83 @@ void	mu_reorg_upgrd_dwngrd(void)
 				}
 				GET_BM_STATUS(bml_lcl_buff, lcnt, bml_status);
 				assert(BLK_MAPINVALID != bml_status); /* cert_blk ran clean so we dont expect invalid entries */
-				if (BLK_BUSY != bml_status)
+				if (BLK_FREE == bml_status)
 				{
-					reorg_stats.blks_skipped_free_recycled++;
+					reorg_stats.blks_skipped_free++;
 					continue;
 				}
-				if (lcnt)
-				{	/* non-bitmap block.
-					 * read in block from disk into private buffer. dont pollute the cache yet.
-					 */
-					if (NULL == bptr)
-						bptr = (sm_uc_ptr_t)malloc(blk_size);
-					status1 = dsk_read(curblk, bptr, &ondsk_blkver);
-					/* dsk_read on curblk could return an error (DYNUPGRDFAIL) if curblk needs to be upgraded
-					 * and if its block size was too big to allow the extra block-header space requirements
-					 * for a dynamic upgrade. a MUPIP REORG DOWNGRADE should not error out in that case
-					 * as the block is already in the downgraded format.
-					 */
-					if (SS_NORMAL != status1)
-					{
-						if (!upgrade && (ERR_DYNUPGRDFAIL == status1))
+				/* MUPIP REORG UPGRADE/DOWNGRADE will convert USED & RECYCLED blocks */
+				if (db_got_to_v5_once || (BLK_RECYCLED != bml_status))
+				{	/* Do NOT read recycled V4 block from disk unless it is guaranteed NOT to be too full */
+					if (lcnt)
+					{	/* non-bitmap block */
+						/* read in block from disk into private buffer. dont pollute the cache yet */
+						if (NULL == bptr)
+							bptr = (sm_uc_ptr_t)malloc(blk_size);
+						status1 = dsk_read(curblk, bptr, &ondsk_blkver);
+						/* dsk_read on curblk could return an error (DYNUPGRDFAIL) if curblk needs to be
+						 * upgraded and if its block size was too big to allow the extra block-header space
+						 * requirements for a dynamic upgrade. a MUPIP REORG DOWNGRADE should not error out
+						 * in that case as the block is already in the downgraded format.
+						 */
+						if (SS_NORMAL != status1)
 						{
-							assert(GDSV4 == new_db_format);
-							ondsk_blkver = new_db_format;
-						} else
-						{
-							gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status1);
-							util_out_print("Region !AD : Error occurred while reading block [0x!8XL]",
-								TRUE, REG_LEN_STR(reg), curblk);
-							status1 = ERR_MUNOFINISH;
-							goto stop_reorg_on_this_reg;	/* goto needed because of nested FOR Loop */
+							if (!upgrade && (ERR_DYNUPGRDFAIL == status1))
+							{
+								assert(GDSV4 == new_db_format);
+								ondsk_blkver = new_db_format;
+							} else
+							{
+								gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status1);
+								util_out_print("Region !AD : Error occurred while reading block "
+									"[0x!8XL]", TRUE, REG_LEN_STR(reg), curblk);
+								status1 = ERR_MUNOFINISH;
+								goto stop_reorg_on_this_reg;/* goto needed due to nested FOR Loop */
+							}
 						}
+						reorg_stats.blks_read_from_disk_nonbmp++;
+					} /* else bitmap block has been read in crit earlier and ondsk_blkver appropriately set */
+					if (new_db_format == ondsk_blkver)
+					{
+						assert((SS_NORMAL == status1) || (!upgrade && (ERR_DYNUPGRDFAIL == status1)));
+						status1 = SS_NORMAL;	/* treat DYNUPGRDFAIL as no error in case of downgrade */
+						reorg_stats.blks_skipped_newfmtindisk++;
+						continue;	/* current disk version is identical to what is desired */
 					}
-					reorg_stats.blks_read_from_disk_nonbmp++;
-				} /* else bitmap block has already been read in crit earlier and ondsk_blkver appropriately set */
-				if (new_db_format == ondsk_blkver)
-				{
-					assert((SS_NORMAL == status1) || (!upgrade && (ERR_DYNUPGRDFAIL == status1)));
-					status1 = SS_NORMAL;	/* treat DYNUPGRDFAIL as no error in case of downgrade */
-					reorg_stats.blks_skipped_newfmtindisk++;
-					continue;	/* current disk version is identical to what is desired */
+					assert(SS_NORMAL == status1);
 				}
-				assert(SS_NORMAL == status1);
 				/* Begin non-TP transaction to upgrade/downgrade the block.
 				 * The way we do that is by updating the block using a null update array.
 				 * Any update to a block will trigger an automatic upgrade/downgrade of the block based on
 				 * 	the current fileheader desired_db_format setting and we use that here.
 				 */
-				update_array_ptr = update_array;	/* reset new block mechanism for every transaction */
+				CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 				t_begin(ERR_MUREORGFAIL, TRUE);
 				for (; ;)
 				{
-					inctn_opcode = upgrade ? inctn_blkupgrd : inctn_blkdwngrd;
 					curr_tn = csd->trans_hist.curr_tn;
-					blkBase = t_qread(curblk, (sm_int_ptr_t)&blkhist.cycle, &blkhist.cr);
-					if (NULL == blkBase)
+					db_got_to_v5_once = csd->db_got_to_v5_once;
+					if (db_got_to_v5_once || (BLK_RECYCLED != bml_status))
 					{
-						t_retry(rdfail_detail);
-						continue;
+						blkBase = t_qread(curblk, (sm_int_ptr_t)&blkhist.cycle, &blkhist.cr);
+						if (NULL == blkBase)
+						{
+							t_retry((enum cdb_sc)rdfail_detail);
+							continue;
+						}
+						blkhist.blk_num = curblk;
+						blkhist.buffaddr = blkBase;
+						ondsk_blkver = blkhist.cr->ondsk_blkver;
+						new_hdr = *(blk_hdr_ptr_t)blkBase;
+						mu_reorg_upgrd_dwngrd_blktn = new_hdr.tn;
+						mark_blk_free = FALSE;
+						inctn_opcode = upgrade ? inctn_blkupgrd : inctn_blkdwngrd;
+					} else
+					{
+						mark_blk_free = TRUE;
+						inctn_opcode = inctn_blkmarkfree;
 					}
-					blkhist.blk_num = curblk;
-					blkhist.buffaddr = blkBase;
-					ondsk_blkver = blkhist.cr->ondsk_blkver;
-					new_hdr = *(blk_hdr_ptr_t)blkBase;
-					mu_reorg_upgrd_dwngrd_blktn = new_hdr.tn;
+					inctn_detail.blknum = curblk;
 					/* t_end assumes that the history it is passed does not contain a bitmap block.
 					 * for bitmap block, the history validation information is passed through cse instead.
 					 * therefore we need to handle bitmap and non-bitmap cases separately.
@@ -466,6 +482,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 						 * overhead is going to be one per bitmap block and since the block is in the cache
 						 * at this point, we should not lose much.
 						 */
+						assert(!mark_blk_free);
 						BLK_ADDR(blkid_ptr, sizeof(block_id), block_id);
 						*blkid_ptr = 0;
 						t_write_map(&blkhist, (unsigned char *)blkid_ptr, curr_tn);
@@ -473,23 +490,27 @@ void	mu_reorg_upgrd_dwngrd(void)
 					} else
 					{	/* non-bitmap block. fill in history for validation in t_end */
 						assert(curblk);	/* we should never come here for block 0 (bitmap) */
-						alt_hist.h[0].blk_num = curblk;
-						alt_hist.h[0].buffaddr = blkBase;
-						alt_hist.h[0].cr      = blkhist.cr;
-						alt_hist.h[0].cycle   = blkhist.cycle;
-						alt_hist.h[0].tn      = curr_tn;
-						alt_hist.h[1].blk_num = 0;
-						/* Also need to pass the bitmap as history to detect if any concurrent
-						 * M-kill is freeing up the same block that we are trying to upgrade/downgrade.
-						 * Because of t_end currently not being able to validate a bitmap without that
-						 * simultaneously having a cse, we need to create a cse for the bitmap that is
-						 * used only for bitmap history validation, but should not be used to update
-						 * the contents of the bitmap block in bg_update.
+						if (!mark_blk_free)
+						{
+							alt_hist.h[0].blk_num = curblk;
+							alt_hist.h[0].buffaddr = blkBase;
+							alt_hist.h[0].cr      = blkhist.cr;
+							alt_hist.h[0].cycle   = blkhist.cycle;
+							alt_hist.h[0].tn      = curr_tn;
+							alt_hist.h[1].blk_num = 0;
+						}
+						/* Also need to pass the bitmap as history to detect if any concurrent M-kill
+						 * is freeing up the same USED block that we are trying to convert OR if any
+						 * concurrent M-set is reusing the same RECYCLED block that we are trying to
+						 * convert. Because of t_end currently not being able to validate a bitmap
+						 * without that simultaneously having a cse, we need to create a cse for the
+						 * bitmap that is used only for bitmap history validation, but should not be
+						 * used to update the contents of the bitmap block in bg_update.
 						 */
 						bmlhist.buffaddr = t_qread(curbmp, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr);
 						if (NULL == bmlhist.buffaddr)
 						{
-							t_retry(rdfail_detail);
+							t_retry((enum cdb_sc)rdfail_detail);
 							continue;
 						}
 						bmlhist.blk_num = curbmp;
@@ -500,44 +521,76 @@ void	mu_reorg_upgrd_dwngrd(void)
 							t_retry(cdb_sc_lostbmlcr);
 							continue;
 						}
-						if ((new_db_format != ondsk_blkver) && (BLK_BUSY == bml_status))
-						{	/* block still needs to be converted. create cse */
-							BLK_INIT(bs_ptr, bs1);
-							BLK_SEG(bs_ptr, blkBase + sizeof(new_hdr), new_hdr.bsiz - sizeof(new_hdr));
-							BLK_FINI(bs_ptr, bs1);
-							t_write(&blkhist, (unsigned char *)bs1, 0, 0,
-										((blk_hdr_ptr_t)blkBase)->levl, FALSE, FALSE);
-							/* reset update_trans to TRUE in case previous retry had set it to FALSE */
-							update_trans = TRUE;
-						} else
-						{	/* Block got converted by another process since we did the dsk_read.
-							 * 	or this block became marked free in the bitmap.
-							 * No need to update this block. just call t_end for validation of
-							 * 	both the non-bitmap block as well as the bitmap block.
-							 * Note down that this transaction is no longer updating any blocks.
+						if (!mark_blk_free)
+						{
+							if ((new_db_format != ondsk_blkver) && (BLK_FREE != bml_status))
+							{	/* block still needs to be converted. create cse */
+								BLK_INIT(bs_ptr, bs1);
+								BLK_SEG(bs_ptr, blkBase + sizeof(new_hdr),
+									new_hdr.bsiz - sizeof(new_hdr));
+								BLK_FINI(bs_ptr, bs1);
+								t_write(&blkhist, (unsigned char *)bs1, 0, 0,
+									((blk_hdr_ptr_t)blkBase)->levl, FALSE,
+									FALSE, GDS_WRITE_PLAIN);
+								/* reset update_trans in case previous retry had set it to FALSE */
+								update_trans = TRUE;
+								if (BLK_RECYCLED == bml_status)
+								{	/* If block that we are upgarding is RECYCLED, indicate to
+									 * bg_update that blks_to_upgrd counter should NOT be
+									 * touched in this case by setting "mode" to a special value
+									 */
+									assert(cw_set[cw_set_depth-1].mode == gds_t_write);
+									cw_set[cw_set_depth-1].mode = gds_t_write_recycled;
+								}
+							} else
+							{	/* Block got converted by another process since we did the dsk_read.
+								 * 	or this block became marked free in the bitmap.
+								 * No need to update this block. just call t_end for validation of
+								 * 	both the non-bitmap block as well as the bitmap block.
+								 * Note down that this transaction is no longer updating any blocks.
+								 */
+								update_trans = FALSE;
+							}
+							/* Need to put bit maps on the end of the cw set for concurrency checking.
+							 * We want to simulate t_write_map, except we want to update "cw_map_depth"
+							 * instead of "cw_set_depth". Hence the save and restore logic below.
+							 * This part of the code is similar to the one in mu_swap_blk.c
 							 */
-							update_trans = FALSE;
+							save_cw_set_depth = cw_set_depth;
+							assert(!cw_map_depth);
+							t_write_map(&bmlhist, NULL, curr_tn); /* will increment cw_set_depth */
+							cw_map_depth = cw_set_depth; /* set cw_map_depth to latest cw_set_depth */
+							cw_set_depth = save_cw_set_depth;/* restore cw_set_depth */
+							/* t_write_map simulation end */
+						} else
+						{
+							if (BLK_RECYCLED != bml_status)
+							{	/* Block was RECYCLED at beginning but no longer so. Retry */
+								t_retry(cdb_sc_bmlmod);
+								continue;
+							}
+							/* Mark recycled block as FREE in bitmap */
+							CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
+							*((block_id *)update_array_ptr) = curblk;
+							update_array_ptr += sizeof(block_id);
+							/* the following assumes sizeof(block_id) == sizeof(int) */
+							assert(sizeof(block_id) == sizeof(int));
+							*(int *)update_array_ptr = 0;
+							t_write_map(&bmlhist, (unsigned char *)update_array, curr_tn);
+							update_trans = TRUE;
 						}
-						/* Need to put bit maps on the end of the cw set for concurrency checking.
-						 * We want to simulate t_write_map, except we want to update "cw_map_depth"
-						 * instead of "cw_set_depth". Hence the save and restore logic below.
-						 * This part of the code is similar to the one in mu_swap_blk.c
-						 */
-						save_cw_set_depth = cw_set_depth;
-						assert(!cw_map_depth);
-						t_write_map(&bmlhist, NULL, curr_tn); /* will increment cw_set_depth */
-						cw_map_depth = cw_set_depth; /* set cw_map_depth to latest cw_set_depth */
-						cw_set_depth = save_cw_set_depth;/* restore cw_set_depth */
-						/* t_write_map simulation end */
 					}
+					assert(sizeof(lcl_update_trans) == sizeof(update_trans));
+					lcl_update_trans = update_trans;	/* take a copy before t_end modifies it */
 					if ((trans_num)0 != t_end(&alt_hist, 0))
 					{
-						if (!update_trans)
+						if (!lcl_update_trans)
 						{
 							assert(lcnt);
+							assert(!mark_blk_free);
 							assert((new_db_format == ondsk_blkver) || (BLK_BUSY != bml_status));
 							if (BLK_BUSY != bml_status)
-								reorg_stats.blks_skipped_free_recycled++;
+								reorg_stats.blks_skipped_free++;
 							else
 								reorg_stats.blks_skipped_newfmtincache++;
 						} else if (!lcnt)
@@ -591,6 +644,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			if ((SS_NORMAL == status1) && first_reorg_in_this_db_fmt && upgrade && (0 == actual_blks2upgrd))
 			{
 				csd->fully_upgraded = TRUE;
+				csd->db_got_to_v5_once = TRUE;
 				set_fully_upgraded = TRUE;
 			}
 			/* flush all changes noted down in the file-header */
@@ -609,8 +663,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 		/* Print statistics */
 		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Bitmap)     : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_read_from_disk_bmp);
-		util_out_print("Region !AD : Statistics : Blocks Skipped (Free/Recycled)     : 0x!8XL",
-			TRUE, REG_LEN_STR(reg), reorg_stats.blks_skipped_free_recycled);
+		util_out_print("Region !AD : Statistics : Blocks Skipped (Free)              : 0x!8XL",
+			TRUE, REG_LEN_STR(reg), reorg_stats.blks_skipped_free);
 		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Non-Bitmap) : 0x!8XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_read_from_disk_nonbmp);
 		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in disk)   : 0x!8XL",

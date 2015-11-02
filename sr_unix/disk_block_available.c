@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,11 +29,11 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#include "gtm_unistd.h"
+#include "gtm_stat.h"
 #include "gtm_statvfs.h"
 #ifndef __MVS__
-#ifndef sun
+#if !defined(sun) && !defined(__CYGWIN__)
 #include <sys/dir.h>
 #endif
 #include <sys/param.h>

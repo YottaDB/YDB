@@ -69,7 +69,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	unsigned char	*inptr, *intop, *outptr, *outbase, *outtop, *dstbase, *nextptr, *chptr;
 	int4		xlate[256]; /* translation table to hold all single-byte character mappings */
 	hash_table_int4	xlate_hash;  /* translation table to hold all multi-byte character mappings */
-	int4		choff;	/* byte offset of the character within out_str */
+	INTPTR_T	choff;	/* byte offset of the character within out_str */
 	ht_ent_int4	*tabent;
 	unsigned char 	ch, drop;
 	int 		n, max_len_incr, size, inlen, outlen, char_len, chlen, dstlen;
@@ -168,7 +168,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 			choff = xlate[*inptr];
 		else {
 			tabent = hashtab_created ? (ht_ent_int4*)lookup_hashtab_int4(&xlate_hash, &code): NULL;
-			choff = (NULL != tabent) ? (int4)tabent->value : 0;
+			choff = (NULL != tabent) ? (INTPTR_T)tabent->value : 0;
 		}
 		if (0 == choff)
 		{ /* no translation exists, retain the source character */

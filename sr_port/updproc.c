@@ -86,10 +86,13 @@
 #include "jnl_get_checksum.h"
 #include "updproc_get_gblname.h"
 
+#define	MAX_IDLE_HARD_SPINS	1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
+
 GBLREF	short			dollar_tlevel;
 GBLREF	gv_key			*gv_currkey;
 GBLREF  gd_region               *gv_cur_region;
 GBLREF  sgmnt_addrs             *cs_addrs;
+GBLREF 	sgmnt_data_ptr_t 	cs_data;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl, temp_jnlpool_ctl;
@@ -291,8 +294,15 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	char	           	gv_mname[MAX_KEY_SZ];
+	boolean_t		log_switched = FALSE;
 	static	seq_num		seqnum_diff = 0;
 	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
+	gld_dbname_list		*curr;
+	gd_region		*save_reg;
+	int4			dummy_errno;
+	boolean_t		buffers_flushed;
+	uint4			idle_flush_count = 0;	/* Number of times buffers were flushed without an intermediate sleep */
 
 	UNIX_ONLY(
 		repl_triple		triple;
@@ -370,8 +380,14 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 									   * change in log interval */
 			}
 			if (upd_proc_local->changelog & REPLIC_CHANGE_LOGFILE)
+			{
+				log_switched = TRUE;
 				upd_log_init(UPDPROC);
+			}
 			upd_proc_local->changelog = 0;
+			if ( log_switched == TRUE )
+				repl_log(updproc_log_fp, TRUE, TRUE, "Change log to %s successful\n",
+                                                     recvpool.upd_proc_local->log_file);
 		}
 		if (upd_proc_local->bad_trans
 			|| (0 == tupd_num && FALSE == recvpool.recvpool_ctl->wrapped
@@ -380,9 +396,41 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			/* to take care of the startup case where jnl_seqno is 0 in the recvpool_ctl */
 			assert((0 == recvpool.recvpool_ctl->jnl_seqno)
 				||  jnl_seqno <= recvpool.recvpool_ctl->jnl_seqno);
-			SHORT_SLEEP(10);
+			/* If any dirty buffers, write them out since nothing else is happening now.
+			 * wcs_wtstart only writes a few buffer a call and putting the call in a loop would flush the
+			 * entire dirty buffer set, but there is no need for a loop around the call since we're already in
+			 * the main updproc loop and this is the only place it really sleeps. */
+			assert(!dollar_tlevel);	/* We should not be idle while in TP */
+			save_reg = gv_cur_region;
+			/* Make sure cs_addrs and cs_data are in sync with gv_cur_region before TP_CHANGE_REG changes them */
+			assert((NULL == gv_cur_region) || (cs_addrs == &FILE_INFO(gv_cur_region)->s_addrs));
+			assert((NULL == gv_cur_region) || (cs_data == cs_addrs->hdr));
+			buffers_flushed = FALSE;
+			for (curr = gld_db_files; NULL != curr; curr = curr->next)
+			{
+				TP_CHANGE_REG(curr->gd);
+				if (cs_addrs->nl->wcs_active_lvl && (FALSE == gv_cur_region->read_only))
+				{
+					DCLAST_WCS_WTSTART(gv_cur_region, 0, dummy_errno);
+					buffers_flushed = TRUE;
+				}
+			}
+			TP_CHANGE_REG(save_reg);
+			/* To avoid a potential infinite cpu-bound loop if the wcs_active_lvl field is bogus and wcs_wtstart()
+			 * returns immediately, we count the number of times a buffer flush has (potentially) occurred.  When
+			 * this count gets to an arbitrarily "large" value or there were no buffers to flush, we will sleep
+			 * and start the count over again.  If there are more than the "large" number of dirty buffers to flush,
+			 * this logic only causes an extra benign sleep whenever the count is "large". */
+			if (buffers_flushed && (MAX_IDLE_HARD_SPINS > idle_flush_count))
+				idle_flush_count++;
+			else
+			{
+				idle_flush_count = 0;
+				SHORT_SLEEP(10);
+			}
 			continue;
 		}
+		idle_flush_count = 0;
 		/* To take the wrapping of buffer in case of over flow ------------ */
 		/*     assume receiver will update wrapped even for exact overflows */
 		if (temp_read >= recvpool.recvpool_ctl->write_wrap)
@@ -416,7 +464,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				continue; /* Receiver server wrapped but hasn't yet written anything into the pool */
 		}
 		rec = (jnl_record *)readaddrs;
-		rectype = rec->prefix.jrec_type;
+		rectype = (enum jnl_record_type)rec->prefix.jrec_type;
 		rec_len = rec->prefix.forwptr;
 		assert(IS_REPLICATED(rectype));
 		UNIX_ONLY(
@@ -593,10 +641,16 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				 */
 				SHM_WRITE_MEMORY_BARRIER;
 				csa->ti->early_tn = csa->ti->curr_tn + 1;
-				JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() */
 				if (JNL_WRITE_LOGICAL_RECS(csa))
 				{
+					SET_GBL_JREC_TIME;	/* needed for jnl_put_jrt_pini() */
 					jpc = csa->jnl;
+					jbp = jpc->jnl_buff;
+					/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
+					 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write
+					 * journal records (if it decides to switch to a new journal file).
+					 */
+					ADJUST_GBL_JREC_TIME(jgbl, jbp);
 					if (JNL_ENABLED(csa))
 					{
 						jnl_status = jnl_ensure_open();

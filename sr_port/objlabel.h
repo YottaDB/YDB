@@ -41,14 +41,20 @@
 #	define	OBJ_PLATFORM_LABEL	0
 #elif defined(__linux__) && defined(Linux390)
 #	define	OBJ_PLATFORM_LABEL	0		/* s390 Linux */
-#elif defined(__linux__) && !defined(Linux390)
+#elif defined(__linux__) && defined(__ia64)
+#	define	OBJ_PLATFORM_LABEL	0		/* Itanium Linux */
+#elif defined(__linux__) && defined(__i386__)
 #	define	OBJ_PLATFORM_LABEL	0		/* i386 Linux */
 #elif defined(__MVS__)
 #	define	OBJ_PLATFORM_LABEL	0		/* os390 */
-#elif defined(__hpux)
-#	define	OBJ_PLATFORM_LABEL	0
+#elif defined(__hpux) && defined(__ia64)
+#	define	OBJ_PLATFORM_LABEL	0		/* Itanium HP-UX */
+#elif defined(__hpux) && defined(__hppa)
+#	define	OBJ_PLATFORM_LABEL	0		/* HPPA HP-UX */
 #elif defined(SUNOS)
 #	define	OBJ_PLATFORM_LABEL	0
+#elif defined(__CYGWIN__)
+#	define OBJ_PLATFORM_LABEL	0		/* CYGWIN on Windows i386 */
 #elif defined(VMS)
 #	define OBJ_PLATFORM_LABEL	0
 #else

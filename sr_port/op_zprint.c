@@ -70,7 +70,7 @@ void op_zprint(mval *rtn,mval *start_label,int start_int_exp,mval *end_label,int
 		null_str.mvtype = MV_STR;
 		null_str.str.len = 0;
 		stat2 = get_src_line(rtn,&null_str,1, &src2);
-		assert((int)src2 > 0);
+		assert((INTPTR_T)src2 > 0);
 		rtn_vector = find_rtn_hdr(&rtn->str);
 		/* number of lines less one for duplicated zero'th line and one due
 		   to termination condition being <=

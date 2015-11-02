@@ -152,7 +152,7 @@ void	gvcst_kill(bool do_subtree)
 		assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 		if (0 == dollar_tlevel)
 		{
-			update_array_ptr = update_array;
+			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 			kill_set_tail = &kill_set_head;
 			for (ks = &kill_set_head;  NULL != ks;  ks = ks->next_kill_set)
 				ks->used = 0;

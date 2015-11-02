@@ -167,7 +167,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	MV_FORCE_STR(tid);
 	if (0 == dollar_tlevel)
 	{
-		jnl_fence_ctl.fence_list = (sgmnt_addrs *)-1L;
+		jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		jgbl.cumul_jnl_rec_len = 0;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 		t_tries = (FALSE == is_standalone) ? 0 : CDB_STAGNATE;
@@ -416,7 +416,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	}
 	++dollar_tlevel;
 	/* Store the global (across all segments) dollar_tlevel specific information. Curently, it holds only jnl related info. */
-	if ((sgmnt_addrs *)-1L != jnl_fence_ctl.fence_list)
+	if (JNL_FENCE_LIST_END != jnl_fence_ctl.fence_list)
 	{
 		for (prev_gtli = NULL, gtli = global_tlvl_info_head; gtli; gtli = gtli->next_global_tlvl_info)
 			prev_gtli = gtli;

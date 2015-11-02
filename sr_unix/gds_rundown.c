@@ -122,6 +122,7 @@ void gds_rundown(void)
 	uint4           	jnl_status;
 	unix_db_info		*udi;
 	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 
 	error_def(ERR_CRITSEMFAIL);
 	error_def(ERR_DBFILERR);
@@ -371,15 +372,16 @@ void gds_rundown(void)
 			 */
 			tp_change_reg();	/* call this because jnl_ensure_open checks cs_addrs rather than gv_cur_region */
 			jpc = csa->jnl;
-			if (jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid == process_id)
+			jbp = jpc->jnl_buff;
+			if (jbp->fsync_in_prog_latch.u.parts.latch_pid == process_id)
                         {
                                 assert(FALSE);
-                                COMPSWAP(&jpc->jnl_buff->fsync_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
+                                COMPSWAP_UNLOCK(&jbp->fsync_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
                         }
-                        if (jpc->jnl_buff->io_in_prog_latch.u.parts.latch_pid == process_id)
+                        if (jbp->io_in_prog_latch.u.parts.latch_pid == process_id)
                         {
                                 assert(FALSE);
-                                COMPSWAP(&jpc->jnl_buff->io_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
+                                COMPSWAP_UNLOCK(&jbp->io_in_prog_latch, process_id, 0, LOCK_AVAILABLE, 0);
                         }
 			if (((NOJNL != jpc->channel) && !JNL_FILE_SWITCHED(jpc))
 				|| we_are_last_writer && (0 != csa->nl->jnl_file.u.inode))
@@ -392,8 +394,12 @@ void gds_rundown(void)
 				grab_crit(reg);
 				if (JNL_ENABLED(csd))
 				{
-					JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* set_jnl/jnl_file_close,
-										 * jnl_put_jrt_pini/pfin need it */
+					SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_put_jrt_pini/pfin/jnl_file_close all need it */
+					/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
+					 * of jnl records. This needs to be done BEFORE the jnl_ensure_open as that could write
+					 * journal records (if it decides to switch to a new journal file).
+					 */
+					ADJUST_GBL_JREC_TIME(jgbl, jbp);
 					jnl_status = jnl_ensure_open();
 					if (0 == jnl_status)
 					{	/* If we_are_last_writer, we would have already done a wcs_flu() which would
@@ -402,7 +408,7 @@ void gds_rundown(void)
 						 * Although we assert pini_addr should be non-zero for last_writer, we
 						 * play it safe in PRO and write a PINI record if not written already.
 						 */
-						assert(!jpc->jnl_buff->before_images || is_mm
+						assert(!jbp->before_images || is_mm
 								|| !we_are_last_writer || 0 != jpc->pini_addr);
 						if (we_are_last_writer && 0 == jpc->pini_addr)
 							jnl_put_jrt_pini(csa);
@@ -412,9 +418,9 @@ void gds_rundown(void)
 						if (!we_are_last_writer && (0 > csa->nl->wcs_timers))
 						{
 							jnl_flush(reg);
-							assert(jpc->jnl_buff->freeaddr == jpc->jnl_buff->dskaddr);
-							jnl_fsync(gv_cur_region, jpc->jnl_buff->dskaddr);
-							assert(jpc->jnl_buff->fsync_dskaddr == jpc->jnl_buff->dskaddr);
+							assert(jbp->freeaddr == jbp->dskaddr);
+							jnl_fsync(gv_cur_region, jbp->dskaddr);
+							assert(jbp->fsync_dskaddr == jbp->dskaddr);
 						}
 						jnl_file_close(reg, we_are_last_writer, FALSE);
 					} else

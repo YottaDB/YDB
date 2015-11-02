@@ -38,6 +38,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	bool			run_time;
 GBLREF	volatile int4		fast_lock_count;
+GBLREF	boolean_t		dse_running;
 
 int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 {
@@ -45,6 +46,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	int4			size, save_errno;
 	enum db_ver		tmp_ondskblkver;
 	sm_uc_ptr_t		save_buff = NULL;
+	boolean_t		fully_upgraded;
 	DEBUG_ONLY(
 		blk_hdr_ptr_t	blk_hdr;
 		static int	in_dsk_read;
@@ -70,7 +72,17 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	assert(cs_addrs->hdr == cs_data);
 	size = cs_data->blk_size;
 	assert (cs_data->acc_meth == dba_bg);
-	if (!cs_data->fully_upgraded)
+	/* Since cs_data->fully_upgraded is referenced more than once in this module (once explicitly and once in
+	 * GDS_BLK_UPGRADE_IF_NEEDED macro used below), take a copy of it and use that so all usages see the same value.
+	 * Not doing this, for example, can cause us to see the database as fully upgraded in the first check causing us
+	 * not to allocate save_buff (a temporary buffer to hold a V4 format block) at all but later in the macro
+	 * we might see the database as NOT fully upgraded so we might choose to call the function gds_blk_upgrade which
+	 * does expect a temporary buffer to have been pre-allocated. It is ok if the value of cs_data->fully_upgraded
+	 * changes after we took a copy of it since we have a buffer locked for this particular block (at least in BG)
+	 * so no concurrent process could be changing the format of this block. For MM there might be an issue.
+	 */
+	fully_upgraded = cs_data->fully_upgraded;
+	if (!fully_upgraded)
 	{
 		save_buff = buff;
 		if (size > read_reformat_buffer_len)
@@ -103,7 +115,7 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 		/* Block must be converted to current version (if necessary) for use by internals.
 		 * By definition, all blocks are converted from/to their on-disk version at the IO point.
 		 */
-		GDS_BLK_UPGRADE_IF_NEEDED(blk, buff, save_buff, cs_data, &tmp_ondskblkver, save_errno);
+		GDS_BLK_UPGRADE_IF_NEEDED(blk, buff, save_buff, cs_data, &tmp_ondskblkver, save_errno, fully_upgraded);
 		DEBUG_DYNGRD_ONLY(
 			if (GDSVCURR != tmp_ondskblkver)
 				PRINTF("DSK_READ: Block %d being dynamically upgraded on read\n", blk);
@@ -122,13 +134,12 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver)
 	}
 	DEBUG_ONLY(
 		in_dsk_read--;
-		if (cs_addrs->now_crit)
-		{	/* Do basic checks on the GDS block that was just read */
+		if (cs_addrs->now_crit && !dse_running)
+		{	/* Do basic checks on GDS block that was just read. Do it only if holding crit as we could read
+			 * uninitialized blocks otherwise. Also DSE might read bad blocks even inside crit so skip checks.
+			 */
 			blk_hdr = (NULL != save_buff) ? (blk_hdr_ptr_t)save_buff : (blk_hdr_ptr_t)buff;
-			assert((unsigned)GDSVLAST > (unsigned)blk_hdr->bver);
-			assert((LCL_MAP_LEVL == blk_hdr->levl) || ((unsigned)MAX_BT_DEPTH > (unsigned)blk_hdr->levl));
-			assert((unsigned)size >= (unsigned)blk_hdr->bsiz);
-			assert((unsigned)cs_data->trans_hist.curr_tn >= (unsigned)blk_hdr->tn);
+			GDS_BLK_HDR_CHECK(cs_data, blk_hdr, fully_upgraded);
 		}
 	)
 	return save_errno;

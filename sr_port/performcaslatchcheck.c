@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,7 +42,7 @@ void performCASLatchCheck(sm_global_latch_ptr_t latch, int loopcnt)
 		if ((process_id == holder_pid VMS_ONLY(&& image_count == holder_imgcnt))
 		    || (FALSE == is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt))))
 		{ /* remove (processe_id == holder && image_count == holder_pid) when fixed */
-			COMPSWAP(latch, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
+			COMPSWAP_UNLOCK(latch, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 		}
 		UNIX_ONLY(else if (loopcnt && 0 == (loopcnt % LOOP_CNT_SEND_WAKEUP))
 		                    continue_proc(holder_pid));	/* Attempt wakeup in case process is stuck */

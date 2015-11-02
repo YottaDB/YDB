@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "gdsblkops.h"	/* for CHECK_AND_RESET_UPDATE_ARRAY macro */
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -55,11 +56,11 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	t_begin_crit(ERR_DSEFAIL);
 	ctn = cs_addrs->ti->curr_tn;
 	if (!(bmp = t_qread(bml, &blkhist.cycle, &blkhist.cr)))
-		t_retry(rdfail_detail);
+		t_retry((enum cdb_sc)rdfail_detail);
 	blkhist.blk_num = bml;
 	blkhist.buffaddr = bmp;
 	alt_hist.h[0].blk_num = 0;	/* Need for calls to T_END for bitmaps */
-	update_array_ptr = update_array;
+	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	*((block_id_ptr_t)update_array_ptr) = blk;
 	update_array_ptr += sizeof(block_id);
 	*((block_id_ptr_t)update_array_ptr) = 0;

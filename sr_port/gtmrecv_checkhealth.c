@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -155,7 +155,7 @@ int gtmrecv_checkhealth(void)
 		{
 			if (0 != (helper_pid = helper->helper_pid_prev))
 			{
-				helper_type = helper->helper_type;
+				helper_type = (recvpool_user)helper->helper_type;
 				helper_alive = is_proc_alive(helper_pid, 0);
 				if (helper_alive && 0 == helper->helper_pid) /* process has vacated its slot, but the rcvr hasn't */
 					helper_alive = FALSE;          /* salvaged it yet. Unix zombies are alive,* er, half dead */

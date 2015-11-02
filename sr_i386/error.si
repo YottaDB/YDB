@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -14,7 +14,12 @@
 #-----------------------------------------------
 # Mumps error condition handler macros
 #-----------------------------------------------
+.ifdef cygwin
+# will need another 8 to save sigmasks
+chnd_size	=	220
+.else
 chnd_size	=	168
+.endif
 chnd_save_active =	0
 chnd_ch_active	=	4
 chnd_ch		=	8
@@ -25,8 +30,13 @@ chnd_jmp	=	12
 .extern	active_ch
 
 .text
+.ifdef cygwin
+#	on cygwin, sigsetjmp is a macro which calls sigprocmask then setjmp
+.extern _setjmp
+.else
 #	setjmp is really __sigsetjmp(env,0)
 .extern	__sigsetjmp
+.endif
 
 	.sbttl	error.si    ESTABLISH
 .macro ESTABLISH  x, label
@@ -37,11 +47,18 @@ chnd_jmp	=	12
 	movl	$0,chnd_ch_active(%eax)		# ctxt->ch_active = FALSE
 	movl	%eax,active_ch			# active_ch = ctxt
 	movl	$\x,chnd_ch(%eax)		# ctxt->ch = x
-	addl	$chnd_jmp,%eax			# setjmp(ctxt->jnp)
+	addl	$chnd_jmp,%eax			# setjmp(ctxt->jmp)
+.ifndef cygwin
 	pushl	$0
+.endif
 	pushl 	%eax
+.ifdef cygwin
+	call _setjmp
+	addl	$4,%esp
+.else
 	call 	__sigsetjmp
 	addl  	$8,%esp
+.endif
 	incl  	%eax
 	jne  	\label
 	REVERT

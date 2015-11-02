@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,14 +45,14 @@ void op_fnlvprvname(mval *src,mval *dst)
 			if (lv && (MV_DEFINED(&(lv->v)) || ((tbl = lv->ptrs.val_ent.children) && (tbl->num || tbl->str))))
 			{
 				MIDENT_CMP(&name, &p->key.var_name, n);
-				if (n > 0)
+				if (0 < n)
 				{
 					if (!max)
 						max = p;
 					else
 					{
 						MIDENT_CMP(&max->key.var_name, &p->key.var_name, n);
-						if (n < 0)
+						if (0 > n)
 							max = p;
 					}
 				}
@@ -66,7 +66,10 @@ void op_fnlvprvname(mval *src,mval *dst)
 	{
 		n = max->key.var_name.len;
 		if (stringpool.top - stringpool.free < n)
+		{
+			dst->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval */
 			stp_gcol(n);
+		}
 		memcpy(stringpool.free, max->key.var_name.addr, n);
 		dst->str.len = n;
 		dst->str.addr = (char *)stringpool.free;

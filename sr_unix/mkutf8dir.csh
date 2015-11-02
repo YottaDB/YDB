@@ -1,12 +1,12 @@
 #################################################################
-#							                                	#
-#	Copyright 2007 Fidelity Information Services, Inc     #
-#								                                #
-#	This source code contains the intellectual property	        #
-#	of its copyright holder(s), and is made available	        #
-#	under a license.  If you do not know the terms of	        #
-#	the license, please stop and do not read further.	        #
-#								                                #
+#								#
+#	Copyright 2007 Fidelity Information Services, Inc	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
 #################################################################
 
 #
@@ -18,28 +18,9 @@
 #
 ###########################################################################################
 
-if (`uname` == "AIX") then
-	setenv LIBPATH /usr/local/lib
-	set library_path = "$LIBPATH"
-else
-	setenv LD_LIBRARY_PATH "/usr/local/lib:/usr/lib"
-	set library_path = `echo $LD_LIBRARY_PATH | sed 's/:/ /g'`
-endif
-
-set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
-if (! -e utf8) then
-	foreach libpath ($library_path)
-		set found_icu = `ls -1 $libpath | grep "libicu.*36.*" | wc -l`
-		if ($found_icu) then
-			break
-		endif
-	end
-	if ($found_icu && $utflocale != "") then
-		mkdir utf8
-	endif
-endif
-
-if (-e utf8) then
+source $gtm_tools/check_unicode_support.csh
+if ("TRUE" == "$is_unicode_support") then
+	if (! -e utf8) mkdir utf8
 	setenv LC_CTYPE $utflocale
 	unsetenv LC_ALL
 	setenv gtm_chset UTF-8	# switch to "UTF-8" mode

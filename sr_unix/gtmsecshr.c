@@ -19,7 +19,7 @@
 #include <sys/un.h>
 #include <signal.h>
 #if (!defined(_AIX) && !defined(__MVS__))
-#if !defined(__linux__) && !defined(__hpux)
+#if !defined(__linux__) && !defined(__hpux) && !defined(__CYGWIN__)
 #include <siginfo.h>
 #endif
 #include "gtm_stdlib.h"
@@ -148,7 +148,7 @@ int main(void)
 	int			num_chars_recd, num_chars_sent;
 	int4			msec_timeout;			/* timeout in milliseconds */
 	TID			timer_id;
-	size_t			client_addr_len;
+	GTM_SOCKLEN_TYPE	client_addr_len;
 	char			*recv_ptr, *send_ptr;
 	fd_set			wait_on_fd;
 	struct sockaddr_un	client_addr;
@@ -204,7 +204,7 @@ int main(void)
 		while (!recv_complete)
 		{
 			num_chars_recd = (int)(RECVFROM(gtmsecshr_sockfd, (void *)recv_ptr, recv_len, 0,
-							(struct sockaddr *)&client_addr, (sssize_t *)&client_addr_len));
+							(struct sockaddr *)&client_addr, (GTM_SOCKLEN_TYPE *)&client_addr_len));
 			if ((-1 == num_chars_recd) && (gtmsecshr_timer_popped || EINTR != errno))
 			{
 				rts_error(VARLSTCNT(6) ERR_GTMSECSHR, 1, process_id, ERR_GTMSECSHRRECVF, 0, errno);

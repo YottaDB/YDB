@@ -195,9 +195,6 @@ typedef struct { /* keep this structure and member offsets defined in sr_avms/mu
 enum crit_ops
 {	crit_ops_gw = 1,	/* grab [write] crit */
 	crit_ops_rw,		/* rel [write] crit */
-	crit_ops_gr,		/* grab read crit */
-	crit_ops_rr,		/* rel read crit */
-	crit_ops_dr,		/* convert read to write */
 	crit_ops_nocrit		/* did a rel_crit when now_crit flag was off */
 };
 
@@ -220,8 +217,20 @@ typedef struct
 	char		lock_op[OP_LOCK_SIZE];	/* Operation performed (either OBTN or RLSE) */
 } lockhist;
 
-#define CRIT_OPS_ARRAY_SIZE	512
-#define LOCKHIST_ARRAY_SIZE	512
+#define	CRIT_OPS_ARRAY_SIZE	512
+#define	LOCKHIST_ARRAY_SIZE	512
+#define	SECSHR_OPS_ARRAY_SIZE	1023		/* 1 less than 1K to accommodate the variable secshr_ops_index */
+
+/* SECSHR_ACCOUNTING macro assumes csa->nl is dereferencible and does accounting if variable "do_accounting" is set to TRUE */
+#define		SECSHR_ACCOUNTING(value)								\
+{													\
+	if (do_accounting)										\
+	{												\
+		if (csa->nl->secshr_ops_index < SECSHR_OPS_ARRAY_SIZE)					\
+			csa->nl->secshr_ops_array[csa->nl->secshr_ops_index] = (INTPTR_T)(value);	\
+		csa->nl->secshr_ops_index++;								\
+	}												\
+}
 
 /* Mapped space local to each node on the cluster */
 typedef struct node_local_struct
@@ -278,7 +287,9 @@ typedef struct node_local_struct
 	unique_file_id	unique_id;
 	uint4		owner_node;
 	volatile int4   wcsflu_pid;				/* pid of the process executing wcs_flu in BG mode */
-	gtm_time8	creation_date_time;			/* Database's creation time to be compared at sm attach time */
+	int4		creation_date_time4;			/* Lower order 4-bytes of database's creation time to be
+								 * compared at sm attach time */
+	int4		time_filler_8byte_align;
 	boolean_t	remove_shm;				/* can this shm be removed by the last process to rundown */
 	union
 	{
@@ -293,7 +304,7 @@ typedef struct node_local_struct
 							  *       In VMS, this is the name of the corresponding global directory.
 							  */
    	int4		secshr_ops_index;
-   	INTPTR_T	secshr_ops_array[255];	/* taking up 1K(on 32-bit platform) and 2K(on 64-bit platforms) */
+   	INTPTR_T	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 4K(on 32-bit platform) and 8K(on 64-bit platforms) */
 
 } node_local;
 
@@ -332,6 +343,61 @@ typedef struct node_local_struct
 	}									\
 }
 
+/* The following macro checks that curr_tn and early_tn are equal right before beginning a transaction commit.
+ * The only exception we know of is if a process in the midst of commit had been killed (kill -9 or STOP/ID)
+ * after having incremented early_tn but before it finished the commit (and therefore incremented curr_tn).
+ * In that case another process that did a rundown (and executed secshr_db_clnup) at around the same time
+ * could have cleaned up the CRIT lock (sensing that the crit holder pid is no longer alive) making the crit
+ * lock available for other processes. To check if that is the case, we need to go back the crit_ops_array and check that
+ *	a) the most recent crit operation was a grab crit done by the current pid (crit_act == crit_ops_gw) AND
+ *	b) the immediately previous crit operation should NOT be a release crit crit_ops_rw but instead should be a crit_ops_gw
+ *	c) there are two exceptions to this and they are
+ *		(i) that there could be one or more crit_ops_nocrit actions from processes that tried releasing crit
+ *			even though they dont own it (cases we know of are in gds_rundown and in t_end/tp_tend if
+ *			t_commit_cleanup completes the transaction after a mid-commit error).
+ *		(ii) there could be one or more crit_ops_gw/crit_ops_rw pair of operations by a pid in between.
+ */
+#define	ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, currtn)						\
+{												\
+	GBLREF	uint4 			process_id;						\
+												\
+	assert((currtn) == csa->ti->curr_tn);							\
+	if (csa->ti->early_tn != (currtn))							\
+	{											\
+		int4			coidx, lcnt;						\
+		node_local_ptr_t	cnl;							\
+		uint4			expect_gw_pid = 0;					\
+												\
+		cnl = csa->nl;									\
+		assert(NULL != (node_local_ptr_t)cnl);						\
+		coidx = cnl->crit_ops_index;							\
+		assert(CRIT_OPS_ARRAY_SIZE > coidx);						\
+		assert(crit_ops_gw == cnl->crit_ops_array[coidx].crit_act);			\
+		assert(process_id == cnl->crit_ops_array[coidx].epid);				\
+		for (lcnt = 0; CRIT_OPS_ARRAY_SIZE > lcnt; lcnt++)				\
+		{										\
+			if (coidx)								\
+				coidx--;							\
+			else									\
+				coidx = CRIT_OPS_ARRAY_SIZE - 1;				\
+			if (crit_ops_nocrit == cnl->crit_ops_array[coidx].crit_act)		\
+				continue;							\
+			if (crit_ops_rw == cnl->crit_ops_array[coidx].crit_act)			\
+			{									\
+				assert(0 == expect_gw_pid);					\
+				expect_gw_pid = cnl->crit_ops_array[coidx].epid;		\
+			} else if (crit_ops_gw == cnl->crit_ops_array[coidx].crit_act)		\
+			{									\
+				if (!expect_gw_pid)						\
+					break;	/* found lone grab-crit */			\
+				assert(expect_gw_pid == cnl->crit_ops_array[coidx].epid);	\
+				expect_gw_pid = 0;/* found paired grab-crit. continue search */	\
+			}									\
+		}										\
+		assert(CRIT_OPS_ARRAY_SIZE > lcnt); /* assert if did not find lone grab-crit */	\
+	}											\
+}
+
 /*
  * The following macro places lock history entries in an array for debugging.
  * NOTE: Users of this macro, set either of the following prior to using this macro.
@@ -366,6 +432,7 @@ typedef struct node_local_struct
 #define DUMP_LOCKHIST() dump_lockhist()
 #else
 #define CRIT_TRACE(X)
+#define	ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, currtn)
 #define LOCK_HIST(OP, LOC, ID, CNT)
 #define DUMP_LOCKHIST()
 #endif

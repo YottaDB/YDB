@@ -30,6 +30,10 @@ void base_frame(rhdtyp *base_address)
 		msp--;
 	if ((INTPTR_T)msp & 2)
 		msp -= 2;
+#ifdef GTM64
+	if ((INTPTR_T)msp & 4)
+		msp -= 4;
+#endif /* GTM64 */
 
 	msp_save = msp;
 	msp -= sizeof(stack_frame) + sizeof (stack_frame *);

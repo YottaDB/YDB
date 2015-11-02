@@ -46,8 +46,7 @@ void op_gvorder (mval *v)
 	gd_binding		*map;
 	mstr			name;
 	enum db_acc_method	acc_meth;
-	bool			found;
-	boolean_t		gbl_target_was_set;
+	boolean_t		found, gbl_target_was_set;
 	gv_namehead		*save_targ;
 
 	/* Modify gv_currkey to reflect the next possible key value in collating order */
@@ -88,7 +87,10 @@ void op_gvorder (mval *v)
 					assert (n > 0);
 				}
 		 		if (stringpool.top - stringpool.free < n)
-					stp_gcol (n);
+				{
+					v->str.len = 0;	/* so stp_gcol ignores otherwise incompletely setup mval */
+					stp_gcol(n);
+				}
 			}
 	 		v->str.addr = (char *)stringpool.free;
 	 		stringpool.free = gvsub2str (&gv_altkey->base[0] + gv_altkey->prev, stringpool.free, FALSE);
@@ -192,7 +194,10 @@ void op_gvorder (mval *v)
 		if (found)
 		{
 			if (stringpool.free + name.len + 1 > stringpool.top)
+			{
+				v->str.len = 0; /* so stp_gcol ignores otherwise incompletely setup mval */
 				stp_gcol (name.len + 1);
+			}
 #ifdef mips
 			/* the following line works around a tandem compiler bug. */
 			v->str.addr = (char *)0;

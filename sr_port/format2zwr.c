@@ -33,7 +33,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
 int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 {
         sm_uc_ptr_t	cp;
-	int4		ch;
+	uint4		ch;
 	int		fastate = 0, ncommas, dstlen, chlen;
 	boolean_t	isctl, isill;
 	uchar_ptr_t	srctop, strnext, tmpptr;

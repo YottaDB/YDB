@@ -39,7 +39,7 @@ GBLREF short			object_name_len;
 
 void op_zlink (mval *v, mval *quals)
 {
-	int			obj_desc, status, qlf, tslash, cntr;
+	int			obj_desc, status, qlf, tslash;
 	unsigned short		type;
 	char			srcnamebuf[MAX_FBUFF + 1], objnamebuf[MAX_FBUFF + 1], *fname;
 	uint4			objnamelen, srcnamelen;
@@ -50,7 +50,6 @@ void op_zlink (mval *v, mval *quals)
 	bool			expdir;
 	parse_blk		pblk;
 	mval			qualifier;
-	struct stat		stat_buf;
 	error_def		(ERR_WILDCARD);
 	error_def		(ERR_VERSION);
 	error_def		(ERR_FILENOTFND);
@@ -210,7 +209,7 @@ void op_zlink (mval *v, mval *quals)
 				objnamebuf[ objnamelen ] = 0;
 			}
 		}
-		POLL_OBJECT_FILE(objnamebuf, obj_desc);
+		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, obj_desc);
 		if (obj_desc == -1)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.len, dollar_zsource.addr, errno);
 		if (USHBIN_ONLY(!incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(!incr_link(obj_desc)))
@@ -332,7 +331,8 @@ void op_zlink (mval *v, mval *quals)
 			if (type == SRC && !(qlf & CQ_OBJECT))
 				return;
 		}
-		POLL_OBJECT_FILE(objnamebuf, obj_desc);
+
+		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, obj_desc);
 		if (obj_desc == -1)
 			rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 		status = USHBIN_ONLY(incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(incr_link(obj_desc));
@@ -359,7 +359,7 @@ void op_zlink (mval *v, mval *quals)
 				cmd_qlf.qlf = glb_cmd_qlf.qlf;
 				rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
 			}
-			POLL_OBJECT_FILE(object_file_name, obj_desc);
+			OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, obj_desc);
 			if (obj_desc == -1)
 				rts_error(VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 			if (USHBIN_ONLY(!incr_link(obj_desc, NULL)) NON_USHBIN_ONLY(!incr_link(obj_desc)))

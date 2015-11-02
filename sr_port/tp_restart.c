@@ -59,8 +59,9 @@ error_def(ERR_TRESTNOT);
 error_def(ERR_TRESTLOC);
 UNIX_ONLY(error_def(ERR_GVFAILCORE);)
 
-#define	MAX_TRESTARTS	16
-#define	GVNAME_UNKNOWN	"*UNKNOWN"
+#define	MAX_TRESTARTS		16
+#define	FAIL_HIST_ARRAY_SIZE	32
+#define	GVNAME_UNKNOWN		"*UNKNOWN"
 
 static	int		num_tprestart = 0;
 static	char		gvname_unknown[] = GVNAME_UNKNOWN;
@@ -140,6 +141,8 @@ void	tp_restart(int newlevel)
 	gd_region		*restart_reg;
 	DEBUG_ONLY(
 	static int4		uncounted_restarts;	/* do not count some failure codes towards MAX_TRESTARTS */
+	static int4		t_fail_hist_index;
+	static int4		t_fail_hist_array[FAIL_HIST_ARRAY_SIZE];
 	)
 
 	ESTABLISH(tp_restart_ch);
@@ -213,7 +216,13 @@ void	tp_restart(int newlevel)
 		caller_id_flag = TRUE;
 		n_pvtmods = n_blkmods = 0;
 	}
-
+	/* We should never come here with a normal restart code unless it is the TRESTART command which resets t_tries to 0 */
+	assert((cdb_sc_normal != t_fail_hist[t_tries]) || (0 == t_tries));
+	DEBUG_ONLY(
+		t_fail_hist_array[t_fail_hist_index++] = t_fail_hist[t_tries];
+		if (FAIL_HIST_ARRAY_SIZE <= t_fail_hist_index)
+			t_fail_hist_index = 0;
+	)
 	if (cdb_sc_normal != t_fail_hist[t_tries])
 	{	/* the following code is parallel, but not identical, to code in t_retry, which should be maintained in parallel */
 		switch (t_fail_hist[t_tries])
@@ -231,6 +240,7 @@ void	tp_restart(int newlevel)
 				assert(dba_mm == csa->hdr->acc_meth);
 				wcs_recover(sgm_info_ptr->gv_cur_region);
 			}
+			DEBUG_ONLY(uncounted_restarts++;)
 			if (CDB_STAGNATE > t_tries)
 				break;
 					/* WARNING - fallthrough !!! */
@@ -306,7 +316,7 @@ void	tp_restart(int newlevel)
 					}
 				}
 			}
-			tp_tend_status = tp_tend(TRUE);	/* call tp_tend just to grab crits */
+			tp_tend_status = tp_crit_all_regions();	/* grab crits on all regions */
 			assert(FALSE != tp_tend_status);
 			/* pick up all MM extension information */
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)

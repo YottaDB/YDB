@@ -50,7 +50,7 @@ GBLREF  mv_stent         	*mv_chain;
 GBLREF	int			mumps_status;
 GBLREF 	void			(*restart)();
 GBLREF 	boolean_t		gtm_startup_active;
-GBLREF	int * volatile		var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
+GBLREF	volatile int 		*var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 GBLREF	rhdtyp			*ci_base_addr;
 GBLDEF 	unsigned int		nested_level;		/* current nested depth of callin environments */
 
@@ -93,7 +93,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 	char			*xc_char_ptr;
 	parmblk_struct 		param_blk;
 	void 			op_extcall(), op_extexfun(), flush_pio(void);
-	int			*save_var_on_cstack_ptr;
+	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
 	error_def(ERR_MAXSTRLEN);
 	error_def(ERR_CIRCALLNAME);
@@ -114,10 +114,10 @@ int gtm_ci (const char *c_rtn_name, ...)
 	if (!(entry = get_entry(c_rtn_name)))	/* c_rtn_name not found in the table */
 		rts_error(VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
-	job_addr(&routine, &label, 0, (char**)&base_addr, (char**)&transfer_addr);
+	job_addr(&routine, &label, 0, (char **)&base_addr, (char **)&transfer_addr);
 
 	memset(&param_blk, sizeof(param_blk), 0);
-	param_blk.rtnaddr = (void*)base_addr;
+	param_blk.rtnaddr = (void *)base_addr;
 	/* lnr_entry below is a pointer to the code offset for this label from the
 	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
 	 * header (on NON_USHBIN platforms).
@@ -131,75 +131,95 @@ int gtm_ci (const char *c_rtn_name, ...)
 	VAR_START(var, c_rtn_name);
 	has_return = (xc_void == entry->return_type) ? 0 : 1;
 	if (has_return)
-	{ /* create mval slot for return value */
-		param_blk.retaddr = (void*)push_mval(&arg_mval);
-		va_arg(var, void*);	/* advance va_arg */
-	}
-	else
+	{	/* create mval slot for return value */
+		param_blk.retaddr = (void *)push_mval(&arg_mval);
+		va_arg(var, void *);	/* advance va_arg */
+	} else
 		param_blk.retaddr = 0;
 	inp_mask = entry->input_mask;
 	out_mask = entry->output_mask;
 	for (i=0, mask = ~inp_mask; i < entry->argcnt; ++i, mask>>=1)
-	{ /* copy pass-by-value arguments - since only first MAXIMUM_PARAMETERS could be O/IO,
-	     any additional params will be treated as Input-only (I).
-	     inp_mask is inversed to achieve this. */
+	{	/* copy pass-by-value arguments - since only first MAXIMUM_PARAMETERS could be O/IO,
+		   any additional params will be treated as Input-only (I).
+		   inp_mask is inversed to achieve this.
+		*/
 		arg_mval.mvtype = MV_XZERO;
 		if (mask & 1)
-		{ /* output-only(O) params : advance va_arg pointer */
+		{ 	/* output-only(O) params : advance va_arg pointer */
 			switch (entry->parms[i])
 			{
+				case xc_int:
+					va_arg(var, gtm_int_t); break;
+				case xc_uint:
+					va_arg(var, gtm_uint_t); break;
 				case xc_long:
 					va_arg(var, gtm_long_t); break;
 				case xc_ulong:
 					va_arg(var, gtm_ulong_t); break;
+				case xc_int_star:
+					va_arg(var, gtm_int_t *); break;
+				case xc_uint_star:
+					va_arg(var, gtm_uint_t *); break;
 				case xc_long_star:
-					va_arg(var, gtm_long_t*); break;
+					va_arg(var, gtm_long_t *); break;
 				case xc_ulong_star:
-					va_arg(var, gtm_ulong_t*); break;
+					va_arg(var, gtm_ulong_t *); break;
 				case xc_float:
 				case xc_double:
 					va_arg(var, gtm_double_t); break;
 				case xc_float_star:
-					va_arg(var, gtm_float_t*); break;
+					va_arg(var, gtm_float_t *); break;
 				case xc_double_star:
-					va_arg(var, gtm_double_t*); break;
+					va_arg(var, gtm_double_t *); break;
 				case xc_char_star:
-					va_arg(var, gtm_char_t*); break;
+					va_arg(var, gtm_char_t *); break;
 				case xc_string_star:
-					va_arg(var, gtm_string_t*); break;
+					va_arg(var, gtm_string_t *); break;
 				default:
 					va_end(var);
 					GTMASSERT;
 			}
-		}
-		else { /* I/IO params: create mval for each native type param */
+		} else
+		{ 	/* I/IO params: create mval for each native type param */
 			switch (entry->parms[i])
 			{
+                                case xc_int:
+                                        i2mval(&arg_mval, va_arg(var, gtm_int_t));
+                                        break;
+                                case xc_uint:
+                                        i2usmval(&arg_mval, va_arg(var, gtm_uint_t));
+                                        break;
 				case xc_long:
 					i2mval(&arg_mval, va_arg(var, gtm_long_t));
 					break;
 				case xc_ulong:
 					i2usmval(&arg_mval, va_arg(var, gtm_ulong_t));
 					break;
+                                case xc_int_star:
+                                        i2mval(&arg_mval, *va_arg(var, gtm_int_t *));
+                                        break;
+                                case xc_uint_star:
+                                        i2usmval(&arg_mval, *va_arg(var, gtm_uint_t *));
+                                        break;
 				case xc_long_star:
-					i2mval(&arg_mval, *va_arg(var, gtm_long_t*));
+					i2mval(&arg_mval, *va_arg(var, gtm_long_t *));
 					break;
 				case xc_ulong_star:
-					i2usmval(&arg_mval, *va_arg(var, gtm_ulong_t*));
+					i2usmval(&arg_mval, *va_arg(var, gtm_ulong_t *));
 					break;
 				case xc_float: /* fall through */
 				case xc_double:
 					double2mval(&arg_mval, va_arg(var, gtm_double_t));
 					break;
 				case xc_float_star:
-					double2mval(&arg_mval, *va_arg(var, gtm_float_t*));
+					double2mval(&arg_mval, *va_arg(var, gtm_float_t *));
 					break;
 				case xc_double_star:
-					double2mval(&arg_mval, *va_arg(var, gtm_double_t*));
+					double2mval(&arg_mval, *va_arg(var, gtm_double_t *));
 					break;
 				case xc_char_star:
 					arg_mval.mvtype = MV_STR;
-					arg_mval.str.addr = va_arg(var, gtm_char_t*);
+					arg_mval.str.addr = va_arg(var, gtm_char_t *);
 					arg_mval.str.len = STRLEN(arg_mval.str.addr);
 					if (MAX_STRLEN < arg_mval.str.len)
 					{
@@ -209,7 +229,7 @@ int gtm_ci (const char *c_rtn_name, ...)
 					s2pool(&arg_mval.str);
 					break;
 				case xc_string_star:
-					mstr_parm = va_arg(var, gtm_string_t*);
+					mstr_parm = va_arg(var, gtm_string_t *);
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 					{
@@ -230,7 +250,9 @@ int gtm_ci (const char *c_rtn_name, ...)
 	}
 	va_end(var);
 	param_blk.mask = out_mask;
-param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0) ? CODE_ADDRESS_TYPE(op_extcall) : CODE_ADDRESS_TYPE(op_extexfun);
+	param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0)
+		? (void (*)())CODE_ADDRESS_TYPE(op_extcall)
+		: (void (*)())CODE_ADDRESS_TYPE(op_extexfun);
 	/* the params block needs to be stored & restored across multiple
 	   gtm environments. So instead of storing explicitely, setting the
 	   global param_list to point to local param_blk will do the job */
@@ -248,9 +270,10 @@ param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0) ? CODE_ADDRESS_TYPE(op
 
 	var_on_cstack_ptr = save_var_on_cstack_ptr; /* restore the old environment's var_on_cstack_ptr */
 	if (1 != mumps_status)
-	{ /* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
-	     it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
-	     or zero on returning from ZGOTO 0 (ci_ret_code_quit) */
+	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
+		   it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
+		   or zero on returning from ZGOTO 0 (ci_ret_code_quit)
+		*/
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
@@ -262,11 +285,10 @@ param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0) ? CODE_ADDRESS_TYPE(op
 		{
 			if (!has_return)
 				continue;
-			arg_ptr = (mval*)(param_blk.retaddr);
+			arg_ptr = (mval *)(param_blk.retaddr);
 			mask = 1;
 			arg_type = entry->return_type;
-		}
-		else
+		} else
 		{
 			arg_ptr = param_blk.args[i-1];
 			mask = out_mask;
@@ -279,19 +301,27 @@ param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0) ? CODE_ADDRESS_TYPE(op
 		{
 			switch (arg_type)
 			{
+                                case xc_int_star:
+                                        va_arg(var, gtm_int_t *); break;
+                                case xc_uint_star:
+                                        va_arg(var, gtm_uint_t *); break;
 				case xc_long_star:
-					va_arg(var, gtm_long_t*); break;
+					va_arg(var, gtm_long_t *); break;
 				case xc_ulong_star:
-					va_arg(var, gtm_ulong_t*); break;
+					va_arg(var, gtm_ulong_t *); break;
 				case xc_float_star:
-					va_arg(var, gtm_float_t*); break;
+					va_arg(var, gtm_float_t *); break;
 				case xc_double_star:
-					va_arg(var, gtm_double_t*); break;
+					va_arg(var, gtm_double_t *); break;
 				case xc_char_star:
-					va_arg(var, gtm_char_t*); break;
+					va_arg(var, gtm_char_t *); break;
 				case xc_string_star:
-					va_arg(var, gtm_string_t*); break;
-				case xc_long:
+					va_arg(var, gtm_string_t *); break;
+                                case xc_int:
+                                        va_arg(var, gtm_int_t); break;
+                                case xc_uint:
+                                        va_arg(var, gtm_uint_t); break;
+ 				case xc_long:
 					va_arg(var, gtm_long_t); break;
 				case xc_ulong:
 					va_arg(var, gtm_ulong_t); break;
@@ -304,26 +334,30 @@ param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0) ? CODE_ADDRESS_TYPE(op
 			}
 
 		} else
-		{ /* Process all output (O/IO) parameters modified by the M routine */
+		{	/* Process all output (O/IO) parameters modified by the M routine */
 			switch (arg_type)
 			{
+                                case xc_int_star:
+                                        *va_arg(var, gtm_int_t *) = mval2i(arg_ptr); break;
+                                case xc_uint_star:
+                                        *va_arg(var, gtm_uint_t *) = mval2ui(arg_ptr); break;
 				case xc_long_star:
-					*va_arg(var, gtm_long_t*) = mval2i(arg_ptr); break;
+					*va_arg(var, gtm_long_t *) = mval2i(arg_ptr); break;
 				case xc_ulong_star:
-					*va_arg(var, gtm_ulong_t*) = mval2ui(arg_ptr); break;
+					*va_arg(var, gtm_ulong_t *) = mval2ui(arg_ptr); break;
 				case xc_float_star:
-					*va_arg(var, gtm_float_t*) = mval2double(arg_ptr); break;
+					*va_arg(var, gtm_float_t *) = mval2double(arg_ptr); break;
 				case xc_double_star:
-					*va_arg(var, gtm_double_t*) = mval2double(arg_ptr); break;
+					*va_arg(var, gtm_double_t *) = mval2double(arg_ptr); break;
 				case xc_char_star:
-					xc_char_ptr = va_arg(var, gtm_char_t*);
+					xc_char_ptr = va_arg(var, gtm_char_t *);
 					if (!MV_IS_STRING(arg_ptr))
 						MV_FORCE_STR(arg_ptr);
 					memcpy(xc_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
 					xc_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
 					break;
 				case xc_string_star:
-					mstr_parm = va_arg(var, gtm_string_t*);
+					mstr_parm = va_arg(var, gtm_string_t *);
 					if (!MV_IS_STRING(arg_ptr));
 						MV_FORCE_STR(arg_ptr);
 					mstr_parm->length = arg_ptr->str.len;
@@ -348,7 +382,7 @@ int gtm_init()
 	error_def(ERR_CIMAXLEVELS);
 
 	if (!gtm_startup_active)
-	{ /* call-in invoked from C as base. GT.M hasn't been started up yet. */
+	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		image_type = GTM_IMAGE;
 		gtm_wcswidth_fnptr = gtm_wcswidth;
 		gtm_env_init();	/* read in all environment variables */
@@ -358,20 +392,19 @@ int gtm_init()
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
 		 * the unwind logic in gtmci_ch() will get rid of the whole stack. */
-		msp = (unsigned char*)-1L;
+		msp = (unsigned char *)-1L;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!gtm_startup_active)
-	{ /* GT.M is not active yet. Create GT.M startup environment */
+	{	/* GT.M is not active yet. Create GT.M startup environment */
 		invocation_mode = MUMPS_CALLIN;
 		init_gtm();
 		gtm_savetraps(); /* nullify default $ZTRAP handling */
 		assert(gtm_startup_active);
 		assert(frame_pointer->flags & SFF_CI);
 		nested_level = 1;
-	}
-	else if (!(frame_pointer->flags & SFF_CI))
-	{ /* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame) */
+	} else if (!(frame_pointer->flags & SFF_CI))
+	{	/* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame) */
 		/* Mark the beginning of the new stack so that initialization errors in
 		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch).*/
 		fgncal_stack = msp;
@@ -419,18 +452,28 @@ int gtm_exit()
 		while (NULL != frame_pointer && !(frame_pointer->flags & SFF_CI))
 			op_unwind();
 		if (NULL != frame_pointer)
-		{ /* unwind the current invocation of call-in environment */
+		{	/* unwind the current invocation of call-in environment */
 			assert(frame_pointer->flags & SFF_CI);
 			ci_ret_code_quit();
 		}
 	}
 	gtm_exit_handler(); /* rundown all open database resource */
+
+	/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
+	   the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
+	   'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
+	   our exit handler has already been called. Linux and Solaris don't need this, looking at the
+	   other platforms we support to see if resolutions can be found. SE 05/2007
+	*/
+#ifdef _AIX
+	unatexit(gtm_exit_handler);
+#endif
 	REVERT;
 	gtm_startup_active = FALSE;
 	return 0;
 }
 
-void gtm_zstatus(char* msg, int len)
+void gtm_zstatus(char *msg, int len)
 {
 	int msg_len;
 

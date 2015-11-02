@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@
 #include "repl_instance.h"
 
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	30
-#define MAX_WAIT_FOR_FETCHRESYNC_CONN	30 /* s */
+#define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* seconds */
 #define FETCHRESYNC_PRIMARY_POLL	(MICROSEC_IN_SEC - 1) /* micro seconds, almost 1 second */
 
 GBLREF	uint4			process_id;
@@ -70,8 +70,8 @@ GBLREF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	boolean_t		repl_connection_reset;
 GBLREF 	mur_gbls_t		murgbl;
-GBLREF	boolean_t	src_node_same_endianness;
-GBLREF	boolean_t 	src_node_endianness_known;
+GBLREF	boolean_t		src_node_same_endianness;
+GBLREF	boolean_t		src_node_endianness_known;
 
 CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 {
@@ -89,7 +89,7 @@ CONDITION_HANDLER(gtmrecv_fetchresync_ch)
 
 int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 {
-	size_t				primary_addr_len;
+	GTM_SOCKLEN_TYPE		primary_addr_len;
 	repl_resync_msg_t		resync_msg;
 	repl_msg_t			msg;
 	unsigned char			*msg_ptr;				/* needed for REPL_{SEND,RECV}_LOOP */
@@ -114,6 +114,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 								   * able to do signed comparisons of this with the macros
 								   * REPL_PROTO_VER_DUALSITE(0) and REPL_PROTO_VER_UNINITIALIZED(-1)
 								   */
+	seq_num				triple_seqnum;
 	error_def(ERR_PRIMARYNOTROOT);
 	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_REPLCOMM);
@@ -144,7 +145,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		t1 = time(NULL);
 		while ((status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &gtmrecv_fetchresync_max_wait)) < 0)
 		{
-			if (errno == EINTR || errno == EAGAIN)
+			if ((EINTR == errno)  || (EAGAIN == errno))
 			{
 				t2 = time(NULL);
 				if (0 >= (int)(gtmrecv_fetchresync_max_wait.tv_sec =
@@ -168,7 +169,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 				RTS_ERROR_LITERAL("Waited too long to get a connection request. Check if primary is alive."));
 		}
 		ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr,
-									(sssize_t *)&primary_addr_len, gtmrecv_sock_fd);
+									(GTM_SOCKLEN_TYPE *)&primary_addr_len, gtmrecv_sock_fd);
 		if (gtmrecv_sock_fd < 0)
 			rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Error accepting connection from Source Server"), errno);
@@ -196,17 +197,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			resync_msg.resync_seqno = jgbl.max_dualsite_resync_seqno;
 		assert(resync_msg.resync_seqno);
 		resync_msg.proto_ver = REPL_PROTO_VER_THIS;
-/* wdm debug begin */
-		if (REPL_PROTO_VER_DUALSITE == resync_msg.proto_ver)
-			repl_log(stdout, TRUE, TRUE, "resync_msg.proto_ver is dualsite \n" );
-		else if (REPL_PROTO_VER_MULTISITE == resync_msg.proto_ver)	
-			repl_log(stdout, TRUE, TRUE, "resync_msg.proto_ver is multisite \n" );
-			else
-			repl_log(stdout, TRUE, TRUE, "resync_msg.proto_ver is neither dual site nor multisite \n" );					
-/* wdm debug end */
 		resync_msg.node_endianness = NODE_ENDIANNESS;
-		src_node_same_endianness = TRUE; /* don't convert */ 
-		src_node_endianness_known = FALSE; /* lets reconsider afresh */
+		src_node_same_endianness = TRUE;
+		src_node_endianness_known = FALSE;
 		gtmrecv_repl_send((repl_msg_ptr_t)&resync_msg, "REPL_FETCH_RESYNC", resync_msg.resync_seqno);
 		if (repl_connection_reset)
 		{	/* Connection got reset during the above send */
@@ -227,36 +220,29 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			}
 			if (status != SS_NORMAL)
 			{
-				if (repl_errno == EREPL_RECV)
+				if (EREPL_RECV == repl_errno)
 					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("Error receiving RESYNC JNLSEQNO. Error in recv"), status);
-				if (repl_errno == EREPL_SELECT)
+				if (EREPL_SELECT == repl_errno)
 					rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("Error receiving RESYNC JNLSEQNO. Error in select"), status);
 			}
 			if (wait_count <= 0)
 				rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Waited too long to get message from primary. Check if primary is alive."));
-/* wdm */ 
-				if (!src_node_endianness_known)
-				{
-					if ( msg.type > 256 && GTM_BYTESWAP_32(msg.type) < 256 )
-					{
-						src_node_endianness_known = FALSE;
-						src_node_same_endianness = FALSE;
-					}
-					else
-					{
-						src_node_endianness_known = FALSE;
-						src_node_same_endianness = TRUE;
-					}
-				}
-				if ( !src_node_same_endianness )
-				{
-					msg.type = GTM_BYTESWAP_32(msg.type);
-					msg.len = GTM_BYTESWAP_32(msg.len);				
-				}
-/* wdm */
+			if ( !src_node_endianness_known )
+			{
+				src_node_endianness_known = TRUE;
+				if ((REPL_MSGTYPE_LAST < msg.type) && (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg.type)))
+					src_node_same_endianness = FALSE;
+				else
+					src_node_same_endianness = TRUE;
+			}
+			if ( !src_node_same_endianness )
+			{
+				msg.type = GTM_BYTESWAP_32(msg.type);
+				msg.len = GTM_BYTESWAP_32(msg.len);
+			}
 			switch(msg.type)
 			{
 				case REPL_NEED_INSTANCE_INFO:
@@ -271,12 +257,11 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 					if ( src_node_same_endianness )
 					{
 						instinfo_msg.type = REPL_INSTANCE_INFO;
-						instinfo_msg.len = MIN_REPL_MSGLEN;	
-					}
-					else
+						instinfo_msg.len = MIN_REPL_MSGLEN;
+					} else
 					{
 						instinfo_msg.type = GTM_BYTESWAP_32(REPL_INSTANCE_INFO);
-						instinfo_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);						
+						instinfo_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
 					}
 					assert(NULL != jnlpool.repl_inst_filehdr);
 					memcpy(instinfo_msg.instname, jnlpool.repl_inst_filehdr->this_instname,
@@ -290,27 +275,17 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 					break;
 
 				case REPL_NEED_TRIPLE_INFO:
-					need_tripleinfo_msg = (repl_needtriple_msg_ptr_t)&msg;
+					need_tripleinfo_msg = RECAST(repl_needtriple_msg_ptr_t)&msg;
 					if ( src_node_same_endianness )
-					{													
-						repl_log(stdout, TRUE, TRUE, "Received REPL_NEED_TRIPLE_INFO message for seqno "
-							"%llu [0x%llx]\n", need_tripleinfo_msg->seqno, need_tripleinfo_msg->seqno);
-					}
+						triple_seqnum = need_tripleinfo_msg->seqno;
 					else
-					{
-						repl_log(stdout, TRUE, TRUE, "Received REPL_NEED_TRIPLE_INFO message for seqno "
-							"%llu [0x%llx]\n", GTM_BYTESWAP_64(need_tripleinfo_msg->seqno), 
-							GTM_BYTESWAP_64(need_tripleinfo_msg->seqno));
-					}
+						triple_seqnum = GTM_BYTESWAP_64(need_tripleinfo_msg->seqno);
+					repl_log(stdout, TRUE, TRUE, "Received REPL_NEED_TRIPLE_INFO message for seqno "
+						"%llu [0x%llx]\n", triple_seqnum, triple_seqnum);
 					assert(REPL_PROTO_VER_UNINITIALIZED != murgbl.remote_proto_ver);
 					assert(NULL != jnlpool.jnlpool_dummy_reg);
 					repl_inst_ftok_sem_lock();
-					if ( src_node_same_endianness )
-						status = repl_inst_wrapper_triple_find_seqno(need_tripleinfo_msg->seqno,
-							&triple, &triple_num);
-					else
-						status = repl_inst_wrapper_triple_find_seqno(GTM_BYTESWAP_64(need_tripleinfo_msg->seqno),
-							&triple, &triple_num);										
+					status = repl_inst_wrapper_triple_find_seqno(triple_seqnum, &triple, &triple_num);
 					repl_inst_ftok_sem_release();
 					if (0 != status)
 					{	/* Close the connection. The function call above would have issued the error. */
@@ -353,13 +328,9 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 			return ERR_REPLCOMM;
 		}
 		if ( src_node_same_endianness )
-		{
 			QWASSIGN(*resync_seqno, *(seq_num *)&msg.msg[0]);
-		}
 		else
-		{
-			QWASSIGN(*resync_seqno, GTM_BYTESWAP_64(*(seq_num *)&msg.msg[0]));	
-		}
+			QWASSIGN(*resync_seqno, GTM_BYTESWAP_64(*(seq_num *)&msg.msg[0]));
 		/* Wait till connection is broken or REPL_CONN_CLOSE is received */
 		REPL_RECV_LOOP(gtmrecv_sock_fd, &msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_fetchresync_poll)
 		{

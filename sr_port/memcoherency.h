@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -143,6 +143,41 @@ void do_isync(void);
 #define SHM_READ_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER /* same SYNC instruction for both read and write barriers.
 							  * For read, we want all cache purges to be completed before
 							  * we load shared fields */
+#elif defined(__ia64)
+
+#if defined(__hpux)
+
+#include <machine/sys/kern_inline.h>
+#define SHM_WRITE_MEMORY_BARRIER										\
+{														\
+	if (num_additional_processors)										\
+	{													\
+		_MF();												\
+	}													\
+}
+
+#elif defined(__linux__) && defined(__INTEL_COMPILER)
+
+#	define SHM_WRITE_MEMORY_BARRIER										\
+	{													\
+		if (num_additional_processors)									\
+		{												\
+			__mf();											\
+		}												\
+	}
+#elif defined(__linux__) /* gcc */
+
+#	define SHM_WRITE_MEMORY_BARRIER										\
+	{													\
+		if (num_additional_processors)									\
+		{												\
+			__asm__ __volatile__ ("mf" ::: "memory");						\
+		}												\
+	}
+#endif /* __linux__ */
+
+/* On IA64, cross processor notifications of write barriers are automatic so no read barrier is necessary */
+#define SHM_READ_MEMORY_BARRIER
 
 #else /* SPARC, I386, S390, Itanium */
 
@@ -151,8 +186,6 @@ void do_isync(void);
  */
 
 /* Memory accesses in Intel x86 and IBM S390 archtectures are strongly ordered */
-
-/* TODO : On Itanium, meomory accesses are "weakly-ordered". We have to provide primitives for write{read}_memory_barrier */
 
 #define SHM_WRITE_MEMORY_BARRIER
 #define SHM_READ_MEMORY_BARRIER

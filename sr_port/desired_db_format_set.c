@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +48,8 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	trans_num		curr_tn;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp;
 
 	error_def(ERR_MMNODYNDWNGRD);
 	error_def(ERR_DBDSRDFMTCHNG);
@@ -119,6 +121,14 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	assert(csd->trans_hist.early_tn == csd->trans_hist.curr_tn);
 	if (JNL_ENABLED(csd))
 	{
+		SET_GBL_JREC_TIME;	/* needed for jnl_ensure_open, jnl_put_jrt_pini and jnl_write_aimg_rec */
+		jpc = csa->jnl;
+		jbp = jpc->jnl_buff;
+		/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order of jnl records.
+		 * This needs to be done BEFORE the jnl_ensure_open as that could write journal records
+		 * (if it decides to switch to a new journal file)
+		 */
+		ADJUST_GBL_JREC_TIME(jgbl, jbp);
 		jnl_status = jnl_ensure_open();
 		if (0 != jnl_status)
 		{
@@ -129,8 +139,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		}
 		save_inctn_opcode = inctn_opcode;
 		inctn_opcode = inctn_db_format_change;
-		JNL_SHORT_TIME(jgbl.gbl_jrec_time);	/* needed for jnl_put_jrt_pini() and jnl_write_inctn_rec() */
-		if (0 == csa->jnl->pini_addr)
+		if (0 == jpc->pini_addr)
 			jnl_put_jrt_pini(csa);
 		jnl_write_inctn_rec(csa);
 		inctn_opcode = save_inctn_opcode;

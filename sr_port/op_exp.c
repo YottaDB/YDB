@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -218,7 +218,13 @@ void op_exp(mval *u, mval* v, mval *p)
 	z = pow(x, y);
 
 #ifdef UNIX
+#ifdef __sun
+	/* Solaris doesn't define the more portable HUGE_VAL, but all the other Unix platforms do, so we have to use pow() to
+	 * cause an overflow and capture that value for the comparison. */
 	infinity = pow(inf, np);
+#else
+	infinity = HUGE_VAL;
+#endif
 	if (z == infinity)
 	{
 		rts_error(VARLSTCNT(1) ERR_NUMOFLOW);

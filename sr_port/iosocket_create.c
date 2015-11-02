@@ -105,7 +105,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 				SPRINTF(addr, "%s", adptr);
 			} else
 				SPRINTF(addr, "%s", temp_addr);
-			if (-1 == (socketptr->remote.sin.sin_addr.s_addr = tcp_routines.aa_inet_addr(addr)))
+			if ((unsigned int)-1 == (socketptr->remote.sin.sin_addr.s_addr = tcp_routines.aa_inet_addr(addr)))
 			{	/* Errno not set by inet_addr() */
 				free(socketptr);
 				rts_error(VARLSTCNT(1) ERR_INVADDRSPEC);
@@ -142,7 +142,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des)
 		}
 		socketptr->local.port = GTM_NTOHS(socketptr->local.sin.sin_port);
 		socknamelen = sizeof(socketptr->remote.sin);
-		if (-1 == getpeername(socketptr->sd, (struct sockaddr *)&socketptr->remote.sin, &socknamelen))
+		if (-1 == getpeername(socketptr->sd, (struct sockaddr *)&socketptr->remote.sin, (GTM_SOCKLEN_TYPE *)&socknamelen))
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);

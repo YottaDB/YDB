@@ -54,7 +54,6 @@
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVIS);
 error_def(ERR_TLVLZERO);
-error_def(ERR_GVKILLFAIL);
 error_def(ERR_TPRETRY);
 
 GBLREF	short			dollar_tlevel, dollar_trestart;
@@ -146,7 +145,7 @@ void	op_tcommit(void)
 					assert(0 != si->cw_set_depth);
 					cw_depth = si->cw_set_depth;
 					/* Caution : since csa->backup_in_prog is initialized below only if si->first_cw_set is
-					 * non-NULL, it should be used in tp_tend() only within an if (NULL != si->first_cw_set)
+					 * non-NULL, it should be used in "tp_tend" only within an if (NULL != si->first_cw_set)
 					 */
 					csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb);
 					jbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
@@ -157,7 +156,7 @@ void	op_tcommit(void)
 					 */
 					if (NULL == si->first_cw_bitmap)
 					{	/* si->first_cw_bitmap can be non-NULL only if there was an rts_error()
-						 * in tp_tend() and ZTRAP handler was invoked which in turn did a TCOMMIT.
+						 * in "tp_tend" and ZTRAP handler was invoked which in turn did a TCOMMIT.
 						 * in that case do not reset si->first_cw_bitmap.
 						 */
 						last_cw_set_before_maps = si->last_cw_set;
@@ -223,14 +222,21 @@ void	op_tcommit(void)
 								TP_RETRY_ACCOUNTING(csa, csd, status);
 								break;	/* transaction must attempt restart */
 							}
-							if (blk_used && read_before_image)
+							/* No need to write before-image in case the block is FREE. In case the
+							 * database had never been fully upgraded from V4 to V5 format (after the
+							 * MUPIP UPGRADE), all RECYCLED blocks can basically be considered FREE
+							 * (i.e. no need to write before-images since backward journal recovery
+							 * will never be expected to take the database to a point BEFORE the
+							 * mupip upgrade).
+							 */
+							if (read_before_image && blk_used && csd->db_got_to_v5_once)
 							{
 								cse->old_block = t_qread(new_blk,
 										(sm_int_ptr_t)&cse->cycle, &cse->cr);
 								old_block = (blk_hdr_ptr_t)cse->old_block;
 								if (NULL == old_block)
 								{
-									status = rdfail_detail;
+									status = (enum cdb_sc)rdfail_detail;
 									t_fail_hist[t_tries] = status;
 									SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
 									TP_RETRY_ACCOUNTING(csa, csd, status);
@@ -244,32 +250,17 @@ void	op_tcommit(void)
 									 * reading uninitialized block headers and in turn a bad
 									 * value of "old_block->bsiz". Restart if we ever access a
 									 * buffer whose size is greater than the db block size.
-									 * The only exception is if the database has been fully
-									 * upgraded and we are reading a reused block that is in
-									 * V4 format. In this case there is no need to write a
-									 * before-image so reset cs->old_block.
 									 */
 									bsiz = old_block->bsiz;
 									if (bsiz > csd->blk_size)
 									{
-										if (!csd->fully_upgraded ||
-											(sizeof(v15_blk_hdr) >
-											((v15_blk_hdr_ptr_t)old_block)->bsiz))
-										{
-											status = cdb_sc_lostbmlcr;
-											t_fail_hist[t_tries] = status;
-											SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa,
-												status);
-											TP_RETRY_ACCOUNTING(csa, csd, status);
-											break;
-										} else
-										{	/* V4 format reused block */
-											cse->old_block = NULL;
-										}
-									} else
-										cse->blk_checksum = jnl_get_checksum(
-													INIT_CHECKSUM_SEED,
-													(uint4 *)old_block, bsiz);
+										status = cdb_sc_lostbmlcr;
+										t_fail_hist[t_tries] = status;
+										SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, status);
+										TP_RETRY_ACCOUNTING(csa, csd, status);
+										break;
+									}
+									JNL_GET_CHECKSUM_ACQUIRED_BLK(cse, csd, old_block, bsiz);
 								}
 							} else
 								cse->old_block = NULL;
@@ -304,7 +295,7 @@ void	op_tcommit(void)
 				} else	/* if (at least one set in segment) */
 					assert(0 == si->cw_set_depth);
 			}	/* for (all segments in the transaction) */
-			if ((cdb_sc_normal == status) && tp_tend(FALSE))
+			if ((cdb_sc_normal == status) && tp_tend())
 				;
 			else	/* commit failed */
 			{
@@ -327,9 +318,9 @@ void	op_tcommit(void)
 			{	/* For mupip journal recover all transactions applied during forward phase are treated as
 			   	 * BATCH transaction for performance gain, since the recover command can be reissued like
 			   	 * a batch restart. Similarly update process considers all transactions as BATCH */
-				if ((sgmnt_addrs *)-1L != (csa = jnl_fence_ctl.fence_list))
+				if (JNL_FENCE_LIST_END != (csa = jnl_fence_ctl.fence_list))
 				{
-					for (; (sgmnt_addrs *)-1L != csa;  csa = csa->next_fenced)
+					for ( ; JNL_FENCE_LIST_END != csa;  csa = csa->next_fenced)
 					{	/* only those regions that are actively journaling will appear in the list: */
 						TP_CHANGE_REG_IF_NEEDED(csa->jnl->region);
 						jnl_wait(csa->jnl->region);

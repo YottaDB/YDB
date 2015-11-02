@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_time.h"		/* for time() */
 #include "gtm_fcntl.h"
+#include "gtm_string.h"		/* for strerror() */
 
 #include <sys/types.h>
 #include <signal.h>
@@ -74,18 +75,6 @@ GBLREF int		 rc_nerrs;
  */
 int main(int argc, char_ptr_t argv[])
 {
-#ifndef __linux__
-#ifdef __osf__
-#pragma pointer_size (save)
-#pragma pointer_size (long)
-#endif
-
-    extern char	 *sys_errlist[];
-
-#ifdef __osf__
-#pragma pointer_size (restore)
-#endif
-#endif
     omi_conn	 *cptr, conn;
     int		  i;
     char	  buff[OMI_BUFSIZ];
@@ -97,7 +86,7 @@ int main(int argc, char_ptr_t argv[])
     else if (argc == 2) {
 	if (INV_FD_P((conn.fd = open(argv[argc - 1], O_RDONLY)))) {
 	    PRINTF("%s: open(\"%s\"): %s\n", argv[0], argv[argc - 1],
-		   sys_errlist[errno]);
+		   STRERROR(errno));
 	    exit(-1);
 	}
     }
@@ -142,7 +131,7 @@ int main(int argc, char_ptr_t argv[])
 	if (omi_srvc_xact(&conn) < 0)
 	    break;
 
-    PRINTF("%d seconds connect time\n", time((time_t)0) - conn.stats.start);
+    PRINTF("%ld seconds connect time\n", time((time_t)0) - conn.stats.start);
     PRINTF("%d OMI transactions\n", omi_nxact);
     PRINTF("%d OMI errors\n", omi_nerrs);
 #ifdef GTCM_RC

@@ -11,19 +11,18 @@
 
 #include "mdef.h"
 
-#include "gtm_ulimit.h"
+#include <sys/resource.h>
+
 #include "gtm_unistd.h"
 
-#if defined(__MVS__) || defined(__linux__) || defined(__sparc)
 #include <sys/time.h>
-#include <sys/resource.h>
 #include <errno.h>
 #include "getstorage.h"
 
 #define ERRSTR "getrlimit()"
 error_def(ERR_SYSCALL);
 
-int4	getstorage(void)
+ssize_t	getstorage(void)
 {
         struct rlimit	rl;
         int 		save_errno;
@@ -39,18 +38,12 @@ int4	getstorage(void)
         }
 	cur_sbrk = (UINTPTR_T)sbrk(0); /* Two step conversion to eliminate warnings */
 	size = rl.rlim_cur - cur_sbrk;
-#ifdef INT8_SUPPORTED
+#if !defined(GTM64) && defined(INT8_SUPPORTED)
         if(MAXPOSINT4 < size)
                 size = MAXPOSINT4;
+#elif defined(GTM64)
+	if (MAX_LONG_IN_DOUBLE < size)
+		size = MAX_LONG_IN_DOUBLE;
 #endif
-        return (int4)size;
+        return size;
 }
-
-#else
-
-int4	getstorage(void)
-{
-	 return (int4)(ulimit(3,0) - (ulimit_t)sbrk(0));
-}
-
-#endif

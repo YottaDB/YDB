@@ -27,13 +27,14 @@
 #include "gtmci.h"
 #include "eintr_wrappers.h"
 #include "error.h"
+#include "gtm_malloc.h"
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
 #define	MAX_SRC_LINE		1024
 #define	MAX_NAM_LEN 		32
 #define	MAXIMUM_STARS		2
-#define	SPACE_BLOCK_SIZE	1024
+#define	SPACE_BLOCK_SIZE	((NON_GTM64_ONLY(1024) GTM64_ONLY(2048)) - SIZEOF(storElem))
 #define	TABLEN			8
 #define	POINTER_SIZE		6
 
@@ -42,19 +43,23 @@ static  int	ext_source_line_len;
 static  int	ext_source_column;
 static  char	ext_source_line[MAX_SRC_LINE];
 static  char	*ext_table_file_name;
-static  bool	star_found;
+static  boolean_t star_found;
 
 static  void 	ext_stx_error(int in_error, ...);
-static 	int 	scan_array_bound(char **b,int curr_type);
-const static int parm_space_needed[] =
+static 	int 	scan_array_bound(char **b, int curr_type);
+const int parm_space_needed[] =
 {
 	0,
 	0,
 	sizeof(void *),
+	sizeof(xc_int_t),
+	sizeof(xc_uint_t),
 	sizeof(xc_long_t),
 	sizeof(xc_ulong_t),
 	sizeof(xc_float_t),
 	sizeof(xc_double_t),
+	sizeof(xc_int_t *) + sizeof(xc_int_t),
+	sizeof(xc_uint_t *) + sizeof(xc_uint_t),
 	sizeof(xc_long_t *) + sizeof(xc_long_t),
 	sizeof(xc_ulong_t *) + sizeof(xc_ulong_t),
 	sizeof(xc_string_t *) + sizeof(xc_string_t),
@@ -97,7 +102,7 @@ static void	*get_memory(size_t n)
 /* skip white space */
 static char	*scan_space(char *c)
 {
-	for ( ;ISSPACE(*c); c++, ext_source_column++)
+	for ( ; ISSPACE(*c); c++, ext_source_column++)
 		;
 	return c;
 }
@@ -111,7 +116,7 @@ static char	*scan_ident(char *c)
 	char	*b;
 
 	b = c;
-	for (  ;ISALNUM(*b)  ||  ('_' == *b); b++, ext_source_column++)
+	for (  ; ISALNUM(*b)  ||  ('_' == *b); b++, ext_source_column++)
 		;
 	return (b == c) ? 0 : b;
 }
@@ -119,12 +124,12 @@ static char	*scan_ident(char *c)
 static char	*scan_labelref(char *c)
 {
 	char	*b = c;
-	for ( ;(ISALNUM(*b) || '_' == *b || '^' == *b); b++,ext_source_column++)
+	for ( ; (ISALNUM(*b) || '_' == *b || '^' == *b); b++,ext_source_column++)
 		;
 	return (b == c) ? 0 : b;
 }
 
-static enum xc_types	scan_keyword (char **c)
+static enum xc_types	scan_keyword(char **c)
 {
 	const static struct
 	{
@@ -135,6 +140,14 @@ static enum xc_types	scan_keyword (char **c)
 	/*	typename		type		type *		type **			*/
 
 		{"void",		xc_void,	xc_notfound,	xc_notfound		},
+
+                {"gtm_int_t",           xc_int,         xc_int_star,    xc_notfound 		},
+                {"xc_int_t",            xc_int,         xc_int_star,    xc_notfound 		},
+                {"int",                 xc_int,         xc_int_star,    xc_notfound 		},
+
+                {"gtm_uint_t",          xc_uint,        xc_uint_star,   xc_notfound 		},
+                {"xc_uint_t",           xc_uint,        xc_uint_star,   xc_notfound 		},
+                {"uint",                xc_uint,        xc_uint_star,   xc_notfound 		},
 
 		{"gtm_long_t",		xc_long,	xc_long_star,	xc_notfound		},
 		{"xc_long_t",		xc_long,	xc_long_star,	xc_notfound		},
@@ -211,10 +224,14 @@ static 	int scan_array_bound(char **b,int curr_type)
 		0, /* Unknown Type */
 		0, /* void */
 		0, /* status */
+		0, /* int */
+		0, /* uint */
 		0, /* long */
 		0, /* unsigned long */
 		0, /* float */
 		0, /* double */
+		1, /* pointer to int */
+		1, /* pointer to unsigned int */
 		1, /* Pointer to long */
 		1, /* Pointer to unsigned long */
 		1, /* Pointer to string */
@@ -247,7 +264,7 @@ static 	int scan_array_bound(char **b,int curr_type)
 	return ATOI(number);
 }
 
-static char	*read_table (char *b,int l,FILE *f)
+static char	*read_table(char *b, int l, FILE *f)
 {
 	char	*t;
 
@@ -284,7 +301,7 @@ static char	*read_table (char *b,int l,FILE *f)
  *   These mstr's will have a trailing null attached so that UNIX system routines can operate
  *   on them directly as const char *'s
  */
-static void	put_mstr (mstr *src, mstr *dst)
+static void	put_mstr(mstr *src, mstr *dst)
 {
 	char	*cp;
 	ssize_t	n;
@@ -301,7 +318,7 @@ static void	put_mstr (mstr *src, mstr *dst)
 }
 
 /* utility to convert an array of bool's to a bit mask */
-static uint4	array_to_mask (bool ar[MAXIMUM_PARAMETERS], int n)
+static uint4	array_to_mask(boolean_t ar[MAXIMUM_PARAMETERS], int n)
 {
 	uint4	mask = 0;
 	int	i;
@@ -315,10 +332,10 @@ static uint4	array_to_mask (bool ar[MAXIMUM_PARAMETERS], int n)
 }
 
 /* Note: need condition handler to clean-up allocated structures and close intput file in the event of an error */
-struct extcall_package_list	*exttab_parse (mval *package)
+struct extcall_package_list	*exttab_parse(mval *package)
 {
 	int		parameter_alloc_values[MAXIMUM_PARAMETERS], parameter_count, ret_pre_alloc_val, i, fclose_res;
-	bool		is_input[MAXIMUM_PARAMETERS], is_output[MAXIMUM_PARAMETERS], got_status;
+	boolean_t	is_input[MAXIMUM_PARAMETERS], is_output[MAXIMUM_PARAMETERS], got_status;
 	mstr		callnam, rtnnam;
 	void_ptr_t	pakhandle;
 	enum xc_types	ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
@@ -343,6 +360,7 @@ struct extcall_package_list	*exttab_parse (mval *package)
 	error_def(ERR_ZCRPARMNAME);
 	error_def(ERR_ZCPREALLVALPAR);
 	error_def(ERR_ZCPREALLVALINV);
+
 	/* First, construct package name environment variable */
 	memcpy(str_buffer, PACKAGE_ENV_PREFIX, sizeof(PACKAGE_ENV_PREFIX));
 	tbp = &str_buffer[sizeof(PACKAGE_ENV_PREFIX) - 1];
@@ -421,22 +439,26 @@ struct extcall_package_list	*exttab_parse (mval *package)
 		/* check for legal return type */
 		switch (ret_tok)
 		{
-		case xc_status:
-		case xc_void:
-		case xc_long:
-		case xc_ulong:
-		case xc_char_star:
-		case xc_float_star:
-		case xc_string_star:
-		case xc_long_star:
-		case xc_ulong_star:
-		case xc_double_star:
-		case xc_char_starstar:
-		case xc_pointertofunc:
-		case xc_pointertofunc_star:
-			break;
-		default:
-			ext_stx_error(ERR_ZCRTNTYP, ext_table_file_name);
+			case xc_status:
+			case xc_void:
+			case xc_int:
+			case xc_uint:
+			case xc_long:
+			case xc_ulong:
+			case xc_char_star:
+			case xc_float_star:
+			case xc_string_star:
+			case xc_int_star:
+			case xc_uint_star:
+			case xc_long_star:
+			case xc_ulong_star:
+			case xc_double_star:
+			case xc_char_starstar:
+			case xc_pointertofunc:
+			case xc_pointertofunc_star:
+				break;
+			default:
+				ext_stx_error(ERR_ZCRTNTYP, ext_table_file_name);
 		}
 		got_status = (ret_tok == xc_status);
 		/*  get call name */
@@ -482,10 +504,8 @@ struct extcall_package_list	*exttab_parse (mval *package)
 				tbp++;
 			}
 			if (((FALSE == is_input[parameter_count]) && (FALSE == is_output[parameter_count]))
-				||(':' != *tbp++))
-			{
+			    ||(':' != *tbp++))
 				ext_stx_error(ERR_ZCRCALLNAME, ext_table_file_name);
-			}
 			/* scanned colon--now get type */
 			pr = scan_keyword(&tbp);
 			if (xc_notfound == pr)
@@ -522,8 +542,8 @@ struct extcall_package_list	*exttab_parse (mval *package)
 		entry_ptr->input_mask = array_to_mask(is_input, parameter_count);
 		entry_ptr->output_mask = array_to_mask(is_output, parameter_count);
 		entry_ptr->parms = get_memory(parameter_count * sizeof(entry_ptr->parms[0]));
-		entry_ptr->param_pre_alloc_size = get_memory(parameter_count * sizeof(int));
-		entry_ptr->parmblk_size = SIZEOF(void *) * parameter_count + SIZEOF(int);
+		entry_ptr->param_pre_alloc_size = get_memory(parameter_count * sizeof(intszofptr_t));
+		entry_ptr->parmblk_size = (SIZEOF(void *) * parameter_count) + SIZEOF(intszofptr_t);
 		for (i = 0 ;  i < parameter_count ;  i++)
 		{
 			entry_ptr->parms[i] = parameter_types[i];
@@ -579,7 +599,7 @@ callin_entry_list*	citab_parse (void)
 	ext_table_file_handle = Fopen(ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
 		rts_error(VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
-					ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
+			  ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
 	ext_source_line_num = 0;
 	while (read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle))
 	{
@@ -595,16 +615,18 @@ callin_entry_list*	citab_parse (void)
 		ret_tok = scan_keyword(&tbp); /* return type */
 		switch (ret_tok) /* return type valid ? */
 		{
-		case xc_void:
-		case xc_char_star:
-		case xc_long_star:
-		case xc_ulong_star:
-		case xc_float_star:
-		case xc_double_star:
-		case xc_string_star:
-			break;
-		default:
-			ext_stx_error(ERR_CIRTNTYP, ext_table_file_name);
+			case xc_void:
+			case xc_char_star:
+			case xc_int_star:
+			case xc_uint_star:
+			case xc_long_star:
+			case xc_ulong_star:
+			case xc_float_star:
+			case xc_double_star:
+			case xc_string_star:
+				break;
+			default:
+				ext_stx_error(ERR_CIRTNTYP, ext_table_file_name);
 		}
 		labref.addr = tbp;
 		if ((end = scan_labelref(tbp)))
@@ -631,22 +653,26 @@ callin_entry_list*	citab_parse (void)
 				ext_stx_error(ERR_CIDIRECTIVE, ext_table_file_name);
 			switch ((pr = scan_keyword(&tbp))) /* valid param type? */
 			{
-			case xc_long:
-			case xc_ulong:
-			case xc_float:
-			case xc_double:
-				if (out_mask & mask)
-					ext_stx_error(ERR_CIPARTYPE, ext_table_file_name);
-				/* fall-thru */
-			case xc_char_star:
-			case xc_long_star:
-			case xc_ulong_star:
-			case xc_float_star:
-			case xc_double_star:
-			case xc_string_star:
-				break;
-			default:
-				ext_stx_error(ERR_CIUNTYPE, ext_table_file_name);
+				case xc_int:
+				case xc_uint:
+				case xc_long:
+				case xc_ulong:
+				case xc_float:
+				case xc_double:
+					if (out_mask & mask)
+						ext_stx_error(ERR_CIPARTYPE, ext_table_file_name);
+					/* fall-thru */
+				case xc_char_star:
+				case xc_int_star:
+				case xc_uint_star:
+				case xc_long_star:
+				case xc_ulong_star:
+				case xc_float_star:
+				case xc_double_star:
+				case xc_string_star:
+					break;
+				default:
+					ext_stx_error(ERR_CIUNTYPE, ext_table_file_name);
 			}
 			parameter_types[parameter_count] = pr;
 			tbp = scan_space(tbp);

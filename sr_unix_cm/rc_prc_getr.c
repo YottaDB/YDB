@@ -261,11 +261,11 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 			if (status == cdb_sc_endtree)
 			{
 				if (fmode & RC_MODE_NEXT)
-				{	rsp->after.value = -1;
+				{	rsp->after.value = (unsigned short)-1;
 					rsp->before.value = 0;
 				}else
 				{	rsp->after.value = 0;
-					rsp->before.value = -1;
+					rsp->before.value = (unsigned short)-1;
 				}
 				rsp->xcc.value = 0;
 			}else

@@ -380,7 +380,8 @@ int	omi_srvc_xact (omi_conn *cptr)
 			{
 /*				Only report this if we're not doing RC */
 				if (!(cptr->exts & OMI_XTF_RC && rh.op_class.value == 2))
-					OMI_DBG((omi_debug, "gtcm_server: xptr != xend (%d)\n", xend - cptr->xptr));
+					NON_IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server: xptr != xend (%d)\n", xend - cptr->xptr)));
+					IA64_ONLY(OMI_DBG((omi_debug, "gtcm_server: xptr != xend (%ld)\n", xend - cptr->xptr)));
 				cptr->xptr = xend;
 			}
 			omi_buff_rsp(&rh, (omi_err_hdr *)0, 0, bptr, rv);
