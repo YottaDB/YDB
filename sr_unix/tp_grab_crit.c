@@ -25,14 +25,11 @@
 #include "tp_grab_crit.h"
 #include "deferred_signal_handler.h"
 #include "wcs_recover.h"
-#include "have_crit.h"
 #include "caller_id.h"
 #include "is_proc_alive.h"
 
 GBLREF	short 			crash_count;
 GBLREF	volatile int4		crit_count;
-GBLREF	VSIG_ATOMIC_T		forced_exit;
-GBLREF	boolean_t		mutex_salvaged;
 GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
 
@@ -45,7 +42,6 @@ bool	tp_grab_crit(gd_region *reg)
 
 	error_def(ERR_CRITRESET);
 	error_def(ERR_DBCCERR);
-	error_def(ERR_WCBLOCKED);
 
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
@@ -69,8 +65,6 @@ bool	tp_grab_crit(gd_region *reg)
 				case cdb_sc_dbccerr:
 					rts_error(VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 				default:
-					if (forced_exit && 0 == have_crit(CRIT_HAVE_ANY_REG))
-						deferred_signal_handler();
 					GTMASSERT;
 			}
 			return(FALSE);
@@ -83,13 +77,6 @@ bool	tp_grab_crit(gd_region *reg)
 		assert((0 == csa->nl->in_crit) || (FALSE == is_proc_alive(csa->nl->in_crit, 0)));
 		csa->nl->in_crit = process_id;
 		CRIT_TRACE(crit_ops_gw);		/* see gdsbt.h for comment on placement */
-		if (mutex_salvaged) /* Mutex crash repaired, want to do write cache recovery, just in case */
-		{
-			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);
-			BG_TRACE_PRO_ANY(csa, wcb_tp_grab_crit);
-			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_tp_grab_crit"),
-				process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
-		}
 		crit_count = 0;
 	}
 	/* Ideally we do not want to do wcs_recover if we are in interrupt code (as opposed to mainline code).

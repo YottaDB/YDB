@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,13 +36,16 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 	enum jnl_state_codes	jnl_curr_state;
 	enum repl_state_codes	repl_curr_state;
 	boolean_t 		current_image;
+	enum db_acc_method	acc_meth;
 
 	error_def(ERR_REPLNOBEFORE);
 	error_def(ERR_REPLJNLCNFLCT);
 	error_def(ERR_JNLDISABLE);
+	error_def(ERR_MMBEFOREJNL);
 
 	jnl_curr_state = (enum jnl_state_codes)rptr->sd->jnl_state;
 	repl_curr_state = (enum repl_state_codes)rptr->sd->repl_state;
+	acc_meth = rptr->sd->acc_meth;
 	current_image = rptr->sd->jnl_before_image;
 	if (CLI_ABSENT == jnl_options->cli_journal)
 		rptr->jnl_new_state = jnl_curr_state;
@@ -72,13 +75,19 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 			rptr->jnl_new_state = jnl_open;	/* turn journaling on for REPLICATION=ON */
 	}
 	VMS_ONLY(rptr->before_images = (jnl_options->image_type_specified ?  jnl_info->before_images : current_image);)
-	UNIX_ONLY(
+	UNIX_ONLY(	/* If turning replic ON, don't set BEFORE images with MM -- leave it unchanged */
 		rptr->before_images = (jnl_options->image_type_specified
 			? jnl_info->before_images
-			: (((CLI_PRESENT == jnl_options->cli_replic_on) && (repl_open != repl_curr_state))
+			: (((CLI_PRESENT == jnl_options->cli_replic_on) && (repl_open != repl_curr_state)
+					&& (dba_bg == acc_meth))
 				? TRUE
 				: current_image));
 	)
+	if (rptr->before_images && (dba_mm == acc_meth))
+	{
+		gtm_putmsg(VARLSTCNT(4) ERR_MMBEFOREJNL, 2, DB_LEN_STR(gv_cur_region));
+		return EXIT_WRN;
+	}
 	if (CLI_PRESENT == jnl_options->cli_replic_on) /* replic="ON" */
 	{
 		assert((CLI_ABSENT == jnl_options->cli_journal)
@@ -89,6 +98,11 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 		VMS_ONLY(
 			assert((CLI_ABSENT == jnl_options->cli_journal)
 				|| (!jnl_options->image_type_specified || rptr->before_images));
+			if (dba_mm == acc_meth)
+			{
+				gtm_putmsg(VARLSTCNT(4) ERR_MMBEFOREJNL, 2, DB_LEN_STR(gv_cur_region));
+				return EXIT_WRN;
+			}
 			rptr->before_images = TRUE;
 		)
 	} else if (CLI_NEGATED == jnl_options->cli_replic_on) /* replic="OFF" */

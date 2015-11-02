@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007 Fidelity Information Services, Inc *
+ *      Copyright 2007, 2008 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -128,6 +128,7 @@ GBLREF int	code_idx;
 GBLREF unsigned char	*obpt;	 /* output buffer index */
 GBLREF unsigned char	outbuf[];
 GBLREF int	curr_addr;
+GBLDEF int	instidx, prev_idx;
 
 #define REG_RIP 16
 LITDEF char	*register_list[] = {
@@ -150,8 +151,8 @@ LITDEF char	*register_list[] = {
 	"RIP"
 };
 
-GBLDEF int force_32 = 1;	/* We want to generate 4 byte offets even for an offset lesser than 8bits long,
-			   to keep things consistent between CGP_APPROX_ADDR phase and CGP_MACHINE phase */
+GBLREF boolean_t force_32;	/* We want to generate 4 byte offets even for an offset lesser than 8bits long,
+				   to keep things consistent between CGP_APPROX_ADDR phase and CGP_MACHINE phase */
 
 int	x86_64_arg_reg(int indx)
 {
@@ -172,6 +173,7 @@ int	x86_64_arg_reg(int indx)
 void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' parameter is ignored */
 {
 	assert (jmp_offset != 0);
+	force_32 = TRUE;
 	jmp_offset -= code_idx * sizeof(code_buf[0]);	/* size of this particular instruction */
 
 	switch (cg_phase)
@@ -198,7 +200,7 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 			{
 				/*code_buf[code_idx++] = I386_INS_NOP__; */
 			} else if (((jmp_offset - 2) >= -128 && (jmp_offset - 2) <= 127 &&
-				 JMP_LONG_INST_SIZE != call_4lcldo_variant) && (force_32 == 0))
+				    JMP_LONG_INST_SIZE != call_4lcldo_variant) && (force_32 == FALSE))
 			{
 				jmp_offset -= 2;
 				switch (branch_op)
@@ -270,6 +272,7 @@ void	emit_jmp(uint4 branch_op, short **instp, int reg) /* Note that the 'reg' pa
 				code_idx += sizeof(int4);
 			}
 	}
+	force_32 = FALSE;
 }
 
 
@@ -285,7 +288,7 @@ void	emit_base_offset(int base_reg, int offset)
  *		emit_base_info.modrm_byte.modrm.mod = I386_MOD32_BASE;
  *		 else
  */
-	if ((offset >= -128  &&  offset <= 127)  &&  force_32 == 0)
+	if ((offset >= -128  &&  offset <= 127)  &&  force_32 == FALSE)
 		emit_base_info.modrm_byte.modrm.mod = I386_MOD32_BASE_DISP_8;
 	else
 		emit_base_info.modrm_byte.modrm.mod = I386_MOD32_BASE_DISP_32;
@@ -306,7 +309,7 @@ void	emit_base_offset(int base_reg, int offset)
 		SET_REX_PREFIX(0, REX_B, base_reg)
 	}
 
-	if ((offset >= -128  &&  offset <= 127)  &&  force_32 == 0)
+	if ((offset >= -128  &&  offset <= 127)  &&  force_32 == FALSE)
 	{
 		emit_base_info.offset8 = offset & 0xff;
 		emit_base_info.offset8_set = 1;
@@ -421,13 +424,27 @@ void print_destination_operand()
 
 void print_instruction()
 {
+
+	list_chkpage();
+	obpt = &outbuf[0];
+	memset(obpt, SP, ASM_OUT_BUFF);
+	obpt += 10;
+	i2hex((curr_addr - sizeof(rhdtyp)), obpt, 8);
+	curr_addr += (instidx - prev_idx);
+	obpt += 10;
+	for( ;  prev_idx < instidx; prev_idx++)
+	{
+		i2hex(code_buf[prev_idx], obpt, 2);
+		obpt += 2;
+	}
+	obpt += 10;
 	*obpt++ = '\n';
 	*obpt++ = '\t';
 	*obpt++ = '\t';
 	*obpt++ = '\t';
 	*obpt++ = '\t';
 	*obpt++ = '\t';
-
+	*obpt++ = '\t';
 	assert( instruction.opcode_mnemonic != NULL );
 	SET_OBPT_STR(instruction.opcode_mnemonic, STRLEN(instruction.opcode_mnemonic))
 	*obpt++ = instruction.opcode_suffix;
@@ -496,7 +513,6 @@ void format_machine_inst()
 {
 	short	next_inst_byte_meaning = one_byte_opcode;
 	int	i, tot_inst_len = 0;
-	int	instidx;
 	unsigned char	inst_curr_byte;
 	short	lock_prefix_seen;
 	short	rep_e_prefix_seen;
@@ -504,23 +520,12 @@ void format_machine_inst()
 	short	operand_size_prefix_seen;
 	short	address_size_prefix_seen;
 
-	instidx = 0;
 
 	/*	Start Parsing the Instruction Buffer	*/
 	instidx = 0;
+	prev_idx = 0;
 	while(instidx < code_idx)
 	{
-		list_chkpage();
-		obpt = &outbuf[0];
-
-		memset(obpt, SP, ASM_OUT_BUFF);
-		obpt += 10;
-		i2hex((curr_addr - sizeof(rhdtyp)), obpt, 8);
-		curr_addr += 4;
-		obpt += 10;
-		i2hex(code_buf[instidx], obpt, 8);
-		obpt += 10;
-
 		switch(next_inst_byte_meaning)
 		{			/* Can be a Prefix, or opcode !! */
 			case one_byte_opcode :
@@ -761,6 +766,8 @@ void format_machine_inst()
 				/*	Ins :: OPCODE ModRM (Reg, Mem)/(No_IMM)	*/
 					case I386_INS_LEA_Gv_M :
 					case I386_INS_MOV_Gv_Ev :
+					case I386_INS_XOR_Gv_Ev :
+					case I386_INS_MOVSXD_Gv_Ev :
 						instruction.num_operands = 2;
 						instruction.source_operand_class = memory_class;
 						instruction.destination_operand_class = register_class;
@@ -780,6 +787,7 @@ void format_machine_inst()
 					case I386_INS_MOV_Ev_Iv :
 						instruction.num_operands = 2;
 						instruction.destination_operand_class = memory_class;
+						instruction.has_immediate = double_word_immediate;
 						instruction.source_operand_class = immediate_class;
 						next_inst_byte_meaning = modrm_sib_bytes;
 						break;
@@ -858,9 +866,7 @@ void format_machine_inst()
 							break;
 					}
 				} else
-				{
 					set_register_reg();
-				}
 
 				set_memory_reg();
 
@@ -874,6 +880,13 @@ void format_machine_inst()
 					assert((sib_byte.sib.base == I386_REG_ESP) || (sib_byte.sib.base == I386_REG_EBP));
 					assert(sib_byte.sib.ss == I386_SS_TIMES_1);
 					assert(sib_byte.sib.index == I386_REG_NO_INDEX);
+
+					if (instruction.source_operand_class == memory_class)
+						instruction.source_operand_reg =
+							(char *) register_list[sib_byte.sib.base + 8 * rex_prefix.Base];
+					else if (instruction.destination_operand_class == memory_class)
+						instruction.destination_operand_reg =
+							(char *) register_list[sib_byte.sib.base + 8 * rex_prefix.Base];
 
 					switch(modrm_byte.modrm.mod)
 					{

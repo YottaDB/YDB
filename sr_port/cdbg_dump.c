@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,8 @@ GBLREF int4	sa_temps_offset[];
 GBLREF int4	sa_temps[];
 LITREF int4	sa_class_sizes[];
 
-static char	indent_str[128];
+#define MAX_INDENT (32 * 1024)
+static char	*indent_str;
 static int	last_indent = 0;
 
 void cdbg_dump_triple(triple *dtrip, int indent)
@@ -121,7 +122,10 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 	else
 		PRINTF("%s ** Warning ** Null opr passed as operand\n", cdbg_indent(indent));
 	if (!opr->oprclass)
+	{
+		fflush(stdout);
 		return;
+	}
 
 	/* We have a real oprclass, dump it's info */
 	switch(opr->oprclass)
@@ -203,6 +207,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 		default:
 			PRINTF("%s   %s bogus reference\n", cdbg_indent(indent), oprtype_type_names[opr->oprclass]);
 	}
+	fflush(stdout);
 }
 
 void cdbg_dump_mval(int indent, mval *mv)
@@ -230,6 +235,7 @@ void cdbg_dump_mval(int indent, mval *mv)
 		if (!first)
 			PRINTF(", ");
 		PRINTF("String");
+		fflush(stdout);
 		first = FALSE;
 	}
 	if (first)
@@ -257,6 +263,7 @@ void cdbg_dump_mval(int indent, mval *mv)
 		else
 			cdbg_dump_mstr(indent, &mv->str);
 	}
+	fflush(stdout);
 }
 
 /* Dump value of a given mstr. Assumes length is non-zero */
@@ -270,6 +277,7 @@ void cdbg_dump_mstr(int indent, mstr *ms)
 	memcpy(buffer, ms->addr, len);
 	buffer[len] = 0;
 	PRINTF("%s   String value: %s\n", cdbg_indent(indent), buffer);
+	fflush(stdout);
 	free(buffer);
 }
 
@@ -279,8 +287,13 @@ char *cdbg_indent(int indent)
 	if (10 >= indent)
 		return (char *)indents[indent];
 
-	if (sizeof(indent_str) < indent * 2)
+	if (NULL == indent_str)
+		indent_str = malloc(MAX_INDENT);
+	if (MAX_INDENT < indent * 2)
+	{
+		fflush(stdout);
 		GTMASSERT;
+	}
 	if (indent > last_indent)
 		memset(indent_str, ' ', indent * 2);
 	indent_str[indent * 2] = 0;

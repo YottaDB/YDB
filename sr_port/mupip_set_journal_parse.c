@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -178,14 +178,14 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		jnl_info->jnl_len = temp_jnl_fn_len;
 	else
 		jnl_info->jnl_len = 0;
-	UNIX_ONLY(
-	if ((CLI_PRESENT == (cli_status1 = cli_present("SYNC_IO"))) || (CLI_NEGATED ==  cli_status1))
+	if ((CLI_PRESENT == (cli_status1 = cli_present(UNIX_ONLY("SYNC_IO") VMS_ONLY("CACHE")))) || (CLI_NEGATED ==  cli_status1))
 	{
 		jnl_options->sync_io_specified = TRUE;
-		jnl_options->sync_io = (CLI_PRESENT == cli_status1) ? TRUE: FALSE;
+		jnl_options->sync_io = (UNIX_ONLY(CLI_PRESENT) VMS_ONLY(CLI_NEGATED) == cli_status1) ? TRUE: FALSE;
 	}
 	else
 		jnl_options->sync_io_specified = FALSE;
+	UNIX_ONLY(
 	if (jnl_options->yield_limit_specified = (CLI_PRESENT == cli_present("YIELD_LIMIT")))
 	{
 		if (!cli_get_int("YIELD_LIMIT", &jnl_options->yield_limit))

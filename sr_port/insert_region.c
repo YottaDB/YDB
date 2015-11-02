@@ -64,6 +64,9 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	boolean_t	run_time;
 GBLREF	short		dollar_tlevel;
 GBLREF	unsigned int	t_tries;
+#ifdef DEBUG
+GBLREF	boolean_t	ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
+#endif
 
 tp_region	*insert_region(	gd_region	*reg,
 		   		tp_region	**reg_list,
@@ -213,11 +216,14 @@ tp_region	*insert_region(	gd_region	*reg,
 		 * 	in the 3rd retry in TP when we have not yet opened the region. In case region is not open,
 		 * 	tp_restart() (invoked through t_retry from gvcst_init) will open "reg" as well as get crit on it for us.
 		 */
+		DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
 		if (FALSE == tp_grab_crit(reg))		/* Attempt lockdown now */
 		{
+			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
 			t_retry(cdb_sc_needcrit);	/* avoid deadlock -- restart transaction */
 			assert(FALSE);			/* should not come here as t_retry() does not return */
 		}
+		DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
 		assert(csa->now_crit);	/* ensure we have crit now */
 	}
 	DBG_CHECK_TP_REG_LIST_SORTING(*reg_list);

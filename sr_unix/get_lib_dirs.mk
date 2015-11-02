@@ -35,7 +35,7 @@ ifeq ($(gt_os_type), HP-UX)
 common_dirs_sp=unix_gnp unix_cm unix port_cm port
 else
 ifeq ($(gt_os_type), SunOS)
-common_dirs_sp=unix_gnp unix_cm unix_nsb unix port_cm port
+common_dirs_sp=unix_gnp unix_cm unix port_cm port
 else
 ifeq ($(gt_os_type), AIX)
 common_dirs_sp=unix_gnp unix_cm unix port_cm port

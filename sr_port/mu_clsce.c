@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -564,8 +564,8 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		BLK_SEG(bs_ptr2, old_blk1_base + sizeof(blk_hdr), old_blk1_sz - sizeof(blk_hdr) );
 		/* Join data from right sibling */
 		BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1, sizeof(rec_hdr));
-		BLK_SEG(bs_ptr2, old_blk2_base + sizeof(blk_hdr) + sizeof(rec_hdr) + newblk1_mid_cmpc,
-				piece_len - sizeof(rec_hdr) );
+		REORG_BLK_SEG(bs_ptr2, old_blk2_base + sizeof(blk_hdr) + sizeof(rec_hdr) + newblk1_mid_cmpc,
+				piece_len - sizeof(rec_hdr));
 	} else
 	{	/* if an index block */
 		BLK_ADDR(bn_ptr1, sizeof(block_id), unsigned char);
@@ -581,7 +581,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 		{	/* May be a complete_merge too */
 			/* write a new *-rec only */
 			BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, sizeof(rec_hdr) );
-			BLK_SEG(bs_ptr2, new_blk1_top - sizeof(block_id), sizeof(block_id));
+			REORG_BLK_SEG(bs_ptr2, new_blk1_top - sizeof(block_id), sizeof(block_id));
 		} else
 		{
 			if (complete_merge)
@@ -589,7 +589,7 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				 * Remainings from rtsib will be appened without change.
 				 */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1, sizeof(rec_hdr));
-				BLK_SEG(bs_ptr2, old_blk2_base + sizeof(blk_hdr) + sizeof(rec_hdr) + newblk1_mid_cmpc,
+				REORG_BLK_SEG(bs_ptr2, old_blk2_base + sizeof(blk_hdr) + sizeof(rec_hdr) + newblk1_mid_cmpc,
 					piece_len - sizeof(rec_hdr) );
 			} else
 			{	/* First key from rtsib had cmpc=0. After coalesce it will be nonzero.
@@ -598,11 +598,11 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 				 * (newblk1_last_keylen + BSTAR_REC_SIZE) = old length of the last record appended
 				 */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1, sizeof(rec_hdr));
-				BLK_SEG(bs_ptr2, old_blk2_base + sizeof(blk_hdr) + sizeof(rec_hdr) + newblk1_mid_cmpc,
+				REORG_BLK_SEG(bs_ptr2, old_blk2_base + sizeof(blk_hdr) + sizeof(rec_hdr) + newblk1_mid_cmpc,
 					piece_len - (newblk1_last_keylen + BSTAR_REC_SIZE)- sizeof(rec_hdr) );
 				/* write a new *-rec only */
 				BLK_SEG(bs_ptr2, (sm_uc_ptr_t)star_rec_hdr, sizeof(rec_hdr) );
-				BLK_SEG(bs_ptr2, new_blk1_top - sizeof(block_id), sizeof(block_id));
+				REORG_BLK_SEG(bs_ptr2, new_blk1_top - sizeof(block_id), sizeof(block_id));
 			}
 		}
 	}

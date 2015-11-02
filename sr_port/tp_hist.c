@@ -30,6 +30,7 @@
 #include "tp.h"
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
+#include "memcoherency.h"
 
 #define MMBLK_OFFSET(BLK)     													\
 	(cs_addrs->db_addrs[0] + (cs_addrs->hdr->start_vbn - 1) * DISK_BLOCK_SIZE + (off_t)(cs_addrs->hdr->blk_size * (BLK)))
@@ -48,18 +49,23 @@
 }
 
 
-GBLREF gv_namehead	*gv_target, *gv_target_list;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF trans_num	local_tn;	/* transaction number for THIS PROCESS */
-GBLREF int4		n_pvtmods, n_blkmods;
-GBLREF unsigned int	t_tries;
-GBLREF uint4		t_err;
-GBLREF int4		tprestart_syslog_delta;
+GBLREF	gv_namehead	*gv_target, *gv_target_list;
+GBLREF	sgm_info	*sgm_info_ptr;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	sgmnt_addrs	*cs_addrs;
+GBLREF	trans_num	local_tn;	/* transaction number for THIS PROCESS */
+GBLREF	int4		n_pvtmods, n_blkmods;
+GBLREF	unsigned int	t_tries;
+GBLREF	uint4		t_err;
+GBLREF	int4		tprestart_syslog_delta;
 GBLREF	boolean_t	is_updproc;
 GBLREF	boolean_t	mupip_jnl_recover;
 GBLREF	boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database (except for curr_tn++) */
+GBLREF	uint4		process_id;
+
+#ifdef DEBUG
+GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#endif
 
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1);
 
@@ -76,6 +82,10 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	sgm_info	*si;
 	ht_ent_int4	*tabent, *lookup_tabent;
 	cw_set_element	*cse;
+	cache_rec_ptr_t	cr;
+#	ifdef DEBUG
+	boolean_t	wc_blocked;
+#	endif
 
 	error_def(ERR_TRANS2BIG);
 	error_def(ERR_GVKILLFAIL);
@@ -94,7 +104,18 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	 */
 	assert(ERR_GVPUTFAIL == t_err && (NULL == hist1 || hist1 == &cs_addrs->dir_tree->hist && !cs_addrs->dir_tree->noisolation)
 			|| !hist1 || hist1->h[0].blk_target == gv_target);
-
+	/* We are going to reference fields from shared memory including cr->in_tend and t1->buffaddr->tn in that order (as part
+	 * of the TP_IS_CDB_SC_BLKMOD macro below). To ensure we read an uptodate value of cr->in_tend, we do a read memory
+	 * barrier here. Note that to avoid out-of-order reads, the read memory barrier needs to be done AFTER the reference
+	 * that sets t1->tn (in a caller function usually gvcst_search.c) and the reference that accesses t1->buffaddr->tn
+	 * (in this function below as part of the TP_IS_CDB_SC_BLKMOD macro). Therefore it is ok to do this at the start of
+	 * this function. If cr->in_tend changes concurrently AFTER we do the read memory barrier and we dont see the change
+	 * in the cr->in_tend reference below, then, as long as the values we see pass the cdb_sc_blkmod check, it is ok to
+	 * consider this transaction as good because whatever change happened concurrently occurred only after we reached this
+	 * part of the code which means that while the caller functions gvcst_put.c,gvcst_search.c etc. were traversing the
+	 * tree and accessing the buffers, they were guaranteed to have seen a consistent state of the database.
+	 */
+	SHM_READ_MEMORY_BARRIER;
 	for (hist = &gv_target->hist; hist != NULL && cdb_sc_normal == status; hist = (hist == &gv_target->hist) ? hist1 : NULL)
 	{	/* this loop execute once or twice: 1st for gv_target and then for hist1, if any */
 		if (tprestart_syslog_delta)
@@ -122,9 +143,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			 */
 			chain = *(off_chain *)&blk;
 			if (!chain.flag)
-			{
-				/* We need to ensure the shared copy hasn't changed since the beginning of the
-				 * transaction since not checking that can cause atleast false UNDEFs.
+			{	/* We need to ensure the shared copy hasn't changed since the beginning of the
+				 * transaction since not checking that can cause at least false UNDEFs.
 				 * e.g. Say earlier in this TP transaction we had gone down
 				 * a level-1 root-block 4 (say) to reach leaf-level block 10 (say) to get at a
 				 * particular key (^x). Let reorg have swapped the contents of block 10 with the
@@ -138,17 +158,21 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 				assert(is_mm || t1->cr || t1->first_tp_srch_status);
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(t1->first_tp_srch_status, si);
 				t2 = t1->first_tp_srch_status ? t1->first_tp_srch_status : t1;
-				/* Note that we are comparing transaction numbers directly from the buffer instead of
-				 * going through the bt or blk queues. This is done to speed up processing. But the effect
-				 * is that we might encounter a situation where the buffer's contents hasn't been modified,
-				 * but the block might actually have been changed i.e. in VMS a twin buffer might have been
-				 * created or the "blk" field in the cache-record corresponding to this buffer might have
-				 * been made CR_BLKEMPTY etc. In these cases, we rely on the fact that the cycle for the
-				 * buffer would have been incremented thereby saving us in the cycle check later.
+				cr = t2->cr;
+				/* Assert that cr->in_tend is never equal to our process_id since at this point we should
+				 * never have locked a buffer for phase2 commit. The only exception is if the previous
+				 * transaction by this process had a commit-time error and secshr_db_clnup finished the
+				 * transaction and had set csd->wc_blocked to TRUE. It is possible in that case no process
+				 * has yet done a cache-recovery by the time we come to tp_hist as part of the next transaction
+				 * in which case cr->in_tend could still be pointing to our process_id. Note that
+				 * csd->wc_blocked could be changing concurrently so need to note it down in a local variable
+				 * BEFORE checking the value of cr->in_tend.
 				 */
-				if (t2->tn <= ((blk_hdr_ptr_t)t2->buffaddr)->tn)
+				DEBUG_ONLY(wc_blocked = cs_addrs->hdr->wc_blocked;)
+				assert((NULL == cr) || (process_id != cr->in_tend) || wc_blocked);
+				if (TP_IS_CDB_SC_BLKMOD(cr, t2))
 				{
-					cse = t1->ptr;
+					cse = t1->cse;
 					/* Check if the cse already has a recompute list (i.e. NOISOLATION turned ON)
 					 * If so no need to restart the transaction even though the block changed.
 					 * We will detect this change in tp_tend and recompute the update array anyways.
@@ -159,7 +183,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						if (tprestart_syslog_delta)
 						{
 							n_blkmods++;
-							if (t2->ptr || t1->ptr)
+							if (t2->cse || t1->cse)
 								n_pvtmods++;
 							if (1 != n_blkmods)
 								continue;
@@ -169,13 +193,27 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 						status = cdb_sc_blkmod;
 						BREAK_IN_PRO__CONTINUE_IN_DBG;
 					}
-					DEBUG_ONLY(
+#					ifdef DEBUG
 					else
-						/* Assert that this is a leaf level block of a global with NOISOLATION
-						 * and that this is a SET operation (not a GET or KILL).
+					{	/* Assert that this is a leaf level block of a global with NOISOLATION
+						 * and that this is a SET operation (not a GET or KILL). The only exception
+						 * we know of to this is that the global corresponding to the incoming history
+						 * (t1) could have NOISOLATION turned OFF but yet contain a block which is
+						 * already part of the first_tp_hist structure (t2) for a different global that
+						 * has NOISOLATION turned ON. This is possible if MUPIP REORG swapped the block
+						 * AFTER the tp_hist was done for the NOISOLATION-ON-global but BEFORE the
+						 * tp_hist (the current one) for the NOISOLATION-OFF-global. This is definitely
+						 * a restartable situation that will be detected in tp_tend. Even though
+						 * we know t1->blk_target != t2->blk_target in this case, we choose to defer
+						 * the restart because we suspect this case is very infrequent that it is better
+						 * to avoid the performance hit of a check in this frequently used code.
 						 */
-						assert((ERR_GVPUTFAIL == t_err) && t1->blk_target->noisolation && (0 == t1->level));
-					)
+						assert((ERR_GVPUTFAIL == t_err) && (0 == t1->level)
+							&& (t1->blk_target->noisolation || t2->blk_target->noisolation));
+						if (t1->blk_target != t2->blk_target)
+							donot_commit |= DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH;
+					}
+#					endif
 				}
 				/* Although t1->first_tp_srch_status (i.e. t2) is used for doing blkmod check,
 				 * we need to use BOTH t1 and t1->first_tp_srch_status to do the cdb_sc_lostcr check.
@@ -208,16 +246,16 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					}
 					t1->cr->refer = TRUE;
 				}
-				if (t2->cr)
+				if (cr)
 				{
-					assert((sm_long_t)GDS_REL2ABS(t2->cr->buffaddr) == (sm_long_t)t2->buffaddr);
-					if (t2->cycle != t2->cr->cycle)
+					assert((sm_long_t)GDS_REL2ABS(cr->buffaddr) == (sm_long_t)t2->buffaddr);
+					if (t2->cycle != cr->cycle)
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_lostcr;
 						break;
 					}
-					t2->cr->refer = TRUE;
+					cr->refer = TRUE;
 				}
 			}
 			/* Note that blocks created within the transaction (chain.flag != 0) are NOT counted
@@ -237,7 +275,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			assert(!chain.flag || !t1->first_tp_srch_status);
 			if (store_history && !chain.flag)
 			{
-				assert(si->cw_set_depth || !t1->ptr);
+				assert(si->cw_set_depth || !t1->cse);
 				local_hash_entry = t1->first_tp_srch_status;
 				DEBUG_ONLY(lookup_tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&blk);)
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(local_hash_entry, si);
@@ -283,8 +321,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					 *	we do a less stringent check and ensure the optimization ("gvdupsetnoop"
 					 *	global variable) is turned on at the very least.
 					 */
-					assert(!t1->blk_target->noisolation || t1->level || t1->ptr ||
-						((ERR_GVKILLFAIL == t_err)
+					assert(!t1->blk_target->noisolation || t1->level || t1->cse
+						|| ((ERR_GVKILLFAIL == t_err)
 							|| ((ERR_GVPUTFAIL == t_err) && gvdupsetnoop)));
 				} else
 				{	/* While it is almost always true that local_hash_entry is non-NULL here, there
@@ -296,8 +334,8 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					 * block is already in the hashtable. But that can be only because of a
 					 * call from gvcst_kill() or one of the $order,$data,$query routines. Among
 					 * these, gvcst_kill() is the only one that can create a condition which
-					 * will require us to update the "ptr" field in the first_tp_hist array
-					 * (i.e. the block may have a null "ptr" field in the first_tp_hist array
+					 * will require us to update the "cse" field in the first_tp_hist array
+					 * (i.e. the block may have a null "cse" field in the first_tp_hist array
 					 * when it would have been modified as part of the kill in which case we
 					 * need to modify the first_tp_hist array appropriately). In that
 					 * rare case (i.e. local_hash_entry is NULL), we don't need to change
@@ -310,24 +348,43 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 					 */
 					assert(local_hash_entry && lookup_tabent && (local_hash_entry == lookup_tabent->value)
 						|| !local_hash_entry && (hist == hist1));
-					/* Ensure we don't miss updating "ptr" */
-					assert((NULL != local_hash_entry) || ((srch_blk_status *)(tabent->value))->ptr || !t1->ptr);
-					assert(!local_hash_entry || !local_hash_entry->ptr || !t1->ptr ||
-						t1->ptr == local_hash_entry->ptr  ||
-						t1->ptr->low_tlevel == local_hash_entry->ptr);
-					if (local_hash_entry && t1->ptr)
+					/* Ensure we don't miss updating "cse" */
+					assert((NULL != local_hash_entry) || ((srch_blk_status *)(tabent->value))->cse|| !t1->cse);
+					assert(!local_hash_entry || !local_hash_entry->cse || !t1->cse ||
+						t1->cse == local_hash_entry->cse  ||
+						t1->cse->low_tlevel == local_hash_entry->cse);
+					if (local_hash_entry && t1->cse)
 					{
-						assert(is_mm || local_hash_entry->ptr
+						assert(is_mm || local_hash_entry->cse
 								|| t1->first_tp_srch_status == local_hash_entry
 									&& t1->cycle == local_hash_entry->cycle
 									&& t1->cr == local_hash_entry->cr
 									&& t1->buffaddr == local_hash_entry->buffaddr);
-						local_hash_entry->ptr = t1->ptr;
+						local_hash_entry->cse = t1->cse;
 					}
 				}
 			}
-			t1->ptr = NULL;
+			t1->cse = NULL;
 		}
+#		ifdef DEBUG
+		/* Now that this history has been successfully validated, check that the current history transaction
+		 * numbers can never be older than their corresponding first_tp_srch_status values.
+		 */
+		if (cdb_sc_normal == status)
+		{
+			for (t1 = hist->h; HIST_TERMINATOR != (blk = t1->blk_num); t1++)
+			{
+				t2 = t1->first_tp_srch_status ? t1->first_tp_srch_status : t1;
+				assert(t2->tn <= t1->tn);
+				/* Take this time to also check that gv_targets match between t1 and t2.
+				 * If they dont, the restart should be detected in tp_tend.
+				 * Set the flag donot_commit to catch the case this does not restart.
+				 */
+				if (t2->blk_target != t1->blk_target)
+					donot_commit |= DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH;
+			}
+		}
+#		endif
 	}
 	gv_target->read_local_tn = local_tn;
 	CWS_RESET;

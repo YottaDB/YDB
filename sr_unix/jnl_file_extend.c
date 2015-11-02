@@ -144,6 +144,8 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 				 * switching to a new journal. */
 				wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH);
 				jnl_file_close(gv_cur_region, TRUE, TRUE);
+				assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+				csd = cs_data;	/* In MM, wcs_flu() can remap an extended DB, so reset csd to be sure */
 			} else
 				rts_error(VARLSTCNT(7) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region), jpc->status);
 			assert(!jgbl.forw_phase_recovery || (NULL != jgbl.mur_pini_addr_reset_fnptr));
@@ -202,12 +204,18 @@ int jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */
 			DO_FILE_READ(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			if (SS_NORMAL != jpc->status)
+			{
+				assert(FALSE);
 				rts_error(VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csd), jpc->status);
+			}
 			assert((header->virtual_size + new_blocks) == new_alq);
 			header->virtual_size = new_alq;
 			DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			if (SS_NORMAL != jpc->status)
+			{
+				assert(FALSE);
 				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
+			}
 		}
 		if (0 >= new_blocks)
 			break;

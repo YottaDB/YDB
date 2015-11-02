@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,8 @@
 #include "gtm_ffs.h"
 #include "cert_blk.h"
 
-GBLREF short		dollar_tlevel;
+GBLREF	short		dollar_tlevel;
+GBLREF	boolean_t	dse_running;
 
 #define BITS_PER_UCHAR	8
 #define BLKS_PER_UINT4	((sizeof(uint4) / sizeof(unsigned char)) * BITS_PER_UCHAR) / BML_BITS_PER_BLK
@@ -61,7 +62,6 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 {
 	block_id		child, prev_child;
 	rec_hdr_ptr_t		rp, r_top;
-	boolean_t		dummy_bool;
 	int			num_subscripts;
 	uint4			bplmap, mask1, offset;
 	sm_uint_ptr_t		chunk_p;			/* Value is unaligned so will be assigned to chunk */
@@ -157,10 +157,9 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 			/* The following code is NOT independent of the bitmap layout: */
 			mask1 = chunk & SIXTEEN_BLKS_FREE;	/* mask 'recycled' blocks to 'free' blocks */
 			if ((mask1 != 0) && full)		/* check for free blocks */
-			{
-				/* if (full bitmap || full chunk || regular scan of a "short" bitmap) */
+			{	/* if (full bitmap || full chunk || regular scan of a "short" bitmap) */
 				if ((offset == bplmap) || ((blk_top - (sm_uc_ptr_t)chunk_p) > sizeof(chunk))
-				    || (bml_find_free((int4)((sm_uc_ptr_t)chunk_p - mp), mp, offset, &dummy_bool) != NO_FREE_SPACE))
+					|| (NO_FREE_SPACE != bml_find_free((int4)((sm_uc_ptr_t)chunk_p - mp), mp, offset)))
 				{
 					full = FALSE;
 				}
@@ -178,6 +177,10 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, boo
 		if (full == (NO_FREE_SPACE != gtm_ffs(blk / bplmap, MM_ADDR(csd), MASTER_MAP_BITS_PER_LMAP)))
 		{
 			RTS_ERROR_FUNC(ERR_DBBMMSTR, util_buff);
+			/* We have seen DSE CACHE -VERIFY fail occasionally with the DBBMMSTR error for no reason.
+			 * Hence adding an assert that will give us a dump file to analyze if ever this happens again.
+			 */
+			assert(!dse_running);
 			return FALSE;
 		}
 		return TRUE;

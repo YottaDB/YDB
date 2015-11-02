@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,12 +21,10 @@
 #include "filestruct.h"
 #include "mutex.h"
 #include "deferred_signal_handler.h"
-#include "have_crit.h"
 #include "caller_id.h"
 #include "is_proc_alive.h"
 
 GBLREF	volatile int4		crit_count;
-GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	uint4			process_id;
 GBLREF	node_local_ptr_t	locknl;
 
@@ -67,8 +65,6 @@ void	grab_lock(gd_region *reg)
 				case cdb_sc_dbccerr:
 					rts_error(VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
 				default:
-					if (forced_exit && 0 == have_crit(CRIT_HAVE_ANY_REG))
-						deferred_signal_handler();
 					GTMASSERT;
 			}
 			return;

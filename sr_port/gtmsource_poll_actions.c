@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +45,7 @@
 #include "gtmio.h"
 #endif
 #include "sgtm_putmsg.h"
+#include "copy.h"
 
 GBLREF	jnlpool_addrs		jnlpool;
 GBLREF	int			gtmsource_sock_fd;
@@ -71,6 +72,8 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	boolean_t 		log_switched = FALSE;
 	int			status;
 	error_def(ERR_REPLWARN);
+	time_t			temp_time;
+	gtm_time4_t		time4;
 
 	gtmsource_local = jnlpool.gtmsource_local;
 	if (SHUTDOWN == gtmsource_local->shutdown)
@@ -90,12 +93,16 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		now = gtmsource_now;
 		if (gtmsource_is_heartbeat_overdue(&now, &overdue_heartbeat))
 		{
-			time_ptr = GTM_CTIME((time_t *)&overdue_heartbeat.ack_time[0]);
+			/* Few platforms don't allow unaligned memory access. Passing ack_time to GTM_CTIME(ctime) may
+			 * cause sig. time4 and temp_time are used as temporary variable for converting time to string.*/
+			GET_LONG(time4, &overdue_heartbeat.ack_time[0]);
+			temp_time = time4;
+			time_ptr = GTM_CTIME(&temp_time);
 			memcpy(time_str, time_ptr, CTIME_BEFORE_NL);
 			time_str[CTIME_BEFORE_NL] = '\0';
 			SPRINTF(msg_str, "No response received for heartbeat sent at %s with SEQNO %llu in %00.f seconds. "
 					"Closing connection\n", time_str, *(seq_num *)&overdue_heartbeat.ack_seqno[0],
-				 	difftime(now, *(time_t *)&overdue_heartbeat.ack_time[0]));
+				 	difftime(now, temp_time));
 			sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			repl_close(&gtmsource_sock_fd);
@@ -135,9 +142,9 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 #error unsupported platform
 #endif
 		}
-		gtmsource_local->changelog = 0;
 	        if ( log_switched == TRUE )
         	        repl_log(gtmsource_log_fp, TRUE, TRUE, "Change log to %s successful\n", gtmsource_local->log_file);
+		gtmsource_local->changelog = 0;
 	}
 	if (!gtmsource_logstats && gtmsource_local->statslog)
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,7 +103,7 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 {
 	int			status, save_errno, sopcnt, tsd_size;
 	char                    now_running[MAX_REL_NAME];
-	boolean_t		rc_cpt_removed = FALSE, sem_created = FALSE;
+	boolean_t		rc_cpt_removed = FALSE, sem_created = FALSE, is_gtm_shm, glob_sec_init;
 	sgmnt_data_ptr_t	csd, tsd = NULL;
 	jnl_private_control	*jpc;
 	struct sembuf		sop[4];
@@ -450,228 +450,306 @@ bool mu_rndwn_file(gd_region *reg, bool standalone)
 	SEG_SHMATTACH(0, reg);
 #endif
 	cs_addrs->nl = (node_local_ptr_t)cs_addrs->db_addrs[0];
-	memcpy(now_running, cs_addrs->nl->now_running, MAX_REL_NAME);
-	if (memcmp(now_running, gtm_release_name, gtm_release_name_len + 1))
-	{
-		gtm_putmsg(VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), gtm_release_name_len,
-				gtm_release_name, LEN_AND_STR(now_running));
-		CLNUP_RNDWN(udi, reg);
-		free(tsd);
-		return FALSE;
-	}
-	if (memcmp(cs_addrs->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1))
-	{
-		if (memcmp(cs_addrs->nl->label, GDS_LABEL, GDS_LABEL_SZ - 3))
-			gtm_putmsg(VARLSTCNT(8) ERR_DBNOTGDS, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_LITERAL("(from shared segment - nl)"));
-		else
-			gtm_putmsg(VARLSTCNT(8) ERR_BADDBVER, 2, DB_LEN_STR(reg),
-				ERR_TEXT, 2, RTS_ERROR_LITERAL("(from shared segment - nl)"));
-		CLNUP_RNDWN(udi, reg);
-		free(tsd);
-		return FALSE;
-	}
-	/* Since nl is memset to 0 initially and then fname is copied over from gv_cur_region and since "fname" is
-	 * guaranteed to not exceed MAX_FN_LEN, we should have a terminating '\0' atleast at cs_addrs->nl->fname[MAX_FN_LEN]
+	/* The following checks for GDS_LABEL_GENERIC, gtm_release_name, and cs_addrs->nl->glob_sec_init ensure that the
+	 * shared memory under consideration is valid.  First, since cs_addrs->nl->label is in the same place for every
+	 * version, a failing check means it is most likely NOT a GT.M created shared memory, so no attempt will be
+	 * made to delete it. Next a successful match of the currently running release will guarantee that all fields in
+	 * the structure are where they're expected to be -- without this check the glob_sec_init check should not be done
+	 * as this field is at different offsets in different versions. Finally, we can check the glob_sec_init flag to
+	 * verify that shared memory has been completely initialized. If not, we should delete it right away. [C9D07-002355]
 	 */
-	assert(cs_addrs->nl->fname[MAX_FN_LEN] == '\0');	/* Note the first '\0' in cs_addrs->nl->fname can be much earlier */
-	/* Check whether cs_addrs->nl->fname exists. If not, then it is a serious condition. Error out. */
-	STAT_FILE((char *)cs_addrs->nl->fname, &stat_buf, stat_res);
-	if (-1 == stat_res)
+	if (!MEMCMP_LIT(cs_addrs->nl->label, GDS_LABEL_GENERIC))
 	{
-		save_errno = errno;
-		send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, save_errno);
-		gtm_putmsg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid, save_errno);
-		CLNUP_RNDWN(udi, reg);
-		free(tsd);
-		return FALSE;
-	}
-	/* Check whether csa->nl->fname and csa->nl->dbfid are in sync. If not its a serious condition. Error out. */
-	set_gdid_from_stat(&tmp_dbfid, &stat_buf);
-	if (FALSE == is_gdid_gdid_identical(&tmp_dbfid, &cs_addrs->nl->unique_id.uid))
-	{
-		send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
-			ERR_TEXT, 2, LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
-		rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
-			ERR_TEXT, 2, LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
-		CLNUP_RNDWN(udi, reg);
-		free(tsd);
-		return FALSE;
-	}
-	/* The shared section is valid and up-to-date with respect to the database file header;
-	 * ignore the temporary storage and use the shared section from here on
-	 */
-	cs_addrs->critical = (mutex_struct_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SIZE);
-        assert(((INTPTR_T)cs_addrs->critical & 0xf) == 0);                        /* critical should be 16-byte aligned */
-#ifdef CACHELINE_SIZE
-	assert(0 == ((INTPTR_T)cs_addrs->critical & (CACHELINE_SIZE - 1)));
-#endif
-	JNL_INIT(cs_addrs, reg, tsd);
-	cs_addrs->shmpool_buffer = (shmpool_buff_hdr_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SPACE + JNL_SHARE_SIZE(tsd));
-	cs_addrs->lock_addrs[0] = (sm_uc_ptr_t)cs_addrs->shmpool_buffer + SHMPOOL_BUFFER_SIZE;
-	cs_addrs->lock_addrs[1] = cs_addrs->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
-
-	if (dba_bg == acc_meth)
-		cs_data = csd = cs_addrs->hdr = (sgmnt_data_ptr_t)(cs_addrs->lock_addrs[1] + 1 + CACHE_CONTROL_SIZE(tsd));
-	else
-	{
-		cs_addrs->acc_meth.mm.mmblk_state = (mmblk_que_heads_ptr_t)(cs_addrs->lock_addrs[1] + 1);
-		FSTAT_FILE(udi->fd, &stat_buf, stat_res);
-		if (-1 == stat_res)
+		is_gtm_shm = TRUE;
+		memcpy(now_running, cs_addrs->nl->now_running, MAX_REL_NAME);
+		if (memcmp(now_running, gtm_release_name, gtm_release_name_len + 1))
 		{
-			RNDWN_ERR("!AD -> Error with fstat.", reg);
+			gtm_putmsg(VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), gtm_release_name_len,
+				   gtm_release_name, LEN_AND_STR(now_running));
 			CLNUP_RNDWN(udi, reg);
 			free(tsd);
 			return FALSE;
 		}
-#ifdef DEBUG_DB64
-		SEG_MEMMAP(next_smseg, reg);
-		next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + stat_buf.st_size), SHMAT_ADDR_INCS);
-#else
-		SEG_MEMMAP(NULL, reg);
-#endif
-		csd = cs_addrs->hdr = (sgmnt_data_ptr_t)cs_addrs->db_addrs[0];
-		cs_addrs->db_addrs[1] = cs_addrs->db_addrs[0] + stat_buf.st_size - 1;
-	}
-	if (sem_created)
-	{
-		csd->semid = tsd->semid;
-		csd->gt_sem_ctime.ctime = tsd->gt_sem_ctime.ctime;
-	}
-	assert(JNL_ALLOWED(csd) == JNL_ALLOWED(tsd));
-	free(tsd);
-	tsd = NULL;
-	/* Check to see that the fileheader in the shared segment is valid, so we won't endup flushing garbage to db file */
-	/* Check the label in the header - keep adding any further appropriate checks in future here */
-	if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
-	{
-		if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 3))
-		{
-			status_msg = ERR_DBNOTGDS;
-			if (0 != shm_rmid(udi->shmid))
-				gtm_putmsg(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					ERR_TEXT, 2, RTS_ERROR_TEXT("Error removing shared memory"));
-		} else
-			status_msg = ERR_BADDBVER;
-		gtm_putmsg(VARLSTCNT(8) status_msg, 2, DB_LEN_STR(reg),
-			ERR_TEXT, 2, RTS_ERROR_LITERAL("(File header in the shared segment seems corrupt)"));
-		CLNUP_RNDWN(udi, reg);
-		return FALSE;
-	}
-	if (dba_bg == acc_meth)
-		db_csh_ini(cs_addrs);
-	else
-		cs_addrs->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_ulong_t)csd + (int)(csd->start_vbn - 1) * DISK_BLOCK_SIZE);
-	db_common_init(reg, cs_addrs, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
-
-	/* cleanup mutex stuff */
-	cs_addrs->hdr->image_count = 0;
-	gtm_mutex_init(reg, NUM_CRIT_ENTRY, FALSE); /* it is ensured, this is the only process running */
-	cs_addrs->nl->in_crit = 0;
-	cs_addrs->now_crit = cs_addrs->read_lock = FALSE;
-
-	reg->open = TRUE;
-	if (rc_cpt_removed)
-		csd->rc_srv_cnt = csd->dsid = csd->rc_node = 0;   /* reset RC values if we've rundown the RC CPT */
-	mu_rndwn_file_dbjnl_flush = TRUE;	/* indicate to wcs_recover() no need to write inctn or increment db curr_tn */
-	/* If csa->nl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we should
-	 * 	not flush shared memory contents to disk as they might be in an inconsistent state.
-	 * In this case, we will go ahead and remove shared memory (without flushing the contents) in this routine.
-	 * A reissue of the recover/rollback command will restore the database to a consistent state.
-	 */
-	if (!cs_addrs->nl->donotflush_dbjnl)
-	{
 		if (cs_addrs->nl->glob_sec_init)
-		{	/* WCSFLU_NONE only is done here, as we aren't sure of the state, so no EPOCHs are written.
-			 * If we write an EPOCH record, recover may get confused
-			 * Note that for journaling we do not call jnl_file_close() with TRUE for second parameter.
-			 * As a result journal file might not have an EOF record.
-			 * So, a new process will switch the journal file and cut the journal file link,
-			 * though it might be a good journal without an EOF
+		{	/* The following check isn't really necessary -- the gtm_release_name check above is stricter, but is left
+			 * in to maintain the historical progression.
 			 */
-			wcs_flu(WCSFLU_NONE);
-		}
-		jpc = cs_addrs->jnl;
-		if (NULL != jpc)
-		{
-			grab_crit(gv_cur_region);
-			/* If we own it or owner died, clear the fsync lock */
-			if (process_id == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid)
+			glob_sec_init = TRUE;
+			if (memcmp(cs_addrs->nl->label, GDS_LABEL, GDS_LABEL_SZ - 1))
 			{
-				RELEASE_SWAPLOCK(&jpc->jnl_buff->fsync_in_prog_latch);
+				if (memcmp(cs_addrs->nl->label, GDS_LABEL, GDS_LABEL_SZ - 3))
+					gtm_putmsg(VARLSTCNT(8) ERR_DBNOTGDS, 2, DB_LEN_STR(reg),
+						   ERR_TEXT, 2, RTS_ERROR_LITERAL("(from shared segment - nl)"));
+				else
+					gtm_putmsg(VARLSTCNT(8) ERR_BADDBVER, 2, DB_LEN_STR(reg),
+						   ERR_TEXT, 2, RTS_ERROR_LITERAL("(from shared segment - nl)"));
+				CLNUP_RNDWN(udi, reg);
+				free(tsd);
+				return FALSE;
+			}
+			/* Since nl is memset to 0 initially and then fname is copied over from gv_cur_region and since "fname" is
+			 * guaranteed to not exceed MAX_FN_LEN, we should have a terminating '\0' atleast at
+			 * cs_addrs->nl->fname[MAX_FN_LEN]
+			 */
+			assert(cs_addrs->nl->fname[MAX_FN_LEN] == '\0');  /* First '\0' in cs_addrs->nl->fname can be earlier */
+			/* Check whether cs_addrs->nl->fname exists. If not, then it is a serious condition. Error out. */
+			STAT_FILE((char *)cs_addrs->nl->fname, &stat_buf, stat_res);
+			if (-1 == stat_res)
+			{
+				save_errno = errno;
+				send_msg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
+					save_errno);
+				gtm_putmsg(VARLSTCNT(7) ERR_DBNAMEMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
+					save_errno);
+				CLNUP_RNDWN(udi, reg);
+				free(tsd);
+				return FALSE;
+			}
+			/* Check if csa->nl->fname and csa->nl->dbfid are in sync. If not its a serious condition. Error out. */
+			set_gdid_from_stat(&tmp_dbfid, &stat_buf);
+			if (FALSE == is_gdid_gdid_identical(&tmp_dbfid, &cs_addrs->nl->unique_id.uid))
+			{
+				send_msg(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
+					 ERR_TEXT, 2,
+					 LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
+				rts_error(VARLSTCNT(10) ERR_DBIDMISMATCH, 4, cs_addrs->nl->fname, DB_LEN_STR(reg), udi->shmid,
+					  ERR_TEXT, 2,
+					  LEN_AND_LIT("[MUPIP] Database filename and fileid in shared memory are not in sync"));
+				CLNUP_RNDWN(udi, reg);
+				free(tsd);
+				return FALSE;
+			}
+			/* The shared section is valid and up-to-date with respect to the database file header;
+			 * ignore the temporary storage and use the shared section from here on
+			 */
+			cs_addrs->critical = (mutex_struct_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SIZE);
+			assert(((INTPTR_T)cs_addrs->critical & 0xf) == 0);		/* critical should be 16-byte aligned */
+#ifdef CACHELINE_SIZE
+			assert(0 == ((INTPTR_T)cs_addrs->critical & (CACHELINE_SIZE - 1)));
+#endif
+			JNL_INIT(cs_addrs, reg, tsd);
+			cs_addrs->shmpool_buffer = (shmpool_buff_hdr_ptr_t)(cs_addrs->db_addrs[0] + NODE_LOCAL_SPACE +
+				JNL_SHARE_SIZE(tsd));
+			cs_addrs->lock_addrs[0] = (sm_uc_ptr_t)cs_addrs->shmpool_buffer + SHMPOOL_BUFFER_SIZE;
+			cs_addrs->lock_addrs[1] = cs_addrs->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
+
+			if (dba_bg == acc_meth)
+				cs_data = csd = cs_addrs->hdr = (sgmnt_data_ptr_t)(cs_addrs->lock_addrs[1] + 1 +
+					CACHE_CONTROL_SIZE(tsd));
+			else
+			{
+				cs_addrs->acc_meth.mm.mmblk_state = (mmblk_que_heads_ptr_t)(cs_addrs->lock_addrs[1] + 1);
+				FSTAT_FILE(udi->fd, &stat_buf, stat_res);
+				if (-1 == stat_res)
+				{
+					RNDWN_ERR("!AD -> Error with fstat.", reg);
+					CLNUP_RNDWN(udi, reg);
+					free(tsd);
+					return FALSE;
+				}
+#ifdef DEBUG_DB64
+				SEG_MEMMAP(next_smseg, reg);
+				next_smseg = (sm_uc_ptr_t)ROUND_UP((sm_long_t)(next_smseg + stat_buf.st_size), SHMAT_ADDR_INCS);
+#else
+				SEG_MEMMAP(NULL, reg);
+#endif
+				cs_data = csd = cs_addrs->hdr = (sgmnt_data_ptr_t)cs_addrs->db_addrs[0];
+				cs_addrs->db_addrs[1] = cs_addrs->db_addrs[0] + stat_buf.st_size - 1;
+			}
+			if (sem_created)
+			{
+				csd->semid = tsd->semid;
+				csd->gt_sem_ctime.ctime = tsd->gt_sem_ctime.ctime;
+			}
+			assert(JNL_ALLOWED(csd) == JNL_ALLOWED(tsd));
+			free(tsd);
+			tsd = NULL;
+			/* Check to see that the fileheader in the shared segment is valid, so we won't endup flushing garbage
+			 * to db file.
+			 * Check the label in the header - keep adding any further appropriate checks in future here
+			 */
+			if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1))
+			{
+				if (memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 3))
+				{
+					status_msg = ERR_DBNOTGDS;
+					if (0 != shm_rmid(udi->shmid))
+						gtm_putmsg(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+							   ERR_TEXT, 2, RTS_ERROR_TEXT("Error removing shared memory"));
+				} else
+					status_msg = ERR_BADDBVER;
+				gtm_putmsg(VARLSTCNT(8) status_msg, 2, DB_LEN_STR(reg),
+					   ERR_TEXT, 2, RTS_ERROR_LITERAL("(File header in the shared segment seems corrupt)"));
+				CLNUP_RNDWN(udi, reg);
+				return FALSE;
+			}
+			if (dba_bg == acc_meth)
+				db_csh_ini(cs_addrs);
+			else
+				cs_addrs->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_ulong_t)csd + (int)(csd->start_vbn - 1)
+										* DISK_BLOCK_SIZE);
+			db_common_init(reg, cs_addrs, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
+
+			/* cleanup mutex stuff */
+			cs_addrs->hdr->image_count = 0;
+			gtm_mutex_init(reg, NUM_CRIT_ENTRY, FALSE); /* it is ensured, this is the only process running */
+			cs_addrs->nl->in_crit = 0;
+			cs_addrs->now_crit = cs_addrs->read_lock = FALSE;
+
+			reg->open = TRUE;
+			if (rc_cpt_removed)
+				csd->rc_srv_cnt = csd->dsid = csd->rc_node = 0;   /* reset RC values if we've rundown the RC CPT */
+			mu_rndwn_file_dbjnl_flush = TRUE;  /* indicate to wcs_recover() no need to write inctn or increment
+							      db curr_tn */
+			/* If csa->nl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we
+			 * should not flush shared memory contents to disk as they might be in an inconsistent state.
+			 * In this case, we will go ahead and remove shared memory (without flushing the contents) in this routine.
+			 * A reissue of the recover/rollback command will restore the database to a consistent state.
+			 */
+			if (!cs_addrs->nl->donotflush_dbjnl)
+			{
+				if (cs_addrs->nl->glob_sec_init)
+				{	/* WCSFLU_NONE only is done here, as we aren't sure of the state, so no EPOCHs are written.
+					 * If we write an EPOCH record, recover may get confused
+					 * Note that for journaling we do not call jnl_file_close() with TRUE for second parameter.
+					 * As a result journal file might not have an EOF record.
+					 * So, a new process will switch the journal file and cut the journal file link,
+					 * though it might be a good journal without an EOF
+					 */
+					wcs_flu(WCSFLU_NONE);
+					csd = cs_addrs->hdr;
+				}
+				jpc = cs_addrs->jnl;
+				if (NULL != jpc)
+				{
+					grab_crit(gv_cur_region);
+					/* If we own it or owner died, clear the fsync lock */
+					if (process_id == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid)
+					{
+						RELEASE_SWAPLOCK(&jpc->jnl_buff->fsync_in_prog_latch);
+					} else
+						performCASLatchCheck(&jpc->jnl_buff->fsync_in_prog_latch, 0);
+					if (NOJNL != jpc->channel)
+						jnl_file_close(gv_cur_region, FALSE, FALSE);
+					free(jpc);
+					cs_addrs->jnl = NULL;
+					rel_crit(gv_cur_region);
+				}
+			}
+			mu_rndwn_file_dbjnl_flush = FALSE;
+			reg->open = FALSE;
+			/* Note: At this point we have write permission */
+			memset(csd->machine_name, 0, MAX_MCNAMELEN);
+			csd->owner_node = 0;
+			csd->freeze = 0;
+			csd->shmid = INVALID_SHMID;
+			csd->gt_shm_ctime.ctime = 0;
+			if (!standalone)
+			{
+				csd->semid = INVALID_SEMID;
+				csd->gt_sem_ctime.ctime = 0;
+			}
+			if (dba_bg == acc_meth)
+			{
+				LSEEKWRITE(udi->fd, (off_t)0, csd, SIZEOF_FILE_HDR(csd), status);
+				if (0 != status)
+				{
+					RNDWN_ERR("!AD -> Error writing header to disk.", reg);
+					CLNUP_RNDWN(udi, reg);
+					return FALSE;
+				}
 			} else
-				performCASLatchCheck(&jpc->jnl_buff->fsync_in_prog_latch, 0);
-			if (NOJNL != jpc->channel)
-				jnl_file_close(gv_cur_region, FALSE, FALSE);
-			free(jpc);
-			cs_addrs->jnl = NULL;
-			rel_crit(gv_cur_region);
-		}
-	}
-	mu_rndwn_file_dbjnl_flush = FALSE;
-	reg->open = FALSE;
-	/* Note: At this point we have write permission */
-	memset(csd->machine_name, 0, MAX_MCNAMELEN);
-	csd->owner_node = 0;
-	csd->freeze = 0;
-	csd->shmid = INVALID_SHMID;
-	csd->gt_shm_ctime.ctime = 0;
-	if (!standalone)
-	{
-		csd->semid = INVALID_SEMID;
-		csd->gt_sem_ctime.ctime = 0;
-	}
-	if (dba_bg == acc_meth)
-	{
-		LSEEKWRITE(udi->fd, (off_t)0, csd, SIZEOF_FILE_HDR(csd), status);
-		if (0 != status)
+			{
+				if (-1 == msync((caddr_t)cs_addrs->db_addrs[0], (size_t)stat_buf.st_size, MS_SYNC))
+				{
+					RNDWN_ERR("!AD -> Error synchronizing mapped memory.", reg);
+					CLNUP_RNDWN(udi, reg);
+					return FALSE;
+				}
+				if (-1 == munmap((caddr_t)cs_addrs->db_addrs[0], (size_t)stat_buf.st_size))
+				{
+					RNDWN_ERR("!AD -> Error unmapping mapped memory.", reg);
+					CLNUP_RNDWN(udi, reg);
+					return FALSE;
+				}
+			}
+		} else
 		{
-			RNDWN_ERR("!AD -> Error writing header to disk.", reg);
-			CLNUP_RNDWN(udi, reg);
-			return FALSE;
+			glob_sec_init = FALSE;
+			assert(FALSE);
 		}
 	} else
 	{
-		if (-1 == msync((caddr_t)cs_addrs->db_addrs[0], (size_t)stat_buf.st_size, MS_SYNC))
-		{
-			RNDWN_ERR("!AD -> Error synchronizing mapped memory.", reg);
-			CLNUP_RNDWN(udi, reg);
-    			return FALSE;
-		}
-		if (-1 == munmap((caddr_t)cs_addrs->db_addrs[0], (size_t)stat_buf.st_size))
-		{
-			RNDWN_ERR("!AD -> Error unmapping mapped memory.", reg);
-			CLNUP_RNDWN(udi, reg);
-			return FALSE;
-		}
+		is_gtm_shm = FALSE;
+		assert(FALSE);
 	}
-	if (-1 == shmdt((caddr_t)cs_addrs->db_addrs[0]))
+	/* Detach from shared memory whether it is a GT.M shared memory or not */
+	if (-1 == shmdt((caddr_t)cs_addrs->nl))
 	{
+		assert(FALSE);
 		RNDWN_ERR("!AD -> Error detaching from shared memory.", reg);
 		CLNUP_RNDWN(udi, reg);
 		return FALSE;
 	}
-	if (0 != shm_rmid(udi->shmid))
+	cs_addrs->nl = NULL;
+	/* Remove the shared memory only if it is a GT.M created one. */
+	if (is_gtm_shm)
 	{
-		RNDWN_ERR("!AD -> Error removing shared memory.", reg);
-		CLNUP_RNDWN(udi, reg);
-		return FALSE;
-	}
-	if (!standalone)
-	{
-		if (is_orphaned_gtm_semaphore(udi->semid) && 0 != sem_rmid(udi->semid))
+		if (0 != shm_rmid(udi->shmid))
 		{
-			RNDWN_ERR("!AD -> Error removing semaphore.", reg);
+			assert(FALSE);
+			RNDWN_ERR("!AD -> Error removing shared memory.", reg);
 			CLNUP_RNDWN(udi, reg);
 			return FALSE;
 		}
+		udi->shmid = INVALID_SHMID;
+		udi->gt_shm_ctime = 0;
 	}
-	udi->shmid = INVALID_SHMID;
-	udi->gt_shm_ctime = 0;
+	/* Check if it is a GT.M created orphaned semaphore and if so remove it (only if standalone access is not requested) */
+	if (!standalone)
+	{
+		if (is_orphaned_gtm_semaphore(udi->semid))
+		{
+			if (0 != sem_rmid(udi->semid))
+			{
+				RNDWN_ERR("!AD -> Error removing semaphore.", reg);
+				CLNUP_RNDWN(udi, reg);
+				return FALSE;
+			}
+			udi->semid = INVALID_SEMID;
+		}
+	}
+	/* If the shared memory was found to a valid GT.M created segment and if it was properly initialized, we would
+	 * have cleared shmid in the database file header to INVALID_SHMID. If not, do the reset now as we nevertheless
+	 * dont want the database to connect to that non-GT.M-shmid or uninitialized-GT.M-shmid anymore.
+	 */
+	if (!is_gtm_shm || !glob_sec_init)
+	{
+		assert(INVALID_SEMID != udi->semid);
+		tsd->shmid = udi->shmid = INVALID_SHMID;
+		tsd->gt_shm_ctime.ctime = udi->gt_shm_ctime = 0;
+		if (mupip_jnl_recover)
+		{
+			memset(tsd->machine_name, 0, MAX_MCNAMELEN);
+			tsd->freeze = 0;
+			tsd->owner_node = 0;
+		}
+		LSEEKWRITE(udi->fd, (off_t)0, tsd, tsd_size, status);
+		if (0 != status)
+		{
+			RNDWN_ERR("!AD -> Unable to write header to disk.", reg);
+			CLNUP_RNDWN(udi, reg);
+			free(tsd);
+			return FALSE;
+		}
+		free(tsd);
+	}
+	assert(INVALID_SHMID == udi->shmid);
+	assert(0 == udi->gt_shm_ctime);
 	REVERT;
 	RESET_GV_CUR_REGION;
 	restore_rndwn_gbl = TRUE;
-	/* For mupip rundown, standalone == TRUE and we want to rlease/remove ftok semaphore.
+	/* For mupip rundown, standalone == TRUE and we want to release/remove ftok semaphore.
 	 * Otherwise, just release ftok semaphore lock. counter will be one more for this process.
 	 * Exit handlers must take care of removing if necessary.
 	 */

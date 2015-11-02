@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,6 +71,7 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 	struct sockaddr_in	peer;		/* socket address + port */
 	fd_set			tcp_fd;
 	int			lsock;
+	short 			retry_num;
 
 	error_def(ERR_DEVPARMNEG);
 	error_def(ERR_INVADDRSPEC);
@@ -282,11 +283,59 @@ short	iotcp_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 ti
 			status = tcp_routines.aa_accept(lsock, &peer, &size);
 			if (-1 == status)
 			{
-				errptr = (char *)STRERROR(errno);
-				errlen = STRLEN(errptr);
-				iotcp_rmlsock((io_desc *)dev->iod);
-				rts_error(VARLSTCNT(6) ERR_SOCKACPT, 0, ERR_TEXT, 2, errlen, errptr);
-				return FALSE;
+#ifdef __hpux
+			/*ENOBUFS in HP-UX is either because of a memory problem or when we have received a RST just
+			after a SYN before an accept call. Normally this is not fatal and is just a transient state.
+			Hence exiting just after a single error of this kind should not be done.
+			So retry in case of HP-UX and ENOBUFS error.*/
+				if (ENOBUFS == errno)
+				{
+					retry_num = 0;
+					while (HPUX_MAX_RETRIES > retry_num)
+					{
+			/*In case of succeeding with select in first go, accept will still get 5ms time difference*/
+						SHORT_SLEEP(5);
+						for ( ; HPUX_MAX_RETRIES > retry_num; retry_num++)
+						{
+							lcl_time_for_read.at_sec = 0;
+							lcl_time_for_read.at_usec = HPUX_SEL_TIMEOUT;
+        			                        FD_ZERO(&tcp_fd);
+                			                FD_SET(lsock, &tcp_fd);
+                                			status = tcp_routines.aa_select(lsock + 1, (void *)&tcp_fd, (void *)0,
+								(void *)0, &lcl_time_for_read);
+			                                if (0 < status)
+								break;
+	        	                                else if (outofband)
+                        	                                break;
+							else
+        	                        	                SHORT_SLEEP(5);
+						}
+						if (outofband)
+							return FALSE;
+						if (0 >= status)
+        		        	        {
+                		        	        errptr = (char *)STRERROR(errno);
+                        		        	errlen = STRLEN(errptr);
+	                                		iotcp_rmlsock((io_desc *)dev->iod);
+			                                rts_error(VARLSTCNT(6) ERR_SOCKWAIT, 0, ERR_TEXT, 2, errlen, errptr);
+        			                        return FALSE;
+                			        }
+						status = tcp_routines.aa_accept(lsock, &peer, &size);
+						if ((-1  ==  status) && (ENOBUFS  == errno))
+							retry_num++;
+						else
+							break;
+					}
+				}
+				if (-1 == status)
+#endif
+				{
+					errptr = (char *)STRERROR(errno);
+					errlen = STRLEN(errptr);
+					iotcp_rmlsock((io_desc *)dev->iod);
+					rts_error(VARLSTCNT(6) ERR_SOCKACPT, 0, ERR_TEXT, 2, errlen, errptr);
+					return FALSE;
+				}
 			}
 			SPRINTF(newtcp.saddr, "%s,%d", tcp_routines.aa_inet_ntoa(peer.sin_addr),
 				GTM_NTOHS(newtcp.sin.sin_port));

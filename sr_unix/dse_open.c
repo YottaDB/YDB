@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +37,9 @@
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
 
+#ifndef __sun
 GBLREF int	sys_nerr;
-
+#endif
 #ifdef	__osf__
 #pragma pointer_size (save)
 #pragma pointer_size (long)
@@ -55,7 +56,7 @@ GBLREF gtm_chset_t	dse_over_chset;
 static int	patch_fd;
 static char	patch_ofile[256];
 static short	patch_len;
-static char     ch_set_name[MAX_CHSET_NAME];
+static char	ch_set_name[MAX_CHSET_NAME];
 
 GBLREF enum dse_fmt	dse_dmp_format;
 
@@ -64,8 +65,8 @@ void	dse_open (void)
 	unsigned short	cli_len;
 	int4 	save_errno;
 
-	mval            val;
-	mval            pars;
+	mval		val;
+	mval		pars;
 	mstr		chset_mstr;
 	int		cnt;
 	static readonly unsigned char open_params_list[2] =
@@ -113,25 +114,25 @@ void	dse_open (void)
 					return;
 				}
 #ifdef KEEP_zOS_EBCDIC
-                                ch_set_name[cli_len] = 0;
-                                ch_set_len = cli_len;
-                                if ( (iconv_t)0 != dse_over_cvtcd )
-                                {
-                                        ICONV_CLOSE_CD(dse_over_cvtcd);
-                                }
-                                ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, ch_set_name);
+				ch_set_name[cli_len] = 0;
+				ch_set_len = cli_len;
+				if ( (iconv_t)0 != dse_over_cvtcd )
+				{
+					ICONV_CLOSE_CD(dse_over_cvtcd);
+				}
+				ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, ch_set_name);
 #else
-                                chset_mstr.addr = ch_set_name;
-                                chset_mstr.len = cli_len;
-                                SET_ENCODING(dse_over_chset, &chset_mstr);
+				chset_mstr.addr = ch_set_name;
+				chset_mstr.len = cli_len;
+				SET_ENCODING(dse_over_chset, &chset_mstr);
 #endif
-                        }
-                } else
+			}
+		} else
 #ifdef KEEP_zOS_EBCDIC
 			if ( (iconv_t) 0 == dse_over_cvtcd )
-                                ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, OUTSIDE_CH_SET);
+				ICONV_OPEN_CD(dse_over_cvtcd, INSIDE_CH_SET, OUTSIDE_CH_SET);
 #else
-		        dse_over_chset = CHSET_M;
+			dse_over_chset = CHSET_M;
 #endif
 		dse_dmp_format = OPEN_FMT;
 	} else
@@ -174,9 +175,9 @@ boolean_t dse_fdmp_output (void *addr, int4 len)
 
 void	dse_close(void)
 {
-	mval            val;
-	mval            pars;
-	unsigned char   no_param = (unsigned char)iop_eol;
+	mval		val;
+	mval		pars;
+	unsigned char	no_param = (unsigned char)iop_eol;
 
 	if (CLOSED_FMT != dse_dmp_format)
 	{
@@ -188,8 +189,7 @@ void	dse_close(void)
 		pars.str.addr = (char *)&no_param;
 		op_close(&val, &pars);
 		dse_dmp_format = CLOSED_FMT;
-	}
-	else
+	} else
 		util_out_print("Error:  no current output file.",TRUE);
 	return;
 }

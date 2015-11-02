@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,11 +26,15 @@ typedef struct { mflt flt ; lv_val *lv ;} sbs_flt_struct;
  */
 
 typedef struct sbs_blk_struct
-{	short	     		cnt;
+{
+	short	     		cnt;
+	/* Note compiler inserts padding here of either 2 or 6 bytes depending on alignment
+	   of the pointers below (32 or 64 bit).
+	*/
 	struct
 	{
 		struct sbs_blk_struct	*fl, *bl;
-	}			sbs_que;
+	} sbs_que;
 	struct sbs_blk_struct	*nxt;
 	union
 	{
@@ -38,14 +42,15 @@ typedef struct sbs_blk_struct
 	      	sbs_str_struct 	sbs_str[SBS_NUM_STR_ELE];	/* 12 * 10 */
 	  	sbs_flt_struct	sbs_flt[SBS_NUM_FLT_ELE]; 	/*  9 * 13 */
 	  	lv_val		*lv[SBS_NUM_INT_ELE];		/* 30 *  4 */
-       	}ptr;
-}sbs_blk;
+       	} ptr;
+} sbs_blk;
 
 typedef struct
-{	sbs_blk		*prev;
+{
+	sbs_blk		*prev;
 	sbs_blk		*blk;
 	char		*ptr;
-}sbs_search_status;
+} sbs_search_status;
 
 #define	SBS_BLK_TYPE_ROOT	1
 #define	SBS_BLK_TYPE_INT	2
@@ -61,8 +66,8 @@ typedef	struct lv_sbs_srch_hist_type
 		lv_val		**intnum;
 		sbs_flt_struct	*flt;
 		sbs_str_struct	*str;
-	}			addr;
-}	lv_sbs_srch_hist;
+	} addr;
+} lv_sbs_srch_hist;
 
 mflt *lv_prv_num_inx(sbs_blk *root, mval *key);
 mstr *lv_prv_str_inx(sbs_blk *root, mstr *key);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,8 +33,9 @@ LITREF int	sys_nerrno;
 #pragma pointer_size (long)
 #endif
 
+#ifndef __sun
 extern char	*sys_errlist[];
-
+#endif
 #ifdef	__osf__
 #pragma pointer_size (restore)
 #endif
@@ -63,7 +64,7 @@ void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 	{
 		sever = ERROR;
 
-                if ((msgnum < sys_nerrno) && (msgnum > 0))
+		if ((msgnum < sys_nerrno) && (msgnum > 0))
 			tag = sys_errnolist[msgnum];
 		else
 		{
@@ -71,16 +72,21 @@ void	gtm_getmsg (int4 msgnum, mstr *msgbuf)
 			/* Below code commented out for now since it was triggered by ZMessage with invalid msg number given */
 			/*PRN_ERROR;*/			/* Flush what we have so far prior to the assert failure */
 			/*assert(FALSE);*/		/* Will cause an error within the error but we will catch where this
-							   happens so we can fix them */
+								happens so we can fix them */
 #endif
 			tag = "UNKNOWN";
 		}
 
 #ifndef __MVS__
-		assert (sys_errlist[1] != 0);		/* OSF/1 check; can happen with 64-bit pointers and bad declaration */
-                if ((msgnum < sys_nerr) && (msgnum > 0))
+#ifdef __sun
+		assert (strerror(1) != 0);		/* OSF/1 check; can happen with 64-bit pointers and bad declaration */
+		if ((msgnum > 0))
 #else
-                if ((msgnum < MAX_SYSERR) && (msgnum > 0))
+		assert (sys_errlist[1] != 0);		/* OSF/1 check; can happen with 64-bit pointers and bad declaration */
+		if ((msgnum < sys_nerr) && (msgnum > 0))
+#endif
+#else
+		if ((msgnum < MAX_SYSERR) && (msgnum > 0))
 #endif
 			msgp = STRERROR(msgnum);
 		else

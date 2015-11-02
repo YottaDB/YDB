@@ -52,15 +52,15 @@ static	boolean_t	first_syslog = TRUE;
  *
  *		!mSB	!mSW	!mSL
  *
- *		!mUB	!mUW	!mUL    !m@UH   !m@UJ
+ *		!mUB	!mUW	!mUL    !m@UJ   !m@UQ
  *
- *		!mXB	!mXW	!mXL    !m@XH   !m@XJ
+ *		!mXB	!mXW	!mXL    !m@XJ   !m@XQ
  *
  *		!mZB	!mZW	!mZL
  *
  *		!n*c
  *
- *		!@ZJ	!@XJ	!@ZH	!@XH
+ *		!@ZJ	!@XJ		!@ZJ	!@ZQ
  #
  *	Where `m' is an optional field width, `n' is a repeat count, and `c' is a single character.
  *	`m' or `n' may be specified as the '#' character, in which case the value is taken from the next parameter.
@@ -70,6 +70,7 @@ static	boolean_t	first_syslog = TRUE;
  *
  *	The @XH and @XJ types need special mention. XH and XJ are ascii formatting of addresses and integers respectively.
  *	BOTH are ASCII formatted hexdecimal output of a 64 bit sign-extended value.
+ *	The present implementation of util_output does not support 'H'.
  *	This support was new in VMS 7.2 (and is one reason why GTM 4.2 requires VMS 7.2).
  *	The "@" designates an "indirect" request meaning that the address of
  *	the 8 byte item is passed rather than the item itself. This is what allows us to print 8 byte values in the
@@ -337,18 +338,26 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 							case 'L':
 								GETFAOVALDEF(faocnt, fao, int4, int_val, 0);
 								break;
+							case 'J':
+								GTM64_ONLY(
+								GETFAOVALDEF(faocnt, fao, UINTPTR_T, addr_val, 0);
+								)
+								NON_GTM64_ONLY(
+								GETFAOVALDEF(faocnt, fao, int4, int_val, 0);
+								)
+								break;
 							default:
 								assert(FALSE);
 						}
 					else
 					{
 						GTM64_ONLY(
-                                                if ('X' == type)
-                                                	{GETFAOVALDEF(faocnt, fao, UINTPTR_T, addr_val, 0);}
-                                                else
-                                                	{GETFAOVALDEF(faocnt, fao, int4, int_val, 0);}
-                                                )
-					  	NON_GTM64_ONLY(GETFAOVALDEF(faocnt, fao, int4, int_val, 0);)
+						if ('J' == type2)
+							{GETFAOVALDEF(faocnt, fao, UINTPTR_T, addr_val, 0);}
+						else
+							{GETFAOVALDEF(faocnt, fao, int4, int_val, 0);}
+						)
+						NON_GTM64_ONLY(GETFAOVALDEF(faocnt, fao, int4, int_val, 0);)
 						switch(type2)
 						{
 							case 'B':
@@ -358,13 +367,10 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 								int_val = int_val & 0xFFFF;
 								break;
 							case 'L':
+								int_val = int_val & 0xFFFFFFFF;
+								break;
+							case 'J':
 								NON_GTM64_ONLY(int_val = int_val & 0xFFFFFFFF;)
-								GTM64_ONLY(
-		                                                if ('X' == type)
-									{addr_val = addr_val & 0xFFFFFFFFFFFFFFFF;}
-								else
-									{int_val = int_val & 0xFFFFFFFF;}
-								)
 								break;
 							default:
 								assert(FALSE);
@@ -373,14 +379,36 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					switch (type)
 					{
 						case 'S':		/* Signed value. Give sign if need to */
-							if (0 > int_val)
+							if ('J' == type2)
+							{
+								GTM64_ONLY(
+									if (0 > (INTPTR_T)addr_val)
+									{
+										*numptr++ = '-';
+										addr_val = -(addr_val);
+									}
+								)
+								NON_GTM64_ONLY(
+									if (0 > int_val)
+									{
+										*numptr++ = '-';
+										int_val = -(int_val);
+									}
+								)
+							} else if (0 > int_val)
 							{
 								*numptr++ = '-';
 								int_val = -(int_val);
-							}		/* note fall into unsigned */
+							} /* note fall into unsigned */
 						case 'U':
 						case 'Z':		/* zero filled */
-							numptr = i2asc(numptr, int_val);
+							NON_GTM64_ONLY(numptr = i2asc(numptr, int_val);)
+							GTM64_ONLY(
+							if ('J' == type2)
+								numptr = i2ascl(numptr, addr_val);
+							else
+								numptr = i2asc(numptr, int_val);
+							)
 							break;
 						case 'X':		/* Hex */
 							switch (type2)
@@ -391,15 +419,18 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 								case 'W':
 									length = sizeof(int4);
 							                break;
-							        case 'L':
-						               		NON_GTM64_ONLY(length = sizeof(int4) + sizeof(int4);)
-									GTM64_ONLY(length = sizeof(INTPTR_T) + sizeof(INTPTR_T);)
+								case 'L':
+									length = 2 * sizeof(int4);
+							                break;
+							        case 'J':
+									length = 2 * sizeof(INTPTR_T);
 						                       	break;
 								default:
 									assert(FALSE);
 							}
 							NON_GTM64_ONLY(i2hex(int_val, numptr, length);)
-							GTM64_ONLY(i2hex(addr_val, numptr, length);)
+							GTM64_ONLY(i2hex(('J' == type2) ? addr_val : int_val, numptr, length);)
+
 							numptr += length;
 							break;
 						default:
@@ -407,9 +438,9 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					}
 				} else
 				{
-					if ('X' == type)	/* Support XH and XJ */
+					if ('X' == type)	/* Support XJ and XQ */
 					{
-						assert('H' == type2 || 'J' == type2);
+						assert('J' == type2 || 'Q' == type2);
 						GETFAOVALDEF(faocnt, fao, qw_num_ptr_t, val_ptr, NULL);	/* Addr of long type */
 						if (val_ptr)
 						{
@@ -423,11 +454,11 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 								numptr += length;
 							}
 						}
-					} else 	/* support ZH, ZJ, UH, and UJ */
+					} else 	/* support ZJ, ZQ, UQ and UJ */
 					{
-						if ('Z' != type && 'U' != type)
+						if ('Z' != type && 'U' != type )
 							GTMASSERT;
-						assert('H' == type2 || 'J' == type2);
+						assert('J' == type2 || 'Q' == type2);
 						GETFAOVALDEF(faocnt, fao, qw_num_ptr_t, val_ptr, NULL);	/* Addr of long type */
 						if (val_ptr)
 						{
@@ -451,7 +482,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					GTM64_ONLY(
 					/* If this is an integer to be printed using format specifier X, display the
 					   least 4 bytes */
-					if (type == 'X' && type2 == 'L' && (length == (2 * sizeof(INTPTR_T))))
+					if (type == 'X' && type2 == 'J' && (length == (2 * sizeof(INTPTR_T))))
 						memcpy(outptr, numa + sizeof(INTPTR_T), length/2);
 					else
 						memset(outptr, '*', field_width);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@ GBLREF	volatile int		suspend_status;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
 GBLREF	enum gtmImageTypes	image_type;
+GBLREF	volatile int4		gtmMallocDepth; 	/* Recursion indicator */
 
 void suspsigs_handler(int sig, siginfo_t* info, void *context)
 {
@@ -37,9 +38,8 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 			/* Terminal access while running in the background */
 			if (GTMSECSHR_IMAGE != image_type) /* Ignore signal if gtmsecshr */
 			{
-				if (EXIT_NOTPENDING < exit_state || 0 != have_crit(CRIT_HAVE_ANY_REG))
-				{
-					 /* Let the process run in the foreground till it finishes the terminal I/O */
+				if ((EXIT_NOTPENDING < exit_state) || !OK_TO_INTERRUPT)
+				{	/* Let the process run in the foreground till it finishes the terminal I/O */
 					if (EXIT_NOTPENDING == exit_state)
 						suspend_status = DEFER_SUSPEND;
 					status = kill(process_id, SIGCONT);
@@ -62,7 +62,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 			{
 				if (EXIT_NOTPENDING == exit_state) /* not processing other signals */
 				{
-					if (0 != have_crit(CRIT_IN_COMMIT))
+					if (!OK_TO_INTERRUPT)
 					{
 						suspend_status = DEFER_SUSPEND;
 						break;

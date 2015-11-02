@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -166,8 +166,12 @@ typedef struct cw_set_element_struct
 							 * Whenever "cse->old_block" is reset, this needs to be reset too (except
 							 *	in the case of gds_t_create/gds_t_acquired).
 							 */
-	enum gds_t_mode	old_mode;			/* saved copy of "cse->mode" before being reset to gds_t_committed */
-
+	int4		old_mode;			/* Saved copy of "cse->mode" before being reset to gds_t_committed.
+							 * Is negated at end of bg_update_phase1 to indicate (to secshr_db_clnup)
+							 * that phase1 is complete. Is negated back to the postive value at end
+							 * of bg_update_phase2. Since this can take on negative values, its type
+							 * is int4 (signed) and not enum gds_t_mode (which is unsigned).
+							 */
 	/* The following two fields aid in rolling back the transactions. 'undo_next_off' holds the
 	 * original next_off in the blk buffer that would be if another nested transaction was not
 	 * started. 'undo_offset' holds the offset at which 'undo_next_off' should be applied in case

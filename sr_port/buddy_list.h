@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,11 +66,20 @@ boolean_t	free_last_n_elements(buddy_list *list, int4 num);	/* to free up the la
 void		free_element(buddy_list *list, char *elem);	/* to free up an element and reuse it later */
 char		*get_new_free_element(buddy_list *list);	/* gets a freed-up element if available otherwise gets a new one */
 
+#define	CAREFUL_FREEUP_BUDDY_LIST(list)		\
+{						\
+	if (NULL != list)			\
+		FREEUP_BUDDY_LIST(list);	\
+}
+
 #define	FREEUP_BUDDY_LIST(list)			\
 {						\
-	cleanup_list(list);			\
 	assert(list);				\
-	free(list);				\
+	if (NULL != list)			\
+	{					\
+		cleanup_list(list);		\
+		free(list);			\
+	}					\
 }
 
 #endif

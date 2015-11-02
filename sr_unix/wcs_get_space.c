@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #include "jnl.h"
 #include "sleep_cnt.h"
 #include "gdsbgtr.h"
+#include "wbox_test_init.h"
 
 /* Include prototypes */
 #include "send_msg.h"
@@ -32,6 +33,8 @@
 #include "error.h"		/* for gtm_fork_n_core() prototype */
 #include "rel_quant.h"
 #include "performcaslatchcheck.h"
+#include "wcs_phase2_commit_wait.h"
+#include "wcs_recover.h"
 
 GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
 GBLDEF	int4			*get_space_fail_array;	/* gbldefed to be accessilbe in a pro core */
@@ -39,11 +42,24 @@ GBLDEF	int4			get_space_fail_arridx;	/* gbldefed to be accessilbe in a pro core 
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	gd_region		*gv_cur_region;
+GBLREF	gd_region		*gv_cur_region;	/* needed for the JNL_ENSURE_OPEN_WCS_WTSTART macro */
 GBLREF	boolean_t		gtm_environment_init;
 GBLREF	int			num_additional_processors;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		fast_lock_count;
+
+#define	ACTIVE_LVL_ARRAYSIZE	64
+#define	LCNT_INCREMENT		DIVIDE_ROUND_UP(UNIX_GETSPACEWAIT, ACTIVE_LVL_ARRAYSIZE)
+
+#define WCS_GET_SPACE_RETURN_FAIL(arraystart)						\
+{											\
+	assert(FALSE);			/* We have failed */				\
+	get_space_fail_cr = cr;								\
+	get_space_fail_array = arraystart;						\
+	if (gtm_environment_init)							\
+		gtm_fork_n_core();	/* take a snapshot in case running in-house */	\
+	return FALSE;									\
+}
 
 /* go after a specific number of buffers or a particular buffer */
 /* not called if UNTARGETED_MSYNC and MM mode */
@@ -56,15 +72,21 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	int4			n, save_errno = 0, k, i, dummy_errno, max_count, count;
 	int			maxspins, retries, spins;
 	uint4			lcnt, size, to_wait, to_msg;
-	int4			wcs_active_lvl[UNIX_GETSPACEWAIT];
+	int4			wcs_active_lvl[ACTIVE_LVL_ARRAYSIZE];
+	boolean_t		is_mm;
+	cache_rec		cr_contents;
 
 	error_def(ERR_DBFILERR);
 	error_def(ERR_WAITDSKSPACE);
+	error_def(ERR_GBLOFLOW);
 
 	assert((0 != needed) || (NULL != cr));
 	get_space_fail_arridx = 0;
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
+	cnl = csa->nl;
+	is_mm = (dba_mm == csd->acc_meth);
+	assert(is_mm || (dba_bg == csd->acc_meth));
 	if (FALSE == csa->now_crit)
 	{
 		assert(0 != needed);	/* if needed == 0, then we should be in crit */
@@ -73,9 +95,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					/* a macro that ensure jnl is open, invokes wcs_wtstart() and checks for errors etc. */
 		return TRUE;
 	}
-	UNTARGETED_MSYNC_ONLY(assert(dba_mm != csd->acc_meth);)
+	UNTARGETED_MSYNC_ONLY(assert(!is_mm);)
 	csd->flush_trigger = MAX(csd->flush_trigger - MAX(csd->flush_trigger / STEP_FACTOR, 1), MIN_FLUSH_TRIGGER(csd->n_bts));
-	cnl = csa->nl;
 	/* Routine actually serves two purposes:
 	 *	1 - Free up required number of buffers or
 	 *	2 - Free up a specific buffer
@@ -87,6 +108,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		for (lcnt = 1; (cnl->wc_in_free < needed) && (BUF_OWNER_STUCK > lcnt); ++lcnt)
 		{
 			JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, needed, save_errno);
+			if (is_mm && (ERR_GBLOFLOW == save_errno))
+				wcs_recover(reg);
 			if (cnl->wc_in_free < needed)
 			{
 				if ((ENOSPC == save_errno) && (csa->hdr->wait_disk_space > 0))
@@ -115,6 +138,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						hiber_start(1000);
 						to_wait--;
 						JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, needed, save_errno);
+						if (is_mm && (ERR_GBLOFLOW == save_errno))
+							wcs_recover(reg);
 						if (cnl->wc_in_free >= needed)
 							break;
 					}
@@ -150,9 +175,13 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		assert(csa->now_crit);		/* must be crit to play with queues when not the writer */
 		BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush);
 		++fast_lock_count;			/* Disable wcs_stale for duration */
-		if (dba_bg == csd->acc_meth)		/* Determine queue base to use */
+		if (!is_mm)		/* Determine queue base to use */
+		{
 			base = &csa->acc_meth.bg.cache_state->cacheq_active;
-		else
+			/* If another process is concurrently finishing up phase2 of commit, wait for that to complete first. */
+			if (cr->in_tend && !wcs_phase2_commit_wait(csa, cr))
+				return FALSE;	/* assumption is that caller will set wc_blocked and trigger cache recovery */
+		} else
 			base = &csa->acc_meth.mm.mmblk_state->mmblkq_active;
 		maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
 		for (retries = LOCK_TRIES - 1; retries > 0 ; retries--)
@@ -179,17 +208,35 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					 * If this didn't work, flush normal amount next time in the loop.
 					 */
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 1, save_errno);
+					if (is_mm && (ERR_GBLOFLOW == save_errno))
+						wcs_recover(reg);
 					for (lcnt = 1; (0 != cr->dirty) && (UNIX_GETSPACEWAIT > lcnt); ++lcnt)
 					{
-						wcs_active_lvl[lcnt] = cnl->wcs_active_lvl;
+						if (0 == (lcnt % LCNT_INCREMENT))
+						{
+							assert((lcnt/LCNT_INCREMENT) < ACTIVE_LVL_ARRAYSIZE);
+							wcs_active_lvl[lcnt/LCNT_INCREMENT] = cnl->wcs_active_lvl;
+						}
 						get_space_fail_arridx = lcnt;
 						max_count = ROUND_UP(cnl->wcs_active_lvl, csd->n_wrt_per_flu);
+						/* Check if cache recovery is needed (could be set by another process in
+						 * secshr_db_clnup finishing off a phase2 commit). If so, no point invoking
+						 * wcs_wtstart as it will return right away. Instead return FALSE so
+						 * cache-recovery can be triggered by the caller.
+						 */
+						if (csd->wc_blocked)
+						{
+							assert(gtm_white_box_test_case_enabled);
+							return FALSE;
+						}
 						/* loop till the active queue is exhausted */
 						for (count = 0; 0 != cr->dirty && 0 != cnl->wcs_active_lvl &&
 							     max_count > count; count++)
 						{
 							BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush_retries);
 							JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, 0, save_errno);
+							if (is_mm && (ERR_GBLOFLOW == save_errno))
+								wcs_recover(reg);
 						}
 						/* Usually we want to sleep only if we need to wait on someone else
 						 * i.e. (i) if we are waiting for another process' fsync to complete
@@ -205,17 +252,28 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 						if (!cr->dirty)
 							return TRUE;
 						else
+						{
+							DEBUG_ONLY(cr_contents = *cr;)
+							/* Assert that if the cache-record is dirty, it better be in the
+							 * active queue or be in the process of getting flushed by a concurrent
+							 * writer or phase2 of the commit is in progress. If none of this is
+							 * true, it should have become non-dirty by now even though we found it
+							 * dirty a few lines above. Note that the cache-record could be in the
+							 * process of being released by a concurrent writer; This is done by
+							 * resetting 3 fields cr->epid, cr->dirty, cr->interlock; Since the write
+							 * interlock is the last field to be released, check that BEFORE dirty.
+							 */
+							assert(cr_contents.state_que.fl || cr_contents.epid || cnl->in_wtstart
+								|| cr_contents.in_tend
+								|| (LATCH_CLEAR != WRITE_LATCH_VAL(&cr_contents))
+								|| !cr_contents.dirty);
 							wcs_sleep(lcnt);
+						}
 						BG_TRACE_PRO_ANY(csa, spcfc_buffer_flush_loop);
 					}
 					if (0 == cr->dirty)
 						return TRUE;
-					assert(FALSE);			/* We have failed */
-					get_space_fail_cr = cr;
-					get_space_fail_array = &wcs_active_lvl[0];
-					if (gtm_environment_init)
-						gtm_fork_n_core();	/* take a snapshot in case running in-house */
-					return FALSE;
+					WCS_GET_SPACE_RETURN_FAIL(&wcs_active_lvl[0]);
 				} else
 				{	/* buffer was locked */
 					if (0 == cr->dirty)
@@ -246,9 +304,5 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		rts_error(VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
 	else
 		assert(FALSE);
-	get_space_fail_cr = cr;
-	get_space_fail_array = &wcs_active_lvl[0];
-	if (gtm_environment_init)
-		gtm_fork_n_core();	/* take a snapshot in case running in-house */
-	return FALSE;
+	WCS_GET_SPACE_RETURN_FAIL(&wcs_active_lvl[0]);
 }

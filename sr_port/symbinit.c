@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,7 @@ int4 symbinit(void)
 	mv_stent	*mv_st_ent, *mvst_tmp, *mvst_prev;
 	stack_frame	*fp,*fp_prev,*fp_fix;
 	symval		*ptr;
-	int4		shift, ls_size, temp_size;
+	int4		shift_size, ls_size, temp_size;
         int		size;
 	unsigned char	*old_sp, *top, *l_syms;
 	error_def(ERR_STACKOFLOW);
@@ -63,9 +63,8 @@ int4 symbinit(void)
 		PUSH_MV_STENT(MVST_STAB);
 		mv_st_ent = mv_chain;
 		l_syms =  (unsigned char *)frame_pointer->l_symtab;
-		shift = 0;
-	}
-	else
+		shift_size = 0;
+	} else
 	{
 		fp = frame_pointer;
 		fp_prev = fp->old_frame_pointer;
@@ -81,10 +80,10 @@ int4 symbinit(void)
 		temp_size = fp_prev->rvector->temp_size;
 		size = fp_prev->vartab_len;
 		ls_size = size * SIZEOF(mval *);
-		shift = MVST_STAB_SIZE;
+		shift_size = MVST_STAB_SIZE;
 		if (fp_prev->l_symtab != (mval **)((char *) fp_prev - ls_size - temp_size))
-			shift += ls_size;
-		msp -= shift;
+			shift_size += ls_size;
+		msp -= shift_size;
 	   	if (msp <= stackwarn)
 	   	{
 			if (msp <= stacktop)
@@ -95,27 +94,29 @@ int4 symbinit(void)
 	   			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		memcpy(msp, old_sp, top - (unsigned char *) old_sp);
-		if (shift > MVST_STAB_SIZE)
-			fp_prev->l_symtab = (mval **)(top - shift);
+		if (shift_size > MVST_STAB_SIZE)
+			fp_prev->l_symtab = (mval **)(top - shift_size);
 		l_syms = (unsigned char *)fp_prev->l_symtab;
 		mv_st_ent = (mv_stent *)(top - MVST_STAB_SIZE);
 		mv_st_ent->mv_st_type = MVST_STAB;
-		frame_pointer = (stack_frame *)((char *) frame_pointer - shift);
+		ADJUST_FRAME_POINTER(frame_pointer, shift_size);
 		for (fp_fix = frame_pointer; fp_fix != fp_prev ;fp_fix = fp_fix->old_frame_pointer)
 		{
 			if ((unsigned char *) fp_fix->l_symtab < top && (unsigned char *) fp_fix->l_symtab > stacktop)
 			{
-				fp_fix->l_symtab = (mval **)((char *) fp_fix->l_symtab - shift);
+				fp_fix->l_symtab = (mval **)((char *) fp_fix->l_symtab - shift_size);
 				if ((unsigned char *) fp_fix->l_symtab < (unsigned char *) fp_fix)
 					memset((unsigned char *) fp_fix->l_symtab, 0, fp_fix->vartab_len * sizeof(mval *));
 			}
 			if (fp_fix->temps_ptr < top && fp_fix->temps_ptr > stacktop)
-				fp_fix->temps_ptr -= shift;
+				fp_fix->temps_ptr -= shift_size;
 			if (fp_fix->vartab_ptr < (char *) top && fp_fix->vartab_ptr > (char *) stacktop)
-				fp_fix->vartab_ptr -= shift;
+				fp_fix->vartab_ptr -= shift_size;
 			if ((unsigned char *) fp_fix->old_frame_pointer < top && (unsigned char *) fp_fix->old_frame_pointer
 				> stacktop)
-				fp_fix->old_frame_pointer = (stack_frame *)((char *) fp_fix->old_frame_pointer - shift);
+			{
+				ADJUST_FRAME_POINTER(fp_fix->old_frame_pointer, shift_size);
+			}
 		}
 		if ((unsigned char *) mv_chain >= top)
 		{
@@ -125,8 +126,8 @@ int4 symbinit(void)
 		}
 		else
 		{
-			fp = (stack_frame *)((char *) fp - shift);
-			mv_chain = (mv_stent *)((char *) mv_chain - shift);
+			fp = (stack_frame *)((char *) fp - shift_size);
+			mv_chain = (mv_stent *)((char *) mv_chain - shift_size);
 			mvst_tmp = mv_chain;
 			mvst_prev = (mv_stent *)((char *) mvst_tmp + mvst_tmp->mv_st_next);
 			while (mvst_prev < (mv_stent *)fp)
@@ -135,7 +136,7 @@ int4 symbinit(void)
 				mvst_prev = (mv_stent *)((char *) mvst_tmp + mvst_tmp->mv_st_next);
 			}
 			mvst_tmp->mv_st_next = (uint4)((char *) mv_st_ent - (char *) mvst_tmp);
-			mv_st_ent->mv_st_next = (uint4)((char *) mvst_prev - (char *) mv_st_ent + shift);
+			mv_st_ent->mv_st_next = (uint4)((char *) mvst_prev - (char *) mv_st_ent + shift_size);
 		}
 	}
 	mv_st_ent->mv_st_cont.mvs_stab = (symval *)NULL;	/* special case this so failed initialization can be detected */
@@ -157,5 +158,5 @@ int4 symbinit(void)
 	/* if we get here, our initialization must have been successful */
 	curr_symval = ptr;
 	mv_st_ent->mv_st_cont.mvs_stab = ptr;
-	return shift;
+	return shift_size;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,17 +10,20 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gtm_string.h"
 #include "rtnhdr.h"
 #include "srcline.h"
 #include "error.h"
 #include "op.h"
 #include "outofband.h"
 
+
 #define	INFO_MSK(error)	(error & ~SEV_MSK | INFO)
 
-GBLREF int4 outofband;
+GBLREF int4		outofband;
+GBLREF mident_fixed	zlink_mname;
 
-void op_zprint(mval *rtn,mval *start_label,int start_int_exp,mval *end_label,int end_int_exp)
+void op_zprint(mval *rtn, mval *start_label, int start_int_exp, mval *end_label, int end_int_exp)
 /* contains label to be located or null string		*/
 /* contains label offset or line number to reference	*/
 /* contains routine to look in or null string		*/
@@ -32,30 +35,35 @@ void op_zprint(mval *rtn,mval *start_label,int start_int_exp,mval *end_label,int
 	mstr	*src1, *src2;
 	uint4	stat1, stat2;
 	rhdtyp	*rtn_vector;
-	error_def (ERR_FILENOTFND);
-	error_def (ERR_TXTSRCMAT);
-	error_def (ERR_ZPRTLABNOTFND);
+	error_def(ERR_FILENOTFND);
+	error_def(ERR_TXTSRCMAT);
+	error_def(ERR_ZPRTLABNOTFND);
+	error_def(ERR_ZLINKFILE);
+	error_def(ERR_ZLMODULE);
 
 	MV_FORCE_STR(start_label);
 	MV_FORCE_STR(end_label);
 	MV_FORCE_STR(rtn);
+	if (NULL == (rtn_vector = find_rtn_hdr(&rtn->str)))
+	{
+		op_zlink(rtn, NULL);
+		rtn_vector = find_rtn_hdr(&rtn->str);
+		if (NULL == rtn_vector)
+			rts_error(VARLSTCNT(8) ERR_ZLINKFILE, 2, rtn->str.len, rtn->str.addr,
+					ERR_ZLMODULE, 2, mid_len(&zlink_mname), &zlink_mname.c[0]);
+	}
 	stat1 = get_src_line(rtn, start_label, start_int_exp, &src1);
 	if (stat1 & LABELNOTFOUND)
 		rts_error(VARLSTCNT(1) ERR_ZPRTLABNOTFND);
 	if (stat1 & SRCNOTFND)
-	{
-		rtn_vector = find_rtn_hdr(&rtn->str);
-		rts_error(VARLSTCNT(4) ERR_FILENOTFND, 2, rtn_vector->src_full_name.len,
-			rtn_vector->src_full_name.addr);
-	}
+		rts_error(VARLSTCNT(4) ERR_FILENOTFND, 2, rtn_vector->src_full_name.len, rtn_vector->src_full_name.addr);
 	if (stat1 & (SRCNOTAVAIL | AFTERLASTLINE))
 		return;
-
 	if (stat1 & (ZEROLINE | NEGATIVELINE))
 	{
 		null_str.mvtype = MV_STR;
 		null_str.str.len = 0;
-		stat1 = get_src_line(rtn,&null_str,1, &src1);
+		stat1 = get_src_line(rtn, &null_str, 1, &src1);
 		if (stat1 & AFTERLASTLINE)		/* the "null" file */
 			return;
 	}
@@ -69,16 +77,16 @@ void op_zprint(mval *rtn,mval *start_label,int start_int_exp,mval *end_label,int
 	{
 		null_str.mvtype = MV_STR;
 		null_str.str.len = 0;
-		stat2 = get_src_line(rtn,&null_str,1, &src2);
-		assert((INTPTR_T)src2 > 0);
-		rtn_vector = find_rtn_hdr(&rtn->str);
+		stat2 = get_src_line(rtn, &null_str, 1, &src2);
 		/* number of lines less one for duplicated zero'th line and one due
 		   to termination condition being <=
 		*/
+		assert((INTPTR_T)src2 > 0);
 		src2 += rtn_vector->lnrtab_len - 2;
 	}
 	if (stat1 & CHECKSUMFAIL)
-	{	rts_error(VARLSTCNT(1) INFO_MSK(ERR_TXTSRCMAT));
+	{
+		rts_error(VARLSTCNT(1) INFO_MSK(ERR_TXTSRCMAT));
 		op_wteol(1);
 	}
 	print_line.mvtype = MV_STR;

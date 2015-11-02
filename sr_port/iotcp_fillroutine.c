@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,39 +17,17 @@
 #include <errno.h>
 #include "gtm_socket.h"
 #include "gtm_inet.h"
-#include "io.h"
-#ifdef _AIX
-/* AIX 3.x doesn't declare the TCP routines
- *	accept, bind, connect, getsockopt, listen, recv, send, setsockopt, and socket.
- */
-#ifndef __xlC__
-/* However, AIX V4.2 and later do declare them.
- * As soon as we drop support for AIX V3.2.x, we should remove these declarations (and
- * the enclosing ifdef's and ifndef's, from this header file).
- */
 
-int accept(int, struct sockaddr *, int *);
-int bind(int, struct sockaddr *, int);
-int connect(int, struct sockaddr *, int);
-int getsockname(int, struct sockaddr *, size_t *);
-int getsockopt(int, int, int, char *, int *);
-int listen(int, int);
-int recv(int, char *, int, int);
-int send(int, char *, int, int);
-int setsockopt(int, int, int, char *, int);
-int socket(int, int, int);
-#endif /* __xlC__ */
-#endif /* _AIX */
+#include "io.h"
+#include "iotcp_select.h"
+#include "iotcproutine.h"
+
+GBLDEF tcp_library_struct        tcp_routines;
 
 int	gtm_accept(int socket, struct sockaddr *address, sssize_t *address_len);
 int	gtm_connect(int socket, struct sockaddr *address, size_t address_len);
 int	gtm_recv(int socket, void *buffer, size_t length, int flags);
 int	gtm_send(int socket, void *buffer, size_t length, int flags);
-
-#include "iotcp_select.h"
-#include "iotcproutine.h"
-
-GBLDEF tcp_library_struct        tcp_routines;
 
 /*
  * Note - the checks for EINTR in these functions are valid and need to stay in,

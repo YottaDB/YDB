@@ -71,11 +71,12 @@
 #define	JNL_AUTOSWITCHLIMIT_DEF	8388600	/* Instead of 8388607 it is adjusted for default allocation = extension = 100 */
 
 /* options (sizeof(char)) to wcs_flu() (currently flush_hdr, write_epoch, sync_epoch) are bit-wise ored */
-#define	WCSFLU_NONE		0
-#define	WCSFLU_FLUSH_HDR	1
-#define	WCSFLU_WRITE_EPOCH	2
-#define	WCSFLU_SYNC_EPOCH	4
-#define	WCSFLU_FSYNC_DB		8	/* Currently used only in Unix wcs_flu() */
+#define	WCSFLU_NONE		 0
+#define	WCSFLU_FLUSH_HDR	 1
+#define	WCSFLU_WRITE_EPOCH	 2
+#define	WCSFLU_SYNC_EPOCH	 4
+#define	WCSFLU_FSYNC_DB		 8	/* Currently used only in Unix wcs_flu() */
+#define	WCSFLU_IN_COMMIT	16	/* Set if caller is t_end or tp_tend. See wcs_flu for explanation of when this is set */
 
 /* EPOCHs are written unconditionally in Unix (assuming jnl is ON) while they are written only for BEFORE_IMAGE in VMS */
 #define JNL_HAS_EPOCH(jnlfile)  UNIX_ONLY(TRUE) VMS_ONLY(jnlfile->before_images)
@@ -315,10 +316,12 @@ typedef struct
 	DBG_CHECK_JNL_BUFF_FREEADDR(jbp);										\
 }
 
-#define	DBG_CHECK_JNL_BUFF_FREEADDR(jbp)			\
-{								\
-	assert((jbp->freeaddr % jbp->size) == jbp->free);	\
-	assert(jbp->freeaddr >= jbp->dskaddr);			\
+#define	DBG_CHECK_JNL_BUFF_FREEADDR(jbp)							\
+{												\
+	assert((jbp->freeaddr % jbp->size) == jbp->free);					\
+	assert((jbp->freeaddr >= jbp->dskaddr)							\
+		|| (gtm_white_box_test_case_enabled						\
+			&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));	\
 }
 
 #ifdef DB64
@@ -358,6 +361,7 @@ typedef struct jnl_private_control_struct
 	volatile boolean_t	qio_active;		/* jnl buffer write in progress in THIS process (recursion indicator) */
 	boolean_t		fd_mismatch;		/* TRUE when jpc->channel does not point to the active journal */
 	volatile boolean_t	sync_io;		/* TRUE if the process is using O_SYNC/O_DSYNC for this jnl (UNIX) */
+							/* TRUE if writers open NOCACHING to bypass XFC cache (VMS) */
 	uint4			status2;		/* for secondary error status, currently used only in VMS */
 	uint4			cycle;			/* private copy of the number of this journal file generation */
 } jnl_private_control;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +41,7 @@ LITREF  int4	gtm_release_name_len;
 /* Downgrade header from v5.0-000 to v4.x */
 void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 {
+	time_t	temp_time;
 	error_def(ERR_MUINFOUINT8);
 
 	memset(v15_csd, 0, sizeof(v15_sgmnt_data));
@@ -70,10 +71,11 @@ void mu_dwngrd_header(sgmnt_data *csd, v15_sgmnt_data *v15_csd)
 	v15_csd->max_non_bm_update_array_size = csd->max_non_bm_update_array_size;/* This is filler for some early V4 versions */
 	v15_csd->file_corrupt = csd->file_corrupt;
 	v15_csd->createinprogress = csd->createinprogress;
-	time((long *)&v15_csd->creation.filler[0]);	/* No need to propagate previous value */
-	v15_csd->last_inc_backup = (v15_trans_num) csd->last_inc_backup;
-	v15_csd->last_com_backup = (v15_trans_num) csd->last_com_backup;
-	v15_csd->last_rec_backup = (v15_trans_num) csd->last_rec_backup;
+	time(&temp_time);	/* No need to propagate previous value */
+	v15_csd->creation.date_time = temp_time;
+	v15_csd->last_inc_backup = (v15_trans_num)csd->last_inc_backup;
+	v15_csd->last_com_backup = (v15_trans_num)csd->last_com_backup;
+	v15_csd->last_rec_backup = (v15_trans_num)csd->last_rec_backup;
 	v15_csd->reorg_restart_block = csd->reorg_restart_block;
 	memcpy(v15_csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
 	v15_csd->owner_node = csd->owner_node;

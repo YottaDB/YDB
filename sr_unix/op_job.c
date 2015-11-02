@@ -41,7 +41,9 @@ GBLREF	boolean_t	job_try_again;
 
 #ifndef SYS_ERRLIST_INCLUDE
 /* needed by TIMEOUT_ERROR in jobsp.h */
+#ifndef __sun
 GBLREF	int		sys_nerr;
+#endif
 #endif
 
 static	int4	tid;	/* Job Timer ID */

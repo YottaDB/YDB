@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,9 @@
 
 #include <sys/time.h>
 #include <errno.h>
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+#include <sys/poll.h>
+#endif
 #ifdef VMS
 #include <descrip.h> /* Required for gtmrecv.h */
 #endif
@@ -60,6 +63,7 @@
 #include "gtmmsg.h"
 #include "is_proc_alive.h"
 #include "jnl_typedef.h"
+#include "iotcpdef.h"
 
 #define RECVBUFF_REPLMSGLEN_FACTOR 		8
 
@@ -259,6 +263,7 @@ static void do_flow_control(uint4 write_pos)
 	int			status;					/* needed for REPL_{SEND,RECV}_LOOP */
 	int			read_pos;
 	char			print_msg[1024];
+	seq_num			temp_seq_num;
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
@@ -282,7 +287,8 @@ static void do_flow_control(uint4 write_pos)
 		} else
 		{
 			xoff_msg.type = GTM_BYTESWAP_32(REPL_XOFF);
-			*((seq_num*)&xoff_msg.msg[0]) = GTM_BYTESWAP_64(upd_proc_local->read_jnl_seqno);
+			temp_seq_num = GTM_BYTESWAP_64(upd_proc_local->read_jnl_seqno);
+			memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&temp_seq_num, sizeof(seq_num));
 			xoff_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
 		}
 		REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_poll_immediate)
@@ -332,7 +338,8 @@ static void do_flow_control(uint4 write_pos)
 		} else
 		{
 			xon_msg.type = GTM_BYTESWAP_32(REPL_XON);
-			*((seq_num*)&xon_msg.msg[0]) = GTM_BYTESWAP_64(upd_proc_local->read_jnl_seqno);
+			temp_seq_num = GTM_BYTESWAP_64(upd_proc_local->read_jnl_seqno);
+			memcpy((uchar_ptr_t)&xon_msg.msg[0], (uchar_ptr_t)&temp_seq_num, sizeof(seq_num));
 			xon_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
 		}
 		REPL_SEND_LOOP(gtmrecv_sock_fd, &xon_msg, MIN_REPL_MSGLEN, FALSE, &gtmrecv_poll_immediate)
@@ -385,9 +392,15 @@ static int gtmrecv_est_conn(void)
 	int			status;
 	const   int     	disable_keepalive = 0;
 	struct  linger  	disable_linger = {0, 0};
-	struct  timeval 	save_gtmrecv_poll_interval;
+	struct  timeval 	save_gtmrecv_poll_interval, sel_timeout_val;
 	char			print_msg[1024];
 	int			send_buffsize, recv_buffsize, tcp_r_bufsize;
+	short 			retry_num;
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+	long		poll_timeout;
+	unsigned long	poll_nfds;
+	struct pollfd	poll_fdlist[1];
+#endif
 
 	error_def(ERR_REPLCOMM);
 	error_def(ERR_TEXT);
@@ -411,18 +424,33 @@ static int gtmrecv_est_conn(void)
 	jnlpool_ctl->primary_instname[0] = '\0';
 	jnlpool_ctl->primary_is_dualsite = FALSE;
 
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 	FD_ZERO(&input_fds);
 	FD_SET(gtmrecv_listen_sock_fd, &input_fds);
+	save_gtmrecv_poll_interval = gtmrecv_poll_interval;
+#else
+	poll_fdlist[0].fd = gtmrecv_listen_sock_fd;
+	poll_fdlist[0].events = POLLIN;
+	poll_nfds = 1;
+	poll_timeout = gtmrecv_poll_interval.tv_usec / 1000;   /* convert to millisecs */
+#endif
 	/*
 	 * Note - the following while loop checks for EINTR on the select. The
 	 * SELECT macro is not used because the FD_SET is redone before the new
 	 * call to select (after the continue).
 	 */
-	save_gtmrecv_poll_interval = gtmrecv_poll_interval;
-	while (0 >= (status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &save_gtmrecv_poll_interval)))
+	while (0 >=
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+		(status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &save_gtmrecv_poll_interval))
+#else
+		(status = poll(&poll_fdlist[0], poll_nfds, poll_timeout))
+#endif
+					)
 	{
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 		save_gtmrecv_poll_interval = gtmrecv_poll_interval;
 		FD_SET(gtmrecv_listen_sock_fd, &input_fds);
+#endif
 		if (0 == status)
 			gtmrecv_poll_actions(0, 0, NULL);
 		else if (EINTR == errno || EAGAIN == errno)
@@ -439,8 +467,61 @@ static int gtmrecv_est_conn(void)
 	if (-1 == gtmrecv_sock_fd)
 	{
 		status = ERRNO;
-		SNPRINTF(print_msg, sizeof(print_msg), "Error accepting connection from Source Server : %s", STRERROR(status));
-		rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+#ifdef __hpux
+	/* ENOBUFS will normally signify a transient state. Hence retry before issuing an error*/
+		if (ENOBUFS == status)
+		{
+			retry_num = 0;
+			while (HPUX_MAX_RETRIES > retry_num)
+			{
+		/*In case of succeeding with select in first go, accept will still get 5ms time difference*/
+				SHORT_SLEEP(5);
+				for ( ; HPUX_MAX_RETRIES > retry_num; retry_num++)
+				{
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+					sel_timeout_val.tv_sec = 0;
+					sel_timeout_val.tv_usec = HPUX_SEL_TIMEOUT;
+					FD_ZERO(&input_fds);
+				        FD_SET(gtmrecv_listen_sock_fd, &input_fds);
+			        	status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL, NULL, &sel_timeout_val);
+#else
+					poll_fdlist[0].fd = gtmrecv_listen_sock_fd;
+					poll_fdlist[0].events = POLLIN;
+					poll_nfds = 1;
+					poll_timeout = HPUX_SEL_TIMEOUT / 1000;   /* convert to millisecs */
+					status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
+#endif
+			                if (0 == status)
+			                        gtmrecv_poll_actions(0, 0, NULL);
+					if (0 < status)
+						break;
+					else
+						SHORT_SLEEP(5);
+				}
+				if (0 > status)
+				{
+                	       		status = ERRNO;
+	                	        SNPRINTF(print_msg, sizeof(print_msg),"Error in select on listen socket after ENOBUFS : %s",
+					STRERROR(status));
+		                        rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		                }
+				ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr,
+				(GTM_SOCKLEN_TYPE *)&primary_addr_len, gtmrecv_sock_fd);
+				status = ERRNO;
+				if ((-1 == gtmrecv_sock_fd) && (ENOBUFS == status))
+					retry_num++;
+				else
+					break;
+			}
+		}
+		if (-1 == gtmrecv_sock_fd)
+#endif
+		{
+			status = ERRNO;
+			SNPRINTF(print_msg, sizeof(print_msg), "Error accepting connection from Source Server : %s",
+			 STRERROR(status));
+			rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(print_msg));
+		}
 	}
 	/* Connection established */
 	repl_close(&gtmrecv_listen_sock_fd); /* Close the listener socket */
@@ -1029,7 +1110,7 @@ static void do_main_loop(boolean_t crash_restart)
 	repl_triple			triple;
 	int4				triple_num;
 	gtm_time4_t			ack_time;
-	seq_num				ack_seqno;
+	seq_num				ack_seqno, temp_ack_seqno;
 
 	error_def(ERR_PRIMARYNOTROOT);
 	error_def(ERR_REPLCOMM);
@@ -1105,7 +1186,7 @@ static void do_main_loop(boolean_t crash_restart)
 		msgp->jnl_ver = jnl_ver;
 		msgp->proto_ver = REPL_PROTO_VER_THIS;
 		msgp->node_endianness = NODE_ENDIANNESS;
-		QWASSIGN(*(seq_num *)&msgp->start_seqno[0], request_from);
+		memcpy((uchar_ptr_t)&msgp->start_seqno[0], (uchar_ptr_t)&request_from, sizeof(seq_num));
 		msgp->len = MIN_REPL_MSGLEN;
 		REPL_SEND_LOOP(gtmrecv_sock_fd, msgp, msgp->len, FALSE, &gtmrecv_poll_immediate)
 		{
@@ -1284,11 +1365,14 @@ static void do_main_loop(boolean_t crash_restart)
 						if ( src_node_same_endianness )
 						{
 							 ack_time = *(gtm_time4_t *)&heartbeat.ack_time[0];
-							 ack_seqno = *(seq_num *)&heartbeat.ack_seqno[0];
+							 memcpy((uchar_ptr_t)&ack_seqno,
+							 	(uchar_ptr_t)&heartbeat.ack_seqno[0], sizeof(seq_num));
 						} else
 						{
 							 ack_time = GTM_BYTESWAP_32(*(gtm_time4_t *)&heartbeat.ack_time[0]);
-							 ack_seqno = GTM_BYTESWAP_64(*(seq_num *)&heartbeat.ack_seqno[0]);
+							 memcpy((uchar_ptr_t)&temp_ack_seqno,
+							 	(uchar_ptr_t)&heartbeat.ack_seqno[0], sizeof(seq_num));
+							 ack_seqno = GTM_BYTESWAP_64(temp_ack_seqno);
 						}
 						REPL_DPRINT4("HEARTBEAT received with time %ld SEQNO %llu at %ld\n",
 							     ack_time, ack_seqno, time(NULL));
@@ -1297,12 +1381,16 @@ static void do_main_loop(boolean_t crash_restart)
 						{
 							heartbeat.type = REPL_HEARTBEAT;
 							heartbeat.len = MIN_REPL_MSGLEN;
-							QWASSIGN(*(seq_num *)&heartbeat.ack_seqno[0], ack_seqno);
+							memcpy((uchar_ptr_t)&heartbeat.ack_seqno[0],
+							 	(uchar_ptr_t)&ack_seqno, sizeof(seq_num));
+
 						} else
 						{
 							heartbeat.type = GTM_BYTESWAP_32(REPL_HEARTBEAT);
 							heartbeat.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
-							*(seq_num *)&heartbeat.ack_seqno[0] = GTM_BYTESWAP_64(ack_seqno);
+							temp_ack_seqno = GTM_BYTESWAP_64(ack_seqno);
+							memcpy((uchar_ptr_t)&heartbeat.ack_seqno[0],
+							 	(uchar_ptr_t)&temp_ack_seqno, sizeof(seq_num));
 						}
 						REPL_SEND_LOOP(gtmrecv_sock_fd, &heartbeat, MIN_REPL_MSGLEN,
 								FALSE, &gtmrecv_poll_immediate)
@@ -1557,7 +1645,8 @@ static void do_main_loop(boolean_t crash_restart)
 						assert(msg_len == MIN_REPL_MSGLEN - REPL_MSG_HDRLEN);
 						start_msg = (repl_start_reply_msg_ptr_t)(buffp - msg_len - REPL_MSG_HDRLEN);
 						assert((unsigned long)start_msg % sizeof(seq_num) == 0); /* alignment check */
-						QWASSIGN(recvd_jnl_seqno, *(seq_num *)start_msg->start_seqno);
+						memcpy((uchar_ptr_t)&recvd_jnl_seqno,
+							(uchar_ptr_t)start_msg->start_seqno, sizeof(seq_num));
 						if ( !src_node_same_endianness )
 						{
 							recvd_jnl_seqno = GTM_BYTESWAP_64(recvd_jnl_seqno);

@@ -77,6 +77,7 @@
 #include "jobexam_process.h"
 #include "jobinterrupt_process_cleanup.h"
 #include "fix_xfer_entry.h"
+#include "change_reg.h"
 
 #ifdef UNIX
 #include "ftok_sems.h"
@@ -100,7 +101,6 @@ GBLREF	lv_val		*active_lv;
 GBLREF	io_pair		io_std_device, io_curr_device;
 GBLREF	short		dollar_tlevel;
 GBLREF	mval		dollar_ztrap;
-GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	volatile bool	neterr_pending;
 GBLREF	xfer_entry_t	xfer_table[];
 GBLREF	unsigned short	proc_act_type;
@@ -131,6 +131,10 @@ GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	boolean_t		in_gvcst_incr;
+GBLREF	gv_namehead		*gv_target;
+GBLREF  gd_region		*gv_cur_region;
+GBLREF  sgmnt_addrs		*cs_addrs;
+GBLREF  sgmnt_data_ptr_t	cs_data;
 
 #define	RUNTIME_ERROR_STR		"Following runtime error"
 #define GTMFATAL_ERROR_DUMP_FILENAME	"GTM_FATAL_ERROR"
@@ -183,7 +187,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	mval			zpos, dummy_mval;
 	stack_frame		*fp;
 	boolean_t		error_in_zyerror;
-	boolean_t		repeat_error, etrap_handling;
+	boolean_t		repeat_error, etrap_handling, reset_mpc;
 	int			level;
 
 #ifdef UNIX
@@ -290,6 +294,32 @@ CONDITION_HANDLER(mdb_condition_handler)
 			tp_restart_fail_sig_used = FALSE;
 		}
 #endif
+	}
+	/* Ensure gv_target and cs_addrs are in sync. If not, make them so. */
+	if (NULL != gv_target)
+	{
+		csa = gv_target->gd_csa;
+		if ((NULL != csa) && (csa != cs_addrs))
+		{
+			assert(0 < csa->regcnt);
+			/* If csa->regcnt is > 1, it is possible that csa->region is different from the actual gv_cur_region
+			 * (before we encountered the runtime error). This is a case of two regions mapping to the same csa.
+			 * The only issue with this is that some user-level error messages that have the region name (as
+			 * opposed to the database file name) could print incorrect values. But other than that there should
+			 * be no issues since finally the csa (corresponding to the physical database file) is what matters
+			 * and that is the same for both the regions. Given that the region mismatch potential exists only
+			 * until the next global reference which is different from $REFERENCE, we consider this acceptable.
+			 */
+			gv_cur_region = csa->region;
+			assert(gv_cur_region->open);
+			assert((dba_mm == gv_cur_region->dyn.addr->acc_meth) || (dba_bg == gv_cur_region->dyn.addr->acc_meth));
+			/* The above assert is needed to ensure that change_reg (invoked below) will set cs_addrs, cs_data etc.
+			 * to non-zero values */
+			change_reg();	/* updates global variables "cs_addrs", "cs_data" and "sgm_info_ptr" */
+			assert(cs_addrs == csa);
+			assert(cs_data == csa->hdr);
+			assert(NULL != cs_data);
+		}
 	}
 	if (DUMPABLE)
 	{	/* Certain conditions we don't want to attempt to create the M-level ZSHOW dump.
@@ -441,8 +471,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	active_device = (io_desc *)0;
 	ind_result_sp = ind_result_array;	/* clean up any active indirection pool usages */
 	ind_source_sp = ind_source_array;
-	dm_action = frame_pointer->old_frame_pointer->type & SFT_DM  ||
-					compile_time && frame_pointer->type & SFT_DM;
+	dm_action = (frame_pointer->old_frame_pointer->type & SFT_DM)
+				|| (compile_time && (frame_pointer->type & SFT_DM));
 	/* The errors are said to be transcendental when they occur during compilation/execution
 	 * of the error trap ({z,e}trap, device exception) or $zinterrupt. The errors in other
 	 * indirect code frames (zbreak, zstep, xecute etc.) aren't defined to be trancendental
@@ -657,50 +687,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 */
 	(*tp_timeout_clear_ptr)();
 
-	/* -----------------------------------------------------------------------
-	 * Reset the line, or set frame to return if it was "transcendental" code.
-	 * If we are in $ZYERROR, we don't care about restarting the line that
-	 * errored since we will unwind all frames upto and including zyerr_frame.
-	 * -----------------------------------------------------------------------
-	 */
-	if (FALSE == compile_time && !trans_action && !dm_action && (NULL == zyerr_frame)
-		&& (NULL == error_frame) && (0 != dollar_ztrap.str.len) && !repeat_error)
-	{
-		for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
-		{
-			/* See if this is a $ZINTERRUPT frame. If yes, we want to restart *this* line
-			   at the beginning. Since it is always an indirect frame, we can use the context
-			   pointer to start over. Only do this if $ZTRAP is active though. $ETRAP does
-			   things somewhat differently in that the current frame is always returned from.
-			*/
-			if ((0 < dollar_ztrap.str.len) && (SFT_ZINTR & fp->type))
-			{
-				assert(SFF_INDCE & fp->flags);
-				fp->mpc = fp->ctxt;
-				break;
-			}
-			/* Do cleanup on indirect frames prior to reset */
-			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
-
-			/* mpc points to PTEXT */
-			/*The equality check in the second half of the expression below is to
-			  account for the delay-slot in HP-UX for implicit quits. Not an issue here,
-			  but added for uniformity. */
-			if (ADDR_IN_CODE(fp->mpc, fp->rvector))
-			{
-				if (dollar_ztrap.str.len > 0)
-				{	/* GT.M specific error trapping retries the line with the error */
-					fp->mpc = dollar_ecode.error_last_b_line;
-					fp->ctxt = context;
-				}
-				break;
-			} else
-			{
-				fp->ctxt = GTM_CONTEXT(pseudo_ret);
-				fp->mpc = CODE_ADDRESS(pseudo_ret);
-			}
-		}
-	}
 	/* ----------------------------------------------------------------
 	 * error from direct mode actions or "transcendental" code does not
 	 * invoke MUMPS error handling routines
@@ -708,22 +694,15 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 */
 	if (!dm_action && !trans_action)
 	{
-		if (compile_time)
-		{	/* This is setting the execution of this frame to instead give
-			   an error because the compile of that code failed. If this
-			   frame is marked for indr cache cleanup, do that cleanup now
-			   and unmark the frame.
-			*/
-			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
-			frame_pointer->mpc = dollar_ecode.error_last_b_line;
-			frame_pointer->ctxt = context;
-		}
 		err_act = NULL;
 		dollar_ecode.error_last_ecode = SIGNAL;
+		reset_mpc = FALSE;
 		if (err_dev && err_dev->error_handler.len && ((int)ERR_TPTIMEOUT != SIGNAL))
 		{
 			proc_act_type = SFT_DEV_ACT;
 			err_act = &err_dev->error_handler;
+			/* Reset mpc to beginning of the current line (to retry after processing the IO exception handler) */
+			reset_mpc = TRUE;
 		} else if (NULL != error_frame)
 		{	/* a primary error occurred already. irrespective of whether ZTRAP or ETRAP is active now, we need to
 			 * consider this as a nested error and trigger nested error processing.
@@ -737,6 +716,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(!ztrap_explicit_null);
 			proc_act_type = SFT_ZTRAP;
 			err_act = &dollar_ztrap.str;
+			/* Reset mpc to beginning of the current line (to retry after invoking $ZTRAP) */
+			reset_mpc = TRUE;
 		} else
 		{	/* either $ETRAP is empty-string or non-empty.
 			 * if non-empty, use $ETRAP for error-handling.
@@ -772,6 +753,56 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{
 				proc_act_type = SFT_ZTRAP;
 				err_act = &dollar_etrap.str;
+			}
+		}
+		if (reset_mpc)
+		{	/* ----------------------------------------------------------------------------------------------------
+			 *  Reset the mpc such that
+			 *   (a) If the current frame is a counted frame, the error line is retried after the error is handled,
+			 *   (b) If the current frame is "transcendental" code, set frame to return.
+			 * If we are in $ZYERROR, we don't care about restarting the line that errored since we will
+			 * 	unwind all frames upto and including zyerr_frame.
+			 * If this is a rethrown error (ERR_REPEATERROR) from a child frame, do NOT reset mpc of the current
+			 *	frame in that case. We do NOT want to retry the current line (after the error has been
+			 *	processed) because the error did not occur in this line and therefore re-executing the same
+			 *	line could cause undesirable effects at the M-user level. We will resume normal execution
+			 *	once the error is handled. Not that it matters, but note that in the case of a rethrown error
+			 *	(repeat_error is FALSE), we would NOT have noted down dollar_ecode.error_last_b_line so cannot
+			 *	use that to reset mpc anyways.
+			 * ----------------------------------------------------------------------------------------------------
+			 */
+			if ((NULL == zyerr_frame) && !repeat_error)
+			{
+				for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
+				{	/* See if this is a $ZINTERRUPT frame. If yes, we want to restart *this* line
+					 * at the beginning. Since it is always an indirect frame, we can use the context
+					 * pointer to start over. Only do this if $ZTRAP is active though. $ETRAP does
+					 * things somewhat differently in that the current frame is always returned from.
+					 */
+					if (SFT_ZINTR & fp->type)
+					{
+						assert(SFF_INDCE & fp->flags);
+						fp->mpc = fp->ctxt;
+						break;
+					}
+					/* Do cleanup on indirect frames prior to reset */
+					IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
+
+					/* mpc points to PTEXT */
+					/* The equality check in the second half of the expression below is to account for the
+					 * delay-slot in HP-UX for implicit quits. Not an issue here, but added for uniformity.
+					 */
+					if (ADDR_IN_CODE(fp->mpc, fp->rvector))
+					{	/* GT.M specific error trapping retries the line with the error */
+						fp->mpc = dollar_ecode.error_last_b_line;
+						fp->ctxt = context;
+						break;
+					} else
+					{
+						fp->ctxt = GTM_CONTEXT(pseudo_ret);
+						fp->mpc = CODE_ADDRESS(pseudo_ret);
+					}
+				}
 			}
 		}
 		if (clean_mum_tstart())

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,16 +20,17 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
+#include "gtmsiginfo.h"
 #include "mutex.h"
 #include "deferred_signal_handler.h"
 #include "have_crit.h"
 #include "caller_id.h"
 
 GBLREF	volatile int4		crit_count;
-GBLREF	VSIG_ATOMIC_T		forced_exit;
-GBLREF	int			process_exiting;
 GBLREF	uint4 			process_id;
+GBLREF	volatile int		suspend_status;
 GBLREF	node_local_ptr_t	locknl;
+GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 
 /* Note about usage of this function : Create dummy gd_region, gd_segment, file_control,
  * unix_db_info, sgmnt_addrs, and allocate mutex_struct (and NUM_CRIT_ENTRY * mutex_que_entry),
@@ -76,8 +77,8 @@ void	rel_lock(gd_region *reg)
 	{
 		CRIT_TRACE(crit_ops_nocrit);
 	}
-
-	/* Only do this if we are not already exiting */
-	if (forced_exit && !process_exiting && 0 == have_crit(CRIT_HAVE_ANY_REG))
-		deferred_signal_handler();
+	/* Now that crit for THIS region is released, check if deferred signal/exit handling can be done and if so do it */
+	DEFERRED_EXIT_HANDLING_CHECK;
+	if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)
+		suspend();
 }

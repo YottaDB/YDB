@@ -23,19 +23,16 @@ GBLREF dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related 
 
 unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigned char **ctxt)
 {
-	boolean_t	line_reset, use_fpmpc_exact;
-	stack_frame	*fp, *first_counted_frame;
+	boolean_t	line_reset;
+	stack_frame	*fp;
 	unsigned char	*addr, *out_addr;
 	unsigned char	*fpmpc, *fpctxt;
 
 	line_reset = FALSE;
-	first_counted_frame = NULL;
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
 		fpmpc = fp->mpc;
 		fpctxt = fp->ctxt;
-		if ((NULL == first_counted_frame) && (fp->type & SFT_COUNT))
-			first_counted_frame = fp;
 		if (ADDR_IN_CODE(fpmpc, fp->rvector))
 		{
 			if (ctxt != 0)
@@ -44,8 +41,7 @@ unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigne
 				addr = fpmpc + 1;
 			else
 				addr = fpmpc;
-			use_fpmpc_exact = (fp == first_counted_frame);
-			out_addr = symb_line(addr, out, b_line, fp->rvector, use_fpmpc_exact);
+			out_addr = symb_line(addr, out, b_line, fp->rvector);
 			assert (out < out_addr);
 			return out_addr;
 		} else

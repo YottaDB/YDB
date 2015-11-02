@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +31,13 @@
 						   * choose the lower limit
 						   */
 #endif
+
+/*Definitions in case of ENOBUFs error in HPUX*/
+#ifdef __hpux
+#define HPUX_MAX_RETRIES 8
+#define HPUX_SEL_TIMEOUT (20 * 1000) /*20 milliseconds(reperesented in micro secs)*/
+#endif
+
 
 #define DOTCPSEND(SDESC, SBUFF, SBUFF_LEN, SFLAGS, RC) \
 { \

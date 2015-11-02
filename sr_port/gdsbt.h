@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,9 @@
 #define MAX_MCNAMELEN   256
 
 #define GDS_LABEL_SZ 	12
+
+#define MAX_DB_WTSTARTS		2			/* Max number of "flush-timer driven" simultaneous writers in wcs_wtstart */
+#define MAX_WTSTART_PID_SLOTS	4 * MAX_DB_WTSTARTS	/* Max number of PIDs for wcs_wtstart to save */
 
 #define BT_FACTOR(X) (X)
 #define FLUSH_FACTOR(X) ((X)-(X)/16)
@@ -258,23 +261,29 @@ typedef struct node_local_struct
 	int4		ccp_state;
 	boolean_t	ccp_jnl_closed;
 	boolean_t	glob_sec_init;
+	uint4		wtstart_pid[MAX_WTSTART_PID_SLOTS];	/* Maintain pids of wcs_wtstart processes */
+	int4		filler8_int;				/* 8-byte alignment filler */
 	global_latch_t	wc_var_lock;                            /* latch used for access to various wc_* ref counters */
 	CACHELINE_PAD(sizeof(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;                               /* latch for interlocking on hppa and tandem */
 	CACHELINE_PAD(sizeof(global_latch_t), 2)
 	int4		cache_hits;
 	int4		wc_in_free;                             /* number of write cache records in free queue */
+	/* All the counters below (declared using CNTR4DCL are 4-byte counters. We would like to keep them in separate
+	 * cachelines on load-lock/store-conditional platforms particularly and other platforms too just to be safe.
+	 */
 	volatile CNTR4DCL(wcs_timers, 1);			/* number of write cache timers in use - 1 */
-	CACHELINE_PAD_COND(sizeof(int4), 3)			/* Keep these counters in separate cache lines on
-								   load-lock/store-conditional platforms */
+	CACHELINE_PAD(4, 3)
 	volatile CNTR4DCL(wcs_active_lvl, 2);			/* number of entries in active queue */
-	CACHELINE_PAD_COND(sizeof(int4), 4)
+	CACHELINE_PAD(4, 4)
 	volatile CNTR4DCL(wcs_staleness, 3);
-	CACHELINE_PAD_COND(sizeof(int4), 5)
+	CACHELINE_PAD(4, 5)
 	volatile CNTR4DCL(ref_cnt, 4);				/* reference count. How many people are using the database */
-	CACHELINE_PAD_COND(sizeof(int4), 6)
+	CACHELINE_PAD(4, 6)
 	volatile CNTR4DCL(in_wtstart, 5);			/* Count of processes in wcs_wtstart */
-	CACHELINE_PAD_COND(sizeof(int4), 7)
+	CACHELINE_PAD(4, 7)
+	volatile CNTR4DCL(wcs_phase2_commit_pidcnt, 6);		/* number of processes actively finishing phase2 commit */
+	CACHELINE_PAD(4, 8)
 	int4            mm_extender_pid;			/* pid of the process executing gdsfilext in MM mode */
 	int4            highest_lbm_blk_changed;                /* Records highest local bit map block that
 									changed so we know how much of master bit

@@ -261,7 +261,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 #define EXIT_HANDLER(x)
 
 #define SEND_CALLERID(callee) send_msg(VARLSTCNT(5) ERR_CALLERID, 3, LEN_AND_STR((callee)), caller_id());
-#define PRINT_CALLERID util_out_print(" -- generated from 0x!XL.", NOFLUSH, caller_id())
+#define PRINT_CALLERID util_out_print(" -- generated from 0x!XJ.", NOFLUSH, caller_id())
 #define UNIX_EXIT_STATUS_MASK	0xFF
 
 void err_init(void (*x)());

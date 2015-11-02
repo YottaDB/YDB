@@ -80,12 +80,25 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_CI_OFF		~(SFF_CI)		/* Mask to turn off SFF_CI */
 #define SFF_ETRAP_ERR_OFF	~(SFF_ETRAP_ERR)	/* Mask to turn off SFF_ETRAP_ERR */
 
+#define	ADJUST_FRAME_POINTER(fptr, shift)			\
+{								\
+	GBLREF	stack_frame	*error_frame;			\
+	stack_frame		*oldfp;				\
+								\
+	oldfp = fptr;						\
+	fptr = (stack_frame *)((char *)oldfp - shift);		\
+	if (error_frame == oldfp)				\
+	{	/* Adjust "error_frame" as well */		\
+		assert(error_frame >= frame_pointer);		\
+		error_frame = fptr;				\
+	}							\
+}
+
 void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 void new_stack_frame_sp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 int4 symbinit(void);
 unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigned char **ctxt);
-unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned char **b_line,
-	rhdtyp *routine, boolean_t use_fpmpc_exact);
+unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned char **b_line, rhdtyp *routine);
 void copy_stack_frame(void);
 void copy_stack_frame_sp(void);
 void exfun_frame(void);

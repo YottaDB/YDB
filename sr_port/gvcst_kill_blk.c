@@ -62,7 +62,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	unsigned short			temp_ushort;
 	int4				temp_long;
 	int				blk_size, blk_seg_cnt, lmatch, rmatch, targ_len, prev_len, targ_base, next_rec_shrink,
-					temp_int;
+					temp_int, blkseglen;
 	bool				kill_root, first_copy;
 	blk_hdr_ptr_t			old_blk_hdr;
 	rec_hdr_ptr_t			left_ptr;	/*pointer to record before first record to delete*/
@@ -76,7 +76,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	unsigned char			*skb;
 	static readonly block_id	zeroes = 0;
 	cw_set_element			*cse, *old_cse;
-	bytptr				curr, prev;
+	bytptr				curr, prev, right_bytptr;
 	off_chain			chain1, curr_chain, prev_chain;
 	block_id			blk;
 	sm_uc_ptr_t			buffer;
@@ -113,8 +113,8 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		(bytptr)right_ptr > (bytptr)top_of_block ||
 		(bytptr)left_ptr >= (bytptr)right_ptr)
 	{
-			assert(CDB_STAGNATE > t_tries);
-			return cdb_sc_rmisalign;
+		assert(CDB_STAGNATE > t_tries);
+		return cdb_sc_rmisalign;
 	}
 	if ((bytptr)left_ptr == (bytptr)old_blk_hdr)
 	{
@@ -158,8 +158,8 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			if (((bytptr)rp1 < (bytptr)(rp + 1) + sizeof(block_id)) ||
 				((bytptr)rp1 < buffer) || ((bytptr)rp1 > (buffer + blk_size)))
 			{
-					assert(CDB_STAGNATE > t_tries);
-					return cdb_sc_rmisalign;
+				assert(CDB_STAGNATE > t_tries);
+				return cdb_sc_rmisalign;
 			}
 			GET_LONG(temp_long, ((bytptr)rp1 - sizeof(block_id)));
 			if (dollar_tlevel)
@@ -241,17 +241,19 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	}
 	BLK_INIT(bs_ptr, bs1);
 	first_copy = TRUE;
-	if ((bytptr)del_ptr > (bytptr)first_in_blk)
+	blkseglen = (bytptr)del_ptr - (bytptr)first_in_blk;
+	if (0 < blkseglen)
 	{
 		if (((bytptr)right_ptr != (bytptr)top_of_block)  ||  (0 == level))
 		{
-			BLK_SEG(bs_ptr, (bytptr)first_in_blk, (bytptr)del_ptr - (bytptr)first_in_blk);
+			BLK_SEG(bs_ptr, (bytptr)first_in_blk, blkseglen);
 			first_copy = FALSE;
 		} else
 		{
-			if (left_ptr > first_in_blk)
+			blkseglen = (bytptr)left_ptr - (bytptr)first_in_blk;
+			if (0 < blkseglen)
 			{
-				BLK_SEG(bs_ptr, (bytptr)first_in_blk, (bytptr)left_ptr - (bytptr)first_in_blk);
+				BLK_SEG(bs_ptr, (bytptr)first_in_blk, blkseglen);
 				first_copy = FALSE;
 			}
 			BLK_ADDR(star_rec_hdr, sizeof(rec_hdr), rec_hdr);
@@ -262,12 +264,14 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			BLK_SEG(bs_ptr, ((bytptr)left_ptr + temp_ushort - sizeof(block_id)), sizeof(block_id));
 		}
 	}
-	if ((bytptr)right_ptr != (bytptr)top_of_block)
+	blkseglen = (bytptr)top_of_block - (bytptr)right_ptr;
+	assert(0 <= blkseglen);
+	if (0 != blkseglen)
 	{
 		next_rec_shrink = targ_len + prev_len;
 		if (0 >= next_rec_shrink)
 		{
-			BLK_SEG(bs_ptr, (bytptr)right_ptr, (bytptr)top_of_block - (bytptr)right_ptr);
+			BLK_SEG(bs_ptr, (bytptr)right_ptr, blkseglen);
 		} else
 		{
 			BLK_ADDR(new_rec_hdr, sizeof(rec_hdr), rec_hdr);
@@ -283,7 +287,16 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			}
 			if (prev_len)
 				BLK_SEG(bs_ptr, (bytptr)(right_prev_ptr + 1) , prev_len);
-			BLK_SEG(bs_ptr, (bytptr)(right_ptr + 1), (bytptr)top_of_block - (bytptr)(right_ptr + 1));
+			right_bytptr = (bytptr)(right_ptr + 1);
+			blkseglen = (bytptr)top_of_block - right_bytptr;
+			if (0 < blkseglen)
+			{
+				BLK_SEG(bs_ptr, right_bytptr, blkseglen);
+			} else
+			{
+				assert(CDB_STAGNATE > t_tries);
+				return cdb_sc_rmisalign;
+			}
 		}
 	}
 	if (!BLK_FINI(bs_ptr, bs1))

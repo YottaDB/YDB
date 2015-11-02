@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +48,7 @@ int	gtm_reg(int vax_reg);
 #define ASM_OUT_BUFF 	256
 #define PUSH_LIST_SIZE	500
 
-#if defined(__vms) || defined(_AIX) || defined(__hpux) || (defined(__linux__) && defined(__ia64))
+#if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux) || (defined(__linux__) && defined(__ia64))
 #  define TRUTH_IN_REG
 #elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__))
 #  undef TRUTH_IN_REG

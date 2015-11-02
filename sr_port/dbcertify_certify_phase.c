@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -1317,7 +1317,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			bml_busy(lcl_blk, lcl_map_p);
 			blk_set_bm_p->usage = gdsblk_update;
 			/* See if entire block is full - if yes, we need to mark master map too */
-			psa->hint_lcl = bml_find_free(psa->hint_lcl, lcl_map_p, blks_this_lmap, &dummy_bool);
+			psa->hint_lcl = bml_find_free(psa->hint_lcl, lcl_map_p, blks_this_lmap);
 			if (NO_FREE_SPACE == psa->hint_lcl)
 			{	/* Local map was filled .. clear appropriate master map bit */
 				DBC_DEBUG(("DBC_DEBUG: -- Local map now full - marking master map\n"));

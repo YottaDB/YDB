@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,6 +86,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 			sbufh_p->backup_errno = errno;
 			csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 			send_msg(VARLSTCNT(5) ERR_BKUPTMPFILOPEN, 2, LEN_AND_STR(sbufh_p->tempfilename), sbufh_p->backup_errno);
+			assert(EACCES == sbufh_p->backup_errno);
 			shmpool_unlock_hdr(reg);
 			return FALSE;
 		}
@@ -118,6 +119,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 				sbufh_p->failed = process_id;
 				sbufh_p->backup_errno = status;
 				csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
+				assert(FALSE);
 				send_msg(VARLSTCNT(8) ERR_BKUPTMPFILWRITE, 2, LEN_AND_STR(sbufh_p->tempfilename), status);
 				break;	/* close file, release lock and return now.. */
 			}

@@ -127,7 +127,13 @@ typedef struct {
 			{	/* this is an error frame and $ECODE is non-NULL during QUIT out of this frame. \
 				 * rethrow the error at lower level */						\
 				(*dollar_ecode.error_return_addr)();						\
-				assert(FALSE);	/* this should not return */					\
+				/* We dont expect the above call to return in Unix since we either rethrow	\
+				 * the error or do a MUM_TSTART which unwinds the C-stack. But in VMS, we dont	\
+				 * do the latter so it is possible if the current frame is of type SFT_DM that	\
+				 * we dont rethrow and dont do a MUM_TSTART as well. Assert accordingly.	\
+				 */										\
+				UNIX_ONLY(assert(FALSE);)	/* this should not return */			\
+				VMS_ONLY(assert(SFT_DM & frame_pointer->type);)					\
 			} else											\
 			{											\
 				assert(FALSE);									\

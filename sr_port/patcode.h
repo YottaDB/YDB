@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +19,7 @@
 #define PATM_U			(1 << 3)
 #define PATM_C			(1 << 4)
 #define PATM_UTF8_ALPHABET	(1 << 5) /* Unicode characters that are alphabets but not cased (i.e. neither L nor U) */
-#define PATM_UTF8_NONBASIC	(1 << 6) /* Unicode characters that fall in neither of the 5 basic classes (N,P,L,U,C) */
+#define PATM_UTF8_NONBASIC	(1 << 6) /* Currently not used, but retained in case needed in the future */
 
 #define	PAT_BASIC_CLASSES	7	/* the 5 canonic classes (defined by the M standard) plus the two PATM_UTF8_* classes */
 

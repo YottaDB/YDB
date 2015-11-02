@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -209,7 +209,7 @@ error_def(ERR_DEVPARVALREQ);
 	stx_error(errcode);						\
 }
 
-#define MAX_SRCLINE	2048	/* maximum length of a program source or indirection line */
+#define MAX_SRCLINE	8192	/* maximum length of a program source or indirection line - increased for Iselin */
 
 #define EXPR_FAIL	0	/* expression had syntax error */
 #define EXPR_GOOD	1	/* expression ok, no indirection at root */

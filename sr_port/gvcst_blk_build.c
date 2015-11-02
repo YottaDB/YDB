@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,9 @@ GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	boolean_t		mu_reorg_upgrd_dwngrd_in_prog;	/* TRUE if MUPIP REORG UPGRADE/DOWNGRADE is in progress */
+GBLREF	boolean_t		write_after_image;
+GBLREF	unsigned int		t_tries;
+GBLREF	boolean_t		run_time;
 
 void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 {
@@ -48,8 +51,10 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	sm_uc_ptr_t	ptr, ptrtop;
 	sm_ulong_t	n;
 	int4		offset;
+	trans_num	blktn;
 
-	assert(dollar_tlevel || cs_addrs->now_crit);
+	assert((dba_bg != cs_data->acc_meth) || dollar_tlevel || !cs_addrs->now_crit || write_after_image);
+	assert((dba_mm != cs_data->acc_meth) || dollar_tlevel || cs_addrs->now_crit);
 	assert(cse->mode != gds_t_writemap);
 	array = (blk_segment *)cse->upd_addr;
 	assert(array->len >= sizeof(blk_hdr));
@@ -90,6 +95,27 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		 */
 		ctn = cs_addrs->ti->curr_tn - 1;
 	}
+	/* Assert that the block's transaction number is LESS than the transaction number corresponding to the blk build.
+	 * i.e. no one else should have touched the block contents in shared memory from the time we locked this in phase1
+	 * to the time we build it in phase2.
+	 * There are a few exceptions.
+	 *	a) With DSE, it is possible to change the block transaction number and then a DSE or MUPIP command can run
+	 *		on the above block with the above condition not true.
+	 *	b) tp_tend calls gvcst_blk_build for cse's with mode kill_t_write/kill_t_create. For them we build a private
+	 *		copy of the block for later use in phase2 of the M-kill. In this case, blktn could be
+	 *		uninitialized so cannot do any checks using this value.
+	 *	c) For MM, we dont have two phase commits so dont do any checks in that case.
+	 *	d) For acquired blocks, it is possible that some process had read in the uninitialized block from disk
+	 *		outside of crit (due to concurrency issues). Therefore the buffer could contain garbage. So we cannot
+	 *		rely on the buffer contents to determine the block's transaction number.
+	 *	e) For VMS, if a twin is created, we explicitly set its buffer tn to be equal to ctn in phase1.
+	 *		But since we are not passed the "cr" in this routine, it is not easily possible to check that.
+	 *		Hence in case of VMS, we relax the check so buffertn == ctn is allowed.
+	 */
+	DEBUG_ONLY(blktn = ((blk_hdr_ptr_t)base_addr)->tn);
+	assert(!run_time || !cs_addrs->t_commit_crit || (dba_bg != cs_data->acc_meth) || (n_gds_t_op < cse->mode)
+			|| (cse->mode == gds_t_acquired) || (blktn UNIX_ONLY(<) VMS_ONLY(<=) ctn));
+	assert((ctn < cs_addrs->ti->early_tn) || write_after_image);
 	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
@@ -102,9 +128,10 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		ptr = base_addr + sizeof(blk_hdr);
 		if (!cse->first_copy)
 			ptr += ((blk_segment *)(array + 1))->len;
-		for (  ;seg <= stop_ptr;)
+		for ( ; seg <= stop_ptr; )
 		{
 			assert(0L <= ((INTPTR_T)seg->len));
+			DBG_BG_PHASE2_CHECK_CR_IS_PINNED(cs_addrs, seg);
 			memmove(ptr, seg->addr, seg->len);
 			ptr += seg->len;
 			seg++;
@@ -117,6 +144,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 		while (seg != stop_ptr)
 		{
 			assert(0L <= ((INTPTR_T)seg->len));
+			DBG_BG_PHASE2_CHECK_CR_IS_PINNED(cs_addrs, seg);
 			ptr -= (n = seg->len);
 			memmove(ptr, seg->addr, n);
 			seg--;

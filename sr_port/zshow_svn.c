@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,6 +98,7 @@ static readonly char zpatnumeric_text[] = "$ZPATNUMERIC";
 static readonly char zproc_text[] = "$ZPROCESS";
 static readonly char zprompt_text[] = "$ZPROMPT";
 static readonly char zpos_text[] = "$ZPOSITION";
+static readonly char zquit_text[] = "$ZQUIT";
 static readonly char zrealstor_text[] = "$ZREALSTOR";
 static readonly char zroutines_text[] = "$ZROUTINES";
 static readonly char zsource_text[] = "$ZSOURCE";
@@ -140,11 +141,12 @@ GBLREF mval		dollar_zinterrupt, dollar_ztexit;
 GBLREF boolean_t	dollar_zininterrupt;
 GBLREF int4		zdir_form;
 GBLREF int4		zdate_form;
-GBLREF int		totalAlloc;
-GBLREF int		totalRmalloc;
-GBLREF int		totalUsed;
+GBLREF size_t		totalAlloc;
+GBLREF size_t		totalRmalloc;
+GBLREF size_t		totalUsed;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
+GBLREF boolean_t	dollar_zquit_anyway;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -283,7 +285,7 @@ void zshow_svn(zshow_out *output)
 		mval_write(output, &var, TRUE);
 	/* SV_ZALLOCSTOR */
 		count = totalAlloc;
-		MV_FORCE_MVAL(&var, count);
+		MV_FORCE_UMVAL(&var, (unsigned int)count);
 		ZS_VAR_EQU(&x, zallocstor_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZB */
@@ -408,9 +410,13 @@ void zshow_svn(zshow_out *output)
 		var.str.len = gtmprompt.len;
 		ZS_VAR_EQU(&x, zprompt_text);
 		mval_write(output, &var, TRUE);
+	/* SV_ZQUIT */
+		MV_FORCE_MVAL(&var, dollar_zquit_anyway);
+		ZS_VAR_EQU(&x, zquit_text);
+		mval_write(output, &var, TRUE);
 	/* SV_ZREALSTOR */
 		count = totalRmalloc;
-		MV_FORCE_MVAL(&var, count);
+		MV_FORCE_UMVAL(&var, (unsigned int)count);
 		ZS_VAR_EQU(&x, zrealstor_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZROUTINES */
@@ -447,7 +453,7 @@ void zshow_svn(zshow_out *output)
 		mval_write(output, &var, TRUE);
 	/* SV_ZUSEDSTOR */
 		count = totalUsed;
-		MV_FORCE_MVAL(&var, count);
+		MV_FORCE_UMVAL(&var, (unsigned int)count);
 		ZS_VAR_EQU(&x, zusedstor_text);
 		mval_write(output, &var, TRUE);
 	/* SV_ZVERSION */

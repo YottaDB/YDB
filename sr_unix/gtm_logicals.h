@@ -37,6 +37,7 @@
 #define GTM_MAX_SOCKETS			"$gtm_max_sockets"
 #define GTM_QUIET_HALT			"$gtm_quiet_halt"
 #define GTM_MEMORY_RESERVE		"$gtm_memory_reserve"
+#define GTM_ZQUIT_ANYWAY		"$gtm_zquit_anyway"
 
 /* Environment variables for Unicode functionality */
 #define GTM_CHSET_ENV			"$gtm_chset"
@@ -57,3 +58,5 @@
 
 #define	GTM_REPL_INSTNAME		"$gtm_repl_instname"
 #define	GTM_REPL_INSTSECONDARY		"$gtm_repl_instsecondary"
+#define GTM_MAX_INDRCACHE_MEMORY	"$gtm_max_indrcache_memory"
+#define GTM_MAX_INDRCACHE_COUNT		"$gtm_max_indrcache_count"

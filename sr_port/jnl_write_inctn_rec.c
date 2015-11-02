@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@ void	jnl_write_inctn_rec(sgmnt_addrs	*csa)
 			break;
 		case inctn_gdsfilext_gtm:
 		case inctn_gdsfilext_mu_reorg:
+		case inctn_db_format_change:
 			inctn_record.detail.blks_to_upgrd_delta = inctn_detail.blks_to_upgrd_delta;
 			break;
 		default:

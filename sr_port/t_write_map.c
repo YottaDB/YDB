@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,8 @@ void t_write_map (
 						 *	    "cr->ondsk_blkver"	--> Actual block version on disk
 						 */
 		unsigned char 	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
-		trans_num	tn)		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
+		trans_num	tn,		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
+		int4		reference_cnt)	/* Same meaning as cse->reference_cnt (see gdscc.h for comments) */
 {
 	cw_set_element		*cs;
 	cache_rec_ptr_t		cr;
@@ -53,6 +54,8 @@ void t_write_map (
 	sgmnt_addrs		*csa;
 	blk_hdr_ptr_t		old_block;
 	unsigned int		bsiz;
+	block_id		blkid;
+	uint4			*updptr;
 
 	csa = cs_addrs;
 	if (dollar_tlevel == 0)
@@ -95,9 +98,23 @@ void t_write_map (
 	cs->ondsk_blkver = (NULL == cr) ? (enum db_ver)GDSVCURR : cr->ondsk_blkver;
 	cs->ins_off = 0;
 	cs->index = 0;
-	cs->reference_cnt = 0;
+	assert(reference_cnt < csa->hdr->bplmap);	/* Cannot allocate more blocks than a bitmap holds */
+	assert(reference_cnt > -csa->hdr->bplmap);	/* Cannot free more blocks than a bitmap holds */
+	cs->reference_cnt = reference_cnt;
 	cs->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cs->upd_addr = upd_addr;
+	DEBUG_ONLY(
+		if (reference_cnt < 0)
+			reference_cnt = -reference_cnt;
+		/* Check that all block numbers are relative to the bitmap block number (i.e. bit number) */
+		updptr = (uint4 *)upd_addr;
+		while (reference_cnt--)
+		{
+			blkid = *updptr;
+			assert((int4)blkid < csa->hdr->bplmap);
+			updptr++;
+		}
+	)
 	cs->tn = tn;
 	cs->level = LCL_MAP_LEVL;
 	cs->done = FALSE;

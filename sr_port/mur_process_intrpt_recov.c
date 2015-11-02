@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,15 +132,15 @@ uint4 mur_process_intrpt_recov()
 									 * to identify all places that set curr_tn */
 		/* MUPIP REORG UPGRADE/DOWNGRADE stores its partially processed state in the database file header.
 		 * It is difficult for recovery to restore those fields to a correct partial value.
-		 * Hence reset the related fields as if the desired_db_format got set just then at the EPOCH record
+		 * Hence reset the related fields as if the desired_db_format got set just ONE tn BEFORE the EPOCH record
 		 * 	and that there was no more processing that happened.
 		 * This might potentially mean some duplicate processing for MUPIP REORG UPGRADE/DOWNGRADE after the recovery.
 		 * But that will only be the case as long as the database is in compatibility (mixed) mode (hopefully not long).
 		 */
-		if (csd->desired_db_format_tn > jctl->turn_around_tn)
-			csd->desired_db_format_tn = jctl->turn_around_tn;
-		if (csd->reorg_db_fmt_start_tn > jctl->turn_around_tn)
-			csd->reorg_db_fmt_start_tn = jctl->turn_around_tn;
+		if (csd->desired_db_format_tn >= jctl->turn_around_tn)
+			csd->desired_db_format_tn = jctl->turn_around_tn - 1;
+		if (csd->reorg_db_fmt_start_tn >= jctl->turn_around_tn)
+			csd->reorg_db_fmt_start_tn = jctl->turn_around_tn - 1;
 		if (csd->tn_upgrd_blks_0 > jctl->turn_around_tn)
 			csd->tn_upgrd_blks_0 = (trans_num)-1;
 		csd->reorg_upgrd_dwngrd_restart_block = 0;
@@ -149,6 +149,9 @@ uint4 mur_process_intrpt_recov()
 			/* This is taken from bt_refresh() */
 			((th_rec *)((uchar_ptr_t)cs_addrs->th_base + cs_addrs->th_base->tnque.fl))->tn = jctl->turn_around_tn - 1;
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_FSYNC_DB);
+		/* In case this is MM and wcs_flu() remapped an extended database, reset rctl->csd */
+		assert((dba_mm == cs_data->acc_meth) || (rctl->csd == cs_data));
+		rctl->csd = cs_data;
 	}
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
 	{
@@ -220,6 +223,7 @@ uint4 mur_process_intrpt_recov()
 				DO_FILE_WRITE(jctl->channel, 0, jctl->jfh, JNL_HDR_LEN, jctl->status, jctl->status2);
 				if (SS_NORMAL != jctl->status)
 				{
+					assert(FALSE);
 					if (SS_NORMAL == jctl->status2)
 						gtm_putmsg(VARLSTCNT(5) ERR_JNLWRERR, 2, jctl->jnl_fn_len,
 							jctl->jnl_fn, jctl->status);

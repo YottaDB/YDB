@@ -52,6 +52,10 @@ GBLREF	volatile int4		db_fsync_in_prog, jnl_qio_in_prog;
 GBLREF	volatile int4 		fast_lock_count;
 GBLREF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
 GBLREF	boolean_t	 	mupip_jnl_recover;
+#ifdef DEBUG
+GBLREF	unsigned int		t_tries;
+GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
+#endif
 
 /* Sync the filehdr (and epoch in the journal file if before imaging). The goal is to sync the database,
  * but if we find us in a situation where we need to block on someone else, then we defer this to the next round.
@@ -65,6 +69,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	sgmnt_addrs		*csa, *check_csaddrs, *save_csaddrs;
 	sgmnt_data_ptr_t	csd, save_csdata;
 	NOPIO_ONLY(boolean_t	lseekIoInProgress_flag;)
+	DEBUG_ONLY(boolean_t	save_ok_to_call_wcs_recover;)
 
 	csa = *csaptr;
 	assert(csa->dbsync_timer);	/* to ensure no duplicate dbsync timers */
@@ -108,11 +113,12 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		 *	Note that the function "mutex_deadlock_check" resets crit_count to 0 temporarily even though we
 		 *	might actually be in the midst of acquiring crit. Therefore we should not interrupt mainline code
 		 *	if we are in the "mutex_deadlock_check" as otherwise it presents reentrancy issues.
-		 *   3) We have crit in the current region or we need to wait to obtain crit.
-		 *   	At least one reason why we should not wait to obtain crit is because the timeout mechanism
-		 *   	for the critical section is currently (as of 2004 May) driven by heartbeat on Tru64, AIX,
-		 *   	Solaris and HPUX. The periodic heartbeat handler cannot pop as it is a SIGALRM
-		 *   	handler and cannot nest while we are already in a SIGALRM handler for the wcs_clean_dbsync.
+		 *   3) We have crit in the current region OR are in the middle of commit for this region (even though
+		 *	we dont hold crit) OR are in wcs_wtstart (potentially holding write interlock and keeping another
+		 *	process in crit waiting) OR we need to wait to obtain crit. At least one reason why we should not wait
+		 *	to obtain crit is because the timeout mechanism for the critical section is currently (as of 2004 May)
+		 *	driven by heartbeat on Tru64, AIX, Solaris and HPUX. The periodic heartbeat handler cannot pop as
+		 *	it is a SIGALRM handler and cannot nest while we are already in a SIGALRM handler for the wcs_clean_dbsync.
 		 *   	Were this to happen, we could end up waiting for crit, not being able to interrupt the wait
 		 *   	with a timeout resulting in a hang until crit became available.
 		 *   4) We are in a "fast lock".
@@ -123,13 +129,31 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		 */
 		dbsync_defer_timer = TRUE;
 		GET_LSEEK_FLAG(FILE_INFO(reg)->fd, lseekIoInProgress_flag);
+		DEBUG_ONLY(
+			/* We invoke tp_grab_crit below which can potentially do cache-recoveries if csd->wc_blocked is set.
+			 * But wcs_recover has an assert that we never invoke it in the final retry. This is to avoid
+			 * restarts in the final retry. But wcs_clean_dbsync invokes tp_grab_crit only if we dont already
+			 * hold crit and that means we have already finished commit on this particular region (e.g. if
+			 * commit is complete on all regions and crit is released on all of them but before we reset t_tries
+			 * to 0 in t_end/tp_tend) so it is okay to invoke wcs_recover in that case. Signal that to wcs_recover
+			 * by setting ok_to_call_wcs_recover to TRUE. Need to save and restore the global as it could be
+			 * TRUE or FALSE depending on where wcs_clean_dbsync interrupted mainline code.
+			 */
+			assert(CDB_STAGNATE >= t_tries);
+			if (CDB_STAGNATE <= t_tries)
+			{
+				save_ok_to_call_wcs_recover = ok_to_call_wcs_recover;
+				ok_to_call_wcs_recover = TRUE;
+			}
+		)
 		if (!mupip_jnl_recover NOPIO_ONLY(&& (FALSE == lseekIoInProgress_flag))
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
 			&& (0 == crit_count) && !in_mutex_deadlock_check
 			&& (0 == fast_lock_count)
 			&& (!jnl_qio_in_prog)      && (!db_fsync_in_prog)
 			&& (!jpc || !jpc->jnl_buff || (LOCK_AVAILABLE == jpc->jnl_buff->fsync_in_prog_latch.u.parts.latch_pid))
-			&& (NULL == check_csaddrs || FALSE == check_csaddrs->now_crit) && (FALSE == csa->now_crit)
+			&& ((NULL == check_csaddrs) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(check_csaddrs))
+			&& !T_IN_CRIT_OR_COMMIT_OR_WRITE(csa)
 			&& (FALSE != tp_grab_crit(reg)))
 		{	/* Note that tp_grab_crit invokes wcs_recover in case csd->wc_blocked is non-zero.
 			 * This means we could be doing cache recovery even though we are in interrupt code.
@@ -153,6 +177,10 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			dbsync_defer_timer = FALSE;
 			rel_crit(reg);
 		}
+		DEBUG_ONLY(
+			if (CDB_STAGNATE <= t_tries)
+				ok_to_call_wcs_recover = save_ok_to_call_wcs_recover;
+		)
 	}
 	if (dbsync_defer_timer)
 	{

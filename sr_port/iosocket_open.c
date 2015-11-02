@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,7 +56,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 	int			handle_len, moreread_timeout;
 	unsigned short		port;
 	int4			errlen, msec_timeout, real_errno, p_offset = 0, zff_len, delimiter_len;
-	int			ii, rv, size, on = 1, temp_1 = -2, d_socket_struct_len;
+	int			d_socket_struct_len;
 	ABS_TIME		cur_time, end_time;
 	io_desc			*ioptr;
 	struct sockaddr_in	peer;		/* socket address + port */

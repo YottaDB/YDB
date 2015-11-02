@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,17 +22,22 @@ void wbox_test_init(void);
 
 /* List of whitebox testcases */
 typedef enum {
-	WBTEST_T_END_JNLFILOPN = 1,
-	WBTEST_TP_TEND_JNLFILOPN,
-	WBTEST_TP_TEND_TRANS2BIG,
-	WBTEST_BG_UPDATE_BTPUTNULL,
-	WBTEST_BG_UPDATE_DBCSHGET_INVALID,
-	WBTEST_BG_UPDATE_DBCSHGETN_INVALID,
-	WBTEST_BG_UPDATE_DBCSHGETN_INVALID2,	/* VMS only twin logic */
-	WBTEST_BG_UPDATE_READINPROGSTUCK1,
-	WBTEST_BG_UPDATE_READINPROGSTUCK2,
-	WBTEST_BG_UPDATE_DIRTYSTUCK1,		/* Unix only dirty wait logic */
-	WBTEST_BG_UPDATE_DIRTYSTUCK2
+	WBTEST_T_END_JNLFILOPN = 1,		/*  1 */
+	WBTEST_TP_TEND_JNLFILOPN,		/*  2 */
+	WBTEST_TP_TEND_TRANS2BIG,		/*  3 */
+	WBTEST_BG_UPDATE_BTPUTNULL,		/*  4 */
+	WBTEST_BG_UPDATE_DBCSHGET_INVALID,	/*  5 */
+	WBTEST_BG_UPDATE_DBCSHGETN_INVALID,	/*  6 */
+	WBTEST_BG_UPDATE_DBCSHGETN_INVALID2,	/*  7 : VMS only twin logic */
+	WBTEST_BG_UPDATE_READINPROGSTUCK1,	/*  8 */
+	WBTEST_BG_UPDATE_READINPROGSTUCK2,	/*  9 */
+	WBTEST_BG_UPDATE_DIRTYSTUCK1,		/* 10 : Unix only dirty wait logic */
+	WBTEST_BG_UPDATE_DIRTYSTUCK2,		/* 11 */
+	WBTEST_BG_UPDATE_INTENDSTUCK,		/* 12 */
+	WBTEST_BG_UPDATE_INSQTIFAIL,		/* 13 */
+	WBTEST_BG_UPDATE_INSQHIFAIL,		/* 14 */
+	WBTEST_BG_UPDATE_PHASE2FAIL,		/* 15 */
+	WBTEST_JNL_FILE_LOST_DSKADDR		/* 16 */
 } wbtest_code_t;
 
 #ifdef DEBUG

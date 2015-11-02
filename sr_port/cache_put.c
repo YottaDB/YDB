@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +20,8 @@
 
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
+GBLREF  uint4           	max_cache_memsize;      /* Maximum bytes used for indirect cache object code */
+GBLREF  uint4           	max_cache_entries;      /* Maximum number of cached indirect compilations */
 
 void cache_put(icode_str *src, mstr *object)
 {
@@ -31,7 +33,7 @@ void cache_put(icode_str *src, mstr *object)
 	boolean_t	added;
 
 	indir_cache_mem_size += (ICACHE_SIZE + object->len);
-	if (indir_cache_mem_size > MAX_CACHE_MEMSIZE || cache_table.size > MAX_CACHE_ENTRIES)
+	if (indir_cache_mem_size > max_cache_memsize || cache_table.size > max_cache_entries)
 		cache_table_rebuild();
 	csp = (cache_entry *)GTM_TEXT_ALLOC(ICACHE_SIZE + object->len);
 	csp->obj.addr = (char *)csp + ICACHE_SIZE;

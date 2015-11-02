@@ -131,6 +131,7 @@ void	gvcst_put(mval *val)
 	boolean_t	extra_block_split_req;
 	sm_uc_ptr_t	jnlpool_instfilename;
 	unsigned char	instfilename_copy[MAX_FN_LEN + 1];
+	int4		jfb_record_size;
 
 	error_def(ERR_SCNDDBNOUPD);
 	error_def(ERR_REPLINSTMISMTCH);
@@ -177,7 +178,23 @@ void	gvcst_put(mval *val)
 	jnl_format_done = FALSE;	/* do jnl_format() only once per logical transaction irrespective of number of retries */
 	do
 	{
+		if (jnl_format_done && !dollar_tlevel)
+		{	/* This is a case where we had done the journal buffer formatting for the SET logical record update but
+			 * ended up not doing the SET because of a preceding extra block split transaction (would have written an
+			 * INCTN journal record). In this case we should continue to keep the journal format buffer untouched
+			 * even though this is the beginning of a fresh non-tp transaction. But t_begin() does not know that and
+			 * unconditionally resets the buffer length to 0 so save that length before the call to t_begin and
+			 * restore it right after the call.
+			 */
+			jfb_record_size = non_tp_jfb_ptr->record_size;
+		}
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVPUTFAIL);
+		if (jnl_format_done && !dollar_tlevel)
+		{	/* Restore record size to what it was */
+			assert(0 == non_tp_jfb_ptr->record_size);
+			non_tp_jfb_ptr->record_size = jfb_record_size;
+			assert(((jrec_prefix *)non_tp_jfb_ptr->buff)->forwptr == non_tp_jfb_ptr->record_size);
+		}
 		while(!gvcst_put_blk(val, &extra_block_split_req))
 			;
 	}
@@ -307,7 +324,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 						tp_srch_status = tabent->value;
 					else
 						tp_srch_status = NULL;
-					cse = tp_srch_status ? tp_srch_status->ptr : NULL;
+					cse = tp_srch_status ? tp_srch_status->cse : NULL;
 				}
 				assert(!cse || !cse->high_tlevel);
 			}
@@ -379,7 +396,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			goto retry;
 		}
 		assert(bs1[0].len <= blk_reserved_size); /* Assert that new block has space for reserved bytes */
-		allocation_clue = cs_data->trans_hist.total_blks / 64 + 8; /* roger 19990607 - arbitrary & should be improved */
+        	allocation_clue = ALLOCATION_CLUE(cs_data->trans_hist.total_blks);
 		next_blk_index = t_create(allocation_clue, (uchar_ptr_t)new_blk_bs, 0, 0, 0);
 		++allocation_clue;
 		ins_chain_index = t_create(allocation_clue, (uchar_ptr_t)bs1, sizeof(blk_hdr) + sizeof(rec_hdr), next_blk_index, 1);
@@ -581,7 +598,15 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)next_rec_hdr, sizeof(rec_hdr));
 						next_rec_shrink += sizeof(rec_hdr);
 					}
-					BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + next_rec_shrink, n - next_rec_shrink);
+					if (n >= next_rec_shrink)
+					{
+						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + next_rec_shrink, n - next_rec_shrink);
+					} else
+					{
+						assert(CDB_STAGNATE > t_tries);
+						status = cdb_sc_mkblk;
+						goto retry;
+					}
 				}
 			} else
 			{
@@ -614,7 +639,6 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 			cse = t_write(bh, (unsigned char *)bs1, ins_chain_offset, ins_chain_index, bh->level,
 				FALSE, FALSE, GDS_WRITE_PLAIN);
 			assert(!dollar_tlevel || !cse->high_tlevel);
-			bh->ptr = cse;	/* used only in TP */
 			if ((0 != ins_chain_offset) && (NULL != cse) && (0 != cse->first_off))
 			{	/* formerly tp_offset_chain - inserts a new_entry in the chain */
 				assert(NULL != cse->new_buff || horiz_growth && cse->low_tlevel->new_buff &&
@@ -652,7 +676,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 						if (offset_sum >= (signed int)curr_rec_offset)
 							break;
 					}
-					/* store the next_off in old_cse before chainging it in the buffer (for rolling back) */
+					/* store the next_off in old_cse before changing it in the buffer (for rolling back) */
 					if (horiz_growth)
 					{
 						old_cse->undo_next_off[0] = curr_chain.next_off;
@@ -678,8 +702,55 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				       (delta + (sm_long_t)cur_blk_size - sizeof(off_chain)));
 			}
 			succeeded = TRUE;
-			if (level_0 && new_rec)
-				gv_target->hist.h[0].curr_rec.match = gv_target->clue.end + 1;	/* Update clue */
+			if (level_0)
+			{
+				if (new_rec)
+					gv_target->hist.h[0].curr_rec.match = gv_target->clue.end + 1;	/* Update clue */
+				/* -------------------------------------------------------------------------------------------------
+				 * We have to maintain information for future recomputation only if the following are satisfied
+				 *	1) The block is a leaf-level block
+				 *	2) We are in TP (indicated by non-null cse)
+				 *	3) The global has NOISOLATION turned ON
+				 *	4) The cw_set_element hasn't encountered a block-split or a kill
+				 *	5) We don't need an extra_block_split
+				 *
+				 * We can also add an optimization that only cse's of mode gds_t_write need to have such updations,
+				 *	but because of the belief that for a nonisolated variable, we will very rarely encounter a
+				 *	situation where a created block (in TP) will have some new keys added to it, and that adding
+				 *	the check slows down the normal code, we don't do that check here.
+				 * -------------------------------------------------------------------------------------------------
+				 */
+				if (cse && gv_target->noisolation && !cse->write_type && !*extra_block_split_req)
+				{
+					assert(dollar_tlevel);
+					if (is_dollar_incr)
+						rts_error(VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
+							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
+					if (NULL == cse->recompute_list_tail ||
+						0 != memcmp(gv_currkey->base, cse->recompute_list_tail->key.base,
+							gv_currkey->top))
+					{
+						tempkv = (key_cum_value *)get_new_element(sgm_info_ptr->recompute_list, 1);
+						tempkv->key = *gv_currkey;
+						tempkv->next = NULL;
+						memcpy(tempkv->key.base, gv_currkey->base, gv_currkey->end + 1);
+						if (NULL == cse->recompute_list_head)
+						{
+							assert(NULL == cse->recompute_list_tail);
+							cse->recompute_list_head = tempkv;
+						} else
+							cse->recompute_list_tail->next = tempkv;
+						cse->recompute_list_tail = tempkv;
+					} else
+						tempkv = cse->recompute_list_tail;
+					assert(0 == val->str.len
+						|| ((val->str.len == bs1[4].len)
+							&& 0 == memcmp(val->str.addr, bs1[4].addr, val->str.len)));
+					tempkv->value.len = val->str.len;	/* bs1[4].addr is undefined if val->str.len is 0 */
+					tempkv->value.addr = (char *)bs1[4].addr;/* 	but not used in that case, so ok */
+				}
+
+			}
 		} else
 		{	/* Block split required */
 			gv_target->clue.end = 0;	/* invalidate clue */
@@ -951,7 +1022,7 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 						tp_srch_status = tabent->value;
 					else
 						tp_srch_status = NULL;
-					cse = tp_srch_status ? tp_srch_status->ptr : NULL;
+					cse = tp_srch_status ? tp_srch_status->cse : NULL;
 				}
 				assert(!cse || !cse->high_tlevel);
 			        if ((NULL != cse) && (0 != cse->first_off))
@@ -1236,7 +1307,6 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 					assert(dollar_tlevel);
 					cse->write_type |= GDS_WRITE_BLOCK_SPLIT;
 				}
-				bh->ptr = cse;	/* used only in TP */
 				value.len = sizeof(block_id);
 				value.addr = (char *)&zeroes;
 				++bh;
@@ -1326,7 +1396,6 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 					t_write_root(ins_off2, ins_chain_index);
 				} else
 				{
-					bh->ptr = cse;
 					cse->write_type |= GDS_WRITE_BLOCK_SPLIT;
 					assert(NULL == cse->new_buff);
 					cse->first_off = 0;
@@ -1350,48 +1419,6 @@ static	boolean_t gvcst_put_blk(mval *val, boolean_t *extra_block_split_req)
 				}
 				succeeded = TRUE;
 			}
-		}
-		/* -----------------------------------------------------------------------------------------------------
-		 * We have to maintain information for future recomputation if and only if the following are satisfied
-		 *	1) The block is a leaf-level block
-		 *	2) We are in TP (indicated by non-null cse)
-		 *	3) The global has NOISOLATION turned ON
-		 *	4) The cw_set_element hasn't encountered a block-split or a kill
-		 *	5) We don't need an extra_block_split
-		 *
-		 * we can also add an optimization that only cse's of mode gds_t_write need to have such updations, but
-		 * 	because of the belief that for a nonisolated variable, we will very rarely encounter a
-		 *	situation where a created block (in TP) will have some new keys added to it, and that adding
-		 *	the check slows down the normal code, we don't do that check here.
-		 * -----------------------------------------------------------------------------------------------------
-		 */
-		if (level_0 && cse && gv_target->noisolation && !cse->write_type && !*extra_block_split_req)
-		{
-			assert(dollar_tlevel);
-			if (is_dollar_incr)
-				rts_error(VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
-					gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
-			if (NULL == cse->recompute_list_tail ||
-				0 != memcmp(gv_currkey->base, cse->recompute_list_tail->key.base,
-					gv_currkey->top))
-			{
-				tempkv = (key_cum_value *)get_new_element(sgm_info_ptr->recompute_list, 1);
-				tempkv->key = *gv_currkey;
-				tempkv->next = NULL;
-				memcpy(tempkv->key.base, gv_currkey->base, gv_currkey->end + 1);
-				if (NULL == cse->recompute_list_head)
-				{
-					assert(NULL == cse->recompute_list_tail);
-					cse->recompute_list_head = tempkv;
-				} else
-					cse->recompute_list_tail->next = tempkv;
-				cse->recompute_list_tail = tempkv;
-			} else
-				tempkv = cse->recompute_list_tail;
-			assert(0 == val->str.len
-				|| (val->str.len == bs1[4].len && 0 == memcmp(val->str.addr, bs1[4].addr, val->str.len)));
-			tempkv->value.len = val->str.len;		/* bs1[4].addr is undefined if val->str.len is 0 */
-			tempkv->value.addr = (char *)bs1[4].addr;	/* 	but not used in that case, so ok */
 		}
 	}
 	assert(succeeded);

@@ -68,9 +68,9 @@ GBLREF FILE		*gtmsource_log_fp;
 GBLREF int		gtmsource_statslog_fd;
 GBLREF FILE		*gtmsource_statslog_fp;
 
-repl_buff_t *repl_buff_create(int buffsize);
+repl_buff_t *repl_buff_create(uint4 buffsize);
 
-repl_buff_t *repl_buff_create(int buffsize)
+repl_buff_t *repl_buff_create(uint4 buffsize)
 {
 	repl_buff_t	*tmp_rb;
 	int		index;

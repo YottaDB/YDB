@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,7 @@ void op_newvar(uint4 arg1)
 	mvs_ntab_struct *ptab;
 	tp_frame	*tpp;
 	int		indx;
+	int4		shift_size;
 
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
@@ -108,7 +109,8 @@ void op_newvar(uint4 arg1)
 		*/
 		top = (unsigned char *)(fp + 1);
 		old_sp = msp;
-		msp -= mvs_size[MVST_NVAL];
+		shift_size = mvs_size[MVST_NVAL];
+		msp -= shift_size;
 	   	if (msp <= stackwarn)
 	   	{
 			if (msp <= stacktop)
@@ -121,33 +123,34 @@ void op_newvar(uint4 arg1)
 	   	}
 		/* Ready, set, shift the younger indirect frames to make room for mv_stent */
 		memmove(msp, old_sp, top - (unsigned char *)old_sp);
-		mv_st_ent = (mv_stent *)(top - mvs_size[MVST_NVAL]);
+		mv_st_ent = (mv_stent *)(top - shift_size);
 		mv_st_ent->mv_st_type = MVST_NVAL;
-		frame_pointer = (stack_frame *)((char *)frame_pointer - mvs_size[MVST_NVAL]);
+		ADJUST_FRAME_POINTER(frame_pointer, shift_size);
 		/* adjust all the pointers in all the stackframes that were moved */
 		for (fp_fix = frame_pointer;  fp_fix != fp_prev;  fp_fix = fp_fix->old_frame_pointer)
 		{
 			if ((unsigned char *)fp_fix->l_symtab < top && (unsigned char *)fp_fix->l_symtab > stacktop)
-				fp_fix->l_symtab = (mval **)((char *)fp_fix->l_symtab - mvs_size[MVST_NVAL]);
+				fp_fix->l_symtab = (mval **)((char *)fp_fix->l_symtab - shift_size);
 			if (fp_fix->temps_ptr < top && fp_fix->temps_ptr > stacktop)
-				fp_fix->temps_ptr -= mvs_size[MVST_NVAL];
+				fp_fix->temps_ptr -= shift_size;
 			if (fp_fix->vartab_ptr < (char *)top && fp_fix->vartab_ptr > (char *)stacktop)
-				fp_fix->vartab_ptr -= mvs_size[MVST_NVAL];
+				fp_fix->vartab_ptr -= shift_size;
 			if ((unsigned char *)fp_fix->old_frame_pointer < top && (char *)fp_fix->old_frame_pointer
 				> (char *)stacktop)
-				fp_fix->old_frame_pointer =
-					(stack_frame *)((char *)fp_fix->old_frame_pointer - mvs_size[MVST_NVAL]);
+			{
+				ADJUST_FRAME_POINTER(fp_fix->old_frame_pointer, shift_size);
+			}
 		}
 		/* Adjust stackframe and mvstent pointers in relevant tp_frame blocks */
 		assert((NULL == tp_pointer && 0 == dollar_tlevel) || (NULL != tp_pointer && 0 != dollar_tlevel));
 		for (tpp = tp_pointer; (tpp && ((unsigned char *)tpp->fp < top)); tpp = tpp->old_tp_frame)
 		{
 			if ((unsigned char *)tpp->fp > stacktop)
-				tpp->fp = (struct stack_frame_struct *)((char *)tpp->fp - mvs_size[MVST_NVAL]);
+				tpp->fp = (struct stack_frame_struct *)((char *)tpp->fp - shift_size);
 			/* Note low check for < top may be superfluous here but without a test case to verify, I
 			   feel better leaving it in. SE 8/2001 */
 			if ((unsigned char *)tpp->mvc < top && (unsigned char *)tpp->mvc > stacktop)
-				tpp->mvc = (struct mv_stent_struct *)((char *)tpp->mvc - mvs_size[MVST_NVAL]);
+				tpp->mvc = (struct mv_stent_struct *)((char *)tpp->mvc - shift_size);
 		}
 		/* Put new mvstent entry on (into) the mvstent chain */
 		if ((unsigned char *)mv_chain >= top)
@@ -158,8 +161,8 @@ void op_newvar(uint4 arg1)
 		{	/* One of the indirect frames has mv_stents associated with it so we have to find
 			   the appropriate insertion point for this frame.
 			*/
-			fp = (stack_frame *)((char *)fp - mvs_size[MVST_NVAL]);
-			mv_chain = (mv_stent *)((char *)mv_chain - mvs_size[MVST_NVAL]);
+			fp = (stack_frame *)((char *)fp - shift_size);
+			mv_chain = (mv_stent *)((char *)mv_chain - shift_size);
 			mvst_tmp = mv_chain;
 			mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			while (mvst_prev < (mv_stent *)fp)
@@ -168,7 +171,7 @@ void op_newvar(uint4 arg1)
 				mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			}
 			mvst_tmp->mv_st_next = (unsigned int)((char *)mv_st_ent - (char *)mvst_tmp);
-			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_NVAL]);
+			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + shift_size);
 		}
 		new = mv_st_ent->mv_st_cont.mvs_nval.mvs_val = lv_getslot(curr_symval);
 		ptab = &mv_st_ent->mv_st_cont.mvs_nval.mvs_ptab;

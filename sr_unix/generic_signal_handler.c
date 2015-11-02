@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,8 @@
 #include "gtmmsg.h"
 #include "have_crit.h"
 
+#define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state) &&			\
+	(exit_handler_active || !OK_TO_INTERRUPT))
 /* These fields are defined as globals not because they are used globally but
  * so they will be easily retrievable even in 'pro' cores.
  */
@@ -59,6 +61,8 @@ GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		gtm_quiet_halt;
+GBLREF	int			process_exiting;
+GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
@@ -128,8 +132,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			 * invoke shutdown. wcs_wtstart() manipulates the active queue that a concurrent process in crit
 			 * in bt_put() might be waiting for. interrupting it can cause deadlocks (see C9C11-002178).
 			 */
-			if (EXIT_PENDING_TOLERANT >= exit_state
-					&& (0 != have_crit(CRIT_HAVE_ANY_REG | HAVE_CRIT_IN_WTSTART) || exit_handler_active))
+			if (DEFER_EXIT_PROCESSING)
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -169,8 +172,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					GTMASSERT;
 			}
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state
-				&& (0 != have_crit(CRIT_HAVE_ANY_REG | HAVE_CRIT_IN_WTSTART) || exit_handler_active))
+			if (DEFER_EXIT_PROCESSING)
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -214,8 +216,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		case SIGDANGER:
 			forced_exit_err = ERR_KRNLKILL;
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (EXIT_PENDING_TOLERANT >= exit_state
-				&& (0 != have_crit(CRIT_HAVE_ANY_REG | HAVE_CRIT_IN_WTSTART) || exit_handler_active))
+			if (DEFER_EXIT_PROCESSING)
 			{
 				forced_exit = TRUE;
 				exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -241,9 +242,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					/* This signal was SENT to us so it can wait until we are out of crit to cause an exit */
 					forced_exit_err = ERR_KILLBYSIGUINFO;
 					/* If nothing pending AND we have crit or already exiting, wait to invoke shutdown */
-					if (EXIT_PENDING_TOLERANT >= exit_state
-						&& (0 != have_crit(CRIT_HAVE_ANY_REG | HAVE_CRIT_IN_WTSTART)
-											|| exit_handler_active))
+					if (DEFER_EXIT_PROCESSING)
 					{
 						assert(GTMSECSHR_IMAGE != image_type);
 						forced_exit = TRUE;
@@ -290,6 +289,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			}
 			break;
 	} /* switch (sig) */
+	process_exiting = TRUE;	/* set this BEFORE cancelling timers as wcs_phase2_commit_wait relies on this */
 	cancel_timer(0);	/* Don't want any interruptions */
 	fflush(stdout);
 	if (!dont_want_core)
@@ -298,7 +298,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		gtm_fork_n_core();
 	}
 	/* As on VMS, a mupip stop does not drive the condition handlers unless we are in crit */
-	if ((0 != have_crit(CRIT_HAVE_ANY_REG) || SIGTERM != exi_condition) && CHANDLER_EXISTS)
+	if ((0 != have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT) || SIGTERM != exi_condition) && CHANDLER_EXISTS)
 		DRIVECH(exi_condition);
 	/* If a special routine was registered to be driven on a signal, drive it now */
 	if (0 != exi_condition && call_on_signal)

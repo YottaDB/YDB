@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +56,7 @@
 #define WARN_STATUS(jctl)									\
 if (SS_NORMAL != jctl->status)									\
 {												\
+	assert(FALSE);										\
 	if (SS_NORMAL != jctl->status2)								\
 		gtm_putmsg(VARLSTCNT1(6) ERR_JNLWRERR, 2, jctl->jnl_fn_len, jctl->jnl_fn,	\
 			jctl->status, PUT_SYS_ERRNO(jctl->status2));				\

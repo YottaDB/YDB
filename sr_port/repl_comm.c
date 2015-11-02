@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,9 @@
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stat.h"
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+#include <sys/poll.h>
+#endif
 
 #include "repl_msg.h"
 #include "repl_errno.h"
@@ -80,6 +83,11 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 	long		wait_val;
 	fd_set		output_fds;
         struct timeval	timeout;
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+	long		poll_timeout;
+	unsigned long	poll_nfds;
+	struct pollfd	poll_fdlist[1];
+#endif
 
 	send_size = *send_len;
 	/* VMS returns SYSTEM-F-INVBUFLEN if send_size is larger than the hard limit VMS_MAX_TCP_SEND_SIZE (64K - 1 on some
@@ -94,12 +102,23 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 		assert(max_pipe_ready_wait->tv_sec  == 0); /* all callers pass sub-second timeout. We take advantage of this fact
 							    * to avoid division while computing wait_val */
 		assert(max_pipe_ready_wait->tv_usec >= 0 && max_pipe_ready_wait->tv_usec < MICROSEC_IN_SEC);
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 		FD_ZERO(&output_fds);
 		FD_SET(sock_fd, &output_fds);
+#else
+        	poll_fdlist[0].fd = sock_fd;
+        	poll_fdlist[0].events = POLLOUT;
+        	poll_nfds = 1;
+        	poll_timeout = max_pipe_ready_wait->tv_usec / 1000;   /* convert to millisecs */
+#endif
 		/* the check for EINTR below is valid and should not be converted to an EINTR wrapper macro, because EAGAIN is also
 		 * being checked */
 		for (timeout = *max_pipe_ready_wait, eintr_cnt = eagain_cnt = 0;
-		     -1 == (status = select(sock_fd + 1, NULL, &output_fds, NULL, &timeout))
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+			-1 == (status = select(sock_fd + 1, NULL, &output_fds, NULL, &timeout))
+#else
+        		-1 == (status = poll(&poll_fdlist[0], poll_nfds, poll_timeout))
+#endif
 		     && (EINTR == errno || EAGAIN == errno); )
 		{
 			if (EINTR == errno)
@@ -113,6 +132,9 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 				}
 				timeout.tv_sec  = 0;
 				timeout.tv_usec = wait_val;
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+				poll_timeout = wait_val / 1000;		/* convert to millisecs */
+#endif
 				REPL_DPRINT5("repl_send: select interrupted, changing timeout from tv_sec %ld tv_usec %ld to "
 						"tv_sec %ld tv_usec %ld\n", 0, (wait_val << 1), timeout.tv_sec, timeout.tv_usec);
 			} else
@@ -123,7 +145,9 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, boolean_t skip_pi
 						 "resource starved; EAGAIN returned from repl_send/select %d times\n", eagain_cnt);
 				rel_quant();
 			}
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 			FD_SET(sock_fd, &output_fds);	/* Linux/gcc does not like this in the iterator */
+#endif
 		}
 	} else
 		status = 1; /* assume connection pipe is ready for sending */
@@ -185,6 +209,11 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 	long		wait_val;
 	fd_set		input_fds;
         struct timeval	timeout;
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+	long		poll_timeout;
+	unsigned long	poll_nfds;
+	struct pollfd	poll_fdlist[1];
+#endif
 
 	assert(-1 != sock_fd);
 	max_recv_len = *recv_len;
@@ -200,12 +229,23 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 		assert(max_data_avail_wait->tv_sec  == 0); /* all callers pass sub-second timeout. We take advantage of this fact
 							    * to avoid division while computing wait_val */
 		assert(max_data_avail_wait->tv_usec >= 0 && max_data_avail_wait->tv_usec < MICROSEC_IN_SEC);
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 		FD_ZERO(&input_fds);
 		FD_SET(sock_fd, &input_fds);
+#else
+        	poll_fdlist[0].fd = sock_fd;
+        	poll_fdlist[0].events = POLLIN;
+        	poll_nfds = 1;
+        	poll_timeout = max_data_avail_wait->tv_usec / 1000;   /* convert to millisecs */
+#endif
 		/* the check for EINTR below is valid and should not be converted to an EINTR wrapper macro, because EAGAIN is also
 		 * being checked */
 		for (timeout = *max_data_avail_wait, eintr_cnt = eagain_cnt = 0;
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 		     -1 == (status = select(sock_fd + 1, &input_fds, NULL, NULL, &timeout))
+#else
+        		-1 == (status = poll(&poll_fdlist[0], poll_nfds, poll_timeout))
+#endif
 		     && (EINTR == errno || EAGAIN == errno); )
 		{
 			if (EINTR == errno)
@@ -219,6 +259,9 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 				}
 				timeout.tv_sec  = 0;
 				timeout.tv_usec = wait_val;
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+				poll_timeout = wait_val / 1000;		/* convert to millisecs */
+#endif
 				REPL_DPRINT5("repl_recv: select interrupted, changing timeout from tv_sec %ld tv_usec %ld to "
 						"tv_sec %ld tv_usec %ld\n", 0, (wait_val << 1), timeout.tv_sec, timeout.tv_usec);
 			} else
@@ -229,7 +272,9 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, boolean_t skip_da
 							"resource starved; EAGAIN returned from select %d times\n", eagain_cnt);
 				rel_quant();
 			}
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 			FD_SET(sock_fd, &input_fds);	/* Linux/gcc does not like this in the iterator */
+#endif
 		}
 	} else
 		status = 1; /* assume data is available, consequence is recv() may block if data is not available */

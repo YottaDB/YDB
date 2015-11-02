@@ -60,22 +60,29 @@ CONDITION_HANDLER(t_ch)
 			}
 		}
 	)
+	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+	{	/* We dont know how it is possible to have a success or info type severity message show up while we are in
+		 * the middle of a transaction commit. In any case, return right away instead of invoking t_commit_cleanup.
+		 * The issue with invoking that is that it would complete the transaction and release crit but the NEXTCH
+		 * call at the end of this condition handler would invoke the next level condition handler which could
+		 * decide the message is innocuous and therefore decide to return control to where the error was signalled
+		 * in the first place (in the midst of database commit) which can cause database damage since we no longer
+		 * hold crit.
+		 */
+		assert(FALSE);
+		CONTINUE;
+	}
 	ENABLE_AST;
-	/* We could go through all regions involved in the TP and check for crit on only those regions - instead we use an existing
-	 * function: have_crit().  If the design assumption that all crits held at transaction commit time are
+	/* We could go through all regions involved in the TP and check for crit on only those regions - instead we use an
+	 * existing function "have_crit".  If the design assumption that all crits held at transaction commit time are
 	 * transaction related holds true, the result is the same and efficiency doesn't matter (too much) in exception handling.
 	 */
-	if ((!dollar_tlevel && cs_addrs->now_crit) || (dollar_tlevel && 0 != have_crit(CRIT_HAVE_ANY_REG)))
+	if ((!dollar_tlevel && T_IN_CRIT_OR_COMMIT(cs_addrs))
+		|| (dollar_tlevel && (0 != have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT))))
 	{
 		retvalue = t_commit_cleanup(cdb_sc_uperr, SIGNAL); /* if return value is TRUE, it means transaction commit has */
-		assert(!retvalue); 				   /* started in which case we should not have come to t_ch()  */
+		assert(!retvalue || DUMPABLE); 			   /* started in which case we should not have come to t_ch()  */
 								   /* instead t_end/tp_tend would have called t_commit_cleanup */
 	}
-	VMS_ONLY(
-		if (SEVERITY == INFO)	/* this turns the info messages from cert_blk into fatals because other approaches */
-		{			/* to that problem seem to get tangled in the vms condition handler system */
-			TERMINATE;
-		}
-	)
 	NEXTCH;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc.*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -649,29 +649,70 @@ LITREF signed int 	utf8_followlen[];
 #define U_ISGRAPH(c)	u_isgraph(c)
 #define U_ISPRINT(c)	GTM_U_ISPRINT(c) /* see macro definition for why redirection needed */
 #define U_ISTITLE(c)	u_istitle(c)
+#define U_CHARTYPE(c)	u_charType(c)
 
 /* uint4	CTYPEMASK(wint_t c)
- * Returns a patcode from a code point (wide character wint_t) using libc classification.
- * Note that, as per UNIX locale documentation, these 5 character classes are mutually exclusive,
- * so we don't need to check for all classes. This macro assumes that "c" is a valid unicode codepoint.
  *
- * Note also that the ISV $ZPATN[UMERIC] dictates how the pattern class N used in the pattern match operator is interpreted.
- * If $ZPATNUMERIC is "UTF-8", the pattern class N matches any numeric character as defined by the Unicode standard.
+ * This macro assumes that "c" is a valid unicode codepoint.
+ *
+ * Returns a patcode from a code point (wide character wint_t) paralleling the way ICU library functions classify codepoints.
+ * 	u_isalpha (for A)
+ * 	u_isdigit (for N)
+ * 	u_ispunct (for P)
+ * 	u_iscntrl (for C)
+ * But with the following adjustments.
+ *	1) If $ZPATNUMERIC is not "UTF-8", non-ASCII decimal digits are classified as A.
+ *	2) Non-decimal digits (Nl and No) are classified as A. Note: u_isdigit only matches decimal digits.
+ *	3) Anything left is classified via u_isprint into either P or C. Note: u_isprint only matches non-control characters.
+ * Note that the ISV $ZPATN[UMERIC] dictates how the pattern class N used in the pattern match operator is interpreted.
+ * If $ZPATNUMERIC is "UTF-8", the pattern class N matches any decimal numeric character as defined by the Unicode standard.
  * If $ZPATNUMERIC is "M", GT.M restricts the pattern class N to match only ASCII digits 0-9 (i.e. ASCII 48-57).
  * The variable "utf8_patnumeric" is TRUE if $ZPATNUMERIC is "UTF-8".
+ *
+ * The above rules result in the following mapping
+ *      --------------------------------------------------
+ *      Unicode general category       GT.M patcode class
+ *      --------------------------------------------------
+ *	L* (all letters)	    -> A
+ *	M* (all marks)		    -> P
+ *	Nd (decimal numbers)	    -> N (if decimal digit is ASCII or $ZPATNUMERIC is "UTF-8", otherwise -> A)
+ *	Nl (letter numbers)	    -> A (examples of Nl are Roman numerals)
+ *	No (other numbers)	    -> A (examples of No are fractions)
+ *	P* (all punctuation)	    -> P
+ *	S* (all symbols)	    -> P
+ *	Zs (spaces)		    -> P
+ *	Zl (line separators)	    -> C
+ *	Zp (paragraph separators)   -> C
+ *	C* (all control codepoints) -> C
+ *
+ * For a description of the Unicode general categories see http://unicode.org/versions/Unicode4.0.0/ch04.pdf (section 4.5)
+ *
+ * E = A + P + N + C and the classifications A, P, N, and C are mutually exclusive.
+ *
+ * This means that PATM_UTF8_NONBASIC does not currently have any codepoints mapped to it.
+ * It is being retained in case it is needed in the future.
  */
+
+/* our mask to map non-decimal digits into the PATM_A  */
+#define GTM_NA_MASK (U_GC_NL_MASK | U_GC_NO_MASK)
+
 #define	CTYPEMASK(c)														\
 	(U_ISALPHA(c) ?						/* alphabet */							\
 		(U_ISLOWER(c) ? PATM_L				/* lower-case */						\
 			: (U_ISUPPER(c) ? PATM_U		/* upper-case */						\
 				: PATM_UTF8_ALPHABET))		/* unicode alphabet that is neither lower nor upper case */	\
-		: (U_ISDIGIT(c)					/* ascii or non-ascii number */					\
+		: (U_ISDIGIT(c)					/* ascii or non-ascii decimal digit */				\
 			? ((utf8_patnumeric || IS_ASCII(c))	/* check $ZPATNUMERIC setting */				\
 				? PATM_N			/* Ascii digit OR $ZPATNUMERIC set to "UTF-8" */		\
-				: PATM_UTF8_NONBASIC)		/* $ZPATNUMERIC set to "M" and non-ascii digit */		\
-			: (U_ISPUNCT(c) ? PATM_P		/* punctuation */						\
-				: (U_ISCNTRL(c) ? PATM_C	/* control */							\
-					: PATM_UTF8_NONBASIC))))/* unicode character that is not part of any basic class */
+				: PATM_UTF8_ALPHABET)		/* $ZPATNUMERIC set to "M" and non-ascii decimal digit */	\
+			: ((U_MASK(U_CHARTYPE(c)) & GTM_NA_MASK)/* put non-decimal digits in  */				\
+				? PATM_UTF8_ALPHABET 		/* PATM_UTF8_ALPHABET */					\
+				: (U_ISPUNCT(c) ? PATM_P	/* punctuation */						\
+					:(U_ISCNTRL(c) ? PATM_C /* control */							\
+								/* unicode character that is not part of any basic class */	\
+						:(U_ISPRINT(c) 		/* if printable  */					\
+							? PATM_P	/* punctuation */					\
+							: PATM_C))))))	/* otherwise, control */
 
 /* uint4	TYPEMASK(char *ptr, char *ptrend, char *ptrnext, wint_t codepoint)
  * Inspects bytes of a character (in UTF-8 format) starting at "ptr" upto "ptrend", and returns its patcode.

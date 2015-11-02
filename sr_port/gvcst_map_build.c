@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,20 +29,33 @@ GBLREF	boolean_t	dse_running;
 
 void gvcst_map_build(uint4 *array, sm_uc_ptr_t base_addr, cw_set_element *cs, trans_num ctn)
 {
-	boolean_t	busy, status;
-	block_id	blkid, bmpblkid;
-	uint4		ret, (*bml_func)();
+	boolean_t	status;
+	uint4		(*bml_func)();
+	uint4		bitnum, ret;
+#ifdef DEBUG
+	int4		prev_bitnum, actual_cnt = 0;
+#endif
 
-	bmpblkid = cs->blk;
-	DEBUG_ONLY(VALIDATE_BM_BLK(bmpblkid, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);)
+	DEBUG_ONLY(VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);)
 	assert(status); /* assert it is a valid bitmap block */
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	base_addr += sizeof(blk_hdr);
-	bml_func = (busy = (cs->reference_cnt > 0)) ? bml_busy : (cs_addrs->hdr->db_got_to_v5_once ? bml_recycled : bml_free);
-	while (blkid = *array)
+	bml_func = (cs->reference_cnt > 0) ? bml_busy : (cs_addrs->hdr->db_got_to_v5_once ? bml_recycled : bml_free);
+	DEBUG_ONLY(prev_bitnum = -1;)
+	while (bitnum = *array)		/* caution : intended assignment */
 	{
-		if (0 == (ret = (* bml_func)((blkid - bmpblkid), base_addr)))
-			cs->reference_cnt--;
+		assert((uint4)bitnum < cs_addrs->hdr->bplmap);	/* check that bitnum is positive and within 0 to bplmap */
+		assert((int4)bitnum > prev_bitnum);	/* assert that blocks are sorted in the update array */
+		ret = (* bml_func)(bitnum, base_addr);
+		DEBUG_ONLY(
+			if (cs->reference_cnt > 0)
+				actual_cnt++;	/* block is being marked busy */
+			else if (!ret)
+				actual_cnt--;	/* block is transitioning from BUSY to either RECYCLED or FREE */
+			/* all other state changes do not involve updates to the free_blocks count */
+		)
 		array++;
+		DEBUG_ONLY(prev_bitnum = (int4)bitnum);
 	}
+	assert(actual_cnt == cs->reference_cnt);
 }

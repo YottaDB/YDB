@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,19 +89,22 @@ static dyn_modes our_modes[2] =
    mechanism to do this
 */
 
+static char dyn_modes_type[2][3] = {
+					{'C','A','A'},
+					{'A','C','A'}
+};
+
 void dmode_table_init()
 {
-	/* Note that we assume the order of the function pointers. If the above our_modes table initialization
-	 * changes, this also needs to be revisited
-	 */
+	/*
+	our_modes[0].func_ptr1 = (void (*)())CODE_ADDRESS(our_modes[0].func_ptr1);
+	our_modes[0].func_ptr2 = (void (*)())CODE_ADDRESS(our_modes[0].func_ptr2);
+	our_modes[0].func_ptr3 = (int (*)())CODE_ADDRESS(our_modes[0].func_ptr3);
 
-	our_modes[0].func_ptr1 = (void (*)())CODE_ADDRESS_C(our_modes[0].func_ptr1);
-	our_modes[0].func_ptr2 = (void (*)())CODE_ADDRESS_ASM(our_modes[0].func_ptr2);
-	our_modes[0].func_ptr3 = (int (*)())CODE_ADDRESS_ASM(our_modes[0].func_ptr3);
-
-	our_modes[1].func_ptr1 = (void (*)())CODE_ADDRESS_ASM(our_modes[1].func_ptr1);
-	our_modes[1].func_ptr2 = (void (*)())CODE_ADDRESS_C(our_modes[1].func_ptr2);
-	our_modes[1].func_ptr3 = (int (*)())CODE_ADDRESS_ASM(our_modes[1].func_ptr3);
+	our_modes[1].func_ptr1 = (void (*)())CODE_ADDRESS(our_modes[1].func_ptr1);
+	our_modes[1].func_ptr2 = (void (*)())CODE_ADDRESS(our_modes[1].func_ptr2);
+	our_modes[1].func_ptr3 = (int (*)())CODE_ADDRESS(our_modes[1].func_ptr3);
+	*/
 }
 
 #endif /* __ia64 */
@@ -147,7 +150,17 @@ rhdtyp *make_mode (int mode_index)
 	NON_X86_64_ONLY(code = (unsigned int *)base_address->ptext_adr;)	/* start of executable code */
 	X86_64_ONLY(code = (char *)base_address->ptext_adr;)	/* start of executable code */
 #endif /* __ia64 */
+#ifdef __ia64
+	if (dyn_modes_type[mode_index][0] == 'C')
+	{
+		GEN_CALL_C(CODE_ADDRESS(dmode->func_ptr1))		/* line 0,1 */
+	} else
+	{
+		GEN_CALL_ASM(CODE_ADDRESS(dmode->func_ptr1))		/* line 0,1 */
+	}
+#else
 	GEN_CALL(dmode->func_ptr1);			/* line 0,1 */
+#endif /* __ia64 */
 
 #ifdef _AIX
 	if (CI_MODE == mode_index)
@@ -162,7 +175,18 @@ rhdtyp *make_mode (int mode_index)
 		*code++ = RS6000_INS_BRL;
 	}
 #endif
-	GEN_CALL(dmode->func_ptr2);
+
+#ifdef __ia64
+        if (dyn_modes_type[mode_index][1] == 'C')
+	{
+                GEN_CALL_C(CODE_ADDRESS(dmode->func_ptr2))
+	} else
+	{
+                GEN_CALL_ASM(CODE_ADDRESS(dmode->func_ptr2))
+	}
+#else
+        GEN_CALL(dmode->func_ptr2);
+#endif /* __ia64 */
 
 #if defined (__ia64)
 	if (DM_MODE == mode_index)
@@ -176,7 +200,18 @@ rhdtyp *make_mode (int mode_index)
 		*code++ = HPPA_INS_NOP;
 	}
 #endif /* __ia64 */
-	GEN_CALL(dmode->func_ptr3);						/* line 2 */
+
+#ifdef __ia64
+        if (dyn_modes_type[mode_index][2] == 'C')
+	{
+                GEN_CALL_C(CODE_ADDRESS(dmode->func_ptr3));  	/* line 2 */
+	} else
+	{
+                GEN_CALL_ASM(CODE_ADDRESS(dmode->func_ptr3));  /* line 2 */
+	}
+#else
+        GEN_CALL(dmode->func_ptr3); 			/* line 2 */
+#endif /* __ia64 */
 
 	lnr = LNRTAB_ADR(base_address);
 	*lnr++ = 0;								/* line 0 */

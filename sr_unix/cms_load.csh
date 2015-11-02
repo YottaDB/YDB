@@ -154,7 +154,7 @@ set gtm_s_osf1    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_g
 set gtm_s_hpux    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hppa     sr_hpux "
 set gtm_s_linux   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux"
 set gtm_s_linux64 = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_x86_regs sr_x86_64  sr_linux"
-set gtm_s_sunos   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_sparc  sr_sun  "
+set gtm_s_sunos   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_sparc  sr_sun  "
 set gtm_s_os390   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_s390   sr_os390"
 set gtm_s_l390    = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_l390   sr_linux"
 set gtm_s_hpia    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hpux   sr_ia64 "
@@ -183,9 +183,6 @@ if ( "x86_64" == $mach_type && "linux" == $platform_library ) then
 	else
 		set platform_library = "linux64"
 	endif
-endif
-if ( $platform_library =~ "cygwin*" ) then
-	set platform_library = "linux"
 endif
 ########### Copy sources from platform-specific directories into appropriate version-subdirectories ############
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,3 +38,4 @@ ICU_DEF(ucnv_getMaxCharSize)
 ICU_DEF(ucnv_getMinCharSize)
 ICU_DEF(ucnv_setToUCallBack)
 ICU_DEF(ucnv_getName)
+ICU_DEF(u_charType)

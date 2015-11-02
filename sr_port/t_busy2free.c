@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,5 +58,6 @@ void	t_busy2free(srch_blk_status *blkhist)
 	cse->upd_addr = NULL;
 	cse->jnl_freeaddr = 0;		/* reset jnl_freeaddr that previous transaction might have filled in */
 	cse->done = FALSE;
+	blkhist->cse = cse;	/* indicate to t_end/tp_tend that this block is part of the write-set */
 	cw_set_depth++;
 }

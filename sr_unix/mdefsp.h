@@ -1,12 +1,12 @@
 /****************************************************************
- *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
- *								*
- *	This source code contains the intellectual property	*
- *	of its copyright holder(s), and is made available	*
- *	under a license.  If you do not know the terms of	*
- *	the license, please stop and do not read further.	*
- *								*
+ *                                                              *
+ *    Copyright 2001, 2008 Fidelity Information Services, Inc   *
+ *                                                              *
+ *    This source code contains the intellectual property       *
+ *    of its copyright holder(s), and is made available         *
+ *    under a license.  If you do not know the terms of         *
+ *    the license, please stop and do not read further.         *
+ *                                                              *
  ****************************************************************/
 
 #ifndef MDESP_included
@@ -14,21 +14,21 @@
 
 #include <sys/types.h>
 
-#if defined(__ia64) || defined(__x86_64__)
+#if defined(__ia64) || defined(__x86_64__) || defined(__sparc)
 #define GTM64
 #endif /* __ia64 */
 
 #ifdef GTM64
-typedef          int    int4;           /* 4-byte signed integer */
-typedef unsigned int    uint4;          /* 4-byte unsigned integer */
-typedef          long   int8;           /* 8-byte signed integer */
-typedef unsigned long   uint8;          /* 8-byte unsigned integer */
-typedef unsigned long 	gtm_uint8;     /*these two datatypes are defined because */
-typedef		 long   gtm_int8;	/*int8 and uint8 are system defined in AIX_64*/
+typedef	int	int4;		/* 4-byte signed integer */
+typedef unsigned int	uint4;	  /* 4-byte unsigned integer */
+typedef	long	int8;		/* 8-byte signed integer */
+typedef unsigned long	uint8;	  /* 8-byte unsigned integer */
+typedef unsigned long 	gtm_uint8;	/*these two datatypes are defined because */
+typedef		 long	gtm_int8;	/*int8 and uint8 are system defined in AIX_64*/
 #define INT8_NATIVE
 #else
-typedef          long   int4;
-typedef unsigned long   uint4;
+typedef	long	int4;
+typedef unsigned long	uint4;
 #endif /* GTM64 */
 
 #ifdef __s390__
@@ -44,7 +44,7 @@ typedef uint4 mach_inst;
 #define UNICODE_SUPPORTED
 
 /* Starting off life as debugging parms and now we need them for the
-   short term so define them here */
+	short term so define them here */
 #define DEBUG_LEAVE_SM
 #define DEBUG_NOMSYNC
 
@@ -69,9 +69,10 @@ error_def(ERR_ASSERT);
 /* #define memcmp(DST,SRC,LEN) memucmp(DST,SRC,LEN) */
 
 #ifdef __sparc
-#define CACHELINE_SIZE        256
-#define MSYNC_ADDR_INCS        OS_PAGE_SIZE
-
+#define CACHELINE_SIZE	256
+#define MSYNC_ADDR_INCS	OS_PAGE_SIZE
+#define USHBIN_SUPPORTED
+#define LINKAGE_PSECT_BOUNDARY	8
 #define OFF_T_LONG
 #define INO_T_LONG
 #define MUTEX_MSEM_WAKE
@@ -80,6 +81,7 @@ error_def(ERR_ASSERT);
 #define sssize_t ssize_t
 #undef SHMDT
 #define SHMDT(X) shmdt((char *)(X))
+typedef uint4 mach_inst;
 
 /* Use rc_mval2subsc only for sun until every DTM client (that needs 16-bit precision as opposed to 18-bit for GT.M) is gone */
 #define	mval2subsc	rc_mval2subsc
@@ -89,13 +91,13 @@ error_def(ERR_ASSERT);
 #endif /* __sparc */
 
 #if defined(__ia64)
-#define CACHELINE_SIZE        128
+#define CACHELINE_SIZE	128
 #elif defined(__hppa)
-#define CACHELINE_SIZE        64
+#define CACHELINE_SIZE	64
 #endif /* __ia64 */
 
 #ifdef __hpux
-#define MSYNC_ADDR_INCS        OS_PAGE_SIZE
+#define MSYNC_ADDR_INCS	OS_PAGE_SIZE
 #define MUTEX_MSEM_WAKE
 #define POSIX_MSEM
 #define USHBIN_SUPPORTED
@@ -121,12 +123,12 @@ typedef unsigned short	in_port_t;
 #ifndef Linux390
 #define Linux390
 #endif
-#define INO_T_LONG			    /* see gdsfhead.h, actually for dev_t == 8 on Linux390 2.2.15 */
+#define INO_T_LONG				/* see gdsfhead.h, actually for dev_t == 8 on Linux390 2.2.15 */
 #endif /* __s390__ */
 #endif /* __linux__ */
 
 #ifdef __linux__
-#define SYS_ERRLIST_INCLUDE   "gtm_stdio.h"
+#define SYS_ERRLIST_INCLUDE	"gtm_stdio.h"
 #define MUTEX_MSEM_WAKE
 #define POSIX_MSEM
 #endif
@@ -135,12 +137,12 @@ typedef unsigned short	in_port_t;
 #ifdef UNICODE_SUPPORTED_OBEYED
 #undef UNICODE_SUPPORTED
 #endif
-#define KEY_T_LONG                    /* 8 bytes */
-#define SYS_ERRLIST_INCLUDE   <errno.h>
+#define KEY_T_LONG			/* 8 bytes */
+#define SYS_ERRLIST_INCLUDE	<errno.h>
 #endif
 
 #ifdef __s390__
-#define CACHELINE_SIZE        256
+#define CACHELINE_SIZE	256
 /* typedef struct {
 	unsigned char	*code_address;
 	unsigned char	*toc;
@@ -157,12 +159,12 @@ typedef unsigned short	in_port_t;
 
 #ifdef __ia64
 #  ifdef __linux__
-#    define MSYNC_ADDR_INCS        OS_PAGE_SIZE
-#    undef BIGENDIAN
+#    define MSYNC_ADDR_INCS	OS_PAGE_SIZE
+#  undef BIGENDIAN
 #    define USHBIN_SUPPORTED
-     /* Make sure linkage Psect is aligned on appropriate boundary. */
+	/* Make sure linkage Psect is aligned on appropriate boundary. */
 #    define LINKAGE_PSECT_BOUNDARY  8
-typedef uint4 mach_inst;        /* machine instruction */
+typedef uint4 mach_inst;	/* machine instruction */
 #  elif defined(__hpux)
 void call_runtime();
 void opp_dmode();
@@ -172,26 +174,26 @@ void dyncall();
 
 #ifdef __i386
 /* Through Pentium Pro/II/III, should use CPUID to get real value perhaps */
-#define CACHELINE_SIZE        32
-#define MSYNC_ADDR_INCS        OS_PAGE_SIZE
+#define CACHELINE_SIZE	32
+#define MSYNC_ADDR_INCS	OS_PAGE_SIZE
 #undef BIGENDIAN
 #endif /* __i386 */
 
 #ifdef __x86_64__
-#define CACHELINE_SIZE        64
-#define MSYNC_ADDR_INCS        OS_PAGE_SIZE
+#define CACHELINE_SIZE	64
+#define MSYNC_ADDR_INCS	OS_PAGE_SIZE
 #define USHBIN_SUPPORTED
 #define INO_T_LONG
 /*
 #define MUTEX_MSEM_WAKE
 #define POSIX_MSEM
-> */
-#    define LINKAGE_PSECT_BOUNDARY  8
+*/
+#define LINKAGE_PSECT_BOUNDARY  8
 #undef BIGENDIAN
-typedef char  mach_inst;        /* machine instruction */
+typedef char  mach_inst;	/* machine instruction */
 #endif
 
-#define INTERLOCK_ADD(X,Y,Z)    (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
+#define INTERLOCK_ADD(X,Y,Z)	(add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
 
 
 /* On NON_USHBIN_ONLY platforms, reserve enough space in routine header for the dummy
@@ -210,9 +212,9 @@ typedef struct
 {
 #ifdef	BIGENDIAN
 	unsigned int	sgn : 1 ;
-	unsigned int	e   : 7 ;
+	unsigned int	e	: 7 ;
 #else
-	unsigned int	e   : 7 ;
+	unsigned int	e	: 7 ;
 	unsigned int	sgn : 1 ;
 #endif
 	int4		m[2]	;
@@ -220,13 +222,13 @@ typedef struct
 
 typedef struct
 {
-	unsigned int	mvtype   : 16;
+	unsigned int	mvtype	: 16;
 #ifdef	BIGENDIAN
-	unsigned int	sgn      : 1;
-	unsigned int	e        : 7;
+	unsigned int	sgn	: 1;
+	unsigned int	e	: 7;
 #else
-	unsigned int	e        : 7;
-	unsigned int	sgn      : 1;
+	unsigned int	e	: 7;
+	unsigned int	sgn	: 1;
 #endif
 	unsigned int	fnpc_indx: 8;	/* Index to fnpc_work area this mval is using */
 	int4	m[2];
@@ -245,7 +247,7 @@ typedef struct
 #define VAR_START(a, b)	va_start(a, b)
 #define VARLSTCNT(a)	a,		/* push count of arguments*/
 
-#ifndef GTSQL    /* these cannot be used within SQL */
+#ifndef GTSQL	/* these cannot be used within SQL */
 #define malloc gtm_malloc
 #define free gtm_free
 #endif
@@ -279,11 +281,11 @@ typedef struct
 #define OS_VIRTUAL_BLOCK_SIZE	OS_PAGELET_SIZE
 #define GTM_MM_FLAGS		MAP_SHARED
 #ifndef SSM_SIZE
-#define SSM_SIZE                OS_PAGE_SIZE
+#define SSM_SIZE		OS_PAGE_SIZE
 #endif
 
-typedef volatile	int4    latch_t;
-typedef volatile	uint4   ulatch_t;
+typedef volatile	int4	latch_t;
+typedef volatile	uint4	ulatch_t;
 
 #define INSIDE_CH_SET		"ISO8859-1"
 #define OUTSIDE_CH_SET		"ISO8859-1"

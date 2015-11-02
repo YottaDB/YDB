@@ -224,6 +224,7 @@ GBLDEF  uint4		dollar_zjob;
 GBLDEF	mval		dollar_zinterrupt;
 GBLDEF	boolean_t	dollar_zininterrupt;
 GBLDEF	boolean_t	dollar_ztexit_bool; /* Truth value of dollar_ztexit when coerced to boolean */
+GBLDEF	boolean_t	dollar_zquit_anyway;
 
 GBLDEF	mv_stent	*mv_chain;
 GBLDEF	sgm_info	*first_sgm_info;	/* List of participating regions in the TP transaction with NO ftok ordering */
@@ -262,6 +263,7 @@ GBLDEF	boolean_t	certify_all_blocks = FALSE;	/* If flag is set all blocks are ch
 							 * VIEW "GDSCERT":1. */
 GBLDEF	mval		curr_gbl_root;
 GBLDEF	gd_addr		*original_header;
+GBLDEF	hash_table_mname *gd_tab_ptr = NULL;
 GBLDEF	mem_list	*mem_list_head;
 GBLDEF	boolean_t	debug_mupip;
 GBLDEF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
@@ -423,7 +425,6 @@ GBLDEF	volatile int4		db_fsync_in_prog;
 GBLDEF	volatile int4		jnl_qio_in_prog;
 #ifdef UNIX
 GBLDEF	gtmsiginfo_t		signal_info;
-GBLDEF	boolean_t		mutex_salvaged;
 #ifndef MUTEX_MSEM_WAKE
 GBLDEF	int			mutex_sock_fd = -1;
 GBLDEF	struct sockaddr_un	mutex_sock_address;
@@ -923,13 +924,13 @@ GBLDEF	int4			pending_errtriplecode;	/* if non-zero contains the error code to i
 GBLDEF	uint4	process_id;
 GBLDEF	uint4	image_count;	/* not used in UNIX but defined to preserve VMS compatibility */
 
-GBLDEF  int     totalRmalloc;                           /* Total storage currently (real) malloc'd (includes extent blocks) */
-GBLDEF  int     totalAlloc;                             /* Total allocated (includes allocation overhead but not free space */
-GBLDEF  int     totalUsed;                              /* Sum of user allocated portions (totalAlloc - overhead) */
+GBLDEF  size_t  totalRmalloc;                           /* Total storage currently (real) malloc'd (includes extent blocks) */
+GBLDEF  size_t  totalAlloc;                             /* Total allocated (includes allocation overhead but not free space */
+GBLDEF  size_t  totalUsed;                              /* Sum of user allocated portions (totalAlloc - overhead) */
 
-GBLDEF	int	totalRallocGta;				/* Total storage currently (real) mmap alloc'd */
-GBLDEF	int     totalAllocGta;                          /* Total mmap allocated (includes allocation overhead but not free space */
-GBLDEF	int     totalUsedGta;                           /* Sum of "in-use" portions (totalAllocGta - overhead) */
+GBLDEF	size_t	totalRallocGta;				/* Total storage currently (real) mmap alloc'd */
+GBLDEF	size_t  totalAllocGta;                          /* Total mmap allocated (includes allocation overhead but not free space */
+GBLDEF	size_t  totalUsedGta;                           /* Sum of "in-use" portions (totalAllocGta - overhead) */
 
 GBLDEF	volatile char		*outOfMemoryMitigation;	/* Cache that we will freed to help cleanup if run out of memory */
 GBLDEF	uint4			outOfMemoryMitigateSize;/* Size of above cache (in Kbytes) */
@@ -937,6 +938,35 @@ GBLDEF	uint4			outOfMemoryMitigateSize;/* Size of above cache (in Kbytes) */
 GBLDEF	int 			mcavail;
 GBLDEF	mcalloc_hdr 		*mcavailptr, *mcavailbase;
 
+GBLDEF	uint4			max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
+GBLDEF	uint4			max_cache_entries;	/* Maximum number of cached indirect compilations */
+
 GBLDEF  void            (*cache_table_relobjs)(void);   /* Function pointer to call cache_table_rebuild() */
 UNIX_ONLY(GBLDEF ch_ret_type (*ht_rhash_ch)();)         /* Function pointer to hashtab_rehash_ch */
 UNIX_ONLY(GBLDEF ch_ret_type (*jbxm_dump_ch)();)        /* Function pointer to jobexam_dump_ch */
+
+#ifdef VMS
+GBLDEF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
+#endif
+
+#ifdef DEBUG
+/* Set to TRUE in a few selected places before wcs_recover is called. Any other place that calls wcs_recover in the final
+ * retry will fail an assert as we dont want to call cache recovery while in the middle of a transaction and confuse ourselves
+ * enough to cause further restarts (which is an out-of-design situation while in the final retry).
+ */
+GBLDEF	boolean_t		ok_to_call_wcs_recover;
+GBLDEF	uint4			donot_commit;	/* see gdsfhead.h for purpose of this debug-only global */
+#endif
+
+GBLDEF	cache_rec_ptr_t	pin_fail_cr;			/* Pointer to the cache-record that we failed while pinning */
+GBLDEF	cache_rec	pin_fail_cr_contents;		/* Contents of the cache-record that we failed while pinning */
+GBLDEF	cache_rec_ptr_t	pin_fail_twin_cr;		/* Pointer to twin of the cache-record that we failed to pin */
+GBLDEF	cache_rec	pin_fail_twin_cr_contents;	/* Contents of twin of the cache-record that we failed to pin */
+GBLDEF	bt_rec_ptr_t	pin_fail_bt;			/* Pointer to bt of the cache-record that we failed to pin */
+GBLDEF	bt_rec		pin_fail_bt_contents;		/* Contents of bt of the cache-record that we failed to pin */
+GBLDEF	int4		pin_fail_in_crit;		/* Holder of crit at the time we failed to pin */
+GBLDEF	int4		pin_fail_wc_in_free;		/* Number of write cache records in free queue when we failed to pin */
+GBLDEF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when we failed to pin */
+GBLDEF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
+GBLDEF	int4		pin_fail_in_wtstart;		/* Count of processes in wcs_wtstart when we failed to pin */
+GBLDEF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 commit when we failed to pin */

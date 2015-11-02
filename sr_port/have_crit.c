@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +11,7 @@
 
 #include "mdef.h"
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "gtm_inet.h"
 #ifdef VMS
 #include <descrip.h> /* Required for gtmsource.h */
 #endif
@@ -40,12 +39,11 @@ GBLREF unsigned int		t_tries;
 
 /* Return number of regions (including jnlpool dummy region) if have or are aquiring crit or in_wtstart
  * ** NOTE **  This routine is called from signal handlers and is thus called asynchronously.
- * If CRIT_IN_COMMIT bit is set, we check for a more restrictive case of crit where we are about to commit in some region.
+ * If CRIT_IN_COMMIT bit is set, we check if in middle of commit (PHASE1 inside crit or PHASE2 outside crit) on some region.
  * If CRIT_RELEASE bit is set, we release crit on region(s) that:
  *   1)  we hold crit on (neither CRIT_IN_COMMIT NOR CRIT_TRANS_NO_REG is specified)
- *   2)  are in the commit code (if CRIT_IN_COMMIT is specified)
- *   3)  are part of the current transactions except those regions that are marked as being valid
- *       to have crit in by virtue of their crit__check_cycle value is the same as crit_deadlock_check_cycle.
+ *   2)  are part of the current transactions except those regions that are marked as being valid
+ *       to have crit in by virtue of their crit_check_cycle value is the same as crit_deadlock_check_cycle.
  * Note: CRIT_RELEASE implies CRIT_ALL_REGIONS
  * If CRIT_ALL_REGIONS bit is set, go through the entire list of regions
  */
@@ -76,8 +74,7 @@ uint4 have_crit(uint4 crit_state)
 				csa = &FILE_INFO(r_local)->s_addrs;
 				if (NULL != csa)
 				{
-					if (csa->now_crit
-					    && (0 == (crit_state & CRIT_IN_COMMIT) || csa->ti->early_tn != csa->ti->curr_tn))
+					if (csa->now_crit)
 					{
 						crit_reg_cnt++;
 						/* It is possible that if DSE has done a CRIT REMOVE and stolen our crit, it
@@ -105,7 +102,18 @@ uint4 have_crit(uint4 crit_state)
 						if (0 == (crit_state & CRIT_ALL_REGIONS))
 							return crit_reg_cnt;
 					}
-					if ((crit_state & HAVE_CRIT_IN_WTSTART) && csa->in_wtstart)
+					/* In Commit-crit is defined as the time since when early_tn is 1 + curr_tn upto when
+					 * t_commit_crit is set to FALSE. Note that the first check should be done only if we
+					 * hold crit as otherwise we could see inconsistent values.
+					 */
+					if ((crit_state & CRIT_IN_COMMIT)
+						&& (csa->now_crit && (csa->ti->early_tn != csa->ti->curr_tn) || csa->t_commit_crit))
+					{
+						crit_reg_cnt++;
+						if (0 == (crit_state & CRIT_ALL_REGIONS))
+							return crit_reg_cnt;
+					}
+					if ((crit_state & CRIT_IN_WTSTART) && csa->in_wtstart)
 					{
 						crit_reg_cnt++;
 						if (0 == (crit_state & CRIT_ALL_REGIONS))

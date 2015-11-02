@@ -103,6 +103,9 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	struct chf$signal_array	*tp_restart_fail_sig;
 GBLREF	boolean_t	tp_restart_fail_sig_used;
 #endif
+#ifdef DEBUG
+GBLREF	boolean_t	ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
+#endif
 
 CONDITION_HANDLER(tp_restart_ch)
 {
@@ -230,12 +233,24 @@ void	tp_restart(int newlevel)
 		{
 		case cdb_sc_helpedout:
 			csa = sgm_info_ptr->tp_csa;
-			if ((dba_bg == csa->hdr->acc_meth) && !csa->now_crit)
-			{	/* The following grab/rel crit logic is purely to ensure that wcs_recover gets called if
-				 * needed. This is because we saw wc_blocked to be TRUE in tp_tend and decided to restart.
-				 */
-				grab_crit(sgm_info_ptr->gv_cur_region);
-				rel_crit(sgm_info_ptr->gv_cur_region);
+			if (dba_bg == csa->hdr->acc_meth)
+			{
+				if (!csa->now_crit)
+				{	/* The following grab/rel crit logic is purely to ensure that wcs_recover gets called if
+					 * needed. This is because we saw wc_blocked to be TRUE in tp_tend and decided to restart.
+					 */
+					grab_crit(sgm_info_ptr->gv_cur_region);
+					rel_crit(sgm_info_ptr->gv_cur_region);
+				} else
+				{	/* Some non-crit holding process set wc_blocked to TRUE causing us to restart even
+					 * though we held crit. Most likely phase2 commit or a process in wcs_wtstart encountered
+					 * an error. In any case, need to run cache-recovery to fix the shared memory structures.
+					 * Since we hold crit, so no need to grab/rel crit. Call wcs_recover right away.
+					 */
+					DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
+					wcs_recover(sgm_info_ptr->gv_cur_region);
+					DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
+				}
 			} else
 			{
 				assert(dba_mm == csa->hdr->acc_meth);
@@ -321,7 +336,9 @@ void	tp_restart(int newlevel)
 				}
 				DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 			}
+			DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
 			tp_tend_status = tp_crit_all_regions();	/* grab crits on all regions */
+			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
 			assert(FALSE != tp_tend_status);
 			/* pick up all MM extension information */
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +30,7 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 
 /* Checks that a block that we have acquired is marked RECYCLED/FREE in the database
  * and that an existing block that we are updating is marked BUSY in the database.
- * For BG, the check is done only if the bitmap block is available in the cache.
+ * For BG, the check is done only if the bitmap block is available in the cache AND is not being concurrently updated.
  */
 void	bml_status_check(cw_set_element *cs)
 {
@@ -51,7 +51,8 @@ void	bml_status_check(cw_set_element *cs)
 		if (!is_mm)
 		{
 			bmlcr = db_csh_get(bmlblk);
-			bmlbuff = ((NULL != bmlcr) && (CR_NOTVALID != (sm_long_t)bmlcr) && (0 > bmlcr->read_in_progress))
+			bmlbuff = ((NULL != bmlcr) && (CR_NOTVALID != (sm_long_t)bmlcr)
+					&& (0 > bmlcr->read_in_progress) && !bmlcr->in_tend)
 				? (blk_hdr_ptr_t)GDS_REL2ABS(bmlcr->buffaddr)
 				: NULL;
 		} else

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2002, 2003 Sanchez Computer Associates, Inc.	;
+;	Copyright 2002, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -151,6 +151,7 @@ error	; Error handler called by $ztrap
 	use outfile
 	zshow "*"
 	close outfile
+	set $ecode=""
 	quit
 MATCH() ; Return array MATCH which contains all Global references which match
 	; the TOPIC array.

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-#	Copyright 2001, 2007 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2008 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -303,10 +303,25 @@ if (!(-z ${TMP_DIR}_inc_files)) then
 endif
 
 # For ia64 & x86_64, the file - xfer_desc.i - needs to be generated.
-if ( "ia64" == $mach_type || "x86_64" == $mach_type ) then
-        pushd $gtm_src
-        tcsh $gtm_tools/gen_xfer_desc.csh
-        popd
+if ($?RUNALL_BYPASS_GEN_XFER_DESC == 0) then
+	if ( "ia64" == $mach_type || "x86_64" == $mach_type ) then
+		pushd $gtm_src
+		tcsh $gtm_tools/gen_xfer_desc.csh
+		popd
+	endif
+endif
+
+#  Generate ttt.c
+if (!(-e $gtm_src/ttt.c) || ((-M $gtm_tools/ttt.txt) > (-M $gtm_src/ttt.c))) then
+	if (-x $gtm_root/$gtm_curpro/pro/mumps) then
+		pushd $gtm_src >& /dev/null
+		/usr/local/bin/tcsh $gtm_tools/gen_ttt.csh
+		echo ttt.c >>&! ${TMP_DIR}_src_files
+		popd >& /dev/null
+	else
+		echo "RUNALL-E-NoMUMPS, unable to regenerate ttt.c due to missing $gtm_curpro/pro/mumps" \
+			>> $gtm_log/error.$RUNALL_IMAGE.log
+	endif
 endif
 
 if (!(-z ${TMP_DIR}_src_files)) then

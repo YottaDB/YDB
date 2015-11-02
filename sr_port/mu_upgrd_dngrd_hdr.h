@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,10 +35,10 @@
 								csd->autoswitchlimit, csd->autoswitchlimit);		\
 	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Journal epoch interval"),				\
 								csd->epoch_interval, csd->epoch_interval);		\
-	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4, LEN_AND_LIT("Journal sync_io"),					\
+	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOSTR, 4, LEN_AND_LIT(UNIX_ONLY("Journal sync_io") VMS_ONLY("Journal NOCACHE")), \
 			LEN_AND_STR((csd->jnl_sync_io ? " TRUE" : "FALSE")));						\
-	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Journal yield limit"),					\
-							csd->yield_lmt, csd->yield_lmt);				\
+	UNIX_ONLY(gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT4, 4, LEN_AND_LIT("Journal yield limit"),			\
+							csd->yield_lmt, csd->yield_lmt);)				\
 	gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Region sequence number"),				\
 				&csd->reg_seqno, &csd->reg_seqno);							\
 }

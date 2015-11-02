@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,6 +55,7 @@
 #include "util.h"
 #include "gtmsource.h"
 #include "repl_instance.h"
+#include "iotcpdef.h"
 
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	30
 #define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* seconds */
@@ -103,7 +104,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 	int				rollback_status;
 	int				wait_status;
 	time_t				t1, t2;
-	struct timeval			gtmrecv_fetchresync_max_wait, gtmrecv_fetchresync_poll;
+	struct timeval			gtmrecv_fetchresync_max_wait, gtmrecv_fetchresync_poll, sel_timeout_val;
 	repl_instinfo_msg_t		instinfo_msg;
 	repl_needinst_msg_ptr_t		need_instinfo_msg;
 	repl_needtriple_msg_ptr_t	need_tripleinfo_msg;
@@ -115,6 +116,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 								   * REPL_PROTO_VER_DUALSITE(0) and REPL_PROTO_VER_UNINITIALIZED(-1)
 								   */
 	seq_num				triple_seqnum;
+	short				retry_num;
 	error_def(ERR_PRIMARYNOTROOT);
 	error_def(ERR_RECVPOOLSETUP);
 	error_def(ERR_REPLCOMM);
@@ -170,10 +172,59 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		}
 		ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr,
 									(GTM_SOCKLEN_TYPE *)&primary_addr_len, gtmrecv_sock_fd);
-		if (gtmrecv_sock_fd < 0)
-			rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error accepting connection from Source Server"), errno);
+		if (0 > gtmrecv_sock_fd)
+		{
+#ifdef __hpux
+		/* ENOBUFS in HP-UX is either because of a memory problem or when we have received a RST just
+		after a SYN before an accept call. Normally this is not fatal and is just a transient state.Hence
+		exiting just after a single error of this kind should not be done. So retry in case of HP-UX and ENOBUFS error*/
+			if (ENOBUFS == errno)
+			{
+ 				  retry_num = 0;
+			  /*In case of succeeding with select in first go, accept will still get 5ms time difference*/
+				while (HPUX_MAX_RETRIES > retry_num)
+				{
+					SHORT_SLEEP(5);
+					FD_ZERO(&input_fds);
+					FD_SET(gtmrecv_listen_sock_fd, &input_fds);
+                          /*Since we use Blocking socket, check before re-trying whether there is a connection to be accepted*/
+                          /*Timeout of HPUX_SEL_TIMEOUT.  In case the earlier connection is not available there can be
+                            some time gap between the time the error occured and the new client requests coming in*/
+                                  	for ( ; HPUX_MAX_RETRIES > retry_num; retry_num++)
+					{
+	                                          FD_ZERO(&input_fds);
+	                                          FD_SET(gtmrecv_listen_sock_fd, &input_fds);
+						  sel_timeout_val.tv_sec = 0;
+        	                                  sel_timeout_val.tv_usec = HPUX_SEL_TIMEOUT;
+                	                          status = select(gtmrecv_listen_sock_fd + 1, &input_fds, NULL,
+								NULL, &sel_timeout_val);
+                        	                  if (0 < status)
+	                                                  break;
+        	                                  else
+                	                                 SHORT_SLEEP(5);
+					}
+					if (0 > status)
+                                                 rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+                                              RTS_ERROR_LITERAL("Error in select on listen socket after ENOBUFS error"), errno);
+					else
+					{
+	                                         ACCEPT_SOCKET(gtmrecv_listen_sock_fd, (struct sockaddr *)&primary_addr,
+                                                                       (GTM_SOCKLEN_TYPE *)&primary_addr_len, gtmrecv_sock_fd);
+						if ((0 > gtmrecv_sock_fd) && (errno == ENOBUFS))
+							retry_num++;
+						else
+							break;
+					}
+				  }
+                        }
 
+			if (0 > gtmrecv_sock_fd)
+#endif
+			{
+				rts_error(VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				RTS_ERROR_LITERAL("Error accepting connection from Source Server"), errno);
+			}
+		}
 		repl_log(stdout, TRUE, TRUE, "Connection established\n");
 		repl_close(&gtmrecv_listen_sock_fd);
 		if (0 != (status = get_send_sock_buff_size(gtmrecv_sock_fd, &repl_max_send_buffsize))

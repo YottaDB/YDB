@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +12,8 @@
 #include "mdef.h"
 
 #include <stddef.h>
+#include <signal.h>		/* for VSIG_ATOMIC_T type */
+
 #include "gtm_time.h"
 #include "gtm_inet.h"
 
@@ -32,6 +34,7 @@
 #include "gdsbml.h"
 #include "ccp.h"
 #include "error.h"
+#include "iosp.h"
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
@@ -49,6 +52,7 @@
 
 #ifdef UNIX
 #include "gtmrecv.h"
+#include "deferred_signal_handler.h"
 #endif
 
 /* Include prototypes */
@@ -72,6 +76,7 @@
 #include "memcoherency.h"
 #include "jnl_get_checksum.h"
 #include "wbox_test_init.h"
+#include "have_crit.h"
 #include "bml_status_check.h"
 
 #define BLOCK_FLUSHING(x) (csa->hdr->clustered && x->flushing && !CCP_SEGMENT_STATE(cs_addrs->nl,CCST_MASK_HAVE_DIRTY_BUFFERS))
@@ -132,6 +137,10 @@ GBLREF	trans_num		mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block 
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 
+#ifdef DEBUG
+GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#endif
+
 #ifdef UNIX
 GBLREF	recvpool_addrs		recvpool;
 #endif
@@ -156,6 +165,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	srch_hist		*hist;
 	bt_rec_ptr_t		bt;
 	boolean_t		blk_used;
+	cache_rec		cr_save;
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cs, *cs_top, *cs1;
 	enum cdb_sc		status;
@@ -165,9 +175,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	jnl_buffer_ptr_t	jbp, jbbp; /* jbp is non-NULL if journaling, jbbp is non-NULL only if before-image journaling */
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	node_local_ptr_t	cnl;
 	sgm_info		*dummysi = NULL;	/* needed as a dummy parameter for {mm,bg}_update */
 	srch_blk_status		*t1;
-	trans_num		valid_thru, tnque_earliest_tn, dbtn, blktn, temp_tn, epoch_tn;
+	trans_num		valid_thru, tnque_earliest_tn, dbtn, blktn, temp_tn, epoch_tn, old_block_tn;
 	unsigned char		cw_depth, cw_bmp_depth;
 	jnldata_hdr_ptr_t	jnl_header;
 	uint4			total_jnl_rec_size, tmp_cumul_jnl_rec_len, tmp_cw_set_depth, prev_cw_set_depth;
@@ -178,19 +189,24 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	boolean_t		write_inctn = FALSE;	/* set to TRUE in case writing an inctn record is necessary */
-	boolean_t		decremented_currtn, retvalue;
+	boolean_t		decremented_currtn, retvalue, busy2free_seen, recompute_cksum, cksum_needed;
 	blk_hdr_ptr_t		old_block;
-	unsigned int		bsiz;
+	unsigned int		bsiz, crindex;
 	jnl_tm_t		save_gbl_jrec_time;
+	enum gds_t_mode		mode;
+	uint4			prev_cr_array_index;
 
 	error_def(ERR_GVKILLFAIL);
 	error_def(ERR_GVPUTFAIL);
-	error_def(ERR_NOTREPLICATED);
 	error_def(ERR_JNLFILOPN);
+	error_def(ERR_JNLFLUSH);
+	error_def(ERR_NOTREPLICATED);
+	error_def(ERR_TEXT);
 
 	assert(hist1 != hist2);
 	csa = cs_addrs;
 	csd = csa->hdr;
+	cnl = csa->nl;
 	is_mm = (dba_mm == csd->acc_meth);
 	status = cdb_sc_normal;
 	assert(cs_data == csd);
@@ -223,6 +239,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			return csa->ti->curr_tn;
 		}
 	}
+	busy2free_seen = FALSE;
 	if ((0 != cw_set_depth)
 			&& ((gds_t_writemap == cw_set[0].mode)
 				|| ((gds_t_busy2free == cw_set[0].mode) && (gds_t_writemap == cw_set[1].mode))))
@@ -231,7 +248,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		if (gds_t_writemap == cw_set[0].mode)
 			cw_bmp_depth = 0;
 		else
+		{
+			busy2free_seen = TRUE;
 			cw_bmp_depth = 1;
+		}
 	} else
 	{
 		cw_depth = cw_set_depth;
@@ -242,7 +262,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		 * 	these variables should be used below only within an if (cw_depth).
 		 */
 		assert(sizeof(bsiz) == sizeof(old_block->bsiz));
-		csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb);
+		csa->backup_in_prog = (BACKUP_NOT_IN_PROGRESS != cnl->nbb);
 		jbbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;
 		read_before_image = ((NULL != jbbp) || csa->backup_in_prog);
 		for (cs = &cw_set[0], cs_top = cs + cw_depth; cs < cs_top; cs++)
@@ -346,7 +366,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		{	/* Get more space if needed. This is done outside crit so that
 			 * any necessary IO has a chance of occurring outside crit.
 			 * The available space must be double-checked inside crit. */
-			if (!is_mm && (csa->nl->wc_in_free < (int4)(cw_set_depth + 1))
+			if (!is_mm && (cnl->wc_in_free < (int4)(cw_set_depth + 1))
 				   && !wcs_get_space(gv_cur_region, cw_set_depth + 1, NULL))
 				assert(FALSE);	/* wcs_get_space should have returned TRUE unconditionally in this case */
 			for (;;)
@@ -361,10 +381,20 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		} else
 			grab_crit(gv_cur_region);
 	}
+        if (is_mm && ((csa->hdr != csd) || (csa->total_blks != csa->ti->total_blks)))
+        {       /* If MM, check if wcs_mm_recover was invoked as part of the grab_crit done above OR if
+                 * the file has been extended. If so, restart.
+                 */
+                status = cdb_sc_helpedout;      /* force retry with special status so philanthropy isn't punished */
+		if ((CDB_STAGNATE - 1) == t_tries)
+			release_crit = TRUE;
+                goto failed;
+        }
 	/* Any retry transition where the destination state is the 3rd retry, we don't want to release crit,
 	 * i.e. for 2nd to 3rd retry transition or 3rd to 3rd retry transition.
 	 * Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries
-	 * But 2nd to 3rd retry transition doesn't occur if in 2nd retry we get jnlstatemod/jnlclose/backupstatemod code.
+	 * But 2nd to 3rd retry transition doesn't occur if in 2nd retry we get jnlstatemod, jnlclose, backupstatemod,
+	 * helpedout, or cacheprob code.
 	 * Hence the variable release_crit to track the above.
 	 */
 	release_crit = (CDB_STAGNATE - 1) > t_tries;
@@ -397,7 +427,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				goto failed;
 			}
 		}
-		if (cw_depth && (csa->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != csa->nl->nbb)))
+		if (cw_depth && (csa->backup_in_prog != (BACKUP_NOT_IN_PROGRESS != cnl->nbb)))
 		{
 			if (!csa->backup_in_prog && !(JNL_ENABLED(csa) && csa->jnl_before_image))
 			{	/* If online backup is in progress now and before-image journaling is not enabled,
@@ -414,10 +444,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			read_before_image = ((JNL_ENABLED(csa) && csa->jnl_before_image) || csa->backup_in_prog); /* recalculate */
 		}
 		/* in crit, ensure cache-space is available. the out-of-crit check done above might not have been enough */
-		if (!is_mm && (csa->nl->wc_in_free < (int4)(cw_set_depth + 1))
+		if (!is_mm && (cnl->wc_in_free < (int4)(cw_set_depth + 1))
 			   && !wcs_get_space(gv_cur_region, cw_set_depth + 1, NULL))
 		{
-			assert(FALSE);
+			assert(csd->wc_blocked);	/* only reason we currently know why wcs_get_space could fail */
+			assert(gtm_white_box_test_case_enabled);
 			SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 			BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
 			status = cdb_sc_cacheprob;
@@ -472,6 +503,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					status = cdb_sc_blkmod;
 					goto failed;
 				}
+				t1->cse = NULL;	/* reset for next transaction */
 			} else
 			{
 				bt = bt_get(t1->blk_num);
@@ -509,7 +541,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					assert(bt->killtn <= bt->tn);
 					if (t1->tn <= bt->tn)
 					{
-						assert(CDB_STAGNATE > t_tries);
+						assert((CDB_STAGNATE > t_tries) || (cdb_sc_helpedout == t_fail_hist[t_tries]));
 						assert(!IS_DOLLAR_INCREMENT || !write_inctn);
 						/* If the current operation is a $INCREMENT, then try to optimize by recomputing
 						 * the update array. Do this only as long as ALL the following conditions are met.
@@ -549,8 +581,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					status = cdb_sc_cacheprob;
 					goto failed;
 				}
-				if ((NULL == cr) || (cr->cycle != t1->cycle) ||
-				    ((sm_long_t)GDS_REL2ABS(cr->buffaddr) != (sm_long_t)t1->buffaddr))
+				if ((NULL == cr) || (cr->cycle != t1->cycle)
+					|| ((sm_long_t)GDS_REL2ABS(cr->buffaddr) != (sm_long_t)t1->buffaddr))
 				{
 					if ((NULL != cr) && (NULL != bt) && (cr->blk != bt->blk))
 					{
@@ -564,26 +596,35 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					status = cdb_sc_lostcr;
 					goto failed;
 				}
-				/* only way to have in_cw_set to be TRUE is in the case
-				 * where both the histories passed contain this particular block.
+				assert(0 == cr->in_tend);
+				/* Pin those buffers that we are planning on updating. Those are easily identified as the ones
+				 * where the history has a non-zero cw-set-element.
 				 */
-				assert(FALSE == cr->in_cw_set || hist == hist2 && cr->blk == hist1->h[t1->level].blk_num);
-				if (!cr->in_cw_set)
+				cs = t1->cse;
+				if (cs)
 				{
-					cr_array[cr_array_index++] = cr;
-					cr->in_cw_set = TRUE;
-					cr->refer = TRUE;
+					if (n_gds_t_op > cs->mode)
+					{
+						assert(update_trans);
+						assert(gds_t_busy2free  > gds_t_committed);
+						assert(gds_t_busy2free  < n_gds_t_op);
+						assert(gds_t_write_root > gds_t_committed);
+						assert(gds_t_write_root < n_gds_t_op);
+						assert((gds_t_committed > cs->mode)
+							|| busy2free_seen && (gds_t_busy2free == cs->mode));
+						PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
+						/* If cs->mode is gds_t_busy2free, then the corresponding cache-record needs
+						 * to be pinned to write the before-image right away but this cse is not going
+						 * to go through bg_update. So remember to unpin the cache-record before phase2
+						 * as otherwise the pre-phase2 check (that we have pinned only those cache-records
+						 * that we are planning to update) will fail. But to do that, we rely on the fact
+						 * that the cache-record corresponding to the gds_t_busy2free cse is always the
+						 * first one in the cr_array.
+						 */
+						assert((gds_t_busy2free != cs->mode) || (1 == cr_array_index));
+					}
+					t1->cse = NULL;	/* reset for next transaction */
 				}
-				DEBUG_ONLY(
-				else
-				{	/* Make sure that we have already added this cache-record into the cr_array */
-					for (tmpi = 0; tmpi < cr_array_index; tmpi++)
-						if (cr_array[tmpi] == cr)
-							break;
-					assert(tmpi < cr_array_index);
-				}
-				)
-
 			}
 			t1->tn = valid_thru;
 		}
@@ -592,6 +633,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 	if (0 != cw_map_depth)
 	{	/* Bit maps on end from mu_reorg (from a call to mu_swap_blk) or mu_reorg_upgrd_dwngrd */
 		prev_cw_set_depth = cw_set_depth;
+		prev_cr_array_index = cr_array_index;	/* note down current depth of pinned cache-records */
 		cw_set_depth = cw_map_depth;
 	}
 	for (cs = &cw_set[cw_bmp_depth], cs_top = &cw_set[cw_set_depth]; cs < cs_top; cs++)
@@ -667,10 +709,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				status = cdb_sc_lostbmlcr;
 				goto failed;
 			}
-			cr_array[cr_array_index++] = cr;
-			assert(FALSE == cr->in_cw_set);
-			cr->in_cw_set = TRUE;
-			cr->refer = TRUE;
+			PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 		}
 	}
 	if ((0 != cw_map_depth) && mu_reorg_upgrd_dwngrd_in_prog)
@@ -679,6 +718,16 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		 */
 		cw_set_depth = prev_cw_set_depth;
 		assert(1 >= cw_set_depth);
+		assert(2 >= cw_map_depth);
+		/* UNPIN the bitmap cache record we no longer need */
+		assert(prev_cr_array_index <= cr_array_index);
+		if (prev_cr_array_index < cr_array_index)
+		{
+			cr_array_index--;
+			assert(prev_cr_array_index == cr_array_index);
+			assert(process_id == cr_array[cr_array_index]->in_cw_set);
+			UNPIN_CACHE_RECORD(cr_array[cr_array_index]);
+		}
 	}
 	assert(csd == csa->hdr);
 	assert(!need_kip_incr || update_trans);
@@ -708,44 +757,69 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						status = cdb_sc_cacheprob;
 						goto failed;
 					}
-					if ((NULL == cr) || (0 <= cr->read_in_progress))
+					/* It is possible that cr->in_cw_set is non-zero in case a concurrent MUPIP REORG
+					 * UPGRADE/DOWNGRADE is in PHASE2 touching this very same block. In that case,
+					 * we cannot reuse this block so we restart. We could try finding a different block
+					 * to acquire instead and avoid a restart (tracked as part of C9E11-002651).
+					 * Note that in_cw_set is set to 0 ahead of in_tend in bg_update_phase2. Therefore
+					 * it is possible that we see in_cw_set 0 but in_tend is still non-zero. In that case,
+					 * we cannot proceed with pinning this cache-record as the cr is still locked by
+					 * the other process. We can choose to wait here but instead decide to restart.
+					 */
+					if ((NULL == cr) || (0 <= cr->read_in_progress)
+						|| (0 != cr->in_cw_set) || (0 != cr->in_tend))
 					{
 						assert(CDB_STAGNATE > t_tries);
 						status = cdb_sc_lostbefor;
 						goto failed;
 					}
-					cr_array[cr_array_index++] = cr;
-					assert(FALSE == cr->in_cw_set);
-					cr->in_cw_set = TRUE;
-					cr->refer = TRUE;
+					PIN_CACHE_RECORD(cr, cr_array, cr_array_index);
 					cs->ondsk_blkver = cr->ondsk_blkver;
-					assert((cs->cr != cr) || (cs->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr)));
-					if ((cs->cr != cr) || (cs->cycle != cr->cycle)
-						|| (cs->tn <= ((blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr))->tn))
-					{	/* Global buffer containing "cs->blk" changed since we read it out of crit */
-						old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
-						if (NULL != jbbp)
-						{	/* PBLK checksum was computed outside-of-crit when block was read but
-							 * block has relocated in the cache since then. Recompute the checksum.
-							 * We hold crit at this point so we are guaranteed valid bsiz field.
-							 * Hence we do not need to take MIN(bsiz, csd->blk_size) like we did
-							 * in the earlier call to jnl_get_checksum.
-							 */
-							bsiz = old_block->bsiz;
-							assert(bsiz <= csd->blk_size);
-							if (old_block->tn < jbbp->epoch_tn)
-								cs->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
-							else
-								cs->blk_checksum = 0;
-						}
+					old_block = (blk_hdr_ptr_t)GDS_REL2ABS(cr->buffaddr);
+					assert((cs->cr != cr) || (cs->old_block == (sm_uc_ptr_t)old_block));
+					old_block_tn = old_block->tn;
+					/* Need checksums if before imaging and if a PBLK record is going to be written. */
+					cksum_needed = ((NULL != jbbp) && (old_block_tn < jbbp->epoch_tn));
+					if ((cs->cr != cr) || (cs->cycle != cr->cycle))
+					{	/* Block has relocated in the cache. Adjust pointers to new location. */
 						cs->cr = cr;
 						cs->cycle = cr->cycle;
 						cs->old_block = (sm_uc_ptr_t)old_block;
+						/* PBLK checksum was computed outside-of-crit when block was read but
+						 * block has relocated in the cache since then so recompute the checksum
+						 * if this block needs a checksum in the first place (cksum_needed is TRUE).
+						 */
+						recompute_cksum = cksum_needed;
+					} else if (cksum_needed)
+					{	/* We have determined that a checksum is needed for this block. If we have not
+						 * previously computed one outside crit OR if the block contents have changed
+						 * since the checksum was previously computed, we need to recompute it.
+						 * Otherwise, the out-of-crit computed value can be safely used.
+						 * Note that cs->tn is valid only if a checksum was computed outside of crit.
+						 * So make sure it is used only if checksum is non-zero. There is a rare chance
+						 * that the computed checksum could be zero in which case we will recompute
+						 * unnecessarily. Since that is expected to be very rare, it is considered ok.
+						 */
+						recompute_cksum = (!cs->blk_checksum || (cs->tn <= old_block_tn));
 					}
-					assert(cs->old_block == (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr));
-					DEBUG_ONLY(old_block = (blk_hdr_ptr_t)cs->old_block;)
-					assert(!cs->blk_checksum
-						|| (cs->blk_checksum == jnl_get_checksum((uint4 *)old_block, old_block->bsiz)));
+					if (!cksum_needed)
+						cs->blk_checksum = 0;	/* zero any out-of-crit computed checksum */
+					else if (recompute_cksum)
+					{	/* We hold crit at this point so we are guaranteed valid bsiz field.
+						 * Hence we do not need to take MIN(bsiz, csd->blk_size) like we did
+						 * in the earlier call to jnl_get_checksum.
+						 */
+						assert(NULL != jbbp);
+						assert(sizeof(bsiz) == sizeof(old_block->bsiz));
+						bsiz = old_block->bsiz;
+						assert(bsiz <= csd->blk_size);
+						cs->blk_checksum = jnl_get_checksum((uint4*)old_block, bsiz);
+					}
+					DEBUG_ONLY(
+					else
+						assert(cs->blk_checksum == jnl_get_checksum((uint4 *)old_block, old_block->bsiz));
+					)
+					assert(cs->cr->blk == cs->blk);
 				}
 			}
 		}
@@ -833,15 +907,26 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				if (DISK_BLOCKS_SUM(jbp->freeaddr, total_jnl_rec_size) > jbp->filesize)
 				{	/* Moved as part of change to prevent journal records splitting
 					 * across multiple generation journal files. */
-					jnl_flush(jpc->region);
-					if (jnl_file_extend(jpc, total_jnl_rec_size) == -1)
+					if (SS_NORMAL != (jnl_status = jnl_flush(jpc->region)))
 					{
+						send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+							ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during t_end"),
+							jnl_status);
+						assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
+						status = cdb_sc_jnlclose;
+						if ((CDB_STAGNATE - 1) == t_tries)
+							release_crit = TRUE;
+						goto failed;
+					} else if (-1 == jnl_file_extend(jpc, total_jnl_rec_size))
+					{
+						assert(csd == csa->hdr);	/* jnl_file_extend() shouldn't reset csd in MM */
 						assert((!JNL_ENABLED(csd)) && (JNL_ENABLED(csa)));
 						status = cdb_sc_jnlclose;
 						if ((CDB_STAGNATE - 1) == t_tries)
 							release_crit = TRUE;
 						goto failed;
 					}
+					assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
 				}
 				assert(jgbl.gbl_jrec_time >= jbp->prev_jrec_time);
 				if (0 == jpc->pini_addr)
@@ -850,20 +935,21 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 				{
 					if (jbp->next_epoch_time <= jgbl.gbl_jrec_time)
 					{	/* Flush the cache. Since we are in crit, defer syncing epoch */
-						if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH))
+						if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT))
 						{
+							SET_WCS_FLU_FAIL_STATUS(status, csd);
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_jnl_wcsflu);
-							status = cdb_sc_cacheprob;
 							goto failed;
 						}
+						assert(csd == csa->hdr);
 						VMS_ONLY(
 							if (csd->clustered  &&
-								!CCP_SEGMENT_STATE(csa->nl, CCST_MASK_HAVE_DIRTY_BUFFERS))
+								!CCP_SEGMENT_STATE(cnl, CCST_MASK_HAVE_DIRTY_BUFFERS))
 							{
 								CCP_FID_MSG(gv_cur_region, CCTR_FLUSHLK);
 								ccp_userwait(gv_cur_region,
-									CCST_MASK_HAVE_DIRTY_BUFFERS, 0, csa->nl->ccp_cycle);
+									CCST_MASK_HAVE_DIRTY_BUFFERS, 0, cnl->ccp_cycle);
 							}
 						)
 					}
@@ -871,6 +957,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			} else
 				rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd), DB_LEN_STR(gv_cur_region));
 		}
+		assert(!donot_commit);	/* We should never commit a transaction that was determined restartable */
 		blktn = dbtn;
 		csa->ti->early_tn = dbtn + 1;
 		if (JNL_ENABLED(csa))
@@ -883,7 +970,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 					epoch_tn = jbp->epoch_tn; /* store in a local as it is used in a loop below */
 					for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
 					{	/* write out before-update journal image records */
-						if (gds_t_committed < cs->mode)
+						mode = cs->mode;
+						if (gds_t_committed < mode)
 						{	/* There are two possibilities at this point.
 							 * a) gds_t_write_root : In this case no need to write PBLK.
 							 * b) gds_t_busy2free : This is set by gvcst_bmp_mark_free to indicate
@@ -892,9 +980,9 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 							 *	csd->db_got_to_v5_once has not yet become TRUE. Once it is
 							 *	TRUE, block frees will write PBLK only when the block is reused.
 							 */
-							assert((gds_t_write_root == cs->mode) || (gds_t_busy2free == cs->mode));
-							if ((gds_t_write_root == cs->mode)
-								|| (gds_t_busy2free == cs->mode) && csd->db_got_to_v5_once)
+							assert((gds_t_write_root == mode) || (gds_t_busy2free == mode));
+							if ((gds_t_write_root == mode)
+								|| (gds_t_busy2free == mode) && csd->db_got_to_v5_once)
 							continue;
 						}
 						old_block = (blk_hdr_ptr_t)cs->old_block;
@@ -1013,18 +1101,26 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			}
 		}
 		csa->prev_free_blks = csa->ti->free_blocks;
-		csa->t_commit_crit = TRUE;
+		csa->t_commit_crit = T_COMMIT_CRIT_PHASE1;
 		if (cw_set_depth)
 		{
+			if (!is_mm)	/* increment counter of # of processes that are actively doing two-phase commit */
+				INCR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
+#			ifdef DEBUG
+			/* Assert that cs->old_mode if uninitialized, never contains a negative value (relied by secshr_db_clnup) */
+			for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
+				assert(0 <= cs->old_mode);
+#			endif
 			for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
 			{
-				assert((gds_t_write_root != cs->mode) || ((cs - cw_set) + 1 == cw_depth));
-				cs->old_mode = cs->mode;	/* note down before being reset to gds_t_committed */
+				mode = cs->mode;
+				assert((gds_t_write_root != mode) || ((cs - cw_set) + 1 == cw_depth));
+				cs->old_mode = (int4)mode;	/* note down before being reset to gds_t_committed */
 				assert(gds_t_committed < gds_t_write_root);
 				assert(gds_t_committed < gds_t_busy2free);
-				assert((n_gds_t_op != cs->mode) && (gds_t_committed != cs->mode));
-				assert((kill_t_write != cs->mode) && (kill_t_create != cs->mode));
-				if (gds_t_committed > cs->mode)
+				assert((n_gds_t_op != mode) && (gds_t_committed != mode));
+				assert((kill_t_write != mode) && (kill_t_create != mode));
+				if (gds_t_committed > mode)
 				{
 					DEBUG_ONLY(
 						/* Check bitmap status of block we are about to modify.
@@ -1046,7 +1142,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 							{
 								if (cs == cw_set)
 								{
-									if ((gds_t_acquired == cs->mode) ||
+									if ((gds_t_acquired == mode) ||
 									    ((cw_set_depth > 1) && (0 == cw_set[1].level)))
 										rc_cpt_inval();
 									else
@@ -1055,15 +1151,29 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 							} else	if (0 == cs->level)
 								rc_cpt_entry(cs->blk);
 						}
-						status = bg_update(cs, dbtn, blktn, dummysi);
+						/* Do phase1 of bg_update while holding crit on the database.
+						 * This will lock the buffers that need to be changed.
+						 * Once crit is released, invoke phase2 which will update those locked buffers.
+						 * The exception is if it is a bitmap block. In that case we also do phase2
+						 * while holding crit so the next process to use this bitmap will see a
+						 * consistent copy of this bitmap when it gets crit for commit. This avoids
+						 * the reallocate_bitmap routine from restarting or having to wait for a
+						 * concurrent phase2 construction to finish. When the change request C9E11-002651
+						 * (to reduce restarts due to bitmap collisions) is addressed, we can reexamine
+						 * whether it makes sense to move bitmap block builds back to phase2.
+						 */
+						status = bg_update_phase1(cs, dbtn, dummysi);
+						if ((cdb_sc_normal == status) && (gds_t_writemap == mode))
+						{
+							status = bg_update_phase2(cs, dbtn, blktn, dummysi);
+							if (cdb_sc_normal == status)
+								cs->mode = gds_t_committed;
+						}
 					}
 					if (cdb_sc_normal != status)
 					{	/* the database is probably in trouble */
-						assert(gtm_white_box_test_case_enabled);
-						retvalue = t_commit_cleanup(status, 0);	/* return value of TRUE implies	that */
-						assert(retvalue); 	/* secshr_db_clnup should have completed the commit */
-						status = cdb_sc_normal;	/* reset status to normal as transaction is complete */
-						assert(!csa->now_crit);	/* assert that we do not hold crit any more */
+						INVOKE_T_COMMIT_CLEANUP(status, csa);
+						assert(cdb_sc_normal == status);
 						/* At this time "cr_array_index" could be non-zero and a few cache-records might
 						 * have their "in_cw_set" field set to TRUE. We should not reset "in_cw_set" as we
 						 * don't hold crit at this point and also because we might still need those buffers
@@ -1076,14 +1186,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 						goto skip_cr_array;	/* hence skip until past "cr_array_index" processing */
 					}
 				}
-				cs->mode = gds_t_committed;
 			}
 		}
 		/* signal secshr_db_clnup/t_commit_cleanup, roll-back is no longer possible */
 		update_trans = T_COMMIT_STARTED;
-		csa->t_commit_crit = FALSE;
 		assert(cdb_sc_normal == status);
 		INCREMENT_CURR_TN(csd);
+		csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;	/* set this BEFORE releasing crit but AFTER incrementing curr_tn */
 		/* If db is journaled, then db header is flushed periodically when writing the EPOCH record,
 		 * otherwise do it here every HEADER_UPDATE_COUNT transactions.
 		 */
@@ -1095,12 +1204,13 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 			INCR_KIP(csd, csa, kip_incremented);
 			need_kip_incr = FALSE;
 		}
+		start_tn = dbtn; /* start_tn temporarily used to store currtn (for bg_update_phase2) before releasing crit */
 	}
-	while (cr_array_index)
+	if (!is_mm && busy2free_seen)
 	{
-		assert(csa->now_crit);	/* check crit held within loop as may not enter always (and its only dbg) */
-		assert(cr_array[cr_array_index-1]->in_cw_set);	/* before resetting assert that in_cw_set is indeed TRUE */
-		cr_array[--cr_array_index]->in_cw_set = FALSE;
+		assert((gds_t_busy2free == cw_set[0].mode) && cr_array_index && (cw_set[0].blk == cr_array[0]->blk));
+		assert(process_id == cr_array[0]->in_cw_set);
+		UNPIN_CACHE_RECORD(cr_array[0]); /* need to do this BEFORE releasing crit as we have no other lock on this buffer */
 	}
 	rel_crit(gv_cur_region);
 	assert(!replication || update_trans);
@@ -1134,9 +1244,59 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2)
 		jpl->jnl_seqno = tjpl->jnl_seqno;
 		rel_lock(jnlpool.jnlpool_dummy_reg);
 	}
+	/* If BG, check that we have not pinned any more buffers than we are updating */
+	DBG_CHECK_PINNED_CR_ARRAY_CONTENTS(is_mm, cr_array, cr_array_index, csd->bplmap);
+	if (cw_set_depth)
+	{	/* Finish 2nd phase of commit for BG (updating the buffers in phase1) now that CRIT has been released.
+		 * For MM, only thing needed is to set cs->mode to gds_t_committed.
+		 */
+		for (cs = cw_set, cs_top = cs + cw_set_depth;  cs < cs_top;  ++cs)
+		{
+			mode = cs->mode;
+			assert((gds_t_write_root != mode) || ((cs - cw_set) + 1 == cw_depth));
+			assert((kill_t_write != mode) && (kill_t_create != mode));
+			if (gds_t_committed > mode)
+			{
+				if (!is_mm)
+				{	/* Validate old_mode noted down in first phase is the same as the current mode.
+					 * Note that cs->old_mode is negated by bg_update_phase1 (to help secshr_db_clnup).
+					 */
+					assert(-cs->old_mode == mode);
+					status = bg_update_phase2(cs, dbtn, blktn, dummysi);
+					if (cdb_sc_normal != status)
+					{	/* the database is probably in trouble */
+						INVOKE_T_COMMIT_CLEANUP(status, csa);
+						assert(cdb_sc_normal == status);
+						/* At this time "cr_array_index" could be non-zero and a few cache-records might
+						 * have their "in_cw_set" field set to TRUE. We should not reset "in_cw_set" as we
+						 * don't hold crit at this point and also because we might still need those buffers
+						 * pinned until their before-images are backed up in wcs_recover (in case an
+						 * online backup was running while secshr_db_clnup did its job). Reset the
+						 * local variable "cr_array_index" though so we do not accidentally reset the
+						 * "in_cw_set" fields ourselves before the wcs_recover.
+						 */
+						cr_array_index = 0;
+						/* Note that seshr_db_clnup (invoked by t_commit_cleanup above) would have
+						 * done a lot of cleanup for us including decrementing the wcs_phase2_commit_pidcnt
+						 * so it is ok to skip all that processing below and go directly to skip_cr_array.
+						 */
+						goto skip_cr_array;	/* hence skip until past "cr_array_index" processing */
+					}
+				}
+			}
+			cs->mode = gds_t_committed;
+		}
+		if (!is_mm)	/* now that two-phase commit is done, decrement counter */
+			DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl);
+	}
+	UNPIN_CR_ARRAY_ON_COMMIT(cr_array, cr_array_index);
+	assert(!cr_array_index);
+	csa->t_commit_crit = FALSE;
 skip_cr_array:
 	assert(!csa->now_crit);
 	assert(cdb_sc_normal == status);
+	REVERT;	/* no need for t_ch to be invoked if any errors occur after this point */
+	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
 	if (block_saved)
 		backup_buffer_flush(gv_cur_region);
 	if (unhandled_stale_timer_pop)
@@ -1150,7 +1310,6 @@ skip_cr_array:
 			send_msg(VARLSTCNT(6) ERR_NOTREPLICATED, 4, &temp_tn, LEN_AND_LIT("DSE"), process_id);
 		}
 	}
-	REVERT;
 	/* "secshr_db_clnup/t_commit_cleanup" assume an active non-TP transaction if cw_set_depth is non-zero
 	 * or if update_trans is set to T_COMMIT_STARTED. Now that the transaction is complete, reset these fields.
 	 */
@@ -1158,6 +1317,7 @@ skip_cr_array:
 	update_trans = FALSE;
 	CWS_RESET;
 	t_tries = 0;	/* commit was successful so reset t_tries */
+	assert(0 == cr_array_index);
 	return dbtn;
 failed:
 	assert(cdb_sc_normal != status);
@@ -1171,10 +1331,12 @@ failed_skip_revert:
 		gv_target->clue.end = 0;
 	if (release_crit && (csa->now_crit))
 		rel_crit(gv_cur_region);
+	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
 	t_retry(status);
 	/* in the retry case, we do not do a CWS_RESET as cw_stagnate is used only in the
 	 * final retry in which case t_end will succeed and do a CWS_RESET
 	 */
 	cw_map_depth = 0;
+	assert(0 == cr_array_index);
 	return 0;
 }

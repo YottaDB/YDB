@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001 Sanchez Computer Associates, Inc.	;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -59,6 +59,7 @@ SCRIPT:
 SHOERR
 	w !,$p($zs,",",3,999),!
 	i comlevel s comlevel=comlevel-1
+	s $ecode=""
 	zg @resume(comlevel)
 	q
 ABORT

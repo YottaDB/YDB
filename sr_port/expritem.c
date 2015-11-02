@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,6 +95,7 @@ LITDEF nametabent svn_names[] =
 	,{ 4, "ZPOS*" }
 	,{ 5, "ZPROC*" }
 	,{ 5, "ZPROM*" }
+	,{ 2, "ZQ*" }
 	,{ 3, "ZRE*" }
 	,{ 3, "ZRO*" }
 	,{ 3, "ZSO*" }
@@ -112,7 +113,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 78	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 79	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -163,6 +164,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZPOS, FALSE, ALL_SYS }
 	,{ SV_ZPROC, FALSE, ALL_SYS }
 	,{ SV_PROMPT, TRUE, ALL_SYS }
+	,{ SV_ZQUIT, TRUE, ALL_SYS }
 	,{ SV_ZREALSTOR, FALSE, ALL_SYS }
 	,{ SV_ZROUTINES, TRUE, ALL_SYS }
 	,{ SV_ZSOURCE, TRUE, ALL_SYS }

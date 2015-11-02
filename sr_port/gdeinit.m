@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2007 Fidelity Information Services, Inc	;
+;	Copyright 2001, 2008 Fidelity Information Services, Inc	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -10,7 +10,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 gdeinit: ;set up local variables and arrays
 GDEINIT
-
 	i $ZVER'["VMS" view "BADCHAR"
 	s renpref=""
 	s log=0,logfile="GDELOG.LOG",BOL=""
@@ -40,6 +39,7 @@ GDEINIT
 	i ($p($zver," ",4)="IA64") s gtm64="true"
 	i ($p($zver," ",4)="RS6000") s gtm64="true"
 	i ($p($zver," ",4)="x86_64") s gtm64="true"
+	i ($p($zver," ",4)="SPARC") s gtm64="true"
 	i (gtm64="true") f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
 	e  f x=1:1:8 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
 	s TWO(26)=TWO(24)*4

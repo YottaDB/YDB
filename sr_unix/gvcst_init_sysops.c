@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -350,7 +350,7 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 						ERR_TEXT, 2, LEN_AND_LIT("semid is valid but shmid is invalid"));
 			semarg.buf = &semstat;
 			if (-1 == semctl(udi->semid, 0, IPC_STAT, semarg))
-				/* file header has valid semid but semaphore does not exists */
+				/* file header has valid semid but semaphore does not exist */
 				rts_error(VARLSTCNT(6) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name));
 			else if (semarg.buf->sem_ctime != tsd->gt_sem_ctime.ctime)
 				rts_error(VARLSTCNT(10) ERR_REQRUNDOWN, 4, DB_LEN_STR(reg), LEN_AND_STR(tsd->machine_name),
@@ -381,13 +381,11 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 			rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, errno_save);
 		}
 	} else /* for mupip_jnl_recover we were already in mu_rndwn_file and got "semid" semaphore  */
-	{
+	{	/* Make sure mu_rndwn_file() has created semaphore for standalone access */
 		if (INVALID_SEMID == udi->semid || 0 == udi->gt_sem_ctime)
-			/* make sure mu_rndwn_file() has reset created semaphore for standalone access */
 			GTMASSERT;
-		if (INVALID_SHMID != udi->shmid || 0 != udi->gt_shm_ctime)
-			/* make sure mu_rndwn_file() has reset shared memory */
-			GTMASSERT;
+		/* Make sure mu_rndwn_file() has reset shared memory. In pro, just clear it and proceed. */
+		assert((INVALID_SHMID == udi->shmid) && (0 == udi->gt_shm_ctime));
 		udi->shmid = INVALID_SHMID;	/* reset shmid so dbinit_ch does not get confused in case we go there */
 		new_dbinit_ipc = TRUE;
 	}
@@ -687,6 +685,13 @@ void db_init(gd_region *reg, sgmnt_data_ptr_t tsd)
 		 */
 		csa->nl->remove_shm = FALSE;
 		STRCPY(csd->machine_name, machine_name);
+		if (!is_bg)
+		{
+			csd->shmid = tsd->shmid;
+			csd->semid = tsd->semid;
+			csd->gt_sem_ctime = tsd->gt_sem_ctime;
+			csd->gt_shm_ctime = tsd->gt_shm_ctime;
+		}
 		LSEEKWRITE(udi->fd, (off_t)0, (sm_uc_ptr_t)csd, sizeof(sgmnt_data), errno_save);
 		if (0 != errno_save)
 		{

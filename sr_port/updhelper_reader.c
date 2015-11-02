@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc.	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -332,8 +332,23 @@ boolean_t updproc_preread(void)
 						gv_currkey->base[key_len] = 0; 	/* second null of a key terminator */
 						gv_currkey->end = key_len;
 						disk_blk_read = FALSE;
-						status = gvcst_search(gv_currkey, NULL); /* ignore return status,
-											because pre-readers do not care */
+						status = gvcst_search(gv_currkey, NULL);
+						if (cdb_sc_normal != status)
+						{	/* If gvcst_search returns abnormal status, no need to retry since
+							 * we are a pre-reader but we need to reset clue to avoid fast-path
+							 * in the next call to gvcst_search for this same global. This is
+							 * necessary because gvcst_search fast path (non-zero clue) assumes that
+							 * srch_status->buffaddr is non-NULL if srch_status->cr is non-NULL. But
+							 * this is not necessarily guaranteed for example if gvcst_search returns
+							 * abnormal status due to t_qread returning NULL (due in turn to the
+							 * function "wcs_phase2_commit_wait" detecting csd->wc_blocked is TRUE
+							 * and deciding to restart). In this case buffaddr will be set to NULL
+							 * while cr will be non-NULL causing srch_status to be inconsistent.
+							 * Resetting the clue would cause this to be freshly initialized next
+							 * time gvcst_search for this gv_target is called.
+							 */
+							gv_target->clue.end = 0;
+						}
 						if (disk_blk_read)
 							csa->nl->n_pre_read--;
 #ifdef REPL_DEBUG
@@ -341,11 +356,11 @@ boolean_t updproc_preread(void)
 									MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 							end = &buff[MAX_ZWR_KEY_SZ - 1];
 						util_out_print(
-							"readaddrs = !XL pre_read_offset = !XL write_wrap = !XL write = !XL",
+							"readaddrs = !XJ pre_read_offset = !XL write_wrap = !XL write = !XL",
 							FALSE, readaddrs, pre_read_offset,
 							recvpool_ctl->write_wrap, recvpool_ctl->write);
 						util_out_print(
-							" Seqno = 0x!16@XJ Rectype = !SL gv_currkey = !AD status = !SL",
+							" Seqno = 0x!16@XQ Rectype = !SL gv_currkey = !AD status = !SL",
 							TRUE, &recvpool.recvpool_ctl->jnl_seqno,
 							rectype, end - buff, buff, status);
 #endif

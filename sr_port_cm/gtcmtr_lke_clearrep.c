@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,8 +62,9 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 			crash_count = cs_adr->critical->crashcnt;
 		grab_crit(cur_region);
 		if (lke_ctl->blkroot != 0)
+			/* Remote lock clears are not supported, so LKE CLEAR -EXACT qualifier will not be supported on GT.CM.*/
 			lke_cleartree(cur_region, lnk, lke_ctl, (mlk_shrblk_ptr_t)R2A(lke_ctl->blkroot), creq->all,
-				      creq->interactive, creq->pid, dnode);
+				      creq->interactive, creq->pid, dnode, FALSE);
 		rel_crit(cur_region);
 	}
 	srep.code = CMMS_U_LKEDELETE;

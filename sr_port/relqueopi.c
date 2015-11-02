@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -159,6 +159,11 @@ void_ptr_t remqhi1(que_head_ptr_t base)
 				ret = (que_ent_ptr_t)remqh((que_ent_ptr_t)base);
 				VERIFY_QUEUE(base);
 				LOCK_HIST("RLSE", &base->latch, process_id, retries);
+				/* Unix wcs_get_space and the queue functions in gtm_relqueopi.c rely on the links being
+				 * reset to 0 right after an element is removed from the queue. Note that this has to be
+				 * done BEFORE releasing the queue header lock as Unix wcs_get_space assumes its has
+				 * exclusive control of the queue if it has the queue header lock.
+				 */
 				if (NULL != ret)
 					ret->fl = ret->bl = 0;
                                 RELEASE_SWAPLOCK(&base->latch);
@@ -206,6 +211,11 @@ void_ptr_t remqti1(que_head_ptr_t base)
 				ret = (que_ent_ptr_t)remqt((que_ent_ptr_t)base);
 				VERIFY_QUEUE(base);
 				LOCK_HIST("RLSE", &base->latch, process_id, retries);
+				/* Unix wcs_get_space and the queue functions in gtm_relqueopi.c rely on the links being
+				 * reset to 0 right after an element is removed from the queue. Note that this has to be
+				 * done BEFORE releasing the queue header lock as Unix wcs_get_space assumes its has
+				 * exclusive control of the queue if it has the queue header lock.
+				 */
 				if (NULL != ret)
 					ret->fl = ret->bl = 0;
                                 RELEASE_SWAPLOCK(&base->latch);

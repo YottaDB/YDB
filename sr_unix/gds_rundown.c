@@ -35,6 +35,7 @@
 #include "jnl.h"
 #include "interlock.h"
 #include "error.h"
+#include "iosp.h"
 #include "gdsbgtr.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -54,6 +55,7 @@
 #include "ipcrmid.h"
 #include "gtmmsg.h"
 #include "wcs_recover.h"
+#include "wcs_mm_recover.h"
 #include "tp_change_reg.h"
 #include "wcs_flu.h"
 #include "add_inter.h"
@@ -125,15 +127,17 @@ void gds_rundown(void)
 	jnl_buffer_ptr_t	jbp;
 
 	error_def(ERR_CRITSEMFAIL);
+	error_def(ERR_DBCCERR);
 	error_def(ERR_DBFILERR);
 	error_def(ERR_DBRNDWNWRN);
-	error_def(ERR_DBCCERR);
 	error_def(ERR_ERRCALL);
+	error_def(ERR_GBLOFLOW);
+	error_def(ERR_GTMASSERT);
 	error_def(ERR_IPCNOTDEL);
+	error_def(ERR_JNLFLUSH);
 	error_def(ERR_RNDWNSEMFAIL);
 	error_def(ERR_TEXT);
 	error_def(ERR_WCBLOCKED);
-	error_def(ERR_GTMASSERT);
 
 	forced_exit = FALSE;		/* Okay, we're dying already -- let rel_crit live in peace now.
 					 * If coming through a DAL, not necessarily dying. what to do then? -- nars -- 8/15/2001
@@ -240,8 +244,11 @@ void gds_rundown(void)
 				return;			/* Already in rundown for this region */
 			}
 			if (EAGAIN != save_errno)
+			{
+				assert(FALSE);
 				rts_error(VARLSTCNT(9) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg),
 					ERR_TEXT, 2, RTS_ERROR_TEXT("gds_rundown first semop/semctl"), save_errno);
+			}
 			sop[0].sem_flg = sop[1].sem_flg = SEM_UNDO;	/* Try again - blocking this time */
 			SEMOP(udi->semid, sop, 2, status);
 			if (-1 == status)			/* We couldn't get it at all.. */
@@ -310,51 +317,29 @@ void gds_rundown(void)
 		/* If we are the last writing user, then everything must be flushed */
 		if (we_are_last_writer)
 		{	/* Time to flush out all of our buffers */
-			if (FALSE == is_mm)
-			{
-				/* Note WCSFLU_SYNC_EPOCH ensures the epoch is synced to the journal and indirectly
-				 * also ensures that the db is fsynced. We don't want to use it in the calls to
-				 * wcs_flu() from t_end() and tp_tend() since we can defer it to out-of-crit there.
-				 * In this case, since we are running down, we don't have any such option.
-				 */
-				csa->nl->remove_shm = wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-				assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
-			} else
+			if (is_mm)
 			{
 				if (csa->total_blks != csa->ti->total_blks)	/* do remap if file had been extended */
 				{
 					grab_crit(reg);
-					wcs_recover(reg);
+					wcs_mm_recover(reg);
 					csd = csa->hdr;
 					rel_crit(reg);
 				}
-				/* Flush MM mode mapped memory segment */
-#if defined(UNTARGETED_MSYNC)
-				if (csa->ti->last_mm_sync != csa->ti->curr_tn)
-				{
-					if (-1 == msync((caddr_t)csa->db_addrs[0],
-								(size_t)(csa->db_addrs[1] - csa->db_addrs[0]), MS_SYNC))
-					{
-						rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-							  ERR_TEXT, 2, RTS_ERROR_TEXT("Error during file msync at close"), errno);
-					}
-					csa->ti->last_mm_sync = csa->ti->curr_tn;
-				}
-#else
-				if (0 != csa->acc_meth.mm.mmblk_state->mmblkq_active.fl)
-				{
-					csa->nl->mm_extender_pid = process_id;	/* to write all at one shot */
-					wcs_wtstart(reg, 0);
-					if (0 != csa->acc_meth.mm.mmblk_state->mmblkq_active.fl)
-					{
-						rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-							  ERR_TEXT, 2, RTS_ERROR_TEXT("Error during write flush at close"), errno);
-					}
-				}
-				csa->nl->mm_extender_pid = 0;
-#endif
 				csa->nl->remove_shm = TRUE;
 			}
+			/* Note WCSFLU_SYNC_EPOCH ensures the epoch is synced to the journal and indirectly
+			 * also ensures that the db is fsynced. We don't want to use it in the calls to
+			 * wcs_flu() from t_end() and tp_tend() since we can defer it to out-of-crit there.
+			 * In this case, since we are running down, we don't have any such option.
+			 */
+			csa->nl->remove_shm = wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
+			/* Since we_are_last_writer, we should be guaranteed that wcs_flu() did not change csd, (in
+			 * case of MM for potential file extension), even if it did a grab_crit().  Therefore, make
+			 * sure that's true.
+			 */
+			assert(csd == csa->hdr);
+			assert(0 == memcmp(csd->label, GDS_LABEL, GDS_LABEL_SZ - 1));
 			csd->trans_hist.header_open_tn = csd->trans_hist.curr_tn;
 		} else if ((cancelled_timer && (0 > csa->nl->wcs_timers)) || cancelled_dbsync_timer)
 		{	/* cancelled pending db or jnl flush timers - flush database and journal buffers to disk */
@@ -364,6 +349,8 @@ void gds_rundown(void)
 			 */
 			wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 			rel_crit(reg);
+			assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+			csd = cs_data;	/* In case this is MM and wcs_flu() remapped an extended database, reset csd */
 		}
 		/* Do rundown journal processing after buffer flushes since they require jnl to be open */
 		if (JNL_ENABLED(csd))
@@ -417,10 +404,24 @@ void gds_rundown(void)
 						/* If not the last writer and no pending flush timer left, do jnl flush now */
 						if (!we_are_last_writer && (0 > csa->nl->wcs_timers))
 						{
-							jnl_flush(reg);
-							assert(jbp->freeaddr == jbp->dskaddr);
-							jnl_fsync(gv_cur_region, jbp->dskaddr);
-							assert(jbp->fsync_dskaddr == jbp->dskaddr);
+							if (SS_NORMAL == (jnl_status = jnl_flush(reg)))
+							{
+								assert(jbp->freeaddr == jbp->dskaddr);
+								jnl_fsync(reg, jbp->dskaddr);
+								assert(jbp->fsync_dskaddr == jbp->dskaddr);
+							} else
+							{
+								send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+									ERR_TEXT, 2,
+									RTS_ERROR_TEXT("Error with journal flush in gds_rundown"),
+									jnl_status);
+								assert(NOJNL == jpc->channel);/* jnl file lost has been triggered */
+								/* In this routine, all code that follows from here on does not
+								 * assume anything about the journaling characteristics of this
+								 * database so it is safe to continue execution even though
+								 * journaling got closed in the middle.
+								 */
+							}
 						}
 						jnl_file_close(reg, we_are_last_writer, FALSE);
 					} else
@@ -451,7 +452,7 @@ void gds_rundown(void)
 				}
 			} else
 			{	/* Now do final MM file sync before exit */
-#ifndef TARGETED_MSYNC
+#if !defined(TARGETED_MSYNC) && !defined(NO_MSYNC)
 				if (-1 == fsync(udi->fd))		/* Sync it all */
 				{
 					rts_error(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),

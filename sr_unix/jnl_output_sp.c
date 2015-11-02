@@ -68,12 +68,13 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	unsigned char		jbuff_base[DISK_BLOCK_SIZE + ALIGNMENT_SIZE];
 	unsigned char		*jbuff;
 
+	error_def(ERR_DBFSYNCERR);
 	error_def(ERR_JNLACCESS);
+	error_def(ERR_JNLCNTRL);
+	error_def(ERR_JNLRDERR);
 	error_def(ERR_JNLWRTDEFER);
 	error_def(ERR_JNLWRTNOWWRTR);
-	error_def(ERR_DBFSYNCERR);
 	error_def(ERR_PREMATEOF);
-	error_def(ERR_JNLRDERR);
 
 	assert(NULL != jpc);
 	udi = FILE_INFO(jpc->region);
@@ -87,6 +88,13 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		jnl_qio_in_prog--;
 		assert(0 <= jnl_qio_in_prog);
 		return ERR_JNLWRTDEFER;
+	}
+	if (jb->dsk != (jb->dskaddr % jb->size))
+	{
+		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
+		jnl_qio_in_prog--;
+		assert(0 <= jnl_qio_in_prog);
+		return ERR_JNLCNTRL;
 	}
 	if (!JNL_FILE_SWITCHED(jpc))
 		jpc->fd_mismatch = FALSE;
@@ -166,6 +174,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 			{
 				jb->errcnt++;
 				jnl_send_oper(jpc, ERR_JNLACCESS);
+				assert(FALSE);
 				status = ERR_JNLRDERR;
 				tsz = 0;	/* skip the write below */
 			}

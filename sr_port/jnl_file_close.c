@@ -67,6 +67,7 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	int			rc, save_errno;
 
 	error_def(ERR_JNLCLOSE);
+	error_def(ERR_JNLFLUSH);
 	error_def(ERR_JNLFSYNCERR);
 	error_def(ERR_JNLWRERR);
 	error_def(ERR_PREMATEOF);
@@ -102,7 +103,16 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 	{
 		jb = jpc->jnl_buff;
 		jnl_write_eof_rec(csa, &eof_record);
-		jnl_flush(reg);
+		if (SS_NORMAL != (jpc->status = jnl_flush(reg)))
+		{
+			send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+				ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during jnl_file_close"),
+				jpc->status);
+			assert(FALSE);
+			rts_error(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csd),
+				ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during jnl_file_close"),
+				jpc->status);
+		}
 		assert(jb->dskaddr == jb->freeaddr);
 		UNIX_ONLY(jnl_fsync(reg, jb->dskaddr);)
 		UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr);)
@@ -120,7 +130,10 @@ void	jnl_file_close(gd_region *reg, bool clean, bool dummy)
 			header->crash = FALSE;
 			DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 			if (SYSCALL_ERROR(jpc->status))
+			{
+				assert(FALSE);
 				rts_error(VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
+			}
 			UNIX_ONLY(
 				GTM_FSYNC(jpc->channel, rc);
 				if (-1 == rc)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +50,9 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	srch_hist	alt_hist;
 	srch_blk_status	blkhist; /* block-history to fill in for t_write_map which uses "blk_num", "buffaddr", "cr", "cycle" */
 	cw_set_element  *cse;
+	int		lbm_status;	/* local bitmap status of input "blk" i.e. BUSY or FREE or RECYCLED  */
+	int4		reference_cnt;
+	uint4		bitnum;
 
 	error_def(ERR_DSEFAIL);
 
@@ -61,11 +64,35 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	blkhist.buffaddr = bmp;
 	alt_hist.h[0].blk_num = 0;	/* Need for calls to T_END for bitmaps */
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-	*((block_id_ptr_t)update_array_ptr) = blk;
-	update_array_ptr += sizeof(block_id);
+	bitnum = blk - bml;
+	/* Find out current status in order to determine if there is going to be a state transition */
+	assert(ROUND_DOWN(blk, cs_data->bplmap) == bml);
+	GET_BM_STATUS(bmp, bitnum, lbm_status);
+	switch(lbm_status)
+	{
+		case BLK_BUSY:
+			reference_cnt = busy ? 0 : -1;
+			break;
+		case BLK_FREE:
+		case BLK_MAPINVALID:
+		case BLK_RECYCLED:
+			assert(BLK_MAPINVALID != lbm_status);
+			reference_cnt = busy ? 1 : 0;
+			break;
+		default:
+			assert(FALSE);
+			break;
+	}
+	if (reference_cnt)
+	{	/* Initialize update array with non-zero bitnum only if reference_cnt is non-zero. */
+		assert(bitnum);
+		*((block_id_ptr_t)update_array_ptr) = bitnum;
+		update_array_ptr += sizeof(block_id);
+	}
+	/* Terminate update array unconditionally with zero bitnum. */
 	*((block_id_ptr_t)update_array_ptr) = 0;
-	t_write_map(&blkhist, (uchar_ptr_t)update_array, ctn);
-	cw_set[0].reference_cnt = busy;	/* Set the block busy */
+	update_array_ptr += sizeof(block_id);
+	t_write_map(&blkhist, (uchar_ptr_t)update_array, ctn, reference_cnt);
 	if (JNL_ENABLED(cs_data))
         {
                 cse = (cw_set_element *)(&cw_set[0]);

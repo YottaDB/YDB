@@ -34,6 +34,8 @@ c) hashtab_objcode.c
 *		GT.M cannot have 0 length mname. So "key" for mname cannot be 0 length.
 */
 
+#include "gtm_malloc.h"		/* For raise_gtmmemory_error() definition */
+
 GBLREF	boolean_t	run_time;
 LITREF	int		ht_sizes[];
 
@@ -263,7 +265,6 @@ boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **t
 	uint4	 	hash, ht_index, save_ht_index, prime, rhfact;
 #endif /* INT8_HASH */
 	HT_ENT		*oldbase, *first_del_ent, *tabbase;
-	error_def(ERR_HTEXPFAIL);
 
 	if (table->count >= table->exp_trigger_size)
 	{
@@ -272,10 +273,11 @@ boolean_t ADD_HASHTAB(HASH_TABLE *table, HT_KEY_T *key, void *value,  HT_ENT **t
 		if (oldbase == table->base) /* expansion failed */
 		{
 			if (table->exp_trigger_size >= table->size)
-			{
-				send_msg(VARLSTCNT(1) ERR_HTEXPFAIL);
- 				rts_error(VARLSTCNT(1) ERR_HTEXPFAIL);
-			}
+				/* Note this error routine will use the memory error parameters recorded when the
+				   memory error was first raised by EXPAND_HASHTAB() above so the error will appear
+				   as if it had occurred during that expansion attempt.
+				*/
+				raise_gtmmemory_error();
 			table->exp_trigger_size = table->size;
 		}
 	}
@@ -398,22 +400,22 @@ void REINITIALIZE_HASHTAB(HASH_TABLE *table)
 }
 
 /*
- * Compact hashtable removing entries marked deleted
+ * Compact hashtable removing entries marked deleted. Note that this is necessary because
+ * of the search algorithm in ADD_HASHTAB which needs to find if a key exists before it can
+ * add a new entry. It keeps searching until it either finds the key, finds an empty (never
+ * used) entry or until it searches the entire table. So we need to replentish the supply of
+ * never used nodes.
  */
 void COMPACT_HASHTAB(HASH_TABLE *table)
 {
- 	error_def	(ERR_HTEXPFAIL);
+ 	error_def	(ERR_HTSHRINKFAIL);
 	HT_ENT	*oldbase;
 
 	oldbase = (table)->base;
 	EXPAND_HASHTAB(table, HT_REHASH_TABLE_SIZE(table));
 	if (oldbase == (table)->base) /* rehash failed */
-	{
-		send_msg(VARLSTCNT(1) ERR_HTEXPFAIL);
-		if (!run_time)
-			gtm_putmsg(VARLSTCNT(1) ERR_HTEXPFAIL);
-		else
-			rts_error(VARLSTCNT(1) ERR_HTEXPFAIL);
+	{	/* We will continue but performance will likely suffer */
+		send_msg(VARLSTCNT(1) ERR_HTSHRINKFAIL);
 		(table)->cmp_trigger_size = (table)->size;
 	}
 }

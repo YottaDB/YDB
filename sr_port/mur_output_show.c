@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ static  const   char 	dashes_fao[] = "!#*-";
 static  const   char proc_header[] =
         "PID      NODE     USER         TERM     JPV_TIME             PNAME           IMGCNT   MODE  LOGIN_TIME          ";
 static	const	char proc_fao[] =
-        "!8XL !8AD !12AD !8AD !20AD !15AD !8XL !5AD !20AD";
+        "!XL !8AD !12AD !8AD !20AD !15AD !XL !5AD !20AD";
 
 #define	TIME_DISPLAY_FAO	"!20AD"
 
@@ -177,22 +177,22 @@ void	mur_show_header(jnl_ctl_list * jctl)
 		util_out_print("!/ Before-image journal                      ENABLED", TRUE);
 	else
 		util_out_print("!/ Before-image journal                     DISABLED", TRUE);
-	util_out_print(" Journal file header size                 !8UL [0x!8XL]", TRUE, DOUBLE_ARG(JNL_HDR_LEN));
-	util_out_print(" Virtual file size                        !8UL [0x!8XL] blocks", TRUE, DOUBLE_ARG(hdr->virtual_size));
-	util_out_print(" Journal file checksum seed             !10UL [0x!8XL]", TRUE, DOUBLE_ARG(hdr->checksum));
+	util_out_print(" Journal file header size                 !8UL [0x!XL]", TRUE, DOUBLE_ARG(JNL_HDR_LEN));
+	util_out_print(" Virtual file size                        !8UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->virtual_size));
+	util_out_print(" Journal file checksum seed             !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->checksum));
 	util_out_print(" Crash                                       !AD", TRUE, 5, (hdr->crash ? " TRUE" : "FALSE"));
 	util_out_print(" Recover interrupted                         !AD", TRUE, 5, (hdr->recover_interrupted ? " TRUE" : "FALSE"));
-	util_out_print(" Blocks to Upgrade Adjustment           !10UL [0x!8XL]", TRUE,
+	util_out_print(" Blocks to Upgrade Adjustment           !10UL [0x!XL]", TRUE,
 		DOUBLE_ARG(hdr->prev_recov_blks_to_upgrd_adjust));
-	util_out_print(" End of Data                            !10UL [0x!8XL]", TRUE, DOUBLE_ARG(hdr->end_of_data));
-	util_out_print(" Prev Recovery End of Data              !10UL [0x!8XL]", TRUE, DOUBLE_ARG(hdr->prev_recov_end_of_data));
+	util_out_print(" End of Data                            !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->end_of_data));
+	util_out_print(" Prev Recovery End of Data              !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->prev_recov_end_of_data));
 	time_len = format_time(hdr->bov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
 	util_out_print(" Journal Creation Time        "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
 	time_len = format_time(hdr->eov_timestamp, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
 	util_out_print(" Time of last update          "TIME_DISPLAY_FAO, TRUE, time_len, time_str);
-	util_out_print(" Begin Transaction            !20@UJ [0x!16@XJ]", TRUE, DOUBLE_ARG(&hdr->bov_tn));
-	util_out_print(" End Transaction              !20@UJ [0x!16@XJ]", TRUE, DOUBLE_ARG(&hdr->eov_tn));
-	util_out_print(" Align size                       !16UL [0x!8XL] bytes", TRUE, DOUBLE_ARG(hdr->alignsize));
+	util_out_print(" Begin Transaction            !20@UQ [0x!16@XQ]", TRUE, DOUBLE_ARG(&hdr->bov_tn));
+	util_out_print(" End Transaction              !20@UQ [0x!16@XQ]", TRUE, DOUBLE_ARG(&hdr->eov_tn));
+	util_out_print(" Align size                       !16UL [0x!XL] bytes", TRUE, DOUBLE_ARG(hdr->alignsize));
 	util_out_print(" Epoch Interval                           !8UL", TRUE, EPOCH_SECOND2SECOND(hdr->epoch_interval));
 	assert(!REPL_WAS_ENABLED(hdr));
 	util_out_print(" Replication State                        !8AD", TRUE, 8,
@@ -200,12 +200,12 @@ void	mur_show_header(jnl_ctl_list * jctl)
 #ifdef VMS
 	util_out_print(" Updates Disabled on Secondary               !AD", TRUE, 5, (hdr->update_disabled ? " TRUE" : "FALSE"));
 #endif
-	util_out_print(" Jnlfile SwitchLimit              !16UL [0x!8XL] blocks", TRUE, DOUBLE_ARG(hdr->autoswitchlimit));
-	util_out_print(" Jnlfile Allocation               !16UL [0x!8XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_alq));
-	util_out_print(" Jnlfile Extension                !16UL [0x!8XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_deq));
-	util_out_print(" Maximum Physical Record Length   !16UL [0x!8XL]", TRUE, DOUBLE_ARG(hdr->max_phys_reclen));
-	util_out_print(" Maximum Logical Record Length    !16UL [0x!8XL]", TRUE, DOUBLE_ARG(hdr->max_logi_reclen));
-	util_out_print(" Turn Around Point Offset               !10UL [0x!8XL]", TRUE, DOUBLE_ARG(hdr->turn_around_offset));
+	util_out_print(" Jnlfile SwitchLimit              !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->autoswitchlimit));
+	util_out_print(" Jnlfile Allocation               !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_alq));
+	util_out_print(" Jnlfile Extension                !16UL [0x!XL] blocks", TRUE, DOUBLE_ARG(hdr->jnl_deq));
+	util_out_print(" Maximum Physical Record Length   !16UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->max_phys_reclen));
+	util_out_print(" Maximum Logical Record Length    !16UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->max_logi_reclen));
+	util_out_print(" Turn Around Point Offset               !10UL [0x!XL]", TRUE, DOUBLE_ARG(hdr->turn_around_offset));
 	if (hdr->turn_around_time)
 		time_len = format_time(hdr->turn_around_time, time_str, sizeof(time_str), SHORT_TIME_FORMAT);
 	else
@@ -214,8 +214,8 @@ void	mur_show_header(jnl_ctl_list * jctl)
 		MEMCPY_LIT(time_str, ZERO_TIME_LITERAL);
 	}
 	util_out_print(" Turn Around Point Time       !20AD", TRUE, time_len, time_str);
-	util_out_print(" Start Region Sequence Number !20@UJ [0x!16@XJ]", TRUE, &hdr->start_seqno, &hdr->start_seqno);
-	util_out_print(" End Region Sequence Number   !20@UJ [0x!16@XJ]", TRUE, &hdr->end_seqno, &hdr->end_seqno);
+	util_out_print(" Start Region Sequence Number !20@UQ [0x!16@XQ]", TRUE, &hdr->start_seqno, &hdr->start_seqno);
+	util_out_print(" End Region Sequence Number   !20@UQ [0x!16@XQ]", TRUE, &hdr->end_seqno, &hdr->end_seqno);
 
 	util_out_print("!/Process That Created the Journal File:!/", TRUE);
 	mur_show_jpv(&hdr->who_created, TRUE);

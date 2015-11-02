@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void dse_f_free(void)
 	sm_uc_ptr_t	lmap_base;
 	int4		bplmap, total_blks;
 	int4		util_len, master_bit, lmap_bit, hint_over_bplmap, hint_mod_bplmap;
-	boolean_t	dummy_bool, was_crit;
+	boolean_t	was_crit;
 	int4		dummy_int, nocrit_present;
 	cache_rec_ptr_t	dummy_cr;
 	error_def(ERR_DSEBLKRDFAIL);
@@ -89,7 +89,7 @@ void dse_f_free(void)
 	else
 		total_blks = bplmap;
 
-	lmap_bit = bml_find_free(hint_mod_bplmap, lmap_base + sizeof(blk_hdr), total_blks, &dummy_bool);
+	lmap_bit = bml_find_free(hint_mod_bplmap, lmap_base + sizeof(blk_hdr), total_blks);
 	if (lmap_bit == -1)
 	{	memcpy(util_buff,"Error: bit map in block ",24);
 		util_len = 24;

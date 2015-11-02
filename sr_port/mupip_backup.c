@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -200,6 +200,9 @@ void mupip_backup(void)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	jnl_tm_t		save_gbl_jrec_time;
+	gd_region		*r_save, *reg;
+	int			sync_io_status;
+	boolean_t		sync_io, sync_io_specified;
 #if defined(VMS)
 	struct FAB		temp_fab;
 	struct NAM		temp_nam;
@@ -212,9 +215,6 @@ void mupip_backup(void)
 #elif defined(UNIX)
 	struct stat		stat_buf;
 	int			fstat_res, fclose_res, tmpfd;
-	int			sync_io_status;
-	boolean_t		sync_io, sync_io_specified;
-	gd_region		*r_save, *reg;
 	gd_segment		*seg;
 	char			instfilename[MAX_FN_LEN + 1], *errptr;
 	unsigned int		full_len;
@@ -320,16 +320,14 @@ void mupip_backup(void)
 		newjnlfiles_specified = newjnlfiles = TRUE;
 		if (CLI_NEGATED == cli_present("NEWJNLFILES.PREVLINK"))
 			keep_prev_link = FALSE;
-		UNIX_ONLY(
-			sync_io_status = cli_present("NEWJNLFILES.SYNC_IO");
-			sync_io_specified = TRUE;
-			if (CLI_PRESENT == sync_io_status)
-				sync_io = TRUE;
-			else if (CLI_NEGATED == sync_io_status)
-				sync_io = FALSE;
-			else
-				sync_io_specified = FALSE;
-		)
+		sync_io_status = cli_present(UNIX_ONLY("NEWJNLFILES.SYNC_IO") VMS_ONLY("NEWJNLFILES.CACHE"));
+		sync_io_specified = TRUE;
+		if (CLI_PRESENT == sync_io_status)
+			sync_io = UNIX_ONLY(TRUE) VMS_ONLY(FALSE);
+		else if (CLI_NEGATED == sync_io_status)
+			sync_io = UNIX_ONLY(FALSE) VMS_ONLY(TRUE);
+		else
+			sync_io_specified = FALSE;
 	} else if (CLI_NEGATED == cli_present("NEWJNLFILES"))
 	{
 		keep_prev_link = FALSE; /* for safety */
@@ -920,7 +918,7 @@ repl_inst_bkup_done:
 				util_out_print("Replication Instance file !AD backed up in file !AD", TRUE,
 					LEN_AND_STR(instfilename),
 					mu_repl_inst_reg_list->backup_file.len, mu_repl_inst_reg_list->backup_file.addr);
-				util_out_print("Journal Seqnos up to 0x!16@XJ are backed up.", TRUE, &jnl_seqno);
+				util_out_print("Journal Seqnos up to 0x!16@XQ are backed up.", TRUE, &jnl_seqno);
 				util_out_print("", TRUE);
 			} else
 				util_out_print("Error backing up replication instance file !AD. Moving on to other backups.",
@@ -1091,10 +1089,8 @@ repl_inst_bkup_done:
 							cs_data->trans_hist.header_open_tn = jnl_info.tn;
 							cs_data->jnl_state = jnl_info.jnl_state;
 							cs_data->repl_state = jnl_info.repl_state;
-							UNIX_ONLY(
-								if (newjnlfiles_specified && sync_io_specified)
-									cs_data->jnl_sync_io = sync_io;
-							)
+							if (newjnlfiles_specified && sync_io_specified)
+								cs_data->jnl_sync_io = sync_io;
 							cs_data->jnl_checksum = jnl_info.checksum;
 							gtm_putmsg(VARLSTCNT(10) ERR_JNLCREATE, 8, jnl_info.jnl_len, jnl_info.jnl,
 								LEN_AND_LIT("region"), REG_LEN_STR(gv_cur_region),

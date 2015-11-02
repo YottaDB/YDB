@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -218,6 +218,12 @@ unsigned char mu_cre_file(void)
 	cs_data->start_vbn = START_VBN_CURRENT;
 	cs_data->free_space += (START_VBN_CURRENT - norm_vbn) * DISK_BLOCK_SIZE;
 	cs_data->acc_meth = gv_cur_region->dyn.addr->acc_meth;
+	if ((dba_mm == cs_data->acc_meth) && (gv_cur_region->jnl_before_image))
+	{
+		PRINTF("MM access method not compatible with BEFORE image journaling; Database file %s not created.\n", path);
+		CLEANUP(EXIT_ERR);
+		return EXIT_ERR;
+	}
 	if (udi->raw)
 	{
 		/* calculate total blocks, reduce to make room for the

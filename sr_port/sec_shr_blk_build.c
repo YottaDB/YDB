@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,8 +36,9 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 	boolean_t	do_accounting;
 
 	array = (blk_segment *)cse->upd_addr;
-	assert(csa->now_crit && csa->read_write);
-	do_accounting = TRUE;	/* used by SECSHR_ACCOUNTING macro */
+	assert(csa->read_write);
+	if (csa->now_crit)	/* csa->now_crit can be FALSE if we are finishing bg_update_phase2 part of the commit */
+		do_accounting = TRUE;	/* used by SECSHR_ACCOUNTING macro */
 	if (!(GTM_PROBE(sizeof(blk_segment), array, READ)))
 	{
 		SECSHR_ACCOUNTING(4);
@@ -58,6 +59,8 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 	}
 	/* block transaction number needs to be modified first. see comment in gvcst_blk_build as to why */
 	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
+	assert(csa->now_crit || (ctn < csd->trans_hist.curr_tn));
+	assert(!csa->now_crit || (ctn == csd->trans_hist.curr_tn));
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
 	((blk_hdr_ptr_t)base_addr)->levl = cse->level;
@@ -99,6 +102,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 				assert(FALSE);
 				return FALSE;
 			}
+			DBG_BG_PHASE2_CHECK_CR_IS_PINNED(csa, seg);
 			memmove(ptr, seg->addr, seg->len);
 			ptr += seg->len;
 		}
@@ -140,6 +144,7 @@ int sec_shr_blk_build(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, boolean_t is_bg,
 				assert(FALSE);
 				return FALSE;
 			}
+			DBG_BG_PHASE2_CHECK_CR_IS_PINNED(csa, seg);
 			memmove(ptr, seg->addr, seg->len);
 		}
 	}

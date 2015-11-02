@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,15 +84,15 @@ void tp_incr_commit(void)
 						 * the first element may be an intermediate element in the vertical list and
 						 * buddy list wont permit use of both free_element() and free_last_n_elements()
 						 * with a given list together.
-						 * This might disturb the tp_srch_status->ptr, so reset it properly.
+						 * This might disturb the tp_srch_status->cse, so reset it properly.
 						 */
 						if (NULL != (tabent = lookup_hashtab_int4(si->blks_in_use, (uint4 *)&cse->blk)))
 							tp_srch_status = tabent->value;
 						else
 							tp_srch_status = NULL;
-						assert(!tp_srch_status || tp_srch_status->ptr == cse);
+						assert(!tp_srch_status || tp_srch_status->cse == cse);
 						if (tp_srch_status)
-							tp_srch_status->ptr = low_cse;
+							tp_srch_status->cse = low_cse;
 						assert(low_cse == orig_cse);
 						/* Members that may not be uptodate in cse need to be copied back from low_cse.
 						 * They are next_cw_set, prev_cw_set, new_buff and done.

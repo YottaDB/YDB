@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,14 +79,15 @@ bool	lke_showlock(
 		     bool		wait,
 		     bool		interactive,
 		     int4 		pid,
-		     mstr		one_lock)
+		     mstr		one_lock,
+		     boolean_t		exact)
 {
 	mlk_prcblk	pblk;
 	mlk_prcblk_ptr_t r;
 	mlk_shrsub_ptr_t value;
 	short		len1;
 	int 		len2;
-	bool		lock = FALSE, owned;
+	boolean_t	lock = FALSE, owned;
 	UINTPTR_T	f[7];
         int4            gtcmbufidx, item, ret;
 	uint4		status;
@@ -216,13 +217,17 @@ bool	lke_showlock(
 					assert((len1 + len2) < sizeof(format));
 					if (NULL == lnk)
 					{
-						if (!memcmp(name->addr, one_lock.addr, one_lock.len) || (NULL == one_lock.addr))
+						if ((NULL == one_lock.addr) ||
+							(!memcmp(name->addr, one_lock.addr, one_lock.len)
+							&& (!exact || (one_lock.len == f[0]))))
 							util_out_print(format, FLUSH, f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
 					} else
 						util_cm_print(lnk, CMMS_V_LKESHOW, format, FLUSH,
 							      f[0], f[1], f[2], f[3], f[4], f[5], f[6]);
 				}
-				if (memcmp(name->addr, one_lock.addr, one_lock.len) && (NULL != one_lock.addr))
+				if ((NULL != one_lock.addr) &&
+					(memcmp(name->addr, one_lock.addr, one_lock.len) ||
+					(exact && (one_lock.len != f[0]))))
 				{
 					lock = FALSE;
 					return lock;

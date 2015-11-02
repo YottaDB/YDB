@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,12 +14,21 @@
 #include "real_len.h"
 
 /* A utility routine to compute the length of a string, exclusive of trailing blanks or nuls
-   (NOTE:  this routine is also called from mur_output_show() and the mur_extract_*() routines) */
+ * (NOTE:  this routine is also called from mur_output_show() and the mur_extract_*() routines)
+ */
 int real_len(int length, unsigned char *str)
 {
-	int	clen;	/* current length */
-	for (clen = length - 1;  clen >= 0  &&  (str[clen] == ' '  ||  str[clen] == '\0');  --clen)
-		;
-	return clen + 1;
-}
+	int		clen;	/* current length */
 
+	/* Find first 'nul' in string */
+	for (clen = 0; (clen < length) && ('\0' != str[clen]); clen++)
+		;
+	/* Remove trailing blanks just before the 'nul' point */
+	if (clen)
+	{
+		for (clen--; (clen >= 0) && (' ' == str[clen]); clen--)
+			;
+		clen++;
+	}
+	return clen;
+}

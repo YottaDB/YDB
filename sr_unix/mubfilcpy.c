@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,6 +38,7 @@
 #include "gtm_tempnam.h"
 #include "gds_blk_downgrade.h"
 #include "shmpool.h"
+#include "wcs_phase2_commit_wait.h"
 
 #ifdef __MVS__
 #define TMPDIR_ACCESS_MODE	R_OK | W_OK | X_OK
@@ -53,13 +54,14 @@
 						return FALSE;			\
 					}
 
-GBLREF	bool		file_backed_up;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	bool		record;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	bool		online;
-GBLREF	uint4           process_id;
-GBLREF	boolean_t	debug_mupip;
+GBLREF	bool			file_backed_up;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	bool			record;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	bool			online;
+GBLREF	uint4			process_id;
+GBLREF	boolean_t		debug_mupip;
 
 bool	mubfilcpy (backup_reg_list *list)
 {
@@ -67,7 +69,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	unsigned char		command[MAX_FN_LEN * 2 + 5]; /* 5 == max(sizeof("cp"),sizeof("mv")) + 2 (space) + 1 (NULL) */
 	sgmnt_data_ptr_t	header_cpy;
 	int4			backup_fd = -1, size, vbn, counter, hdrsize, rsize, ntries;
-        ssize_t                 status;
+	ssize_t                 status;
 	int4			save_errno, adjust, blk_num, temp, rv, tempfilelen;
 	struct stat		stat_buf;
 	off_t			filesize, handled, offset;
@@ -79,10 +81,11 @@ bool	mubfilcpy (backup_reg_list *list)
 	shmpool_blk_hdr_ptr_t	sblkh_p;
 
 	error_def(ERR_BCKUPBUFLUSH);
-	error_def(ERR_TMPFILENOCRE);
-	error_def(ERR_TEXT);
+	error_def(ERR_COMMITWAITSTUCK);
 	error_def(ERR_DBCCERR);
 	error_def(ERR_ERRCALL);
+	error_def(ERR_TEXT);
+	error_def(ERR_TMPFILENOCRE);
 
 	file = &(list->backup_file);
 	file->addr[file->len] = '\0';
@@ -112,7 +115,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	{
 		save_errno = errno;
 		errptr = (char *)STRERROR(save_errno);
-                util_out_print("access : !AZ", TRUE, errptr);
+		util_out_print("access : !AZ", TRUE, errptr);
 		if (online)
 			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 		util_out_print("ERROR: Do NOT have full access to directory !AD", TRUE,
@@ -158,7 +161,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-                	util_out_print("system : !AZ", TRUE, errptr);
+			util_out_print("system : !AZ", TRUE, errptr);
 		}
 		if (online)
 			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
@@ -171,7 +174,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	{
 		save_errno = errno;
 		errptr = (char *)STRERROR(save_errno);
-                util_out_print("open : !AZ", TRUE, errptr);
+		util_out_print("open : !AZ", TRUE, errptr);
 		if (online)
 			cs_addrs->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 		util_out_print("Error opening backup file !AD.", TRUE, file->len, file->addr);
@@ -189,7 +192,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-                	util_out_print("fstat : !AZ", TRUE, errptr);
+			util_out_print("fstat : !AZ", TRUE, errptr);
 			util_out_print("Error obtaining status of backup file !AD.", TRUE, file->len, file->addr);
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 			CLEANUP_AND_RETURN_FALSE;
@@ -204,7 +207,7 @@ bool	mubfilcpy (backup_reg_list *list)
 			{
 				save_errno = errno;
 				errptr = (char *)STRERROR(save_errno);
-                		util_out_print("ftruncate : !AZ", TRUE, errptr);
+				util_out_print("ftruncate : !AZ", TRUE, errptr);
 				util_out_print("Error truncating backup file !AD.", TRUE, file->len, file->addr);
 				util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 				CLEANUP_AND_RETURN_FALSE;
@@ -220,7 +223,6 @@ bool	mubfilcpy (backup_reg_list *list)
 			}
 			free(zero_blk);
 		}
-
 		/* By getting crit here, we ensure that there is no process still in transaction logic that sees
 		   (nbb != BACKUP_NOT_IN_PRORESS). After rel_crit(), any process that enters transaction logic will
 		   see (nbb == BACKUP_NOT_IN_PRORESS) because we just set it to that value. At this point, backup
@@ -228,6 +230,25 @@ bool	mubfilcpy (backup_reg_list *list)
 		   backup.
 		*/
 		grab_crit(gv_cur_region);
+		if (dba_bg == cs_data->acc_meth)
+		{	/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen
+			 * outside of crit, we dont want them to keep writing to the backup temporary file even after the
+			 * backup is complete and the temporary file has been deleted.
+			 */
+			if (cs_addrs->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(cs_addrs, NULL))
+			{
+				assert(FALSE);
+				gtm_putmsg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
+					cs_addrs->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
+				rel_crit(gv_cur_region);
+				CLEANUP_AND_RETURN_FALSE;
+			}
+		}
+		if (debug_mupip)
+		{
+			util_out_print("MUPIP INFO:   Current Transaction # at end of backup is 0x!16@XQ", TRUE,
+				&cs_data->trans_hist.curr_tn);
+		}
 		rel_crit(gv_cur_region);
 		counter = 0;
 		while ((0 != cs_addrs->shmpool_buffer->backup_cnt) && (0 == cs_addrs->shmpool_buffer->failed))
@@ -256,6 +277,7 @@ bool	mubfilcpy (backup_reg_list *list)
 
 		if (0 != cs_addrs->shmpool_buffer->failed)
 		{
+			assert(EACCES == cs_addrs->shmpool_buffer->backup_errno);
 			util_out_print("Process !UL encountered the following error.", TRUE, cs_addrs->shmpool_buffer->failed);
 			if (0 != cs_addrs->shmpool_buffer->backup_errno)
 				gtm_putmsg(VARLSTCNT(1) cs_addrs->shmpool_buffer->backup_errno);
@@ -268,7 +290,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-                	util_out_print("fstat : !AZ", TRUE, errptr);
+			util_out_print("fstat : !AZ", TRUE, errptr);
 			util_out_print("Error obtaining status of temporary file !AD.",
 				       TRUE, LEN_AND_STR(list->backup_tempfile));
 			util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
@@ -292,7 +314,7 @@ bool	mubfilcpy (backup_reg_list *list)
 				if (0 < status)
 				{
 					errptr = (char *)STRERROR((int)status);
-                			util_out_print("read : ", TRUE, errptr);
+					util_out_print("read : ", TRUE, errptr);
 					util_out_print("Error reading the temporary file !AD.",
 						       TRUE, LEN_AND_STR(list->backup_tempfile));
 				}
@@ -308,7 +330,7 @@ bool	mubfilcpy (backup_reg_list *list)
 				assert(sblkh_p->valid_data);
 				blk_num = sblkh_p->blkid;
 				if (debug_mupip)
-					util_out_print("MUPIP INFO:     Restoring block 0x!8XL from temporary file.",
+					util_out_print("MUPIP INFO:     Restoring block 0x!XL from temporary file.",
 						       TRUE, blk_num);
 				if (blk_num < header_cpy->trans_hist.total_blks)
 				{
@@ -327,22 +349,22 @@ bool	mubfilcpy (backup_reg_list *list)
 					if (cs_addrs->do_fullblockwrites)
 						size = (int4)ROUND_UP(size, cs_addrs->fullblockwrite_len);
 					assert(cs_addrs->hdr->blk_size >= size);
-                        		offset = (header_cpy->start_vbn - 1) * DISK_BLOCK_SIZE
+					offset = (header_cpy->start_vbn - 1) * DISK_BLOCK_SIZE
 						+ ((off_t)header_cpy->blk_size * blk_num);
-                        		LSEEKWRITE(backup_fd,
-                        		           offset,
-                        		           inbuf,
-                        		           size,
-                        		           save_errno);
-                        		if (0 != save_errno)
-                        		{
-                        		        util_out_print("Error accessing output file !AD. Aborting restore.",
+					LSEEKWRITE(backup_fd,
+						   offset,
+						   inbuf,
+						   size,
+						   save_errno);
+					if (0 != save_errno)
+					{
+						util_out_print("Error accessing output file !AD. Aborting restore.",
 							       TRUE, file->len, file->addr);
 						errptr = (char *)STRERROR(save_errno);
-                				util_out_print("write : !AZ", TRUE, errptr);
+						util_out_print("write : !AZ", TRUE, errptr);
 						free(sblkh_p);
 						CLEANUP_AND_RETURN_FALSE;
-                        		}
+					}
 				} /* Else ignore block that is larger than file was at time backup initiated */
 				DOREADRC(list->backup_fd, (sm_uc_ptr_t)sblkh_p, rsize, save_errno);
 				if (0 != save_errno)
@@ -352,7 +374,7 @@ bool	mubfilcpy (backup_reg_list *list)
 						util_out_print("Error accessing temporary file !AD.",
 							       TRUE, LEN_AND_STR(list->backup_tempfile));
 						errptr = (char *)STRERROR(save_errno);
-                				util_out_print("read : !AZ", TRUE, errptr);
+						util_out_print("read : !AZ", TRUE, errptr);
 						free(sblkh_p);
 						CLEANUP_AND_RETURN_FALSE;
 					} else
@@ -370,7 +392,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	if (0 != save_errno)
 	{
 		errptr = (char *)STRERROR(save_errno);
-               	util_out_print("write : !AZ", TRUE, errptr);
+		util_out_print("write : !AZ", TRUE, errptr);
 		util_out_print("Error writing data to backup file !AD.", TRUE, file->len, file->addr);
 		util_out_print("WARNING: backup file !AD is not valid.", TRUE, file->len, file->addr);
 		CLEANUP_AND_RETURN_FALSE;
@@ -396,7 +418,7 @@ bool	mubfilcpy (backup_reg_list *list)
 		{
 			save_errno = errno;
 			errptr = (char *)STRERROR(save_errno);
-               		util_out_print("system : !AZ", TRUE, errptr);
+			util_out_print("system : !AZ", TRUE, errptr);
 		}
 		util_out_print("Error doing !AD", TRUE, 4 + gv_cur_region->dyn.addr->fname_len + tempfilelen, command);
 		CLEANUP_AND_RETURN_FALSE;
@@ -405,7 +427,7 @@ bool	mubfilcpy (backup_reg_list *list)
 
 	util_out_print("DB file !AD backed up in file !AD", TRUE, gv_cur_region->dyn.addr->fname_len,
 		       gv_cur_region->dyn.addr->fname, file->len, file->addr);
-	util_out_print("Transactions up to 0x!16@XJ are backed up.", TRUE, &header_cpy->trans_hist.curr_tn);
+	util_out_print("Transactions up to 0x!16@XQ are backed up.", TRUE, &header_cpy->trans_hist.curr_tn);
 	cs_addrs->hdr->last_com_backup = header_cpy->trans_hist.curr_tn;
 	cs_addrs->hdr->last_com_bkup_last_blk = header_cpy->trans_hist.total_blks;
 	if (record)

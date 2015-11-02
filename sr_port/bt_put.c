@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,7 @@
 #include "wcs_recover.h"
 #include "wcs_get_space.h"
 #include "jnl.h"
+#include "wbox_test_init.h"
 
 #ifdef DEBUG
 static	int4		entry_count = 0;
@@ -34,12 +35,12 @@ GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
 GBLREF	uint4			process_id;
 GBLREF 	jnl_gbls_t		jgbl;
 
-bt_rec_ptr_t bt_put(gd_region *r, int4 block)
+bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 {
-	bt_rec_ptr_t		p, q0, q1, hdr;
+	bt_rec_ptr_t		bt, q0, q1, hdr;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	cache_rec_ptr_t		w;
+	cache_rec_ptr_t		cr;
 	th_rec_ptr_t		th;
 	trans_num		lcl_tn;
 	uint4			lcnt;
@@ -48,52 +49,54 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 	error_def(ERR_WCFAIL);
 	error_def(ERR_WCBLOCKED);
 
-	csa = (sgmnt_addrs *)&FILE_INFO(r)->s_addrs;
+	csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	assert(csa->now_crit || csd->clustered);
 	assert(dba_mm != csa->hdr->acc_meth);
 	lcl_tn = csa->ti->curr_tn;
 	hdr = csa->bt_header + (block % csd->bt_buckets);
 	assert(BT_QUEHEAD == hdr->blk);
-	for (lcnt = 0, p = (bt_rec_ptr_t)((sm_uc_ptr_t)hdr + hdr->blkque.fl);  ;
-		p = (bt_rec_ptr_t)((sm_uc_ptr_t)p + p->blkque.fl), lcnt++)
+	for (lcnt = 0, bt = (bt_rec_ptr_t)((sm_uc_ptr_t)hdr + hdr->blkque.fl);  ;
+		bt = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->blkque.fl), lcnt++)
 	{
-		if (BT_QUEHEAD == p->blk)
+		if (BT_QUEHEAD == bt->blk)
 		{	/* there is no matching bt */
-			assert(p == hdr);
-			p = (bt_rec_ptr_t)((sm_uc_ptr_t)(csa->th_base) + csa->th_base->tnque.fl - sizeof(th->tnque));
-			if (CR_NOTVALID != p->cache_index)
+			assert(bt == hdr);
+			bt = (bt_rec_ptr_t)((sm_uc_ptr_t)(csa->th_base) + csa->th_base->tnque.fl - sizeof(th->tnque));
+			if (CR_NOTVALID != bt->cache_index)
 			{	/* the oldest bt is still valid */
 				assert(!in_wcs_recover);
-				w = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, p->cache_index);
-				if (w->dirty)
+				cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
+				if (cr->dirty)
 				{	/* get it written so it can be reused */
 					BG_TRACE_PRO_ANY(csa, bt_put_flush_dirty);
-					if (FALSE == wcs_get_space(r, 0, w))
+					if (FALSE == wcs_get_space(reg, 0, cr))
 					{
-						assert(FALSE);
+						assert(csd->wc_blocked);	/* only reason we currently know
+										 * why wcs_get_space could fail */
+						assert(gtm_white_box_test_case_enabled);
 						BG_TRACE_PRO_ANY(csa, wcb_bt_put);
 						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bt_put"),
-							process_id, &lcl_tn, DB_LEN_STR(r));
+							process_id, &lcl_tn, DB_LEN_STR(reg));
 						return NULL;
 					}
 				}
-				p->cache_index = CR_NOTVALID;
-				w->bt_index = 0;
+				bt->cache_index = CR_NOTVALID;
+				cr->bt_index = 0;
 			}
-			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)p + p->blkque.fl);
+			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->blkque.fl);
 			q1 = (bt_rec_ptr_t)remqt((que_ent_ptr_t)q0);
 			if (EMPTY_QUEUE == (sm_long_t)q1)
 				rts_error(VARLSTCNT(3) ERR_BTFAIL, 1, 1);
-			p->blk = block;
-			p->killtn = lcl_tn;
-			insqt((que_ent_ptr_t)p, (que_ent_ptr_t)hdr);
+			bt->blk = block;
+			bt->killtn = lcl_tn;
+			insqt((que_ent_ptr_t)bt, (que_ent_ptr_t)hdr);
 			th = (th_rec_ptr_t)remqh((que_ent_ptr_t)csa->th_base);
 			if (EMPTY_QUEUE == (sm_long_t)th)
 				GTMASSERT;
 			break;
 		}
-		if (p->blk == block)
+		if (bt->blk == block)
 		{	/* bt_put should never be called twice for the same block with the same lcl_tn. This is because
 			 * t_end/tp_tend update every block only once as part of each update transaction. Assert this.
 			 * The two exceptions are
@@ -108,19 +111,19 @@ bt_rec_ptr_t bt_put(gd_region *r, int4 block)
 			 *	and potentially with the same tn. This is because the state of the queues is questionable
 			 *	and there could be more than one cache record for a given block number.
 			 */
-			assert(in_wcs_recover || (p->tn < lcl_tn) || (jgbl.forw_phase_recovery && !JNL_ENABLED(csa)));
-			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)p + p->tnque.fl);
+			assert(in_wcs_recover || (bt->tn < lcl_tn) || (jgbl.forw_phase_recovery && !JNL_ENABLED(csa)));
+			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->tnque.fl);
 			th = (th_rec_ptr_t)remqt((que_ent_ptr_t)((sm_uc_ptr_t)q0 + sizeof(th->tnque)));
 			if (EMPTY_QUEUE == (sm_long_t)th)
 				GTMASSERT;
 			break;
 		}
-		if (0 == p->blkque.fl)
+		if (0 == bt->blkque.fl)
 			rts_error(VARLSTCNT(3) ERR_BTFAIL, 1, 2);
 		if (lcnt >= csd->n_bts)
 			rts_error(VARLSTCNT(3) ERR_BTFAIL, 1, 3);
 	}
 	insqt((que_ent_ptr_t)th, (que_ent_ptr_t)csa->th_base);
-	p->tn = lcl_tn;
-	return p;
+	bt->tn = lcl_tn;
+	return bt;
 }

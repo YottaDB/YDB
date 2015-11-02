@@ -34,7 +34,7 @@
 #include "send_msg.h"
 #include "longset.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
-#include "wcs_recover.h"
+#include "wcs_mm_recover.h"
 #include "wcs_sleep.h"
 #include "have_crit.h"
 #include "gdsbgtr.h"		/* for the BG_TRACE_PRO macros */
@@ -53,6 +53,10 @@ GBLREF	unsigned int		t_tries;
 GBLREF	uint4			t_err;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_dollar_incr;
+#ifdef DEBUG
+GBLREF	boolean_t		ok_to_call_wcs_recover;	/* see comment in gbldefs.c for purpose */
+GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#endif
 
 void t_retry(enum cdb_sc failure)
 {
@@ -70,27 +74,42 @@ void t_retry(enum cdb_sc failure)
 	t_fail_hist[t_tries] = (unsigned char)failure;
 	if (mu_reorg_process)
 		CWS_RESET;
+	DEBUG_ONLY(donot_commit = FALSE;)
 	if (0 == dollar_tlevel)
 	{
 		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(cs_addrs, failure);	/* set wc_blocked if cache related status */
 		cs_addrs->hdr->n_retries[t_tries]++;
 		if (cs_addrs->critical)
 			crash_count = cs_addrs->critical->crashcnt;
-		if (cdb_sc_jnlclose == failure || cdb_sc_jnlstatemod == failure || cdb_sc_backupstatemod == failure)
-			t_tries--;
-		if ((CDB_STAGNATE <= ++t_tries) || (cdb_sc_future_read == failure) || (cdb_sc_helpedout == failure))
+		/* If the restart code is something that should not increment t_tries, handle that by decrementing t_tries
+		 * for these special codes just before incrementing it unconditionally. Note that this should be done ONLY IF
+		 * t_tries is CDB_STAGNATE or higher and not for lower values as otherwise it can cause livelocks (e.g.
+		 * because csd->wc_blocked is set to TRUE, it is possible we end up restarting with cdb_sc_helpedout
+		 * without even doing a cache-recovery (due to the fast path in t_end that does not invoke grab_crit in case
+		 * of read-only transactions). In this case, not incrementing t_tries will cause us to eternally retry
+		 * the transaction with no one eventually grabbing crit and doing the cache-recovery).
+		 */
+		assert(CDB_STAGNATE >= t_tries);
+		if ((CDB_STAGNATE <= t_tries)
+			&& ((cdb_sc_jnlclose == failure) || (cdb_sc_jnlstatemod == failure) || (cdb_sc_backupstatemod == failure)
+				|| (cdb_sc_future_read == failure) || (cdb_sc_helpedout == failure)))
+			t_tries = CDB_STAGNATE - 1;
+		if (CDB_STAGNATE <= ++t_tries)
 		{
+			DEBUG_ONLY(ok_to_call_wcs_recover = TRUE;)
 			grab_crit(gv_cur_region);
-			if ((dba_mm == cs_addrs->hdr->acc_meth) &&		/* we have MM and.. */
-				(cs_addrs->total_blks != cs_addrs->ti->total_blks))	/* and file has been extended */
-					wcs_recover(gv_cur_region);
+			if ((dba_mm == cs_addrs->hdr->acc_meth)					/* we have MM and.. */
+					&& (cs_addrs->total_blks != cs_addrs->ti->total_blks))	/* and file has been extended */
+				wcs_mm_recover(gv_cur_region);
+			DEBUG_ONLY(ok_to_call_wcs_recover = FALSE;)
 			if (CDB_STAGNATE > t_tries)
 				rel_crit(gv_cur_region);
-			else  if (CDB_STAGNATE < t_tries)
+			else if (CDB_STAGNATE < t_tries)
 			{
-				if ((cdb_sc_helpedout == failure) || (cdb_sc_future_read == failure))
-					t_tries = CDB_STAGNATE;		/* don't let it creep up on special cases */
-				else if (cdb_sc_unfreeze_getcrit == failure)
+				assert((failure != cdb_sc_helpedout) && (failure != cdb_sc_future_read)
+					&& (failure != cdb_sc_jnlclose) && (failure != cdb_sc_jnlstatemod)
+					&& (failure != cdb_sc_backupstatemod));
+				if (cdb_sc_unfreeze_getcrit == failure)
 				{
 					GRAB_UNFROZEN_CRIT(gv_cur_region, cs_addrs, cs_data);
 					t_tries = CDB_STAGNATE;
@@ -119,7 +138,7 @@ void t_retry(enum cdb_sc failure)
 			}
 		} else  if (cdb_sc_readblocked == failure)
 		{
-			if (TRUE == cs_addrs->now_crit)
+			if (cs_addrs->now_crit)
 			{
 				assert(FALSE);
 				rel_crit(gv_cur_region);

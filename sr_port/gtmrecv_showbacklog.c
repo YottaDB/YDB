@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,19 +49,19 @@ int gtmrecv_showbacklog(void)
 	QWASSIGN(read_jnl_seqno, recvpool.upd_proc_local->read_jnl_seqno);
 
 	QWSUB(seq_num, jnl_seqno, read_jnl_seqno);
-	util_out_print("!@UJ : number of backlog transactions received by receiver server and yet to be processed "
+	util_out_print("!@UQ : number of backlog transactions received by receiver server and yet to be processed "
 		       "by update process", TRUE, &seq_num);
 
 	QWASSIGN(seq_num, jnl_seqno);
 	if (QWNE(seq_num, seq_num_zero))
 		QWDECRBY(seq_num, seq_num_one);
-	util_out_print("!@UJ : sequence number of last transaction received from Source Server and written to receive pool",
+	util_out_print("!@UQ : sequence number of last transaction received from Source Server and written to receive pool",
 			TRUE, &seq_num);
 
 	QWASSIGN(seq_num, read_jnl_seqno);
 	if (QWNE(seq_num, seq_num_zero))
 		QWDECRBY(seq_num, seq_num_one);
-	util_out_print("!@UJ : sequence number of last transaction processed by update process", TRUE, &seq_num);
+	util_out_print("!@UQ : sequence number of last transaction processed by update process", TRUE, &seq_num);
 
 	return (NORMAL_SHUTDOWN);
 }

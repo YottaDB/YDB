@@ -1,5 +1,5 @@
 /****************************************************************
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,14 +87,15 @@ GBLREF int4		zdir_form;
 GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF int4		zdate_form;
 GBLREF mval		dollar_ztexit;
-GBLREF int		totalAlloc;
-GBLREF int		totalRmalloc;
-GBLREF int		totalUsed;
-GBLREF int		totalAllocGta;
-GBLREF int		totalRallocGta;
-GBLREF int		totalUsedGta;
+GBLREF size_t		totalAlloc;
+GBLREF size_t		totalRmalloc;
+GBLREF size_t		totalUsed;
+GBLREF size_t		totalAllocGta;
+GBLREF size_t		totalRallocGta;
+GBLREF size_t		totalUsedGta;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
+GBLREF boolean_t	dollar_zquit_anyway;
 
 LITREF mval		literal_zero,literal_one;
 LITREF char		gtm_release_name[];
@@ -104,6 +105,7 @@ void op_svget(int varnum, mval *v)
 {
 	io_log_name	*tl;
 	int 		count;
+	unsigned int	ucount;
 	char		*c1, *c2;
 
 	error_def(ERR_UNIMPLOP);
@@ -206,6 +208,9 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZEOF:
 			*v = io_curr_device.in->dollar.zeof ? literal_one : literal_zero;
+			break;
+		case SV_ZQUIT:
+			*v = dollar_zquit_anyway ? literal_one : literal_zero;
 			break;
 		case SV_IO:
 			v->str.addr = io_curr_device.in->name->dollar_io;
@@ -352,16 +357,16 @@ void op_svget(int varnum, mval *v)
 			*v = dollar_ztexit;
 			break;
 		case SV_ZALLOCSTOR:
-			count = totalAlloc + totalAllocGta;
-			MV_FORCE_MVAL(v, count);
+			ucount = totalAlloc + totalAllocGta;
+			MV_FORCE_UMVAL(v, ucount);
 			break;
 		case SV_ZREALSTOR:
-			count = totalRmalloc + totalRallocGta;
-			MV_FORCE_MVAL(v, count);
+			ucount = totalRmalloc + totalRallocGta;
+			MV_FORCE_UMVAL(v, ucount);
 			break;
 		case SV_ZUSEDSTOR:
-			count = totalUsed + totalUsedGta;
-			MV_FORCE_MVAL(v, count);
+			ucount = totalUsed + totalUsedGta;
+			MV_FORCE_UMVAL(v, ucount);
 			break;
 		case SV_ZCHSET:
 			v->mvtype = MV_STR;

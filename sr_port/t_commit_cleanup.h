@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,5 +13,19 @@
 #define T_COMMIT_CLEANUP_DEFINED
 
 boolean_t t_commit_cleanup(enum cdb_sc status, int signal);
+
+#define	INVOKE_T_COMMIT_CLEANUP(status, csa)						\
+{											\
+	boolean_t	retvalue;							\
+											\
+	assert(gtm_white_box_test_case_enabled);					\
+	retvalue = t_commit_cleanup(status, 0);						\
+	/* return value of TRUE implies	secshr_db_clnup has done commit for us */	\
+	assert(retvalue);								\
+	/* reset status to normal as transaction is now complete */			\
+	status = cdb_sc_normal;								\
+	assert(!csa->now_crit);	/* assert that we do not hold crit any more */		\
+	assert(!csa->t_commit_crit); /* assert we are no longer in midst of commit */	\
+}
 
 #endif

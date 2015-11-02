@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +55,7 @@ void	mupcli_get_offset_size_value(uint4 *offset, uint4 *size, gtm_uint64_t *valu
 	}
 	if (0 != (*offset % *size))
 	{
-		util_out_print("Error: OFFSET [0x!8XL] should be a multiple of Size [!UL]", TRUE, *offset, *size);
+		util_out_print("Error: OFFSET [0x!XL] should be a multiple of Size [!UL]", TRUE, *offset, *size);
 		rts_error(VARLSTCNT(1) ERR_MUPCLIERR);
 	}
 	if (CLI_PRESENT == cli_present("VALUE"))
@@ -86,12 +86,12 @@ void	mupcli_edit_offset_size_value(sm_uc_ptr_t buff, uint4 offset, uint4 size, g
 	}
 	else if (sizeof(int4) == size)
 	{
-		SPRINTF(temp_str, "!UL [0x!8XL]");
+		SPRINTF(temp_str, "!UL [0x!XL]");
 		old_value = *(sm_uint_ptr_t)buff;
 	}
 	else if (sizeof(gtm_int64_t) == size)
 	{
-		SPRINTF(temp_str, "!@UJ [0x!@XJ]");
+		SPRINTF(temp_str, "!@UQ [0x!@XQ]");
 		old_value = *(qw_num_ptr_t)buff;
 	}
 	if (value_present)
@@ -106,7 +106,7 @@ void	mupcli_edit_offset_size_value(sm_uc_ptr_t buff, uint4 offset, uint4 size, g
 			*(qw_num_ptr_t)buff = value;
 	} else
 		value = old_value;
-	SPRINTF(temp_str1, "Offset !UL [0x!8XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
+	SPRINTF(temp_str1, "Offset !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
 		temp_str, temp_str);
 	if (sizeof(int4) >= size)
 		util_out_print(temp_str1, TRUE, offset, offset, (uint4)old_value, (uint4)old_value,

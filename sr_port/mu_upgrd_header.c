@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@
 #include "mu_upgrd_dngrd_hdr.h"
 #include "gtmmsg.h"
 #include "lockconst.h"
+#include "wcs_phase2_commit_wait.h"
 
 LITREF  char                    gtm_release_name[];
 LITREF  int4                    gtm_release_name_len;
@@ -63,7 +64,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->extension_size = v15_csd->extension_size;
 	csd->def_coll = v15_csd->def_coll;
 	csd->def_coll_ver = v15_csd->def_coll_ver;
-	csd->std_null_coll = v15_csd->std_null_coll;	/* New in V5.0-FT01 */
+	csd->std_null_coll = v15_csd->std_null_coll;					/* New in V5.0-FT01 */
 	csd->null_subs = v15_csd->null_subs;
 	csd->free_space = v15_csd->free_space;
 	csd->mutex_spin_parms.mutex_hard_spin_count = v15_csd->mutex_spin_parms.mutex_hard_spin_count;
@@ -72,7 +73,8 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->max_update_array_size = v15_csd->max_update_array_size;			/* New from V4.0-001G */
 	csd->max_non_bm_update_array_size = v15_csd->max_non_bm_update_array_size;	/* New from V4.0-001G */
 	csd->file_corrupt = v15_csd->file_corrupt;
-	csd->minor_dbver = (enum mdb_ver)GDSMVCURR;		/* New in V5.0-000 */
+	csd->minor_dbver = (enum mdb_ver)GDSMVCURR;					/* New in V5.0-000 */
+	csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;	/* New from V5.3-002 */
 	csd->createinprogress = v15_csd->createinprogress;
 	time(&ctime);
 	assert(sizeof(ctime) >= sizeof(int4));
@@ -90,7 +92,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->tn_upgrd_blks_0 = 0;								/* New in V5.0-000 */
 	csd->fully_upgraded = FALSE;								/* New in V5.0-000 */
 	csd->desired_db_format = (enum db_ver)GDSVCURR;							/* New in V5.0-000 */
-	csd->desired_db_format_tn = v15_csd->trans_hist.curr_tn;				/* New in V5.0-000 */
+	csd->desired_db_format_tn = v15_csd->trans_hist.curr_tn - 1;				/* New in V5.0-000 */
 	csd->reorg_db_fmt_start_tn = 0;								/* New in V5.0-000 */
 	csd->certified_for_upgrade_to = v15_csd->certified_for_upgrade_to;			/* New in V5.0-000 */
 	csd->master_map_len = MASTER_MAP_SIZE_V4;						/* New in V5.0-000 */

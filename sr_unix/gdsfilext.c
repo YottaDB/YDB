@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,7 +61,6 @@ GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	sgmnt_data_ptr_t cs_data;
 GBLREF	unsigned char	cw_set_depth;
 GBLREF	short		dollar_tlevel;
-GBLREF	gd_addr		*gd_header;
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	inctn_opcode_t	inctn_opcode;
 GBLREF	boolean_t	mu_reorg_process;
@@ -102,9 +101,10 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	error_def(ERR_DBFILERR);
 	error_def(ERR_DBFILEXT);
 	error_def(ERR_DSKSPACEFLOW);
+	error_def(ERR_JNLFLUSH);
+	error_def(ERR_TEXT);
 	error_def(ERR_TOTALBLKMAX);
 	error_def(ERR_WAITDSKSPACE);
-	error_def(ERR_TEXT);
 
 	/* Both blocks and total blocks are unsigned ints so make sure we aren't asking for huge numbers that will
 	   overflow and end up doing silly things.
@@ -149,8 +149,15 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 	/* If we are coming from mupip_extend (which gets crit itself) we better have waited for any unfreezes to occur */
 	assert(!was_crit || CDB_STAGNATE == t_tries || FALSE == cs_data->freeze);
 	for ( ; ; )
-	{
-		grab_crit(gv_cur_region);
+	{	/* If we are in the final retry and already hold crit, it is possible that csd->wc_blocked is also set to TRUE
+		 * (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
+		 * finished the job for it). In this case we do NOT want to invoke wcs_recover as that will update the "bt"
+		 * transaction numbers without correspondingly updating the history transaction numbers (effectively causing
+		 * a cdb_sc_blkmod type of restart). Therefore do NOT call grab_crit (which unconditionally invokes wcs_recover)
+		 * if we already hold crit.
+		 */
+		if (!was_crit)
+			grab_crit(gv_cur_region);
 		if (FALSE == cs_data->freeze)
 			break;
 		rel_crit(gv_cur_region);
@@ -250,6 +257,7 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 			return (uint4)(NO_FREE_SPACE);
 		}
 		cs_addrs->hdr = cs_data;
+		cs_addrs->ti = &cs_data->trans_hist;
 	}
 	if (new_blocks + cs_data->trans_hist.total_blks > MAXTOTALBLKS(cs_data))
 	{
@@ -321,7 +329,18 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		/* Harden INCTN to disk before updating/flushing database. This will ensure that any positive adjustment to the
 		 * blks_to_upgrd counter (stored in the inctn record) is seen by recovery before a V4 format bitmap block is.
 		 */
-		jnl_flush(gv_cur_region);
+		jnl_status = jnl_flush(gv_cur_region);
+		if (SS_NORMAL != jnl_status)
+		{
+			send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(cs_data),
+				ERR_TEXT, 2, RTS_ERROR_TEXT("Error with journal flush during gdsfilext"),
+				jnl_status);
+			assert(NOJNL == jpc->channel); /* jnl file lost has been triggered */
+			/* In this routine, all code that follows from here on does not assume anything about the
+			 * journaling characteristics of this database so it is safe to continue execution even though
+			 * journaling got closed in the middle. Let the caller deal with this situation.
+			 */
+		}
 	}
 	if (new_bit_maps)
 	{
@@ -363,15 +382,9 @@ uint4	 gdsfilext (uint4 blocks, uint4 filesize)
 		}
 #endif
 		free(cs_data);			/* note current assumption that cs_data has not changed since memcpy above */
-		cs_data = cs_addrs->hdr = (sgmnt_data_ptr_t)cs_addrs->db_addrs[0];
-		cs_addrs->db_addrs[1] = cs_addrs->db_addrs[0] + new_eof - 1;
-		cs_addrs->bmm = MM_ADDR(cs_data);
-		cs_addrs->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_uc_ptr_t)cs_data + (cs_data->start_vbn - 1) * DISK_BLOCK_SIZE);
-		bt_init(cs_addrs);
-		if ((cs_addrs->db_addrs[0] != old_base[0]) && (NULL != cs_addrs->dir_tree))
-			gds_map_moved(gd_header->tab_ptr, cs_addrs->db_addrs[0], old_base[0], old_base[1]);
-		cs_addrs->total_blks = new_total;	/* Local copy to test if file has extended */
-	}
+		gds_map_moved(cs_addrs->db_addrs[0], old_base[0], old_base[1], new_eof);
+                cs_addrs->total_blks = new_total;       /* Local copy to test if file has extended */
+ 	}
 	assert(0 < (int)blocks);
 	assert(0 < (int)(cs_addrs->ti->free_blocks + blocks));
 	cs_addrs->ti->free_blocks += blocks;

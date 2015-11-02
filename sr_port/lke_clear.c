@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@ error_def(ERR_NOREGION);
 void	lke_clear(void)
 {
 	bool		locks, all = TRUE, wait = FALSE, interactive = TRUE, match = FALSE, memory = FALSE, nocrit = FALSE;
+	boolean_t	exact = TRUE;
 	int4		pid;
 	int		n;
 	char		regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
@@ -70,7 +71,7 @@ void	lke_clear(void)
 	one_lock.addr = one_lockbuf;
 	one_lock.len = sizeof(one_lockbuf);
 
-	if (lke_getcli(&all, &wait, &interactive, &pid, &reg, &node, &one_lock, &memory, &nocrit) == 0)
+	if (lke_getcli(&all, &wait, &interactive, &pid, &reg, &node, &one_lock, &memory, &nocrit, &exact) == 0)
 		return;
 
 	/* Search all regions specified on the command line */
@@ -90,6 +91,7 @@ void	lke_clear(void)
 			if (gv_cur_region->dyn.addr->acc_meth == dba_cm)
 			{
 #if defined(LKE_WORKS_OK_WITH_CM)
+/* Remote lock clears are not supported, so LKE CLEAR -EXACT qualifier will not be supported on GT.CM.*/
 				locks = gtcmtr_lke_clearreq(gv_cur_region->dyn.addr->cm_blk, gv_cur_region->cmx_regnum,
 							    all, interactive, pid, &node);
 #else
@@ -118,7 +120,7 @@ void	lke_clear(void)
 				locks = ctl->blkroot == 0 ? FALSE
 							  : lke_cleartree(gv_cur_region, NULL, ctl,
 									 (mlk_shrblk_ptr_t)R2A(ctl->blkroot),
-									  all, interactive, pid, one_lock);
+									  all, interactive, pid, one_lock, exact);
 
 				rel_crit(gv_cur_region);
 			} else

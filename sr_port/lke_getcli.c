@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,7 +33,8 @@ int4 lke_getcli(bool *all,
 		mstr *node,
 		mstr *one_lock,
 		bool *memory,
-		bool *nocrit)
+		bool *nocrit,
+		boolean_t *exact)
 {
 	int4		status;
 	unsigned short	len;
@@ -60,6 +61,7 @@ int4 lke_getcli(bool *all,
 
 	*memory = (*memory && cli_present("MEMORY") == CLI_PRESENT);
 	*nocrit = (*nocrit && cli_present("CRIT") == CLI_NEGATED);
+	*exact  = (*exact  && cli_present("EXACT") == CLI_PRESENT);
 
 	if (cli_present("PID") == CLI_PRESENT)
 	{

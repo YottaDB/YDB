@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2004, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -76,10 +76,22 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	blk_fill_size = (blk_size * gv_fillfactor) / 100 - cs_data->reserved_bytes;
 	/* clues for gv_target involved in recomputation need not be nullified since only the value changes (not the key) */
 	assert(CR_NOTVALID != (sm_long_t)cr);
-	if (NULL == cr || CR_NOTVALID == (sm_long_t)cr || 0 <= cr->read_in_progress)
+	if (NULL == cr || CR_NOTVALID == (sm_long_t)cr || (0 <= cr->read_in_progress))
 	{
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_lostcr;
+	}
+	if (cr->in_tend)
+	{	/* Possible if this cache-record is being modified concurrently by another process in bg_update_phase2.
+		 * Normally t_qread would have waited for this to complete before returning. But it is possible in some
+		 * cases to bypass t_qread (e.g. gv_target->clue.end is non-zero). In this case we have two options.
+		 *	a) Signal a restart. This will cause clue.end to get reset to 0 and will now go through t_qread.
+		 *	b) Wait for in_tend to become non-zero and then proceed. This will save a restart.
+		 * Since we are not in TP the overhead of restarting is not that bad.
+		 * Since we hold crit at this point, we decide not to wait. We choose (a).
+		 */
+		assert(CDB_STAGNATE > t_tries);
+		return cdb_sc_blkmod;
 	}
 	buffaddr = bh->buffaddr;
 	target_key_size = gv_currkey->end + 1;

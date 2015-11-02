@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +25,8 @@
 #include "io.h"
 #include "jnl.h"
 #include "mutex.h"
+#include "wcs_phase2_commit_wait.h"
+
 #include "gvcst_protos.h"	/* for gvcst_init_sysops prototype */
 
 void db_auto_upgrade(gd_region *reg)
@@ -94,6 +96,8 @@ void db_auto_upgrade(gd_region *reg)
 				break;			/* Nothing to do for this version */
 		}
 		csd->minor_dbver = (enum mdb_ver)GDSMVCURR;
+		if (0 == csd->wcs_phase2_commit_wait_spincnt)
+			csd->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	}
 	return;
 }

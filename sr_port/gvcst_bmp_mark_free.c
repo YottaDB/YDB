@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +58,7 @@ GBLREF	short			dollar_tlevel;
 
 trans_num gvcst_bmp_mark_free(kill_set *ks)
 {
-	block_id	bit_map, next_bm;
+	block_id	bit_map, next_bm, *updptr;
 	blk_ident	*blk, *blk_top, *nextblk;
 	trans_num	ctn, start_db_fmt_tn;
 	unsigned int	len;
@@ -102,15 +102,18 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 			assert((int4)blk->block < cs_addrs->ti->total_blks);
 			bit_map = ROUND_DOWN2((int)blk->block, BLKS_PER_LMAP);
 			next_bm = bit_map + BLKS_PER_LMAP;
+			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 			/* Scan for the next local bitmap */
+			updptr = (block_id *)update_array_ptr;
 			for (nextblk = blk;
 				(0 == nextblk->flag) && (nextblk < blk_top) && ((block_id)nextblk->block < next_bm);
 				++nextblk)
-				;
-			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
+			{
+				assert((block_id)nextblk->block - bit_map);
+				*updptr++ = (block_id)nextblk->block - bit_map;
+			}
 			len = (unsigned int)((char *)nextblk - (char *)blk);
-			memcpy(update_array_ptr, blk, len);
-			update_array_ptr += len;
+			update_array_ptr = (char *)updptr;
 			alt_hist.h[0].blk_num = 0;			/* need for calls to T_END for bitmaps */
 			/* the following assumes sizeof(blk_ident) == sizeof(int) */
 			assert(sizeof(blk_ident) == sizeof(int));
@@ -137,7 +140,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 					t_retry((enum cdb_sc)rdfail_detail);
 					continue;
 				}
-				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn);
+				t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -(nextblk - blk));
 				if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL)))
 					continue;
 				break;
@@ -174,7 +177,9 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		alt_hist.h[0].level = 0;	/* Initialize for loop below */
 		alt_hist.h[1].blk_num = 0;
 		CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-		*((blk_ident *)update_array_ptr) = *blk;
+		assert((block_id)blk->block - bit_map);
+		assert(sizeof(block_id) == sizeof(blk_ident));
+		*((block_id *)update_array_ptr) = ((block_id)blk->block - bit_map);
 		update_array_ptr += sizeof(blk_ident);
 		/* the following assumes sizeof(blk_ident) == sizeof(int) */
 		assert(sizeof(blk_ident) == sizeof(int));
@@ -183,6 +188,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 		for (;;)
 		{
 			ctn = cs_addrs->ti->curr_tn;
+			alt_hist.h[0].cse     = NULL;
 			alt_hist.h[0].tn      = ctn;
 			alt_hist.h[0].blk_num = blk->block;
 			if (NULL == (alt_hist.h[0].buffaddr = t_qread(alt_hist.h[0].blk_num,
@@ -223,7 +229,7 @@ trans_num gvcst_bmp_mark_free(kill_set *ks)
 				t_retry((enum cdb_sc)rdfail_detail);
 				continue;
 			}
-			t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn);
+			t_write_map(&bmphist, (uchar_ptr_t)update_array, ctn, -1);
 			if ((trans_num)0 == (ret_tn = t_end(&alt_hist, NULL)))
 				continue;
 			break;

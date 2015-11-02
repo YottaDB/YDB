@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +39,7 @@
  */
 boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_code)
 {
-	uint4	lcnt;
+	uint4	lcnt, r_epid;
 	int4	n;
 
 	for (lcnt = 1; -1 != cr->read_in_progress; lcnt++)
@@ -55,9 +55,13 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 		GTM_WHITE_BOX_TEST(wbox_test_code, lcnt, (2 * BUF_OWNER_STUCK));
 		if (BUF_OWNER_STUCK < lcnt)
 		{	/* sick of waiting */
-			if (0 != cr->r_epid)
+			/* Since cr->r_epid can be changing concurrently, take a local copy before using it below,
+			 * particularly before calling is_proc_alive as we dont want to call it with a 0 r_epid.
+			 */
+			r_epid = cr->r_epid;
+			if (0 != r_epid)
 			{
-				if (FALSE == is_proc_alive(cr->r_epid, cr->image_count))
+				if (FALSE == is_proc_alive(r_epid, cr->image_count))
 				{	/* process gone; release its lock */
 					RELEASE_BUFF_READ_LOCK(cr);
 				} else

@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007 Fidelity Information Services, Inc *
+ *      Copyright 2007, 2008 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -34,6 +34,7 @@ void emit_base_offset(int base, int offset);
 #define BRB_INST_SIZE 2
 #define JMP_LONG_INST_SIZE 5
 #define CALL_4LCLDO_XFER 2	/* index in ttt from start of call[sp] and forlcldo to xfer_table index */
+#define MAX_BRANCH_CODEGEN_SIZE 32  /* The length in bytes, of the longest form of branch instruction sequence */
 
 
 int x86_64_arg_reg(int indx);
@@ -207,6 +208,7 @@ GBLREF struct emit_base_info emit_base_info;
 	emit_base_info.modrm_byte.modrm.reg_opcode = reg & 0x7;	\
 	CODE_BUF_GEN(I386_INS_MOV_Gv_Ev)				\
 }
+#define IGEN_LOAD_NATIVE_REG(reg)	IGEN_LOAD_WORD_REG_8(reg)
 
 /* Sign extended load */
 #define IGEN_LOAD_WORD_REG_4(reg) \
@@ -233,16 +235,16 @@ GBLREF struct emit_base_info emit_base_info;
 #define IGEN_STORE_ZERO_REG_8(reg) \
 { \
 	SET_REX_PREFIX(REX_W, 0, 0)				\
-	emit_base_info.imm64 = 0; \
-	emit_base_info.imm64_set = 1; \
-	CODE_BUF_GEN(I386_INS_MOV_Ev_Iv) \
-}
-
-#define IGEN_STORE_ZERO_REG_4(reg) \
-{ \
 	emit_base_info.imm32 = 0; \
 	emit_base_info.imm32_set = 1; \
 	CODE_BUF_GEN(I386_INS_MOV_Ev_Iv) \
+}
+
+#define IGEN_STORE_ZERO_REG_4(reg)	\
+{ \
+	emit_base_info.imm32 = 0;	\
+	emit_base_info.imm32_set = 1;	\
+	CODE_BUF_GEN(I386_INS_MOV_Ev_Iv)	\
 }
 
 #define IGEN_GENERIC_REG(opcode, reg) \
@@ -291,7 +293,12 @@ GBLREF struct emit_base_info emit_base_info;
 	CODE_BUF_GEN(I386_INS_LEA_Gv_M) \
 }
 
-#define GEN_STORE_ARG(reg, offset)	GEN_STORE_WORD_8(reg, I386_REG_RSP, offset)
+#define GEN_STORE_ARG(reg, offset)	\
+{ \
+	X86_64_ONLY(force_32 = TRUE;)	\
+	GEN_STORE_WORD_8(reg, I386_REG_RSP, offset)	\
+	X86_64_ONLY(force_32 = FALSE;)	\
+}
 
 #define GEN_LOAD_WORD_8(reg, base_reg, offset)	\
 { \
@@ -330,9 +337,9 @@ GBLREF struct emit_base_info emit_base_info;
 { \
 	int op_code = I386_INS_MOV_eAX + (reg & 0x7); \
 	memset((void *)&emit_base_info, 0, sizeof(emit_base_info));	\
-	SET_REX_PREFIX(REX_W, REX_B, reg) \
-	emit_base_info.imm64 = (int64_t) imval;	\
-	emit_base_info.imm64_set = 1; \
+	SET_REX_PREFIX(0, REX_B, reg) \
+	emit_base_info.imm32 = (int) imval & 0xffffffff;	\
+	emit_base_info.imm32_set = 1; \
 	CODE_BUF_GEN(op_code)	\
 }
 
@@ -485,3 +492,11 @@ GBLREF struct emit_base_info emit_base_info;
 	CODE_BUF_GEN(op_code) \
 }
 
+/*
+ * GT.M on AIX and SPARC is 64bit
+ * By default the loads/stores use ldd/std(load double),
+ * but if the value being dealt with is a word,the
+ * opcode in generic_inst is changed to ldw/stw
+ * On other platforms, it is defined to null
+ */
+#define REVERT_GENERICINST_TO_WORD(inst)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -228,7 +228,6 @@ boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boole
 				if (-1 != sem_pid)
 				{
 					gtm_putmsg(VARLSTCNT(5) ERR_SEMWT2LONG, 3,  DB_LEN_STR(reg), sem_pid);
-					assert(DSE_IMAGE == image_type); /* We want to debug why reorg/gtm fails here */
 					return FALSE;
 				} else
 				{
@@ -328,6 +327,8 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t incr_cnt, boolean_t immediate)
 		{
 			gtm_putmsg(VARLSTCNT(4) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg));
 			gtm_putmsg(VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("semop()"), CALLFROM, save_errno);
+			assert(EINVAL != save_errno);
+			assert(0 <= udi->ftok_semid);
 			return FALSE;
 		}
 		/* Try again - IPC_NOWAIT is set TRUE, if immediate is TRUE */

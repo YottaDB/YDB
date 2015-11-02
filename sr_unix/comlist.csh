@@ -366,40 +366,13 @@ if ( -x $gtm_root/$gtm_curpro/pro/mumps ) then
 	endif
     end
 
-    # Generate ttt.c from $gtm_tools/ttt.txt, $gtm_inc/opcode_def.h, and $gtm_inc/vxi.h, if needed
-    if (-e ttt.c && $gtm_verno !~ V9*) then
-	echo "comlist-I-tttexist : ttt.c already exists for production version $gtm_verno. Not recreating."
-    else
-	if (-e ttt.c) then
-	    echo "comlist-I-tttexist : ttt.c already exists for development version $gtm_verno. Recreating."
-	    chmod +w ttt.c
-	    rm -f ttt.c
-	endif
-	cd $p3/obj
-	cp $gtm_inc/opcode_def.h $gtm_inc/vxi.h $gtm_tools/ttt.txt .
-	if (-e ttt.c) then
-	    chmod +w ttt.c
-	    rm -f ttt.c
-	endif
-	$gtm_root/$gtm_curpro/pro/mumps -direct <<GTM_in_tttgen
-Set \$ZROUTINES=". $gtmroutines"
-Do ^tttgen
-ZContinue
-Halt
-GTM_in_tttgen
-	cp ttt.c $gtm_src
-	chmod $comlist_chmod_src $gtm_src/ttt.c
-	# clean up the files that we just copied here and the generated ttt.c
-	chmod +w ttt.c opcode_def.h vxi.h ttt.txt
-	rm -f ttt.c opcode_def.h vxi.h ttt.txt
-        # remove the .o-s we just created so they're not put into libraries
-        rm -f chk2lev.o chkop.o gendash.o genout.o loadop.o loadvx.o tttgen.o tttscan.o
-    endif
+    #  Generate ttt.c
+    tcsh $gtm_tools/gen_ttt.csh
+
     setenv gtmroutines "$old_gtmroutines"
     unset old_gtmroutines
     setenv gtm_dist "$real_gtm_dist"
     unset real_gtm_dist
-
     popd
 else
     echo "comlist-E-NoMUMPS, unable to regenerate merrors.c and ttt.c due to missing $gtm_curpro/pro/mumps" \

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -198,7 +198,7 @@ void dse_chng_fhead(void)
 				|| ((uint4)SGMNT_HDR_LEN < ((uint4)location + (uint4)size)))
 			util_out_print("Error: Cannot modify any location outside the file-header", TRUE);
 		else  if (0 != location % size)
-			util_out_print("Error: Location !UL [0x!8XL] should be a multiple of Size !UL",
+			util_out_print("Error: Location !UL [0x!XL] should be a multiple of Size !UL",
 							TRUE, location, location, size, size);
 		else
 		{
@@ -215,12 +215,12 @@ void dse_chng_fhead(void)
 			}
 			else if (sizeof(int4) == size)
 			{
-				SPRINTF(temp_str, "!UL [0x!8XL]");
+				SPRINTF(temp_str, "!UL [0x!XL]");
 				old_value = *(sm_uint_ptr_t)chng_ptr;
 			}
 			else if (sizeof(gtm_int64_t) == size)
 			{
-				SPRINTF(temp_str, "!@UJ [0x!@XJ]");
+				SPRINTF(temp_str, "!@UQ [0x!@XQ]");
 				old_value = *(qw_num_ptr_t)chng_ptr;
 			}
 			if (value_present)
@@ -235,7 +235,7 @@ void dse_chng_fhead(void)
 					*(qw_num_ptr_t)chng_ptr = value;
 			} else
 				value = old_value;
-			SPRINTF(temp_str1, "Location !UL [0x!8XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
+			SPRINTF(temp_str1, "Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
 				temp_str, temp_str);
 			if (sizeof(int4) >= size)
 				util_out_print(temp_str1, TRUE, location, location, (uint4)old_value, (uint4)old_value,
@@ -269,6 +269,14 @@ void dse_chng_fhead(void)
 	{
 		cs_addrs->hdr->max_key_size = x;
 		gv_cur_region->max_key_size = x;
+	}
+	if (CLI_PRESENT == cli_present("INTERRUPTED_RECOV"))
+	{
+		x = cli_t_f_n("INTERRUPTED_RECOV");
+		if (1 == x)
+			cs_addrs->hdr->recov_interrupted = TRUE;
+		else if (0 == x)
+			cs_addrs->hdr->recov_interrupted = FALSE;
 	}
 	if ((CLI_PRESENT == cli_present("REFERENCE_COUNT")) && (cli_get_int("REFERENCE_COUNT", &x)))
 		cs_addrs->nl->ref_cnt = x;
@@ -488,6 +496,15 @@ void dse_chng_fhead(void)
 				cs_addrs->hdr->mutex_spin_parms.mutex_spin_sleep_mask = x;
 		}
 	}
+	UNIX_ONLY(
+		if ((CLI_PRESENT == cli_present("COMMITWAIT_SPIN_COUNT")) && cli_get_int("COMMITWAIT_SPIN_COUNT", &x))
+		{
+			if (0 <= x)
+				cs_addrs->hdr->wcs_phase2_commit_wait_spincnt = x;
+			else
+				util_out_print("Error: COMMITWAIT SPIN COUNT should be a positive number", TRUE);
+		}
+	)
 	if ((CLI_PRESENT == cli_present("B_RECORD")) && (cli_get_hex64("B_RECORD", &tn)))
 		cs_addrs->hdr->last_rec_backup = tn;
 	if ((CLI_PRESENT == cli_present("BLKS_TO_UPGRADE")) && (cli_get_hex("BLKS_TO_UPGRADE", (uint4 *)&x)))
@@ -529,6 +546,12 @@ void dse_chng_fhead(void)
 
 		}
 		cs_addrs->persistent_freeze = x;	/* secshr_db_clnup() shouldn't clear the freeze up */
+	}
+	if (CLI_PRESENT == cli_present("FULLY_UPGRADED") && cli_get_int("FULLY_UPGRADED", &x))
+	{
+		cs_addrs->hdr->fully_upgraded = (boolean_t)x;
+		if (x)
+			cs_addrs->hdr->db_got_to_v5_once = TRUE;
 	}
 	if (CLI_PRESENT == cli_present("ONLINE_NBB"))
 	{
@@ -609,15 +632,15 @@ void dse_chng_fhead(void)
 		else
 			cs_addrs->hdr->yield_lmt = x;
 	}
-	if (CLI_PRESENT == cli_present("JNL_SYNCIO"))
-	{
-		x = cli_t_f_n("JNL_SYNCIO");
-		if (1 == x)
-			cs_addrs->hdr->jnl_sync_io = TRUE;
-		else if (0 == x)
-			cs_addrs->hdr->jnl_sync_io = FALSE;
-	}
 #endif
+	if (CLI_PRESENT == cli_present(UNIX_ONLY("JNL_SYNCIO") VMS_ONLY("JNL_CACHE")))
+	{
+		x = cli_t_f_n(UNIX_ONLY("JNL_SYNCIO") VMS_ONLY("JNL_CACHE"));
+		if (1 == x)
+			cs_addrs->hdr->jnl_sync_io = UNIX_ONLY(TRUE) VMS_ONLY(FALSE);
+		else if (0 == x)
+			cs_addrs->hdr->jnl_sync_io = UNIX_ONLY(FALSE) VMS_ONLY(TRUE);
+	}
 	if ((CLI_PRESENT == cli_present("AVG_BLKS_READ")) && (cli_get_int("AVG_BLKS_READ", &x)))
 	{
 		if (x <= 0)

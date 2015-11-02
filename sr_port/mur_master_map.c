@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,8 +43,7 @@ GBLREF	int			mur_regno;
 void	mur_master_map()
 {
 	uchar_ptr_t		bml_buffer, bmp_buffer;
-	uint4			bplmap, blk_index, bml_size, total_blks, blks_in_last_bitmap;
-	boolean_t		dummy_bool;
+	uint4			bplmap, blk_index, bml_size, total_blks, blks_in_bitmap;
 	int			status;
 	file_control		*db_ctl;
 	enum db_ver		dummy_ondskblkver;
@@ -77,19 +76,12 @@ void	mur_master_map()
 			else
 				rts_error(VARLSTCNT(1) status);
 		}
-		if (bml_find_free(0, bmp_buffer, bplmap, &dummy_bool) == NO_FREE_SPACE)
-			bit_clear(blk_index / bplmap, cs_addrs->bmm);
-		else
+		blks_in_bitmap = (blk_index + bplmap <= total_blks) ? bplmap : total_blks - blk_index;
+		assert(1 < blks_in_bitmap);	/* the last valid block in the database should never be a bitmap block */
+		if (NO_FREE_SPACE != bml_find_free(0, bmp_buffer, blks_in_bitmap))
 			bit_set(blk_index / bplmap, cs_addrs->bmm);
-	}
-	blks_in_last_bitmap = total_blks - ROUND_DOWN(total_blks, bplmap);
-	if (blks_in_last_bitmap)
-	{	/* Last local map may be smaller than bplmap so redo with correct bit count */
-		assert(blks_in_last_bitmap > 1);	/* the last valid block in the database should never be a bitmap block */
-		if (NO_FREE_SPACE == bml_find_free(0, bmp_buffer, blks_in_last_bitmap, &dummy_bool))
-			bit_clear(blk_index / bplmap - 1, cs_addrs->bmm);
 		else
-			bit_set(blk_index / bplmap - 1, cs_addrs->bmm);
+			bit_clear(blk_index / bplmap, cs_addrs->bmm);
 	}
 	free(bml_buffer);
 	cs_addrs->nl->highest_lbm_blk_changed = total_blks;

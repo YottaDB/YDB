@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -84,7 +84,7 @@ bool	lke_showtree(struct CLB 	*lnk,
 		name.len = subscript_offset[depth];
 
 		/* Display the lock node */
-		locks = lke_showlock(lnk, node, &name, all, wait, TRUE, pid, one_lock)
+		locks = lke_showlock(lnk, node, &name, all, wait, TRUE, pid, one_lock, FALSE)
 			|| locks;
 
 	  	/* Move to the next node */

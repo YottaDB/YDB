@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -155,6 +155,24 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	new_rec_hdr1b->rsiz = rec_size + tkeycmpc;
 	new_rec_hdr1b->cmpc = 0;
 
+	/* Create new split piece, we already know that this will not be *-rec only.
+	 * Note that this has to be done BEFORE modifying working block as building this buffer relies on the
+	 * working block to be pinned which is possible only if this cw-set-element is created ahead of that
+	 * of the working block (since order in which blocks are built is the order in which cses are created).
+	 */
+	BLK_INIT(bs_ptr2, bs_ptr1);
+	BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1b, sizeof(rec_hdr));
+	BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
+	BLK_SEG(bs_ptr2, new_blk2_rem, new_blk2_top - new_blk2_rem);
+	if (!BLK_FINI(bs_ptr2, bs_ptr1))
+	{
+		assert(t_tries < CDB_STAGNATE);
+		return cdb_sc_blkmod;
+	}
+        allocation_clue = ALLOCATION_CLUE(cs_data->trans_hist.total_blks);
+	right_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
+	(*blks_created)++;
+
 	/* Modify working block removing split piece */
 	BLK_INIT(bs_ptr2, bs_ptr1);
 	if (0 == level)
@@ -176,21 +194,6 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		return cdb_sc_blkmod;
 	}
 	t_write(&gv_target->hist.h[level], (unsigned char *)bs_ptr1, 0, 0, level, FALSE, TRUE, GDS_WRITE_KILLTN);
-
-	/* Create new split piece, we already know that this will not be *-rec only */
-	BLK_INIT(bs_ptr2, bs_ptr1);
-	BLK_SEG(bs_ptr2, (sm_uc_ptr_t)new_rec_hdr1b, sizeof(rec_hdr));
-	BLK_SEG(bs_ptr2, newblk2_first_key, newblk2_first_keysz);
-	BLK_SEG(bs_ptr2, new_blk2_rem, new_blk2_top - new_blk2_rem);
-	if (!BLK_FINI(bs_ptr2, bs_ptr1))
-	{
-		assert(t_tries < CDB_STAGNATE);
-		return cdb_sc_blkmod;
-	}
-        allocation_clue = (cs_data->trans_hist.total_blks >> 6) + 8;
-	right_index = t_create(allocation_clue++, (unsigned char *)bs_ptr1, 0, 0, level);
-	(*blks_created)++;
-
 
 	/*
 	----------------------------------------------------------------------------
@@ -430,6 +433,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 		/* if SPLIT REQUIRED */
 		if (insert_in_left) /* new_ins_key will go to left block */
 		{
+			/* LEFT BLOCK */
 			BLK_INIT(bs_ptr2, bs_ptr1);
 			if (sizeof(blk_hdr) < gv_target->hist.h[level].curr_rec.offset)
 			{
@@ -555,7 +559,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 				memcpy(save_blk_piece, new_blk2_rem, save_blk_piece_len);
 				BLK_SEG(bs_ptr2, save_blk_piece, save_blk_piece_len);
 			}
-			/* Following else if may not be necessary. But I wanted it to be safe:Layek:10/310/2000 */
+			/* Following else if may not be necessary. But I wanted it to be safe:Layek:10/3/2000 */
 			else if (new_leftblk_top_off > gv_target->hist.h[level].curr_rec.offset)
 			{
 				assert(t_tries < CDB_STAGNATE);

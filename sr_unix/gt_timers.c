@@ -161,6 +161,7 @@ volatile static int4 timer_active = FALSE;
 GBLDEF volatile boolean_t timer_in_handler = FALSE;     /* set to TRUE when timer pops */
 
 GBLREF	int4		outofband;
+GBLREF	int		process_exiting;
 
 static void hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
 static void (*safe_handlers[])() = {hiber_wake, wake_alarm , NULL};
@@ -424,6 +425,7 @@ void cancel_timer(TID tid)
 	sys_get_curr_time(&at);
 	if (tid == 0)
 	{
+		assert(process_exiting); /* wcs_phase2_commit_wait relies on this flag being set BEFORE cancelling all timers */
 		cancel_all_timers();
 		timer_in_handler = FALSE;
 		sigprocmask(SIG_SETMASK, &savemask, NULL);

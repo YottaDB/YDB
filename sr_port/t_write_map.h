@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +22,7 @@ void t_write_map(
 						 *	    "cr->ondsk_blkver"	--> Actual block version on disk
 						 */
 		unsigned char 	*upd_addr,	/* Address of the update array containing list of blocks to be cleared in bitmap */
-		trans_num	tn);		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
+		trans_num	tn,		/* Transaction Number when this block was read. Used for cdb_sc_blkmod validation */
+		int4		reference_cnt);	/* Same meaning as cse->reference_cnt (see gdscc.h for comments) */
 
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -168,10 +168,10 @@ void dump_tables(void)
 			if (mx >= 32 && mx < 127)
 			{
 				mout = mx;
-				util_out_print("!3UL:  !8XL  ('!AD')!/", TRUE, mx, (*patp)->typemask[mx], 1, &mout);
+				util_out_print("!3UL:  !XL  ('!AD')!/", TRUE, mx, (*patp)->typemask[mx], 1, &mout);
 			} else
 			{
-				util_out_print("!3UL:  !8XL!/", TRUE, mx, (*patp)->typemask[mx]);
+				util_out_print("!3UL:  !XL!/", TRUE, mx, (*patp)->typemask[mx]);
 			}
 		}
 	}

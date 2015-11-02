@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2007 Fidelity Information Services, Inc 	#
+#	Copyright 2007, 2008 Fidelity Information Services, Inc 	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -20,8 +20,9 @@
 
 set found_icu = ""
 set utflocale = `locale -a | grep -i en_us | grep -i utf | grep '8$'`
-if (`uname` == "AIX") then
+if (`uname` == "AIX" || `uname` == "SunOS") then
 	setenv LIBPATH /usr/local/lib64:/usr/local/lib
+	setenv LD_LIBRARY_PATH /usr/local/lib64:/usr/local/lib
 	set library_path = `echo $LIBPATH | sed 's/:/ /g'`
 else
 # Optional parameter added. This script can be executed from remote system using ssh

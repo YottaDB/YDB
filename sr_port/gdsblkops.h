@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -127,7 +127,7 @@ GBLREF	unsigned char		cw_set_depth;
 													\
 	update_array_ptr = (char*)ROUND_UP2((INTPTR_T)update_array_ptr, UPDATE_ELEMENT_ALIGN_SIZE);	\
 	(ARRAY) = (blk_segment*)update_array_ptr;							\
-	update_array_ptr += BLK_SEG_ARRAY_SIZE*sizeof(blk_segment);					\
+	update_array_ptr += (BLK_SEG_ARRAY_SIZE * sizeof(blk_segment));					\
 	assert((update_array + update_array_size) - update_array_ptr >= 0);				\
 	(BNUM) = (ARRAY + 1);										\
 	blk_seg_cnt = sizeof(blk_hdr);									\
@@ -137,13 +137,34 @@ GBLREF	unsigned char		cw_set_depth;
  *	BLK_SEG(BNUM, ADDR, LEN) adds a new entry to the blk_segment array
  */
 
-#define BLK_SEG(BNUM, ADDR, LEN) 					\
-{									\
-	(BNUM)->addr = (ADDR);				\
-	(BNUM)->len  = (LEN);				\
-	blk_seg_cnt += (LEN); 						\
-	assert((char *)BNUM - update_array_ptr < 0); 			\
-	(BNUM)++;							\
+#define BLK_SEG(BNUM, ADDR, LEN)										\
+{														\
+	sm_ulong_t	lcl_len1;										\
+	GBLREF	short	dollar_tlevel;										\
+														\
+	/* Note that name of len variable "lcl_len1" should be different					\
+	 * from the name used in the REORG_BLK_SEG macro as otherwise						\
+	 * the below assignment will leave lcl_len1 uninitialized.						\
+	 */													\
+	lcl_len1 = (LEN);											\
+	/* The function "gvcst_blk_build" (which uses this update array to build the block) relies on "len" to	\
+	 * be positive. This macro is called from both non-TP and TP code. In non-TP, we know of a few callers	\
+	 * (dse etc.) that could pass in a negative length to the BLK_SEG macro. Those are okay since we are	\
+	 * guaranteed the validation (in t_end inside of crit) would catch this case and force a restart thus	\
+	 * avoiding a call to gvcst_blk_build. But in TP, validations happen before commit time in tp_hist and	\
+	 * it has a few optimizations where for globals with NOISOLATION turned ON, it allows validation to	\
+	 * succeed even if the block contents changed concurrently. This means update arrays with negative	\
+	 * lengths could find their way to gvcst_blk_build even after tp_hist. Since those lengths are passed	\
+	 * directly to memmove which treats it as an unsigned quantity, it means huge memmoves that are likely	\
+	 * to cause memory corruption and/or SIG-11. Therefore it is absolutely necessary that if we are in TP	\
+	 * the caller does not pass in a negative length. Assert that.						\
+	 */													\
+	assert(!dollar_tlevel || (0 <= (sm_long_t)lcl_len1));							\
+	(BNUM)->addr = (ADDR);											\
+	(BNUM)->len  = lcl_len1;										\
+	blk_seg_cnt += lcl_len1;										\
+	assert((char *)BNUM - update_array_ptr < 0);								\
+	(BNUM)++;												\
 }
 
 /* ***************************************************************************
@@ -171,18 +192,50 @@ GBLREF	unsigned char		cw_set_depth;
  */
 
 #ifdef DEBUG
-#define BLK_ADDR(X,Y,Z)                                                                 \
-(                                                                                       \
-        update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),              \
-        assert((update_array + update_array_size - Y) - update_array_ptr >= 0),         \
-        (X) = (Z*)update_array_ptr, update_array_ptr += (INTPTR_T)Y                       \
+#define BLK_ADDR(X,Y,Z)									\
+(											\
+	update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),		\
+	assert((update_array + update_array_size - Y) - update_array_ptr >= 0),		\
+	(X) = (Z*)update_array_ptr, update_array_ptr += (INTPTR_T)Y			\
 )
 #else
-#define BLK_ADDR(X,Y,Z)                                                                 \
-(                                                                                       \
-        update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),              \
-        (X) = (Z*)update_array_ptr, update_array_ptr += (INTPTR_T)Y                       \
+#define BLK_ADDR(X,Y,Z)									\
+(											\
+	update_array_ptr = (char*)(((INTPTR_T)update_array_ptr + 7) & ~7),		\
+	(X) = (Z*)update_array_ptr, update_array_ptr += (INTPTR_T)Y			\
 )
 #endif
+
+/* ********************************************************************************
+ *	REORG_BLK_SEG(BNUM, ADDR, LEN) is the same as the BLK_SEG macro
+ *	except that it takes a private copy of the input memory and adds that
+ *	to the update array. This is necessary in case of MUPIP REORG for two
+ *	operations (Coalesce and Swap). In either cases, the contents of one block
+ *	will rely on the contents of itself and another block. This is not currently
+ *	supported by t_end where the assumption is that all contents needed to build
+ *	a buffer are available in that buffer itself (this greatly simplifies the
+ *	process of pinning of buffers in shared memory). To avoid cross-links to other
+ *	buffers, we need to take a copy of the other buffer's contents from shared
+ *	memory into private memory before adding it to the update array. This macro
+ *	should be called only by MUPIP REORG. An assert has been added to that effect.
+ */
+#define REORG_BLK_SEG(BNUM, ADDR, LEN)						\
+{										\
+	char			*lcl_ptr;					\
+	sm_ulong_t		lcl_len;					\
+										\
+	GBLREF	boolean_t	mu_reorg_process;				\
+										\
+	assert(mu_reorg_process);						\
+	lcl_len = (LEN);							\
+	if ((0 > (sm_long_t)lcl_len) || ((blk_seg_cnt + lcl_len) > blk_size))	\
+	{									\
+		assert(CDB_STAGNATE > t_tries);					\
+		return cdb_sc_blkmod;						\
+	}									\
+	BLK_ADDR(lcl_ptr, lcl_len, char);					\
+	memcpy(lcl_ptr, (ADDR), lcl_len);					\
+	BLK_SEG((BNUM), (sm_uc_ptr_t)lcl_ptr, lcl_len);				\
+}
 
 #endif

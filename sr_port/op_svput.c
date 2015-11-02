@@ -74,6 +74,7 @@ GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to N
 GBLREF int4		zdate_form;
 GBLREF mval		dollar_ztexit;
 GBLREF boolean_t	dollar_ztexit_bool;
+GBLREF boolean_t	dollar_zquit_anyway;
 
 void op_svput(int varnum, mval *v)
 {
@@ -306,6 +307,9 @@ void op_svput(int varnum, mval *v)
 		 * rethrow at TR/TRO. Since we want to maintain dollar_ztexit as a string, coercion should
 		 * not be performed on dollar_ztext, but on a temporary (i.e. parameter v) */
 		dollar_ztexit_bool = MV_FORCE_BOOL(v);
+		break;
+	case SV_ZQUIT:
+		dollar_zquit_anyway = MV_FORCE_BOOL(v);
 		break;
 	default:
 		GTMASSERT;

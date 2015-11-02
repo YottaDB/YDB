@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,7 +57,7 @@ void process_deferred_stale(void)
 			if (r_cur->open)
 			{
 				csa = &FILE_INFO(r_cur)->s_addrs;
-				assert(!csa->now_crit);
+				assert(!T_IN_CRIT_OR_COMMIT_OR_WRITE(csa));
 				if (csa->stale_defer)
 				{
 					gv_cur_region = r_cur;

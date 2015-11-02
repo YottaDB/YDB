@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,8 @@ void buff_flush(void);
 #  define JSB_ACTION_N_INS	3
 #elif defined(__x86_64__)
 #  define JSB_ACTION_N_INS	8
+#elif defined(__sparc)
+#  define JSB_ACTION_N_INS	3
 #else
 #  define JSB_ACTION_N_INS	2
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,8 +18,13 @@
 #include "util.h"
 #include "dse_exit.h"
 
+GBLREF	unsigned int		t_tries;
+
 void dse_exit(void)
 {
+	/* reset t_tries (from CDB_STAGNATE to 0) as we are exiting and no longer going to be running transactions
+	 * and an assert in wcs_recover relies on this */
+	t_tries = 0;
 	util_out_close();
 	EXIT(SS_NORMAL);
 }

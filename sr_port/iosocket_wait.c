@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +65,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
 	GTM_SOCKLEN_TYPE	size;
 	boolean_t		zint_restart;
 	mv_stent		*mv_zintdev;
-
+	short			retry_num;
         error_def(ERR_SOCKACPT);
         error_def(ERR_SOCKWAIT);
         error_def(ERR_TEXT);
@@ -219,13 +219,78 @@ boolean_t iosocket_wait(io_desc *iod, int4 timepar)
                 }
 		size = sizeof(struct sockaddr_in);
 		rv = tcp_routines.aa_accept(socketptr->sd, &peer, &size);
-		if (rv == -1)
+		if (-1 == rv)
+		{
+#ifdef __hpux
+		/*ENOBUFS in HP-UX is either because of a memory problem or when we have received a RST just
+		after a SYN before an accept call. Normally this is not fatal and is just a transient state. Hence
+		exiting just after a single error of this kind should not be done. So retry in case of HP-UX and ENOBUFS error.*/
+		if (ENOBUFS == errno)
+		{
+		/*In case of succeeding with select in first go, accept will still get 5ms time difference*/
+			retry_num = 0;
+			while (HPUX_MAX_RETRIES > retry_num)
+			{
+				SHORT_SLEEP(5);
+				for ( ; HPUX_MAX_RETRIES > retry_num; retry_num++)
+				{
+					utimeout.tv_sec = 0;
+					utimeout.tv_usec = HPUX_SEL_TIMEOUT;
+					FD_ZERO(&tcp_fd);
+					FD_SET(socketptr->sd, &tcp_fd);
+					rv = select(max_fd + 1, (void *)&tcp_fd, (void *)0, (void *)0,
+					&utimeout);
+					if (0 < rv)
+						break;
+					if (0 > rv && (EINTR == errno))
+					{
+        	        		          if (0 != outofband)
+			                          {
+                			                  SOCKET_DEBUG(PRINTF("socwait: outofband interrupt received (%d) -- "
+	                                                      "queueing mv_stent for wait intr\n", outofband); DEBUGSOCKFLUSH);
+			                                  PUSH_MV_STENT(MVST_ZINTDEV);
+        	        		                  mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
+                	                		  mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+		        	                          sockintr->who_saved = sockwhich_wait;
+                			                  sockintr->end_time = end_time;
+		                        	          sockintr->end_time_valid = TRUE;
+                		                	  dsocketptr->mupintr = TRUE;
+			                                  socketus_interruptus++;
+        	        		                  SOCKET_DEBUG(
+							  PRINTF("socwait: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
+                	                                      end_time.at_sec, end_time.at_usec, socketus_interruptus);
+	                                	              DEBUGSOCKFLUSH);
+		        	                          outofband_action(FALSE);
+        		        	                  GTMASSERT;      /* Should *never* return from outofband_action */
+		        	                          return FALSE;   /* For the compiler.. */
+						}
+					}
+					else
+						SHORT_SLEEP(5);
+				 }
+				if (0 > rv)
+				{
+					errptr = (char *)STRERROR(errno);
+					errlen = STRLEN(errptr);
+					rts_error(VARLSTCNT(6) ERR_SOCKWAIT, 0, ERR_TEXT, 2, errlen, errptr);
+					return FALSE;
+				}
+				rv = tcp_routines.aa_accept(socketptr->sd, &peer, &size);
+				if ((-1 == rv) && (ENOBUFS == errno))
+					retry_num++;
+				else
+					break;
+			}
+		}
+                if (-1 == rv)
+#endif
 		{
 			errptr = (char *)STRERROR(errno);
 			errlen = STRLEN(errptr);
 			rts_error(VARLSTCNT(6) ERR_SOCKACPT, 0, ERR_TEXT, 2, errlen, errptr);
 			return FALSE;
 		}
+	}
 		/* got the connection, create a new socket in the device socket list */
 		newsocketptr = (socket_struct *)malloc(sizeof(socket_struct));
 		*newsocketptr = *socketptr;

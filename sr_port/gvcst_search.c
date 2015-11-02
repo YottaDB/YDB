@@ -33,10 +33,8 @@
 #include "longset.h"		/* needed for cws_insert.h */
 #include "hashtab.h"
 #include "cws_insert.h"
-#include "cert_blk.h"
 #include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_search_tail,gvcst_search prototype */
 
-GBLREF boolean_t	certify_all_blocks;
 GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gv_namehead	*gv_target;
@@ -79,6 +77,8 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	srch_blk_status		*tp_srch_status, *srch_status, *leaf_blk_hist;
 	boolean_t		already_built, is_mm;
 	ht_ent_int4		*tabent;
+	sm_uc_ptr_t		buffaddr;
+	trans_num		blkhdrtn;
 
 	pTarg = gv_target;
 	assert(NULL != pTarg);
@@ -138,7 +138,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 						tp_srch_status = tabent->value;
 				}
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(tp_srch_status, sgm_info_ptr);
-				cse = tp_srch_status ? tp_srch_status->ptr : NULL;
+				cse = tp_srch_status ? tp_srch_status->cse : NULL;
 			}
 			assert(!cse || !cse->high_tlevel);
 			leaf_blk_hist->first_tp_srch_status = tp_srch_status;
@@ -146,29 +146,39 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			{	/* there's a private copy and it's not up to date */
 				already_built = (NULL != cse->new_buff);
 				gvcst_blk_build(cse, cse->new_buff, 0);
+				/* Validate the block's search history right after building a private copy.
+				 * This is not needed in case gvcst_search is going to reuse the clue's search history and return
+				 * (because tp_hist will do the validation of this block). But if gvcst_search decides to do a
+				 * fresh traversal (because the clue does not cover the path of the current input key etc.) the
+				 * block build that happened now will not get validated in tp_hist since it will instead be given
+				 * the current key's search history path (a totally new path) for validation. Since a private copy
+				 * of the block has been built, tp_tend would also skip validating this block so it is necessary
+				 * that we validate the block right here. Since it is tricky to accurately differentiate between
+				 * the two cases, we do the validation unconditionally here (besides it is only a few if checks
+				 * done per block build so it is considered okay performance-wise).
+				 */
 				if (!already_built && !chain1.flag)
 				{	/* is_mm is calculated twice, but this is done so as to speed up the most-frequent path,
 					 * i.e. when there is a clue and either no cse or cse->done is TRUE
 					 */
 					is_mm = (dba_mm == cs_data->acc_meth);
-					assert(tp_srch_status && (is_mm || tp_srch_status->cr) && tp_srch_status->buffaddr);
-					if (tp_srch_status->tn <= ((blk_hdr_ptr_t)(tp_srch_status->buffaddr))->tn)
+					buffaddr = tp_srch_status->buffaddr;
+					cr = tp_srch_status->cr;
+					assert(tp_srch_status && (is_mm || cr) && buffaddr);
+					blkhdrtn = ((blk_hdr_ptr_t)buffaddr)->tn;
+					if (TP_IS_CDB_SC_BLKMOD3(cr, tp_srch_status, blkhdrtn))
 					{
 						assert(CDB_STAGNATE > t_tries);
 						TP_TRACE_HIST_MOD(leaf_blk_hist->blk_num, gv_target, tp_blkmod_gvcst_srch, cs_data,
-							tp_srch_status->tn, ((blk_hdr_ptr_t)(tp_srch_status->buffaddr))->tn,
-								((blk_hdr_ptr_t)(tp_srch_status->buffaddr))->levl);
+							tp_srch_status->tn, blkhdrtn, ((blk_hdr_ptr_t)buffaddr)->levl);
 						return cdb_sc_blkmod;
 					}
-					if ((!is_mm) && (tp_srch_status->cycle != tp_srch_status->cr->cycle
-						|| tp_srch_status->blk_num != tp_srch_status->cr->blk))
+					if (!is_mm && ((tp_srch_status->cycle != cr->cycle)
+								|| (tp_srch_status->blk_num != cr->blk)))
 					{
 						assert(CDB_STAGNATE > t_tries);
 						return cdb_sc_lostcr;
 					}
-					if (certify_all_blocks)
-						cert_blk(gv_cur_region, leaf_blk_hist->blk_num, (blk_hdr_ptr_t)cse->new_buff,
-								cse->blk_target->root, TRUE);	/* will GTMASSERT on integ error */
 				}
 				cse->done = TRUE;
 				leaf_blk_hist->buffaddr = cse->new_buff;
@@ -182,7 +192,8 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			 * that it is quite infrequent assuming a lot of global buffers in a production environment.
 			 */
 	    		srch_status = &pTargHist->h[1];
-			if (srch_status->cr && (srch_status->tn <= ((blk_hdr_ptr_t)srch_status->buffaddr)->tn))
+			cr = srch_status->cr;
+			if (TP_IS_CDB_SC_BLKMOD(cr, srch_status))
 				status = cdb_sc_blkmod;
 			srch_status--;
 		} else
@@ -194,7 +205,10 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			for (srch_status = &pTargHist->h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
 			{
 				assert(srch_status->level == srch_status - &pTargHist->h[0]);
-				if ((is_mm || srch_status->cr) && srch_status->tn <= ((blk_hdr_ptr_t)(srch_status->buffaddr))->tn)
+				assert(is_mm || (NULL == srch_status->cr) || (NULL != srch_status->buffaddr));
+				cr = srch_status->cr;
+				assert(!is_mm || (NULL == cr));
+				if (TP_IS_CDB_SC_BLKMOD(cr, srch_status))
 				{
 					status = cdb_sc_blkmod;
 					break;
@@ -213,9 +227,11 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			}
 		} else if (srch_status->cr)
 		{	/* Re-read leaf block if cr doesn't match history. Do this only for leaf-block for performance reasons. */
-			if (srch_status->tn <= ((blk_hdr_ptr_t)srch_status->buffaddr)->tn)
+			assert(NULL != srch_status->buffaddr);
+			cr = srch_status->cr;
+			if (TP_IS_CDB_SC_BLKMOD(cr, srch_status))
 				status = cdb_sc_blkmod;
-			else if ((srch_status->cycle != srch_status->cr->cycle)
+			else if ((srch_status->cycle != cr->cycle)
 					&& (NULL == (srch_status->buffaddr =
 						t_qread(srch_status->blk_num, &srch_status->cycle, &srch_status->cr))))
 				status = cdb_sc_lostcr;
@@ -288,7 +304,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	for (;;)
 	{
 		assert(pCurr->level == nLevl);
-		pCurr->ptr = NULL;
+		pCurr->cse = NULL;
 		pCurr->blk_num = nBlkId;
 		pCurr->buffaddr = pBlkBase;
 		if (cdb_sc_normal != (status = gvcst_search_blk(pKey, pCurr)))

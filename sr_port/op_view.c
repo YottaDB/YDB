@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +24,7 @@
 #include "cmd_qlf.h"
 #include "collseq.h"
 #include "error.h"
+#include "iosp.h"
 #include "jnl.h"
 #include "hashtab_mname.h"
 #include "hashtab.h"
@@ -40,6 +41,7 @@
 #include "mvalconv.h"
 #include "dpgbldir.h"	/* for get_next_gdr() prototype */
 #include "ast.h"
+#include "wcs_flu.h"
 
 #define WRITE_LITERAL(x) (outval.str.len = sizeof(x) - 1, outval.str.addr = (x), op_write(&outval))
 
@@ -115,18 +117,20 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	static readonly char upper[] = "UPPER";
 	static readonly char lower[] = "LOWER";
 
-	error_def(ERR_VIEWCMD);
-	error_def(ERR_ZDEFACTIVE);
-	error_def(ERR_PATTABNOTFND);
-	error_def(ERR_PATLOAD);
-	error_def(ERR_YDIRTSZ);
-	error_def(ERR_REQDVIEWPARM);
 	error_def(ERR_ACTRANGE);
 	error_def(ERR_COLLATIONUNDEF);
 	error_def(ERR_COLLDATAEXISTS);
-	error_def(ERR_ISOLATIONSTSCHN);
-	error_def(ERR_TRACEON);
 	error_def(ERR_INVZDIRFORM);
+	error_def(ERR_ISOLATIONSTSCHN);
+	error_def(ERR_JNLFLUSH);
+	error_def(ERR_PATLOAD);
+	error_def(ERR_PATTABNOTFND);
+	error_def(ERR_REQDVIEWPARM);
+	error_def(ERR_TEXT);
+	error_def(ERR_TRACEON);
+	error_def(ERR_VIEWCMD);
+	error_def(ERR_YDIRTSZ);
+	error_def(ERR_ZDEFACTIVE);
 
 	VAR_START(var, keyword);
 	VMS_ONLY(va_count(numarg);)
@@ -190,7 +194,8 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				{
 					gv_cur_region = reg;
 					change_reg(); /* for jnl_ensure_open */
-					JNL_ENSURE_OPEN_WCS_WTSTART(cs_addrs, gv_cur_region, 0, dummy_errno);
+					ENSURE_JNL_OPEN(cs_addrs, gv_cur_region);
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 				}
 			}
 			gv_cur_region = save_reg;
@@ -262,10 +267,19 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					if (0 == jnl_status)
 					{
 						jb = csa->jnl->jnl_buff;
-						jnl_flush(reg);
-						assert(jb->dskaddr == jb->freeaddr);
-						UNIX_ONLY(jnl_fsync(reg, jb->dskaddr);)
-						UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr);)
+						if (SS_NORMAL == (jnl_status = jnl_flush(reg)))
+						{
+							assert(jb->dskaddr == jb->freeaddr);
+							UNIX_ONLY(jnl_fsync(reg, jb->dskaddr);)
+							UNIX_ONLY(assert(jb->freeaddr == jb->fsync_dskaddr);)
+						} else
+						{
+							send_msg(VARLSTCNT(9) ERR_JNLFLUSH, 2, JNL_LEN_STR(csa->hdr),
+								ERR_TEXT, 2,
+								RTS_ERROR_TEXT("Error with journal flush during op_view"),
+								jnl_status);
+							assert(FALSE);
+						}
 					} else
 						send_msg(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
 					rel_crit(reg);

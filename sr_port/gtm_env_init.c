@@ -24,6 +24,7 @@
 #include "iotcpdef.h"
 #include "iosocketdef.h"
 #include "gtm_malloc.h"
+#include "cache.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -38,6 +39,7 @@ GBLDEF	boolean_t 	gtmdbglvl_inited;	/* gtmDebugLevel has been initialized */
 #  define DEFAULT_FBW_FLAG FALSE
 #endif
 
+GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
 GBLREF	boolean_t	gvdupsetnoop; 		/* if TRUE, duplicate SETs update journal but not database (except
 						   for curr_tn++) */
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
@@ -50,13 +52,15 @@ GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extensi
 GBLREF	uint4		gtm_max_sockets;	/* Maximum sockets in a socket device that can be created by this process */
 GBLREF	bool		undef_inhibit;
 GBLREF	uint4		outOfMemoryMitigateSize;	/* Reserve that we will freed to help cleanup if run out of memory */
+GBLREF	uint4		max_cache_memsize;	/* Maximum bytes used for indirect cache object code */
+GBLREF	uint4		max_cache_entries;	/* Maximum number of cached indirect compilations */
 
 void	gtm_env_init(void)
 {
 	static boolean_t	gtm_env_init_done = FALSE;
 	mstr			val;
 	boolean_t		ret, is_defined;
-	uint4			tdbglvl, tmsock, reservesize;
+	uint4			tdbglvl, tmsock, reservesize, memsize, cachent;
 
 	if (!gtm_env_init_done)
 	{
@@ -142,6 +146,25 @@ void	gtm_env_init(void)
 		val.len = sizeof(GTM_MEMORY_RESERVE) - 1;
 		if (reservesize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
 			outOfMemoryMitigateSize = reservesize;
+
+		/* Initialize indirect cache limits (max memory, max entries) */
+		max_cache_memsize = MAX_CACHE_MEMSIZE * 1024;
+		val.addr = GTM_MAX_INDRCACHE_MEMORY;
+		val.len = sizeof(GTM_MAX_INDRCACHE_MEMORY) - 1;
+		if (memsize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+			max_cache_memsize = memsize * 1024;
+		max_cache_entries = MAX_CACHE_ENTRIES;
+                val.addr = GTM_MAX_INDRCACHE_COUNT;
+                val.len = sizeof(GTM_MAX_INDRCACHE_COUNT) - 1;
+                if (cachent = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+                        max_cache_entries = cachent;
+
+		/* Initialize ZQUIT to control funky QUIT compilation */
+		val.addr = GTM_ZQUIT_ANYWAY;
+		val.len = sizeof(GTM_ZQUIT_ANYWAY) - 1;
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+			dollar_zquit_anyway = ret;
 
 		/* Platform specific initializations */
 		gtm_env_init_sp();

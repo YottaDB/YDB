@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,8 +95,8 @@ TAB_BG_TRC_REC("  Epoch Timer Calls     ", n_dbsync_timers)		/* count of calls t
 TAB_BG_TRC_REC("  Epoch Timer Writes    ", n_dbsync_writes)		/* no. of dbsyncs actually done by wcs_clean_dbsync */
 TAB_BG_TRC_REC("  Mutex Queue full      ", mutex_queue_full)		/* number of times the mutex queue overflowed */
 TAB_BG_TRC_REC("  WcBlocked from bt_put ", wcb_bt_put)
-TAB_BG_TRC_REC("  WcBlocked grab crit   ", wcb_grab_crit)
-TAB_BG_TRC_REC("  WcBlocked tp_grab_crit", wcb_tp_grab_crit)
+TAB_BG_TRC_REC("  WcBlocked mutexsalvage", wcb_mutex_salvage)
+TAB_BG_TRC_REC("  WcBlocked tp_grab_crit", wcb_tp_grab_crit)		/* currently unused */
 TAB_BG_TRC_REC("  WcBlocked nocr_invcr  ", wcb_t_end_sysops_nocr_invcr)
 TAB_BG_TRC_REC("  WcBlocked cr_invcr    ", wcb_t_end_sysops_cr_invcr)
 TAB_BG_TRC_REC("  WcBlocked rip_wait    ", wcb_t_end_sysops_rip_wait)
@@ -148,3 +148,20 @@ TAB_BG_TRC_REC("  RefmtBchk blk freed   ", refmt_blk_chk_blk_freed)
 TAB_BG_TRC_REC("  RefmtBchk blk kept    ", refmt_blk_chk_blk_kept)
 TAB_BG_TRC_REC("  Active level tripped  ", active_lvl_trigger)
 TAB_BG_TRC_REC("  T_end new got buff    ", new_buff)
+TAB_BG_TRC_REC("  CommitWait SleepInCrit", phase2_commit_wait_sleep_in_crit)
+TAB_BG_TRC_REC("  CommitWait SleepNoCrit", phase2_commit_wait_sleep_no_crit)
+TAB_BG_TRC_REC("  CommitWait PidCnt     ", phase2_commit_wait_pidcnt)
+TAB_BG_TRC_REC("  WcBlocked intend_wait ", wcb_t_end_sysops_intend_wait)
+TAB_BG_TRC_REC("  WcBlocked secshrclnup3", wcb_secshr_db_clnup_phase2_clnup)
+TAB_BG_TRC_REC("  WcBlocked commitwait  ", wcb_phase2_commit_wait)
+TAB_BG_TRC_REC("  recompute_upd_array # ", recompute_upd_array_calls)
+TAB_BG_TRC_REC("  recompute_upd rip     ", recompute_upd_array_rip)
+TAB_BG_TRC_REC("  recompute_upd in_tend ", recompute_upd_array_in_tend)
+TAB_BG_TRC_REC("  recompute_upd srchblk ", recompute_upd_array_search_blk)
+TAB_BG_TRC_REC("  recompute_upd new_rec ", recompute_upd_array_new_rec)
+TAB_BG_TRC_REC("  recompute_upd rec_size", recompute_upd_array_rec_size)
+TAB_BG_TRC_REC("  recompute_upd rec_cmpc", recompute_upd_array_rec_cmpc)
+TAB_BG_TRC_REC("  recompute_upd blk_fini", recompute_upd_array_blk_fini)
+TAB_BG_TRC_REC("  recompute_upd blksplit", recompute_upd_array_blk_split)
+TAB_BG_TRC_REC("  T_qread ripsleep_cnt  ", t_qread_ripsleep_cnt)
+TAB_BG_TRC_REC("  T_qread ripsleep_nblks", t_qread_ripsleep_nblks)

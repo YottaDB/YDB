@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,9 +18,11 @@
 #include "stringpool.h"
 #include "gtm_caseconv.h"
 #include "advancewindow.h"
+#include "show_source_line.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_utf8.h"
+#include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
 #endif
 
 LITREF	char		ctypetab[NUM_CHARS];
@@ -41,6 +43,8 @@ GBLREF	boolean_t	run_time;
 GBLREF	mident		window_ident;	/* the current identifier */
 GBLREF	mident		director_ident;	/* the look-ahead identifier */
 
+error_def(ERR_LITNONGRAPH);
+
 static readonly unsigned char apos_ok[] =
 {
 	0,TK_NEXCLAIMATION,0,0,0,0,TK_NAMPERSAND,0
@@ -57,11 +61,15 @@ void advancewindow(void)
 {
 	error_def(ERR_NUMOFLOW);
 	unsigned char	*cp1, *cp2, *cp3, x;
-	char		*tmp;
+	char		*tmp, source_line_buff[MAX_SRCLINE + sizeof(ARROW)];
 	int		y, charlen;
+#ifdef UNICODE_SUPPORTED
+	uint4		ch;
+	unsigned char	*cptr;
+#endif
 
 	last_source_column = source_column;
-	source_column = (unsigned char *) lexical_ptr - source_buffer + 1;
+	source_column = (unsigned char *)lexical_ptr - source_buffer + 1;
 	window_token = director_token;
 	window_mval = director_mval;
 
@@ -78,29 +86,46 @@ void advancewindow(void)
 		case TK_QUOTE:
 			if (stringpool.free + MAX_SRCLINE > stringpool.top )
 				stp_gcol(MAX_SRCLINE);
-			cp1 = (unsigned char *) lexical_ptr + 1;
+			cp1 = (unsigned char *)lexical_ptr + 1;
 			cp2 = cp3 = stringpool.free;
 			for (;;)
 			{
-				if ((x = *cp1++) < SP)
+
+#ifdef UNICODE_SUPPORTED
+				if (gtm_utf8_mode)
+					cptr = (unsigned char *)UTF8_MBTOWC((sm_uc_ptr_t)cp1, source_buffer + MAX_SRCLINE, ch);
+#endif
+				x = *cp1++;
+				if ((((SP > x) && !gtm_utf8_mode)
+					UNICODE_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch))))) && !run_time)
 				{
-					director_token = TK_ERROR;
-					return;
+					last_source_column = cp1 - source_buffer;
+					dec_err(VARLSTCNT(1) ERR_LITNONGRAPH);
+					show_source_line(source_line_buff, TRUE);
 				}
-				if (x == '\"')
+				if ('\"' == x)
 				{
-					if (*cp1 == '\"')
+					UNICODE_ONLY(assert(!gtm_utf8_mode || (cp1 == cptr));)
+					if ('\"' == *cp1)
 						cp1++;
 					else
 						break;
 				}
 				*cp2++ = x;
+#ifdef UNICODE_SUPPORTED
+				if (gtm_utf8_mode && (cptr > cp1))
+				{
+					assert(4 > (cptr - cp1));
+					for (; cptr > cp1;)
+						*cp2++ = *cp1++;
+				}
+#endif
 				assert(cp2 <= stringpool.top);
 			}
-			lexical_ptr = (char *) cp1;
+			lexical_ptr = (char *)cp1;
 			director_token = TK_STRLIT;
 			director_mval.mvtype = MV_STR;
-			director_mval.str.addr = (char *) cp3;
+			director_mval.str.addr = (char *)cp3;
 			director_mval.str.len = INTCAST(cp2 - cp3);
 			stringpool.free = cp2;
 			s2n(&director_mval);
@@ -130,7 +155,7 @@ void advancewindow(void)
 				if (cp2 < cp3)
 					*cp2++ = x;
 				y = ctypetab[x = *++lexical_ptr];
-				if (y != TK_UPPER && y != TK_DIGIT && y != TK_LOWER)
+				if ((TK_UPPER != y) && (TK_DIGIT != y) && (TK_LOWER != y))
 					break;
 			}
 			director_ident.len = INTCAST(cp2 - (unsigned char*)director_ident.addr);
@@ -143,7 +168,7 @@ void advancewindow(void)
 			director_mval.str.addr = lexical_ptr;
 			director_mval.str.len = MAX_SRCLINE;
 			director_mval.mvtype = MV_STR;
-			lexical_ptr = (char *) s2n(&director_mval);
+			lexical_ptr = (char *)s2n(&director_mval);
 			if (!(director_mval.mvtype &= MV_NUM_MASK))
 			{
 				stx_error(ERR_NUMOFLOW);
@@ -157,10 +182,10 @@ void advancewindow(void)
 			} else
 			{
 				director_token = TK_INTLIT ;
-				director_mval.str.len = INTCAST(lexical_ptr - director_mval.str.addr );
+				director_mval.str.len = INTCAST(lexical_ptr - director_mval.str.addr);
 				if (stringpool.free + director_mval.str.len > stringpool.top)
-					stp_gcol(director_mval.str.len) ;
-				memcpy(stringpool.free,director_mval.str.addr,director_mval.str.len) ;
+					stp_gcol(director_mval.str.len);
+				memcpy(stringpool.free, director_mval.str.addr, director_mval.str.len);
 				assert (stringpool.free <= stringpool.top) ;
 			}
 			return;
@@ -172,12 +197,12 @@ void advancewindow(void)
 				{
 					if (y = apos_ok[x])
 					{
-						if ((x = *++lexical_ptr) > DEL)
+						if (DEL < (x = *++lexical_ptr))
 						{
 							director_token = TK_ERROR;
 							return;
 						}
-						if (ctypetab[x] == TK_RBRACKET)
+						if (TK_RBRACKET == ctypetab[x])
 						{
 							lexical_ptr++;
 							y = TK_NSORTS_AFTER;
@@ -194,12 +219,12 @@ void advancewindow(void)
 			y = TK_EOL;
 			break;
 		case TK_ASTERISK:
-			if ((x = *(lexical_ptr + 1)) > DEL)
+			if (DEL < (x = *(lexical_ptr + 1)))
 			{
 				director_token = TK_ERROR;
 				return;
 			}
-			if (ctypetab[x] == TK_ASTERISK)
+			if (TK_ASTERISK == ctypetab[x])
 			{
 				lexical_ptr++;
 				y = TK_EXPONENT;
@@ -211,7 +236,7 @@ void advancewindow(void)
 				director_token = TK_ERROR;
 				return;
 			}
-			if (ctypetab[x] == TK_RBRACKET)
+			if (TK_RBRACKET == ctypetab[x])
 			{
 				lexical_ptr++;
 				y = TK_SORTS_AFTER;

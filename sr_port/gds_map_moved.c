@@ -26,10 +26,15 @@
 #include "gds_map_moved.h"
 #include "hashtab.h"
 #include "hashtab_mname.h"
+#include "dpgbldir.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF sgmnt_data_ptr_t	cs_data;
+GBLREF boolean_t	run_time;
+GBLREF gd_addr		*gd_header;
+GBLREF hash_table_mname	*gd_tab_ptr;
 
-void gds_map_moved(hash_table_mname *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top)
+void gds_map_moved(sm_uc_ptr_t new_base, sm_uc_ptr_t old_base, sm_uc_ptr_t old_top, off_t new_eof)
 {
 	int		hist_index;
 	sm_long_t	adj;
@@ -37,9 +42,28 @@ void gds_map_moved(hash_table_mname *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_
 	ht_ent_mname 	*tabent, *topent;
 	gv_namehead	*gvt;
 	gvnh_reg_t	*gvnh_reg;
+	hash_table_mname	*tbl;
+	gd_addr		*addr_ptr;
 
 	assert(cs_addrs->now_crit);
-	assert((NULL != cs_addrs->dir_tree) && (NULL != &cs_addrs->dir_tree->hist));
+	/* It's possible to arrive here via mupip_backup --> wcs_flu --> wcs_mm_recover --> gds_map_moved and have
+	 * cs_addrs->dir_tree be NULL.  To distinguish that case, we can also check run_time (which would be FALSE)
+	 * in the following assert and then return because there's nothing to do here.
+	 */
+	assert((FALSE == run_time) || ((NULL != cs_addrs->dir_tree) && (NULL != &cs_addrs->dir_tree->hist)));
+	/* This initialization has to be done irrespective of whether new_base is different from old_base or not. */
+	cs_data = cs_addrs->hdr = (sgmnt_data_ptr_t)new_base;
+	cs_addrs->db_addrs[1] = new_base + new_eof - 1;
+	cs_addrs->bmm = MM_ADDR(cs_data);
+	cs_addrs->acc_meth.mm.base_addr = (sm_uc_ptr_t)((sm_uc_ptr_t)cs_data + (cs_data->start_vbn - 1) * DISK_BLOCK_SIZE);
+	if (NULL != cs_addrs->sgm_info_ptr)
+		cs_addrs->sgm_info_ptr->tp_csd = cs_addrs->hdr;
+	bt_init(cs_addrs);
+	if (NULL == cs_addrs->dir_tree)
+		return;
+	/* The following adjustment needs to be done only if new_base is different from old_base */
+	if (new_base == old_base)
+		return;
 	adj = (sm_long_t)(new_base - old_base);
 	assert(0 != adj);
 	dir_hist = hist = &cs_addrs->dir_tree->hist;
@@ -51,44 +75,55 @@ void gds_map_moved(hash_table_mname *tbl, sm_uc_ptr_t new_base, sm_uc_ptr_t old_
 		{
 			hist->h[hist_index].buffaddr += adj;
 			assert(new_base <= hist->h[hist_index].buffaddr);
-		}
-		else
+		} else
 		{
 			/* It has to be a private copy */
 			assert((hist->h[hist_index].first_tp_srch_status != 0) ||
 				(((off_chain *)&(hist->h[hist_index].blk_num))->flag != 0));
 		}
 	}
-
-	if (NULL == tbl)
-		return;		/* for mupip recover */
-
-	for (tabent = tbl->base, topent = tbl->top; tabent < topent; tabent++)
+	/* It is possible that more than one global directory has regions mapping to the same physical database file.
+	 * In this case, the search histories in the gv_targets hash tables of all those glds should be fixed.  Hence,
+	 * we go through all open glds (instead of just the currently active gd_header).
+	 */
+	if (NULL != gd_tab_ptr)
+		tbl = gd_tab_ptr;
+	else
 	{
-		if ((HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg))
-			&& (NULL != (gvt = gvnh_reg->gvt))
-			&& (cs_addrs == gvt->gd_csa) && (0 < gvt->clue.end))
+		addr_ptr = get_next_gdr(NULL);
+		assert(NULL != addr_ptr);
+		tbl = addr_ptr->tab_ptr;
+	}
+	for ( ; ; tbl = addr_ptr->tab_ptr)
+	{
+		assert(NULL != tbl);
+		for (tabent = tbl->base, topent = tbl->top; tabent < topent; tabent++)
 		{
-			hist = &(((gv_namehead *)(tabent->value))->hist);
-			if (hist == dir_hist)
-				continue;
-			for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)
+			if ((HTENT_VALID_MNAME(tabent, gvnh_reg_t, gvnh_reg)) && (NULL != (gvt = gvnh_reg->gvt))
+				&& (cs_addrs == gvt->gd_csa) && (0 < gvt->clue.end))
 			{
-				assert(MAX_BT_DEPTH >= hist_index);
-				if ((old_base <= hist->h[hist_index].buffaddr) &&
-					(old_top > hist->h[hist_index].buffaddr))
+				hist = &(((gvnh_reg_t *)(tabent->value))->gvt->hist);
+				if (hist == dir_hist)
+					continue;
+				for (hist_index = 0;  HIST_TERMINATOR != hist->h[hist_index].blk_num;  hist_index++)
 				{
-					hist->h[hist_index].buffaddr += adj;
-					assert(new_base <= hist->h[hist_index].buffaddr);
-				}
-				else
-				{
-					/* It has to be a private copy */
-					assert((hist->h[hist_index].first_tp_srch_status != 0) ||
-						(((off_chain *)&(hist->h[hist_index].blk_num))->flag != 0));
+					assert(MAX_BT_DEPTH >= hist_index);
+					if ((old_base <= hist->h[hist_index].buffaddr) && (old_top > hist->h[hist_index].buffaddr))
+					{
+						hist->h[hist_index].buffaddr += adj;
+						assert(new_base <= hist->h[hist_index].buffaddr);
+					} else
+					{	/* It's already been adjusted or it has to be a private copy */
+						assert(((new_base <= hist->h[hist_index].buffaddr)
+							&& (hist->h[hist_index].buffaddr < new_base + (old_top - old_base)))
+							|| (0 != hist->h[hist_index].first_tp_srch_status)
+							|| (0 != ((off_chain *)&(hist->h[hist_index].blk_num))->flag));
+					}
 				}
 			}
 		}
+		if ((NULL != gd_tab_ptr) || (NULL == (addr_ptr = get_next_gdr(addr_ptr))))
+			break;
 	}
 	return;
 }

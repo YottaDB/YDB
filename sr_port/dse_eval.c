@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +41,7 @@ void dse_eval(void)
 	memcpy(util_buff, "Hex:  ", 6);
 	util_len = 6;
 	util_len += i2hexl_nofill(num, (uchar_ptr_t)&util_buff[util_len], 16);
-	memcpy(&util_buff[util_len],"   Dec:  !@UJ", 13);
+	memcpy(&util_buff[util_len],"   Dec:  !@UQ", 13);
 	util_len += 13;
 	util_buff[util_len] = 0;
 	util_out_print(util_buff, TRUE, &num);

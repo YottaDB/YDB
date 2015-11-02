@@ -46,6 +46,13 @@ GBLREF	buddy_list		*global_tlvl_info_list;
 GBLREF	global_tlvl_info	*global_tlvl_info_head;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int			process_exiting;
+#ifdef VMS
+GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
+#endif
+
+#ifdef DEBUG
+GBLREF	uint4			donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#endif
 
 void	tp_clean_up(boolean_t rollback_flag)
 {
@@ -67,6 +74,11 @@ void	tp_clean_up(boolean_t rollback_flag)
 
 	assert((NULL != first_sgm_info) || (0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* if no database activity, cw_stagnate should be uninitialized or reinitialized */
+	DEBUG_ONLY(
+		if (rollback_flag)
+			donot_commit = FALSE;
+		assert(!donot_commit);
+	)
 	if (first_sgm_info != NULL)
 	{	/* It is possible that first_ua is NULL at this point due to a prior call to tp_clean_up() that failed in
 		 * malloc() of tmp_ua->update_array. This is possible because we might have originally had two chunks of
@@ -206,7 +218,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 								srch_hist[level].cycle = cse->cycle;
 								srch_hist[level].buffaddr = GDS_REL2ABS(cse->cr->buffaddr);
 							}
-							srch_hist[level].ptr = NULL;
+							srch_hist[level].cse = NULL;
 						} else
 						{
 							chain1 = *(off_chain *)&srch_hist[level].blk_num;
@@ -229,7 +241,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 										srch_hist[level].buffaddr =
 											GDS_REL2ABS(cse->cr->buffaddr);
 									}
-									srch_hist[level].ptr = NULL;
+									srch_hist[level].cse = NULL;
 								}
 							}
 						}
@@ -256,15 +268,20 @@ void	tp_clean_up(boolean_t rollback_flag)
 			jnl_fence_ctl.fence_list = JNL_FENCE_LIST_END;
 		}	/* for (all segments in the transaction) */
 		DEBUG_ONLY(
-			for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
-			{	/* check that we did not miss out on clearing any gv_target->root which had chain.flag bit set */
-				chain1 = *(off_chain *)&gvnh->root;
-				assert(!chain1.flag);
-				if (gvnh->root)
-				{	/* check that gv_target->root falls within total blocks range */
-					csa = gvnh->gd_csa;
-					assert(NULL != csa);
-					assert(gvnh->root < csa->ti->total_blks);
+			if (!process_exiting)
+			{	/* Ensure that we did not miss out on clearing any gv_target->root which had chain.flag set.
+				 * Dont do this if the process is cleaning up the TP transaction as part of exit handling
+				 */
+				for (gvnh = gv_target_list; NULL != gvnh; gvnh = gvnh->next_gvnh)
+				{
+					chain1 = *(off_chain *)&gvnh->root;
+					assert(!chain1.flag);
+					if (gvnh->root)
+					{	/* check that gv_target->root falls within total blocks range */
+						csa = gvnh->gd_csa;
+						assert(NULL != csa);
+						assert(gvnh->root < csa->ti->total_blks);
+					}
 				}
 			}
 		)
@@ -274,7 +291,7 @@ void	tp_clean_up(boolean_t rollback_flag)
 		reinitialize_list(global_tlvl_info_list);		/* reinitialize the global_tlvl_info buddy_list */
 		CWS_RESET; /* reinitialize the hashtable before restarting/committing the TP transaction */
 	}	/* if (any database work in the transaction) */
-
+	VMS_ONLY(tp_has_kill_t_cse = FALSE;)
 	tp_allocation_clue = MASTER_MAP_SIZE_MAX * BLKS_PER_LMAP + 1;
 	sgm_info_ptr = NULL;
 	first_sgm_info = NULL;

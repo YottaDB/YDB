@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,7 +34,11 @@
 #define STARTUP_ENV	"gtmjb"
 #define GTMJCNT_ENV	"gtmjcnt"
 #ifndef __MVS__
+#ifdef __sun
+#define TIMEOUT_ERROR ((int)strerror + 1)   /* a special value so as to differentiate it from the rest of errno's */
+#else
 #define TIMEOUT_ERROR (sys_nerr + 1)	/* a special value so as to differentiate it from the rest of errno's */
+#endif
 #else
 #define TIMEOUT_ERROR (MAX_SYSERR + 1)
 #endif

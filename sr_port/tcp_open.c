@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	ABS_TIME                cur_time, end_time;
 	fd_set                  tcp_fd;
 	struct sockaddr_in      peer;
+	short 			retry_num;
 
 	error_def(ERR_INVADDRSPEC);
 
@@ -123,7 +124,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		if (-1 == lsock)
 		{
 			errptr = (char *)STRERROR(errno);
-			util_out_print(errptr, TRUE, errno);
+			util_out_print(errptr, TRUE);
 			return -1;
 		}
 		/* allow multiple connections to the same IP address */
@@ -131,14 +132,14 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		{
 			errptr = (char *)STRERROR(errno);
 			(void)tcp_routines.aa_close(lsock);
-			util_out_print(errptr, TRUE, errno);
+			util_out_print(errptr, TRUE);
 			return -1;
 		}
 		if (-1 == tcp_routines.aa_bind(lsock, (struct sockaddr *)&sin, sizeof(struct sockaddr)))
 		{
 			errptr = (char *)STRERROR(errno);
 			(void)tcp_routines.aa_close(lsock);
-			util_out_print(errptr, TRUE, errno);
+			util_out_print(errptr, TRUE);
 			return -1;
 		}
 		/* establish a queue of length MAX_CONN_PENDING for incoming connections */
@@ -146,7 +147,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		{
 			errptr = (char *)STRERROR(errno);
 			(void)tcp_routines.aa_close(lsock);
-			util_out_print(errptr, TRUE, errno);
+			util_out_print(errptr, TRUE);
 			return -1;
 		}
 
@@ -193,7 +194,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			} else  if (0 > rv)
 			{
 				errptr = (char *)STRERROR(errno);
-				util_out_print(errptr, TRUE, errno);
+				util_out_print(errptr, TRUE);
 				(void)tcp_routines.aa_close(lsock);
 				return -1;
 			}
@@ -201,10 +202,53 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			sock = tcp_routines.aa_accept(lsock, &peer, &size);
 			if (-1 == sock)
 			{
-				errptr = (char *)STRERROR(errno);
-				util_out_print(errptr, TRUE, errno);
-				(void)tcp_routines.aa_close(lsock);
-				return -1;
+#ifdef __hpux
+			/*ENOBUFS in HP-UX is either because of a memory problem or when we have received a RST just
+			after a SYN before an accept call. Normally this is not fatal and is just a transient state.
+			Hence exiting just after a single error of this kind should not be done. So retry in case
+			of HP-UX and ENOBUFS error. */
+				if (ENOBUFS == errno)
+				{
+					retry_num = 0;
+					while (HPUX_MAX_RETRIES > retry_num)
+					{
+				/*In case of succeeding with select in first go, accept will still get 5ms time difference*/
+						SHORT_SLEEP(5);
+						for ( ; HPUX_MAX_RETRIES > retry_num; retry_num++)
+						{
+							utimeout.tv_sec = 0;
+							utimeout.tv_usec = HPUX_SEL_TIMEOUT;
+							FD_ZERO(&tcp_fd);
+							FD_SET(lsock, &tcp_fd);
+							rv = tcp_routines.aa_select(lsock + 1, (void *)&tcp_fd, (void *)0,
+							 (void *)0, &utimeout);
+							if (0 < rv)
+								break;
+							else
+								SHORT_SLEEP(5);
+						}
+						if (0 > rv)
+			                        {
+                			                errptr = (char *)STRERROR(errno);
+		        	                        util_out_print(errptr, TRUE);
+                			                (void)tcp_routines.aa_close(lsock);
+		                        	       return -1;
+	                		        }
+						sock = tcp_routines.aa_accept(lsock, &peer, &size);
+						if ((-1 == sock) && (ENOBUFS  == errno))
+							retry_num++;
+						else
+							break;
+					}
+				}
+				if (-1 == sock)
+#endif
+				{
+					errptr = (char *)STRERROR(errno);
+					util_out_print(errptr, TRUE);
+					(void)tcp_routines.aa_close(lsock);
+					return -1;
+				}
 			}
 			SPRINTF(&temp_addr[0], "%s", tcp_routines.aa_inet_ntoa(peer.sin_addr));
 #ifdef	DEBUG_ONLINE
@@ -253,7 +297,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			if (-1 == sock)
 			{
 				errptr = (char *)STRERROR(errno);
-				util_out_print(errptr, TRUE, errno);
+				util_out_print(errptr, TRUE);
 				return -1;
 			}
 			/*      allow multiple connections to the same IP address */
@@ -261,7 +305,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			{
 				(void)tcp_routines.aa_close(sock);
 				errptr = (char *)STRERROR(errno);
-			        util_out_print(errptr, TRUE, errno);
+			        util_out_print(errptr, TRUE);
 				return -1;
 			}
 			temp_1 = tcp_routines.aa_connect(sock, (struct sockaddr *)(&sin), sizeof(sin));
@@ -274,7 +318,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			{
 				(void)tcp_routines.aa_close(sock);
 				errptr = (char *)STRERROR(errno);
-			        util_out_print(errptr, TRUE, errno);
+			        util_out_print(errptr, TRUE);
 				return -1;
 			}
 			if ((0 > temp_1) && (EINTR == errno))

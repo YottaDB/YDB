@@ -190,9 +190,9 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 					nlen = (0 == date) ? 0 : -3;
 				} else
 				{
-                                        UNICODE_ONLY(gtm_utf8_mode ? op_fnp1(mo_str, comma, dow, &temp_mval) :
-                                                                     op_fnzp1(mo_str, comma, dow, &temp_mval));
-					VMS_ONLY(op_fnzp1(mo_str, comma, dow, &temp_mval, TRUE));
+                                        UNICODE_ONLY(gtm_utf8_mode ? op_fnp1(day_str, comma, dow, &temp_mval) :
+                                                                     op_fnzp1(day_str, comma, dow, &temp_mval));
+					VMS_ONLY(op_fnzp1(day_str, comma, dow, &temp_mval, TRUE));
 					nlen = (0 == date) ? 0 : -temp_mval.str.len;
 					outlen += - 3 - nlen;
 					if (outlen >= ZDATE_MAX_LEN)

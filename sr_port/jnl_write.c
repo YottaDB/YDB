@@ -38,6 +38,7 @@
 #include "jnl_get_checksum.h"
 #include "memcoherency.h"
 #include "is_proc_alive.h"
+#include "wbox_test_init.h"
 
 GBLREF	jnlpool_ctl_ptr_t	temp_jnlpool_ctl;
 DEBUG_ONLY( GBLREF boolean_t	run_time;)
@@ -54,9 +55,13 @@ LITREF	int			jrt_is_replicated[];
 /* The fancy ordering of operators/operands in the JNL_SPACE_AVAILABLE calculation is to avoid overflows. */
 #define	JNL_SPACE_AVAILABLE(jb, lcl_dskaddr, lcl_freeaddr, lcl_size)				\
 (												\
-	assert((jb)->dskaddr <= lcl_freeaddr),							\
-	/* the following assert is an || to take care of 4G value overflows or 0 underflows */  \
-	assert((lcl_freeaddr <= lcl_size) || (jb)->dskaddr >= lcl_freeaddr - lcl_size),		\
+	assert(((jb)->dskaddr <= lcl_freeaddr)							\
+		|| (gtm_white_box_test_case_enabled						\
+			&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))),	\
+	/* the following assert is an || to take care of 4G value overflows or 0 underflows */	\
+	assert((lcl_freeaddr <= lcl_size) || ((jb)->dskaddr >= lcl_freeaddr - lcl_size)		\
+		|| (gtm_white_box_test_case_enabled						\
+			&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))),	\
 	(lcl_size - (lcl_freeaddr - ((lcl_dskaddr = (jb)->dskaddr) & JNL_WRT_START_MASK)))	\
 )
 #else
@@ -168,7 +173,11 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		if (jb->filesize < DISK_BLOCKS_SUM(lcl_freeaddr, align_rec_len)) /* not enough room in jnl file, extend it. */
 		{	/* We should never reach here if we are called from t_end/tp_tend */
 			assert(!run_time || csa->ti->early_tn == csa->ti->curr_tn);
-			jnl_flush(reg);
+			if (SS_NORMAL != jnl_flush(reg))
+			{
+				assert(NOJNL == jpc->channel); /* jnl file lost */
+				return; /* let the caller handle the error */
+			}
 			assert(lcl_freeaddr == jb->dskaddr);
 			if (-1 == jnl_file_extend(jpc, align_rec_len))	/* if extension fails, not much we can do */
 			{
@@ -275,7 +284,11 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	if (jb->filesize < DISK_BLOCKS_SUM(lcl_freeaddr, rlen)) /* not enough room in jnl file, extend it. */
 	{	/* We should never reach here if we are called from t_end/tp_tend */
 		assert(!run_time || csa->ti->early_tn == csa->ti->curr_tn);
-		jnl_flush(reg);
+		if (SS_NORMAL != jnl_flush(reg))
+		{
+			assert(NOJNL == jpc->channel); /* jnl file lost */
+			return; /* let the caller handle the error */
+		}
 		assert(lcl_freeaddr == jb->dskaddr);
 		if (-1 == jnl_file_extend(jpc, rlen))	/* if extension fails, not much we can do */
 		{
@@ -332,6 +345,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			}
 		} else
 		{	/* SET, KILL, ZKILL for TP, ZTP, non-TP */
+			assert(((jrec_prefix *)jfb->buff)->forwptr == jfb->record_size);
 			if (nowrap)
 			{
 				memcpy(lcl_buff + lcl_free, (uchar_ptr_t)jfb->buff, rlen);
@@ -345,7 +359,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	assert((lcl_free - lcl_orig_free + lcl_size) % lcl_size == rlen);
 	assert(lcl_buff[lcl_orig_free] == rectype);
 	assert(lcl_orig_free < lcl_free  ||  lcl_free < jb->dsk);
-	assert(lcl_freeaddr >= jb->dskaddr);
+	assert((lcl_freeaddr >= jb->dskaddr)
+		|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
 	jpc->new_freeaddr = lcl_freeaddr + rlen;
 	assert(lcl_free == jpc->new_freeaddr % lcl_size);
 	if (REPL_ENABLED(csa) && jrt_is_replicated[rectype])

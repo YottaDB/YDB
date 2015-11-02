@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,27 +49,29 @@
 #include "gtmio.h"
 #include "jnl.h"
 
-#define MAX_CMD_LINE	8192	/* Maximum command line length */
-#define MAX_PATH	 128	/* Maximum file path length */
-#define MAX_LAB_LEN	  32	/* Maximum Label string length */
-#define MAX_RTN_LEN	  32	/* Maximum Routine string length */
-#define TEMP_BUFF_SIZE  1024
-#define PARM_STRING_SIZE   9
-#define MAX_NUM_LEN	  10	/* Maximum length number will be when converted to string */
-#define MAX_JOB_QUALS	  12	/* Maximum environ variables set for job qualifiers */
+#define MAX_CMD_LINE	 8192	/* Maximum command line length */
+#define MAX_PATH	     128	/* Maximum file path length */
+#define MAX_LAB_LEN	     32		/* Maximum Label string length */
+#define MAX_RTN_LEN	     32		/* Maximum Routine string length */
+#define TEMP_BUFF_SIZE   1024
+#define PARM_STRING_SIZE 9
+#define MAX_NUM_LEN	     10	/* Maximum length number will be when converted to string */
+#define MAX_JOB_QUALS	 12	/* Maximum environ variables set for job qualifiers */
 
 static 	int		joberr = joberr_gen;
 static 	boolean_t	job_launched = FALSE;
 
 GBLREF	bool			jobpid;		/* job's output files should have the pid appended to them. */
-GBLREF	volatile boolean_t    	ojtimeout;
-GBLREF	boolean_t    		job_try_again;
+GBLREF	volatile boolean_t		ojtimeout;
+GBLREF	boolean_t			job_try_again;
 GBLREF	uint4			process_id;
 GBLREF	int			mutex_sock_fd;
 #ifndef SYS_ERRLIST_INCLUDE
 /* currently either stdio.h or errno.h both of which are included above */
 /*	needed by TIMEOUT_ERROR in jobsp.h */
+#ifndef __sun
 GBLREF	int			sys_nerr;
+#endif
 #endif
 
 #ifdef	__osf__
@@ -244,7 +246,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		job_addr(&jparms->routine, &jparms->label, jparms->offset, (char **)&base_addr, &transfer_addr);
 
 		joberr = joberr_syscall;
-                if (-1 == setsid())
+		if (-1 == setsid())
 			rts_error(VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("Error setting session id for the Job."), errno);
 
@@ -292,10 +294,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 		{
 			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top;
-			     r_local++)
+				r_local++)
 			{
 				if (r_local->open && !r_local->was_open &&
-				    (dba_bg == r_local->dyn.addr->acc_meth || dba_mm == r_local->dyn.addr->acc_meth))
+					(dba_bg == r_local->dyn.addr->acc_meth || dba_mm == r_local->dyn.addr->acc_meth))
 				{
 					udi = (unix_db_info *)(r_local->dyn.addr->file_cntl->file_info);
 					csa = &udi->s_addrs;
@@ -678,8 +680,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				 * a union wait argument (on AIX) */
 		if (done_pid == child_pid)
 			return (wait_status);
-                else if (0 > done_pid && EINTR == errno && TRUE == ojtimeout)
-                {
+		else if (0 > done_pid && EINTR == errno && TRUE == ojtimeout)
+		{
 			/* Kill the middle process with SIGTERM and check the exit status from
 			 * the handler to see if the Middle process had actually successfully forked the Job */
 			KILL_N_REAP(child_pid, SIGTERM, kill_ret);

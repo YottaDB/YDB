@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +19,7 @@
 
 typedef struct lv_sbs_tbl_struct
 {
-       	UNICODE_ONLY(unsigned short	ident;)
-       	NON_UNICODE_ONLY(unsigned char	ident;)
+       	unsigned short			ident;
        	bool   	       	       	       	int_flag;
        	unsigned char	       		level;
 	struct sbs_blk_struct		*str;
@@ -63,8 +62,7 @@ typedef struct lv_blk_struct
 
 typedef struct symval_struct
 {
-       	UNICODE_ONLY(unsigned short	ident;)
-       	NON_UNICODE_ONLY(unsigned char	ident;)
+       	unsigned short		ident;
 	unsigned char		tp_save_all;
 	struct
 	{

@@ -490,6 +490,7 @@ int main(int argc, char **argv, char **envp)
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 	cs_data = cs_addrs->hdr;
 	cs_addrs->nl = (node_local_ptr_t)malloc(sizeof(node_local));
+	memset((char *)cs_addrs->nl, 0, sizeof(node_local));
 	action_que_dummy_reg = gv_cur_region;
 	/* ... now we are ready! */
 	ntd_root->crq = gtcm_init_ast;

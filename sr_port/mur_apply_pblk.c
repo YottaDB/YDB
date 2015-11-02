@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,13 +37,14 @@
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 #endif
-GBLREF int			mur_regno;
-GBLREF reg_ctl_list		*mur_ctl;
-GBLREF jnl_ctl_list		*mur_jctl;
-GBLREF mur_gbls_t		murgbl;
-GBLREF mur_opt_struct 		mur_options;
-GBLREF mur_rab_t		mur_rab;
-GBLREF seq_num			seq_num_zero;
+GBLREF	int			mur_regno;
+GBLREF	reg_ctl_list		*mur_ctl;
+GBLREF	jnl_ctl_list		*mur_jctl;
+GBLREF	mur_gbls_t		murgbl;
+GBLREF	mur_opt_struct 		mur_options;
+GBLREF	mur_rab_t		mur_rab;
+GBLREF	seq_num			seq_num_zero;
+GBLREF	mur_read_desc_t		mur_desc;
 
 uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 {
@@ -299,10 +300,13 @@ uint4 mur_apply_pblk(boolean_t apply_intrpt_pblk)
 
 uint4 mur_output_pblk(void)
 {
-	reg_ctl_list	*rctl;
-	file_control	*db_ctl;
-	struct_jrec_blk	pblkrec;
-	uchar_ptr_t	pblkcontents;
+	reg_ctl_list		*rctl;
+	file_control		*db_ctl;
+	struct_jrec_blk		pblkrec;
+	uchar_ptr_t		pblkcontents, pblk_jrec_start;
+	int4			size, fbw_size, fullblockwrite_len;
+	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 
 	if (mur_options.rollback_losttnonly)	/* In case of a LOSTTNONLY rollback, it is still possible to reach here */
 		return SS_NORMAL;/* if one region has NOBEFORE_IMAGE while another has BEFORE_IMAGE. Any case do NOT apply PBLKs */
@@ -324,17 +328,55 @@ uint4 mur_output_pblk(void)
 		 */
 		 gds_blk_downgrade((v15_blk_hdr_ptr_t)pblkcontents, (blk_hdr_ptr_t)pblkcontents);
 	}
-	db_ctl =  rctl->db_ctl;
+	db_ctl = rctl->db_ctl;
 	/* apply PBLKs to database of mur_ctl[mur_regno].
 	 * This only takes place during rollback/recover, and is thus the first restoration being done to the database;
 	 * therefore, it will not cause a conflict with the write cache, as the cache will be empty
 	 */
 	db_ctl->op = FC_WRITE;
-	db_ctl->op_buff = (uchar_ptr_t)pblkcontents;
-	/* Use jrec size even if downgrade may have shrunk block. If the block has an integ error, we don't run into
-	 * any trouble.
-	*/
-	db_ctl->op_len = pblkrec.bsiz;
-	db_ctl->op_pos = mur_ctl[mur_regno].csd->blk_size / DISK_BLOCK_SIZE * pblkrec.blknum + mur_ctl[mur_regno].csd->start_vbn;
+	csd = rctl->csd;
+	db_ctl->op_pos = (csd->blk_size / DISK_BLOCK_SIZE) * pblkrec.blknum + csd->start_vbn;
+	/* Use jrec size even if downgrade may have shrunk block. If the block has an integ error, we don't run into any trouble. */
+	size = pblkrec.bsiz;
+	assert(size <= csd->blk_size);
+	if (size > csd->blk_size)	/* safety check in pro to avoid buffer overflows */
+		size = csd->blk_size;
+	/* If full-block-writes are enabled, round size up to next full logical filesys block. We want to use "dbfilop" to
+	 * do the write but it does not honour full-block-writes setting. So prepare the buffer accordingly before invoking it.
+	 */
+	csa = rctl->csa;
+	if (csa->do_fullblockwrites)
+	{	/* Determine full-block-write size corresponding to the current PBLK record block size (need to write only as
+		 * many full-blocks as needed for current block size). For example, with database block size 16K, current block
+		 * size (in the pblk record) is 3K and filesystem pagesize (fullblockwrite_len) is 4K, it is enough to only
+		 * write 4K data out for the current pblk record (instead of the entire 16K).
+		 */
+		fullblockwrite_len = (int4)csa->fullblockwrite_len;
+		assert(fullblockwrite_len);
+		fbw_size = (int4)ROUND_UP(size, fullblockwrite_len);
+		/* Even though we are going to write full-block-write aligned blocks, we are not going to copy the pblk record
+		 * to an alternate buffer. We are going to copy whatever follows the pblk record in the journal file (and has
+		 * been read into the mur_desc buffers) into the database block as part of the full-block write. It is ok to do
+		 * so since the database does not care about the data that follows the valid end of the block. But we need to
+		 * ensure that there is referencible memory for the entire length of the full-block write. This is guaranteed
+		 * because of the layout of the mur_desc buffers. We have a contiguous sequence of 5 buffers (random_buff,
+		 * aux_buff1, seq_buff[0], seq_buff[1], aux_buff2) each occupying MUR_BUFF_SIZE bytes. Usually the PBLK record
+		 * is expected to lie somewhere in seq_buff[0] or seq_buff[1]. If at all, it can overflow into aux_buff2.
+		 * But aux_buff2 is an overflow buffer and therefore can contain at most one PBLK record (overflowing from
+		 * seq_buff[1]) and since the current value of MUR_BUFF_SIZE is 128K, we have enough room to hold one
+		 * GDS block (given that the maximum database block size is MAX_DB_BLK_SIZE which is 64K). All this is
+		 * asserted below so whenever these constants change, this code is reworked.
+		 */
+		DEBUG_ONLY(pblk_jrec_start = (uchar_ptr_t)&mur_rab.jnlrec->jrec_pblk;)
+		assert(pblk_jrec_start > mur_desc.aux_buff1);	/* assert that PBLK record ends AFTER aux_buff1 ends */
+		assert((pblk_jrec_start + fbw_size) > mur_desc.seq_buff[0].base);
+		assert(pblk_jrec_start < mur_desc.aux_buff2.base);/* assert that PBLK record begins BEFORE aux_buff2 begins */
+		assert((pblk_jrec_start + fbw_size) < mur_desc.aux_buff2.top);
+		assert((pblk_jrec_start + fbw_size) < (mur_desc.aux_buff2.base + MAX_DB_BLK_SIZE));
+		assert(MUR_BUFF_SIZE > MAX_DB_BLK_SIZE);
+	} else
+		fbw_size = size;
+	db_ctl->op_buff = pblkcontents;
+	db_ctl->op_len = fbw_size;
 	return (dbfilop(db_ctl));
 }

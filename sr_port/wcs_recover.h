@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +13,4 @@
 #define __WCS_RECOVER_H__
 
 void		wcs_recover(gd_region *reg);
-#ifdef UNIX
-void	wcs_mm_recover(gd_region *reg);
-#elif defined(VMS)
-void	wcs_mm_recover(gd_region *reg);
-#else
-#error UNSUPPORTED PLATFORM
-#endif
-
 #endif

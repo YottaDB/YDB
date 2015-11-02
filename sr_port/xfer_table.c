@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,5 +48,34 @@ GBLDEF xfer_entry_t xfer_table[] =
 #include "xfer.h"
 };
 #undef XFER
+
+#if defined(__ia64)
+
+#ifdef XFER
+#       undef XFER
+#endif /* XFER */
+
+#define XFER(a,b) #b
+
+
+/* On IA64, we want to use CODE_ADDRESS() macro, to dereference all the function pointers, before storing them in
+   global array. Now doing a dereference operation, as part of initialization, is not allowed by linux/gcc (HP'a aCC
+   was more tolerant towards this). So to make sure that the xfer_table is initialized correctly, before anyone
+   uses it, this function is called right at the beginning of gtm_startup
+*/
+
+int init_xfer_table()
+{
+        int i;
+
+        for (i = 0; i < (sizeof(xfer_table) / sizeof(xfer_entry_t)); i++)
+        {
+                xfer_table[i] = (int (*)())CODE_ADDRESS(xfer_table[i]);
+        }
+
+        return 0;
+}
+
+#endif /* __ia64 */
 
 

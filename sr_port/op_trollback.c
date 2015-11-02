@@ -38,6 +38,7 @@ GBLREF  gd_region		*gv_cur_region;
 GBLREF  sgmnt_data_ptr_t	cs_data;
 GBLREF  sgmnt_addrs		*cs_addrs;
 GBLREF	void			(*tp_timeout_clear_ptr)(void);
+GBLREF	int			process_exiting;
 
 #define	RESTORE_GV_CUR_REGION						\
 {									\
@@ -63,6 +64,20 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		rts_error(VARLSTCNT(4) ERR_INVROLLBKLVL, 2, rb_levels, dollar_tlevel);
 
 	newlevel = (0 > rb_levels) ? dollar_tlevel + rb_levels : rb_levels;
+	/* The DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC macro is used at various points in the database code to check that
+	 * gv_target and cs_addrs are in sync. This is because op_gvname relies on this in order to avoid a gv_bind_name
+	 * function call (if incoming key matches gv_currkey from previous call, it uses gv_target and cs_addrs right
+	 * away instead of recomputing them). We want to check that here as well. The only exception is if we were
+	 * interrupted in the middle of TP transaction by an external signal which resulted in us terminating right away.
+	 * In this case, we are guaranteed not to make a call to op_gvname again (because we are exiting) so it is ok
+	 * not to do this check.
+	 */
+	DEBUG_ONLY(
+		if (!process_exiting)
+		{
+			DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+		}
+	)
 	save_cur_region = gv_cur_region;
 	if (!newlevel)
 	{
@@ -95,4 +110,10 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		RESTORE_GV_CUR_REGION;
 		tp_unwind(newlevel, ROLLBACK_INVOCATION);
 	}
+	DEBUG_ONLY(
+		if (!process_exiting)
+		{
+			DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;
+		}
+	)
 }

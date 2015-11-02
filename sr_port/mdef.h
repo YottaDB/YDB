@@ -24,7 +24,7 @@ typedef struct
 } mstr;
 #  define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
 #  define MSTR_DEF(name, length, string)	mstr name = {0, length, string}
-#  define MIDENT_CONST(name, string)            mident name = {0, LEN_AND_LIT(string)}
+#  define MIDENT_CONST(name, string)	    mident name = {0, LEN_AND_LIT(string)}
 #  define MIDENT_DEF(name, length, string)      mident name = {0, length, string}
 #else
 typedef struct
@@ -34,7 +34,7 @@ typedef struct
 } mstr;
 #  define MSTR_CONST(name, string)		mstr name = {LEN_AND_LIT(string)}
 #  define MSTR_DEF(name, length, string)	mstr name = {length, string}
-#  define MIDENT_CONST(name, string)            mident name = {LEN_AND_LIT(string)}
+#  define MIDENT_CONST(name, string)	    mident name = {LEN_AND_LIT(string)}
 #  define MIDENT_DEF(name, length, string)      mident name = {length, string}
 #endif
 
@@ -138,20 +138,21 @@ typedef UINTPTR_T uintszofptr_t;
 #endif/* __ia64 */
 
 #ifdef __x86_64__
-#define X86_64_ONLY(x)                x
+#define X86_64_ONLY(x)		x
 #define NON_X86_64_ONLY(x)
 #else
 #define X86_64_ONLY(x)
 #define NON_X86_64_ONLY(x)    x
 #endif /* __x86_64__ */
 
-#if defined(__x86_64__) || defined(__ia64)
+#if defined(__i386) || defined(__x86_64__) || defined(__ia64)
+#define NON_RISC_ONLY(x)	x
 #define RISC_ONLY(x)
-#define NON_RISC_ONLY(x)        x
-#else
-#define RISC_ONLY(x)            x
+#elif defined(__sparc) || defined(_AIX) || defined(__hppa) || defined(__alpha)
+#define RISC_ONLY(x)	x
 #define NON_RISC_ONLY(x)
-#endif /* __x86_64__ && __ia64 */
+#endif
+
 
 #ifdef _AIX
 #       define  AIX_ONLY(X) X
@@ -159,6 +160,11 @@ typedef UINTPTR_T uintszofptr_t;
 #       define  AIX_ONLY(X)
 #endif
 
+#ifdef __sparc
+#	define  SPARC_ONLY(X) X
+#else
+#define  SPARC_ONLY(X)
+#endif
 #define BITS_PER_UCHAR  8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
@@ -218,7 +224,8 @@ typedef struct
  * Note removed "defined(__MVS__) || defined(__s390__) ||" from this ifdef to shorten the line. These can
  * be reinserted in the even these platforms are reactivated.
  */
-#if defined(__alpha) || defined(_AIX) || defined(__hpux) || (defined(__linux__) && (defined(__ia64) || defined(__x86_64__)))
+#if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || (defined(__linux__) &&  \
+	(defined(__ia64) || defined(__x86_64__)))
 #	define HAS_LITERAL_SECT
 #endif
 
@@ -277,7 +284,7 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
  * 	character. Here are the expansion ratios for different ranges of characters.
  * 	------------------------------------------------------------------------------
  * 		Byte pattern			max. expanded 	   input byte	ratio
- * 						output length         length
+ * 						output length	 length
  * 	------------------------------------------------------------------------------
  * 		$C(129)_$ZCH(128)_		18			2	 9
  * 		$C(1536)_$ZCH(128)_		19			3	 7
@@ -479,30 +486,55 @@ int m_usleep(int useconds);
 #	define SHORT_SLEEP(x) hiber_start(x);
 #endif
 
+/* The following "MSYNC" defines are for the MM access method
+ *    NO_MSYNC		-- minimum number of msyncs -- only in run down
+ *    UNTARGETED_MSYNC	-- msync the entire file
+ *    TARGETED_MSYNC	-- keep track of changed buffers and only msync them
+ *    REGULAR_MSYNC	-- do regular file I/O on the mapped file (ignoring the fact it is mapped)
+ *
+ * If none of the MSYNCs are explicitly defined, the ifdef and elif defined sequence will fall through
+ * to the else case, defining NO_MSYNC as the default.
+ */
 #ifdef UNIX
 #	define UNIX_ONLY(X)		X
 #	define UNIX_ONLY_COMMA(X)	X,
-#	ifdef UNTARGETED_MSYNC
+#	if defined UNTARGETED_MSYNC
 #		define UNTARGETED_MSYNC_ONLY(X)		X
 #		define NON_UNTARGETED_MSYNC_ONLY(X)
 #		define TARGETED_MSYNC_ONLY(X)
 #		define NON_TARGETED_MSYNC_ONLY(X)	X
 #		define REGULAR_MSYNC_ONLY(X)
 #		define NON_REGULAR_MSYNC_ONLY(X)	X
-#	else
+#		define NO_MSYNC_ONLY(X)
+#		define NON_NO_MSYNC_ONLY(X)
+#	elif defined TARGETED_MSYNC
 #		define UNTARGETED_MSYNC_ONLY(X)
 #		define NON_UNTARGETED_MSYNC_ONLY(X)	X
-#		if defined(TARGETED_MSYNC)
-#			define TARGETED_MSYNC_ONLY(X)		X
-#			define NON_TARGETED_MSYNC_ONLY(X)
-#			define REGULAR_MSYNC_ONLY(X)
-#			define NON_REGULAR_MSYNC_ONLY(X)	X
-#		else
-#			define TARGETED_MSYNC_ONLY(X)
-#			define NON_TARGETED_MSYNC_ONLY(X)	X
-#			define REGULAR_MSYNC_ONLY(X)		X
-#			define NON_REGULAR_MSYNC_ONLY(X)
-#		endif
+#		define TARGETED_MSYNC_ONLY(X)		X
+#		define NON_TARGETED_MSYNC_ONLY(X)
+#		define REGULAR_MSYNC_ONLY(X)
+#		define NON_REGULAR_MSYNC_ONLY(X)	X
+#		define NO_MSYNC_ONLY(X)
+#		define NON_NO_MSYNC_ONLY(X)
+#	elif defined REGULAR_MSYNC
+#		define UNTARGETED_MSYNC_ONLY(X)
+#		define NON_UNTARGETED_MSYNC_ONLY(X)	X
+#		define TARGETED_MSYNC_ONLY(X)
+#		define NON_TARGETED_MSYNC_ONLY(X)	X
+#		define REGULAR_MSYNC_ONLY(X)		X
+#		define NON_REGULAR_MSYNC_ONLY(X)
+#		define NO_MSYNC_ONLY(X)
+#		define NON_NO_MSYNC_ONLY(X)
+#	else
+#		define NO_MSYNC
+#		define UNTARGETED_MSYNC_ONLY(X)
+#		define NON_UNTARGETED_MSYNC_ONLY(X)
+#		define TARGETED_MSYNC_ONLY(X)
+#		define NON_TARGETED_MSYNC_ONLY(X)
+#		define REGULAR_MSYNC_ONLY(X)
+#		define NON_REGULAR_MSYNC_ONLY(X)
+#		define NO_MSYNC_ONLY(X)			X
+#		define NON_NO_MSYNC_ONLY(X)
 #	endif
 #else
 #	define UNIX_ONLY(X)
@@ -513,6 +545,8 @@ int m_usleep(int useconds);
 #	define NON_UNTARGETED_MSYNC_ONLY(X)
 #	define NON_TARGETED_MSYNC_ONLY(X)
 #	define NON_REGULAR_MSYNC_ONLY(X)
+#	define NO_MSYNC_ONLY(X)
+#	define NON_NO_MSYNC_ONLY(X)
 #endif
 
 #ifdef VMS
@@ -603,7 +637,7 @@ typedef struct
 #define latch_image_count latch_word
 
 #define GLOBAL_LATCH_HELD_BY_US(latch) (process_id == (latch)->u.parts.latch_pid \
-                                        VMS_ONLY(&& image_count == (latch)->u.parts.latch_image_count))
+					VMS_ONLY(&& image_count == (latch)->u.parts.latch_image_count))
 
 typedef	union gtm_time8_struct
 {
@@ -975,7 +1009,7 @@ typedef INTPTR_T  ptroff_t;
 #endif
 
 #define MEMCP(dst,src,start,count,limit){ \
-	if(start+count > limit) \
+	if (start+count > limit) \
 		rts_error(VARLSTCNT(1) ERR_CPBEYALLOC); \
 	else	\
 		memcpy(dst+start,src,count); \
@@ -1029,7 +1063,7 @@ unsigned int asc_hex2i(char *p, int len);
 {													\
 	if ((unsigned)(num) < 1000)									\
 	{ /* perform light-weight conversion of numbers upto 3 digits */				\
-        	int 	n1, n2; /* digits at the 10th and 100th decimal positions respectively */	\
+		int 	n1, n2; /* digits at the 10th and 100th decimal positions respectively */	\
 		n2 = ((num) / 100) % 10;								\
 		if (0 != n2)										\
 			(des)[(des_len)++] = n2 + '0';							\

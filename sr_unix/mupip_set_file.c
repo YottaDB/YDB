@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -403,8 +403,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				}
 				if (csd->blks_to_upgrd)
 				{
-					util_out_print("MM access method cannot be set if there are blocks to upgrade",
-						TRUE);
+					util_out_print("MM access method cannot be set if there are blocks to upgrade",	TRUE);
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 					exit_stat |= EXIT_WRN;
 					db_ipcs_reset(gv_cur_region, FALSE);
@@ -415,6 +414,15 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				{
 					util_out_print("MM access method cannot be set in DB compatibility mode",
 						TRUE);
+					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
+					exit_stat |= EXIT_WRN;
+					db_ipcs_reset(gv_cur_region, FALSE);
+					mu_gv_cur_reg_free();
+					continue;
+				}
+				if (JNL_ENABLED(csd) && csd->jnl_before_image)
+				{
+					util_out_print("MM access method cannot be set with BEFORE image journaling", TRUE);
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 					exit_stat |= EXIT_WRN;
 					db_ipcs_reset(gv_cur_region, FALSE);

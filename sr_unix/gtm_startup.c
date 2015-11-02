@@ -95,7 +95,7 @@
 #define MIN_INDIRECTION_NESTING 32
 #define MAX_INDIRECTION_NESTING 256
 
-static int init_xfer_table(void);
+GBLREF int init_xfer_table(void);
 
 GBLDEF void		(*restart)() = &mum_tstart;
 
@@ -299,42 +299,6 @@ void gtm_startup(struct startup_vector *svec)
 	fnpca.fnpcmax = &fnpca.fnpcs[FNPC_MAX - 1];	/* The last element */
 	return;
 }
-
-#if defined(__ia64)
-
-#ifdef XFER
-#	undef XFER
-#endif /* XFER */
-
-#define XFER(a,b) #b
-
-GBLDEF char *xfer_text[] = {
-#include "xfer.h"
-};
-#include "xfer_desc.i"
-
-/* On IA64, we want to use CODE_ADDRESS() macro, to dereference all the function pointers, before storing them in
-   global array. Now doing a dereference operation, as part of initialization, is not allowed by linux/gcc (HP'a aCC
-   was more tolerant towards this). So to make sure that the xfer_table is initialized correctly, before anyone
-   uses it, this function is called right at the beginning of gtm_startup
-*/
-
-static int init_xfer_table()
-{
-	int i;
-
-	for (i = 0; i < (sizeof(xfer_text) / sizeof(char *)); i++)
-	{
-		if (ASM == function_type(xfer_text[i]))
-			xfer_table[i] = (int (*)())CODE_ADDRESS_ASM(xfer_table[i]);
-		else
-			xfer_table[i] = (int (*)())CODE_ADDRESS_C(xfer_table[i]);
-	}
-
-	return 0;
-}
-
-#endif /* __ia64 */
 
 void gtm_utf8_init(void)
 {

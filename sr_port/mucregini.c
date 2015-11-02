@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +39,7 @@
 #include "gtmmsg.h"
 #include "gtm_file_stat.h"
 #include "lockconst.h"
+#include "wcs_phase2_commit_wait.h"
 
 #define WCR_SIZE_PER_BUF 	0
 #define BLK_SIZE (((gd_segment*)gv_cur_region->dyn.addr)->blk_size)
@@ -202,6 +203,7 @@ void mucregini(int4 blk_init_size)
 	cs_data->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;
 	cs_data->mutex_spin_parms.mutex_spin_sleep_mask = MUTEX_SPIN_SLEEP_MASK;
+	cs_data->wcs_phase2_commit_wait_spincnt = WCS_PHASE2_COMMIT_DEFAULT_SPINCNT;
 	time(&ctime);
 	assert(sizeof(ctime) >= sizeof(int4));
 	cs_data->creation_time4 = (int4)ctime;	/* Need only lower order 4-bytes of current time (in case system time is 8-bytes) */

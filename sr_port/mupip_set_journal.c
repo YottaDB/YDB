@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -529,6 +529,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				} else if ((jnl_closed == jnl_curr_state) && (jnl_open == rptr->jnl_new_state))
 				{	/* sync db for closed->open transition. for VMS WCSFLU_FSYNC_DB is ignored */
 					wcs_flu(WCSFLU_FSYNC_DB | WCSFLU_FLUSH_HDR);
+					/* In case this is MM and wcs_flu() remapped an extended database, reset csd and rptr->sd */
+					assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+					rptr->sd = csd = cs_data;
 				}
 			}
 			if (newjnlfiles)
@@ -593,11 +596,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			csd->jnl_file_name[jnl_info.jnl_len] = 0;
 			csd->trans_hist.header_open_tn = jnl_info.tn;
 			csd->reg_seqno = jnl_info.reg_seqno;
-			UNIX_ONLY(
-				if (jnl_options.sync_io_specified)
-					csd->jnl_sync_io = jnl_options.sync_io;
-				csd->yield_lmt = jnl_options.yield_limit;
-			)
+			if (jnl_options.sync_io_specified)
+				csd->jnl_sync_io = jnl_options.sync_io;
+			UNIX_ONLY(csd->yield_lmt = jnl_options.yield_limit;)
 		} else
 		{	/* Journaling is to be disabled for this region. Reset all fields */
 			csd->jnl_before_image = FALSE;
@@ -610,7 +611,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			csd->epoch_interval = 0;
 			csd->jnl_deq = 0;
 			csd->jnl_file_len = 0;
-			UNIX_ONLY(csd->jnl_sync_io = FALSE;)
+			csd->jnl_sync_io = FALSE;
 			UNIX_ONLY(csd->yield_lmt = DEFAULT_YIELD_LIMIT;)
 		}
 		if (CLI_ABSENT != jnl_options.cli_journal || CLI_ABSENT != jnl_options.cli_replic_on)

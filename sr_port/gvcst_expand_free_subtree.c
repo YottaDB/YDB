@@ -34,6 +34,7 @@
 #include "gvcst_kill_sort.h"
 #include "gvcst_expand_free_subtree.h"
 #include "rc_cpt_ops.h"
+#include "wcs_phase2_commit_wait.h"
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -62,6 +63,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 	unsigned short		temp_ushort;
 	trans_num		ret_tn;
 	inctn_opcode_t		save_inctn_opcode;
+	bt_rec_ptr_t		bt;
 
 	error_def(ERR_GVKILLFAIL);
 
@@ -92,6 +94,23 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 				{	/* This should have worked because t_qread was done in crit */
 					free(temp_buff);
 					rts_error(VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &rdfail_detail);
+				}
+				if (NULL != cr)
+				{	/* It is possible that t_qread returned a buffer from first_tp_srch_status.
+					 * In that case, t_qread does not wait for cr->in_tend to be zero since
+					 * there is no need to wait as long as all this is done inside of the TP
+					 * transaction. But the gvcst_expand_free_subtree logic is special in that it
+					 * is done AFTER the TP transaction is committed but with dollar_tlevel still
+					 * set to non-zero. So it is possible that cr->in_tend is non-zero in this case.
+					 * Hence we need to check if cr->in_tend is non-zero and if so wait for commit
+					 * to complete before scanning the block for child-block #s to free.
+					 */
+					if (dollar_tlevel && cr->in_tend)
+						wcs_phase2_commit_wait(csa, cr);
+					assert(!cr->twin || cr->bt_index);
+					assert((NULL == (bt = bt_get(blk)))
+						|| (CR_NOTVALID == bt->cache_index)
+						|| (cr == (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index)) && (0 == cr->in_tend));
 				}
 				memcpy(temp_buff, bp, bp->bsiz);
 				if (!was_crit)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,46 +35,47 @@
 #endif
 
 /* Required to find out variable length argument runtime function calls*/
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__ia64)
+
+#include "code_address_type.h"
 
 #ifdef XFER
-#       undef XFER
+#	undef XFER
 #endif /* XFER */
 
 #define XFER(a,b) #b
 
-GBLDEF char *xfer_text[] = {
-#include "xfer.h"
-};
+
 #include "xfer_desc.i"
+DEFINE_XFER_TABLE_DESC;
 
-GBLDEF int call_4lcldo_variant;         /* used in emit_jmp for call[sp] and forlcldo */
+GBLDEF int call_4lcldo_variant;	 /* used in emit_jmp for call[sp] and forlcldo */
 
-#endif /* __x86_64__ */
+#endif /* __x86_64__ || __ia64 */
 
 #define MVAL_INT_SIZE DIVIDE_ROUND_UP(sizeof(mval), sizeof(UINTPTR_T))
 
 #ifdef DEBUG
 #include "vdatsize.h"
 /* VAX DISASSEMBLER TEXT */
-static const char       vdat_bdisp[VDAT_BDISP_SIZE + 1] =       "B^";
-static const char       vdat_wdisp[VDAT_WDISP_SIZE + 1] =       "W^";
-static const char       vdat_r9[VDAT_R9_SIZE + 1]=      "(r9)";
-static const char       vdat_r8[VDAT_R8_SIZE + 1]=      "(r8)";
-static const char       vdat_gr[VDAT_GR_SIZE + 1] =     "G^";
-static const char       vdat_immed[VDAT_IMMED_SIZE + 1] =       "I^#";
-static const char       vdat_r11[VDAT_R11_SIZE + 1] =   "(R11)";
-static const char       vdat_gtmliteral[VDAT_GTMLITERAL_SIZE + 1] =     "GTM$LITERAL";
-static const char       vdat_def[VDAT_DEF_SIZE + 1] =   "@";
+static const char	vdat_bdisp[VDAT_BDISP_SIZE + 1] = "B^";
+static const char	vdat_wdisp[VDAT_WDISP_SIZE + 1] = "W^";
+static const char	vdat_r9[VDAT_R9_SIZE + 1] = "(r9)";
+static const char	vdat_r8[VDAT_R8_SIZE + 1] = "(r8)";
+static const char	vdat_gr[VDAT_GR_SIZE + 1] = "G^";
+static const char	vdat_immed[VDAT_IMMED_SIZE + 1] = "I^#";
+static const char	vdat_r11[VDAT_R11_SIZE + 1] = "(R11)";
+static const char	vdat_gtmliteral[VDAT_GTMLITERAL_SIZE + 1] = "GTM$LITERAL";
+static const char	vdat_def[VDAT_DEF_SIZE + 1] = "@";
 
 IA64_ONLY(GBLDEF char	asm_mode = 0; /* 0 - disassembly mode. 1 - decode mode */)
-GBLDEF unsigned char    *obpt;          /* output buffer index */
-GBLDEF unsigned char    outbuf[ASM_OUT_BUFF];    /* assembly language output buffer */
-static int              vaxi_cnt = 1;   /* Vax instruction count */
+GBLDEF unsigned char	*obpt;	  /* output buffer index */
+GBLDEF unsigned char	outbuf[ASM_OUT_BUFF];	/* assembly language output buffer */
+static int		vaxi_cnt = 1;	/* Vax instruction count */
 
 /* Disassembler text: */
-LITREF char             *xfer_name[];
-LITREF char             vxi_opcode[][6];
+LITREF char		*xfer_name[];
+LITREF char		vxi_opcode[][6];
 GBLREF char 		*oc_tab_graphic[];
 #endif
 
@@ -99,6 +100,12 @@ GBLDEF int		code_reference;	/* Offset from pgm start to current loc */
 DEBUG_ONLY(static boolean_t	opcode_emitted;)
 
 static int		stack_depth = 0;
+
+/* On x86_64, the smaller offsets are encoded in 1 byte (4 bytes otherwise). But for some cases,
+  the offsets may be different during APPROX_ADDR and MACHINE phases, hence generating different size instruction.
+  to solve this  even the smaller offsets need to be encoded in 4 bytes so that same size instructions are generated
+  in both APPROX_ADDR and MACHINE phase. the variable  force_32 is used for this purpose*/
+X86_64_ONLY(GBLDEF boolean_t force_32 = FALSE;)
 
 GBLREF int		curr_addr;
 GBLREF char		cg_phase;	/* code generation phase */
@@ -152,7 +159,7 @@ void trip_gen (triple *ct)
 	}
 
 	code_idx = 0;
-        vax_pushes_seen = 0;
+	vax_pushes_seen = 0;
 	vax_number_of_arguments = 0;
 
 	if (cg_phase_last != cg_phase)
@@ -184,7 +191,7 @@ void trip_gen (triple *ct)
 		}
 		opr++;
 	}
-	*sopr=0;
+	*sopr = 0;
 
 	jmp_offset = 0;
 	if (oct & OCT_JUMP || ct->opcode == OC_LDADDR || ct->opcode == OC_FORLOOP)
@@ -208,17 +215,17 @@ void trip_gen (triple *ct)
 				else
 					off = jmp_offset - XFER_LONG_INST_SIZE;
 				if (-128 <= (off - BRB_INST_SIZE) && 127 >= (off - BRB_INST_SIZE))
-					call_4lcldo_variant = BRB_INST_SIZE;    /* used by emit_jmp */
+					call_4lcldo_variant = BRB_INST_SIZE;	/* used by emit_jmp */
 				else
 				{
-					call_4lcldo_variant = JMP_LONG_INST_SIZE;   /* used by emit_jmp */
+					call_4lcldo_variant = JMP_LONG_INST_SIZE;	/* used by emit_jmp */
 					tsp = (short *)&ttt[ttt[tp + 1]];
 					if (-128 <= tsp[CALL_4LCLDO_XFER] && 127 >= tsp[CALL_4LCLDO_XFER])
 						off = jmp_offset - XFER_BYTE_INST_SIZE;
 					else
 						off = jmp_offset - XFER_LONG_INST_SIZE;
 					if (-32768 > (off - JMP_LONG_INST_SIZE) &&
-					    32767 < (off - JMP_LONG_INST_SIZE))
+						32767 < (off - JMP_LONG_INST_SIZE))
 						tsp = (short *)&ttt[ttt[tp + 2]];
 				}
 				break;
@@ -422,14 +429,14 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					GTM64_ONLY(  GEN_LOAD_WORD_4(reg, gtm_reg(*inst++), 0);)
 #else
 					/* For platforms, where the $TRUTH value is not carried in a register and
-					   must be fetched from a global variable by subroutine call. */
+						must be fetched from a global variable by subroutine call. */
 					assert(*inst == 0x5a);		/* VAX r10 or $TEST register */
 					inst++;
 					emit_call_xfer(sizeof(intszofptr_t) * xf_dt_get);
 					reg = GTM_REG_R0;	/* function return value */
 #endif
 					/* Generate a cmp instruction using the return value of the previous call,
-					   which will be in EAX */
+						which will be in EAX */
 					X86_64_ONLY(GEN_CMP_EAX_IMM32(0);)
 
 					if (sav_in == VXI_BLBC)
@@ -490,7 +497,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							opr = &ct->destination;
 #ifdef __vms
 						/* This is a case where VMS puts the argument count in a special register so
-						   handle that differently here.
+							handle that differently here.
 						*/
 						if (opr->oprclass == TRIP_REF)
 						{
@@ -512,7 +519,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						}
 #else
 						/* All other platforms put argument counts in normal parameter
-						   registers and go through this path instead.
+							registers and go through this path instead.
 						*/
 						if (opr->oprclass == TRIP_REF)
 						{
@@ -543,9 +550,9 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 							emit_pop(cnt);
 					} else
 					{	/* During the commonization of emit_code.c I discovered that TINT_REF is
-						   not currently used in the compiler so this may be dead code but I'm
-						   leaving this path in here anyway because I don't want to put it back
-						   in if we find we need it. (4/2003 SE)
+							not currently used in the compiler so this may be dead code but I'm
+							leaving this path in here anyway because I don't want to put it back
+							in if we find we need it. (4/2003 SE)
 						*/
 						emit_trip(opr, TRUE, GENERIC_OPCODE_LOAD, CALLS_TINT_TEMP_REG);
 						emit_pop(1);
@@ -613,19 +620,18 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						assert(*inst == VXT_REG);
 						inst++;
 						emit_trip(*(fst_opr + save_inst), addr, GENERIC_OPCODE_LDA, gtm_reg(*inst++));
-					}
-					else
+					} else
 						GTMASSERT;
 					break;
 				case VXI_MOVC3:
 					/* The MOVC3 instruction is only used to copy an mval from one place to another
-					   so that is the expansion we will generate. The most efficient expansion is to
-					   generate a series of load and store instructions. Do the loads first then the
-					   stores to keep the pipelines flowing and not stall waiting for any given load
-					   or store to complete. Because some platforms (notably HPPA) do not have enough
-					   argument registers to contain an entire MVAL and because an mval may grow from
-					   its present size and affect other platforms some day, We put the whole code gen
-					   thing in a loop so we can do this regardless of how big it gets.
+						so that is the expansion we will generate. The most efficient expansion is to
+						generate a series of load and store instructions. Do the loads first then the
+						stores to keep the pipelines flowing and not stall waiting for any given load
+						or store to complete. Because some platforms (notably HPPA) do not have enough
+						argument registers to contain an entire MVAL and because an mval may grow from
+						its present size and affect other platforms some day, We put the whole code gen
+						thing in a loop so we can do this regardless of how big it gets.
 					*/
 
 					assert(*inst == VXT_LIT);
@@ -642,20 +648,20 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 						reg = MACHINE_FIRST_ARG_REG;
 						save_reg_offset = reg_offset;
 						for (cnt = 0, cnttop = MIN(words_to_move, MACHINE_REG_ARGS) ;  cnt < cnttop;
-						     cnt++, reg_offset += sizeof(UINTPTR_T))
+							cnt++, reg_offset += sizeof(UINTPTR_T))
 						{
-							X86_64_ONLY(targ_reg=GET_ARG_REG(cnt);)
-							NON_X86_64_ONLY(targ_reg=reg + cnt;)
+							X86_64_ONLY(targ_reg = GET_ARG_REG(cnt);)
+							NON_X86_64_ONLY(targ_reg = reg + cnt;)
 							NON_GTM64_ONLY(GEN_LOAD_WORD(targ_reg, MOVC3_SRC_REG, reg_offset);)
 							GTM64_ONLY(GEN_LOAD_WORD_8(targ_reg, MOVC3_SRC_REG, reg_offset);)
 						}
 						reg = MACHINE_FIRST_ARG_REG;
 						for (cnt = 0;
-						     cnt < cnttop;
-						     cnt++, save_reg_offset += sizeof(UINTPTR_T), words_to_move--)
+							cnt < cnttop;
+							cnt++, save_reg_offset += sizeof(UINTPTR_T), words_to_move--)
 						{
-							X86_64_ONLY(targ_reg=GET_ARG_REG(cnt);)
-							NON_X86_64_ONLY(targ_reg=reg + cnt;)
+							X86_64_ONLY(targ_reg = GET_ARG_REG(cnt);)
+							NON_X86_64_ONLY(targ_reg = reg + cnt;)
 							NON_GTM64_ONLY(GEN_STORE_WORD(targ_reg, MOVC3_TRG_REG, save_reg_offset);)
 							GTM64_ONLY(GEN_STORE_WORD_8(targ_reg, MOVC3_TRG_REG, save_reg_offset);)
 						}
@@ -693,9 +699,9 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 								if (*inst == 0x5a)	/* to VAX r10 or $TEST */
 								{
 									NON_GTM64_ONLY(GEN_STORE_WORD(MOVL_RETVAL_REG,
-												     GTM_REG_DOLLAR_TRUTH, 0);)
+													GTM_REG_DOLLAR_TRUTH, 0);)
 									GTM64_ONLY(GEN_STORE_WORD_4(MOVL_RETVAL_REG,
-												   GTM_REG_DOLLAR_TRUTH, 0);)
+													GTM_REG_DOLLAR_TRUTH, 0);)
 								} else
 								{
 									GEN_MOVE_REG(gtm_reg(*inst), MOVL_RETVAL_REG);
@@ -747,8 +753,7 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					{
 						inst++;
 						emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, reg);
-					}
-					else
+					} else
 						GTMASSERT;
 					emit_push(reg);
 					break;
@@ -809,30 +814,29 @@ short	*emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	assert(code_idx < NUM_BUFFERRED_INSTRUCTIONS);
 	if (cg_phase == CGP_MACHINE)
 	{
-	   generated_code_size += code_idx;
+		generated_code_size += code_idx;
 #ifdef DEBUG
-	   if(generated_count < MAX_CODE_COUNT)
-	   {
-	     generated_details[generated_count].size = code_idx;
-	     generated_details[generated_count++].sav_in = sav_in;
-	   }
+		if (generated_count < MAX_CODE_COUNT)
+		{
+		generated_details[generated_count].size = code_idx;
+		generated_details[generated_count++].sav_in = sav_in;
+		}
 #endif /* DEBUG */
-	   emit_immed ((char *)&code_buf[0], (uint4)(INST_SIZE * code_idx));
-	}
-	else if (cg_phase != CGP_ASSEMBLY)
+		emit_immed ((char *)&code_buf[0], (uint4)(INST_SIZE * code_idx));
+	} else if (cg_phase != CGP_ASSEMBLY)
 	{
-	   if (cg_phase == CGP_APPROX_ADDR)
-	   {
-               calculated_code_size += code_idx;
+		if (cg_phase == CGP_APPROX_ADDR)
+		{
+		calculated_code_size += code_idx;
 #ifdef DEBUG
-	       if(calculated_count < MAX_CODE_COUNT)
-	       {
+		if (calculated_count < MAX_CODE_COUNT)
+		{
 		 calculated_details[calculated_count].size = code_idx;
 		 calculated_details[calculated_count++].sav_in = sav_in;
-	       }
+		}
 #endif /* DEBUG */
-	   }
-	   curr_addr += (INST_SIZE * code_idx);
+		}
+		curr_addr += (INST_SIZE * code_idx);
 	}
 	code_reference += (INST_SIZE * code_idx);
 	jmp_offset -= (INST_SIZE * code_idx);
@@ -884,7 +888,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 			(*instp)++;
 			if (0 == branch_offset)
 			{	/* This is a jump to the immediately following instruction. Nullify the jump
-				   and don't generate any instruction (not even a NOP) */
+					and don't generate any instruction (not even a NOP) */
 				/* code_buf[code_idx++] = GENERIC_OPCODE_NOP; */
 			} else if (EMIT_JMP_SHORT_CODE_CHECK)
 			{	/* Short jump immediate operand - some platforms also do a compare */
@@ -894,8 +898,8 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 				skip_idx = -1;
 				if (EMIT_JMP_OPPOSITE_BR_CHECK)
 				{	/* This jump sequence is longer and is not conditional so if we need a conditional
-					   jump, create the opposite conditional jump to jump around the longer jump to
-					   the target thereby preserving the original semantics.
+						jump, create the opposite conditional jump to jump around the longer jump to
+						the target thereby preserving the original semantics.
 					*/
 					EMIT_JMP_GEN_COMPARE;
 					switch (branchop)
@@ -930,68 +934,57 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 							GTMASSERT;
 							break;
 					}
-#ifdef DELAYED_BRANCH
-					NON_IA64_ONLY(
-						skip_idx = code_idx++; /* Save index of branch inst. Set target offset later */
-						code_buf[skip_idx] = IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0);
-						branch_offset--;
-						code_buf[code_idx++] = GENERIC_OPCODE_NOP;
-						branch_offset--;
-					)
-#else
-					NON_IA64_ONLY(
+					RISC_ONLY(
 						skip_idx = code_idx++; /* Save index of branch inst. Set target offset later */
 						code_buf[skip_idx] = IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0);
 						branch_offset--;
 					)
-#endif
-					IA64_ONLY(
+					NON_RISC_ONLY(
 						skip_idx = code_idx; /* Save index of branch inst. Set target offset later */
 						IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, 0)
-						branch_offset -= 2;
+						branch_offset -= NUM_INST_IGEN_COND_BRANCH_REG_OFFSET;
 					)
+#ifdef DELAYED_BRANCH
+						code_buf[code_idx++] = GENERIC_OPCODE_NOP;
+						branch_offset--;
+#endif
+
 				}
 				if (EMIT_JMP_LONG_CODE_CHECK)
 				{ /* This is more common unconditional branch generation and should be mutually
-				     exclusive to EMIT_JMP_OPPOSITE_BR_CHECK. Some platforms will have the "short"
-				     branch generation up top be more common but that form does not cover unconditional
-				     jumps (Examples: AIX and HP-UX) */
+					exclusive to EMIT_JMP_OPPOSITE_BR_CHECK. Some platforms will have the "short"
+					branch generation up top be more common but that form does not cover unconditional
+					jumps (Examples: AIX and HP-UX) */
 					assert(!(EMIT_JMP_OPPOSITE_BR_CHECK));
+					NON_RISC_ONLY(IGEN_UCOND_BRANCH_REG_OFFSET(branchop, branch_offset))
+					RISC_ONLY(
+					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
+					)
 #ifdef DELAYED_BRANCH
-					NON_IA64_ONLY(
-					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
 					code_buf[code_idx++] = GENERIC_OPCODE_NOP;
-					)
-#else
-					NON_IA64_ONLY(
-					code_buf[code_idx++] = IGEN_UCOND_BRANCH_REG_OFFSET(branchop, 0, branch_offset);
-					)
 #endif
-					IA64_ONLY(IGEN_UCOND_BRANCH_REG_OFFSET(branchop, branch_offset))
 				} else
 				{
 					if (EMIT_JMP_OPPOSITE_BR_CHECK)
 					{  /* VAX conditional long jump generates two native branch instructions -
-					      one conditional branch (above) and one PC relative branch (below).
-					      The second branch instruction also needs adjustment of the origin. */
+						one conditional branch (above) and one PC relative branch (below).
+						The second branch instruction also needs adjustment of the origin. */
 						EMIT_JMP_ADJUST_BRANCH_OFFSET;
 					}
 					GEN_PCREL;
 					emit_base_offset(GTM_REG_CODEGEN_TEMP, (INST_SIZE * branch_offset));
-					NON_IA64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP);)
-					NON_IA64_ONLY(GEN_JUMP_REG(GTM_REG_CODEGEN_TEMP);)
-
-					IA64_ONLY(IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP))
-					IA64_ONLY(GEN_JUMP_REG(GTM_REG_CODEGEN_TEMP))
+					RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP);)
+					NON_RISC_ONLY(IGEN_LOAD_ADDR_REG(GTM_REG_CODEGEN_TEMP))
+					GEN_JUMP_REG(GTM_REG_CODEGEN_TEMP);
 				}
 				if (skip_idx != -1)
 				{	/* Fill in the offset from our opposite jump instruction to here .. the
-					   place to bypass the jump.
+						place to bypass the jump.
 					*/
 					branch_offset = BRANCH_OFFSET_FROM_IDX(skip_idx, code_idx);
-					NON_IA64_ONLY(code_buf[skip_idx] |= IGEN_COND_BRANCH_OFFSET(branch_offset);)
+					RISC_ONLY(code_buf[skip_idx] |= IGEN_COND_BRANCH_OFFSET(branch_offset);)
 
-					IA64_ONLY(
+					NON_RISC_ONLY(
 						tmp_code_idx = code_idx;
 						code_idx = skip_idx;
 						IGEN_COND_BRANCH_REG_OFFSET(branchop_opposite, reg, branch_offset)
@@ -1009,7 +1002,7 @@ void	emit_jmp (uint4 branchop, short **instp, int reg)
 #endif /* !__x86_64__ */
 
 /* Emit code that generates a relative pc based jump target. The last instruction is not
-   complete so the caller may finish it with whatever instruction is necessary.
+	complete so the caller may finish it with whatever instruction is necessary.
 */
 void	emit_pcrel(void)
 {
@@ -1027,7 +1020,7 @@ void	emit_pcrel(void)
 			obpt += i2hex_nofill(jmp_offset + code_reference, (uchar_ptr_t)obpt, 8);
 			*obpt++ = ',';
 			*obpt++ = ' ';
-		                /*****  WARNING - FALL THRU *****/
+				/*****  WARNING - FALL THRU *****/
 #endif
 		case CGP_ADDR_OPT:
 		case CGP_APPROX_ADDR:
@@ -1088,17 +1081,23 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							if (CGP_ADDR_OPT == cg_phase)
 							{
 							/* We want the expansion to be proper sized this time. Note
-							   that this won't be true so much on the initial CGP_ADDR_OPT
-							   pass but will be true on the shrink_trips() pass after the
-							   literals are compiled.
+								that this won't be true so much on the initial CGP_ADDR_OPT
+								pass but will be true on the shrink_trips() pass after the
+								literals are compiled.
 							*/
 								offset = literal_offset(ct->operand[0].oprval.mlit->rt_addr);
 								/* Need non-zero base reg for AIX */
+								X86_64_ONLY(force_32 = TRUE;)
 								emit_base_offset(reg, offset);
+								X86_64_ONLY(force_32 = FALSE;)
 							} else
+							{
 								/* Gross expansion ok first time through */
 								/* Non-0 base reg for AIX */
+								X86_64_ONLY(force_32 = TRUE;)
 								emit_base_offset(reg, LONG_JUMP_OFFSET);
+								X86_64_ONLY(force_32 = FALSE;)
+							}
 
 							X86_64_ONLY(IGEN_LOAD_ADDR_REG(trg_reg))
 							NON_X86_64_ONLY(code_idx++;)
@@ -1107,14 +1106,14 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						case OC_CDLIT:
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
 							if (GENERIC_OPCODE_LDA == generic_inst) {
-								NON_GTM64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
-								GTM64_ONLY(IGEN_LOAD_LINKAGE(trg_reg);)
+								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
+								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(trg_reg);)
 								inst_emitted = TRUE;
-							}
-							else {
-								NON_GTM64_ONLY(code_buf[code_idx++]
-									      |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
-								GTM64_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+							} else
+							{
+								RISC_ONLY(code_buf[code_idx++]
+										|= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
 							break;
@@ -1126,13 +1125,13 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							break;
 						case OC_TRIPSIZE:
 							/* This tiples value is calculated in the shrink_jmp/shrink_trips
-							   phase. It is a parameter to (currently only) op_exfun and is the
-							   length of the generated jump instruction. op_exfun needs this
-							   length to adjust the return address in the created stackframe
-							   so it does not have to parse instructions at the return address
-							   to see what return signature was created. We will add asserts to
-							   this generation in later phases after the true value has been
-							   calculated. At this point, it is zero.
+								phase. It is a parameter to (currently only) op_exfun and is the
+								length of the generated jump instruction. op_exfun needs this
+								length to adjust the return address in the created stackframe
+								so it does not have to parse instructions at the return address
+								to see what return signature was created. We will add asserts to
+								this generation in later phases after the true value has been
+								calculated. At this point, it is zero.
 							*/
 							immediate = ct->operand[0].oprval.tsize->size;
 							EMIT_TRIP_ILIT_GEN;
@@ -1149,14 +1148,15 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
 					GTM64_ONLY(
-					if ( sa_class_sizes[opr->oprclass] == 4 )
-					{
-						next_ptr_offset = 4;
-						AIX_ONLY(REVERT_GENERICINST_TO_WORD(generic_inst));
-					})
+						if ( sa_class_sizes[opr->oprclass] == 4 )
+						{
+							next_ptr_offset = 4;
+							REVERT_GENERICINST_TO_WORD(generic_inst);
+						}
+					)
 					NON_GTM64_ONLY(
-					if (offset < 0  ||  offset > MAX_OFFSET)
-						GTMASSERT;
+						if (offset < 0  ||  offset > MAX_OFFSET)
+							GTMASSERT;
 					)
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
 					break;
@@ -1167,14 +1167,15 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
 					GTM64_ONLY(
-					if ( sa_class_sizes[opr->oprclass] == 4 )
-					{
-						next_ptr_offset = 4;
-						AIX_ONLY(REVERT_GENERICINST_TO_WORD(generic_inst));
-					})
+						if ( sa_class_sizes[opr->oprclass] == 4 )
+						{
+							next_ptr_offset = 4;
+							REVERT_GENERICINST_TO_WORD(generic_inst);
+						}
+					)
 					NON_GTM64_ONLY(
-					if (offset < 0  ||  offset > MAX_OFFSET)
-						GTMASSERT;
+						if (offset < 0  ||  offset > MAX_OFFSET)
+							GTMASSERT;
 					)
 					if (opr->oprclass == TVAR_REF)
 						reg = GTM_REG_FRAME_VAR_PTR;
@@ -1185,35 +1186,36 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					{
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
-							NON_GTM64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(trg_reg);)
-							GTM64_ONLY(IGEN_LOAD_WORD_REG_8(trg_reg);)
+							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
+							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
 							inst_emitted = TRUE;
 						} else
 						{
-							NON_GTM64_ONLY(code_buf[code_idx++]
-								      |= IGEN_LOAD_WORD_REG(GTM_REG_CODEGEN_TEMP);)
-							GTM64_ONLY(IGEN_LOAD_WORD_REG_8(GTM_REG_CODEGEN_TEMP);)
+							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP))
+							RISC_ONLY(code_buf[code_idx++]
+									|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP);)
 							emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 						}
 					}
 					break;
 
 				case OCNT_REF:
-					/* This ref's value is calculated in emit_call_xfer(). This value is related to TSIZ_REF in
-					   that it is used for the same reason to different calls (op_call, op_callsp, op_forlcldo,
-					   and their mprof counterparts). It is the offset needed to be added to the return address
-					   from the calls to these routines to bypass a generated jump sequence. In this case
-					   however, the jump sequence is being generated as part of the OC_CALL, OC_CALLSP or
-					   OC_FORLCLDO triple itself. There is no separate jump triple so the TSIZ_REF triple
-					   cannot be used. So this operand is the OFFSET from the CALL to the NEXT TRIPLE. The
-					   operation is that when this routine sees this type of reference, it will set a flag
+					/* This ref's value is calculated in emit_call_xfer(). This value is related to TSIZ_REF
+					   in that it is used for the same reason to different calls (op_call, op_callsp,
+					   op_forlcldo, and their mprof counterparts). It is the offset needed to be
+					   added to the return address from the calls to these routines to bypass a
+					   generated jump sequence. In this case however, the jump sequence is being
+					   generated as part of the OC_CALL, OC_CALLSP or OC_FORLCLDO triple itself.
+					   There is no separate jump triple so the TSIZ_REF triple cannot be used.
+					   So this operand is the OFFSET from the CALL to the NEXT TRIPLE. The operation
+					   is that when this routine sees this type of reference, it will set a flag
 					   and record the operand address and go ahead and generate the value that it has. The
 					   next transfer table generation that occurs will see the set flag and will compute
 					   the address from the return address of that transfer table call to the next triple
-					   and update this triple's value. Since our originating triple has a JUMP type, it will
-					   be updated in shrink_jmp/shirnk_trips() until all necessary shrinkage is done so the
-					   final phase will have the correct value and we only have to generate an immediate
-					   value.
+					   and update this triple's value. Since our originating triple has a JUMP type,
+					   it will be updated in shrink_jmp/shirnk_trips() until all necessary shrinkage
+					   is done so the final phase will have the correct value and we only have to
+					   generate an immediate value.
 					*/
 					immediate = opr->oprval.offset;
 					EMIT_TRIP_ILIT_GEN;
@@ -1252,7 +1254,9 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								reg = GTM_REG_PV;
 							else
 								reg = GTM_REG_LITERAL_BASE;
+							X86_64_ONLY(force_32 = TRUE;)
 							emit_base_offset(reg, offset);
+							X86_64_ONLY(force_32 = FALSE;)
 							NON_RISC_ONLY(IGEN_LOAD_ADDR_REG(trg_reg))
 							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(trg_reg);)
 							inst_emitted = TRUE;
@@ -1264,19 +1268,20 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								obpt += VDAT_GR_SIZE;
 							}
 							memcpy(obpt, ct->operand[0].oprval.cdlt->addr,
-							       ct->operand[0].oprval.cdlt->len);
+								ct->operand[0].oprval.cdlt->len);
 							obpt += ct->operand[0].oprval.cdlt->len;
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
 							if (GENERIC_OPCODE_LDA == generic_inst)
 							{
-								NON_GTM64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
-								GTM64_ONLY(IGEN_LOAD_LINKAGE(trg_reg);)
+								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);
+)
+								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(trg_reg))
 								inst_emitted = TRUE;
 							} else
 							{
-								NON_GTM64_ONLY(code_buf[code_idx++]
-									      |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
-								GTM64_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+								RISC_ONLY(code_buf[code_idx++]
+										|= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
 							break;
@@ -1292,7 +1297,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						case OC_TRIPSIZE:
 							immediate = ct->operand[0].oprval.tsize->size;
 							assert(0 < immediate);
-							assert(32 > immediate); /* Shouldn't exceed this on any platform */
+							assert(MAX_BRANCH_CODEGEN_SIZE > immediate);
 							EMIT_TRIP_ILIT_GEN;
 							inst_emitted = TRUE;
 							break;
@@ -1308,8 +1313,8 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
 					NON_GTM64_ONLY(
-					if (offset < 0  ||  offset > MAX_OFFSET)
-						GTMASSERT;
+						if (offset < 0  ||  offset > MAX_OFFSET)
+							GTMASSERT;
 					)
 					if (offset < 127)
 					{
@@ -1323,15 +1328,18 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					obpt = i2asc((uchar_ptr_t)obpt, offset);
 					memcpy(obpt, &vdat_r9[0], VDAT_R9_SIZE);
 					obpt += VDAT_R9_SIZE;
-					AIX_ONLY(
-						/*
-					 	 * GT.M on AIX is 64bit
-						 * By default the loads/stores use ld/std(load double),
-						 * but if the value being dealt with is a word,the
-						 * opcode in generic_inst is changed to lwz/stw
-						 */
+					/*
+					 * for 64 bit platforms, By default the loads/stores
+					 * are of 8 bytes, but if the value being dealt with
+					 * is a word, then the opcode in generic_inst is
+					 * changed to ldw/stw(4 byte load/stores)
+					 */
+					GTM64_ONLY(
 						if (sa_class_sizes[opr->oprclass] == 4)
-						 	REVERT_GENERICINST_TO_WORD(generic_inst);
+						{
+							next_ptr_offset = 4;
+							REVERT_GENERICINST_TO_WORD(generic_inst);
+						}
 					)
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
 					break;
@@ -1366,23 +1374,20 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						obpt += VDAT_R9_SIZE;
 					}
 					NON_GTM64_ONLY(
-					if (offset < 0  ||  offset > MAX_OFFSET)
-						GTMASSERT;
+						if (offset < 0  ||  offset > MAX_OFFSET)
+							GTMASSERT;
 					)
 					if (opr->oprclass == TVAR_REF)
 						reg = GTM_REG_FRAME_VAR_PTR;
 					else
 						reg = GTM_REG_FRAME_TMP_PTR;
-					AIX_ONLY(
-                                        	/*
-                                        	 * GT.M on AIX is 64bit
-                                        	 * By default the loads/stores use ld/std(load double),
-                                        	 * but if the value being dealt with is a word,the
-                                        	 * opcode in generic_inst is changed to lwz/stw
-                                        	 */
+					GTM64_ONLY(
 						if (sa_class_sizes[opr->oprclass] == 4)
-                                         		REVERT_GENERICINST_TO_WORD(generic_inst);
-                                        )
+						{
+							next_ptr_offset = 4;
+							REVERT_GENERICINST_TO_WORD(generic_inst);
+						}
+					)
 
 					emit_base_offset(reg, offset);
 					if (val_output)	/* indirection */
@@ -1390,14 +1395,14 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
-							NON_GTM64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(trg_reg);)
-							GTM64_ONLY(IGEN_LOAD_WORD_REG_8(trg_reg);)
+							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
+							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
 							inst_emitted = TRUE;
 						} else
 						{
-							NON_GTM64_ONLY(code_buf[code_idx++]
-								      |= IGEN_LOAD_WORD_REG(GTM_REG_CODEGEN_TEMP);)
-							GTM64_ONLY(IGEN_LOAD_WORD_REG_8(GTM_REG_CODEGEN_TEMP);)
+							RISC_ONLY(code_buf[code_idx++]
+									|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP);)
+							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP))
 							emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 						}
 					}
@@ -1406,7 +1411,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 				case OCNT_REF:
 					immediate = opr->oprval.offset;
 					assert(0 < immediate);
-					assert(32 > immediate); /* Shouldn't exceed this on any platform */
+					assert(MAX_BRANCH_CODEGEN_SIZE > immediate);
 					EMIT_TRIP_ILIT_GEN;
 					inst_emitted = TRUE;
 					ocnt_ref_seen = TRUE;
@@ -1440,7 +1445,9 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 								reg = GTM_REG_PV;
 							else
 								reg = GTM_REG_LITERAL_BASE;
+							X86_64_ONLY(force_32 = TRUE;)
 							emit_base_offset(reg, offset);
+							X86_64_ONLY(force_32 = FALSE;)
 							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_ADDR_REG(trg_reg);)
 							NON_RISC_ONLY(IGEN_LOAD_ADDR_REG(trg_reg);)
 							inst_emitted = TRUE;
@@ -1449,14 +1456,14 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							emit_base_offset(GTM_REG_PV, find_linkage(ct->operand[0].oprval.cdlt));
 							if (GENERIC_OPCODE_LDA == generic_inst)
 							{
-								NON_GTM64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
-								GTM64_ONLY(IGEN_LOAD_LINKAGE(trg_reg);)
+								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_LINKAGE(trg_reg);)
+								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(trg_reg);)
 								inst_emitted = TRUE;
 							} else
 							{
-	 							NON_GTM64_ONLY(code_buf[code_idx++]
-									      |= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
-								GTM64_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+	 							RISC_ONLY(code_buf[code_idx++]
+										|= IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
+								NON_RISC_ONLY(IGEN_LOAD_LINKAGE(GTM_REG_CODEGEN_TEMP);)
 								emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 							}
 							break;
@@ -1469,7 +1476,7 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						case OC_TRIPSIZE:
 							immediate = ct->operand[0].oprval.tsize->size;
 							assert(0 < immediate);
-							assert(32 > immediate); /* Shouldn't exceed this on any platform */
+							assert(MAX_BRANCH_CODEGEN_SIZE > immediate);
 							EMIT_TRIP_ILIT_GEN;
 							inst_emitted = TRUE;
 							break;
@@ -1485,14 +1492,16 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
 					GTM64_ONLY(
-                                        if ( sa_class_sizes[opr->oprclass] == 4 ) {
-                                                next_ptr_offset = 4;
-                                                AIX_ONLY(REVERT_GENERICINST_TO_WORD(generic_inst));
-                                        })
+						if ( sa_class_sizes[opr->oprclass] == 4 )
+						{
+							next_ptr_offset = 4;
+							REVERT_GENERICINST_TO_WORD(generic_inst);
+						}
+					)
 
 					NON_GTM64_ONLY(
-					if (offset < 0  ||  offset > MAX_OFFSET)
-						GTMASSERT;
+						if (offset < 0  ||  offset > MAX_OFFSET)
+							GTMASSERT;
 					)
 					emit_base_offset(GTM_REG_FRAME_TMP_PTR, offset);
 					break;
@@ -1502,20 +1511,17 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 				case TVAR_REF:
 					offset = sa_temps_offset[opr->oprclass];
 					offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-					AIX_ONLY(
-                                        	/*
-                                        	 * GT.M on AIX is 64bit
-                                        	 * By default the loads/stores use ld/std(load double),
-                                        	 * but if the value being dealt with is a word,the
-                                        	 * opcode in generic_inst is changed to lwz/stw
-                                        	 */
+					GTM64_ONLY(
 						if (sa_class_sizes[opr->oprclass] == 4)
-                                         		REVERT_GENERICINST_TO_WORD(generic_inst);
-                                        )
+						{
+							next_ptr_offset = 4;
+							REVERT_GENERICINST_TO_WORD(generic_inst);
+						}
+					)
 
 					NON_GTM64_ONLY(
-					if (offset < 0 || offset > MAX_OFFSET)
-						GTMASSERT;
+						if (offset < 0 || offset > MAX_OFFSET)
+							GTMASSERT;
 					)
 					if (opr->oprclass == TVAR_REF)
 						reg = GTM_REG_FRAME_VAR_PTR;
@@ -1526,14 +1532,14 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					{
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
-							NON_GTM64_ONLY(code_buf[code_idx++] |= IGEN_LOAD_WORD_REG(trg_reg);)
-							GTM64_ONLY(IGEN_LOAD_WORD_REG_8(trg_reg);)
+							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg);)
+							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg))
 							inst_emitted = TRUE;
 						} else
 						{
-							NON_GTM64_ONLY(code_buf[code_idx++]
-								      |= IGEN_LOAD_WORD_REG(GTM_REG_CODEGEN_TEMP);)
-							GTM64_ONLY(IGEN_LOAD_WORD_REG_8(GTM_REG_CODEGEN_TEMP);)
+							RISC_ONLY(code_buf[code_idx++]
+									|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP);)
+							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP);)
 							emit_base_offset(GTM_REG_CODEGEN_TEMP, 0);
 						}
 					}
@@ -1541,8 +1547,8 @@ void	emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 
 				case OCNT_REF:
 					immediate = opr->oprval.offset;
-					assert(0 < immediate);
-					assert(32 > immediate); /* Shouldn't exceed this on any platform */
+					assert(0 <= immediate);
+					assert(MAX_BRANCH_CODEGEN_SIZE > immediate);
 					EMIT_TRIP_ILIT_GEN;
 					inst_emitted = TRUE;
 					ocnt_ref_seen = TRUE;
@@ -1827,47 +1833,59 @@ void	emit_call_xfer(int xfer)
 #endif
 
 	assert(0 == (xfer & 0x3));
-#ifdef __x86_64__
 	offset = (int)(xfer / sizeof(char *));
+#ifdef __x86_64__
 /* Set RAX to 0 for variable argument function calls. This is part of the ABI.
-   The RAX represents the # of floating of values being passed
+	The RAX represents the # of floating of values being passed
 */
 	if (C_VAR_ARGS == xfer_table_desc[offset])
 	{
 		GEN_LOAD_IMMED(I386_REG_RAX, 0);
 	}
 #endif /* __x86_64__ */
+
+#ifdef __ia64
+        if (ASM == xfer_table_desc[offset])
+        {
+                GEN_XFER_TBL_CALL_FAKE(xfer);
+        } else
+        {
+                GEN_XFER_TBL_CALL_DIRECT(xfer);
+
+        }
+#else
 	GEN_XFER_TBL_CALL(xfer);
+#endif /* __ia64 */
 
 	/* In the normal case we will return */
 	if (!ocnt_ref_seen)
 		return;		/* fast test for return .. we hope */
 
 	/* If ocnt_ref_seen is set, then we need to compute the value to be used by a recent
-	   OCNT_REF parameter. This parameter is (currently as of 6/2003) used by op_call, op_callsp,
-	   op_forlcldo, and their mprof counterparts and is the number of bytes those entry points
-	   should add to the return address that they will store as the return point in the new stack
-	   frame that they create. This parameter is basically the size of the generated code for the
-	   jump that follows the call to the above routines that is generates by the associated
-	   triples OC_CALL, OC_CALLSP, and OC_FORLCLDO respectively. Since this jump can be variable in
-	   size and the only other way for these routines to know what form the jump takes is to parse
-	   the instructions at run time, this routine in the compiler will calculate that information and
-	   allow it to be passed in as a parameter. The OCNT_REF handler in emit_trip() has set the
-	   ocnt_ref_seen flag to bring us here. We now calculate the current PC address and subtract it
-	   from the PC address of the next triple.
+		OCNT_REF parameter. This parameter is (currently as of 6/2003) used by op_call, op_callsp,
+		op_forlcldo, and their mprof counterparts and is the number of bytes those entry points
+		should add to the return address that they will store as the return point in the new stack
+		frame that they create. This parameter is basically the size of the generated code for the
+		jump that follows the call to the above routines that is generates by the associated
+		triples OC_CALL, OC_CALLSP, and OC_FORLCLDO respectively. Since this jump can be variable in
+		size and the only other way for these routines to know what form the jump takes is to parse
+		the instructions at run time, this routine in the compiler will calculate that information and
+		allow it to be passed in as a parameter. The OCNT_REF handler in emit_trip() has set the
+		ocnt_ref_seen flag to bring us here. We now calculate the current PC address and subtract it
+		from the PC address of the next triple.
 	*/
 	assert(OC_CALL == current_triple->opcode || OC_CALLSP == current_triple->opcode ||
-	       OC_FORLCLDO == current_triple->opcode);
+		OC_FORLCLDO == current_triple->opcode);
 	offset = current_triple->exorder.fl->rtaddr - (code_reference + (code_idx * INST_SIZE));
 	/* If in assembly or machine (final) phases, make sure have reasonable offset. The offset may be
-	   negative in the early phases so don't check during them. For other phases, put a govenor on
-	   the values so we don't affect the codegen sizes which can mess up shrink_trips. During the
-	   triple shrink phase, the triple distances can vary widely and cause the codegen to change
-	   sizes. Note this still allows an assert fail for 0 if a negative number was being produced.
+		negative in the early phases so don't check during them. For other phases, put a govenor on
+		the values so we don't affect the codegen sizes which can mess up shrink_trips. During the
+		triple shrink phase, the triple distances can vary widely and cause the codegen to change
+		sizes. Note this still allows an assert fail for 0 if a negative number was being produced.
 	*/
 	if (CGP_MACHINE == cg_phase || CGP_ASSEMBLY == cg_phase)
 	{
-		assert(0 < offset && 32 > offset);
+		assert(0 <= offset && MAX_BRANCH_CODEGEN_SIZE > offset);
 	} else
 		offset = MAX(0, MIN(128, offset));
 	ocnt_ref_opr->oprval.offset = offset;

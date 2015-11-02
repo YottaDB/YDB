@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -199,7 +199,8 @@ void	gvcst_kill(bool do_subtree)
 			{
 				cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, right->curr_rec,
 								right_extra, &tp_cse);
-				left->ptr = tp_cse;
+				assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
+				assert( dollar_tlevel || (NULL == tp_cse));
 				if (tp_cse)
 					actual_update = TRUE;
 				if (cdb_sc_normal == cdb_status)
@@ -227,7 +228,8 @@ void	gvcst_kill(bool do_subtree)
 				local_srch_rec.offset = ((blk_hdr_ptr_t)left->buffaddr)->bsiz;
 				local_srch_rec.match = 0;
 				cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, local_srch_rec, FALSE, &tp_cse);
-				left->ptr = tp_cse;
+				assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
+				assert( dollar_tlevel || (NULL == tp_cse));
 				if (tp_cse)
 					actual_update = TRUE;
 				if (cdb_sc_normal == cdb_status)
@@ -242,7 +244,8 @@ void	gvcst_kill(bool do_subtree)
 						      = 0;
 				cdb_status = gvcst_kill_blk(right, lev, gv_altkey, local_srch_rec, right->curr_rec,
 								right_extra, &tp_cse);
-				right->ptr = tp_cse;
+				assert(!dollar_tlevel || (NULL == tp_cse) || (right->cse == tp_cse));
+				assert( dollar_tlevel || (NULL == tp_cse));
 				if (tp_cse)
 					actual_update = TRUE;
 				if (cdb_sc_normal == cdb_status)

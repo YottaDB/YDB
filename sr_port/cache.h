@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,12 +40,12 @@ typedef struct ihead_struct
 #define ICACHE_TABLE_INIT_SIZE 	64	/* Use 1K memory initially */
 #define ICACHE_SIZE 		ROUND_UP2(sizeof(cache_entry), NATIVE_WSIZE)
 
-/* We allow cache_table to grow till we hit 10K memory or 200 entries. If more memory is needed, we do compaction.
- * Note : We need to do some experiment to find out good numbers for this.
- *        May be these numbers should be automatically adjustible during run time
+/* We allow cache_table to grow till we hit memory or entry maximums. If more memory is needed, we do compaction.
+ * Current default limits (overrideable by environment variable): 128 entries, 128KB of object code on all platforms
+ * except IA64 architecture which gets 256KB due to its less compact instruction forms.
  */
-#define MAX_CACHE_MEMSIZE	10240
-#define MAX_CACHE_ENTRIES	200
+#define MAX_CACHE_MEMSIZE	(IA64_ONLY(256) NON_IA64_ONLY(128))
+#define MAX_CACHE_ENTRIES	128
 
 void indir_lits(ihdtyp *ihead);
 void cache_init(void);

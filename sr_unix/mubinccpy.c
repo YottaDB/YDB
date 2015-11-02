@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +13,7 @@
  *
  * -- online incremental	online && incremental
  * -- incremental		!online && incremental
- * -------- requires		cs_addrs and gv_cur_region be current.
+ * -------- requires		cs_addrs, cs_data and gv_cur_region be current.
  */
 
 #include "mdef.h"
@@ -63,6 +63,7 @@
 #include "shmpool.h"
 #include "min_max.h"
 #include "gvcst_lbm_check.h"
+#include "wcs_phase2_commit_wait.h"
 
 GBLREF	bool			record;
 GBLREF	bool			online;
@@ -75,9 +76,11 @@ GBLREF	int4			mubmaxblk;
 GBLREF	spdesc			stringpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uchar_ptr_t		mubbuf;
 GBLREF	tcp_library_struct	tcp_routines;
 GBLREF	uint4			pipe_child;
+GBLREF	uint4			process_id;
 GBLREF	boolean_t		debug_mupip;
 GBLREF	int4			backup_write_errno;
 
@@ -143,6 +146,7 @@ bool	mubinccpy (backup_reg_list *list)
 	DEBUG_INCBKUP_ONLY(int	blks_this_lmap;)
 
 	error_def(ERR_BCKUPBUFLUSH);
+	error_def(ERR_COMMITWAITSTUCK);
 	error_def(ERR_DBCCERR);
 	error_def(ERR_ERRCALL);
 
@@ -159,11 +163,11 @@ bool	mubinccpy (backup_reg_list *list)
 	file	=	&(list->backup_file);
 
 	if (list->tn >= header->trans_hist.curr_tn)
-        {
-                util_out_print("!/TRANSACTION number is greater than or equal to current transaction,", TRUE);
-                util_out_print("no blocks backed up from database !AD", TRUE, DB_LEN_STR(gv_cur_region));
-                return TRUE;
-        }
+	{
+		util_out_print("!/TRANSACTION number is greater than or equal to current transaction,", TRUE);
+		util_out_print("no blocks backed up from database !AD", TRUE, DB_LEN_STR(gv_cur_region));
+		return TRUE;
+	}
 	if (!mubtomag)
 		mubmaxblk = (64 * 1024);
 	db_fd = ((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd;
@@ -382,7 +386,7 @@ bool	mubinccpy (backup_reg_list *list)
 					{
 						free(outptr);
 						free(bm_blk_buff);
-						util_out_print("Error: Block 0x!8XL is too large for automatic upgrade", TRUE,
+						util_out_print("Error: Block 0x!XL is too large for automatic upgrade", TRUE,
 							       blk_num);
 						CLEANUP_AND_RETURN_FALSE;
 					}
@@ -450,6 +454,25 @@ bool	mubinccpy (backup_reg_list *list)
 		   backup.
 		*/
 		grab_crit(gv_cur_region);
+		if (dba_bg == cs_data->acc_meth)
+		{	/* Now that we have crit, wait for any pending phase2 updates to finish. Since phase2 updates happen
+			 * outside of crit, we dont want them to keep writing to the backup temporary file even after the
+			 * backup is complete and the temporary file has been deleted.
+			 */
+			if (cs_addrs->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(cs_addrs, NULL))
+			{
+				assert(FALSE);
+				gtm_putmsg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
+					cs_addrs->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
+				rel_crit(gv_cur_region);
+				CLEANUP_AND_RETURN_FALSE;
+			}
+		}
+		if (debug_mupip)
+		{
+			util_out_print("MUPIP INFO:   Current Transaction # at end of backup is 0x!16@XQ", TRUE,
+				&cs_data->trans_hist.curr_tn);
+		}
 		rel_crit(gv_cur_region);
 		counter = 0;
 		while (0 != cs_addrs->shmpool_buffer->backup_cnt)
@@ -588,7 +611,7 @@ bool	mubinccpy (backup_reg_list *list)
 		util_out_print("DB file !AD incrementally backed up in file !AD", TRUE,
 			DB_LEN_STR(gv_cur_region), file->len, file->addr);
 		util_out_print("!UL blocks saved.", TRUE, save_blks);
-		util_out_print("Transactions from 0x!16@XJ to 0x!16@XJ are backed up.", TRUE,
+		util_out_print("Transactions from 0x!16@XQ to 0x!16@XQ are backed up.", TRUE,
 			&list->tn, &header->trans_hist.curr_tn);
 		cs_addrs->hdr->last_inc_backup = header->trans_hist.curr_tn;
 		cs_addrs->hdr->last_inc_bkup_last_blk = (block_id)header->trans_hist.total_blks;

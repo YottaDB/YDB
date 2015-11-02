@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2007, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -182,12 +182,12 @@ static	volatile int4	gtaSmDepth;			/* If we get nested... */
 static	boolean_t	gtaSmInitialized;		/* Initialized indicator */
 
 /* Fields to help instrument our algorithm */
-GBLREF  int     	totalRallocGta;                 /* Total storage currently (real) mmap alloc'd */
-GBLREF  int     	totalAllocGta;                  /* Total mmap allocated (includes allocation overhead but not free space */
-GBLREF  int     	totalUsedGta;                   /* Sum of "in-use" portions (totalAllocGta - overhead) */
+GBLREF  size_t    	totalRallocGta;                 /* Total storage currently (real) mmap alloc'd */
+GBLREF  size_t     	totalAllocGta;                  /* Total mmap allocated (includes allocation overhead but not free space */
+GBLREF  size_t     	totalUsedGta;                   /* Sum of "in-use" portions (totalAllocGta - overhead) */
 static	int		totalAllocs;                    /* Total alloc requests */
 static	int		totalFrees;                     /* Total free requests */
-static	int		rAllocMax;                      /* Maximum value of totalRalloc */
+static	size_t		rAllocMax;                      /* Maximum value of totalRalloc */
 static	int		allocCnt[MAXINDEX + 2];         /* Alloc count satisfied by each queue size */
 static	int		freeCnt[MAXINDEX + 2];          /* Free count for element in each queue size */
 static	int		elemSplits[MAXINDEX + 2];       /* Times a given queue size block was split */
@@ -339,12 +339,13 @@ void *gtm_text_alloc(size_t size)
 	   be near the end of this entry point */
 	if (gtaSmInitialized)
 	{
-		assert(MAXPOSINT4 >= size);			/* Since unsigned, no negative check needed */
-		hdrSize = OFFSETOF(storElem, userStorage);	/* Size of storElem header */
+		hdrSize = OFFSETOF(storElem, userStorage);		/* Size of storElem header */
+		GTM64_ONLY(if (MAXUINT4 < (size + hdrSize)) GTMASSERT); /* Only deal with < 4GB requests */
+		NON_GTM64_ONLY(if ((size + hdrSize) < size) GTMASSERT); /* Check for wrap with 32 bit platforms */
 		assert(hdrSize < MINTWO);
 
 		fast_lock_count++;
-		++gtaSmDepth;					/* Nesting depth of memory calls */
+		++gtaSmDepth;						/* Nesting depth of memory calls */
 		reentered = (1 < gtaSmDepth);
 		if (reentered)
 		{
@@ -362,7 +363,7 @@ void *gtm_text_alloc(size_t size)
 				assert(0 <= sizeIndex && MAXINDEX >= sizeIndex);
 				GET_QUEUED_ELEMENT(sizeIndex, uStor, qHdr);
 				tSize = TwoTable[sizeIndex];
-				uStor->realLen = (int)tSize;
+				uStor->realLen = (unsigned int)tSize;
 			} else
 			{	/* Use regular mmap to obtain the piece */
 				TEXT_ALLOC(tSize, uStor);
@@ -477,12 +478,12 @@ void printAllocInfo(void)
 		return;		/* Nothing to report -- likely a utility that doesn't use mmap */
 	FPRINTF(stderr,"\nMmap small storage performance:\n");
 	FPRINTF(stderr,
-		"Total allocs: %d, total frees: %d, total ralloc bytes: %d, max ralloc bytes: %d\n",
+		"Total allocs: %d, total frees: %d, total ralloc bytes: %ld, max ralloc bytes: %ld\n",
 		totalAllocs, totalFrees, totalRallocGta, rAllocMax);
 	FPRINTF(stderr,
-		"Total (currently) allocated (includes overhead): %d, Total (currently) used (no overhead): %d\n",
+		"Total (currently) allocated (includes overhead): %ld, Total (currently) used (no overhead): %ld\n",
 		totalAllocGta, totalUsedGta);
-	FPRINTF(stderr,"\nQueueSize   Allocs      Frees    Splits  Combines    CurCnt    MaxCnt\n");
+	FPRINTF(stderr,"\nQueueSize    Allocs     Frees    Splits  Combines    CurCnt    MaxCnt\n");
 	FPRINTF(stderr,  "                                                      Free       Free\n");
 	FPRINTF(stderr,  "---------------------------------------------------------------------\n");
 	{

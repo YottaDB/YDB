@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -99,6 +99,7 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 				if (-1 == fstat_res)
 				{
 					jpc->status = errno;
+					assert(FALSE);
 					sts = ERR_JNLRDERR;
 					F_CLOSE(jpc->channel, close_res);
 					jpc->channel = NOJNL;
@@ -158,9 +159,10 @@ uint4 jnl_file_open(gd_region *reg, bool init, void *dummy)	/* third argument fo
 					jpc->cycle = jb->cycle;	/* make private cycle and shared cycle in sync */
 				}  /* if jnl_state */
 			} else
-			{  /* not init and file moved */
+			{	/* not init and file moved */
 				jpc->status = ERR_JNLMOVED;
 				sts = ERR_JNLOPNERR;
+				assert(FALSE);
 			}
 		} else
 		{	/* stat failed */

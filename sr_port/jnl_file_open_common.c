@@ -98,7 +98,10 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	/* Read the journal file header */
 	DO_FILE_READ(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
+	{
+		assert(FALSE);
 		return ERR_JNLRDERR;
+	}
 	VMS_ONLY(adjust = header->end_of_data & (DISK_BLOCK_SIZE - 1);)
 	UNIX_ONLY(adjust = jpc->sync_io ? (header->end_of_data & (DISK_BLOCK_SIZE - 1)) : 0;)
 	assert(ROUND_UP2(adjust + EOF_RECLEN, DISK_BLOCK_SIZE) <=
@@ -108,7 +111,10 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 		jpc->sync_io ? ROUND_UP2(EOF_RECLEN + adjust, DISK_BLOCK_SIZE) : EOF_RECLEN + adjust,
 		jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
+	{
+		assert(FALSE);
 		return ERR_JNLRDERR;
+	}
 	if (0 != MEMCMP_LIT(header->label, JNL_LABEL_TEXT))
 	{
 		jpc->status = ERR_JNLBADLABEL;
@@ -210,7 +216,10 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size)
 	)
 	DO_FILE_WRITE(jpc->channel, 0, header, JNL_HDR_LEN, jpc->status, jpc->status2);
 	if (SS_NORMAL != jpc->status)
+	{
+		assert(FALSE);
 		return ERR_JNLWRERR;
+	}
 	if (!jb->prev_jrec_time || !header->prev_jnl_file_name_length)
 	{	/* This is the first time a journal file for this database is being opened OR the previous link is NULL.
 		 * In both these cases, we dont know or care about the timestamp of the last written journal record.

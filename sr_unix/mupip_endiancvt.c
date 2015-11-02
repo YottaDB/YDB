@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -610,6 +610,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	assert(sizeof(int4) == sizeof(old->minor_dbver));	/* enum */
 	SWAP_SD4_CAST(minor_dbver, enum mdb_ver);
 	SWAP_SD4(jnl_checksum);
+	SWAP_SD4(wcs_phase2_commit_wait_spincnt);
 	/* SWAP_SD4(createinprogress);	checked above as FALSE so no need */
 	assert(sizeof(int4) == sizeof(old->creation_time4));
 	time(&ctime);

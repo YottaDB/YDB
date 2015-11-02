@@ -85,6 +85,13 @@ GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		tp_in_use;
 GBLREF	boolean_t		gtm_utf8_mode;
+#ifdef VMS
+GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
+#endif
+
+#ifdef DEBUG
+GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#endif
 
 #define NORESTART -1
 #define ALLLOCAL  -2
@@ -132,6 +139,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 	mname_entry		tpvent;
 	ht_ent_mname		*tabent, *curent, *topent;
 	sgmnt_addrs		*csa;
+	int4			shift_size;
 
 	/* If we haven't done any TP until now, turn the flag on to tell gvcst_init to
 	   initialize it in any regions it opens from now on and initialize it in any
@@ -214,6 +222,8 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 					jgbl.wait_for_jnl_hard = FALSE;
 			}
 		}
+		VMS_ONLY(tp_has_kill_t_cse = FALSE;)
+		assert(!donot_commit);
 	}
 	assert((0 == cw_stagnate.size) || cw_stagnate_reinitialized);
 		/* either cw_stagnate has not been initialized at all or previous-non-TP or tp_hist should have done CWS_RESET */
@@ -236,7 +246,8 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		fp = frame_pointer->old_frame_pointer->old_frame_pointer;
 		top = (unsigned char *)(frame_pointer->old_frame_pointer + 1);
 		old_sp = msp;
-		msp -= mvs_size[MVST_TPHOLD];
+		shift_size = mvs_size[MVST_TPHOLD];
+		msp -= shift_size;
 		if (msp <= stackwarn)
 		{
 			va_end(varlst);
@@ -248,21 +259,22 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 				rts_error(VARLSTCNT(1) ERR_STACKCRIT);
 		}
 		memcpy(msp, old_sp, top - (unsigned char *)old_sp);
-		mv_st_ent = (mv_stent *)(top - mvs_size[MVST_TPHOLD]);
+		mv_st_ent = (mv_stent *)(top - shift_size);
 		mv_st_ent->mv_st_type = MVST_TPHOLD;
-		frame_pointer = (stack_frame *)((char *)frame_pointer - mvs_size[MVST_TPHOLD]);
+		ADJUST_FRAME_POINTER(frame_pointer, shift_size);
 		for (fp_fix = frame_pointer;  fp_fix != fp;  fp_fix = fp_fix->old_frame_pointer)
 		{
 			if ((unsigned char *)fp_fix->l_symtab < top  &&  (unsigned char *)fp_fix->l_symtab > stacktop)
-				fp_fix->l_symtab = (mval **)((char *)fp_fix->l_symtab - mvs_size[MVST_TPHOLD]);
+				fp_fix->l_symtab = (mval **)((char *)fp_fix->l_symtab - shift_size);
 			if (fp_fix->temps_ptr < top  &&  fp_fix->temps_ptr > stacktop)
-				fp_fix->temps_ptr -= mvs_size[MVST_TPHOLD];
+				fp_fix->temps_ptr -= shift_size;
 			if (fp_fix->vartab_ptr < (char *)top  &&  fp_fix->vartab_ptr > (char *)stacktop)
-				fp_fix->vartab_ptr -= mvs_size[MVST_TPHOLD];
+				fp_fix->vartab_ptr -= shift_size;
 			if ((unsigned char *)fp_fix->old_frame_pointer < top  &&
 			   (char *)fp_fix->old_frame_pointer > (char *)stacktop)
-				fp_fix->old_frame_pointer = (stack_frame *)((char *)fp_fix->old_frame_pointer
-								- mvs_size[MVST_TPHOLD]);
+			{
+				ADJUST_FRAME_POINTER(fp_fix->old_frame_pointer, shift_size);
+			}
 		}
 		if ((unsigned char *)mv_chain >= top)
 		{
@@ -270,8 +282,8 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 			mv_chain = mv_st_ent;
 		} else
 		{
-			top -= mvs_size[MVST_TPHOLD] + sizeof(stack_frame);
-			mv_chain = (mv_stent *)((char *)mv_chain - mvs_size[MVST_TPHOLD]);
+			top -= shift_size + sizeof(stack_frame);
+			mv_chain = (mv_stent *)((char *)mv_chain - shift_size);
 			mvst_tmp = mv_chain;
 			mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			while (mvst_prev < (mv_stent *)top)
@@ -280,7 +292,7 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 				mvst_prev = (mv_stent *)((char *)mvst_tmp + mvst_tmp->mv_st_next);
 			}
 			mvst_tmp->mv_st_next = (unsigned int)((char *)mv_st_ent - (char *)mvst_tmp);
-			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + mvs_size[MVST_TPHOLD]);
+			mv_st_ent->mv_st_next = (unsigned int)((char *)mvst_prev - (char *)mv_st_ent + shift_size);
 
 		}
 	} else
@@ -345,9 +357,9 @@ void	op_tstart(int dollar_t, ...) /* value of $T when TSTART */
 		{
 			preserve = va_arg(lvname, mval *);
 			/* Note: the assumption (according to the comment below) is that this mval points into the literal table
-			   and thus could not possibly be undefined. In that case, I do not understand why the earlier loop to 
+			   and thus could not possibly be undefined. In that case, I do not understand why the earlier loop to
 			   do MV_FORCE_STR on these variables. Future todo -- verify if that loop is needed. On the assumption
-			   that it is not, the below assert will verify that the mval is defined to catch any NOUNDEF case. 
+			   that it is not, the below assert will verify that the mval is defined to catch any NOUNDEF case.
 			*/
 			assert(MV_DEFINED(preserve));
 			/* The incoming 'preserve' is the pointer to a literal mval table entry. For the indirect code

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -368,7 +368,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			assert(msg.len == MIN_REPL_MSGLEN);
 			*msg_type = msg.type;
 			*start_flags = START_FLAG_NONE;
-			QWASSIGN(*recvd_jnl_seqno, *(seq_num *)&msg.msg[0]);
+			memcpy((uchar_ptr_t)recvd_jnl_seqno, (uchar_ptr_t)&msg.msg[0], sizeof(seq_num));
 			if (REPL_START_JNL_SEQNO == msg.type)
 			{
 				if (!rcv_node_same_endianness)
@@ -431,7 +431,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 				xoff_ack.type = REPL_XOFF_ACK;
 				if (!rcv_node_same_endianness)
 					*recvd_jnl_seqno = GTM_BYTESWAP_64(*recvd_jnl_seqno);
-				QWASSIGN(*(seq_num *)&xoff_ack.msg[0], *recvd_jnl_seqno);
+				memcpy((uchar_ptr_t)&xoff_ack.msg[0], (uchar_ptr_t)recvd_jnl_seqno, sizeof(seq_num));
 				xoff_ack.len = MIN_REPL_MSGLEN;
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Sending REPL_XOFF_ACK message\n");
 				REPL_SEND_LOOP(gtmsource_sock_fd, &xoff_ack, xoff_ack.len, FALSE, &gtmsource_poll_immediate)
@@ -907,7 +907,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 		 */
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Received REPL_XOFF_ACK_ME message\n", msgtypestr);
 		xoff_ack.type = REPL_XOFF_ACK;
-		QWASSIGN(*(seq_num *)&xoff_ack.msg[0], *(seq_num *)&gtmsource_msgp->msg[0]);
+		memcpy((uchar_ptr_t)&xoff_ack.msg[0], (uchar_ptr_t)&gtmsource_msgp->msg[0], sizeof(seq_num));
 		xoff_ack.len = MIN_REPL_MSGLEN;
 		gtmsource_repl_send((repl_msg_ptr_t)&xoff_ack, "REPL_XOFF_ACK", MAX_SEQNO);
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_WAITING_FOR_CONNECTION == gtmsource_state))

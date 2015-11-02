@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +18,9 @@
 #define BLK_MAPINVALID		0x02
 #define BLK_RECYCLED		0x03
 #define BML_BITS_PER_BLK	2
+#define	THREE_BLKS_BITMASK	0x3F
+#define	TWO_BLKS_BITMASK	0x0F
+#define	ONE_BLK_BITMASK		0x03
 
 /* returns the bitmap status (BLK_BUSY|BLK_FREE|etc.) of the "blknum"th block within the local bitmap block "bp" in bml_status */
 #define	GET_BM_STATUS(bp, blknum, bml_status)								\
@@ -58,6 +61,7 @@
 }
 
 #define NO_FREE_SPACE		-1
+
 /* MAP_RD_FAIL is hard coded into the file BML_GET_FREE.MAR */
 #define MAP_RD_FAIL		-2
 #define EXTEND_SUSPECT		-3
@@ -100,7 +104,7 @@
 
 #define MASTER_MAP_BITS_PER_LMAP	1
 
-int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits, boolean_t *used);
+int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits);
 int4 bml_init(block_id bml);
 uint4 bml_busy(uint4 setbusy, sm_uc_ptr_t map);
 uint4 bml_free(uint4 setfree, sm_uc_ptr_t map);

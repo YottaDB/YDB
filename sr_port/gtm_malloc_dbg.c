@@ -37,11 +37,13 @@
 /* We have a PRO build -- generate a full debug version with debug versions of
    our global names */
 
+#  define gtmSmInit gtmSmInit_dbg
 #  define gtm_malloc gtm_malloc_dbg
 #  define gtm_free gtm_free_dbg
 #  define findStorElem findStorElem_dbg
 #  define processDeferredFrees processDeferredFrees_dbg
 #  define release_unused_storage release_unused_storage_dbg
+#  define raise_gtmmemory_error raise_gtmmemory_error_dbg
 #  define DEBUG
 #  define PRO_BUILD
 #  define GTM_MALLOC_DEBUG

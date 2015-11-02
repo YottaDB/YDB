@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -330,8 +330,8 @@ void mupip_restore(void)
 		}
 		if (curr_tn != inhead->start_tn)
 		{
-			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !16@XJ!_"
-				       "Input file: !16@XJ", TRUE, ptr->input_file.len, ptr->input_file.addr,
+			util_out_print("Transaction in input file !AD does not align with database TN.!/DB: !16@XQ!_"
+				       "Input file: !16@XQ", TRUE, ptr->input_file.len, ptr->input_file.addr,
 				       &curr_tn, &inhead->start_tn);
 			free(inbuf);
 			db_ipcs_reset(gv_cur_region, TRUE);

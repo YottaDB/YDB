@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,19 +44,21 @@
 #include "cws_insert.h"
 #include "wcs_sleep.h"
 #include "add_inter.h"
+#include "wbox_test_init.h"
+#include "memcoherency.h"
+
 #ifdef UNIX
 #include "io.h"			/* needed by gtmsecshr.h */
 #include "gtmsecshr.h"		/* for continue_proc */
 #endif
-#include "cert_blk.h"
 #include "hashtab.h"
+#include "wcs_phase2_commit_wait.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
 					status of the read is returned using a global reference, as the status detail
 					should typically not be needed and optimizing the call is important */
 
-GBLREF	boolean_t		certify_all_blocks;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -69,6 +71,7 @@ GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
 GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		dse_running;
 GBLREF	boolean_t		disk_blk_read;
+GBLREF	uint4			t_err;
 
 /* There are 3 passes (of the do-while loop below) we allow now.
  * The first pass which is potentially out-of-crit and hence can end up not locating the cache-record for the input block.
@@ -79,6 +82,7 @@ GBLREF	boolean_t		disk_blk_read;
  * This # of passes is hardcoded in the macro BAD_LUCK_ABOUNDS
  */
 #define BAD_LUCK_ABOUNDS 2
+
 #define	RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, newcr, newcycle)				\
 	assert((first_tp_srch_status)->cr != (newcr) || (first_tp_srch_status)->cycle != (newcycle));	\
 	(first_tp_srch_status)->cr = (newcr);								\
@@ -99,12 +103,16 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	register sgmnt_data_ptr_t	csd;
 	enum db_ver		ondsk_blkver;
 	int4			dummy_errno;
-	boolean_t		already_built, is_mm, reset_first_tp_srch_status, set_wc_blocked;
+	boolean_t		already_built, is_mm, reset_first_tp_srch_status, set_wc_blocked, sleep_invoked;
 	ht_ent_int4		*tabent;
+	srch_blk_status		*blkhist;
+	trans_num		dirty, blkhdrtn;
+	sm_uc_ptr_t		buffaddr;
 
 	error_def(ERR_BUFOWNERSTUCK);
 	error_def(ERR_DBFILERR);
 	error_def(ERR_DYNUPGRDFAIL);
+	error_def(ERR_GVPUTFAIL);
 
 	first_tp_srch_status = NULL;
 	reset_first_tp_srch_status = FALSE;
@@ -137,7 +145,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				else
 					first_tp_srch_status = NULL;
 				ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(first_tp_srch_status, sgm_info_ptr);
-				cse = first_tp_srch_status ? first_tp_srch_status->ptr : NULL;
+				cse = first_tp_srch_status ? first_tp_srch_status->cse : NULL;
 			}
 			assert(!cse || !cse->high_tlevel);
 			assert(!chain1.flag || cse);
@@ -152,34 +160,43 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					{	/* out of date, so make it current */
 						assert(gds_t_committed != cse->mode);
 						already_built = (NULL != cse->new_buff);
+						/* Validate the block's search history right after building a private copy.
+						 * This is not needed in case gvcst_search is going to reuse the clue's search
+						 * history and return (because tp_hist will do the validation of this block).
+						 * But if gvcst_search decides to do a fresh traversal (because the clue does not
+						 * cover the path of the current input key etc.) the block build that happened now
+						 * will not get validated in tp_hist since it will instead be given the current
+						 * key's search history path (a totally new path) for validation. Since a private
+						 * copy of the block has been built, tp_tend would also skip validating this block
+						 * so it is necessary that we validate the block right here. Since it is tricky to
+						 * accurately differentiate between the two cases, we do the validation
+						 * unconditionally here (besides it is only a few if checks done per block build
+						 * so it is considered okay performance-wise).
+						 */
 						gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, 0);
 						assert(NULL != cse->blk_target);
 						if (!already_built && !chain1.flag)
 						{
-							assert(first_tp_srch_status && (is_mm || first_tp_srch_status->cr)
-											&& first_tp_srch_status->buffaddr);
-							if (first_tp_srch_status->tn <=
-									((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->tn)
+							buffaddr = first_tp_srch_status->buffaddr;
+							cr = first_tp_srch_status->cr;
+							assert((is_mm || cr) && buffaddr);
+							blkhdrtn = ((blk_hdr_ptr_t)buffaddr)->tn;
+							if (TP_IS_CDB_SC_BLKMOD3(cr, first_tp_srch_status, blkhdrtn))
 							{
 								assert(CDB_STAGNATE > t_tries);
 								rdfail_detail = cdb_sc_blkmod;	/* should this be something else */
 								TP_TRACE_HIST_MOD(blk, gv_target, tp_blkmod_t_qread, cs_data,
-									first_tp_srch_status->tn,
-									((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->tn,
-									((blk_hdr_ptr_t)(first_tp_srch_status->buffaddr))->levl);
+									first_tp_srch_status->tn, blkhdrtn,
+									((blk_hdr_ptr_t)buffaddr)->levl);
 								return (sm_uc_ptr_t)NULL;
 							}
-							if ((!is_mm)
-								&& (first_tp_srch_status->cycle != first_tp_srch_status->cr->cycle
-								|| first_tp_srch_status->blk_num != first_tp_srch_status->cr->blk))
+							if (!is_mm && ((first_tp_srch_status->cycle != cr->cycle)
+										|| (first_tp_srch_status->blk_num != cr->blk)))
 							{
 								assert(CDB_STAGNATE > t_tries);
-								rdfail_detail = cdb_sc_lostcr;	/* should this be something else */
+								rdfail_detail = cdb_sc_lostcr; /* should this be something else */
 								return (sm_uc_ptr_t)NULL;
 							}
-							if (certify_all_blocks) /* will GTMASSERT on integ error */
-								cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)cse->new_buff,
-									cse->blk_target->root, TRUE);
 						}
 						cse->done = TRUE;
 					}
@@ -212,12 +229,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(first_tp_srch_status, sgm_info_ptr);
 		if (!is_mm && first_tp_srch_status)
 		{
-			assert(first_tp_srch_status->cr && !first_tp_srch_status->ptr);
-			if (first_tp_srch_status->cycle == first_tp_srch_status->cr->cycle)
+			cr = first_tp_srch_status->cr;
+			assert(cr && !first_tp_srch_status->cse);
+			if (first_tp_srch_status->cycle == cr->cycle)
 			{
 				*cycle = first_tp_srch_status->cycle;
-				*cr_out = first_tp_srch_status->cr;
-				first_tp_srch_status->cr->refer = TRUE;
+				*cr_out = cr;
+				cr->refer = TRUE;
 				if (CDB_STAGNATE <= t_tries)	/* mu_reorg doesn't use TP else should have an || for that */
 					CWS_INSERT(blk);
 				return (sm_uc_ptr_t)first_tp_srch_status->buffaddr;
@@ -275,7 +293,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				}
 				if (csd->flush_trigger <= csa->nl->wcs_active_lvl  &&  FALSE == gv_cur_region->read_only)
 					JNL_ENSURE_OPEN_WCS_WTSTART(csa, gv_cur_region, 0, dummy_errno);
-						/* a macro that dclast's wcs_wtstart() and checks for errors etc. */
+						/* a macro that dclast's "wcs_wtstart" and checks for errors etc. */
 				grab_crit(gv_cur_region);
 				cr = db_csh_get(blk);			/* in case blk arrived before crit */
 			}
@@ -290,6 +308,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				cr = db_csh_getn(blk);
 				if (CR_NOTVALID == (sm_long_t)cr)
 				{
+					assert(csd->wc_blocked); /* only reason we currently know why wcs_get_space could fail */
+					assert(gtm_white_box_test_case_enabled);
 					SET_TRACEABLE_VAR(cs_data->wc_blocked, TRUE);
 					BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_getn_invalid_blk);
 					set_wc_blocked = TRUE;
@@ -297,7 +317,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				}
 				assert(0 <= cr->read_in_progress);
 				*cycle = cr->cycle;
-				cr->tn = csa->ti->curr_tn;
+				cr->tn = csd->trans_hist.curr_tn;
 				if (FALSE == was_crit)
 					rel_crit(gv_cur_region);
 				/* read outside of crit may be of a stale block but should be detected by t_end or tp_tend */
@@ -365,16 +385,18 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			set_wc_blocked = TRUE;
 			break;
 		}
-		/* it is very important for cycle to be noted down before checking for read_in_progress. doing it
-		 * the other way round introduces the scope for a bug in the concurrency control validation logic in
-		 * t_end/tp_hist/tp_tend. this is because the validation logic relies on t_qread returning an atomically
+		/* It is very important for cycle to be noted down before checking for read_in_progress/in_tend.
+		 * Doing it the other way round introduces the scope for a bug in the concurrency control validation logic in
+		 * t_end/tp_hist/tp_tend. This is because the validation logic relies on t_qread returning an atomically
 		 * consistent value of <"cycle","cr"> for a given input blk such that cr->buffaddr held the input blk's
-		 * contents at the time when cr->cycle was "cycle". it is important that cr->read_in_progress is -1
-		 * (indicating the read from disk into the buffer is complete) when t_qread returns. the only exception
-		 * is if cr->cycle is higher than the "cycle" returned by t_qread (signifying the buffer got reused for
-		 * another block concurrently) in which case the cycle check in the validation logic will detect this.
+		 * contents at the time when cr->cycle was "cycle". It is important that cr->read_in_progress is -1
+		 * (indicating the read from disk into the buffer is complete) AND cr->in_tend is FALSE (indicating
+		 * that the buffer is not being updated) when t_qread returns. The only exception is if cr->cycle is higher
+		 * than the "cycle" returned by t_qread (signifying the buffer got reused for another block concurrently)
+		 * in which case the cycle check in the validation logic will detect this.
 		 */
 		*cycle = cr->cycle;
+		sleep_invoked = FALSE;
 		for (lcnt = 1;  ; lcnt++)
 		{
 			if (0 > cr->read_in_progress)
@@ -388,17 +410,17 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				}
 				*cr_out = cr;
 				VMS_ONLY(
-					/* If we were doing the db_csh_get() above (in t_qread itself) and located the cache-record
+					/* If we were doing the "db_csh_get" above (in t_qread itself) and located the cache-record
 					 * which, before coming here and taking a copy of cr->cycle a few lines above, was made an
 					 * older twin by another process in bg_update (note this can happen in VMS only) which has
 					 * already incremented the cycle, we will end up having a copy of the old cache-record with
 					 * its incremented cycle number and hence will succeed in tp_hist validation if we return
 					 * this <cr,cycle> combination although we don't want to since this "cr" is not current for
-					 * the given block as of now. Note that the "indexmod" optimization in tp_tend() relies on
-					 * an accurate intermediate validation by tp_hist() which in turn relies on the <cr,cycle>
+					 * the given block as of now. Note that the "indexmod" optimization in "tp_tend" relies on
+					 * an accurate intermediate validation by "tp_hist" which in turn relies on the <cr,cycle>
 					 * value returned by t_qread to be accurate for a given blk at the current point in time.
 					 * We detect the older-twin case by the following check. Note that here we depend on the
-					 * the fact that bg_update() sets cr->bt_index to 0 before incrementing cr->cycle.
+					 * the fact that "bg_update" sets cr->bt_index to 0 before incrementing cr->cycle.
 					 * Given that order, cr->bt_index can be guaranteed to be 0 if we read the incremented cycle
 					 */
 					if (cr->twin && (0 == cr->bt_index))
@@ -409,13 +431,66 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if (was_crit != csa->now_crit)
 					rel_crit(gv_cur_region);
 				assert(was_crit == csa->now_crit);
+				/* Check if "cr" is locked for phase2 update by a concurrent process. Before doing so, need to
+				 * do a read memory barrier to ensure we read a consistent state. Otherwise, we could see
+				 * cr->in_tend as 0 even though it is actually non-zero in another processor (due to cache
+				 * coherency delays in multi-processor environments) and this could lead to mysterious
+				 * failures including GTMASSERTs and database damage as the validation logic in t_end/tp_tend
+				 * relies on the fact that the cr->in_tend check here is accurate as of this point.
+				 */
+				SHM_READ_MEMORY_BARRIER;
+				blocking_pid = cr->in_tend;
+				if (blocking_pid)
+				{	/* Wait for cr->in_tend to be non-zero. But in the case we are doing a TP transaction and
+					 * the global has NOISOLATION turned ON and this is a leaf level block and this is a SET
+					 * operation (t_err == ERR_GVPUTFAIL), avoid the sleep but ensure a cdb_sc_blkmod type
+					 * restart will be triggered (in tp_tend) and the function "recompute_upd_array" will be
+					 * invoked. Avoiding the sleep in this case (at the cost of recomputing the update array
+					 * in crit) is expected to improve throughput. The only exception is if we are in the
+					 * final retry in which case it is better to wait here as we dont want to end up in a
+					 * situation where "recompute_upd_array" indicates that a restart is necessary.
+					 */
+					if (dollar_tlevel && gv_target->noisolation && (ERR_GVPUTFAIL == t_err)
+						&& (CDB_STAGNATE > t_tries))	/* do not skip wait in case of final retry */
+					{	/* We know that the only caller in this case would be the function "gvcst_search".
+						 * If the input cr and cycle match corresponding fields of gv_target->hist.h[0],
+						 * we update the corresponding "tn" field to reset it BACK thereby ensuring the
+						 * cdb_sc_blkmod check in tp_tend will fail and that the function
+						 * "recompute_upd_array" will be invoked to try and recompute the update array.
+						 * We do this only in case of gv_target->hist.h[0] as recomputations
+						 * are currently done for NOISOLATION globals only for leaf level blocks.
+						 */
+						blkhist = &gv_target->hist.h[0];
+						dirty = cr->dirty;
+						if (((sm_int_ptr_t)&blkhist->cycle == (sm_int_ptr_t)cycle)
+							&& ((cache_rec_ptr_ptr_t)&blkhist->cr == (cache_rec_ptr_ptr_t)cr_out))
+						{
+							if (blkhist->tn > dirty)
+							{
+								blkhist->tn = dirty;
+								if (reset_first_tp_srch_status)
+									first_tp_srch_status->tn = dirty;
+							}
+							blocking_pid = 0;	/* do not sleep in the for loop below */
+						}
+					}
+					if (blocking_pid && !wcs_phase2_commit_wait(csa, cr))
+					{	/* Timed out waiting for cr->in_tend to become non-zero. Restart. */
+						rdfail_detail = cdb_sc_phase2waitfail;
+						return NULL;
+					}
+				}
 				if (reset_first_tp_srch_status)
 				{	/* keep the parantheses for the if (although single line) since the following is a macro */
 					RESET_FIRST_TP_SRCH_STATUS(first_tp_srch_status, cr, *cycle);
 				}
+				assert(!csa->now_crit || !cr->twin || cr->bt_index);
+				assert(!csa->now_crit || (NULL == (bt = bt_get(blk)))
+					|| (CR_NOTVALID == bt->cache_index)
+					|| (cr == (cache_rec_ptr_t)GDS_REL2ABS(bt->cache_index)) && (0 == cr->in_tend));
 				/* Note that at this point we expect t_qread to return a <cr,cycle> combination that
 				 * corresponds to "blk" passed in. It is crucial to get an accurate value for both the fields
-				 * since tp_hist() relies on this for its intermediate validation.
+				 * since "tp_hist" relies on this for its intermediate validation.
 				 */
 				return (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 			}
@@ -431,7 +506,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 					INTERLOCK_INIT(cr);
 					assert(0 == cr->r_epid);
 					cr->r_epid = 0;
-				} else  if (cr->read_in_progress >= 0)
+				} else if (cr->read_in_progress >= 0)
 				{
 					BG_TRACE_PRO(t_qread_buf_owner_stuck);
 					if (0 != (blocking_pid = cr->r_epid))
@@ -456,7 +531,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							send_msg(VARLSTCNT(9) ERR_BUFOWNERSTUCK, 7, process_id, blocking_pid,
 								cr->blk, cr->blk, (lcnt / BUF_OWNER_STUCK),
 								cr->read_in_progress, cr->rip_latch.u.parts.latch_pid);
-							if ((4 * BUF_OWNER_STUCK) <= lcnt)
+							if (MAX_TQREAD_WAIT <= lcnt)	/* max wait of 4 mins */
 								GTMASSERT;
 							/* Kickstart the process taking a long time in case it was suspended */
 							UNIX_ONLY(continue_proc(blocking_pid));
@@ -481,7 +556,13 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if (was_crit != csa->now_crit)
 					rel_crit(gv_cur_region);
 			} else
+			{
+				BG_TRACE_PRO_ANY(csa, t_qread_ripsleep_cnt);
+				if (!sleep_invoked)	/* Count # of blks for which we ended up sleeping on the read */
+					BG_TRACE_PRO_ANY(csa, t_qread_ripsleep_nblks);
 				wcs_sleep(lcnt);
+				sleep_invoked = TRUE;
+			}
 		}
 		if (set_wc_blocked)	/* cannot use csd->wc_blocked here as we might not necessarily have crit */
 			break;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -182,7 +182,7 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 			bmp = cs1->old_block;
 			b_ptr = (block_id_ptr_t)(cs1->upd_addr);
 			b_ptr += cs1->reference_cnt - 1;
-			offset = *b_ptr + 1 - bml;
+			offset = *b_ptr + 1;
 		}
 		if (offset < map_size)
 		{
@@ -212,7 +212,7 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 	{
 		b_ptr = (block_id_ptr_t)(cs1->upd_addr);
 		b_ptr += cs1->reference_cnt++;
-		*b_ptr = free_bit + bml;
+		*b_ptr = free_bit;
 	} else
 	{
 		space_needed = (BLKS_PER_LMAP + 1) * sizeof(block_id);
@@ -222,17 +222,10 @@ block_id bm_getfree(block_id orig_hint, boolean_t *blk_used, unsigned int cw_wor
 		}
 		BLK_ADDR(b_ptr, space_needed, block_id);
 		memset(b_ptr, 0, space_needed);
-		*b_ptr = free_bit + bml;
+		*b_ptr = free_bit;
 		blkhist.blk_num = bml;
 		blkhist.buffaddr = bmp;	/* cycle and cr have already been assigned from t_qread */
-		t_write_map(&blkhist, (uchar_ptr_t)b_ptr, ctn);
-		if (0 != dollar_tlevel)
-		{
-			tp_get_cw(cs, (int)(*cw_depth_ptr - 1), &cs1);
-			assert(!cs1->done);
-		} else
-			cs1 = cs + *cw_depth_ptr;
-		cs1->reference_cnt++;
+		t_write_map(&blkhist, (uchar_ptr_t)b_ptr, ctn, 1); /* last parameter 1 is what cs->reference_cnt gets set to */
 	}
 	return bml + free_bit;
 }

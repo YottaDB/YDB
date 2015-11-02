@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,6 +65,7 @@ GBLREF boolean_t	block_saved;
 GBLREF boolean_t	unhandled_stale_timer_pop;
 GBLREF unsigned char	*non_tp_jfb_buff_ptr;
 GBLREF jnl_gbls_t	jgbl;
+GBLREF uint4		process_id;
 
 void dse_chng_bhead(void)
 {
@@ -203,7 +204,7 @@ void dse_chng_bhead(void)
 		{
 			BLK_ADDR(blkid_ptr, sizeof(block_id), block_id);
 			*blkid_ptr = 0;
-			t_write_map(&blkhist, (unsigned char *)blkid_ptr, cs_addrs->ti->curr_tn);
+			t_write_map(&blkhist, (unsigned char *)blkid_ptr, cs_addrs->ti->curr_tn, 0);
 			cr_array_index = 0;
 			block_saved = FALSE;
 		} else
@@ -246,8 +247,8 @@ void dse_chng_bhead(void)
 			mm_update(cw_set, cs_addrs->ti->curr_tn, tn, dummysi);
 		INCREMENT_CURR_TN(cs_data);
 		/* the following code is analogous to that in t_end and should be maintained in a similar fashion */
-		while (cr_array_index)
-			cr_array[--cr_array_index]->in_cw_set = FALSE;
+		UNPIN_CR_ARRAY_ON_COMMIT(cr_array, cr_array_index);
+		assert(!cr_array_index);
 		rel_crit(gv_cur_region);
 		cw_set_depth = 0;	/* signal end of active transaction to secshr_db_clnup/t_commit_clnup */
 		if (block_saved)

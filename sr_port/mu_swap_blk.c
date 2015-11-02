@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,7 +113,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 	srch_blk_status		bmlhist, destblkhist, *hist_ptr;
 	unsigned char    	save_cw_set_depth;
 	cw_set_element		*tmpcse;
-	jnl_buffer_ptr_t	jbbp; /* jbp is non-NULL only if before-image journaling */
+	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
 	unsigned int		bsiz;
 
 	dest_blk_id = *pdest_blk_id;
@@ -414,6 +414,9 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 			else
 			{	/* Destination is a recycled block that needs a before image */
 				tmpcse->old_block = destblkhist.buffaddr;
+				/* Record cr,cycle. This is used later in t_end to determine if checksums need to be recomputed */
+				tmpcse->cr = destblkhist.cr;
+				tmpcse->cycle = destblkhist.cycle;
 				jbbp = (JNL_ENABLED(cs_addrs) && cs_addrs->jnl_before_image) ? cs_addrs->jnl->jnl_buff : NULL;
 				if ((NULL != jbbp) && (((blk_hdr_ptr_t)tmpcse->old_block)->tn < jbbp->epoch_tn))
 				{	/* Compute CHECKSUM for writing PBLK record before getting crit.
@@ -557,16 +560,18 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		 * kill_set_ptr will save the block which will become free.
 		 */
 		child1 = ROUND_DOWN(dest_blk_id, BLKS_PER_LMAP); /* bit map block */
-		PUT_LONG(update_array_ptr, dest_blk_id);
 		bmlhist.buffaddr = bmp_buff;
 		bmlhist.blk_num = child1;
+		child1 = dest_blk_id - child1;
+		assert(child1);
+		PUT_LONG(update_array_ptr, child1);
 		/* Need to put bit maps on the end of the cw set for concurrency checking.
 		 * We want to simulate t_write_map, except we want to update "cw_map_depth" instead of "cw_set_depth".
 		 * Hence the save and restore logic (for "cw_set_depth") below.
 		 */
 		save_cw_set_depth = cw_set_depth;
 		assert(!cw_map_depth);
-		t_write_map(&bmlhist, (uchar_ptr_t)update_array_ptr, ctn);	/* will increment cw_set_depth */
+		t_write_map(&bmlhist, (uchar_ptr_t)update_array_ptr, ctn, 1);	/* will increment cw_set_depth */
 		cw_map_depth = cw_set_depth;		/* set cw_map_depth to the latest cw_set_depth */
 		cw_set_depth = save_cw_set_depth;	/* restore cw_set_depth */
 		/* t_write_map simulation end */
@@ -574,7 +579,7 @@ enum cdb_sc mu_swap_blk(int level, block_id *pdest_blk_id, kill_set *kill_set_pt
 		child1 = 0;
 		PUT_LONG(update_array_ptr, child1);
 		update_array_ptr += sizeof(block_id);
-		cw_set[cw_map_depth - 1].reference_cnt = 1;	/* 1 free block is now becoming BLK_USED in the bitmap */
+		assert(1 == cw_set[cw_map_depth - 1].reference_cnt);	/* 1 free block is now becoming BLK_USED in the bitmap */
 		/* working block will be removed */
 		kill_set_ptr->blk[kill_set_ptr->used].flag = 0;
 		kill_set_ptr->blk[kill_set_ptr->used].level = 0;

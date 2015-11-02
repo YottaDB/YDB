@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -68,6 +68,7 @@ GBLREF boolean_t	block_saved;
 GBLREF boolean_t        unhandled_stale_timer_pop;
 GBLREF unsigned char    *non_tp_jfb_buff_ptr;
 GBLREF jnl_gbls_t	jgbl;
+GBLREF uint4		process_id;
 
 void dse_maps(void)
 {
@@ -79,9 +80,8 @@ void dse_maps(void)
 	sm_uc_ptr_t		bp;
 	char			util_buff[MAX_UTIL_LEN];
 	int4			bml_size, bml_list_size, blk_index, bml_index;
-	int4			total_blks;
+	int4			total_blks, blks_in_bitmap;
 	int4			bplmap, dummy_int;
-	boolean_t		dummy_bool;
 	unsigned char		*bml_list;
 	cache_rec_ptr_t		cr, dummy_cr;
 	bt_rec_ptr_t		btr;
@@ -93,143 +93,136 @@ void dse_maps(void)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 
-        error_def(ERR_DSEBLKRDFAIL);
+	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DBRDONLY);
 
 	if (CLI_PRESENT == cli_present("BUSY") || CLI_PRESENT == cli_present("FREE") ||
 		CLI_PRESENT == cli_present("MASTER") || CLI_PRESENT == cli_present("RESTORE_ALL"))
-        {
+	{
 	if (gv_cur_region->read_only)
 		rts_error(VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-        }
+	}
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-        assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs);
-        was_crit = cs_addrs->now_crit;
-        if (cs_addrs->critical)
-                crash_count = cs_addrs->critical->crashcnt;
-        bplmap = cs_addrs->hdr->bplmap;
-        if (CLI_PRESENT == cli_present("BLOCK"))
-        {
-                if (!cli_get_hex("BLOCK", (uint4 *)&blk))
-                        return;
-                if (blk < 0 || blk >= cs_addrs->ti->total_blks)
-                {
-                        util_out_print("Error: invalid block number.", TRUE);
-                        return;
-                }
-                patch_curr_blk = blk;
-        }
-        else
-                blk = patch_curr_blk;
-        if (CLI_PRESENT == cli_present("FREE"))
-        {
-                if (0 == bplmap)
-                {
-                        util_out_print("Cannot perform map updates:  bplmap field of file header is zero.", TRUE);
-                        return;
-                }
-                if (blk / bplmap * bplmap == blk)
-                {
-                        util_out_print("Cannot perform action on a map block.", TRUE);
-                        return;
-                }
-                bml_blk = blk / bplmap * bplmap;
-                bm_setmap(bml_blk, blk, FALSE);
-                return;
-        }
-        if (CLI_PRESENT == cli_present("BUSY"))
-        {
-                if (0 == bplmap)
-                {
-                        util_out_print("Cannot perform map updates:  bplmap field of file header is zero.", TRUE);
-                        return;
-                }
-                if (blk / bplmap * bplmap == blk)
-                {
-                        util_out_print("Cannot perform action on a map block.", TRUE);
-                        return;
-                }
-                bml_blk = blk / bplmap * bplmap;
-                bm_setmap(bml_blk, blk, TRUE);
-                return;
-        }
-        blk_size = cs_addrs->hdr->blk_size;
-        if (CLI_PRESENT == cli_present("MASTER"))
-        {
-                if (0 == bplmap)
-                {
-                        util_out_print("Cannot perform maps updates:  bplmap field of file header is zero.", TRUE);
-                        return;
-                }
-                if (!was_crit)
-                        grab_crit(gv_cur_region);
-                bml_blk = blk / bplmap * bplmap;
-                if (dba_mm == cs_addrs->hdr->acc_meth)
-                        bp = (sm_uc_ptr_t)cs_addrs->acc_meth.mm.base_addr + (off_t)bml_blk * blk_size;
-                else
-                {
-                        assert(dba_bg == cs_addrs->hdr->acc_meth);
-                        if (!(bp = t_qread(bml_blk, &dummy_int, &dummy_cr)))
-                                rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-                }
-                if ((cs_addrs->ti->total_blks / bplmap) * bplmap == bml_blk)
-                        total_blks = (cs_addrs->ti->total_blks - bml_blk);
-                else
-                        total_blks = bplmap;
-                if (-1 == bml_find_free(0, bp + sizeof(blk_hdr), total_blks, &dummy_bool))
-                {
-                        bit_clear(bml_blk / bplmap, cs_addrs->bmm);
-                        if (bml_blk > cs_addrs->nl->highest_lbm_blk_changed)
-                                cs_addrs->nl->highest_lbm_blk_changed = bml_blk;
-                }
-                else
-                {
-                        bit_set(bml_blk / bplmap, cs_addrs->bmm);
-                        if (bml_blk > cs_addrs->nl->highest_lbm_blk_changed)
-                                cs_addrs->nl->highest_lbm_blk_changed = bml_blk;
-                }
-                if (!was_crit)
-                        rel_crit(gv_cur_region);
-                return;
-        }
-        if (CLI_PRESENT == cli_present("RESTORE_ALL"))
-        {
-                if (0 == bplmap)
-                {
-                        util_out_print("Cannot perform maps updates:  bplmap field of file header is zero.", TRUE);
-                        return;
-                }
-                assert(ROUND_DOWN2(blk_size, 2 * sizeof(int4)) == blk_size);
-                bml_size = BM_SIZE(bplmap);
-                bml_list_size = (cs_addrs->ti->total_blks + bplmap - 1) / bplmap * bml_size;
-                bml_list = (unsigned char *)malloc(bml_list_size);
-                for (blk_index = 0, bml_index = 0;  blk_index < cs_addrs->ti->total_blks;
-                        blk_index += bplmap, bml_index++)
-                        bml_newmap((blk_hdr_ptr_t)(bml_list + bml_index * bml_size), bml_size, cs_addrs->ti->curr_tn);
-                if (!was_crit)
-                        grab_crit(gv_cur_region);
-                blk = get_dir_root();
-                assert(blk < bplmap);
-                cs_addrs->ti->free_blocks = cs_addrs->ti->total_blks - (cs_addrs->ti->total_blks / bplmap + 1);
-                bml_busy(blk, bml_list + sizeof(blk_hdr));
-                cs_addrs->ti->free_blocks =  cs_addrs->ti->free_blocks - 1;
-                dse_m_rest(blk, bml_list, bml_size, &cs_addrs->ti->free_blocks, TRUE);
-                for (blk_index = 0, bml_index = 0;  blk_index < cs_addrs->ti->total_blks;
-                                                                blk_index += bplmap, bml_index++)
-                {
+	assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs);
+	was_crit = cs_addrs->now_crit;
+	if (cs_addrs->critical)
+		crash_count = cs_addrs->critical->crashcnt;
+	bplmap = cs_addrs->hdr->bplmap;
+	if (CLI_PRESENT == cli_present("BLOCK"))
+	{
+		if (!cli_get_hex("BLOCK", (uint4 *)&blk))
+			return;
+		if (blk < 0 || blk >= cs_addrs->ti->total_blks)
+		{
+			util_out_print("Error: invalid block number.", TRUE);
+			return;
+		}
+		patch_curr_blk = blk;
+	}
+	else
+		blk = patch_curr_blk;
+	if (CLI_PRESENT == cli_present("FREE"))
+	{
+		if (0 == bplmap)
+		{
+			util_out_print("Cannot perform map updates:  bplmap field of file header is zero.", TRUE);
+			return;
+		}
+		if (blk / bplmap * bplmap == blk)
+		{
+			util_out_print("Cannot perform action on a map block.", TRUE);
+			return;
+		}
+		bml_blk = blk / bplmap * bplmap;
+		bm_setmap(bml_blk, blk, FALSE);
+		return;
+	}
+	if (CLI_PRESENT == cli_present("BUSY"))
+	{
+		if (0 == bplmap)
+		{
+			util_out_print("Cannot perform map updates:  bplmap field of file header is zero.", TRUE);
+			return;
+		}
+		if (blk / bplmap * bplmap == blk)
+		{
+			util_out_print("Cannot perform action on a map block.", TRUE);
+			return;
+		}
+		bml_blk = blk / bplmap * bplmap;
+		bm_setmap(bml_blk, blk, TRUE);
+		return;
+	}
+	blk_size = cs_addrs->hdr->blk_size;
+	if (CLI_PRESENT == cli_present("MASTER"))
+	{
+		if (0 == bplmap)
+		{
+			util_out_print("Cannot perform maps updates:  bplmap field of file header is zero.", TRUE);
+			return;
+		}
+		if (!was_crit)
+			grab_crit(gv_cur_region);
+		bml_blk = blk / bplmap * bplmap;
+		if (dba_mm == cs_addrs->hdr->acc_meth)
+			bp = (sm_uc_ptr_t)cs_addrs->acc_meth.mm.base_addr + (off_t)bml_blk * blk_size;
+		else
+		{
+			assert(dba_bg == cs_addrs->hdr->acc_meth);
+			if (!(bp = t_qread(bml_blk, &dummy_int, &dummy_cr)))
+				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		}
+		if ((cs_addrs->ti->total_blks / bplmap) * bplmap == bml_blk)
+			total_blks = (cs_addrs->ti->total_blks - bml_blk);
+		else
+			total_blks = bplmap;
+		if (NO_FREE_SPACE == bml_find_free(0, bp + sizeof(blk_hdr), total_blks))
+			bit_clear(bml_blk / bplmap, cs_addrs->bmm);
+		else
+			bit_set(bml_blk / bplmap, cs_addrs->bmm);
+		if (bml_blk > cs_addrs->nl->highest_lbm_blk_changed)
+			cs_addrs->nl->highest_lbm_blk_changed = bml_blk;
+		if (!was_crit)
+			rel_crit(gv_cur_region);
+		return;
+	}
+	if (CLI_PRESENT == cli_present("RESTORE_ALL"))
+	{
+		if (0 == bplmap)
+		{
+			util_out_print("Cannot perform maps updates:  bplmap field of file header is zero.", TRUE);
+			return;
+		}
+		total_blks = cs_addrs->ti->total_blks;
+		assert(ROUND_DOWN2(blk_size, 2 * sizeof(int4)) == blk_size);
+		bml_size = BM_SIZE(bplmap);
+		bml_list_size = (total_blks + bplmap - 1) / bplmap * bml_size;
+		bml_list = (unsigned char *)malloc(bml_list_size);
+		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
+			bml_newmap((blk_hdr_ptr_t)(bml_list + bml_index * bml_size), bml_size, cs_addrs->ti->curr_tn);
+		if (!was_crit)
+			grab_crit(gv_cur_region);
+		blk = get_dir_root();
+		assert(blk < bplmap);
+		cs_addrs->ti->free_blocks = total_blks - DIVIDE_ROUND_UP(total_blks, bplmap);
+		bml_busy(blk, bml_list + sizeof(blk_hdr));
+		cs_addrs->ti->free_blocks =  cs_addrs->ti->free_blocks - 1;
+		dse_m_rest(blk, bml_list, bml_size, &cs_addrs->ti->free_blocks, TRUE);
+		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
+		{
 			CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			CWS_RESET;
 			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-                        assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
-                        cs_addrs->ti->early_tn++;
-                        blk_ptr = bml_list + bml_index * bml_size;
+			assert(cs_addrs->ti->early_tn == cs_addrs->ti->curr_tn);
+			cs_addrs->ti->early_tn++;
+			blk_ptr = bml_list + bml_index * bml_size;
 			blkhist.blk_num = blk_index;
 			if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-                        BLK_INIT(bs_ptr, bs1);
-                        BLK_SEG(bs_ptr, blk_ptr + sizeof(blk_hdr), bml_size - sizeof(blk_hdr));
-                        BLK_FINI(bs_ptr, bs1);
-                        t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
+			BLK_INIT(bs_ptr, bs1);
+			BLK_SEG(bs_ptr, blk_ptr + sizeof(blk_hdr), bml_size - sizeof(blk_hdr));
+			BLK_FINI(bs_ptr, bs1);
+			t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
 			cr_array_index = 0;
 			block_saved = FALSE;
 			if (JNL_ENABLED(cs_data))
@@ -255,67 +248,50 @@ void dse_maps(void)
 				} else
 					rts_error(VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
 			}
-                        if (dba_bg == cs_addrs->hdr->acc_meth)
-                                bg_update(cw_set, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
-                        else
-                                mm_update(cw_set, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
-                        INCREMENT_CURR_TN(cs_data);
-			while (cr_array_index)	/* could have been incremented by bg_update/mm_update */
-				cr_array[--cr_array_index]->in_cw_set = FALSE;
+			if (dba_bg == cs_addrs->hdr->acc_meth)
+				bg_update(cw_set, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
+			else
+				mm_update(cw_set, cs_addrs->ti->curr_tn, cs_addrs->ti->curr_tn, dummysi);
+			INCREMENT_CURR_TN(cs_data);
+			/* the following code is analogous to that in t_end and should be maintained in a similar fashion */
+			UNPIN_CR_ARRAY_ON_COMMIT(cr_array, cr_array_index);
+			assert(!cr_array_index);
 			if (block_saved)
 				backup_buffer_flush(gv_cur_region);
 			wcs_timer_start(gv_cur_region, TRUE);
 			cw_set_depth = 0;	/* signal end of active transaction to secshr_db_clnup/t_commit_clnup */
-                }
-                /* Fill in master map */
-                for (blk_index = 0, bml_index = 0;  blk_index < cs_addrs->ti->total_blks;
-                        blk_index += bplmap, bml_index++)
-                {
-                        if (-1 != bml_find_free(0, (bml_list + bml_index * bml_size) + sizeof(blk_hdr),
-                                 bplmap, &dummy_bool))
-                        {
-                                bit_set(blk_index / bplmap, cs_addrs->bmm);
-                                if (blk_index > cs_addrs->nl->highest_lbm_blk_changed)
-                                        cs_addrs->nl->highest_lbm_blk_changed = blk_index;
-                        } else
-                        {
-                                bit_clear(blk_index / bplmap, cs_addrs->bmm);
-                                if (blk_index > cs_addrs->nl->highest_lbm_blk_changed)
-                                        cs_addrs->nl->highest_lbm_blk_changed = blk_index;
-                        }
-                }
-                /* last local map may be smaller than bplmap so redo with correct bit count */
-                if (-1 != bml_find_free(0, bml_list + (bml_index - 1) * bml_size + sizeof(blk_hdr),
-                        (cs_addrs->ti->total_blks - cs_addrs->ti->total_blks / bplmap * bplmap), &dummy_bool))
-                {
-                        bit_set(blk_index / bplmap - 1, cs_addrs->bmm);
-                        if (blk_index > cs_addrs->nl->highest_lbm_blk_changed)
-                                cs_addrs->nl->highest_lbm_blk_changed = blk_index;
-                } else
-                {
-                        bit_clear(blk_index / bplmap - 1, cs_addrs->bmm);
-                        if (blk_index > cs_addrs->nl->highest_lbm_blk_changed)
-                                cs_addrs->nl->highest_lbm_blk_changed = blk_index;
-                }
-                if (!was_crit)
-                        rel_crit(gv_cur_region);
+		}
+		/* Fill in master map */
+		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
+		{
+			blks_in_bitmap = (blk_index + bplmap <= total_blks) ? bplmap : total_blks - blk_index;
+			assert(1 < blks_in_bitmap);	/* the last valid block in the database should never be a bitmap block */
+			if (NO_FREE_SPACE != bml_find_free(0, (bml_list + bml_index * bml_size) + sizeof(blk_hdr), blks_in_bitmap))
+				bit_set(blk_index / bplmap, cs_addrs->bmm);
+			else
+				bit_clear(blk_index / bplmap, cs_addrs->bmm);
+			if (blk_index > cs_addrs->nl->highest_lbm_blk_changed)
+				cs_addrs->nl->highest_lbm_blk_changed = blk_index;
+		}
+		if (!was_crit)
+			rel_crit(gv_cur_region);
 		if (unhandled_stale_timer_pop)
 			process_deferred_stale();
-                free(bml_list);
+		free(bml_list);
 		cs_addrs->hdr->kill_in_prog = 0;
-                return;
-        }
-        MEMCPY_LIT(util_buff, "!/Block ");
-        util_len = sizeof("!/Block ") - 1;
-        util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
-        memcpy(&util_buff[util_len], " is marked !AD in its local bit map.!/",
+		return;
+	}
+	MEMCPY_LIT(util_buff, "!/Block ");
+	util_len = sizeof("!/Block ") - 1;
+	util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
+	memcpy(&util_buff[util_len], " is marked !AD in its local bit map.!/",
 		sizeof(" is marked !AD in its local bit map.!/") - 1);
-        util_len += sizeof(" is marked !AD in its local bit map.!/") - 1;
-        util_buff[util_len] = 0;
-        if (!was_crit)
-                grab_crit(gv_cur_region);
-        util_out_print(util_buff, TRUE, 4, dse_is_blk_free(blk, &dummy_int, &dummy_cr) ? "free" : "busy");
-        if (!was_crit)
-                rel_crit(gv_cur_region);
-        return;
+	util_len += sizeof(" is marked !AD in its local bit map.!/") - 1;
+	util_buff[util_len] = 0;
+	if (!was_crit)
+		grab_crit(gv_cur_region);
+	util_out_print(util_buff, TRUE, 4, dse_is_blk_free(blk, &dummy_int, &dummy_cr) ? "free" : "busy");
+	if (!was_crit)
+		rel_crit(gv_cur_region);
+	return;
 }

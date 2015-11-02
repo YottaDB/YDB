@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007 Fidelity Information Services, Inc        *
+ *      Copyright 2007, 2008 Fidelity Information Services, Inc        *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -23,8 +23,8 @@ GBLREF int   function_type(char*);
 
 #ifndef __ia64
 #define CODE_ADDRESS_TYPE(func) &func
-#else  /* _-ia64 */
-#define CODE_ADDRESS_TYPE(func) ((function_type(#func) == ASM)? CODE_ADDRESS_ASM(func) : CODE_ADDRESS_C(func) )
-#endif  /* _-ia64 */
+#else  /* __ia64 */
+#define CODE_ADDRESS_TYPE(func) CODE_ADDRESS(func)
+#endif  /* __ia64 */
 
 #endif /* CODE_ADDRESS_TYPE_INCLUDE */

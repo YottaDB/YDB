@@ -18,15 +18,18 @@
 
 #define OFFSET_LEN 5
 
-GBLREF unsigned char *stackbase, *stacktop;
+GBLREF	unsigned char	*stackbase, *stacktop;
+GBLREF	unsigned short	proc_act_type;
+GBLREF	mstr		*err_act;
+GBLREF	mval		dollar_ztrap;
 
-unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned char **b_line, rhdtyp *routine,
-	boolean_t use_fpmpc_exact)
+unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned char **b_line, rhdtyp *routine)
 {
 	unsigned char	temp[OFFSET_LEN], *adjusted_in_addr;
 	lab_tabent	*max_label, *label_table, *last_label;
 	lnr_tabent	*line_table, *last_line;
 	int4		len, ct, offset, in_addr_offset;
+	boolean_t	mpc_reset_to_linestart;
 
 	if (!ADDR_IN_CODE(in_addr, routine))
 		return out;
@@ -41,23 +44,20 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 		);
 	assert(routine->labtab_len >= 0);
 	assert(routine->lnrtab_len >= 0);
+	if ((SFT_DEV_ACT == proc_act_type) || ((SFT_ZTRAP == proc_act_type) && (err_act == &dollar_ztrap.str)))
+	{	/* This means we got an error while trying to compile the device-exception or ZTRAP string as
+		 * part of handling yet another primary error. The primary error would have reset fp->mpc to
+		 * the beginning of the line so note this down.
+		 */
+		mpc_reset_to_linestart = TRUE;
+	} else
+		mpc_reset_to_linestart = FALSE;
 	label_table = LABTAB_ADR(routine);
 	last_label = label_table + routine->labtab_len;
 	max_label = label_table++;
-#	if defined(__hpux) || defined(__ia64)
-	/* On HPUX HPPA, HPUX IA64 and Linux IA64, before transferring control to a C runtime function from generated code,
-	 * call_runtime.s updates frame_pointer->mpc to point to the instruction AFTER the call. Therefore we should
-	 * never do an exact match as otherwise we could end up returning the M-source line which is ONE MORE than
-	 * the actual. The correct solution to this issue is to fix call_runtime.s to maintain mpc similar to what
-	 * is done in GT.M implementations for other architectures. But for now, it is not easily possible so we work around
-	 * it in symb_line instead. On IA64 (both HPUX and Linux), call_runtime.s is about to be eliminated, at which point
-	 * one should change the above #ifdef to only include HPUX HPPA only where call_runtime.s cannot be easily removed.
-	 */
-	use_fpmpc_exact = FALSE;
-#	endif
-	adjusted_in_addr = in_addr + (use_fpmpc_exact ? 1 : 0);
+	adjusted_in_addr = in_addr + (mpc_reset_to_linestart ? 1 : 0);
 	while (label_table < last_label)
-	{	/* Find first label that equals or goes past the input addr depending on use_fpmpc_exact.
+	{	/* Find first label that equals or goes past the input addr depending on mpc_reset_to_linestart.
 		 * If past, the previous label is then the target line */
 		if (adjusted_in_addr > LABEL_ADDR(routine, label_table))
 		{
@@ -74,12 +74,16 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 		out += len;
 	}
 	offset = 0;
-	in_addr_offset = (int4)(in_addr - CODE_BASE_ADDR(routine));
+	in_addr_offset = (int4)(adjusted_in_addr - CODE_BASE_ADDR(routine));
 	last_line = LNRTAB_ADR(routine);
 	last_line += routine->lnrtab_len;
-	for( ; ++line_table < last_line ; offset++)
-	{	/* Find first line that is > input addr. The previous line is the target line */
-		if (in_addr_offset <= *line_table)
+	for ( ; ++line_table < last_line ; offset++)
+	{	/* Find first line that is >= input addr. The previous line is the target line.
+		 * In addition, ensure we never return NULL label and ZERO offset i.e. no ^MODULENAME.
+		 * Line #s start at 1 so in this case, return +1^MODULENAME.
+		 * The "(offset || len)" check below takes care of this.
+		 */
+		if ((in_addr_offset <= *line_table) && (offset || len))
 		{
 			if (b_line)
 				*b_line = LINE_NUMBER_ADDR(routine, (line_table - 1));

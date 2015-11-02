@@ -64,7 +64,7 @@ void	get_frame_place_mcode(int level, int mode, int cur_zlevel, mval *result)
 	if (ADDR_IN_CODE(fpmpc, fp->rvector))
 	{
 		result->str.addr = (char *)&pos_str[0];
-		result->str.len = INTCAST(symb_line(fpmpc, &pos_str[0], 0, fp->rvector, FALSE) - &pos_str[0]);
+		result->str.len = INTCAST(symb_line(fpmpc, &pos_str[0], 0, fp->rvector) - &pos_str[0]);
 		indirect_frame = FALSE;
 	} else
 	{

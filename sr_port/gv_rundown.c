@@ -100,26 +100,33 @@ void gv_rundown(void)
 					if (cs_addrs->sgm_info_ptr)
 					{
 						si = cs_addrs->sgm_info_ptr;
-						assert(si->tp_csa == cs_addrs);
+						/* It is possible we got interrupted before initializing all fields of "si"
+						 * completely so account for NULL values while freeing/releasing those fields.
+						 */
+						assert((si->tp_csa == cs_addrs) || (NULL == si->tp_csa));
 						if (si->jnl_tail)
 						{
-							FREEUP_BUDDY_LIST(si->format_buff_list);
-							FREEUP_BUDDY_LIST(si->jnl_list);
+							CAREFUL_FREEUP_BUDDY_LIST(si->format_buff_list);
+							CAREFUL_FREEUP_BUDDY_LIST(si->jnl_list);
 						}
-						FREEUP_BUDDY_LIST(si->recompute_list);
-						FREEUP_BUDDY_LIST(si->new_buff_list);
-						FREEUP_BUDDY_LIST(si->tlvl_info_list);
-						FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
-						FREEUP_BUDDY_LIST(si->cw_set_list);
-						free_hashtab_int4(si->blks_in_use);
-						free(si->blks_in_use);
-						si->blks_in_use = NULL;
+						CAREFUL_FREEUP_BUDDY_LIST(si->recompute_list);
+						CAREFUL_FREEUP_BUDDY_LIST(si->new_buff_list);
+						CAREFUL_FREEUP_BUDDY_LIST(si->tlvl_info_list);
+						CAREFUL_FREEUP_BUDDY_LIST(si->tlvl_cw_set_list);
+						CAREFUL_FREEUP_BUDDY_LIST(si->cw_set_list);
+						if (NULL != si->blks_in_use)
+						{
+							free_hashtab_int4(si->blks_in_use);
+							free(si->blks_in_use);
+							si->blks_in_use = NULL;
+						}
 						if (si->cr_array_size)
 						{
 							assert(NULL != si->cr_array);
-							free(si->cr_array);
+							if (NULL != si->cr_array)
+								free(si->cr_array);
 						}
-						if (si->first_tp_hist)
+						if (NULL != si->first_tp_hist)
 							free(si->first_tp_hist);
 						free(si);
 					}

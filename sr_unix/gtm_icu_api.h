@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +43,7 @@
 #define ucnv_getMinCharSize		(*ucnv_getMinCharSize_ptr)
 #define ucnv_setToUCallBack		(*ucnv_setToUCallBack_ptr)
 #define ucnv_getName			(*ucnv_getName_ptr)
+#define u_charType			(*u_charType_ptr)
 
 #include <unicode/uchar.h>
 #include <unicode/ucnv.h>

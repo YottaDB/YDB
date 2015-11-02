@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2005, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,18 +30,23 @@
 #include "gtmmsg.h"		/* for gtm_putmsg prototype */
 #include "desired_db_format_set.h"
 #include "send_msg.h"		/* for send_msg */
+#include "wcs_phase2_commit_wait.h"
+
+#define	WCS_PHASE2_COMMIT_WAIT_LIT	"wcb_phase2_commit_wait"
 
 LITREF	char			*gtm_dbversion_table[];
 
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			process_id;
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
 
 /* input parameter "command_name" is a string that is either "MUPIP REORG UPGRADE/DOWNGRADE" or "MUPIP SET VERSION" */
 int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *command_name)
 {
 	boolean_t		was_crit;
 	char			*db_fmt_str;
+	char			*wcblocked_ptr;
 	int4			status;
 	uint4			jnl_status;
 	inctn_opcode_t		save_inctn_opcode;
@@ -51,10 +56,12 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 
-	error_def(ERR_MMNODYNDWNGRD);
+	error_def(ERR_COMMITWAITSTUCK);
 	error_def(ERR_DBDSRDFMTCHNG);
+	error_def(ERR_MMNODYNDWNGRD);
 	error_def(ERR_MUDWNGRDTN);
 	error_def(ERR_MUNOACTION);
+	error_def(ERR_WCBLOCKED);
 
 	assert(reg->open);
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -100,6 +107,19 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 			rel_crit(reg);
 		return status;
 	}
+	/* Wait for concurrent phase2 commits to complete before switching the desired db format */
+	if (csa->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
+	{	/* Set wc_blocked so next process to get crit will trigger cache-recovery */
+		SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
+		wcblocked_ptr = WCS_PHASE2_COMMIT_WAIT_LIT;
+		send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),
+			process_id, &csd->trans_hist.curr_tn, DB_LEN_STR(reg));
+		status = ERR_COMMITWAITSTUCK;
+		gtm_putmsg(VARLSTCNT(7) status, 5, process_id, 1, csa->nl->wcs_phase2_commit_pidcnt, DB_LEN_STR(reg));
+		if (FALSE == was_crit)
+			rel_crit(reg);
+		return status;
+	}
 	csd->desired_db_format = new_db_format;
 	csd->fully_upgraded = FALSE;
 	csd->desired_db_format_tn = curr_tn;
@@ -139,6 +159,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		}
 		save_inctn_opcode = inctn_opcode;
 		inctn_opcode = inctn_db_format_change;
+		inctn_detail.blks_to_upgrd_delta = csd->blks_to_upgrd;
 		if (0 == jpc->pini_addr)
 			jnl_put_jrt_pini(csa);
 		jnl_write_inctn_rec(csa);

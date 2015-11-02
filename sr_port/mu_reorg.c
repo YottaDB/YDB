@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -97,7 +97,7 @@ void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *
 	assert(NULL != (char *)(Y));
 	assert(0 < (Y)->depth);
 	assert((NULL == (char *)(Z)) || (0 < (Z)->depth));
-	util_out_print("!AD::!16@XJ::", FALSE, LEN_AND_STR(X), &tn);
+	util_out_print("!AD::!16@XQ::", FALSE, LEN_AND_STR(X), &tn);
 	for (i = 0; i <= (Y)->depth; i++)
 		util_out_print("!SL|", FALSE, (Y)->h[i].blk_num);
 	if (NULL != (char *)(Z))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +40,10 @@ GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	volatile int4		fast_lock_count;
 
+#ifdef DEBUG
+GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#endif
+
 void t_begin (uint4 err, boolean_t update_transaction) 	/* err --> error code for current gvcst_routine */
 {
 	srch_blk_status	*s;
@@ -75,4 +79,5 @@ void t_begin (uint4 err, boolean_t update_transaction) 	/* err --> error code fo
 	t_tries = 0;
 	if (non_tp_jfb_ptr)
 		non_tp_jfb_ptr->record_size = 0; /* re-initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
+	assert(!donot_commit);
 }

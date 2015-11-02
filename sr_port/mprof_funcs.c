@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -166,11 +166,11 @@ void turn_tracing_on(mval *gvn)
 	profstack_top = prof_stackptr;
 	profstack_warn = profstack_top + GUARD_RING_FOR_PROFILING_STACK;
 	prof_fp = (stack_frame_prof *) (prof_msp -= sizeof(stack_frame_prof));
+	memset(prof_fp, 0, sizeof(*prof_fp));
 	get_entryref_information(FALSE, NULL);
 	tmp_trc_tbl_entry.rout_name = NULL; /* initialize */
 	tmp_trc_tbl_entry.label_name = NULL;
 	mprof_ptr->curr_tblnd = mprof_ptr->head_tblnd = (mprof_tree *)new_node(&tmp_trc_tbl_entry);
-	prof_fp->prev = (stack_frame_prof *)NULL;
 	prof_fp->sys_time = curr.tms_stime;
 	prof_fp->usr_time = curr.tms_utime;
 	prof_fp->dummy_stack_count = 0;
@@ -348,11 +348,9 @@ void pcurrpos(int inside_for_loop)
 char *pcalloc(unsigned int n)
 {
 	char **x;
-#ifdef __ia64
-	n = ((n + 7) & ~7); /* same logic applied for alignment */
-#else
-	n = ((n + 3) & ~3); /* make sure that it is quad-word aliged */
-#endif
+
+	GTM64_ONLY(n = ((n + 7) & ~7);) /* same logic applied for alignment */
+	NON_GTM64_ONLY(n = ((n + 3) & ~3);) /* make sure that it is quad-word aliged */
 	if (n > mprof_ptr->pcavail)
 	{
 		if (*mprof_ptr->pcavailptr)
@@ -647,7 +645,8 @@ void crt_gbl(mprof_tree *p, int info_level)
 #endif
 	}
 	data.mvtype = MV_STR;
-	data.str.len = (((INTPTR_T)tmpnum - start_point) > 0) ? ((int )((INTPTR_T)tmpnum - start_point)) : ((int)(start_point - (INTPTR_T)tmpnum));
+	data.str.len = (((INTPTR_T)tmpnum - start_point) > 0)
+		? ((int)((INTPTR_T)tmpnum - start_point)) : ((int)(start_point - (INTPTR_T)tmpnum));
 	if ((mprof_ptr->overflowed_levels) && (-1 == p->e.line_num))
 	{
 		tmp_str_len = data.str.len;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -112,8 +112,8 @@ cw_set_element *t_write (
 				tp_srch_status = (srch_blk_status *)tabent->value;
 			else
 				tp_srch_status = NULL;
-			cse = tp_srch_status ? tp_srch_status->ptr : NULL;
-				/* tp_srch_status->ptr always returns latest in the horizontal list */
+			cse = tp_srch_status ? tp_srch_status->cse : NULL;
+				/* tp_srch_status->cse always returns latest in the horizontal list */
 	    	}
 		assert(!cse || !cse->high_tlevel);
 		if (cse == NULL)
@@ -236,5 +236,6 @@ cw_set_element *t_write (
 	else
 		cse->write_type = write_type;
 	prev_first_off = prev_next_off = PREV_OFF_INVALID;
+	blkhist->cse = cse;	/* indicate to t_end/tp_tend that this block is part of the write-set */
 	return tp_cse;
 }

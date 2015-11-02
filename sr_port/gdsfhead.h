@@ -133,10 +133,10 @@ typedef struct cache_rec_struct
 	io_status_block_disk	iosb;	/* used on VMS write */
 #endif
 	CNTR4DCL(read_in_progress, 10);	/* -1 for normal and 0 for rip used by t_qread and checked by others */
-	boolean_t	in_tend;	/* TRUE from bg_update indicates secshr_db_clnup should finish update */
-	boolean_t	in_cw_set;	/* TRUE from t_end, tp_tend or bg_update protects block from db_csh_getn; returned to
-  					 * FALSE by t_end, tp_tend or t_commit_cleanup */
-	boolean_t	data_invalid;	/* TRUE from bg_update indicates t_commit_cleanup and wcs_recover should invalidate */
+	uint4		in_tend;	/* non-zero pid from bg_update indicates secshr_db_clnup should finish update */
+	uint4		in_cw_set;	/* non-zero pid from t_end, tp_tend or bg_update protects block from db_csh_getn;
+					 * returned to 0 by t_end, tp_tend or t_commit_cleanup */
+	uint4		data_invalid;	/* non-zero pid from bg_update indicates t_commit_cleanup/wcs_recover should invalidate */
 	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
 	boolean_t	wip_stopped;	/* TRUE indicates to wcs_recover, wcs_wtfini, wcs_get_blk and gds_rundown
   					 * that secshr_db_clnup cancelled the qio */
@@ -203,10 +203,10 @@ typedef struct
 	io_status_block_disk	iosb;	/* used on VMS write */
 #endif
 	CNTR4DCL(read_in_progress, 10);	/* -1 for normal and 0 for rip used by t_qread and checked by others */
-	boolean_t	in_tend;	/* TRUE from bg_update indicates secshr_db_clnup should finish update */
-	boolean_t	in_cw_set;	/* TRUE from t_end, tp_tend or bg_update protects block from db_csh_getn; returned to
-  					 * FALSE by t_end, tp_tend or t_commit_cleanup */
-	boolean_t	data_invalid;	/* TRUE from bg_update indicates t_commit_cleanup and wcs_recover should invalidate */
+	uint4		in_tend;	/* non-zero pid from bg_update indicates secshr_db_clnup should finish update */
+	uint4		in_cw_set;	/* non-zero pid from t_end, tp_tend or bg_update protects block from db_csh_getn;
+					 * returned to 0 by t_end, tp_tend or t_commit_cleanup */
+	uint4		data_invalid;	/* non-zero pid from bg_update indicates t_commit_cleanup/wcs_recover should invalidate */
 	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
 	boolean_t	wip_stopped;	/* TRUE indicates to wcs_recover, wcs_wtfini, wcs_get_blk and gds_rundown
   					 * that secshr_db_clnup cancelled the qio */
@@ -313,6 +313,22 @@ void verify_queue(que_head_ptr_t qhdr);
 	}												\
 }
 
+#define		T_COMMIT_CRIT_PHASE1	1	/* csa->t_commit_crit gets set to this in during bg_update_phase1 */
+#define		T_COMMIT_CRIT_PHASE2	2	/* csa->t_commit_crit gets set to this in during bg_update_phase2 */
+
+/* macro to check if we hold crit or are committing (with or without crit) */
+#define		T_IN_CRIT_OR_COMMIT(CSA)	((CSA)->now_crit || (CSA)->t_commit_crit)
+
+/* Macro to check if we hold crit or are committing (with or without crit) or are in wcs_wtstart for this region.
+ * This is used in timer handling code to determine if it is ok to interrupt. We do not want to interrupt if holding
+ * crit or in the midst of commit or in wcs_wtstart (in the last case, we could be causing another process HOLDING CRIT
+ * on the region to wait in bg_update_phase1 if we hold the write interlock).
+ */
+#define		T_IN_CRIT_OR_COMMIT_OR_WRITE(CSA)	(T_IN_CRIT_OR_COMMIT(CSA) || (CSA)->in_wtstart)
+
+/* macro to check if a database commit is past the point where it can be successfully rolled back */
+#define		T_UPDATE_UNDERWAY(CSA)	((CSA)->t_commit_crit)
+
 /* the file header has relative pointers to its data structures so each process will malloc
  * one of these and fill it in with absolute pointers upon file initialization.
  */
@@ -325,35 +341,108 @@ void verify_queue(que_head_ptr_t qhdr);
 	assert((NULL == (ptr)) || (((ptr) >= csa->db_addrs[0]) && ((0 == csa->db_addrs[1]) || ((ptr) < csa->db_addrs[1]))))
 
 #ifdef DEBUG
-#define	DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd)							\
+#define	DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd)								\
+{															\
+	cache_rec_ptr_t		cache_start;										\
+	long			bufindx;										\
+	sm_uc_ptr_t		bufstart;										\
+	GBLREF	boolean_t	dse_running, write_after_image;								\
+															\
+	assert((gds_t_write != cse->mode) && (gds_t_write_recycled != cse->mode) && gds_t_writemap != cse->mode		\
+		|| (NULL != cse->old_block));	/* don't miss writing a PBLK */						\
+	if (NULL != cse->old_block)											\
+	{														\
+		if (!is_mm)												\
+		{													\
+			cache_start = &csa->acc_meth.bg.cache_state->cache_array[0];					\
+			cache_start += csd->bt_buckets;									\
+			bufstart = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cache_start->buffaddr);				\
+			bufindx = (cse->old_block - bufstart) / csd->blk_size;						\
+			assert(bufindx < csd->n_bts);									\
+			assert(cse->blk == cache_start[bufindx].blk);							\
+			assert(dse_running || write_after_image || (process_id == cache_start[bufindx].in_cw_set));	\
+		} else													\
+		{													\
+			assert(cse->old_block == csa->db_addrs[0] + cse->blk * csd->blk_size				\
+						+ (csd->start_vbn - 1) * DISK_BLOCK_SIZE);				\
+		}													\
+	}														\
+}
+
+/* Check if a given address corresponds to a global buffer (BG) in database shared memory AND if
+ * we are in phase2 of commit. If so check whether the corresponding cache-record is pinned.
+ * Used by gvcst_blk_build to ensure the update array points to valid contents even though we dont hold crit.
+ */
+#define	DBG_BG_PHASE2_CHECK_CR_IS_PINNED(csa, seg)								\
 {														\
 	cache_rec_ptr_t		cache_start;									\
 	long			bufindx;									\
-	sm_uc_ptr_t		bufstart;									\
-	GBLREF	boolean_t	dse_running, write_after_image;							\
+	sm_uc_ptr_t		bufstart, bufend, bufaddr;							\
 														\
-	assert((gds_t_write != cse->mode) && (gds_t_write_recycled != cse->mode) && gds_t_writemap != cse->mode	\
-		|| (NULL != cse->old_block));	/* don't miss writing a PBLK */					\
-	if (NULL != cse->old_block)										\
+	GBLREF	uint4		process_id;									\
+														\
+	if ((seg)->len && (T_COMMIT_CRIT_PHASE2 == csa->t_commit_crit) && (dba_bg == csa->hdr->acc_meth))	\
 	{													\
-		if (!is_mm)											\
+		cache_start = &csa->acc_meth.bg.cache_state->cache_array[0];					\
+		cache_start += csa->hdr->bt_buckets;								\
+		bufstart = (sm_uc_ptr_t)GDS_ANY_REL2ABS(csa, cache_start->buffaddr);				\
+		bufend = bufstart + (csa->hdr->n_bts * csa->hdr->blk_size);					\
+		bufaddr = (sm_uc_ptr_t)(seg)->addr;								\
+		/* Check if given address is within database shared memory range */				\
+		if ((bufaddr >= bufstart) && (bufaddr < bufend))						\
 		{												\
-			cache_start = &csa->acc_meth.bg.cache_state->cache_array[0];				\
-			cache_start += csd->bt_buckets;								\
-			bufstart = (sm_uc_ptr_t)GDS_REL2ABS(cache_start->buffaddr);				\
-			bufindx = (cse->old_block - bufstart) / csd->blk_size;					\
-			assert(bufindx < csd->n_bts);								\
-			assert(cse->blk == cache_start[bufindx].blk);						\
-			assert(dse_running || write_after_image || cache_start[bufindx].in_cw_set);		\
-		} else												\
-		{												\
-			assert(cse->old_block == csa->db_addrs[0] + cse->blk * csd->blk_size			\
-						+ (csd->start_vbn - 1) * DISK_BLOCK_SIZE);			\
+			bufindx = (bufaddr - bufstart) / csa->hdr->blk_size;					\
+			assert(bufindx < csa->hdr->n_bts);							\
+			/* Assert that we have the cache-record pinned */					\
+			assert(process_id == cache_start[bufindx].in_cw_set);					\
 		}												\
 	}													\
 }
+
+/* Macro to check that we have not pinned any more buffers than we are updating.
+ * This check is done only for BG access method and in dbg mode.
+ * This is invoked by t_end/tp_tend just before beginning phase2 of commit.
+ */
+#define	DBG_CHECK_PINNED_CR_ARRAY_CONTENTS(is_mm, crarray, crarrayindex, bplmap)				\
+{														\
+	GBLREF	boolean_t	write_after_image;								\
+														\
+	if (!is_mm)												\
+	{													\
+		int4		crindex;									\
+														\
+		for (crindex = 0; crindex < crarrayindex; crindex++)						\
+		{												\
+			if (process_id == crarray[crindex]->in_cw_set)						\
+			{	/* We have pinned that cache-record implies we are planning on updating it	\
+				 * (so should have set in_tend).						\
+				 *										\
+				 * Since bitmap blocks are done with phase2 inside of crit, they should not	\
+				 * show up in the pinned array list at end of phase1 for GT.M. But DSE is an	\
+				 * exception as it could operate on a bitmap block as if it is updating a	\
+				 * non-bitmap block (i.e. without invoking gvcst_map_build). MUPIP JOURNAL	\
+				 * RECOVER also could do the same thing while applying an AIMG record.		\
+				 * 										\
+				 * In addition, VMS has an exception in case this is a twinned cache-record.	\
+				 * In that case, for the older twin in_cw_set will be set to non-zero, but	\
+				 * in_tend will be set to FALSE. Since we are outside of crit at this point,	\
+				 * it is possible cr->twin field might be 0 (could have gotten cleared by	\
+				 * wcs_wtfini concurrently) so we cannot assert on the twin field but		\
+				 * cr->bt_index should still be 0 since we have not yet finished the		\
+				 * update on the newer twin so we can check on that.				\
+				 */										\
+				assert(crarray[crindex]->in_tend						\
+					&& ((0 != crarray[crindex]->blk % bplmap) || write_after_image)		\
+					VMS_ONLY(|| !crarray[crindex]->bt_index));				\
+			}											\
+		}												\
+	}													\
+}
+
 #else
 #define DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd)
+#define DBG_BG_PHASE2_CHECK_CR_IS_PINNED(csa, bufaddr)
+#define	DBG_CHECK_PINNED_CR_ARRAY_CONTENTS(is_mm, crarray, crarrayindex, bplmap)
 #endif
 
 /* The TP_CHANGE_REG macro is a replica of the tp_change_reg() routine to be used for performance considerations.
@@ -447,6 +536,236 @@ void verify_queue(que_head_ptr_t qhdr);
 		GTMASSERT;											\
 }
 
+/* Macro to be used whenever cr->data_invalid needs to be set */
+#define	SET_DATA_INVALID(cr)										\
+{													\
+	uint4	in_tend, data_invalid;									\
+													\
+	DEBUG_ONLY(in_tend = cr->in_tend);								\
+	DEBUG_ONLY(data_invalid = cr->data_invalid);							\
+	assert((process_id == in_tend) || (0 == in_tend) && (0 == data_invalid));			\
+	assert((0 == in_tend)										\
+		|| (process_id == in_tend) && ((0 == data_invalid) || (process_id == data_invalid)));	\
+	cr->data_invalid = process_id;									\
+}
+
+/* Macro to be used whenever cr->data_invalid needs to be re-set */
+#define	RESET_DATA_INVALID(cr)				\
+{							\
+	uint4	data_invalid;				\
+							\
+	DEBUG_ONLY(data_invalid = cr->data_invalid);	\
+	assert(process_id == data_invalid);		\
+	cr->data_invalid = 0;				\
+}
+
+/* Macro to be used whenever cr->in_cw_set needs to be set (PIN) inside a TP transaction */
+#define	TP_PIN_CACHE_RECORD(cr, si)					\
+{									\
+	assert(0 <= si->cr_array_index);				\
+	assert(si->cr_array_index < si->cr_array_size);			\
+	PIN_CACHE_RECORD(cr, si->cr_array, si->cr_array_index);		\
+}
+
+GBLREF	cache_rec_ptr_t	pin_fail_cr;			/* Pointer to the cache-record that we failed while pinning */
+GBLREF	cache_rec	pin_fail_cr_contents;		/* Contents of the cache-record that we failed while pinning */
+GBLREF	cache_rec_ptr_t	pin_fail_twin_cr;		/* Pointer to twin of the cache-record that we failed to pin */
+GBLREF	cache_rec	pin_fail_twin_cr_contents;	/* Contents of twin of the cache-record that we failed to pin */
+GBLREF	bt_rec_ptr_t	pin_fail_bt;			/* Pointer to bt of the cache-record that we failed to pin */
+GBLREF	bt_rec		pin_fail_bt_contents;		/* Contents of bt of the cache-record that we failed to pin */
+GBLREF	int4		pin_fail_in_crit;		/* Holder of crit at the time we failed to pin */
+GBLREF	int4		pin_fail_wc_in_free;		/* Number of write cache records in free queue when we failed to pin */
+GBLREF	int4		pin_fail_wcs_active_lvl;	/* Number of entries in active queue when we failed to pin */
+GBLREF	int4		pin_fail_ref_cnt;		/* Reference count when we failed to pin */
+GBLREF	int4		pin_fail_in_wtstart;		/* Count of processes in wcs_wtstart when we failed to pin */
+GBLREF	int4		pin_fail_phase2_commit_pidcnt;	/* Number of processes in phase2 commit when we failed to pin */
+/* Macro to be used whenever cr->in_cw_set needs to be set (PIN) outside of a TP transaction */
+#define	PIN_CACHE_RECORD(cr, crarray, crarrayindex)							\
+{													\
+	uint4	in_tend, data_invalid, in_cw_set;							\
+													\
+	DEBUG_ONLY(in_tend = cr->in_tend);								\
+	DEBUG_ONLY(data_invalid = cr->data_invalid);							\
+	assert((process_id == in_tend) || (0 == in_tend));						\
+	assert((process_id == data_invalid) || (0 == data_invalid));					\
+	in_cw_set = cr->in_cw_set;									\
+	if (0 != in_cw_set)										\
+	{												\
+		pin_fail_cr = cr;									\
+		pin_fail_cr_contents = *cr;								\
+		if (cr->bt_index)									\
+		{											\
+			pin_fail_bt = (bt_rec_ptr_t)GDS_ANY_REL2ABS(cs_addrs, cr->bt_index);		\
+			pin_fail_bt_contents = *pin_fail_bt;						\
+		}											\
+		if (cr->twin)										\
+		{											\
+			pin_fail_twin_cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(cs_addrs, cr->twin);	\
+			pin_fail_twin_cr_contents = *pin_fail_twin_cr;					\
+		}											\
+		pin_fail_in_crit		= cs_addrs->nl->in_crit;				\
+		pin_fail_wc_in_free		= cs_addrs->nl->wc_in_free;				\
+		pin_fail_wcs_active_lvl		= cs_addrs->nl->wcs_active_lvl;				\
+		pin_fail_ref_cnt		= cs_addrs->nl->ref_cnt;				\
+		pin_fail_in_wtstart		= cs_addrs->nl->in_wtstart;				\
+		pin_fail_phase2_commit_pidcnt	= cs_addrs->nl->wcs_phase2_commit_pidcnt;		\
+		GTMASSERT;										\
+	}												\
+	/* In VMS we should never set in_cw_set on an OLDER twin. */					\
+	VMS_ONLY(assert(!cr->twin || cr->bt_index));							\
+	/* stuff it in the array before setting in_cw_set */						\
+	crarray[crarrayindex] = cr;									\
+	crarrayindex++;											\
+	cr->in_cw_set = process_id;									\
+}
+
+/* Macro to be used whenever cr->in_cw_set needs to be re-set (UNPIN) in TP or non-TP) */
+#define	UNPIN_CACHE_RECORD(cr)								\
+{											\
+	uint4	in_tend, data_invalid, in_cw_set;					\
+											\
+	in_cw_set = cr->in_cw_set;							\
+	if (process_id == cr->in_cw_set) /* reset in_cw_set only if we hold it */	\
+	{										\
+		DEBUG_ONLY(in_tend = cr->in_tend);					\
+		DEBUG_ONLY(data_invalid = cr->data_invalid);				\
+		assert((process_id == in_tend) || (0 == in_tend));			\
+		assert((process_id == data_invalid) || (0 == data_invalid));		\
+		cr->in_cw_set = 0;							\
+	}										\
+}
+
+/* Macro to reset cr->in_cw_set for the entire cr_array in case of a retry (TP or non-TP) */
+#define	UNPIN_CR_ARRAY_ON_RETRY(crarray, crarrayindex)				\
+{										\
+	int4			lcl_crarrayindex;				\
+	cache_rec_ptr_ptr_t	cr_ptr;						\
+	cache_rec_ptr_t		cr;						\
+	uint4			in_tend, data_invalid, in_cw_set;		\
+										\
+	lcl_crarrayindex = crarrayindex;					\
+	if (lcl_crarrayindex)							\
+	{									\
+		cr_ptr = (cache_rec_ptr_ptr_t)&crarray[lcl_crarrayindex-1];	\
+		while (lcl_crarrayindex--)					\
+		{								\
+			cr = *cr_ptr;						\
+			DEBUG_ONLY(in_tend = cr->in_tend);			\
+			DEBUG_ONLY(data_invalid = cr->data_invalid);		\
+			DEBUG_ONLY(in_cw_set = cr->in_cw_set);			\
+			assert(!data_invalid);					\
+			assert(!in_tend);					\
+			assert(process_id == in_cw_set);			\
+			UNPIN_CACHE_RECORD(cr);					\
+			cr_ptr--;						\
+		}								\
+		crarrayindex = 0;						\
+	}									\
+}
+
+/* Macro to reset cr->in_cw_set (UNPIN) for the entire cr_array in case of a commit (TP or non-TP).
+ * Usually in_cw_set is set for all cache-records that we are planning on updating before we start phase1.
+ * After updating each cse in phase2, we reset the corresponding cse->cr->in_cw_set.
+ * Therefore on a successful commit, after completing all cses in phase2, we dont expect any pinned cr->in_cw_set at all.
+ * This is true for Unix but in VMS where we could have twins, both the older and newer twins have the in_cw_set set in
+ * phase1 while only the newer twin's in_cw_set gets reset in phase2 (since only this cr will be stored in cse->cr).
+ * Therefore there could be a few cache-records which need to be unpinned even after all cses are done in phase2.
+ * The following macro unpins those. It is structured such a way that in Unix, it only checks that all have been reset
+ * while it actually does the reset only in VMS.
+ */
+#if defined(VMS)
+#define UNPIN_CR_ARRAY_ON_COMMIT(crarray, crarrayindex)				\
+{										\
+	int4			lcl_crarrayindex;				\
+	cache_rec_ptr_ptr_t	cr_ptr;						\
+	cache_rec_ptr_t		cr;						\
+										\
+	lcl_crarrayindex = crarrayindex;					\
+	if (lcl_crarrayindex)							\
+	{									\
+		cr_ptr = (cache_rec_ptr_ptr_t)&crarray[lcl_crarrayindex-1];	\
+		while (lcl_crarrayindex--)					\
+		{								\
+			cr = *cr_ptr;						\
+			UNPIN_CACHE_RECORD(cr);					\
+			cr_ptr--;						\
+		}								\
+		crarrayindex = 0;						\
+	}									\
+}
+#elif defined(UNIX)
+#	ifdef DEBUG
+#	define UNPIN_CR_ARRAY_ON_COMMIT(crarray, crarrayindex)				\
+	{										\
+		int4			lcl_crarrayindex;				\
+		cache_rec_ptr_ptr_t	cr_ptr;						\
+		cache_rec_ptr_t		cr;						\
+											\
+		lcl_crarrayindex = crarrayindex;					\
+		if (lcl_crarrayindex)							\
+		{									\
+			cr_ptr = (cache_rec_ptr_ptr_t)&crarray[lcl_crarrayindex-1];	\
+			while (lcl_crarrayindex--)					\
+			{								\
+				cr = *cr_ptr;						\
+				assert(process_id != cr->in_cw_set);			\
+				cr_ptr--;						\
+			}								\
+			crarrayindex = 0;						\
+		}									\
+	}
+#	else
+#	define UNPIN_CR_ARRAY_ON_COMMIT(crarray, crarrayindex)				\
+		crarrayindex = 0;
+#	endif
+#endif
+
+/* Explanation for why we need the following macro.
+ *
+ * Normally a cdb_sc_blkmod check is done using the "bt". This is done in t_end and tp_tend.
+ * But that is possible only if we hold crit. There are a few routines (TP only) that need
+ * to do this check outside of crit (e.g. tp_hist, gvcst_search). For those, the following macro
+ * is defined. This macro compares transaction numbers directly from the buffer instead of
+ * going through the bt or blk queues. This is done to speed up processing. One consequence
+ * is that we might encounter a situation where the buffer's contents hasn't been modified,
+ * but the block might actually have been changed i.e. in VMS a twin buffer might have been
+ * created or the "blk" field in the cache-record corresponding to this buffer might have
+ * been made CR_BLKEMPTY etc. In these cases, we rely on the fact that the cycle for the
+ * buffer would have been incremented thereby saving us in the cdb_sc_lostcr check which will
+ * always FOLLOW (never PRECEDE) this check.
+ *
+ * Note that in case of BG, it is possible that the buffer could be in the process of being updated
+ * (phase2 outside of crit). In this case we have to restart as otherwise we could incorrectly
+ * validate an inconsistent state of the database as okay. For example, say our search path
+ * contains a level-1 root-block and a level-0 data block. If both of these blocks were
+ * concurrently being updated in phase2 (outside of crit) by another process, it is possible
+ * (because of the order in which blocks are committed) that the data block contents get
+ * modified first but the index block is still unchanged. If we traversed down the tree at
+ * this instant, we are looking at a search path that contains a mix of pre-update and post-update
+ * blocks and should never validate this traversal as okay. In this case, the cache record
+ * corresponding to the index block would have its "in_tend" flag non-zero indicating update is pending.
+ *
+ * The order of the check should be cr->in_tend BEFORE the buffaddr->tn check. Doing it otherwise
+ * would mean it is posible for the buffaddr->tn check to succeed and before the cr->in_tend
+ * check is done the buffer gets rebuilt (from start to finish in phase2). This would result
+ * in us falsely validating this transaction as okay when in fact we should have restarted.
+ *
+ * Because we rely on the fact that cr->in_tend is reset to 0 AFTER t1->buffaddr->tn is updated, and
+ * since these could be updated concurrently, and since this macro is used outside of crit, we need to
+ * ensure a read memory barrier is done. Currently, the only two places which use this macro are tp_hist.c
+ * and gvcst_search.c. Out of this, the latter uses this only as a performance measure and not for correctness.
+ * But the former uses this for correctness. In fact tp_tend.c relies on tp_hist.c doing a proper validation.
+ * Therefore the read memory barrier is essential in tp_hist.c and not needed in gvcst_search.c. See tp_hist.c
+ * for use of the read memory barrier and a comment describing why it is ok to do it only once per function
+ * invocation (instead of using it once per block that gets validated).
+ *
+ * There are two variants of this macro.
+ * TP_IS_CDB_SC_BLKMOD  : That calculates the blktn by doing t1->buffaddr->tn explicitly.
+ * TP_IS_CDB_SC_BLKMOD3 : This is provided the blktn as input so can avoid the explicit calculation.
+ */
+#define	TP_IS_CDB_SC_BLKMOD(cr, t1) (((NULL != (cr)) && (cr)->in_tend) || ((t1)->tn <= ((blk_hdr_ptr_t)(t1)->buffaddr)->tn))
+#define	TP_IS_CDB_SC_BLKMOD3(cr, t1, blktn) (((NULL != (cr)) && (cr)->in_tend) || ((t1)->tn <= blktn))
+
 #define MM_ADDR(SGD)		((sm_uc_ptr_t)(((sgmnt_data_ptr_t)SGD) + 1))
 #define MASTER_MAP_BLOCKS_DFLT	64				/* 64 gives 128M possible blocks  */
 #define MASTER_MAP_BLOCKS_V4	32				/* 32 gives 64M possible blocks  */
@@ -504,11 +823,38 @@ void verify_queue(que_head_ptr_t qhdr);
 			ENABLE_AST;				\
 	}							\
 }
+#define GET_C_STACK_WTSTART_WRITERS(cnl_pid)
 #elif defined(UNIX)
 #define	DCLAST_WCS_WTSTART(reg, num_bufs, RET)	RET = wcs_wtstart(reg, num_bufs);
+#define GET_C_STACK_WTSTART_WRITERS(cnl_pid)			\
+{								\
+	uint4	index;						\
+	uint4	pid;						\
+	for (index = 0; MAX_WTSTART_PID_SLOTS > index; index++)	\
+	{							\
+		pid = cnl_pid[index];				\
+		if (0 != pid)					\
+			kill(pid, SIGILL);			\
+	}							\
+}
 #else
 #error UNSUPPORTED PLATFORM
 #endif
+
+#define SAVE_WTSTART_PID(cnl, pid, index)			\
+{								\
+	for (index = 0; index < MAX_WTSTART_PID_SLOTS; index++)	\
+		if (0 == cnl->wtstart_pid[index])		\
+			break;					\
+	if (MAX_WTSTART_PID_SLOTS > index)			\
+		cnl->wtstart_pid[index] = pid;			\
+}
+
+#define CLEAR_WTSTART_PID(cnl, index)				\
+{								\
+	if (MAX_WTSTART_PID_SLOTS > index)			\
+		cnl->wtstart_pid[index] = 0;			\
+}
 
 #define ENSURE_JNL_OPEN(csa, reg)                                                 					\
 {                                                                               					\
@@ -541,31 +887,37 @@ void verify_queue(que_head_ptr_t qhdr);
  * We should hold crit on the region in all cases except for one when we are in MUPIP CREATE (but we are still standalone here).
  * Therefore we need not use any interlocks to update this field. This is asserted below.
  * Although we can derive "csd" from "csa", we pass them as two separate arguments for performance reasons.
+ * Use local variables to record shared memory information doe debugging purposes in case of an assert failure.
  */
-#define INCR_BLKS_TO_UPGRD(csa, csd, delta)										\
-{															\
-	int4	new_blks_to_upgrd;											\
-															\
-	assert((csd)->createinprogress || (csa)->now_crit);								\
-	assert((csa)->hdr == (csd));											\
-	assert(0 != (delta));												\
-	assert(0 <= (csd)->blks_to_upgrd);										\
-	new_blks_to_upgrd = (delta) + (csd)->blks_to_upgrd;								\
-	assert(0 <= new_blks_to_upgrd);											\
-	(csd)->blks_to_upgrd = new_blks_to_upgrd;									\
-	if (0 >= new_blks_to_upgrd)											\
-	{														\
-		if (0 == new_blks_to_upgrd)										\
-			(csd)->tn_upgrd_blks_0 = (csd)->trans_hist.curr_tn;						\
-		else													\
-		{	/* blks_to_upgrd counter in the fileheader should never hold a negative value.			\
-			 * note down the negative value in a separate field for debugging and set the counter to 0.	\
-			 */												\
-			(csd)->blks_to_upgrd = 0;									\
-			(csd)->blks_to_upgrd_subzero_error -= (new_blks_to_upgrd);					\
-		}													\
-	} else														\
-		(csd)->fully_upgraded = FALSE;										\
+#define INCR_BLKS_TO_UPGRD(csa, csd, delta)						\
+{											\
+	int4	new_blks_to_upgrd;							\
+	int4	cur_blks_to_upgrd;							\
+	int4	cur_delta;								\
+											\
+	assert((csd)->createinprogress || (csa)->now_crit);				\
+	cur_delta = (delta);								\
+	assert((csa)->hdr == (csd));							\
+	assert(0 != cur_delta);								\
+	cur_blks_to_upgrd = (csd)->blks_to_upgrd;					\
+	assert(0 <= (csd)->blks_to_upgrd);						\
+	new_blks_to_upgrd = cur_delta + cur_blks_to_upgrd;				\
+	assert(0 <= new_blks_to_upgrd);							\
+	(csd)->blks_to_upgrd = new_blks_to_upgrd;					\
+	if (0 >= new_blks_to_upgrd)							\
+	{										\
+		if (0 == new_blks_to_upgrd)						\
+			(csd)->tn_upgrd_blks_0 = (csd)->trans_hist.curr_tn;		\
+		else									\
+		{	/* blks_to_upgrd counter in the fileheader should never hold a	\
+			 * negative value. Note down the negative value in a separate	\
+			 * field for debugging and set the counter to 0.		\
+			 */								\
+			(csd)->blks_to_upgrd = 0;					\
+			(csd)->blks_to_upgrd_subzero_error -= (new_blks_to_upgrd);	\
+		}									\
+	} else										\
+		(csd)->fully_upgraded = FALSE;						\
 }
 #define DECR_BLKS_TO_UPGRD(csa, csd, delta)	INCR_BLKS_TO_UPGRD((csa), (csd), -(delta))
 
@@ -611,6 +963,17 @@ enum tp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] */
 	tp_blkmod_tp_hist,
 	n_tp_blkmod_types
 };
+
+/* Below is a list of macro bitmasks used to set the global variable "donot_commit". This variable should normally be 0.
+ * But in rare cases, we could end up in situations where we know it is a restartable situation but decide not to
+ * restart right away (because of interface issues that the function where this is detected cannot signal a restart
+ * or because we dont want to take a performance hit to check this restartable situation in highly frequented code if
+ * the restart will anyway be detected before commit. In this cases, this variable will take on non-zero values.
+ * The commit logic will assert that this variable is indeed zero after validation but before proceeding with commit.
+ */
+#define	DONOTCOMMIT_TPHIST_BLKTARGET_MISMATCH	(1 << 0)	/* Restartable situation encountered in tp_hist */
+#define	DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL	(1 << 1)	/* Restartable situation encountered in gvcst_delete_blk */
+#define	DONOTCOMMIT_JNLGETCHECKSUM_NULL_CR	(1 << 2)	/* Restartable situation encountered in jnl_get_checksum.h */
 
 #define	ARRAYSIZE(arr)	sizeof(arr)/sizeof(arr[0])
 
@@ -715,7 +1078,8 @@ typedef struct sgmnt_data_struct
 						   file-header or API changes occur. See note at top of sgmnt_data.
 						*/
 	uint4		jnl_checksum;
-	char		filler_128[8];
+	uint4		wcs_phase2_commit_wait_spincnt;	/* # of spin iterations before sleeping while waiting for phase2 commits */
+	char		filler_128[4];
 	/************* FIELDS SET AT CREATION TIME ********************************/
 	char		filler_created[52];	/* Now unused .. was "file_info created" */
 	boolean_t	createinprogress;	/* TRUE only if MUPIP CREATE is in progress. FALSE otherwise */
@@ -877,7 +1241,8 @@ typedef struct sgmnt_data_struct
 	uint4		autoswitchlimit;	/* limit in disk blocks (max 4GB) when jnl should be auto switched */
 	int4		epoch_interval;		/* Time between successive epochs in epoch-seconds */
 	uint4		alignsize;		/* alignment size for JRT_ALIGN */
-	int4		jnl_sync_io;		/* drives sync I/O ('direct' if applicable) for journals, if set */
+	int4		jnl_sync_io;		/* drives sync I/O ('direct' if applicable) for journals, if set (UNIX) */
+						/* writers open NOCACHING to bypass XFC cache, if set (VMS) */
 	int4		yield_lmt;		/* maximum number of times a process yields to get optimal jnl writes */
 	char		filler_jnl[20];		/* to ensure this section has 64-byte multiple size */
 	/************* INTERRUPTED RECOVERY RELATED FIELDS ****************/
@@ -1201,7 +1566,7 @@ typedef struct	sgmnt_addrs_struct
 	unsigned char	mb_mess[6];
 	bool		locking_flush;
 	bool		freeze;
-	bool		t_commit_crit;
+	bool		filler;
 	shmpool_buff_hdr_ptr_t shmpool_buffer;	/* 1MB chunk of shared memory that we micro manage */
 	struct sgm_info_struct	*sgm_info_ptr;
 	volatile boolean_t	dbsync_timer;	/* whether a timer to sync the filehdr (and write epoch) is active */
@@ -1236,6 +1601,13 @@ typedef struct	sgmnt_addrs_struct
 	int4		regcnt;			/* # of regions that have this as their csa */
 	struct hash_table_mname_struct *gvt_hashtab;	/* NON-NULL only if regcnt > 1;
 							 * Maintains all gv_targets mapped to this db file */
+	boolean_t	t_commit_crit;		/* set to FALSE by default. set to TRUE if in the middle of database commit.
+						 * if access method is BG, this assumes a multi-state value.
+						 * FALSE -> T_COMMIT_CRIT_PHASE1 -> T_COMMIT_CRIT_PHASE2 -> FALSE
+						 *           (bg_update_phase1)      (bg_update_phase2)      (finish commit)
+						 */
+	boolean_t	wcs_pidcnt_incremented;	/* set to TRUE if we incremented cnl->wcs_phase2_commit_pidcnt.
+						 * used by secshr_db_clnup to decrement the shared counter. */
 } sgmnt_addrs;
 
 typedef struct	gd_binding_struct
@@ -1266,7 +1638,7 @@ typedef struct srch_blk_status_struct
 			curr_rec;
 	int4		cycle;
 	int4		level;
-	struct cw_set_element_struct	*ptr;
+	struct cw_set_element_struct	*cse;
 	struct srch_blk_status_struct	*first_tp_srch_status;
 	struct gv_namehead_struct	*blk_target;
 } srch_blk_status;
@@ -1564,6 +1936,37 @@ typedef replpool_identifier 	*replpool_id_ptr_t;
 # pragma pointer_size(restore)
 #endif
 
+/* Macro to increment the count of processes that are doing two phase commit.
+ * This is invoked just BEFORE starting phase1 of the commit.
+ */
+#define	INCR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl)				\
+{									\
+	assert(!csa->wcs_pidcnt_incremented);				\
+	INCR_CNT(&cnl->wcs_phase2_commit_pidcnt, &cnl->wc_var_lock);	\
+	csa->wcs_pidcnt_incremented = TRUE;				\
+}
+
+/* Macro to decrement the count of processes that are doing two phase commit.
+ * This is invoked just AFTER finishing phase2 of the commit.
+ */
+#define	DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl)				\
+{									\
+	assert(csa->wcs_pidcnt_incremented);				\
+	csa->wcs_pidcnt_incremented = FALSE;				\
+	DECR_CNT(&cnl->wcs_phase2_commit_pidcnt, &cnl->wc_var_lock);	\
+}
+
+/* The CAREFUL_DECR_WCS_PHASE2_COMMIT_PIDCNT macro is the same as the DECR_WCS_PHASE2_COMMIT_PIDCNT macro
+ * except that it uses CAREFUL_DECR_CNT instead of DECR_CNT. This does alignment checks and is needed by
+ * secshr_db_clnup as it runs in kernel mode in VMS. The two macros should be maintained in parallel.
+ */
+#define	CAREFUL_DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl)				\
+{										\
+	assert(csa->wcs_pidcnt_incremented);					\
+	csa->wcs_pidcnt_incremented = FALSE;					\
+	CAREFUL_DECR_CNT(&cnl->wcs_phase2_commit_pidcnt, &cnl->wc_var_lock);	\
+}
+
 #define DECR_KIP(CSD, CSA, KIP_FLAG)				\
 {								\
 	assert(KIP_FLAG);					\
@@ -1676,7 +2079,7 @@ boolean_t	region_init(bool cm_regions);
 bool		region_freeze(gd_region *region, bool freeze, bool override);
 void		rel_crit(gd_region *reg);
 void		rel_lock(gd_region *reg);
-bool		wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs_recover);
+boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_is_wcs_recover);
 bool		wcs_wtfini(gd_region *reg);
 
 #ifdef VMS
@@ -1708,21 +2111,21 @@ void ccp_closejnl_ast(struct gd_region_struct *reg);
 bt_rec *ccp_bt_get(sgmnt_addrs *cs_addrs, int4 block);
 unsigned char *mval2subsc(mval *in_val, gv_key *out_key);
 
-int4 dsk_read(block_id blk, sm_uc_ptr_t buff, enum db_ver *ondisk_blkver);
+int4	dsk_read(block_id blk, sm_uc_ptr_t buff, enum db_ver *ondisk_blkver);
 
-void jnl_flush(gd_region *reg);
-void jnl_fsync(gd_region *reg, uint4 fsync_addr);
-void jnl_mm_timer(sgmnt_addrs *csa, gd_region *reg);
-void jnl_oper_user_ast(gd_region *reg);
-void jnl_wait(gd_region *reg);
-void view_jnlfile(mval *dst, gd_region *reg);
-void jnl_put_jrt_pfin(sgmnt_addrs *csa);
-void jnl_put_jrt_pini(sgmnt_addrs *csa);
-void jnl_write_epoch_rec(sgmnt_addrs *csa);
-void jnl_write_inctn_rec(sgmnt_addrs *csa);
-void fileheader_sync(gd_region *reg);
+uint4	jnl_flush(gd_region *reg);
+void	jnl_fsync(gd_region *reg, uint4 fsync_addr);
+void	jnl_mm_timer(sgmnt_addrs *csa, gd_region *reg);
+void	jnl_oper_user_ast(gd_region *reg);
+void	jnl_wait(gd_region *reg);
+void	view_jnlfile(mval *dst, gd_region *reg);
+void	jnl_put_jrt_pfin(sgmnt_addrs *csa);
+void	jnl_put_jrt_pini(sgmnt_addrs *csa);
+void	jnl_write_epoch_rec(sgmnt_addrs *csa);
+void	jnl_write_inctn_rec(sgmnt_addrs *csa);
+void	fileheader_sync(gd_region *reg);
 
-gd_addr *create_dummy_gbldir(void);
+gd_addr	*create_dummy_gbldir(void);
 
 #include "gdsfheadsp.h"
 

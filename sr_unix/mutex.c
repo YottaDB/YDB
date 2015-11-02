@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +63,7 @@
 #define MUTEX_LCKALERT_PERIOD		8
 #endif
 
-GBLREF boolean_t		mutex_salvaged, disable_sigcont;
+GBLREF boolean_t		disable_sigcont;
 GBLREF pid_t			process_id;
 GBLREF uint4			image_count;
 GBLREF int			num_additional_processors;
@@ -201,6 +201,9 @@ static	void	clean_initialize(mutex_struct_ptr_t addr, int n, bool crash)
 			rts_error(VARLSTCNT(7) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Error with mutex wait memory semaphore initialization"), errno);
 #endif
+		/* Initialize fl,bl links to 0 before INSQTI as it (gtm_insqti in relqueopi.c) asserts this */
+		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->fl = 0;)
+		DEBUG_ONLY(((que_ent_ptr_t)q_free_entry)->bl = 0;)
 		if (INTERLOCK_FAIL == INSQTI((que_ent_ptr_t)q_free_entry++, (que_head_ptr_t)&addr->freehead))
 			rts_error(VARLSTCNT(6) ERR_MUTEXERR, 0, ERR_TEXT, 2,
 				RTS_ERROR_TEXT("Interlock instruction failure in mutex initialize"));
@@ -767,7 +770,6 @@ static enum cdb_sc mutex_lock(gd_region *reg,
 	 * know for sure there is no other pid accessing the database shared memory.
 	 */
 	assert(mutex_per_process_init_pid == process_id || (0 == mutex_per_process_init_pid) && mu_rndwn_file_dbjnl_flush);
-	mutex_salvaged = FALSE;
 	optimistic_attempts = 0;
 	lock_attempts = 0;
 	alert = FALSE;
@@ -872,18 +874,23 @@ void mutex_salvage(gd_region *reg)
 	sgmnt_addrs	*csa;
 	int		salvage_status;
 	pid_t		holder_pid;
+	boolean_t	mutex_salvaged;
 	VMS_ONLY(uint4	holder_imgcnt;)
 
 	error_def(ERR_MUTEXFRCDTERM);
+	error_def(ERR_WCBLOCKED);
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	if (0 != (holder_pid = csa->critical->semaphore.u.parts.latch_pid))
 	{
+		mutex_salvaged = FALSE;
 		VMS_ONLY(holder_imgcnt = csa->critical->semaphore.u.parts.latch_image_count);
 		if (holder_pid == process_id VMS_ONLY(&& holder_imgcnt == image_count))
 		{	/* We were trying to obtain a lock we already held -- very odd */
 			RELEASE_SWAPLOCK(&csa->critical->semaphore);
 			csa->nl->in_crit = 0;
+			/* Mutex crash repaired, want to do write cache recovery, just in case */
+			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);
 			mutex_salvaged = TRUE;
 			MUTEX_DPRINT2("%d : mutex salvaged, culprit was our own process\n", process_id);
 		} else if (!is_proc_alive(holder_pid, UNIX_ONLY(0) VMS_ONLY(holder_imgcnt)))
@@ -892,6 +899,11 @@ void mutex_salvage(gd_region *reg)
 			 */
 			send_msg(VARLSTCNT(5) ERR_MUTEXFRCDTERM, 3, holder_pid, REG_LEN_STR(reg));
 			csa->nl->in_crit = 0;
+			/* Mutex crash repaired, want to do write cache recovery, in case previous holder of crit had set
+			 * some cr->in_cw_set to a non-zero value. Not doing cache recovery could cause incorrect
+			 * GTMASSERTs in PIN_CACHE_RECORD macro in t_end/tp_tend.
+			 */
+			SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);
 			COMPSWAP_UNLOCK(&csa->critical->semaphore, holder_pid, holder_imgcnt, LOCK_AVAILABLE, 0);
 			mutex_salvaged = TRUE;
 			/* Reset jb->blocked as well if the holder_pid had it set */
@@ -903,6 +915,12 @@ void mutex_salvage(gd_region *reg)
 			/* The process might have been STOPPED (kill -SIGSTOP). Send SIGCONT and nudge the stopped
 			 * process forward */
 			continue_proc(holder_pid);
+		}
+		if (mutex_salvaged)
+		{
+			BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage);
+			send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_mutex_salvage"),
+				process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 		}
 	}
 }

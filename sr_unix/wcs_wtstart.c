@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,10 +52,20 @@
 #include "gds_blk_downgrade.h"
 #include "deferred_signal_handler.h"
 
+#define	REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, trace_cntr)	\
+{									\
+	n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);		\
+	if (INTERLOCK_FAIL == n)					\
+	{								\
+		assert(FALSE);						\
+		SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);		\
+		BG_TRACE_PRO_ANY(csa, trace_cntr);			\
+		break;							\
+	}								\
+}
+
 GBLREF	boolean_t	*lseekIoInProgress_flags;	/* needed for the LSEEK* macros in gtmio.h */
 GBLREF	uint4		process_id;
-GBLREF	VSIG_ATOMIC_T	forced_exit;
-GBLREF	int		process_exiting;
 GBLREF	sm_uc_ptr_t	reformat_buffer;
 GBLREF	int		reformat_buffer_len;
 GBLREF	volatile int	reformat_buffer_in_use;	/* used only in DEBUG mode */
@@ -91,12 +101,14 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	unix_db_info		*udi;
 	cache_rec_ptr_t		cr, cr_lo, cr_hi;
 	static	int4		error_message_loop_count = 0;
+	uint4			index;
 
 	error_def(ERR_DBFILERR);
 	error_def(ERR_JNLFSYNCERR);
 	error_def(ERR_TEXT);
 	error_def(ERR_JNLWRTNOWWRTR);
 	error_def(ERR_JNLWRTDEFER);
+	error_def(ERR_GBLOFLOW);
 
 	udi = FILE_INFO(region);
 	csa = &udi->s_addrs;
@@ -122,6 +134,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	cnl = csa->nl;
 	csa->in_wtstart = TRUE;				/* Tell ourselves we're here and make the csa->in_wtstart (private copy) */
 	INCR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);	/* and cnl->in_wtstart (shared copy) assignments as close as possible.   */
+	SAVE_WTSTART_PID(cnl, process_id, index);
 	assert(cnl->in_wtstart > 0 && csa->in_wtstart);
 
 	max_ent = csd->n_bts;
@@ -172,13 +185,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 		if (csr == csrfirst)
 		{					/* completed a tour of the queue */
 			queue_empty = FALSE;
-			n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);
-			if (INTERLOCK_FAIL == n)
-			{
-				assert(FALSE);
-				SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-				BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail2);
-			}
+			REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail2);
 			break;
 		}
 		cr = (cache_rec_ptr_t)((sm_uc_ptr_t)csr - sizeof(cr->blkque));
@@ -208,19 +215,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 				    || (need_jnl_sync && (NOJNL == jpc->channel
 							  || (FALSE == (got_lock = GET_SWAPLOCK(&jb->fsync_in_prog_latch))))))
                                 {
-                                        if (need_jnl_sync)
-                                                BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
-					n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);
-                                        if (n == INTERLOCK_FAIL)
-					{
-						assert(FALSE);
-						SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-						BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail3);
-						break;
-					}
-                                        if (csrfirst == NULL)
-                                                csrfirst = csr;
-                                        continue;
+					if (need_jnl_sync)
+						BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
+					REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail3);
+					if (NULL == csrfirst)
+						csrfirst = csr;
+					continue;
                                 } else if (got_lock)
                                 {
                                         saved_dsk_addr = jb->dskaddr;
@@ -238,6 +238,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 							send_msg(VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 								 ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), errno);
 							RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
+							REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail3);
 							if (NULL == csrfirst)
 								csrfirst = csr;
 							continue;
@@ -262,6 +263,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 			/* We're going to write this block out now */
 			if (dba_bg == csd->acc_meth)
 			{
+				assert(FALSE == csr->data_invalid);	/* check that buffer has valid data */
 				csr->epid = process_id;
 				CR_BUFFER_CHECK1(region, csa, csd, cr, cr_lo, cr_hi);
 				bp = (blk_hdr_ptr_t)(GDS_ANY_REL2ABS(csa, csr->buffaddr));
@@ -316,52 +318,39 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 #if defined(TARGETED_MSYNC)
 			        bp = (blk_hdr_ptr_t)(csa->db_addrs[0] + (sm_off_t)csr->blk * MSYNC_ADDR_INCS);
 				if ((sm_uc_ptr_t)bp > csa->db_addrs[1])
+					save_errno = ERR_GBLOFLOW;
+				else
 				{
-					wcs_recover(region);
-					csd = csa->hdr;
-					bp = (blk_hdr_ptr_t)(csa->db_addrs[0] +
-							     (sm_off_t)csr->blk * MSYNC_ADDR_INCS);
-					assert((sm_uc_ptr_t)bp < csa->db_addrs[1]);
+					size = MSYNC_ADDR_INCS;
+					save_errno = 0;			/* Assume all will work well */
+					if (-1 == msync((caddr_t)bp, MSYNC_ADDR_INCS, MS_ASYNC))
+						save_errno = errno;
 				}
-				size = MSYNC_ADDR_INCS;
-				save_errno = 0;			/* Assume all will work well */
-				if (-1 == msync((caddr_t)bp, MSYNC_ADDR_INCS, MS_ASYNC))
-				        save_errno = errno;
-#else
+#elif !defined(NO_MSYNC)
 				bp = (blk_hdr_ptr_t)(csa->acc_meth.mm.base_addr + (sm_off_t)csr->blk * csd->blk_size);
 				if ((sm_uc_ptr_t)bp > csa->db_addrs[1])
+					save_errno = ERR_GBLOFLOW;
+				else
 				{
-					wcs_recover(region);
-					csd = csa->hdr;
-					bp = (blk_hdr_ptr_t)(csa->acc_meth.mm.base_addr +
-							     (sm_off_t)csr->blk * csd->blk_size);
-					assert((sm_uc_ptr_t)bp < csa->db_addrs[1]);
+					size = bp->bsiz;
+					if (csa->do_fullblockwrites)
+						size = ROUND_UP(size, csa->fullblockwrite_len);
+					assert(size <= csd->blk_size);
+					offset = (off_t)((sm_uc_ptr_t)bp - (sm_uc_ptr_t)csd);
+					INCR_DB_CSH_COUNTER(csa, n_dsk_writes, 1);
+					/* Do db write without timer protect (not needed --  wtstart not reenterable in one task) */
+					LSEEKWRITE(udi->fd, offset, bp, size, save_errno);
 				}
-				size = bp->bsiz;
-				if (csa->do_fullblockwrites)
-					size = ROUND_UP(size, csa->fullblockwrite_len);
-				assert(size <= csd->blk_size);
-				offset = (off_t)((sm_uc_ptr_t)bp - (sm_uc_ptr_t)csd);
-				INCR_DB_CSH_COUNTER(csa, n_dsk_writes, 1);
-				/* Do db write without timer protect (not needed since wtstart not reenterable in one task) */
-				LSEEKWRITE(udi->fd, offset, bp, size, save_errno);
 #endif
 			}
 			if (0 != save_errno)
 			{
 				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
-                                n = INSQTI((que_ent_ptr_t)csr, (que_head_ptr_t)ahead);
-				if (n == INTERLOCK_FAIL)
-				{
-					assert(FALSE);
-					SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
-					BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail4);
-					break;
-				}
+				REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail4);
 				/* note: this will be automatically retried after csd->flush_time[0] msec, if this was called
 				 * through a timer-pop, otherwise, error should be handled (including ignored) by the caller.
 				 */
-				if (dskspace_msg_counter != save_dskspace_msg_counter)
+				if ((ENOSPC == save_errno) && (dskspace_msg_counter != save_dskspace_msg_counter))
 				{	/* first time and every minute */
 					send_msg(VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(region),
 						 ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
@@ -370,7 +359,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 					save_dskspace_msg_counter = dskspace_msg_counter;
 					start_timer((TID)&dskspace_msg_timer, DSKSPACE_MSG_INTERVAL, dskspace_msg_timer, 0, NULL);
 				}
-				assert(ENOSPC == save_errno); 	/* Out-of-space should not be considered severe error */
 				err_status = save_errno;
 				break;
 			}
@@ -398,13 +386,13 @@ int4	wcs_wtstart(gd_region *region, int4 writes)
 	csa->wbuf_dqd--;
 	DEBUG_ONLY(
 		if (0 == n2)
-		BG_TRACE_ANY(csa, wrt_noblks_wrtn);
-		)
+			BG_TRACE_ANY(csa, wrt_noblks_wrtn);
 		assert(cnl->in_wtstart > 0 && csa->in_wtstart);
+	)
 	DECR_CNT(&cnl->in_wtstart, &cnl->wc_var_lock);
+	CLEAR_WTSTART_PID(cnl, index);
 	csa->in_wtstart = FALSE;			/* This process can write again */
-	if (forced_exit && !process_exiting && !have_crit(HAVE_CRIT_IN_WTSTART)) /* do deferred MUPIP STOP handling if needed */
-		deferred_signal_handler();					 /* do it only if not already exiting */
+	DEFERRED_EXIT_HANDLING_CHECK; /* now that in_wtstart is FALSE, check if deferred signal/exit handling needs to be done */
 	if (queue_empty)			/* Active queue has become empty. */
 		wcs_clean_dbsync_timer(csa);	/* Start a timer to flush-filehdr (and write epoch if before-imaging) */
 	return err_status;

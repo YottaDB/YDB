@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,143 +14,64 @@
 #include "gdsblk.h"
 #include "gdsbml.h"
 
-#define MAX_FFS_SIZE 32
+#define	RETURN_IF_FREE(valid, ptr, base_addr)							\
+{												\
+	int4	bits;										\
+												\
+	if (valid)										\
+	{											\
+		if (valid > THREE_BLKS_BITMASK)							\
+			bits = 3;								\
+		else if (valid > TWO_BLKS_BITMASK)						\
+			bits = 2;								\
+		else if (valid > ONE_BLK_BITMASK)						\
+			bits = 1;								\
+		else										\
+			bits = 0;								\
+		return (int4)((ptr - base_addr) * (BITS_PER_UCHAR / BML_BITS_PER_BLK) + bits);	\
+	}											\
+}
 
-/* Returns the location of the first set bit in the field.	*/
-/* The search starts at the hint and wraps if necessary.	*/
-
-int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits, boolean_t *used)
+/* Returns the location of the first set bit in the field. The search starts at the hint and wraps if necessary.
+ * If a non-null update array is passed, that is also taken into account while figuring out if any free block is available.
+ */
+int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits)
 {
 	uchar_ptr_t	ptr, top;
 	unsigned char 	valid;
 	int4		bits;
 
 	hint *= BML_BITS_PER_BLK;
-	hint = hint / 8;
+	hint = hint / BITS_PER_UCHAR;
 	total_bits *= BML_BITS_PER_BLK;
 
 	if (hint > total_bits)
 		hint = 0;
-	for (ptr = base_addr + hint, top = base_addr + (total_bits +7) / 8 - 1; ptr < top; ptr++)
-	{	if (*ptr)
-		{
-			if (*ptr > 63)
-			{
-				if (*ptr > 127)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3 );
-			}
-			else if (*ptr > 15)
-			{
-				if (*ptr > 31)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2 );
-			}
-			else if (*ptr > 3)
-			{
-				if (*ptr > 7)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1 );
-			}
-			else
-			{
-				if (*ptr == 2)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) );
-			}
-		}
+	for (ptr = base_addr + hint, top = base_addr + DIVIDE_ROUND_UP(total_bits, BITS_PER_UCHAR) - 1; ptr < top; ptr++)
+	{
+		valid = *ptr;
+		RETURN_IF_FREE(valid, ptr, base_addr);
 	}
 	if (*ptr)	/* Special processing for last byte as may be only partially valid */
 	{
-		bits = total_bits % 8;
+		bits = total_bits % BITS_PER_UCHAR;
 		if (bits == 6)
-			valid = *ptr & 63;
+			valid = *ptr & THREE_BLKS_BITMASK;
 		else if (bits == 4)
-			valid = *ptr & 15;
+			valid = *ptr & TWO_BLKS_BITMASK;
 		else if (bits == 2)
-			valid = *ptr & 3;
+			valid = *ptr & ONE_BLK_BITMASK;
 		else
 			valid = *ptr;
-		if (valid)
-		{
-			if (valid > 63)
-			{
-				if (valid > 127)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3 );
-			}
-			else if (valid > 15)
-			{
-				if (valid > 31)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2 );
-			}
-			else if (valid > 3)
-			{
-				if (valid > 7)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1 );
-			}
-			else
-			{
-				if (valid == 2)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) );
-			}
-		}
+		RETURN_IF_FREE(valid, ptr, base_addr);
 	}
-	for (ptr = base_addr, top = base_addr + hint; ptr < top; ptr++)
+	if (hint)
 	{
-		if (*ptr)
+		for (ptr = base_addr, top = base_addr + hint; ptr < top; ptr++)
 		{
-			if (*ptr > 63)
-			{
-				if (*ptr > 127)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 3 );
-			}
-			else if (*ptr > 15)
-			{
-				if (*ptr > 31)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 2 );
-			}
-			else if (*ptr > 3)
-			{
-				if (*ptr > 7)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) + 1 );
-			}else
-			{
-				if (*ptr == 2)
-					*used = TRUE;
-				else
-					*used = FALSE;
-				return (int4)((ptr - base_addr) * (8 / BML_BITS_PER_BLK) );
-			}
+			valid = *ptr;
+			RETURN_IF_FREE(valid, ptr, base_addr);
 		}
 	}
-	return -1;
+	return NO_FREE_SPACE;
 }

@@ -121,7 +121,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blkBase, bml_sm_buff;	/* shared memory pointer to the bitmap global buffer */
 	srch_hist		alt_hist;
-	srch_blk_status		blkhist, bmlhist;
+	srch_blk_status		*blkhist, bmlhist;
 	tp_region		*rptr;
 	trans_num		curr_tn;
 	unsigned char    	save_cw_set_depth;
@@ -176,6 +176,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	gv_keysize = ROUND_UP2(MAX_KEY_SZ + MAX_NUM_SUBSC_LEN, 4);
 	gv_target = targ_alloc(gv_keysize, NULL, NULL);	/* t_begin needs this initialized */
 	memset(&alt_hist, 0, sizeof(alt_hist));	/* null-initialize history */
+	blkhist = &alt_hist.h[0];
 	for (rptr = grlist;  NULL != rptr;  rptr = rptr->fPtr)
 	{
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
@@ -254,8 +255,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 		{
 			util_out_print("Region !AD : Blocks to Upgrade counter indicates no action needed for MUPIP REORG !AD",
 				       TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
-			util_out_print("Region !AD : Total Blocks = [0x!8XL] : Free Blocks = [0x!8XL] : "
-				       "Blocks to upgrade = [0x!8XL]",
+			util_out_print("Region !AD : Total Blocks = [0x!XL] : Free Blocks = [0x!XL] : "
+				       "Blocks to upgrade = [0x!XL]",
 				       TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
 			util_out_print("Region !AD : MUPIP REORG !AD finished!/", TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
 			rel_crit(reg);
@@ -296,7 +297,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 		start_bmp = ROUND_DOWN(start_blk, BLKS_PER_LMAP);
 		last_bmp  = ROUND_DOWN(stop_blk - 1, BLKS_PER_LMAP);
 		curblk = start_blk;	/* curblk is the block to be upgraded/downgraded */
-		util_out_print("Region !AD : Started processing from block number [0x!8XL]", TRUE, REG_LEN_STR(reg), curblk);
+		util_out_print("Region !AD : Started processing from block number [0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
 		if (NULL != bptr)
 		{	/* malloc/free "bptr" for each region as GDS block-size can be different */
 			free(bptr);
@@ -362,7 +363,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			{	/* certify the block while holding crit as cert_blk uses fields from file-header (shared memory) */
 				assert(FALSE);	/* in pro, skip ugprading/downgarding all blks in this unreliable local bitmap */
 				rel_crit(reg);
-				util_out_print("Region !AD : Bitmap Block [0x!8XL] has integrity errors. Skipping this bitmap.",
+				util_out_print("Region !AD : Bitmap Block [0x!XL] has integrity errors. Skipping this bitmap.",
 					TRUE, REG_LEN_STR(reg), curbmp);
 				status1 = ERR_MUNOFINISH;
 				continue;
@@ -415,7 +416,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 							{
 								gtm_putmsg(VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status1);
 								util_out_print("Region !AD : Error occurred while reading block "
-									"[0x!8XL]", TRUE, REG_LEN_STR(reg), curblk);
+									"[0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
 								status1 = ERR_MUNOFINISH;
 								goto stop_reorg_on_this_reg;/* goto needed due to nested FOR Loop */
 							}
@@ -436,23 +437,24 @@ void	mu_reorg_upgrd_dwngrd(void)
 				 * Any update to a block will trigger an automatic upgrade/downgrade of the block based on
 				 * 	the current fileheader desired_db_format setting and we use that here.
 				 */
-				CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 				t_begin(ERR_MUREORGFAIL, TRUE);
 				for (; ;)
 				{
+					CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 					curr_tn = csd->trans_hist.curr_tn;
 					db_got_to_v5_once = csd->db_got_to_v5_once;
 					if (db_got_to_v5_once || (BLK_RECYCLED != bml_status))
 					{
-						blkBase = t_qread(curblk, (sm_int_ptr_t)&blkhist.cycle, &blkhist.cr);
+						blkhist->cse = NULL;	/* start afresh (do not use value from previous retry) */
+						blkBase = t_qread(curblk, (sm_int_ptr_t)&blkhist->cycle, &blkhist->cr);
 						if (NULL == blkBase)
 						{
 							t_retry((enum cdb_sc)rdfail_detail);
 							continue;
 						}
-						blkhist.blk_num = curblk;
-						blkhist.buffaddr = blkBase;
-						ondsk_blkver = blkhist.cr->ondsk_blkver;
+						blkhist->blk_num = curblk;
+						blkhist->buffaddr = blkBase;
+						ondsk_blkver = blkhist->cr->ondsk_blkver;
 						new_hdr = *(blk_hdr_ptr_t)blkBase;
 						mu_reorg_upgrd_dwngrd_blktn = new_hdr.tn;
 						mark_blk_free = FALSE;
@@ -467,7 +469,6 @@ void	mu_reorg_upgrd_dwngrd(void)
 					 * for bitmap block, the history validation information is passed through cse instead.
 					 * therefore we need to handle bitmap and non-bitmap cases separately.
 					 */
-					alt_hist.h[0].blk_num = 0; /* create empty history by default assuming block is bitmap */
 					if (!lcnt)
 					{	/* Means a bitmap block.
 						 * At this point we can do a "new_db_format != ondsk_blkver" check to determine
@@ -485,18 +486,18 @@ void	mu_reorg_upgrd_dwngrd(void)
 						assert(!mark_blk_free);
 						BLK_ADDR(blkid_ptr, sizeof(block_id), block_id);
 						*blkid_ptr = 0;
-						t_write_map(&blkhist, (unsigned char *)blkid_ptr, curr_tn);
+						t_write_map(blkhist, (unsigned char *)blkid_ptr, curr_tn, 0);
+						assert(&alt_hist.h[0] == blkhist);
+						alt_hist.h[0].blk_num = 0; /* create empty history for bitmap block */
 						assert(update_trans);
 					} else
 					{	/* non-bitmap block. fill in history for validation in t_end */
 						assert(curblk);	/* we should never come here for block 0 (bitmap) */
 						if (!mark_blk_free)
 						{
-							alt_hist.h[0].blk_num = curblk;
-							alt_hist.h[0].buffaddr = blkBase;
-							alt_hist.h[0].cr      = blkhist.cr;
-							alt_hist.h[0].cycle   = blkhist.cycle;
-							alt_hist.h[0].tn      = curr_tn;
+							assert(blkhist->blk_num == curblk);
+							assert(blkhist->buffaddr == blkBase);
+							blkhist->tn      = curr_tn;
 							alt_hist.h[1].blk_num = 0;
 						}
 						/* Also need to pass the bitmap as history to detect if any concurrent M-kill
@@ -529,7 +530,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 								BLK_SEG(bs_ptr, blkBase + sizeof(new_hdr),
 									new_hdr.bsiz - sizeof(new_hdr));
 								BLK_FINI(bs_ptr, bs1);
-								t_write(&blkhist, (unsigned char *)bs1, 0, 0,
+								t_write(blkhist, (unsigned char *)bs1, 0, 0,
 									((blk_hdr_ptr_t)blkBase)->levl, FALSE,
 									FALSE, GDS_WRITE_PLAIN);
 								/* reset update_trans in case previous retry had set it to FALSE */
@@ -558,7 +559,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 							 */
 							save_cw_set_depth = cw_set_depth;
 							assert(!cw_map_depth);
-							t_write_map(&bmlhist, NULL, curr_tn); /* will increment cw_set_depth */
+							t_write_map(&bmlhist, NULL, curr_tn, 0); /* will increment cw_set_depth */
 							cw_map_depth = cw_set_depth; /* set cw_map_depth to latest cw_set_depth */
 							cw_set_depth = save_cw_set_depth;/* restore cw_set_depth */
 							/* t_write_map simulation end */
@@ -570,20 +571,23 @@ void	mu_reorg_upgrd_dwngrd(void)
 								continue;
 							}
 							/* Mark recycled block as FREE in bitmap */
-							CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
-							*((block_id *)update_array_ptr) = curblk;
+							assert(lcnt == (curblk - curbmp));
+							assert(update_array_ptr == update_array);
+							*((block_id *)update_array_ptr) = lcnt;
 							update_array_ptr += sizeof(block_id);
 							/* the following assumes sizeof(block_id) == sizeof(int) */
 							assert(sizeof(block_id) == sizeof(int));
 							*(int *)update_array_ptr = 0;
-							t_write_map(&bmlhist, (unsigned char *)update_array, curr_tn);
+							t_write_map(&bmlhist, (unsigned char *)update_array, curr_tn, 0);
 							update_trans = TRUE;
 						}
 					}
 					assert(sizeof(lcl_update_trans) == sizeof(update_trans));
 					lcl_update_trans = update_trans;	/* take a copy before t_end modifies it */
 					if ((trans_num)0 != t_end(&alt_hist, 0))
-					{
+					{	/* In case this is MM and t_end() remapped an extended database, reset csd */
+						assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+						csd = cs_data;
 						if (!lcl_update_trans)
 						{
 							assert(lcnt);
@@ -599,6 +603,9 @@ void	mu_reorg_upgrd_dwngrd(void)
 							reorg_stats.blks_converted_nonbmp++;
 						break;
 					}
+					/* In case this is MM and t_end() remapped an extended database, reset csd */
+					assert((dba_mm == cs_data->acc_meth) || (csd == cs_data));
+					csd = cs_data;
 				}
 			}
 		}
@@ -659,21 +666,21 @@ void	mu_reorg_upgrd_dwngrd(void)
 		}
 		curr_tn = csd->trans_hist.curr_tn;
 		rel_crit(reg);
-		util_out_print("Region !AD : Stopped processing at block number [0x!8XL]", TRUE, REG_LEN_STR(reg), curblk);
+		util_out_print("Region !AD : Stopped processing at block number [0x!XL]", TRUE, REG_LEN_STR(reg), curblk);
 		/* Print statistics */
-		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Bitmap)     : 0x!8XL",
+		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Bitmap)     : 0x!XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_read_from_disk_bmp);
-		util_out_print("Region !AD : Statistics : Blocks Skipped (Free)              : 0x!8XL",
+		util_out_print("Region !AD : Statistics : Blocks Skipped (Free)              : 0x!XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_skipped_free);
-		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Non-Bitmap) : 0x!8XL",
+		util_out_print("Region !AD : Statistics : Blocks Read From Disk (Non-Bitmap) : 0x!XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_read_from_disk_nonbmp);
-		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in disk)   : 0x!8XL",
+		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in disk)   : 0x!XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_skipped_newfmtindisk);
-		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in cache)  : 0x!8XL",
+		util_out_print("Region !AD : Statistics : Blocks Skipped (new fmt in cache)  : 0x!XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_skipped_newfmtincache);
-		util_out_print("Region !AD : Statistics : Blocks Converted (Bitmap)          : 0x!8XL",
+		util_out_print("Region !AD : Statistics : Blocks Converted (Bitmap)          : 0x!XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_converted_bmp);
-		util_out_print("Region !AD : Statistics : Blocks Converted (Non-Bitmap)      : 0x!8XL",
+		util_out_print("Region !AD : Statistics : Blocks Converted (Non-Bitmap)      : 0x!XL",
 			TRUE, REG_LEN_STR(reg), reorg_stats.blks_converted_nonbmp);
 		if (reorg_entiredb && (SS_NORMAL == status1) && (0 != blocks_left))
 		{	/* file-header counter does not match what reorg on the entire database expected to see */
@@ -682,8 +689,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 				TRUE, REG_LEN_STR(reg));
 			status1 = ERR_MUNOFINISH;
 		} else
-			util_out_print("Region !AD : Total Blocks = [0x!8XL] : Free Blocks = [0x!8XL] : "
-				       "Blocks to upgrade = [0x!8XL]",
+			util_out_print("Region !AD : Total Blocks = [0x!XL] : Free Blocks = [0x!XL] : "
+				       "Blocks to upgrade = [0x!XL]",
 				       TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
 		/* Issue success or failure message for this region */
 		if (SS_NORMAL == status1)

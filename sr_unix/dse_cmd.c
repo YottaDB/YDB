@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -123,6 +123,7 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "B_INCREMENTAL",             0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "B_RECORD",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "CERT_DB_VER",               0, 0, 0,                     db_vers,             0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "COMMITWAIT_SPIN_COUNT",     0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "CORRUPT_FILE",              0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "CRIT",                      0, 0, 0,                     0,                   0, 0, VAL_N_A,     0, NEG,     0,        0       },
 { "CURRENT_TN",                0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
@@ -133,9 +134,11 @@ static readonly CLI_ENTRY dse_cfhead_qual[] = {
 { "DUALSITE_RESYNC_SEQNO",     0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "FLUSH_TIME",                0, 0, dse_ftime_parm_values, 0,                   0, 0, VAL_NOT_REQ, 0, NON_NEG, VAL_TIME, 0       },
 { "FREEZE",                    0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "FULLY_UPGRADED",            0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "HARD_SPIN_COUNT",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "HEXLOCATION",               0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "HEXVALUE",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "INTERRUPTED_RECOV",         0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "JNL_SYNCIO",                0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
 { "JNL_YIELD_LIMIT",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 { "KEY_MAX_SIZE",              0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },

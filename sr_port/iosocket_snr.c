@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,12 @@
 #include "gtm_fcntl.h"
 #include "eintr_wrappers.h"
 static int fcntl_res;
+#ifdef DEBUG
+#include <sys/time.h>		/* for gettimeofday */
+#endif
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+#include <sys/poll.h>
+#endif
 #endif
 #include "gt_timer.h"
 #include "io.h"
@@ -133,6 +139,11 @@ ssize_t iosocket_snr(socket_struct *socketptr, void *buffer, size_t maxlength, i
 	return bytesread;
 }
 
+#ifdef DEBUG
+/* hold gettimeofday before and after select to debug AIX spin */
+static	struct timeval tvbefore, tvafter;
+#endif
+
 /* Do the IO dirty work. Note the return value can be from either select() or recv().
    This would be a static routine but that just makes it harder to debug.
 */
@@ -141,17 +152,32 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 	int		status, bytesread, real_errno;
 	fd_set		tcp_fd;
 	ABS_TIME	lcl_time_for_read;
+#ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
+	long		poll_timeout;
+	unsigned long	poll_nfds;
+	struct pollfd	poll_fdlist[1];
+#endif
 
 	SOCKET_DEBUG2(PRINTF("socsnrio: Socket read request - socketptr: %08lx  buffer: %08lx  maxlength: %d  flags: %d  ",
 			     socketptr, buffer, maxlength, flags); DEBUGSOCKFLUSH);
 	SOCKET_DEBUG2(PRINTF("time_for_read->at_sec: %d  usec: %d\n", time_for_read->at_sec, time_for_read->at_usec);
 		      DEBUGSOCKFLUSH);
+	DEBUG_ONLY(gettimeofday(&tvbefore, NULL);)
+#ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
         FD_ZERO(&tcp_fd);
         FD_SET(socketptr->sd, &tcp_fd);
         assert(0 != FD_ISSET(socketptr->sd, &tcp_fd));
         lcl_time_for_read = *time_for_read;
         status = tcp_routines.aa_select(socketptr->sd + 1, (void *)(&tcp_fd), (void *)0, (void *)0, &lcl_time_for_read);
+#else
+	poll_fdlist[0].fd = socketptr->sd;
+	poll_fdlist[0].events = POLLIN;
+	poll_nfds = 1;
+	poll_timeout = time_for_read->at_usec / 1000;	/* convert to millisecs */
+	status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
+#endif
 	real_errno = errno;
+	DEBUG_ONLY(gettimeofday(&tvafter, NULL);)
 	SOCKET_DEBUG2(PRINTF("socsnrio: Select return code: %d :: errno: %d\n", status, real_errno); DEBUGSOCKFLUSH);
         if (0 < status)
 	{

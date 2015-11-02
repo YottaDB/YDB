@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -101,7 +101,7 @@ void tp_incr_clean_up(short newlevel)
 			DEBUG_ONLY(
 				tmp_cse = cse;
 				TRAVERSE_TO_LATEST_CSE(tmp_cse);
-				assert(!tp_srch_status || tp_srch_status->ptr == tmp_cse);
+				assert(!tp_srch_status || tp_srch_status->cse == tmp_cse);
 			)
 			if (newlevel < cse->t_level)
 			{	/* delete the entire horizontal list for this cw-set-element.
@@ -165,7 +165,7 @@ void tp_incr_clean_up(short newlevel)
 					cse = tmp_cse;
 				}
 				if (NULL != tp_srch_status)
-					tp_srch_status->ptr = (void *)cse_newlvl;
+					tp_srch_status->cse = (void *)cse_newlvl;
 			}
 			cse = next_cse;
 		}

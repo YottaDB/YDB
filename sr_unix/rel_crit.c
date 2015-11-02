@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,11 +28,10 @@
 
 GBLREF	short 			crash_count;
 GBLREF	volatile int4		crit_count;
-GBLREF	VSIG_ATOMIC_T		forced_exit;
-GBLREF	int			process_exiting;
 GBLREF	uint4 			process_id;
 GBLREF	volatile int		suspend_status;
 GBLREF	node_local_ptr_t	locknl;
+GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 
 void	rel_crit(gd_region *reg)
 {
@@ -74,11 +73,8 @@ void	rel_crit(gd_region *reg)
 	{
 		CRIT_TRACE(crit_ops_nocrit);
 	}
-
-	/* Only do this if the process is not already exiting */
-	if (forced_exit && !process_exiting && 0 == have_crit(CRIT_HAVE_ANY_REG))
-		deferred_signal_handler();
-
-	if (DEFER_SUSPEND == suspend_status && 0 == have_crit(CRIT_HAVE_ANY_REG))
+	/* Now that crit for THIS region is released, check if deferred signal/exit handling can be done and if so do it */
+	DEFERRED_EXIT_HANDLING_CHECK;
+	if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)
 		suspend();
 }

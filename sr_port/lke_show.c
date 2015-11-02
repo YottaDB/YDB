@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,6 +53,7 @@ error_def(ERR_NOREGION);
 void	lke_show(void)
 {
 	bool			locks, all = TRUE, wait = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE;
+	boolean_t		exact = FALSE;
 	int4			pid;
 	size_t			ls_len;
 	int			n;
@@ -71,7 +72,7 @@ void	lke_show(void)
 	one_lock.addr = one_lockbuf;
 	one_lock.len = sizeof one_lockbuf;
 
-	if (lke_getcli(&all, &wait, &interactive, &pid, &reg, &node, &one_lock, &memory, &nocrit) == 0)
+	if (lke_getcli(&all, &wait, &interactive, &pid, &reg, &node, &one_lock, &memory, &nocrit, &exact) == 0)
 		return;
 
 	/* Search all regions specified on the command line */

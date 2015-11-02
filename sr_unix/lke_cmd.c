@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,9 +26,11 @@
 #include "cli.h"
 #include "lke.h"
 #include "util_spawn.h"
+#include "lke_cmd_disallow.h"
 
 static readonly CLI_ENTRY clear_qual[] = {
 	{ "ALL",          0, 0, 0, 0, 0, 0, VAL_DISALLOWED,   0, NON_NEG, VAL_N_A, 0 },
+	{ "EXACT",	  0, 0, 0, 0, 0, 0, VAL_DISALLOWED,   0, NEG,     VAL_N_A, 0 },
 	{ "INTERACTIVE",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED,   0, NEG,     VAL_N_A, 0 },
 	{ "LOCK", 	  0, 0, 0, 0, 0, 0, VAL_REQ,	   1, NON_NEG, VAL_STR, 0 },
 	{ "OUTPUT", 	  0, 0, 0, 0, 0, 0, VAL_REQ, 	   1, NON_NEG, VAL_STR, 0 },
@@ -58,7 +60,7 @@ static readonly CLI_ENTRY show_qual[] = {
  */
 
 GBLDEF CLI_ENTRY cmd_ary[] = {
-	{ "CLEAR",  lke_clear,  clear_qual, 0, 0, 0, 0, VAL_NOT_REQ,    2, 0, VAL_STR, 0},
+	{ "CLEAR",  lke_clear,  clear_qual, 0, 0, cli_disallow_lke_clear, 0, VAL_NOT_REQ,    2, 0, VAL_STR, 0},
 	{ "EXIT",   lke_exit,   0,          0, 0, 0, 0, VAL_DISALLOWED, 0, 0, 0,       0},
 	{ "HELP",   lke_help,   0,          0, 0, 0, 0, VAL_NOT_REQ,    5, 0, 0,       0},
 	{ "SETGDR", lke_setgdr,	0,          0, 0, 0, 0, VAL_REQ,        1, 0, 0,       0},

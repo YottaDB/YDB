@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +43,7 @@ GBLREF	int			socketus_interruptus;
 
 boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz)
 {
-	int		temp_1;
+	int		temp_1 = 1;
 	char		*errptr;
 	int4            errlen, msec_timeout, real_errno;
 	boolean_t	no_time_left = FALSE;
@@ -53,6 +53,7 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
         socket_interrupt *sockintr;
 	ABS_TIME        cur_time, end_time;
         mv_stent        *mv_zintdev;
+	GTM_SOCKLEN_TYPE	sockbuflen;
 
 	error_def(ERR_SOCKINIT);
 	error_def(ERR_OPENCONN);
@@ -166,9 +167,9 @@ boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t upd
 			}
 		} else
 		{
-			temp_1 = sizeof(socketptr->bufsiz);
+			sockbuflen = sizeof(socketptr->bufsiz);
 			if (-1 == tcp_routines.aa_getsockopt(socketptr->sd,
-							     SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, &temp_1))
+							     SOL_SOCKET, SO_RCVBUF, &socketptr->bufsiz, &sockbuflen))
 			{
 				errptr = (char *)STRERROR(errno);
          			errlen = STRLEN(errptr);

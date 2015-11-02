@@ -58,15 +58,6 @@ GBLREF gv_namehead		*gv_target;
 GBLREF int4			update_trans;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 
-#define CACHE_REC_CLEANUP(csa, cr)		\
-{						\
-	assert(!cr->in_tend);			\
-	assert(!cr->data_invalid);		\
-	assert(csa->now_crit);			\
-	assert(cr->in_cw_set);			\
-	cr->in_cw_set = FALSE;			\
-}
-
 #define	RESET_EARLY_TN_IF_NEEDED(csa)						\
 {										\
 	assert(!csa->t_commit_crit);						\
@@ -100,6 +91,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	sgmnt_addrs	*csa, *jpl_csa = NULL;
 	char		*trstr;
 	gd_region	*xactn_err_region, *jpl_reg = NULL;
+	cache_rec_ptr_t	*tp_cr_array;
 
 	error_def(ERR_DBCOMMITCLNUP);
 
@@ -133,10 +125,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			if (NULL != si->first_cw_set)
 			{
 				csa = si->tp_csa;
-				/* Assert that if we are in the midst of commit in a region, we better hold crit */
-				assert(!csa->t_commit_crit || csa->now_crit);
-				/* Just to be safe, set update_underway to TRUE only if we have crit on this region. */
-				if (csa->now_crit && csa->t_commit_crit)
+				if (T_UPDATE_UNDERWAY(csa))
 				{
 					update_underway = TRUE;
 					break;
@@ -146,7 +135,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	} else
 	{
 		trstr = "NON-TP";
-		update_underway = (cs_addrs->now_crit && (cs_addrs->t_commit_crit || (T_COMMIT_STARTED == update_trans)));
+		update_underway = (cs_addrs->now_crit && (T_COMMIT_STARTED == update_trans) || T_UPDATE_UNDERWAY(cs_addrs));
 		if (NULL != gv_target)	/* gv_target can be NULL in case of DSE MAPS command etc. */
 			gv_target->clue.end = 0; /* in case t_end() had set history's tn to be "valid_thru++", undo it */
 	}
@@ -178,19 +167,17 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			for (si = first_sgm_info; NULL != si; si = si->next_sgm_info)
 			{
 				TP_CHANGE_REG(si->gv_cur_region);
+				tp_cr_array = &si->cr_array[0];
+				UNPIN_CR_ARRAY_ON_RETRY(tp_cr_array, si->cr_array_index);
+				assert(!si->cr_array_index);
 				csa = cs_addrs;
-				while (si->cr_array_index > 0)
-				{
-					cr = si->cr_array[--si->cr_array_index];
-					CACHE_REC_CLEANUP(csa, cr);
-				}
 				if (si->update_trans)
 				{
 					RESET_EARLY_TN_IF_NEEDED(csa);		/* step (4) of the commit logic is undone here */
 					RESET_REG_SEQNO_IF_NEEDED(csa, jpl_csa);/* step (5) of the commit logic is undone here */
 				}
 				assert(!csa->t_commit_crit);
-				assert(!csa->now_crit || csa->ti->curr_tn == csa->ti->early_tn);
+				assert(!csa->now_crit || (csa->ti->curr_tn == csa->ti->early_tn));
 				ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between
 											  * seqno of filehdr and jnlpool */
 				/* Do not release crit on the region until reg_seqno has been reset above */
@@ -200,12 +187,9 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 			RELEASE_JNLPOOL_LOCK_IF_NEEDED(jpl_reg);/* step (2) of the commit logic is undone here */
 		} else
 		{
+			UNPIN_CR_ARRAY_ON_RETRY(cr_array, cr_array_index);
+			assert(!cr_array_index);
 			csa = cs_addrs;
-			while (cr_array_index > 0)
-			{
-				cr = cr_array[--cr_array_index];
-				CACHE_REC_CLEANUP(csa, cr);
-			}
 			if (update_trans)
 			{
 				RESET_EARLY_TN_IF_NEEDED(csa);		/* step (4) of the commit logic is undone here */

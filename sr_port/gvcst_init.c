@@ -55,6 +55,7 @@
 #include "hashtab.h"
 #include "hashtab_mname.h"
 #include "process_gvt_pending_list.h"
+#include "gtmmsg.h"
 
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -84,6 +85,7 @@ GBLREF	volatile int		reformat_buffer_in_use;	/* used only in DEBUG mode */
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		new_dbinit_ipc;
 GBLREF	gvt_container		*gvt_pending_list;
+GBLREF	boolean_t		dse_running;
 
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
@@ -377,8 +379,12 @@ void gvcst_init (gd_region *greg)
 	}
 	if (temp_cs_data->createinprogress)
 		rts_error(VARLSTCNT(4) ERR_DBCREINCOMP, 2, DB_LEN_STR(greg));
-	if (temp_cs_data->file_corrupt && !mupip_jnl_recover)
+	/* Do not error out while journal recovery is running or dse is running */
+	if (temp_cs_data->file_corrupt && !mupip_jnl_recover && !dse_running)
 		rts_error(VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(greg));
+	/* Warn the user CORRUPT_FILE flag set*/
+	if (temp_cs_data->file_corrupt && dse_running)
+		gtm_putmsg(VARLSTCNT(4) MAKE_MSG_WARNING(ERR_DBFLCORRP), 2, DB_LEN_STR(greg));
 	if ((dba_mm == temp_cs_data->acc_meth) && temp_cs_data->blks_to_upgrd)
 		rts_error(VARLSTCNT(4) ERR_MMNODYNUPGRD, 2, DB_LEN_STR(greg));
 	assert(greg_acc_meth != dba_cm);
@@ -436,6 +442,10 @@ void gvcst_init (gd_region *greg)
 	 *	and so that the db-file-name can be successfully obtained from orphaned shm by mu_rndwn_all.
 	 */
  	assert(offsetof(node_local, label[0]) == 0);
+	/* Unfortunately, GDS_LABEL_SZ can't be defined with STR_LIT_LEN because of header nesting issues.
+	 * So, let's make sure it's correct.
+	 */
+	assert(GDS_LABEL_SZ == sizeof(GDS_LABEL));
 	assert(offsetof(node_local, fname[0]) == GDS_LABEL_SZ);
 	assert(offsetof(node_local, now_running[0]) == GDS_LABEL_SZ + MAX_FN_LEN + 1);
 	assert(sizeof(csa->nl->now_running) == MAX_REL_NAME);

@@ -150,7 +150,7 @@ static	int repl_read_file(repl_buff_t *rb)
 	}
 	start_addr = ROUND_DOWN2(b->readaddr, DISK_BLOCK_SIZE);
 	end_addr = ROUND_UP2(b->readaddr + b->buffremaining - read_less, DISK_BLOCK_SIZE);
-	if (lseek(fc->fd, start_addr, SEEK_SET) == (off_t)-1)
+	if ((off_t)-1 == lseek(fc->fd, (off_t)start_addr, SEEK_SET))
 	{
 		repl_errno = EREPL_JNLFILESEEK;
 		return (ERRNO);
@@ -929,8 +929,11 @@ static	tr_search_state_t do_binary_search(repl_ctl_element *ctl, uint4 lo_addr, 
 		mid_diff = fc->eof_addr - mid;
 		assert(0 != mid_diff);
 		stop_at = mid + MIN(REPL_BLKSIZE(rb) - mid_mod, mid_diff);
-		assert(stop_at <= high);
-		found = do_linear_search(ctl, mid, stop_at, read_seqno, srch_status);
+		/* Note that for high values of journal-alignsize (which is what REPL_BLKSIZE macro expands to), it is
+		 * possible that stop_at is GREATER than high. Since it is not necessary to search any further than high,
+		 * limit it accordingly before calling the linear search.
+		 */
+		found = do_linear_search(ctl, mid, MIN(stop_at, high), read_seqno, srch_status);
 		assert(srch_status->seqno == 0 || srch_status->seqno == ctl->seqno);
 		switch (found)
 		{
@@ -1075,6 +1078,7 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 	uint4			lo_addr, hi_addr;
 	tr_search_state_t	found, (*srch_func)();
 	tr_search_status_t	srch_status;
+	uint4			willnotbefound_addr = 0, willnotbefound_stop_at = 0;
 	DEBUG_ONLY(jnl_record	*jrec;)
 	DEBUG_ONLY(enum jnl_record_type	rectype;)
 
@@ -1105,6 +1109,15 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 		{
 			lo_addr = b->recaddr;
 			hi_addr = ctl->max_seqno_dskaddr;
+			/* Since we know that read_seqno is LESSER than ctl->max_seqno, we know for sure we should not return
+			 * this function with found = TR_NOT_FOUND. If ever the binary/linear search invocation at the end of
+			 * this function returns with TR_NOT_FOUND, we have to change that to TR_WILL_NOT_BE_FOUND and also
+			 * adjust ctl->seqno to point to ctl->max_seqno that way we dont repeat binary search (wastefully) for
+			 * all seqnos between read_seqno and the least seqno larger than read_seqno in this file.
+			 */
+			willnotbefound_addr = hi_addr;
+			assert(ctl->max_seqno_dskaddr < rb->fc->eof_addr);
+			willnotbefound_stop_at = rb->fc->eof_addr;
 		} else if (read_seqno == ctl->max_seqno)
 		{	/* For read_seqno == ctl->max_seqno, do not use linear search. Remember, max_seqno_dskaddr may be the
 			 * the address of the TCOM record of a transaction, and this TCOM record may be in a different block
@@ -1156,6 +1169,18 @@ static	tr_search_state_t position_read(repl_ctl_element *ctl, seq_num read_seqno
 	REPL_DPRINT6("position_read: Using %s search to locate %llu in %s between %u and %u\n",
 			(srch_func == do_linear_search) ? "linear" : "binary", read_seqno, ctl->jnl_fn, lo_addr, hi_addr);
 	found = srch_func(ctl, lo_addr, hi_addr, read_seqno, &srch_status);
+	if ((TR_NOT_FOUND == found) && (0 != willnotbefound_addr))
+	{	/* There is a block that contains a seqno larger than read_seqno; leave ctl positioned at this higher seqno.
+		 * If we don't do this, we could end up in an infinite loop if the caller of this function is "read_regions".
+		 * That caller redoes the "position_read" function call assuming there would have been some progress in the
+		 * previous call to the same function. So not resetting ctl->seqno here will result in an infinite loop.
+		 */
+		found = do_linear_search(ctl, willnotbefound_addr, willnotbefound_stop_at, read_seqno, &srch_status);
+		REPL_DPRINT4("do_binary_search: position at seqno %llu in block [%u, %u)\n", srch_status.seqno,
+				willnotbefound_addr, willnotbefound_stop_at);
+		assert(found == TR_WILL_NOT_BE_FOUND);
+		assert(read_seqno < ctl->seqno);
+	}
 	assert(found != TR_NOT_FOUND);
 	return (found);
 }
@@ -1215,6 +1240,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	int			read_len, cumul_read;
 	int			nopen;
 	unsigned char		seq_num_str[32], *seq_num_ptr;  /* INT8_PRINT */
+	DEBUG_ONLY(static int	loopcnt;)
 
 	cumul_read = 0;
 	*brkn_trans = TRUE;
@@ -1224,6 +1250,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	{
 		found = TR_NOT_FOUND;
 		region = ctl->reg;
+		DEBUG_ONLY(loopcnt = 0;)
 		while (found == TR_NOT_FOUND)
 		{	/* Find the generation of the journal file which has read_jnl_seqno */
 			for ( ; ctl != NULL && ctl->reg == region &&
@@ -1409,6 +1436,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					found = TR_WILL_NOT_BE_FOUND;
 				} else	/* QWGT(read_jnl_seqno, ctl->seqno) */
 				{
+					/* Detect infinite loop of calls to position_read() by limiting # of calls to 1024 in dbg */
+					DEBUG_ONLY(loopcnt++;)
+					assert(1024 > loopcnt);
 					if (ctl->file_state == JNL_FILE_OPEN)
 					{	/* State change from READ_FILE->READ_POOL-> READ_FILE might cause this.
 						 * The journal files have grown since the transition from READ_FILE to READ_POOL

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,7 +45,8 @@ bool	lke_cleartree(
 		      bool		all,
 		      bool		interactive,
 		      int4 		pid,
-		      mstr		one_lock)
+		      mstr		one_lock,
+		      boolean_t		exact)
 
 {
 	mlk_shrblk_ptr_t	node, oldnode, start[KDIM];
@@ -66,13 +67,16 @@ bool	lke_cleartree(
 		name.len = subscript_offset[depth];
 
 		/* Display the lock node */
-		locked = lke_showlock(lnk, node, &name, all, FALSE, interactive, pid, one_lock);
+		locked = lke_showlock(lnk, node, &name, all, FALSE, interactive, pid, one_lock, exact);
 		locks |= locked;
 
 		/* If it was locked, clear it and wake up any processes waiting for it */
 		if (locked  &&  lke_clearlock(region, lnk, ctl, node, &name, all, interactive, pid)  &&  node->pending != 0)
 			mlk_wake_pending(ctl, node, region);
 
+		/* if a specific lock was requested (-EXACT and -LOCK=), then we are done */
+		if (exact && (0 != one_lock.len) && locked)
+			return locks;
 		/* Move to the next node */
 		if (node->children == 0)
 		{

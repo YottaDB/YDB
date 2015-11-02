@@ -25,9 +25,10 @@
 #include "gdsblk.h"
 #include "util.h"
 #include "dse.h"
-#include "stringpool.h"		/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
-#include "op.h"			/* for op_fnzdate and op_horolog prototype */
-#include "wcs_recover.h"	/* for wcs_recover prototype */
+#include "stringpool.h"			/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
+#include "op.h"				/* for op_fnzdate and op_horolog prototype */
+#include "wcs_recover.h"		/* for wcs_recover prototype */
+#include "wcs_phase2_commit_wait.h"
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*original_header;
@@ -93,10 +94,19 @@ void dse_cache(void)
 		{
 			GET_CURR_TIME_IN_DOLLARH_AND_ZDATE(dollarh_mval, dollarh_buffer, zdate_mval, zdate_buffer);
 			if (verify_present)
+			{	/* Before invoking wcs_verify, wait for any pending phase2 commits to finish.
+				 * Need to wait as otherwise ongoing phase2 commits can result in cache verification
+				 * returning FALSE (e.g. due to DBCRERR message indicating that cr->in_tend is non-zero).
+				 */
+				if (csa->nl->wcs_phase2_commit_pidcnt)
+				{	/* No need to check return value since even if it fails, we want to do cache verification */
+					wcs_phase2_commit_wait(csa, NULL);
+				}
 				is_clean = wcs_verify(reg, TRUE, FALSE); /* expect_damage is TRUE, caller_is_wcs_recover is FALSE */
-			else
+			} else
 			{
-				csa->hdr->wc_blocked = TRUE;
+				SET_TRACEABLE_VAR(csa->hdr->wc_blocked, TRUE);
+				/* No need to invoke function "wcs_phase2_commit_wait" as "wcs_recover" does that anyways */
 				wcs_recover(reg);
 				assert(FALSE == csa->hdr->wc_blocked);	/* wcs_recover() should have cleared this */
 			}
@@ -124,7 +134,7 @@ void dse_cache(void)
 					old_value = *(sm_ushort_ptr_t)chng_ptr;
 				} else if (sizeof(int4) == size)
 				{
-					SPRINTF(temp_str, "!UL [0x!8XL]");
+					SPRINTF(temp_str, "!UL [0x!XL]");
 					old_value = *(sm_uint_ptr_t)chng_ptr;
 				}
 				if (value_present)
@@ -139,13 +149,13 @@ void dse_cache(void)
 					value = old_value;
 				if (show_present)
 				{
-					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!8XL] : Value = %s :"
+					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!XL] : Value = %s :"
 								" Size = !UB [0x!XB]", temp_str);
 					util_out_print(temp_str1, TRUE, REG_LEN_STR(reg), offset, offset,
 								value, value, size, size);
 				} else
 				{
-					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!8XL] : Old Value = %s : "
+					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!XL] : Old Value = %s : "
 						"New Value = %s : Size = !UB [0x!XB]", temp_str, temp_str);
 					util_out_print(temp_str1, TRUE, REG_LEN_STR(reg), offset, offset,
 								old_value, old_value, value, value, size, size);
@@ -154,42 +164,42 @@ void dse_cache(void)
 		} else
 		{
 			assert(show_present);	/* this should be a DSE CACHE -SHOW command with no other qualifiers */
-			util_out_print("Region !AD : Shared_memory       = 0x!XL",
+			util_out_print("Region !AD : Shared_memory       = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), csa->db_addrs[0]);
-			util_out_print("Region !AD :  node_local         = 0x!XL",
+			util_out_print("Region !AD :  node_local         = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->nl));
-			util_out_print("Region !AD :  critical           = 0x!XL",
+			util_out_print("Region !AD :  critical           = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->critical));
 			if (JNL_ALLOWED(csa))
 			{
-				util_out_print("Region !AD :  jnl_buffer_struct  = 0x!XL",
+				util_out_print("Region !AD :  jnl_buffer_struct  = 0x!XJ",
 						TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->jnl->jnl_buff));
-				util_out_print("Region !AD :  jnl_buffer_data    = 0x!XL", TRUE, REG_LEN_STR(reg),
+				util_out_print("Region !AD :  jnl_buffer_data    = 0x!XJ", TRUE, REG_LEN_STR(reg),
 					       DB_ABS2REL(&csa->jnl->jnl_buff->buff[csa->jnl->jnl_buff->buff_off]));
 			}
-			util_out_print("Region !AD :  shmpool_buffer     = 0x!XL",
+			util_out_print("Region !AD :  shmpool_buffer     = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->shmpool_buffer));
-			util_out_print("Region !AD :  lock_space         = 0x!XL",
+			util_out_print("Region !AD :  lock_space         = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->lock_addrs[0]));
-			util_out_print("Region !AD :  cache_queues_state = 0x!XL",
+			util_out_print("Region !AD :  cache_queues_state = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->acc_meth.bg.cache_state));
 			cr_que_lo = &csa->acc_meth.bg.cache_state->cache_array[0];
-			util_out_print("Region !AD :  cache_que_header   = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
+			util_out_print("Region !AD :  cache_que_header   = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo), csa->hdr->bt_buckets, sizeof(cache_rec));
-			util_out_print("Region !AD :  cache_record       = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
+			util_out_print("Region !AD :  cache_record       = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets),
 					csa->hdr->n_bts, sizeof(cache_rec));
-			util_out_print("Region !AD :  global_buffer      = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
+			util_out_print("Region !AD :  global_buffer      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg),
 					ROUND_UP2(DB_ABS2REL(cr_que_lo + csa->hdr->bt_buckets + csa->hdr->n_bts), OS_PAGE_SIZE),
 					csa->hdr->n_bts, csa->hdr->blk_size);
-			util_out_print("Region !AD :  db_file_header     = 0x!XL",
+			util_out_print("Region !AD :  db_file_header     = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->hdr));
-			util_out_print("Region !AD :  bt_que_header      = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
+			util_out_print("Region !AD :  bt_que_header      = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_header), csa->hdr->bt_buckets, sizeof(bt_rec));
-			util_out_print("Region !AD :  th_base            = 0x!XL",
+			util_out_print("Region !AD :  th_base            = 0x!XJ",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->th_base));
-			util_out_print("Region !AD :  bt_record          = 0x!XL : Numelems = 0x!XL : Elemsize = 0x!XL",
+			util_out_print("Region !AD :  bt_record          = 0x!XJ : Numelems = 0x!XL : Elemsize = 0x!XL",
 					TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->bt_base), csa->hdr->n_bts, sizeof(bt_rec));
 			util_out_print("Region !AD :  shared_memory_size = 0x!XL",
 					TRUE, REG_LEN_STR(reg), reg->sec_size VMS_ONLY(* OS_PAGELET_SIZE));

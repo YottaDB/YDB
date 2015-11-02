@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,24 +18,34 @@
    is hiber_start which can be accessed through the LONG_SLEEP macro defined in mdef.h.
  */
 
-#define MAXSLPTIME 		100			/* max (millisec) sleep possible thru wcs_sleep */
+/* It has been found that on some platforms wcs_sleep(1msec) takes a lot longer than 1 msec to return. We think
+ * this is because the frequency of the kernel's timer interrupt is a lot lower in older kernels at least in Linux.
+ * Therefore we should never use MINSLPTIME (1msec) in sleep loops as it will result in a total loop sleep time
+ * that is potentially an order of magnitude higher than the desired total sleep time. 10msec seems to work a lot
+ * more effectively so use that for now until all unix kernels can support 1msec sleep granularity more accurately.
+ */
+#define MINSLPTIME 		1	/* min (millisec) sleep possible thru wcs_sleep. See comment above about loop usage */
+#define MAXSLPTIME 		10	/* max (millisec) sleep possible thru wcs_sleep */
+#define	SLEEP_ONE_MIN		6000	/* # of wcs_sleep iterations (each max MAXSLPTIME msec) needed to wait 1 minute */
 
-/* 650 ==> incremental count to make a complete 1 min sleep */
-
-#define MAXWTSTARTWAIT 		650
-#define BUF_OWNER_STUCK 	650
+#define MAXWTSTARTWAIT 		SLEEP_ONE_MIN
+#define BUF_OWNER_STUCK 	SLEEP_ONE_MIN
 #define UNIX_GETSPACEWAIT	(BUF_OWNER_STUCK * 2)
-#define MAXGETSPACEWAIT 	650
-#define MAX_CRIT_TRY		650
+#define MAXGETSPACEWAIT 	SLEEP_ONE_MIN
+#define MAX_CRIT_TRY		SLEEP_ONE_MIN
 #define MAX_BACKUP_FLUSH_TRY	650
-#define MAX_OPEN_RETRY		650		/* vms only: for dbfilop  and others trying to open the db file */
-#define MAX_SHMGET_COUNT	650		/* unix only: 1 min try to get shared memory */
-#define JNL_MAX_FLUSH_TRIES     650
+#define MAX_OPEN_RETRY		SLEEP_ONE_MIN	/* vms only: for dbfilop  and others trying to open the db file */
+#define JNL_MAX_FLUSH_TRIES     SLEEP_ONE_MIN
 #define JNL_FLUSH_PROG_FACTOR	2
 #define JNL_FLUSH_PROG_TRIES	(JNL_MAX_FLUSH_TRIES * JNL_FLUSH_PROG_FACTOR)
-#define MAX_LCK_TRIES 		650		/* vms only: wait in mu_rndwn_file */
+#define MAX_LCK_TRIES 		SLEEP_ONE_MIN	/* vms only: wait in mu_rndwn_file */
 #define TIME_TO_FLUSH           10      	/* milliseconds */
-#define MAX_FSYNC_WAIT_CNT     	1150		/* 2 mins of total wait for fsync, before GTMASSERTing */
+#define MAX_FSYNC_WAIT_CNT     	(2 * SLEEP_ONE_MIN)	/* 2 mins of total wait for fsync, before GTMASSERTing */
+#define	MAX_TQREAD_WAIT		(4 * BUF_OWNER_STUCK)	/* 4 mins of total wait for t_qread, before GTMASSERTing */
+
+#define PHASE2_COMMIT_SLEEP	MAXSLPTIME	/* 10 msec inter-iteration sleep wait for active phase2 commits */
+#define	PHASE2_COMMIT_WAIT	SLEEP_ONE_MIN
+#define	PHASE2_COMMIT_WAIT_HTBT	8		/* = 8 heartbeats (each 8 seconds) = 64 seconds wait (used in Unix) */
 
 #define LOOP_CNT_SEND_WAKEUP	300		/* When loops hit multiple of this count, they can send
 						   a wakeup (resume/continue) to the process */

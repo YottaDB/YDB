@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007 Fidelity Information Services, Inc *
+ *      Copyright 2008 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -26,7 +26,7 @@ union
 } modrm_byte_byte, modrm_byte_long, modrm_byte_actual;
 
 
-short opcode_correct(char *curr_pc, short opcode, short reg_opcode, short is_rm, short r_m)
+short opcode_correct(unsigned char *curr_pc, short opcode, short reg_opcode, short is_rm, short r_m)
 {
 	if (*(curr_pc - MOD_BYTE_SZ) == opcode)
         {
@@ -72,7 +72,7 @@ short opcode_correct(char *curr_pc, short opcode, short reg_opcode, short is_rm,
 }
 
 
-short valid_calling_sequence(char *pc)
+short valid_calling_sequence(unsigned char *pc)
 {
 	short curr_offset = 0, inst_sz;
 
@@ -88,28 +88,8 @@ short valid_calling_sequence(char *pc)
 	if(curr_offset += opcode_correct(pc, I386_INS_Grp5_Prefix, I386_INS_CALL_Ev, TRUE, GTM_REG_XFER_TABLE))
 	{
 			/* 	inst is :: mov R0 = MEM 	*/
-		inst_sz = opcode_correct((pc - curr_offset),I386_INS_MOV_Gv_Ev,GTM_REG_R0,FALSE,0);
-		switch(inst_sz)
-		{
-			case FALSE :
-				return FALSE;
-			case MOD_NONE_SZ :
-				labaddr_off = 0;
-				break;
-			case MOD_BYTE_SZ :
-				labaddr_off = (int4) *(pc - curr_offset - 1);
-				break;
-			case MOD_LONG_SZ :
-				labaddr_off = (int4) *((int4 *)(pc - curr_offset - 4));
-				break;
-			default :
-				GTMASSERT;
-		}
-		curr_offset += inst_sz;
-		/* if invalid, would've returned before... */
-			/*	inst is :: mov R1 = MEM		*/
-		inst_sz = opcode_correct((pc - curr_offset),I386_INS_MOV_Gv_Ev,GTM_REG_R1,FALSE,0);
-		switch(inst_sz)
+		inst_sz = 1 + opcode_correct((pc - curr_offset),I386_INS_MOV_Gv_Ev,I386_REG_RDI,TRUE,GTM_REG_PV & 0x7);
+		switch(inst_sz - 1)
 		{
 			case FALSE :
 				return FALSE;
@@ -117,10 +97,30 @@ short valid_calling_sequence(char *pc)
 				rtnhdr_off = 0;
 				break;
 			case MOD_BYTE_SZ :
-				rtnhdr_off = (int4) *(pc - curr_offset - 1);
+				rtnhdr_off = (int4) *((char *)pc - curr_offset - 1);
 				break;
 			case MOD_LONG_SZ :
 				rtnhdr_off = (int4) *((int4 *)(pc - curr_offset - 4));
+				break;
+			default :
+				GTMASSERT;
+		}
+		curr_offset += inst_sz;
+		/* if invalid, would've returned before... */
+			/*	inst is :: mov R1 = MEM		*/
+		inst_sz = 1 + opcode_correct((pc - curr_offset),I386_INS_MOV_Gv_Ev,I386_REG_RSI,TRUE,GTM_REG_PV & 0x7);
+		switch(inst_sz - 1)
+		{
+			case FALSE :
+				return FALSE;
+			case MOD_NONE_SZ :
+				labaddr_off = 0;
+				break;
+			case MOD_BYTE_SZ :
+				labaddr_off = (int4) *((char *)pc - curr_offset - 1);
+				break;
+			case MOD_LONG_SZ :
+				labaddr_off = (int4) *((int4 *)(pc - curr_offset - 4));
 				break;
 			default :
 				GTMASSERT;

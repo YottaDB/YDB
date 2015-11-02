@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +16,7 @@
 #define OFFSET_LEN 			8
 #define TOTAL_SIZE_OF_PROFILING_STACKS 	8388608
 #define	GUARD_RING_FOR_PROFILING_STACK	1024
-#ifdef __ia64
+#ifdef GTM64
 #define PROFCALLOC_DSBLKSIZE 		8192
 #else
 #define PROFCALLOC_DSBLKSIZE            8180

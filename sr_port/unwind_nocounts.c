@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,7 @@
 #include "tp_frame.h"
 #include "op.h"
 #include "unwind_nocounts.h"
+#include "error_trap.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF stack_frame	*error_frame;
@@ -36,8 +37,8 @@ bool unwind_nocounts(void)
 	for (fp = frame_pointer; !(fp->type & SFT_COUNT) && fp->old_frame_pointer; fp = fp->old_frame_pointer)
 	{
 		if (error_frame == fp)
-		{	/* avoid SET_ERROR_FRAME macro in order to preserve current error_frame->mpc and error_frame->ctxt */
-			error_frame = fp->old_frame_pointer;
+		{
+			SET_ERROR_FRAME(fp->old_frame_pointer);
 			assert(NULL != error_frame);
 		}
 		if (fp->type & SFT_DM)

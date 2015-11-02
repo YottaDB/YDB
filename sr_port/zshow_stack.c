@@ -67,10 +67,10 @@ void zshow_stack(zshow_out *output)
 			}
 			else
 				addr = fp->mpc;
-			v.len = INTCAST(symb_line(addr, &buff[0], 0, fp->rvector, FALSE) - &buff[0]);
+			v.len = INTCAST(symb_line(addr, &buff[0], 0, fp->rvector) - &buff[0]);
 			if (v.len == 0)
 			{
-				memcpy(&buff[0], UNK_LOC_MESS, sizeof(UNK_LOC_MESS) - 1);
+				MEMCPY_LIT(&buff[0], UNK_LOC_MESS);
 				v.len = sizeof(UNK_LOC_MESS) - 1;
 			}
 			if (nfp != &nocount_frames[0])
@@ -80,23 +80,23 @@ void zshow_stack(zshow_out *output)
 					switch(*nfp)
 					{
 					case SFT_ZBRK_ACT:
-						memcpy(&buff[v.len], ZBRK_FRAME, sizeof(ZBRK_FRAME) - 1);
+						MEMCPY_LIT(&buff[v.len], ZBRK_FRAME);
 						v.len += sizeof(ZBRK_FRAME) - 1;
 						break;
 					case SFT_DEV_ACT:
-						memcpy(&buff[v.len], DEVERR_FRAME, sizeof(DEVERR_FRAME) - 1);
+						MEMCPY_LIT(&buff[v.len], DEVERR_FRAME);
 						v.len += sizeof(DEVERR_FRAME) - 1;
 						break;
 					case SFT_ZTRAP:
-						memcpy(&buff[v.len], ZTRAP_FRAME, sizeof(ZTRAP_FRAME) - 1);
+						MEMCPY_LIT(&buff[v.len], ZTRAP_FRAME);
 						v.len += sizeof(ZTRAP_FRAME) - 1;
 						break;
 					case SFT_DM:
-						memcpy(&buff[v.len], DIR_MODE_MESS, sizeof(DIR_MODE_MESS) - 1);
+						MEMCPY_LIT(&buff[v.len], DIR_MODE_MESS);
 						v.len += sizeof(DIR_MODE_MESS) - 1;
 						break;
 					case (SFT_COUNT | SFT_ZINTR):
-						memcpy(&buff[v.len], ZINTR_FRAME, sizeof(ZINTR_FRAME) - 1);
+						MEMCPY_LIT(&buff[v.len], ZINTR_FRAME);
 						v.len += sizeof(DIR_MODE_MESS) - 1;
 						break;
 					default:

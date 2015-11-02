@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2003, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -749,10 +749,19 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 		if (this_rec_valid)
 		{
 			assert(mid_off >= jctl->rec_offset || 0 == mid_off); /* are we by any chance going backwards? */
+			rec_offset = jctl->rec_offset;	/* save this in case we need to restore it */
 			jctl->rec_offset = MAX(mid_off, JNL_HDR_LEN);
 			mur_rab.jnlrec = rec;
 			mur_rab.jreclen = rec->prefix.forwptr;
 			this_rec_valid = (jctl->rec_offset + mur_rab.jreclen <= hi_off) && mur_validate_checksum();
+			if (!this_rec_valid)
+			{	/* Initial validity checks were good but second check of this_rec_valid returned FALSE
+				 * (most likely checksum did not match). So restore jctl->rec_offset to what it was before.
+				 * The reason why it is set above before confirming the second validation check is that
+				 * mur_validate_checksum relies on jctl->rec_offset being set for its calculations.
+				 */
+				jctl->rec_offset = rec_offset;
+			}
 		}
 		if (mid_off <= lo_off)
 			break;
@@ -961,7 +970,7 @@ boolean_t mur_fopen(jnl_ctl_list *jctl)
 		 * But we can still try to continue recovery. We already removed time continuty check from mur_fread_eof().
 		 * So if error limit allows, we will continue recovery  */
 		gtm_putmsg(VARLSTCNT(6) ERR_BOVTMGTEOVTM, 4, jctl->jnl_fn_len, jctl->jnl_fn,
-							jfh->bov_timestamp, jfh->eov_timestamp);
+							&jfh->bov_timestamp, &jfh->eov_timestamp);
 		/* since mur_jctl global is not ready yet mur_report_error does not print message */
 		if (!mur_report_error(MUR_BOVTMGTEOVTM))
 			return FALSE;
@@ -996,6 +1005,7 @@ boolean_t mur_fclose(jnl_ctl_list *jctl)
 		return TRUE;
 	}
 	UNIX_ONLY(jctl->status = errno;)
+	assert(FALSE);
 	gtm_putmsg(VARLSTCNT(5) ERR_JNLFILECLOSERR, 2, jctl->jnl_fn_len, jctl->jnl_fn, jctl->status);
 	return FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2005 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -126,7 +126,10 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value)
 		mu_int_errknt++;
 		return;
 	}
+	/* Take a copy of the file-header. To ensure it is consistent, do it while holding crit. */
+	grab_crit(gv_cur_region);
 	memcpy((uchar_ptr_t)&mu_int_data, (uchar_ptr_t)cs_data, sizeof(sgmnt_data));
+	rel_crit(gv_cur_region);
 	mu_int_master = malloc(MASTER_MAP_SIZE(cs_data));
 	memcpy(mu_int_master, MM_ADDR(cs_data), MASTER_MAP_SIZE(cs_data));
 	*return_value = mu_int_fhead();

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -69,7 +69,7 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 	(new--)->blk_num = 0;
 	new->blk_num = old->blk_num;
 	new->tn = old->tn;
-	new->ptr = NULL;
+	new->cse = NULL;
 	new->first_tp_srch_status = old->first_tp_srch_status;
 	assert(new->level == old->level);
 	assert(new->blk_target == old->blk_target);
@@ -89,7 +89,7 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 		--old;
 		GET_LONG(blk, ((sm_int_ptr_t)(bp + rtop - sizeof(block_id))));
 		new->tn = cs_addrs->ti->curr_tn;
-		new->ptr = NULL;
+		new->cse = NULL;
 		if (NULL == (buffer_address = t_qread(blk, &new->cycle, &new->cr)))
 			return((enum cdb_sc)rdfail_detail);
 		new->first_tp_srch_status = first_tp_srch_status;

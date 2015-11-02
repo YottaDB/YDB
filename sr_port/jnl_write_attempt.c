@@ -30,6 +30,7 @@
 #include "compswap.h"
 #include "is_file_identical.h"
 #include "have_crit.h"
+#include "wbox_test_init.h"
 
 #ifdef UNIX
 #include "gtmmsg.h"
@@ -50,14 +51,15 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	sgmnt_addrs		*csa;
 	jnl_buffer_ptr_t	jb;
 	unsigned int		status;
-	boolean_t		was_crit;
+	boolean_t		was_crit, exact_check;
 	/**** Note static/local */
 	static uint4		loop_image_count, writer;	/* assumes calls from one loop at a time */
+	uint4			new_dskaddr, new_dsk;
 
 	error_def(ERR_JNLCNTRL);
 	error_def(ERR_JNLFLUSH);
-	error_def(ERR_JNLMEMDSK);
 	error_def(ERR_JNLPROCSTUCK);
+	error_def(ERR_TEXT);
 	error_def(ERR_JNLWRTDEFER);
 	error_def(ERR_JNLWRTNOWWRTR);
 
@@ -70,7 +72,9 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	jb = jpc->jnl_buff;
 	status = ERR_JNLWRTDEFER;
 	csa = &FILE_INFO(jpc->region)->s_addrs;
-	while (jb->dskaddr < threshold)
+	was_crit = csa->now_crit;
+	exact_check = was_crit && (threshold == jb->freeaddr);	/* see comment in jnl_write_attempt() for why this is needed */
+	while (exact_check ? (jb->dskaddr != threshold) : (jb->dskaddr < threshold))
 	{
 #ifdef UNIX
 		if (jb->io_in_prog_latch.u.parts.latch_pid == process_id)
@@ -94,28 +98,43 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			}
 			break;		/* no fancy stuff within an AST */
 		} else if (!jb->io_in_prog)
+		{	/* Note down jpc->new_dskaddr/new_dsk into local variables so we get a consistent copy of these two
+			 * variables for checking them later.
+			 */
+			new_dskaddr = jpc->new_dskaddr;
+			new_dsk = jpc->new_dsk;
 			status = jnl_qio_start(jpc);
+		}
 #else
 #error UNSUPPORTED PLATFORM
 #endif
 		if (SS_NORMAL == status)
 		{
-			if (jb->free == jb->dsk && jb->dskaddr < threshold) /* there's nothing in the buffer to write, */
-				status = ERR_JNLMEMDSK;			    /* but this process still isn't satisfied */
+#			if defined VMS
+			/* Check if JNLCNTRL error was signalled by jnl_qio_start(). Note that it does not explicitly
+			 * return this error since it in turn calls an AST routine jnl_start_ast that actually has the
+			 * qio lock (and hence can look at dskaddr/dsk without any concurrency issues). But jpc will
+			 * have two fields new_dskaddr/new_dsk set to what dskaddr/dsk were right after obtaining the
+			 * qio lock but before releasing it in case of a JNLCNTRL error. We use those two values to
+			 * recheck if this is a JNLCNTRL error situation and if so return that error from here.
+			 * Note that we cannot use fields from jpc since they could be set by an AST that pops right
+			 * after we check new_dskaddr below but before we fetch the value of new_dsk. So it is important
+			 * to use the local variables which we know are a consistent snapshot of jpc->new_dskaddr/new_dsk.
+			 * The only consequence of this approach is that in case there is a dskaddr/dsk inconsistency,
+			 * it will be detected by the local variables in the next iteration (not the first time around).
+			 */
+			if ((new_dskaddr % jb->size) != new_dsk)
+			{
+				assert(gtm_white_box_test_case_enabled
+					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number));
+				status = ERR_JNLCNTRL;
+			}
+#			endif
 			break;
 		}
 		UNIX_ONLY(assert(ERR_JNLWRTNOWWRTR != status);)	/* dont have asynchronous jnl writes in Unix */
 		if ((ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
-		{
-			if (csa->now_crit)
-			{	/* If not waiting for some other writer (or self in VMS) and holding crit better
-				 * turn off journaling and proceed with database update to avoid a database hang.
-				 */
-				jpc->jnl_buff->blocked = 0;
-				jnl_file_lost(jpc, status);
-			}
 			return status;
-		}
 		if ((writer != CURRENT_WRITER) || (1 == *lcnt))
 		{
 			writer = CURRENT_WRITER;
@@ -136,19 +155,22 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		)
 		if (writer == CURRENT_WRITER)
 		{
-			if (FALSE == (was_crit = csa->now_crit))
+			if (!was_crit)
 				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
 			if (VMS_ONLY(0 == writer ||) FALSE == is_proc_alive(writer, jb->image_count))
 			{	/* no one home, clear the semaphore; */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
+				jnl_send_oper(jpc, ERR_JNLFLUSH);
+				send_msg(VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, CURRENT_WRITER);
+				send_msg(VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Journal IO writer changed during wait"));
 				VMS_ONLY(jb->io_in_prog = 0);
 				UNIX_ONLY(COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0));
-				if (FALSE == was_crit)
+				if (!was_crit)
 					rel_crit(jpc->region);
 				*lcnt = 1;
 				continue;
 			}
-			if (FALSE == was_crit)
+			if (!was_crit)
 				rel_crit(jpc->region);
 			/* this is the interesting case: a process is stuck */
 			BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_stuck);
@@ -161,11 +183,14 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		}
 		break;
 	}
-	if ((threshold > jb->freeaddr) || (csa->now_crit && jb->dskaddr > jb->freeaddr))
-	{	/* jb->dskaddr > jb->freeaddr => out of design condition, or jnl was switched
-		 * threshold > jb->freeaddr => somebody decremented jb->freeaddr after we computed threshold, or jnl was switched
+	if ((threshold > jb->freeaddr)
+		|| (csa->now_crit && ((jb->dskaddr > jb->freeaddr) || (jb->free != (jb->freeaddr % jb->size)))))
+	{	/* threshold > jb->freeaddr => somebody decremented jb->freeaddr after we computed threshold, or jnl was switched
+		 * jb->dsk != jb->freeaddr % jb->size => out of design condition
+		 * jb->dskaddr > jb->freeaddr => out of design condition, or jnl was switched
 		 */
-		assert(!csa->now_crit);
+		assert(!csa->now_crit
+			|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
 		status = ERR_JNLCNTRL;
 	}
 	return status;
@@ -177,12 +202,11 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 	unsigned int		lcnt, prev_lcnt, cnt, proc_stuck_cnt;
 	sgmnt_addrs		*csa;
 	unsigned int		status;
-	boolean_t		was_crit, jnlfile_lost;
+	boolean_t		was_crit, jnlfile_lost, exact_check;
 
 	error_def(ERR_JNLCNTRL);
 	error_def(ERR_JNLFLUSH);
 	error_def(ERR_JNLFLUSHNOPROG);
-	error_def(ERR_JNLMEMDSK);
 	error_def(ERR_JNLPROCSTUCK);
 	error_def(ERR_JNLWRTDEFER);
 	error_def(ERR_JNLWRTNOWWRTR);
@@ -190,14 +214,25 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 
 	jb = jpc->jnl_buff;
 	csa = &FILE_INFO(jpc->region)->s_addrs;
+	was_crit = csa->now_crit;
 
-	assert(!csa->now_crit || threshold <= jb->freeaddr);
+	/* If holding crit and input threshold matches jb->freeaddr, then we need to wait in the loop as long as dskaddr
+	 * is not EQUAL to threshold. This is because if dskaddr is lesser than threshold we need to wait. If ever it
+	 * becomes greater than threshold, it is an out-of-design situation (since dskaddr has effectively become > freeaddr)
+	 * and so we need to trigger "jnl_file_lost" which is done in "jnl_sub_write_attempt" so it is important to invoke
+	 * that routine (in the for loop below). Hence the need to do an exact match instead of a < match. If not holding
+	 * crit or input threshold does not match jb->freeaddr, then dskaddr becoming GREATER than threshold is a valid
+	 * condition so we should do a (dskaddr < threshold), not a (dskaddr != threshold) check in that case.
+	 */
+	exact_check = was_crit && (threshold == jb->freeaddr);
+	assert(!was_crit || threshold <= jb->freeaddr);
 	/* Check that we either own crit on the current region or we DONT own crit on ANY region. This is relied upon by
 	 * the grab_crit calls (done in jnl_write_attempt and jnl_sub_write_attempt) to ensure no deadlocks are possible.
 	 */
-	assert(csa->now_crit || (0 == have_crit(CRIT_HAVE_ANY_REG)));
-	for (prev_lcnt = lcnt = cnt = 1, proc_stuck_cnt = 0; (csa->now_crit || NOJNL != jpc->channel) && (jb->dskaddr < threshold);
-	     lcnt++, prev_lcnt = lcnt, cnt++)
+	assert(was_crit || (0 == have_crit(CRIT_HAVE_ANY_REG)));
+	for (prev_lcnt = lcnt = cnt = 1, proc_stuck_cnt = 0;
+		(was_crit || (NOJNL != jpc->channel)) && (exact_check ? jb->dskaddr != threshold : jb->dskaddr < threshold);
+		lcnt++, prev_lcnt = lcnt, cnt++)
 	{
 		status = jnl_sub_write_attempt(jpc, &lcnt, threshold);
 		if (JNL_FILE_SWITCHED(jpc))
@@ -220,17 +255,13 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				 ERR_TEXT, 2, LEN_AND_LIT("Could not flush all the buffered journal data"));
 			GTMASSERT; /* too many attempts to flush journal data */
 		}
-		if ((ERR_JNLCNTRL == status) || (ERR_JNLMEMDSK == status))
-		{
-			/* Take a DUMP for debugging */
-			/********************** Disable till gtm_fork_n_core doesn't mess with signals in the parent
-			UNIX_ONLY(
-				if (JNL_ENABLED(csa->hdr))
-					gtm_fork_n_core(); CMNT_START do it just once; jnl_file_lost will close journaling CMNT_END
-				else;
-			)
-			*********************************************************************************************/
-			if (was_crit = csa->now_crit) /* CAUTION : Assigment */
+		if ((ERR_JNLCNTRL == status)
+			|| (csa->now_crit
+				&& (ERR_JNLWRTDEFER != status) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLPROCSTUCK != status)))
+		{	/* If JNLCNTRL or if holding crit and not waiting for some other writer (or self in VMS)
+			 * better turn off journaling and proceed with database update to avoid a database hang.
+			 */
+			if (was_crit)
 				jb->blocked = 0;
 			else
 				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
@@ -238,10 +269,10 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			if (jb->free_update_pid)
 			{
 				FIX_NONZERO_FREE_UPDATE_PID(csa, jb);
-			} else if (jb->dskaddr > jb->freeaddr || threshold > jb->freeaddr || jb->free != (jb->freeaddr % jb->size))
-			{ /* if it's possible to recover from JNLCNTRL, or JNLMEMDSK errors, do it here.
-			   * jnl_file_lost is disruptive - Vinaya, June 05, 2001 */
-				assert(FALSE);
+			} else
+			{
+				assert(gtm_white_box_test_case_enabled
+					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number));
 				jnlfile_lost = TRUE;
 				jnl_file_lost(jpc, status);
 			}

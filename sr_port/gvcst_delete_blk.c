@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,13 @@ GBLREF  gv_namehead	*gv_target;
 GBLREF  boolean_t	horiz_growth;
 GBLREF	sgmnt_addrs	*cs_addrs;
 GBLREF	unsigned int	t_tries;
+#ifdef VMS
+GBLREF	boolean_t	tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
+#endif
+
+#ifdef DEBUG
+GBLREF	uint4		donot_commit;	/* see gdsfhead.h for the purpose of this debug-only global */
+#endif
 
 void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 {
@@ -64,7 +71,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 		{
 			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
 				tp_srch_status = (srch_blk_status *)tabent->value;
-			cse = tp_srch_status ? tp_srch_status->ptr : NULL;
+			cse = tp_srch_status ? tp_srch_status->cse : NULL;
 		}
 		if (cse)
 		{
@@ -81,6 +88,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 					 * newer cse and return. the restart will be later detected by tp_hist.
 					 */
 					 cse = cse->high_tlevel;
+					 DEBUG_ONLY(donot_commit |= DONOTCOMMIT_GVCST_DELETE_BLK_CSE_TLEVEL;)
 					 DEBUG_ONLY(block_already_in_hist = TRUE;)
 				}
 				assert(!cse->high_tlevel);
@@ -108,22 +116,24 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 					} else
 						cse->new_buff = NULL;
 					assert(!block_already_in_hist);
-					/* tp_hist (called from gvcst_kill) updates "->ptr" fields for all blocks that are
+					/* tp_hist (called from gvcst_kill) updates "->cse" fields for all blocks that are
 					 * part of the left or right histories of the M-kill. But this block is not one of
-					 * those. Hence tp_srch_status->ptr has to be updated here explicitly.
+					 * those. Hence tp_srch_status->cse has to be updated here explicitly.
 					 */
 					if (tp_srch_status)
-						tp_srch_status->ptr = (void *)cse;
+						tp_srch_status->cse = (void *)cse;
 				}
 				switch (cse->mode)
 				{
 				case gds_t_create:
 					cse->mode = kill_t_create;
+					VMS_ONLY(tp_has_kill_t_cse = TRUE;)
 					if (level == 0)
 					    return;
 					break;
 				case gds_t_write:
 					cse->mode = kill_t_write;
+					VMS_ONLY(tp_has_kill_t_cse = TRUE;)
 					break;
 				default:
 					;
@@ -133,6 +143,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 				switch(cse->mode)
 				{
 				case kill_t_create:
+					VMS_ONLY(assert(tp_has_kill_t_cse);)
 					if (level == 0)
 						return;
 					break;

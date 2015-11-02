@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,6 +85,7 @@
 #include "aswp.h"
 #include "jnl_get_checksum.h"
 #include "updproc_get_gblname.h"
+#include "wcs_recover.h"
 
 #define	MAX_IDLE_HARD_SPINS	1000	/* Fail-safe count to avoid hanging CPU in tight loop while it's idle */
 
@@ -300,7 +301,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	jnl_buffer_ptr_t	jbp;
 	gld_dbname_list		*curr;
 	gd_region		*save_reg;
-	int4			dummy_errno;
+	int4			wtstart_errno;
 	boolean_t		buffers_flushed;
 	uint4			idle_flush_count = 0;	/* Number of times buffers were flushed without an intermediate sleep */
 
@@ -309,7 +310,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		repl_triple_jnl_ptr_t	triplecontent;
 	)
 
+	error_def(ERR_UPDREPLSTATEOFF);
 	error_def(ERR_TPRETRY);
+	error_def(ERR_GBLOFLOW);
 
 	ESTABLISH(updproc_ch);
 	recvpool_ctl = recvpool.recvpool_ctl;
@@ -384,10 +387,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				log_switched = TRUE;
 				upd_log_init(UPDPROC);
 			}
-			upd_proc_local->changelog = 0;
 			if ( log_switched == TRUE )
 				repl_log(updproc_log_fp, TRUE, TRUE, "Change log to %s successful\n",
                                                      recvpool.upd_proc_local->log_file);
+			upd_proc_local->changelog = 0;
 		}
 		if (upd_proc_local->bad_trans
 			|| (0 == tupd_num && FALSE == recvpool.recvpool_ctl->wrapped
@@ -411,7 +414,16 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				TP_CHANGE_REG(curr->gd);
 				if (cs_addrs->nl->wcs_active_lvl && (FALSE == gv_cur_region->read_only))
 				{
-					DCLAST_WCS_WTSTART(gv_cur_region, 0, dummy_errno);
+					DCLAST_WCS_WTSTART(gv_cur_region, 0, wtstart_errno);
+					/* DCLAST_WCS_WTSTART macro does not set the wtstart_errno variable in VMS. But in
+					 * any case, we do not support database file extensions with MM on VMS. So we could
+					 * never get a ERR_GBLOFLOW error there.  Therefore the file extension check below is
+					 * done only in Unix.
+					 */
+					UNIX_ONLY(
+						if ((dba_mm == cs_data->acc_meth) && (ERR_GBLOFLOW == wtstart_errno))
+							wcs_recover(gv_cur_region);
+					)
 					buffers_flushed = TRUE;
 				}
 			}
@@ -738,6 +750,20 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			else if (IS_SET_KILL_ZKILL(rectype))
 			{
 				gv_bind_name(gd_header, &mname);	/* this sets gv_target and gv_cur_region */
+				csa = &FILE_INFO(gv_cur_region)->s_addrs;
+				if (!REPL_ALLOWED(csa))
+				{	/* Replication/Journaling is NOT enabled on the database file that the current
+					 * global maps to on the secondary even though it was enabled on the corresponding
+					 * database file on the primary. Do NOT allow this update to happen as otherwise
+					 * the journal seqno on the secondary database will get out-of-sync with that of
+					 * the primary database.
+					 */
+					gtm_putmsg(VARLSTCNT(6) ERR_UPDREPLSTATEOFF, 4,
+						mname.len, mname.addr, DB_LEN_STR(gv_cur_region));
+					/* Shut down the update process normally */
+					upd_proc_local->upd_proc_shutdown = SHUTDOWN;
+					break;
+				}
 				memcpy(gv_currkey->base, keystr->text, keystr->length);
 				gv_currkey->base[keystr->length] = 0; 	/* second null of a key terminator */
 				gv_currkey->end = keystr->length;
@@ -757,7 +783,6 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				}
 				if ((upd_good_record == bad_trans_type) && !IS_TP(rectype))
 					incr_seqno = TRUE;
-				csa = &FILE_INFO(gv_cur_region)->s_addrs;
 				if (disk_blk_read || 0 >= csa->n_pre_read_trigger)
 				{
 					csd = csa->hdr;

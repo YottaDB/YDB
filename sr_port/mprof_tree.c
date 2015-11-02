@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,7 +64,7 @@ void mprof_print_entryref(mident *rout, mident *lab, int line)
 	if (rout->addr) util_out_print("(!AD, ", FALSE, rout->len, rout->addr);
 	if (lab->addr) util_out_print("!AD, ", FALSE, lab->len, lab->addr);
 	util_out_print("!SL) ", FALSE, line);
-	util_out_print("[0x!8XL,0x!8XL]", FALSE, rout,lab);
+	util_out_print("[0x!XJ,0x!XJ]", FALSE, rout,lab);
 }
 
 void mprof_tree_print(mprof_tree *tree, int tabs, int longl)

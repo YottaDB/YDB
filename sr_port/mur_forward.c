@@ -62,6 +62,7 @@ GBLREF	short		dollar_tlevel;
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	seq_num		seq_num_zero;
 GBLREF	jnl_fence_control	jnl_fence_ctl;
+GBLREF	hash_table_mname	*gd_tab_ptr;
 LITREF	int		jrt_update[JRT_RECTYPES];
 LITREF	boolean_t	jrt_is_replicated[JRT_RECTYPES];
 static	void	(* const extraction_routine[])() =
@@ -119,6 +120,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 	for (mur_regno = 0, rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++, mur_regno++)
 	{
 		process_losttn = FALSE;
+		gd_tab_ptr = &rctl->gvntab;
 		if (mur_options.forward)
 		{
 			assert(NULL == rctl->jctl_turn_around);
@@ -413,7 +415,10 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 			}
 		}
 		if (SS_NORMAL != status && ERR_JNLREADEOF != status)
+		{
+			gd_tab_ptr = NULL;
 			return status;
+		}
 		jgbl.mur_plst = NULL;	/* No more simulation of GT.M activity for this region. */
 		if (murgbl.db_updated && SS_NORMAL != mur_block_count_correct())
 		{
@@ -424,5 +429,6 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 		assert(mur_options.rollback || 0 == murgbl.consist_jnl_seqno);
 		assert(!dollar_tlevel);	/* In case it applied a broken TUPD */
 	}
+	gd_tab_ptr = NULL;
 	return SS_NORMAL;
 }
