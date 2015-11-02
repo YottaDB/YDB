@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -374,6 +374,7 @@ int main(int argc, char **argv, char **envp)
 	error_def(ERR_TEXT);
 
 	GTM_THREADGBL_INIT;
+	set_blocksig();
 	gtm_imagetype_init(GTCM_GNP_SERVER_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */
@@ -390,7 +391,7 @@ int main(int argc, char **argv, char **envp)
 		cli_gettoken(&eof);
 	cli_token_buf[0] = '\0';
 	ptr = cli_lex_in_ptr->in_str;
-	memmove(ptr + SIZEOF("GTCM_GNP_SERVER ") - 1, ptr, strlen(ptr) + 1);
+	memmove(ptr + SIZEOF("GTCM_GNP_SERVER ") - 1, ptr, strlen(ptr) + 1); /* BYPASSOK */
 	MEMCPY_LIT(ptr, "GTCM_GNP_SERVER ");
 	cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
 	parse_ret = parse_cmd();

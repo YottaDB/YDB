@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,6 +15,12 @@
 
 #include "view.h"
 #include "gtm_caseconv.h"
+#include "gdsroot.h"		/* Added to support alias.h */
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "alias.h"		/* Needed for DEBUG_ALIAS flag used in viewtab.h */
 
 #define VT_KWSIZE (SIZEOF(viewtab[0].keyword))
 
@@ -25,18 +31,18 @@ const static readonly viewtab_entry viewtab[] =
 };
 #undef VIEWTAB
 
+error_def(ERR_VIEWNOTFOUND);
+error_def(ERR_VIEWAMBIG);
+
 viewtab_entry *viewkeys(mstr *v)
-{
-/* given view keyword, return pointer to viewtab_entry for that keyword
-   or: return 0 means not found, return -1 means keyword is ambiguous */
+{	/* given view keyword, return pointer to viewtab_entry for that keyword
+	 * or: return 0 means not found, return -1 means keyword is ambiguous.
+	 */
 
 	unsigned char		cmpbuf[VT_KWSIZE];
 	const viewtab_entry	*vt_ptr, *vt_top;
 	short 			len;
 	int 			n;
-
-	error_def(ERR_VIEWNOTFOUND);
-	error_def(ERR_VIEWAMBIG);
 
 	if (v->len == 0)
 		vt_ptr = (viewtab_entry *)NULL;
@@ -64,6 +70,5 @@ viewtab_entry *viewkeys(mstr *v)
 		rts_error(VARLSTCNT(4) ERR_VIEWAMBIG, 2, v->len, v->addr);
 	else if (!vt_ptr || vt_ptr >= vt_top)
 		rts_error(VARLSTCNT(4) ERR_VIEWNOTFOUND, 2, v->len, v->addr);
-
 	return (viewtab_entry *)vt_ptr;
 }

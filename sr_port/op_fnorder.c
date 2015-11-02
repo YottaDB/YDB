@@ -28,8 +28,8 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 	mval		tmp_sbs;
 	int             length;
 	boolean_t	is_canonical, is_fnnext, get_first;
-	tree		*lvt;
-	treeNode	*node;
+	lvTree		*lvt;
+	lvTreeNode	*node;
 	uint4		mvt;	/* Local copy of mvtype, bit ands use a int4, so do conversion once */
 	mstr		*str;
 	int4		intval;
@@ -96,10 +96,7 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 			}
 			node = lvAvlTreeKeyNext(lvt, key);
 		}
-		/* If STDNULLCOLL, skip to the next subscript should the current subscript be "".
-		 * Since the "" subscript is guaranteed to be in the avl tree, and since we want to go to the NEXT collating node
-		 * which is guaranteed to not be a string, there is no need to look in the integer array at all.
-		 */
+		/* If STDNULLCOLL, skip to the next subscript should the current subscript be "" */
 		if (TREF(local_collseq_stdnull) && (NULL != node) && LV_NODE_KEY_IS_NULL_SUBS(node))
 		{
 			assert(LVNULLSUBS_OK == TREF(lv_null_subs));
@@ -118,7 +115,7 @@ void op_fnorder(lv_val *src, mval *key, mval *dst)
 	} else
 	{
 		LV_NODE_GET_KEY(node, dst); /* Get node key into "dst" depending on the structure type of "node" */
-		/* Code outside tree.c does not currently know to make use of MV_CANONICAL bit so reset it
+		/* Code outside lv_tree.c does not currently know to make use of MV_CANONICAL bit so reset it
 		 * until the entire codebase gets fixed to maintain MV_CANONICAL bit accurately at which point,
 		 * this RESET can be removed */
 		TREE_KEY_SUBSCR_RESET_MV_CANONICAL_BIT(dst);

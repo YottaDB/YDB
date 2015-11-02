@@ -81,11 +81,9 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	rtnname.str.addr = rtnname_buff;
 	memcpy(lblname_buff, lblname.str.addr, lblname.str.len);
 	lblname.str.addr = lblname_buff;
-#	ifdef DEBUG_ZGOTO
-	DBGFPF((stdout, "op_zgoto: rtnname: %.*s  lblname: %.*s  offset: %d  level: %d\n",
-		rtnname.str.len, rtnname.str.addr, lblname.str.len, lblname.str.addr,
-		offset, level));
-#	endif
+	DBGEHND((stdout, "op_zgoto: rtnname: %.*s  lblname: %.*s  offset: %d  level: %d\n",
+		 rtnname.str.len, rtnname.str.addr, lblname.str.len, lblname.str.addr,
+		 offset, level));
 	/* Validate entryref before do any unwinding */
 	if (0 == rtnname.str.len)
 	{	/* If no routine name given, take it from the currently running routine unless the label name

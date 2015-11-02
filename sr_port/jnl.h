@@ -1061,17 +1061,21 @@ typedef struct
  * But to write it out, we should have it already built before bg_update().
  * Hence, we pre-build the block here itself before invoking t_end().
  */
-#define	BUILD_AIMG_IF_JNL_ENABLED(csd, jfb, cse, tn)					\
-{											\
-	GBLREF	cw_set_element   	cw_set[];					\
-											\
-	if (JNL_ENABLED(csd))								\
-	{										\
-		cse = (cw_set_element *)(&cw_set[0]);					\
-		cse->new_buff = jfb;							\
-		gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, tn);			\
-		cse->done = TRUE;							\
-	}										\
+#define	BUILD_AIMG_IF_JNL_ENABLED(CSD, JFB, TN)									\
+{														\
+	GBLREF	cw_set_element   	cw_set[];								\
+	GBLREF	unsigned char		cw_set_depth;								\
+														\
+	cw_set_element			*cse;									\
+														\
+	if (JNL_ENABLED(CSD))											\
+	{													\
+		assert(1 == cw_set_depth); /* Only DSE uses this macro and it updates one block at a time */	\
+		cse = (cw_set_element *)(&cw_set[0]);								\
+		cse->new_buff = JFB;										\
+		gvcst_blk_build(cse, (uchar_ptr_t)cse->new_buff, TN);						\
+		cse->done = TRUE;										\
+	}													\
 }
 
 /* In Unix, the journal file header size is currently set to 64K so it is aligned with any possible filesystem block size

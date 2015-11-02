@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -244,9 +244,9 @@ enum ftok_ops
 
 typedef struct
 {
+	enum ftok_ops	ftok_oper;
 	uint4           process_id;
 	trans_num       cr_tn;
-	enum ftok_ops	ftok_oper;
 } ftokhist;
 
 #define	DSKREAD_OPS_ARRAY_SIZE	 512

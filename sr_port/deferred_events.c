@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -91,6 +91,8 @@ GBLREF  global_latch_t		defer_latch;
  * -------------------------------------------------------
  */
 GBLDEF	volatile int4	first_event = no_event;
+
+error_def(ERR_DEFEREVENT);
 
 /* =============================================================================
  * EXPORTED FUNCTIONS
@@ -204,9 +206,9 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 		 assert((xfer_table[xf_zbstart] == op_zbstart) ||
 			(xfer_table[xf_zbstart] == op_zstzb_st_over) ||
 			(xfer_table[xf_zbstart] == op_zstzbstart));
-		 assert(xfer_table[xf_forchk1] == op_forchk1);
-		 assert((xfer_table[xf_forloop] == op_forloop) ||
-                        (xfer_table[xf_forloop] == op_mprofforloop));
+		 assert((xfer_table[xf_forchk1] == op_forchk1) ||
+			(xfer_table[xf_forchk1] == op_mprofforchk1));
+		 assert((xfer_table[xf_forloop] == op_forloop));
 		 assert(xfer_table[xf_ret] == opp_ret ||
 			xfer_table[xf_ret] == opp_zst_over_ret ||
 			xfer_table[xf_ret] == opp_zstepret);
@@ -322,7 +324,6 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	int4		status;
 	int 		e, ei, e_tot=0;
 
-	error_def(ERR_DEFEREVENT);
 
 	/* ------------------------------------------------------------------
 	 * Note: If reset routine can preempt path from handler to
@@ -338,16 +339,16 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	{
 		FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);
 		FIX_XFER_ENTRY(xf_linestart, op_mproflinestart);
-		FIX_XFER_ENTRY(xf_forloop, op_mprofforloop);
+		FIX_XFER_ENTRY(xf_forchk1, op_mprofforchk1);
 	} else
 	{
 		FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
 		FIX_XFER_ENTRY(xf_linestart, op_linestart);
-		FIX_XFER_ENTRY(xf_forloop, op_forloop);
+		FIX_XFER_ENTRY(xf_forchk1, op_forchk1);
 	}
+	FIX_XFER_ENTRY(xf_forloop, op_forloop);
 	FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
 	FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
-	FIX_XFER_ENTRY(xf_forchk1, op_forchk1);
 	FIX_XFER_ENTRY(xf_ret, opp_ret);
 	FIX_XFER_ENTRY(xf_retarg, op_retarg);
 

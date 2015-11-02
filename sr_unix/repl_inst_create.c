@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,6 +78,8 @@ void repl_inst_create(void)
 	error_def(ERR_REPLINSTNMUNDEF);
 	error_def(ERR_REPLINSTSTNDALN);
 	error_def(ERR_TEXT);
+	error_def(ERR_FILEEXISTS);
+	error_def(ERR_FILERENAME);
 
 	if (!repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error))
 		GTMASSERT;	/* rts_error should have been issued by repl_inst_get_name */
@@ -87,7 +89,7 @@ void repl_inst_create(void)
 	inst_name_len = 0;
 	if (cli_present("NAME"))
 	{
-		inst_name_len = SIZEOF(inst_name);;
+		inst_name_len = SIZEOF(inst_name);
 		if (!cli_get_str("NAME", &inst_name[0], &inst_name_len))
 			rts_error(VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("Error parsing NAME qualifier"));
 	} else
@@ -118,6 +120,8 @@ void repl_inst_create(void)
 	STAT_FILE(inst_fn, &stat_buf, status);
 	if (-1 != status)
 	{
+		if (cli_present("NOREPLACE"))	/* the file exists, so error out */
+			rts_error(VARLSTCNT(4) ERR_FILEEXISTS, 2, inst_fn_len, inst_fn);
 		in_repl_inst_create = TRUE;	/* used by an assert in the call to "repl_inst_read" below */
 		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)repl_instance, SIZEOF(repl_inst_hdr));
 		in_repl_inst_create = FALSE;
@@ -144,7 +148,9 @@ void repl_inst_create(void)
 						rename_fn_len, rename_fn, status, 0, status2);
 			else
 				rts_error(VARLSTCNT(7) ERR_RENAMEFAIL, 4, inst_fn_len, inst_fn, rename_fn_len, rename_fn, status);
-		}
+		} else	/* successfully renamed the existing file; print a message */
+			gtm_putmsg(VARLSTCNT(6) ERR_FILERENAME, 4, inst_fn_len, inst_fn, rename_fn_len, rename_fn);
+
 	} else if (ENOENT != errno) /* some error happened */
 		rts_error(VARLSTCNT(5) ERR_REPLINSTACC, 2, inst_fn_len, inst_fn, errno);
 	/* The instance file consists of 3 parts.

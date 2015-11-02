@@ -166,7 +166,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 	view_arg_convert(vtp, arg, &parmblk);
 	switch(vtp->keycode)
 	{
-#ifdef 		UNICODE_SUPPORTED
+#		ifdef UNICODE_SUPPORTED
 		case VTK_BADCHAR:
 			badchar_inhibit = FALSE;
 			break;
@@ -269,7 +269,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 		case VTK_NEVERLVNULLSUBS:
 			TREF(lv_null_subs) = LVNULLSUBS_NEVER;
 			break;
-#ifndef VMS
+#		ifndef VMS
 		case VTK_JNLERROR:
 			TREF(error_on_jnl_file_lost) = MV_FORCE_INT(parmblk.value);
 			if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
@@ -303,7 +303,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 				}
 			}
 			break;
-#endif
+#		endif
 		case VTK_JNLFLUSH:
 			if (NULL == gd_header)		/* open gbldir */
 				gvinit();
@@ -661,7 +661,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 					gtmDebugLevel &= (~GDL_SmDump);	/* Shut indicator back off */
 			}
 			break;
-#if			DEBUG_ALIAS
+#		ifdef DEBUG_ALIAS
 		case VTK_LVMONOUT:
 			als_lvmon_output();
 			break;
@@ -676,7 +676,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 							lvp < lvp_top; lvp++)
 					{
 						assert(LV_IS_BASE_VAR(lv));
-						lvp->stats.lvmon_mark = FALSE;
+						lvp->lvmon_mark = FALSE;
 					}
 				}
 			}
@@ -685,7 +685,7 @@ void	op_view(UNIX_ONLY_COMMA(int numarg) mval *keyword, ...)
 			als_lvmon_output();
 			lvmon_enabled = FALSE;
 			break;
-#			endif
+#		endif
 		default:
 			va_end(var);
 			rts_error(VARLSTCNT(1) ERR_VIEWCMD);

@@ -310,6 +310,7 @@ void gtmsecshr_init(void)
 	error_def(ERR_GTMSECSHRCHDIRF);
 
 	process_id = getpid();
+	set_blocksig();
 	if (-1 == setuid(ROOTUID))
 	{
 		send_msg(VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3, RTS_ERROR_LITERAL("Server"), process_id,

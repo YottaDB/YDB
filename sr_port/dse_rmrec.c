@@ -62,7 +62,6 @@ void dse_rmrec(void)
 	char		comp_key[MAX_KEY_SZ + 1];
 	unsigned char	cc, cc_base;
 	short int	size, i, rsize;
-	cw_set_element	*cse;
 	srch_blk_status	blkhist;
 
 	error_def(ERR_DBRDONLY);
@@ -145,7 +144,7 @@ void dse_rmrec(void)
 				}
 				t_write(&blkhist, (unsigned char *)bs1, 0, 0,
 					((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-				BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cse, cs_addrs->ti->curr_tn);
+				BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cs_addrs->ti->curr_tn);
 				t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 				free(lbp);
 				return;
@@ -195,7 +194,7 @@ void dse_rmrec(void)
 			return;
 		}
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-		BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cse, cs_addrs->ti->curr_tn);
+		BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cs_addrs->ti->curr_tn);
 		t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 		free(lbp);
 		return;

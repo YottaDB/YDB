@@ -1738,6 +1738,7 @@ int jnl_v21TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 					 */
 					keystr = (jnl_string *)mumps_node_ptr;
 					keyend = &keystr->text[keystr->length - 1];
+					assert('\0' == *keyend); /* we better have a null terminator at the end of the key */
 					if (!MEMCMP_LIT((keyend - LITERAL_HASHLABEL_LEN), LITERAL_HASHLABEL))
 					{	/* ^#t("GBL","#LABEL") found. For details on the update record layout, see the
 						 * comment in upgrd_hasht_xecute_string
@@ -1746,6 +1747,22 @@ int jnl_v21TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 						assert(0 == MEMCMP_LIT(ptr, HASHT_GBL_CURLABEL));
 						assert(STR_LIT_LEN(HASHT_GBL_CURLABEL) == STR_LIT_LEN(V19_HASHT_GBL_LABEL));
 						MEMCPY_LIT(ptr, V19_HASHT_GBL_LABEL);
+					} else if (0x80 == (unsigned char)(*(keyend - 1)))
+					{	/* last subscript is zero. Check if the preceding subscript is "XECUTE" */
+						ptr = keyend - 2; /* -1 for 0x80 and -1 for null terminator */
+						if (!MEMCMP_LIT((ptr - LITERAL_XECUTE_LEN), LITERAL_XECUTE))
+						{	/* preceding subscript is "XECUTE". Ensure the preceding character is \0 */
+							ptr -= (LITERAL_XECUTE_LEN + 1); /* +1 for the leading \0 */
+							assert(STR_SUB_PREFIX == ((unsigned char)(*ptr)));
+							if (STR_SUB_PREFIX == ((unsigned char)(*ptr)))
+							{	/* found ^#t("GBL",1,"XECUTE",0) which V5.4-001 secondary does
+								 * NOT understand
+								 */
+								repl_errno = EREPL_INTLFILTER_MULTILINEXECUTE;
+								status = -1;
+								break;
+							}
+						}
 					}
 				}
 				if (!secondary_side_trigger_support)

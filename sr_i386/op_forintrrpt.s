@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -29,10 +29,6 @@
 
 # PUBLIC	op_forintrrpt
 ENTRY op_forintrrpt
-# smw 1999/12/14 C9905-001096 - was pop ever correct:  if so, still need it
-#	popl	%eax
-#	subl	$6,%eax
-#	movl	%eax,restart_pc
 	cmpb	$0,neterr_pending
 	je	l1
 	call	outofband_clear

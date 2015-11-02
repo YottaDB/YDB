@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -197,7 +197,7 @@ typedef struct dev_dispatch_struct
 	void	(*iocontrol)(mstr *);
 	void	(*dlr_device)(mstr *);
 	void	(*dlr_key)(mstr *);
-}dev_dispatch_struct;
+} dev_dispatch_struct;
 
 /* io_ prototypes */
 void io_rundown(int rundown_type);
@@ -235,8 +235,9 @@ void io_init_name(void);
  *	3. iopi_iocontrol() is an extra routine on unix to handle write /writeof
  */
 
-#define ioxx(X) ioxx_##X(tt);ioxx_##X(mt);ioxx_##X(rm);ioxx_##X(mb);ioxx_##X(nl);ioxx_##X(us);ioxx_##X(tcp);ioxx_##X(socket)
-#define xxdlr(X) xx_iocontrol(X);xx_dlr_device(X);xx_dlr_key(X)
+#define ioxx(X) ioxx_##X(tt); ioxx_##X(mt); ioxx_##X(rm); VMS_ONLY(ioxx_##X(mb);) ioxx_##X(nl); \
+	ioxx_##X(us); ioxx_##X(tcp); ioxx_##X(socket)
+#define xxdlr(X) xx_iocontrol(X); xx_dlr_device(X); xx_dlr_key(X)
 
 /* prototypes for dispatch functions */
 
@@ -303,7 +304,9 @@ void iotcp_rmlsock(io_desc *iod);
 int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive);
 
 /* iomb_ prototypes */
+#ifdef VMS
 int iomb_dataread (int timeout);
+#endif
 
 bool same_device_check(mstr tname, char *buf);
 
@@ -312,6 +315,10 @@ bool same_device_check(mstr tname, char *buf);
 	O##_open, X##_close, X##_use, X##_read, X##_rdone, X##_write, 		\
 	X##_wtone, X##_wteol, X##_wtff, NULL, X##_flush, X##_readfl,		\
 	Y##_iocontrol, Y##_dlr_device, Y##_dlr_key 				\
+}
+#define ionil_dev 												\
+{														\
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL	\
 }
 
 #ifdef __sparc

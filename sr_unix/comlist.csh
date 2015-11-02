@@ -300,6 +300,7 @@ cp $gtm_inc/gtm_sizeof.h .
 # headers to support ASCII/EBCDIC independence
 #
 cp $gtm_inc/main_pragma.h .
+cp $gtm_inc/gtm_limits.h .
 cp $gtm_inc/gtm_stdio.h .
 cp $gtm_inc/gtm_stdlib.h .
 cp $gtm_inc/gtm_string.h .
@@ -593,16 +594,19 @@ end
 
 switch ( $3 )
 case "gtm_bta":
+	set bldtype = "Bta"
 	$shell $gtm_tools/buildbta.csh $p4
 	if (0 != $status) @ comlist_status = $status	# done before each breaksw instead of after endsw
 	breaksw						# as $status seems to be get reset in between
 
 case "gtm_dbg":
+	set bldtype = "Dbg"
 	$shell $gtm_tools/builddbg.csh $p4
 	if (0 != $status) @ comlist_status = $status
 	breaksw
 
 case "gtm_pro":
+	set bldtype = "Pro"
 	$shell $gtm_tools/buildpro.csh $p4
 	if (0 != $status) @ comlist_status = $status
 	breaksw
@@ -636,6 +640,7 @@ endif
 # directory has a version of it or not.
 rm -f obj/gengtmdeftypes.log* >& /dev/null
 rm -f GTMDefinedTypesInit.m >& /dev/null
+echo "Generating GTMDefinedTypesInit.m"
 if ($?work_dir) then
 	if (-e $work_dir/tools/cms_tools/gengtmdeftypes.csh) then
 		$work_dir/tools/cms_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
@@ -651,12 +656,13 @@ if ((0 != $status) || (! -e GTMDefinedTypesInit.m)) then
 	echo "gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m - see log in $gtm_obj/gengtmdeftypes.log" >> $gtm_log/error.`basename $gtm_exe`.log
 endif
 if (-e GTMDefinedTypesInit.m) then
+	cp -f GTMDefinedTypesInit.m $gtm_pct/GTMDefinedTypesInit${bldtype}.m   # Need a different name for each build type as they can be different
 	./mumps GTMDefinedTypesInit.m
 	if (0 != $status) then
 		@ comlist_status = $status
 		echo "Failed to compile $gtm_exe/GTMDefinedTypes.m" >> $gtm_log/error.`basename $gtm_exe`.log
 	endif
-	# If we have a utf8 dir (created by buildaux.csh above), add a link to it for GTMDefinedTypesInit.m
+	# If we have a utf8 dir (created by buildaux.csh called from buildbdp.csh above), add a link to it for GTMDefinedTypesInit.m
 	if (-e $gtm_dist/utf8) then
 		ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
 		pushd utf8

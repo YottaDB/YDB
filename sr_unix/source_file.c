@@ -136,10 +136,8 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 CONDITION_HANDLER(source_ch)
 {
 	int	dummy1, dummy2;
-	DCL_THREADGBL_ACCESS;
 
 	START_CH;
-	SETUP_THREADGBL_ACCESS;
 	if (DUMP)
 	{
 		NEXTCH;
@@ -257,6 +255,7 @@ int4	read_source_file (void)
 CONDITION_HANDLER(read_source_ch)
 {
 	int	dummy1, dummy2;
+
 	START_CH;
 	UNWIND(dummy1, dummy2);
 }

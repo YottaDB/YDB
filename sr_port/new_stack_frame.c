@@ -11,11 +11,13 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
 #include "gtm_string.h"
 
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mprof.h"
+#include "error.h"
 
 GBLREF stack_frame	*frame_pointer;
 GBLREF unsigned char	*stackbase, *stacktop, *msp, *stackwarn;
@@ -28,6 +30,7 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	error_def(ERR_STACKOFLOW);
 	error_def(ERR_STACKCRIT);
 
+	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	msp_save = msp;
 	sf = (stack_frame *)(msp -= SIZEOF(stack_frame));
    	if (msp <= stackwarn)
@@ -68,6 +71,9 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	assert(msp < stackbase);
 	memset(msp, 0, x1 + x2);
 	frame_pointer = sf;
+	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
+	DBGEHND((stderr, "new_stack_frame: Added stackframe at addr 0x"lvaddr"  old-msp: 0x"lvaddr"  new-msp: 0x"lvaddr"\n",
+		 sf, msp_save, msp));
 	return;
 }
 

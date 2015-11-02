@@ -24,6 +24,7 @@ GBLREF spdesc stringpool;
 #include "gtm_utf8.h"
 
 GBLREF	boolean_t	badchar_inhibit;
+
 error_def(ERR_MAXSTRLEN);
 
 /******************************************************************************
@@ -158,7 +159,7 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 	outtop = outbase + out_str->str.len;
 	dstbase = stringpool.free;
 	dstlen = char_len = 0; /* character length of the result */
-	for (inptr = (unsigned char *)src->str.addr, intop = inptr + src->str.len ; inptr < intop ; inptr = nextptr)
+	for (inptr = (unsigned char *)src->str.addr, intop = inptr + src->str.len; inptr < intop; inptr = nextptr)
 	{
 		nextptr = UTF8_MBTOWC(inptr, intop, code);
 		inlen = (int)(nextptr - inptr);
@@ -202,37 +203,36 @@ void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 }
 #endif /* UNICODE_SUPPORTED */
 
-/* $ZTRANSLATE() is implemented using a byte-indexed translation table xlate[256]
- * which stores the replacement character (byte) for a given character (byte) of
- * the second argument specified in $TR() */
-void op_fnztranslate(mval *src,mval *in_str,mval *out_str,mval *dst)
+/* $ZTRANSLATE() is implemented using a byte-indexed translation table xlate[256] which stores the
+ * replacement character (byte) for a given character (byte) of the second argument specified in $TR().
+ */
+void op_fnztranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
 {
-	int xlate[256];
-	unsigned char *inpt,*intop,*outpt,*dstp;
-	int n;
-	unsigned char ch;
+	int		n, xlate[256];
+	unsigned char	ch, *inpt, *intop, *outpt, *dstp;
 
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(in_str);
 	MV_FORCE_STR(out_str);
 	ENSURE_STP_FREE_SPACE(src->str.len);
-	memset(xlate,0xFF,SIZEOF(xlate));
+	memset(xlate, 0xFF, SIZEOF(xlate));
 	n = in_str->str.len < out_str->str.len ? in_str->str.len : out_str->str.len;
-	for (inpt = (unsigned char *)in_str->str.addr,
-		outpt = (unsigned char *)out_str->str.addr,
-		intop = inpt + n; inpt < intop ; inpt++, outpt++ )
-		if (xlate[ch = *inpt] == -1)
+	for (inpt = (unsigned char *)in_str->str.addr, outpt = (unsigned char *)out_str->str.addr, intop = inpt + n;
+		inpt < intop; inpt++, outpt++)
+	{
+		if (-1 == xlate[ch = *inpt])
 		    xlate[ch] = *outpt;
-	for (intop = (unsigned char *)in_str->str.addr + in_str->str.len ; inpt < intop ; inpt++)
-		if (xlate[ch = *inpt] == -1)
+	}
+	for (intop = (unsigned char *)in_str->str.addr + in_str->str.len; inpt < intop; inpt++)
+		if (-1 == xlate[ch = *inpt])
 		    xlate[ch] = -2;
 	dstp = outpt = stringpool.free;
-	for (inpt = (unsigned char *)src->str.addr, intop = inpt + src->str.len ; inpt < intop ; )
+	for (inpt = (unsigned char *)src->str.addr, intop = inpt + src->str.len; inpt < intop; )
 	{
 		n = xlate[ch = *inpt++];
-		if (n >= 0)
+		if (0 <= n)
 			*outpt++ = n;
-		else if (n == -1)
+		else if (-1 == n)
 			*outpt++ = ch;
 	}
 	dst->str.addr = (char *)dstp;

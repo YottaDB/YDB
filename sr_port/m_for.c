@@ -108,7 +108,7 @@ int m_for(void)
 	oprtype		arg_eval_addr[MAX_FORARGS], increment[MAX_FORARGS], terminate[MAX_FORARGS],
 			arg_next_addr, arg_value, *body, control_variable, indr_jeopardy_ref,
 			*iteration_start_addr, iteration_start_addr_indr, *not_even_once_addr;
-	triple		*eval_next_addr[MAX_FORARGS],
+	triple		*eval_next_addr[MAX_FORARGS], *forchk1opc,
 			*control_ref, *ctrl_lv_ref, forpos_in_chain, *init_ref, *ref, *step_ref, *term_ref;
 	DCL_THREADGBL_ACCESS;
 
@@ -279,8 +279,8 @@ int m_for(void)
 	}
 	if (not_even_once_addr)
 		*not_even_once_addr = for_end_of_scope(1);	/* 1 means down a level */
-	ref = newtriple(OC_FORCHK1);		/* FORCHK1 is a do-nothing routine used by the out-of-band mechanism */
-	*iteration_start_addr = put_tjmp(ref);
+	forchk1opc = newtriple(OC_FORCHK1);	/* FORCHK1 is a do-nothing routine used by the out-of-band mechanism */
+	*iteration_start_addr = put_tjmp(forchk1opc);
 	body = (oprtype *)mcalloc(SIZEOF(oprtype));
 	tnxtarg(body);
 	if ((TK_EOL != window_token) && (TK_SPACE != window_token))
@@ -322,7 +322,8 @@ int m_for(void)
 			init_ref->operand[0] = control_variable;
 			init_ref->operand[1] = put_tref(step_ref);
 			ref = newtriple(OC_FORLOOP);
-			ref->operand[0] = *body;
+			/* redirects back to forchk1, which is at the beginning of new iteration */
+			ref->operand[0] = *iteration_start_addr;
 			ref->operand[1] = put_tref(init_ref);
 		} else if (increment[arg_index].oprclass)
 		{

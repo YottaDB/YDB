@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +27,6 @@
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	int4			exi_condition;
 GBLREF	void			(*call_on_signal)();
-GBLREF	void			(*create_fatal_error_zshow_dmp_fp)();
 GBLREF	int			forced_exit_err;
 GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
@@ -37,16 +36,16 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 
+error_def(ERR_FORCEDHALT);
+error_def(ERR_KILLBYSIG);
+error_def(ERR_KILLBYSIGSINFO1);
+error_def(ERR_KILLBYSIGSINFO2);
+error_def(ERR_KILLBYSIGSINFO3);
+error_def(ERR_KILLBYSIGUINFO);
+
 void deferred_signal_handler(void)
 {
 	void (*signal_routine)();
-
-	error_def(ERR_KILLBYSIG);
-	error_def(ERR_KILLBYSIGUINFO);
-	error_def(ERR_KILLBYSIGSINFO1);
-	error_def(ERR_KILLBYSIGSINFO2);
-	error_def(ERR_KILLBYSIGSINFO3);
-	error_def(ERR_FORCEDHALT);
 
 	/* To avoid nested calls to this routine, we set forced_exit to FALSE at the very beginning */
 	forced_exit = FALSE;
@@ -112,6 +111,5 @@ void deferred_signal_handler(void)
 	/* Note, we do not drive create_fatal_error zshow_dmp() in this routine since any deferrable signals are
 	 * by definition not fatal.
 	 */
-
 	exit(-exi_condition);
 }

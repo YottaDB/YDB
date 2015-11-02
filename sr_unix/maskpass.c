@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +17,7 @@
 
 #define MAX_LEN			512
 #define	FSTR_LEN		7		/* %2048s */
-#define GTM_PATH_MAX		255
+#define GTM_PATH_MAX  		1024
 #define GTM_DIST		"gtm_dist"
 
 struct termios 			old_tty, no_echo_tty;

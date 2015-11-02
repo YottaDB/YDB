@@ -138,33 +138,33 @@ void lvzwr_out(lv_val *lvp)
 				*one.addr = '=';
 				zshow_output(zwr_output, &one);
 				zav = (zwr_alias_var *)tabent_addr->value;
-				assert(zav->ptrs.val_ent.zwr_var.len);
+				assert(0 < zav->zwr_var.len);
 				zwr_output->flush = TRUE;
-				zshow_output(zwr_output, (const mstr *)&zav->ptrs.val_ent.zwr_var);
+				zshow_output(zwr_output, (const mstr *)&zav->zwr_var);
 				return;
 			}
 			/* This lv_val isn't known to us yet. Scan the hash curr_symval hash table to see if it is known as a
-			   base variable as we could have a "forward reference" here.
-			*/
+			 * base variable as we could have a "forward reference" here.
+			 */
 			tabent_mname = als_lookup_base_lvval(lvpc);
 			/* note even though both paths below add a zav, not bothering to set zav_added because that flag is
-			   really only (currently) cared about in reference to processing a basevar so we wouldn't
-			   be in this code path anyway. Comment here to record potential usage if that changes.
-			*/
+			 * really only (currently) cared about in reference to processing a basevar so we wouldn't
+			 * be in this code path anyway. Comment here to record potential usage if that changes.
+			 */
 			if (tabent_mname)
 			{	/* Found a base var it can reference -- create a zwrhtab entry for it */
 				assert(tabent_mname->key.var_name.len);
 				newzav = als_getzavslot();
-				newzav->ptrs.val_ent.zwr_var = tabent_mname->key.var_name;
+				newzav->zwr_var = tabent_mname->key.var_name;
 				htent_added = add_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lvpc, newzav, &tabent_addr);
 				assert(htent_added);
 				dump_container = FALSE;
 			} else
 			{	/* Unable to find lv_val .. must be "orphaned" so we generate a new $ZWRTAC var for it. The first
-				   check however is if this is the first $ZWRTAC var being generated for this $ZWR. If yes, generate
-				   a $ZWRTAC="" line to preceed it. This will be a flag to load to clear out all existing $ZWRTAC
-				   temp vars so there is no pollution between loads of ZWRitten data.
-				*/
+				 * check however is if this is the first $ZWRTAC var being generated for this $ZWR. If yes, generate
+				 * a $ZWRTAC="" line to preceed it. This will be a flag to load to clear out all existing $ZWRTAC
+				 * temp vars so there is no pollution between loads of ZWRitten data.
+				 */
 				if (0 == zwrtacindx++)
 				{	/* Put out "dummy" statement that will clear all the $ZWRTAC vars for a clean slate */
 					zwr_output->flush = TRUE;
@@ -173,9 +173,9 @@ void lvzwr_out(lv_val *lvp)
 				MEMCPY_LIT(zwrt_varname.c, DOLLAR_ZWRTAC);
 				lastc = i2asc((uchar_ptr_t)zwrt_varname.c + STR_LIT_LEN(DOLLAR_ZWRTAC), zwrtacindx);
 				newzav =  als_getzavslot();
-				newzav->ptrs.val_ent.zwr_var.addr = zwrt_varname.c;
-				newzav->ptrs.val_ent.zwr_var.len = INTCAST(((char *)lastc - &zwrt_varname.c[0]));
-				s2pool(&newzav->ptrs.val_ent.zwr_var);
+				newzav->zwr_var.addr = zwrt_varname.c;
+				newzav->zwr_var.len = INTCAST(((char *)lastc - &zwrt_varname.c[0]));
+				s2pool(&newzav->zwr_var);
 				htent_added = add_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lvpc, newzav, &tabent_addr);
 				assert(htent_added);
 				dump_container = TRUE;
@@ -190,16 +190,16 @@ void lvzwr_out(lv_val *lvp)
 			*one.addr = '=';
 			zshow_output(zwr_output, &one);
 			zwr_output->flush = TRUE;
-			zshow_output(zwr_output, (const mstr *)&newzav->ptrs.val_ent.zwr_var);
+			zshow_output(zwr_output, (const mstr *)&newzav->zwr_var);
 			if (dump_container)
 			{	/* We want to dump the entire container variable but the name doesn't match the var we are
 				 * currently dumping so push a new lvzwrite_block onto the stack, fill it in for the current var
-				 * and call lvzwr_va() to handle it. When done, dismantle the temp lvzwrite_block.
+				 * and call lvzwr_var() to handle it. When done, dismantle the temp lvzwrite_block.
 				 */
 				newzwrb = (lvzwrite_datablk *)malloc(SIZEOF(lvzwrite_datablk));
 				memset(newzwrb, 0, SIZEOF(lvzwrite_datablk));
 				newzwrb->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_LVSUBSCRIPTS);
-				newzwrb->curr_name = &newzav->ptrs.val_ent.zwr_var;
+				newzwrb->curr_name = &newzav->zwr_var;
 				newzwrb->prev = lvzwrite_block;
 				lvzwrite_block = newzwrb;
 				lvzwr_var(lvpc, 0);
@@ -229,9 +229,9 @@ void lvzwr_out(lv_val *lvp)
 					*one.addr = '=';
 					zshow_output(zwr_output, &one);
 					/* .. and the var name aliasing to (the first seen with this lv_val) */
-					assert(zav->ptrs.val_ent.zwr_var.len);
+					assert(zav->zwr_var.len);
 					zwr_output->flush = TRUE;
-					zshow_output(zwr_output, &zav->ptrs.val_ent.zwr_var);
+					zshow_output(zwr_output, &zav->zwr_var);
 					return;
 				}
 				/* Else the value for this entry has not yet been printed so let us fall into case 3
@@ -245,7 +245,7 @@ void lvzwr_out(lv_val *lvp)
 			} else
 			{	/* Entry was added so is first appearance -- give it a value to hold onto and print it */
 				newzav = als_getzavslot();
-				newzav->ptrs.val_ent.zwr_var = *lvzwrite_block->curr_name;
+				newzav->zwr_var = *lvzwrite_block->curr_name;
 				newzav->value_printed = TRUE;		/* or rather it will be shortly.. */
 				tabent_addr->value = (void *)newzav;
 				lvzwrite_block->zav_added = TRUE;

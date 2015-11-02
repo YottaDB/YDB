@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +23,7 @@ int dollar_zlevel()
 
 	for (count = 0, fp = frame_pointer; NULL != fp; fp = fpprev)
 	{
+		assert((fp < fp->old_frame_pointer) || (NULL == fp->old_frame_pointer));
 		fpprev = fp->old_frame_pointer;
 		if (!(fp->type & SFT_COUNT))
 			continue;

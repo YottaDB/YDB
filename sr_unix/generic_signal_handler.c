@@ -58,27 +58,28 @@ GBLREF	volatile boolean_t	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
-GBLREF	void			(*create_fatal_error_zshow_dmp_fp)();
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 
 LITREF	gtmImageName		gtmImageNames[];
+
+error_def(ERR_FORCEDHALT);
+error_def(ERR_GTMSECSHRSHUTDN);
+error_def(ERR_KILLBYSIG);
+error_def(ERR_KILLBYSIGSINFO1);
+error_def(ERR_KILLBYSIGSINFO2);
+error_def(ERR_KILLBYSIGSINFO3);
+error_def(ERR_KILLBYSIGUINFO);
+error_def(ERR_KRNLKILL);
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	boolean_t	exit_now;
 	gtm_sigcontext_t	*context_ptr;
 	void		(*signal_routine)();
+	DCL_THREADGBL_ACCESS;
 
-	error_def(ERR_KRNLKILL);
-	error_def(ERR_FORCEDHALT);
-	error_def(ERR_KILLBYSIG);
-	error_def(ERR_KILLBYSIGUINFO);
-	error_def(ERR_KILLBYSIGSINFO1);
-	error_def(ERR_KILLBYSIGSINFO2);
-	error_def(ERR_KILLBYSIGSINFO3);
-	error_def(ERR_GTMSECSHRSHUTDN);
-
+	SETUP_THREADGBL_ACCESS;
 	/* Save parameter value in global variables for easy access in core */
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
 	created_core = FALSE;		/* we can deal with a second core if needbe */
@@ -310,18 +311,16 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		 * situations that would cause a ZSHOW dump to explode). Better for user to use jobexam to cause a dump prior
 		 * to terminating the process in a deferrable fashion.
 		 */
-		if (!dont_want_core && IS_MCODE_RUNNING && (NULL != create_fatal_error_zshow_dmp_fp))
-		{
-			signal_routine = create_fatal_error_zshow_dmp_fp;
-			create_fatal_error_zshow_dmp_fp = NULL;
+		if (!dont_want_core && IS_MCODE_RUNNING && (NULL != (signal_routine = RFPTR(create_fatal_error_zshow_dmp_fptr))))
+		{	/* note assignment of signal_routine above */
+			SFPTR(create_fatal_error_zshow_dmp_fptr, NULL);
 			(*signal_routine)(exi_condition, FALSE);
 		}
 		/* Some mupip functions define an entry point to drive on signals. Make sure to do this AFTER we create the
 		 * dump file above as it may detach things (like the recvpool) we need to create the above dump.
 		 */
-		if (call_on_signal)
+		if (NULL != (signal_routine = call_on_signal))	/* Note assignment */
 		{
-			signal_routine = call_on_signal;
 			call_on_signal = NULL;		/* So we don't recursively call ourselves */
 			(*signal_routine)();
 		}

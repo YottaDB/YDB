@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -133,7 +133,7 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 	error_def(ERR_TEXT);
 
 	assert(CDB_STAGNATE <= t_tries);
-	assert((NULL != pStat) && (NULL != pStat->cr) && (NULL != cs_addrs));
+	assert((NULL != pStat) && ((NULL != pStat->cr) || (dba_mm == gv_cur_region->dyn.addr->acc_meth)) && (NULL != cs_addrs));
 	if (NULL != pStat)
 	{
 		if (NULL != pStat->cr)

@@ -28,7 +28,7 @@ GBLREF uint4		dollar_tlevel;
 void	lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree)
 {
 	lv_val		*base_lv;
-	tree		*lvt_child, *lvt;
+	lvTree		*lvt_child, *lvt;
 	boolean_t	is_base_var;
 	symval		*sym;
 
@@ -39,7 +39,7 @@ void	lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree)
 		is_base_var = LV_IS_BASE_VAR(lv);
 		base_lv = !is_base_var ? LV_GET_BASE_VAR(lv) : lv;
 		if (dotpsave && dollar_tlevel && (NULL != base_lv->tp_var) && !base_lv->tp_var->var_cloned)
-			TP_VAR_CLONE(base_lv);	/* clone the tree. */
+			TP_VAR_CLONE(base_lv);	/* clone the tree */
 		lvt_child = LV_GET_CHILD(lv);
 		if (do_subtree && (NULL != lvt_child))
 		{
@@ -54,17 +54,17 @@ void	lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree)
 			{
 				lvt = LV_GET_PARENT_TREE(lv);
 				LV_VAL_CLEAR_MVTYPE(lv); /* see comment in macro definition for why this is necessary */
-				lvTreeNodeDelete(lvt, (treeNode *)lv);
+				LV_TREE_NODE_DELETE(lvt, (lvTreeNode *)lv);
 				/* if there is at least one other sibling node to the deleted "lv" the zap stops here */
 				if (lvt->avl_height)
 					break;
 				assert(NULL == lvt->avl_root);
-				lv = (lv_val *)lvt->sbs_parent;
+				lv = (lv_val *)LVT_PARENT(lvt);
 				assert(NULL != lv);
 				LV_CHILD(lv) = NULL;
 				LVTREE_FREESLOT(lvt);
-				assert(MV_DEFINED(&lv->v) == (0 != lv->v.mvtype));
-				if (MV_DEFINED(&lv->v))
+				assert(LV_IS_VAL_DEFINED(lv) == (0 != lv->v.mvtype));
+				if (LV_IS_VAL_DEFINED(lv))
 					break;
 				if (lv == base_lv)
 				{	/* Base node. Do not invoke LV_FREESLOT/LV_FLIST_ENQUEUE as we will still keep the

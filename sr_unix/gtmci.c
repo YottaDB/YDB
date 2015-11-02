@@ -57,6 +57,7 @@
 #include "hashtab.h"
 #include "hashtab_str.h"
 #include "compiler.h"
+#include "gt_timer.h"
 
 GBLDEF 	unsigned int		nested_level;		/* current nested depth of callin environments */
 
@@ -121,6 +122,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	set_blocksig();
 	VAR_COPY(var, temp_var);
 	added = FALSE;
 	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be

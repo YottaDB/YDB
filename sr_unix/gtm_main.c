@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +37,7 @@
 #include "gtm_env_init.h"	/* for gtm_env_init() prototype */
 #include "gtm_main.h"		/* for "gtm_main" prototype */
 #include "io.h"
+#include "gt_timer.h"
 #include "gtm_imagetype_init.h"
 #include "gtm_threadgbl_init.h"
 
@@ -88,6 +89,7 @@ int gtm_main (int argc, char **argv, char **envp)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	set_blocksig();
 	gtmenvp = envp;
 	gtm_imagetype_init(GTM_IMAGE);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +36,7 @@
 #include "mutex.h"
 #endif
 #include "op.h"
+#include "fgncalsp.h"
 #include "zcall_package.h"
 #include "gtm_exit_handler.h"
 #include "gv_rundown.h"
@@ -65,7 +66,10 @@ GBLREF	boolean_t		ok_to_UNWIND_in_exit_handling;
 void gtm_exit_handler(void)
 {
         struct sigaction	act;
+	struct extcall_package_list *package_ptr;
+        DCL_THREADGBL_ACCESS;
 
+        SETUP_THREADGBL_ACCESS;
 	if (exit_handler_active)	/* Don't recurse if exit handler exited */
 		return;
 	if (is_tracing_on)
@@ -96,6 +100,16 @@ void gtm_exit_handler(void)
 	REVERT;
 
 	ESTABLISH(lastchance3);
+	/* Invoke cleanup routines for all the shared libraries loaded during external call initialisation.
+ 	 * The cleanup routines are not mandatory routines, but if defined, will be invoked before
+	 * closing the shared library.
+	 */
+	for (package_ptr = TREF(extcall_package_root); package_ptr; package_ptr = package_ptr->next_package)
+	{
+	    if (package_ptr->package_clnup_rtn)
+		package_ptr->package_clnup_rtn();
+	    fgn_closepak(package_ptr->package_handle, INFO);
+	}
 	/* We know of at least one case where the below code would error out. That is if this were a replication external
 	 * filter M program halting out after the other end of the pipe has been closed by the source server. In this case,
 	 * the io_rundown call below would error out and would invoke the lastchance3 condition handler which will do an

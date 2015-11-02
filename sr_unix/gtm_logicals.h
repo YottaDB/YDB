@@ -72,7 +72,6 @@
 #define	GTM_ZQUIT_ANYWAY		"$gtm_zquit_anyway"
 #define	GTM_NOUNDEF			"$gtm_noundef"
 #define	GTM_PROMPT			"$gtm_prompt"
-#define GTM_LVSCALE			"$gtm_lvscale"
 #define GTM_BOOLEAN			"$gtm_boolean"
 
 /* -------------------------- Unix only --------------------------  */

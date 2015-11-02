@@ -218,8 +218,6 @@ GBLDEF	mstr		*comline_base,
 			extnam_str,
 			env_gtm_env_xlate;
 GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");
-GBLDEF int              (*gtm_env_xlate_entry)() = NULL;
-GBLDEF void             (*gtm_sigusr1_handler)() = NULL;
 GBLDEF	mval		dollar_zgbldir,
 			dollar_zsource = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_zstatus,
@@ -439,7 +437,6 @@ GBLDEF	fd_set			mutex_wait_on_descs;
 #endif
 #endif
 GBLDEF	void			(*call_on_signal)();
-GBLDEF	void			(*create_fatal_error_zshow_dmp_fp)();
 GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, lke.c, gtm.c, mupip.c, gtmsecshr.c etc. */
 
 #ifdef UNIX
@@ -1124,11 +1121,3 @@ GBLDEF	boolean_t	skip_block_chain_tail_check;
 #endif
 
 GBLDEF	char		gvcst_search_clue;
-
-/* The following are variables used by the ALS_SCAN_FOR_CONTAINERS macro and als_scan_for_containers functions.
- * The global variables below are used to avoid the overhead of passing this down the recursion stack otherwise.
- */
-GBLDEF	als_cntnr_fnptr_t	als_cntnr_fnptr_gbldef;
-GBLDEF	void			*als_cntnr_arg1_gbldef, *als_cntnr_arg2_gbldef;
-GBLDEF	int			als_cntnrs_cnt_gbldef;
-

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -215,7 +215,7 @@ LITREF	int		ht_sizes[];
 	assert((ht_index) < (prime));			\
 	(ht_index) += (rhfact);				\
 	if ((ht_index) >= (prime))			\
-		(ht_index) -= (prime);			\
+		(ht_index) -= (prime);
 
 #define RETURN_IF_ADDED(table, tabent, hkey, value)				\
 {										\

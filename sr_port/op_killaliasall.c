@@ -27,36 +27,37 @@
 
 GBLREF symval           *curr_symval;
 GBLREF lv_val		*active_lv;
+GBLREF uint4		dollar_tlevel;
 GBLREF mstr             **stp_array;
 GBLREF int              stp_array_size;
 
 /* Delete all aliases and the data they point to.
-
-   Two things need to happen:
-   1) Scan the hash table for aliased base variables and remove them.
-   2) Scan ALL subscripted vars for containers, delete the data they point to maintaining
-      proper maintenance of reference counts and unmark the container making it a normal value.
-
-   Note that use of lv_kill(lv, DOTPSAVE_TRUE, DO_SUBTREE_TRUE) to clear values also does the requisite
-   TP restart var protection of current values so we need not worry about it in this routine.
-
-   Since an alias with two references ceases being an alias if a reference is killed, we
-   cannot just do a simple scan and delete references. We will leave "klingons" who used to
-   be aliases but now are not. So we do this in a 3 step procedure:
-   1) Identify all overt aliases in the hash table.
-   2) For the entries that are not aliases but which contain alias containers, scan those
-      arrays for containers, remove the container attribute and do the necessary refcnt
-      cleanup. When all containers have been removed (including step 3), any remaining
-      orphaned data will be recovered by the next LVGC.
-   3) Go through the list of HTEs recorded in step one and kill their hash table reference.
-*/
+ *
+ * Two things need to happen:
+ * 1) Scan the hash table for aliased base variables and remove them.
+ * 2) Scan ALL subscripted vars for containers, delete the data they point to maintaining
+ *    proper maintenance of reference counts and unmark the container making it a normal value.
+ *
+ * Since an alias with two references ceases being an alias if a reference is killed, we
+ * cannot just do a simple scan and delete references. We will leave "klingons" who used to
+ * be aliases but now are not. So we do this in a 3 step procedure:
+ * 1) Identify all overt aliases in the hash table.
+ * 2) For the entries that are not aliases but which contain alias containers, scan those
+ *    arrays for containers, remove the container attribute and do the necessary refcnt
+ *    cleanup. When all containers have been removed (including step 3), any remaining
+ *    orphaned data will be recovered by the next LVGC.
+ * 3) Go through the list of HTEs recorded in step one and kill their hash table reference.
+ */
 void op_killaliasall(void)
 {
 	ht_ent_mname    *tabent, *tabent_top, **htearray, **htearraytop, **htep;
 	lv_val		*lvp, *lvp_top, *lvrefp;
+	symval		*symv;
+	int		lowest_symvlvl;
 
 	active_lv = (lv_val *)NULL;	/* if we get here, subscript set was successful.  clear active_lv to avoid later
-					   cleanup problems */
+					 * cleanup problems */
+	lowest_symvlvl = MAXPOSINT4;
         if (NULL == stp_array)
                 /* Same initialization as is in stp_gcol_src.h */
                 stp_array = (mstr **)malloc((stp_array_size = STP_MAXITEMS) * SIZEOF(mstr *));
@@ -78,6 +79,13 @@ void op_killaliasall(void)
 				htearraytop = htearray + stp_array_size;
 			}
 			*htep++ = tabent;
+			/* Need to find the lowest level symval that is affected by this kill * so we can mark all necessary
+			 * symvals as having had alias activity.
+			 */
+			lvp = (lv_val *)tabent->value;
+			symv = LV_GET_SYMVAL(lvp);
+			if (lowest_symvlvl > symv->symvlvl)
+				lowest_symvlvl = symv->symvlvl;
 		}
 	}
 	/* This next, less scenic trip through the hash table entries we scan any arrays we
@@ -104,7 +112,12 @@ void op_killaliasall(void)
 		assert(lvp);
 		assert(LV_IS_BASE_VAR(lvp));
 		assert(0 < lvp->stats.trefcnt);
-		lv_kill(lvp, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);
+		/* Clone var if necessary */
+		if (dollar_tlevel && (NULL != lvp->tp_var) && !lvp->tp_var->var_cloned)
+			TP_VAR_CLONE(lvp);
+		/* Decrement reference count and cleanup if necessary */
 		DECR_BASE_REF(tabent, lvp, TRUE);
 	}
+	/* Now mark all symvals from the earliest affected by our command to the current as having had alias activity */
+	MARK_ALIAS_ACTIVE(lowest_symvlvl);
   }

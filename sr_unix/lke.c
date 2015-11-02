@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -85,6 +85,7 @@ int main (int argc, char *argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	set_blocksig();
 	gtm_imagetype_init(LKE_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */

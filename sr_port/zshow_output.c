@@ -50,6 +50,13 @@ GBLREF	mv_stent	*mv_chain;
 GBLREF	unsigned char    *msp, *stackwarn, *stacktop;
 GBLREF	int		process_exiting;
 
+error_def(ERR_ZSHOWGLOSMALL);
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
+error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_GVSUBOFLOW);
+error_def(ERR_GVIS);
+
 void zshow_output(zshow_out *out, const mstr *str)
 {
 	mval		*mv, lmv;
@@ -64,13 +71,6 @@ void zshow_output(zshow_out *out, const mstr *str)
 #ifdef UNICODE_SUPPORTED
 	wint_t		codepoint;
 #endif
-
-	error_def(ERR_ZSHOWGLOSMALL);
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
-	error_def(ERR_MAXNRSUBSCRIPTS);
-	error_def(ERR_GVSUBOFLOW);
-	error_def(ERR_GVIS);
 
 	if (NULL != str)
 	{
@@ -200,7 +200,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				if (NULL != lv_child)
 				{
 					lvundef = FALSE;
-					if (!MV_DEFINED(&lv->v))
+					if (!LV_IS_VAL_DEFINED(lv))
 					{
 						lv->v.mvtype = MV_STR;
 						lv->v.str.len = 0;

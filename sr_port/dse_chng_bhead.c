@@ -54,6 +54,7 @@ GBLREF	gd_addr			*gd_header;
 GBLREF	cache_rec		*cr_array[((MAX_BT_DEPTH * 2) - 1) * 2]; /* Maximum number of blocks that can be in transaction */
 GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	unsigned char		*non_tp_jfb_buff_ptr;
+GBLREF	cw_set_element		cw_set[];
 
 void dse_chng_bhead(void)
 {
@@ -63,7 +64,6 @@ void dse_chng_bhead(void)
 	cache_rec_ptr_t		cr;
 	blk_hdr			new_hdr;
 	blk_segment		*bs1, *bs_ptr;
-	cw_set_element		*cse;
 	int4			blk_seg_cnt, blk_size;	/* needed for BLK_INIT,BLK_SEG and BLK_FINI macros */
 	boolean_t		ismap;
 	boolean_t		chng_blk;
@@ -172,7 +172,7 @@ void dse_chng_bhead(void)
 			return;
 		}
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0, new_hdr.levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, cse, csa->ti->curr_tn);
+		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, csa->ti->curr_tn);
 		t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 	}
 	if (cli_present("TN") == CLI_PRESENT)
@@ -199,14 +199,14 @@ void dse_chng_bhead(void)
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0,
 			((blk_hdr_ptr_t)blkhist.buffaddr)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
 		/* Pass the desired tn as argument to bg_update/mm_update below */
-		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, cse, tn);
+		BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, tn);
 		was_hold_onto_crit = csa->hold_onto_crit;
 		csa->hold_onto_crit = TRUE;
 		t_end(&dummy_hist, NULL, tn);
 #		ifdef GTM_CRYPT
 		if (csd->is_encrypted && (tn < csa->ti->curr_tn))
 		{	/* BG and db encryption is enabled and the DSE update caused the block-header to potentially have a tn
-			 * that is LESS than what it had before. At this point, the global buffer (corresponding to cse->blk)
+			 * that is LESS than what it had before. At this point, the global buffer (corresponding to blkhist.blk_num)
 			 * reflects the contents of the block AFTER the dse update (bg_update would have touched this) whereas
 			 * the corresponding encryption global buffer reflects the contents of the block BEFORE the update.
 			 * Normally wcs_wtstart takes care of propagating the tn update from the regular global buffer to the
@@ -220,8 +220,13 @@ void dse_chng_bhead(void)
 			 * tn update. The consequence of this is would be writing an older before-image PBLK) record to the
 			 * journal file. To prevent this situation, we update the encryption buffer here (before releasing crit)
 			 * using logic like that in wcs_wtstart to ensure it is in sync with the regular global buffer.
+			 * Note:
+			 * Although we use cw_set[0] to access the global buffer corresponding to the block number being updated,
+			 * cw_set_depth at this point is 0 because t_end resets it. This is considered safe since cw_set is a
+			 * static array (as opposed to malloc'ed memory) and hence is always available and valid until it gets
+			 * overwritten by subsequent updates.
 			 */
-			bp = (blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cse->cr->buffaddr);
+			bp = (blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cw_set[0].cr->buffaddr);
 			DBG_ENSURE_PTR_IS_VALID_GLOBUFF(csa, csd, (sm_uc_ptr_t)bp);
 			save_bp = (blk_hdr_ptr_t)GDS_ANY_ENCRYPTGLOBUF(bp, csa);
 			DBG_ENSURE_PTR_IS_VALID_ENCTWINGLOBUFF(csa, csd, (sm_uc_ptr_t)save_bp);

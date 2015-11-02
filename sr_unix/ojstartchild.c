@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,6 +82,11 @@ GBLREF char	**environ;
 #ifdef	__osf__
 #pragma pointer_size (restore)
 #endif
+
+error_def(ERR_JOBFAIL);
+error_def(ERR_JOBPARTOOLONG);
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_TEXT);
 
 #define KILL_N_REAP(PROCESS_ID, SIGNAL, RET_VAL)					\
 {											\
@@ -171,11 +176,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #ifdef	__osf__
 #pragma pointer_size (restore)
 #endif
-	error_def(ERR_JOBFAIL);
-	error_def(ERR_JOBPARTOOLONG);
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_TEXT);
-
 	job_launched = FALSE;
 	par_pid = process_id;
 	if (-1 == (child_pid = fork()))
@@ -630,11 +630,12 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 */
 
 		do
-			done_pid = waitpid(child_pid, &wait_status, 0);
-		while(!ojtimeout && 0 > done_pid && EINTR == errno);
-				/* note : macro, WAITPID would not be suitable here because we want to catch our timeout */
-				/* waitpid expects an integer wait_status even for _BSD cases, but WIF* macros expect
-				 * a union wait argument (on AIX) */
+		{	/* note : macro, WAITPID would not be suitable here because we want to catch our timeout
+			 * waitpid expects an integer wait_status even for _BSD cases, but WIF* macros expect
+			 * a union wait argument (on AIX)
+			 */
+			done_pid = waitpid(child_pid, &wait_status, 0);	/* BYPASSOK */
+		} while(!ojtimeout && 0 > done_pid && EINTR == errno);
 		if (done_pid == child_pid)
 			return (wait_status);
 		else if (0 > done_pid && EINTR == errno && TRUE == ojtimeout)

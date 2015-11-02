@@ -215,7 +215,7 @@ list_files:=$(filter %.list, $(allfiles_list))
 msgfile_list:=$(filter %.msg, $(allfiles_list))
 plugin_ksh_file:=$(filter %.ksh, $(allfiles_list))
 
-hfile_list := gtm_stdio.h gtm_stdlib.h gtm_string.h gtm_strings.h gtmxc_types.h main_pragma.h $(hfile_list_sp)
+hfile_list := gtm_stdio.h gtm_stdlib.h gtm_string.h gtm_strings.h gtmxc_types.h gtm_limits.h main_pragma.h $(hfile_list_sp)
 sh_targets:=$(basename $(sh_list))
 
 msgcfile_list=$(addsuffix _ctl.c,$(basename $(msgfile_list)))

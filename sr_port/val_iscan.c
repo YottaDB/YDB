@@ -15,29 +15,30 @@
 
 int	val_iscan(mval *v)
 {
-	bool	dot;
-	char 	*c, *eos;
-	int4	zeroes, sigdigs, exp;
+	boolean_t	dot;
+	char		*c, *eos;
+	int4		zeroes, sigdigs, exp;
 
 	MV_FORCE_STR(v);
-
 	c = v->str.addr;
-	if (v->str.len == 0)
+	if (0 == v->str.len)
 		return FALSE;
-	else if (v->str.len == 1 && *c == '0')
+	else if ((1 == v->str.len) && ('0' == *c))
 		return TRUE;
 	eos = c + v->str.len;
 	zeroes = sigdigs = exp = 0;
-	if (*c == '-')
-	{	c++;
+	if ('-' == *c)
+	{
+		c++;
 		if (c == eos)
 			return FALSE;
 	}
 	dot = FALSE;
-	if (*c <= '9' && *c > '0')
+	if (('9' >= *c) && ('0' < *c))
 	{
-		while (c != eos && *c <= '9' && *c >= '0')
-		{	if (*c == '0')		/* don't count trailing zeroes on a big number */
+		while ((c != eos) && ('9' >= *c) && ('0' <= *c))
+		{
+			if ('0' == *c)		/* don't count trailing zeroes on a big number */
 				zeroes++;
 			else
 				zeroes = 0;
@@ -45,11 +46,13 @@ int	val_iscan(mval *v)
 			exp++;
 			c++ ;
 		}
-		if (c != eos && *c == '.')
-		{	dot = TRUE;
+		if ((c != eos) && ('.' == *c))
+		{
+			dot = TRUE;
 			c++;
-			while (c != eos && *c <= '9' && *c >= '0')
-			{	if (*c == '0')		/* don't count trailing zeroes on a big number */
+			while ((c != eos) && ('9' >= *c) && ('0' <= *c))
+			{
+				if ('0' == *c)		/* don't count trailing zeroes on a big number */
 					zeroes++;
 				else
 					zeroes = 0;
@@ -58,21 +61,24 @@ int	val_iscan(mval *v)
 			}
 		}
 		sigdigs -= zeroes;
-	} else if (*c == '.')
+	} else if ('.' == *c)
 	{
-		dot = TRUE ; c++;
-		while (c != eos && *c == '0')
-		{	exp--;
+		dot = TRUE; c++;
+		while ((c != eos) && ('0' == *c))
+		{
+			exp--;
 			c++;
 		}
-		while (c != eos && *c <= '9' && *c >= '0')
-		{	sigdigs++;
+		while ((c != eos) && ('9' >= *c) && ('0' <= *c))
+		{
+			sigdigs++;
 			c++;
 		}
 	} else
 		return FALSE;
 	exp += MV_XBIAS;
-	if (c != eos || (dot && (*(c-1) == '0' || *(c-1) == '.')) || (NUM_DEC_DG_2L < sigdigs)|| (EXPLO > exp) || (EXPHI <= exp))
+	if ((c != eos) || (dot && (('0' == *(c - 1)) || ('.' == *(c - 1))))
+			|| (NUM_DEC_DG_2L < sigdigs) || (EXPLO > exp) || (EXPHI <= exp))
 		return FALSE;
 	return TRUE;
 }

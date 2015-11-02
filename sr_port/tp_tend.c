@@ -249,6 +249,7 @@ boolean_t	tp_tend()
 	jnldata_hdr_ptr_t	jnl_header;
 	jnl_record		*rec;
 	boolean_t		release_crit, yes_jnl_no_repl, recompute_cksum, cksum_needed;
+	boolean_t		save_dont_reset_gbl_jrec_time;
 	uint4			jnl_status, leafmods, indexmods;
 	uint4			total_jnl_rec_size, in_tend;
 	uint4			update_trans;
@@ -731,15 +732,35 @@ boolean_t	tp_tend()
 					if (JNL_HAS_EPOCH(jbp)
 						&& ((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE)))
 					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
+						/* Note that at this point, jgbl.gbl_jrec_time has been computed taking into
+						 * account the current system time & the last journal record timestamp of ALL
+						 * regions involved in this TP transaction. To prevent wcs_flu from inadvertently
+						 * setting this BACK in time (poses out-of-order timestamp issues for backward
+						 * recovery and is asserted later in tp_tend) set jgbl.dont_reset_gbl_jrec_time
+						 * to TRUE for the duration of the wcs_flu.
+						 * Also, in case of rts_error from wcs_flu, t_ch will be invoked which will take
+						 * care of restoring this variable to FALSE. Any new codepath in mumps that sets
+						 * this variable for the duration of wcs_flu should take care of resetting this
+						 * back to FALSE in an existing condition handler (or by creating a new one if not
+						 * already present)
+						 * Since, this global is set to TRUE explicitly by forward recovery, we should NOT
+						 * reset this to FALSE unconditionally. But, instead of checking if forward recovery
+						 * is TRUE, save and restore this variable unconditionally thereby saving a few
+						 * CPU cycles.
+						 */
+						save_dont_reset_gbl_jrec_time = jgbl.dont_reset_gbl_jrec_time;
+						jgbl.dont_reset_gbl_jrec_time = TRUE;
 						if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT))
 						{
 							assert(csd == csa->hdr);
+							jgbl.dont_reset_gbl_jrec_time = save_dont_reset_gbl_jrec_time;
 							SET_WCS_FLU_FAIL_STATUS(status, csd);
 							SET_TRACEABLE_VAR(csd->wc_blocked, TRUE);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_wcsflu);
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 							goto failed;
 						}
+						jgbl.dont_reset_gbl_jrec_time = save_dont_reset_gbl_jrec_time;
 						assert(csd == csa->hdr);
 					}
 					assert(jgbl.gbl_jrec_time >= jbp->prev_jrec_time);

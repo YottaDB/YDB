@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -157,7 +157,13 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{	/* not for stdin, stdout, stderr or pipes */
 			if (iod->newly_created || newversion)
 			{	/* tag the file */
-				SET_TAG_FROM_CHSET(iod->ochset, iod->file_chset, TRUE);
+				if (d_rm->fifo && (iod->is_ochset_default || d_rm->noread))
+				{	/* If FIFO, set tag per ichset if no ochset or READONLY */
+					SET_TAG_FROM_CHSET(iod->ichset, iod->file_chset, TRUE);
+				} else
+				{
+					SET_TAG_FROM_CHSET(iod->ochset, iod->file_chset, TRUE);
+				}
 				iod->file_tag = (unsigned int)file_tag;
 				if (-1 == gtm_zos_set_tag(fd, file_tag, text_tag, TAG_FORCE, &realfiletag))
 				{
@@ -172,10 +178,12 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			} else
 			{
 				iod->file_tag = (unsigned int)file_tag;	/* save real tag for file */
-				SET_TAG_FROM_CHSET(iod->ochset, dummy_chset, FALSE);
 				if (iod->is_ochset_default || d_rm->noread)
 				{	/* set tag per ichset if no ochset or READONLY */
 					SET_TAG_FROM_CHSET(iod->ichset, dummy_chset, FALSE);
+				} else
+				{
+					SET_TAG_FROM_CHSET(iod->ochset, dummy_chset, FALSE);
 				}
 				if (-1 == (obtained_tag = gtm_zos_tag_to_policy(fd, file_tag, &realfiletag)))
 				{

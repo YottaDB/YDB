@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +33,9 @@ GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
 GBLREF	boolean_t		hold_onto_locks;
 
+error_def(ERR_DBCCERR);
+error_def(ERR_CRITRESET);
+
 void	grab_crit(gd_region *reg)
 {
 	unix_db_info		*udi;
@@ -40,9 +43,6 @@ void	grab_crit(gd_region *reg)
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
 	DCL_THREADGBL_ACCESS;
-
-	error_def(ERR_DBCCERR);
-	error_def(ERR_CRITRESET);
 
 	SETUP_THREADGBL_ACCESS;
 	udi = FILE_INFO(reg);

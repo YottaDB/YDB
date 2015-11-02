@@ -23,7 +23,6 @@
 #include "io.h"
 #include "iottdef.h"
 #include "trmdef.h"
-#include "iombdef.h"
 #include "iormdef.h"
 #include "iotcpdef.h"
 #include "gt_timer.h"
@@ -66,7 +65,6 @@ void zshow_devices(zshow_out *output)
 	mval		v;
 	mval		m;
 	d_rm_struct	*rm_ptr;
-	d_mb_struct	*mb_ptr;
 	d_tt_struct	*tt_ptr;
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr;
@@ -148,7 +146,7 @@ void zshow_devices(zshow_out *output)
 			v.str.addr = &l->dollar_io[0];
 			v.str.len = l->len;
 			zshow_output(output,&v.str);
-			ZS_ONE_OUT(&v,space_text);
+			ZS_ONE_OUT(&v, space_text);
 			if (l->iod->state == dev_open)
 			{
 				ZS_STR_OUT(&v, devop);
@@ -158,63 +156,63 @@ void zshow_devices(zshow_out *output)
 						ZS_STR_OUT(&v, terminal_text);
 						tt_ptr = (d_tt_struct*)l->iod->dev_sp;
 						if (!ctrlc_on && io_std_device->out == l->iod) /* and standard input */
-						{	ZS_PARM_SP(&v,zshow_nocene);
+						{	ZS_PARM_SP(&v, zshow_nocene);
 						}
 						if (tt_ptr->enbld_outofbands.mask)
-						{	ZS_PARM_EQU(&v,zshow_ctra);
+						{	ZS_PARM_EQU(&v, zshow_ctra);
 							ZS_STR_OUT(&v,dollarc_text);
 							first = TRUE;
 							for ( i = 1, j = 0; j < 32  ; j++,i = i * 2)
 							{	if (i & tt_ptr->enbld_outofbands.mask)
 								{	if (!first)
-									{	ZS_ONE_OUT(&v,comma_text);
+									{	ZS_ONE_OUT(&v, comma_text);
 									}else
 									{	first = FALSE;
 									}
-									MV_FORCE_MVAL(&m,j) ;
+									MV_FORCE_MVAL(&m,j);
 									mval_write(output,&m,FALSE);
 								}
 							}
 							ZS_ONE_OUT(&v, rparen_text);
-							ZS_ONE_OUT(&v,space_text);
+							ZS_ONE_OUT(&v, space_text);
 						}
 						if ((int4)(tt_ptr->term_ctrl) & TRM_NOECHO)
 						{
-							ZS_PARM_SP(&v,zshow_noecho);
+							ZS_PARM_SP(&v, zshow_noecho);
 						}
 						if (tt_ptr->term_ctrl & TRM_PASTHRU)
 						{
-							ZS_PARM_SP(&v,zshow_past);
+							ZS_PARM_SP(&v, zshow_past);
 						} else
 						{
-							ZS_PARM_SP(&v,zshow_nopast);
+							ZS_PARM_SP(&v, zshow_nopast);
 						}
 						if (!(tt_ptr->term_ctrl & TRM_ESCAPE))
 						{
-							ZS_PARM_SP(&v,zshow_noesca);
+							ZS_PARM_SP(&v, zshow_noesca);
 						}
 						if (tt_ptr->term_ctrl & TRM_READSYNC)
 						{
-							ZS_PARM_SP(&v,zshow_reads);
+							ZS_PARM_SP(&v, zshow_reads);
 						} else
 						{
-							ZS_PARM_SP(&v,zshow_noreads);
+							ZS_PARM_SP(&v, zshow_noreads);
 						}
 						if (tt_ptr->term_ctrl & TRM_NOTYPEAHD)
 						{
-							ZS_PARM_SP(&v,zshow_notype);
+							ZS_PARM_SP(&v, zshow_notype);
 						} else
 						{
-							ZS_PARM_SP(&v,zshow_type);
+							ZS_PARM_SP(&v, zshow_type);
 						}
 						if (!l->iod->wrap)
 						{
-							ZS_PARM_SP(&v,zshow_nowrap);
+							ZS_PARM_SP(&v, zshow_nowrap);
 						}
 						mask_out = &tt_ptr->mask_term;
 						if (!tt_ptr->default_mask_term)
 						{
-							ZS_PARM_EQU(&v,zshow_term);
+							ZS_PARM_EQU(&v, zshow_term);
 							ZS_STR_OUT(&v,dollarc_text);
 							first = TRUE;
 							for ( i = 0; i < 8 ;i++)
@@ -227,26 +225,26 @@ void zshow_devices(zshow_out *output)
 											ZS_ONE_OUT(&v, comma_text);
 										} else
 											first = FALSE;
-										MV_FORCE_MVAL(&m,i * 32 + j) ;
+										MV_FORCE_MVAL(&m,i * 32 + j);
 										mval_write(output,&m,FALSE);
 									}
 							}
 							ZS_ONE_OUT(&v, rparen_text);
-							ZS_ONE_OUT(&v,space_text);
+							ZS_ONE_OUT(&v, space_text);
 						}
-						ZS_PARM_EQU(&v,zshow_width);
-						MV_FORCE_MVAL(&m,(int)l->iod->width) ;
+						ZS_PARM_EQU(&v, zshow_width);
+						MV_FORCE_MVAL(&m,(int)l->iod->width);
 						mval_write(output, &m, FALSE);
-						ZS_ONE_OUT(&v,space_text);
-						ZS_PARM_EQU(&v,zshow_leng);
-						MV_FORCE_MVAL(&m,(int)l->iod->pair.out->length) ;
+						ZS_ONE_OUT(&v, space_text);
+						ZS_PARM_EQU(&v, zshow_leng);
+						MV_FORCE_MVAL(&m,(int)l->iod->pair.out->length);
 						mval_write(output, &m, FALSE);
-						ZS_ONE_OUT(&v,space_text);
+						ZS_ONE_OUT(&v, space_text);
 						if (l->iod->write_filter)
 						{
 							bool twoparms = FALSE;
 
-							ZS_PARM_EQU(&v,zshow_fil);
+							ZS_PARM_EQU(&v, zshow_fil);
 							if (l->iod->write_filter & CHAR_FILTER)
 							{
 								if (l->iod->write_filter & ESC1)
@@ -257,15 +255,15 @@ void zshow_devices(zshow_out *output)
 								ZS_STR_OUT(&v,filchar_text);
 								if (twoparms)
 								{
-									ZS_ONE_OUT(&v,comma_text);
-									ZS_ONE_OUT(&v,space_text);
+									ZS_ONE_OUT(&v, comma_text);
+									ZS_ONE_OUT(&v, space_text);
 								}
 							}
 							if (l->iod->write_filter & ESC1)
 								ZS_STR_OUT(&v,filesc_text);
 							if (twoparms)
 								ZS_ONE_OUT(&v,rparen_text);
-							ZS_ONE_OUT(&v,space_text);
+							ZS_ONE_OUT(&v, space_text);
 						}
 						if (TT_EDITING & tt_ptr->ext_cap)
 							ZS_PARM_SP(&v, zshow_edit);
@@ -339,53 +337,53 @@ void zshow_devices(zshow_out *output)
 										&v,rm_ptr->dev_param_pairs.pairs[i].name);
 									ZS_VAR_STR_OUT(
 										&v,rm_ptr->dev_param_pairs.pairs[i].definition);
-									ZS_ONE_OUT(&v,space_text);
+									ZS_ONE_OUT(&v, space_text);
 								}
 							}
 							if (rm_ptr->independent)
 							{
-								ZS_PARM_SP(&v,zshow_independent);
+								ZS_PARM_SP(&v, zshow_independent);
 							}
 							if (rm_ptr->parse)
 							{
-								ZS_PARM_SP(&v,zshow_parse);
+								ZS_PARM_SP(&v, zshow_parse);
 							}
 						}
 						if (rm_ptr->fixed)
 						{
-							ZS_PARM_SP(&v,zshow_fixed);
+							ZS_PARM_SP(&v, zshow_fixed);
 						}
 						if (rm_ptr->noread)
 						{
-							ZS_PARM_SP(&v,zshow_read);
+							ZS_PARM_SP(&v, zshow_read);
 						}
 						if (gtm_utf8_mode && (IS_UTF_CHSET(l->iod->ichset) || IS_UTF_CHSET(l->iod->ochset)))
 						{
 							if (!rm_ptr->def_recsize)
 							{
-								ZS_PARM_EQU(&v,zshow_rec);
+								ZS_PARM_EQU(&v, zshow_rec);
 								MV_FORCE_MVAL(&m, (int)rm_ptr->recordsize);
 								mval_write(output, &m, FALSE);
-								ZS_ONE_OUT(&v,space_text);
+								ZS_ONE_OUT(&v, space_text);
 							}
 							if (!rm_ptr->def_width)
 							{
-								ZS_PARM_EQU(&v,zshow_width);
+								ZS_PARM_EQU(&v, zshow_width);
 								MV_FORCE_MVAL(&m, (int)l->iod->width);
 								mval_write(output, &m, FALSE);
-								ZS_ONE_OUT(&v,space_text);
+								ZS_ONE_OUT(&v, space_text);
 							}
 						}
 						else if (l->iod->width != DEF_RM_WIDTH)
 						{
-							ZS_PARM_EQU(&v,zshow_rec);
+							ZS_PARM_EQU(&v, zshow_rec);
 							MV_FORCE_MVAL(&m,(int)l->iod->width);
 							mval_write(output, &m, FALSE);
-							ZS_ONE_OUT(&v,space_text);
+							ZS_ONE_OUT(&v, space_text);
 						}
 						if (!l->iod->wrap)
 						{
-							ZS_PARM_SP(&v,zshow_nowrap);
+							ZS_PARM_SP(&v, zshow_nowrap);
 						}
 						switch(l->iod->ichset)
 						{
@@ -473,40 +471,9 @@ void zshow_devices(zshow_out *output)
 						}
 #endif
 						break;
-					case mb:
-						ZS_STR_OUT(&v,mailbox_text);
-						mb_ptr = (d_mb_struct*) l->iod->dev_sp;
-						if (mb_ptr->write_mask)
-						{
-							ZS_PARM_SP(&v,zshow_wait);
-						}
-						if (mb_ptr->prmflg)
-						{
-							ZS_PARM_SP(&v,zshow_prmmbx);
-						}
-						if (mb_ptr->maxmsg != DEF_MB_MAXMSG)
-						{
-							ZS_PARM_EQU(&v,zshow_bloc);
-							MV_FORCE_MVAL(&m,(int)mb_ptr->maxmsg) ;
-							mval_write(output, &m, FALSE);
-							ZS_ONE_OUT(&v,space_text);
-						}
-						if (mb_ptr->promsk & IO_RD_ONLY)
-						{
-							ZS_PARM_SP(&v,zshow_read);
-						}
-						if (mb_ptr->del_on_close)
-						{
-							ZS_PARM_SP(&v,zshow_dele);
-						}
-						if (mb_ptr->promsk & IO_SEQ_WRT)
-						{
-							ZS_PARM_SP(&v,zshow_write);
-						}
-						break;
 					case gtmsocket:
-						delim_buff_sm = (sm_uc_ptr_t) malloc(MAX_DELIM_LEN);
-						delim.addr = (char *) malloc(MAX_DELIM_LEN * 7);
+						delim_buff_sm = (sm_uc_ptr_t)malloc(MAX_DELIM_LEN);
+						delim.addr = (char *)malloc(MAX_DELIM_LEN * 7);
 						delim_len = 0;
 						ZS_STR_OUT(&v, socket_text);
 						dsocketptr = (d_socket_struct *)l->iod->dev_sp;
@@ -528,7 +495,8 @@ void zshow_devices(zshow_out *output)
 							/* output each socket */
 							socketptr = dsocketptr->socket[ii];
 							ZS_STR_OUT(&v, space8_text);
-							/* socket handle */		ZS_STR_OUT(&v, socket_text);
+							/* socket handle */
+							ZS_STR_OUT(&v, socket_text);
 							ZS_ONE_OUT(&v, lb_text);
 							MV_FORCE_MVAL(&m, ii);
 							mval_write(output, &m, FALSE);
@@ -538,7 +506,8 @@ void zshow_devices(zshow_out *output)
 							v.str.len = socketptr->handle_len;
 							zshow_output(output, &v.str);
 							ZS_ONE_OUT(&v, space_text);
-							/* socket descriptor */		ZS_STR_OUT(&v, descriptor_text);
+							/* socket descriptor */
+							ZS_STR_OUT(&v, descriptor_text);
 							MV_FORCE_MVAL(&m, socketptr->sd);
 							mval_write(output, &m, FALSE);
 							ZS_ONE_OUT(&v, space_text);
@@ -593,7 +562,8 @@ void zshow_devices(zshow_out *output)
 								default:
 									GTMASSERT;
 							}
-							/* socket type */		if (socketptr->passive)
+							/* socket type */
+							if (socketptr->passive)
 							{
 								ZS_STR_OUT(&v, passive_text);
 							} else
@@ -601,7 +571,8 @@ void zshow_devices(zshow_out *output)
 								ZS_STR_OUT(&v, active_text);
 							}
 							ZS_ONE_OUT(&v, space_text);
-							/* error trapping */		if (socketptr->ioerror)
+							/* error trapping */
+							if (socketptr->ioerror)
 							{
 								ZS_STR_OUT(&v, trap_text);
 							} else
@@ -609,7 +580,8 @@ void zshow_devices(zshow_out *output)
 								ZS_STR_OUT(&v, notrap_text);
 							}
 							ZS_ONE_OUT(&v, space_text);
-							/* address + port */		if (socketptr->passive)
+							/* address + port */
+							if (socketptr->passive)
 							{
 								ZS_STR_OUT(&v, port_text);
 								tmpport = (int)socketptr->local.port;
@@ -643,7 +615,8 @@ void zshow_devices(zshow_out *output)
 							zshow_output(output, 0);
 							ZS_STR_OUT(&v, space8_text);
 							ZS_STR_OUT(&v, space8_text);
-							/* zdelay */			if (socketptr->nodelay)
+							/* zdelay */
+							if (socketptr->nodelay)
 							{
 								ZS_STR_OUT(&v, znodelay_text);
 							} else
@@ -651,15 +624,18 @@ void zshow_devices(zshow_out *output)
 								ZS_STR_OUT(&v, zdelay_text);
 							}
 							ZS_ONE_OUT(&v, space_text);
-							/* zbfsize */ 			ZS_STR_OUT(&v, zbfsize_text);
+							/* zbfsize */
+							ZS_STR_OUT(&v, zbfsize_text);
 							MV_FORCE_MVAL(&m, (int4)(socketptr->buffer_size));
 							mval_write(output, &m, FALSE);
 							ZS_ONE_OUT(&v, space_text);
-							/* izbfsize */ 			ZS_STR_OUT(&v, zibfsize_text);
+							/* izbfsize */
+							ZS_STR_OUT(&v, zibfsize_text);
 							MV_FORCE_MVAL(&m, socketptr->bufsiz);
 							mval_write(output, &m, FALSE);
 							ZS_ONE_OUT(&v, space_text);
-							/* delimiters */ 		if (socketptr->n_delimiter > 0)
+							/* delimiters */
+							if (socketptr->n_delimiter > 0)
 							{
 								output->flush = TRUE;
 								zshow_output(output, 0);
@@ -673,7 +649,7 @@ void zshow_devices(zshow_out *output)
 									       socketptr->delimiter[jj].addr, delim_len_sm);
 									format2zwr(delim_buff_sm, delim_len_sm,
 										   (uchar_ptr_t)delim.addr, &delim_len);
-									delim.len = (unsigned short) delim_len;
+									delim.len = (unsigned short)delim_len;
 									zshow_output(output, &delim);
 									ZS_ONE_OUT(&v, space_text);
 								}

@@ -34,7 +34,7 @@
  */
 void lv_var_clone(lv_val *clone_var, lv_val *base_lv)
 {
-	tree		*clone_lvt;
+	lvTree		*clone_lvt;
 
 	assert(clone_var);
 	assert(LV_IS_BASE_VAR(clone_var));
@@ -45,7 +45,6 @@ void lv_var_clone(lv_val *clone_var, lv_val *base_lv)
 	if (NULL != clone_lvt)
 	{
 		assert(1 == clone_lvt->sbs_depth);
-		lvTreeClone(clone_lvt, (treeNode *)clone_var, base_lv);
+		LV_TREE_CLONE(clone_lvt, (lvTreeNode *)clone_var, base_lv);
 	}
-	return;
 }

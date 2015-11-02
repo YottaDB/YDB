@@ -27,7 +27,6 @@ GBLREF gv_namehead	*gv_target;
 GBLREF gd_region       *gv_cur_region;
 
 error_def(ERR_GVSUBOFLOW);
-error_def(ERR_NUMOFLOW);
 error_def(ERR_GVIS);
 
 static readonly unsigned char pos_code[100] =
@@ -94,8 +93,7 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key)
 		{	/* Yes, convert it to numeric */
 			(void)s2n(in_val);
 			mvt = in_val->mvtype;
-			if (!(mvt & MV_NM))
-				rts_error(VARLSTCNT(1) ERR_NUMOFLOW);
+			assert(mvt & MV_NM);
 		} else
 		{	/* No, not numeric.  Note the fact for future reference */
 			mvt = in_val->mvtype |= MV_NUM_APPROX;

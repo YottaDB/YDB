@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_limits.h"
 
 #include <dlfcn.h>
 
@@ -23,9 +24,6 @@
 #include "real_len.h"
 #include "gtmcrypt.h"
 
-#ifndef GTM_PATH_MAX
-#define GTM_PATH_MAX	255
-#endif
 #ifndef	GTM_DIST
 #define GTM_DIST	"gtm_dist"
 #endif

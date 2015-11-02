@@ -105,14 +105,14 @@
 
 #define	LVP_KILL_SUBTREE_IF_EXISTS(lvp, dotpsave)				\
 {										\
-	tree	*lvt_child;							\
+	lvTree	*lvt_child;							\
 										\
 	assert(LV_IS_BASE_VAR(lvp));						\
 	assert(0 == (lvp)->stats.crefcnt);					\
 	lvt_child = LV_GET_CHILD(lvp);						\
 	if (NULL != lvt_child)							\
 	{									\
-		assert(((treeNode *)(lvp)) == lvt_child->sbs_parent);		\
+		assert(((lvTreeNode *)(lvp)) == LVT_PARENT(lvt_child));		\
 		LV_CHILD(lvp) = NULL;						\
 		lv_killarray(lvt_child, dotpsave);				\
 	}									\
@@ -204,30 +204,34 @@
 }
 
 /* Macro to mark nested symvals as having had alias activity. Mark nested symvals until we get
-   to a symval owning the lv_val specified. This loop will normally only run once except in the
-   case where the lv_val given is owned by a symval nested by an exclusive NEW.
-*/
-#define MARK_ALIAS_ACTIVE(lv_own_svlvl)			\
-{							\
-	symval	*sv;					\
-	int4	lcl_own_svlvl;				\
-							\
-	lcl_own_svlvl = lv_own_svlvl;			\
-	for (sv = curr_symval; sv; sv = sv->last_tab)	\
-	{						\
-		sv->alias_activity = TRUE;		\
-		if (sv->symvlvl == lcl_own_svlvl)	\
-			break;				\
-	}						\
-	assert(sv);	/* Loop should end early */	\
+ * to a symval owning the lv_val specified. This loop will normally only run once except in the
+ * case where the lv_val given is owned by a symval nested by an exclusive NEW.
+ */
+#define MARK_ALIAS_ACTIVE(lv_own_svlvl)									\
+{													\
+	symval	*sv;											\
+	int4	lcl_own_svlvl;										\
+													\
+	lcl_own_svlvl = lv_own_svlvl;									\
+	for (sv = curr_symval; ((NULL != sv) && (sv->symvlvl >= lcl_own_svlvl)); sv = sv->last_tab)	\
+		sv->alias_activity = TRUE;								\
 }
 
-/* Macro to scan a tree for container vars and for each one, treat it as if it had been specified in a TP restart variable list
- * by setting it up to be cloned if deleted. This activity should nest so container vars that point to further trees should also be
+/* The following *_CNTNRS_IN_TREE macros scan the supplied tree for container vars. Note that in debug mode,
+ * even if "has_aliascont" is NOT set, we will still scan the array for containers but if one is found, then we will assert fail.
+ * Note this means the processing is different for PRO and DBG builds in that this routine will not even be called in PRO if
+ * the has_aliascont flag is not on in the base mval. But this allows us to check the integrity of the has_aliascont flag
+ * in DBG because we will fail if ever a container is found in an array with the flag turned off.
+ */
+
+/* Macro to scan a lvTree for container vars and for each one, treat it as if it had been specified in a TP restart variable list
+ * by setting it up to be cloned if deleted. This activity should nest so container vars that point to further trees should also
  * be scanned.
  */
 #define TPSAV_CNTNRS_IN_TREE(lv_base)												\
 {																\
+	lvTree	*lvt;														\
+																\
 	assert(LV_IS_BASE_VAR(lv_base));											\
         if (lv_base->stats.tstartcycle != tstartcycle)										\
 	{	/* If haven't processed this lv_val for this transaction (or nested transaction */				\
@@ -236,14 +240,14 @@
 		   to rescan the var anyway since one attempt can execute differently than a following attempt and thus create	\
 		   different variables for us to find -- if it has aliases in it that is.					\
 		*/														\
-		if (DEBUG_ONLY(TRUE) PRO_ONLY(lv_base->has_aliascont))								\
+		if ((NULL != (lvt = LV_GET_CHILD(lv_base))) PRO_ONLY(&& (lv_base)->has_aliascont))				\
 		{														\
-			DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base)); 	\
-			ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_tpsav_cntnr_node, tp_pointer, NULL);			\
-			DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base)); 	\
+			DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Beginning processing lvTree at 0x"lvaddr"\n", lv_base)); 	\
+			als_prcs_tpsav_cntnr(lvt);										\
+			DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Finished processing lvTree at 0x"lvaddr"\n", lv_base)); 	\
 		}														\
 	} else															\
-		DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Bypassing tree at 0x"lvaddr" as already processed\n", lv_base));	\
+		DBGRFCT((stderr, "\n## TPSAV_CNTNRS_IN_TREE: Bypassing lvTree at 0x"lvaddr" as already processed\n", lv_base));	\
 }
 
 /* Macro similar to TPSAV_CNTNRS_IN_TREE() above but in this case, we know we want to increment the reference counts
@@ -253,12 +257,14 @@
  */
 #define TPREST_CNTNRS_IN_TREE(lv_base)											\
 {															\
+	lvTree	*lvt;													\
+															\
 	assert(LV_IS_BASE_VAR(lv_base));										\
-	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))							\
+	if ((NULL != (lvt = LV_GET_CHILD(lv_base))) PRO_ONLY(&& (lv_base)->has_aliascont))				\
 	{														\
-		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base));	\
-		ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_tprest_cntnr_node, NULL, NULL);				\
-		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base));	\
+		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Beginning processing lvTree at 0x"lvaddr"\n", lv_base));	\
+		als_prcs_tprest_cntnr(lvt);										\
+		DBGRFCT((stderr, "\n++ TPREST_CNTNRS_IN_TREE: Finished processing lvTree at 0x"lvaddr"\n", lv_base));	\
 	}														\
 }
 
@@ -266,30 +272,36 @@
    in unwind processing */
 #define TPUNWND_CNTNRS_IN_TREE(lv_base)												\
 {																\
+	lvTree	*lvt;														\
+																\
 	assert(LV_IS_BASE_VAR(lv_base));											\
-	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))								\
+	if ((NULL != (lvt = LV_GET_CHILD(lv_base))) PRO_ONLY(&& (lv_base)->has_aliascont))					\
 	{															\
-		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Begining processing tree at 0x"lvaddr"\n", lv_base));		\
-		ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_tpunwnd_cntnr_node, NULL, NULL);					\
-		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Finished processing tree at 0x"lvaddr"\n", lv_base));		\
+		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Beginning processing lvTree at 0x"lvaddr"\n", lv_base));		\
+		als_prcs_tpunwnd_cntnr(lvt);											\
+		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Finished processing lvTree at 0x"lvaddr"\n", lv_base));		\
 	} else															\
-		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Scan for tree at 0x"lvaddr" bypassed - no containers", lv_base));\
+		DBGRFCT((stderr, "\n-- TPUNWND_CNTNRS_IN_TREE: Scan for lvTree at 0x"lvaddr" bypassed - no containers", lv_base));\
 }
 
 /* Macro to scan a tree for container vars, delete what they point to and unmark the container so it is no longer a container */
 #define KILL_CNTNRS_IN_TREE(lv_base)								\
 {												\
+	lvTree	*lvt;										\
+												\
 	assert(LV_IS_BASE_VAR(lv_base));							\
-	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))				\
-		ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_kill_cntnr_node, NULL, NULL);	\
+	if ((NULL != (lvt = LV_GET_CHILD(lv_base))) PRO_ONLY(&& (lv_base)->has_aliascont))	\
+		als_prcs_kill_cntnr(lvt);							\
 }
 
 /* Macro to scan an lvval for containers pointing to other structures that need to be scanned in xnew pop processing */
 #define XNEWREF_CNTNRS_IN_TREE(lv_base)								\
 {												\
+	lvTree	*lvt;										\
+												\
 	assert(LV_IS_BASE_VAR(lv_base));							\
-	if (DEBUG_ONLY(TRUE) PRO_ONLY((lv_base)->has_aliascont))				\
-		ALS_SCAN_FOR_CONTAINERS((lv_base), &als_prcs_xnewref_cntnr_node, NULL, NULL);	\
+	if ((NULL != (lvt = LV_GET_CHILD(lv_base))) PRO_ONLY(&& (lv_base)->has_aliascont))	\
+		als_prcs_xnewref_cntnr(lvt);							\
 }
 
 /* Macro to mark the base frame of the current var as having a container */
@@ -299,73 +311,14 @@
 	lv_base->has_aliascont = TRUE;										\
 }
 
-/* Macro to scan the supplied tree for container vars and invoke the supplied routine and args. Note that in debug mode,
- * even if "has_aliascont" is NOT set, we will still scan the array for containers but if one is found, then we will assert fail.
- * Note this means the processing is different for PRO and DBG builds in that this routine will not even be called in PRO if
- * the has_aliascont flag is not on in the base mval. But this allows us to check the integrity of the has_aliascont flag
- * in DBG because we will fail if ever a container is found in an array with the flag turned off.
- *
- * Just like "als_xnew_killaliasarray", we have a choice here of recursion vs iteration. Since a function pointer is passed
- * in and we cannot be sure what that function does, the safest thing to do would be to do a post-order traversal using recursion.
- *
- * Since the ALS_SCAN_FOR_CONTAINERS macro invocation can nest on itself (if one local variable has a container pointing to a
- * different local variable), we need to save the counters in a local variable and restore it before returning to the parent local.
- * Since we save/restore the counter, we also do the same with the other global variables (even though we will be setting those
- * to the exact same values in case of nested invocations) as we cannot easily distinguish a fresh call from a nested call.
- */
-#define	ALS_SCAN_FOR_CONTAINERS(LVP, FNPTR, ARG1, ARG2)						\
-{												\
-	tree			*lvt_child;							\
-	als_cntnr_fnptr_t	als_cntnr_fnptr;						\
-	void			*als_cntnr_arg1, *als_cntnr_arg2;				\
-	int			als_cntnrs_cnt;							\
-												\
-	GBLREF	als_cntnr_fnptr_t	als_cntnr_fnptr_gbldef;					\
-	GBLREF	void			*als_cntnr_arg1_gbldef, *als_cntnr_arg2_gbldef;		\
-	GBLREF	int			als_cntnrs_cnt_gbldef;					\
-												\
-	assert(LV_IS_BASE_VAR(LVP));								\
-	DEBUG_ONLY(if (!LVP->has_aliascont)							\
-	   DBGRFCT((stderr, "als_scan_for_containers: Scan would have been avoided in PRO\n")));\
-	/* Save globals from previous invocation of ALS_SCAN_FOR_CONTAINERS (if any) */		\
-	als_cntnr_fnptr = als_cntnr_fnptr_gbldef;						\
-	als_cntnr_arg1 = als_cntnr_arg1_gbldef;							\
-	als_cntnr_arg2 = als_cntnr_arg2_gbldef;							\
-	als_cntnrs_cnt = als_cntnrs_cnt_gbldef;							\
-	/* Update global to reflect current invocation */					\
-	als_cntnr_fnptr_gbldef = FNPTR;								\
-	als_cntnr_arg1_gbldef = (void *)ARG1;							\
-	als_cntnr_arg2_gbldef = (void *)ARG2;							\
-	als_cntnrs_cnt_gbldef = 0;								\
-	lvt_child = LV_GET_CHILD(LVP);								\
-	assert(lvt_child);	/* caller should not call if lvt_child is NULL */		\
-	lvTreeWalkPostOrder(lvt_child, als_scan_for_containers_recurse);			\
-	/* If no alias containers found in this base var, make sure flag gets turned off */	\
-	if (0 == als_cntnrs_cnt_gbldef)								\
-		LVP->has_aliascont = FALSE;							\
-	else											\
-		assert(LVP->has_aliascont);							\
-	/* Restore globals before returning */							\
-	als_cntnr_fnptr_gbldef = als_cntnr_fnptr;						\
-	als_cntnr_arg1_gbldef = als_cntnr_arg1;							\
-	als_cntnr_arg2_gbldef = als_cntnr_arg2;							\
-	als_cntnrs_cnt_gbldef = als_cntnrs_cnt;							\
-}
-
 void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, int table_size_orig);
 void als_check_xnew_var_aliases(symval *oldsymtab, symval *cursymtab);
 void als_zwrhtab_init(void);
-void als_prcs_tpsav_cntnr_node(treeNode *node);
-void als_prcs_tprest_cntnr_node(treeNode *node);
-void als_prcs_tpunwnd_cntnr_node(treeNode *node);
-void als_prcs_kill_cntnr_node(treeNode *node);
-void als_prcs_xnewref_cntnr_node(treeNode *node);
-void als_scan_for_containers_recurse(treeNode *node);
-
-
-typedef	void (*als_cntnr_fnptr_t)(treeNode *node);
-
-void als_scan_for_containers(lv_val *lv_base);
+void als_prcs_tpsav_cntnr(lvTree *lvt);
+void als_prcs_tprest_cntnr(lvTree *lvt);
+void als_prcs_tpunwnd_cntnr(lvTree *lvt);
+void als_prcs_kill_cntnr(lvTree *lvt);
+void als_prcs_xnewref_cntnr(lvTree *lvt);
 
 ht_ent_mname *als_lookup_base_lvval(lv_val *lvp);
 zwr_alias_var *als_getzavslot(void);

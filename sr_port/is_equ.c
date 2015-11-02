@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +15,8 @@
 
 int is_equ(mval *u,mval *v)
 {
-	char utyp, vtyp, land, lor;
+	int		land, lor, utyp, vtyp;
+
 	utyp = u->mvtype;
 	vtyp = v->mvtype;
 	land = utyp & vtyp;
@@ -30,13 +31,13 @@ int is_equ(mval *u,mval *v)
 		if (lor & MV_INT)
 			return 0;
 		/* They are both decimal floating numbers, do a full comparison */
-		return (u->sgn == v->sgn && u->e == v->e &&
-			u->m[1] == v->m[1] && u->m[0]==v->m[0]);
+		return ((((mval_b *)u)->sgne == ((mval_b *)v)->sgne) && (u->m[1] == v->m[1]) && (u->m[0]==v->m[0]));
 	}
 	/* At least one of the numbers is not in numeric form or is not a cannoical number, do a string compare */
 	MV_FORCE_STR(u);
 	MV_FORCE_STR(v);
-	if (u->str.len != v->str.len || u->str.len > 0 && memcmp(u->str.addr,v->str.addr,u->str.len) != 0)
+	if ((u->str.len != v->str.len)
+			|| (u->str.len && (u->str.addr != v->str.addr) && memcmp(u->str.addr, v->str.addr, u->str.len)))
 		return 0;
 	else
 		return 1;

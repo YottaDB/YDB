@@ -70,9 +70,9 @@ else
 	#	set xfer_desc.i path to $gtm_inc in normal build
 	set xfer_dir=$gtm_inc
 
-	# If this is a non-developmental version and the current image is "dbg" and xfer_desc.i already exists, do not recreate xfer_desc.i.
-	# The assumption is that a "pro" build had already created xfer_desc.i so we should not change whatever it had relied upon.
-	# For development versions, we dont care so we unconditionally recreate this file.
+	# If this is a non-developmental version and the current image is "dbg" and xfer_desc.i already exists, do not
+	# recreate xfer_desc.i. The assumption is that a "pro" build had already created xfer_desc.i so we should not
+	# change whatever it had relied upon. For development versions, we dont care so we unconditionally recreate this file.
 
 	if (-e $xfer_dir/xfer_desc.i) then
 		if ($gtm_verno !~ V9*) then
@@ -179,7 +179,7 @@ op_mprofexfun
 op_mprofforlcldow
 op_mprofforlcldol
 op_mprofforlcldob
-op_mprofforloop
+op_mprofforchk1
 op_mproflinefetch
 op_mproflinestart
 EOF

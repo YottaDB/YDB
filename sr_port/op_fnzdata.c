@@ -33,7 +33,7 @@ void op_fnzdata(lv_val *srclv, mval *dst)
 	isalias = FALSE;
 	if (srclv)
 	{
-		if (MV_DEFINED(&(srclv->v)))
+		if (LV_IS_VAL_DEFINED((srclv)))
 	  		isdefd++;
 		is_base_var = LV_IS_BASE_VAR(srclv);
        	       	if (LV_HAS_CHILD(srclv))
@@ -43,7 +43,7 @@ void op_fnzdata(lv_val *srclv, mval *dst)
 			isalias = IS_ALIASLV(srclv);
 		} else
 		{	/* Must be a subscript lv - check if a container */
-			/* ensure "srclv" is of type "treeNode *" or "treeNodeFlt *" */
+			/* ensure "srclv" is of type "lvTreeNode *" or "lvTreeNodeNum *" */
 			assert(IS_LVAVLTREENODE(srclv));
 			isalias = (0 != (MV_ALIASCONT & srclv->v.mvtype));
 		}

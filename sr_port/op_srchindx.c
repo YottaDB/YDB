@@ -30,8 +30,8 @@ lv_val	*op_srchindx(UNIX_ONLY_COMMA(int argcnt) lv_val *lv, ...)
 	int                     length;
 	mval			*key;
 	mval                    tmp_sbs;
-	tree			*lvt;
-	treeNode		*parent;
+	lvTree			*lvt;
+	lvTreeNode		*parent;
 	va_list			var;
 	DCL_THREADGBL_ACCESS;
 

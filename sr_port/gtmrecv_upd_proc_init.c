@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc.*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc.*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,13 +51,17 @@
 #define UPDPROC_CMD_ARG2	"-updateproc"
 #define UPDPROC_CMD_STR		"REPLICATE/UPDATEPROC"
 
-GBLDEF pid_t		updproc_pid;
 GBLREF recvpool_addrs	recvpool;
 GBLREF int		recvpool_shmid;
 
 GBLREF int		gtmrecv_log_fd;
 GBLREF FILE		*gtmrecv_log_fp;
 GBLREF int		updproc_log_fd;
+
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_RECVPOOLSETUP);
+error_def(ERR_REPLINFO);
+error_def(ERR_TEXT);
 
 int gtmrecv_upd_proc_init(boolean_t fresh_start)
 {
@@ -74,10 +78,6 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	uint4	cmd_channel;
 	$DESCRIPTOR(cmd_desc, UPDPROC_CMD_STR);
 #endif
-
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_TEXT);
 
 	/* Check if the update process is alive */
 
@@ -174,7 +174,6 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 		return(UPDPROC_START_ERR);
 	}
 #endif
-	updproc_pid = upd_pid;
 	repl_log(gtmrecv_log_fp, TRUE, FALSE, "Update Process started. PID %d [0x%X]\n", upd_pid, upd_pid);
 	return(UPDPROC_STARTED);
 }
@@ -182,10 +181,6 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 int gtmrecv_start_updonly(void)
 {
 	int start_status, recvr_status, upd_status;
-
-	error_def(ERR_RECVPOOLSETUP);
-	error_def(ERR_REPLINFO);
-	error_def(ERR_TEXT);
 
 	if ((upd_status = is_updproc_alive()) == SRV_ALIVE)
 	{

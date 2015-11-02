@@ -42,30 +42,30 @@ void cache_put(icode_str *src, mstr *object)
 	csp->refcnt = csp->zb_refcnt = 0;
 	csp->src = *src;
 	csp->obj.len = object->len;
-	DBGCACHE((stdout, "cache_put: *** Adding to cache lookaside %d bytes - (%d/%d, %d)\n", ICACHE_SIZE + object->len,
-		  cache_table.count, cache_table.size, indir_cache_mem_size));
 	memcpy(csp->obj.addr, object->addr, object->len);
 	((ihdtyp *)(csp->obj.addr))->indce = csp;	/* Set backward link to this cache entry */
 	added = add_hashtab_objcode(&cache_table, &csp->src, csp, &tabent);
 	assert(added);
-
+	DBGCACHE((stdout, "cache_put: Added to cache lookaside %d bytes - (%d/%d/%d %d/%d) code: %d  src: %.*s\n",
+		  ICACHE_SIZE + object->len, cache_table.count, cache_table.size, max_cache_entries,
+		  indir_cache_mem_size, max_cache_memsize, src->code, src->str.len, src->str.addr));
+	DBGCACHE((stdout, "cache_put: *** updated entry: 0x"lvaddr"  value: 0x"lvaddr"\n\n", tabent, tabent->value));
 	/* Do address fixup on the literals that preceed the code */
 	fixup_cnt = ((ihdtyp *)(csp->obj.addr))->fixup_vals_num;
 	if (fixup_cnt)
 	{
 		/* Do address fixups for literals in indirect code. This is done by making them point
-		   to the literals that are still resident in the stringpool. The rest of the old object
-		   code will be garbage collected but these literals will be salvaged. The reason to point
-		   to the stringpool version instead of in the copy we just created is that if an assignment
-		   to a local variable from an indirect string literal were to occur, only the mval is copied.
-		   So then there would be a local variable mval pointing into our malloc'd storage instead of
-		   the stringpool. If the cache entry were recycled to hold a different object, the local
-		   mval would then be pointing at garbage. By pointing these literals to their stringpool
-		   counterparts, we save having to (re)copy them to the stringpool where they will be handled
-		   safely and correctly.
-		*/
+		 * to the literals that are still resident in the stringpool. The rest of the old object
+		 * code will be garbage collected but these literals will be salvaged. The reason to point
+		 * to the stringpool version instead of in the copy we just created is that if an assignment
+		 * to a local variable from an indirect string literal were to occur, only the mval is copied.
+		 * So then there would be a local variable mval pointing into our malloc'd storage instead of
+		 * the stringpool. If the cache entry were recycled to hold a different object, the local
+		 * mval would then be pointing at garbage. By pointing these literals to their stringpool
+		 * counterparts, we save having to (re)copy them to the stringpool where they will be handled
+		 * safely and correctly.
+		 */
 		fix_base = (mval *)((unsigned char *)csp->obj.addr + ((ihdtyp *)(csp->obj.addr))->fixup_vals_off);
-
 		for (fix = fix_base, i = 0 ;  i < fixup_cnt ;  i++, fix++)
 		{
 			if (MV_IS_STRING(fix))		/* if string, place in string pool */

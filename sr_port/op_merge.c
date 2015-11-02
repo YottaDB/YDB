@@ -69,7 +69,7 @@
 {										\
 	if (NULL != active_lv)							\
 	{									\
-		if (!MV_DEFINED(&active_lv->v) && !LV_HAS_CHILD(active_lv))	\
+		if (!LV_IS_VAL_DEFINED(active_lv) && !LV_HAS_CHILD(active_lv))	\
 			op_kill(active_lv);					\
 		active_lv = (lv_val *)NULL;					\
 	}									\
@@ -119,8 +119,7 @@ void op_merge(void)
 	value = &mv_chain->mv_st_cont.mvs_mval;
 	value->mvtype = 0; /* initialize mval in the M-stack in case stp_gcol gets called before value gets initialized below */
 	if (MARG2_IS_GBL(merge_args))
-	{
-		/* Need to protect mkey returned from gvcst_queryget from stpgcol */
+	{	/* Need to protect mkey returned from gvcst_queryget from stpgcol */
 		PUSH_MV_STENT(MVST_MVAL);
 		mkey = &mv_chain->mv_st_cont.mvs_mval;
 		mkey->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before mkey gets initialized below */
@@ -129,10 +128,12 @@ void op_merge(void)
 		op_gvdata(value);
 		dollardata_src = MV_FORCE_INT(value);
 		if (0 == dollardata_src)
-		{
+		{	/* nothing in source global */
 			UNDO_ACTIVE_LV;
 			POP_MV_STENT();	/* value */
 			POP_MV_STENT(); /* mkey */
+			if (MARG1_IS_GBL(merge_args))
+				gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
 			merge_args = 0;	/* Must reset to zero to reuse the Global */
 			return;
 		}
@@ -146,8 +147,7 @@ void op_merge(void)
 		(TREF(gv_mergekey2))->prev = gv_currkey->prev;
 		memcpy((TREF(gv_mergekey2))->base, gv_currkey->base, gv_currkey->end + 1);
 		if (MARG1_IS_GBL(merge_args))
-		{
-			/*==================== MERGE ^gvn1=^gvn2 =====================*/
+		{	/*==================== MERGE ^gvn1=^gvn2 =====================*/
 			if (mglvnp->gblp[IND2]->s_gv_target->nct != mglvnp->gblp[IND1]->s_gv_target->nct)
 				rts_error(VARLSTCNT(1) ERR_NCTCOLLDIFF);
 			merge_desc_check(); /* will not proceed if one is descendant of another */
@@ -157,12 +157,12 @@ void op_merge(void)
 			{
 				found = op_gvget(value);  /* value of ^glvn2 */
 				if (found)
-				{
-					/* SET ^gvn1=^gvn2 */
+				{	/* SET ^gvn1=^gvn2 */
 					gvname_env_restore(mglvnp->gblp[IND1]);
 					op_gvput(value);
 					/* Note: If ^gvn1's null_sub=ALLOWEXISTING and say ^gvn1("")=^gvn,
-					this will give NULL_SUBC error */
+					 * this will give NULL_SUBC error
+					 */
 				}
 			}
 			check_for_null_subs = (NEVER != mglvnp->gblp[IND2]->s_gv_cur_region->null_subs) &&
@@ -226,7 +226,8 @@ void op_merge(void)
 					}
 				}
 				/* check null subscripts in destination key, note that we have already restored, destination global
-				   and curresponding region, key  information */
+				 * and curresponding region, key information
+				 */
 				if (check_for_null_subs)
 				{
 					ptr2 = gv_currkey->base + gv_currkey->end - 1;
@@ -246,19 +247,17 @@ void op_merge(void)
 							 * the standard allows the naked indicator to reflect any intermediate
 							 * state. This provision was made intentionally, otherwise it would
 							 * have become nearly impossible to create a fully standard
-							 * implementation. : From Ed de Moel : 2/1/2 */
-
+							 * implementation. : From Ed de Moel : 2/1/2
+							 */
 							sgnl_gvnulsubsc();
-
 					}
 				}
 				/* Now put value of ^glvn2 descendant into corresponding descendant under ^glvn1 */
 				op_gvput(value);
 			}
-			gvname_env_restore(mglvnp->gblp[IND1]);	 /* naked indicator is restored into gv_currkey */
+			gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
 		} else
-		{
-			/*==================== MERGE lvn1=^gvn2 =====================*/
+		{	/*==================== MERGE lvn1=^gvn2 =====================*/
 			assert(MARG1_IS_LCL(merge_args));
 			assert(mglvnp->lclp[IND1]);
 			/* Need to protect subsc created from global variable subscripts from stpgcol */
@@ -267,8 +266,7 @@ void op_merge(void)
 			/* Restore ^gvn2 we will work */
 			gvname_env_save(mglvnp->gblp[IND2]);
 			if (1 == dollardata_src || 11 == dollardata_src)
-			{
-				/* SET lvn1=^gvn2 */
+			{	/* SET lvn1=^gvn2 */
 				found = op_gvget(value);
 				if (found)
 					mglvnp->lclp[IND1]->v = *value;
@@ -287,7 +285,8 @@ void op_merge(void)
 				gv_currkey->base[gv_currkey->end + 2] = 0;
 				gv_currkey->end += 2;
 				/* Do $QUERY and $GET of current glvn2. Result will be in mkey and value respectively.
-				 * mkey->str contains data as database format. So no conversion necessary */
+				 * mkey->str contains data as database format. So no conversion necessary
+				 */
 				if (!op_gvqueryget(mkey, value))
 					break;
 				if (mkey->str.len < (TREF(gv_mergekey2))->end + 1)
@@ -332,13 +331,15 @@ void op_merge(void)
 		}
 		POP_MV_STENT();     /* mkey */
 	} else
-	{
+	{	/* source is local */
 		op_fndata(mglvnp->lclp[IND2], value);
 		dollardata_src = MV_FORCE_INT(value);
 		if (0 == dollardata_src)
 		{
 			UNDO_ACTIVE_LV;
 			POP_MV_STENT();	/* value */
+			if (MARG1_IS_GBL(merge_args))
+				gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
 			merge_args = 0;	/* Must reset to zero to reuse the Global */
 			return;
 		}
@@ -373,7 +374,7 @@ void op_merge(void)
 			lvzwr_init(zwr_patrn_mident, &mglvnp->lclp[IND2]->v);
 			lvzwr_arg(ZWRITE_ASTERISK, 0, 0);
 			lvzwr_var(mglvnp->lclp[IND2], 0);
-			gvname_env_restore(mglvnp->gblp[IND1]);	 /* naked indicator is restored into gv_currkey */
+			gvname_env_restore(mglvnp->gblp[IND1]);	 /* store destination as naked indicator in gv_currkey */
 		}
 	}
 	POP_MV_STENT();	/* value */

@@ -558,7 +558,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	 * stack for us.
 	 */
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: beginning frame unwinds (state %d)\n", tprestart_state)));
-	while (frame_pointer != tf->fp)
+	while (frame_pointer < tf->fp)
 	{
 #		ifdef GTM_TRIGGER
 		if (SFT_TRIGR & frame_pointer->type)
@@ -578,14 +578,21 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	assert((msp <= stackbase) && (msp > stacktop));
 	assert((mv_chain <= (mv_stent *)stackbase) && (mv_chain > (mv_stent *)stacktop));
 	assert(MVST_TPHOLD == tf->mvc->mv_st_type);
+	/* Our stack frames are unwound to the correct frame but there could be mv_stents pushed on after we last (re)started
+	 * this transaction. We need to get rid of them to get back to the correct restart state.
+	 */
 	for (mvc = mv_chain;  mvc < tf->mvc;)
-	{
+	{	/* Make sure we don't unwind the MVST_TPHOLD for our target level */
+		assert((MVST_TPHOLD != mvc->mv_st_type) || ((newlevel - 1) != mvc->mv_st_cont.mvs_tp_holder.tphold_tlevel));
+		DBGEHND((stderr, "tp_restart: unwinding mv_stent addr 0x"lvaddr" type %d\n", mvc, mvc->mv_st_type));
 		unw_mv_ent(mvc);
 		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 	}
 	assert((void *)mvc < (void *)frame_pointer);
 	assert(mvc == tf->mvc);
 	assert(mvc->mv_st_cont.mvs_tp_holder.tphold_tlevel == (dollar_tlevel - 1));
+	DBGEHND((stderr, "tp_restart: Resetting msp from 0x"lvaddr", to 0x"lvaddr" (diff=%d)\n",
+		 msp, mvc, INTCAST((unsigned char *)mvc - msp)));
 	mv_chain = mvc;
 	msp = (unsigned char *)mvc;
 #	ifdef GTM_TRIGGER

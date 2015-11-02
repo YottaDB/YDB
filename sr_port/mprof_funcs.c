@@ -17,9 +17,7 @@
 #include "gtm_fcntl.h"
 #include <signal.h>
 #include "gtm_stat.h"
-#include "gtm_times.h"
 #include "gtm_unistd.h"
-#include <sys/resource.h>
 #include "min_max.h"
 #elif defined(VMS)
 #include <ssdef.h>
@@ -36,7 +34,6 @@
 #include "svnames.h"
 #include "mprof.h"
 #include "outofband.h"
-/* #include "xfer_enum.h" */
 #include "op.h"
 #include "lv_val.h"	/* needed for "callg.h" */
 #include "callg.h"
@@ -52,55 +49,36 @@ GBLREF 	mval			dollar_job;
 GBLREF	uint4			process_id;
 GBLREF	int * volatile		var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 
-static const MIDENT_CONST(above_routine, "*above*");
+LITDEF  MIDENT_CONST(above_routine, "*above*");
+LITDEF  MIDENT_CONST(overflow_routine, "*overflow*");
 
 #define	MAX_MPROF_STACK_LEVEL	1024
-#ifdef 	MPROF_DEBUGGING
-#define	MPROF_DEBUGGING 1
-#include "util.h"
-#define PRINT_PROF_TREE(x)	{ util_out_print(x, FALSE); mprof_tree_print(mprof_ptr->head_tblnd, 0, 1);}
-#define PRINT_PROF_TREE_ELEM(x)	{ util_out_print(x, FALSE); mprof_tree_print(mprof_ptr->curr_tblnd, 0, -1);}
-#else
-#define PRINT_PROF_TREE(x)
-#define PRINT_PROF_TREE_ELEM(x)
-#endif
 
 struct mprof_struct
 {
-	 struct tms		tprev, tcurr;
-	 struct tms		time_stack[MAX_MPROF_STACK_LEVEL];
-	 mprof_tree		*head_tblnd, *curr_tblnd;
-	 mprof_tree		*currnd_stk[MAX_MPROF_STACK_LEVEL];
-	 unsigned int		loop_info_stk[MAX_MPROF_STACK_LEVEL]; /*for DO's*/
-	 unsigned int		for_level;
-	 int			inside_for_loop_state;
-	 int			line_prof_stack;
-	 int			curr_num_subscripts;
-	 char			**pcavailptr, **pcavailbase;
-	 int			pcavail;
-	 boolean_t		is_tracing_ini;
-	 mval			subsc[MAX_GVSUBSCRIPTS];
-	 gvargs_t		gvargs;
-	 mval			gbl_to_fill;
-	 int			overflowed_levels;
+	struct tms		tprev, tcurr;
+	mprof_tree		*currnd_stk[MAX_MPROF_STACK_LEVEL];
+	mprof_tree		*head_tblnd, *curr_tblnd, *ovrflw;
+	int			line_prof_stack;
+	int			curr_num_subscripts;
+	char			**pcavailptr, **pcavailbase;
+	int			pcavail;
+	boolean_t		is_tracing_ini;
+	mval			subsc[MAX_GVSUBSCRIPTS];
+	gvargs_t		gvargs;
+	mval			gbl_to_fill;
+	boolean_t		overflown;
+	boolean_t		last_label_recorded;
 };
 static struct mprof_struct *mprof_ptr;
+
+static struct mprof_tree *last_mprof_node;
 
 #define OVERFLOW_STRING	":INCOMPLETE DATA: MAXTRACELEVEL"
 #define MPROF_NULL_LABEL "^"
 #define MPROF_FOR_LOOP	"FOR_LOOP"
 #define UPDATE_TIME(x)	x->e.usr_time += (mprof_ptr->tcurr.tms_utime - mprof_ptr->tprev.tms_utime);\
 			x->e.sys_time += (mprof_ptr->tcurr.tms_stime - mprof_ptr->tprev.tms_stime);
-#define MPROF_INCR_COUNT		mprof_ptr->curr_tblnd->e.count += 1
-#define LINK_NEW(x) 	if (NULL == x->loop_link) \
-				x->loop_link = (mprof_tree *)new_node(&x->e)
-#define SAME_LINE_FUNC(rout1, rout2, lab1, lab2, line1, line2)				\
-			(((line1) == (line2)) && ((lab1) == (lab2) || MIDENT_EQ((lab1), (lab2))) && \
-			((rout1) == (rout2) || MIDENT_EQ((rout1), (rout2))))
-
-#define SAME_LINE	SAME_LINE_FUNC(tmp_trc_tbl_entry.rout_name,  mprof_ptr->curr_tblnd->e.rout_name, \
-				       tmp_trc_tbl_entry.label_name, mprof_ptr->curr_tblnd->e.label_name, \
-				       tmp_trc_tbl_entry.line_num,   mprof_ptr->curr_tblnd->e.line_num)
 #define RTS_ERROR_VIEWNOTFOUND(x)	rts_error(VARLSTCNT(8) ERR_VIEWNOTFOUND, 2, gvn->str.len, gvn->str.addr, \
 						ERR_TEXT, 2, RTS_ERROR_STRING(x));
 
@@ -110,28 +88,42 @@ static struct mprof_struct *mprof_ptr;
 #define TIMES			get_cputime
 #endif
 
+error_def(ERR_MAXNRSUBSCRIPTS);
+error_def(ERR_MAXTRACELEVEL);
+error_def(ERR_NOTGBL);
+error_def(ERR_STRUNXEOR);
+error_def(ERR_SYSCALL);
+error_def(ERR_TEXT);
+error_def(ERR_TRACINGON);
+error_def(ERR_VIEWNOTFOUND);
+
+STATICFNDCL void parse_gvn(mval *);
+STATICFNDCL void get_entryref_information(boolean_t, trace_entry *);
+STATICFNDCL void pcfree(void);
+
 #ifdef UNIX
-static void times_usec(struct tms *curr)
+STATICFNDCL void times_usec(struct tms *curr);
+STATICFNDEF void times_usec(struct tms *curr)
 {
 	int res;
 	struct rusage usage;
-	error_def(ERR_SYSCALL);
 
 	res = getrusage(RUSAGE_SELF, &usage);
 	if (res == -1)
-		rts_error(VARLSTCNT(6) ERR_SYSCALL, 5, CALLFROM, errno);
+		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno);
 	curr->tms_utime = (usage.ru_utime.tv_sec * 1000000) + usage.ru_utime.tv_usec;
 	curr->tms_stime = (usage.ru_stime.tv_sec * 1000000) + usage.ru_stime.tv_usec;
 }
+
 #elif defined(VMS)
-static void get_cputime (struct tms *curr)
+STATICFNDCL void get_cputime (struct tms *curr);
+STATICFNDEF void get_cputime (struct tms *curr)
 {
 	int4	cpu_time_used;
 	int	status;
 	int	jpi_code = JPI$_CPUTIM;
-	error_def(ERR_SYSCALL);
 
-	 if ((status = lib$getjpi(&jpi_code, &process_id, 0, &cpu_time_used, 0, 0)) != SS$_NORMAL)
+	if ((status = lib$getjpi(&jpi_code, &process_id, 0, &cpu_time_used, 0, 0)) != SS$_NORMAL)
 		rts_error(VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("LIB$GETJPI"), CALLFROM, status);
 	curr->tms_utime = cpu_time_used;
 	curr->tms_stime = 0;
@@ -140,20 +132,15 @@ static void get_cputime (struct tms *curr)
 #error UNSUPPORTED PLATFORM
 #endif
 
-static void parse_gvn(mval *);
-static void get_entryref_information(boolean_t, trace_entry *);
-
 void turn_tracing_on(mval *gvn)
 {
-	struct tms	curr;
+	struct tms	*curr;
 	trace_entry	tmp_trc_tbl_entry;
 	/* For some reason the construct below and/or the strcpy calls made GTMSHR writeable on Vax
 	   which means it was no longer shareable. Doing this differently makes it all still work.
 	   Tiz a kludge authored by Satya..
 	   struct mprof_tree p = {{"*dummy**", "*dummy**", "*dummy*", 0, 0, 0}, 0 , 0 }; */
 
-	error_def(ERR_NOTGBL);
-	error_def(ERR_TRACINGON);
 	if (is_tracing_on)
 	{
 		gtm_putmsg(VARLSTCNT(1) ERR_TRACINGON);
@@ -178,7 +165,8 @@ void turn_tracing_on(mval *gvn)
 	mprof_ptr->pcavailptr = mprof_ptr->pcavailbase;
 	mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - SIZEOF(char *);
 	memset(mprof_ptr->pcavailptr + 1, 0, mprof_ptr->pcavail);
-	TIMES(&curr);
+	curr = &(mprof_ptr->tprev);
+	TIMES(curr);
 	prof_stackptr = (unsigned char *)malloc(TOTAL_SIZE_OF_PROFILING_STACKS);
 	prof_msp = profstack_base = prof_stackptr + (TOTAL_SIZE_OF_PROFILING_STACKS - GUARD_RING_FOR_PROFILING_STACK);
 	profstack_top = prof_stackptr;
@@ -188,17 +176,18 @@ void turn_tracing_on(mval *gvn)
 	get_entryref_information(FALSE, NULL);
 	tmp_trc_tbl_entry.rout_name = NULL; /* initialize */
 	tmp_trc_tbl_entry.label_name = NULL;
-	mprof_ptr->curr_tblnd = mprof_ptr->head_tblnd = (mprof_tree *)new_node(&tmp_trc_tbl_entry);
-	prof_fp->sys_time = curr.tms_stime;
-	prof_fp->usr_time = curr.tms_utime;
+	mprof_ptr->curr_tblnd = mprof_ptr->head_tblnd = NULL;
+	mprof_ptr->overflown = FALSE;
+	last_mprof_node = (mprof_tree *)NULL;
+	prof_fp->start.tms_stime = (*curr).tms_stime;
+	prof_fp->start.tms_utime = (*curr).tms_utime;
 	prof_fp->dummy_stack_count = 0;
+
 	POPULATE_PROFILING_TABLE();
 	is_tracing_on = TRUE;
-	mprof_ptr->inside_for_loop_state = 0;
-	mprof_ptr->for_level = 0;
 }
 
-static void pcfree(void)
+STATICFNDEF void pcfree(void)
 {
 	mprof_ptr->pcavailptr = mprof_ptr->pcavailbase;
 	mprof_ptr->pcavail = PROFCALLOC_DSBLKSIZE - SIZEOF(char *);
@@ -209,9 +198,19 @@ void turn_tracing_off (mval *gvn)
 {
 	if (FALSE == is_tracing_on)
 		return;
-	PRINT_PROF_TREE("");
 	assert(mprof_ptr);
 	TIMES(&mprof_ptr->tcurr);
+
+	/* update the time of previous M line */
+	if (mprof_ptr->overflown)
+	{
+		mprof_ptr->ovrflw->e.usr_time += (mprof_ptr->tcurr.tms_utime - mprof_ptr->ovrflw->e.usr_time);
+		mprof_ptr->ovrflw->e.sys_time += (mprof_ptr->tcurr.tms_stime - mprof_ptr->ovrflw->e.sys_time);
+	} else if (NULL != mprof_ptr->curr_tblnd)
+	{
+		UPDATE_TIME(mprof_ptr->curr_tblnd);
+	}
+
 	if (NULL != gvn)
 		parse_gvn(gvn);
 	is_tracing_on = mprof_ptr->is_tracing_ini = FALSE;
@@ -225,142 +224,106 @@ void turn_tracing_off (mval *gvn)
 	CLEAR_PROFILING_TABLE();
 }
 
-void pcurrpos(int inside_for_loop)
+void forchkhandler(char *return_address)
 {
-	/* This function actually counts the line (number of executions and timing info)
-	 * It recognizes 4 "states" (inside_for_loop)
-	 * MPROF_INTOFOR	: going into loop
-	 * MPROF_OUTOFFOR	: coming out of a loop
-	 * MPROF_LINEFETCH 	: from op_mproflinefetch
-	 * MPROF_LINESTART	: from op_mproflinestart
-	 *
-	 * Below is an example for the execution flow of a FOR line:
-	 * 	for i=1:1:2 for j=1:1:3 s ij="dummy"
-	 * When the above line is executing, the flow will be (i.e. pcurrpos will be called with):
-	 * MPROF_LINESTARTorFETCH (i=1, j=1)
-	 * MPROF_INTOFOR	(i=1, j=2)
-	 * MPROF_INTOFOR	(j=3)
-	 * MPROF_OUTOFFOR	(j end)
-	 * MPROF_INTOFOR	(i=2, j=1)
-	 * MPROF_INTOFOR	(j=2)
-	 * MPROF_INTOFOR	(j=3)
-	 * MPROF_OUTOFFOR	(j end)
-	 * MPROF_OUTOFFOR	(i end)
-	 * MPROF_LINESTART	(next line of code)
-	 *
-	 * So the loop-level counting is not straightforward.
-	 * You can tell you had more than one level of FOR's only when you get MPROF_OUTOFFOR more than expected.
-	 * Hence, time counting is not trivial for FOR's, and is not attempted here.
-	 *
-	 * inside_for_loop_state is used to count things, since you know how much time was spent only after it's spent.
-	*/
-	trace_entry	tmp_trc_tbl_entry;
-	mprof_tree	*tmp_tblnd;
-	int		tmp_int, tmp_int_a;
+        trace_entry     	tmp_trc_tbl_entry;
+	int			for_level_on_line;
+	mprof_tree		*for_link, *for_node;
 
-	assert(mprof_ptr);
-	if (!mprof_ptr)
-		return;	/* protect in pro build */
-	TIMES(&mprof_ptr->tcurr);
-	get_entryref_information(TRUE, &tmp_trc_tbl_entry);
+	if (mprof_ptr->overflown)
+	{
+		return;
+	}
+
+        get_entryref_information(TRUE, &tmp_trc_tbl_entry);
 	if (FALSE == mprof_ptr->is_tracing_ini)
 	{
 		mprof_ptr->is_tracing_ini = TRUE;
 		mprof_ptr->curr_tblnd = mprof_ptr->head_tblnd = (mprof_tree *)new_node(&tmp_trc_tbl_entry);
+		mprof_ptr->curr_tblnd->e.count = 1;
+		for_node = (mprof_tree *)new_for_node(&tmp_trc_tbl_entry, return_address);
+		for_node->e.count = 1;
+		for_node->e.loop_level = 1;
+		mprof_ptr->curr_tblnd->loop_link = (mprof_tree *)for_node;
+	} else
+	{
+		mprof_ptr->curr_tblnd = (mprof_tree *)mprof_tree_insert(&(mprof_ptr->head_tblnd), &tmp_trc_tbl_entry);
+
+		if (NULL != mprof_ptr->curr_tblnd->loop_link)
+		{	/* FORs have been saved for this line */
+			for_link = (mprof_tree *)mprof_ptr->curr_tblnd->loop_link;
+			for_level_on_line = 1;
+			while (TRUE)
+			{	/* same FOR, so just update the count */
+				if (for_link->e.raddr == return_address)
+				{
+					for_link->e.count++;
+					break;
+				}
+
+				/* new FOR for this line */
+				if (NULL == for_link->loop_link)
+				{
+					for_node = (mprof_tree *)new_for_node(&tmp_trc_tbl_entry, return_address);
+					for_node->e.count = 1;
+					for_node->e.loop_level = for_level_on_line + 1;
+					for_link->loop_link = (mprof_tree *)for_node;
+					break;
+				} else
+				{
+					for_link = (mprof_tree *)for_link->loop_link;
+					for_level_on_line++;
+				}
+			}
+		} else
+		{	/* first FOR for this node */
+			for_node = (mprof_tree *)new_for_node(&tmp_trc_tbl_entry, return_address);
+			for_node->e.count = 1;
+			for_node->e.loop_level = 1;
+			mprof_ptr->curr_tblnd->loop_link = (mprof_tree *)for_node;
+		}
 	}
+}
+
+void pcurrpos(int inside_for_loop)
+{
+	trace_entry	tmp_trc_tbl_entry;
+
+	assert(mprof_ptr);
+	if (!mprof_ptr)
+		return;	/* protect in pro build */
+
+	if (mprof_ptr->overflown)
+	{
+		return;
+	}
+
+	TIMES(&mprof_ptr->tcurr); /* remember the new time */
+
+	/* update the time of previous M line */
 	if (NULL != mprof_ptr->curr_tblnd)
 	{
-		if ((MPROF_OUTOFFOR | MPROF_INTOFOR) & mprof_ptr->inside_for_loop_state)
-		{
-			/*either on the way out of FOR, or into FOR (or another iteration)*/
-			LINK_NEW(mprof_ptr->curr_tblnd);
-			if (MPROF_OUTOFFOR == mprof_ptr->inside_for_loop_state)
-			{
-				/*going OUT of a loop*/
-				mprof_ptr->curr_tblnd->e.cur_loop_level--;
-				if (mprof_ptr->curr_tblnd->e.cur_loop_level < 0)
-				{
-					/* there was another level*/
-					mprof_ptr->curr_tblnd->e.cur_loop_level = 0;
-					mprof_ptr->curr_tblnd->e.loop_level++;
-				}
-				/*update the loop counts*/
-				tmp_int = mprof_ptr->curr_tblnd->e.loop_level;
-				tmp_tblnd = mprof_ptr->curr_tblnd->loop_link;
-				tmp_tblnd->e.loop_level = mprof_ptr->curr_tblnd->e.loop_level;
-				while (0 < tmp_int)
-				{
-					LINK_NEW(tmp_tblnd);
-					(tmp_tblnd->loop_link)->e.loop_level = tmp_tblnd->e.loop_level - 1;
-					if (tmp_int == mprof_ptr->curr_tblnd->e.cur_loop_level + 1)
-					{
-						(tmp_tblnd->loop_link)->e.count++;
-						PRINT_PROF_TREE_ELEM("INC: ");
-					}
-					tmp_tblnd = tmp_tblnd->loop_link;
-					tmp_int--;
-				}
-			}
-
-			if (MPROF_INTOFOR == mprof_ptr->inside_for_loop_state)
-			{
-				/*going INTO a loop*/
-				/* when going into, we go all the way in*/
-				if (0 == mprof_ptr->curr_tblnd->e.loop_level)
-					mprof_ptr->curr_tblnd->e.loop_level = 1;
-				mprof_ptr->curr_tblnd->e.cur_loop_level = mprof_ptr->curr_tblnd->e.loop_level;
-			}
-			UPDATE_TIME(mprof_ptr->curr_tblnd->loop_link);
-			UPDATE_TIME(mprof_ptr->curr_tblnd);
-			if ((MPROF_OUTOFFOR == mprof_ptr->inside_for_loop_state) && (!SAME_LINE))
-				mprof_ptr->for_level = 1;
-			if (MPROF_INTOFOR == mprof_ptr->inside_for_loop_state)
-				mprof_ptr->for_level = 1;
-
-			if (mprof_ptr->for_level)
-			{
-				/* increment the level count for all levels*/
-				tmp_int = mprof_ptr->curr_tblnd->e.loop_level;
-				tmp_int_a = 1; /* do the time update only for the first time*/
-				tmp_tblnd = mprof_ptr->curr_tblnd;
-				while (0 <= tmp_int)
-				{
-					LINK_NEW(tmp_tblnd);
-					if (tmp_int_a)
-						(tmp_tblnd->loop_link)->e.count++;
-					else
-						UPDATE_TIME(tmp_tblnd->loop_link);
-					tmp_int_a = 0;
-					tmp_tblnd = tmp_tblnd->loop_link;
-					tmp_int--;
-				}
-			}
-			if (MPROF_OUTOFFOR == mprof_ptr->inside_for_loop_state)
-			{
-				mprof_ptr->curr_tblnd->e.for_count = 0;
-				mprof_ptr->for_level = 0;
-			}
-
-		}
-		if ((MPROF_LINEFETCH + MPROF_LINESTART) & mprof_ptr->inside_for_loop_state)
-		{
-			UPDATE_TIME(mprof_ptr->curr_tblnd);
-			MPROF_INCR_COUNT;
-		}
-		if ((MPROF_OUTOFFOR == inside_for_loop) && (SAME_LINE))
-		{
-			/*prepare next guy*/
-			tmp_trc_tbl_entry.for_count = 1;
-			mprof_ptr->for_level = 0;
-			/*no counting here, no timing either */
-		} else
-			mprof_ptr->for_level = 1;
+		UPDATE_TIME(mprof_ptr->curr_tblnd);
 	}
-	mprof_ptr->curr_tblnd = (mprof_tree *)mprof_tree_insert(mprof_ptr->head_tblnd, &tmp_trc_tbl_entry);
-	PRINT_PROF_TREE("in pcurrpos");
-	/*PRINT_PROF_TREE_ELEM("end pcurrpos: ");*/
+
+	get_entryref_information(TRUE, &tmp_trc_tbl_entry);
+
+	if (FALSE == mprof_ptr->is_tracing_ini)
+	{
+		mprof_ptr->is_tracing_ini = TRUE;
+		mprof_ptr->curr_tblnd = mprof_ptr->head_tblnd = (mprof_tree *)new_node(&tmp_trc_tbl_entry);
+		mprof_ptr->curr_tblnd->e.count = 1;
+	} else
+	{
+		mprof_ptr->curr_tblnd = (mprof_tree *)mprof_tree_insert(&(mprof_ptr->head_tblnd), &tmp_trc_tbl_entry);
+
+		if (0 == mprof_ptr->curr_tblnd->e.count)
+			mprof_ptr->curr_tblnd->e.count = 1;
+		else
+			mprof_ptr->curr_tblnd->e.count += 1;
+	}
+
 	mprof_ptr->tprev = mprof_ptr->tcurr;
-	mprof_ptr->inside_for_loop_state = inside_for_loop;
 }
 
 char *pcalloc(unsigned int n)
@@ -388,7 +351,7 @@ char *pcalloc(unsigned int n)
 	return (char *) mprof_ptr->pcavailptr + mprof_ptr->pcavail + SIZEOF(char *);
 }
 
-void new_prof_frame(int dummy)
+void new_prof_frame(int real_frame)
 {
 	/*****************************************************************************************
 	The time for frames accounts for the time spent within that frame,
@@ -428,36 +391,53 @@ void new_prof_frame(int dummy)
 				=(t3-t2)+(t1-t0)
 	******************************************************************************************/
 	stack_frame_prof	*psf;
-	struct tms		curr;
+	mprof_tree		*ovrflw_node;
+	trace_entry		e;
 
-	error_def(ERR_MAXTRACELEVEL);
-
-	if (dummy)
+	/* a call to a routine, not IF or FOR with DO */
+	if (real_frame)
 	{
-		if (++mprof_ptr->line_prof_stack < MAX_MPROF_STACK_LEVEL)
-		{
-			mprof_ptr->currnd_stk[mprof_ptr->line_prof_stack] = mprof_ptr->curr_tblnd;
-			mprof_ptr->time_stack[mprof_ptr->line_prof_stack] = mprof_ptr->tprev;
-			mprof_ptr->loop_info_stk[mprof_ptr->line_prof_stack] = mprof_ptr->inside_for_loop_state;
-		} else
-		{
-			if (!mprof_ptr->overflowed_levels)
+		/* exceeded MPROF stack level; will not record deeper frames */
+		if (MAX_MPROF_STACK_LEVEL <= ++mprof_ptr->line_prof_stack)
+		{	/* print warning message if stack was not overflown before */
+			if (!mprof_ptr->overflown)
 			{
+				/* update the time of previous M line */
+				if (NULL != mprof_ptr->curr_tblnd)
+				{
+					UPDATE_TIME(mprof_ptr->curr_tblnd);
+				}
 				gtm_putmsg(VARLSTCNT(3) ERR_MAXTRACELEVEL, 1, MAX_MPROF_STACK_LEVEL);
-				mprof_ptr->overflowed_levels++;
+				mprof_ptr->overflown = TRUE;
+				TIMES(&mprof_ptr->tcurr);
+				e.label_name = (mident *)&overflow_routine;
+				e.rout_name = (mident *)&overflow_routine;
+				e.line_num = -2;
+				mprof_ptr->ovrflw = mprof_tree_insert(&(mprof_ptr->head_tblnd), &e);
+				/*update count and timing (from prof_fp) of frame I'm leaving*/
+				mprof_ptr->ovrflw->e.count = 1;
+				mprof_ptr->ovrflw->e.usr_time = mprof_ptr->tcurr.tms_utime;
+				mprof_ptr->ovrflw->e.sys_time = mprof_ptr->tcurr.tms_stime;
 			}
 			return;
+		} else
+		{
+			/* update the time of the line in the parent frame */
+			if (NULL != mprof_ptr->curr_tblnd)
+			{
+				TIMES(&mprof_ptr->tcurr);
+				UPDATE_TIME(mprof_ptr->curr_tblnd);
+			}
+			mprof_ptr->currnd_stk[mprof_ptr->line_prof_stack] = mprof_ptr->curr_tblnd;
 		}
 		mprof_ptr->curr_tblnd = NULL;
-		TIMES(&curr);
-		prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
-		prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
+		/* create a new frame on the stack */
 		psf = (stack_frame_prof *) (prof_msp -= SIZEOF(stack_frame_prof));
 		psf->prev = prof_fp;
-		psf->sys_time = curr.tms_stime;
-		psf->usr_time = curr.tms_utime;
 		psf->rout_name = NULL;
 		psf->label_name = NULL;
+
+		psf->start = mprof_ptr->tprev = mprof_ptr->tcurr;
 		prof_fp = psf;
 		prof_fp->dummy_stack_count = 0;
 	} else
@@ -472,27 +452,38 @@ void unw_prof_frame(void)
 	mprof_tree	*t;
 	struct tms	curr;
 	stack_frame	*save_fp;
+	unsigned int    frame_usr_time, frame_sys_time;
 
 	assert(mprof_ptr);
 	if (!mprof_ptr)
 		return;	/* protect in pro build */
-	if (mprof_ptr->line_prof_stack >= MAX_MPROF_STACK_LEVEL)
-	{
-		mprof_ptr->line_prof_stack--;
-		assert(mprof_ptr->overflowed_levels);
-		return;
-	}
-	TIMES(&curr);
+
 	if (NULL == prof_fp)
 		return;
-	if (!prof_fp->dummy_stack_count)
+	/* we are leaving a real frame, not an IF or FOR with DO */
+	if (0 >= prof_fp->dummy_stack_count)
 	{
+		/* if we have previously exceeded the maximum MPROF stack depth,
+		 * we had better be aware of it; hence the assert */
+		if (mprof_ptr->overflown)
+		{
+			if (mprof_ptr->last_label_recorded)
+			{
+				mprof_ptr->line_prof_stack--;
+				return;
+			}
+			mprof_ptr->last_label_recorded = TRUE;
+		}
+		TIMES(&mprof_ptr->tcurr);
+		/* update the time of last line in this frame before returning */
+		if (NULL != mprof_ptr->curr_tblnd)
+		{
+			UPDATE_TIME(mprof_ptr->curr_tblnd);
+		}
+
 		get_entryref_information(TRUE, &tmp_trc_tbl_entry);
 		if (NULL == prof_fp)
 			return;
-		PRINT_PROF_TREE("");
-		prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
-		prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
 		if (prof_fp->rout_name == &above_routine)
 		{
 			/* it should have been filled in get_entryref_information */
@@ -510,32 +501,31 @@ void unw_prof_frame(void)
 			memcpy(e.rout_name->addr, prof_fp->rout_name->addr, prof_fp->rout_name->len);
 		}
 		e.line_num = -1;
-		e.for_count = 0;
-		t = mprof_tree_insert(mprof_ptr->head_tblnd, &tmp_trc_tbl_entry);
-		/*update count and timing of quit statements (implicit or explicit)*/
-		t->e.count++;
-		t->e.usr_time += (curr.tms_utime - mprof_ptr->tprev.tms_utime);
-		t->e.sys_time += (curr.tms_stime - mprof_ptr->tprev.tms_stime);
-		t = mprof_tree_insert(mprof_ptr->head_tblnd, &e);
+
+		/* insert/find a frame entry into/in the MPROF tree, -1 indicating that it is
+		 * not a real line number, but rather an aggregation of several lines */
+		t = mprof_tree_insert(&(mprof_ptr->head_tblnd), &e);
 		/*update count and timing (from prof_fp) of frame I'm leaving*/
 		t->e.count++;
-		t->e.sys_time += (unsigned int)prof_fp->sys_time;
-		t->e.usr_time += (unsigned int)prof_fp->usr_time;
+		frame_usr_time = (mprof_ptr->tcurr.tms_utime - prof_fp->start.tms_utime);
+		frame_sys_time = (mprof_ptr->tcurr.tms_stime - prof_fp->start.tms_stime);
+		t->e.usr_time += frame_usr_time;
+		t->e.sys_time += frame_sys_time;
+		/* not the first frame in the stack */
 		if (prof_fp->prev)
 		{
-			if (mprof_ptr->line_prof_stack > 0)
-			{
-				mprof_ptr->tprev = mprof_ptr->time_stack[mprof_ptr->line_prof_stack];
+			if (0 < mprof_ptr->line_prof_stack)
+			{	/* restore the context of the parent frame */
+				mprof_ptr->tprev = mprof_ptr->tcurr;
 				mprof_ptr->curr_tblnd = mprof_ptr->currnd_stk[mprof_ptr->line_prof_stack];
-				mprof_ptr->inside_for_loop_state = mprof_ptr->loop_info_stk[mprof_ptr->line_prof_stack];
 				mprof_ptr->line_prof_stack--;
 			} else
 				GTMASSERT;
 			/* move back up to parent frame */
 			prof_msp = (unsigned char *)prof_fp + SIZEOF(stack_frame_prof);
 			prof_fp = prof_fp->prev;
-			prof_fp->sys_time = curr.tms_stime - prof_fp->sys_time;
-			prof_fp->usr_time = curr.tms_utime - prof_fp->usr_time;
+			prof_fp->start.tms_utime += frame_usr_time;
+			prof_fp->start.tms_stime += frame_sys_time;
 		} else
 		{
 			/* This should only be true only if the View command is not at
@@ -560,8 +550,7 @@ void unw_prof_frame(void)
 			if (NULL == prof_fp)
 				return;
 			prof_fp->prev = (stack_frame_prof *)NULL;
-			prof_fp->sys_time = curr.tms_stime;
-			prof_fp->usr_time = curr.tms_utime;
+			prof_fp->start = mprof_ptr->tcurr;
 			prof_fp->prev = NULL;
 			/*tag it so that next time, it will pick up label/routine info from current loc*/
 			prof_fp->rout_name = (mident *)&above_routine;
@@ -569,14 +558,11 @@ void unw_prof_frame(void)
 			prof_fp->dummy_stack_count = 0;
 		}
 	} else
-	{
-		assert(prof_fp->dummy_stack_count > 0);
 		prof_fp->dummy_stack_count--;
-	}
 	return;
 }
 
-void crt_gbl(mprof_tree *p, int info_level)
+void crt_gbl(mprof_tree *p, boolean_t is_for)
 {
 	/* Write the data into the global
 	 */
@@ -614,7 +600,7 @@ void crt_gbl(mprof_tree *p, int info_level)
 	}
 	mprof_ptr->gvargs.args[count++] = spt++;
 	spt->mvtype = MV_STR;
-	if (-1 != p->e.line_num)
+	if (0 <= p->e.line_num)
 	{
 		tmpnum = i2asc(asc_line_num, (unsigned int) p->e.line_num);
 		spt->str.len = INTCAST(tmpnum - asc_line_num);
@@ -623,15 +609,9 @@ void crt_gbl(mprof_tree *p, int info_level)
 		mprof_ptr->gvargs.args[count] = spt;
 		count++;
 		spt++;
-	} else if (0 == p->e.line_num)
-	{
-		spt->str.len = SIZEOF("*unk*") - 1;
-		spt->str.addr = (char *)pcalloc((unsigned int)spt->str.len);
-		memcpy(spt->str.addr, "*unk*", spt->str.len);
-		mprof_ptr->gvargs.args[count] = spt;
-		count++;
 	}
-	if (info_level)
+	/* for FOR loops */
+	if (is_for)
 	{
 		spt->mvtype = MV_STR;
 		spt->str.len = SIZEOF(MPROF_FOR_LOOP) - 1;
@@ -651,16 +631,18 @@ void crt_gbl(mprof_tree *p, int info_level)
 	mprof_ptr->gvargs.count = mprof_ptr->curr_num_subscripts;
 	/* Data --> "count:cpu-time in user mode:cpu-time in sys mode:cpu-time total" */
 	start_point = (INTPTR_T)&dataval[0];
+	/* get count */
 	tmpnum = (unsigned char *)&dataval[0];
 	end = i2asc(tmpnum, p->e.count);
 	tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
-	if (info_level < 1)
+	/* for non-FOR stuff get CPU time as well */
+	if (!is_for)
 	{
 		*tmpnum = ':';
 		tmpnum++;
 		end = i2asc(tmpnum, p->e.usr_time);
 		tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
-#ifndef VMS
+#		ifndef VMS
 		*tmpnum = ':';
 		tmpnum++;
 		end = i2asc(tmpnum, p->e.sys_time);
@@ -669,12 +651,12 @@ void crt_gbl(mprof_tree *p, int info_level)
 		tmpnum++;
 		end = i2asc(tmpnum, p->e.sys_time + p->e.usr_time);
 		tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
-#endif
+#		endif
 	}
 	data.mvtype = MV_STR;
 	data.str.len = (((INTPTR_T)tmpnum - start_point) > 0)
 		? ((int)((INTPTR_T)tmpnum - start_point)) : ((int)(start_point - (INTPTR_T)tmpnum));
-	if ((mprof_ptr->overflowed_levels) && (-1 == p->e.line_num))
+	if ((mprof_ptr->overflown) && (-1 == p->e.line_num))
 	{
 		tmp_str_len = data.str.len;
 		data.str.len += SIZEOF(OVERFLOW_STRING) - 1;
@@ -688,7 +670,7 @@ void crt_gbl(mprof_tree *p, int info_level)
 	return;
 }
 
-static void get_entryref_information(boolean_t line, trace_entry *tmp_trc_tbl_entry)
+STATICFNDEF void get_entryref_information(boolean_t line, trace_entry *tmp_trc_tbl_entry)
 {
 	boolean_t	line_reset;
 	lab_tabent	*max_label, *label_table, *last_label;
@@ -752,7 +734,6 @@ static void get_entryref_information(boolean_t line, trace_entry *tmp_trc_tbl_en
 	}
 	if (NULL == prof_fp->rout_name)
 		prof_fp->rout_name = &routine->routine_name;
-	/* if (0 != max_label->lab_name.len && NULL == prof_fp->label_name) */
 	if (NULL == prof_fp->label_name)
 		prof_fp->label_name = &max_label->lab_name;
 	if (!line)
@@ -768,10 +749,9 @@ static void get_entryref_information(boolean_t line, trace_entry *tmp_trc_tbl_en
 			break;
 	}
 	tmp_trc_tbl_entry->line_num = offset;
-	tmp_trc_tbl_entry->for_count = 0;
 }
 
-static void parse_gvn(mval *gvn)
+STATICFNDEF void parse_gvn(mval *gvn)
 {
 	/* parse the global variable name the information will be dumped into
 	 * to make sure it is a valid gvn
@@ -782,12 +762,6 @@ static void parse_gvn(mval *gvn)
 	unsigned int		count = 0;
 	static mstr		mprof_mstr;	/* area to hold global and subscripts */
 	char			*mpsp;		/* pointer into mprof_mstr area */
-
-	error_def(ERR_NOTGBL);
-	error_def(ERR_STRUNXEOR);
-	error_def(ERR_VIEWNOTFOUND);
-	error_def(ERR_TEXT);
-	error_def(ERR_MAXNRSUBSCRIPTS);
 
 	c_ref = gvn->str.addr;
 	c_top = c_ref + gvn->str.len;
@@ -929,9 +903,9 @@ void stack_leak_check(void)
 	if (NULL == var_on_cstack_ptr)
 		var_on_cstack_ptr = &var_on_cstack;
 	if ((&var_on_cstack != var_on_cstack_ptr)
-#ifdef	__i386	/* for 32-bit Linux allow a two pointer variation to accommodate ZHELP */
-		&& ((SIZEOF(var_on_cstack) * 2) < ABS(&var_on_cstack - var_on_cstack_ptr))
-#endif
-		)
+#	    ifdef	__i386	/* for 32-bit Linux allow a two pointer variation to accommodate ZHELP */
+	    && ((SIZEOF(var_on_cstack) * 2) < ABS(&var_on_cstack - var_on_cstack_ptr))
+#	    endif
+	    )
 		GTMASSERT;
 }

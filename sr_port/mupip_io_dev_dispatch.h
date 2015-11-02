@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,43 +11,36 @@
 
 /* io_dev_dispatch.h is a superset of this file which includes those needed by GT.M
  * so, if you need to make a change here, please keep the other one in sync.
- */
-
-
-/* Following definitions have a pattern that most of the routines follow. Only exceptions is:
+ *
+ * Following definitions have a pattern that most of the routines follow. Only exceptions is:
  *      1. ioff_open() is an extra routine
+ *
+ * VMS can have addresses in literal constants while most Unix platforms cannot
  */
-
-#define ionil_dev \
-	{													\
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL	\
-	}
-
-/* VMS can have addresses in literal constants while most Unix platforms cannot */
-UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch_mupip[]=
+UNIX_ONLY(GBLDEF) VMS_ONLY(LITDEF) dev_dispatch_struct io_dev_dispatch_mupip[] =
 {
-#ifdef UNIX
+#	ifdef UNIX
 	iotype(iott, iott, nil),
-#else
+#	else
 	ionil_dev,
-#endif
+#	endif
 	ionil_dev,
-#ifdef UNIX
+#	ifdef UNIX
 	iotype(iorm, iorm, iopi),
-#else
+#	else
 	iotype(iorm, iorm, nil),
-#endif
+#	endif
 	ionil_dev,
 	ionil_dev,
 	ionil_dev,
-#ifdef UNIX
+#	ifdef UNIX
 	iotype(ioff, iorm, iopi),
-#else
+#	else
 	iotype(ioff, iorm, nil),
-#endif
+#	endif
 	ionil_dev,
 	ionil_dev
-#ifdef UNIX
+#	ifdef UNIX
 	,ionil_dev
-#endif
+#	endif
 };

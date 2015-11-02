@@ -126,10 +126,36 @@ GBLREF zshow_out	*zwr_output;
 GBLREF int		merge_args;
 GBLREF zwr_hash_table	*zwrhtab;			/* How we track aliases during zwrites */
 
-error_def(ERR_UNDEF);
-
 LITREF	mval		literal_null;
 
+error_def(ERR_UNDEF);
+
+/* lv subscript usage notes:
+ *  1. The sub field in lvzwrite_datablk is an array allocated at MAX_LVSUBSCRIPTS.
+ *  2. The subscripts that appear at any given time are those for the current node being processed.
+ *  3. Nodes are setup by lvzwr_arg().
+ *
+ * Example - take the following nodes:
+ *   A(1,1)=10
+ *   A(1,2)=20
+ *
+ * The simplified processing that occurs is as follows:
+ *  1. lvzwr_fini() sets curr_name which is the base var name (A)
+ *  2. First level lvzwr_var is called with level (aka n) == 0
+ *  3. Since A has no value, nothing is printed. Notices that there are children so lvzwr_arg()
+ *     is called recursively with level 1.
+ *  4. Sets up the level 1 subscript (key = 1).
+ *  5. Since A(1) has no value, nothing is printed. Notices that there are children so lvzwr_arg()
+ *     is called recursively withe level 2.
+ *  6. Sets up the level 2 subscript (key = 1).
+ *  7. A(1,1) does have a value so lvzwr_out() is called to print the current key (from these
+ *     subscripts) and its value.
+ *  8. No more subscripts at this level so pops back to level 1.
+ *  9. There is another child at this level so calls lvzwr_arg() recursively with level 2.
+ * 10. Replaces the level 2 subscript with the new key value (key = 2).
+ * 11. A(1,2) does have a value so lvzwr_out() is called to print the current key.
+ * 12. no more children at any level so everything pops back.
+ */
 void lvzwr_var(lv_val *lv, int4 n)
 {
 	mval		mv;
@@ -141,8 +167,8 @@ void lvzwr_var(lv_val *lv, int4 n)
 	zwr_sub_lst	*zwr_sub;
 	ht_ent_addr	*tabent_addr;
 	zwr_alias_var	*zav, *newzav;
-	tree		*lvt;
-	treeNode	*node, *nullsubsnode, *parent;
+	lvTree		*lvt;
+	lvTreeNode	*node, *nullsubsnode, *parent;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -157,23 +183,22 @@ void lvzwr_var(lv_val *lv, int4 n)
 	lvzwrite_block->curr_subsc = n;
 	zwr_sub = (zwr_sub_lst *)lvzwrite_block->sub;
 	zwr_sub->subsc_list[n].actual = (mval *)NULL;
-
 	/* Before we process this var, there are some special cases to check for first when
 	 * this is a base var (0 == lvzwrite_block->subsc_count) and the var is an alias.
 	 *
-	 * - Check if we have seen it before (the lvval is in the zwr_alias_var hash table), then we
-	 *   need to process this var with lvzwr_out NOW and we will only be processing the base
-	 *   var, not any of the subscripts. This is because all those subscripts (and the value
-	 *   of the base var itself) have been dealt with previously when we first saw this
-	 *   lvval. So in that case, call lvzwr_out() to output the association after which we are
-	 *   done with this var.
-	 *-  If we haven't seen it before, set a flag so we verify if the base var gets processed by
-	 *   lvzwr_out or not (i.e. whether it has a value and the "subscript" or lack there of is
-	 *   either wildcarded or whatever so that it actually gets dumped by lvzwr_out (see conditions
-	 *   below). If not, then *we* need to add the lvval to the hash table to signify we have seen
-	 *   it before so the proper associations to this alias var can be printed at a later time
-	 *   when/if they are encountered.
-	*/
+	 * 1. Check if we have seen it before (the lvval is in the zwr_alias_var hash table), then we
+	 *    need to process this var with lvzwr_out NOW and we will only be processing the base
+	 *    var, not any of the subscripts. This is because all those subscripts (and the value
+	 *    of the base var itself) have been dealt with previously when we first saw this
+	 *    lvval. So in that case, call lvzwr_out() to output the association after which we are
+	 *    done with this var.
+	 * 2. If we haven't seen it before, set a flag so we verify if the base var gets processed by
+	 *    lvzwr_out or not (i.e. whether it has a value and the "subscript" or lack there of is
+	 *    either wildcarded or whatever so that it actually gets dumped by lvzwr_out (see conditions
+	 *    below). If not, then *we* need to add the lvval to the hash table to signify we have seen
+	 *    it before so the proper associations to this alias var can be printed at a later time
+	 *    when/if they are encountered.
+	 */
 	verify_hash_add = FALSE;	/* By default we don't need to verify add */
 	value_printed_pending = FALSE;	/* Force the "value_printed" flag on if TRUE */
 	zav = NULL;
@@ -196,27 +221,27 @@ void lvzwr_var(lv_val *lv, int4 n)
 	}
 	if ((0 == lvzwrite_block->subsc_count) && (0 == n))
 		zwr_sub->subsc_list[n].subsc_type = ZWRITE_ASTERISK;
-	if (MV_DEFINED(&(lv->v))
+	if (LV_IS_VAL_DEFINED(lv)
 	    && (!lvzwrite_block->subsc_count || ((0 == n) && ZWRITE_ASTERISK == zwr_sub->subsc_list[n].subsc_type)
 		|| ((0 != n) && !(lvzwrite_block->mask >> n))))
-	{
+	{	/* Print value for *this* node  */
 		lvzwr_out(lv);
 	}
 	if (verify_hash_add && !lvzwrite_block->zav_added)
 	{	/* lvzwr_out processing didn't add a zav for this var. Take care of that now so we
-		   recognize it as a "dealt with" alias when they are encountered later.
-		*/
+		 * recognize it as a "dealt with" alias when/if it is encountered later.
+		 */
 		newzav = als_getzavslot();
-		newzav->ptrs.val_ent.zwr_var = *lvzwrite_block->curr_name;
+		newzav->zwr_var = *lvzwrite_block->curr_name;
 		newzav->value_printed = TRUE;
 		htent_added = add_hashtab_addr(&zwrhtab->h_zwrtab, (char **)&lv, newzav, &tabent_addr);
 		assert(htent_added);
 	}
 	/* If we processed a base var above to print an alias association but it hadn't been printed yet,
-	   we had to wait until after lvzwr_out() was called before we could set the flag that indicated
-	   the printing had occurred. Do that now. Note that it is only when this flag is set we are
-	   certain to have a good value in zav.
-	*/
+	 * we had to wait until after lvzwr_out() was called before we could set the flag that indicated
+	 * the printing had occurred. Do that now. Note that it is only when this flag is set we are
+	 * certain to have a good value in zav.
+	 */
 	if (value_printed_pending)
 	{
 		assert(zav);
@@ -230,7 +255,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 	{
 		var = op_srchindx(VARLSTCNT(2) lv, zwr_sub->subsc_list[n].first);
 		zwr_sub->subsc_list[n].actual = zwr_sub->subsc_list[n].first;
-		if (var && (MV_DEFINED(&(var->v)) || n < lvzwrite_block->subsc_count -1))
+		if (var && (LV_IS_VAL_DEFINED(var) || n < lvzwrite_block->subsc_count -1))
 		{
 			lvzwr_var(var, n + 1);
 			zwr_sub->subsc_list[n].actual = (mval *)NULL;
@@ -249,7 +274,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 			}
 		}
 	} else  if (lvt = LV_GET_CHILD(lv))
-	{
+	{	/* If node has children, process them now */
 		zwr_sub->subsc_list[n].actual = &mv;
 		/* In case of standard null collation, first process null subscript if it exists */
 		if (TREF(local_collseq_stdnull))
@@ -273,10 +298,10 @@ void lvzwr_var(lv_val *lv, int4 n)
 			}
 			LV_NODE_GET_KEY(node, &mv); /* Get node key into "mv" depending on the structure type of "node" */
 			if (!MVTYPE_IS_STRING(mv.mvtype))
-			{	/* "node" is of type "treeNodeFlt *" */
+			{	/* "node" is of type "lvTreeNodeNum *" */
 				COMMON_NUMERIC_PROCESSING(node);
 			} else
-			{	/* "node" is of type "treeNode *" */
+			{	/* "node" is of type "lvTreeNode *" */
 				COMMON_STR_PROCESSING(node);
 			}
 		}

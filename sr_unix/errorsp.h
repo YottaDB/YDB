@@ -128,7 +128,7 @@ void ch_trace_point() {return;}
 					/* Absolutely critical that this *never* occur hence GTMASSERT */			\
 					if ((SFF_TRIGR_CALLD & frame_pointer->flags) && (0 == proc_act_type)			\
 					    && !(SFF_ETRAP_ERR & frame_pointer->flags)) GTMASSERT;				\
-					DBGEHND((stderr, "MUM_TSTART: Frame %016lx dispatched\n", frame_pointer));		\
+					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
                                         ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
 					active_ch = ctxt;									\
@@ -142,7 +142,7 @@ void ch_trace_point() {return;}
                                         CHTRACEPOINT;										\
 					for ( ;ctxt > &chnd[0] && ctxt->ch != &mdb_condition_handler; ctxt--)	; 		\
 					assert(ctxt->ch == &mdb_condition_handler && FALSE == ctxt->save_active_ch->ch_active);	\
-					DBGEHND((stderr, "MUM_TSTART: Frame %016lx dispatched\n", frame_pointer));		\
+					DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
                                         ctxt->ch_active = FALSE; 								\
 					restart = mum_tstart;									\
 					active_ch = ctxt;									\
@@ -259,16 +259,17 @@ void ch_trace_point() {return;}
 					longjmp(active_ch->jmp, -1);					\
 				}
 
-#define START_CH		condition_handler *current_ch;									\
-		                {												\
-                                        CHTRACEPOINT;										\
-                                        current_ch = active_ch;									\
-                                        current_ch->ch_active = TRUE;								\
-					active_ch--;										\
-                                        CHECKLOWBOUND(active_ch);								\
-					DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",	\
-                                                 __FILE__, __LINE__, arg, SIGNAL)); 						\
-				}
+#define START_CH		condition_handler *current_ch;								\
+				DCL_THREADGBL_ACCESS;									\
+															\
+				SETUP_THREADGBL_ACCESS;									\
+				CHTRACEPOINT;										\
+				current_ch = active_ch;									\
+				current_ch->ch_active = TRUE;								\
+				active_ch--;										\
+				CHECKLOWBOUND(active_ch);								\
+				DBGEHND((stderr, "%s: Condition handler entered at line %d - arg: %d  SIGNAL: %d\n",	\
+				         __FILE__, __LINE__, arg, SIGNAL));
 
 #define MDB_START
 

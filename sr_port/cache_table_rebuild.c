@@ -24,19 +24,20 @@
 GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
 
+error_def(ERR_MEMORY);
+error_def(ERR_VMSMEMORY);
+
 void cache_table_rebuild()
 {
 	ht_ent_objcode 	*tabent, *topent;
 	cache_entry	*csp;
-	error_def(ERR_MEMORY);
-	error_def(ERR_VMSMEMORY);
 
 	DBGCACHE((stdout, "cache_table_rebuild: Rebuilding indirect lookaside cache\n"));
 	for (tabent = cache_table.base, topent = cache_table.top; tabent < topent; tabent++)
 	{
 		if (HTENT_VALID_OBJCODE(tabent, cache_entry, csp))
 		{
-			if (0 == csp->refcnt && 0 == csp->zb_refcnt)
+			if ((0 == csp->refcnt) && (0 == csp->zb_refcnt))
 			{
 				((ihdtyp *)(csp->obj.addr))->indce = NULL;
 				indir_cache_mem_size -= (ICACHE_SIZE + csp->obj.len);
@@ -46,8 +47,8 @@ void cache_table_rebuild()
 		}
 	}
 	/* Only do compaction processing if we are not processing a memory type error (which
-	   involves allocating a smaller table with storage we don't have.
-	*/
+	 * involves allocating a smaller table with storage we don't have.
+	 */
 	if (COMPACT_NEEDED(&cache_table) && error_condition != UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY))
 		compact_hashtab_objcode(&cache_table);
 }

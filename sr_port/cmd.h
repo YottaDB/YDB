@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,6 +49,7 @@ int m_zcontinue(void);
 int m_zdeallocate(void);
 int m_zedit(void);
 int m_zgoto(void);
+int m_zhalt(void);
 int m_zhelp(void);
 int m_zlink(void);
 int m_zmessage(void);

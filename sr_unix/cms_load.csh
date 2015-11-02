@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
+#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -105,6 +105,10 @@ if (-e $dst_ver) then
 	if ($dst_ver =~ V3* || $dst_ver =~ V4* || $dst_ver =~ V5* || $dst_ver == "V990") then
 		set move_args = "compulsory"
 	endif
+	# to use this script to update released versions, you must
+	# copy this script to your own directtory and change the following IF statement to: (!($mods_only) && $?move_args)
+	# execute the updated script as library with the following command, replacing VER as necessary
+	# doall -server "all" -fg -run '~/cms_load.csh -m $cms_root/${VER} $gtm_root/${VER} |& tee -a ~/logs/${VER}_${HOST}.log'
 	if ($?move_args)  then
 		set save_ver = `ls -ld ${gtm_root}/$dst_ver | \
 			awk '{if (length($7)==1) $7="0"_$7; time=$6"_"$7"_"$8; print toupper(time)}' | sed 's/://g'`
@@ -158,18 +162,18 @@ cp $preserve_time $cms_dir/*/gtmsrc.csh .
 # platform ordering goes:
 # platform+OS arch arch_common OS {portable,nsb_portable}
 
-
+# The extra spaces at the end are required for override_libs to work correctly
 set gtm_s_aix     = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_rs6000   sr_aix  "
 set gtm_s_osf1    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_alpha    sr_dux  "
 set gtm_s_hpux    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hppa     sr_hpux "
-set gtm_s_linux   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux"
-set gtm_s_linux64 = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_x86_regs sr_x86_64 sr_linux"
-set gtm_s_sunos   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_sparc    sr_sun"
-set gtm_s_os390   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_s390     sr_os390"
-set gtm_s_l390    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_linux    sr_s390   sr_l390"
+set gtm_s_linux   = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux "
+set gtm_s_linux64 = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_x86_regs sr_x86_64 sr_linux "
+set gtm_s_sunos   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_sparc    sr_sun "
+set gtm_s_os390   = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_s390     sr_os390 "
+set gtm_s_l390    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_linux    sr_s390   sr_l390 "
 set gtm_s_hpia    = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_hpux     sr_ia64 "
 set gtm_s_linuxia = "sr_port sr_port_cm sr_unix             sr_unix_cm sr_unix_gnp sr_linux    sr_ia64 "
-set gtm_s_cygwin  = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux"
+set gtm_s_cygwin  = "sr_port sr_port_cm sr_unix sr_unix_nsb sr_unix_cm sr_unix_gnp sr_x86_regs sr_i386   sr_linux "
 
 set platform_library = "$platform_name"
 if ( "s390x" == $MACHTYPE && "linux" == $platform_library ) then

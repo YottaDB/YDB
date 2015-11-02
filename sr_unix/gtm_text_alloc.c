@@ -90,9 +90,9 @@ error_def(ERR_TRNLOGFAIL);
 #define CALLERID ((unsigned char *)caller_id())
 #ifdef DEBUG
 #  define TRACE_TXTALLOC(addr,len) {if (GDL_SmTrace & gtmDebugLevel) \
- 			FPRINTF(stderr,"TxtAlloc at 0x%lx of %ld bytes from 0x%lx\n", addr, len, CALLERID);}
+ 			FPRINTF(stdout,"TxtAlloc at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}
 #  define TRACE_TXTFREE(addr,len)   {if (GDL_SmTrace & gtmDebugLevel) \
-			FPRINTF(stderr,"TxtFree at 0x%lx of %d bytes from 0x%lx\n", addr, len, CALLERID);}
+			FPRINTF(stdout,"TxtFree at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}
 #else
 #  define TRACE_TXTALLOC(addr, len)
 #  define TRACE_TXTFREE(addr, len)

@@ -1353,7 +1353,7 @@ TRIGNAMEUNIQ	<Unable to make trigger name !AD unique beyond !UL versions already
 ZTRIGINVACT	<Missing or invalid parameter in position !UL given to $ZTRIGGER()>/error/fao=1!/ansi=0
 UNUSEDMSG1354	<ZTRIGNOTP : Last used in V5.4-001>/error/fao=0!/ansi=0
 QUITALSINV	<QUIT * return when the extrinsic was not invoked with SET *>/error/fao=0!/ansi=0
-PROCTERM	<!AD process termination due to !AD from !AD>/warning/fao=6!/ansi=0
+PROCTERM	<!AD process termination due to !AD (return code !UL) from !AD>/warning/fao=7!/ansi=0
 SRCLNNTDSP	<Source lines exceeding !UL character width are not displayed>/info/fao=1!/ansi=0
 ARROWNTDSP	<Unable to display ^----- due to length of source line>/info/fao=0!/ansi=0
 TRIGDEFBAD	<Trigger initialization failed for global ^!AD. Error while processing ^#t("!AD",!AD)>/error/fao=6!/ansi=0
@@ -1370,7 +1370,7 @@ GVZTRIGFAIL	<ZTRIGGER of a global variable failed.  Failure code: !AD.>/error/fa
 UNUSEDMSG1370	<ONLYLDTRIG: Last used in V5.4-001>/error/fao=0!/ansi=0
 SETINSETTRIGONLY      <ISV !AD can only be modified in a 'SET' type trigger>/error/fao=2!/ansi=0
 DZTRIGINTRIG	<$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD>/error/fao=2!/ansi=0
-SECNODZTRIGINTP	<Sequence number 0x!16@XQ contains $ZTRIGGER() updates made inside a trasanction which the current replicator does not support. The replicator must be upgraded to at least V5.4-002 to support this type of transaction. Cannot continue>/error/fao=1!/ansi=0
+SECNODZTRIGINTP	<Sequence number 0x!16@XQ contains $ZTRIGGER() updates made inside a trasanction which the current replicating instance does not support. The replicating instance must be upgraded to at least V5.4-002 to support this type of transaction. Cannot continue>/error/fao=1!/ansi=0
 BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression>/warning/fao=0!/ansi=0
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID   <PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
@@ -1380,6 +1380,9 @@ REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at jou
 ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
 FORCTRLINDX	<Using a FOR with an indexed control variable that's assigned values calculated in extrinsics is not currently safe>/error/fao=0!/ansi=0
+ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/error/fao=0!/ansi=0
+ZCINVALIDKEYWORD  <External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
+REPLNOMULTILINETRG	<Sequence number 0x!16@XQ contains a trigger definition too large for transmission to the current replicating instance, which does not support multi-line triggers - stopping replication>/error/fao=1!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

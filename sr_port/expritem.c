@@ -32,6 +32,15 @@ GBLREF	mident		window_ident;
 GBLREF	mval		window_mval;
 GBLREF	char		window_token;
 
+error_def(ERR_BOOLSIDEFFECT);
+error_def(ERR_EXPR);
+error_def(ERR_FCNSVNEXPECTED);
+error_def(ERR_FNOTONSYS);
+error_def(ERR_INVFCN);
+error_def(ERR_INVSVN);
+error_def(ERR_RPARENMISSING);
+error_def(ERR_VAREXPECTED);
+
 LITREF	toktabtype	tokentable[];
 LITREF	mval		literal_null;
 
@@ -440,14 +449,6 @@ int expritem(oprtype *a)
 	oprtype 	x1;
 	char		source_line_buff[MAX_SRCLINE + SIZEOF(ARROW)];
 	unsigned char 	type;
-	error_def(ERR_BOOLSIDEFFECT);
-	error_def(ERR_EXPR);
-	error_def(ERR_FCNSVNEXPECTED);
-	error_def(ERR_FNOTONSYS);
-	error_def(ERR_INVFCN);
-	error_def(ERR_INVSVN);
-	error_def(ERR_RPARENMISSING);
-	error_def(ERR_VAREXPECTED);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -500,8 +501,8 @@ int expritem(oprtype *a)
 		case TK_DOLLAR:
 			if ((TK_DOLLAR == director_token) || (TK_AMPERSAND == director_token))
 			{
-				if (!run_time && TREF(shift_side_effects) && (FULL_BOOL_WARN == TREF(gtm_fullbool)))
-				{	/* warnings requested */
+				if ((-TRUE == TREF(shift_side_effects)) && !run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))
+				{	/* warnings requested by by gtm_fullbool and enabled by -TRUE from eval_expr */
 					show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
 					dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);
 				}
@@ -561,8 +562,9 @@ int expritem(oprtype *a)
 							 * error to show up which means we need to set "temp_subs" to TRUE.
 							 */
 							TREF(temp_subs) = TRUE;
-							if (!run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))
-							{	/* warnings requested */
+							if ((-TRUE == TREF(shift_side_effects)) && !run_time
+								&& (FULL_BOOL_WARN == TREF(gtm_fullbool))) /* warnings requested */
+							{	/* by gtm_fullbool and enabled by -TRUE from eval_expr  */
 								show_source_line(source_line_buff, SIZEOF(source_line_buff), TRUE);
 								dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);
 							}

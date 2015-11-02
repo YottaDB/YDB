@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2002, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,6 +28,7 @@ void adjust_frames(unsigned char *old_ptext_beg, unsigned char *old_ptext_end, u
 			fp = *(stack_frame **)(fp + 1);
 		assert(fp);
 #endif
+		assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 		if (old_ptext_beg <= fp->mpc && fp->mpc <= old_ptext_end)
 			fp->mpc += (new_ptext_beg - old_ptext_beg);
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,6 +44,7 @@
 }
 
 typedef int4	(*fgnfnc)();
+typedef void	(*clnupfptr)();
 
 struct extcall_string
 {
@@ -63,6 +64,7 @@ struct extcall_package_list
 	struct extcall_entry_list	*first_entry;
 	void_ptr_t			package_handle;
 	mstr				package_name;
+	clnupfptr			package_clnup_rtn;
 };
 
 enum xc_types

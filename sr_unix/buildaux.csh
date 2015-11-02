@@ -1,6 +1,6 @@
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc #
+#	Copyright 2001, 2011 Fidelity Information Services, Inc #
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -151,10 +151,26 @@ if ( $buildaux_gde == 1 ) then
 
 		\rm -f *.m *.o	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
 		cp $gtm_pct/*.m .
-
+		switch ($gt_image)  # potentially all 3 versions could be in $gtm_pct .. we only need one, delete the others
+		    case "pro":
+			rm -f GTMDefinedTypesInitBta.m >& /dev/null
+			rm -f GTMDefinedTypesInitDbg.m >& /dev/null
+			mv GTMDefinedTypesInitPro.m GTMDefinedTypesInit.m
+			breaksw
+		    case "dbg":
+			rm -f GTMDefinedTypesInitBta.m >& /dev/null
+			rm -f GTMDefinedTypesInitPro.m >& /dev/null
+			mv GTMDefinedTypesInitDbg.m GTMDefinedTypesInit.m
+			breaksw
+		    case "bta":
+			rm -f GTMDefinedTypesInitDbg.m >& /dev/null
+			rm -f GTMDefinedTypesInitPro.m >& /dev/null
+			mv GTMDefinedTypesInitBta.m GTMDefinedTypesInit.m
+			breaksw
+		endsw
 		# GDE and the % routines should all be in upper-case.
 		if ( `uname` !~ "CYGWIN*") then
-			ls -1 *.m | awk '{printf "mv %s %s\n", $1, toupper($1);}' | sed 's/.M$/.m/g' | sh
+			ls -1 *.m | awk '! /GTMDefinedTypesInit/ {printf "mv %s %s\n", $1, toupper($1);}' | sed 's/.M$/.m/g' | sh
 		else
 			# unless the mount is "managed", Cygwin is case insensitive but preserving
 			ls -1 *.m | awk '{printf "mv %s %s.tmp;mv %s.tmp %s\n", $1, $1, $1, toupper($1);}' | sed 's/.M$/.m/g' | sh

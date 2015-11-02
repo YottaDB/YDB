@@ -202,7 +202,7 @@ mval	*unw_mv_ent(mv_stent *mv_st_ent)
 					/* Special cleanup for aliases and passed through vars */
 					als_check_xnew_var_aliases(symval_ptr, curr_symval);
 				else
-				{	/* Drop reference counts & Release any lv_xnew_var blocks we have */
+				{	/* Drop reference counts & requeue any lv_xnew_var blocks we have */
 					assert(NULL == symval_ptr->xnew_ref_list);	/* Without aliases, no ref list possible */
 					for (xnewvar = symval_ptr->xnew_var_list; xnewvar; xnewvar = xnewvarnext)
 					{

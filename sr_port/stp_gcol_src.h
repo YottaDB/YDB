@@ -102,34 +102,34 @@ OS_PAGE_SIZE_DECLARE
 
 static mstr		**topstr, **array, **arraytop;
 
-error_def		(ERR_STPEXPFAIL);
+error_def(ERR_STPEXPFAIL);
 
 /* See comment inside LV_NODE_KEY_STPG_ADD macro for why the ASSERT_LV_NODE_MSTR_EQUIVALENCE macro does what it does */
 #ifdef UNIX
-# define	ASSERT_LV_NODE_MSTR_EQUIVALENCE								\
-{													\
-	assert(OFFSETOF(treeNode, key_len) - OFFSETOF(treeNode, key_mvtype) == OFFSETOF(mstr, len));	\
-	assert(SIZEOF(((treeNode *)NULL)->key_len) == SIZEOF(((mstr *)NULL)->len));			\
-	assert(OFFSETOF(treeNode, key_addr) - OFFSETOF(treeNode, key_mvtype) == OFFSETOF(mstr, addr));	\
-	assert(SIZEOF(((treeNode *)NULL)->key_addr) == SIZEOF(((mstr *)NULL)->addr));			\
+# define	ASSERT_LV_NODE_MSTR_EQUIVALENCE									\
+{														\
+	assert(OFFSETOF(lvTreeNode, key_len) - OFFSETOF(lvTreeNode, key_mvtype) == OFFSETOF(mstr, len));	\
+	assert(SIZEOF(((lvTreeNode *)NULL)->key_len) == SIZEOF(((mstr *)NULL)->len));				\
+	assert(OFFSETOF(lvTreeNode, key_addr) - OFFSETOF(lvTreeNode, key_mvtype) == OFFSETOF(mstr, addr));	\
+	assert(SIZEOF(((lvTreeNode *)NULL)->key_addr) == SIZEOF(((mstr *)NULL)->addr));				\
 }
 #elif defined(VMS)
-# define	ASSERT_LV_NODE_MSTR_EQUIVALENCE								\
-{													\
-	assert(SIZEOF(((treeNode *)NULL)->key_len) == SIZEOF(((mstr *)NULL)->len));			\
-	assert(OFFSETOF(treeNode, key_addr) - OFFSETOF(treeNode, key_len) == OFFSETOF(mstr, addr));	\
-	assert(SIZEOF(((treeNode *)NULL)->key_addr) == SIZEOF(((mstr *)NULL)->addr));			\
+# define	ASSERT_LV_NODE_MSTR_EQUIVALENCE									\
+{														\
+	assert(SIZEOF(((lvTreeNode *)NULL)->key_len) == SIZEOF(((mstr *)NULL)->len));				\
+	assert(OFFSETOF(lvTreeNode, key_addr) - OFFSETOF(lvTreeNode, key_len) == OFFSETOF(mstr, addr));		\
+	assert(SIZEOF(((lvTreeNode *)NULL)->key_addr) == SIZEOF(((mstr *)NULL)->addr));				\
 }
 #endif
 
 #define	LV_NODE_KEY_STPG_ADD(NODE)											\
-{	/* NODE is of type "treeNode *" or "treeNodeFlt *" or "lvIntNode *".						\
-	 * Only if it is a "treeNode *" (MV_STR bit is set in this case only)						\
+{	/* NODE is of type "lvTreeNode *" or "lvTreeNodeNum *".								\
+	 * Only if it is a "lvTreeNode *" (MV_STR bit is set in this case only)						\
 	 * should we go ahead with the STPG_ADD.									\
 	 */														\
 	if (LV_NODE_KEY_IS_STRING(NODE))										\
 	{														\
-		/* NODE is of type "treeNode *". We need to now pass an mstr pointer to the MSTR_STPG_ADD macro.	\
+		/* NODE is of type "lvTreeNode *". We need to now pass an mstr pointer to the MSTR_STPG_ADD macro.	\
 		 * We cannot create a local mstr since the address of this mstr needs to be different for each		\
 		 * NODE passed in to LV_NODE_KEY_STPG_ADD during stp_gcol. Therefore we use an offset inside NODE	\
 		 * as the mstr address. Even though NODE is not exactly laid out as an mstr, we ensure the fields	\
@@ -198,8 +198,6 @@ error_def		(ERR_STPEXPFAIL);
 	char		*lcl_addr;							\
 											\
 	GBLREF	spdesc	stringpool;							\
-	GBLREF	char	*stp_move_from, *stp_move_to;					\
-	GBLREF	int	stp_move_count;							\
 											\
 	lcl_mstr = MSTR1;								\
 	if (lcl_mstr->len)								\
@@ -326,7 +324,7 @@ error_def		(ERR_STPEXPFAIL);
 		{												\
 			if (HTENT_VALID_ADDR(tabent_addr, zwr_alias_var, zav))					\
 			{											\
-				x = &zav->ptrs.val_ent.zwr_var;							\
+				x = &zav->zwr_var;								\
 				/* Regular varnames are already accounted for in other ways so			\
 				 * we need to avoid putting this mstr into the process array twice.		\
 				 * The only var names we need worry about are $ZWRTACxxx so make		\
@@ -344,7 +342,7 @@ error_def		(ERR_STPEXPFAIL);
 */
 #if 0
 /* Debug FPRINTF with pre and post requisite flushing of appropriate streams  */
-#define DBGSTPGCOL(x) {flush_pio(); FPRINTF x; fflush(stderr);}
+#define DBGSTPGCOL(x) DBGFPF(x)
 #else
 #define DBGSTPGCOL(x)
 #endif
@@ -433,18 +431,14 @@ void mv_parse_tree_collect(mvar *node)
 
 
 #ifdef STP_MOVE
-
-GBLDEF	char	*stp_move_from, *stp_move_to;	/* input parameters to "stp_move" saved in globals to be accessible to lvval_gcol */
-GBLDEF	int	stp_move_count;
-
-void stp_move(char *from, char *to) /* garbage collect and move range (from,to] to stringpool adjusting all mvals/mstrs pointing
-				     * in this range */
+/* garbage collect and move range [from,to) to stringpool adjusting all mvals/mstrs pointing in this range */
+void stp_move(char *stp_move_from, char *stp_move_to)
 #else
 void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough space for space_asked bytes */
 #endif
 {
 #	ifdef STP_MOVE
-	int			space_asked = 0;
+	int			space_asked = 0, stp_move_count = 0;
 #	endif
 	unsigned char		*strpool_base, *straddr, *tmpaddr, *begaddr, *endaddr;
 	int			index, space_needed, fixup_cnt, tmplen, totspace;
@@ -452,7 +446,7 @@ void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough spa
 	io_log_name		*l;		/* logical name pointer		*/
 	lv_blk			*lv_blk_ptr;
 	lv_val			*lvp, *lvlimit;
-	treeNode		*node, *node_limit;
+	lvTreeNode		*node, *node_limit;
 	mstr			**cstr, *x;
 	mv_stent		*mvs;
 	mval			*m, *mtop;
@@ -474,6 +468,7 @@ void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough spa
 	var_tabent		*vent, *vartop;
 	symval			*symtab;
 	lv_xnew_var		*xnewvar;
+	lvzwrite_datablk	*lvzwrblk;
 	tp_var			*restore_ent;
 	boolean_t		non_mandatory_expansion, exp_gt_spc_needed, first_expansion_try;
 	routine_source		*rsptr;
@@ -525,12 +520,10 @@ void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough spa
         assert(CHK_BOUNDARY_ALIGNMENT(stringpool.top) == 0);
 	/* stp_vfy_mval(); / * uncomment to debug lv corruption issues.. */
 #	ifdef STP_MOVE
-	assert(from < to); /* why did we call with zero length range, or a bad range? */
-	assert((from <  (char *)stringpool.base && to <  (char *)stringpool.base) || /* range to be moved should not intersect */
-	       (from >= (char *)stringpool.top  && to >= (char *)stringpool.top));   /* with stringpool range */
-	stp_move_from = from;
-	stp_move_to = to;
-	stp_move_count = 0;
+	assert(stp_move_from < stp_move_to); /* why did we call with zero length range, or a bad range? */
+	/* assert that range to be moved does not intersect with stringpool range */
+	assert((stp_move_from <  (char *)stringpool.base && stp_move_to <  (char *)stringpool.base)
+		|| (stp_move_from >= (char *)stringpool.top  && stp_move_to >= (char *)stringpool.top));
 #	endif
 	space_needed = ROUND_UP2(space_asked, NATIVE_WSIZE);
 	assert(0 == (INTPTR_T)stringpool.base % NATIVE_WSIZE);
@@ -653,7 +646,10 @@ void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough spa
 				MSTR_STPG_PUT(x);
 			}
 		}
-		LVZWRITE_BLOCK_GC(lvzwrite_block);
+		for (lvzwrblk = lvzwrite_block; NULL != lvzwrblk; lvzwrblk = lvzwrblk->prev)
+		{
+			LVZWRITE_BLOCK_GC(lvzwrblk);
+		}
 		ZWRHTAB_GC(zwrhtab);
 		for (l = io_root_log_name;  0 != l;  l = l->next)
 		{
@@ -714,7 +710,7 @@ void stp_gcol(int space_asked) /* BYPASSOK garbage collect and create enough spa
 						for (lv_blk_ptr = symtab->lvtreenode_first_block; NULL != lv_blk_ptr;
 												lv_blk_ptr = lv_blk_ptr->next)
 						{
-							for (node = (treeNode *)LV_BLK_GET_BASE(lv_blk_ptr),
+							for (node = (lvTreeNode *)LV_BLK_GET_BASE(lv_blk_ptr),
 								node_limit = LV_BLK_GET_FREE(lv_blk_ptr, node);
 									node < node_limit; node++)
 							{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +35,7 @@ void cache_cleanup(stack_frame *sf)
 		vp--;
 		irtnhdr = (ihdtyp *)((char *)vp + *vp);
 		csp = irtnhdr->indce;
+		assert(NULL != csp);
 		assert(0 < csp->refcnt);
 		csp->refcnt--;		/* This usage of this cache entry is done */
 		/* We want to keep the entry around with the hope that it will be accessed again.

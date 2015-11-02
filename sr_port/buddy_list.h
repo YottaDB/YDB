@@ -73,11 +73,11 @@ char		*get_new_free_element(buddy_list *list);	/* gets a freed-up element if ava
 	 * function "reinitialize_list". Any changes to one should be reflected	\
 	 * in the other.							\
 	 */									\
-	assert(0 == list->nElems);						\
-	assert(list->cumulMaxElems == list->initAlloc);				\
-	assert(list->ptrArrayCurr == list->ptrArray);				\
-	assert(list->nextFreePtr == list->ptrArray[0]);				\
-	assert(NULL == list->free_que);						\
+	assert((0 == list->nElems) || process_exiting);				\
+	assert((list->cumulMaxElems == list->initAlloc) || process_exiting);	\
+	assert((list->ptrArrayCurr == list->ptrArray) || process_exiting);	\
+	assert((list->nextFreePtr == list->ptrArray[0])|| process_exiting);	\
+	assert((NULL == list->free_que) || process_exiting);			\
 }
 
 #define	REINITIALIZE_LIST(LST)						\

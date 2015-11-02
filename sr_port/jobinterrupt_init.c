@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +32,6 @@
 #include "jobinterrupt_event.h"
 
 GBLREF	mval	dollar_zinterrupt;
-GBLREF	void	(*gtm_sigusr1_handler)();
 
 #define DEF_ZINTERRUPT "IF $ZJOBEXAM()"
 
@@ -40,9 +39,11 @@ void jobinterrupt_init(void)
 {
 	mstr	envvar_logical;
 	char	trans_bufr[MAX_TRANS_NAME_LEN];
+	DCL_THREADGBL_ACCESS;
 #ifdef UNIX
 	struct sigaction new_action;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Setup new signal handler to just drive condition handler which will do the right thing.
 	   Note that although we use send a posix-style signal with mupip intrpt on VMS, the signal
 	   that comes in is NOT handled by posix signal handler because the posix handler is implemented
@@ -60,8 +61,9 @@ void jobinterrupt_init(void)
 #endif
 	sigaction(SIGUSR1, &new_action, NULL);
 #else
+	SETUP_THREADGBL_ACCESS;
 	/* Handler for VMS setup via function pointer called by START_CH macro */
-	gtm_sigusr1_handler = jobinterrupt_event;
+	RFPTR(gtm_sigusr1_handler) = jobinterrupt_event;
 #endif
 
 	/* Provide initial setting for $ZINTERRUPT */

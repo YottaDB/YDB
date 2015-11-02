@@ -15,7 +15,6 @@
 #include "gtm_stdio.h"
 
 #include "cache.h"
-#include "hashtab_objcode.h"
 #include "rtnhdr.h"
 #include "zbreak.h"
 #include "stack_frame.h"
@@ -39,7 +38,6 @@ GBLREF z_records		zbrk_recs;
 GBLREF mident_fixed		zlink_mname;
 GBLREF stack_frame		frame_pointer;
 GBLREF unsigned short		proc_act_type;
-GBLREF hash_table_objcode	cache_table;
 
 error_def(ERR_COMMENT);
 error_def(ERR_MEMORY);
@@ -136,16 +134,16 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			op_unwind();				/* This removes entry from stack and decrements refcnt field */
 			addr = (zb_code *)LINE_NUMBER_ADDR(CURRENT_RHEAD_ADR(routine), line_offset_addr);
 			/* On HPPA (& other platforms) the addr returned is the address of the field in the instruction which is
-			   the offset of xfer table. But on IA64, as this field is set in the ADDS instruction as 14 bit immed
-			   value and this is written into 3 bitwise fields, we need to return the address of the whole instruction
-			   itself (in our case bundle as we are using a bundle for every instruction in the generated code.
-			*/
+			 * the offset of xfer table. But on IA64, as this field is set in the ADDS instruction as 14 bit immed
+			 * value and this is written into 3 bitwise fields, we need to return the address of the whole instruction
+			 * itself (in our case bundle as we are using a bundle for every instruction in the generated code.
+			 */
 			addr = find_line_call(addr);
 			if (NULL == (z_ptr = zr_find(&zbrk_recs, addr)))
 			{
 #				ifdef USHBIN_SUPPORTED
 				if (NULL != routine->shlib_handle && NULL == routine->shared_ptext_adr)
-				{ /* setting a breakpoint in a shared routine, need to make a private copy */
+				{	/* setting a breakpoint in a shared routine, need to make a private copy */
 					addr_off = (unsigned char *)addr - routine->ptext_adr;
 					if (SS_NORMAL == (status = cre_private_code_copy(routine)))
 						addr = (zb_code *)(routine->ptext_adr + addr_off);
@@ -205,12 +203,6 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 				assert(z_ptr->action->zb_refcnt > 0);
 				z_ptr->action->zb_refcnt--;
 				assert(z_ptr->action != csp || z_ptr->action->zb_refcnt > 0);
-				if (z_ptr->action != csp && 0 == z_ptr->action->refcnt && 0 == z_ptr->action->zb_refcnt)
-				{	/* new action is different one, this is not in stack and no zbreak points to this */
-					deleted = delete_hashtab_objcode(&cache_table, &z_ptr->action->src);
-					assert(deleted);
-					GTM_TEXT_FREE(z_ptr->action);
-				}
 			}
 			z_ptr->action = csp;
 			z_ptr->count = cnt;

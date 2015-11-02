@@ -211,7 +211,7 @@ void	op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...);
 void	op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...);
 /*	op_merge     : prototype defined separately in op_merge.h */
 /*	op_merge_arg : prototype defined separately in op_merge.h */
-int	op_mprofforloop();
+int	op_mprofforchk1();
 int	op_mproflinefetch();
 int	op_mproflinestart();
 void	op_mul(mval *u, mval *v, mval *p);
@@ -291,6 +291,7 @@ void	op_zgoto(mval *rtnname, mval *lblname, int offset, int level);
         /* note op_ztrigger.c is present even in non-GTM_TRIGGER UNIX environments but is not runnable */
 void	op_ztrigger(void);
 #	endif
+void	op_zhalt(mval *returncode);
 void	op_zhelp_xfr(mval *subject, mval *lib);
 void	op_zlink(mval *v, mval *quals);
 void	op_zmess(UNIX_ONLY(unsigned int cnt) VMS_ONLY(int4 errnum), ...);

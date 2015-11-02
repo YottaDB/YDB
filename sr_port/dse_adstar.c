@@ -55,7 +55,6 @@ void dse_adstar(void)
 	blk_segment	*bs1, *bs_ptr;
 	int4		blk_seg_cnt, blk_size;
 	short		rsize;
-	cw_set_element  *cse;
 	srch_blk_status	blkhist;
 
 	error_def(ERR_DBRDONLY);
@@ -127,7 +126,7 @@ void dse_adstar(void)
 		return;
 	}
 	t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)lbp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-	BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cse, cs_addrs->ti->curr_tn);
+	BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cs_addrs->ti->curr_tn);
 	t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 
 	free(lbp);

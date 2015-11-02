@@ -189,24 +189,12 @@ STATICFNDEF void gt_timers_alloc(void)
 }
 
 /*
- * --------------------------------------
- * Initialize group of timer blocks
- * --------------------------------------
+ * Do the initialization of block_sigsent and blockalrm, and set blocksig_initialized to TRUE, so
+ * that we can later block signals when there is a need. This function should be called very early
+ * in the main() routines of modules that wish to do their own interrupt handling.
  */
-void	prealloc_gt_timers(void)
+void set_blocksig(void)
 {
-
-	/* Preallocate some timer blocks. This will be all the timer blocks we hope to need.
-	 * Allocate them with 8 bytes of possible data each.
-	 * If more timer blocks are needed, we will allocate them as needed.
-	 */
-#ifdef __MVS__
-	gtm_zos_HZ == sysconf(_SC_CLK_TCK);	/* get the real value */
-#endif
-
-	gt_timers_alloc();	/* Allocate timers */
-
-	/* While we are initializing things, initialize blockalrm and block_sigsent */
 	sigemptyset(&blockalrm);
 	sigaddset(&blockalrm, SIGALRM);
 
@@ -219,6 +207,25 @@ void	prealloc_gt_timers(void)
 	sigaddset(&block_sigsent, SIGALRM);
 
 	blocksig_initialized = TRUE;	/* note the fact that blockalrm and block_sigsent are initialized */
+}
+
+/*
+ * --------------------------------------
+ * Initialize group of timer blocks
+ * --------------------------------------
+ */
+void prealloc_gt_timers(void)
+{
+
+	/* Preallocate some timer blocks. This will be all the timer blocks we hope to need.
+	 * Allocate them with 8 bytes of possible data each.
+	 * If more timer blocks are needed, we will allocate them as needed.
+	 */
+#ifdef __MVS__
+	gtm_zos_HZ == sysconf(_SC_CLK_TCK);	/* get the real value */
+#endif
+
+	gt_timers_alloc();	/* Allocate timers */
 }
 
 /*

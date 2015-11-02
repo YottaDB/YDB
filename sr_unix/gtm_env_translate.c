@@ -20,7 +20,6 @@
 #include "gtm_env_xlate_init.h"
 
 GBLREF mstr	env_gtm_env_xlate;
-GBLREF int	(*gtm_env_xlate_entry)();
 GBLREF mval	dollar_zdir;
 
 error_def(ERR_XTRNTRANSERR);
@@ -36,16 +35,18 @@ mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 	char		pakname[PATH_MAX + 1];
 	void_ptr_t	pakhandle;
 	MSTR_CONST(routine_name, GTM_ENV_XLATE_ROUTINE_NAME);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (0 != env_gtm_env_xlate.len)
 	{
 		MV_FORCE_STR(val2);
-		if (NULL == gtm_env_xlate_entry)
+		if (NULL == RFPTR(gtm_env_xlate_entry))
 		{
 			memcpy(pakname, env_gtm_env_xlate.addr, env_gtm_env_xlate.len);
 			pakname[env_gtm_env_xlate.len]='\0';
 			pakhandle = fgn_getpak(pakname, ERROR);
-			gtm_env_xlate_entry = (int (*)())fgn_getrtn(pakhandle, &routine_name, ERROR);
+			SFPTR(gtm_env_xlate_entry, (fgnfnc)fgn_getrtn(pakhandle, &routine_name, ERROR));
 			/* With Unicode mstr changes, xc_string_t is no longer compatible with mstr
 			 * so explicit copy of len/addr fields required */
 		}
@@ -56,7 +57,7 @@ mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 		in3.length = dollar_zdir.str.len;
 		in3.address = dollar_zdir.str.addr;
 		out.address = NULL;
-		ret_gtm_env_xlate = (*gtm_env_xlate_entry)(&in1, &in2, &in3, &out);
+		ret_gtm_env_xlate = IVFPTR(gtm_env_xlate_entry)(&in1, &in2, &in3, &out);
 		val_xlated->str.len = (mstr_len_t)out.length;
 		val_xlated->str.addr = out.address;
 		if (MAX_DBSTRLEN < val_xlated->str.len)
@@ -65,7 +66,7 @@ mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 		{
 			if ((val_xlated->str.len) && (val_xlated->str.addr))
 				rts_error(VARLSTCNT(6) ERR_XTRNTRANSERR, 0, ERR_TEXT,  2,
-						val_xlated->str.len, val_xlated->str.addr);
+					  val_xlated->str.len, val_xlated->str.addr);
 			else
 				rts_error(VARLSTCNT(1) ERR_XTRNTRANSERR);
 		}

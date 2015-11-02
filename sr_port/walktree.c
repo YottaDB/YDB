@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,10 +14,15 @@
 
 void walktree(mvar *n,void (*f)(),char *arg)
 {
-if (n->lson)
-	walktree(n->lson,f,arg);
-(*f)(n,arg);
-if (n->rson)
-	walktree(n->rson,f,arg);
-return;
+	while (TRUE)
+	{
+		if (n->lson)
+			walktree(n->lson,f,arg);
+		(*f)(n,arg);
+		if (n->rson)
+			n = n->rson;
+		else
+			break;
+	}
+	return;
 }

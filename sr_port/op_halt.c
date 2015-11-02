@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,8 +43,8 @@ void op_halt(void)
 		zposition.mvtype = 0;   /* It's not an mval yet till getzposition fills it in */
 		getzposition(&zposition);
 		assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
-		send_msg(VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("HALT"),
-			 zposition.str.len, zposition.str.addr);
+		send_msg(VARLSTCNT(9) ERR_PROCTERM, 7, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("HALT"),
+			 0, zposition.str.len, zposition.str.addr);
 	}
 #	endif
 	exit(0);

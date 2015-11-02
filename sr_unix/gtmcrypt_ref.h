@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +72,7 @@ typedef gcry_cipher_hd_t	crypt_key_t;
 #define GTM_DBKEYS		"gtm_dbkeys"
 #define DOT_GTM_DBKEYS		"."GTM_DBKEYS
 #define PASSWD_EMPTY		"Environment variable gtm_passwd set to empty string. Password prompting not allowed for utilites"
-#define GTM_PATH_MAX 		512
+#define GTM_PATH_MAX		1024
 #define GTM_KEY_MAX		32
 #define GTMCRYPT_HASH_LEN	64
 #define GTMCRYPT_HASH_HEX_LEN	GTMCRYPT_HASH_LEN * 2

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -78,3 +78,4 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 #ifdef GTM_TRIGGER
 ,INDIR(indir_ztrigger,		m_ztrigger,	0)
 #endif
+,INDIR(indir_zhalt,		m_zhalt,	0)

@@ -38,7 +38,6 @@
 #include "stp_parms.h"
 #include "create_fatal_error_zshow_dmp.h"
 
-GBLREF void		(*create_fatal_error_zshow_dmp_fp)();
 GBLREF void		(*ctrlc_handler_ptr)();
 GBLREF void		(*tp_timeout_action_ptr)(void);
 GBLREF void		(*tp_timeout_clear_ptr)(void);
@@ -56,7 +55,9 @@ void init_gtm(void)
 	struct startup_vector   svec;
 	DEBUG_ONLY(mval		chkmval;)
 	DEBUG_ONLY(mval		chkmval_b;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* We believe much of our code depends on these relationships.  */
 	assert(SIZEOF(int) == 4);
 	assert(SIZEOF(int4) == 4);
@@ -80,7 +81,7 @@ void init_gtm(void)
 	assert(SIZEOF(chkmval.fnpc_indx) == SIZEOF(chkmval_b.fnpc_indx));
 	assert(OFFSETOF(mval, fnpc_indx) == OFFSETOF(mval_b, fnpc_indx));
 
-	create_fatal_error_zshow_dmp_fp = create_fatal_error_zshow_dmp;
+	SFPTR(create_fatal_error_zshow_dmp_fptr, create_fatal_error_zshow_dmp);
 	tp_timeout_start_timer_ptr = tp_start_timer;
 	tp_timeout_clear_ptr = tp_clear_timeout;
 	tp_timeout_action_ptr = tp_timeout_action;

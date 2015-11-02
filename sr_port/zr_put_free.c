@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,14 +14,11 @@
 #include "gtm_string.h"
 
 #include "cache.h"
-#include "hashtab_objcode.h"
 #include "rtnhdr.h"
 #include "zbreak.h"
 #include "inst_flush.h"
 #include "private_code_copy.h"
 #include "gtm_text_alloc.h"
-
-GBLREF hash_table_objcode	cache_table;
 
 void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 {
@@ -34,21 +31,12 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 	assert(z_ptr >= zrecs->beg);
 	assert(z_ptr <= zrecs->free);
 	if (NULL != z_ptr->action)
-	{
+	{	/* An action exists, reduce our interest in it */
 		assert(z_ptr->action->zb_refcnt > 0);
 		z_ptr->action->zb_refcnt--;
 		if (0 == z_ptr->action->zb_refcnt)
-		{
-			if (0 == z_ptr->action->refcnt)
-			{
-				deleted = delete_hashtab_objcode(&cache_table, &z_ptr->action->src);
-				assert(deleted);
-				GTM_TEXT_FREE(z_ptr->action);
-			}
 			z_ptr->action = NULL;
-		}
 	}
-
 	/* In the generated code, change the offset in TRANSFER TABLE */
 #ifdef COMPLEX_INSTRUCTION_UPDATE
 	EXTRACT_AND_UPDATE_INST(z_ptr->mpc, z_ptr->m_opcode);
@@ -56,14 +44,14 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 	*z_ptr->mpc = z_ptr->m_opcode;
 #endif
 	inst_flush(z_ptr->mpc, SIZEOF(INST_TYPE));
-
 #ifdef USHBIN_SUPPORTED
 	if (((z_ptr == zrecs->beg) || !MIDENT_EQ((z_ptr - 1)->rtn, z_ptr->rtn)) &&
 	    (((z_ptr + 1) == zrecs->free) || !MIDENT_EQ((z_ptr + 1)->rtn, z_ptr->rtn)))
-	{ /* No more breakpoints in the routine we just removed a break from. */
-	  /* Note that since zrecs is sorted based on mpc, all breakpoints in a given routine are bunched together.
-	   * Hence, it is possible to determine if all breakpoints are deleted from a routine by checking the
-	   * preceding and succeeding entries of the one we are removing. */
+	{	/* No more breakpoints in the routine we just removed a break from. Note that since zrecs is sorted based
+		 * on mpc, all breakpoints in a given routine are bunched together. Hence, it is possible to determine
+		 * if all breakpoints are deleted from a routine by checking the preceding and succeeding entries of the
+		 * one we are removing.
+		 */
 		assert(0 != z_ptr->rtn->len);
 		rtn_str.len = z_ptr->rtn->len;
 		rtn_str.addr = z_ptr->rtn->addr;
@@ -76,7 +64,7 @@ void zr_put_free(z_records *zrecs, zbrk_struct *z_ptr)
 	/* potentially overlapped memory, use memmove, not memcpy */
 	memmove((char *)z_ptr, (char *)(z_ptr + 1), (zrecs->free - z_ptr) * SIZEOF(zbrk_struct));
 	if (zrecs->free == zrecs->beg)
-	{ /* all breaks gone, free space allocated for breakpoints */
+	{	/* all breaks gone, free space allocated for breakpoints */
 		free(zrecs->beg);
 		zrecs->beg = NULL;
 		zrecs->free = NULL;

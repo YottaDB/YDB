@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +17,18 @@
 #include "mprof.h"
 #include "min_max.h" /* necessary for MIN which is necessary for MIDENT_CMP */
 
+#define LEFT 	0
+#define RIGHT 	1
+#define NEITHER	-1
+#define BASE	1
+
+#define LESS	-1
+#define MORE	1
+#define EQUAL	0
+
 static mident	*tmp_rout_name, *tmp_label_name;
 
+/* Creates a new generic node in the MPROF tree based on the information passed in arg. */
 mprof_tree *new_node(trace_entry *arg)
 {
 	mprof_tree *tree;
@@ -44,322 +54,251 @@ mprof_tree *new_node(trace_entry *arg)
 		arg->label_name->addr = (char *) pcalloc((unsigned int)tmp_label_name->len);
 		memcpy(arg->label_name->addr, tmp_label_name->addr, tmp_label_name->len);
 	}
-
         tree = (mprof_tree *)pcalloc(SIZEOF(mprof_tree));
-	tree->e = *arg;
-	tree->e.count = tree->e.usr_time = tree->e.sys_time = 0;
-	tree->e.loop_level = tree->e.cur_loop_level = 0;
-	tree->link[0] = tree->link[1] = tree->loop_link = (mprof_tree *)NULL;
-	tree->bal = 0;
-	tree->cache = 0;
-
+	tree->e.rout_name = arg->rout_name;
+	tree->e.label_name = arg->label_name;
+	tree->e.line_num = arg->line_num;
+	tree->e.count = tree->e.usr_time = tree->e.sys_time = tree->e.loop_level = 0;
+	tree->e.raddr = NULL;
+	tree->link[LEFT] = tree->link[RIGHT] = tree->loop_link = NULL;
+	tree->desc_dir = NEITHER;
 	return tree;
 }
 
-#ifdef MPROF_DEBUGGING
-#define	MPROF_DEBUGGING 1
-#include "util.h"
-void mprof_print_entryref(mident *rout, mident *lab, int line)
+/* Creates a FOR-specific node in the MPROF tree based on the information passed in arg and
+ * return_address for this loop. */
+mprof_tree *new_for_node(trace_entry *arg, char *ret_addr)
 {
-	if (rout->addr) util_out_print("(!AD, ", FALSE, rout->len, rout->addr);
-	if (lab->addr) util_out_print("!AD, ", FALSE, lab->len, lab->addr);
-	util_out_print("!SL) ", FALSE, line);
-	util_out_print("[0x!XJ,0x!XJ]", FALSE, rout,lab);
+	mprof_tree *node;
+
+	node = (mprof_tree *)new_node(arg);
+	node->e.raddr = (char *)ret_addr;
+	return node;
 }
 
-void mprof_tree_print(mprof_tree *tree, int tabs, int longl)
+void mprof_tree_walk(mprof_tree *node)
 {
-	/*
-	 * This is a debugging function. It MUST NOT be called for normal behaviour.
-	 * It prints the mprof_tree, in a structured way. It does not print every field of the structure.
-	 *
-	 * longl:
-	 * -1 means do not recurse the whole tree
-	 * 1  means write the output indented appropriately
-	 * 0  means do not indent
-	 *
-	 * tabs: shows the number of tabs to indent (i.e. level of root)
-	 */
-#define PRINTTABS       if (longl) for (x=0;x<tabs;x++) util_out_print("\t", FALSE)
-#define PRINTNL         if (longl) util_out_print("", TRUE)
-#define PRINTLB		PRINTNL; PRINTTABS; util_out_print("(", FALSE);
-#define PRINTRB		PRINTNL; PRINTTABS; util_out_print(")", FALSE);
-        mprof_tree 	*p = tree;
-        mprof_tree 	*tmp_te;
-        mprof_tree 	*tmp_tmp;
-	int x = 0;
+	mprof_tree *loop_link;
 
-
-	if (p != NULL)
+	while (TRUE)
 	{
-		util_out_print("[", FALSE);
-		mprof_print_entryref(p->e.rout_name, p->e.label_name, p->e.line_num);
-		util_out_print("<c: !SL, fc: !SL, ll: !SL, cll: !SL>", FALSE, p->e.count, p->e.for_count,
-				p->e.loop_level, p->e.cur_loop_level);
-		tmp_tmp = p->loop_link;
-		tmp_te = p->loop_link;
-		while (tmp_te != '\0')
+		if (NULL != node->link[LEFT])
+			mprof_tree_walk(node->link[LEFT]);
+		crt_gbl(node, FALSE);
+		loop_link = node->loop_link;
+		while (NULL != loop_link)
 		{
-			util_out_print("<one more: ", FALSE);
-			util_out_print("!SL,!SL,!SL,!SL> ", FALSE, tmp_te->e.count, tmp_te->e.for_count,
-					tmp_te->e.loop_level, tmp_te->e.cur_loop_level);
-			tmp_te=tmp_te->loop_link;
+			crt_gbl(loop_link, TRUE);
+			loop_link = loop_link->loop_link;
 		}
-		if (0 > longl)
-		{
-			util_out_print("", TRUE);
-			return;
-		}
-		PRINTLB;
-		mprof_tree_print(p->link[0], tabs+1, longl);
-		PRINTRB;
-		PRINTLB;
-		mprof_tree_print(p->link[1], tabs+1, longl);
-		PRINTRB;
-	}
-	else
-		util_out_print(".", FALSE);
-
-}
-#endif /* MPROF_DEBUGGING */
-
-static mprof_tree 	*lastp, *topp;	/* for debugging segv chasing pointers */
-static int 		mproftreeheight;	/* keep in static for debugging */
-
-void mprof_tree_walk(mprof_tree *tree)
-{
-	mprof_tree *an[MAX_MPROF_TREE_HEIGHT]; 	/* Stack A: nodes */
-	mprof_tree **ap = an;			/* Stack A: stack pointer */
-	mprof_tree *p = tree->link[0];
-	mprof_tree *tmp_p;
-
-	error_def(ERR_MAXTRACEHEIGHT);
-
-	assert(tree);
-	mproftreeheight = 0;
-
-	for ( ; ; )
-	{
-		while (NULL != p)
-		{
-			if (&an[MAX_MPROF_TREE_HEIGHT - 1] < ap)
-			{
-				if (!mproftreeheight)	/* first time */
-					rts_error(VARLSTCNT(3) ERR_MAXTRACEHEIGHT, 1, MAX_MPROF_TREE_HEIGHT);
-				mproftreeheight++;
-				lastp = p;
-				assert(FALSE);
-				break;
-			}
-
-			*ap++ = p;
-			p = p->link[0];
-		}
-		if (ap == an)
-			return;
-		p = *--ap;
-		topp = p;
-		crt_gbl(p, 0);
-		tmp_p =  p->loop_link;
-		if (0 != p->e.cur_loop_level)
-			while (NULL != tmp_p)
-			{
-				lastp = tmp_p;
-				tmp_p->e.loop_level +=  p->e.cur_loop_level;
-				tmp_p =  tmp_p->loop_link;
-			}
-
-		tmp_p =  p->loop_link;
-		if ((NULL != tmp_p) && (0 != tmp_p->e.loop_level))
-		{
-			lastp = tmp_p;
-			crt_gbl(tmp_p, 1);
-			tmp_p =  tmp_p->loop_link;
-		}
-
-		while ((NULL != tmp_p) && (0 != tmp_p->e.loop_level))
-		{
-			lastp = tmp_p;
-			crt_gbl(tmp_p, 2);
-			tmp_p = tmp_p->loop_link;
-		}
-		p = p->link[1];
-	}
-}
-
-static mprof_tree *mprof_tree_find_node(mprof_tree *tree, trace_entry *arg)
-{
-	mprof_tree 	*t, *s, *p, *q, *r;
-	int		diff;
-
-	t = tree;
-	s = p = t->link[0];
-
-	if (s)
-	{
-		for ( ; ; )
-		{
-			if (p->e.rout_name == arg->rout_name)
-				diff = 0;
-			else
-			{
-				MIDENT_CMP(p->e.rout_name, arg->rout_name, diff);
-				if (0 == diff)
-				{ /* it's the same routine name, so they need not be different memory locations */
-					arg->rout_name = p->e.rout_name;
-				}
-			}
-			if (0 == diff)
-			{
-				if (p->e.label_name == arg->label_name)
-					diff = 0;
-				else
-				{
-					MIDENT_CMP(p->e.label_name, arg->label_name, diff);
-					if (0 == diff)
-					{ /* it's the same label name, so they need not be different memory locations */
-						arg->label_name = p->e.label_name;
-					}
-				}
-				if (0 == diff)
-					diff = arg->line_num - p->e.line_num;
-			}
-
-			if (0 > diff)
-			{
-				p->cache = 0;
-				q = p->link[0];
-				if (!q)
-				{
-					p->link[0] = q = new_node(arg);
-					break;
-				}
-			}
-			else if (0 < diff)
-			{
-				p->cache = 1;
-				q = p->link[1];
-				if (!q)
-				{
-					p->link[1] = q = new_node(arg);
-					break;
-				}
-			}
-			else
-				return p;
-			if (0 != q->bal)
-				t = p, s = q;
-			p = q;
-		}
-		r = p = s->link[s->cache];
-		while (p != q)
-		{
-			p->bal = (p->cache*2) - 1;
-			p = p->link[p->cache];
-		}
-		if (0 == s->cache)
-		{
-			if (0 == s->bal)
-			{
-				s->bal = -1;
-				return q;
-			}
-			else if (1 == s->bal)
-			{
-				s->bal = 0;
-				return q;
-			}
-			assert (-1 == s->bal);
-			if (-1 == r->bal)
-			{
-				p = r;
-				s->link[0] = r->link[1];
-				r->link[1] = s;
-				s->bal = r->bal = 0;
-			}
-			else
-			{
-				assert(r->bal == 1);
-				p = r->link[1];
-				r->link[1] = p->link[0];
-				p->link[0] = r;
-				s->link[0] = p->link[1];
-				p->link[1] = s;
-				if (-1 == p->bal)
-					s->bal = 1, r->bal = 0;
-				else if (0 == p->bal)
-					s->bal = r->bal = 0;
-				else
-				{
-					assert(1 == p->bal);
-					s->bal = 0, r->bal = -1;
-				}
-				p->bal = 0;
-			}
-		}
+		if (NULL != node->link[RIGHT])
+			node = node->link[RIGHT];
 		else
-		{
-      			if (0 == s->bal)
-        		{
-          			s->bal = 1;
-          			return q;
-        		}
-      			else if (-1 == s->bal)
-        		{
-          			s->bal = 0;
-          			return q;
-        		}
-
-      			assert (1 == s->bal);
-      			if (1 == r->bal)
-        		{
-          			p = r;
-          			s->link[1] = r->link[0];
-          			r->link[0] = s;
-          			s->bal = r->bal = 0;
-        			}
-      			else
-        		{
-				assert (r->bal == -1);
-          			p = r->link[0];
-          			r->link[0] = p->link[1];
-          			p->link[1] = r;
-          			s->link[1] = p->link[0];
-          			p->link[0] = s;
-          			if (1 == p->bal)
-            				s->bal = -1, r->bal = 0;
-          			else if (0 == p->bal)
-            				s->bal = r->bal = 0;
-          			else
-            			{
-              				assert (-1 == p->bal);
-              				s->bal = 0, r->bal = 1;
-            			}
-          			p->bal = 0;
-			}
-		}
-		if (t != tree && s == t->link[1])
-			t->link[1] = p;
-		else
-			t->link[0] = p;
+			break;
 	}
+}
+
+/* Does a single left or right rotation, depending on the index passed. The diagram
+ * of the rotation (for index == RIGHT) is presented below:
+ *
+ *       B                      D
+ *      / \                    / \
+ *     A   D      ==>         B   E
+ *        / \                / \
+ *       C   E              A   C
+ */
+static mprof_tree *rotate_2(mprof_tree **path_top, int index)
+{
+	mprof_tree *B, *C, *D, *E;
+
+	B = *path_top;
+	D = B->link[index];
+	C = D->link[BASE - index];
+	E = D->link[index];
+	*path_top = D;
+	D->link[BASE - index] = B;
+	B->link[index] = C;
+	B->desc_dir = NEITHER;
+	D->desc_dir = NEITHER;
+	return E;
+}
+
+/* Does a double left or right rotation, depending on the index passed. The diagram
+ * of the rotation (for index == RIGHT) is presented below:
+ *
+ *       B                            _D_
+ *      / \                          /   \
+ *     A   F                        B     F
+ *        / \      ===>            / \   / \
+ *       D   G                    A   C  E  G
+ *      / \
+ *     C   E
+ */
+static mprof_tree *rotate_3(mprof_tree **path_top, int index, int third)
+{
+	mprof_tree *B, *C, *D, *E, *F;
+
+	B = *path_top;
+	F = B->link[index];
+	D = F->link[BASE - index];
+	/* nodes C and E can be NULL */
+	C = D->link[BASE - index];
+	E = D->link[index];
+	*path_top = D;
+	D->link[BASE - index] = B;
+	D->link[index] = F;
+	B->link[index] = C;
+	F->link[BASE - index] = E;
+	D->desc_dir = NEITHER;
+	/* assume both subtrees are balanced */
+	B->desc_dir = F->desc_dir = NEITHER;
+	/* tree became balanced */
+	if (third == NEITHER)
+		return NULL;
+	if (third == index)
+	{
+		/* E holds the insertion so B is now unbalanced */
+		B->desc_dir = BASE - index;
+		return E;
+	} else
+	{
+		/* C holds the insertion so F is now unbalanced */
+		F->desc_dir = index;
+		return C;
+	}
+}
+
+/* Compares the contents of the specified node with the information stored in arg.
+ * Returns 0 on a match, 1 if arg was evaluated as "greater" than node, and -1 if otherwise. */
+static int mprof_tree_compare(mprof_tree *node, trace_entry *arg)
+{
+	int diff;
+
+	if (node->e.rout_name == arg->rout_name)
+		diff = EQUAL;
 	else
 	{
-		q = t->link[0] = new_node(arg);
-		q->link[0] = q->link[1] = NULL;
-		q->bal = 0;
+		MIDENT_CMP(node->e.rout_name, arg->rout_name, diff);
+		/* it's the same routine name, so they need not be different memory locations */
+		if (EQUAL == diff)
+			arg->rout_name = node->e.rout_name;
 	}
+	/* the routine names are the same */
+	if (EQUAL == diff)
+	{
+		/* pointers to the label name are the same */
+		if (node->e.label_name == arg->label_name)
+			diff = EQUAL;
+		else
+		{
+			MIDENT_CMP(node->e.label_name, arg->label_name, diff);
+			/* it's the same label name, so they need not be different memory locations */
+			if (EQUAL == diff)
+				arg->label_name = node->e.label_name;
+		}
+		/* the label names are the same */
+		if (EQUAL == diff)
+		{
+			diff = arg->line_num - node->e.line_num;
 
-	return q;
+			if (EQUAL != diff)
+				diff = diff > EQUAL ? MORE : LESS;
+		}
+	}
+	return diff;
 }
 
-mprof_tree  *mprof_tree_insert(mprof_tree *tree, trace_entry *arg)
+/* Adjusts the descending directions for nodes in the path in which the node has just been added */
+static void mprof_tree_rebalance_path(mprof_tree *path, trace_entry *arg)
 {
-	mprof_tree *p;
+	int diff;
+
+	/* Each node in path is currently balanced, so we will descend in the direction
+	 * of the newly inserted node, marking every node as unbalanced in that direction
+	 * along the way. */
+	while (path)
+	{
+		diff = mprof_tree_compare(path, arg);
+
+		if (EQUAL == diff)
+			break;
+
+		path->desc_dir = (EQUAL < diff ? RIGHT : LEFT);
+		path = path->link[path->desc_dir];
+	}
+}
+
+/* Determines at which point (if any) tree became unbalanced, and balances it. */
+static void mprof_tree_rebalance(mprof_tree **path_top, trace_entry *arg)
+{
+	mprof_tree *path;
+	int first, second, third, diff;
+
+	path = *path_top;
+
+	/* entire tree is balanced, so only update desc_dir */
+	if (NEITHER == path->desc_dir) {
+		mprof_tree_rebalance_path(path, arg);
+		return;
+	}
+	/* we still had the room for the new node, so only update desc_dir */
+	first = EQUAL < mprof_tree_compare(path, arg) ? RIGHT : LEFT;
+	if (path->desc_dir != first) {
+		path->desc_dir = NEITHER;
+		mprof_tree_rebalance_path(path->link[first], arg);
+		return;
+	}
+	/* tree became unbalanced, but it is a simpler case, so we need a single rotation */
+	second = EQUAL < mprof_tree_compare(path->link[first], arg) ? RIGHT : LEFT;
+	if (first == second) {
+		path = rotate_2(path_top, first);
+		mprof_tree_rebalance_path(path, arg);
+		return;
+	}
+	/* we will need a double rotation */
+	path = path->link[first]->link[second];
+	diff = mprof_tree_compare(path, arg);
+
+	if (EQUAL == diff)
+		third = NEITHER;	/* node we are interested in is the node we just added */
+	else
+		third = EQUAL < diff ? RIGHT : LEFT; /* node was added in the sibling spot of the parent node */
+	path = rotate_3(path_top, first, third);
+	mprof_tree_rebalance_path(path, arg);
+}
+
+/* Attempts to find a node that matches arg's specification. If the node is not found, we
+ * create one; in either case the pointer to the desired node is returned. */
+mprof_tree  *mprof_tree_insert(mprof_tree **treep, trace_entry *arg)
+{
+	int 		diff;
+	mprof_tree 	*tree = *treep;
+	mprof_tree 	**path_top = treep;
 
 	tmp_rout_name = arg->rout_name;
 	tmp_label_name = arg->label_name;
-	p = mprof_tree_find_node(tree, arg);
+
+	while (tree)
+	{
+		diff = mprof_tree_compare(tree, arg);
+
+		if (EQUAL == diff)
+			break;
+
+		if (NEITHER != tree->desc_dir)
+			path_top = treep;
+
+		treep = &tree->link[EQUAL < diff ? RIGHT : LEFT];
+		tree = *treep;
+	}
+	/* did not find the node; will create one */
+	if (NULL == tree)
+	{
+		tree = new_node(arg);
+		tree->desc_dir = NEITHER;
+		*treep = tree;
+		mprof_tree_rebalance(path_top, arg);
+	}
 
 	/* If the rout_name or label_name already exists in the tree, it would have been changed to point to the reused
 	 * name in the tree. Otherwise, if it doesn't already exist in the tree, new_node() would have created new copies
@@ -367,5 +306,5 @@ mprof_tree  *mprof_tree_insert(mprof_tree *tree, trace_entry *arg)
 	assert(tmp_rout_name != arg->rout_name);
 	assert(tmp_label_name != arg->label_name);
 	tmp_rout_name = tmp_label_name = NULL;
-	return p;
+	return tree;
 }

@@ -48,10 +48,10 @@ typedef struct
 													\
 	lcl_str1Len = STR1LEN;										\
 	lcl_str2Len = STR2LEN;										\
-	if (lcl_str1Len == lcl_str2Len)									\
+	if (lcl_str1Len < lcl_str2Len)									\
 	{												\
 		lcl_minLen = lcl_str1Len;								\
-		lcl_retVal = 0;										\
+		lcl_retVal = -1;									\
 	} else if (lcl_str1Len > lcl_str2Len)								\
 	{												\
 		lcl_minLen = lcl_str2Len;								\
@@ -59,7 +59,7 @@ typedef struct
 	} else												\
 	{												\
 		lcl_minLen = lcl_str1Len;								\
-		lcl_retVal = -1;									\
+		lcl_retVal = 0;										\
 	}												\
 	RESULT = (0 == (lcl_retVal2 = memcmp(STR1, STR2, lcl_minLen))) ? lcl_retVal : lcl_retVal2;	\
 }
@@ -347,7 +347,7 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define MV_NUM_APPROX	 8	/* 0x0008 */	/* bit set implies value is guaranteed to be part number, part string */
 #define	MV_CANONICAL    16	/* 0x0010
 				 * Note: this bit is set currently only for mvals corresponding to local variable subscripts
-				 * in tree.c/tree.h. This bit should not be examined/relied-upon anywhere outside tree.c
+				 * in lv_tree.c/lv_tree.h. This bit should not be examined/relied-upon anywhere outside lv_tree.c
 				 */
 #define MV_SYM		32	/* 0x0020 */
 #define MV_SUBLIT	64	/* 0x0040 */
@@ -369,7 +369,7 @@ typedef long		ulimit_t;	/* NOT int4; the Unix ulimit function returns a value of
 #define MV_LVCOPIED	0xf000
 
 /* A few more special definitions */
-#define	MV_LV_TREE	0xf001
+#define	MV_LV_TREE	0xf001		/* An "lvTree" structure has its "ident" field set to this special value */
 
 #define MV_XBIAS	62
 #define MV_XZERO	 0
@@ -476,9 +476,12 @@ mval *underr (mval *start, ...);
 #define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = 0xff,		\
 				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
 
+/* The MVTYPE_IS_* macros are similar to the MV_IS_* macros except that the input is an mvtype instead of an "mval *".
+ * In the caller, use appropriate macro depending on available input. Preferable to use the MVTYPE_IS_* variant to avoid
+ * the (X)->mvtype dereference */
 #define MVTYPE_IS_NUMERIC(X)	(0 != ((X) & MV_NM))
-#define MVTYPE_IS_NUM_APPROX(X)	(0 != ((X) & MV_NUM_APPROX))
 #define MVTYPE_IS_INT(X)	(0 != ((X) & MV_INT))
+#define MVTYPE_IS_NUM_APPROX(X)	(0 != ((X) & MV_NUM_APPROX))
 #define MVTYPE_IS_STRING(X)	(0 != ((X) & MV_STR))
 
 /* DEFINE_MVAL_LITERAL is intended to be used to define a string mval where the string is a literal or defined with type

@@ -926,7 +926,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 		{
 			if (EREPL_RECV == repl_errno)
 			{
-				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
+				if (REPL_CONN_RESET(status))
 				{	/* Connection reset */
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
 						"Connection reset while attempting to receive %s message. Status = %d ; %s\n",

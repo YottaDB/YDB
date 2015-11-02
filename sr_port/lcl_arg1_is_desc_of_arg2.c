@@ -16,7 +16,7 @@
 boolean_t lcl_arg1_is_desc_of_arg2(lv_val *cur, lv_val *ref)
 {
 	lv_val		*lv;
-	tree		*lvt;
+	lvTree		*lvt;
 
 	if (cur == ref)
 		return TRUE;
@@ -24,7 +24,7 @@ boolean_t lcl_arg1_is_desc_of_arg2(lv_val *cur, lv_val *ref)
 	while (!LV_IS_BASE_VAR(lv))
 	{
 		lvt = LV_GET_PARENT_TREE(lv);
-		lv = (lv_val *)lvt->sbs_parent;
+		lv = (lv_val *)LVT_PARENT(lvt);
 		if (lv == ref)
 			return TRUE;
 	}

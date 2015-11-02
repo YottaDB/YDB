@@ -26,6 +26,9 @@ GBLREF	symval			*curr_symval;
 GBLREF	mval			**ind_result_sp, **ind_result_top;
 LITREF	mval			literal_null;
 
+error_def(ERR_INDMAXNEST);
+error_def(ERR_UNDEF);
+
 void	op_indglvn(mval *v,mval *dst)
 {
 	bool		rval;
@@ -34,9 +37,6 @@ void	op_indglvn(mval *v,mval *dst)
 	icode_str	indir_src;
 	var_tabent	targ_key;
 	ht_ent_mname	*tabent;
-
-	error_def(ERR_INDMAXNEST);
-	error_def(ERR_UNDEF);
 
 	MV_FORCE_STR(v);
 	indir_src.str = v->str;
@@ -49,7 +49,7 @@ void	op_indglvn(mval *v,mval *dst)
 			COMPUTE_HASH_MNAME(&targ_key);
 			tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &targ_key);
 			assert(NULL == tabent ||  NULL != tabent->value);
-			if (!tabent || !MV_DEFINED(&((lv_val *)tabent->value)->v))
+			if (!tabent || !LV_IS_VAL_DEFINED(tabent->value))
 			{
 				if (undef_inhibit)
 				{

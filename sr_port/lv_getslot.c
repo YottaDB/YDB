@@ -66,17 +66,17 @@ lv_val *lv_getslot(symval *sym)
 	return lv;
 }
 
-tree *lvtree_getslot(symval *sym)
+lvTree *lvtree_getslot(symval *sym)
 {
 	lv_blk		*p,*q;
-	tree		*lvt;
+	lvTree		*lvt;
 	unsigned int	numElems, numUsed;
 
 	numElems = MAXUINT4;	/* maximum value */
 	if (lvt = sym->lvtree_flist)
 	{
 		assert(NULL == LVT_GET_PARENT(lvt));
-		sym->lvtree_flist = (tree *)lvt->avl_root;
+		sym->lvtree_flist = (lvTree *)lvt->avl_root;
 	} else
 	{
 		for (p = sym->lvtree_first_block; ; p = p->next)
@@ -93,7 +93,7 @@ tree *lvtree_getslot(symval *sym)
 			}
 			if ((numUsed = p->numUsed) < p->numAlloc)
 			{
-				lvt = (tree *)LV_BLK_GET_BASE(p);
+				lvt = (lvTree *)LV_BLK_GET_BASE(p);
 				lvt = &lvt[numUsed];
 				p->numUsed++;
 				break;
@@ -103,21 +103,21 @@ tree *lvtree_getslot(symval *sym)
 		}
 	}
 	assert(lvt);
-	DBGRFCT((stderr, ">> lvtree_getslot(): Allocating new tree at 0x"lvaddr" by routine 0x"lvaddr"\n", lvt, caller_id()));
+	DBGRFCT((stderr, ">> lvtree_getslot(): Allocating new lvTree at 0x"lvaddr" by routine 0x"lvaddr"\n", lvt, caller_id()));
 	return lvt;
 }
 
-treeNode *lvtreenode_getslot(symval *sym)
+lvTreeNode *lvtreenode_getslot(symval *sym)
 {
 	lv_blk		*p,*q;
-	treeNode	*lv;
+	lvTreeNode	*lv;
 	unsigned int	numElems, numUsed;
 
 	numElems = MAXUINT4;	/* maximum value */
 	if (lv = sym->lvtreenode_flist)
 	{
 		assert(NULL == LV_PARENT(lv));	/* stp_gcol relies on this for correct garbage collection */
-		sym->lvtreenode_flist = (treeNode *)lv->sbs_child;
+		sym->lvtreenode_flist = (lvTreeNode *)lv->sbs_child;
 	} else
 	{
 		for (p = sym->lvtreenode_first_block; ; p = p->next)
@@ -134,7 +134,7 @@ treeNode *lvtreenode_getslot(symval *sym)
 			}
 			if ((numUsed = p->numUsed) < p->numAlloc)
 			{
-				lv = (treeNode *)LV_BLK_GET_BASE(p);
+				lv = (lvTreeNode *)LV_BLK_GET_BASE(p);
 				lv = &lv[numUsed];
 				p->numUsed++;
 				break;
@@ -144,7 +144,7 @@ treeNode *lvtreenode_getslot(symval *sym)
 		}
 	}
 	assert(lv);
-	DBGRFCT((stderr, ">> lvtreenode_getslot(): Allocating new treeNode at 0x"lvaddr" by routine 0x"lvaddr"\n",
+	DBGRFCT((stderr, ">> lvtreenode_getslot(): Allocating new lvTreeNode at 0x"lvaddr" by routine 0x"lvaddr"\n",
 			lv, caller_id()));
 	return lv;
 }

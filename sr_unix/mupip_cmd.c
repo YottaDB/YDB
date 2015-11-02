@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -492,7 +492,8 @@ static CLI_ENTRY	updproc_qual[] = {
 };
 
 static	CLI_ENTRY	inst_cre_qual[] = {
-	{"NAME", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0 },
+	{"NAME", 	0, 0, 0, 0, 0, 0, VAL_REQ, 		0, NON_NEG, VAL_STR, 0 },
+	{"NOREPLACE", 	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 	0, NON_NEG, VAL_N_A, 0 },
 	{ 0 }
 };
 

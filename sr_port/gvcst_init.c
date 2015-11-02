@@ -255,6 +255,7 @@ void gvcst_init(gd_region *greg)
 	{
 		if (NULL == prev_reg || (gd_region *)-1L == prev_reg) /* (gd_region *)-1 == prev_reg => cm region open attempted */
 			return;
+		/* Found same database already open - prev_reg contains addr of originally openned region */
 		greg->dyn.addr->file_cntl = prev_reg->dyn.addr->file_cntl;
 		memcpy(greg->dyn.addr->fname, prev_reg->dyn.addr->fname, prev_reg->dyn.addr->fname_len);
 		greg->dyn.addr->fname_len = prev_reg->dyn.addr->fname_len;
@@ -503,8 +504,13 @@ void gvcst_init(gd_region *greg)
 	default:
 		GTMASSERT;
 	}
-	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
+	/* It is necessary that we do the pending gv_target list reallocation BEFORE db_common_init as the latter resets
+	 * greg->max_key_size to be equal to the csd->max_key_size and hence process_gvt_pending_list might wrongly conclude
+	 * that NO reallocation (since it checks greg->max_key_size with csd->max_key_size) is needed when in fact a
+	 * reallocation might be necessary (if the user changed max_key_size AFTER database creation)
+	 */
 	PROCESS_GVT_PENDING_LIST(greg, csa, gvt_pending_list);
+	db_common_init(greg, csa, csd);	/* do initialization common to db_init() and mu_rndwn_file() */
 
 	/* If we are not fully upgraded, see if we need to send a warning to the operator console about
 	   performance. Compatibility mode is a known performance drain. Actually, we can send one of two

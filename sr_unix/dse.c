@@ -102,6 +102,7 @@ int main(int argc, char *argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	set_blocksig();
 	gtm_imagetype_init(DSE_IMAGE);
 	gtm_wcswidth_fnptr = gtm_wcswidth;
 	gtm_env_init();	/* read in all environment variables */

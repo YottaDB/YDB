@@ -193,21 +193,29 @@ void repl_filter_error(seq_num filter_seqno, int why);
 	assert(0 < OUT_BUFSIZ);									\
 }
 
-#define INT_FILTER_RTS_ERROR(STATUS, FILTER_SEQNO)										\
-{																\
-	assert(SS_NORMAL != STATUS);												\
-	if (EREPL_INTLFILTER_BADREC == repl_errno)										\
-		rts_error(VARLSTCNT(1) ERR_REPLRECFMT);										\
-	else if (EREPL_INTLFILTER_DATA2LONG == repl_errno)									\
-		rts_error(VARLSTCNT(4) ERR_JNLSETDATA2LONG, 2, jnl_source_datalen, jnl_dest_maxdatalen);			\
-	else if (EREPL_INTLFILTER_NEWREC == repl_errno)										\
-		rts_error(VARLSTCNT(4) ERR_JNLNEWREC, 2, (unsigned int)jnl_source_rectype, (unsigned int)jnl_dest_maxrectype);	\
-	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)									\
-		rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);									\
-	else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)								\
-		rts_error(VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1, &FILTER_SEQNO);							\
-	else															\
-		GTMASSERT;													\
+#ifdef UNIX
+# define INT_FILTER_RTS_ERROR(FILTER_SEQNO)							\
+{												\
+	if (EREPL_INTLFILTER_BADREC == repl_errno)						\
+		rts_error(VARLSTCNT(1) ERR_REPLRECFMT);						\
+	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)					\
+		rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);					\
+	else if (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)				\
+		rts_error(VARLSTCNT(3) ERR_SECNODZTRIGINTP, 1, &FILTER_SEQNO);			\
+	else if (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno)				\
+		rts_error(VARLSTCNT(3) ERR_REPLNOMULTILINETRG, 1, &FILTER_SEQNO);		\
+	else											\
+		GTMASSERT;									\
 }
-
+#else
+# define INT_FILTER_RTS_ERROR(FILTER_SEQNO)							\
+{												\
+	if (EREPL_INTLFILTER_BADREC == repl_errno)						\
+		rts_error(VARLSTCNT(1) ERR_REPLRECFMT);						\
+	else if (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)					\
+		rts_error(VARLSTCNT(1) ERR_REPLGBL2LONG);					\
+	else											\
+		GTMASSERT;									\
+}
+#endif
 #endif

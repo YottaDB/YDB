@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,10 +16,14 @@
 #include "advancewindow.h"
 #include "compile_pattern.h"
 
-LITREF toktabtype tokentable[];
 GBLREF triple *curtchain;
 GBLREF char director_token, window_token;
+
+error_def(ERR_EXPR);
+error_def(ERR_RHMISSING);
+
 LITREF octabstruct oc_tab[];
+LITREF toktabtype tokentable[];
 
 int eval_expr(oprtype *a)
 {
@@ -29,8 +33,6 @@ int eval_expr(oprtype *a)
 	opctype i;
 	unsigned short type;
 	bool ind_pat;
-	error_def(ERR_RHMISSING);
-	error_def(ERR_EXPR);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -43,12 +45,26 @@ int eval_expr(oprtype *a)
 	while (i = tokentable[window_token].bo_type)
 	{
 		type = tokentable[window_token].opr_type;
-		if ((oc_tab[i].octype & OCT_BOOL) && !TREF(shift_side_effects))
+		if (oc_tab[i].octype & OCT_BOOL)
 		{
-			TREF(shift_side_effects) = TRUE;
-			for (ref = curtchain->exorder.bl; oc_tab[ref->opcode].octype & OCT_BOOL; ref = ref->exorder.bl)
-				;
-			TREF(expr_start) = TREF(expr_start_orig) = ref;
+			if (!TREF(shift_side_effects))
+			{
+				for (ref = curtchain->exorder.bl; oc_tab[ref->opcode].octype & OCT_BOOL; ref = ref->exorder.bl)
+					;
+				TREF(expr_start) = TREF(expr_start_orig) = ref;
+			}
+			switch (i)
+			{
+				case OC_NAND:
+				case OC_AND:
+				case OC_NOR:
+				case OC_OR:
+					TREF(shift_side_effects) = -TRUE;	/* "special" TRUE triggers warning in expritem */
+					break;
+				default:
+					if (!TREF(shift_side_effects))
+						TREF(shift_side_effects) = TRUE;
+			}
 		}
 		coerce(&x1, type);
 		if (OC_CAT == i)

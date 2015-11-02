@@ -256,12 +256,17 @@
 	} while(-1 == RC && EINTR == errno);	\
 }
 
-#define WAITPID(PID, STATUS, OPTS, RC)		\
-{						\
-	do					\
-	{					\
-	   RC = waitpid(PID, STATUS, OPTS);	\
-	} while(-1 == RC && EINTR == errno);	\
+#define WAITPID(PID, STATUS, OPTS, RC)											\
+{															\
+	/* Ensure that the incoming PID is non-zero. We currently don't know of any places where we want to invoke	\
+	 * waitpid with child PID being 0 as that would block us till any of the child spawned by this parent process	\
+	 * changes its state unless invoked with WNOHANG bit set. 							\
+	 */														\
+	assert(0 != PID);												\
+	do														\
+	{														\
+	   RC = waitpid(PID, STATUS, OPTS);										\
+	} while(-1 == RC && EINTR == errno);										\
 }
 
 #define WRITE_FILE(FD, BUF, SIZE, RC)		\

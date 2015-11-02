@@ -73,8 +73,8 @@ void op_zg1(int4 level)
 		zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
 		getzposition(&zposition);
 		assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
-		send_msg(VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("ZGOTO 0"),
-			 zposition.str.len, zposition.str.addr);
+		send_msg(VARLSTCNT(9) ERR_PROCTERM, 7, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("ZGOTO 0"),
+			 ERR_PROCTERM, zposition.str.len, zposition.str.addr);
 		exit(ERR_PROCTERM);
 	}
 	/* Find the frame we are unwinding to while counting the frames we need to unwind (which we will feed to

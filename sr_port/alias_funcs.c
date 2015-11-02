@@ -50,7 +50,7 @@
  */
 #define DECR_BASE_REF_LIGHT(lvp)					\
 {	/* Perform reference count maintenance for base var */		\
-	tree	*lvt_child;						\
+	lvTree	*lvt_child;						\
 									\
 	assert(LV_IS_BASE_VAR(lvp));					\
 	assert(0 < (lvp)->stats.trefcnt);				\
@@ -101,16 +101,13 @@
 	}											\
 }
 
-/* The following are variables used by the ALS_SCAN_FOR_CONTAINERS macro and als_scan_for_containers functions.
- * The global variables below are used to avoid the overhead of passing this down the recursion stack otherwise.
+/* Macro to mark an lv_val as reachable and process its descendants if any.
+ * Note that like the _CNTNRS_IN_TREE macros, in dbg mode, we will scan the array
+ * for containers even if has_aliascont flag is FALSE.
  */
-GBLREF	als_cntnr_fnptr_t	als_cntnr_fnptr_gbldef;
-GBLREF	void			*als_cntnr_arg1_gbldef, *als_cntnr_arg2_gbldef;
-GBLREF	int			als_cntnrs_cnt_gbldef;
-
-/* Macro to mark an lv_val as reachable and process its descendants if any */
 #define MARK_REACHABLE(lvp)										\
 {													\
+	lvTree	*lvt;											\
 	symval	*sym;											\
 													\
 	assert((lvp));											\
@@ -126,10 +123,10 @@ GBLREF	int			als_cntnrs_cnt_gbldef;
 		DBGRFCT((stderr, "\nMARK_REACHABLE: Marking lv 0x"lvaddr" as reachable\n",		\
 			 (lvp)));									\
 		(lvp)->stats.lvtaskcycle = lvtaskcycle;		/* Mark it */				\
-		if (LV_HAS_CHILD(lvp) PRO_ONLY(&& (lvp)->has_aliascont))				\
+		if ((NULL != (lvt = LV_GET_CHILD(lvp))) PRO_ONLY(&& (lvp)->has_aliascont))		\
 		{	/* And it has descendents to process */						\
 			DBGRFCT((stderr, "MARK_REACHABLE: Scanning same lv for containers\n"));		\
-			ALS_SCAN_FOR_CONTAINERS(lvp, &als_prcs_markreached_cntnr_node, NULL, NULL);	\
+			als_prcs_markreached_cntnr(lvt);						\
 		}											\
 	}												\
 }
@@ -155,15 +152,19 @@ GBLREF	int			als_cntnrs_cnt_gbldef;
 /* Macro to run a given tree looking for container vars. Process what they point to in order to make sure what they point to
  * doesn't live in the symbol tree being popped. If so, move to the current tree (copying if necessary). If what is being pointed
  * to was not passed through then it will not be put into the symbol table but will instead just be data pointed to by the
- * container var.
+ * container var. Like the _CNTNRS_IN_TREE macros, in dbg mode, we will scan the array for containers even if has_aliascont
+ * flag is FALSE.
  */
-#define RESOLV_ALIAS_CNTNRS_IN_TREE(LV_BASE, POPDSYMVAL, CURSYMVAL)								\
-{																\
-	if (LV_HAS_CHILD(LV_BASE) && ((LV_BASE)->stats.lvtaskcycle != lvtaskcycle) PRO_ONLY(&& (LV_BASE)->has_aliascont))	\
-	{															\
-		(LV_BASE)->stats.lvtaskcycle = lvtaskcycle;									\
-		ALS_SCAN_FOR_CONTAINERS(LV_BASE, &als_prcs_xnew_alias_cntnr_node, POPDSYMVAL, CURSYMVAL);			\
-	}															\
+#define RESOLV_ALIAS_CNTNRS_IN_TREE(LV_BASE, POPDSYMVAL, CURSYMVAL)					\
+{													\
+	lvTree	*lvt;											\
+													\
+	if ((NULL != (lvt = LV_GET_CHILD(LV_BASE))) && ((LV_BASE)->stats.lvtaskcycle != lvtaskcycle)	\
+		PRO_ONLY(&& (LV_BASE)->has_aliascont))							\
+	{												\
+		(LV_BASE)->stats.lvtaskcycle = lvtaskcycle;						\
+		als_prcs_xnew_alias_cntnr(lvt, POPDSYMVAL, CURSYMVAL);					\
+	}												\
 }
 
 GBLREF stack_frame	*frame_pointer;
@@ -188,9 +189,9 @@ GBLREF mval		*alias_retarg;
 LITREF mname_entry	null_mname_entry;
 
 /* Local routines -- not made static so they show up in pro core stack traces */
-void als_xnew_killaliasarray(tree *lvt);
-void als_prcs_xnew_alias_cntnr_node(treeNode *node);
-void als_prcs_markreached_cntnr_node(treeNode *node);
+STATICFNDCL void als_xnew_killaliasarray(lvTree *lvt);
+STATICFNDCL void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symval *cursymval);
+STATICFNDCL void als_prcs_markreached_cntnr(lvTree *lvt);
 
 CONDITION_HANDLER(als_check_xnew_var_aliases_ch);
 
@@ -517,7 +518,7 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	 *         This type of value is created by unw_retarg() as the result of a "QUIT *" statement. It is an alias container
 	 *	   mval that lives in the compiler temps of the caller with a pointer in an mv_stent of the callee in the mvs_parm
 	 *	   block allocated by push_parm. Since this mval-container is just an mval and not an lv_val, we have to largely
-	 *         do similar processing to the "als_prcs_xnew_alias_cntnr_node" with this block type difference in mind.
+	 *         do similar processing to the "als_prcs_xnew_alias_cntnr" with this block type difference in mind.
 	 */
 	if (NULL != alias_retarg)
 	{
@@ -559,267 +560,363 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
  * This routine is basically a slightly lightweight lv_killarray() that goes through a given tree looking for container vars
  * and performing the necessary reference count cleanup as well as freeing the lv tree nodes but wont go through the
  * bother of hashtable maintenance since the hashtable is anyways going away as part of the symbol table pop.
- *
- * See comment in lv_killarray.c for why recursion is chosen (over iteration) here.
  */
-static void	als_xnew_killaliasarray_recurse(treeNode *node);
-
-void	als_xnew_killaliasarray(tree *lvt)
+STATICFNDEF void als_xnew_killaliasarray(lvTree *lvt)
 {
+	lvTreeNode	*node, *nextnode;
+	lvTree		*tmplvt;
+
 	DEBUG_ONLY(
 		lv_val		*lv;
 
-		lv = (lv_val *)lvt->sbs_parent;
-		assert(NULL == LV_CHILD(lv));	/* Owner lv's children pointer MUST have already been set to NULL by caller */
+		assert(NULL != lvt);
+		lv = (lv_val *)LVT_PARENT(lvt);
+		assert(NULL == LV_CHILD(lv));	/* Owner lv's children pointer MUST be NULL! */
+			/* See comment in lv_killarray for why this is necessary */
 	)
-	lvTreeWalkPostOrder(lvt, als_xnew_killaliasarray_recurse);
-	LVTREE_FREESLOT(lvt);
-	return;
-}
-
-static void	als_xnew_killaliasarray_recurse(treeNode *node)
-{
-	tree	*lvt;
-
-	assert(NULL != node);
-	lvt = LV_GET_CHILD(node);
-	if (NULL != lvt)
-	{
-		LV_CHILD(node) = NULL;
-		als_xnew_killaliasarray(lvt);
-	}
-	DECR_AC_REF_LIGHT((lv_val *)node);	/* Decrement alias contain ref and cleanup if necessary */
-	/* If node points to an "lv_val", we need to do a heavyweight LV_FREESLOT call to free up the
-	 * lv_val. But we are guaranteed node points to a "treeNode" and hence we do a simple "LVTREENODE_FREESLOT"
-	 * call (i.e. it is a subscripted lv and never the base lv). Assert that.
+	/* Iterate through the tree in post-order fashion. Doing it in-order or pre-order has issues since we would have
+	 * freed up nodes in the tree but would need to access links in them to get at the NEXT node.
 	 */
-	assert(!LV_IS_BASE_VAR(node));
-	LVTREENODE_FREESLOT(node);
-}
-
-void als_scan_for_containers_recurse(treeNode *node)
-{
-	tree	*lvt_child;
-
-	if (node->v.mvtype & MV_ALIASCONT)
+	for (node = lvAvlTreeFirstPostOrder(lvt); NULL != node; node = nextnode)
 	{
-		als_cntnrs_cnt_gbldef++;
-		(*als_cntnr_fnptr_gbldef)(node);
-		/* If this node has children, run scan on them as well */
-		if (lvt_child = LV_GET_CHILD((lv_val *)node))	/* Note: lvt_child assignment */
-			lvTreeWalkPostOrder(lvt_child, als_scan_for_containers_recurse);
+		nextnode = lvAvlTreeNextPostOrder(node);	/* determine "nextnode" before freeing "node" */
+		assert(NULL != node);
+		tmplvt = LV_CHILD(node);
+		if (NULL != tmplvt)
+		{
+			LV_CHILD(node) = NULL;
+			als_xnew_killaliasarray(tmplvt);
+		}
+		DECR_AC_REF_LIGHT(((lv_val *)node));	/* Decrement alias contain ref and cleanup if necessary */
+		/* If node points to an "lv_val", we need to do a heavyweight LV_FREESLOT call to free up the lv_val.
+		 * But we instead do a simple "LVTREENODE_FREESLOT" call because we are guaranteed node points to a "lvTreeNode"
+		 * (i.e. it is a subscripted lv and never the base lv). Assert that.
+		 */
+		assert(!LV_IS_BASE_VAR(node));
+		LVTREENODE_FREESLOT(node);
 	}
+	LVTREE_FREESLOT(lvt);
 }
 
 /* Local routine!
  * Routine to process an alias container found in a node of a var being "returned" back through an exclusive new.
  * We may have to move the data.
  */
-void als_prcs_xnew_alias_cntnr_node(treeNode *node)
+STATICFNDEF void als_prcs_xnew_alias_cntnr(lvTree *lvt, symval *popdsymval, symval *cursymval)
 {
-	lv_val	*newlv, *oldlv;
-	symval	*popdsymval, *cursymval;
+	lvTree		*lvt_child;
+	lvTreeNode	*node;
+	lv_val		*newlv, *oldlv;
 
-	assert(!LV_IS_BASE_VAR(node));
-	oldlv = (lv_val *)node->v.str.addr;
-	assert(oldlv);
-	if (MV_LVCOPIED == oldlv->v.mvtype)
-	{	/* This lv_val has been copied over already so use that pointer instead */
-		newlv = oldlv->ptrs.copy_loc.newtablv;
-		node->v.str.addr = (char *)newlv;			/* Replace container ptr */
-		DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr_node: aliascont var found - referenced array already copied"
-			 " - Setting pointer in aliascont lv 0x"lvaddr" to lv 0x"lvaddr"\n", node, newlv));
-	} else
+	assert(NULL != lvt);	/* caller should not call if no subtree */
+	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
+	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
+	 * choose any order. We choose in-order as that is faster than post-order.
+	 */
+	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
 	{
-		assert(LV_IS_BASE_VAR(oldlv));
-		popdsymval = als_cntnr_arg1_gbldef;
-		cursymval = als_cntnr_arg2_gbldef;
-		if (popdsymval == LV_SYMVAL(oldlv))
-		{	/* lv_val is owned by the popped symtab .. clone it to the new current tree */
-			CLONE_LVVAL(oldlv, newlv, cursymval);
-			node->v.str.addr = (char *)newlv;		/* Replace container ptr */
-			DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr_node: aliascont var found - aliascont lv 0x"lvaddr
-				 " being reset to point to lv 0x"lvaddr" which is a clone of lv 0x"lvaddr"\n", node, newlv, oldlv));
-		} else
-		{	/* lv_val is owned by current or older symval .. just use it in the subsequent scan in case it
-			   leads us to other lv_vals owned by the popped symtab.
-			*/
-			DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr_node: aliascont var found - aliascont lv 0x"lvaddr
-				 " just being (potentially) scanned for container vars\n", node));
-			newlv = oldlv;
+		if (node->v.mvtype & MV_ALIASCONT)
+		{
+			assert(lvt->base_lv->has_aliascont);
+			assert(!LV_IS_BASE_VAR(node));
+			oldlv = (lv_val *)node->v.str.addr;
+			assert(NULL != oldlv);
+			assert(LV_IS_BASE_VAR(oldlv));
+			if (MV_LVCOPIED == oldlv->v.mvtype)
+			{	/* This lv_val has been copied over already so use that pointer instead */
+				newlv = oldlv->ptrs.copy_loc.newtablv;
+				assert(LV_IS_BASE_VAR(newlv));
+				node->v.str.addr = (char *)newlv;			/* Replace container ptr */
+				DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found - referenced array already "
+					 "copied - Setting pointer in aliascont lv 0x"lvaddr" to lv 0x"lvaddr"\n", node, newlv));
+			} else
+			{
+				assert(LV_IS_BASE_VAR(oldlv));
+				if (popdsymval == LV_SYMVAL(oldlv))
+				{	/* lv_val is owned by the popped symtab .. clone it to the new current tree */
+					CLONE_LVVAL(oldlv, newlv, cursymval);
+					assert(LV_IS_BASE_VAR(newlv));
+					node->v.str.addr = (char *)newlv;		/* Replace container ptr */
+					DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found - aliascont lv 0x"lvaddr
+						 " being reset to point to lv 0x"lvaddr" which is a clone of lv 0x"lvaddr"\n", node,
+						 newlv, oldlv));
+				} else
+				{	/* lv_val is owned by current or older symval .. just use it in the subsequent scan in case
+					 * it leads us to other lv_vals owned by the popped symtab. */
+					DBGRFCT((stderr, "\nals_prcs_xnew_alias_cntnr: aliascont var found - aliascont lv 0x"lvaddr
+						 " just being (potentially) scanned for container vars\n", node));
+					newlv = oldlv;
+				}
+				RESOLV_ALIAS_CNTNRS_IN_TREE(newlv, popdsymval, cursymval);
+			}
 		}
-		RESOLV_ALIAS_CNTNRS_IN_TREE(newlv, popdsymval, cursymval);
+		lvt_child = LV_GET_CHILD(node);
+		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
+			als_prcs_xnew_alias_cntnr(lvt_child, popdsymval, cursymval);
 	}
 }
 
 /* Routine to process an alias container found in an array being "saved" by TSTART (op_tstart). We need to set this array up
  * so it gets copied just like op_tstart does for the base variables that are specified in it. In addition, this new array
  * itself needs to be scanned so if it points to anything, that too gets saved if modified (all handled by
- * TP_SAVE_RESTART_VAR() macro).
+ * TP_SAVE_RESTART_VAR macro).
  */
-void als_prcs_tpsav_cntnr_node(treeNode *node)
+void als_prcs_tpsav_cntnr(lvTree *lvt)
 {
-	lv_val		*lv_base;
-	tp_frame	*tf;
+	lvTree		*lvt_child;
+	lvTreeNode	*node;
+	lv_val		*cntnr_lv_base;
 
-	assert(node);
-	assert(!LV_IS_BASE_VAR(node));
-	tf = (tp_frame *)als_cntnr_arg1_gbldef;
-	assert(tf);
-	lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
-	assert(lv_base);
-	assert(LV_IS_BASE_VAR(lv_base));
-	assert(1 <= lv_base->stats.trefcnt);
-	assert(1 <= lv_base->stats.crefcnt);
-	if (NULL == lv_base->tp_var)
-	{	/* Save this var if it hasn't already been saved */
-		assert(lv_base->stats.tstartcycle != tstartcycle);
-		DBGRFCT((stderr, "\ntpSAV_container: Container at 0x"lvaddr" refers to lv 0x"lvaddr" -- Creating tpsav block\n",
-			node, lv_base));
-		TP_SAVE_RESTART_VAR(lv_base, tf, &null_mname_entry);
-		INCR_CREFCNT(lv_base);	/* 2nd increment for reference via a container node */
-		INCR_TREFCNT(lv_base);
-		if (LV_HAS_CHILD(lv_base))
-			TPSAV_CNTNRS_IN_TREE(lv_base);
-	} else
-	{	/* If not saving it, we still need to bump the ref count(s) for this reference and
-		 * process any children if we have't already seen this node (taskcycle check will tell us this).
-		 */
-		DBGRFCT((stderr, "\ntpSAV_container: Container at 0x"lvaddr" refers to lv 0x"lvaddr" -- Incrementing refcnts\n",
-			node, lv_base));
-		INCR_CREFCNT(lv_base);
-		INCR_TREFCNT(lv_base);
-		assert(0 < lv_base->stats.trefcnt);
-		assert(0 < lv_base->stats.crefcnt);
-		if (lv_base->stats.tstartcycle != tstartcycle)
+	assert(NULL != lvt);	/* caller should not call if no subtree */
+	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
+	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
+	 * choose any order. We choose in-order as that is faster than post-order.
+	 */
+	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
+	{
+		if (node->v.mvtype & MV_ALIASCONT)
 		{
-			DBGRFCT((stderr, "\ntpSAV_container: .. Container at 0x"lvaddr" refers to lv 0x"lvaddr
-				 " -- processing tree\n", node, lv_base));
-			if (LV_HAS_CHILD(lv_base))
-				TPSAV_CNTNRS_IN_TREE(lv_base);
-		} else
-		{
-			DBGRFCT((stderr, "\ntpSAV_container: .. Container at 0x"lvaddr" refers to lv 0x"lvaddr
-				 " -- Already processed -- bypassing\n", node, lv_base));
+			assert(lvt->base_lv->has_aliascont);
+			assert(!LV_IS_BASE_VAR(node));
+			cntnr_lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
+			assert(NULL != cntnr_lv_base);
+			assert(LV_IS_BASE_VAR(cntnr_lv_base));
+			assert(1 <= cntnr_lv_base->stats.trefcnt);
+			assert(1 <= cntnr_lv_base->stats.crefcnt);
+			if (NULL == cntnr_lv_base->tp_var)
+			{	/* Save this var if it hasn't already been saved */
+				assert(cntnr_lv_base->stats.tstartcycle != tstartcycle);
+				DBGRFCT((stderr, "\ntpSAV_container: Container at 0x"lvaddr
+					" refers to lv 0x"lvaddr" -- Creating tpsav block\n", node, cntnr_lv_base));
+				TP_SAVE_RESTART_VAR(cntnr_lv_base, tp_pointer, &null_mname_entry);
+				INCR_CREFCNT(cntnr_lv_base);	/* 2nd increment for reference via a container node */
+				INCR_TREFCNT(cntnr_lv_base);
+				if (LV_HAS_CHILD(cntnr_lv_base))
+					TPSAV_CNTNRS_IN_TREE(cntnr_lv_base);
+			} else
+			{	/* If not saving it, we still need to bump the ref count(s) for this reference and
+				 * process any children if we have't already seen this node (taskcycle check will tell us this).
+				 */
+				DBGRFCT((stderr, "\ntpSAV_container: Container at 0x"lvaddr" refers to lv 0x"lvaddr
+					" -- Incrementing refcnts\n", node, cntnr_lv_base));
+				INCR_CREFCNT(cntnr_lv_base);
+				INCR_TREFCNT(cntnr_lv_base);
+				assert(0 < cntnr_lv_base->stats.trefcnt);
+				assert(0 < cntnr_lv_base->stats.crefcnt);
+				if (cntnr_lv_base->stats.tstartcycle != tstartcycle)
+				{
+					DBGRFCT((stderr, "\ntpSAV_container: .. Container at 0x"lvaddr" refers to lv 0x"lvaddr
+						 " -- processing tree\n", node, cntnr_lv_base));
+					if (LV_HAS_CHILD(cntnr_lv_base))
+						TPSAV_CNTNRS_IN_TREE(cntnr_lv_base);
+				} else
+				{
+					DBGRFCT((stderr, "\ntpSAV_container: .. Container at 0x"lvaddr" refers to lv 0x"lvaddr
+						 " -- Already processed -- bypassing\n", node, cntnr_lv_base));
+				}
+			}
 		}
+		lvt_child = LV_GET_CHILD(node);
+		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
+			als_prcs_tpsav_cntnr(lvt_child);
 	}
 }
 
 /* For a given container var found in the tree  we need to re-establish the reference counts for the base var
  * the container is pointing to. Used during a local var restore on a TP restart.
  */
-void als_prcs_tprest_cntnr_node(treeNode *node)
+void als_prcs_tprest_cntnr(lvTree *lvt)
 {
-	lv_val		*lv_base;
+	lvTree		*lvt_child;
+	lvTreeNode	*node;
+	lv_val		*cntnr_lv_base;
 
-	assert(node);
-	assert(!LV_IS_BASE_VAR(node));
-	lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
-	assert(lv_base);
-	assert(LV_IS_BASE_VAR(lv_base));
-	assert(1 <= lv_base->stats.trefcnt);
-	assert(1 <= lv_base->stats.crefcnt);
-	assert(lv_base->tp_var);
-	DBGRFCT((stderr, "\ntpREST_cntnr_node: Processing container at 0x"lvaddr"\n", node));
-	INCR_CREFCNT(lv_base);
-	INCR_TREFCNT(lv_base);
-	assert(0 < (lv_base)->stats.trefcnt);
-	assert(0 < (lv_base)->stats.crefcnt);
+	assert(NULL != lvt);	/* caller should not call if no subtree */
+	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
+	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
+	 * choose any order. We choose in-order as that is faster than post-order.
+	 */
+	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
+	{
+		if (node->v.mvtype & MV_ALIASCONT)
+		{
+			assert(lvt->base_lv->has_aliascont);
+			assert(!LV_IS_BASE_VAR(node));
+			cntnr_lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
+			assert(NULL != cntnr_lv_base);
+			assert(LV_IS_BASE_VAR(cntnr_lv_base));
+			assert(1 <= cntnr_lv_base->stats.trefcnt);
+			assert(1 <= cntnr_lv_base->stats.crefcnt);
+			assert(cntnr_lv_base->tp_var);
+			DBGRFCT((stderr, "\ntpREST_cntnr_node: Processing container at 0x"lvaddr"\n", node));
+			INCR_CREFCNT(cntnr_lv_base);
+			INCR_TREFCNT(cntnr_lv_base);
+			assert(0 < (cntnr_lv_base)->stats.trefcnt);
+			assert(0 < (cntnr_lv_base)->stats.crefcnt);
+		}
+		lvt_child = LV_GET_CHILD(node);
+		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
+			als_prcs_tprest_cntnr(lvt_child);
+	}
 }
 
 /* For a given container, decrement the ref count of the creature it points to. Part of unwinding an unmodified
  * tp saved variable.
  */
-void als_prcs_tpunwnd_cntnr_node(treeNode *node)
+void als_prcs_tpunwnd_cntnr(lvTree *lvt)
 {
-	lv_val		*lv_base;
+	lvTree		*lvt_child;
+	lvTreeNode	*node;
+	lv_val		*cntnr_lv_base;
 
-	assert(node);
-	assert(!LV_IS_BASE_VAR(node));
-	lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
-	assert(lv_base);
-	assert(LV_IS_BASE_VAR(lv_base));
-	assert(1 <= lv_base->stats.trefcnt);
-	assert(1 <= lv_base->stats.crefcnt);
-	/* Note we cannot assert lv_base->tp_var here since the tp_var node may have already been freed and cleared
-	 * by unwind processing of the base var itself. We just have to undo our counts here and keep going.
+	assert(NULL != lvt);	/* caller should not call if no subtree */
+	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
+	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
+	 * choose any order. We choose in-order as that is faster than post-order.
 	 */
-	DBGRFCT((stderr, "\ntpUNWND_cntnr_node: Processing container at 0x"lvaddr"\n", lv_base));
-	DECR_CREFCNT(lv_base);
-	DECR_BASE_REF_NOSYM(lv_base, FALSE);
+	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
+	{
+		if (node->v.mvtype & MV_ALIASCONT)
+		{
+			assert(lvt->base_lv->has_aliascont);
+			assert(!LV_IS_BASE_VAR(node));
+			cntnr_lv_base = (lv_val *)node->v.str.addr;	/* Extract container pointer */
+			assert(NULL != cntnr_lv_base);
+			assert(LV_IS_BASE_VAR(cntnr_lv_base));
+			assert(1 <= cntnr_lv_base->stats.trefcnt);
+			assert(1 <= cntnr_lv_base->stats.crefcnt);
+			/* Note we cannot assert cntnr_lv_base->tp_var here since the tp_var node may have already been freed and
+			 * cleared by unwind processing of the base var itself. We just have to undo our counts here and keep going.
+			 */
+			DBGRFCT((stderr, "\ntpUNWND_cntnr_node: Processing container at 0x"lvaddr"\n", cntnr_lv_base));
+			DECR_CREFCNT(cntnr_lv_base);
+			DECR_BASE_REF_NOSYM(cntnr_lv_base, FALSE);
+		}
+		lvt_child = LV_GET_CHILD(node);
+		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
+			als_prcs_tpunwnd_cntnr(lvt_child);
+	}
 }
 
 /* This routine deletes the data pointed to by the lv_val and removes the container flag from the value making it just
  * a regular NULL/0 value.
  */
-void als_prcs_kill_cntnr_node(treeNode *node)
+void als_prcs_kill_cntnr(lvTree *lvt)
 {
-	lv_val	*lv_base;
+	lvTree		*lvt_child;
+	lvTreeNode	*node;
+	lv_val		*cntnr_lv_base;
 
-	assert(!LV_IS_BASE_VAR(node));
-	assert(node->v.mvtype & MV_ALIASCONT);
-	lv_base = (lv_val *)node->v.str.addr;
-	assert(lv_base);
-	assert(LV_IS_BASE_VAR(lv_base));
-	lv_kill(lv_base, DOTPSAVE_TRUE, DO_SUBTREE_TRUE);
-	node->v.mvtype &= ~MV_ALIASCONT;
-	DECR_CREFCNT(lv_base);
-	DECR_BASE_REF_NOSYM(lv_base, TRUE);
+	assert(NULL != lvt);	/* caller should not call if no subtree */
+	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
+	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
+	 * choose any order. We choose in-order as that is faster than post-order.
+	 */
+	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
+	{
+		if (node->v.mvtype & MV_ALIASCONT)
+		{
+			assert(lvt->base_lv->has_aliascont);
+			assert(!LV_IS_BASE_VAR(node));
+			cntnr_lv_base = (lv_val *)node->v.str.addr;
+			assert(NULL != cntnr_lv_base);
+			assert(LV_IS_BASE_VAR(cntnr_lv_base));
+			node->v.mvtype &= ~MV_ALIASCONT;
+			DECR_CREFCNT(cntnr_lv_base);
+			DECR_BASE_REF_NOSYM(cntnr_lv_base, TRUE);
+		}
+		lvt_child = LV_GET_CHILD(node);
+		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
+			als_prcs_kill_cntnr(lvt_child);
+	}
 }
 
 /* Local routine!
  * This routine checks if the supplied container points to an lv_val that is already marked as having been processd in this pass.
  * If not, the lv_val is marked and processed recursively.
  */
-void als_prcs_markreached_cntnr_node(treeNode *node)
+STATICFNDEF void als_prcs_markreached_cntnr(lvTree *lvt)
 {
-	lv_val	*lv_base;
+	lvTree		*lvt_child;
+	lvTreeNode	*node;
+	lv_val		*cntnr_lv_base;
 
-	assert(node->v.mvtype & MV_ALIASCONT);
-	assert(!LV_IS_BASE_VAR(node));
-	lv_base = (lv_val *)node->v.str.addr;
-	assert(lv_base);
-	assert(LV_IS_BASE_VAR(lv_base));
-	MARK_REACHABLE(lv_base);
+	assert(NULL != lvt);	/* caller should not call if no subtree */
+	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
+	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
+	 * choose any order. We choose in-order as that is faster than post-order.
+	 */
+	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
+	{
+		if (node->v.mvtype & MV_ALIASCONT)
+		{
+			assert(lvt->base_lv->has_aliascont);
+			assert(!LV_IS_BASE_VAR(node));
+			cntnr_lv_base = (lv_val *)node->v.str.addr;
+			assert(NULL != cntnr_lv_base);
+			assert(LV_IS_BASE_VAR(cntnr_lv_base));
+			MARK_REACHABLE(cntnr_lv_base);
+		}
+		lvt_child = LV_GET_CHILD(node);
+		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
+			als_prcs_markreached_cntnr(lvt_child);
+	}
 }
 
-/* This regular routine processes the base var pointed to by the container if it has not already been processed in
- * this pass (as determined by lvtaskcycle). Processing includes incrementing refcnts and creating an lv_xnew_ref entry
- * for the base var so we can check it again when the symtab pops to see if any containers were created in them that
- * point to the symtab being popped.
+/* Function to scan an lvval for containers pointing to other structures that need to be scanned in xnew pop processing.
+ * This goes through the entire tree of lv nodes looking for containers and if it finds any, it finds the base var pointed
+ * to by the container if it has not already been processed in this pass (as determined by lvtaskcycle). Processing includes
+ * incrementing refcnts and creating an lv_xnew_ref entry for the base var so we can check it again when the symtab pops to
+ * see if any containers were created in them that point to the symtab being popped.
  */
-void als_prcs_xnewref_cntnr_node(treeNode *node)
+void als_prcs_xnewref_cntnr(lvTree *lvt)
 {
-	lv_val		*lv_base;
+	lvTree		*lvt_child;
+	lvTreeNode	*node;
+	lv_val		*cntnr_lv_base;
 	lv_xnew_ref	*xnewref;
 
-	assert(!LV_IS_BASE_VAR(node));
-	assert(node->v.mvtype & MV_ALIASCONT);
-	lv_base = (lv_val *)node->v.str.addr;
-	assert(lv_base);
-	assert(LV_IS_BASE_VAR(lv_base));
-	if (lv_base->stats.lvtaskcycle != lvtaskcycle)
+	assert(NULL != lvt);	/* caller should not call if no subtree */
+	/* In the case of lv_killarray, the only option we have is to do post-order traversal since we are freeing
+	 * nodes in the tree as we traverse. But in this case, we dont change the tree structure so we are free to
+	 * choose any order. We choose in-order as that is faster than post-order.
+	 */
+	for (node = lvAvlTreeFirst(lvt); NULL != node; node = lvAvlTreeNext(node))
 	{
-		INCR_CREFCNT(lv_base);
-		INCR_TREFCNT(lv_base);
-		lv_base->stats.lvtaskcycle = lvtaskcycle;
-		if (NULL != xnewref_anchor)
-		{	/* Reuse entry from list */
-			xnewref = xnewref_anchor;
-			xnewref_anchor = xnewref->next;
-		} else
-		{	/* Malloc an entry. Note that these blocks are put back on the chain anchored at the
-			 * xnewref_anchor global in function "als_check_xnew_var_aliases". They are not freed
-			 * since xnew’s typically happen in subroutines for temporary periods making the likelihood
-			 * of block reuse high. Also they are small and typically few in number.
-			 */
-			xnewref = (lv_xnew_ref *)malloc(SIZEOF(lv_xnew_ref));
+		if (node->v.mvtype & MV_ALIASCONT)
+		{
+			assert(lvt->base_lv->has_aliascont);
+			assert(!LV_IS_BASE_VAR(node));
+			cntnr_lv_base = (lv_val *)node->v.str.addr;
+			assert(NULL != cntnr_lv_base);
+			assert(LV_IS_BASE_VAR(cntnr_lv_base));
+			if (cntnr_lv_base->stats.lvtaskcycle != lvtaskcycle)
+			{
+				INCR_CREFCNT(cntnr_lv_base);
+				INCR_TREFCNT(cntnr_lv_base);
+				cntnr_lv_base->stats.lvtaskcycle = lvtaskcycle;
+				if (NULL != xnewref_anchor)
+				{	/* Reuse entry from list */
+					xnewref = xnewref_anchor;
+					xnewref_anchor = xnewref->next;
+				} else
+				{	/* Malloc an entry. Note that these blocks are put back on the chain anchored at the
+					 * xnewref_anchor global in function "als_check_xnew_var_aliases". They are not freed
+					 * since xnews typically happen in subroutines for temporary periods making the
+					 * likelihood of block reuse high. Also they are small and typically few in number.
+					 */
+					xnewref = (lv_xnew_ref *)malloc(SIZEOF(lv_xnew_ref));
+				}
+				xnewref->lvval = cntnr_lv_base;
+				xnewref->next = curr_symval->xnew_ref_list;
+				curr_symval->xnew_ref_list = xnewref;
+				if (LV_HAS_CHILD(cntnr_lv_base))
+					XNEWREF_CNTNRS_IN_TREE(cntnr_lv_base);
+			}
 		}
-		xnewref->lvval = lv_base;
-		xnewref->next = curr_symval->xnew_ref_list;
-		curr_symval->xnew_ref_list = xnewref;
-		if (LV_HAS_CHILD(lv_base))
-			XNEWREF_CNTNRS_IN_TREE(lv_base);
+		lvt_child = LV_GET_CHILD(node);
+		if (NULL != lvt_child)	/* Descend recursively down this tree as well */
+			als_prcs_xnewref_cntnr(lvt_child);
 	}
 }
 
@@ -834,11 +931,9 @@ void als_zwrhtab_init(void)
 	{	/* none yet .. allocate and init one */
 		zwrhtab = (zwr_hash_table *)malloc(SIZEOF(zwr_hash_table));
 		zwrhtab->first_zwrzavb = NULL;
-		zwrhtab->zav_flist = NULL;
 		init_hashtab_addr(&zwrhtab->h_zwrtab, ZWR_HTAB_INIT_SIZE, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 	} else
 	{	/* Have one, reinitialize it */
-		zwrhtab->zav_flist = NULL;
 		assert(zwrhtab->first_zwrzavb);
 		zavb = zwrhtab->first_zwrzavb;
 		if (zavb)
@@ -868,22 +963,17 @@ zwr_alias_var *als_getzavslot(void)
 	assert(zwrhtab->first_zwrzavb);
 
 	zwrhtab->cleaned = FALSE;	/* No longer in a clean/initialized state */
-	if (zwrhtab->zav_flist)
-	{	/* Free block available */
-		zav = zwrhtab->zav_flist;
-		zwrhtab->zav_flist = zav->ptrs.free_ent.next_free;
-	} else
-	{	/* Check if a block can be allocated out of a zavb super block */
-		zavb = zwrhtab->first_zwrzavb;
-		if (zavb->zav_free >= zavb->zav_top)
-		{	/* This block is full too .. need a new one */
-			zavb = (zwr_zav_blk *)malloc(SIZEOF(zwr_zav_blk) + (SIZEOF(zwr_alias_var) * ZWR_ZAV_BLK_CNT));
-			ZAV_BLK_INIT(zavb, zwrhtab->first_zwrzavb);
-			zwrhtab->first_zwrzavb = zavb;
-		}
-		assert(zavb->zav_free < zavb->zav_top);
-		zav = zavb->zav_free++;
+	/* Check if a block can be allocated out of a zavb super block */
+	zavb = zwrhtab->first_zwrzavb;
+	assert(zavb);
+	if (zavb->zav_free >= zavb->zav_top)
+	{	/* This block is full too .. need a new one */
+		zavb = (zwr_zav_blk *)malloc(SIZEOF(zwr_zav_blk) + (SIZEOF(zwr_alias_var) * ZWR_ZAV_BLK_CNT));
+		ZAV_BLK_INIT(zavb, zwrhtab->first_zwrzavb);
+		zwrhtab->first_zwrzavb = zavb;
 	}
+	assert(zavb->zav_free < zavb->zav_top);
+	zav = zavb->zav_free++;
 	zav->value_printed = FALSE;
 	return zav;
 }
@@ -963,7 +1053,7 @@ int als_lvval_gc(void)
 	mv_stent 	*mv_st_ent;
 	tp_frame	*tf;
 	tp_var		*restore_ent;
-	tree		*lvt_child;
+	lvTree		*lvt_child;
 	symval		*sym;
 	DEBUG_ONLY(uint4 savelvtaskcycle;)
 	DCL_THREADGBL_ACCESS;
@@ -1129,7 +1219,7 @@ int als_lvval_gc(void)
 				lvt_child = LV_GET_CHILD(lvp);
 				if (NULL != lvt_child)
 				{
-					assert(lvp == (lv_val *)lvt_child->sbs_parent);
+					assert(lvp == (lv_val *)LVT_PARENT(lvt_child));
 					LV_CHILD(lvp) = NULL;
 					lv_killarray(lvt_child, FALSE);
 				}
@@ -1178,7 +1268,7 @@ void als_lvmon_output(void)
 		{
 			for (lvp = (lv_val *)LV_BLK_GET_BASE(lvbp), lvp_top = LV_BLK_GET_FREE(lvbp, lvp); lvp < lvp_top; lvp++)
 			{
-				if (lvp->stats.lvmon_mark)
+				if (lvp->lvmon_mark)
 				{	/* lv_val slot not used as an sbs and is marked. Report it */
 					FPRINTF(stderr, "als_lvmon_output: lv_val at 0x"lvaddr" is still marked\n", lvp);
 				}

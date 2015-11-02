@@ -197,6 +197,7 @@ error_def(ERR_REPLCOMM);
 error_def(ERR_REPLFTOKSEM);
 error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLINSTNOHIST);
+error_def(ERR_REPLNOMULTILINETRG);
 error_def(ERR_REPLRECFMT);
 error_def(ERR_REPLUPGRADESEC);
 error_def(ERR_REPLXENDIANFAIL);
@@ -347,7 +348,7 @@ int gtmsource_process(void)
 	repl_cmpmsg_ptr_t		send_cmpmsgp;
 	repl_start_reply_msg_ptr_t	reply_msgp;
 	boolean_t			rollback_first, secondary_ahead, secondary_was_rootprimary, secondary_is_dualsite;
-	boolean_t			rcvr_same_endianness;
+	boolean_t			rcvr_same_endianness, intfilter_error;
 	int				semval, cmpret;
 	uLongf				cmpbuflen;
 	int4				msghdrlen;
@@ -443,7 +444,7 @@ int gtmsource_process(void)
 		{
 			if (EREPL_RECV == repl_errno)
 			{
-				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
+				if (REPL_CONN_RESET(status))
 				{	/* Connection reset */
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
 							"Connection reset while receiving restart SEQNO. Status = %d ; %s\n",
@@ -1163,7 +1164,7 @@ int gtmsource_process(void)
 			{
 				if (EREPL_RECV == repl_errno)
 				{
-					if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
+					if (REPL_CONN_RESET(status))
 					{
 						/* Connection reset */
 						repl_log(gtmsource_log_fp, TRUE, TRUE,
@@ -1238,6 +1239,7 @@ int gtmsource_process(void)
 					gtmsource_msgp->len = data_len + REPL_MSG_HDRLEN;
 					send_msgp = gtmsource_msgp;
 					send_tr_len = tot_tr_len;
+					intfilter_error = FALSE;
 					if (gtmsource_filter & INTERNAL_FILTER)
 					{
 						in_buff = gtmsource_msgp->msg;
@@ -1280,15 +1282,30 @@ int gtmsource_process(void)
 								/* note that in_buff and in_buflen is not changed so that we can
 								 * start from where we left
 								 */
-							} else
+							} else /* fatal error from the internal filter */
 							{
-								INT_FILTER_RTS_ERROR(status, filter_seqno);
+								intfilter_error = TRUE;
+								break;
 							}
 						}
-						assert(0 == remaining_len);
+						assert((0 == remaining_len) || intfilter_error);
 						GTMTRIG_ONLY(ISSUE_TRIG2NOTRIG_IF_NEEDED;)
 						send_msgp = (repl_msg_ptr_t)repl_filter_buff;
 						send_tr_len = out_buffmsg - repl_filter_buff;
+						if (0 == send_tr_len)
+						{	/* This is possible ONLY if the first transaction in the buffer read from
+							 * journal pool or disk encountered error while doing internal filter
+							 * conversion. Issue rts_error right away as there is nothing much we can
+							 * do at this point.
+							 */
+							assert(intfilter_error);
+							assert((EREPL_INTLFILTER_BADREC == repl_errno)
+								|| (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
+								|| (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)
+								|| (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno));
+							assert(filter_seqno == pre_read_seqno);
+							INT_FILTER_RTS_ERROR(filter_seqno); /* no return */
+						}
 					}
 					assert(send_tr_len && (0 == (send_tr_len % REPL_MSG_ALIGN)));
 					/* ensure that the head of the buffer has the correct type and len */
@@ -1349,6 +1366,13 @@ int gtmsource_process(void)
 					 * resync_seqno of the system is the minimum of the resync_seqno of both primary
 					 * and secondary). This is done by the call to gtmsource_flush_fh() done within the
 					 * REPL_SEND_LOOP macro as well as in the (SS_NORMAL != status) if condition below.
+					 * Note that all of this is applicable only in a dualsite replication scenario. In
+					 * case of a multisite scenario, it is always the receiver server that tells the
+					 * sequence number from where the source server should start sending. So, even if
+					 * the source server notes down a higher value of journal sequence number in
+					 * jnlpool.gtmsource_local->read_jnl_seqno, it is not a problem since the receiver
+					 * server will communicate the appropriate sequence number as part of the triple
+					 * exchange.
 					 */
 					REPL_SEND_LOOP(gtmsource_sock_fd, send_msgp, send_tr_len, catchup, &poll_immediate)
 					{
@@ -1389,6 +1413,22 @@ int gtmsource_process(void)
 							rts_error(VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 								  RTS_ERROR_STRING(err_string));
 						}
+					}
+					if (intfilter_error)
+					{	/* Now that we are done sending whatever buffer was filter converted, issue
+						 * the error. This will bring down the source server (due to the rts_error).
+						 * At this point, jnlpool.gtmsource_local->read_jnl_seqno could effectively
+						 * be behind the receiver server's journal sequence number. But, that is
+						 * okay since as part of reconnection (when the source server comes back up),
+						 * the receiever server will communicate the appropriate sequence number as
+						 * part of the triple exchange.
+						 */
+						assert((EREPL_INTLFILTER_BADREC == repl_errno)
+							|| (EREPL_INTLFILTER_REPLGBL2LONG == repl_errno)
+							|| (EREPL_INTLFILTER_SECNODZTRIGINTP == repl_errno)
+							|| (EREPL_INTLFILTER_MULTILINEXECUTE == repl_errno));
+						assert(filter_seqno <= post_read_seqno);
+						INT_FILTER_RTS_ERROR(filter_seqno); /* no return */
 					}
 					jnlpool.gtmsource_local->read_jnl_seqno = post_read_seqno;
 					if (secondary_is_dualsite)

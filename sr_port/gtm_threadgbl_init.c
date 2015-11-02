@@ -156,14 +156,16 @@ GBLDEF void	*gtm_threadgbl;		/* Anchor for thread global for this thread */
  * contain the types. This structure can be accessed through the debugger for easier type dumping.
  * Note we define this structure even in pro since it could be useful even in pro debugging (by gtmpcat).
  */
-#define THREADGBLDEF(name,type) type name;
-#define THREADGBLAR1DEF(name, type, dim1) type name[dim1];
-#define THREADGBLAR2DEF(name, type, dim1, dim2) type name[dim1][dim2];
+#define THREADGBLDEF(name,type)			type name;
+#define THREADGBLFPTR(name, type, args)		type (*name)args;
+#define THREADGBLAR1DEF(name, type, dim1)	type name[dim1];
+#define THREADGBLAR2DEF(name, type, dim1, dim2)	type name[dim1][dim2];
 typedef struct
 {
 #	include "gtm_threadgbl_defs.h"
 } gtm_threadgbl_true_t;
 #undef THREADGBLDEF
+#undef THREADGBLFPTR
 #undef THREADGBLAR1DEF
 #undef THREADGBLAR2DEF
 
@@ -203,7 +205,7 @@ void gtm_threadgbl_init(void)
 	memset(gtm_threadgbl, 0, size_gtm_threadgbl_struct);
 	gtm_threadgbl_true = (gtm_threadgbl_true_t *)gtm_threadgbl;
 
-	/* Add specific initializations if other than 0s here using TREF() macros: */
+	/* Add specific initializations if other than 0s here using the TREF() family of macros: */
 	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
 	(TREF(gtmprompt)).addr = TADR(prombuf);
 	(TREF(gtmprompt)).len = SIZEOF(DEFAULT_PROMPT) - 1;

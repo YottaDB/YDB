@@ -57,7 +57,6 @@ GBLREF	FILE			*gtmrecv_statslog_fp;
 GBLREF	boolean_t		gtmrecv_logstats;
 GBLREF	boolean_t		gtmrecv_wait_for_jnl_seqno;
 GBLREF	boolean_t		gtmrecv_bad_trans_sent;
-GBLREF	pid_t			updproc_pid;
 GBLREF	uint4			log_interval;
 GBLREF	volatile time_t		gtmrecv_now;
 GBLREF	boolean_t		gtmrecv_send_cmp2uncmp;
@@ -152,7 +151,27 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				send_xoff = TRUE;
 				QWASSIGN(recvpool_ctl->old_jnl_seqno, recvpool_ctl->jnl_seqno);
 				QWASSIGNDW(recvpool_ctl->jnl_seqno, 0);
-				WAITPID(updproc_pid, &upd_exit_status, 0, waitpid_res); /* Release defunct upd proc */
+				/* Even though we have identified that the update process is NOT alive, a waitpid on the update
+				 * process PID is necessary so that the system doesn't leave any zombie process lying around.
+				 * This is possible since any child process that dies without the parent doing a waitpid on it
+				 * will be defunct unless the parent dies at which point the "init" process takes the role of
+				 * the parent and invokes waitpid to remove the zombies.
+				 * NOTE: It is possible that the update process was killed before the receiver server got a
+				 * chance to record it's PID in the recvpool.upd_proc_local structure. In such a case, don't
+				 * invoke waitpid as that will block us (receiver server) if this instance of the receiver
+				 * server was started with helper processes.
+				 */
+				if (0 < upd_proc_local->upd_proc_pid)
+				{
+					WAITPID(upd_proc_local->upd_proc_pid, &upd_exit_status, 0, waitpid_res);
+					/* Since the update process as part of its shutdown does NOT reset the upd_proc_pid, reset
+					 * it here ONLY if the update process was NOT kill -9ed. This is needed because receiver
+					 * server as part of its shutdown relies on this field (upd_proc_pid) to determine if the
+					 * update process was cleanly shutdown or was kill -9ed.
+					 */
+					if (!alert)
+						upd_proc_local->upd_proc_pid = 0;
+				}
 				upd_proc_local->bad_trans = FALSE; /* No point in doing bad transaction processing */
 			}
 			gtmrecv_wait_for_jnl_seqno = TRUE;
@@ -338,7 +357,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		{
 			if (EREPL_RECV == repl_errno)
 			{
-				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
+				if (REPL_CONN_RESET(status))
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while receiving XOFF_ACK. "
 							"Status = %d ; %s\n", status, STRERROR(status));

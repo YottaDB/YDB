@@ -255,11 +255,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	ifdef UNIX
 	unix_db_info		*udi;
 #	endif
-	DCL_THREADGBL_ACCESS;
 
 	START_CH;
-	SETUP_THREADGBL_ACCESS;
-	DBGEHND((stderr, "mdb_condition_handler: Entered with SIGNAL=%d frame_pointer=%016lx\n", SIGNAL, frame_pointer));
+	DBGEHND((stderr, "mdb_condition_handler: Entered with SIGNAL=%d frame_pointer=0x"lvaddr"\n", SIGNAL, frame_pointer));
 #	ifdef UNIX
 	/* It is possible that we entered here from a bad compile of the open exception handler
 	 * for an rm device.  If gtm_err_dev is still set and SFT_DEV_ACT is equal to
@@ -509,7 +507,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	endif
 	if (active_lv)
 	{
-		if (!MV_DEFINED(&active_lv->v) && !LV_HAS_CHILD(active_lv))
+		if (!LV_IS_VAL_DEFINED(active_lv) && !LV_HAS_CHILD(active_lv))
 			op_kill(active_lv);
 		active_lv = (lv_val *)0;
 	}

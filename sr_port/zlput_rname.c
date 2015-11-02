@@ -170,6 +170,21 @@ bool zlput_rname (rhdtyp *hdr)
 #				else
 #				  error "unsupported platform"
 #				endif
+				/* Note that there are two possible ways to proceed here to clear this entry:
+				 *   1. Just clear the value as we do below.
+				 *   2. Use the DELETE_HTENT() macro to remove the entry entirely from the hash table.
+				 *
+				 * We choose #1 since a routine that had had its source loaded is likely to have it reloaded
+				 * and if the source load rtn has to re-add the key, it won't reuse the deleted key (if it
+				 * remained a deleted key) until all other hashtable slots have been used up (creating a long
+				 * collision chain). A deleted key may not remain a deleted key if it was reached with no
+				 * collisions but will instead be turned into an unused key and be immediately reusable.
+				 * But since it is likely to be reused, we just zero the entry but this creates a necessity
+				 * that the key be maintained. If this is a non-USBHIN platform, everything stays around
+				 * anyway so that's not an issue. However, in a USHBIN platform, the literal storage the key
+				 * is pointing to gets released. For that reason, in the USHBIN processing section below, we
+				 * update the key to point to the newly loaded module's routine name.
+				 */
 				tabent->value = NULL;
 			}
 		}

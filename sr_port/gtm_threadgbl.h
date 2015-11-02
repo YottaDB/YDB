@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +23,7 @@
  * such that we can have different arrays per thread.
  *
  * The macros can be classified as declaration (DCL_THREADGBL_ACCESS), definition (SETUP_THREADGBL_ACCESS), and
- * usage (TADR, TREF, TAREF1, TAREF2).
+ * usage (TADR, TREF, TAREF1, TAREF2, RFPTR, SFPTR, IVFPTR).
  *
  * DCL_THREADGBL_ACCESS     - simple job is to declare the local variable used as an anchor to the thread global
  *                            array. It should be located in the declaration section of an entry point.
@@ -35,13 +35,16 @@
  * TADR			    - Used to obtain the address of the element.
  * TREF			    - Used to dereference a global var (see notes at TREF macro for usage).
  * TAREF1/TAREF2	    - Used to access array elements - TAREF1 for vectors, TAREF2 for 2 subscript access.
+ * RFPTR		    - Used to reference a function pointer in an expression or conditional.
+ * SFPTR		    - Used to set a new value into a function pointer.
+ * IVFPTR		    - Used to invoke a function pointer.
  */
 
 /* Declare local thread global anchor */
-#define DCL_THREADGBL_ACCESS void *lcl_gtm_threadgbl
+#define DCL_THREADGBL_ACCESS	void 	*lcl_gtm_threadgbl
 
 /* Setup the local thread global anchor giving a value (and purpose in life) */
-#define SETUP_THREADGBL_ACCESS lcl_gtm_threadgbl = gtm_threadgbl
+#define SETUP_THREADGBL_ACCESS	lcl_gtm_threadgbl = gtm_threadgbl
 
 /* Reference a given global in the thread global array. There are a couple of different ways this macro can be
  * used. Note that its first term is a "de-reference" (aka "*"). As an example, say we have a global name defined
@@ -67,6 +70,12 @@
  * The general rule of thumb is if the global is a pointer being used to access a subfield, or if the global is a structure
  * itself and you are accessing subfields with a "." operator (e.g. (TREF(fnpca)).fnpcs[i].indx = i;) surround the TREF with ().
  * Otherwise* you can leave it unadorned.
+ *
+ * Note that function pointers present some odd constraints. You can cast something to a function pointer type but only
+ * when you are going to actually invoke it (as the IVFPTR() macro does below). But this means that non-invoking references
+ * (or assignments) cannot use casts to make types match. So we need 2 additional macros for reference in an expression (RFPTR)
+ * or setting a function pointer (SFPTR) so we can control the necessary aspects of the expressions involved. See
+ * $sr_unix/generic_signal_handler.c for uses of most of these macros used with function pointers.
  */
 #define TREF(name) *((ggt_##name *)((char *)lcl_gtm_threadgbl + ggo_##name))
 
@@ -79,6 +88,17 @@
 /* For access to 2 dimension array, use TAREF2 macro */
 #define TAREF2(name, indx1, indx2) ((ggt_##name *)((char *)lcl_gtm_threadgbl + ggo_##name +	/* Base addr of array */	\
 						   (((indx1) - 1) * SIZEOF(ggt_##name) * ggd_##name)))[indx2]  /* Row offset */
+
+/* To set a function pointer, use SFPTR(name) macro - Used to copy an address INTO a function pointer */
+#define SFPTR(name, value) *((char **)((char *)lcl_gtm_threadgbl + ggo_##name)) = (char *)(value)
+
+/* To reference a function pointer's value, use RFPTR(name) macro. Use only in rvalue RHS expressions. Does not produce
+ * an lvalue suitable for LHS usage. See SFPTR() above if function pointer needs a new value.
+ */
+#define RFPTR(name) (ggt_##name (*)gga_##name)(*(char **)((char *)lcl_gtm_threadgbl + ggo_##name))
+
+/* To invoke a function pointer, use IVFPTR(name) macro */
+#define IVFPTR(name) ((ggf_##name)(*(char **)((char *)lcl_gtm_threadgbl + ggo_##name)))
 
 /* In the main routines for GTM and the utilities that need to initialize the thread global structure all other routines access,
  * this macro should be used in lieu of SETUP_THREADGBL_ACCESS.

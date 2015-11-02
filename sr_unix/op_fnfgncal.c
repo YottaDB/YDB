@@ -95,7 +95,6 @@
  *
  ******************************************************************************/
 
-static struct extcall_package_list	*extcall_package_root = 0;
 GBLREF stack_frame      *frame_pointer;
 GBLREF unsigned char    *msp;
 GBLREF spdesc 		stringpool;
@@ -268,6 +267,11 @@ static int	extarg_getsize(void *src, enum xc_types typ, mval *dst)
 	return 0; /* This should never get executed, added to make compiler happy */
 }
 
+error_def	(ERR_TEXT);
+error_def	(ERR_XCVOIDRET);
+error_def	(ERR_ZCCTENV);
+error_def	(ERR_ZCVECTORINDX);
+
 void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
 	va_list		var;
@@ -286,19 +290,16 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	struct extcall_package_list	*package_ptr;
 	struct extcall_entry_list	*entry_ptr;
 	gparam_list	*param_list;
+	DCL_THREADGBL_ACCESS;
 
-	error_def	(ERR_TEXT);
-	error_def	(ERR_ZCVECTORINDX);
-	error_def	(ERR_ZCCTENV);
-	error_def	(ERR_XCVOIDRET);
-
+	SETUP_THREADGBL_ACCESS;
 	assert(n_mvals == argcnt + 5);
 	assert(MV_IS_STRING(package));	/* package and routine are literal strings */
 	assert(MV_IS_STRING(extref));
 	if (MAXIMUM_PARAMETERS < argcnt)
 		rts_error(VARLSTCNT(1) ERR_ZCMAXPARAM);
 	/* find package */
-	for (package_ptr = extcall_package_root;  package_ptr;  package_ptr = package_ptr->next_package)
+	for (package_ptr = TREF(extcall_package_root); package_ptr; package_ptr = package_ptr->next_package)
 	{
 		MSTR_CMP(package_ptr->package_name, package->str, rslt);
 		if (0 == rslt)
@@ -308,15 +309,15 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	if (NULL == package_ptr)
 	{
 		package_ptr = exttab_parse(package);
-		package_ptr->next_package = extcall_package_root;
-		extcall_package_root = package_ptr;
+		package_ptr->next_package = TREF(extcall_package_root);
+		TREF(extcall_package_root) = package_ptr;
 	}
 	/* At this point, we have a valid package, pointed to by package_ptr */
 	assert(NULL != package_ptr);
 	if (NULL == package_ptr->package_handle)
 		rts_error(VARLSTCNT(1) errno);
 	/* Find entry */
-	for (entry_ptr = package_ptr->first_entry;  entry_ptr;  entry_ptr = entry_ptr->next_entry)
+	for (entry_ptr = package_ptr->first_entry; entry_ptr; entry_ptr = entry_ptr->next_entry)
 	{
 		MSTR_CMP(entry_ptr->entry_name, extref->str, rslt);
 		if (0 == rslt)
@@ -337,7 +338,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	/* compute size of parameter block */
 	n = entry_ptr->parmblk_size;	/* This is enough for the parameters and the fixed length entries */
 	/* Now, add enough for the char *'s and the char **'s and string *'s */
-	for (i = 0, m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		/* if it is an input value of char* or char **, add the length */
@@ -380,7 +381,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* load-up the parameter list */
 	VAR_START(var, argcnt);
-	for (i = 0, m1 = entry_ptr->input_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, m1 = entry_ptr->input_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		/* Note that even in this second pass at these mvals, we need to do the MV_FORCE processing because
@@ -548,7 +549,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	/* compute space requirement for return values */
 	n = 0;
 	VAR_START(var, argcnt);
-	for (i = 0, m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, m1 = mask & entry_ptr->output_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		if (m1 & 1)
@@ -560,7 +561,7 @@ void	op_fnfgncal (uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 m
 	ENSURE_STP_FREE_SPACE(n);
 	/* convert return values */
 	VAR_START(var, argcnt);
-	for (i = 0, m1 = mask & entry_ptr->output_mask;  i < argcnt;  i++, m1 = m1 >> 1)
+	for (i = 0, m1 = mask & entry_ptr->output_mask; i < argcnt; i++, m1 = m1 >> 1)
 	{
 		v = va_arg(var, mval *);
 		if (m1 & 1)

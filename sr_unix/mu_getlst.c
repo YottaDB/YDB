@@ -12,6 +12,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_limits.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -59,7 +60,7 @@ error_def(ERR_TEXT);
 
 void mu_getlst(char *name, int4 size)
 {
-	char		*c1, *c2, *c3, *c4, rbuff[MAX_FN_LEN + 1], fbuff[MAX_FN_LEN + 1];
+	char		*c1, *c2, *c3, *c4, rbuff[GTM_PATH_MAX], fbuff[GTM_PATH_MAX];
 	unsigned short	rlen, flen, i;
 	gd_region	*reg;
 	tp_region	*list;

@@ -91,6 +91,7 @@ int main (int argc, char **argv)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	set_blocksig();
 	gtm_imagetype_init(MUPIP_IMAGE);
 	invocation_mode = MUMPS_UTILTRIGR;
 	gtm_wcswidth_fnptr = gtm_wcswidth;

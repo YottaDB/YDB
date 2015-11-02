@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +21,7 @@
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"		/* for exit() */
 #include "gtm_time.h"		/* for time() */
+#include "gt_timer.h"		/* for set_blocksig() */
 #include "gtm_fcntl.h"
 #include "gtm_string.h"		/* for strerror() */
 
@@ -82,6 +83,7 @@ int main(int argc, char_ptr_t argv[])
     DCL_THREADGBL_ACCESS;
 
     GTM_THREADGBL_INIT;
+    set_blocksig();
     gtm_env_init(); /* read in all environment variables before calling any function particularly malloc (from err_init below)*/
 /*  Open the packet log file for playback */
     if (argc == 1)

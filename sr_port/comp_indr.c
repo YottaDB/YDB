@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +11,7 @@
 
 #include "mdef.h"
 
+#include "gtm_stdio.h"
 #include "gtm_string.h"
 
 #include "rtnhdr.h"
@@ -23,11 +24,15 @@
 #include "cacheflush.h"
 #include "compiler.h"
 #include "obj_file.h"
+#include "error.h"
 
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
 GBLREF stack_frame	*frame_pointer;
 GBLREF boolean_t	is_tracing_on;
+
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
 
 void	comp_indr (mstr *obj)
 {
@@ -36,9 +41,8 @@ void	comp_indr (mstr *obj)
 	int		tempsz, vartabsz, fixup_cnt, zapsz;
 	INTPTR_T	*vp;
 	ihdtyp		*rtnhdr;
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
 
+	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	save_msp = msp;
 	sf = (stack_frame *)(msp -= SIZEOF(stack_frame));
 	rtnhdr = (ihdtyp *)obj->addr;
@@ -68,8 +72,8 @@ void	comp_indr (mstr *obj)
 	sf->temps_ptr = tmps;
 	sf->l_symtab = (ht_ent_mname **)syms;
 	sf->vartab_len = rtnhdr->vartab_len;
-	if (zapsz = (vartabsz + tempsz))
-		memset(syms, 0, zapsz);	/* Zap temps and symtab together */
+	if (zapsz = (vartabsz + tempsz))	/* Note assignment */
+		memset(syms, 0, zapsz);		/* Zap temps and symtab together */
 
 	sf->vartab_ptr = (char *)rtnhdr + rtnhdr->vartab_off;
 	sf->temp_mvals = rtnhdr->temp_mvals;
@@ -82,6 +86,7 @@ void	comp_indr (mstr *obj)
 	sf->flags = SFF_INDCE;		/* We will be needing cleanup for this frame */
 	DEBUG_ONLY(
 		vp = (INTPTR_T *)sf->mpc;
+		assert(NULL != vp);
 		vp--;
 		assert((GTM_OMAGIC << 16) + OBJ_LABEL == *vp);
 		vp--;
@@ -94,5 +99,7 @@ void	comp_indr (mstr *obj)
 	sf->ctxt = sf->mpc;
 	assert(msp < stackbase);
 	frame_pointer = sf;
+	DBGEHND((stderr, "comp_indr: Added indirect stack frame at addr 0x"lvaddr" - New msp: 0x"lvaddr"\n", sf, msp));
+	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	return;
 }

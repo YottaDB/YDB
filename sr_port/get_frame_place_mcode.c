@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -142,11 +142,14 @@ void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *r
 		} else
 		{	/* code picked up from cache_cleanup(). any changes here might need to be reflected there */
 			vp = (INTPTR_T *)fp->ctxt;
+			assert(NULL != vp);
 			vp--;
-			assert((GTM_OMAGIC << 16) + OBJ_LABEL == *vp);	/* Validate backward linkage */
+			if ((GTM_OMAGIC << 16) + OBJ_LABEL != *vp)	/* Validate backward linkage */
+				GTMASSERT;
 			vp--;
 			irtnhdr = (ihdtyp *)((char *)vp + *vp);
 			indce = irtnhdr->indce;
+			assert(NULL != indce);
 			assert(0 < indce->refcnt);	/* currently used in the M stack better have a non-zero refcnt */
 			result->str = indce->src.str;
 			s2pool(&result->str);

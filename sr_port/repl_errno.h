@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,7 +50,8 @@ enum
 	EREPL_FILTERRECV,			/* 287 */
 	EREPL_FILTERNOSPC,			/* 288 */
 	EREPL_INTLFILTER_SECNODZTRIGINTP,	/* 289 */
-	EREPL_MAXERRNO				/* 290 */
+	EREPL_INTLFILTER_MULTILINEXECUTE,	/* 290 */
+	EREPL_MAXERRNO				/* 291 */
 };
 
 #endif

@@ -285,4 +285,5 @@ XFER(xf_ztrigger, op_ztrigger), /* Restrict to UNIX, not GTM_TRIGGER since is in
 XFER(xf_savputindx, op_savputindx),
 XFER(xf_rfrshindx, op_rfrshindx),
 XFER(xf_forctrlindr1, op_forctrlindr1),
-XFER(xf_forctrlindr2, op_forctrlindr2)
+XFER(xf_forctrlindr2, op_forctrlindr2),
+XFER(xf_zhalt, op_zhalt)

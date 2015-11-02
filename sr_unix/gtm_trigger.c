@@ -229,10 +229,7 @@ CONDITION_HANDLER(gtm_trigger_complink_ch)
 	 * have their own handler but other errors are still possible. The primary use of this handler is (1) to remove
 	 * the mv_stent we created and (2) most importantly to turn off the trigger_compile flag.
 	 */
-	DCL_THREADGBL_ACCESS;
-
 	START_CH;
-	SETUP_THREADGBL_ACCESS;
 	TREF(trigger_compile) = FALSE;
 	run_time = gtm_trigger_comp_prev_run_time;
 	if (((unsigned char *)mv_chain == msp) && (MVST_MSAV == mv_chain->mv_st_type)

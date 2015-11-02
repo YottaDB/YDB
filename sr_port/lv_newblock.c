@@ -48,15 +48,15 @@ void	lvtree_newblock(symval *sym, int numElems)
 {
 	register lv_blk	*ptr;
 	register int	n;
-	tree		*lvt_base;
+	lvTree		*lvt_base;
 
-	n = numElems * SIZEOF(tree) + SIZEOF(lv_blk);
+	n = numElems * SIZEOF(lvTree) + SIZEOF(lv_blk);
 	n = INTCAST(gtm_bestfitsize(n));
 	/* Maximize use of storage block we are going to get */
-	assert(DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(tree)) >= numElems);
-	numElems = DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(tree));
+	assert(DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(lvTree)) >= numElems);
+	numElems = DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(lvTree));
 	ptr = (lv_blk *)malloc(n);
-	lvt_base = (tree *)LV_BLK_GET_BASE(ptr);
+	lvt_base = (lvTree *)LV_BLK_GET_BASE(ptr);
 	ptr->next = sym->lvtree_first_block;
 	sym->lvtree_first_block = ptr;
 	ptr->numAlloc = numElems;
@@ -68,16 +68,16 @@ void	lvtreenode_newblock(symval *sym, int numElems)
 {
 	register lv_blk	*ptr;
 	register int	n;
-	treeNode	*lv_base;
+	lvTreeNode	*lv_base;
 
-	n = numElems * SIZEOF(treeNode) + SIZEOF(lv_blk);
+	n = numElems * SIZEOF(lvTreeNode) + SIZEOF(lv_blk);
 	n = INTCAST(gtm_bestfitsize(n));
 	/* Maximize use of storage block we are going to get */
-	assert(DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(treeNode)) >= numElems);
-	numElems = DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(treeNode));
+	assert(DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(lvTreeNode)) >= numElems);
+	numElems = DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(lvTreeNode));
 	ptr = (lv_blk *)malloc(n);
-	lv_base = (treeNode *)LV_BLK_GET_BASE(ptr);
-	memset(lv_base, 0, numElems * SIZEOF(treeNode));
+	lv_base = (lvTreeNode *)LV_BLK_GET_BASE(ptr);
+	memset(lv_base, 0, numElems * SIZEOF(lvTreeNode));
 	ptr->next = sym->lvtreenode_first_block;
 	sym->lvtreenode_first_block = ptr;
 	ptr->numAlloc = numElems;

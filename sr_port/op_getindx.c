@@ -37,8 +37,8 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	int                     length;
 	mval			*key;
 	mval			tmp_sbs;
-	tree			*lvt;
-	treeNode		*lv, *parent;
+	lvTree			*lvt;
+	lvTreeNode		*lv, *parent;
 	unsigned char		buff[512], *end;
 	va_list			var;
 	DCL_THREADGBL_ACCESS;
@@ -46,7 +46,7 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	SETUP_THREADGBL_ACCESS;
 	VAR_START(var, start);
 	VMS_ONLY(va_count(argcnt));
-	lv = (treeNode *)start;
+	lv = (lvTreeNode *)start;
 	arg1 = --argcnt;
 	while (lv && (0 < argcnt--))
 	{
@@ -97,10 +97,10 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		}
 	}
 	va_end(var);
-	if (!lv || !MV_DEFINED(&lv->v))
+	if (!lv || !LV_IS_VAL_DEFINED(lv))
 	{
 		if (undef_inhibit)
-			lv = (treeNode *)&literal_null;
+			lv = (lvTreeNode *)&literal_null;
 		else
 		{
 			VAR_START(var, start);

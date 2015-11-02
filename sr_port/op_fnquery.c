@@ -38,7 +38,7 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 error_def(ERR_LVNULLSUBS);
 
-void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
+void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 {
 	int			length;
 	mval		 	tmp_sbs;
@@ -48,8 +48,8 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out;
 	lv_val			*v;
-	treeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *parent, *node, *nullsubsnode, *nullsubsparent;
-	tree			*lvt;
+	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *parent, *node, *nullsubsnode, *nullsubsparent;
+	lvTree			*lvt;
 	int			i, j;
 	VMS_ONLY(int		sbscnt;)
 	boolean_t		found, is_num, last_sub_null, nullify_term, is_str;
@@ -72,7 +72,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 		return;
 	}
 	h1 = history;
-	*h1++ = (treeNode *)v;
+	*h1++ = (lvTreeNode *)v;
 	found = FALSE;
 	DEBUG_ONLY(node = NULL;)
 	for (i = 0, argpp = &args[0]; i < sbscnt; i++, argpp++, h1++)
@@ -215,7 +215,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 				--h1;
 		} else
 		{	/* Need to find right sibling. "lvt" is tree to search in and "arg1" is key to search for. */
-			node = lvTreeKeyCollatedNext(lvt, arg1);
+			node = lvAvlTreeKeyCollatedNext(lvt, arg1);
 			if (NULL != node)
 			{
 				*h1 = node;
@@ -238,7 +238,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 			node = *h1;
 			assert(NULL != node);
 			/* Find the right sibling (next) subscript */
-			node = lvTreeNodeCollatedNext(node);
+			node = lvAvlTreeNodeCollatedNext(node);
 			if (NULL != node)
 			{
 				*h1 = node;
@@ -251,7 +251,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 	(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
 	(TREF(last_fnquery_return_varname)).str.len = 0;
 	/* Go down leftmost subtree path (potentially > 1 avl trees) starting from "node" until you find the first DEFINED mval */
-	while (!MV_DEFINED(&node->v))
+	while (!LV_IS_VAL_DEFINED(node))
 	{
 		lvt = LV_GET_CHILD(node);
 		assert(NULL != lvt);	/* there cannot be an undefined lv node with no children dangling around */
@@ -288,7 +288,7 @@ void op_fnquery (UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 	for (h2 = &history[1]; h2 <= h1; h2++)
 	{
 		node = *h2;
-		assert(!LV_IS_BASE_VAR(node)); /* guarantees to us that "node" is a "treeNode *" and not "lv_val *" */
+		assert(!LV_IS_BASE_VAR(node)); /* guarantees to us that "node" is a "lvTreeNode *" and not "lv_val *" */
 		mv = &tmpmv;
 		LV_NODE_GET_KEY(node, mv); /* Get node key into "mv" depending on the structure type of "node" */
 		if (MV_IS_NUMERIC(mv))

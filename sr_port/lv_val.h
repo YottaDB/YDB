@@ -16,14 +16,14 @@
 #include <stddef.h> /* for OFFSETOF macro used in the IS_OFFSET_AND_SIZE_MATCH macro */
 
 #include "hashtab_mname.h"
-#include "tree.h"
+#include "lv_tree.h"
 
 /* Define a few generic LV related macros. These macros work irrespective of whether the input is an unsubscripted
  * local variable (aka base variable) which is of type (lv_val *) or a subscripted local variable which is of type
- * (treeNode *). All of these assume the layout of the two structures is very similar (asserted in "lvTreeCreate"
- * function in tree.c). These macros will be used extensively for code centralization and to avoid code duplication.
+ * (lvTreeNode *). All of these assume the layout of the two structures is very similar (asserted in "LV_TREE_CREATE"
+ * macro). These macros will be used extensively for code centralization and to avoid code duplication.
  *
- * The macros that are only passed an LV_PTR need to ensure that it is indeed a "lv_val *" or a "treeNode *".
+ * The macros that are only passed an LV_PTR need to ensure that it is indeed a "lv_val *" or a "lvTreeNode *".
  * The macros that are also passed an IS_BASE_VAR parameter can safely assume this to be the case since the IS_BASE_VAR
  *	parameter would have been computed using the LV_IS_BAS_VAR macro which already does the ensure.
  *	So we avoid the duplicate assert in these cases.
@@ -31,18 +31,18 @@
 
 #define	SYM_IS_SYMVAL(SYM)			(MV_SYM == (SYM)->ident)
 
-#define	IS_LV_TREE(LVT)				(MV_LV_TREE == ((tree *)LVT)->ident)
+#define	IS_LV_TREE(LVT)				(MV_LV_TREE == ((lvTree *)LVT)->ident)
 #define	LV_PARENT(LV)				LV_AVLNODE_PARENT(LV)
-#define	LV_AVLNODE_PARENT(PTR)			(((treeNode *)PTR)->tree_parent)
-#define	LVT_PARENT(LVT)				(((tree *)LVT)->sbs_parent)
+#define	LV_AVLNODE_PARENT(PTR)			(((lvTreeNode *)PTR)->tree_parent)
+#define	LVT_PARENT(LVT)				(((lvTree *)LVT)->sbs_parent)
 #define	IS_LVAVLTREENODE(PTR)			(IS_LV_TREE(LV_AVLNODE_PARENT((lv_val *)PTR)))
 
 #define	IS_PARENT_MV_SYM(LV_PTR)		(SYM_IS_SYMVAL(LV_SYMVAL((lv_val *)LV_PTR)))
 
-#define	DBG_ASSERT_LVT(LVT)			DBG_ASSERT(IS_LV_TREE(LVT))	/* is "tree *" */
+#define	DBG_ASSERT_LVT(LVT)			DBG_ASSERT(IS_LV_TREE(LVT))	/* is "lvTree *" */
 
 #define	DBG_ASSERT_LV_OR_TREENODE(LV_PTR)	DBG_ASSERT(IS_PARENT_MV_SYM(LV_PTR)	/* is "lv_val *" */	\
-							|| IS_LVAVLTREENODE(LV_PTR))	/* is "treeNode *" or "treeNodeFlt *" */
+							|| IS_LVAVLTREENODE(LV_PTR))	/* is "lvTreeNode *" or "lvTreeNodeFlt *" */
 
 #define	LV_IS_BASE_VAR(LV_PTR)			(DBG_ASSERT_LV_OR_TREENODE(LV_PTR)		\
 							IS_PARENT_MV_SYM(LV_PTR))
@@ -76,7 +76,8 @@
 							LV_CHILD(LV_PTR))				\
 
 /* if an lv_ptr's chlidren tree pointer is non-NULL, we should be guaranteed (by lv_kill)
- * that there is at least one child node in that tree (int-array or avl tree). assert that as well.
+ * that there is at least one child node in that subscript tree (currently only an avl tree).
+ * assert that as well.
  */
 #define	LV_HAS_CHILD(LV_PTR)		(DBG_ASSERT_LV_OR_TREENODE(LV_PTR)					\
 						(NULL != LV_CHILD(LV_PTR))					\
@@ -91,8 +92,8 @@
 #define	LV_GET_SYMVAL(BASE_VAR)			(DBG_ASSERT(LV_IS_BASE_VAR(BASE_VAR))		\
 							LV_SYMVAL(BASE_VAR))
 
-/* The below macro relies on the fact that the parent field is at the same offset in an "lv_val" as it is in a "treeNode".
- * This is asserted in "lvTreeCreate" function in tree.c
+/* The below macro relies on the fact that the parent field is at the same offset in an "lv_val" as it is in a "lvTreeNode".
+ * This is asserted in "LV_TREE_CREATE" macro.
  */
 #define	LV_GET_PARENT(LV_PTR)			(DBG_ASSERT_LV_OR_TREENODE(LV_PTR)	\
 							LV_AVLNODE_PARENT(LV_PTR))
@@ -100,22 +101,14 @@
 							LVT_PARENT(LVT))
 
 #define	LV_IS_VAL_DEFINED(LV_PTR)		(DBG_ASSERT_LV_OR_TREENODE(LV_PTR)	\
-							MV_DEFINED(&LV_PTR->v))
+							MV_DEFINED(&((lv_val *)LV_PTR)->v))
 
 #define	LV_SBS_DEPTH(LV_PTR, IS_BASE_VAR, DEPTH)					\
 {											\
-	tree	*lclLVT;								\
-											\
-	assert(IS_OFFSET_AND_SIZE_MATCH(tree, sbs_depth, symval, sbs_depth));		\
+	assert(IS_OFFSET_AND_SIZE_MATCH(lvTree, sbs_depth, symval, sbs_depth));		\
 	assert(!IS_BASE_VAR || (0 == LV_PTR->ptrs.val_ent.parent.sbs_tree->sbs_depth));	\
 	assert(IS_BASE_VAR || (0 < LV_PTR->ptrs.val_ent.parent.sbs_tree->sbs_depth));	\
-	if (IS_BASE_VAR)								\
-		DEPTH = LV_PTR->ptrs.val_ent.parent.sbs_tree->sbs_depth;		\
-	else										\
-	{										\
-		lclLVT = LV_GET_PARENT_TREE(LV_PTR);					\
-		DEPTH = lclLVT->sbs_depth;						\
-	}										\
+	DEPTH = LV_PTR->ptrs.val_ent.parent.sbs_tree->sbs_depth;			\
 }
 
 /* Mark mval held by lv_ptr to be undefined. Also lets stp_gcol and lv_gcol know to NOT protect
@@ -145,7 +138,7 @@
 	(lv_ptr)->ptrs.free_ent.next_free = *savflist_ptr;					\
 	*savflist_ptr = (lv_ptr);								\
 	LV_SYMVAL(lv_ptr) = NULL;								\
-	DBGALS_ONLY((lv_ptr)->stats.lvmon_mark = FALSE);					\
+	DBGALS_ONLY((lv_ptr)->lvmon_mark = FALSE);						\
 }
 
 /* Increment the cycle for tstarts. Field is compared to same name field in lv_val to signify an lv_val has been seen
@@ -190,26 +183,27 @@
 	}														\
 }
 
-/* Initialize given lv_val (should be of type "lv_val *" and not "treeNode *") */
-#define LVVAL_INIT(lv, symvalarg)										\
-{														\
-	assert(MV_SYM == symvalarg->ident); /* ensure above macro is never used to initialize a "treeNode *" */	\
-	(lv)->v.mvtype = 0;											\
-	(lv)->stats.trefcnt = 1;										\
-	(lv)->stats.crefcnt = 0;										\
-	(lv)->stats.tstartcycle = 0;										\
-	(lv)->stats.lvtaskcycle = 0;										\
-	(lv)->has_aliascont = FALSE;										\
-	DBGALS_ONLY(if (lvmon_enabled) (lv)->stats.lvmon_mark = TRUE; else (lv)->stats.lvmon_mark = FALSE);	\
-	(lv)->tp_var = NULL;											\
-	LV_CHILD(lv) = NULL;											\
-	LV_SYMVAL(lv) = symvalarg;										\
+/* Initialize given lv_val (should be of type "lv_val *" and not "lvTreeNode *") */
+#define LVVAL_INIT(lv, symvalarg)											\
+{															\
+	DBGALS_ONLY(GBLREF boolean_t lvmon_enabled;)									\
+	assert(MV_SYM == symvalarg->ident); /* ensure above macro is never used to initialize a "lvTreeNode *" */	\
+	(lv)->v.mvtype = 0;												\
+	(lv)->stats.trefcnt = 1;											\
+	(lv)->stats.crefcnt = 0;											\
+	(lv)->stats.tstartcycle = 0;											\
+	(lv)->stats.lvtaskcycle = 0;											\
+	(lv)->has_aliascont = FALSE;											\
+	DBGALS_ONLY(if (lvmon_enabled) (lv)->lvmon_mark = TRUE; else (lv)->lvmon_mark = FALSE);				\
+	(lv)->tp_var = NULL;												\
+	LV_CHILD(lv) = NULL;												\
+	LV_SYMVAL(lv) = symvalarg;											\
 }
 
 /* Macro to call lv_var_clone and set the cloned status in the tp_var structure.
  * Note that we want the cloned tree to have its base_lv point back to "lv" and not the cloned lv.
  * This is because in case we want to restore the lv, we can then safely move the saved tree
- * back to "lv" without then having to readjust the base_lv linked in the "tree *" structures beneath
+ * back to "lv" without then having to readjust the base_lv linked in the "lvTree *" structures beneath
  */
 #define TP_VAR_CLONE(lv)				\
 {							\
@@ -241,18 +235,18 @@ typedef struct lv_val_struct
 {
 	mval 				v;			/* Value associated with this lv_val */
 	/* Note: The offsets of "ptrs.val_ent.children" and "ptrs.val_ent.parent.sym" are relied upon by
-	* other modules (e.g. tree.h) and asserted in lvTreeCreate (in tree.c) */
+	* other modules (e.g. lv_tree.h) and asserted in LV_TREE_CREATE macro. */
 	union
 	{
 		struct
  		{
-       	       	       	tree		*children;
+       	       	       	lvTree		*children;
 			union
 			{	/* Note these two fields are still available when mvtype == MV_LVCOPIED
 				 * and there is code in "als_check_xnew_var_aliases" that depends on this
 				 */
 				struct symval_struct   	*sym;
-				tree			*sbs_tree;
+				lvTree			*sbs_tree;
 			} parent;
 		} val_ent;
 		struct
@@ -273,7 +267,7 @@ typedef struct lv_val_struct
 		uint4			lvtaskcycle;		/* Cycle of various lv related tasks */
 	} stats;
 	boolean_t			has_aliascont;		/* This base var has or had an alias container in it */
-	boolean_t			lvmon_mark;		/* This lv_val is being monitored */
+	boolean_t			lvmon_mark;		/* This lv_val is being monitored; Used only #ifdef DEBUG_ALIAS */
 	struct tp_var_struct		*tp_var;
 } lv_val;
 
@@ -315,10 +309,10 @@ typedef struct lv_xnewref_struct
 typedef struct symval_struct
 {
        	unsigned short		ident;
-	unsigned short		sbs_depth;  /* is always 0. Defined to match offset & size of tree->sbs_depth.
+	unsigned short		sbs_depth;  /* is always 0. Defined to match offset & size of lvTree->sbs_depth.
 					     * This way callers can avoid an if check depending on whether
-					     * the input pointer is a "symval *" or a "tree *" type.
-					     * This is also asserted in "lvTreeCreate" function in tree.c */
+					     * the input pointer is a "symval *" or a "lvTree *" type.
+					     * This is also asserted in "LV_TREE_CREATE" macro. */
 	boolean_t		tp_save_all;
 	lv_xnew_var		*xnew_var_list;
 	lv_xnew_ref		*xnew_ref_list;
@@ -327,8 +321,8 @@ typedef struct symval_struct
 	lv_blk			*lvtree_first_block;
 	lv_blk			*lvtreenode_first_block;
 	lv_val			*lv_flist;
-	tree			*lvtree_flist;
-	treeNode		*lvtreenode_flist;
+	lvTree			*lvtree_flist;
+	lvTreeNode		*lvtreenode_flist;
 	struct symval_struct	*last_tab;
 	int4			symvlvl;		/* Level of symval struct (nesting) */
 	boolean_t		trigr_symval;		/* Symval is owned by a trigger */
@@ -382,7 +376,7 @@ typedef lvname_info	*lvname_info_ptr;
 	assert(NULL != LVT_GET_PARENT(LVT));				\
 	LVT_PARENT(LVT) = NULL;	/* indicates this is free */		\
 	/* avl_root is overloaded to store linked list in free state */	\
-	LVT->avl_root = (treeNode *)sym->lvtree_flist;			\
+	LVT->avl_root = (lvTreeNode *)sym->lvtree_flist;			\
 	sym->lvtree_flist = LVT;					\
 }
 
@@ -396,13 +390,13 @@ typedef lvname_info	*lvname_info_ptr;
 	sym = LV_GET_SYMVAL(base_lv);							\
 	LV_AVLNODE_PARENT(LV) = NULL;	/* indicates to stp_gcol this is free */	\
 	/* sbs_child is overloaded to store linked list in free state */		\
-	LV->sbs_child = (tree *)sym->lvtreenode_flist;					\
+	(LV)->sbs_child = (lvTree *)sym->lvtreenode_flist;				\
 	sym->lvtreenode_flist = LV;							\
 }
 
 lv_val		*lv_getslot(symval *sym);
-tree		*lvtree_getslot(symval *sym);
-treeNode	*lvtreenode_getslot(symval *sym);
+lvTree		*lvtree_getslot(symval *sym);
+lvTreeNode	*lvtreenode_getslot(symval *sym);
 
 void		lv_newblock(symval *sym, int numElems);
 void		lvtree_newblock(symval *sym, int numElems);
@@ -411,7 +405,7 @@ void		lvtreenode_newblock(symval *sym, int numElems);
 #define NOARG 3				/* used by the FOR slight of hand because the compiler doesn't pass NULL pointers */
 
 lv_val *lv_getslot(symval *sym);
-void lv_killarray(tree *lvt, boolean_t dotpsave);
+void lv_killarray(lvTree *lvt, boolean_t dotpsave);
 void lv_newname(ht_ent_mname *hte, symval *sym);
 void lv_kill(lv_val *lv, boolean_t dotpsave, boolean_t do_subtree);
 void lv_var_clone(lv_val *clone_var, lv_val *base_lv);

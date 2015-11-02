@@ -148,14 +148,16 @@
  */
 
 /* First step, create the structure */
-#define THREADGBLDEF(name, type) type name;
-#define THREADGBLAR1DEF(name, type, dim1) type name[dim1];
-#define THREADGBLAR2DEF(name, type, dim1, dim2) type name[dim1][dim2];
+#define THREADGBLDEF(name, type)		type name;
+#define THREADGBLFPTR(name, type, args)		type (*name)args;
+#define THREADGBLAR1DEF(name, type, dim1)	type name[dim1];
+#define THREADGBLAR2DEF(name, type, dim1, dim2)	type name[dim1][dim2];
 typedef struct
 {
 #include "gtm_threadgbl_defs.h"
 } gtm_threadgbl_def_t;
 #undef THREADGBLDEF
+#undef THREADGBLFPTR
 #undef THREADGBLAR1DEF
 #undef THREADGBLAR2DEF
 
@@ -167,6 +169,16 @@ typedef struct
 #define PRINT_TYPE_OFFSET(name, type)								\
 	printf("# define ggo_%s %d\n", #name, (int)OFFSETOF(gtm_threadgbl_def_t, name));	\
 	printf("# define ggt_%s %s\n", #name, #type);
+
+/* For function pointers, we need the offset and type (which is a return type in this case since the actual type of
+ * the item is "function pointer") but also need the argument declarations for the function declaration to be complete
+ * Lastly, we need a function pointer typedef to make invocations work correctly.
+ */
+#define PRINT_TYPE_OFFSET_FPTR(name, type, args) 						\
+	printf("# define ggo_%s %d\n", #name, (int)OFFSETOF(gtm_threadgbl_def_t, name));	\
+	printf("# define ggt_%s %s\n", #name, #type);	/* In this case, return type */		\
+	printf("# define gga_%s %s\n", #name, #args);						\
+	printf("typedef %s (*ggf_%s)%s;\n", #type, #name, #args);
 
 /* For single dimension arrays, include the length of the entire array as it is likely needed, especially
  * for character types.
@@ -188,10 +200,14 @@ int main()
 	gtm_threadgbl_def_t gtd;
 
 	/* Now run through each var in the structure generating defines for the type and offset within the structure */
-#	define THREADGBLDEF(name, type) PRINT_TYPE_OFFSET(name, type)
-#	define THREADGBLAR1DEF(name, type, dim1) PRINT_TYPE_OFFSET_ARY1(name, type, dim1)
-#	define THREADGBLAR2DEF(name, type, dim1, dim2) PRINT_TYPE_OFFSET_ARY1(name, type, dim1, dim2)
+#	define THREADGBLDEF(name, type)			PRINT_TYPE_OFFSET(name, type)
+#	define THREADGBLFPTR(name, type, args)		PRINT_TYPE_OFFSET_FPTR(name, type, args)
+#	define THREADGBLAR1DEF(name, type, dim1)	PRINT_TYPE_OFFSET_ARY1(name, type, dim1)
+#	define THREADGBLAR2DEF(name, type, dim1, dim2)	PRINT_TYPE_OFFSET_ARY1(name, type, dim1, dim2)
 #	include "gtm_threadgbl_defs.h"
 #	undef THREADGBLDEF
+#	undef THREADGBLFPTR
+#	undef THREADGBLAR1DEF
+#	undef THREADGBLAR2DEF
 	printf("# define size_gtm_threadgbl_struct %d\n", (int)SIZEOF(gtm_threadgbl_def_t));
 }

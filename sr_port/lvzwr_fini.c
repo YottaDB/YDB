@@ -31,6 +31,8 @@ GBLREF symval		*curr_symval;
 GBLREF lvzwrite_datablk	*lvzwrite_block;
 GBLREF zshow_out	*zwr_output;
 
+error_def(ERR_UNDEF);
+
 void lvzwr_fini(zshow_out *out, int t)
 {
 	int4		size;
@@ -38,8 +40,6 @@ void lvzwr_fini(zshow_out *out, int t)
 	mname_entry	temp_key;
 	ht_ent_mname	*tabent;
 	mident_fixed	m;
-
-	error_def(ERR_UNDEF);
 
 	zwr_output = out;
 	assert(lvzwrite_block);
@@ -49,7 +49,7 @@ void lvzwr_fini(zshow_out *out, int t)
 		temp_key.var_name = lvzwrite_block->pat->str;
 		COMPUTE_HASH_MNAME(&temp_key);
 		tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &temp_key);
-		if (!tabent || (!MV_DEFINED(&((lv_val *)tabent->value)->v)) && !LV_HAS_CHILD((lv_val *)tabent->value))
+		if (!tabent || !LV_IS_VAL_DEFINED(tabent->value) && !LV_HAS_CHILD(tabent->value))
 		{
 			lvzwrite_block->subsc_count = 0;
 			rts_error(VARLSTCNT(4) ERR_UNDEF, 2, size, lvzwrite_block->pat->str.addr);

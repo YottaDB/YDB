@@ -37,8 +37,8 @@ unsigned char	*format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size)
 	int		cnt, cntfmt;
 	lv_val		*lv, *base_lv;
 	mval		tempmv;
-	tree		*lvt;
-	treeNode	*node, *nodep[MAX_LVSUBSCRIPTS];
+	lvTree		*lvt;
+	lvTreeNode	*node, *nodep[MAX_LVSUBSCRIPTS];
 	unsigned char	*endbuff;
 
 	if (NULL == lvpin)
@@ -50,11 +50,11 @@ unsigned char	*format_key_lv_val(lv_val *lvpin, unsigned char *buff, int size)
 	while (lv != base_lv)
 	{
 		assert(!LV_IS_BASE_VAR(lv));
-		nodep[cntfmt++] = (treeNode *)lv;
+		nodep[cntfmt++] = (lvTreeNode *)lv;
 		lvt = LV_GET_PARENT_TREE(lv);
 		assert(NULL != lvt);
 		assert(lvt->base_lv == base_lv);
-		lv = (lv_val *)lvt->sbs_parent;
+		lv = (lv_val *)LVT_PARENT(lvt);
 		assert(NULL != lv);
 	}
 	endbuff = format_lvname(base_lv, buff, size);

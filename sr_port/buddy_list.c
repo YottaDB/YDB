@@ -47,10 +47,12 @@ void    initialize_list(buddy_list *list, int4 elemSize, int4 initAlloc)
         list->initAlloc = initAlloc;
         list->cumulMaxElems = initAlloc;
         list->nElems = 0;
+	/* Note: size_t typecast done below to enable 64-bit arithmetic so sizes > 4GB can be allocated */
         list->ptrArray = (char **)malloc((size_t)SIZEOF(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
-							/* +2 = +1 for holding the NULL pointer and +1 for ptrArray[0] */
+						/* +2 = +1 for holding the NULL pointer and +1 for ptrArray[0] */
         memset(list->ptrArray, 0, SIZEOF(char *) * (MAX_MEM_SIZE_IN_BITS + 2));
         list->ptrArrayCurr = list->ptrArray;
+	/* Note: size_t typecast done below to enable 64-bit arithmetic so sizes > 4GB can be allocated */
         list->nextFreePtr = list->ptrArray[0] = (char *)malloc((size_t)initAlloc * elemSize);
 	list->free_que = NULL; /* initialize the list to have no free element queue */
 	DEBUG_ONLY(list->used_free_last_n_elements = FALSE;)
@@ -129,6 +131,7 @@ char    *get_new_element(buddy_list *list, int4 nElements)
 		do
 		{
 			ptrArrayCurr = ++list->ptrArrayCurr;
+			/* Note: size_t typecast done below to enable 64-bit arithmetic so sizes > 4GB can be allocated */
 			if (!(retPtr = *ptrArrayCurr))
 				retPtr = *ptrArrayCurr = (char *)malloc((size_t)cumulMaxElems * elemSize);
 			nElems = cumulMaxElems;

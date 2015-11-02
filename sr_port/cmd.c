@@ -83,7 +83,9 @@ LITDEF nametabent cmd_names[] =
 		,{2, "ZD"}, {8, "ZDEALLOC*"}
 		,{3, "ZED"}, {5, "ZEDIT"}
 		,{2, "ZG"}, {5, "ZGOTO"}
-		,{2, "ZH"}, {5, "ZHELP"}
+		,{2, "ZH"}
+		,{5, "ZHALT"}
+		,{5, "ZHELP"}
 		,{2, "ZK"}, {5, "ZKILL"}
 		,{2, "ZL"}, {5, "ZLINK"}
 		,{2, "ZM"}, {8, "ZMESSAGE"}
@@ -122,7 +124,7 @@ LITDEF unsigned char cmd_index[27] =
 	{
 		0, 0, 2, 4, 6, 8, 10, 12, 15, 17, 19, 21, 23
 		,25, 27, 29, 29, 31, 33, 35, 43, 45, 47, 49
-		,51, 51, GTMTRIG_ONLY(94) NON_GTMTRIG_ONLY(92)
+		,51, 51, GTMTRIG_ONLY(95) NON_GTMTRIG_ONLY(93)
 	};
 LITDEF struct
 	{
@@ -169,7 +171,9 @@ LITDEF struct
 		,{m_zdeallocate, 1, 1, ALL_SYS}, {m_zdeallocate, 1, 1, ALL_SYS}
 		,{m_zedit, 1, 1, ALL_SYS}, {m_zedit, 1, 1, ALL_SYS}
 		,{m_zgoto, 1, 1, ALL_SYS}, {m_zgoto, 1, 1, ALL_SYS}
-		,{m_zhelp, 1, 1, ALL_SYS}, {m_zhelp, 1, 1, ALL_SYS}
+		,{m_zhelp, 1, 1, ALL_SYS}
+		,{m_zhalt, 1, 1, ALL_SYS}
+		,{m_zhelp, 1, 1, ALL_SYS}
 		,{m_zwithdraw, 0, 1, ALL_SYS}, {m_zwithdraw, 0, 1, ALL_SYS}
 		,{m_zlink, 1, 1, ALL_SYS}, {m_zlink, 1, 1, ALL_SYS}
 		,{m_zmessage, 0, 1, ALL_SYS}, {m_zmessage, 0, 1, ALL_SYS}

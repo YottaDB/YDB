@@ -83,7 +83,6 @@ void dse_maps(void)
 	jnl_buffer_ptr_t	jbp;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	cw_set_element		*cse;
 
 	error_def(ERR_DSEBLKRDFAIL);
 	error_def(ERR_DBRDONLY);
@@ -221,7 +220,7 @@ void dse_maps(void)
 			BLK_SEG(bs_ptr, blk_ptr + SIZEOF(blk_hdr), bml_size - SIZEOF(blk_hdr));
 			BLK_FINI(bs_ptr, bs1);
 			t_write(&blkhist, (unsigned char *)bs1, 0, 0, LCL_MAP_LEVL, TRUE, FALSE, GDS_WRITE_KILLTN);
-			BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, cse, csa->ti->curr_tn);
+			BUILD_AIMG_IF_JNL_ENABLED(csd, non_tp_jfb_buff_ptr, csa->ti->curr_tn);
 			t_end(&dummy_hist, NULL, csa->ti->curr_tn);
 		}
 		/* Fill in master map */

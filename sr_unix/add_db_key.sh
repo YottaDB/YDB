@@ -62,14 +62,5 @@ else #Master does not exist; confirm that directory is writable
     if [ ! -w $tmp ] ; then $ECHO "Directory $tmp not writable for master key file $master" ; exit 1 ; fi
 fi
 
-# Some replacements for sh, e.g., dash, do not properly handle Unicode characters in directory paths
-# when used for redirection. So if bash is available, use it.
-if [ -x "/bin/bash" ] ; then
-"/bin/bash" <<HERE
-    $ECHO dat $dbfile >>$master
-    $ECHO key $keyfile >>$master
-HERE
-else
-    $ECHO dat $dbfile >>$master
-    $ECHO key $keyfile >>$master
-fi
+$ECHO dat $dbfile >>$master
+$ECHO key $keyfile >>$master

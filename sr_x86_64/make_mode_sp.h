@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- *      Copyright 2007, 2009 Fidelity Information Services, Inc *
+ *      Copyright 2007, 2011 Fidelity Information Services, Inc *
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -15,10 +15,11 @@
 #define EXTRA_INST_SIZE	0
 
 #define GEN_CALL(func)  { \
-    *((char *)code)++ = 0x48;				       \
-    *((char *)code)++ = I386_INS_MOV_eAX;		       \
+    assert(SIZEOF(*code) == SIZEOF(char));                     \
+    *code++ = 0x48;				               \
+    *code++ = I386_INS_MOV_eAX;		                       \
     *((intptr_t *)code) = (intptr_t)(unsigned char *)func;     \
     code += SIZEOF(intptr_t);				       \
-    *((char *)code)++ = I386_INS_Grp5_Prefix;		       \
-    *((char *)code)++ = 0xd0;				       \
+    *code++ = I386_INS_Grp5_Prefix;		               \
+    *code++ = 0xd0;				               \
 }

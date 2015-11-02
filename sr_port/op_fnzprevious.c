@@ -24,8 +24,8 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 {
 	int		cur_subscr, length;
 	mval		tmp_sbs;
-	treeNode	*node;
-	tree		*lvt;
+	lvTreeNode	*node;
+	lvTree		*lvt;
 	boolean_t	is_canonical, get_last;
 	DCL_THREADGBL_ACCESS;
 
@@ -84,7 +84,7 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 	} else
 	{
 		LV_NODE_GET_KEY(node, dst); /* Get node key into "dst" depending on the structure type of "node" */
-		/* Code outside tree.c does not currently know to make use of MV_CANONICAL bit so reset it
+		/* Code outside lv_tree.c does not currently know to make use of MV_CANONICAL bit so reset it
 		 * until the entire codebase gets fixed to maintain MV_CANONICAL bit accurately at which point,
 		 * this RESET can be removed */
 		TREE_KEY_SUBSCR_RESET_MV_CANONICAL_BIT(dst);

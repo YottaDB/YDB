@@ -42,8 +42,8 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	lv_val			*lv;
 	mval			*key, tmp_sbs;
 	va_list			var;
-	tree			*lvt;
-	treeNode		*parent;
+	lvTree			*lvt;
+	lvTreeNode		*parent;
 	lv_val			*base_lv;
 	VMS_ONLY(int		argcnt;)
 	DCL_THREADGBL_ACCESS;
@@ -104,7 +104,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			if (lvt = LV_GET_CHILD(lv))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
 			else	/* No children exist at this level - create a child */
-				lvt = lvTreeCreate((treeNode *)lv, subs_level, base_lv);
+				LV_TREE_CREATE(lvt, (lvTreeNode *)lv, subs_level, base_lv);
 			lv = (lv_val *)lvAvlTreeLookupStr(lvt, key, &parent);
 		} else
 		{	/* Need to set canonical bit before calling tree search functions.
@@ -125,7 +125,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			if (lvt = LV_GET_CHILD(lv))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
 			else	/* No children exist at this level - create a child */
-				lvt = lvTreeCreate((treeNode *)lv, subs_level, base_lv);
+				LV_TREE_CREATE(lvt, (lvTreeNode *)lv, subs_level, base_lv);
 			if (MVTYPE_IS_INT(tmp_sbs.mvtype))
 				lv = (lv_val *)lvAvlTreeLookupInt(lvt, key, &parent);
 			else
@@ -133,7 +133,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		}
 		if (NULL == lv)
 		{
-			lv = (lv_val *)lvTreeNodeInsert(lvt, key, parent);
+			lv = (lv_val *)lvAvlTreeNodeInsert(lvt, key, parent);
 			lv->v.mvtype = 0;	/* initialize mval to undefined value at this point */
 		}
 	}
@@ -141,7 +141,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	/* This var is about to be set/modified. If it exists and is an alias container var,
 	 * that reference is going to go away. Take care of that possibility now.
 	 */
-	if (MV_DEFINED(&lv->v))
+	if (LV_IS_VAL_DEFINED(lv))
 	{
 		DECR_AC_REF(lv, TRUE);
 		lv->v.mvtype &= ~MV_ALIASCONT;	/* Value being replaced is now no longer a container var */

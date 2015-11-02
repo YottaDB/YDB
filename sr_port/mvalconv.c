@@ -248,10 +248,8 @@ boolean_t isint(mval *v, int4 *intval)
 	 * see the MV_NM bit set, we should also check the MV_NUM_APPROX bit is unset before we go ahead
 	 * and check the numeric part of this mval for whether it is an integer.
 	 */
-	DEBUG_ONLY(
-		is_canonical = MV_IS_CANONICAL(v);
-		assert(!is_canonical || (MVTYPE_IS_NUMERIC(mvtype) && !MVTYPE_IS_NUM_APPROX(mvtype)));
-	)
+	DEBUG_ONLY(is_canonical = MV_IS_CANONICAL(v));
+	assert(!is_canonical || (MVTYPE_IS_NUMERIC(mvtype) && !MVTYPE_IS_NUM_APPROX(mvtype)));
 	if (!MVTYPE_IS_NUMERIC(mvtype) || MVTYPE_IS_NUM_APPROX(mvtype))
 		return FALSE;
 	assert(v->m[1] < MANT_HI);

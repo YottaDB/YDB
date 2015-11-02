@@ -28,6 +28,9 @@ GBLREF	char			window_token;
 GBLREF	mval			**ind_source_sp, **ind_source_top;
 GBLREF	mval			**ind_result_sp, **ind_result_top;
 
+error_def(ERR_INDMAXNEST);
+error_def(ERR_VAREXPECTED);
+
 void	op_indget(mval *dst, mval *target, mval *value)
 {
 	bool		rval;
@@ -37,8 +40,6 @@ void	op_indget(mval *dst, mval *target, mval *value)
 	icode_str	indir_src;
 	var_tabent	targ_key;
 	ht_ent_mname	*tabent;
-	error_def(ERR_INDMAXNEST);
-	error_def(ERR_VAREXPECTED);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -53,7 +54,7 @@ void	op_indget(mval *dst, mval *target, mval *value)
 			targ_key.var_name = target->str;
 			COMPUTE_HASH_MNAME(&targ_key);
 			tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &targ_key);
-			if (!tabent || !MV_DEFINED(&((lv_val *)tabent->value)->v))
+			if (!tabent || !LV_IS_VAL_DEFINED(tabent->value))
 				*dst = *value;
 			else
 				*dst = ((lv_val *)tabent->value)->v;

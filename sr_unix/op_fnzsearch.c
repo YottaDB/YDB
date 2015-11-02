@@ -51,9 +51,9 @@ error_def(ERR_STACKOFLOW);
 
 LITREF mval	literal_null;
 
-STATICFNDEF		CONDITION_HANDLER(fnzsrch_ch);
-STATICFNDEF		CONDITION_HANDLER(dir_ch);
-STATICFNDEF int		pop_top(lv_val *src, mval *res);
+STATICFNDCL		CONDITION_HANDLER(fnzsrch_ch);
+STATICFNDCL		CONDITION_HANDLER(dir_ch);
+STATICFNDCL int		pop_top(lv_val *src, mval *res);
 
 void		dir_srch(parse_blk *pfil);
 
@@ -405,10 +405,8 @@ void dir_srch(parse_blk *pfil)
 STATICFNDEF CONDITION_HANDLER(fnzsrch_ch)
 {
 	int	dummy1, dummy2;
-	DCL_THREADGBL_ACCESS;
 
 	START_CH;
-	SETUP_THREADGBL_ACCESS;
 	TREF(lv_null_subs) = TREF(fnzsearch_nullsubs_sav);
 	NEXTCH;
 }
@@ -416,10 +414,8 @@ STATICFNDEF CONDITION_HANDLER(fnzsrch_ch)
 STATICFNDEF CONDITION_HANDLER(dir_ch)
 {
 	int	dummy1, dummy2;
-	DCL_THREADGBL_ACCESS;
 
 	START_CH;
-	SETUP_THREADGBL_ACCESS;
 	if (DUMP)
 	{
 		NEXTCH;

@@ -95,6 +95,7 @@ ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
 void		sys_get_curr_time(ABS_TIME *atp);
 void		uninit_timers(void);
 void		prealloc_gt_timers(void);
+void		set_blocksig(void);
 void		check_for_timer_pops(void);
 GT_TIMER	*find_timer_intr_safe(TID tid, GT_TIMER **tprev);
 

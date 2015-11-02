@@ -437,7 +437,8 @@ OC_FOLLOW:	movab	val.1,r0
 OC_FORCENUM:	movab	val.0,r0
 		movab	val.1,r1
 		jsb	xfer.xf_forcenum
-OC_FORCHK1:	jsb 	xfer.xf_forchk1
+OC_FORCHK1:	jsb	xfer.xf_restartpc
+		jsb 	xfer.xf_forchk1
 OC_FORINIT:	pushab	val.3
 		pushab	val.2
 		pushab	val.1
@@ -887,6 +888,8 @@ OC_ZGOTO:	pushl	val.1
 		pushab	val.3
 		pushab	val.2
 		jsb	xfer.xf_zgoto
+OC_ZHALT:	pushab	val.1
+		calls	#1,xfer.xf_zhalt
 OC_ZHELP:	pushab	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_zhelp
@@ -905,11 +908,13 @@ OC_ZPRINT:	jsb 	xfer.xf_restartpc
 		pushab	val.2
 		pushab	val.1
 		calls	#5,xfer.xf_zprint
-OC_ZSHOW:	pushl	#0
+OC_ZSHOW:	jsb	xfer.xf_restartpc
+		pushl	#0
 		pushl	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_zshow
-OC_ZSHOWLOC:	pushab	val.3
+OC_ZSHOWLOC:	jsb     xfer.xf_restartpc
+		pushab	val.3
 		pushl	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_zshow

@@ -21,7 +21,7 @@
 #define ZWRITE_LOWER	6
 #define ZWRITE_PATTERN	7
 
-#define ZWR_HTAB_INIT_SIZE  16		/* Initial # elems in ZWR addr hash table */
+#define ZWR_HTAB_INIT_SIZE  12		/* Initial # elems in ZWR addr hash table */
 /* Number of entries in zwr_zav_blk */
 #define ZWR_ZAV_BLK_CNT	    ((GTM64_ONLY(256)NON_GTM64_ONLY(128) - SIZEOF(storElem) - SIZEOF(zwr_zav_blk)) / SIZEOF(zwr_alias_var))
 
@@ -36,22 +36,11 @@ enum zwr_init_types
 };
 
 /* Structures associated with tracking aliases during ZWRite */
-
 typedef struct zwr_alias_var_struct
 {
 	boolean_t	value_printed;
 	GTM64_ONLY(int4	filler;)
-	union
-	{
-		struct
-		{
-			mident				zwr_var;	/* Base var name for this entry */
-		} val_ent;
-		struct
-		{
-			struct zwr_alias_var_struct	*next_free;
-		} free_ent;
-	} ptrs;
+	mident		zwr_var;	/* Base var name for this entry */
 } zwr_alias_var;
 
 typedef struct zwr_zav_blk_struct
@@ -70,6 +59,7 @@ typedef struct zwr_hash_table_struct
 	zwr_alias_var			*zav_flist;
 } zwr_hash_table;
 
+/* Structures used to keep track of the subscript(s) for the current var/value being processed */
 typedef struct zwr_sub_lst_struct
 {
 	struct

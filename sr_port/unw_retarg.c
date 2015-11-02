@@ -42,6 +42,11 @@ GBLREF	mval		*alias_retarg;
 
 LITREF	mval 		literal_null;
 
+error_def(ERR_ALIASEXPECTED);
+error_def(ERR_NOTEXTRINSIC);
+error_def(ERR_STACKUNDERFLO);
+error_def(ERR_TPQUIT);
+
 /* this has to be maintained in parallel with op_unwind(), the unwind without a return argument (intrinsic quit) routine */
 int unw_retarg(mval *src, boolean_t alias_return)
 {
@@ -52,11 +57,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	symval		*symlv, *symlvc;
 	int4		srcsymvlvl;
 
-	error_def(ERR_ALIASEXPECTED);
-	error_def(ERR_NOTEXTRINSIC);
-	error_def(ERR_STACKUNDERFLO);
-	error_def(ERR_TPQUIT);
-
+	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	assert(NULL == alias_retarg);
 	alias_retarg = NULL;
 	DBGEHND_ONLY(prevfp = frame_pointer);
@@ -148,12 +149,14 @@ int unw_retarg(mval *src, boolean_t alias_return)
 		(*unw_prof_frame_ptr)();
 	msp = (unsigned char *)frame_pointer + SIZEOF(stack_frame);
 	frame_pointer = frame_pointer->old_frame_pointer;
-	DBGEHND((stderr, "unw_retarg: Stack frame 0x%016lx unwound - frame 0x%016lx now current\n", prevfp, frame_pointer));
+	DBGEHND((stderr, "unw_retarg: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
+		 prevfp, frame_pointer, msp));
 	if (NULL != zyerr_frame && frame_pointer > zyerr_frame)
 		zyerr_frame = NULL;
 	if (!frame_pointer)
 		rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
 	assert(frame_pointer >= (stack_frame *)msp);
 	trg->mvtype |= MV_RETARG;
+	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	return 0;
 }

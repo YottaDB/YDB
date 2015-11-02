@@ -42,24 +42,23 @@ typedef struct hash_table_objcode_struct
 #define HTENT_EMPTY_OBJCODE(tabent, type, htvalue) (!(htvalue = (type *)(tabent)->value) && !(tabent)->key.str.len)
 #define HTENT_MARK_EMPTY_OBJCODE(tabent)				\
 {									\
-	(tabent)->value = (void *)0L; 					\
+	(tabent)->value = NULL; 					\
 	(tabent)->key.str.len = 0;					\
 }
 #define HTENT_VALID_OBJCODE(tabent, type, htvalue) ((!HTENT_EMPTY_OBJCODE(tabent, type, htvalue)) && (HT_DELETED_ENTRY != htvalue))
-#define COMPUTE_HASH_OBJCODE(hkey, hash) 				\
-{									\
-	char *sptr;							\
-	sptr = (hkey)->str.addr;					\
-	if ((hkey)->str.len < SIZEOF(mident_fixed))			\
-	{								\
-		STR_HASH((sptr), (hkey)->str.len, hash, 0);		\
-	}								\
-	else 								\
-	{								\
-		STR_HASH((sptr), SIZEOF(mident_fixed)/2, hash, 0);		\
-		STR_HASH((sptr) +  (hkey)->str.len - SIZEOF(mident_fixed)/2, 	\
-			SIZEOF(mident_fixed)/2, hash, hash);			\
-	}								\
+#define COMPUTE_HASH_OBJCODE(hkey, hash) 						\
+{											\
+	char *sptr;									\
+	sptr = (hkey)->str.addr;							\
+	if ((hkey)->str.len < SIZEOF(mident_fixed))					\
+	{										\
+		STR_HASH((sptr), (hkey)->str.len, hash, 0);				\
+	} else 										\
+	{										\
+		STR_HASH((sptr), (SIZEOF(mident_fixed) / 2), hash, 0);			\
+		STR_HASH(((sptr) + (hkey)->str.len - (SIZEOF(mident_fixed) / 2)),	\
+			 (SIZEOF(mident_fixed) / 2), hash, hash);			\
+	}										\
 }
 
 /* Prototypes for objcode hash routines. See hashtab_implementation.h for detail interface and implementation */

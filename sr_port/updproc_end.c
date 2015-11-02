@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -108,7 +108,10 @@ void  updproc_stop(boolean_t exit)
 		pool_init = FALSE;
 	}
 	recvpool.upd_proc_local->upd_proc_shutdown = NORMAL_SHUTDOWN;
-	recvpool.upd_proc_local->upd_proc_pid = 0;
+	/* On UNIX, the receiver server needs to do a WAITPID on the update process so that the STOPed update process can be
+	 * reaped by the OS and don't go into the defunct state. So, do not reset the upd_proc_pid
+	 */
+	VMS_ONLY(recvpool.upd_proc_local->upd_proc_pid = 0;)
 #ifdef UNIX
 	SHMDT(recvpool.recvpool_ctl);
 #elif defined(VMS)

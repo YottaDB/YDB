@@ -57,7 +57,6 @@ void dse_chng_rhead(void)
 	rec_hdr		new_rec;
 	uint4		x;
 	blk_segment	*bs1, *bs_ptr;
-	cw_set_element  *cse;
 	int4		blk_seg_cnt, blk_size;
 	srch_blk_status	blkhist;
 
@@ -158,7 +157,7 @@ void dse_chng_rhead(void)
 			return;
 		}
 		t_write(&blkhist, (unsigned char *)bs1, 0, 0, ((blk_hdr_ptr_t)bp)->levl, TRUE, FALSE, GDS_WRITE_KILLTN);
-		BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cse, cs_addrs->ti->curr_tn);
+		BUILD_AIMG_IF_JNL_ENABLED(cs_data, non_tp_jfb_buff_ptr, cs_addrs->ti->curr_tn);
 		t_end(&dummy_hist, NULL, TN_NOT_SPECIFIED);
 	}
 	return;

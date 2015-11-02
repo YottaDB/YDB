@@ -1519,7 +1519,7 @@ static void do_main_loop(boolean_t crash_restart)
 		{
 			if (EREPL_RECV == repl_errno)
 			{
-				if (REPL_CONN_RESET(status) || ETIMEDOUT == status)
+				if (REPL_CONN_RESET(status))
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset. Status = %d ; %s\n",
 							status, STRERROR(status));

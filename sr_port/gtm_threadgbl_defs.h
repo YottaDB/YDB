@@ -46,7 +46,7 @@ THREADGBLDEF(gtm_fullbool,			unsigned int)			/* controls boolean side-effect beh
 THREADGBLDEF(last_source_column,		short int)			/* parser tracker */
 THREADGBLDEF(pos_in_chain,			triple)				/* anchor used to restart after a parsing error */
 THREADGBLDEF(s2n_intlit, 			boolean_t)			/* type info from s2n for advancewindow */
-THREADGBLDEF(shift_side_effects, 		boolean_t)			/* flag shifting of side-effects ahead of boolean
+THREADGBLDEF(shift_side_effects, 		int)				/* flag shifting of side-effects ahead of boolean
 										 * evalation */
 THREADGBLDEF(source_error_found,		int4)				/* ?? */
 THREADGBLDEF(temp_subs,				boolean_t)			/* flag temp storing of subscripts to preserve
@@ -110,6 +110,7 @@ THREADGBLDEF(replgbl,				replgbl_t)			/* set of global variables needed by the s
 THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mapped collation
 										 * algorithms - since this seems only used in
 										 * collseq.c -seems more like a STATICDEF */
+THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		())		/* Fptr for gtm_fatal_error* zshow dmp routine */
 THREADGBLDEF(disable_sigcont,			boolean_t)			/* indicates whether the SIGCONT signal
 										 * is allowed internally */
 THREADGBLDEF(dollar_zcompile,			mstr)				/* compiler qualifiers */
@@ -126,8 +127,10 @@ THREADGBLDEF(fnzsearch_sub_mval,		mval)				/* UNIX op_fnzsearch subscript constu
 THREADGBLDEF(fnzsearch_nullsubs_sav,		int)				/* UNIX op_fnzsearch temp for null subs control */
 #endif
 THREADGBLDEF(gtm_env_init_done,			boolean_t)			/* gtm_env_init flag for completion */
+THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() function pointer */
 THREADGBLDEF(gtmprompt,				mstr)				/* mstr pointing to prombuf containing the GTM
 										 * prompt */
+THREADGBLFPTR(gtm_sigusr1_handler,		void, 		())		/* SIGUSR1 signal handler function ptr */
 THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
 #ifdef UNIX
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
@@ -163,7 +166,7 @@ THREADGBLAR1DEF(parm_ary,                       char *,         MAX_PARMS)      
 THREADGBLAR1DEF(parm_ary_len,                   int,            MAX_PARMS)      /* array element allocation length */
 THREADGBLAR1DEF(parm_str_len,                   int,            MAX_PARMS)      /* parameter strings lengths */
 #endif
-THREADGBLAR1DEF(prombuf,			char,	MAX_MIDENT_LEN)		/* The prompt buffer size (31) below would allow at
+THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size (32) would allow at
 										 * least 8 Unicode characters, but since most
 										 * commonly used Unicode characters only occupy up
 										 * to 3 bytes, the buffer would at least
@@ -176,4 +179,4 @@ THREADGBLDEF(ci_table, 				callin_entry_list *)		/* Callin table in the form of 
 THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* current nested depth of callin environments */
 #endif
 THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
-
+THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)		/* External call table package list */

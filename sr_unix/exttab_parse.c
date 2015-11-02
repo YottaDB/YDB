@@ -74,6 +74,43 @@ const int parm_space_needed[] =
 	SIZEOF(xc_pointertofunc_t *) + SIZEOF(xc_pointertofunc_t)
 };
 
+error_def(ERR_CIDIRECTIVE);
+error_def(ERR_CIENTNAME);
+error_def(ERR_CIMAXPARAM);
+error_def(ERR_CIPARTYPE);
+error_def(ERR_CIRCALLNAME);
+error_def(ERR_CIRPARMNAME);
+error_def(ERR_CIRTNTYP);
+error_def(ERR_CITABENV);
+error_def(ERR_CITABOPN);
+error_def(ERR_CIUNTYPE);
+error_def(ERR_COLON);
+error_def(ERR_EXTSRCLIN);
+error_def(ERR_EXTSRCLOC);
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_TEXT);
+error_def(ERR_SYSCALL);
+error_def(ERR_ZCALLTABLE);
+error_def(ERR_ZCCOLON);
+error_def(ERR_ZCCLNUPRTNMISNG);
+error_def(ERR_ZCCSQRBR);
+error_def(ERR_ZCCTENV);
+error_def(ERR_ZCCTNULLF);
+error_def(ERR_ZCCTOPN);
+error_def(ERR_ZCENTNAME);
+error_def(ERR_ZCINVALIDKEYWORD);
+error_def(ERR_ZCMLTSTATUS);
+error_def(ERR_ZCPREALLNUMEX);
+error_def(ERR_ZCPREALLVALINV);
+error_def(ERR_ZCPREALLVALPAR);
+error_def(ERR_ZCRCALLNAME);
+error_def(ERR_ZCRPARMNAME);
+error_def(ERR_ZCRTENOTF);
+error_def(ERR_ZCRTNTYP);
+error_def(ERR_ZCUNAVAIL);
+error_def(ERR_ZCUNTYPE);
+error_def(ERR_ZCUSRRTN);
+
 /* manage local get_memory'ed space (the space is never returned) */
 static void	*get_memory(size_t n)
 {
@@ -119,7 +156,7 @@ static char	*scan_ident(char *c)
 	char	*b;
 
 	b = c;
-	for (  ; ISALNUM_ASCII(*b)  ||  ('_' == *b); b++, ext_source_column++)
+	for ( ; ISALNUM_ASCII(*b) || ('_' == *b); b++, ext_source_column++)
 		;
 	return (b == c) ? 0 : b;
 }
@@ -197,13 +234,13 @@ static enum xc_types	scan_keyword(char **c)
 	if (!d)
 		return xc_notfound;
 	len = (int)(d - b);
-	for (i = 0 ;  i < SIZEOF(xctab) / SIZEOF(xctab[0]) ;  i++)
+	for (i = 0 ; i < SIZEOF(xctab) / SIZEOF(xctab[0]) ; i++)
 	{
 		if ((0 == memcmp(xctab[i].nam, b, len)) && ('\0' ==  xctab[i].nam[len]))
 		{
 			/* got name */
 			/* scan stars */
-			for (star_count = 0;(MAXIMUM_STARS >= star_count);star_count++, d++)
+			for (star_count = 0; (MAXIMUM_STARS >= star_count); star_count++, d++)
 			{
 				d = scan_space(d);
 				if ('*' != *d)
@@ -224,8 +261,6 @@ static 	int scan_array_bound(char **b,int curr_type)
 	char		*c;
 	char 		*line;
 	int 		index;
-	error_def	(ERR_ZCCSQRBR);
-	error_def	(ERR_ZCPREALLNUMEX);
 
 	const static int default_pre_alloc_value[] =
 	{
@@ -253,7 +288,7 @@ static 	int scan_array_bound(char **b,int curr_type)
 
 	c = *b;
 	/* already found '[' */
-	for (index=0, c++; ']' != *c;c++)
+	for (index=0, c++; ']' != *c; c++)
 	{
 		if ('\0' != *c)
 		{
@@ -291,7 +326,7 @@ static char	*read_table(char *b, int l, FILE *f)
 	} else
 	{
 		/* unfortunately, fgets does not strip the NL, we will do it for it */
-		for (ext_source_line_len = 0; *t ;  t++)
+		for (ext_source_line_len = 0; *t ; t++)
 		{
 			ext_source_line[ext_source_line_len++] = *t;
 			if (CR == *t)
@@ -331,7 +366,7 @@ static uint4	array_to_mask(boolean_t ar[MAXIMUM_PARAMETERS], int n)
 	uint4	mask = 0;
 	int	i;
 
-	for (i = n - 1;0 <= i;i--)
+	for (i = n - 1; 0 <= i; i--)
 	{
 		assert((ar[i] & ~1) == 0);
 		mask = (mask << 1) | ar[i];
@@ -339,32 +374,13 @@ static uint4	array_to_mask(boolean_t ar[MAXIMUM_PARAMETERS], int n)
 	return mask;
 }
 
-error_def(ERR_LOGTOOLONG);
-error_def(ERR_TEXT);
-error_def(ERR_ZCALLTABLE);
-error_def(ERR_ZCCOLON);
-error_def(ERR_ZCCTENV);
-error_def(ERR_ZCCTNULLF);
-error_def(ERR_ZCCTOPN);
-error_def(ERR_ZCENTNAME);
-error_def(ERR_ZCMLTSTATUS);
-error_def(ERR_ZCPREALLVALINV);
-error_def(ERR_ZCPREALLVALPAR);
-error_def(ERR_ZCRCALLNAME);
-error_def(ERR_ZCRPARMNAME);
-error_def(ERR_ZCRTENOTF);
-error_def(ERR_ZCRTNTYP);
-error_def(ERR_ZCUNAVAIL);
-error_def(ERR_ZCUNTYPE);
-error_def(ERR_ZCUSRRTN);
-
 /* Note: need condition handler to clean-up allocated structures and close intput file in the event of an error */
 struct extcall_package_list	*exttab_parse(mval *package)
 {
 	int		parameter_alloc_values[MAXIMUM_PARAMETERS], parameter_count, ret_pre_alloc_val, i, fclose_res;
-	int		path_len;
+	int		path_len, len, keywordlen;
 	boolean_t	is_input[MAXIMUM_PARAMETERS], is_output[MAXIMUM_PARAMETERS], got_status;
-	mstr		callnam, rtnnam;
+	mstr		callnam, rtnnam, clnuprtn;
 	mstr 		val, trans;
 	void_ptr_t	pakhandle;
 	enum xc_types	ret_tok, parameter_types[MAXIMUM_PARAMETERS], pr;
@@ -407,6 +423,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		rts_error(VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
 	}
 	path_len = STRLEN(str_buffer);
+	/* STRNCPY_STR(str_temp_buffer, str_buffer, path_len); */
 	STRNCPY_STR(str_temp_buffer, str_buffer);
 	str_temp_buffer[path_len] = 0;
 	val.addr = str_temp_buffer;
@@ -433,6 +450,8 @@ struct extcall_package_list	*exttab_parse(mval *package)
 	pak->first_entry = 0;
 	put_mstr(&package->str, &pak->package_name);
 	pak->package_handle = pakhandle;
+	pak->package_clnup_rtn = NULL;
+	len = STRLEN("GTMSHLIBEXIT");
 	/* At this point, we have a valid package, pointed to by pak */
 #ifdef DEBUG_EXTCALL
 	FPRINTF(stderr, "GT.M external call opened package name: %s\n", pak->package_name.addr);
@@ -447,10 +466,35 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		/* empty line? */
 		if (!*tbp)
 			continue;
-		/* No, must be entryref */
+		/* No, must be entryref or keyword */
 		end = scan_ident(tbp);
 		if (!end)
 			ext_stx_error(ERR_ZCENTNAME, ext_table_file_name);
+		keywordlen = end - tbp;
+		end = scan_space(end);
+		if ('=' == *end)
+		{	/* Keyword before '=' has a string of size == STRLEN("GTMSHLIBEXIT") */
+			if (keywordlen == len)
+			{
+				if (0 == MEMCMP_LIT(tbp, "GTMSHLIBEXIT"))
+				{
+					/* Skip past the '=' char */
+					tbp = scan_space(end + 1);
+					if (*tbp)
+					{	/* We have a cleanup routine name */
+						clnuprtn.addr = tbp;
+						clnuprtn.len = scan_ident(tbp) - tbp;
+						clnuprtn.addr[clnuprtn.len] = 0;
+						pak->package_clnup_rtn =
+						  (clnupfptr)fgn_getrtn(pak->package_handle, &clnuprtn, ERROR);
+					} else
+						ext_stx_error(ERR_ZCCLNUPRTNMISNG, ext_table_file_name);
+					continue;
+				}
+			}
+			ext_stx_error(ERR_ZCINVALIDKEYWORD, ext_table_file_name);
+			continue;
+		}
 		if ('^' == *end)
 		{
 			end++;
@@ -576,7 +620,7 @@ struct extcall_package_list	*exttab_parse(mval *package)
 		entry_ptr->parms = get_memory(parameter_count * SIZEOF(entry_ptr->parms[0]));
 		entry_ptr->param_pre_alloc_size = get_memory(parameter_count * SIZEOF(intszofptr_t));
 		entry_ptr->parmblk_size = (SIZEOF(void *) * parameter_count) + SIZEOF(intszofptr_t);
-		for (i = 0 ;  i < parameter_count ;  i++)
+		for (i = 0 ; i < parameter_count; i++)
 		{
 			entry_ptr->parms[i] = parameter_types[i];
 			entry_ptr->parmblk_size += parm_space_needed[parameter_types[i]];
@@ -610,19 +654,6 @@ callin_entry_list*	citab_parse (void)
 	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr, *save_entry_ptr = 0;
-
-	error_def(ERR_CITABENV);
-	error_def(ERR_CITABOPN);
-	error_def(ERR_CIENTNAME);
-	error_def(ERR_COLON);
-	error_def(ERR_CIRTNTYP);
-	error_def(ERR_CIRCALLNAME);
-	error_def(ERR_CIDIRECTIVE);
-	error_def(ERR_CIRPARMNAME);
-	error_def(ERR_CIPARTYPE);
-	error_def(ERR_CIUNTYPE);
-	error_def(ERR_SYSCALL);
-	error_def(ERR_CIMAXPARAM);
 
 	ext_table_file_name = GETENV(CALLIN_ENV_NAME);
 	if (!ext_table_file_name) /* environment variable not set */
@@ -719,7 +750,7 @@ callin_entry_list*	citab_parse (void)
 		entry_ptr->input_mask = inp_mask;
 		entry_ptr->output_mask = out_mask;
 		entry_ptr->parms = get_memory(parameter_count * SIZEOF(entry_ptr->parms[0]));
-		for (i = 0 ;  i < parameter_count ;  i++)
+		for (i = 0 ; i < parameter_count; i++)
 			entry_ptr->parms[i] = parameter_types[i];
 		put_mstr(&labref, &entry_ptr->label_ref);
 		put_mstr(&callnam, &entry_ptr->call_name);
@@ -734,8 +765,6 @@ static void ext_stx_error(int in_error, ...)
 	char	*ext_table_name;
 	char	buf[MAX_SRC_LINE], *b;
 	int	num_tabs, num_spaces;
-	error_def(ERR_EXTSRCLIN);
-	error_def(ERR_EXTSRCLOC);
 
 	va_start(args, in_error);
 	ext_table_name = va_arg(args, char *);

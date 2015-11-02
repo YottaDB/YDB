@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,6 +46,7 @@ void op_unwind(void)
 	error_def(ERR_STACKUNDERFLO);
 	error_def(ERR_TPQUIT);
 
+	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	if (frame_pointer->type & SFT_COUNT)
 	{	/* If unwinding a counted frame, make sure we don't have an alias return argument in flight */
 		assert(NULL == alias_retarg);
@@ -95,7 +96,8 @@ void op_unwind(void)
 			  frame_pointer, frame_pointer->type));
 #	endif
 	frame_pointer = frame_pointer->old_frame_pointer;
-	DBGEHND((stderr, "op_unwind: Stack frame 0x%016lx unwound - frame 0x%016lx now current\n", prevfp, frame_pointer));
+	DBGEHND((stderr, "op_unwind: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
+		 prevfp, frame_pointer, msp));
 	if (NULL != zyerr_frame && frame_pointer > zyerr_frame)
 		zyerr_frame = NULL;
 	if (frame_pointer)
@@ -103,6 +105,7 @@ void op_unwind(void)
 		if (frame_pointer < (stack_frame *)msp || frame_pointer > (stack_frame *)stackbase
 		    || frame_pointer < (stack_frame *)stacktop)
 			rts_error(VARLSTCNT(1) ERR_STACKUNDERFLO);
+		assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	}
 	return;
 }
